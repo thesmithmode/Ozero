@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Placeholder theme — full Material3 theme applied in E1+ UI sprint -->
+    <style name="Theme.Ozero" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>
