@@ -1,0 +1,17 @@
+plugins {
+    id("ozero.android.library")
+}
+
+android {
+    namespace = "ru.ozero.commondns"
+}
+
+dependencies {
+    implementation(project(":core-api"))
+    implementation(libs.bundles.coroutines)
+    implementation(libs.okhttp.core)
+
+    testImplementation(libs.bundles.junit5)
+    testRuntimeOnly(libs.junit.jupiter.engine)
+    testImplementation(libs.bundles.testing.unit)
+}
