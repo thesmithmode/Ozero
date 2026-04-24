@@ -24,3 +24,21 @@ plugins {
 jacoco {
     toolVersion = "0.8.12"
 }
+
+// Hilt 2.56.2 + AGP 8.5.2: принудительно javapoet 1.13.0, иначе
+// java.lang.NoSuchMethodError: com.squareup.javapoet.ClassName.canonicalName()
+buildscript {
+    configurations.classpath {
+        resolutionStrategy {
+            force("com.squareup:javapoet:1.13.0")
+        }
+    }
+}
+
+allprojects {
+    configurations.all {
+        resolutionStrategy {
+            force("com.squareup:javapoet:1.13.0")
+        }
+    }
+}

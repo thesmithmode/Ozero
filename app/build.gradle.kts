@@ -23,9 +23,26 @@ android {
     // externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt"); version = "3.22.1" } }
 
     dynamicFeatures += setOf(":dynamic_tor")
+
+    packaging {
+        resources {
+            excludes +=
+                setOf(
+                    "META-INF/versions/9/OSGI-INF/MANIFEST.MF",
+                    "META-INF/LICENSE*",
+                    "META-INF/NOTICE*",
+                    "META-INF/DEPENDENCIES",
+                    "META-INF/AL2.0",
+                    "META-INF/LGPL2.1",
+                )
+        }
+    }
 }
 
 dependencies {
+    // AndroidX
+    implementation(libs.core.ktx)
+
     // Compose BOM
     implementation(platform(libs.compose.bom))
     implementation(libs.bundles.compose)
@@ -44,6 +61,8 @@ dependencies {
     implementation(project(":core-orchestrator"))
     implementation(project(":core-subscriptions"))
     implementation(project(":core-storage"))
+    implementation(project(":common-vpn"))
+    implementation(project(":engine-byedpi"))
     implementation(project(":security"))
 
     // Testing
