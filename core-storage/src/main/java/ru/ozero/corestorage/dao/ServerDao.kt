@@ -1,0 +1,29 @@
+package ru.ozero.corestorage.dao
+
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import kotlinx.coroutines.flow.Flow
+import ru.ozero.corestorage.entity.ServerEntity
+
+@Dao
+interface ServerDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(server: ServerEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(servers: List<ServerEntity>)
+
+    @Query("SELECT * FROM servers ORDER BY priority DESC")
+    fun observeAll(): Flow<List<ServerEntity>>
+
+    @Query("SELECT * FROM servers WHERE isAlive = 1 ORDER BY priority DESC")
+    suspend fun getLiveServers(): List<ServerEntity>
+
+    @Query("DELETE FROM servers WHERE id = :id")
+    suspend fun deleteById(id: String)
+
+    @Query("DELETE FROM servers")
+    suspend fun deleteAll()
+}

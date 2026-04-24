@@ -7,6 +7,10 @@ android {
     namespace = "ru.ozero.corestorage"
 }
 
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     implementation(project(":core-api"))
     implementation(libs.bundles.room)

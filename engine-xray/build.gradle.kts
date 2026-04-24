@@ -17,6 +17,7 @@ dependencies {
     implementation(project(":core-api"))
     implementation(project(":common-vpn"))
     implementation(project(":common-crypto"))
+    implementation(project(":core-subscriptions"))
     implementation(libs.bundles.coroutines)
 
     testImplementation(libs.bundles.junit5)
