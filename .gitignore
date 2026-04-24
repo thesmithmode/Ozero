@@ -1,5 +1,7 @@
 # Исходные/личные материалы
 Исходники/
+Контекст/
+.scratch/
 
 # AI-агенты и IDE (локальные, не для репо)
 .claude/
@@ -19,11 +21,12 @@ QWEN.md
 Index.md
 docs/superpowers/
 
-# IntelliJ IDEA
+# IntelliJ IDEA / Android Studio
 .idea/
 *.iws
 *.iml
 *.ipr
+captures/
 
 # VS Code
 .vscode/
@@ -31,13 +34,51 @@ docs/superpowers/
 # Mac OS
 .DS_Store
 
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/**/build/
+gradle-app.setting
+!gradle-wrapper.properties
+
+# Android
+local.properties
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+.cxx/
+.externalNativeBuild/
+bin/
+gen/
+out/
+release/
+proguard/
+app/release/
+**/app/release/
+**/*/release/
+**/*/debug/
+**/*/build/
+*.hprof
+
+# NDK
+obj/
+jni/obj/
+**/jni/obj/
+
+# Keystore (НИКОГДА НЕ КОММИТИТЬ RELEASE)
+*.jks
+*.keystore
+!debug.keystore
+
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-build/
 develop-eggs/
 dist/
 downloads/
@@ -67,3 +108,10 @@ env/
 
 # SQLite
 *.db
+
+# Temp / OS / Editor
+*.swp
+*.swo
+*~
+*.log
+Thumbs.db

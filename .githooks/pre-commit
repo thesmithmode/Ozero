@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -e
+
+# Pre-commit hook for Ozero project
+# Checks:
+# 1. ktlint formatting on staged Kotlin files
+# 2. Detekt code analysis
+# 3. gitleaks secret detection (optional)
+
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$PROJECT_ROOT"
+
+echo "Running pre-commit checks..."
+echo ""
+
+# 1. ktlint check
+echo "[1/2] Running ktlint check..."
+if ! ./gradlew ktlintCheck --daemon 2>&1 | head -100; then
+    echo ""
+    echo "ktlint check failed. Fix formatting issues and try again:"
+    echo "  ./gradlew ktlintFormat  # to auto-fix"
+    echo ""
+    exit 1
+fi
+
+# 2. detekt check
+echo "[2/2] Running detekt analysis..."
+if ! ./gradlew detekt --daemon 2>&1 | head -100; then
+    echo ""
+    echo "detekt found issues. Review the report above."
+    echo ""
+    exit 1
+fi
+
+# 3. gitleaks check (optional — fail gracefully if not installed)
+if command -v gitleaks &> /dev/null; then
+    echo "[3/3] Running gitleaks secret detection..."
+    if ! gitleaks detect --staged --verbose --redact 2>&1 | head -50; then
+        echo ""
+        echo "gitleaks detected potential secrets. Review and remove before committing."
+        echo ""
+        exit 1
+    fi
+else
+    echo "[3/3] gitleaks not installed — skipping secret detection (install with: brew install gitleaks)"
+fi
+
+echo ""
+echo "All pre-commit checks passed!"
+exit 0

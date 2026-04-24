@@ -1,0 +1,125 @@
+[versions]
+# Core
+kotlin = "2.0.20"
+agp = "8.5.2"
+ksp = "2.0.20-1.0.25"
+
+# Compose
+composeBom = "2024.09.01"
+activityCompose = "1.9.2"
+
+# DI
+hilt = "2.52"
+
+# Persistence
+room = "2.6.1"
+
+# Async
+coroutines = "1.9.0"
+
+# Network
+okhttp = "5.0.0-alpha.14"
+ktor = "3.0.0"
+
+# Crypto
+bouncycastle = "1.79"
+
+# Testing
+junitJupiter = "5.11.0"
+mockk = "1.13.12"
+espresso = "3.6.1"
+composeTest = "1.7.2"
+testExtJunit = "1.2.1"
+
+# Quality
+detekt = "1.23.7"
+ktlint = "12.1.1"
+jacoco = "0.8.12"
+
+[libraries]
+# Kotlin
+kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
+
+# Compose BOM
+compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
+compose-ui = { module = "androidx.compose.ui:ui" }
+compose-ui-graphics = { module = "androidx.compose.ui:ui-graphics" }
+compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
+compose-material3 = { module = "androidx.compose.material3:material3" }
+compose-runtime = { module = "androidx.compose.runtime:runtime" }
+activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
+
+# Hilt
+hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
+hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
+
+# Room
+room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
+room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
+room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
+
+# Coroutines
+coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
+
+# OkHttp
+okhttp-core = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
+okhttp-logging = { module = "com.squareup.okhttp3:logging-interceptor", version.ref = "okhttp" }
+
+# Ktor
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-android = { module = "io.ktor:ktor-client-android", version.ref = "ktor" }
+ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
+ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-serialization-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+
+# BouncyCastle
+bouncycastle-prov = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
+bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bouncycastle" }
+
+# Testing — JUnit 5
+junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junitJupiter" }
+junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junitJupiter" }
+junit-jupiter-params = { module = "org.junit.jupiter:junit-jupiter-params", version.ref = "junitJupiter" }
+
+# Testing — MockK
+mockk-core = { module = "io.mockk:mockk", version.ref = "mockk" }
+mockk-android = { module = "io.mockk:mockk-android", version.ref = "mockk" }
+
+# Testing — Coroutines
+coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+
+# Testing — Espresso
+espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "espresso" }
+test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "testExtJunit" }
+
+# Testing — Compose
+compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4", version.ref = "composeTest" }
+compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest", version.ref = "composeTest" }
+
+# Hilt Testing
+hilt-android-testing = { module = "com.google.dagger:hilt-android-testing", version.ref = "hilt" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+android-dynamic-feature = { id = "com.android.dynamic-feature", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
+detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
+
+[bundles]
+compose = ["compose-ui", "compose-ui-graphics", "compose-ui-tooling-preview", "compose-material3", "compose-runtime", "activity-compose"]
+ktor = ["ktor-client-core", "ktor-client-android", "ktor-client-okhttp", "ktor-client-content-negotiation", "ktor-serialization-json"]
+room = ["room-runtime", "room-ktx"]
+coroutines = ["coroutines-core", "coroutines-android"]
+okhttp = ["okhttp-core", "okhttp-logging"]
+bouncycastle = ["bouncycastle-prov", "bouncycastle-pkix"]
+junit5 = ["junit-jupiter-api", "junit-jupiter-params"]
+testing-unit = ["mockk-core", "coroutines-test"]
+testing-android = ["espresso-core", "test-ext-junit", "mockk-android"]
