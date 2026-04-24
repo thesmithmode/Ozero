@@ -22,7 +22,7 @@ android {
     // ndkVersion = "27.2.12479018"
     // externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt"); version = "3.22.1" } }
 
-    dynamicFeatures += setOf(":dynamic-tor")
+    dynamicFeatures += setOf(":dynamic_tor")
 }
 
 dependencies {
