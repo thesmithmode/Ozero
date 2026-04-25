@@ -47,8 +47,9 @@ class XrayCandidateSource(
     private suspend fun toCandidate(entity: ServerEntity, port: Int): Candidate? =
         when (val parsed = parser.parse(entity.uri)) {
             is ParsedServer.Vless -> {
-                if (entity.role == "entry" && entity.pairId != null) {
-                    chainCandidate(parsed.server, entity.pairId, port)
+                val pairId = entity.pairId
+                if (entity.role == "entry" && pairId != null) {
+                    chainCandidate(parsed.server, pairId, port)
                 } else {
                     vlessCandidate(parsed.server, port)
                 }
@@ -69,6 +70,7 @@ class XrayCandidateSource(
                 Log.w(TAG, "пропуск URI: ${parsed.reason}")
                 null
             }
+            is ParsedServer.AmneziaWg, is ParsedServer.Naive -> null
         }
 
     private suspend fun chainCandidate(
