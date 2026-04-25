@@ -39,11 +39,9 @@ data class TorBridge(
     }
 
     private companion object {
-        private val UNSAFE = Regex("[\\r\\n\\t\\u0000 ]")
-
         fun requireSafe(value: String, field: String) {
             require(value.isNotEmpty()) { "$field пустой" }
-            require(!UNSAFE.containsMatchIn(value)) {
+            require(value.none { it.isWhitespace() || it.code == 0 }) {
                 val hex = value.toByteArray().joinToString("") { "%02x".format(it) }
                 "$field содержит управляющий символ или пробел: $hex"
             }
