@@ -18,6 +18,13 @@ class SubscriptionFilter {
             is ParsedServer.Hysteria2 -> true
             is ParsedServer.Trojan -> true
             is ParsedServer.Shadowsocks -> false
+            // AmneziaWG 2.0 — только если задан хоть один параметр обфускации,
+            // иначе это голый WG, который ТСПУ режет на handshake.
+            is ParsedServer.AmneziaWg -> parsed.server.hasObfuscation()
             is ParsedServer.Error -> false
         }
+
+    private fun ru.ozero.coresubscriptions.uri.AmneziaWgServer.hasObfuscation(): Boolean =
+        jc > 0 || jmin > 0 || jmax > 0 || s1 > 0 || s2 > 0 ||
+            h1 != 0L || h2 != 0L || h3 != 0L || h4 != 0L
 }

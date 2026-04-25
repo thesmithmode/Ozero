@@ -5,6 +5,7 @@ sealed class ParsedServer {
     data class Hysteria2(val server: Hysteria2Server) : ParsedServer()
     data class Trojan(val server: TrojanServer) : ParsedServer()
     data class Shadowsocks(val server: ShadowsocksServer) : ParsedServer()
+    data class AmneziaWg(val server: AmneziaWgServer) : ParsedServer()
     data class Error(val reason: String) : ParsedServer()
 }
 
@@ -13,6 +14,7 @@ class SubscriptionUriParser(
     private val hysteria2: Hysteria2UriParser = Hysteria2UriParser(),
     private val trojan: TrojanUriParser = TrojanUriParser(),
     private val shadowsocks: ShadowsocksUriParser = ShadowsocksUriParser(),
+    private val amneziaWg: AmneziaWgUriParser = AmneziaWgUriParser(),
 ) {
 
     fun parse(uri: String): ParsedServer =
@@ -21,6 +23,7 @@ class SubscriptionUriParser(
             uri.startsWith("hysteria2://") || uri.startsWith("hy2://") -> toHy2(hysteria2.parse(uri))
             uri.startsWith("trojan://") -> toTrojan(trojan.parse(uri))
             uri.startsWith("ss://") -> toSs(shadowsocks.parse(uri))
+            uri.startsWith("awg://") -> toAwg(amneziaWg.parse(uri))
             else -> ParsedServer.Error("неизвестный scheme")
         }
 
@@ -45,6 +48,12 @@ class SubscriptionUriParser(
     private fun toSs(r: UriParseResult<ShadowsocksServer>): ParsedServer =
         when (r) {
             is UriParseResult.Ok -> ParsedServer.Shadowsocks(r.server)
+            is UriParseResult.Error -> ParsedServer.Error(r.reason)
+        }
+
+    private fun toAwg(r: UriParseResult<AmneziaWgServer>): ParsedServer =
+        when (r) {
+            is UriParseResult.Ok -> ParsedServer.AmneziaWg(r.server)
             is UriParseResult.Error -> ParsedServer.Error(r.reason)
         }
 }
