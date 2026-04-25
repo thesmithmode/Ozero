@@ -51,7 +51,9 @@ class AntiEmulatorCheck(
         if (f.product.contains("sdk_gphone") || f.product.equals("google_sdk")) {
             reasons += "product=${f.product}"
         }
-        if (f.hardware.contains("goldfish") || f.hardware.contains("ranchu") ||
+        if (
+            f.hardware.contains("goldfish") ||
+            f.hardware.contains("ranchu") ||
             f.hardware.contains("vbox86")
         ) {
             reasons += "hardware=${f.hardware}"
