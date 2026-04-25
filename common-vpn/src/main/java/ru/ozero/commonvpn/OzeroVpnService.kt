@@ -58,13 +58,20 @@ class OzeroVpnService : android.net.VpnService() {
         stopSelf()
     }
 
-    internal fun buildTunBuilder(): Builder = Builder()
-        .addAddress(TUN_ADDRESS, TUN_PREFIX_LENGTH)
-        .addRoute("0.0.0.0", 0)
-        .addDnsServer(TUN_DNS)
-        .setMtu(TUN_MTU)
-        .setSession(SESSION_NAME)
-        .setBlocking(true)
+    internal fun buildTunBuilder(
+        splitConfig: ru.ozero.commonvpn.split.SplitTunnelConfig =
+            ru.ozero.commonvpn.split.SplitTunnelConfig(),
+    ): Builder {
+        val builder = Builder()
+            .addAddress(TUN_ADDRESS, TUN_PREFIX_LENGTH)
+            .addDnsServer(TUN_DNS)
+            .setMtu(TUN_MTU)
+            .setSession(SESSION_NAME)
+            .setBlocking(true)
+        ru.ozero.commonvpn.split.TunBuilderConfigurator(packageName)
+            .apply(builder, splitConfig)
+        return builder
+    }
 
     private fun buildNotification(): Notification {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
