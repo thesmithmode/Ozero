@@ -10,8 +10,11 @@ class AntiFridaCheckTest {
 
     private fun check(maps: String?) = AntiFridaCheck(reader = { maps })
 
-    @Test fun emptyMapsReturnsFalse() = assertFalse(check("").isHookFrameworkPresent())
-    @Test fun nullMapsReturnsFalse() = assertFalse(check(null).isHookFrameworkPresent())
+    @Test
+    fun emptyMapsReturnsFalse() = assertFalse(check("").isHookFrameworkPresent())
+
+    @Test
+    fun nullMapsReturnsFalse() = assertFalse(check(null).isHookFrameworkPresent())
 
     @Test
     fun cleanMapsReturnsFalse() {
