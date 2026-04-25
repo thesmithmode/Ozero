@@ -227,6 +227,64 @@ class XrayConfigBuilderTest {
         assertEquals(expected, builder.build(s, 1080))
     }
 
+    // ---- E8: double-hop chain -----------------------------------------
+
+    @Test
+    fun chainHasTwoOutboundsWithCorrectTags() {
+        val entry = sampleVless().copy(host = "ru-entry.example.com", port = 443)
+        val exit = sampleVless().copy(host = "nl-exit.example.com", port = 8443, uuid = "exit-uuid")
+        val cfg = builder.buildChain(entry, exit, socksPort = 10808)
+        assertTrue(cfg.contains(""""tag":"proxy""""))
+        assertTrue(cfg.contains(""""tag":"exit-proxy""""))
+        // entry содержит proxySettings.tag = exit-proxy
+        assertTrue(cfg.contains(""""proxySettings":{"tag":"exit-proxy"}"""), cfg)
+    }
+
+    @Test
+    fun chainEntryReferencesExitTag() {
+        val entry = sampleVless().copy(host = "ru1.com")
+        val exit = sampleVless().copy(host = "nl1.com", uuid = "EXIT")
+        val cfg = builder.buildChain(entry, exit, 10808)
+        // entry должен идти раньше exit-proxy
+        val iEntry = cfg.indexOf(""""tag":"proxy"""")
+        val iExit = cfg.indexOf(""""tag":"exit-proxy"""")
+        assertTrue(iEntry > 0 && iExit > iEntry, cfg)
+    }
+
+    @Test
+    fun chainExitOutboundCarriesExitParams() {
+        val entry = sampleVless().copy(host = "ru.com", uuid = "ENTRY")
+        val exit = sampleVless().copy(host = "nl.com", uuid = "EXIT", publicKey = "EXITPK")
+        val cfg = builder.buildChain(entry, exit, 10808)
+        assertTrue(cfg.contains(""""id":"EXIT""""))
+        assertTrue(cfg.contains(""""publicKey":"EXITPK""""))
+    }
+
+    @Test
+    fun chainRejectsSameServer() {
+        val s = sampleVless()
+        val ex = runCatching { builder.buildChain(s, s, 10808) }.exceptionOrNull()
+        assertTrue(ex is IllegalArgumentException)
+    }
+
+    @Test
+    fun chainRejectsBlankHosts() {
+        val s = sampleVless()
+        val ex1 = runCatching { builder.buildChain(s.copy(host = ""), s.copy(host = "x"), 10808) }.exceptionOrNull()
+        val ex2 = runCatching { builder.buildChain(s.copy(host = "x"), s.copy(host = ""), 10808) }.exceptionOrNull()
+        assertTrue(ex1 is IllegalArgumentException)
+        assertTrue(ex2 is IllegalArgumentException)
+    }
+
+    @Test
+    fun chainRejectsInvalidPort() {
+        val s = sampleVless()
+        val ex = runCatching {
+            builder.buildChain(s.copy(host = "a"), s.copy(host = "b"), 0)
+        }.exceptionOrNull()
+        assertTrue(ex is IllegalArgumentException)
+    }
+
     private fun sampleVless() = VlessServer(
         uuid = "uuid",
         host = "example.com",

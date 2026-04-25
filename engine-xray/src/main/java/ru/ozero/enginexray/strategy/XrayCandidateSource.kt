@@ -43,9 +43,15 @@ class XrayCandidateSource(
         return out
     }
 
-    private fun toCandidate(entity: ServerEntity, port: Int): Candidate? =
+    private suspend fun toCandidate(entity: ServerEntity, port: Int): Candidate? =
         when (val parsed = parser.parse(entity.uri)) {
-            is ParsedServer.Vless -> vlessCandidate(parsed.server, port)
+            is ParsedServer.Vless -> {
+                if (entity.role == "entry" && entity.pairId != null) {
+                    chainCandidate(parsed.server, entity.pairId, port)
+                } else {
+                    vlessCandidate(parsed.server, port)
+                }
+            }
             is ParsedServer.Hysteria2 -> {
                 val json = runCatching { builder.build(parsed.server, port) }.getOrNull() ?: return null
                 Candidate(EngineId.XRAY, EngineConfig.Xray(json, port), Candidate.PRIORITY_XRAY_HYSTERIA2)
@@ -63,6 +69,38 @@ class XrayCandidateSource(
                 null
             }
         }
+
+    private suspend fun chainCandidate(
+        entry: VlessServer,
+        exitPairId: String,
+        port: Int,
+    ): Candidate? {
+        val transport = entry.transport.lowercase()
+        if (transport !in TRANSPORT_SAFE_2026 || entry.security.lowercase() != "reality") {
+            Log.w(TAG, "пропуск double-hop entry — небезопасный transport/security")
+            return null
+        }
+        val exitEntity = serverDao.findById(exitPairId) ?: run {
+            Log.w(TAG, "пропуск double-hop — exit (pairId=$exitPairId) не найден в БД")
+            return null
+        }
+        val exitParsed = parser.parse(exitEntity.uri)
+        if (exitParsed !is ParsedServer.Vless) {
+            Log.w(TAG, "double-hop exit не VLESS: ${exitEntity.protocol}")
+            return null
+        }
+        val exitTransport = exitParsed.server.transport.lowercase()
+        if (exitTransport !in TRANSPORT_SAFE_2026 || exitParsed.server.security.lowercase() != "reality") {
+            Log.w(TAG, "double-hop exit имеет небезопасный transport/security")
+            return null
+        }
+        val json = runCatching { builder.buildChain(entry, exitParsed.server, port) }.getOrNull() ?: return null
+        return Candidate(
+            engineId = EngineId.XRAY,
+            config = EngineConfig.Xray(json, port),
+            priority = Candidate.PRIORITY_XRAY_VLESS_REALITY,
+        )
+    }
 
     private fun vlessCandidate(server: VlessServer, port: Int): Candidate? {
         val transport = server.transport.lowercase()

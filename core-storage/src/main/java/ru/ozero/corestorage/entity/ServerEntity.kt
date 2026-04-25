@@ -13,5 +13,11 @@ data class ServerEntity(
     val port: Int,
     val priority: Int = 10,
     val isAlive: Boolean = true,
-    val lastCheckedAt: Long = 0L
+    val lastCheckedAt: Long = 0L,
+    /**
+     * E8 double-hop: id парного [ServerEntity] (entry↔exit). Если задан и role="entry",
+     * Orchestrator собирает chain через XrayConfigBuilder.buildChain(entry, exit).
+     * Для role="single" остаётся null.
+     */
+    val pairId: String? = null
 )

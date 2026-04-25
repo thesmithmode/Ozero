@@ -21,6 +21,9 @@ interface ServerDao {
     @Query("SELECT * FROM servers WHERE isAlive = 1 ORDER BY priority DESC")
     suspend fun getLiveServers(): List<ServerEntity>
 
+    @Query("SELECT * FROM servers WHERE id = :id LIMIT 1")
+    suspend fun findById(id: String): ServerEntity?
+
     @Query("DELETE FROM servers WHERE id = :id")
     suspend fun deleteById(id: String)
 
