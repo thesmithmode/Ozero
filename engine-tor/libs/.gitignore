@@ -1,0 +1,9 @@
+*.aar
+*.jar
+*.so
+tor
+obfs4proxy
+snowflake-client
+conjure-client
+!.gitkeep
+!.gitignore
