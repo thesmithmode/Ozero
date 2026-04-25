@@ -48,7 +48,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' }}
 
       - name: Run ktlint, detekt, lint, build, and tests
-        run: ./gradlew ktlintCheck detekt lint assembleDebug testDebugUnitTest jacocoTestReport jacocoTestCoverageVerification --stacktrace
+        run: ./gradlew ktlintCheck detekt lint assembleDebug testDebugUnitTest jacocoTestReport jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Upload debug APK
         if: always()
@@ -114,7 +114,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' }}
 
       - name: Build for ${{ matrix.abi }}
-        run: ./gradlew assembleDebug -PabiFilter=${{ matrix.abi }} --stacktrace
+        run: ./gradlew assembleDebug -PabiFilter=${{ matrix.abi }} --stacktrace --continue
 
   xray-builder-image:
     name: Xray Builder Scripts (verify)
