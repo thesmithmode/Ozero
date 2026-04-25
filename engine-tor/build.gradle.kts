@@ -21,6 +21,9 @@ dependencies {
     implementation(project(":common-vpn"))
     implementation(libs.bundles.coroutines)
 
+    // PlayCore SplitInstall — on-demand доставка :dynamic_tor (~200 МБ tor+iptproxy)
+    implementation(libs.play.feature.delivery)
+
     testImplementation(libs.bundles.junit5)
     testRuntimeOnly(libs.junit.jupiter.engine)
     testImplementation(libs.bundles.testing.unit)
