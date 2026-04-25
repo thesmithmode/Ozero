@@ -57,6 +57,7 @@ class Hy2ConfigBuilder {
         val pwd = server.obfsPassword
         if (pwd.isNullOrBlank()) return null
         val type = server.obfs?.takeIf { it.isNotBlank() } ?: "salamander"
+        require(type in SUPPORTED_OBFS) { "неизвестный obfs type: $type (поддерживается ${SUPPORTED_OBFS.joinToString()})" }
         return linkedMapOf<String, Any?>(
             "type" to type,
             type to linkedMapOf<String, Any?>("password" to pwd),
@@ -74,5 +75,6 @@ class Hy2ConfigBuilder {
     private companion object {
         const val MIN_PORT = 1
         const val MAX_PORT = 65535
+        val SUPPORTED_OBFS = setOf("salamander")
     }
 }

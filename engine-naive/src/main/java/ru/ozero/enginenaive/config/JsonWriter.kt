@@ -1,7 +1,7 @@
 package ru.ozero.enginenaive.config
 
 /** Мини JSON-сериализатор без зависимостей. Дублирует engine-xray/engine-hysteria2 для изоляции. */
-internal object JsonWriter {
+object JsonWriter {
 
     fun write(value: Any?): String {
         val sb = StringBuilder()

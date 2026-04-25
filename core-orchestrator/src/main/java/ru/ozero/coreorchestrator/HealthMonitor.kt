@@ -22,37 +22,53 @@ class HealthMonitor(
     private val _status = MutableStateFlow(HealthStatus.Healthy)
     val status: StateFlow<HealthStatus> = _status.asStateFlow()
 
+    private val lock = Any()
+
+    @Volatile
     private var job: Job? = null
     private var consecutiveFails = 0
 
     fun start() {
-        Log.i(TAG, "start interval=${probeIntervalMs}ms threshold=$failThreshold")
-        job = scope.launch {
-            while (true) {
-                delay(probeIntervalMs)
-                val result = engine.probe()
-                if (result is ProbeResult.Failure) {
-                    consecutiveFails++
-                    Log.w(TAG, "probe failed $consecutiveFails/$failThreshold: ${result.reason}")
-                    if (consecutiveFails >= failThreshold) {
-                        Log.e(TAG, "порог достигнут → Degraded")
-                        _status.value = HealthStatus.Degraded
+        synchronized(lock) {
+            if (job?.isActive == true) {
+                Log.w(TAG, "start ignored — already running")
+                return
+            }
+            Log.i(TAG, "start interval=${probeIntervalMs}ms threshold=$failThreshold")
+            consecutiveFails = 0
+            job = scope.launch {
+                while (true) {
+                    delay(probeIntervalMs)
+                    val result = engine.probe()
+                    if (result is ProbeResult.Failure) {
+                        val fails = synchronized(lock) { ++consecutiveFails }
+                        Log.w(TAG, "probe failed $fails/$failThreshold: ${result.reason}")
+                        if (fails >= failThreshold) {
+                            Log.e(TAG, "порог достигнут → Degraded")
+                            _status.value = HealthStatus.Degraded
+                        }
+                    } else {
+                        val prevFails = synchronized(lock) {
+                            val prev = consecutiveFails
+                            consecutiveFails = 0
+                            prev
+                        }
+                        if (prevFails > 0) Log.i(TAG, "recovered после $prevFails фейлов")
+                        _status.value = HealthStatus.Healthy
                     }
-                } else {
-                    if (consecutiveFails > 0) Log.i(TAG, "recovered после $consecutiveFails фейлов")
-                    consecutiveFails = 0
-                    _status.value = HealthStatus.Healthy
                 }
             }
         }
     }
 
     fun stop() {
-        Log.i(TAG, "stop")
-        job?.cancel()
-        job = null
-        consecutiveFails = 0
-        _status.value = HealthStatus.Healthy
+        synchronized(lock) {
+            Log.i(TAG, "stop")
+            job?.cancel()
+            job = null
+            consecutiveFails = 0
+            _status.value = HealthStatus.Healthy
+        }
     }
 
     private companion object {

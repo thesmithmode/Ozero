@@ -54,17 +54,18 @@ class DohResolver(
     }
 
     companion object {
-        const val CLOUDFLARE_ENDPOINT = "https://1.1.1.1/dns-query"
-        const val QUAD9_ENDPOINT = "https://9.9.9.9/dns-query"
+        // Hostname-варианты эндпоинтов: TLS SNI отправляется корректно, сертификат валидируется
+        // против hostname (а не IP). IP-варианты `https://1.1.1.1/dns-query` обрывают SNI на части
+        // OkHttp/conscrypt билдов и могут пропустить подмену сертификата.
+        const val CLOUDFLARE_ENDPOINT = "https://cloudflare-dns.com/dns-query"
+        const val QUAD9_ENDPOINT = "https://dns.quad9.net/dns-query"
         private const val TAG = "DohResolver"
 
         // Cloudflare/Quad9 pin текущих корневых сертификатов (SPKI SHA-256 pins).
         // Обновлять при ротации CA. Источник: https://cloudflare.com/ssl/, https://quad9.net/service/service-addresses-and-features
         fun defaultPinner(): CertificatePinner = CertificatePinner.Builder()
-            .add("1.1.1.1", "sha256/v3zZBT4LfPWyUJGyl0NCMCsKnaVj2UZfKUwRk4G3DuA=")
-            .add("1.0.0.1", "sha256/v3zZBT4LfPWyUJGyl0NCMCsKnaVj2UZfKUwRk4G3DuA=")
-            .add("9.9.9.9", "sha256/i7WTqTvh0OioIruIfFR4kMPnBqrS2rdiVPl/s2uC/CY=")
-            .add("149.112.112.112", "sha256/i7WTqTvh0OioIruIfFR4kMPnBqrS2rdiVPl/s2uC/CY=")
+            .add("cloudflare-dns.com", "sha256/v3zZBT4LfPWyUJGyl0NCMCsKnaVj2UZfKUwRk4G3DuA=")
+            .add("dns.quad9.net", "sha256/i7WTqTvh0OioIruIfFR4kMPnBqrS2rdiVPl/s2uC/CY=")
             .build()
     }
 }

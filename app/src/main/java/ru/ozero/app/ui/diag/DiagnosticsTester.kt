@@ -3,7 +3,10 @@ package ru.ozero.app.ui.diag
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -25,7 +28,10 @@ class DiagnosticsTester(
     private val socksHost: String = "127.0.0.1",
     private val socksPort: Int,
     private val timeoutSec: Long = 10,
+    private val concurrency: Int = DEFAULT_CONCURRENCY,
 ) {
+    private val semaphore = Semaphore(concurrency)
+
     private val client by lazy {
         OkHttpClient.Builder()
             .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(socksHost, socksPort)))
@@ -35,11 +41,9 @@ class DiagnosticsTester(
     }
 
     suspend fun runAll(urls: List<String> = DiagnosticTargets.URLS): List<DiagResult> = coroutineScope {
-        urls.chunked(5).flatMap { batch ->
-            batch.map { url ->
-                async(Dispatchers.IO) { test(url) }
-            }.map { it.await() }
-        }
+        urls.map { url ->
+            async(Dispatchers.IO) { semaphore.withPermit { test(url) } }
+        }.awaitAll()
     }
 
     private suspend fun test(url: String): DiagResult = withContext(Dispatchers.IO) {
@@ -59,5 +63,6 @@ class DiagnosticsTester(
 
     private companion object {
         const val TAG = "DiagnosticsTester"
+        const val DEFAULT_CONCURRENCY = 5
     }
 }

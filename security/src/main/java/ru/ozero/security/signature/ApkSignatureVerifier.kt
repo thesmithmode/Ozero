@@ -36,11 +36,10 @@ class ApkSignatureVerifier(
                     PackageManager.GET_SIGNING_CERTIFICATES,
                 )
                 val sigInfo = info.signingInfo ?: return null
-                if (sigInfo.hasMultipleSigners()) {
-                    sigInfo.apkContentsSigners.map { it.toByteArray() }
-                } else {
-                    sigInfo.signingCertificateHistory.map { it.toByteArray() }
-                }
+                // Используем ТЕКУЩИЕ подписи (apkContentsSigners) для обеих веток.
+                // signingCertificateHistory пропустит ротированные (потенциально
+                // скомпрометированные) ключи как валидные — это противоречит anti-repackaging.
+                sigInfo.apkContentsSigners.map { it.toByteArray() }
             } else {
                 @Suppress("DEPRECATION")
                 val info = pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNATURES)

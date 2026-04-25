@@ -3,6 +3,11 @@ package ru.ozero.commoncrypto
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
 import org.bouncycastle.crypto.signers.Ed25519Signer
 
+/**
+ * Ed25519 verifier для подписей подписок и self-update APK.
+ * Сам [Ed25519Signer.verifySignature] работает за константное время (BC реализация),
+ * ранние возвраты по длине параметров — публичная информация, не утечка.
+ */
 object SubscriptionVerifier {
     fun verify(message: ByteArray, signature: ByteArray, publicKey: ByteArray): Boolean {
         if (signature.size != 64 || publicKey.size != 32) return false
@@ -12,7 +17,10 @@ object SubscriptionVerifier {
             signer.init(false, params)
             signer.update(message, 0, message.size)
             signer.verifySignature(signature)
-        } catch (_: Exception) {
+        } catch (e: IllegalArgumentException) {
+            // Невалидная точка на кривой / некорректные параметры BC.
+            false
+        } catch (e: org.bouncycastle.crypto.DataLengthException) {
             false
         }
     }

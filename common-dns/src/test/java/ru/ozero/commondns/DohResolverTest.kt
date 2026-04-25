@@ -64,8 +64,8 @@ class DohResolverTest {
 
     @Test
     fun resolverDefaultsUseCloudflare() {
-        assertEquals("https://1.1.1.1/dns-query", DohResolver.CLOUDFLARE_ENDPOINT)
-        assertEquals("https://9.9.9.9/dns-query", DohResolver.QUAD9_ENDPOINT)
+        assertEquals("https://cloudflare-dns.com/dns-query", DohResolver.CLOUDFLARE_ENDPOINT)
+        assertEquals("https://dns.quad9.net/dns-query", DohResolver.QUAD9_ENDPOINT)
     }
 
     @Test

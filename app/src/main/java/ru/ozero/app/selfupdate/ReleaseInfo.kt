@@ -14,20 +14,24 @@ data class ReleaseInfo(
     val publishedAt: String? = null,
 ) {
     /** Парсит "vX.Y.Z[-rcN]" → Triple(major, minor, patch). */
-    fun semver(): Triple<Int, Int, Int>? {
-        val cleaned = tag.removePrefix("v").substringBefore('-')
-        val parts = cleaned.split('.').mapNotNull { it.toIntOrNull() }
-        if (parts.size < 3) return null
-        return Triple(parts[0], parts[1], parts[2])
-    }
+    fun semver(): Triple<Int, Int, Int>? = parseSemver(tag)
 
     fun isNewerThan(currentTag: String): Boolean {
         val a = semver() ?: return false
-        val b = ReleaseInfo(tag = currentTag, apkUrl = "", sigUrl = "").semver() ?: return true
+        val b = parseSemver(currentTag) ?: return false
         return when {
             a.first != b.first -> a.first > b.first
             a.second != b.second -> a.second > b.second
             else -> a.third > b.third
+        }
+    }
+
+    companion object {
+        fun parseSemver(tag: String): Triple<Int, Int, Int>? {
+            val cleaned = tag.removePrefix("v").substringBefore('-')
+            val parts = cleaned.split('.').mapNotNull { it.toIntOrNull() }
+            if (parts.size < 3) return null
+            return Triple(parts[0], parts[1], parts[2])
         }
     }
 }
