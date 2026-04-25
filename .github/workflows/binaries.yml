@@ -14,6 +14,7 @@ on:
           - naive
           - amneziawg
           - hysteria2
+          - tor
   push:
     branches:
       - 'feat/**'
@@ -26,6 +27,7 @@ on:
       - 'build-tools/build_naive.sh'
       - 'build-tools/build_amneziawg.sh'
       - 'build-tools/build_hysteria2.sh'
+      - 'build-tools/build_tor.sh'
       - 'build-tools/regen_lock.py'
 
 jobs:
@@ -65,6 +67,9 @@ jobs:
               ;;
             hysteria2)
               FILES="build-tools/Dockerfile build-tools/build_hysteria2.sh build-tools/regen_lock.py"
+              ;;
+            tor)
+              FILES="build-tools/build_tor.sh build-tools/regen_lock.py"
               ;;
             *)
               echo "Unknown artifact: $ARTIFACT" >&2
@@ -160,6 +165,17 @@ jobs:
             -e ANDROID_TARGETS="android/arm64,android/arm,android/386,android/amd64" \
             ozero-xray \
             bash build-tools/build_hysteria2.sh
+
+      # ---------------------------------------------------------------------
+      # tor build (download tor-android + IPtProxy AAR из Maven Central,
+      # extract jni/<abi>/*.so, 4 ABI)
+      # ---------------------------------------------------------------------
+      - name: Build tor + IPtProxy (extract from Maven Central AAR)
+        if: env.ARTIFACT == 'tor'
+        run: |
+          REPO_ROOT="$PWD" \
+          OUT_DIR="$PWD/out/tor" \
+          bash build-tools/build_tor.sh
 
       # ---------------------------------------------------------------------
       # naive build (распаковка libnaive.so из upstream APK plugin, 4 ABI)
@@ -262,6 +278,27 @@ jobs:
           files: |
             out/hysteria2/libhysteria2.aar
             out/hysteria2/manifest.txt
+          fail_on_unmatched_files: true
+
+      - name: Upload tor assets
+        if: env.ARTIFACT == 'tor'
+        uses: softprops/action-gh-release@v2
+        env:
+          GH_TAG: ${{ steps.tag.outputs.tag }}
+        with:
+          tag_name: ${{ env.GH_TAG }}
+          name: Native binaries ${{ env.GH_TAG }}
+          body: |
+            Auto-built native binaries.
+
+            Engine: tor (tor + IPtProxy bundled, два logical engine один tag)
+            Source: tor-android Maven Central + IPtProxy Maven Central
+            Commit: ${{ github.sha }}
+          files: |
+            out/tor/libtor-*.so
+            out/tor/libiptproxy-*.so
+            out/tor/manifest-tor.txt
+            out/tor/manifest-iptproxy.txt
           fail_on_unmatched_files: true
 
   # Lock-файл обновляется вручную через build-tools/regen_lock.py — workflow

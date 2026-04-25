@@ -51,6 +51,14 @@ ENGINE_CONFIGS = {
         "filename_re": re.compile(r"^libhysteria2\.aar$"),
         "destination": "libs",
     },
+    "tor": {
+        "filename_re": re.compile(r"^libtor-(?P<abi>[a-z0-9_-]+)\.so$"),
+        "destination": "jniLibs",
+    },
+    "iptproxy": {
+        "filename_re": re.compile(r"^libiptproxy-(?P<abi>[a-z0-9_-]+)\.so$"),
+        "destination": "jniLibs",
+    },
 }
 
 
