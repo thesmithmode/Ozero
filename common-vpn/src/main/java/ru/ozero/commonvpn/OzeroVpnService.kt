@@ -8,21 +8,27 @@ import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_START
 import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_STOP
-import ru.ozero.coreapi.Engine
-import ru.ozero.coreapi.EngineId
-import ru.ozero.coreorchestrator.Orchestrator
+import ru.ozero.commonvpn.pipeline.VpnEnginePipeline
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class OzeroVpnService : android.net.VpnService() {
 
-    // Граф собран в RT.2 — реальное использование engines/orchestrator в startVpn
-    // придёт в RT.3 (VpnService→Engine pipeline). Сейчас инъекция доказывает что
-    // multi-binding из EngineModule достаёт все 6 движков.
-    @Inject lateinit var engines: Map<EngineId, @JvmSuppressWildcards Engine>
-    @Inject lateinit var orchestrator: Orchestrator
+    @Inject lateinit var pipeline: VpnEnginePipeline
+
+    /**
+     * Service-scoped coroutine для async операций pipeline (probe + engine.start
+     * могут занять секунды). SupervisorJob — failure одного launch не валит scope.
+     * Отменяется в onDestroy чтобы pipeline.start не выполнился после stop сервиса.
+     */
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     companion object {
         const val ACTION_START = "ru.ozero.vpn.ACTION_START"
@@ -52,13 +58,36 @@ class OzeroVpnService : android.net.VpnService() {
 
     private fun startVpn() {
         Log.i(TAG, "startVpn")
+        // Foreground запускаем СРАЗУ — Android 8+ имеет 5-секундный deadline,
+        // pipeline.start (probe + engine.start) может превысить его.
         startForeground(NOTIFICATION_ID, buildNotification())
-        tunFd = buildTunBuilder().establish()
-        Log.i(TAG, "TUN established fd=${tunFd?.fd}")
+        val fd = buildTunBuilder().establish()
+        if (fd == null) {
+            Log.e(TAG, "TUN не установлен — VpnService.prepare не выдан?")
+            stopVpn()
+            return
+        }
+        tunFd = fd
+        Log.i(TAG, "TUN established fd=${fd.fd}")
+        serviceScope.launch {
+            val result = runCatching { pipeline.start(tunFd = fd.fd) }
+                .onFailure { Log.e(TAG, "pipeline.start threw", it) }
+                .getOrNull()
+            if (result !is VpnEnginePipeline.Result.Connected) {
+                Log.w(TAG, "pipeline не подключился: $result, останавливаем")
+                stopVpn()
+            }
+        }
     }
 
     private fun stopVpn() {
         Log.i(TAG, "stopVpn")
+        // pipeline.stop ДО закрытия tunFd — hev-tunnel должен корректно
+        // освободить FD прежде чем PFD.close() → kernel освободит /dev/tun.
+        serviceScope.launch {
+            runCatching { pipeline.stop() }
+                .onFailure { Log.w(TAG, "pipeline.stop threw", it) }
+        }
         tunFd?.close()
         tunFd = null
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -110,6 +139,7 @@ class OzeroVpnService : android.net.VpnService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        serviceScope.cancel()
         tunFd?.close()
         tunFd = null
     }
