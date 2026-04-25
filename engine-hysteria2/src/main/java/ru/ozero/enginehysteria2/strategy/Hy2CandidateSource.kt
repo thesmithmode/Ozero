@@ -50,11 +50,9 @@ class Hy2CandidateSource(
         if (parsed !is ParsedServer.Hysteria2) return null
         val server: Hysteria2Server = parsed.server
 
-        val portRange = if (server.portRangeStart != null && server.portRangeEnd != null) {
-            server.portRangeStart..server.portRangeEnd
-        } else {
-            null
-        }
+        val rangeStart = server.portRangeStart
+        val rangeEnd = server.portRangeEnd
+        val portRange = if (rangeStart != null && rangeEnd != null) rangeStart..rangeEnd else null
         val opts = Hy2BuildOptions(
             socksPort = port,
             portRange = portRange,

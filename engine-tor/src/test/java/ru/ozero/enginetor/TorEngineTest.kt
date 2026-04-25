@@ -17,6 +17,7 @@ import ru.ozero.enginetor.config.TorBuildOptions
 import ru.ozero.enginetor.dynamicmod.DynamicTorInstaller
 import ru.ozero.enginetor.dynamicmod.InstallResult
 import java.net.ServerSocket
+import kotlin.concurrent.thread
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
@@ -113,6 +114,7 @@ class TorEngineTest {
     @Test
     fun probeSuccessWhenBootstrappedAndSocketListens() = runTest {
         val server = ServerSocket(0)
+        server.acceptSocks5InBackground()
         try {
             val port = server.localPort
             every { delegate.startTor(any()) } returns 0
@@ -122,6 +124,18 @@ class TorEngineTest {
             assertIs<ProbeResult.Success>(e.probe())
         } finally {
             server.close()
+        }
+    }
+
+    private fun ServerSocket.acceptSocks5InBackground() {
+        thread(isDaemon = true) {
+            runCatching {
+                accept().use { c ->
+                    c.getInputStream().read(ByteArray(8))
+                    c.getOutputStream().write(byteArrayOf(0x05, 0x00))
+                    c.getOutputStream().flush()
+                }
+            }
         }
     }
 

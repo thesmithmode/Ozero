@@ -33,8 +33,10 @@ class NaiveCandidateSource(
             val parsed = parser.parse(entity.uri)
             if (parsed !is ParsedServer.Naive) continue
             val port = basePort + portOffset
-            val json = runCatching { builder.build(parsed.server, port) }.getOrElse {
-                Log.w(TAG, "пропуск Naive — ошибка сборки: ${it.message}")
+            val jsonResult = runCatching { builder.build(parsed.server, port) }
+            val json = jsonResult.getOrNull()
+            if (json == null) {
+                Log.w(TAG, "пропуск Naive — ошибка сборки: ${jsonResult.exceptionOrNull()?.message}")
                 continue
             }
             out += Candidate(

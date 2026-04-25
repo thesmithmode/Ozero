@@ -93,7 +93,9 @@ class TunBuilderConfiguratorTest {
     @Test
     fun gracefullyIgnoresPackageNotFound() {
         val b = mockBuilder()
-        every { b.addAllowedApplication("missing.pkg") } throws android.content.pm.PackageManager.NameNotFoundException()
+        every {
+            b.addAllowedApplication("missing.pkg")
+        } throws android.content.pm.PackageManager.NameNotFoundException()
         every { b.addAllowedApplication("ok.pkg") } returns b
         configurator.apply(
             b,

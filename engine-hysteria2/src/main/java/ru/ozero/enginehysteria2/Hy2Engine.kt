@@ -13,8 +13,7 @@ import ru.ozero.coreapi.EngineId
 import ru.ozero.coreapi.EngineStats
 import ru.ozero.coreapi.ProbeResult
 import ru.ozero.coreapi.StartResult
-import java.net.InetSocketAddress
-import java.net.Socket
+import ru.ozero.coreorchestrator.probe.Socks5HandshakeProbe
 
 /**
  * Native Hysteria2 engine. UDP/QUIC + port-hopping + Salamander obfs.
@@ -78,17 +77,13 @@ class Hy2Engine(
             Log.w(TAG, "probe: движок не запущен")
             return ProbeResult.Failure(reason = "движок не запущен")
         }
-        return withContext(Dispatchers.IO) {
-            try {
-                val start = System.currentTimeMillis()
-                Socket().use { it.connect(InetSocketAddress("127.0.0.1", port), 3_000) }
-                val latency = System.currentTimeMillis() - start
-                Log.d(TAG, "probe OK latency=${latency}ms")
-                ProbeResult.Success(latencyMs = latency)
-            } catch (e: Exception) {
-                Log.w(TAG, "probe failed: ${e.message}")
-                ProbeResult.Failure(reason = e.message ?: "connection refused")
-            }
+        return try {
+            val latency = Socks5HandshakeProbe.probe("127.0.0.1", port, timeoutMs = 3_000)
+            Log.d(TAG, "probe OK latency=${latency}ms")
+            ProbeResult.Success(latencyMs = latency)
+        } catch (e: Exception) {
+            Log.w(TAG, "probe failed: ${e.message}")
+            ProbeResult.Failure(reason = e.message ?: "connection refused")
         }
     }
 

@@ -12,6 +12,7 @@ import ru.ozero.coreapi.EngineId
 import ru.ozero.coreapi.ProbeResult
 import ru.ozero.coreapi.StartResult
 import java.net.ServerSocket
+import kotlin.concurrent.thread
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
@@ -85,12 +86,25 @@ class NaiveEngineTest {
     @Test
     fun probeSuccessWhenSocketListens() = runTest {
         val server = ServerSocket(0)
+        server.acceptSocks5InBackground()
         try {
             every { delegate.startNaive(any()) } returns 0
             engine.start(EngineConfig.Naive(proxyUrl = "https://u:p@h:443", socksPort = server.localPort))
             assertIs<ProbeResult.Success>(engine.probe())
         } finally {
             server.close()
+        }
+    }
+
+    private fun ServerSocket.acceptSocks5InBackground() {
+        thread(isDaemon = true) {
+            runCatching {
+                accept().use { c ->
+                    c.getInputStream().read(ByteArray(8))
+                    c.getOutputStream().write(byteArrayOf(0x05, 0x00))
+                    c.getOutputStream().flush()
+                }
+            }
         }
     }
 
