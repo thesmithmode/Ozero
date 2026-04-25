@@ -80,14 +80,14 @@ git clone --depth 1 --branch "v${OBFS4_VERSION}" \
 
 log "Building obfs4proxy for android-${ABIS}..."
 case "${ABIS}" in
-    arm64-v8a) GOARCH=arm64 ;;
-    armeabi-v7a) GOARCH=arm GOARM=7 ;;
-    x86_64) GOARCH=amd64 ;;
+    arm64-v8a) GOARCH=arm64; GOARM= ;;
+    armeabi-v7a) GOARCH=arm; GOARM=7 ;;
+    x86_64) GOARCH=amd64; GOARM= ;;
     *) die "неизвестный ABI: ${ABIS}" ;;
 esac
 (
     cd "${OBFS4_DIR}/obfs4proxy"
-    GOOS=android GOARCH="${GOARCH}" CGO_ENABLED=0 \
+    GOOS=android GOARCH="${GOARCH}" GOARM="${GOARM}" CGO_ENABLED=0 \
         go build -trimpath -ldflags="-s -w" \
         -o "${OUTPUT_DIR}/${ABIS}/libobfs4proxy.so" .
 )
@@ -105,7 +105,7 @@ git clone --depth 1 --branch "${SNOWFLAKE_VERSION}" \
 log "Building snowflake-client for android-${ABIS}..."
 (
     cd "${SNOWFLAKE_DIR}/client"
-    GOOS=android GOARCH="${GOARCH}" CGO_ENABLED=0 \
+    GOOS=android GOARCH="${GOARCH}" GOARM="${GOARM}" CGO_ENABLED=0 \
         go build -trimpath -ldflags="-s -w" \
         -o "${OUTPUT_DIR}/${ABIS}/libsnowflake.so" .
 )
@@ -123,7 +123,7 @@ git clone --depth 1 --branch "${CONJURE_VERSION}" \
 log "Building conjure PT для android-${ABIS}..."
 (
     cd "${CONJURE_DIR}/cmd/application"
-    GOOS=android GOARCH="${GOARCH}" CGO_ENABLED=0 \
+    GOOS=android GOARCH="${GOARCH}" GOARM="${GOARM}" CGO_ENABLED=0 \
         go build -trimpath -ldflags="-s -w" \
         -o "${OUTPUT_DIR}/${ABIS}/libconjure.so" .
 ) || log "conjure build failed (опц.); пропускаем"
