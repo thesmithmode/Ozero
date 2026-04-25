@@ -58,14 +58,13 @@ class OzeroVpnService : android.net.VpnService() {
         stopSelf()
     }
 
-    internal fun buildTunBuilder(): Builder =
-        Builder()
-            .addAddress(TUN_ADDRESS, TUN_PREFIX_LENGTH)
-            .addRoute("0.0.0.0", 0)
-            .addDnsServer(TUN_DNS)
-            .setMtu(TUN_MTU)
-            .setSession(SESSION_NAME)
-            .setBlocking(true)
+    internal fun buildTunBuilder(): Builder = Builder()
+        .addAddress(TUN_ADDRESS, TUN_PREFIX_LENGTH)
+        .addRoute("0.0.0.0", 0)
+        .addDnsServer(TUN_DNS)
+        .setMtu(TUN_MTU)
+        .setSession(SESSION_NAME)
+        .setBlocking(true)
 
     private fun buildNotification(): Notification {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

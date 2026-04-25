@@ -125,7 +125,10 @@ git clone \
     --branch "${XRAY_VERSION}" \
     "https://${GO_MODULE}.git" \
     "${REPO_DIR}"
+
+UPSTREAM_SHA="$(git -C "${REPO_DIR}" rev-parse HEAD)"
 log "Clone: OK"
+log "Upstream commit: ${UPSTREAM_SHA}"
 
 # ---------------------------------------------------------------------------
 # Создание libs.go — stub для gomobile bind
@@ -243,8 +246,24 @@ log "SHA256 written to ${OUTPUT_SHA256}"
 cat "${OUTPUT_SHA256}"
 
 # ---------------------------------------------------------------------------
+# Manifest — метаданные сборки для аудита и reproducibility
+# ---------------------------------------------------------------------------
+OUTPUT_MANIFEST="${OUTPUT_DIR}/libxray.manifest.txt"
+{
+    echo "xray_version=${XRAY_VERSION}"
+    echo "upstream_commit=${UPSTREAM_SHA}"
+    echo "go_module=${GO_MODULE}"
+    echo "android_targets=${ANDROID_TARGETS}"
+    echo "android_api=${ANDROID_API}"
+    echo "go_version=${GO_MAJOR_MINOR}"
+    echo "build_timestamp_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+} > "${OUTPUT_MANIFEST}"
+log "Manifest written to ${OUTPUT_MANIFEST}"
+
+# ---------------------------------------------------------------------------
 # Done
 # ---------------------------------------------------------------------------
 log "=== Build complete ==="
 log "Artifact  : ${OUTPUT_AAR}"
 log "Checksum  : ${OUTPUT_SHA256}"
+log "Manifest  : ${OUTPUT_MANIFEST}"

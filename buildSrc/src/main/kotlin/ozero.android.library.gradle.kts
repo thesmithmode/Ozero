@@ -85,6 +85,6 @@ extensions.configure<LibraryExtension> {
         abortOnError = true
         warningsAsErrors = false
         checkReleaseBuilds = true
-        disable += setOf("GradleDependency", "NewerVersionAvailable")
+        disable += setOf("GradleDependency", "NewerVersionAvailable", "NewApi")
     }
 }

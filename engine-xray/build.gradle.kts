@@ -15,9 +15,11 @@ android {
 
 dependencies {
     implementation(project(":core-api"))
+    implementation(project(":core-orchestrator"))
     implementation(project(":common-vpn"))
     implementation(project(":common-crypto"))
     implementation(project(":core-subscriptions"))
+    implementation(project(":core-storage"))
     implementation(libs.bundles.coroutines)
 
     testImplementation(libs.bundles.junit5)

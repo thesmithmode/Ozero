@@ -40,12 +40,18 @@ docker run --rm -v "$PWD:/workspace" ozero-xray-builder
 
 ## Reproducibility
 
-Все скрипты пишут SHA256 output рядом с артефактом. При релизе сверяются:
+Скрипт пишет рядом с AAR:
+- `libxray.aar.sha256` — чексумма артефакта
+- `libxray.manifest.txt` — метаданные сборки (XRAY_VERSION, upstream commit SHA, Go/NDK/API, timestamp)
+
+При релизе сверяются:
 - локальная сборка разработчика
 - Docker-сборка (эталон)
 - F-Droid CI сборка (итоговая эталонная)
 
-Хэши должны совпадать. Если не совпадают — bisect зависимостей, чаще всего причина: go.sum toolchain drift, NDK patch version.
+Хэши должны совпадать. Если не совпадают — bisect зависимостей: чаще всего go.sum toolchain drift, NDK patch version.
+
+AAR артефакты **не коммитятся** в Git (см. `engine-xray/libs/.gitignore`). Релизный pipeline подкладывает AAR из защищённого хранилища или пересобирает детерминированно.
 
 ## Trust chain
 

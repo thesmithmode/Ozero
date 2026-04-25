@@ -116,6 +116,29 @@ jobs:
       - name: Build for ${{ matrix.abi }}
         run: ./gradlew assembleDebug -PabiFilter=${{ matrix.abi }} --stacktrace
 
+  xray-builder-image:
+    name: Xray Builder Scripts (verify)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: shellcheck + bash syntax build_xray.sh
+        run: |
+          bash -n build-tools/build_xray.sh
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends shellcheck
+          shellcheck -S warning build-tools/build_xray.sh
+
+      - name: Validate Dockerfile syntax (hadolint)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: build-tools/Dockerfile
+          failure-threshold: error
+
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest

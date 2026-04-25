@@ -25,10 +25,7 @@ private val DarkColors =
     )
 
 @Composable
-fun OzeroTheme(
-    darkTheme: Boolean = false,
-    content: @Composable () -> Unit,
-) {
+fun OzeroTheme(darkTheme: Boolean = false, content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = if (darkTheme) DarkColors else LightColors,
         content = content,

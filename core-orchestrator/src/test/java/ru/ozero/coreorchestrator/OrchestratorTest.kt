@@ -3,9 +3,9 @@ package ru.ozero.coreorchestrator
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.coreapi.EngineId
-import kotlin.test.assertIs
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 
 class OrchestratorTest {
     private lateinit var orchestrator: Orchestrator
