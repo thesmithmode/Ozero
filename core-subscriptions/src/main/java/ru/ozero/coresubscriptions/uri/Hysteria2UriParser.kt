@@ -26,18 +26,41 @@ class Hysteria2UriParser {
 
         val query = parsed.rawQuery?.let(::parseQuery) ?: emptyMap()
 
+        val sniRaw = query["sni"]
+        val sniList = sniRaw?.split(',')?.map { it.trim() }?.filter { it.isNotBlank() } ?: emptyList()
+        val (mportStart, mportEnd) = parseMport(query["mport"])
+
         return UriParseResult.Ok(
             Hysteria2Server(
                 password = password,
                 host = host,
                 port = port,
-                sni = query["sni"],
+                sni = sniList.firstOrNull(),
+                sniAlternatives = if (sniList.size > 1) sniList.drop(1) else emptyList(),
                 insecure = query["insecure"] == "1" || query["insecure"]?.lowercase() == "true",
                 obfs = query["obfs"],
                 obfsPassword = query["obfs-password"],
+                pinSHA256 = query["pinSHA256"]?.takeIf { it.isNotBlank() },
+                portRangeStart = mportStart,
+                portRangeEnd = mportEnd,
+                bandwidthUp = query["up"]?.takeIf { it.isNotBlank() },
+                bandwidthDown = query["down"]?.takeIf { it.isNotBlank() },
                 remark = decodeFragment(parsed.rawFragment),
             ),
         )
+    }
+
+    /**
+     * Парсит `mport=20000-50000` → Pair(20000, 50000). Возвращает Pair(null,null) при ошибке.
+     */
+    private fun parseMport(s: String?): Pair<Int?, Int?> {
+        if (s.isNullOrBlank()) return null to null
+        val parts = s.split('-')
+        if (parts.size != 2) return null to null
+        val a = parts[0].toIntOrNull() ?: return null to null
+        val b = parts[1].toIntOrNull() ?: return null to null
+        if (a !in 1..65535 || b !in 1..65535 || a > b) return null to null
+        return a to b
     }
 
     private companion object {

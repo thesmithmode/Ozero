@@ -1,0 +1,4 @@
+*.aar
+*.jar
+!.gitkeep
+!.gitignore

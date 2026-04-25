@@ -150,6 +150,57 @@ class StrategyEngineTest {
         assertNull(result)
     }
 
+    // ---- E4: UDP / CGNAT фильтр --------------------------------------
+
+    @Test
+    fun udpReachableTrueKeepsHysteria2Candidate() = runTest {
+        val hy2 = Candidate(
+            engineId = EngineId.HYSTERIA2,
+            config = EngineConfig.ByeDpi(),
+            priority = Candidate.PRIORITY_HYSTERIA2_NATIVE,
+            requiresUdp = true,
+        )
+        val strategy = StrategyEngine(
+            engines = emptyMap(),
+            extraSources = listOf(CandidateSource { listOf(hy2) }),
+            udpReachable = { true },
+        )
+        val list = strategy.buildCandidates()
+        assertEquals(EngineId.HYSTERIA2, list[0].engineId)
+    }
+
+    @Test
+    fun udpReachableFalseFiltersHysteria2() = runTest {
+        val hy2 = Candidate(
+            engineId = EngineId.HYSTERIA2,
+            config = EngineConfig.ByeDpi(),
+            priority = Candidate.PRIORITY_HYSTERIA2_NATIVE,
+            requiresUdp = true,
+        )
+        val vless = xrayCandidate(Candidate.PRIORITY_XRAY_VLESS_REALITY)
+        val strategy = StrategyEngine(
+            engines = emptyMap(),
+            extraSources = listOf(CandidateSource { listOf(hy2, vless) }),
+            udpReachable = { false },
+        )
+        val list = strategy.buildCandidates()
+        assertTrue(list.none { it.engineId == EngineId.HYSTERIA2 }, "Hy2 не отфильтрован при CGNAT")
+        // VLESS остаётся как fallback
+        assertEquals(EngineId.XRAY, list[0].engineId)
+    }
+
+    @Test
+    fun udpReachableFalseKeepsTcpCandidates() = runTest {
+        val vless = xrayCandidate(Candidate.PRIORITY_XRAY_VLESS_REALITY)
+        val strategy = StrategyEngine(
+            engines = emptyMap(),
+            extraSources = listOf(CandidateSource { listOf(vless) }),
+            udpReachable = { false },
+        )
+        val list = strategy.buildCandidates()
+        assertEquals(2, list.size) // VLESS + ByeDpi
+    }
+
     @Test
     fun pickBestRunsProbesInParallelNotSequentially() = runTest {
         // 3 движка по 100мс каждый. Sequential = 300мс, parallel ~100мс.

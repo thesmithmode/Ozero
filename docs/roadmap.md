@@ -64,10 +64,12 @@ GitHub Actions на tag push `v*.*.*`. Signed APK + SHA256 + GPG. F-Droid submis
 
 | Фаза | Статус | Ветка |
 |------|--------|-------|
-| E0 | В процессе | `feat/e0-setup` |
-| E1 | Pending | `feat/e1-mvp-byedpi` |
-| E2 | Pending | `feat/e2-subscriptions` |
-| E3 | Pending | `feat/e3-xray` |
+| E0 | ✅ Done | `feat/e0-setup` |
+| E1 | ✅ Done | `feat/e1-mvp-byedpi` |
+| E2 | ✅ Done | `feat/e2-subscriptions` |
+| E3 | ✅ Done (AAR + DI отложены до интеграции рантайма) | `feat/e3-xray` |
+| E4 | ✅ Done (AAR + DI отложены до интеграции рантайма) | `feat/e4-hysteria2` |
+| E5 | В процессе | `feat/e5-amneziawg` |
 | … | … | … |
 
 ## Nice-to-have (v2.0+)
