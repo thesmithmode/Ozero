@@ -1,5 +1,6 @@
 package ru.ozero.enginexray.config
 
+import ru.ozero.commonjson.JsonWriter
 import ru.ozero.coresubscriptions.uri.Hysteria2Server
 import ru.ozero.coresubscriptions.uri.ShadowsocksServer
 import ru.ozero.coresubscriptions.uri.TrojanServer

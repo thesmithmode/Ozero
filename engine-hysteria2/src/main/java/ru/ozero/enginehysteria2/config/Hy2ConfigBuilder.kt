@@ -1,5 +1,6 @@
 package ru.ozero.enginehysteria2.config
 
+import ru.ozero.commonjson.JsonWriter
 import ru.ozero.coresubscriptions.uri.Hysteria2Server
 
 /**

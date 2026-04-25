@@ -1,4 +1,4 @@
-package ru.ozero.enginexray.config
+package ru.ozero.commonjson
 
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
@@ -24,7 +24,10 @@ class JsonWriterTest {
         assertEquals("\"\\\"\"", JsonWriter.write("\""))
         assertEquals("\"\\\\\"", JsonWriter.write("\\"))
         assertEquals("\"\\n\"", JsonWriter.write("\n"))
+        assertEquals("\"\\r\"", JsonWriter.write("\r"))
         assertEquals("\"\\t\"", JsonWriter.write("\t"))
+        assertEquals("\"\\b\"", JsonWriter.write("\b"))
+        assertEquals("\"\\f\"", JsonWriter.write("\u000C"))
         assertEquals("\"\\u0001\"", JsonWriter.write("\u0001"))
     }
 
@@ -46,6 +49,12 @@ class JsonWriterTest {
             "a" to listOf(1, 2, linkedMapOf("k" to null)),
         )
         assertEquals("""{"a":[1,2,{"k":null}]}""", JsonWriter.write(m))
+    }
+
+    @Test
+    fun listWithMixedTypes() {
+        val list = listOf(1, "x", true, null, listOf(2))
+        assertEquals("""[1,"x",true,null,[2]]""", JsonWriter.write(list))
     }
 
     @Test
