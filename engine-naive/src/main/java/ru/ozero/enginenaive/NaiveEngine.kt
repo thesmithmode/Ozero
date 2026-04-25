@@ -13,6 +13,7 @@ import ru.ozero.coreapi.EngineId
 import ru.ozero.coreapi.EngineStats
 import ru.ozero.coreapi.ProbeResult
 import ru.ozero.coreapi.StartResult
+import ru.ozero.enginenaive.config.JsonWriter
 import java.net.InetSocketAddress
 import java.net.Socket
 
@@ -46,7 +47,13 @@ class NaiveEngine(
         val jsonConfig = if (config.proxyUrl.startsWith("{")) {
             config.proxyUrl
         } else {
-            """{"listen":"socks://127.0.0.1:${config.socksPort}","proxy":"${config.proxyUrl}","log":""}"""
+            JsonWriter.write(
+                linkedMapOf<String, Any?>(
+                    "listen" to "socks://127.0.0.1:${config.socksPort}",
+                    "proxy" to config.proxyUrl,
+                    "log" to "",
+                ),
+            )
         }
         if (jsonConfig.isBlank()) {
             Log.e(TAG, "start: пустой конфиг")

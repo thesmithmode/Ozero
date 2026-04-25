@@ -11,9 +11,10 @@ class EngineApiTest {
     @Test
     fun engineIdContainsAllValues() {
         val entries = EngineId.entries
-        assertEquals(5, entries.size)
+        assertEquals(6, entries.size)
         assertTrue(entries.contains(EngineId.BYEDPI))
         assertTrue(entries.contains(EngineId.XRAY))
+        assertTrue(entries.contains(EngineId.HYSTERIA2))
         assertTrue(entries.contains(EngineId.AMNEZIA))
         assertTrue(entries.contains(EngineId.TOR))
         assertTrue(entries.contains(EngineId.NAIVE))

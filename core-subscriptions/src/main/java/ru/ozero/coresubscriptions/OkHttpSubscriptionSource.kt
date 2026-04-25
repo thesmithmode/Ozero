@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit
 
 class OkHttpSubscriptionSource(
     private val timeoutMs: Long = 10_000L,
+    private val maxBodyBytes: Long = DEFAULT_MAX_BODY_BYTES,
     private val client: OkHttpClient =
         OkHttpClient.Builder()
             .connectTimeout(timeoutMs, TimeUnit.MILLISECONDS)
@@ -38,7 +39,20 @@ class OkHttpSubscriptionSource(
                     Log.w(TAG, "HTTP ${response.code} для $url")
                     FetchBytesResult.HttpError(response.code)
                 } else {
-                    FetchBytesResult.Ok(response.body?.bytes() ?: ByteArray(0))
+                    val body = response.body
+                    if (body == null) {
+                        FetchBytesResult.Ok(ByteArray(0))
+                    } else {
+                        val source = body.source()
+                        // Не доверяем Content-Length: пробуем запросить (limit+1) байт.
+                        // Если буфер их получает → тело > лимита → отбрасываем.
+                        if (source.request(maxBodyBytes + 1)) {
+                            Log.w(TAG, "тело > $maxBodyBytes байт для $url — отброшено")
+                            FetchBytesResult.IoError("тело превысило лимит $maxBodyBytes")
+                        } else {
+                            FetchBytesResult.Ok(source.readByteArray())
+                        }
+                    }
                 }
             }
         } catch (e: IOException) {
@@ -62,5 +76,6 @@ class OkHttpSubscriptionSource(
 
     private companion object {
         const val TAG = "OkHttpSubscriptionSource"
+        const val DEFAULT_MAX_BODY_BYTES: Long = 4L * 1024 * 1024 // 4 МБ — подписка как правило <100 КБ
     }
 }

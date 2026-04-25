@@ -19,7 +19,8 @@ import ru.ozero.enginexray.config.XrayConfigBuilder
  * чтобы StrategyEngine мог пробовать их параллельно, не конфликтуя на одном порту.
  *
  * Фильтрация: VLESS+Reality допускается только с transport ∈ TRANSPORT_SAFE_2026
- * (xhttp / grpc / ws-tls — SPEC §4.3). Остальные транспорты выбрасываются.
+ * (xhttp / grpc / ws — SPEC §4.3, security=tls/reality задаётся отдельно).
+ * Остальные транспорты выбрасываются.
  */
 class XrayCandidateSource(
     private val serverDao: ServerDao,
@@ -120,6 +121,6 @@ class XrayCandidateSource(
         const val DEFAULT_BASE_PORT = 10808
         const val DEFAULT_MAX = 5
         private const val TAG = "XrayCandidateSource"
-        val TRANSPORT_SAFE_2026 = setOf("xhttp", "grpc", "ws", "ws-tls")
+        val TRANSPORT_SAFE_2026 = setOf("xhttp", "grpc", "ws")
     }
 }

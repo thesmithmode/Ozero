@@ -55,6 +55,18 @@ class Orchestrator {
             state is OrchestratorState.Failed && transition is OrchestratorTransition.Disconnect ->
                 OrchestratorState.Disconnecting
 
+            state is OrchestratorState.Failed && transition is OrchestratorTransition.Connect ->
+                OrchestratorState.Probing
+
+            state is OrchestratorState.Probing && transition is OrchestratorTransition.Disconnect ->
+                OrchestratorState.Disconnecting
+
+            state is OrchestratorState.Connecting && transition is OrchestratorTransition.Disconnect ->
+                OrchestratorState.Disconnecting
+
+            state is OrchestratorState.Switching && transition is OrchestratorTransition.Disconnect ->
+                OrchestratorState.Disconnecting
+
             state is OrchestratorState.Disconnecting && transition is OrchestratorTransition.DisconnectComplete ->
                 OrchestratorState.Idle
 

@@ -17,6 +17,16 @@ data class TorBridge(
     val args: Map<String, String> = emptyMap(),
     val remark: String? = null,
 ) {
+    init {
+        requireSafe(transport, "transport")
+        requireSafe(address, "address")
+        requireSafe(fingerprint, "fingerprint")
+        for ((k, v) in args) {
+            requireSafe(k, "arg key")
+            requireSafe(v, "arg[$k]")
+        }
+    }
+
     fun toTorrcLine(): String {
         val sb = StringBuilder("Bridge ")
         sb.append(transport).append(' ')
@@ -26,5 +36,19 @@ data class TorBridge(
             sb.append(' ').append(k).append('=').append(v)
         }
         return sb.toString()
+    }
+
+    private companion object {
+        private val UNSAFE = Regex("[\\r\\n\\t\\u0000 ]")
+
+        fun requireSafe(value: String, field: String) {
+            require(value.isNotEmpty()) { "$field пустой" }
+            require(!UNSAFE.containsMatchIn(value)) {
+                "$field содержит управляющий символ или пробел: ${value.toByteArray().toHexString()}"
+            }
+        }
+
+        @OptIn(ExperimentalStdlibApi::class)
+        private fun ByteArray.toHexString(): String = joinToString("") { "%02x".format(it) }
     }
 }

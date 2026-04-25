@@ -1,12 +1,20 @@
 package ru.ozero.commondns
 
 import java.io.ByteArrayOutputStream
+import java.security.SecureRandom
 
 internal object DnsMessage {
 
+    private val random = SecureRandom()
+
     fun buildAQuery(hostname: String): ByteArray {
         val buf = ByteArrayOutputStream()
-        buf.write(byteArrayOf(0x12, 0x34)) // id
+        // RFC 5452: ID должен быть случайным для защиты от off-path forgery,
+        // даже когда транспорт — DoH (HTTPS экранирует канал, но детерминированный ID
+        // упрощает фингерпринтинг трафика и нарушает best practices DNS).
+        val id = ByteArray(2)
+        random.nextBytes(id)
+        buf.write(id)
         buf.write(byteArrayOf(0x01, 0x00)) // flags: standard query, recursion desired
         buf.write(byteArrayOf(0, 1, 0, 0, 0, 0, 0, 0)) // qd=1 an=0 ns=0 ar=0
         hostname.split(".").forEach { label ->

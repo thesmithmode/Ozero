@@ -80,11 +80,14 @@ class TunBuilderConfiguratorTest {
     }
 
     @Test
-    fun allowlistEmptySetIsNoOp() {
+    fun allowlistEmptySetFiltersOnlySelf() {
         val b = mockBuilder()
+        every { b.addAllowedApplication(any()) } returns b
         configurator.apply(b, SplitTunnelConfig(mode = SplitTunnelMode.ALLOWLIST, packages = emptySet()))
         verify(exactly = 1) { b.addRoute("0.0.0.0", 0) }
-        verify(exactly = 0) { b.addAllowedApplication(any()) }
+        // Пустой ALLOWLIST = kill-all: добавляется только self-package в фильтр
+        // (Android не направляет own VPN traffic в собственный TUN → 0 пакетов через VPN)
+        verify(exactly = 1) { b.addAllowedApplication("ru.ozero.app") }
     }
 
     @Test
