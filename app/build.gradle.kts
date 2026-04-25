@@ -62,8 +62,12 @@ dependencies {
     implementation(project(":core-subscriptions"))
     implementation(project(":core-storage"))
     implementation(project(":common-vpn"))
+    implementation(project(":common-crypto"))
     implementation(project(":engine-byedpi"))
     implementation(project(":security"))
+
+    // Networking (self-update + diagnostics)
+    implementation(libs.bundles.okhttp)
 
     // Testing
     testImplementation(libs.bundles.junit5)

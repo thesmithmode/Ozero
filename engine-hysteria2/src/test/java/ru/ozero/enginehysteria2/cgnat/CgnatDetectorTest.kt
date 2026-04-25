@@ -11,7 +11,9 @@ class CgnatDetectorTest {
     // ---- CGNAT (RFC 6598: 100.64.0.0/10 = 100.64.0.0 .. 100.127.255.255) ----
 
     @Test fun cgnatLowerBoundary() = assertEquals(NatStatus.CGNAT, detect("100.64.0.0"))
+
     @Test fun cgnatUpperBoundary() = assertEquals(NatStatus.CGNAT, detect("100.127.255.255"))
+
     @Test fun cgnatTypicalMobileIsp() = assertEquals(NatStatus.CGNAT, detect("100.96.42.7"))
 
     @Test
@@ -27,8 +29,11 @@ class CgnatDetectorTest {
     // ---- private RFC1918 → UNKNOWN (нужен STUN, отложен на E9) ----
 
     @Test fun privateClassA() = assertEquals(NatStatus.UNKNOWN, detect("10.0.0.5"))
+
     @Test fun privateClassB() = assertEquals(NatStatus.UNKNOWN, detect("172.16.0.10"))
+
     @Test fun privateClassC() = assertEquals(NatStatus.UNKNOWN, detect("192.168.1.100"))
+
     @Test fun linkLocal() = assertEquals(NatStatus.UNKNOWN, detect("169.254.1.1"))
 
     // ---- public → OPEN ----
@@ -38,6 +43,7 @@ class CgnatDetectorTest {
     // ---- IPv6 (нет понятия CGNAT) ----
 
     @Test fun ipv6UlaTreatedAsUnknown() = assertEquals(NatStatus.UNKNOWN, detect("fc00::1"))
+
     @Test fun ipv6PublicIsOpen() = assertEquals(NatStatus.OPEN, detect("2001:db8::1"))
 
     // ---- комбинации ----

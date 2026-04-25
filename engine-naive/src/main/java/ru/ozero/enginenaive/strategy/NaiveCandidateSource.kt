@@ -54,6 +54,7 @@ class NaiveCandidateSource(
     companion object {
         const val DEFAULT_BASE_PORT = 12808
         const val DEFAULT_MAX = 5
+
         // Между Xray-SS (6) и AmneziaWG (7). Chrome-fingerprint надёжнее SS, но
         // ниже WG-обфускации, потому что HTTP/2 сильнее зависит от стабильности TLS-handshake.
         const val PRIORITY = 6
