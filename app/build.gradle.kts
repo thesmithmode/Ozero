@@ -73,6 +73,7 @@ dependencies {
     testImplementation(libs.bundles.junit5)
     testRuntimeOnly(libs.junit.jupiter.engine)
     testImplementation(libs.bundles.testing.unit)
+    testImplementation(libs.bundles.bouncycastle)
     androidTestImplementation(libs.bundles.testing.android)
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)
