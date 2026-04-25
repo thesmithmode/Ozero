@@ -27,6 +27,9 @@ ktor = "3.0.0"
 # Crypto
 bouncycastle = "1.79"
 
+# Play Core (SplitInstall)
+playFeatureDelivery = "2.1.0"
+
 # Testing
 junitJupiter = "5.11.0"
 mockk = "1.13.12"
@@ -83,6 +86,9 @@ ktor-serialization-json = { module = "io.ktor:ktor-serialization-kotlinx-json", 
 # BouncyCastle
 bouncycastle-prov = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
 bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bouncycastle" }
+
+# Play Core — Feature Delivery (SplitInstall) для on-demand модуля :dynamic_tor
+play-feature-delivery = { module = "com.google.android.play:feature-delivery", version.ref = "playFeatureDelivery" }
 
 # Testing — JUnit 5
 junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junitJupiter" }

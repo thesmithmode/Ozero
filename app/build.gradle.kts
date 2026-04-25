@@ -73,6 +73,12 @@ dependencies {
     implementation(project(":engine-tor"))
     implementation(project(":security"))
 
+    // PlayCore feature-delivery — нужен И в base APK (не только engine-tor):
+    // dynamic_tor merged manifest ссылается на @integer/google_play_services_version
+    // и @style/Theme.PlayCore.Transparent, которые приходят из этой либы.
+    // AAPT линкует base + feature manifests в одном проходе → ресурсы должны быть в base.
+    implementation(libs.play.feature.delivery)
+
     // Networking (self-update + diagnostics)
     implementation(libs.bundles.okhttp)
 
