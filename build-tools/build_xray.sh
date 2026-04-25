@@ -176,6 +176,10 @@ import (
 	// Stats and logging
 	_ "github.com/xtls/xray-core/app/stats"
 	_ "github.com/xtls/xray-core/app/log"
+
+	// gomobile bind generator dependency: gobind импортирует этот пакет
+	// программно, без blank import `go mod tidy` выбросит его из go.sum.
+	_ "golang.org/x/mobile/bind"
 )
 
 // Version returns the Xray-core version string baked into the AAR.
