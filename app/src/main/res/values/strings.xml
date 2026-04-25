@@ -1,4 +1,56 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- App -->
     <string name="app_name">Ozero</string>
+
+    <!-- Main -->
+    <string name="main_connect">Подключиться</string>
+    <string name="main_disconnect">Отключиться</string>
+    <string name="main_status_disconnected">Отключено</string>
+    <string name="main_status_connecting">Подключение…</string>
+    <string name="main_status_connected">Подключено</string>
+    <string name="main_status_failed">Ошибка</string>
+    <string name="main_active_engine">Активный движок: %1$s</string>
+
+    <!-- Tabs -->
+    <string name="tab_main">Главная</string>
+    <string name="tab_settings">Настройки</string>
+    <string name="tab_diagnostics">Диагностика</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Настройки</string>
+    <string name="settings_split_tunnel_title">Split-tunnel</string>
+    <string name="settings_split_tunnel_summary">Какие приложения идут через VPN</string>
+    <string name="settings_split_mode_all">Все приложения</string>
+    <string name="settings_split_mode_bypass_lan">Все, кроме локальной сети</string>
+    <string name="settings_split_mode_allowlist">Только выбранные приложения</string>
+    <string name="settings_split_mode_blocklist">Все, кроме выбранных</string>
+    <string name="settings_dh_title">Двойной хоп (Double-hop)</string>
+    <string name="settings_dh_summary">Entry → Exit. Защита от деанонимизации, цена — задержка</string>
+    <string name="settings_subscription_title">Подписка</string>
+    <string name="settings_subscription_url_hint">URL подписки (https://…)</string>
+    <string name="settings_subscription_refresh">Обновить</string>
+    <string name="settings_language_title">Язык</string>
+    <string name="settings_language_system">Системный</string>
+    <string name="settings_language_ru">Русский</string>
+    <string name="settings_language_en">English</string>
+
+    <!-- Diagnostics -->
+    <string name="diag_title">Диагностика</string>
+    <string name="diag_run">Запустить тест</string>
+    <string name="diag_stop">Остановить</string>
+    <string name="diag_running">Тест… %1$d / %2$d URL</string>
+    <string name="diag_summary">%1$d ✓ / %2$d ✗ из %3$d</string>
+    <string name="diag_url_ok">%1$s — %2$d ms</string>
+    <string name="diag_url_failed">%1$s — ошибка: %2$s</string>
+
+    <!-- Errors -->
+    <string name="error_subscription_invalid">Подписка повреждена или подписана не тем ключом</string>
+    <string name="error_no_servers">Нет live-серверов в подписке</string>
+    <string name="error_compromised_env">Обнаружено небезопасное окружение — VPN не запущен</string>
+
+    <!-- Accessibility -->
+    <string name="a11y_status_indicator">Индикатор состояния VPN</string>
+    <string name="a11y_connect_button">Кнопка подключения VPN</string>
+    <string name="a11y_engine_active">Сейчас активен движок %1$s</string>
 </resources>
