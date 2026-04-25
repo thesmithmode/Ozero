@@ -12,6 +12,9 @@ import java.nio.charset.StandardCharsets
  */
 class NaiveUriParser {
 
+    // Guard-clause парсер: каждая проверка возвращает специфичную ошибку.
+    // Объединение в общий error path потеряет контекст для пользователя.
+    @Suppress("ReturnCount")
     fun parse(uri: String): UriParseResult<NaiveServer> {
         if (!uri.startsWith("naive+")) return UriParseResult.Error("scheme не naive+")
 
