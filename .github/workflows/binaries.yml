@@ -11,6 +11,7 @@ on:
         options:
           - byedpi
           - xray
+          - naive
   push:
     branches:
       - 'feat/**'
@@ -20,6 +21,7 @@ on:
       - 'build-tools/Dockerfile.byedpi'
       - 'build-tools/build_byedpi.sh'
       - 'build-tools/build_xray.sh'
+      - 'build-tools/build_naive.sh'
       - 'build-tools/regen_lock.py'
 
 jobs:
@@ -50,6 +52,9 @@ jobs:
               ;;
             xray)
               FILES="build-tools/Dockerfile build-tools/build_xray.sh build-tools/regen_lock.py"
+              ;;
+            naive)
+              FILES="build-tools/build_naive.sh build-tools/regen_lock.py"
               ;;
             *)
               echo "Unknown artifact: $ARTIFACT" >&2
@@ -109,6 +114,16 @@ jobs:
             bash build-tools/build_xray.sh
 
       # ---------------------------------------------------------------------
+      # naive build (распаковка libnaive.so из upstream APK plugin, 4 ABI)
+      # ---------------------------------------------------------------------
+      - name: Build naive (extract from APK plugin)
+        if: env.ARTIFACT == 'naive'
+        run: |
+          REPO_ROOT="$PWD" \
+          OUT_DIR="$PWD/out/naive" \
+          bash build-tools/build_naive.sh
+
+      # ---------------------------------------------------------------------
       # Upload — engine-specific glob
       # ---------------------------------------------------------------------
       - name: Upload byedpi assets
@@ -145,6 +160,24 @@ jobs:
           files: |
             out/xray/libxray.aar
             out/xray/manifest.txt
+          fail_on_unmatched_files: true
+
+      - name: Upload naive assets
+        if: env.ARTIFACT == 'naive'
+        uses: softprops/action-gh-release@v2
+        env:
+          GH_TAG: ${{ steps.tag.outputs.tag }}
+        with:
+          tag_name: ${{ env.GH_TAG }}
+          name: Native binaries ${{ env.GH_TAG }}
+          body: |
+            Auto-built native binaries.
+
+            Engine: naive
+            Commit: ${{ github.sha }}
+          files: |
+            out/naive/libnaive-*.so
+            out/naive/manifest.txt
           fail_on_unmatched_files: true
 
   # Lock-файл обновляется вручную через build-tools/regen_lock.py — workflow

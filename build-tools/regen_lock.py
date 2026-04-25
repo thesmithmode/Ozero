@@ -39,6 +39,10 @@ ENGINE_CONFIGS = {
         "filename_re": re.compile(r"^libxray\.aar$"),
         "destination": "libs",
     },
+    "naive": {
+        "filename_re": re.compile(r"^libnaive-(?P<abi>[a-z0-9_-]+)\.so$"),
+        "destination": "jniLibs",
+    },
 }
 
 

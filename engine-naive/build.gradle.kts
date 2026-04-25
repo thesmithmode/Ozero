@@ -1,5 +1,16 @@
 plugins {
     id("ozero.android.library")
+    id("ozero.binaries")
+}
+
+// libnaive-<abi>.so извлекается из upstream APK plugin (klzgrad/naiveproxy)
+// и публикуется в GitHub Releases (RT.1.7.3). Скачивается preBuild с sha256 verify.
+// JNI-интеграция и запуск как child process — RT.2/RT.3.
+ozeroBinaries {
+    artifact("libnaive-arm64-v8a.so")
+    artifact("libnaive-armeabi-v7a.so")
+    artifact("libnaive-x86_64.so")
+    artifact("libnaive-x86.so")
 }
 
 android {
@@ -7,7 +18,7 @@ android {
 
     defaultConfig {
         ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
         }
     }
     // ndkVersion and externalNativeBuild activated when CMakeLists.txt is added (E1+)
