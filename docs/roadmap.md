@@ -76,7 +76,7 @@ GitHub Actions на tag push `v*.*.*`. Signed APK + SHA256 + GPG. F-Droid submis
 | E9 | ✅ Done (split-tunnel ядро; UI настроек в E11) | `feat/e9-dns-split-tunnel` |
 | E10 | ✅ Done (obfuscator-LLVM — отложен, требует custom NDK plugin) | `feat/e10-security` |
 | E11 | ⏳ Partial — i18n RU+EN, DiagnosticsTester (20 URL), strings; SettingsScreen / DiagnosticsScreen Compose UI отложены до интеграции рантайма | `feat/e11-ui` |
-| E12 | Pending | `feat/e12-self-update` |
+| E12 | ✅ Done (PackageInstaller invocation отложен — Activity-bound) | `feat/e12-self-update` |
 | E13 | Pending | `feat/e13-final-tests` |
 | E14 | Pending | `feat/e14-release` |
 | … | … | … |
