@@ -127,15 +127,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: shellcheck + bash syntax (build_xray.sh, build_hysteria2.sh, build_amneziawg.sh)
+      - name: shellcheck + bash syntax (build_*.sh)
         run: |
           bash -n build-tools/build_xray.sh
           bash -n build-tools/build_hysteria2.sh
           bash -n build-tools/build_amneziawg.sh
+          bash -n build-tools/build_naive.sh
           sudo apt-get update && sudo apt-get install -y --no-install-recommends shellcheck
           shellcheck -S warning build-tools/build_xray.sh
           shellcheck -S warning build-tools/build_hysteria2.sh
           shellcheck -S warning build-tools/build_amneziawg.sh
+          shellcheck -S warning build-tools/build_naive.sh
 
       - name: Validate Dockerfile syntax (hadolint)
         uses: hadolint/hadolint-action@v3.1.0

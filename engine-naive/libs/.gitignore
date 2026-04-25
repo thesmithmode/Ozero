@@ -1,0 +1,6 @@
+*.aar
+*.jar
+*.so
+naive
+!.gitkeep
+!.gitignore

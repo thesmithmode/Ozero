@@ -21,6 +21,7 @@ class SubscriptionFilter {
             // AmneziaWG 2.0 — только если задан хоть один параметр обфускации,
             // иначе это голый WG, который ТСПУ режет на handshake.
             is ParsedServer.AmneziaWg -> parsed.server.hasObfuscation()
+            is ParsedServer.Naive -> true
             is ParsedServer.Error -> false
         }
 

@@ -70,7 +70,8 @@ GitHub Actions на tag push `v*.*.*`. Signed APK + SHA256 + GPG. F-Droid submis
 | E3 | ✅ Done (AAR + DI отложены до интеграции рантайма) | `feat/e3-xray` |
 | E4 | ✅ Done (AAR + DI отложены до интеграции рантайма) | `feat/e4-hysteria2` |
 | E5 | ✅ Done (AAR + DI отложены до интеграции рантайма) | `feat/e5-amneziawg` |
-| E6 | В процессе | `feat/e6-naive` |
+| E6 | ✅ Done (binary + DI отложены до интеграции рантайма) | `feat/e6-naive` |
+| E7 | В процессе | `feat/e7-tor` |
 | … | … | … |
 
 ## Nice-to-have (v2.0+)
