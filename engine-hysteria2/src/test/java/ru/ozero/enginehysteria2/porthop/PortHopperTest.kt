@@ -71,7 +71,9 @@ class PortHopperTest {
     }
 
     @Test
+    @Suppress("InvalidRange")
     fun rejectsInvalidRange() {
+        // Намеренный empty range (start > end) — проверяем что PortHopper отклоняет.
         val ex = runCatching { PortHopper("k", 50000..20000, 30) }.exceptionOrNull()
         assertTrue(ex is IllegalArgumentException)
     }
