@@ -12,8 +12,14 @@ data class Candidate(
     val engineId: EngineId,
     val config: EngineConfig,
     val priority: Int = PRIORITY_BYEDPI,
+    /**
+     * Кандидату нужен исходящий UDP (QUIC). При CGNAT/UDP-фильтре провайдера
+     * StrategyEngine отфильтрует такие кандидаты и оставит TCP-fallback.
+     */
+    val requiresUdp: Boolean = false,
 ) {
     companion object {
+        const val PRIORITY_HYSTERIA2_NATIVE = 11
         const val PRIORITY_XRAY_VLESS_REALITY = 10
         const val PRIORITY_XRAY_HYSTERIA2 = 9
         const val PRIORITY_XRAY_TROJAN = 8
@@ -37,6 +43,12 @@ class StrategyEngine(
     private val engines: Map<EngineId, Engine>,
     private val extraSources: List<CandidateSource> = emptyList(),
     private val parallelProbeCount: Int = DEFAULT_PARALLEL_PROBE,
+    /**
+     * Доступен ли исходящий UDP. По умолчанию `true` (open NAT). При CGNAT/UDP-фильтре
+     * выставляется `false` извне (например, по результату `CgnatDetector`) — тогда
+     * `buildCandidates()` отфильтрует UDP-зависимые кандидаты (Hysteria2 native).
+     */
+    private val udpReachable: () -> Boolean = { true },
 ) {
 
     suspend fun buildCandidates(): List<Candidate> {
@@ -49,7 +61,10 @@ class StrategyEngine(
             config = EngineConfig.ByeDpi(),
             priority = Candidate.PRIORITY_BYEDPI,
         )
-        return list.sortedByDescending { it.priority }
+        val udpOk = udpReachable()
+        return list
+            .filter { udpOk || !it.requiresUdp }
+            .sortedByDescending { it.priority }
     }
 
     /**

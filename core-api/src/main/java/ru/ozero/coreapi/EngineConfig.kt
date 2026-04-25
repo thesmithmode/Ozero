@@ -11,6 +11,11 @@ sealed class EngineConfig {
         val socksPort: Int = 10808
     ) : EngineConfig()
 
+    data class Hysteria2(
+        val configJson: String,
+        val socksPort: Int = 10809
+    ) : EngineConfig()
+
     data class Amnezia(
         val configJson: String,
         val socksPort: Int = 10808
