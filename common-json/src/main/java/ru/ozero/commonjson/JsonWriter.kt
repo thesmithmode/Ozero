@@ -1,12 +1,12 @@
-package ru.ozero.enginexray.config
+package ru.ozero.commonjson
 
 /**
  * Мини JSON-сериализатор без внешних зависимостей. Сохраняет порядок ключей из
- * LinkedHashMap — это даёт детерминированный вывод и exact-match тесты.
+ * LinkedHashMap — детерминированный вывод для exact-match тестов конфигов движков.
  *
  * Поддерживает: Map<String, Any?>, List<Any?>, String, Number, Boolean, null.
  */
-internal object JsonWriter {
+object JsonWriter {
 
     fun write(value: Any?): String {
         val sb = StringBuilder()

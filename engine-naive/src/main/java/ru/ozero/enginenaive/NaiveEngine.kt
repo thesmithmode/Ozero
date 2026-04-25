@@ -13,8 +13,8 @@ import ru.ozero.coreapi.EngineId
 import ru.ozero.coreapi.EngineStats
 import ru.ozero.coreapi.ProbeResult
 import ru.ozero.coreapi.StartResult
+import ru.ozero.commonjson.JsonWriter
 import ru.ozero.coreorchestrator.probe.Socks5HandshakeProbe
-import ru.ozero.enginenaive.config.JsonWriter
 
 /**
  * NaiveProxy engine. HTTP/2 (или QUIC) CONNECT через Chromium net stack —

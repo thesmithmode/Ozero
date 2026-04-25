@@ -1,5 +1,6 @@
 package ru.ozero.enginenaive.config
 
+import ru.ozero.commonjson.JsonWriter
 import ru.ozero.coresubscriptions.uri.NaiveServer
 
 /**

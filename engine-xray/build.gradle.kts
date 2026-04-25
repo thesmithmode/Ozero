@@ -18,6 +18,7 @@ dependencies {
     implementation(project(":core-orchestrator"))
     implementation(project(":common-vpn"))
     implementation(project(":common-crypto"))
+    implementation(project(":common-json"))
     implementation(project(":core-subscriptions"))
     implementation(project(":core-storage"))
     implementation(libs.bundles.coroutines)
