@@ -1,14 +1,14 @@
 package ru.ozero.enginetor.bridges
 
 /**
- * Сериализованный bridge для torrc — `Bridge <transport> <addr> <fingerprint> [args...]`.
+ * Сериализованный bridge для torrc — Bridge transport addr fingerprint args.
  *
  * Поддерживаемые транспорты:
- * - `obfs4`        — TLS-обфускация, `cert=` и `iat-mode=` параметры
- * - `snowflake`    — WebRTC через volunteer proxies, опц. `url=`/`front=`
- * - `webtunnel`    — HTTPS-туннель через CDN-fronting
- * - `meek_lite`    — domain fronting через `front=` и `url=`
- * - `conjure`      — refraction networking, набор `args=`
+ * - obfs4 — TLS-обфускация
+ * - snowflake — WebRTC через volunteer proxies
+ * - webtunnel — HTTPS-туннель через CDN-fronting
+ * - meek_lite — domain fronting
+ * - conjure — refraction networking
  */
 data class TorBridge(
     val transport: String,
@@ -23,7 +23,7 @@ data class TorBridge(
         requireSafe(fingerprint, "fingerprint")
         for ((k, v) in args) {
             requireSafe(k, "arg key")
-            requireSafe(v, "arg[$k]")
+            requireSafe(v, "arg value for $k")
         }
     }
 
@@ -37,14 +37,12 @@ data class TorBridge(
         }
         return sb.toString()
     }
+}
 
-    private companion object {
-        fun requireSafe(value: String, field: String) {
-            require(value.isNotEmpty()) { "$field пустой" }
-            require(value.none { it.isWhitespace() || it.code == 0 }) {
-                val hex = value.toByteArray().joinToString("") { "%02x".format(it) }
-                "$field содержит управляющий символ или пробел: $hex"
-            }
-        }
+private fun requireSafe(value: String, field: String) {
+    require(value.isNotEmpty()) { "$field пустой" }
+    require(value.none { it.isWhitespace() || it.code == 0 }) {
+        val hex = value.toByteArray().joinToString("") { b -> "%02x".format(b) }
+        "$field содержит управляющий символ или пробел: $hex"
     }
 }
