@@ -134,4 +134,44 @@ class EngineApiTest {
         assertEquals("http://proxy.example.com", config.proxyUrl)
         assertEquals(1080, config.socksPort)
     }
+
+    @Test
+    fun hysteria2ConfigDefaults() {
+        val config = EngineConfig.Hysteria2(configJson = "{\"server\":\"example.com:443\"}")
+        assertEquals("{\"server\":\"example.com:443\"}", config.configJson)
+        assertEquals(10809, config.socksPort)
+    }
+
+    @Test
+    fun hysteria2ConfigCustomPort() {
+        val config = EngineConfig.Hysteria2(configJson = "{}", socksPort = 12345)
+        assertEquals("{}", config.configJson)
+        assertEquals(12345, config.socksPort)
+        val copy = config.copy(socksPort = 54321)
+        assertEquals(54321, copy.socksPort)
+    }
+
+    @Test
+    fun amneziaConfigDefaults() {
+        val config = EngineConfig.Amnezia(configJson = "{\"interface\":\"wg0\"}")
+        assertEquals("{\"interface\":\"wg0\"}", config.configJson)
+        assertEquals(10808, config.socksPort)
+    }
+
+    @Test
+    fun amneziaConfigCustomPort() {
+        val config = EngineConfig.Amnezia(configJson = "{}", socksPort = 9999)
+        assertEquals(9999, config.socksPort)
+        val copy = config.copy(configJson = "{\"changed\":true}")
+        assertEquals("{\"changed\":true}", copy.configJson)
+        assertEquals(9999, copy.socksPort)
+    }
+
+    @Test
+    fun torConfigWithBridges() {
+        val bridges = listOf("obfs4 1.2.3.4:443 cert=ABCD", "snowflake 0.0.3.0:1")
+        val config = EngineConfig.Tor(bridges = bridges, socksPort = 9051)
+        assertEquals(bridges, config.bridges)
+        assertEquals(9051, config.socksPort)
+    }
 }
