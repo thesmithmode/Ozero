@@ -1,5 +1,5 @@
-tag: xray-c5e9cdf0
-generated_at: 2026-04-25T20:35:57Z
+tag: naive-9becd3ee
+generated_at: 2026-04-25T20:51:07Z
 artifacts:
   - name: libbyedpi-arm64-v8a.so
     engine: byedpi
@@ -45,3 +45,39 @@ artifacts:
     size_bytes: 83829006
     source_repo: https://github.com/xtls/xray-core
     source_commit: 81f8f398c7b2b845853b1e85087c6122acc6db0b
+  - name: libnaive-arm64-v8a.so
+    engine: naive
+    abi: arm64-v8a
+    destination: jniLibs
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/naive-9becd3ee/libnaive-arm64-v8a.so
+    sha256: 1e98b657239bbdcc040e93f4c069e0a89cd32d4faf786acc0e77a6bd2f57c037
+    size_bytes: 6304920
+    source_repo: https://github.com/klzgrad/naiveproxy
+    source_commit: 6315863d2d8d1fad80d2b2afd46162c301f973e2
+  - name: libnaive-armeabi-v7a.so
+    engine: naive
+    abi: armeabi-v7a
+    destination: jniLibs
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/naive-9becd3ee/libnaive-armeabi-v7a.so
+    sha256: 299dc7353fa27f89053bbc5749a76326c1f30a59835a620d61e9ef69b83209c7
+    size_bytes: 4690560
+    source_repo: https://github.com/klzgrad/naiveproxy
+    source_commit: 6315863d2d8d1fad80d2b2afd46162c301f973e2
+  - name: libnaive-x86.so
+    engine: naive
+    abi: x86
+    destination: jniLibs
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/naive-9becd3ee/libnaive-x86.so
+    sha256: c9c10c7345062c2b1eec9b1f706f2f87172619473abd49242d31781cde20b982
+    size_bytes: 6818336
+    source_repo: https://github.com/klzgrad/naiveproxy
+    source_commit: 6315863d2d8d1fad80d2b2afd46162c301f973e2
+  - name: libnaive-x86_64.so
+    engine: naive
+    abi: x86_64
+    destination: jniLibs
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/naive-9becd3ee/libnaive-x86_64.so
+    sha256: 9dedf6cdf0f35999e0d6a6025cf573174df6bb00b7ed5eb820320727ec7817c4
+    size_bytes: 6484984
+    source_repo: https://github.com/klzgrad/naiveproxy
+    source_commit: 6315863d2d8d1fad80d2b2afd46162c301f973e2
