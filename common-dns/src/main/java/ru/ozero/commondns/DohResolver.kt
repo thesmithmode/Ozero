@@ -62,7 +62,8 @@ class DohResolver(
         private const val TAG = "DohResolver"
 
         // Cloudflare/Quad9 pin текущих корневых сертификатов (SPKI SHA-256 pins).
-        // Обновлять при ротации CA. Источник: https://cloudflare.com/ssl/, https://quad9.net/service/service-addresses-and-features
+        // Обновлять при ротации CA.
+        // Источник: https://cloudflare.com/ssl/ , https://quad9.net/service/service-addresses-and-features
         fun defaultPinner(): CertificatePinner = CertificatePinner.Builder()
             .add("cloudflare-dns.com", "sha256/v3zZBT4LfPWyUJGyl0NCMCsKnaVj2UZfKUwRk4G3DuA=")
             .add("dns.quad9.net", "sha256/i7WTqTvh0OioIruIfFR4kMPnBqrS2rdiVPl/s2uC/CY=")

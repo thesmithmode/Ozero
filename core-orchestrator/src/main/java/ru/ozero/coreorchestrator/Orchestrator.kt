@@ -17,10 +17,10 @@ class Orchestrator {
             val current = _state.value
             val next = reduce(current, transition)
             if (_state.compareAndSet(current, next)) {
-                Log.i(
-                    TAG,
-                    "transition ${current::class.simpleName} + ${transition::class.simpleName} → ${next::class.simpleName}",
-                )
+                val from = current::class.simpleName
+                val tr = transition::class.simpleName
+                val to = next::class.simpleName
+                Log.i(TAG, "transition $from + $tr → $to")
                 return
             }
         }

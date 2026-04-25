@@ -6,8 +6,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Тянет latest release с GitHub Releases API. По умолчанию `https://api.github.com/repos/<owner>/<repo>/releases/latest`.
- * `apk` и `apk.sig` ассеты определяются по суффиксу имени.
+ * Тянет latest release с GitHub Releases API.
+ * URL по умолчанию: https://api.github.com/repos/OWNER/REPO/releases/latest
+ * apk и apk.sig ассеты определяются по суффиксу имени.
  *
  * Безопасность:
  * - HTTPS обязателен (network_security_config с E10 запрещает cleartext)
