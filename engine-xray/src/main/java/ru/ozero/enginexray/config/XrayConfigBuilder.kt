@@ -56,6 +56,42 @@ class XrayConfigBuilder {
         return JsonWriter.write(root)
     }
 
+    /**
+     * Double-hop: entry outbound (RU) → exit outbound (foreign) → internet.
+     *
+     * Trafic flow: client → SOCKS inbound → entry outbound → entry server → exit outbound
+     *              (proxySettings.tag) → exit server → internet.
+     *
+     * Преимущество: ни entry-server, ни ISP не видят destination,
+     * exit-server не видит исходный IP клиента (видит entry-server). Защита от
+     * deanonymization: даже если entry-сервер скомпрометирован, exit-сервер не
+     * раскрывает реального клиента.
+     */
+    fun buildChain(entry: VlessServer, exit: VlessServer, socksPort: Int): String {
+        require(socksPort in 1..65535) { "socksPort вне диапазона: $socksPort" }
+        require(entry.host.isNotBlank()) { "entry.host пуст" }
+        require(exit.host.isNotBlank()) { "exit.host пуст" }
+        require(entry.host != exit.host || entry.port != exit.port) {
+            "entry и exit указывают на один сервер — chain бессмыслен"
+        }
+
+        val entryOutbound = vlessOutbound(entry).toMutableMap().apply {
+            this["tag"] = TAG_ENTRY
+            this["proxySettings"] = linkedMapOf<String, Any?>("tag" to TAG_EXIT)
+        }
+        val exitOutbound = vlessOutbound(exit).toMutableMap().apply {
+            this["tag"] = TAG_EXIT
+        }
+
+        val root = linkedMapOf<String, Any?>(
+            "log" to log(),
+            "inbounds" to listOf(socksInbound(socksPort)),
+            // Порядок outbound значим для tag-routing: entry должен быть default.
+            "outbounds" to listOf(entryOutbound, exitOutbound),
+        )
+        return JsonWriter.write(root)
+    }
+
     fun build(server: ShadowsocksServer, socksPort: Int): String {
         require(socksPort in 1..65535) { "socksPort вне диапазона: $socksPort" }
         require(server.host.isNotBlank()) { "host пуст" }
@@ -221,4 +257,9 @@ class XrayConfigBuilder {
             "udp" to true,
         ),
     )
+
+    private companion object {
+        const val TAG_ENTRY = "proxy"
+        const val TAG_EXIT = "exit-proxy"
+    }
 }

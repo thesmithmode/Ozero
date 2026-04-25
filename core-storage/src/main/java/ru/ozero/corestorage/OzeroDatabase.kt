@@ -11,7 +11,9 @@ import ru.ozero.corestorage.entity.ServerEntity
 
 @Database(
     entities = [ServerEntity::class, ConnectionLogEntity::class, AppSplitRule::class],
-    version = 1,
+    // v2: добавлено `pairId` в ServerEntity для double-hop chains (E8).
+    // До stable релиза fallbackToDestructiveMigration() в RoomBuilder — миграция не нужна.
+    version = 2,
     exportSchema = true
 )
 abstract class OzeroDatabase : RoomDatabase() {
