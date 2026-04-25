@@ -6,6 +6,19 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
 
+    <!-- Android 13 (API 33+): runtime-permission, без неё system-tray notification VPN не покажет -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Android 8+ (API 26+): self-update через PackageInstaller (RT.7) — иначе install upd APK падает -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <!--
+        ACCESS_NETWORK_STATE: probe-логика (CGNAT detector, network type) опирается на
+        ConnectivityManager.getNetworkCapabilities — без permission возвращает null,
+        StrategyEngine.udpReachable не сможет принять решение.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <application
         android:name=".OzeroApp"
         android:allowBackup="false"
