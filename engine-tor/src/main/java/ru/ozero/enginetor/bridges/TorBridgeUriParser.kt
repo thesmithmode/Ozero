@@ -24,8 +24,12 @@ class TorBridgeUriParser {
         }
 
         val transport = parsed.userInfo
-        if (transport.isNullOrBlank()) return Result.failure(IllegalArgumentException("отсутствует transport (userinfo)"))
-        if (transport !in VALID_TRANSPORTS) return Result.failure(IllegalArgumentException("неизвестный transport: $transport"))
+        if (transport.isNullOrBlank()) {
+            return Result.failure(IllegalArgumentException("отсутствует transport (userinfo)"))
+        }
+        if (transport !in VALID_TRANSPORTS) {
+            return Result.failure(IllegalArgumentException("неизвестный transport: $transport"))
+        }
 
         val host = parsed.host ?: return Result.failure(IllegalArgumentException("отсутствует host"))
         val port = parsed.port
