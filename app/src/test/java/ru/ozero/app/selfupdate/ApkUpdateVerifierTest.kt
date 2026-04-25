@@ -30,8 +30,8 @@ class ApkUpdateVerifierTest {
         val (priv, pub) = generateKeyPair()
         val apk = (tmp / "ozero.apk").toFile().apply { writeBytes(byteArrayOf(0x01, 0x02, 0x03)) }
         val sig = (tmp / "ozero.apk.sig").toFile().apply { writeBytes(sign(priv, apk.readBytes())) }
-        // Тампер
-        apk.writeBytes(byteArrayOf(0x01, 0x02, 0x99))
+        // Тампер: 0x99 (153) выходит за диапазон Byte (-128..127), требует .toByte()
+        apk.writeBytes(byteArrayOf(0x01, 0x02, 0x99.toByte()))
         val verifier = ApkUpdateVerifier(pub)
         assertFalse(verifier.verify(apk, sig))
     }
