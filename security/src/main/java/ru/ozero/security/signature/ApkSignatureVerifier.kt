@@ -26,6 +26,10 @@ class ApkSignatureVerifier(
     /** Текущий fingerprint — для логов / debug release setup. */
     fun currentSignatureSha256(): String? = loadSignatures()?.firstOrNull()?.let(::sha256)
 
+    // Намеренно swallow NameNotFoundException → null (own package всегда существует;
+    // edge case в тестах/изменённой среде маппится в "подпись не доступна").
+    // Логирование избыточно — caller обрабатывает null.
+    @Suppress("SwallowedException")
     private fun loadSignatures(): List<ByteArray>? {
         val pm = context.packageManager
         return try {
