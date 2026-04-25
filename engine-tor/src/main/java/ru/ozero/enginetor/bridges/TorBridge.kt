@@ -44,11 +44,9 @@ data class TorBridge(
         fun requireSafe(value: String, field: String) {
             require(value.isNotEmpty()) { "$field пустой" }
             require(!UNSAFE.containsMatchIn(value)) {
-                "$field содержит управляющий символ или пробел: ${value.toByteArray().toHexString()}"
+                val hex = value.toByteArray().joinToString("") { "%02x".format(it) }
+                "$field содержит управляющий символ или пробел: $hex"
             }
         }
-
-        @OptIn(ExperimentalStdlibApi::class)
-        private fun ByteArray.toHexString(): String = joinToString("") { "%02x".format(it) }
     }
 }
