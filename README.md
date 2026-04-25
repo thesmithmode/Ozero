@@ -1,5 +1,11 @@
 # Ozero
 
+[![CI](https://github.com/thesmithmode/Ozero/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/thesmithmode/Ozero/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/thesmithmode/Ozero?include_prereleases&sort=semver)](https://github.com/thesmithmode/Ozero/releases)
+[![F-Droid](https://img.shields.io/f-droid/v/ru.ozero.app.svg)](https://f-droid.org/packages/ru.ozero.app/)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![Telegram](https://img.shields.io/badge/Telegram-Channel-26A5E4?logo=telegram)](https://t.me/ozero_app)
+
 **Один клик — интернет без границ.**
 
 Ozero — Android-комбайн обхода блокировок и DPI-цензуры. Один APK, в котором под одной кнопкой работают все актуальные средства:

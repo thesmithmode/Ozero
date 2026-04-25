@@ -39,6 +39,26 @@ extensions.configure<BaseAppModuleExtension> {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    val keystorePath = providers.environmentVariable("OZERO_KEYSTORE_PATH").orNull
+    val keystorePassword = providers.environmentVariable("OZERO_KEYSTORE_PASSWORD").orNull
+    val keyAlias = providers.environmentVariable("OZERO_KEY_ALIAS").orNull
+    val keyPassword = providers.environmentVariable("OZERO_KEY_PASSWORD").orNull
+    val hasReleaseSigning =
+        keystorePath != null && keystorePassword != null && keyAlias != null && keyPassword != null
+
+    if (hasReleaseSigning) {
+        signingConfigs {
+            create("release") {
+                storeFile = file(keystorePath!!)
+                storePassword = keystorePassword
+                this.keyAlias = keyAlias
+                this.keyPassword = keyPassword
+                enableV2Signing = true
+                enableV3Signing = true
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -46,6 +66,9 @@ extensions.configure<BaseAppModuleExtension> {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
         debug {
             isMinifyEnabled = false
