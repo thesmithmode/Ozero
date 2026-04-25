@@ -11,13 +11,15 @@ import org.json.JSONObject
  *
  * Безопасность:
  * - HTTPS обязателен (network_security_config с E10 запрещает cleartext)
- * - Pinned cert для api.github.com проверяется через системный TrustStore
+ * - Сertificate pinning api.github.com через [GithubPinnedClient] — защита от
+ *   compromised CA (любой публично доверенный CA мог бы выпустить mitm-сертификат
+ *   и подменить APK URL)
  * - Подпись APK верифицируется отдельно через Ed25519 (см. ApkUpdateVerifier)
  */
 class GithubReleaseFetcher(
     private val owner: String,
     private val repo: String,
-    private val client: OkHttpClient = OkHttpClient(),
+    private val client: OkHttpClient = GithubPinnedClient.create(),
     private val baseUrl: String = "https://api.github.com",
 ) {
 
