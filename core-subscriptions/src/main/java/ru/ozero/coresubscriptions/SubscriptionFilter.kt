@@ -26,6 +26,13 @@ class SubscriptionFilter {
         }
 
     private fun ru.ozero.coresubscriptions.uri.AmneziaWgServer.hasObfuscation(): Boolean =
-        jc > 0 || jmin > 0 || jmax > 0 || s1 > 0 || s2 > 0 ||
-            h1 != 0L || h2 != 0L || h3 != 0L || h4 != 0L
+        jc > 0 ||
+            jmin > 0 ||
+            jmax > 0 ||
+            s1 > 0 ||
+            s2 > 0 ||
+            h1 != 0L ||
+            h2 != 0L ||
+            h3 != 0L ||
+            h4 != 0L
 }
