@@ -1,5 +1,5 @@
-tag: hysteria2-a7bf52a5
-generated_at: 2026-04-25T21:12:50Z
+tag: tor-0253c6b2
+generated_at: 2026-04-25T21:42:56Z
 artifacts:
   - name: libbyedpi-arm64-v8a.so
     engine: byedpi
@@ -97,3 +97,75 @@ artifacts:
     size_bytes: 50520590
     source_repo: https://github.com/apernet/hysteria
     source_commit: 15e31d48a09af0835773bd5c62cedbb3fc0e351d
+  - name: libtor-arm64-v8a.so
+    engine: tor
+    abi: arm64-v8a
+    destination: jniLibs
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/tor-0253c6b2/libtor-arm64-v8a.so
+    sha256: 39e1e4b1cd15c0436c57c934f0de17f3a0aa7ba88cfa4b2e9a5084c194e2ff85
+    size_bytes: 9267272
+    source_repo: https://github.com/guardianproject/tor-android
+    source_commit: tor-android-0.4.9.6
+  - name: libtor-armeabi-v7a.so
+    engine: tor
+    abi: armeabi-v7a
+    destination: jniLibs
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/tor-0253c6b2/libtor-armeabi-v7a.so
+    sha256: 45e9edb07c75c80341964875f4565f3deb69e58f480b7ec985a2e6fab7d669ed
+    size_bytes: 7608528
+    source_repo: https://github.com/guardianproject/tor-android
+    source_commit: tor-android-0.4.9.6
+  - name: libtor-x86.so
+    engine: tor
+    abi: x86
+    destination: jniLibs
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/tor-0253c6b2/libtor-x86.so
+    sha256: 1847810606a36fc274f24780c4d682f79477a99d67a95e51bbf8197822e30d48
+    size_bytes: 8214812
+    source_repo: https://github.com/guardianproject/tor-android
+    source_commit: tor-android-0.4.9.6
+  - name: libtor-x86_64.so
+    engine: tor
+    abi: x86_64
+    destination: jniLibs
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/tor-0253c6b2/libtor-x86_64.so
+    sha256: 797e7864615c83cc546c5ea1ea23b030c76670fc94777adfbd8657ad7a086210
+    size_bytes: 9549152
+    source_repo: https://github.com/guardianproject/tor-android
+    source_commit: tor-android-0.4.9.6
+  - name: libiptproxy-arm64-v8a.so
+    engine: iptproxy
+    abi: arm64-v8a
+    destination: jniLibs
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/tor-0253c6b2/libiptproxy-arm64-v8a.so
+    sha256: 8fa8040b8a179197c89bf7df7758cc5e71e773a858a51f4de152df3b6b4371fd
+    size_bytes: 24249808
+    source_repo: https://github.com/tladesignz/IPtProxy
+    source_commit: v5.4.1
+  - name: libiptproxy-armeabi-v7a.so
+    engine: iptproxy
+    abi: armeabi-v7a
+    destination: jniLibs
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/tor-0253c6b2/libiptproxy-armeabi-v7a.so
+    sha256: 798559fff2396de2e863279965e0abbcc8793f36544995408f8f7f156c61f4b1
+    size_bytes: 23280680
+    source_repo: https://github.com/tladesignz/IPtProxy
+    source_commit: v5.4.1
+  - name: libiptproxy-x86.so
+    engine: iptproxy
+    abi: x86
+    destination: jniLibs
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/tor-0253c6b2/libiptproxy-x86.so
+    sha256: 428dd2795d944ca75fc661c7935b1ec183f583bee84c336eda317f415dcf637f
+    size_bytes: 23716192
+    source_repo: https://github.com/tladesignz/IPtProxy
+    source_commit: v5.4.1
+  - name: libiptproxy-x86_64.so
+    engine: iptproxy
+    abi: x86_64
+    destination: jniLibs
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/tor-0253c6b2/libiptproxy-x86_64.so
+    sha256: fcbe6f19d4267dced8981474f61b0a01f2ea62a5bfcfbe58b29df0cd5e31d784
+    size_bytes: 27070800
+    source_repo: https://github.com/tladesignz/IPtProxy
+    source_commit: v5.4.1
