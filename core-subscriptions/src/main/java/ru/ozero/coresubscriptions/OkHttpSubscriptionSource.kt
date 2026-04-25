@@ -31,6 +31,10 @@ class OkHttpSubscriptionSource(
             SubscriptionFetchResult.Success(bodyResult.bytes, signature)
         }
 
+    // Вложенность обусловлена defensive HTTP read внутри response.use {}: проверка
+    // success → body null → лимит размера. Уплощение требует extract-method, который
+    // разрывает .use{} scope и усложняет lifecycle закрытия body.
+    @Suppress("NestedBlockDepth")
     private fun fetchBytes(url: String): FetchBytesResult {
         val request = Request.Builder().url(url).build()
         return try {
