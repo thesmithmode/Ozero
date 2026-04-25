@@ -193,6 +193,8 @@ jobs:
             --out build-tools/binaries.lock.yaml
 
       - name: Open PR if lock changed
+        id: cpr
+        continue-on-error: true
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ github.token }}
@@ -208,3 +210,19 @@ jobs:
             Содержимое lock-файла отражает SHA256 + размеры артефактов из Release.
           base: dev
           delete-branch: true
+
+      # peter-evans пушит ветку bot/binaries-lock-<tag>, потом пытается открыть
+      # PR. Если permission «Allow GH Actions to create PRs» выключен — PR
+      # creation fail, но ветка уже на remote и остаётся orphan'ом. Чистим.
+      - name: Cleanup orphan bot branch on PR creation failure
+        if: steps.cpr.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BRANCH="bot/binaries-lock-${TAG}"
+          if gh api "repos/${REPO}/branches/${BRANCH}" >/dev/null 2>&1; then
+            echo "::warning::PR creation failed (likely repo permission). Deleting orphan ${BRANCH}."
+            git push origin --delete "${BRANCH}" || true
+          fi
+          echo "Manual lock regen instructions: build-tools/README.md → Binary artifact pipeline."
+          exit 1
