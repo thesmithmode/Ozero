@@ -24,7 +24,7 @@ ARG NDK_VERSION=r27c
 ARG NDK_ZIP=android-ndk-${NDK_VERSION}-linux.zip
 ARG NDK_URL=https://dl.google.com/android/repository/${NDK_ZIP}
 # SHA256 of android-ndk-r27c-linux.zip (official Google distribution)
-ARG NDK_SHA256=1a81810f8e45fd91d7c4c2aa17aa1e8efa6c89b2571e3f0625c9cad8a14bdcdc
+ARG NDK_SHA256=59c2f6dc96743b5daf5d1626684640b20a6bd2b1d85b13156b90333741bad5cc
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
@@ -57,6 +57,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
         openjdk-17-jdk-headless \
         python3 \
+        cmake \
+        make \
     && rm -rf /var/lib/apt/lists/*
 
 # Verify JDK

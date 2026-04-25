@@ -1,0 +1,132 @@
+name: Build native binaries
+
+on:
+  workflow_dispatch:
+    inputs:
+      artifact:
+        description: 'Which artifact to build'
+        required: true
+        default: 'byedpi'
+        type: choice
+        options:
+          - byedpi
+  push:
+    branches:
+      - feat/rt-runtime-integration
+    paths:
+      - '.github/workflows/binaries.yml'
+      - 'build-tools/Dockerfile'
+      - 'build-tools/Dockerfile.byedpi'
+      - 'build-tools/build_byedpi.sh'
+
+jobs:
+  build:
+    name: Build artifact
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    env:
+      ARTIFACT: ${{ inputs.artifact || 'byedpi' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Clone byedpi (pinned)
+        env:
+          BYEDPI_VERSION: v0.17.3
+        run: |
+          git clone --depth 1 --branch "$BYEDPI_VERSION" \
+            https://github.com/hufrea/byedpi.git \
+            engine-byedpi/src/main/cpp/byedpi
+
+      - name: Compute lock_sha8 tag
+        id: tag
+        run: |
+          if [ -f build-tools/binaries.lock.yaml ]; then
+            LOCK_HASH=$(grep -v '^tag:' build-tools/binaries.lock.yaml | sha256sum | cut -c1-8)
+          else
+            LOCK_HASH="initial0"
+          fi
+          TREE_HASH=$(find build-tools -type f -not -name 'binaries.lock.yaml' -print0 \
+            | sort -z | xargs -0 sha256sum | sha256sum | cut -c1-8)
+          TAG="binaries-${LOCK_HASH}${TREE_HASH}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Tag: $TAG"
+
+      - name: Build byedpi Docker image
+        if: env.ARTIFACT == 'byedpi'
+        run: docker build -t ozero-byedpi -f build-tools/Dockerfile.byedpi build-tools/
+
+      - name: Build byedpi (4 ABI)
+        if: env.ARTIFACT == 'byedpi'
+        run: |
+          docker run --rm \
+            -v "$PWD:/src" \
+            -w /src \
+            -e REPO_ROOT=/src \
+            -e OUT_DIR=/src/out/byedpi \
+            ozero-byedpi \
+            bash build-tools/build_byedpi.sh
+
+      - name: Upload assets to Release
+        uses: softprops/action-gh-release@v2
+        env:
+          GH_TAG: ${{ steps.tag.outputs.tag }}
+        with:
+          tag_name: ${{ env.GH_TAG }}
+          name: Native binaries ${{ env.GH_TAG }}
+          body: |
+            Auto-built native binaries.
+
+            Artifact: ${{ env.ARTIFACT }}
+            Commit: ${{ github.sha }}
+          files: |
+            out/byedpi/libbyedpi-*.so
+            out/byedpi/manifest.txt
+          fail_on_unmatched_files: true
+
+  update-lock:
+    name: Regenerate binaries.lock.yaml
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      TAG: ${{ needs.build.outputs.tag }}
+      REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p out/byedpi
+          gh release download "$TAG" -p 'libbyedpi-*.so' -p 'manifest.txt' -D out/byedpi/
+
+      - name: Regenerate lock file
+        run: |
+          python3 build-tools/regen_lock.py \
+            --tag "$TAG" \
+            --repo "$REPO" \
+            --manifest out/byedpi/manifest.txt \
+            --out build-tools/binaries.lock.yaml
+
+      - name: Open PR if lock changed
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ github.token }}
+          branch: bot/binaries-lock-${{ env.TAG }}
+          title: "FEAT: RT.1.7 — обновлён binaries.lock.yaml (${{ env.TAG }})"
+          commit-message: "FEAT: RT.1.7 — binaries.lock.yaml для ${{ env.TAG }}"
+          body: |
+            Автоматический PR от binaries.yml workflow.
+
+            Тег: `${{ env.TAG }}`
+            Содержимое lock-файла отражает SHA256 + размеры артефактов из Release.
+          base: feat/rt-runtime-integration
+          delete-branch: true

@@ -65,3 +65,60 @@ AAR артефакты **не коммитятся** в Git (см. `engine-xray/
 - `ANDROID_NDK_ROOT not set` -> экспортируй путь к NDK (не NDK toolchain, а корень NDK)
 - `linker error arm64`: проверь NDK версию >= r27
 - Docker build медленный: первая сборка ~800MB download (NDK), последующие — cache
+
+---
+
+## Binary artifact pipeline (RT.1.7)
+
+Native бинари собираются workflow `.github/workflows/binaries.yml` (Docker pinned NDK r27 + cmake), публикуются в GitHub Releases с тегом `binaries-<sha8>`. Convention plugin `ozero.binaries` качает их в Gradle через lock-файл `build-tools/binaries.lock.yaml` с SHA256 verify.
+
+### Когда пересобирать бинари
+
+После изменений в `build-tools/build_*.sh` или Dockerfile, или при bump upstream версии (byedpi tag).
+
+```bash
+# 1) push изменения в build-tools/* → workflow триггерится автоматически
+git push
+
+# 2) После зелёного workflow → скачай новый manifest и обнови lock:
+gh release download <new-tag> -p 'libbyedpi-*.so' -p 'manifest.txt' -D /tmp/bin/ -R thesmithmode/Ozero
+python3 build-tools/regen_lock.py \
+  --tag <new-tag> --repo thesmithmode/Ozero \
+  --manifest /tmp/bin/manifest.txt --out build-tools/binaries.lock.yaml
+git add build-tools/binaries.lock.yaml
+git commit -m "FEAT: RT.1.7 — обновлён binaries.lock.yaml для <new-tag>"
+git push
+```
+
+(Auto-PR из workflow требует repo permission «Allow GitHub Actions to create PRs» — пока вручную.)
+
+### Применение в engine-* модулях
+
+```kotlin
+plugins {
+    id("ozero.android.library")
+    id("ozero.binaries")
+}
+
+ozeroBinaries {
+    artifact("libbyedpi-arm64-v8a.so")
+    artifact("libbyedpi-armeabi-v7a.so")
+}
+```
+
+Hook добавляет `downloadBinaries` task в `preBuild`. Бинари кладутся в `src/main/jniLibs/<abi>/`.
+
+### Файлы
+
+| Файл | Назначение |
+|------|-----------|
+| `build-tools/binaries.lock.yaml` | source of truth: tag + URL + SHA256 каждого артефакта |
+| `build-tools/Dockerfile.byedpi` | Reproducible env для byedpi (debian + NDK + cmake, без Go) |
+| `build-tools/build_byedpi.sh` | CMake-сборка libbyedpi.so для 4 ABI |
+| `build-tools/regen_lock.py` | manifest.txt → binaries.lock.yaml |
+| `.github/workflows/binaries.yml` | Triggered on push to build-tools/* — собирает в Docker, публикует Release |
+| `buildSrc/src/main/kotlin/ozero.binaries.gradle.kts` | Convention plugin для engine-* модулей |
+
+### Negative test
+
+Удаление asset из Release → CI fail с сообщением `HTTP 404 for ... Run: gh workflow run binaries.yml --ref dev`. Восстановление = повторный dispatch workflow.
