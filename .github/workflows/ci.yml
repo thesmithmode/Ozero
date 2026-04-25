@@ -47,6 +47,9 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' }}
 
+      - name: Download native binaries (RT.1.7)
+        run: ./gradlew :engine-byedpi:downloadBinaries --stacktrace
+
       - name: Run ktlint, detekt, lint, build, and tests
         run: ./gradlew ktlintCheck detekt lint assembleDebug testDebugUnitTest jacocoTestReport jacocoTestCoverageVerification --stacktrace --continue
 

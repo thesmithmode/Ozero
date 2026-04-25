@@ -1,28 +1,23 @@
 plugins {
     id("ozero.android.library")
+    id("ozero.binaries")
 }
 
-// byedpi C-исходники — git submodule (hufrea/byedpi), добавляется отдельно.
-// Пока submodule не инициализирован, externalNativeBuild отключён чтобы CI оставался зелёным.
-val byedpiSourcesPresent = file("src/main/cpp/byedpi").listFiles()?.any { it.name.endsWith(".c") } == true
+// libbyedpi.so для 4 ABI скачивается из GitHub Releases через ozero.binaries (RT.1.7).
+// Локальная сборка из submodule более не нужна — production использует prebuilt бинари.
+ozeroBinaries {
+    artifact("libbyedpi-arm64-v8a.so")
+    artifact("libbyedpi-armeabi-v7a.so")
+    artifact("libbyedpi-x86_64.so")
+    artifact("libbyedpi-x86.so")
+}
 
 android {
     namespace = "ru.ozero.enginebyedpi"
 
-    if (byedpiSourcesPresent) {
-        ndkVersion = "27.2.12479018"
-
-        defaultConfig {
-            ndk {
-                abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
-            }
-        }
-
-        externalNativeBuild {
-            cmake {
-                path = file("src/main/cpp/CMakeLists.txt")
-                version = "3.22.1"
-            }
+    defaultConfig {
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
         }
     }
 }
