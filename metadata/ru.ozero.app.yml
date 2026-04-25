@@ -1,0 +1,48 @@
+Categories:
+  - Internet
+  - Security
+License: GPL-3.0-or-later
+AuthorName: thesmithmode
+AuthorWebSite: https://github.com/thesmithmode
+WebSite: https://ozero.app
+SourceCode: https://github.com/thesmithmode/Ozero
+IssueTracker: https://github.com/thesmithmode/Ozero/issues
+Changelog: https://github.com/thesmithmode/Ozero/releases
+
+AutoName: Ozero
+Description: |-
+    Ozero — Android-комбайн обхода блокировок и DPI-цензуры. Один APK,
+    в котором под одной кнопкой работают: ByeDPI, Xray-core (VLESS + Reality),
+    Hysteria2 (QUIC + port hopping), AmneziaWG 2.0, NaiveProxy, Tor + obfs4 +
+    Snowflake.
+
+    Приложение само выбирает живой метод (параллельный probe 3 кандидатов)
+    и переключается при деградации. Поддерживает double-hop (entry → exit).
+
+    Принципы: одна кнопка ON/OFF, internal kill-switch (fail-closed),
+    Ed25519-подписанные подписки, anti-debug / anti-frida, R8 full minify.
+
+RepoType: git
+Repo: https://github.com/thesmithmode/Ozero.git
+
+Builds:
+  - versionName: 0.1.0
+    versionCode: 1
+    commit: v0.1.0
+    subdir: app
+    sudo:
+      - apt-get update
+      - apt-get install -y openjdk-17-jdk-headless
+      - update-java-alternatives -a
+    gradle:
+      - yes
+    output: build/outputs/apk/release/app-release.apk
+    srclibs: []
+    prebuild: ''
+    scanignore: []
+    scandelete: []
+
+AutoUpdateMode: Version v%v
+UpdateCheckMode: Tags ^v[0-9]+\.[0-9]+\.[0-9]+$
+CurrentVersion: 0.1.0
+CurrentVersionCode: 1

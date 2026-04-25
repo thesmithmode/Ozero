@@ -1,0 +1,21 @@
+Ozero — Android-комбайн обхода блокировок и DPI-цензуры. Один APK с
+несколькими движками под одной кнопкой ON/OFF:
+
+* ByeDPI — локальный DPI-обход без сервера (SNI-фрагментация)
+* Xray-core — VLESS + Reality + XHTTP / gRPC
+* Hysteria2 — QUIC/UDP с port hopping
+* AmneziaWG 2.0 — WireGuard с полной мимикрией
+* NaiveProxy — HTTP/2 маскировка под Chrome
+* Tor + obfs4 + Snowflake — аварийная анонимность
+
+Приложение само пробует трёх кандидатов параллельно, активирует первого
+живого и переключается при деградации. Поддерживает double-hop
+(entry → exit).
+
+Принципы:
+
+* одна кнопка, без настройки протоколов и ключей
+* internal kill-switch — при сбое трафик блокируется (fail-closed)
+* Ed25519-подписанные подписки серверов
+* security-first: anti-debug / anti-frida / signature check / R8 full minify
+* free, без Google Play — только F-Droid / GitHub Releases / Telegram

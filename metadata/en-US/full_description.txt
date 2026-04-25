@@ -1,0 +1,21 @@
+Ozero is an Android circumvention toolkit that bundles multiple protocols
+behind a single ON/OFF button:
+
+* ByeDPI — local DPI bypass (SNI fragmentation, no server)
+* Xray-core — VLESS + Reality + XHTTP / gRPC
+* Hysteria2 — QUIC/UDP with port hopping
+* AmneziaWG 2.0 — WireGuard with full mimicry
+* NaiveProxy — HTTP/2 masquerading as Chrome network stack
+* Tor + obfs4 + Snowflake — emergency anonymity tier
+
+The app probes three candidates in parallel and activates the first one that
+works, switching automatically on degradation. Supports double-hop (entry →
+exit) chaining.
+
+Design principles:
+
+* one ON/OFF button, no protocol knobs
+* internal kill-switch (fail-closed): traffic blocked outside TUN if engine fails
+* Ed25519-signed server subscriptions
+* security-first: anti-debug / anti-frida / signature check / R8 full minify
+* free, no Google Play (F-Droid / GitHub Releases / Telegram only)
