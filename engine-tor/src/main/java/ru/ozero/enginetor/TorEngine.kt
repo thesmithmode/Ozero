@@ -13,13 +13,12 @@ import ru.ozero.coreapi.EngineId
 import ru.ozero.coreapi.EngineStats
 import ru.ozero.coreapi.ProbeResult
 import ru.ozero.coreapi.StartResult
+import ru.ozero.coreorchestrator.probe.Socks5HandshakeProbe
 import ru.ozero.enginetor.bridges.TorBridge
 import ru.ozero.enginetor.config.TorBuildOptions
 import ru.ozero.enginetor.config.TorConfigBuilder
 import ru.ozero.enginetor.dynamicmod.DynamicTorInstaller
 import ru.ozero.enginetor.dynamicmod.InstallResult
-import java.net.InetSocketAddress
-import java.net.Socket
 
 /**
  * Tor engine с PT-bridges (obfs4 / snowflake / webtunnel / conjure / meek_lite).
@@ -110,14 +109,11 @@ class TorEngine(
         if (!delegate.isBootstrapped()) {
             return ProbeResult.Failure(reason = "tor не bootstrapped (${delegate.bootstrapPercent()}%)")
         }
-        return withContext(Dispatchers.IO) {
-            try {
-                val start = System.currentTimeMillis()
-                Socket().use { it.connect(InetSocketAddress("127.0.0.1", buildOptions.socksPort), 5_000) }
-                ProbeResult.Success(latencyMs = System.currentTimeMillis() - start)
-            } catch (e: Exception) {
-                ProbeResult.Failure(reason = e.message ?: "connection refused")
-            }
+        return try {
+            val latency = Socks5HandshakeProbe.probe("127.0.0.1", buildOptions.socksPort, timeoutMs = 5_000)
+            ProbeResult.Success(latencyMs = latency)
+        } catch (e: Exception) {
+            ProbeResult.Failure(reason = e.message ?: "connection refused")
         }
     }
 

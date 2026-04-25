@@ -29,8 +29,10 @@ class AwgCandidateSource(
             if (out.size >= maxCandidates) break
             val parsed = parser.parse(entity.uri)
             if (parsed !is ParsedServer.AmneziaWg) continue
-            val ini = runCatching { builder.build(parsed.server) }.getOrElse {
-                Log.w(TAG, "пропуск Awg — ошибка сборки: ${it.message}")
+            val iniResult = runCatching { builder.build(parsed.server) }
+            val ini = iniResult.getOrNull()
+            if (ini == null) {
+                Log.w(TAG, "пропуск Awg — ошибка сборки: ${iniResult.exceptionOrNull()?.message}")
                 continue
             }
             out += Candidate(

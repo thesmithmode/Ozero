@@ -11,6 +11,7 @@ import ru.ozero.coreapi.EngineId
 import ru.ozero.coreapi.ProbeResult
 import ru.ozero.coreapi.StartResult
 import java.net.ServerSocket
+import kotlin.concurrent.thread
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
@@ -82,6 +83,7 @@ class ByeDpiEngineTest {
     fun probeSuccessWhenSocketListens() = runTest {
         val server = ServerSocket(0)
         val port = server.localPort
+        server.acceptSocks5InBackground()
         try {
             every { proxy.jniStartProxy(any()) } returns 0
             engine.start(EngineConfig.ByeDpi(socksPort = port))
@@ -89,6 +91,18 @@ class ByeDpiEngineTest {
             assertIs<ProbeResult.Success>(result)
         } finally {
             server.close()
+        }
+    }
+
+    private fun ServerSocket.acceptSocks5InBackground() {
+        thread(isDaemon = true) {
+            runCatching {
+                accept().use { c ->
+                    c.getInputStream().read(ByteArray(8))
+                    c.getOutputStream().write(byteArrayOf(0x05, 0x00))
+                    c.getOutputStream().flush()
+                }
+            }
         }
     }
 
