@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Network Security Config (E10).
+
+    Запрещает cleartext HTTP трафик; для всех соединений требует TLS.
+    User-installed CA certificates НЕ доверяются — это ломает установленные
+    вручную сертификаты MITM-инструментов (mitmproxy / Charles / РКН-issued root).
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

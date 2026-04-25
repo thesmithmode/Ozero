@@ -74,7 +74,8 @@ GitHub Actions на tag push `v*.*.*`. Signed APK + SHA256 + GPG. F-Droid submis
 | E7 | ✅ Done (PT-бинари + DI + PlayCore SplitInstall отложены) | `feat/e7-tor` |
 | E8 | ✅ Done (UI выбора пары — в E11) | `feat/e8-double-hop` |
 | E9 | ✅ Done (split-tunnel ядро; UI настроек в E11) | `feat/e9-dns-split-tunnel` |
-| E10 | В процессе | `feat/e10-security` |
+| E10 | ✅ Done (obfuscator-LLVM — отложен, требует custom NDK plugin) | `feat/e10-security` |
+| E11 | В процессе | `feat/e11-ui` |
 | … | … | … |
 
 ## Nice-to-have (v2.0+)
