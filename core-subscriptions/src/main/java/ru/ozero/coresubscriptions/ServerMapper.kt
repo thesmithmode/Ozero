@@ -58,6 +58,16 @@ class ServerMapper {
                     port = parsed.server.port,
                 )
 
+            is ParsedServer.Naive ->
+                ServerEntity(
+                    id = stableId(originalUri),
+                    country = countryFromRemark(parsed.server.remark) ?: UNKNOWN_COUNTRY,
+                    role = "single",
+                    protocol = "naive",
+                    uri = originalUri,
+                    port = parsed.server.port,
+                )
+
             is ParsedServer.Error -> null
         }
 
