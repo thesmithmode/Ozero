@@ -13,11 +13,19 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object OrchestratorModule {
+
     @Provides
     @Singleton
     fun provideOrchestrator(): Orchestrator = Orchestrator()
 
+    /**
+     * `@JvmSuppressWildcards` обязателен — без него Kotlin сгенерирует
+     * Map<EngineId, ? extends Engine>, а Hilt мульти-биндинг ожидает
+     * Map<EngineId, Engine>. Параметр не разрешится → InjectException.
+     */
     @Provides
     @Singleton
-    fun provideStrategyEngine(engines: Map<EngineId, Engine>): StrategyEngine = StrategyEngine(engines)
+    fun provideStrategyEngine(
+        engines: Map<EngineId, @JvmSuppressWildcards Engine>,
+    ): StrategyEngine = StrategyEngine(engines)
 }

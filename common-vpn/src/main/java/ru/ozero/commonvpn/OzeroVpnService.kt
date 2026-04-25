@@ -7,10 +7,22 @@ import android.content.Intent
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
+import dagger.hilt.android.AndroidEntryPoint
 import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_START
 import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_STOP
+import ru.ozero.coreapi.Engine
+import ru.ozero.coreapi.EngineId
+import ru.ozero.coreorchestrator.Orchestrator
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class OzeroVpnService : android.net.VpnService() {
+
+    // Граф собран в RT.2 — реальное использование engines/orchestrator в startVpn
+    // придёт в RT.3 (VpnService→Engine pipeline). Сейчас инъекция доказывает что
+    // multi-binding из EngineModule достаёт все 6 движков.
+    @Inject lateinit var engines: Map<EngineId, @JvmSuppressWildcards Engine>
+    @Inject lateinit var orchestrator: Orchestrator
 
     companion object {
         const val ACTION_START = "ru.ozero.vpn.ACTION_START"
