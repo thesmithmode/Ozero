@@ -42,10 +42,14 @@ RUN curl -fsSL -o "${NDK_ZIP}" "${NDK_URL}" \
 
 # ---------------------------------------------------------------------------
 # Stage 2: Go toolchain base
-# golang:1.22.12-bookworm — pinned patch version for reproducibility.
-# Using bookworm (Debian 12) for glibc compatibility with NDK toolchain.
+# golang:1.25-bookworm — required for `gomobile init`. gomobile-init unconditionally
+# runs `go install gobind@latest`, and the upstream golang.org/x/mobile HEAD now
+# requires Go ≥ 1.25 (toolchain directive). Pinning to an older patch fails with:
+#   "golang.org/x/mobile@... requires go >= 1.25.0 (running go 1.22.12)".
+# Tag `1.25-bookworm` resolves to the current 1.25.x patch — accepted drift in
+# exchange for a working build. See manifest.txt for the exact go_version per build.
 # ---------------------------------------------------------------------------
-FROM golang:1.22.12-bookworm AS builder
+FROM golang:1.25-bookworm AS builder
 
 # ---------------------------------------------------------------------------
 # System dependencies
@@ -73,10 +77,43 @@ ENV ANDROID_NDK_ROOT=/opt/android-ndk
 ENV ANDROID_NDK_HOME=/opt/android-ndk
 
 # ---------------------------------------------------------------------------
+# Android SDK (требуется gomobile bind для AAR упаковки + classes.jar)
+#
+# gomobile проверяет ANDROID_HOME / ANDROID_SDK_ROOT, fallback на ~/Android/Sdk.
+# Без SDK падает с "Android SDK was not found at /root/Android/Sdk".
+# Минимальный набор: cmdline-tools + platforms;android-24 + build-tools.
+# ---------------------------------------------------------------------------
+ARG ANDROID_PLATFORM=android-24
+ARG ANDROID_BUILD_TOOLS=34.0.0
+ARG ANDROID_CMDLINE_TOOLS=11076708
+
+RUN mkdir -p /opt/android-sdk/cmdline-tools \
+    && cd /opt/android-sdk/cmdline-tools \
+    && curl -fsSL -o tools.zip \
+        "https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_CMDLINE_TOOLS}_latest.zip" \
+    && unzip -q tools.zip \
+    && mv cmdline-tools latest \
+    && rm tools.zip
+
+ENV ANDROID_HOME=/opt/android-sdk
+ENV ANDROID_SDK_ROOT=/opt/android-sdk
+ENV PATH=/opt/android-sdk/cmdline-tools/latest/bin:${PATH}
+
+RUN yes | sdkmanager --licenses > /dev/null \
+    && sdkmanager --install \
+        "platform-tools" \
+        "platforms;${ANDROID_PLATFORM}" \
+        "build-tools;${ANDROID_BUILD_TOOLS}"
+
+# ---------------------------------------------------------------------------
 # gomobile (pinned для reproducibility — F-Droid требование)
+#
+# v0.0.0-20240806... зависит от golang.org/x/tools@v0.24.0, который не
+# компилируется на Go 1.25 ("invalid array length -delta * delta"). Поднят
+# до HEAD сборки апреля 2026 — синхронно с bump base image до Go 1.25.
 # Обновлять одновременно с upstream golang.org/x/mobile releases.
 # ---------------------------------------------------------------------------
-ARG GOMOBILE_VERSION=v0.0.0-20240806205939-81131f6468ab
+ARG GOMOBILE_VERSION=v0.0.0-20260410095206-2cfb76559b7b
 RUN go install golang.org/x/mobile/cmd/gomobile@${GOMOBILE_VERSION} \
     && go install golang.org/x/mobile/cmd/gobind@${GOMOBILE_VERSION}
 
@@ -91,10 +128,9 @@ RUN gomobile version
 # ---------------------------------------------------------------------------
 WORKDIR /workspace
 
-# The build script is mounted via -v "$PWD:/workspace" at runtime.
-# ENTRYPOINT runs it directly so `docker run ... ozero-xray-builder` works
-# without specifying the script path.
-ENTRYPOINT ["/workspace/build-tools/build_xray.sh"]
+# Build script mounts via -v "$PWD:/workspace" + invoked explicitly by caller
+# (docker run … ozero-xray bash build-tools/build_xray.sh). No ENTRYPOINT —
+# binaries.yml workflow uses a single image for multiple commands.
 
 # ---------------------------------------------------------------------------
 # Labels
@@ -102,6 +138,6 @@ ENTRYPOINT ["/workspace/build-tools/build_xray.sh"]
 LABEL org.opencontainers.image.title="ozero-xray-builder" \
       org.opencontainers.image.description="Reproducible build env: Xray-core -> Android AAR via gomobile" \
       org.opencontainers.image.source="https://github.com/thesmithmode/Ozero" \
-      org.opencontainers.image.base.name="golang:1.22.12-bookworm" \
+      org.opencontainers.image.base.name="golang:1.25-bookworm" \
       com.ozero.ndk.version="r27c" \
-      com.ozero.go.version="1.22.12"
+      com.ozero.go.version="1.25"

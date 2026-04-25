@@ -68,29 +68,34 @@ AAR артефакты **не коммитятся** в Git (см. `engine-xray/
 
 ---
 
-## Binary artifact pipeline (RT.1.7)
+## Binary artifact pipeline (RT.1.7 / RT.1.7.1)
 
-Native бинари собираются workflow `.github/workflows/binaries.yml` (Docker pinned NDK r27 + cmake), публикуются в GitHub Releases с тегом `binaries-<sha8>`. Convention plugin `ozero.binaries` качает их в Gradle через lock-файл `build-tools/binaries.lock.yaml` с SHA256 verify.
+Native бинари собираются workflow `.github/workflows/binaries.yml`, публикуются в GitHub Releases с **per-engine** тегом (`byedpi-<sha8>`, `xray-<sha8>`). Convention plugin `ozero.binaries` качает их в Gradle через единый lock-файл `build-tools/binaries.lock.yaml` с SHA256 verify.
+
+### Tag scheme
+
+`<engine>-<sha8>`, где `sha8` = первые 8 hex от sha256 списка build-входов engine'а (Dockerfile + build script + regen_lock). Per-engine изоляция: bump xray не инвалидирует byedpi tag.
 
 ### Когда пересобирать бинари
 
-После изменений в `build-tools/build_*.sh` или Dockerfile, или при bump upstream версии (byedpi tag).
+После изменений в `build-tools/build_<engine>.sh`, `Dockerfile*`, или при bump upstream версии.
 
 ```bash
-# 1) push изменения в build-tools/* → workflow триггерится автоматически
-git push
+# 1) Запусти workflow вручную для нужного engine:
+gh workflow run binaries.yml --ref <branch> -f artifact=xray   # или byedpi
 
-# 2) После зелёного workflow → скачай новый manifest и обнови lock:
-gh release download <new-tag> -p 'libbyedpi-*.so' -p 'manifest.txt' -D /tmp/bin/ -R thesmithmode/Ozero
+# 2) Дождись зелёного → workflow откроет PR с обновлённым lock.
+#    Если permission disabled — обнови lock локально:
+gh release download <new-tag> -p 'libxray.aar' -p 'manifest.txt' -D /tmp/bin/ -R thesmithmode/Ozero
 python3 build-tools/regen_lock.py \
-  --tag <new-tag> --repo thesmithmode/Ozero \
+  --engine xray --tag <new-tag> --repo thesmithmode/Ozero \
   --manifest /tmp/bin/manifest.txt --out build-tools/binaries.lock.yaml
 git add build-tools/binaries.lock.yaml
-git commit -m "FEAT: RT.1.7 — обновлён binaries.lock.yaml для <new-tag>"
+git commit -m "FEAT: RT.1.7 — binaries.lock.yaml для <new-tag>"
 git push
 ```
 
-(Auto-PR из workflow требует repo permission «Allow GitHub Actions to create PRs» — пока вручную.)
+`regen_lock.py` сохраняет artifacts других engine-ов нетронутыми — обновляет только указанный `--engine`.
 
 ### Применение в engine-* модулях
 
@@ -101,24 +106,38 @@ plugins {
 }
 
 ozeroBinaries {
+    // byedpi — 4 .so в jniLibs/<abi>/
     artifact("libbyedpi-arm64-v8a.so")
     artifact("libbyedpi-armeabi-v7a.so")
 }
 ```
 
-Hook добавляет `downloadBinaries` task в `preBuild`. Бинари кладутся в `src/main/jniLibs/<abi>/`.
+Hook добавляет `downloadBinaries` task в `preBuild`. Destination определяется lock-файлом (jniLibs или libs).
+
+### Статус движков
+
+| Engine | Status | Notes |
+|--------|--------|-------|
+| byedpi | ✅ Production | 4 ABI .so в jniLibs, lock entries actual |
+| xray | 🚧 Pending RT.1.3 | Infrastructure ready (Dockerfile, build_xray.sh skeleton, matrix workflow), `gomobile bind` blocked: `golang.org/x/mobile/bind` package разрушен в актуальных pin'ах. Engine-xray plugin apply отложен до RT.1.3 |
+| naive | Pending RT.1.7.2 | После RT.1.3 |
+| amnezia | Pending RT.1.7.3 | После RT.1.2 |
+| tor + PT | Pending RT.1.7.4 | После RT.1.6 |
 
 ### Файлы
 
 | Файл | Назначение |
 |------|-----------|
-| `build-tools/binaries.lock.yaml` | source of truth: tag + URL + SHA256 каждого артефакта |
-| `build-tools/Dockerfile.byedpi` | Reproducible env для byedpi (debian + NDK + cmake, без Go) |
-| `build-tools/build_byedpi.sh` | CMake-сборка libbyedpi.so для 4 ABI |
-| `build-tools/regen_lock.py` | manifest.txt → binaries.lock.yaml |
-| `.github/workflows/binaries.yml` | Triggered on push to build-tools/* — собирает в Docker, публикует Release |
+| `build-tools/binaries.lock.yaml` | Source of truth: per-engine artifacts + URL + SHA256 |
+| `build-tools/Dockerfile.byedpi` | Reproducible env для byedpi (NDK + cmake, без Go) |
+| `build-tools/Dockerfile` | Reproducible env для xray (NDK + Go 1.22 + gomobile pinned) |
+| `build-tools/build_byedpi.sh` | CMake → libbyedpi.so для 4 ABI |
+| `build-tools/build_xray.sh` | gomobile bind → libxray.aar (multi-ABI) |
+| `build-tools/regen_lock.py` | manifest.txt → binaries.lock.yaml (multi-engine merge) |
+| `build-tools/tests/test_regen_lock.py` | Unit tests для regen_lock |
+| `.github/workflows/binaries.yml` | Build matrix: byedpi/xray, upload Release, lock-PR |
 | `buildSrc/src/main/kotlin/ozero.binaries.gradle.kts` | Convention plugin для engine-* модулей |
 
 ### Negative test
 
-Удаление asset из Release → CI fail с сообщением `HTTP 404 for ... Run: gh workflow run binaries.yml --ref dev`. Восстановление = повторный dispatch workflow.
+Удаление asset из Release → CI fail с сообщением `HTTP 404 for ... Run: gh workflow run binaries.yml`. Восстановление = повторный dispatch workflow.

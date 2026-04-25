@@ -77,7 +77,8 @@ GitHub Actions на tag push `v*.*.*`. Signed APK + SHA256 + GPG. F-Droid submis
 | E10 | ✅ Done (obfuscator-LLVM — отложен, требует custom NDK plugin) | `feat/e10-security` |
 | E11 | ⏳ Partial — i18n RU+EN, DiagnosticsTester (20 URL), strings; SettingsScreen / DiagnosticsScreen Compose UI отложены до интеграции рантайма | `feat/e11-ui` |
 | E12 | ✅ Done (PackageInstaller invocation отложен — Activity-bound) | `feat/e12-self-update` |
-| E13 | Pending | `feat/e13-final-tests` |
+| **RT** | **Pending — блокер для E13.** Закрытие отложенного долга: AAR/binary артефакты, DI Hilt для всех движков, VpnService→Engine pipeline, Compose UI (Settings/Diagnostics/Servers/SplitTunnel), PlayCore SplitInstall для `:dynamic-tor`, Activity-bound PackageInstaller, Manifest Android 13/14/15 (POST_NOTIFICATIONS, FGS specialUse, predictive back), deep-links подписок, onboarding, privacy.md, telemetry policy, cert-pin rotation playbook | `feat/rt-runtime-integration` |
+| E13 | Pending — gated by RT | `feat/e13-final-tests` |
 | E14 | Pending | `feat/e14-release` |
 | … | … | … |
 

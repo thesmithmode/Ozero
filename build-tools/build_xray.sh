@@ -27,18 +27,21 @@ die() {
 # ---------------------------------------------------------------------------
 # Параметры (можно переопределить через env)
 # ---------------------------------------------------------------------------
-# Xray-core version. Можно override: XRAY_VERSION=v25.11.0 ./build-tools/build_xray.sh
-XRAY_VERSION="${XRAY_VERSION:-v25.10.1}"
+# Xray-core version. Можно override: XRAY_VERSION=v25.12.8 ./build-tools/build_xray.sh
+# v25.10.1 (старый default) никогда не выпускался upstream — checkout failed.
+# v25.12.8 — latest stable на 2026-04 (см. https://github.com/XTLS/Xray-core/releases).
+XRAY_VERSION="${XRAY_VERSION:-v25.12.8}"
 
-# Куда сохранить артефакт (относительно корня проекта или абсолютный путь)
-OUTPUT_DIR="${OUTPUT_DIR:-engine-xray/libs}"
+# Куда сохранить артефакт. Default `out/xray` (CI binaries.yml).
+# Локально для drop-in в engine: OUTPUT_DIR=engine-xray/libs ./build-tools/build_xray.sh
+OUTPUT_DIR="${OUTPUT_DIR:-out/xray}"
 
 # Go module upstream
 GO_MODULE="${GO_MODULE:-github.com/xtls/xray-core}"
 
-# Целевые ABI. Default — только arm64 (достаточно для 95%+ устройств, быстрее).
-# Для полного релиза: ANDROID_TARGETS="android/arm64,android/arm,android/386,android/amd64"
-ANDROID_TARGETS="${ANDROID_TARGETS:-android/arm64}"
+# Целевые ABI. Default — все 4 ABI для production AAR (используется F-Droid + универсальный APK).
+# Локально для dev: ANDROID_TARGETS=android/arm64 ./build-tools/build_xray.sh — быстрее.
+ANDROID_TARGETS="${ANDROID_TARGETS:-android/arm64,android/arm,android/386,android/amd64}"
 
 # Android API level minimum
 ANDROID_API="${ANDROID_API:-24}"
@@ -140,16 +143,15 @@ BIND_PKG_DIR="${TMP_DIR}/xraybind"
 mkdir -p "${BIND_PKG_DIR}"
 
 cat > "${BIND_PKG_DIR}/libs.go" <<'GOEOF'
-// Package xraybind is a gomobile bind stub that exposes Xray-core public API
-// to Android via JNI. Only packages with exported (uppercase) symbols that
-// are gomobile-compatible (no chan, no func values, no unsafe) are listed.
-//
-// Add or remove imports here to control which subsystems appear in the AAR.
+// Package xraybind is a gomobile bind stub that exposes Xray-core to Android
+// via JNI. gomobile bind requires at least one exported symbol — we expose
+// Version() so the AAR is non-trivial; the side-effect imports register all
+// proxy/transport/app subsystems with the global registry so a runtime config
+// (built in Kotlin via Xray JSON) finds them.
 package xraybind
 
 import (
-	// Core runtime and version info
-	_ "github.com/xtls/xray-core/core"
+	"github.com/xtls/xray-core/core"
 
 	// Configuration infrastructure (JSON/YAML parsing)
 	_ "github.com/xtls/xray-core/infra/conf"
@@ -175,15 +177,31 @@ import (
 	_ "github.com/xtls/xray-core/app/stats"
 	_ "github.com/xtls/xray-core/app/log"
 )
+
+// Version returns the Xray-core version string baked into the AAR.
+func Version() string {
+	return core.Version()
+}
 GOEOF
 
-# Инициализируем go module для bind-пакета, указываем зависимость на клон
+# Инициализируем go module для bind-пакета. Xray-core имеет major version >=2
+# (v25.x) без /vN суффикса в module path, поэтому Go modules отказывается
+# принимать "v25.x.x" в require ("should be v0 or v1, not v25"). Стандартный
+# воркэраунд при локальном replace — placeholder v0.0.0; настоящая версия
+# фиксируется через git checkout (см. UPSTREAM_SHA + manifest source_commit).
+#
+# golang.org/x/mobile в require обязателен — gobind импортирует подпакет
+# golang.org/x/mobile/bind во время генерации Java/Go wrappers.
+GOMOBILE_PIN="${GOMOBILE_VERSION:-v0.0.0-20260410095206-2cfb76559b7b}"
 cat > "${BIND_PKG_DIR}/go.mod" <<MODEOF
 module xraybind
 
 go 1.22
 
-require github.com/xtls/xray-core ${XRAY_VERSION}
+require (
+	github.com/xtls/xray-core v0.0.0
+	golang.org/x/mobile ${GOMOBILE_PIN}
+)
 
 replace github.com/xtls/xray-core => ${REPO_DIR}
 MODEOF
@@ -246,17 +264,23 @@ log "SHA256 written to ${OUTPUT_SHA256}"
 cat "${OUTPUT_SHA256}"
 
 # ---------------------------------------------------------------------------
-# Manifest — метаданные сборки для аудита и reproducibility
+# Manifest — метаданные сборки для regen_lock.py + аудита reproducibility
+# Формат совместим с build-tools/regen_lock.py (key=value + блок "# SHA256:").
 # ---------------------------------------------------------------------------
-OUTPUT_MANIFEST="${OUTPUT_DIR}/libxray.manifest.txt"
+OUTPUT_MANIFEST="${OUTPUT_DIR}/manifest.txt"
+SHA_VALUE="$(awk '{print $1}' "${OUTPUT_SHA256}")"
 {
+    echo "# build_xray manifest"
+    echo "source_repo=https://${GO_MODULE}"
+    echo "source_commit=${UPSTREAM_SHA}"
     echo "xray_version=${XRAY_VERSION}"
-    echo "upstream_commit=${UPSTREAM_SHA}"
-    echo "go_module=${GO_MODULE}"
     echo "android_targets=${ANDROID_TARGETS}"
     echo "android_api=${ANDROID_API}"
     echo "go_version=${GO_MAJOR_MINOR}"
     echo "build_timestamp_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo
+    echo "# SHA256:"
+    echo "${SHA_VALUE}  libxray.aar"
 } > "${OUTPUT_MANIFEST}"
 log "Manifest written to ${OUTPUT_MANIFEST}"
 

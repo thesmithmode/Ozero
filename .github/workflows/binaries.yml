@@ -10,14 +10,17 @@ on:
         type: choice
         options:
           - byedpi
+          - xray
   push:
     branches:
-      - feat/rt-runtime-integration
+      - 'feat/**'
     paths:
       - '.github/workflows/binaries.yml'
       - 'build-tools/Dockerfile'
       - 'build-tools/Dockerfile.byedpi'
       - 'build-tools/build_byedpi.sh'
+      - 'build-tools/build_xray.sh'
+      - 'build-tools/regen_lock.py'
 
 jobs:
   build:
@@ -27,6 +30,7 @@ jobs:
       contents: write
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
+      artifact: ${{ env.ARTIFACT }}
     env:
       ARTIFACT: ${{ inputs.artifact || 'byedpi' }}
     steps:
@@ -34,27 +38,41 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Compute per-engine tag
+        id: tag
+        run: |
+          # Tag scheme: <engine>-<sha8> where sha8 hashes the engine's build
+          # inputs (Dockerfile + build script + regen_lock). Per-engine isolation:
+          # bumping xray never invalidates the byedpi tag.
+          case "$ARTIFACT" in
+            byedpi)
+              FILES="build-tools/Dockerfile.byedpi build-tools/build_byedpi.sh build-tools/regen_lock.py"
+              ;;
+            xray)
+              FILES="build-tools/Dockerfile build-tools/build_xray.sh build-tools/regen_lock.py"
+              ;;
+            *)
+              echo "Unknown artifact: $ARTIFACT" >&2
+              exit 1
+              ;;
+          esac
+          # shellcheck disable=SC2086
+          HASH=$(cat $FILES | sha256sum | cut -c1-8)
+          TAG="${ARTIFACT}-${HASH}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Tag: $TAG"
+
+      # ---------------------------------------------------------------------
+      # byedpi build (CMake + NDK only)
+      # ---------------------------------------------------------------------
       - name: Clone byedpi (pinned)
+        if: env.ARTIFACT == 'byedpi'
         env:
           BYEDPI_VERSION: v0.17.3
         run: |
           git clone --depth 1 --branch "$BYEDPI_VERSION" \
             https://github.com/hufrea/byedpi.git \
             engine-byedpi/src/main/cpp/byedpi
-
-      - name: Compute lock_sha8 tag
-        id: tag
-        run: |
-          if [ -f build-tools/binaries.lock.yaml ]; then
-            LOCK_HASH=$(grep -v '^tag:' build-tools/binaries.lock.yaml | sha256sum | cut -c1-8)
-          else
-            LOCK_HASH="initial0"
-          fi
-          TREE_HASH=$(find build-tools -type f -not -name 'binaries.lock.yaml' -print0 \
-            | sort -z | xargs -0 sha256sum | sha256sum | cut -c1-8)
-          TAG="binaries-${LOCK_HASH}${TREE_HASH}"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "Tag: $TAG"
 
       - name: Build byedpi Docker image
         if: env.ARTIFACT == 'byedpi'
@@ -71,7 +89,30 @@ jobs:
             ozero-byedpi \
             bash build-tools/build_byedpi.sh
 
-      - name: Upload assets to Release
+      # ---------------------------------------------------------------------
+      # xray build (Go + gomobile bind → AAR)
+      # ---------------------------------------------------------------------
+      - name: Build xray Docker image
+        if: env.ARTIFACT == 'xray'
+        run: docker build -t ozero-xray -f build-tools/Dockerfile build-tools/
+
+      - name: Build xray AAR (multi-ABI)
+        if: env.ARTIFACT == 'xray'
+        run: |
+          docker run --rm \
+            -v "$PWD:/src" \
+            -w /src \
+            -e REPO_ROOT=/src \
+            -e OUTPUT_DIR=/src/out/xray \
+            -e ANDROID_TARGETS="android/arm64,android/arm,android/386,android/amd64" \
+            ozero-xray \
+            bash build-tools/build_xray.sh
+
+      # ---------------------------------------------------------------------
+      # Upload — engine-specific glob
+      # ---------------------------------------------------------------------
+      - name: Upload byedpi assets
+        if: env.ARTIFACT == 'byedpi'
         uses: softprops/action-gh-release@v2
         env:
           GH_TAG: ${{ steps.tag.outputs.tag }}
@@ -81,11 +122,29 @@ jobs:
           body: |
             Auto-built native binaries.
 
-            Artifact: ${{ env.ARTIFACT }}
+            Engine: byedpi
             Commit: ${{ github.sha }}
           files: |
             out/byedpi/libbyedpi-*.so
             out/byedpi/manifest.txt
+          fail_on_unmatched_files: true
+
+      - name: Upload xray assets
+        if: env.ARTIFACT == 'xray'
+        uses: softprops/action-gh-release@v2
+        env:
+          GH_TAG: ${{ steps.tag.outputs.tag }}
+        with:
+          tag_name: ${{ env.GH_TAG }}
+          name: Native binaries ${{ env.GH_TAG }}
+          body: |
+            Auto-built native binaries.
+
+            Engine: xray
+            Commit: ${{ github.sha }}
+          files: |
+            out/xray/libxray.aar
+            out/xray/manifest.txt
           fail_on_unmatched_files: true
 
   update-lock:
@@ -97,23 +156,40 @@ jobs:
       pull-requests: write
     env:
       TAG: ${{ needs.build.outputs.tag }}
+      ARTIFACT: ${{ needs.build.outputs.artifact }}
       REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Setup Python (with PyYAML for regen_lock)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install regen_lock dependencies
+        run: pip install --quiet pyyaml
 
       - name: Download release assets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir -p out/byedpi
-          gh release download "$TAG" -p 'libbyedpi-*.so' -p 'manifest.txt' -D out/byedpi/
+          mkdir -p "out/${ARTIFACT}"
+          case "$ARTIFACT" in
+            byedpi)
+              gh release download "$TAG" -p 'libbyedpi-*.so' -p 'manifest.txt' -D "out/${ARTIFACT}/"
+              ;;
+            xray)
+              gh release download "$TAG" -p 'libxray.aar' -p 'manifest.txt' -D "out/${ARTIFACT}/"
+              ;;
+          esac
 
       - name: Regenerate lock file
         run: |
           python3 build-tools/regen_lock.py \
+            --engine "$ARTIFACT" \
             --tag "$TAG" \
             --repo "$REPO" \
-            --manifest out/byedpi/manifest.txt \
+            --manifest "out/${ARTIFACT}/manifest.txt" \
             --out build-tools/binaries.lock.yaml
 
       - name: Open PR if lock changed
@@ -127,6 +203,8 @@ jobs:
             Автоматический PR от binaries.yml workflow.
 
             Тег: `${{ env.TAG }}`
+            Артефакт: `${{ env.ARTIFACT }}`
+
             Содержимое lock-файла отражает SHA256 + размеры артефактов из Release.
-          base: feat/rt-runtime-integration
+          base: dev
           delete-branch: true

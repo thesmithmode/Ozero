@@ -50,6 +50,17 @@ jobs:
       - name: Download native binaries (RT.1.7)
         run: ./gradlew :engine-byedpi:downloadBinaries --stacktrace
 
+      - name: Setup Python for build-tools tests
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install build-tools test dependencies
+        run: pip install --quiet pyyaml
+
+      - name: Run build-tools Python tests (regen_lock)
+        run: python3 -m unittest discover -s build-tools/tests -p 'test_*.py' -v
+
       - name: Run ktlint, detekt, lint, build, and tests
         run: ./gradlew ktlintCheck detekt lint assembleDebug testDebugUnitTest jacocoTestReport jacocoTestCoverageVerification --stacktrace --continue
 
