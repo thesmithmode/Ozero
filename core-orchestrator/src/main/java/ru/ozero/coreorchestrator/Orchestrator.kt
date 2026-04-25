@@ -26,10 +26,12 @@ class Orchestrator {
         }
     }
 
+    /**
+     * FSM reducer: 13 явных переходов состояний — табличное перечисление,
+     * CC отражает число валидных переходов, не реальную сложность. Рефактор
+     * (вынос в map/visitor) ухудшит читаемость state machine.
+     */
     @Suppress("CyclomaticComplexMethod")
-    // FSM reducer: 13 явных переходов состояний — табличное перечисление,
-    // CC отражает число валидных переходов, не реальную сложность. Рефактор
-    // (вынос в map/visitor) ухудшит читаемость state machine.
     private fun reduce(
         state: OrchestratorState,
         transition: OrchestratorTransition,

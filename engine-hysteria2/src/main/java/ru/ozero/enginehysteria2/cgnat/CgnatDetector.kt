@@ -45,9 +45,9 @@ class CgnatDetector(
     }
 
     private fun InetAddress.isPublic(): Boolean {
-        @Suppress("ComplexCondition")
         // 4 reserved-address категории — RFC 5735 / RFC 4291. Дробление в helper
         // ухудшит читаемость списка категорий.
+        @Suppress("ComplexCondition")
         if (isLoopbackAddress || isLinkLocalAddress || isAnyLocalAddress || isMulticastAddress) return false
         if (isSiteLocalAddress) return false // RFC1918 для v4, fec0::/10 (deprecated) для v6
         if (this is Inet4Address && isCgnat()) return false

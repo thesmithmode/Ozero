@@ -23,11 +23,14 @@ class AntiEmulatorCheck(
 
     fun isEmulator(): Boolean = matchedReasons().isNotEmpty()
 
-    /** Список сработавших эвристик — для диагностики и логов. */
+    /**
+     * Список сработавших эвристик — для диагностики и логов.
+     *
+     * Эвристики содержат группы fingerprint-substring проверок (4+ OR на категорию):
+     * generic/unknown/vbox/test-keys, google_sdk/Emulator/SDK, Genymotion/unknown и т.п.
+     * Дробление потеряет атомарность правил детекции.
+     */
     @Suppress("ComplexCondition")
-    // Эвристики содержат группы fingerprint-substring проверок (4+ OR на категорию):
-    // generic/unknown/vbox/test-keys, google_sdk/Emulator/SDK, Genymotion/unknown и т.п.
-    // Дробление потеряет атомарность правил детекции.
     fun matchedReasons(): List<String> {
         val f = provider()
         val reasons = mutableListOf<String>()
