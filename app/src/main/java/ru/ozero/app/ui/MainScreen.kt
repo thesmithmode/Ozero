@@ -23,17 +23,11 @@ import androidx.compose.ui.unit.dp
 import ru.ozero.coreorchestrator.OrchestratorState
 
 @Composable
-fun MainScreen(
-    viewModel: MainViewModel,
-    onConnectClick: () -> Unit,
-) {
+fun MainScreen(viewModel: MainViewModel, onConnectClick: () -> Unit) {
     val state by viewModel.state.collectAsState()
 
     Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(24.dp),
+        modifier = Modifier.fillMaxSize().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -50,20 +44,16 @@ fun MainScreen(
             is OrchestratorState.Switching,
             -> {
                 CircularProgressIndicator(
-                    modifier =
-                        Modifier
-                            .size(48.dp)
-                            .semantics { contentDescription = "Загрузка" },
+                    modifier = Modifier.size(48.dp).semantics { contentDescription = "Загрузка" },
                 )
             }
             else -> {
                 val isConnected = state is OrchestratorState.Connected
                 Button(
                     onClick = onConnectClick,
-                    modifier =
-                        Modifier.semantics {
-                            contentDescription = if (isConnected) "Отключить VPN" else "Подключить VPN"
-                        },
+                    modifier = Modifier.semantics {
+                        contentDescription = if (isConnected) "Отключить VPN" else "Подключить VPN"
+                    },
                 ) {
                     Text(if (isConnected) "Выключить" else "Включить")
                 }

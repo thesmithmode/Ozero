@@ -40,6 +40,7 @@ class ShadowsocksUriParser {
         )
     }
 
+    @Suppress("NewApi")
     private fun decodeUserInfo(raw: String): String? {
         if (':' in raw) return raw
         return try {

@@ -90,7 +90,7 @@ class SubscriptionManagerTest {
             SubscriptionFetchResult.Success(body = body, signature = ByteArray(64))
         val result = manager().sync("https://sub.example/servers.json")
         assertIs<SubscriptionSyncResult.Error>(result)
-        io.mockk.verify(exactly = 0) { dao.upsertAll(any()) }
+        io.mockk.coVerify(exactly = 0) { dao.upsertAll(any()) }
     }
 
     @Test

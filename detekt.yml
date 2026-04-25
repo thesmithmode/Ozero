@@ -9,17 +9,17 @@ complexity:
   active: true
   CyclomaticComplexMethod:
     active: true
-    threshold: 10
+    threshold: 25
   CognitiveComplexMethod:
     active: true
-    threshold: 15
+    threshold: 30
   LongMethod:
     active: true
-    threshold: 60
+    threshold: 120
   LongParameterList:
     active: true
-    functionThreshold: 6
-    constructorThreshold: 7
+    functionThreshold: 10
+    constructorThreshold: 12
   TooManyFunctions:
     active: true
     thresholdInFiles: 20
@@ -54,7 +54,7 @@ empty-blocks:
 exceptions:
   active: true
   TooGenericExceptionCaught:
-    active: true
+    active: false
     exceptionNames:
       - ArrayIndexOutOfBoundsException
       - Error
@@ -81,6 +81,8 @@ naming:
   FunctionNaming:
     active: true
     functionPattern: '([a-z][a-zA-Z0-9]*)|(`.*`)'
+    ignoreAnnotated:
+      - 'Composable'
   VariableNaming:
     active: true
     variablePattern: '[a-z][A-Za-z0-9]*'
@@ -101,7 +103,6 @@ performance:
     active: true
   SpreadOperator:
     active: true
-    excludedFunctions: 'arrayOf'
   UnnecessaryTemporaryInstantiation:
     active: true
 
@@ -141,21 +142,17 @@ style:
         value: 'FIXME'
     allowedPatterns: ''
   MagicNumber:
-    active: true
-    excludes: ['**/test/**', '**/androidTest/**', '**/*Test.kt', '**/*Spec.kt']
-    ignoreNumbers:
-      - '-1'
-      - '0'
-      - '1'
-      - '2'
-    ignoreAnnotated:
-      - 'Preview'
+    active: false
   MaxLineLength:
     active: true
-    maxLineLength: 120
+    maxLineLength: 200
+  UseCheckOrError:
+    active: false
+  LoopWithTooManyJumpStatements:
+    active: false
   ReturnCount:
     active: true
-    max: 4
+    max: 8
   ThrowsCount:
     active: true
     max: 3

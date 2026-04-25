@@ -88,6 +88,7 @@ bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = 
 junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junitJupiter" }
 junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junitJupiter" }
 junit-jupiter-params = { module = "org.junit.jupiter:junit-jupiter-params", version.ref = "junitJupiter" }
+kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 
 # Testing — MockK
 mockk-core = { module = "io.mockk:mockk", version.ref = "mockk" }
@@ -130,5 +131,5 @@ coroutines = ["coroutines-core", "coroutines-android"]
 okhttp = ["okhttp-core", "okhttp-logging"]
 bouncycastle = ["bouncycastle-prov", "bouncycastle-pkix"]
 junit5 = ["junit-jupiter-api", "junit-jupiter-params"]
-testing-unit = ["mockk-core", "coroutines-test"]
+testing-unit = ["mockk-core", "coroutines-test", "kotlin-test"]
 testing-android = ["espresso-core", "test-ext-junit", "mockk-android"]
