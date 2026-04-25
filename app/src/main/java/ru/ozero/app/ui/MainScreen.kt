@@ -17,9 +17,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import ru.ozero.app.R
 import ru.ozero.coreorchestrator.OrchestratorState
 
 @Composable
@@ -43,19 +45,22 @@ fun MainScreen(viewModel: MainViewModel, onConnectClick: () -> Unit) {
             is OrchestratorState.Disconnecting,
             is OrchestratorState.Switching,
             -> {
+                val loadingDesc = stringResource(R.string.a11y_loading)
                 CircularProgressIndicator(
-                    modifier = Modifier.size(48.dp).semantics { contentDescription = "Загрузка" },
+                    modifier = Modifier.size(48.dp).semantics { contentDescription = loadingDesc },
                 )
             }
             else -> {
                 val isConnected = state is OrchestratorState.Connected
+                val buttonDesc =
+                    stringResource(
+                        if (isConnected) R.string.a11y_disconnect_button else R.string.a11y_connect_button,
+                    )
                 Button(
                     onClick = onConnectClick,
-                    modifier = Modifier.semantics {
-                        contentDescription = if (isConnected) "Отключить VPN" else "Подключить VPN"
-                    },
+                    modifier = Modifier.semantics { contentDescription = buttonDesc },
                 ) {
-                    Text(if (isConnected) "Выключить" else "Включить")
+                    Text(stringResource(if (isConnected) R.string.main_disconnect else R.string.main_connect))
                 }
             }
         }
@@ -64,19 +69,26 @@ fun MainScreen(viewModel: MainViewModel, onConnectClick: () -> Unit) {
 
 @Composable
 private fun StatusLabel(state: OrchestratorState) {
-    val (label, engine) =
+    val labelRes =
         when (state) {
-            is OrchestratorState.Idle -> "Выключено" to null
-            is OrchestratorState.Probing -> "Поиск маршрута..." to null
-            is OrchestratorState.Connecting -> "Подключение..." to state.engineId.name
-            is OrchestratorState.Connected -> "Подключено" to state.engineId.name
-            is OrchestratorState.Switching -> "Переключение..." to null
-            is OrchestratorState.Failed -> "Ошибка" to state.engineId.name
-            is OrchestratorState.Disconnecting -> "Отключение..." to null
+            is OrchestratorState.Idle -> R.string.main_status_disconnected
+            is OrchestratorState.Probing -> R.string.main_status_probing
+            is OrchestratorState.Connecting -> R.string.main_status_connecting
+            is OrchestratorState.Connected -> R.string.main_status_connected
+            is OrchestratorState.Switching -> R.string.main_status_switching
+            is OrchestratorState.Failed -> R.string.main_status_failed
+            is OrchestratorState.Disconnecting -> R.string.main_status_disconnecting
+        }
+    val engine =
+        when (state) {
+            is OrchestratorState.Connecting -> state.engineId.name
+            is OrchestratorState.Connected -> state.engineId.name
+            is OrchestratorState.Failed -> state.engineId.name
+            else -> null
         }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
-            text = label,
+            text = stringResource(labelRes),
             style = MaterialTheme.typography.headlineMedium,
         )
         if (engine != null) {

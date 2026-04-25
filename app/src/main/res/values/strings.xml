@@ -7,8 +7,11 @@
     <string name="main_connect">Подключиться</string>
     <string name="main_disconnect">Отключиться</string>
     <string name="main_status_disconnected">Отключено</string>
+    <string name="main_status_probing">Поиск маршрута…</string>
     <string name="main_status_connecting">Подключение…</string>
     <string name="main_status_connected">Подключено</string>
+    <string name="main_status_switching">Переключение…</string>
+    <string name="main_status_disconnecting">Отключение…</string>
     <string name="main_status_failed">Ошибка</string>
     <string name="main_active_engine">Активный движок: %1$s</string>
 
@@ -51,6 +54,8 @@
 
     <!-- Accessibility -->
     <string name="a11y_status_indicator">Индикатор состояния VPN</string>
-    <string name="a11y_connect_button">Кнопка подключения VPN</string>
+    <string name="a11y_loading">Загрузка</string>
+    <string name="a11y_connect_button">Подключить VPN</string>
+    <string name="a11y_disconnect_button">Отключить VPN</string>
     <string name="a11y_engine_active">Сейчас активен движок %1$s</string>
 </resources>

@@ -7,8 +7,11 @@
     <string name="main_connect">Connect</string>
     <string name="main_disconnect">Disconnect</string>
     <string name="main_status_disconnected">Disconnected</string>
+    <string name="main_status_probing">Searching route…</string>
     <string name="main_status_connecting">Connecting…</string>
     <string name="main_status_connected">Connected</string>
+    <string name="main_status_switching">Switching…</string>
+    <string name="main_status_disconnecting">Disconnecting…</string>
     <string name="main_status_failed">Error</string>
     <string name="main_active_engine">Active engine: %1$s</string>
 
@@ -51,6 +54,8 @@
 
     <!-- Accessibility -->
     <string name="a11y_status_indicator">VPN state indicator</string>
-    <string name="a11y_connect_button">VPN connect button</string>
+    <string name="a11y_loading">Loading</string>
+    <string name="a11y_connect_button">Connect VPN</string>
+    <string name="a11y_disconnect_button">Disconnect VPN</string>
     <string name="a11y_engine_active">Active engine: %1$s</string>
 </resources>
