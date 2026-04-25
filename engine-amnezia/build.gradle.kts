@@ -1,5 +1,13 @@
 plugins {
     id("ozero.android.library")
+    id("ozero.binaries")
+}
+
+// libamneziawg.aar собирается из amneziawg-go (форк wireguard-go от amnezia)
+// через gomobile bind в CI (RT.1.7.4). Скачивается preBuild с sha256 verify.
+// JNI integration (StartAwg/StopAwg/IsUp/Version) — RT.2/RT.3.
+ozeroBinaries {
+    artifact("libamneziawg.aar")
 }
 
 android {

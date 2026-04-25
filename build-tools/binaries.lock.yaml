@@ -1,5 +1,5 @@
-tag: naive-9becd3ee
-generated_at: 2026-04-25T20:51:07Z
+tag: hysteria2-a7bf52a5
+generated_at: 2026-04-25T21:12:50Z
 artifacts:
   - name: libbyedpi-arm64-v8a.so
     engine: byedpi
@@ -81,3 +81,19 @@ artifacts:
     size_bytes: 6484984
     source_repo: https://github.com/klzgrad/naiveproxy
     source_commit: 6315863d2d8d1fad80d2b2afd46162c301f973e2
+  - name: libamneziawg.aar
+    engine: amneziawg
+    destination: libs
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/amneziawg-175ff631/libamneziawg.aar
+    sha256: c11ed8068abc1c743e51d7af67cf3bf1bb48fb851354eccc7d1b69127c9e0286
+    size_bytes: 10221286
+    source_repo: https://github.com/amnezia-vpn/amneziawg-go
+    source_commit: 2e3f7d122ca8ef61e403fddc48a9db8fccd95dbf
+  - name: libhysteria2.aar
+    engine: hysteria2
+    destination: libs
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/hysteria2-a7bf52a5/libhysteria2.aar
+    sha256: 7e9c212273ef7a20c64a8415786b2c4aa8dd03765a5740c6e7dffe7695323620
+    size_bytes: 50520590
+    source_repo: https://github.com/apernet/hysteria
+    source_commit: 15e31d48a09af0835773bd5c62cedbb3fc0e351d

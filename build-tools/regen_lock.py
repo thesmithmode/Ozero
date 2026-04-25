@@ -43,6 +43,14 @@ ENGINE_CONFIGS = {
         "filename_re": re.compile(r"^libnaive-(?P<abi>[a-z0-9_-]+)\.so$"),
         "destination": "jniLibs",
     },
+    "amneziawg": {
+        "filename_re": re.compile(r"^libamneziawg\.aar$"),
+        "destination": "libs",
+    },
+    "hysteria2": {
+        "filename_re": re.compile(r"^libhysteria2\.aar$"),
+        "destination": "libs",
+    },
 }
 
 

@@ -12,6 +12,8 @@ on:
           - byedpi
           - xray
           - naive
+          - amneziawg
+          - hysteria2
   push:
     branches:
       - 'feat/**'
@@ -22,6 +24,8 @@ on:
       - 'build-tools/build_byedpi.sh'
       - 'build-tools/build_xray.sh'
       - 'build-tools/build_naive.sh'
+      - 'build-tools/build_amneziawg.sh'
+      - 'build-tools/build_hysteria2.sh'
       - 'build-tools/regen_lock.py'
 
 jobs:
@@ -55,6 +59,12 @@ jobs:
               ;;
             naive)
               FILES="build-tools/build_naive.sh build-tools/regen_lock.py"
+              ;;
+            amneziawg)
+              FILES="build-tools/Dockerfile build-tools/build_amneziawg.sh build-tools/regen_lock.py"
+              ;;
+            hysteria2)
+              FILES="build-tools/Dockerfile build-tools/build_hysteria2.sh build-tools/regen_lock.py"
               ;;
             *)
               echo "Unknown artifact: $ARTIFACT" >&2
@@ -112,6 +122,44 @@ jobs:
             -e ANDROID_TARGETS="android/arm64,android/arm,android/386,android/amd64" \
             ozero-xray \
             bash build-tools/build_xray.sh
+
+      # ---------------------------------------------------------------------
+      # amneziawg build (Go + gomobile bind → AAR, multi-ABI)
+      # ---------------------------------------------------------------------
+      - name: Build amneziawg Docker image
+        if: env.ARTIFACT == 'amneziawg'
+        run: docker build -t ozero-xray -f build-tools/Dockerfile build-tools/
+
+      - name: Build amneziawg AAR (multi-ABI)
+        if: env.ARTIFACT == 'amneziawg'
+        run: |
+          docker run --rm \
+            -v "$PWD:/src" \
+            -w /src \
+            -e REPO_ROOT=/src \
+            -e OUTPUT_DIR=/src/out/amneziawg \
+            -e ANDROID_TARGETS="android/arm64,android/arm,android/386,android/amd64" \
+            ozero-xray \
+            bash build-tools/build_amneziawg.sh
+
+      # ---------------------------------------------------------------------
+      # hysteria2 build (Go + gomobile bind → AAR, multi-ABI)
+      # ---------------------------------------------------------------------
+      - name: Build hysteria2 Docker image
+        if: env.ARTIFACT == 'hysteria2'
+        run: docker build -t ozero-xray -f build-tools/Dockerfile build-tools/
+
+      - name: Build hysteria2 AAR (multi-ABI)
+        if: env.ARTIFACT == 'hysteria2'
+        run: |
+          docker run --rm \
+            -v "$PWD:/src" \
+            -w /src \
+            -e REPO_ROOT=/src \
+            -e OUTPUT_DIR=/src/out/hysteria2 \
+            -e ANDROID_TARGETS="android/arm64,android/arm,android/386,android/amd64" \
+            ozero-xray \
+            bash build-tools/build_hysteria2.sh
 
       # ---------------------------------------------------------------------
       # naive build (распаковка libnaive.so из upstream APK plugin, 4 ABI)
@@ -178,6 +226,42 @@ jobs:
           files: |
             out/naive/libnaive-*.so
             out/naive/manifest.txt
+          fail_on_unmatched_files: true
+
+      - name: Upload amneziawg assets
+        if: env.ARTIFACT == 'amneziawg'
+        uses: softprops/action-gh-release@v2
+        env:
+          GH_TAG: ${{ steps.tag.outputs.tag }}
+        with:
+          tag_name: ${{ env.GH_TAG }}
+          name: Native binaries ${{ env.GH_TAG }}
+          body: |
+            Auto-built native binaries.
+
+            Engine: amneziawg
+            Commit: ${{ github.sha }}
+          files: |
+            out/amneziawg/libamneziawg.aar
+            out/amneziawg/manifest.txt
+          fail_on_unmatched_files: true
+
+      - name: Upload hysteria2 assets
+        if: env.ARTIFACT == 'hysteria2'
+        uses: softprops/action-gh-release@v2
+        env:
+          GH_TAG: ${{ steps.tag.outputs.tag }}
+        with:
+          tag_name: ${{ env.GH_TAG }}
+          name: Native binaries ${{ env.GH_TAG }}
+          body: |
+            Auto-built native binaries.
+
+            Engine: hysteria2
+            Commit: ${{ github.sha }}
+          files: |
+            out/hysteria2/libhysteria2.aar
+            out/hysteria2/manifest.txt
           fail_on_unmatched_files: true
 
   # Lock-файл обновляется вручную через build-tools/regen_lock.py — workflow
