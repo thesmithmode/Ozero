@@ -1,5 +1,5 @@
-tag: byedpi-6afef5e5
-generated_at: 2026-04-25T17:50:46Z
+tag: xray-c5e9cdf0
+generated_at: 2026-04-25T20:35:57Z
 artifacts:
   - name: libbyedpi-arm64-v8a.so
     engine: byedpi
@@ -37,3 +37,11 @@ artifacts:
     size_bytes: 308288
     source_repo: https://github.com/hufrea/byedpi
     source_commit: 7efde1b1296eaaa187b70e951894dde17527489c
+  - name: libxray.aar
+    engine: xray
+    destination: libs
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/xray-c5e9cdf0/libxray.aar
+    sha256: bab9a149007f1aef0e2f02b5a6d62c94a423e30d10fbc86dbc7233abd1b6dcab
+    size_bytes: 83829006
+    source_repo: https://github.com/xtls/xray-core
+    source_commit: 81f8f398c7b2b845853b1e85087c6122acc6db0b

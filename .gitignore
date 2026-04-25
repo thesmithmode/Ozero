@@ -47,6 +47,7 @@ local.properties
 *.apk
 *.aab
 *.ap_
+*.aar
 *.dex
 *.class
 .cxx/

@@ -1,5 +1,12 @@
 plugins {
     id("ozero.android.library")
+    id("ozero.binaries")
+}
+
+// libxray.aar скачивается из GitHub Releases через ozero.binaries (RT.1.7.2).
+// Подключение AAR к Kotlin/JNI — отдельный шаг RT.2 (DI) / RT.3 (VpnService pipeline).
+ozeroBinaries {
+    artifact("libxray.aar")
 }
 
 android {
