@@ -20,4 +20,12 @@ interface SplitInstallClient {
      * Cancellation (отмена корутины) → отмена session_id через PlayCore.
      */
     fun requestInstall(moduleName: String): Flow<InstallResult>
+
+    /**
+     * Запросить deferred-uninstall модуля. PlayCore удалит split-pack при следующем
+     * подходящем моменте. Используется RT.5.3 при детекте повреждённого/подменённого
+     * dynamic_tor: верификатор SHA-256 не сошёлся → выкидываем модуль, чтобы
+     * следующий запуск перекачал его с CDN.
+     */
+    suspend fun deferredUninstall(moduleName: String)
 }
