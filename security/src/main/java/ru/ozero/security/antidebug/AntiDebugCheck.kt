@@ -23,7 +23,10 @@ private val DefaultReader = ProcStatusReader {
 class AntiDebugCheck(
     private val reader: ProcStatusReader = DefaultReader,
     private val javaDebuggerAttached: () -> Boolean = { android.os.Debug.isDebuggerConnected() },
-    private val isReleaseBuild: () -> Boolean = { !android.os.Build.TYPE.equals("eng") },
+    // Build.TYPE: "user" = release, "userdebug" / "eng" = development.
+    // Раньше !equals("eng") считало "userdebug" release-сборкой → false-positive на
+    // девелоперских устройствах команды.
+    private val isReleaseBuild: () -> Boolean = { android.os.Build.TYPE == "user" },
 ) {
 
     fun isDebuggerAttached(): Boolean {

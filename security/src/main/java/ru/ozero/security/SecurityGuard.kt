@@ -39,8 +39,11 @@ class SecurityGuard(
         when (val v = check()) {
             is Verdict.Clean -> Unit
             is Verdict.Compromised -> {
+                // Причины пишем ТОЛЬКО в Log.e (видно разработчику), не в exception.message.
+                // SecurityException.message попадает в crash-репорты (Crashlytics/Firebase) и
+                // может сообщить атакующему какие именно проверки сработали.
                 Log.e(TAG, "security: compromised env, причины=${v.reasons}")
-                throw SecurityException("compromised: ${v.reasons.joinToString(",")}")
+                throw SecurityException("compromised")
             }
         }
     }
