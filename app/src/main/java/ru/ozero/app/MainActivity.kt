@@ -15,9 +15,12 @@ import androidx.compose.runtime.setValue
 import dagger.hilt.android.AndroidEntryPoint
 import ru.ozero.app.ui.MainScreen
 import ru.ozero.app.ui.MainViewModel
+import ru.ozero.app.ui.diag.DiagnosticsScreen
 import ru.ozero.app.ui.settings.SettingsScreen
 import ru.ozero.app.ui.theme.OzeroTheme
 import ru.ozero.commonvpn.OzeroVpnService
+
+enum class TopScreen { Main, Settings, Diagnostics }
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -40,15 +43,19 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             OzeroTheme {
-                var settingsOpen by rememberSaveable { mutableStateOf(false) }
-                if (settingsOpen) {
-                    SettingsScreen(onBack = { settingsOpen = false })
-                } else {
-                    MainScreen(
-                        viewModel = viewModel,
-                        onConnectClick = ::onConnectClick,
-                        onOpenSettings = { settingsOpen = true },
-                    )
+                var screen by rememberSaveable { mutableStateOf(TopScreen.Main) }
+                when (screen) {
+                    TopScreen.Settings ->
+                        SettingsScreen(onBack = { screen = TopScreen.Main })
+                    TopScreen.Diagnostics ->
+                        DiagnosticsScreen(onBack = { screen = TopScreen.Main })
+                    TopScreen.Main ->
+                        MainScreen(
+                            viewModel = viewModel,
+                            onConnectClick = ::onConnectClick,
+                            onOpenSettings = { screen = TopScreen.Settings },
+                            onOpenDiagnostics = { screen = TopScreen.Diagnostics },
+                        )
                 }
             }
         }
