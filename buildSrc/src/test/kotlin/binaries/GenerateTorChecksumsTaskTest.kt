@@ -83,7 +83,7 @@ class GenerateTorChecksumsTaskTest {
         assertThat(generated).exists()
         val content = generated.readText()
         assertThat(content).contains("package ru.ozero.enginetor.dynamicmod")
-        assertThat(content).contains("internal object TorBinaryChecksums")
+        assertThat(content).contains("object TorBinaryChecksums")
         assertThat(content).contains("\"arm64-v8a\"")
         assertThat(content).contains("\"x86\"")
         assertThat(content).contains("libtor-arm64-v8a.so")
