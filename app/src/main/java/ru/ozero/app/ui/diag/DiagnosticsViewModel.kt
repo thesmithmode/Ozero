@@ -1,5 +1,6 @@
 package ru.ozero.app.ui.diag
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -13,6 +14,8 @@ import kotlinx.coroutines.launch
 import ru.ozero.coreorchestrator.Orchestrator
 import ru.ozero.coreorchestrator.OrchestratorState
 import javax.inject.Inject
+
+private const val TAG = "DiagnosticsVM"
 
 @HiltViewModel
 class DiagnosticsViewModel @Inject constructor(
@@ -45,6 +48,7 @@ class DiagnosticsViewModel @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                Log.w(TAG, "diagnostics run failed", e)
                 _uiState.value = DiagnosticsUiState.Done(emptyList())
             }
         }

@@ -32,11 +32,6 @@ import androidx.compose.ui.unit.dp
 import ru.ozero.app.R
 import ru.ozero.coreorchestrator.OrchestratorState
 
-object MainScreenTestTags {
-    const val OPEN_SETTINGS = "main_open_settings"
-    const val OPEN_DIAGNOSTICS = "main_open_diagnostics"
-}
-
 @Composable
 fun MainScreen(
     viewModel: MainViewModel,
