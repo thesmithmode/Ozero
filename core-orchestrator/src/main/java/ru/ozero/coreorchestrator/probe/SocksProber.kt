@@ -23,7 +23,7 @@ import java.net.URL
 class SocksProber(
     private val targets: List<ProbeTarget> = DEFAULT_TARGETS,
     private val timeoutMs: Long = 5_000L,
-    private val connector: HttpConnector = JdkHttpConnector,
+    private val connector: HttpConnector = JdkHttpConnector(),
 ) {
 
     suspend fun probe(socksPort: Int): ProbeResult {
@@ -59,14 +59,19 @@ class SocksProber(
         suspend fun connect(target: ProbeTarget, socksPort: Int): Long
     }
 
-    object JdkHttpConnector : HttpConnector {
+    class JdkHttpConnector(
+        // Внутренние таймауты ≤ половины timeoutMs из withTimeoutOrNull, чтобы дать
+        // connect/read шанс отработать до внешней отмены (раньше connect=4s+read=4s
+        // = 8s, при timeoutMs=5000 внешний выключатель срабатывал первым).
+        private val perLegTimeoutMs: Int = 2_000,
+    ) : HttpConnector {
         override suspend fun connect(target: ProbeTarget, socksPort: Int): Long =
             withContext(Dispatchers.IO) {
                 val proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", socksPort))
                 val started = System.currentTimeMillis()
                 val conn = URL(target.url).openConnection(proxy) as HttpURLConnection
-                conn.connectTimeout = 4_000
-                conn.readTimeout = 4_000
+                conn.connectTimeout = perLegTimeoutMs
+                conn.readTimeout = perLegTimeoutMs
                 conn.requestMethod = target.method
                 conn.instanceFollowRedirects = false
                 try {

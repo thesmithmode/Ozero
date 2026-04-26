@@ -3,10 +3,12 @@ package ru.ozero.coreorchestrator
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import ru.ozero.coreapi.Engine
 import ru.ozero.coreapi.ProbeResult
@@ -37,9 +39,12 @@ class HealthMonitor(
             Log.i(TAG, "start interval=${probeIntervalMs}ms threshold=$failThreshold")
             consecutiveFails = 0
             job = scope.launch {
-                while (true) {
+                while (isActive) {
                     delay(probeIntervalMs)
                     val result = engine.probe()
+                    // Если корутина уже отменена пока probe выполнялся — не пишем в _status,
+                    // иначе stop() мог установить Healthy, а probe сразу после перепишет в Degraded.
+                    if (!isActive) return@launch
                     if (result is ProbeResult.Failure) {
                         val fails = synchronized(lock) { ++consecutiveFails }
                         Log.w(TAG, "probe failed $fails/$failThreshold: ${result.reason}")
@@ -61,14 +66,21 @@ class HealthMonitor(
         }
     }
 
-    fun stop() {
-        synchronized(lock) {
+    /**
+     * suspend stop — гарантирует завершение текущего probe ДО возврата.
+     * Раньше job?.cancel() не дожидался окончания suspending-вызова probe(), и
+     * результат мог быть записан в _status уже после установки Healthy.
+     */
+    suspend fun stop() {
+        val toJoin = synchronized(lock) {
             Log.i(TAG, "stop")
-            job?.cancel()
+            val current = job
             job = null
             consecutiveFails = 0
             _status.value = HealthStatus.Healthy
+            current
         }
+        toJoin?.cancelAndJoin()
     }
 
     private companion object {
