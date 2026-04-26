@@ -66,6 +66,11 @@ class PlayCoreDynamicTorInstaller(
                         "actual=${v.actual.take(8)}…",
                 )
             }
+            is VerifyResult.UnknownAbi -> {
+                Log.e(TAG, "unknown abi=${v.abi} — нет checksums, REJECT")
+                client.deferredUninstall(moduleName)
+                InstallResult.Failed(reason = "unknown abi: ${v.abi} — нет эталонных checksums")
+            }
         }
     }
 

@@ -35,7 +35,7 @@ class TorEngineTest {
 
     private fun engine(
         bridges: List<TorBridge> = emptyList(),
-        options: TorBuildOptions = TorBuildOptions(socksPort = 9050, controlPort = 9051),
+        options: TorBuildOptions = TorBuildOptions(socksPort = 9050, controlPort = 9051, dataDir = "/tmp/tor"),
     ) = TorEngine(delegate, installer, bridges = bridges, buildOptions = options)
 
     @Test fun engineIdIsTor() = assertEquals(EngineId.TOR, engine().id)
@@ -67,7 +67,7 @@ class TorEngineTest {
         val cfg = slot<String>()
         every { delegate.startTor(capture(cfg)) } returns 0
         engine().start(EngineConfig.Tor(socksPort = 9050))
-        assertTrue(cfg.captured.contains("SocksPort 9050"))
+        assertTrue(cfg.captured.contains("SocksPort 127.0.0.1:9050"))
     }
 
     @Test
@@ -119,7 +119,7 @@ class TorEngineTest {
             val port = server.localPort
             every { delegate.startTor(any()) } returns 0
             every { delegate.isBootstrapped() } returns true
-            val e = engine(options = TorBuildOptions(socksPort = port, controlPort = port + 1))
+            val e = engine(options = TorBuildOptions(socksPort = port, controlPort = port + 1, dataDir = "/tmp/tor"))
             e.start(EngineConfig.Tor(socksPort = port))
             assertIs<ProbeResult.Success>(e.probe())
         } finally {
@@ -155,7 +155,7 @@ class TorEngineTest {
             installer,
             bridges = listOf(bridge),
             buildOptions = TorBuildOptions(
-                socksPort = 9050, controlPort = 9051,
+                socksPort = 9050, controlPort = 9051, dataDir = "/tmp/tor",
                 ptBinaries = mapOf("obfs4" to "/lib/obfs4proxy"),
             ),
         ).start(EngineConfig.Tor(socksPort = 9050))

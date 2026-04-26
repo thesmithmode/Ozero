@@ -85,14 +85,14 @@ class Sha256TorBinaryVerifierTest {
     }
 
     @Test
-    fun `Ok when abi has no expected entries (empty set)`() = runTest {
+    fun `UnknownAbi when abi has no expected entries`() = runTest {
         val verifier = Sha256TorBinaryVerifier(
             mapOf("arm64-v8a" to mapOf("libtor-arm64-v8a.so" to "0".repeat(64))),
         )
 
         val result = verifier.verify("mips", tmp.toFile())
 
-        assertEquals(VerifyResult.Ok, result)
+        assertEquals(VerifyResult.UnknownAbi("mips"), result)
     }
 
     @Test

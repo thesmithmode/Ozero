@@ -54,12 +54,11 @@ class NaiveEngineTest {
     }
 
     @Test
-    fun startPassesPrebuiltJsonAsIs() = runTest {
-        val cfg = slot<String>()
-        every { delegate.startNaive(capture(cfg)) } returns 0
+    fun startRejectsJsonAsProxyUrl() = runTest {
         val pre = """{"listen":"socks://127.0.0.1:9999","proxy":"https://u:p@h:443","log":""}"""
-        engine.start(EngineConfig.Naive(proxyUrl = pre, socksPort = 9999))
-        assertEquals(pre, cfg.captured)
+        val ex = runCatching { engine.start(EngineConfig.Naive(proxyUrl = pre, socksPort = 9999)) }
+            .exceptionOrNull()
+        assertIs<IllegalArgumentException>(ex)
     }
 
     @Test

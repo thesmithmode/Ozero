@@ -20,6 +20,7 @@ interface TorBinaryVerifier {
 sealed class VerifyResult {
     data object Ok : VerifyResult()
     data class Missing(val fileName: String) : VerifyResult()
+    data class UnknownAbi(val abi: String) : VerifyResult()
     data class Corrupted(
         val fileName: String,
         val expected: String,
@@ -36,10 +37,12 @@ class Sha256TorBinaryVerifier(
 ) : TorBinaryVerifier {
 
     override suspend fun verify(abi: String, libDir: File): VerifyResult {
-        val expected = checksumsByAbi[abi].orEmpty()
-        if (expected.isEmpty()) {
-            Log.w(TAG, "no expected checksums for abi=$abi — skip verification")
-            return VerifyResult.Ok
+        val expected = checksumsByAbi[abi]
+        if (expected.isNullOrEmpty()) {
+            // Отсутствие checksum для ABI = supply-chain угроза: нельзя верифицировать
+            // подмену .so, поэтому отклоняем установку (раньше возвращали Ok → дыра).
+            Log.e(TAG, "no expected checksums for abi=$abi — REJECT install")
+            return VerifyResult.UnknownAbi(abi)
         }
         for ((fileName, expectedSha) in expected) {
             val file = File(libDir, fileName)
