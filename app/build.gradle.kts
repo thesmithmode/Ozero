@@ -3,6 +3,8 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
+    // OWASP Dependency-Check — только для security audit CI task (E13.4)
+    id("org.owasp.dependencycheck")
 }
 
 android {
@@ -115,4 +117,15 @@ dependencies {
     androidTestImplementation(libs.bundles.testing.android)
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)
+}
+
+// E13.4: OWASP Dependency-Check конфигурация
+dependencyCheck {
+    format = "ALL"  // HTML + XML + JSON отчёты
+    failBuildOnCVSS = 11.0f  // Не ломаем build по умолчанию, только аудит
+    suppressionFile = rootProject.file("owasp-suppressions.xml").takeIf { it.exists() }?.absolutePath
+    nvd {
+        // API ключ через переменную окружения NVD_API_KEY (из GH Secret)
+        apiKey = providers.environmentVariable("NVD_API_KEY").orNull ?: ""
+    }
 }
