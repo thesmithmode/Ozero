@@ -54,6 +54,7 @@
     <string name="settings_auto_start_summary">VPN turns on automatically after reboot</string>
     <string name="settings_allowed_apps_title">App list</string>
     <string name="settings_allowed_apps_summary">Coming in RT.4.4</string>
+    <string name="settings_allowed_apps_open_summary">Pick apps and Split-tunnel mode</string>
     <string name="settings_check_update_title">Check for update</string>
     <string name="settings_check_update_summary">GitHub Releases · Ed25519 verify</string>
     <string name="settings_about_version">Version %1$s</string>
@@ -72,6 +73,17 @@
     <string name="diag_not_connected">VPN is not connected. Connect first, then run the test.</string>
     <string name="diag_idle_hint">The test sends 20 URLs through the active SOCKS proxy.</string>
     <string name="diag_back">Back</string>
+
+    <!-- Split-tunnel screen -->
+    <string name="split_tunnel_title">App list</string>
+    <string name="split_tunnel_back">Back</string>
+    <string name="split_tunnel_search_hint">Search apps…</string>
+    <string name="split_tunnel_no_apps">No apps found</string>
+    <string name="split_tunnel_system_app">System</string>
+    <string name="split_tunnel_short_all">All</string>
+    <string name="split_tunnel_short_bypass_lan">Bypass LAN</string>
+    <string name="split_tunnel_short_allowlist">Allowlist</string>
+    <string name="split_tunnel_short_blocklist">Blocklist</string>
 
     <!-- Errors -->
     <string name="error_subscription_invalid">Subscription is corrupted or signed by wrong key</string>

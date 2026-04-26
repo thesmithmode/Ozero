@@ -54,6 +54,7 @@
     <string name="settings_auto_start_summary">VPN включится автоматически после перезагрузки</string>
     <string name="settings_allowed_apps_title">Список приложений</string>
     <string name="settings_allowed_apps_summary">Откроется в RT.4.4</string>
+    <string name="settings_allowed_apps_open_summary">Выбор приложений и режим Split-tunnel</string>
     <string name="settings_check_update_title">Проверить обновление</string>
     <string name="settings_check_update_summary">GitHub Releases · Ed25519 verify</string>
     <string name="settings_about_version">Версия %1$s</string>
@@ -72,6 +73,17 @@
     <string name="diag_not_connected">VPN не подключён. Подключитесь, прежде чем запускать тест.</string>
     <string name="diag_idle_hint">Тест прогонит 20 URL через активный SOCKS-прокси.</string>
     <string name="diag_back">Назад</string>
+
+    <!-- Split-tunnel screen -->
+    <string name="split_tunnel_title">Список приложений</string>
+    <string name="split_tunnel_back">Назад</string>
+    <string name="split_tunnel_search_hint">Поиск приложения…</string>
+    <string name="split_tunnel_no_apps">Ничего не найдено</string>
+    <string name="split_tunnel_system_app">Системное</string>
+    <string name="split_tunnel_short_all">Все</string>
+    <string name="split_tunnel_short_bypass_lan">Без LAN</string>
+    <string name="split_tunnel_short_allowlist">Allowlist</string>
+    <string name="split_tunnel_short_blocklist">Blocklist</string>
 
     <!-- Errors -->
     <string name="error_subscription_invalid">Подписка повреждена или подписана не тем ключом</string>

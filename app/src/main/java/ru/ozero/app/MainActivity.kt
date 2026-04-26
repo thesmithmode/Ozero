@@ -17,10 +17,11 @@ import ru.ozero.app.ui.MainScreen
 import ru.ozero.app.ui.MainViewModel
 import ru.ozero.app.ui.diag.DiagnosticsScreen
 import ru.ozero.app.ui.settings.SettingsScreen
+import ru.ozero.app.ui.splittunnel.SplitTunnelScreen
 import ru.ozero.app.ui.theme.OzeroTheme
 import ru.ozero.commonvpn.OzeroVpnService
 
-enum class TopScreen { Main, Settings, Diagnostics }
+enum class TopScreen { Main, Settings, Diagnostics, SplitTunnel }
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -46,9 +47,14 @@ class MainActivity : ComponentActivity() {
                 var screen by rememberSaveable { mutableStateOf(TopScreen.Main) }
                 when (screen) {
                     TopScreen.Settings ->
-                        SettingsScreen(onBack = { screen = TopScreen.Main })
+                        SettingsScreen(
+                            onBack = { screen = TopScreen.Main },
+                            onOpenAllowedApps = { screen = TopScreen.SplitTunnel },
+                        )
                     TopScreen.Diagnostics ->
                         DiagnosticsScreen(onBack = { screen = TopScreen.Main })
+                    TopScreen.SplitTunnel ->
+                        SplitTunnelScreen(onBack = { screen = TopScreen.Settings })
                     TopScreen.Main ->
                         MainScreen(
                             viewModel = viewModel,
