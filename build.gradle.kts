@@ -16,6 +16,8 @@ plugins {
     // KSP and Hilt — NOT in buildSrc, need version from catalog
     alias(libs.plugins.ksp) apply false
     alias(libs.plugins.hilt) apply false
+    // OWASP Dependency-Check — security audit (E13.4)
+    id("org.owasp.dependencycheck") version "10.0.4" apply false
     // JaCoCo — built-in Gradle plugin
     jacoco
 }

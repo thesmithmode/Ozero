@@ -1,0 +1,87 @@
+name: RU Vantage Proxy Probe
+
+on:
+  workflow_dispatch:
+    inputs:
+      max-proxies:
+        description: 'Максимум прокси (0 = только unit-тесты)'
+        required: false
+        default: '0'
+  schedule:
+    - cron: '0 2 * * *'  # ночной cron, 02:00 UTC
+
+jobs:
+  ru-probe:
+    name: RU Vantage Probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install --quiet pytest
+
+      - name: Run unit tests (парсеры)
+        run: python3 -m pytest tools/tests/test_ru_vantage_probe.py -v
+
+      - name: Run RU vantage probe (прямой mode, без внешних прокси)
+        run: |
+          python3 tools/ru-vantage-probe.py \
+            --bootstrap-file app/src/main/assets/bootstrap-servers.json \
+            --output ru-probe-results.json \
+            --timeout 8 \
+            --workers 4 \
+            --direct
+
+      - name: Write job summary
+        if: always()
+        run: |
+          echo "## RU Vantage Probe Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f ru-probe-results.json ]; then
+            python3 - << 'PYEOF'
+          import json, sys, os
+          path = "ru-probe-results.json"
+          try:
+              with open(path) as f:
+                  data = json.load(f)
+          except Exception as e:
+              print(f"Ошибка чтения {path}: {e}", file=sys.stderr)
+              sys.exit(0)
+
+          lines = [
+              f"**Время:** {data.get('probed_at', 'N/A')}",
+              f"**Серверов всего:** {data.get('servers_total', 0)}",
+              f"**Доступны (прямой probe):** {data.get('servers_ok', 0)}",
+              "",
+              "| Сервер (URI truncated) | Статус | Latency |",
+              "|------------------------|--------|---------|",
+          ]
+          for r in data.get("results", []):
+              uri_short = r["server_uri"][:50]
+              status = r["status"]
+              latency = f"{r['latency_ms']:.0f}ms" if r.get("latency_ms") else "N/A"
+              lines.append(f"| `{uri_short}` | {status} | {latency} |")
+
+          summary_path = os.environ.get("GITHUB_STEP_SUMMARY", "/dev/stdout")
+          with open(summary_path, "a") as f:
+              f.write("\n".join(lines) + "\n")
+          PYEOF
+          fi
+
+      - name: Upload probe results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ru-probe-results
+          path: ru-probe-results.json
+          retention-days: 30

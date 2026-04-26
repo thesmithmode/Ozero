@@ -1,0 +1,141 @@
+name: Security Audit
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 4 * * *'  # ночной аудит, 04:00 UTC
+
+jobs:
+  dependency-check:
+    name: OWASP Dependency Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: true
+
+      - name: Download native binaries
+        run: ./gradlew :engine-byedpi:downloadBinaries --stacktrace
+
+      - name: Run OWASP Dependency Check
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          ./gradlew :app:dependencyCheckAggregate \
+            -Pnvd.api.key="${NVD_API_KEY:-}" \
+            --info \
+            --stacktrace \
+            --continue || true
+
+      - name: Upload dependency check report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: owasp-dependency-check-report
+          path: |
+            **/build/reports/dependency-check-report.html
+            **/build/reports/dependency-check-report.xml
+            **/build/reports/dependency-check-report.json
+          retention-days: 30
+
+  mobsfscan:
+    name: MobSF Static Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run unit tests (mobsfscan-to-sarif converter)
+        run: |
+          pip install --quiet pytest
+          python3 -m pytest tools/tests/test_mobsfscan_to_sarif.py -v
+
+      - name: Run mobsfscan via Docker
+        run: |
+          docker run --rm \
+            -v "$PWD:/code" \
+            opensecurity/mobsfscan:latest \
+            /code \
+            --json \
+            -o /code/mobsf.json \
+            || true
+
+      - name: Convert mobsfscan JSON to SARIF
+        run: |
+          if [ -f mobsf.json ]; then
+            python3 tools/mobsfscan-to-sarif.py mobsf.json mobsf.sarif
+          else
+            echo '{"runs":[{"tool":{"driver":{"name":"mobsfscan","rules":[]}},"results":[]}]}' > mobsf.sarif
+            echo "mobsf.json не найден, создан пустой SARIF" >&2
+          fi
+
+      - name: Upload SARIF to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: mobsf.sarif
+          category: mobsfscan
+
+      - name: Write job summary
+        if: always()
+        run: |
+          echo "## MobSF Static Analysis Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f mobsf.json ]; then
+            python3 - << 'PYEOF'
+          import json, os, sys
+          try:
+              with open("mobsf.json") as f:
+                  data = json.load(f)
+              results = data.get("results", {})
+              count = len(results) if isinstance(results, list) else len(results)
+              lines = [
+                  f"**Findings:** {count}",
+                  "",
+              ]
+              summary_path = os.environ.get("GITHUB_STEP_SUMMARY", "/dev/stdout")
+              with open(summary_path, "a") as f:
+                  f.write("\n".join(lines) + "\n")
+          except Exception as e:
+              print(f"Ошибка: {e}", file=sys.stderr)
+          PYEOF
+          fi
+
+      - name: Upload mobsfscan artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mobsfscan-results
+          path: |
+            mobsf.json
+            mobsf.sarif
+          retention-days: 30
