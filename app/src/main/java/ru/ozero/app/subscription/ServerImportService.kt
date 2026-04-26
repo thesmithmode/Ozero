@@ -4,6 +4,7 @@ import android.util.Log
 import ru.ozero.corestorage.dao.ServerDao
 import ru.ozero.corestorage.entity.ServerEntity
 import ru.ozero.coresubscriptions.ServerMapper
+import ru.ozero.coresubscriptions.SubscriptionFilter
 import ru.ozero.coresubscriptions.uri.ParsedServer
 import ru.ozero.coresubscriptions.uri.SubscriptionUriParser
 import javax.inject.Inject
@@ -16,17 +17,12 @@ import javax.inject.Singleton
  * но без fetch/Ed25519 — пользователь явно вставляет URI, доверие = действие.
  */
 @Singleton
-class ServerImportService(
+class ServerImportService @Inject constructor(
     private val serverDao: ServerDao,
-    private val parser: SubscriptionUriParser,
-    private val mapper: ServerMapper,
+    private val parser: SubscriptionUriParser = SubscriptionUriParser(),
+    private val mapper: ServerMapper = ServerMapper(),
+    private val filter: SubscriptionFilter = SubscriptionFilter(),
 ) {
-
-    @Inject constructor(serverDao: ServerDao) : this(
-        serverDao = serverDao,
-        parser = SubscriptionUriParser(),
-        mapper = ServerMapper(),
-    )
 
     suspend fun import(rawUri: String): ImportResult {
         val trimmed = rawUri.trim()
@@ -37,6 +33,10 @@ class ServerImportService(
         if (parsed is ParsedServer.Error) {
             Log.w(TAG, "parse error: ${parsed.reason}")
             return ImportResult.Error(parsed.reason)
+        }
+        if (!filter.isLiveIn2026(parsed)) {
+            Log.w(TAG, "import REJECT: protocol/config не пройдёт ТСПУ в 2026")
+            return ImportResult.Error("протокол/конфиг не пройдёт фильтрацию (нужен Reality/Hy2/Trojan/Naive/AWG2)")
         }
         val entity: ServerEntity = mapper.toEntity(parsed, trimmed)
             ?: return ImportResult.Error("маппинг не дал ServerEntity")

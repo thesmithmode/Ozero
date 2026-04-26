@@ -4,6 +4,8 @@ import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.corestorage.dao.ServerDao
@@ -33,12 +35,17 @@ class LiveProber(
 
     suspend fun probeAll(servers: List<ServerEntity>): ProbeStats {
         if (servers.isEmpty()) return ProbeStats(0, 0, 0)
+        // Семафор ограничивает реальный параллелизм: при 500+ серверах без него
+        // открывается 500 одновременных TCP-сокетов → fd exhaustion + сетевой шторм.
+        val sem = Semaphore(MAX_CONCURRENT)
         val results = coroutineScope {
             servers.map { srv ->
                 async(Dispatchers.IO) {
-                    val alive = withTimeoutOrNull(PROBE_TIMEOUT) { probeOne(srv) } ?: false
-                    serverDao.setAlive(srv.id, alive, now())
-                    alive
+                    sem.withPermit {
+                        val alive = withTimeoutOrNull(PROBE_TIMEOUT) { probeOne(srv) } ?: false
+                        serverDao.setAlive(srv.id, alive, now())
+                        alive
+                    }
                 }
             }.map { it.await() }
         }
@@ -77,6 +84,7 @@ class LiveProber(
 
     private companion object {
         const val TAG = "LiveProber"
+        const val MAX_CONCURRENT = 16
         val PROBE_TIMEOUT = 5.seconds
         const val CONNECT_TIMEOUT_MS = 3_000
     }

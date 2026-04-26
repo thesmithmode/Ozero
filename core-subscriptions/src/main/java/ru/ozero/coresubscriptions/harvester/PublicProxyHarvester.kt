@@ -1,8 +1,12 @@
 package ru.ozero.coresubscriptions.harvester
 
 import android.util.Log
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.json.JSONArray
+import org.json.JSONObject
 import ru.ozero.corestorage.dao.ServerDao
 import ru.ozero.corestorage.entity.ServerEntity
 import ru.ozero.coresubscriptions.ServerMapper
@@ -31,11 +35,18 @@ class PublicProxyHarvester(
     private val mapper: ServerMapper = ServerMapper(),
 ) {
 
-    suspend fun harvest(sources: List<PublicProxySource>): HarvestResult {
+    suspend fun harvest(sources: List<PublicProxySource>): HarvestResult = withContext(Dispatchers.IO) {
         var totalEntities = 0
         var failed = 0
         val perSource = mutableListOf<PerSourceResult>()
         for (source in sources) {
+            // HTTPS-only: HTTP-источник = MITM возможен, отбрасываем сразу.
+            if (!source.url.startsWith("https://")) {
+                Log.w(TAG, "source ${source.id} non-HTTPS URL — skip")
+                failed++
+                perSource += PerSourceResult(source.id, parsedCount = 0, error = "non-HTTPS URL")
+                continue
+            }
             val sr = runCatching { harvestOne(source) }.getOrElse {
                 Log.w(TAG, "source ${source.id} failed", it)
                 failed++
@@ -53,7 +64,7 @@ class PublicProxyHarvester(
         } else {
             Log.w(TAG, "harvest пустой → БД не трогаем (network outage защита)")
         }
-        return HarvestResult(totalParsed = totalEntities, failedSources = failed, perSource = perSource)
+        HarvestResult(totalParsed = totalEntities, failedSources = failed, perSource = perSource)
     }
 
     private fun harvestOne(source: PublicProxySource): PerSourceResult {
@@ -62,7 +73,18 @@ class PublicProxyHarvester(
             if (!resp.isSuccessful) {
                 return PerSourceResult(source.id, parsedCount = 0, error = "HTTP ${resp.code}")
             }
-            val body = resp.body?.string().orEmpty()
+            val respBody = resp.body ?: return PerSourceResult(source.id, 0, error = "empty body")
+            // Лимит размера тела — против OOM от malicious source.
+            if (respBody.contentLength() > MAX_BODY_BYTES) {
+                return PerSourceResult(source.id, 0, error = "body too large")
+            }
+            val src = respBody.source()
+            // Читаем максимум MAX_BODY_BYTES+1 — если всё ещё есть данные, отказ.
+            val bytes = src.readByteString(MAX_BODY_BYTES)
+            if (src.request(1L)) {
+                return PerSourceResult(source.id, 0, error = "body exceeds $MAX_BODY_BYTES bytes")
+            }
+            val body = bytes.utf8()
             val lines: List<String> = when (source.format) {
                 SourceFormat.LINES -> body.lineSequence().toList()
                 SourceFormat.BASE64_LINES -> {
@@ -84,13 +106,18 @@ class PublicProxyHarvester(
         }
     }
 
-    /** Простой парсер `{ "servers": ["uri", ...] }` без org.json (Android dep). */
+    /** Парсер `{ "servers": ["uri", ...] }` или верхнего массива через org.json (надёжно). */
     private fun parseJsonArray(body: String): List<String> {
-        val start = body.indexOf('[')
-        val end = body.lastIndexOf(']')
-        if (start < 0 || end <= start) return emptyList()
-        val inner = body.substring(start + 1, end)
-        return inner.split(',').map { it.trim().removeSurrounding("\"") }
+        val arr: JSONArray = runCatching {
+            // Сначала пробуем как JSON-объект с полем servers
+            val obj = JSONObject(body)
+            obj.optJSONArray("servers") ?: return emptyList()
+        }.getOrElse {
+            runCatching { JSONArray(body) }.getOrElse { return emptyList() }
+        }
+        return buildList {
+            for (i in 0 until arr.length()) add(arr.optString(i))
+        }
     }
 
     data class HarvestResult(
@@ -108,5 +135,6 @@ class PublicProxyHarvester(
 
     private companion object {
         const val TAG = "PublicProxyHarvester"
+        const val MAX_BODY_BYTES = 4L * 1024 * 1024 // 4 МБ — достаточно для тысяч URI
     }
 }
