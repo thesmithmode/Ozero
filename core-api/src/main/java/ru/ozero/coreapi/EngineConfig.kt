@@ -45,5 +45,9 @@ sealed class EngineConfig {
         val region: String? = null,
         val mode: String = "consumer",
         val socksPort: Int = 10810,
-    ) : EngineConfig()
+    ) : EngineConfig() {
+        // Кастомный toString маскирует JWT, чтобы Log.d(TAG, "$config") не сливал токен в logcat.
+        override fun toString(): String =
+            "Urnetwork(jwtToken=***, apiUrl=$apiUrl, region=$region, mode=$mode, socksPort=$socksPort)"
+    }
 }
