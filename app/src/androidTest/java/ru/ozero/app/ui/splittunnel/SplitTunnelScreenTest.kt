@@ -52,12 +52,11 @@ class SplitTunnelScreenTest {
         composeRule.setContent {
             OzeroTheme {
                 SplitTunnelScreenContent(
-                    state =
-                        SplitTunnelUiState.Content(
-                            mode = SplitTunnelMode.ALL,
-                            query = "",
-                            apps = emptyList(),
-                        ),
+                    state = SplitTunnelUiState.Content(
+                        mode = SplitTunnelMode.ALL,
+                        query = "",
+                        apps = emptyList(),
+                    ),
                     onBack = {},
                     onModeChange = { captured += it },
                     onToggleApp = { _, _ -> },
@@ -79,12 +78,11 @@ class SplitTunnelScreenTest {
         composeRule.setContent {
             OzeroTheme {
                 SplitTunnelScreenContent(
-                    state =
-                        SplitTunnelUiState.Content(
-                            mode = SplitTunnelMode.ALL,
-                            query = "",
-                            apps = emptyList(),
-                        ),
+                    state = SplitTunnelUiState.Content(
+                        mode = SplitTunnelMode.ALL,
+                        query = "",
+                        apps = emptyList(),
+                    ),
                     onBack = {},
                     onModeChange = {},
                     onToggleApp = { _, _ -> },

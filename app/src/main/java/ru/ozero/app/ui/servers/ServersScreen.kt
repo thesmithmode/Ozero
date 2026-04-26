@@ -113,12 +113,11 @@ private fun LoadingBody(padding: PaddingValues) {
 @Composable
 private fun EmptyBody(padding: PaddingValues) {
     Box(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(24.dp)
-                .testTag(ServersTestTags.EMPTY),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(padding)
+            .padding(24.dp)
+            .testTag(ServersTestTags.EMPTY),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -138,11 +137,10 @@ private fun ContentBody(
     onClearPair: () -> Unit,
 ) {
     Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(padding)
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         ServerDropdown(
@@ -193,11 +191,10 @@ private fun ServerDropdown(
     var expanded by remember { mutableStateOf(false) }
     val selected = servers.firstOrNull { it.id == selectedId }
     Card(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clickable { expanded = !expanded }
-                .testTag(tag),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { expanded = !expanded }
+            .testTag(tag),
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(text = label, style = MaterialTheme.typography.labelMedium)
@@ -233,18 +230,17 @@ private fun PreviewCard(state: ServersUiState.Content) {
             )
             val entry = state.entry
             val exit = state.exit
-            val text =
-                if (entry != null && exit != null && state.canSave) {
-                    stringResource(
-                        R.string.servers_preview_format,
-                        entry.country,
-                        entry.protocol,
-                        exit.country,
-                        exit.protocol,
-                    )
-                } else {
-                    stringResource(R.string.servers_preview_unset)
-                }
+            val text = if (entry != null && exit != null && state.canSave) {
+                stringResource(
+                    R.string.servers_preview_format,
+                    entry.country,
+                    entry.protocol,
+                    exit.country,
+                    exit.protocol,
+                )
+            } else {
+                stringResource(R.string.servers_preview_unset)
+            }
             Text(text = text, style = MaterialTheme.typography.bodyMedium)
         }
     }

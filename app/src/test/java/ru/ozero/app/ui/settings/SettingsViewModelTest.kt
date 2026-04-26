@@ -4,7 +4,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -117,12 +116,11 @@ class SettingsViewModelTest {
         val autoStartUpdates = mutableListOf<Boolean>()
         val manualEngineUpdates = mutableListOf<EngineId?>()
 
-        override val settings: Flow<SettingsModel> =
-            kotlinx.coroutines.flow.flow {
-                flow.collect { value ->
-                    if (value != null) emit(value)
-                }
+        override val settings: Flow<SettingsModel> = kotlinx.coroutines.flow.flow {
+            flow.collect { value ->
+                if (value != null) emit(value)
             }
+        }
 
         suspend fun emit(model: SettingsModel) {
             flow.value = model

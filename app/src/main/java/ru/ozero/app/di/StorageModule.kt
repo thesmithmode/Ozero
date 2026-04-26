@@ -1,7 +1,6 @@
 package ru.ozero.app.di
 
 import android.content.Context
-import androidx.room.Room
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -19,16 +18,11 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object StorageModule {
 
-    private const val DATABASE_NAME = "ozero.db"
-
     @Provides
     @Singleton
     fun provideOzeroDatabase(
         @ApplicationContext context: Context,
-    ): OzeroDatabase =
-        Room.databaseBuilder(context, OzeroDatabase::class.java, DATABASE_NAME)
-            .addMigrations(OzeroDatabase.MIGRATION_1_2)
-            .build()
+    ): OzeroDatabase = OzeroDatabase.create(context)
 
     @Provides
     fun provideServerDao(database: OzeroDatabase): ServerDao = database.serverDao()
