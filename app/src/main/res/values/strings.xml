@@ -38,6 +38,29 @@
     <string name="settings_language_ru">Русский</string>
     <string name="settings_language_en">English</string>
 
+    <!-- Settings — RT.4.1 -->
+    <string name="settings_section_connection">Подключение</string>
+    <string name="settings_section_network">Сеть</string>
+    <string name="settings_section_security">Безопасность</string>
+    <string name="settings_section_updates">Обновления</string>
+    <string name="settings_section_about">О приложении</string>
+    <string name="settings_split_mode_label">Режим Split-tunnel</string>
+    <string name="settings_manual_engine_title">Выбор движка</string>
+    <string name="settings_manual_engine_summary">Авто — Ozero сам выберет лучший</string>
+    <string name="settings_manual_engine_auto">Авто</string>
+    <string name="settings_ipv6_title">IPv6</string>
+    <string name="settings_ipv6_summary">Маршрутизировать IPv6 через VPN</string>
+    <string name="settings_auto_start_title">Автозапуск при загрузке</string>
+    <string name="settings_auto_start_summary">VPN включится автоматически после перезагрузки</string>
+    <string name="settings_allowed_apps_title">Список приложений</string>
+    <string name="settings_allowed_apps_summary">Откроется в RT.4.4</string>
+    <string name="settings_check_update_title">Проверить обновление</string>
+    <string name="settings_check_update_summary">GitHub Releases · Ed25519 verify</string>
+    <string name="settings_about_version">Версия %1$s</string>
+    <string name="settings_about_summary">Open-source VPN. Подробности в Privacy / Threat model.</string>
+    <string name="settings_back">Назад</string>
+    <string name="settings_open">Открыть настройки</string>
+
     <!-- Diagnostics -->
     <string name="diag_title">Диагностика</string>
     <string name="diag_run">Запустить тест</string>

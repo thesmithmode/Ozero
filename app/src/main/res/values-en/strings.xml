@@ -38,6 +38,29 @@
     <string name="settings_language_ru">Русский</string>
     <string name="settings_language_en">English</string>
 
+    <!-- Settings — RT.4.1 -->
+    <string name="settings_section_connection">Connection</string>
+    <string name="settings_section_network">Network</string>
+    <string name="settings_section_security">Security</string>
+    <string name="settings_section_updates">Updates</string>
+    <string name="settings_section_about">About</string>
+    <string name="settings_split_mode_label">Split-tunnel mode</string>
+    <string name="settings_manual_engine_title">Engine selection</string>
+    <string name="settings_manual_engine_summary">Auto — Ozero picks the best</string>
+    <string name="settings_manual_engine_auto">Auto</string>
+    <string name="settings_ipv6_title">IPv6</string>
+    <string name="settings_ipv6_summary">Route IPv6 through VPN</string>
+    <string name="settings_auto_start_title">Start on boot</string>
+    <string name="settings_auto_start_summary">VPN turns on automatically after reboot</string>
+    <string name="settings_allowed_apps_title">App list</string>
+    <string name="settings_allowed_apps_summary">Coming in RT.4.4</string>
+    <string name="settings_check_update_title">Check for update</string>
+    <string name="settings_check_update_summary">GitHub Releases · Ed25519 verify</string>
+    <string name="settings_about_version">Version %1$s</string>
+    <string name="settings_about_summary">Open-source VPN. Details in Privacy / Threat model.</string>
+    <string name="settings_back">Back</string>
+    <string name="settings_open">Open settings</string>
+
     <!-- Diagnostics -->
     <string name="diag_title">Diagnostics</string>
     <string name="diag_run">Run test</string>
