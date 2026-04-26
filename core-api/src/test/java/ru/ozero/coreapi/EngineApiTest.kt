@@ -169,6 +169,34 @@ class EngineApiTest {
     }
 
     @Test
+    fun urnetworkConfigDefaults() {
+        val config = EngineConfig.Urnetwork(jwtToken = "tok123")
+        assertEquals("tok123", config.jwtToken)
+        assertEquals("https://api.urnetwork.com", config.apiUrl)
+        assertNull(config.region)
+        assertEquals("consumer", config.mode)
+        assertEquals(10810, config.socksPort)
+    }
+
+    @Test
+    fun urnetworkConfigCustom() {
+        val config = EngineConfig.Urnetwork(
+            jwtToken = "t",
+            apiUrl = "https://staging.urnetwork.com",
+            region = "EU",
+            mode = "provider",
+            socksPort = 20000,
+        )
+        assertEquals("https://staging.urnetwork.com", config.apiUrl)
+        assertEquals("EU", config.region)
+        assertEquals("provider", config.mode)
+        assertEquals(20000, config.socksPort)
+        val copy = config.copy(region = "US")
+        assertEquals("US", copy.region)
+        assertEquals("provider", copy.mode)
+    }
+
+    @Test
     fun torConfigWithBridges() {
         val bridges = listOf("obfs4 1.2.3.4:443 cert=ABCD", "snowflake 0.0.3.0:1")
         val config = EngineConfig.Tor(bridges = bridges, socksPort = 9051)
