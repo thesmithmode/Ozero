@@ -113,3 +113,25 @@ Plugin парсит lock, генерирует `DownloadBinaryTask` per artifact
 - Версии upstream pinned (envvars `XRAY_VERSION`, `TOR_VERSION`, `IPTPROXY_VERSION`)
 - Sha256 коммитится в git — F-Droid bot повторяет тот же build, сверяет sha
 - `gomobile bind` детерминистичен с фиксированным Go + NDK
+
+## 9. UI hygiene (Releases)
+
+Каждый успешный build публикует **prerelease** в GitHub Releases:
+- `prerelease: true` — релиз не маячит как «Latest» на главной странице репо.
+- После upload workflow удаляет старые prerelease того же движка, оставляя последние **3 версии** (откат возможен в течение 3 циклов).
+- Cleanup использует `gh release delete --cleanup-tag` — git tag удаляется вместе с релизом.
+
+Эти релизы — build-кэш, **не** пользовательские релизы продукта. Релизы Ozero APK выпускаются отдельно через RT.6 self-update flow.
+
+## 10. Upstream version watcher
+
+Workflow `.github/workflows/upstream-check.yml` запускается раз в неделю (или вручную через workflow_dispatch). Скрипт `build-tools/check_upstream.py`:
+
+1. Парсит `_VERSION` переменные из `build_*.sh`.
+2. Дёргает `releases/latest` каждого upstream-репо (с fallback на `tags` API для репо без GitHub Releases).
+3. Если pinned ≠ latest — пишет markdown отчёт `build-tools/upstream-bumps.md` (gitignored).
+4. `peter-evans/create-pull-request` открывает PR с этим отчётом в описании.
+
+Человек смотрит changelog upstream, проверяет breaking changes, bump'ает `_VERSION` в build-скрипте, запускает `binaries.yml --ref <branch>` для пересборки. После публикации release — `regen_lock.py` обновляет `binaries.lock.yaml`.
+
+API rate limit GitHub: 5000 req/h с токеном (есть в workflow), 60 без. У нас ~5 запросов раз в неделю — лимит неактуален.

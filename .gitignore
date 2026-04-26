@@ -116,3 +116,4 @@ env/
 *~
 *.log
 Thumbs.db
+build-tools/upstream-bumps.md

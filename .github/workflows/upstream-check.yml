@@ -1,0 +1,38 @@
+name: Upstream version check
+
+# Раз в неделю проверяем upstream-репо движков на свежие релизы.
+# Триггеры — schedule + manual workflow_dispatch. Untrusted input отсутствует.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run check_upstream.py
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 build-tools/check_upstream.py
+      - name: Open PR with bump report
+        if: env.HAS_BUMPS == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: bot/upstream-bump
+          delete-branch: true
+          title: "chore(deps): upstream version bumps detected"
+          body-path: build-tools/upstream-bumps.md
+          commit-message: "chore: upstream-bumps report"
+          add-paths: |
+            build-tools/upstream-bumps.md
