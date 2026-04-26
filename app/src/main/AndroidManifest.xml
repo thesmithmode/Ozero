@@ -48,6 +48,15 @@
             </intent-filter>
         </receiver>
 
+        <!-- RT.6.1: result-broadcast от PackageInstaller.commit() при self-update -->
+        <receiver
+            android:name=".selfupdate.UpdateInstallResultReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="ru.ozero.app.UPDATE_INSTALL_RESULT" />
+            </intent-filter>
+        </receiver>
+
         <service
             android:name=".OzeroQuickTile"
             android:exported="true"
