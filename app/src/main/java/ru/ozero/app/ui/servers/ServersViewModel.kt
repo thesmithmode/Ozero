@@ -11,7 +11,6 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import ru.ozero.corestorage.dao.ServerDao
-import ru.ozero.corestorage.entity.ServerEntity
 import javax.inject.Inject
 
 @HiltViewModel
