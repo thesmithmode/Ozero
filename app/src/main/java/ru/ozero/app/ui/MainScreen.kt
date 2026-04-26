@@ -4,12 +4,14 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -32,6 +34,7 @@ import ru.ozero.coreorchestrator.OrchestratorState
 
 object MainScreenTestTags {
     const val OPEN_SETTINGS = "main_open_settings"
+    const val OPEN_DIAGNOSTICS = "main_open_diagnostics"
 }
 
 @Composable
@@ -39,22 +42,35 @@ fun MainScreen(
     viewModel: MainViewModel,
     onConnectClick: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenDiagnostics: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
 
     Box(modifier = Modifier.fillMaxSize()) {
-        IconButton(
-            onClick = onOpenSettings,
+        Row(
             modifier =
                 Modifier
                     .align(Alignment.TopEnd)
-                    .padding(8.dp)
-                    .testTag(MainScreenTestTags.OPEN_SETTINGS),
+                    .padding(8.dp),
         ) {
-            Icon(
-                imageVector = Icons.Filled.Settings,
-                contentDescription = stringResource(R.string.tab_settings),
-            )
+            IconButton(
+                onClick = onOpenDiagnostics,
+                modifier = Modifier.testTag(MainScreenTestTags.OPEN_DIAGNOSTICS),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Build,
+                    contentDescription = stringResource(R.string.tab_diagnostics),
+                )
+            }
+            IconButton(
+                onClick = onOpenSettings,
+                modifier = Modifier.testTag(MainScreenTestTags.OPEN_SETTINGS),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Settings,
+                    contentDescription = stringResource(R.string.tab_settings),
+                )
+            }
         }
 
         Column(

@@ -69,6 +69,9 @@
     <string name="diag_summary">%1$d ✓ / %2$d ✗ из %3$d</string>
     <string name="diag_url_ok">%1$s — %2$d ms</string>
     <string name="diag_url_failed">%1$s — ошибка: %2$s</string>
+    <string name="diag_not_connected">VPN не подключён. Подключитесь, прежде чем запускать тест.</string>
+    <string name="diag_idle_hint">Тест прогонит 20 URL через активный SOCKS-прокси.</string>
+    <string name="diag_back">Назад</string>
 
     <!-- Errors -->
     <string name="error_subscription_invalid">Подписка повреждена или подписана не тем ключом</string>
