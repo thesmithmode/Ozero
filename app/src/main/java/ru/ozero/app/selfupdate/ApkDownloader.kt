@@ -48,9 +48,17 @@ open class ApkDownloader(
         }
         val apkFile = File(destDir, APK_NAME)
         val sigFile = File(destDir, SIG_NAME)
-        runCatching {
-            if (apkFile.exists()) apkFile.delete()
-            if (sigFile.exists()) sigFile.delete()
+        // Если предыдущий файл залочен (open file handle от другого download) и удалить
+        // не удаётся — нельзя продолжать: corrupt-mix старых и новых байт пройдёт verify.
+        if (apkFile.exists() && !apkFile.delete()) {
+            Log.e(TAG, "не удалось удалить старый apk: ${apkFile.absolutePath}")
+            emit(Event.Failed("apk locked, перезапустите приложение"))
+            return@flow
+        }
+        if (sigFile.exists() && !sigFile.delete()) {
+            Log.e(TAG, "не удалось удалить старую sig: ${sigFile.absolutePath}")
+            emit(Event.Failed("sig locked"))
+            return@flow
         }
 
         try {

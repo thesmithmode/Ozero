@@ -41,12 +41,13 @@ class UpdateCoordinatorTest {
     @AfterEach
     fun tearDown() = Unit
 
-    private fun coordinator() = UpdateCoordinator(
+    private fun coordinator(currentVc: Long = 100L) = UpdateCoordinator(
         fetcher = fetcher,
         downloader = downloader,
         verifier = verifier,
         installer = installer,
         currentVersion = current,
+        currentVersionCode = currentVc,
         cacheDir = tempDir.toFile(),
     )
 
@@ -65,6 +66,30 @@ class UpdateCoordinatorTest {
     fun `older or equal release → UpToDate`() = runTest {
         fetcher.release = newRelease(tag = "v0.1.0")
         val events = coordinator().check().toList()
+        assertEquals(listOf(UpdateCoordinator.Progress.Checking, UpdateCoordinator.Progress.UpToDate), events)
+    }
+
+    @Test
+    fun `non-https apkUrl rejected at FETCH stage`() = runTest {
+        fetcher.release = ReleaseInfo(
+            tag = "v0.2.0",
+            apkUrl = "http://attacker/a.apk",
+            sigUrl = "https://x/a.sig",
+        )
+        val events = coordinator().check().toList()
+        val terminal = events.last()
+        val failed = assertIs<UpdateCoordinator.Progress.Failed>(terminal)
+        assertEquals(UpdateCoordinator.Progress.Stage.FETCH, failed.stage)
+    }
+
+    @Test
+    fun `downgrade by versionCode rejected → UpToDate`() = runTest {
+        fetcher.release = ReleaseInfo(
+            tag = "v0.2.0",
+            apkUrl = "https://x/a.apk", sigUrl = "https://x/a.sig",
+            versionCode = 50L,
+        )
+        val events = coordinator(currentVc = 100L).check().toList()
         assertEquals(listOf(UpdateCoordinator.Progress.Checking, UpdateCoordinator.Progress.UpToDate), events)
     }
 

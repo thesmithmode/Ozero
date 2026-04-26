@@ -5,6 +5,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 
 /**
@@ -23,8 +25,15 @@ open class UpdateCoordinator(
     private val verifier: ApkUpdateVerifier,
     private val installer: SilentPackageInstaller,
     private val currentVersion: String,
+    private val currentVersionCode: Long,
     private val cacheDir: File,
 ) {
+
+    /**
+     * Mutex против гонки параллельных check(). Иначе два concurrent download затирают
+     * один и тот же файл `ozero-update.apk` → verify проходит на смеси байт.
+     */
+    private val checkMutex = Mutex()
 
     sealed class Progress {
         data object Checking : Progress()
@@ -40,23 +49,44 @@ open class UpdateCoordinator(
     }
 
     open fun check(): Flow<Progress> = flow {
-        Log.i(TAG, "check() current=$currentVersion")
-        emit(Progress.Checking)
+        checkMutex.withLock { runCheck(this) }
+    }.flowOn(Dispatchers.IO)
+
+    private suspend fun runCheck(collector: kotlinx.coroutines.flow.FlowCollector<Progress>) {
+        Log.i(TAG, "check() current=$currentVersion vc=$currentVersionCode")
+        collector.emit(Progress.Checking)
 
         val release = runCatching { fetcher.latest() }
             .onFailure { Log.e(TAG, "fetcher.latest() threw", it) }
             .getOrNull()
         if (release == null) {
             Log.w(TAG, "no release info from GitHub API")
-            emit(Progress.NoRelease)
-            return@flow
+            collector.emit(Progress.NoRelease)
+            return
         }
         Log.i(TAG, "latest release tag=${release.tag} apk=${release.apkUrl}")
 
+        // HTTPS-only: GitHub CDN URLs всегда https, любая http-схема = MITM/подмена.
+        if (!release.apkUrl.startsWith("https://") || !release.sigUrl.startsWith("https://")) {
+            Log.e(TAG, "non-HTTPS URL в release info — REJECT")
+            collector.emit(Progress.Failed(Progress.Stage.FETCH, "non-HTTPS URL в release"))
+            return
+        }
+
         if (!release.isNewerThan(currentVersion)) {
             Log.i(TAG, "release ${release.tag} not newer than current $currentVersion")
-            emit(Progress.UpToDate)
-            return@flow
+            collector.emit(Progress.UpToDate)
+            return
+        }
+
+        // Downgrade protection: даже если semver-tag выше, versionCode из manifest скачанного
+        // APK проверяется отдельно после verify. Здесь — pre-check по полю release.versionCode
+        // (если backend его выдаёт). Полная проверка versionCode из APK manifest требует парсинга
+        // AndroidManifest и ляжет на PackageInstaller, который вернёт INSTALL_FAILED_VERSION_DOWNGRADE.
+        if (release.versionCode > 0 && release.versionCode <= currentVersionCode) {
+            Log.w(TAG, "release versionCode=${release.versionCode} <= current=$currentVersionCode → REJECT")
+            collector.emit(Progress.UpToDate)
+            return
         }
 
         var apkFile: File? = null
@@ -64,7 +94,7 @@ open class UpdateCoordinator(
         var downloadFailed: String? = null
         downloader.download(release.apkUrl, release.sigUrl, cacheDir).collect { ev ->
             when (ev) {
-                is ApkDownloader.Event.Progress -> emit(Progress.Downloading(ev.percent))
+                is ApkDownloader.Event.Progress -> collector.emit(Progress.Downloading(ev.percent))
                 is ApkDownloader.Event.Success -> {
                     apkFile = ev.apk
                     sigFile = ev.sig
@@ -74,20 +104,21 @@ open class UpdateCoordinator(
                 }
             }
         }
-        if (downloadFailed != null) {
-            Log.e(TAG, "download failed: $downloadFailed")
-            emit(Progress.Failed(Progress.Stage.DOWNLOAD, downloadFailed))
-            return@flow
+        val df = downloadFailed
+        if (df != null) {
+            Log.e(TAG, "download failed: $df")
+            collector.emit(Progress.Failed(Progress.Stage.DOWNLOAD, df))
+            return
         }
         val apk = apkFile
         val sig = sigFile
         if (apk == null || sig == null) {
             Log.e(TAG, "download done but files missing")
-            emit(Progress.Failed(Progress.Stage.DOWNLOAD, "files missing"))
-            return@flow
+            collector.emit(Progress.Failed(Progress.Stage.DOWNLOAD, "files missing"))
+            return
         }
 
-        emit(Progress.Verifying)
+        collector.emit(Progress.Verifying)
         val ok = runCatching { verifier.verify(apk, sig) }
             .onFailure { Log.e(TAG, "verifier threw", it) }
             .getOrDefault(false)
@@ -95,27 +126,27 @@ open class UpdateCoordinator(
             Log.e(TAG, "Ed25519 verify FAILED — apk discarded")
             apk.delete()
             sig.delete()
-            emit(Progress.Failed(Progress.Stage.VERIFY, "подпись APK невалидна"))
-            return@flow
+            collector.emit(Progress.Failed(Progress.Stage.VERIFY, "подпись APK невалидна"))
+            return
         }
         Log.i(TAG, "Ed25519 verify OK")
 
-        emit(Progress.Installing)
+        collector.emit(Progress.Installing)
         when (val res = installer.install(apk)) {
             is SilentPackageInstaller.Result.Submitted -> {
                 Log.i(TAG, "PackageInstaller session committed id=${res.sessionId}")
-                emit(Progress.Submitted(res.sessionId))
+                collector.emit(Progress.Submitted(res.sessionId))
             }
             is SilentPackageInstaller.Result.FileError -> {
                 Log.e(TAG, "installer FileError: ${res.reason}")
-                emit(Progress.Failed(Progress.Stage.INSTALL, res.reason))
+                collector.emit(Progress.Failed(Progress.Stage.INSTALL, res.reason))
             }
             is SilentPackageInstaller.Result.IoError -> {
                 Log.e(TAG, "installer IoError sid=${res.sessionId}: ${res.reason}")
-                emit(Progress.Failed(Progress.Stage.INSTALL, res.reason))
+                collector.emit(Progress.Failed(Progress.Stage.INSTALL, res.reason))
             }
         }
-    }.flowOn(Dispatchers.IO)
+    }
 
     private companion object {
         const val TAG = "UpdateCoordinator"

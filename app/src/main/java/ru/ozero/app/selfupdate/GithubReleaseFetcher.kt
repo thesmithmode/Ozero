@@ -50,18 +50,31 @@ open class GithubReleaseFetcher(
             val a = assets.getJSONObject(i)
             val name = a.optString("name")
             val url = a.optString("browser_download_url")
+            // Валидация схемы — отбрасываем file://, http://, ftp://, javascript: и пр.
+            if (!url.startsWith("https://")) continue
             when {
                 name.endsWith(".apk") && !name.endsWith(".apk.sig") -> apkUrl = url
                 name.endsWith(".apk.sig") -> sigUrl = url
             }
         }
         if (apkUrl.isNullOrBlank() || sigUrl.isNullOrBlank()) return null
+        // Опциональный versionCode из release body (формат: "version_code: 12345" или JSON-блок).
+        val versionCode = obj.optLong("version_code", 0L)
+            .takeIf { it > 0 }
+            ?: parseVersionCodeFromBody(obj.optString("body"))
         return ReleaseInfo(
             tag = tag,
             apkUrl = apkUrl,
             sigUrl = sigUrl,
             isPrerelease = isPrerelease,
             publishedAt = publishedAt,
+            versionCode = versionCode,
         )
+    }
+
+    private fun parseVersionCodeFromBody(body: String): Long {
+        // Поддерживаем строку вида "version_code: 12345" в release body
+        val m = Regex("""version_code:\s*(\d+)""", RegexOption.IGNORE_CASE).find(body)
+        return m?.groupValues?.get(1)?.toLongOrNull() ?: 0L
     }
 }
