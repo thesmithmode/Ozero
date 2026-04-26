@@ -62,6 +62,9 @@ extensions.configure<BaseAppModuleExtension> {
     buildTypes {
         release {
             isMinifyEnabled = true
+            // E13.3: shrinkResources убирает unused resources из APK (меньше surface
+            // для reverse engineering, меньше размер).
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
