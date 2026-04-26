@@ -1,9 +1,12 @@
 package ru.ozero.app.ui.settings
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -16,6 +19,8 @@ import ru.ozero.app.settings.SettingsModel
 import ru.ozero.app.settings.SettingsRepository
 import ru.ozero.commonvpn.split.SplitTunnelMode
 import ru.ozero.coreapi.EngineId
+import ru.ozero.enginetor.dynamicmod.InstallResult
+import ru.ozero.enginetor.dynamicmod.SplitInstallClient
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
@@ -24,13 +29,15 @@ class SettingsViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
     private lateinit var repository: FakeSettingsRepository
+    private lateinit var torClient: FakeSplitInstallClient
     private lateinit var viewModel: SettingsViewModel
 
     @BeforeEach
     fun setUp() {
         Dispatchers.setMain(dispatcher)
         repository = FakeSettingsRepository()
-        viewModel = SettingsViewModel(repository)
+        torClient = FakeSplitInstallClient()
+        viewModel = SettingsViewModel(repository, torClient)
     }
 
     @AfterEach
@@ -108,6 +115,80 @@ class SettingsViewModelTest {
         assertEquals(listOf(EngineId.HYSTERIA2, null), repository.manualEngineUpdates)
     }
 
+    @Test
+    fun `tor initial state is Installed when module already present`() {
+        torClient = FakeSplitInstallClient(installed = setOf("dynamic_tor"))
+        viewModel = SettingsViewModel(repository, torClient)
+
+        assertEquals(TorInstallUiState.Installed, viewModel.torInstall.value)
+    }
+
+    @Test
+    fun `tor initial state is NotInstalled when module absent`() {
+        assertEquals(TorInstallUiState.NotInstalled, viewModel.torInstall.value)
+    }
+
+    @Test
+    fun `onInstallTor emits Installing percents and Installed on terminal`() = runTest {
+        torClient.flow = flowOf(
+            InstallResult.Installing(percent = 25),
+            InstallResult.Installing(percent = 80),
+            InstallResult.Installed,
+        )
+
+        viewModel.onInstallTor()
+        advanceUntilIdle()
+
+        assertEquals(TorInstallUiState.Installed, viewModel.torInstall.value)
+        assertEquals(1, torClient.requestCount)
+    }
+
+    @Test
+    fun `onInstallTor sets Failed when client emits Failed`() = runTest {
+        torClient.flow = flowOf(
+            InstallResult.Installing(percent = 30),
+            InstallResult.Failed(reason = "code=-100"),
+        )
+
+        viewModel.onInstallTor()
+        advanceUntilIdle()
+
+        val state = viewModel.torInstall.value
+        val failed = assertIs<TorInstallUiState.Failed>(state)
+        assertEquals("code=-100", failed.reason)
+    }
+
+    @Test
+    fun `onCancelTor cancels job and resets to NotInstalled`() = runTest {
+        val gate = CompletableDeferred<InstallResult>()
+        torClient.flow = flow {
+            emit(InstallResult.Installing(percent = 10))
+            // блок дальше до cancel
+            emit(gate.await())
+        }
+
+        viewModel.onInstallTor()
+        advanceUntilIdle()
+        assertIs<TorInstallUiState.Installing>(viewModel.torInstall.value)
+
+        viewModel.onCancelTor()
+        advanceUntilIdle()
+
+        assertEquals(TorInstallUiState.NotInstalled, viewModel.torInstall.value)
+    }
+
+    @Test
+    fun `onInstallTor is idempotent when already Installed`() = runTest {
+        torClient = FakeSplitInstallClient(installed = setOf("dynamic_tor"))
+        viewModel = SettingsViewModel(repository, torClient)
+
+        viewModel.onInstallTor()
+        advanceUntilIdle()
+
+        assertEquals(TorInstallUiState.Installed, viewModel.torInstall.value)
+        assertEquals(0, torClient.requestCount)
+    }
+
     private class FakeSettingsRepository : SettingsRepository {
         private val flow = MutableStateFlow<SettingsModel?>(null)
 
@@ -140,6 +221,20 @@ class SettingsViewModelTest {
 
         override suspend fun setManualEngine(engine: EngineId?) {
             manualEngineUpdates += engine
+        }
+    }
+
+    private class FakeSplitInstallClient(
+        installed: Set<String> = emptySet(),
+    ) : SplitInstallClient {
+        override val installedModules: Set<String> = installed
+        var flow: Flow<InstallResult> = flowOf()
+        var requestCount: Int = 0
+            private set
+
+        override fun requestInstall(moduleName: String): Flow<InstallResult> {
+            requestCount += 1
+            return flow
         }
     }
 }

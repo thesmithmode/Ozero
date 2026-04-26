@@ -13,12 +13,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -47,15 +50,23 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val torState by viewModel.torInstall.collectAsStateWithLifecycle()
     SettingsScreenContent(
         state = state,
+        torState = torState,
         onBack = onBack,
-        onOpenAllowedApps = onOpenAllowedApps,
-        onOpenServers = onOpenServers,
+        nav = SettingsNavActions(
+            onOpenAllowedApps = onOpenAllowedApps,
+            onOpenServers = onOpenServers,
+        ),
         onSplitModeChange = viewModel::onSplitModeChange,
         onIpv6Toggle = viewModel::onIpv6Toggle,
         onAutoStartToggle = viewModel::onAutoStartToggle,
         onManualEngineSelect = viewModel::onManualEngineSelect,
+        torActions = TorActions(
+            onInstall = viewModel::onInstallTor,
+            onCancel = viewModel::onCancelTor,
+        ),
     )
 }
 
@@ -63,13 +74,14 @@ fun SettingsScreen(
 @Composable
 fun SettingsScreenContent(
     state: SettingsUiState,
+    torState: TorInstallUiState = TorInstallUiState.NotInstalled,
     onBack: () -> Unit,
-    onOpenAllowedApps: () -> Unit = {},
-    onOpenServers: () -> Unit = {},
+    nav: SettingsNavActions = SettingsNavActions(onOpenAllowedApps = {}, onOpenServers = {}),
     onSplitModeChange: (SplitTunnelMode) -> Unit,
     onIpv6Toggle: (Boolean) -> Unit,
     onAutoStartToggle: (Boolean) -> Unit,
     onManualEngineSelect: (EngineId?) -> Unit,
+    torActions: TorActions = TorActions(onInstall = {}, onCancel = {}),
 ) {
     Scaffold(
         modifier = Modifier.testTag(SettingsTestTags.SCREEN),
@@ -96,12 +108,13 @@ fun SettingsScreenContent(
                 ContentBody(
                     padding = padding,
                     model = state.model,
-                    onOpenAllowedApps = onOpenAllowedApps,
-                    onOpenServers = onOpenServers,
+                    torState = torState,
+                    nav = nav,
                     onSplitModeChange = onSplitModeChange,
                     onIpv6Toggle = onIpv6Toggle,
                     onAutoStartToggle = onAutoStartToggle,
                     onManualEngineSelect = onManualEngineSelect,
+                    torActions = torActions,
                 )
         }
     }
@@ -123,12 +136,13 @@ private fun LoadingBody(padding: PaddingValues) {
 private fun ContentBody(
     padding: PaddingValues,
     model: SettingsModel,
-    onOpenAllowedApps: () -> Unit,
-    onOpenServers: () -> Unit,
+    torState: TorInstallUiState,
+    nav: SettingsNavActions,
     onSplitModeChange: (SplitTunnelMode) -> Unit,
     onIpv6Toggle: (Boolean) -> Unit,
     onAutoStartToggle: (Boolean) -> Unit,
     onManualEngineSelect: (EngineId?) -> Unit,
+    torActions: TorActions,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
@@ -140,7 +154,7 @@ private fun ContentBody(
                 manualEngine = model.manualEngine,
                 onSplitModeChange = onSplitModeChange,
                 onManualEngineSelect = onManualEngineSelect,
-                onOpenServers = onOpenServers,
+                onOpenServers = nav.onOpenServers,
             )
         }
         item { SectionDivider() }
@@ -148,7 +162,7 @@ private fun ContentBody(
             NetworkSection(
                 ipv6Enabled = model.ipv6Enabled,
                 onIpv6Toggle = onIpv6Toggle,
-                onOpenAllowedApps = onOpenAllowedApps,
+                onOpenAllowedApps = nav.onOpenAllowedApps,
             )
         }
         item { SectionDivider() }
@@ -160,6 +174,14 @@ private fun ContentBody(
         }
         item { SectionDivider() }
         item { UpdatesSection() }
+        item { SectionDivider() }
+        item {
+            TorSection(
+                state = torState,
+                onInstall = torActions.onInstall,
+                onCancel = torActions.onCancel,
+            )
+        }
         item { SectionDivider() }
         item { AboutSection() }
     }
@@ -260,6 +282,83 @@ private fun UpdatesSection() {
         onClick = {},
         enabled = false,
     )
+}
+
+@Composable
+private fun TorSection(
+    state: TorInstallUiState,
+    onInstall: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    SectionHeader(R.string.settings_section_tor, SettingsTestTags.SECTION_TOR)
+    Text(
+        text = stringResource(R.string.settings_tor_summary),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+    )
+    when (state) {
+        TorInstallUiState.NotInstalled -> {
+            Button(
+                onClick = onInstall,
+                modifier = Modifier
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .testTag(SettingsTestTags.TOR_INSTALL_BUTTON),
+            ) {
+                Text(stringResource(R.string.settings_tor_install))
+            }
+        }
+        is TorInstallUiState.Installing -> {
+            LinearProgressIndicator(
+                progress = { state.percent / 100f },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .testTag(SettingsTestTags.TOR_PROGRESS),
+            )
+            Text(
+                text = stringResource(R.string.settings_tor_progress, state.percent),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+            OutlinedButton(
+                onClick = onCancel,
+                modifier = Modifier
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .testTag(SettingsTestTags.TOR_CANCEL_BUTTON),
+            ) {
+                Text(stringResource(R.string.settings_tor_cancel))
+            }
+        }
+        TorInstallUiState.Installed -> {
+            Text(
+                text = stringResource(R.string.settings_tor_installed),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .testTag(SettingsTestTags.TOR_INSTALLED_LABEL),
+            )
+        }
+        is TorInstallUiState.Failed -> {
+            Text(
+                text = stringResource(R.string.settings_tor_failed, state.reason),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .testTag(SettingsTestTags.TOR_FAILED_LABEL),
+            )
+            Button(
+                onClick = onInstall,
+                modifier = Modifier
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .testTag(SettingsTestTags.TOR_RETRY_BUTTON),
+            ) {
+                Text(stringResource(R.string.settings_tor_retry))
+            }
+        }
+    }
 }
 
 @Composable
