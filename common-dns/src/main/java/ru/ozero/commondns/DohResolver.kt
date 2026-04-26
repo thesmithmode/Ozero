@@ -27,10 +27,15 @@ class DohResolver(
             .build(),
 ) {
 
-    suspend fun resolve(hostname: String): DohResult = withContext(Dispatchers.IO) {
+    suspend fun resolve(hostname: String): DohResult =
+        execute(DnsMessage.buildAQuery(hostname), parseV6 = false)
+
+    suspend fun resolveAAAA(hostname: String): DohResult =
+        execute(DnsMessage.buildAAAAQuery(hostname), parseV6 = true)
+
+    private suspend fun execute(query: ByteArray, parseV6: Boolean): DohResult = withContext(Dispatchers.IO) {
         // Логируем только endpoint, не hostname — иначе READ_LOGS/ADB видит все резолвы.
-        Log.i(TAG, "resolve via $endpoint")
-        val query = DnsMessage.buildAQuery(hostname)
+        Log.i(TAG, "resolve via $endpoint v6=$parseV6")
         val request =
             Request.Builder()
                 .url(endpoint)
@@ -44,8 +49,8 @@ class DohResolver(
                     return@use DohResult.Failure("HTTP ${response.code}", response.code)
                 }
                 val body = response.body?.bytes() ?: return@use DohResult.Failure("empty body")
-                val addresses = DnsMessage.parseAAnswers(body)
-                if (addresses.isEmpty()) DohResult.Failure("нет A-записей") else DohResult.Ok(addresses)
+                val addresses = if (parseV6) DnsMessage.parseAAAAAnswers(body) else DnsMessage.parseAAnswers(body)
+                if (addresses.isEmpty()) DohResult.Failure("нет записей") else DohResult.Ok(addresses)
             }
         } catch (e: IOException) {
             Log.w(TAG, "IO fail: ${e.message}")

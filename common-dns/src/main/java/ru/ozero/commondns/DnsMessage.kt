@@ -7,7 +7,11 @@ internal object DnsMessage {
 
     private val random = SecureRandom()
 
-    fun buildAQuery(hostname: String): ByteArray {
+    fun buildAQuery(hostname: String): ByteArray = buildQuery(hostname, qtype = 1)
+
+    fun buildAAAAQuery(hostname: String): ByteArray = buildQuery(hostname, qtype = 28)
+
+    private fun buildQuery(hostname: String, qtype: Int): ByteArray {
         val buf = ByteArrayOutputStream()
         // RFC 5452: ID должен быть случайным для защиты от off-path forgery,
         // даже когда транспорт — DoH (HTTPS экранирует канал, но детерминированный ID
@@ -22,11 +26,15 @@ internal object DnsMessage {
             buf.write(label.toByteArray())
         }
         buf.write(0)
-        buf.write(byteArrayOf(0, 1, 0, 1)) // qtype=A qclass=IN
+        buf.write(byteArrayOf(0, (qtype and 0xFF).toByte(), 0, 1)) // qtype, qclass=IN
         return buf.toByteArray()
     }
 
-    fun parseAAnswers(body: ByteArray): List<String> {
+    fun parseAAnswers(body: ByteArray): List<String> = parseAnswers(body, expectType = 1, expectRdLen = 4)
+
+    fun parseAAAAAnswers(body: ByteArray): List<String> = parseAnswers(body, expectType = 28, expectRdLen = 16)
+
+    private fun parseAnswers(body: ByteArray, expectType: Int, expectRdLen: Int): List<String> {
         if (body.size < 12) return emptyList()
         val anCount = ((body[6].toInt() and 0xFF) shl 8) or (body[7].toInt() and 0xFF)
         if (anCount == 0) return emptyList()
@@ -44,22 +52,37 @@ internal object DnsMessage {
             val rdLength = ((body[offset + 8].toInt() and 0xFF) shl 8) or (body[offset + 9].toInt() and 0xFF)
             offset += 10
             if (offset + rdLength > body.size) return result
-            if (type == 1 && rdLength == 4) {
-                val ip =
-                    "${body[offset].toInt() and 0xFF}." +
-                        "${body[offset + 1].toInt() and 0xFF}." +
-                        "${body[offset + 2].toInt() and 0xFF}." +
-                        "${body[offset + 3].toInt() and 0xFF}"
-                result += ip
+            if (type == expectType && rdLength == expectRdLen) {
+                result += if (expectType == 1) formatIpv4(body, offset) else formatIpv6(body, offset)
             }
             offset += rdLength
         }
         return result
     }
 
+    private fun formatIpv4(body: ByteArray, off: Int): String =
+        "${body[off].toInt() and 0xFF}." +
+            "${body[off + 1].toInt() and 0xFF}." +
+            "${body[off + 2].toInt() and 0xFF}." +
+            "${body[off + 3].toInt() and 0xFF}"
+
+    private fun formatIpv6(body: ByteArray, off: Int): String {
+        val sb = StringBuilder(39)
+        for (i in 0 until 8) {
+            if (i > 0) sb.append(':')
+            val hi = body[off + i * 2].toInt() and 0xFF
+            val lo = body[off + i * 2 + 1].toInt() and 0xFF
+            sb.append(Integer.toHexString((hi shl 8) or lo))
+        }
+        return sb.toString()
+    }
+
     private fun skipName(body: ByteArray, start: Int): Int {
         var offset = start
+        // Защита от malformed-пакета с зацикленными labels: max 128 label-итераций.
+        var iter = 0
         while (offset < body.size) {
+            if (iter++ > MAX_LABEL_ITER) return body.size
             val len = body[offset].toInt() and 0xFF
             when {
                 len == 0 -> return offset + 1
@@ -73,4 +96,6 @@ internal object DnsMessage {
         }
         return offset
     }
+
+    private const val MAX_LABEL_ITER = 128
 }

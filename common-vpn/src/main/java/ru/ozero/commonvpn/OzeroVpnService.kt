@@ -13,6 +13,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_START
 import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_STOP
 import ru.ozero.commonvpn.pipeline.VpnEnginePipeline
@@ -37,6 +39,10 @@ class OzeroVpnService : android.net.VpnService() {
         const val NOTIFICATION_ID = 1
         const val TUN_ADDRESS = "10.10.10.10"
         const val TUN_PREFIX_LENGTH = 32
+        // IPv6 ULA (RFC 4193) для TUN: должен быть назначен иначе VpnService.Builder
+        // не маршрутизирует IPv6 в туннель и весь IPv6-трафик утекает мимо VPN.
+        const val TUN_ADDRESS_V6 = "fd00:ffff:ffff:ffff::1"
+        const val TUN_PREFIX_LENGTH_V6 = 64
         const val TUN_DNS = "127.0.0.1"
         const val TUN_MTU = 1500
         private const val SESSION_NAME = "Ozero"
@@ -82,21 +88,25 @@ class OzeroVpnService : android.net.VpnService() {
 
     private fun stopVpn() {
         Log.i(TAG, "stopVpn")
-        // pipeline.stop ДО закрытия tunFd — hev-tunnel должен корректно
-        // освободить FD прежде чем PFD.close() → kernel освободит /dev/tun.
+        // ВСЁ последовательно в одной корутине: pipeline.stop() ДОЛЖНА завершиться
+        // ДО закрытия tunFd, иначе hev-tunnel читает из уже закрытого fd → native crash.
+        // stopForeground/stopSelf тоже после остановки pipeline, чтобы Service не был
+        // убит планировщиком до завершения cleanup.
         serviceScope.launch {
             runCatching { pipeline.stop() }
                 .onFailure { Log.w(TAG, "pipeline.stop threw", it) }
+            withContext(Dispatchers.Main) {
+                tunFd?.close()
+                tunFd = null
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                } else {
+                    @Suppress("DEPRECATION")
+                    stopForeground(true)
+                }
+                stopSelf()
+            }
         }
-        tunFd?.close()
-        tunFd = null
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            stopForeground(STOP_FOREGROUND_REMOVE)
-        } else {
-            @Suppress("DEPRECATION")
-            stopForeground(true)
-        }
-        stopSelf()
     }
 
     internal fun buildTunBuilder(
@@ -105,6 +115,7 @@ class OzeroVpnService : android.net.VpnService() {
     ): Builder {
         val builder = Builder()
             .addAddress(TUN_ADDRESS, TUN_PREFIX_LENGTH)
+            .addAddress(TUN_ADDRESS_V6, TUN_PREFIX_LENGTH_V6)
             .addDnsServer(TUN_DNS)
             .setMtu(TUN_MTU)
             .setSession(SESSION_NAME)
@@ -139,6 +150,12 @@ class OzeroVpnService : android.net.VpnService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        // Kill-switch гарантия: при force-stop / OOM-kill системы pipeline должен быть
+        // остановлен ДО закрытия fd, иначе native код hev-tunnel пишет в закрытый fd.
+        // runBlocking на main thread допустим — onDestroy уже синхронный teardown.
+        runCatching {
+            runBlocking { pipeline.stop() }
+        }.onFailure { Log.w(TAG, "pipeline.stop in onDestroy threw", it) }
         serviceScope.cancel()
         tunFd?.close()
         tunFd = null

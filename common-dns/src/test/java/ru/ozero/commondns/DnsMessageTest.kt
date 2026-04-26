@@ -1,0 +1,74 @@
+package ru.ozero.commondns
+
+import org.junit.jupiter.api.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+class DnsMessageTest {
+
+    @Test
+    fun aQueryHasCorrectQtype() {
+        val q = DnsMessage.buildAQuery("example.com")
+        // Последние 4 байта: qtype(2) + qclass(2). Для A-записи qtype=0x0001.
+        assertEquals(0, q[q.size - 4].toInt())
+        assertEquals(1, q[q.size - 3].toInt())
+        assertEquals(0, q[q.size - 2].toInt())
+        assertEquals(1, q[q.size - 1].toInt())
+    }
+
+    @Test
+    fun aaaaQueryHasCorrectQtype() {
+        val q = DnsMessage.buildAAAAQuery("example.com")
+        // qtype=0x001C (28) для AAAA
+        assertEquals(0, q[q.size - 4].toInt())
+        assertEquals(28, q[q.size - 3].toInt())
+        assertEquals(0, q[q.size - 2].toInt())
+        assertEquals(1, q[q.size - 1].toInt())
+    }
+
+    @Test
+    fun aaaaQueryEncodesHostnameCorrectly() {
+        val q = DnsMessage.buildAAAAQuery("a.b")
+        // header(12) + 1.a.1.b.0 = 12+5 = 17 байт до qtype(2)+qclass(2)
+        assertEquals(17 + 4, q.size)
+    }
+
+    @Test
+    fun parseAAAAAnswersExtractsIpv6() {
+        // Минимальный AAAA-ответ: header + question + 1 answer
+        // header: id(2)=0x0000, flags(2)=0x8180, qd=1, an=1, ns=0, ar=0
+        // question: 1 a 1 b 0, qtype=28, qclass=1
+        // answer: pointer 0xC00C, type=28, class=1, ttl=60, rdlen=16, 16 байт IPv6
+        val body = byteArrayOf(
+            0, 0, 0x81.toByte(), 0x80.toByte(), 0, 1, 0, 1, 0, 0, 0, 0,
+            // question
+            1, 'a'.code.toByte(), 1, 'b'.code.toByte(), 0,
+            0, 28, 0, 1,
+            // answer
+            0xC0.toByte(), 0x0C, 0, 28, 0, 1, 0, 0, 0, 60, 0, 16,
+            0x20, 0x01, 0x0d, 0xb8.toByte(), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+        )
+        val ips = DnsMessage.parseAAAAAnswers(body)
+        assertEquals(1, ips.size)
+        assertEquals("2001:db8:0:0:0:0:0:1", ips[0])
+    }
+
+    @Test
+    fun parseAAnswersReturnsEmptyForMalformedTooShort() {
+        assertTrue(DnsMessage.parseAAnswers(ByteArray(5)).isEmpty())
+        assertTrue(DnsMessage.parseAAAAAnswers(ByteArray(5)).isEmpty())
+    }
+
+    @Test
+    fun parseAAnswersIgnoresAAAARecords() {
+        // AAAA record не должен попадать в результат parseAAnswers
+        val body = byteArrayOf(
+            0, 0, 0x81.toByte(), 0x80.toByte(), 0, 1, 0, 1, 0, 0, 0, 0,
+            1, 'a'.code.toByte(), 0,
+            0, 28, 0, 1,
+            0xC0.toByte(), 0x0C, 0, 28, 0, 1, 0, 0, 0, 60, 0, 16,
+            0x20, 0x01, 0x0d, 0xb8.toByte(), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+        )
+        assertTrue(DnsMessage.parseAAnswers(body).isEmpty())
+    }
+}

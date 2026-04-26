@@ -18,6 +18,7 @@ class TunBuilderConfiguratorTest {
         val b = mockBuilder()
         configurator.apply(b, SplitTunnelConfig(mode = SplitTunnelMode.ALL))
         verify(exactly = 1) { b.addRoute("0.0.0.0", 0) }
+        verify(exactly = 1) { b.addRoute("::", 0) }
         verify(exactly = 0) { b.addAllowedApplication(any()) }
         verify(exactly = 0) { b.addDisallowedApplication(any()) }
     }
@@ -31,6 +32,30 @@ class TunBuilderConfiguratorTest {
         // Один из ожидаемых routes
         verify { b.addRoute("8.0.0.0", 7) }
         verify { b.addRoute("1.0.0.0", 8) }
+        // IPv6 global unicast добавляется (ULA/link-local исключены)
+        verify(exactly = 1) { b.addRoute("2000::", 3) }
+    }
+
+    @Test
+    fun allowlistAddsIpv6DefaultRoute() {
+        val b = mockBuilder()
+        every { b.addAllowedApplication(any()) } returns b
+        configurator.apply(
+            b,
+            SplitTunnelConfig(mode = SplitTunnelMode.ALLOWLIST, packages = setOf("com.x")),
+        )
+        verify(exactly = 1) { b.addRoute("::", 0) }
+    }
+
+    @Test
+    fun blocklistAddsIpv6DefaultRoute() {
+        val b = mockBuilder()
+        every { b.addDisallowedApplication(any()) } returns b
+        configurator.apply(
+            b,
+            SplitTunnelConfig(mode = SplitTunnelMode.BLOCKLIST, packages = setOf("com.x")),
+        )
+        verify(exactly = 1) { b.addRoute("::", 0) }
     }
 
     @Test
