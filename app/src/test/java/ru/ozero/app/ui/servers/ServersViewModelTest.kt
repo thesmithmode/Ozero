@@ -175,5 +175,9 @@ class ServersViewModelTest {
         override suspend fun deleteAll() {
             flow.value = emptyList()
         }
+
+        override suspend fun setAlive(id: String, alive: Boolean, ts: Long) {
+            flow.value = flow.value.map { if (it.id == id) it.copy(isAlive = alive, lastCheckedAt = ts) else it }
+        }
     }
 }

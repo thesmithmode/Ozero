@@ -1,4 +1,11 @@
-# Ozero subscription backend
+# Ozero subscription backend (DEPRECATED — PLAN v4)
+
+> **Статус:** документ исторический. Backend `sub.ozero.app` **не используется**
+> в server-less архитектуре PLAN v4 (апрель 2026). Источник серверов — публичные
+> GitHub-репо живых прокси под РФ через `PublicProxyHarvester` (E16.1) +
+> `assets/bootstrap-servers.json` для первого запуска. Self-update — GitHub
+> Releases этого же репо. Документ оставлен на случай возможного приватного
+> backend для бета-канала в будущем.
 
 ## 1. Назначение
 Единый источник актуальных рабочих серверов для клиентов Ozero. Клиент приложения скачивает `servers.json` + `servers.json.sig`, верифицирует Ed25519, использует серверы из пула.

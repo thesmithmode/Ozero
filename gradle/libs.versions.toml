@@ -35,6 +35,10 @@ bouncycastle = "1.79"
 # Play Core (SplitInstall)
 playFeatureDelivery = "2.1.0"
 
+# WorkManager + Hilt-Work (E16.1 PublicProxyHarvester periodic job)
+work = "2.9.1"
+hiltWork = "1.2.0"
+
 # Testing
 junitJupiter = "5.11.0"
 mockk = "1.13.12"
@@ -74,6 +78,9 @@ datastore-preferences-core = { module = "androidx.datastore:datastore-preference
 
 # Hilt
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
+work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }
+hilt-work = { module = "androidx.hilt:hilt-work", version.ref = "hiltWork" }
+hilt-androidx-compiler = { module = "androidx.hilt:hilt-compiler", version.ref = "hiltWork" }
 hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
 
 # Room

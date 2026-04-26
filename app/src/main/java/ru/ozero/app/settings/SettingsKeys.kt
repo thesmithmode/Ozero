@@ -16,4 +16,10 @@ object SettingsKeys {
 
     // RT.9: onboarding пройден → main UI.
     val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
+
+    // E16.3: winning ByeDPI strategy args (CLI-string), кэш probe-результата.
+    val BYDPI_WINNING_ARGS = stringPreferencesKey("bydpi_winning_args")
+
+    // E16.3: timestamp последнего успешного probe (ms epoch). Re-probe раз в 24h.
+    val BYDPI_LAST_PROBE_AT = androidx.datastore.preferences.core.longPreferencesKey("bydpi_last_probe_at")
 }

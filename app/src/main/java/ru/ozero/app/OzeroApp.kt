@@ -2,19 +2,34 @@ package ru.ozero.app
 
 import android.app.Application
 import android.util.Log
+import androidx.hilt.work.HiltWorkerFactory
+import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
 import ru.ozero.app.data.CrashLogStore
+import ru.ozero.app.subscription.HarvestWorker
 import javax.inject.Inject
 import kotlin.system.exitProcess
 
 @HiltAndroidApp
-class OzeroApp : Application() {
+class OzeroApp : Application(), Configuration.Provider {
 
     @Inject lateinit var crashLogStore: CrashLogStore
+
+    @Inject lateinit var workerFactory: HiltWorkerFactory
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
+            .setWorkerFactory(workerFactory)
+            .setMinimumLoggingLevel(Log.INFO)
+            .build()
 
     override fun onCreate() {
         super.onCreate()
         installCrashHandler()
+        // E16.1: запускаем periodic harvester. KEEP-policy → не пересоздаёт
+        // существующий job при каждом старте, schedule сохраняется между
+        // запусками приложения и перезагрузками.
+        HarvestWorker.enqueueUnique(this)
     }
 
     /**

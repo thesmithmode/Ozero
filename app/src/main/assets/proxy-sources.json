@@ -1,0 +1,62 @@
+{
+  "_comment": "E16.1 — публичные GitHub-репо живых прокси под РФ. PullPrioritized сверху вниз, RU-специфичные первыми. Источники verified апрель 2026.",
+  "_updated": "2026-04-26",
+  "sources": [
+    {
+      "id": "kort0881-vless-russia",
+      "url": "https://raw.githubusercontent.com/kort0881/vpn-vless-configs-russia/main/vless.txt",
+      "format": "LINES",
+      "region": "RU",
+      "priority": 1
+    },
+    {
+      "id": "kort0881-vmess-russia",
+      "url": "https://raw.githubusercontent.com/kort0881/vpn-vless-configs-russia/main/vmess.txt",
+      "format": "LINES",
+      "region": "RU",
+      "priority": 2
+    },
+    {
+      "id": "kort0881-trojan-russia",
+      "url": "https://raw.githubusercontent.com/kort0881/vpn-vless-configs-russia/main/trojan.txt",
+      "format": "LINES",
+      "region": "RU",
+      "priority": 2
+    },
+    {
+      "id": "kort0881-ss-russia",
+      "url": "https://raw.githubusercontent.com/kort0881/vpn-vless-configs-russia/main/shadowsocks.txt",
+      "format": "LINES",
+      "region": "RU",
+      "priority": 3
+    },
+    {
+      "id": "igareck-russia",
+      "url": "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/main/configs.txt",
+      "format": "LINES",
+      "region": "RU",
+      "priority": 1
+    },
+    {
+      "id": "gfpcom-vless",
+      "url": "https://raw.githubusercontent.com/gfpcom/free-proxy-list/main/v2ray/vless.txt",
+      "format": "LINES",
+      "region": "GLOBAL",
+      "priority": 5
+    },
+    {
+      "id": "gfpcom-hysteria2",
+      "url": "https://raw.githubusercontent.com/gfpcom/free-proxy-list/main/v2ray/hysteria2.txt",
+      "format": "LINES",
+      "region": "GLOBAL",
+      "priority": 5
+    },
+    {
+      "id": "mahdibland-aggregator-sub",
+      "url": "https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_merge.txt",
+      "format": "BASE64_LINES",
+      "region": "GLOBAL",
+      "priority": 6
+    }
+  ]
+}

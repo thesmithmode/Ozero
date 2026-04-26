@@ -1,0 +1,8 @@
+{
+  "_comment": "RT.9.2 / E16.4 — bootstrap-список known-good серверов. Зашит в APK для out-of-box работы при первом запуске. После первого pull PublicProxyHarvester'а перезаписывается актуальным snapshot'ом. Источники snapshot'а: GitHub-репо из docs/проксиисточники.md (kort0881/vpn-vless-configs-russia, igareck/vpn-configs-for-russia, gfpcom/free-proxy-list). Обновлять при tag v*.*.* через scripts/refresh-bootstrap.sh.",
+  "_snapshot_date": "2026-04-26",
+  "_snapshot_source": "manual placeholder — заменить реальными URI перед v1.0.0",
+  "servers": [
+    "vless://00000000-0000-0000-0000-000000000000@example.invalid:443?encryption=none&security=reality&pbk=PLACEHOLDER&fp=chrome&sni=example.com&type=tcp&flow=xtls-rprx-vision#bootstrap-placeholder-1"
+  ]
+}
