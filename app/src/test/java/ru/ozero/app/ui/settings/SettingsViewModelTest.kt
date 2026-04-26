@@ -1,10 +1,14 @@
 package ru.ozero.app.ui.settings
 
+import android.content.Context
+import android.content.pm.PackageInstaller
+import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -12,15 +16,22 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import okhttp3.OkHttpClient
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import ru.ozero.app.selfupdate.ApkDownloader
+import ru.ozero.app.selfupdate.ApkUpdateVerifier
+import ru.ozero.app.selfupdate.GithubReleaseFetcher
+import ru.ozero.app.selfupdate.SilentPackageInstaller
+import ru.ozero.app.selfupdate.UpdateCoordinator
 import ru.ozero.app.settings.SettingsModel
 import ru.ozero.app.settings.SettingsRepository
 import ru.ozero.commonvpn.split.SplitTunnelMode
 import ru.ozero.coreapi.EngineId
 import ru.ozero.enginetor.dynamicmod.InstallResult
 import ru.ozero.enginetor.dynamicmod.SplitInstallClient
+import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
@@ -30,6 +41,7 @@ class SettingsViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private lateinit var repository: FakeSettingsRepository
     private lateinit var torClient: FakeSplitInstallClient
+    private lateinit var coordinator: FakeUpdateCoordinator
     private lateinit var viewModel: SettingsViewModel
 
     @BeforeEach
@@ -37,7 +49,8 @@ class SettingsViewModelTest {
         Dispatchers.setMain(dispatcher)
         repository = FakeSettingsRepository()
         torClient = FakeSplitInstallClient()
-        viewModel = SettingsViewModel(repository, torClient)
+        coordinator = FakeUpdateCoordinator()
+        viewModel = SettingsViewModel(repository, torClient, coordinator)
     }
 
     @AfterEach
@@ -118,7 +131,7 @@ class SettingsViewModelTest {
     @Test
     fun `tor initial state is Installed when module already present`() {
         torClient = FakeSplitInstallClient(installed = setOf("dynamic_tor"))
-        viewModel = SettingsViewModel(repository, torClient)
+        viewModel = SettingsViewModel(repository, torClient, coordinator)
 
         assertEquals(TorInstallUiState.Installed, viewModel.torInstall.value)
     }
@@ -195,13 +208,119 @@ class SettingsViewModelTest {
     @Test
     fun `onInstallTor is idempotent when already Installed`() = runTest {
         torClient = FakeSplitInstallClient(installed = setOf("dynamic_tor"))
-        viewModel = SettingsViewModel(repository, torClient)
+        viewModel = SettingsViewModel(repository, torClient, coordinator)
 
         viewModel.onInstallTor()
         advanceUntilIdle()
 
         assertEquals(TorInstallUiState.Installed, viewModel.torInstall.value)
         assertEquals(0, torClient.requestCount)
+    }
+
+    @Test
+    fun `update initial state Idle`() = runTest {
+        assertEquals(UpdateUiState.Idle, viewModel.update.value)
+    }
+
+    @Test
+    fun `onCheckUpdate maps Checking and UpToDate`() = runTest {
+        coordinator.script = flowOf(
+            UpdateCoordinator.Progress.Checking,
+            UpdateCoordinator.Progress.UpToDate,
+        )
+        viewModel.onCheckUpdate()
+        advanceUntilIdle()
+        assertEquals(UpdateUiState.UpToDate, viewModel.update.value)
+    }
+
+    @Test
+    fun `onCheckUpdate maps Downloading percent`() = runTest {
+        coordinator.script = flowOf(
+            UpdateCoordinator.Progress.Checking,
+            UpdateCoordinator.Progress.Downloading(42),
+            UpdateCoordinator.Progress.Verifying,
+            UpdateCoordinator.Progress.Installing,
+            UpdateCoordinator.Progress.Submitted(sessionId = 1),
+        )
+        viewModel.onCheckUpdate()
+        advanceUntilIdle()
+        // Финал: Submitted маппится в Installing (system confirm-dialog ещё впереди).
+        assertEquals(UpdateUiState.Installing, viewModel.update.value)
+    }
+
+    @Test
+    fun `onCheckUpdate maps Failed reason includes stage`() = runTest {
+        coordinator.script = flowOf(
+            UpdateCoordinator.Progress.Checking,
+            UpdateCoordinator.Progress.Failed(
+                stage = UpdateCoordinator.Progress.Stage.VERIFY,
+                reason = "подпись APK невалидна",
+            ),
+        )
+        viewModel.onCheckUpdate()
+        advanceUntilIdle()
+        val failed = assertIs<UpdateUiState.Failed>(viewModel.update.value)
+        assertEquals("VERIFY: подпись APK невалидна", failed.reason)
+    }
+
+    @Test
+    fun `onCheckUpdate ignored when already in non-terminal state`() = runTest {
+        val gate = CompletableDeferred<UpdateCoordinator.Progress>()
+        coordinator.script = flow {
+            emit(UpdateCoordinator.Progress.Checking)
+            emit(gate.await())
+        }
+        viewModel.onCheckUpdate()
+        advanceUntilIdle()
+        assertEquals(UpdateUiState.Checking, viewModel.update.value)
+        val callsBefore = coordinator.calls
+        viewModel.onCheckUpdate()
+        advanceUntilIdle()
+        assertEquals(callsBefore, coordinator.calls, "повторный onCheckUpdate должен быть no-op")
+    }
+
+    @Test
+    fun `onResetUpdate from Failed back to Idle`() = runTest {
+        coordinator.script = flowOf(
+            UpdateCoordinator.Progress.Checking,
+            UpdateCoordinator.Progress.Failed(UpdateCoordinator.Progress.Stage.FETCH, "x"),
+        )
+        viewModel.onCheckUpdate()
+        advanceUntilIdle()
+        assertIs<UpdateUiState.Failed>(viewModel.update.value)
+        viewModel.onResetUpdate()
+        assertEquals(UpdateUiState.Idle, viewModel.update.value)
+    }
+
+    private class FakeUpdateCoordinator : UpdateCoordinator(
+        fetcher = object : GithubReleaseFetcher("o", "r", OkHttpClient(), "http://x") {
+            override fun latest() = null
+        },
+        downloader = object : ApkDownloader(OkHttpClient()) {
+            override fun download(apkUrl: String, sigUrl: String, destDir: File) = emptyFlow<Event>()
+        },
+        verifier = object : ApkUpdateVerifier(ByteArray(32)) {
+            override fun verify(apkFile: File, signatureFile: File): Boolean = false
+        },
+        installer = object : SilentPackageInstaller(
+            mockk<Context>(relaxed = true), mockk<PackageInstaller>(relaxed = true),
+        ) {
+            override suspend fun install(
+                apkFile: File,
+                sessionName: String,
+                resultIntentAction: String,
+            ): Result = Result.FileError("test-stub")
+        },
+        currentVersion = "v0.1.0",
+        cacheDir = File("/tmp"),
+    ) {
+        var script: Flow<Progress> = emptyFlow()
+        var calls: Int = 0
+            private set
+        override fun check(): Flow<Progress> {
+            calls += 1
+            return script
+        }
     }
 
     private class FakeSettingsRepository : SettingsRepository {

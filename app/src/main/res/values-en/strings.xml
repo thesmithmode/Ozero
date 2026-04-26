@@ -59,6 +59,12 @@
     <string name="settings_servers_summary">Pick entry/exit pair and preview</string>
     <string name="settings_check_update_title">Check for update</string>
     <string name="settings_check_update_summary">GitHub Releases · Ed25519 verify</string>
+    <string name="settings_update_state_checking">Checking for update…</string>
+    <string name="settings_update_state_downloading">Downloading %1$d %%</string>
+    <string name="settings_update_state_verifying">Verifying signature…</string>
+    <string name="settings_update_state_installing">Launching installer…</string>
+    <string name="settings_update_state_uptodate">Already up to date</string>
+    <string name="settings_update_state_failed">Error: %1$s. Tap to retry</string>
 
     <!-- Tor on-demand module (RT.5.2) -->
     <string name="settings_section_tor">Tor (emergency mode)</string>
