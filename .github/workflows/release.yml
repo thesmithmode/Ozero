@@ -58,6 +58,7 @@ jobs:
           OZERO_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
           OZERO_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           OZERO_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          UPDATE_PUBLIC_KEY_HEX: ${{ secrets.UPDATE_PUBLIC_KEY_HEX }}
         run: ./gradlew :app:assembleRelease --stacktrace
 
       - name: Collect artifacts
@@ -100,9 +101,10 @@ jobs:
         run: |
           set -euo pipefail
           cd release-out
+          # passphrase через fd 0 (stdin), не argv — иначе видна в /proc/<pid>/cmdline
           for apk in *.apk; do
-            gpg --batch --yes --pinentry-mode loopback \
-                --passphrase "$GPG_PASSPHRASE" \
+            printf '%s\n' "$GPG_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback \
+                --passphrase-fd 0 \
                 --detach-sign --armor \
                 --output "${apk}.asc" \
                 "$apk"

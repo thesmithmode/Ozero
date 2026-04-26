@@ -76,6 +76,16 @@ class Orchestrator {
             state is OrchestratorState.Disconnecting && transition is OrchestratorTransition.DisconnectComplete ->
                 OrchestratorState.Idle
 
+            // Switch failed mid-flight → Failed (раньше падало IllegalStateException,
+            // crash при network error в момент переключения движка).
+            state is OrchestratorState.Switching && transition is OrchestratorTransition.ConnectFailed ->
+                OrchestratorState.Failed(transition.engineId, transition.reason)
+
+            // Idempotent stop: повторный Disconnect в Disconnecting/Idle — no-op.
+            // Защита от race "user dispatch + auto-stop on probe failure".
+            state is OrchestratorState.Disconnecting && transition is OrchestratorTransition.Disconnect -> state
+            state is OrchestratorState.Idle && transition is OrchestratorTransition.Disconnect -> state
+
             else -> {
                 Log.e(TAG, "invalid: ${state::class.simpleName} + ${transition::class.simpleName}")
                 throw IllegalStateException(

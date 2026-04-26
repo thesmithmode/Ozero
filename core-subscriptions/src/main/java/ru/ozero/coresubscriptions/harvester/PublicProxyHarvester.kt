@@ -74,26 +74,24 @@ class PublicProxyHarvester(
                 return PerSourceResult(source.id, parsedCount = 0, error = "HTTP ${resp.code}")
             }
             val respBody = resp.body ?: return PerSourceResult(source.id, 0, error = "empty body")
-            // Лимит размера тела — против OOM от malicious source.
-            if (respBody.contentLength() > MAX_BODY_BYTES) {
-                return PerSourceResult(source.id, 0, error = "body too large")
-            }
+            // contentLength() возвращает -1 для chunked → ему доверять нельзя.
+            // Реальный лимит — стримовая проверка ниже: читаем ровно MAX_BODY_BYTES,
+            // затем пробуем ещё 1 байт; если есть — превышение.
             val src = respBody.source()
-            // Читаем максимум MAX_BODY_BYTES+1 — если всё ещё есть данные, отказ.
             val bytes = src.readByteString(MAX_BODY_BYTES)
             if (src.request(1L)) {
                 return PerSourceResult(source.id, 0, error = "body exceeds $MAX_BODY_BYTES bytes")
             }
             val body = bytes.utf8()
-            val lines: List<String> = when (source.format) {
-                SourceFormat.LINES -> body.lineSequence().toList()
+            val lines: Sequence<String> = when (source.format) {
+                SourceFormat.LINES -> body.lineSequence()
                 SourceFormat.BASE64_LINES -> {
                     val decoded = runCatching {
                         Base64.getDecoder().decode(body.trim()).toString(Charsets.UTF_8)
                     }.getOrElse { return PerSourceResult(source.id, 0, error = "base64 decode failed") }
-                    decoded.lineSequence().toList()
+                    decoded.lineSequence()
                 }
-                SourceFormat.JSON_ARRAY -> parseJsonArray(body)
+                SourceFormat.JSON_ARRAY -> parseJsonArray(body).asSequence()
             }
             val entities = lines
                 .map { it.trim() }
@@ -102,6 +100,8 @@ class PublicProxyHarvester(
                     val parsed = parser.parse(uri)
                     if (parsed is ParsedServer.Error) null else mapper.toEntity(parsed, uri)
                 }
+                .take(MAX_ENTITIES_PER_SOURCE)
+                .toList()
             return PerSourceResult(source.id, parsedCount = entities.size, entities = entities)
         }
     }
@@ -115,8 +115,9 @@ class PublicProxyHarvester(
         }.getOrElse {
             runCatching { JSONArray(body) }.getOrElse { return emptyList() }
         }
-        return buildList {
-            for (i in 0 until arr.length()) add(arr.optString(i))
+        val cap = minOf(arr.length(), MAX_ENTITIES_PER_SOURCE)
+        return buildList(cap) {
+            for (i in 0 until cap) add(arr.optString(i))
         }
     }
 
@@ -136,5 +137,6 @@ class PublicProxyHarvester(
     private companion object {
         const val TAG = "PublicProxyHarvester"
         const val MAX_BODY_BYTES = 4L * 1024 * 1024 // 4 МБ — достаточно для тысяч URI
+        const val MAX_ENTITIES_PER_SOURCE = 2000
     }
 }

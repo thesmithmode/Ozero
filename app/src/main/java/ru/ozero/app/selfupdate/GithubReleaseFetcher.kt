@@ -44,8 +44,8 @@ open class GithubReleaseFetcher(
         val publishedAt = obj.optString("published_at").takeIf { it.isNotBlank() }
         val assets: JSONArray = obj.optJSONArray("assets") ?: return null
 
-        var apkUrl: String? = null
-        var sigUrl: String? = null
+        val apkUrls = mutableListOf<String>()
+        val sigUrls = mutableListOf<String>()
         for (i in 0 until assets.length()) {
             val a = assets.getJSONObject(i)
             val name = a.optString("name")
@@ -53,11 +53,15 @@ open class GithubReleaseFetcher(
             // Валидация схемы — отбрасываем file://, http://, ftp://, javascript: и пр.
             if (!url.startsWith("https://")) continue
             when {
-                name.endsWith(".apk") && !name.endsWith(".apk.sig") -> apkUrl = url
-                name.endsWith(".apk.sig") -> sigUrl = url
+                name.endsWith(".apk") && !name.endsWith(".apk.sig") -> apkUrls += url
+                name.endsWith(".apk.sig") -> sigUrls += url
             }
         }
-        if (apkUrl.isNullOrBlank() || sigUrl.isNullOrBlank()) return null
+        // Fail-closed: множественные .apk = неоднозначность (split-APK / атакующий
+        // добавил второй ассет). Раньше брали последний — атакующая поверхность.
+        if (apkUrls.size != 1 || sigUrls.size != 1) return null
+        val apkUrl = apkUrls.single()
+        val sigUrl = sigUrls.single()
         // Опциональный versionCode из release body (формат: "version_code: 12345" или JSON-блок).
         val versionCode = obj.optLong("version_code", 0L)
             .takeIf { it > 0 }

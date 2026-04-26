@@ -35,7 +35,10 @@ class GithubReleaseFetcherTest {
     fun parsesPrereleaseFlag() {
         val json = """
             {"tag_name":"v0.3.0-rc1","prerelease":true,
-             "assets":[{"name":"o.apk","browser_download_url":"u"},{"name":"o.apk.sig","browser_download_url":"s"}]}
+             "assets":[
+               {"name":"o.apk","browser_download_url":"https://example.com/o.apk"},
+               {"name":"o.apk.sig","browser_download_url":"https://example.com/o.apk.sig"}
+             ]}
         """.trimIndent()
         val r = fetcher.parse(json)
         assertNotNull(r)
@@ -45,7 +48,9 @@ class GithubReleaseFetcherTest {
     @Test
     fun rejectsMissingApk() {
         val json = """
-            {"tag_name":"v1.0.0","assets":[{"name":"o.apk.sig","browser_download_url":"s"}]}
+            {"tag_name":"v1.0.0","assets":[
+              {"name":"o.apk.sig","browser_download_url":"https://example.com/o.apk.sig"}
+            ]}
         """.trimIndent()
         assertNull(fetcher.parse(json))
     }
@@ -53,7 +58,22 @@ class GithubReleaseFetcherTest {
     @Test
     fun rejectsMissingSignature() {
         val json = """
-            {"tag_name":"v1.0.0","assets":[{"name":"o.apk","browser_download_url":"u"}]}
+            {"tag_name":"v1.0.0","assets":[
+              {"name":"o.apk","browser_download_url":"https://example.com/o.apk"}
+            ]}
+        """.trimIndent()
+        assertNull(fetcher.parse(json))
+    }
+
+    @Test
+    fun rejectsMultipleApks() {
+        // Множественные .apk = неоднозначность; fail-closed.
+        val json = """
+            {"tag_name":"v1.0.0","assets":[
+              {"name":"o-arm64.apk","browser_download_url":"https://e.com/a1.apk"},
+              {"name":"o-x86.apk","browser_download_url":"https://e.com/a2.apk"},
+              {"name":"o.apk.sig","browser_download_url":"https://e.com/s.sig"}
+            ]}
         """.trimIndent()
         assertNull(fetcher.parse(json))
     }
@@ -79,15 +99,15 @@ class GithubReleaseFetcherTest {
     fun ignoresUnrelatedAssets() {
         val json = """
             {"tag_name":"v1.0.0","assets":[
-              {"name":"checksums.txt","browser_download_url":"x"},
-              {"name":"o.apk","browser_download_url":"a"},
-              {"name":"o.apk.sig","browser_download_url":"s"},
-              {"name":"o.aab","browser_download_url":"y"}
+              {"name":"checksums.txt","browser_download_url":"https://e.com/x.txt"},
+              {"name":"o.apk","browser_download_url":"https://e.com/a.apk"},
+              {"name":"o.apk.sig","browser_download_url":"https://e.com/s.sig"},
+              {"name":"o.aab","browser_download_url":"https://e.com/y.aab"}
             ]}
         """.trimIndent()
         val r = fetcher.parse(json)
         assertNotNull(r)
-        assertEquals("a", r.apkUrl)
-        assertEquals("s", r.sigUrl)
+        assertEquals("https://e.com/a.apk", r.apkUrl)
+        assertEquals("https://e.com/s.sig", r.sigUrl)
     }
 }

@@ -5,6 +5,9 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import okhttp3.OkHttpClient
+import ru.ozero.coresubscriptions.ServerMapper
+import ru.ozero.coresubscriptions.SubscriptionFilter
+import ru.ozero.coresubscriptions.uri.SubscriptionUriParser
 import java.util.concurrent.TimeUnit
 import javax.inject.Named
 import javax.inject.Singleton
@@ -26,4 +29,19 @@ object HarvesterModule {
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
+
+    // Hilt MissingBinding fix: ServerImportService.@Inject constructor с default-параметрами
+    // не использует defaults — Hilt требует явный binding для каждого аргумента.
+    // Эти типы stateless, безопасно как @Singleton.
+    @Provides
+    @Singleton
+    fun provideSubscriptionUriParser(): SubscriptionUriParser = SubscriptionUriParser()
+
+    @Provides
+    @Singleton
+    fun provideServerMapper(): ServerMapper = ServerMapper()
+
+    @Provides
+    @Singleton
+    fun provideSubscriptionFilter(): SubscriptionFilter = SubscriptionFilter()
 }

@@ -71,24 +71,27 @@ class StrategyEngine(
     }
 
     /**
-     * Параллельный probe первых [parallelProbeCount] кандидатов.
-     * После завершения всех — возвращает первый по приоритету с успешным probe.
-     * Это означает: даже если низко-приоритетный кандидат отвечает быстрее,
-     * мы предпочитаем высоко-приоритетный, если он тоже успешен.
+     * Параллельный probe батчами по [parallelProbeCount]. Возвращает первый успешный
+     * (по приоритету в рамках батча) — переходит к следующему батчу только если
+     * весь текущий провалился. Раньше пробовали только top-N → если topN упал, юзер
+     * получал NoCandidates даже когда низкоприоритетный TOR/URnetwork был доступен.
      */
     suspend fun pickBest(candidates: List<Candidate>): Candidate? {
         if (candidates.isEmpty()) return null
-        val top = candidates.take(parallelProbeCount)
-        val results = coroutineScope {
-            top.map { c ->
-                async {
-                    val engine = engines[c.engineId]
-                    val res: ProbeResult = engine?.probe() ?: ProbeResult.Failure("engine отсутствует")
-                    c to res
-                }
-            }.awaitAll()
+        candidates.chunked(parallelProbeCount).forEach { batch ->
+            val results = coroutineScope {
+                batch.map { c ->
+                    async {
+                        val engine = engines[c.engineId]
+                        val res: ProbeResult = engine?.probe() ?: ProbeResult.Failure("engine отсутствует")
+                        c to res
+                    }
+                }.awaitAll()
+            }
+            val winner = results.firstOrNull { (_, r) -> r is ProbeResult.Success }?.first
+            if (winner != null) return winner
         }
-        return results.firstOrNull { (_, r) -> r is ProbeResult.Success }?.first
+        return null
     }
 
     private companion object {

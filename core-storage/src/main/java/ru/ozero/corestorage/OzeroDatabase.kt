@@ -15,8 +15,8 @@ import ru.ozero.corestorage.entity.ServerEntity
 
 @Database(
     entities = [ServerEntity::class, ConnectionLogEntity::class, AppSplitRule::class],
-    // v2: добавлено `pairId` в ServerEntity для double-hop chains (E8).
-    version = 2,
+    // v3: индексы isAlive/priority в servers (hot-path getLiveServers/observeAll).
+    version = 3,
     exportSchema = true,
 )
 abstract class OzeroDatabase : RoomDatabase() {
@@ -40,9 +40,18 @@ abstract class OzeroDatabase : RoomDatabase() {
                 }
             }
 
+        /** v2 → v3: индексы для hot-path filter/sort. Неразрушающие CREATE INDEX. */
+        private val MIGRATION_2_3: Migration =
+            object : Migration(2, 3) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_servers_isAlive ON servers(isAlive)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_servers_priority ON servers(priority)")
+                }
+            }
+
         fun create(context: Context): OzeroDatabase =
             Room.databaseBuilder(context, OzeroDatabase::class.java, DATABASE_NAME)
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
     }
 }

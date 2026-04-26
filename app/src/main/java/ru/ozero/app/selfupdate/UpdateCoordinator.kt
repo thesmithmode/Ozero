@@ -132,19 +132,26 @@ open class UpdateCoordinator(
         Log.i(TAG, "Ed25519 verify OK")
 
         collector.emit(Progress.Installing)
-        when (val res = installer.install(apk)) {
-            is SilentPackageInstaller.Result.Submitted -> {
-                Log.i(TAG, "PackageInstaller session committed id=${res.sessionId}")
-                collector.emit(Progress.Submitted(res.sessionId))
+        try {
+            when (val res = installer.install(apk)) {
+                is SilentPackageInstaller.Result.Submitted -> {
+                    Log.i(TAG, "PackageInstaller session committed id=${res.sessionId}")
+                    collector.emit(Progress.Submitted(res.sessionId))
+                }
+                is SilentPackageInstaller.Result.FileError -> {
+                    Log.e(TAG, "installer FileError: ${res.reason}")
+                    collector.emit(Progress.Failed(Progress.Stage.INSTALL, res.reason))
+                }
+                is SilentPackageInstaller.Result.IoError -> {
+                    Log.e(TAG, "installer IoError sid=${res.sessionId}: ${res.reason}")
+                    collector.emit(Progress.Failed(Progress.Stage.INSTALL, res.reason))
+                }
             }
-            is SilentPackageInstaller.Result.FileError -> {
-                Log.e(TAG, "installer FileError: ${res.reason}")
-                collector.emit(Progress.Failed(Progress.Stage.INSTALL, res.reason))
-            }
-            is SilentPackageInstaller.Result.IoError -> {
-                Log.e(TAG, "installer IoError sid=${res.sessionId}: ${res.reason}")
-                collector.emit(Progress.Failed(Progress.Stage.INSTALL, res.reason))
-            }
+        } finally {
+            // PackageInstaller session уже скопировал байты — apk/sig в cacheDir не нужны.
+            // Раньше оставались висеть до OS cache eviction (50–200 МБ).
+            apk.delete()
+            sig.delete()
         }
     }
 

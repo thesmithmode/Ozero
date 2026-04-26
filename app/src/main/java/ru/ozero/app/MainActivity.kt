@@ -90,7 +90,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         observeSelfUpdateEvents()
-        handleSubscriptionIntent(intent)
+        // Идемпотентность: на rotation/process-restore onCreate fires снова с тем же
+        // intent — без guard'а ServerImportService.import выполнится повторно (Toast x2,
+        // лишние upsert). Обрабатываем только при первом создании Activity.
+        if (savedInstanceState == null) {
+            handleSubscriptionIntent(intent)
+        }
         setContent {
             OzeroTheme {
                 // RT.9: gate. Пока флаг не прочитан — пустой экран (DataStore миллисекундно).

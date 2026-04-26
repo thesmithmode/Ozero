@@ -42,4 +42,16 @@ class ReleaseInfoTest {
 
     @Test
     fun rcDoesNotInfluenceSemver() = assertFalse(rel("v1.0.0-rc1").isNewerThan("v1.0.0"))
+
+    @Test
+    fun prereleaseRejectedEvenIfNewerSemver() {
+        val r = ReleaseInfo(tag = "v2.0.0-rc1", apkUrl = "u", sigUrl = "s", isPrerelease = true)
+        assertFalse(r.isNewerThan("v1.0.0"))
+    }
+
+    @Test
+    fun stableReleaseAcceptedWhenNewer() {
+        val r = ReleaseInfo(tag = "v2.0.0", apkUrl = "u", sigUrl = "s", isPrerelease = false)
+        assertTrue(r.isNewerThan("v1.0.0"))
+    }
 }

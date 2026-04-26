@@ -29,11 +29,12 @@ open class ApkUpdateVerifier(
         if (!apkFile.exists() || !signatureFile.exists()) return false
         val signature = signatureFile.readBytes()
         if (signature.size != ED25519_SIG_LEN) return false
-        // Для больших APK (~50 МБ) loading в память приемлемо: одноразовый flow.
-        // Альтернатива: streaming через Ed25519Signer.update() chunked — оставлено
-        // на оптимизацию когда профайлер покажет проблему.
-        val apkBytes = apkFile.readBytes()
-        return SubscriptionVerifier.verify(apkBytes, signature, publicKey)
+        // Streaming verify: 200 МБ APK в один heap-allocation = OOM на бюджетных
+        // устройствах. SubscriptionVerifier.verifyUpdate(InputStream) читает 64KB чанками.
+        // Domain-prefix "ozero.update.v1:" — защита от cross-protocol подмены подписей.
+        return apkFile.inputStream().buffered().use { stream ->
+            SubscriptionVerifier.verifyUpdate(stream, signature, publicKey)
+        }
     }
 
     private companion object {

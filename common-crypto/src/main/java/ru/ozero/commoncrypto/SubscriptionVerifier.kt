@@ -2,6 +2,7 @@ package ru.ozero.commoncrypto
 
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
 import org.bouncycastle.crypto.signers.Ed25519Signer
+import java.io.InputStream
 
 /**
  * Ed25519 verifier для подписей подписок и self-update APK.
@@ -25,6 +26,7 @@ object SubscriptionVerifier {
 
     private val BOOTSTRAP_DOMAIN = "ozero.bootstrap.v1:".toByteArray(Charsets.UTF_8)
     private val UPDATE_DOMAIN = "ozero.update.v1:".toByteArray(Charsets.UTF_8)
+    private const val STREAM_CHUNK_BYTES = 64 * 1024
 
     /** Bootstrap snapshot подпись. Domain prefix защищает от cross-protocol re-use. */
     fun verifyBootstrap(message: ByteArray, signature: ByteArray, publicKey: ByteArray): Boolean =
@@ -33,6 +35,35 @@ object SubscriptionVerifier {
     /** Self-update payload подпись. Отдельный domain от bootstrap. */
     fun verifyUpdate(message: ByteArray, signature: ByteArray, publicKey: ByteArray): Boolean =
         verify(UPDATE_DOMAIN + message, signature, publicKey)
+
+    /**
+     * Streaming overload — для больших APK (десятки/сотни МБ): не загружает весь файл
+     * в heap, читает чанками. Caller отвечает за close [messageStream].
+     */
+    @Suppress("SwallowedException")
+    fun verifyUpdate(messageStream: InputStream, signature: ByteArray, publicKey: ByteArray): Boolean {
+        if (signature.size != 64 || publicKey.size != 32) return false
+        return try {
+            val signer = Ed25519Signer()
+            signer.init(false, Ed25519PublicKeyParameters(publicKey))
+            signer.update(UPDATE_DOMAIN, 0, UPDATE_DOMAIN.size)
+            val buf = ByteArray(STREAM_CHUNK_BYTES)
+            while (true) {
+                val n = messageStream.read(buf)
+                if (n < 0) break
+                if (n > 0) signer.update(buf, 0, n)
+            }
+            signer.verifySignature(signature)
+        } catch (e: IllegalArgumentException) {
+            false
+        } catch (e: org.bouncycastle.crypto.DataLengthException) {
+            false
+        } catch (e: java.io.IOException) {
+            false
+        } catch (e: RuntimeException) {
+            false
+        }
+    }
 
     @Suppress("SwallowedException")
     fun verify(message: ByteArray, signature: ByteArray, publicKey: ByteArray): Boolean {
