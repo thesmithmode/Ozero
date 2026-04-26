@@ -15,6 +15,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -93,13 +94,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             OzeroTheme {
                 // RT.9: gate. Пока флаг не прочитан — пустой экран (DataStore миллисекундно).
-                var checked by androidx.compose.runtime.remember {
-                    androidx.compose.runtime.mutableStateOf(false)
-                }
-                var showOnboarding by androidx.compose.runtime.remember {
-                    androidx.compose.runtime.mutableStateOf(false)
-                }
-                androidx.compose.runtime.LaunchedEffect(Unit) {
+                // rememberSaveable — иначе при повороте/process death gate-флаги
+                // ресетятся в false → DataStore читается заново → мигает пустой экран.
+                var checked by rememberSaveable { mutableStateOf(false) }
+                var showOnboarding by rememberSaveable { mutableStateOf(false) }
+                LaunchedEffect(Unit) {
                     val completed = userFlags.isOnboardingCompleted()
                     showOnboarding = !completed
                     checked = true
