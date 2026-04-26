@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- RT.11.1: экспорт crash log из filesDir/crashes/ через ACTION_SEND -->
+    <files-path name="crashes" path="crashes/" />
+</paths>

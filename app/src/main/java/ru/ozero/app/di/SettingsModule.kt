@@ -19,6 +19,8 @@ import ru.ozero.app.settings.BootReceiverAutoStartGateway
 import ru.ozero.app.settings.SettingsKeys
 import ru.ozero.app.settings.SettingsRepository
 import ru.ozero.app.settings.SettingsRepositoryImpl
+import ru.ozero.app.settings.UserFlagsRepository
+import ru.ozero.app.settings.UserFlagsRepositoryImpl
 import javax.inject.Singleton
 
 @Module
@@ -47,4 +49,8 @@ abstract class SettingsModule {
     @Binds
     @Singleton
     abstract fun bindAutoStartGateway(impl: BootReceiverAutoStartGateway): AutoStartGateway
+
+    @Binds
+    @Singleton
+    abstract fun bindUserFlagsRepository(impl: UserFlagsRepositoryImpl): UserFlagsRepository
 }

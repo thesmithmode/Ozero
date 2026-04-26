@@ -126,4 +126,32 @@
     <string name="a11y_connect_button">Connect VPN</string>
     <string name="a11y_disconnect_button">Disconnect VPN</string>
     <string name="a11y_engine_active">Active engine: %1$s</string>
+
+    <!-- RT.8.1/8.2 -->
+    <string name="import_ok">Server %1$s added</string>
+    <string name="import_error">Import failed: %1$s</string>
+
+    <!-- RT.9 -->
+    <string name="onboarding_title_1">Why Ozero</string>
+    <string name="onboarding_body_1">Free internet access under censorship. Open-source, zero telemetry.</string>
+    <string name="onboarding_title_2">How it works</string>
+    <string name="onboarding_body_2">Multiple engines (Xray, Hysteria2, ByeDPI, AmneziaWG, Tor) auto-selected for your network.</string>
+    <string name="onboarding_title_3">VPN consent</string>
+    <string name="onboarding_body_3">Ozero needs Android VPN mode. The tunnel stays on-device.</string>
+    <string name="onboarding_next">Next</string>
+    <string name="onboarding_finish">Start</string>
+    <string name="onboarding_skip">Skip</string>
+
+    <!-- RT.10.2 -->
+    <string name="about_title">About</string>
+    <string name="about_version">Version %1$s</string>
+    <string name="about_repo">Source code on GitHub</string>
+    <string name="about_telegram">Telegram channel</string>
+    <string name="about_privacy">Privacy policy</string>
+    <string name="about_threat_model">Threat model</string>
+    <string name="about_legal">Licenses</string>
+
+    <!-- RT.11.1 -->
+    <string name="diag_export_crashes">Export crash log</string>
+    <string name="diag_export_no_crashes">Crash log is empty</string>
 </resources>

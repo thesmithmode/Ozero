@@ -1,5 +1,6 @@
 package ru.ozero.app.ui.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,11 +48,13 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onOpenAllowedApps: () -> Unit,
     onOpenServers: () -> Unit,
+    onOpenAbout: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val torState by viewModel.torInstall.collectAsStateWithLifecycle()
     val updateState by viewModel.update.collectAsStateWithLifecycle()
+    BackHandler(onBack = onBack)
     SettingsScreenContent(
         state = state,
         torState = torState,
@@ -60,6 +63,7 @@ fun SettingsScreen(
         nav = SettingsNavActions(
             onOpenAllowedApps = onOpenAllowedApps,
             onOpenServers = onOpenServers,
+            onOpenAbout = onOpenAbout,
         ),
         onSplitModeChange = viewModel::onSplitModeChange,
         onIpv6Toggle = viewModel::onIpv6Toggle,
@@ -202,7 +206,7 @@ private fun ContentBody(
             )
         }
         item { SectionDivider() }
-        item { AboutSection() }
+        item { AboutSection(onOpenAbout = nav.onOpenAbout) }
     }
 }
 
@@ -401,12 +405,19 @@ private fun TorSection(
 }
 
 @Composable
-private fun AboutSection() {
+private fun AboutSection(onOpenAbout: () -> Unit) {
     SectionHeader(R.string.settings_section_about, SettingsTestTags.SECTION_ABOUT)
     Text(
         text = stringResource(R.string.settings_about_summary),
         style = MaterialTheme.typography.bodyMedium,
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+    )
+    NavRow(
+        title = stringResource(R.string.about_title),
+        summary = "",
+        tag = "settings_about_row",
+        onClick = onOpenAbout,
+        enabled = true,
     )
 }
 
