@@ -58,6 +58,10 @@ class UrnetworkEngine(
 
         Log.i(TAG, "start jwtLen=${config.jwtToken.length} mode=${config.mode} region=${config.region}")
 
+        // Безопасная проверка — даже если EngineConfig.Urnetwork.toString сделан masked,
+        // конкретные exception messages могут содержать токен, поэтому в Failure message
+        // jwtToken не попадает (cause: Throwable доступен через cause если нужен debug).
+
         return withContext(Dispatchers.IO) {
             try {
                 val mode = parseMode(config.mode)
@@ -84,7 +88,9 @@ class UrnetworkEngine(
                 }
             } catch (e: Throwable) {
                 Log.e(TAG, "start исключение", e)
-                StartResult.Failure(reason = e.message ?: "URnetwork native error", cause = e)
+                // НЕ передаём e.message в reason — gomobile-обёртка может включить
+                // jwtToken/JSON config в exception text → утечка в logcat / crash reports.
+                StartResult.Failure(reason = "URnetwork native error", cause = e)
             }
         }
     }
