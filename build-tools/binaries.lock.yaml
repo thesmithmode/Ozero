@@ -40,11 +40,11 @@ artifacts:
   - name: libxray.aar
     engine: xray
     destination: libs
-    download_url: https://github.com/thesmithmode/Ozero/releases/download/xray-ee43298d/libxray.aar
-    sha256: e304782bfb2212d94b34afea1294278e0dae818bc0c0cc7762861f2c5a3ab312
-    size_bytes: 83828969
-    source_repo: https://github.com/xtls/xray-core
-    source_commit: 81f8f398c7b2b845853b1e85087c6122acc6db0b
+    download_url: https://github.com/2dust/AndroidLibXrayLite/releases/download/v26.4.25/libv2ray.aar
+    sha256: e7fcc8d9923cc6507481e03973e474325cf3aed74b0f42a3ca5101e7904150a1
+    size_bytes: 55794103
+    source_repo: https://github.com/2dust/AndroidLibXrayLite
+    source_commit: v26.4.25
   - name: libnaive-arm64-v8a.so
     engine: naive
     abi: arm64-v8a
