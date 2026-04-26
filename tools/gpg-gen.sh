@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# umask 077 ДО любого создания файлов — закрывает race между mktemp/echo и chmod 600.
+umask 077
 
 OUT="${1:?Usage: gpg-gen.sh <out-dir>}"
 mkdir -p "$OUT"

@@ -34,6 +34,11 @@ ANDROID_API="${ANDROID_API:-24}"
 ANDROID_TARGETS="${ANDROID_TARGETS:-android/arm64,android/arm,android/amd64}"
 JAVA_PKG="${JAVA_PKG:-com.bringyour}"
 
+# Защита от git parameter injection в --branch: SDK_VERSION должен быть только
+# tag/branch именем (буквы, цифры, точки, подчёркивания, слэши, дефисы).
+[[ "$SDK_VERSION" =~ ^[A-Za-z0-9_./-]+$ ]] || die "Invalid SDK_VERSION: $SDK_VERSION"
+[[ "$ANDROID_API" =~ ^[0-9]+$ ]] || die "Invalid ANDROID_API: $ANDROID_API"
+
 log "=== URnetwork AAR build ==="
 log "SDK version : $SDK_VERSION"
 log "RUNNER_TEMP : $RUNNER_TEMP"

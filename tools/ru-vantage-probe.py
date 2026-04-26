@@ -52,7 +52,12 @@ def fetch_ru_proxies(max_proxies: int, timeout: int) -> list[str]:
             headers={"User-Agent": "ozero-ru-probe/1.0"},
         )
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            text = resp.read().decode("utf-8", errors="replace")
+            # 10 МБ лимит против OOM при malicious response
+            body = resp.read(10 * 1024 * 1024 + 1)
+            if len(body) > 10 * 1024 * 1024:
+                print("[probe] Ответ > 10 МБ — отклонено", flush=True)
+                return []
+            text = body.decode("utf-8", errors="replace")
         proxies = [
             line.strip()
             for line in text.splitlines()
