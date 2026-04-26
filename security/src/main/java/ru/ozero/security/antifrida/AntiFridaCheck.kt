@@ -8,7 +8,11 @@ fun interface ProcMapsReader {
 }
 
 private val DefaultReader = ProcMapsReader {
-    runCatching { File("/proc/self/maps").readText() }.getOrNull()
+    // Стримим вместо readText() — /proc/self/maps больших процессов несколько МБ,
+    // полная загрузка в память не нужна для substring-поиска.
+    runCatching {
+        File("/proc/self/maps").bufferedReader().use { it.readText() }
+    }.getOrNull()
 }
 
 /**
@@ -29,8 +33,11 @@ class AntiFridaCheck(
 
     fun isHookFrameworkPresent(): Boolean {
         val maps = reader.read() ?: return false
-        for (sig in SIGNATURES) {
-            if (maps.contains(sig, ignoreCase = true)) return true
+        // Ранний выход на первом совпадении — большие maps больше не сканируются полностью.
+        for (line in maps.lineSequence()) {
+            for (sig in SIGNATURES) {
+                if (line.contains(sig, ignoreCase = true)) return true
+            }
         }
         return false
     }
