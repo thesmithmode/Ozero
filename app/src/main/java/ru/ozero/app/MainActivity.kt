@@ -8,9 +8,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import dagger.hilt.android.AndroidEntryPoint
 import ru.ozero.app.ui.MainScreen
 import ru.ozero.app.ui.MainViewModel
+import ru.ozero.app.ui.settings.SettingsScreen
 import ru.ozero.app.ui.theme.OzeroTheme
 import ru.ozero.commonvpn.OzeroVpnService
 
@@ -35,10 +40,16 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             OzeroTheme {
-                MainScreen(
-                    viewModel = viewModel,
-                    onConnectClick = ::onConnectClick,
-                )
+                var settingsOpen by rememberSaveable { mutableStateOf(false) }
+                if (settingsOpen) {
+                    SettingsScreen(onBack = { settingsOpen = false })
+                } else {
+                    MainScreen(
+                        viewModel = viewModel,
+                        onConnectClick = ::onConnectClick,
+                        onOpenSettings = { settingsOpen = true },
+                    )
+                }
             }
         }
     }
