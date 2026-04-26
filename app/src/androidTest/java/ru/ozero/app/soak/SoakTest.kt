@@ -1,6 +1,5 @@
 package ru.ozero.app.soak
 
-import android.app.ActivityManager
 import android.content.Context
 import android.os.Debug
 import android.util.Log
@@ -62,8 +61,11 @@ class SoakTest {
         val json = buildMetricsJson(metrics, requestCount, targetUrl)
         File(OUTPUT_FILE).writeText(json)
 
-        Log.i(TAG, "Soak завершён. drops=${metrics.connectionDrops}, retryRate=${metrics.retryRate}%, " +
-            "peakMemMb=${metrics.peakMemoryMb}, anrEvents=${metrics.anrLikeDelays}")
+        Log.i(
+            TAG,
+            "Soak завершён. drops=${metrics.connectionDrops}, retryRate=${metrics.retryRate}%, " +
+                "peakMemMb=${metrics.peakMemoryMb}, anrEvents=${metrics.anrLikeDelays}",
+        )
         Log.i(TAG, "Метрики сохранены в $OUTPUT_FILE")
     }
 
@@ -108,7 +110,11 @@ class SoakTest {
                 if (currentMem > peakMemKb) {
                     peakMemKb = currentMem
                 }
-                Log.d(TAG, "[$i/$requestCount] success=${successCount.get()} drops=${dropCount.get()} mem=${currentMem}KB")
+                Log.d(
+                    TAG,
+                    "[$i/$requestCount] success=${successCount.get()} " +
+                        "drops=${dropCount.get()} mem=${currentMem}KB",
+                )
             }
 
             val sleepTime = INTERVAL_MS - (System.currentTimeMillis() - requestStart)
