@@ -95,6 +95,7 @@ dependencies {
     implementation(project(":engine-amnezia"))
     implementation(project(":engine-hysteria2"))
     implementation(project(":engine-naive"))
+    implementation(project(":engine-urnetwork"))
     // engine-tor: Kotlin/JVM код в base APK (нужен для DI EngineModule), а
     // тяжёлые нативные .so доставляет :dynamic_tor on-demand через PlayCore.
     implementation(project(":engine-tor"))

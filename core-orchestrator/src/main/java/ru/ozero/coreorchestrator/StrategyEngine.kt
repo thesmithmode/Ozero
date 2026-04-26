@@ -26,6 +26,9 @@ data class Candidate(
         const val PRIORITY_AMNEZIA = 7
         const val PRIORITY_XRAY_SHADOWSOCKS = 6
         const val PRIORITY_BYEDPI = 5
+
+        /** URnetwork P2P — fallback после всех primary engines, выше TOR */
+        const val PRIORITY_URNETWORK = 2
         const val PRIORITY_TOR = 1
     }
 }

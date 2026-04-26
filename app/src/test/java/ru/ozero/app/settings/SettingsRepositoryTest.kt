@@ -133,6 +133,30 @@ class SettingsRepositoryTest {
         assertNull(repository.settings.first().manualEngine)
     }
 
+    @Test
+    fun `urnetwork disabled by default`() = runTest {
+        assertFalse(repository.settings.first().urnetworkEnabled)
+        assertNull(repository.settings.first().urnetworkJwt)
+    }
+
+    @Test
+    fun `setUrnetworkEnabled persists toggle`() = runTest {
+        repository.setUrnetworkEnabled(true)
+        assertTrue(repository.settings.first().urnetworkEnabled)
+
+        repository.setUrnetworkEnabled(false)
+        assertFalse(repository.settings.first().urnetworkEnabled)
+    }
+
+    @Test
+    fun `setUrnetworkJwt stores jwt and null clears it`() = runTest {
+        repository.setUrnetworkJwt("my-test-jwt")
+        assertEquals("my-test-jwt", repository.settings.first().urnetworkJwt)
+
+        repository.setUrnetworkJwt(null)
+        assertNull(repository.settings.first().urnetworkJwt)
+    }
+
     private class FakeAutoStartGateway : AutoStartGateway {
         val invocations = mutableListOf<Boolean>()
 

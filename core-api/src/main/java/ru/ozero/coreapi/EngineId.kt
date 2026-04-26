@@ -6,5 +6,6 @@ enum class EngineId {
     HYSTERIA2,
     AMNEZIA,
     TOR,
-    NAIVE
+    NAIVE,
+    URNETWORK,
 }

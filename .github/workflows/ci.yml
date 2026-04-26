@@ -147,11 +147,13 @@ jobs:
           bash -n build-tools/build_amneziawg.sh
           bash -n build-tools/build_naive.sh
           bash -n build-tools/build_tor.sh
+          bash -n tools/build-urnetwork-aar.sh
           sudo apt-get update && sudo apt-get install -y --no-install-recommends shellcheck
           shellcheck -S warning build-tools/build_hysteria2.sh
           shellcheck -S warning build-tools/build_amneziawg.sh
           shellcheck -S warning build-tools/build_naive.sh
           shellcheck -S warning build-tools/build_tor.sh
+          shellcheck -S warning tools/build-urnetwork-aar.sh
 
       - name: Validate Dockerfile syntax (hadolint)
         uses: hadolint/hadolint-action@v3.1.0
