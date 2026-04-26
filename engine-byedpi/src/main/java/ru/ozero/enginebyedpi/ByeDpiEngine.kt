@@ -34,6 +34,10 @@ class ByeDpiEngine(
 
     override suspend fun start(config: EngineConfig): StartResult {
         require(config is EngineConfig.ByeDpi) { "ByeDpiEngine требует EngineConfig.ByeDpi" }
+        if (!ByeDpiProxy.libraryLoaded) {
+            Log.e(TAG, "native lib не загружена — устройство не поддерживает или stripped APK")
+            return StartResult.Failure(reason = "byedpi native library не загружена")
+        }
         Log.i(TAG, "start socksPort=${config.socksPort} args=${config.args}")
         return withContext(Dispatchers.IO) {
             val args = buildArgs(config)
@@ -54,7 +58,10 @@ class ByeDpiEngine(
     override suspend fun stop() {
         Log.i(TAG, "stop")
         withContext(Dispatchers.IO) {
-            proxy.jniStopProxy()
+            // runCatching: иначе JNI exception оставит engine в состоянии "активен" навсегда,
+            // блокируя повторный старт (AwgEngine.stop сделан так же).
+            runCatching { proxy.jniStopProxy() }
+                .onFailure { Log.w(TAG, "jniStopProxy исключение: ${it.message}") }
             activeSocksPort = 0
         }
     }

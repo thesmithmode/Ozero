@@ -16,6 +16,8 @@ class Hy2ConfigBuilder {
         require(options.socksPort in MIN_PORT..MAX_PORT) {
             "socksPort вне диапазона: ${options.socksPort}"
         }
+        require(server.password.isNotBlank()) { "Hy2 password пуст" }
+        require(server.host.isNotBlank()) { "Hy2 host пуст" }
 
         val serverAddress = if (options.portRange != null) {
             "${server.host}:${options.portRange.first}-${options.portRange.last}"
