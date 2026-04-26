@@ -55,6 +55,8 @@
     <string name="settings_allowed_apps_title">App list</string>
     <string name="settings_allowed_apps_summary">Coming in RT.4.4</string>
     <string name="settings_allowed_apps_open_summary">Pick apps and Split-tunnel mode</string>
+    <string name="settings_servers_title">Servers / Double-hop</string>
+    <string name="settings_servers_summary">Pick entry/exit pair and preview</string>
     <string name="settings_check_update_title">Check for update</string>
     <string name="settings_check_update_summary">GitHub Releases · Ed25519 verify</string>
     <string name="settings_about_version">Version %1$s</string>
@@ -84,6 +86,18 @@
     <string name="split_tunnel_short_bypass_lan">Bypass LAN</string>
     <string name="split_tunnel_short_allowlist">Allowlist</string>
     <string name="split_tunnel_short_blocklist">Blocklist</string>
+
+    <!-- Servers (double-hop) -->
+    <string name="servers_title">Servers — Double-hop</string>
+    <string name="servers_back">Back</string>
+    <string name="servers_empty">No servers. Import a subscription first.</string>
+    <string name="servers_entry_label">Entry server</string>
+    <string name="servers_exit_label">Exit server</string>
+    <string name="servers_save">Save pair</string>
+    <string name="servers_clear">Clear pair</string>
+    <string name="servers_preview_title">Chain</string>
+    <string name="servers_preview_format">%1$s/%2$s → %3$s/%4$s</string>
+    <string name="servers_preview_unset">Select entry and exit</string>
 
     <!-- Errors -->
     <string name="error_subscription_invalid">Subscription is corrupted or signed by wrong key</string>

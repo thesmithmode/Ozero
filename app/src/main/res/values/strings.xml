@@ -55,6 +55,8 @@
     <string name="settings_allowed_apps_title">Список приложений</string>
     <string name="settings_allowed_apps_summary">Откроется в RT.4.4</string>
     <string name="settings_allowed_apps_open_summary">Выбор приложений и режим Split-tunnel</string>
+    <string name="settings_servers_title">Серверы / Double-hop</string>
+    <string name="settings_servers_summary">Выбор entry/exit пары и предпросмотр</string>
     <string name="settings_check_update_title">Проверить обновление</string>
     <string name="settings_check_update_summary">GitHub Releases · Ed25519 verify</string>
     <string name="settings_about_version">Версия %1$s</string>
@@ -84,6 +86,18 @@
     <string name="split_tunnel_short_bypass_lan">Без LAN</string>
     <string name="split_tunnel_short_allowlist">Allowlist</string>
     <string name="split_tunnel_short_blocklist">Blocklist</string>
+
+    <!-- Servers (double-hop) -->
+    <string name="servers_title">Серверы — Double-hop</string>
+    <string name="servers_back">Назад</string>
+    <string name="servers_empty">Нет серверов. Импортируйте подписку.</string>
+    <string name="servers_entry_label">Entry-сервер</string>
+    <string name="servers_exit_label">Exit-сервер</string>
+    <string name="servers_save">Сохранить пару</string>
+    <string name="servers_clear">Сбросить пару</string>
+    <string name="servers_preview_title">Цепочка</string>
+    <string name="servers_preview_format">%1$s/%2$s → %3$s/%4$s</string>
+    <string name="servers_preview_unset">Выберите entry и exit</string>
 
     <!-- Errors -->
     <string name="error_subscription_invalid">Подписка повреждена или подписана не тем ключом</string>
