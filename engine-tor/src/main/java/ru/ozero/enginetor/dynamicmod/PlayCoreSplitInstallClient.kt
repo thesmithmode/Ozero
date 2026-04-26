@@ -12,6 +12,7 @@ import com.google.android.play.core.splitinstall.model.SplitInstallSessionStatus
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.tasks.await
 
 /**
  * Production-обёртка над PlayCore [SplitInstallManager].
@@ -91,6 +92,12 @@ class PlayCoreSplitInstallClient(
                     .onFailure { Log.w(TAG, "cancelInstall threw", it) }
             }
         }
+    }
+
+    override suspend fun deferredUninstall(moduleName: String) {
+        Log.i(TAG, "deferredUninstall module=$moduleName")
+        runCatching { manager.deferredUninstall(listOf(moduleName)).await() }
+            .onFailure { Log.w(TAG, "deferredUninstall threw", it) }
     }
 
     private fun computePercent(state: SplitInstallSessionState): Int {

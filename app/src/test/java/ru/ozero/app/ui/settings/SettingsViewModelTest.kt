@@ -159,6 +159,21 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun `onInstallTor propagates checksum mismatch reason from Failed`() = runTest {
+        val reason = "checksum mismatch: libtor-arm64-v8a.so expected=39e1e4b1… actual=deadbeef…"
+        torClient.flow = flowOf(
+            InstallResult.Installing(percent = 90),
+            InstallResult.Failed(reason = reason),
+        )
+
+        viewModel.onInstallTor()
+        advanceUntilIdle()
+
+        val failed = assertIs<TorInstallUiState.Failed>(viewModel.torInstall.value)
+        assertEquals(reason, failed.reason)
+    }
+
+    @Test
     fun `onCancelTor cancels job and resets to NotInstalled`() = runTest {
         val gate = CompletableDeferred<InstallResult>()
         torClient.flow = flow {
@@ -236,5 +251,7 @@ class SettingsViewModelTest {
             requestCount += 1
             return flow
         }
+
+        override suspend fun deferredUninstall(moduleName: String) = Unit
     }
 }
