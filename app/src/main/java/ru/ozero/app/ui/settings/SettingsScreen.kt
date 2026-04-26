@@ -110,10 +110,9 @@ fun SettingsScreenContent(
 @Composable
 private fun LoadingBody(padding: PaddingValues) {
     Box(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(padding),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(padding),
         contentAlignment = Alignment.Center,
     ) {
         CircularProgressIndicator(modifier = Modifier.testTag(SettingsTestTags.LOADING))
@@ -282,11 +281,10 @@ private fun SectionHeader(
         text = stringResource(titleRes),
         style = MaterialTheme.typography.titleMedium,
         color = MaterialTheme.colorScheme.primary,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .testTag(tag),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .testTag(tag),
     )
 }
 
@@ -307,12 +305,11 @@ private fun RadioRow(
     onClick: () -> Unit,
 ) {
     Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-                .testTag(tag),
+        modifier = Modifier
+            .fillMaxWidth()
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .testTag(tag),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RadioButton(selected = selected, onClick = null)
@@ -329,11 +326,10 @@ private fun SwitchRow(
     onCheckedChange: (Boolean) -> Unit,
 ) {
     Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .testTag(tag),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .testTag(tag),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -357,12 +353,11 @@ private fun NavRow(
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
-    val rowModifier =
-        Modifier
-            .fillMaxWidth()
-            .let { if (enabled) it.clickable(onClick = onClick) else it }
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-            .testTag(tag)
+    val rowModifier = Modifier
+        .fillMaxWidth()
+        .let { if (enabled) it.clickable(onClick = onClick) else it }
+        .padding(horizontal = 16.dp, vertical = 12.dp)
+        .testTag(tag)
     val alpha = if (enabled) 1f else 0.5f
     Column(modifier = rowModifier) {
         Text(

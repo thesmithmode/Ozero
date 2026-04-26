@@ -98,10 +98,9 @@ fun SplitTunnelScreenContent(
 @Composable
 private fun LoadingBody(padding: PaddingValues) {
     Box(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(padding),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(padding),
         contentAlignment = Alignment.Center,
     ) {
         CircularProgressIndicator(modifier = Modifier.testTag(SplitTunnelTestTags.LOADING))
@@ -118,10 +117,9 @@ private fun ContentBody(
     onQuery: (String) -> Unit,
 ) {
     Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(padding),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(padding),
     ) {
         ModeSegment(
             mode = state.mode,
@@ -132,19 +130,17 @@ private fun ContentBody(
             onValueChange = onQuery,
             label = { Text(stringResource(R.string.split_tunnel_search_hint)) },
             singleLine = true,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .testTag(SplitTunnelTestTags.SEARCH),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .testTag(SplitTunnelTestTags.SEARCH),
         )
         if (state.apps.isEmpty()) {
             Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .padding(24.dp)
-                        .testTag(SplitTunnelTestTags.EMPTY),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp)
+                    .testTag(SplitTunnelTestTags.EMPTY),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -154,10 +150,9 @@ private fun ContentBody(
             }
         } else {
             LazyColumn(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .testTag(SplitTunnelTestTags.APPS_LIST),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(SplitTunnelTestTags.APPS_LIST),
                 contentPadding = PaddingValues(vertical = 8.dp),
             ) {
                 items(state.apps, key = { it.packageName }) { app ->
@@ -176,20 +171,18 @@ private fun ModeSegment(
     onModeChange: (SplitTunnelMode) -> Unit,
 ) {
     SingleChoiceSegmentedButtonRow(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         SplitTunnelMode.entries.forEachIndexed { index, value ->
             SegmentedButton(
                 selected = value == mode,
                 onClick = { onModeChange(value) },
-                shape =
-                    SegmentedButtonDefaults.itemShape(
-                        index = index,
-                        count = SplitTunnelMode.entries.size,
-                    ),
+                shape = SegmentedButtonDefaults.itemShape(
+                    index = index,
+                    count = SplitTunnelMode.entries.size,
+                ),
                 modifier = Modifier.testTag(SplitTunnelTestTags.MODE_SEGMENT_PREFIX + value.name),
             ) {
                 Text(stringResource(value.shortLabelRes()))
@@ -204,11 +197,10 @@ private fun AppRowView(
     onToggleApp: (String, Boolean) -> Unit,
 ) {
     Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .testTag(SplitTunnelTestTags.APP_ROW_PREFIX + app.packageName),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .testTag(SplitTunnelTestTags.APP_ROW_PREFIX + app.packageName),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {

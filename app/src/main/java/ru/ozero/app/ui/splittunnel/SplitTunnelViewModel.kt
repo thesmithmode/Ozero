@@ -24,8 +24,7 @@ class SplitTunnelViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
 
-    private val _uiState =
-        MutableStateFlow<SplitTunnelUiState>(SplitTunnelUiState.Loading)
+    private val _uiState = MutableStateFlow<SplitTunnelUiState>(SplitTunnelUiState.Loading)
     val uiState: StateFlow<SplitTunnelUiState> = _uiState.asStateFlow()
 
     private val query = MutableStateFlow("")
@@ -40,20 +39,18 @@ class SplitTunnelViewModel @Inject constructor(
             query,
         ) { appsList, rules, mode, q ->
             val included = rules.map { it.packageName }.toSet()
-            val filtered =
-                if (q.isBlank()) appsList else appsList.filter { it.matches(q) }
+            val filtered = if (q.isBlank()) appsList else appsList.filter { it.matches(q) }
             SplitTunnelUiState.Content(
                 mode = mode,
                 query = q,
-                apps =
-                    filtered.map { app ->
-                        AppRow(
-                            packageName = app.packageName,
-                            label = app.label,
-                            isSystem = app.isSystem,
-                            included = app.packageName in included,
-                        )
-                    },
+                apps = filtered.map { app ->
+                    AppRow(
+                        packageName = app.packageName,
+                        label = app.label,
+                        isSystem = app.isSystem,
+                        included = app.packageName in included,
+                    )
+                },
             )
         }.onEach { _uiState.value = it }.launchIn(viewModelScope)
     }

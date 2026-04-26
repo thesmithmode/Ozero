@@ -99,10 +99,9 @@ class SettingsScreenTest {
         composeRule.setContent {
             OzeroTheme {
                 SettingsScreenContent(
-                    state =
-                        SettingsUiState.Content(
-                            SettingsModel.DEFAULT.copy(ipv6Enabled = true),
-                        ),
+                    state = SettingsUiState.Content(
+                        SettingsModel.DEFAULT.copy(ipv6Enabled = true),
+                    ),
                     onBack = {},
                     onSplitModeChange = {},
                     onIpv6Toggle = { captured += it },

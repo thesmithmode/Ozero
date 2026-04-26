@@ -48,10 +48,9 @@ fun MainScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Row(
-            modifier =
-                Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(8.dp),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(8.dp),
         ) {
             IconButton(
                 onClick = onOpenDiagnostics,
@@ -97,10 +96,9 @@ fun MainScreen(
                 }
                 else -> {
                     val isConnected = state is OrchestratorState.Connected
-                    val buttonDesc =
-                        stringResource(
-                            if (isConnected) R.string.a11y_disconnect_button else R.string.a11y_connect_button,
-                        )
+                    val buttonDesc = stringResource(
+                        if (isConnected) R.string.a11y_disconnect_button else R.string.a11y_connect_button,
+                    )
                     Button(
                         onClick = onConnectClick,
                         modifier = Modifier.semantics { contentDescription = buttonDesc },
@@ -115,23 +113,21 @@ fun MainScreen(
 
 @Composable
 private fun StatusLabel(state: OrchestratorState) {
-    val labelRes =
-        when (state) {
-            is OrchestratorState.Idle -> R.string.main_status_disconnected
-            is OrchestratorState.Probing -> R.string.main_status_probing
-            is OrchestratorState.Connecting -> R.string.main_status_connecting
-            is OrchestratorState.Connected -> R.string.main_status_connected
-            is OrchestratorState.Switching -> R.string.main_status_switching
-            is OrchestratorState.Failed -> R.string.main_status_failed
-            is OrchestratorState.Disconnecting -> R.string.main_status_disconnecting
-        }
-    val engine =
-        when (state) {
-            is OrchestratorState.Connecting -> state.engineId.name
-            is OrchestratorState.Connected -> state.engineId.name
-            is OrchestratorState.Failed -> state.engineId.name
-            else -> null
-        }
+    val labelRes = when (state) {
+        is OrchestratorState.Idle -> R.string.main_status_disconnected
+        is OrchestratorState.Probing -> R.string.main_status_probing
+        is OrchestratorState.Connecting -> R.string.main_status_connecting
+        is OrchestratorState.Connected -> R.string.main_status_connected
+        is OrchestratorState.Switching -> R.string.main_status_switching
+        is OrchestratorState.Failed -> R.string.main_status_failed
+        is OrchestratorState.Disconnecting -> R.string.main_status_disconnecting
+    }
+    val engine = when (state) {
+        is OrchestratorState.Connecting -> state.engineId.name
+        is OrchestratorState.Connected -> state.engineId.name
+        is OrchestratorState.Failed -> state.engineId.name
+        else -> null
+    }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = stringResource(labelRes),

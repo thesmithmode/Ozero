@@ -80,12 +80,11 @@ class ServersScreenTest {
         composeRule.setContent {
             OzeroTheme {
                 ServersScreenContent(
-                    state =
-                        ServersUiState.Content(
-                            servers = sample,
-                            entryId = "a",
-                            exitId = "b",
-                        ),
+                    state = ServersUiState.Content(
+                        servers = sample,
+                        entryId = "a",
+                        exitId = "b",
+                    ),
                     onBack = {},
                     onEntrySelect = {},
                     onExitSelect = {},

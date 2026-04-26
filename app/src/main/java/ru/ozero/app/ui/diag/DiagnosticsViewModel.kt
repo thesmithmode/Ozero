@@ -20,8 +20,7 @@ class DiagnosticsViewModel @Inject constructor(
     private val engine: DiagnosticsEngine,
 ) : ViewModel() {
 
-    private val _uiState =
-        MutableStateFlow<DiagnosticsUiState>(DiagnosticsUiState.NotConnected)
+    private val _uiState = MutableStateFlow<DiagnosticsUiState>(DiagnosticsUiState.NotConnected)
     val uiState: StateFlow<DiagnosticsUiState> = _uiState.asStateFlow()
 
     private var runJob: Job? = null
@@ -38,19 +37,17 @@ class DiagnosticsViewModel @Inject constructor(
         val current = orchestrator.state.value
         if (current !is OrchestratorState.Connected) return
         runJob?.cancel()
-        runJob =
-            viewModelScope.launch {
-                _uiState.value =
-                    DiagnosticsUiState.Running(total = TOTAL_URLS, completed = 0)
-                try {
-                    val results = engine.runAll(current.socksPort)
-                    _uiState.value = DiagnosticsUiState.Done(results)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    _uiState.value = DiagnosticsUiState.Done(emptyList())
-                }
+        runJob = viewModelScope.launch {
+            _uiState.value = DiagnosticsUiState.Running(total = TOTAL_URLS, completed = 0)
+            try {
+                val results = engine.runAll(current.socksPort)
+                _uiState.value = DiagnosticsUiState.Done(results)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _uiState.value = DiagnosticsUiState.Done(emptyList())
             }
+        }
     }
 
     fun onStop() {

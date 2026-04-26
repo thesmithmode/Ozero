@@ -86,12 +86,11 @@ fun DiagnosticsScreenContent(
 @Composable
 private fun NotConnectedBody(padding: PaddingValues) {
     Box(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(24.dp)
-                .testTag(DiagnosticsTestTags.NOT_CONNECTED),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(padding)
+            .padding(24.dp)
+            .testTag(DiagnosticsTestTags.NOT_CONNECTED),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -107,12 +106,11 @@ private fun IdleBody(
     onRun: () -> Unit,
 ) {
     Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(24.dp)
-                .testTag(DiagnosticsTestTags.IDLE),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(padding)
+            .padding(24.dp)
+            .testTag(DiagnosticsTestTags.IDLE),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -122,10 +120,9 @@ private fun IdleBody(
         )
         Button(
             onClick = onRun,
-            modifier =
-                Modifier
-                    .padding(top = 24.dp)
-                    .testTag(DiagnosticsTestTags.RUN_BUTTON),
+            modifier = Modifier
+                .padding(top = 24.dp)
+                .testTag(DiagnosticsTestTags.RUN_BUTTON),
         ) {
             Text(stringResource(R.string.diag_run))
         }
@@ -139,11 +136,10 @@ private fun RunningBody(
     onStop: () -> Unit,
 ) {
     Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(24.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(padding)
+            .padding(24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -155,11 +151,10 @@ private fun RunningBody(
         val progress = if (state.total == 0) 0f else state.completed.toFloat() / state.total
         LinearProgressIndicator(
             progress = { progress },
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp)
-                    .testTag(DiagnosticsTestTags.PROGRESS),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp)
+                .testTag(DiagnosticsTestTags.PROGRESS),
         )
         OutlinedButton(
             onClick = onStop,
@@ -179,28 +174,25 @@ private fun DoneBody(
     val successCount = state.results.count { it is DiagResult.Success }
     val failureCount = state.results.size - successCount
     Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(padding),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(padding),
     ) {
         Text(
-            text =
-                stringResource(
-                    R.string.diag_summary,
-                    successCount,
-                    failureCount,
-                    state.results.size,
-                ),
+            text = stringResource(
+                R.string.diag_summary,
+                successCount,
+                failureCount,
+                state.results.size,
+            ),
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(16.dp),
         )
         HorizontalDivider()
         LazyColumn(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .testTag(DiagnosticsTestTags.RESULTS_LIST),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(DiagnosticsTestTags.RESULTS_LIST),
             contentPadding = PaddingValues(vertical = 8.dp),
         ) {
             items(state.results, key = { it.url }) { result ->
@@ -210,11 +202,10 @@ private fun DoneBody(
         }
         Button(
             onClick = onRun,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-                    .testTag(DiagnosticsTestTags.RUN_BUTTON),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .testTag(DiagnosticsTestTags.RUN_BUTTON),
         ) {
             Text(stringResource(R.string.diag_run))
         }
@@ -223,26 +214,23 @@ private fun DoneBody(
 
 @Composable
 private fun ResultRow(result: DiagResult) {
-    val text =
-        when (result) {
-            is DiagResult.Success ->
-                stringResource(R.string.diag_url_ok, result.url, result.latencyMs)
-            is DiagResult.Failure ->
-                stringResource(R.string.diag_url_failed, result.url, result.reason)
-        }
-    val color =
-        when (result) {
-            is DiagResult.Success -> MaterialTheme.colorScheme.onSurface
-            is DiagResult.Failure -> MaterialTheme.colorScheme.error
-        }
+    val text = when (result) {
+        is DiagResult.Success ->
+            stringResource(R.string.diag_url_ok, result.url, result.latencyMs)
+        is DiagResult.Failure ->
+            stringResource(R.string.diag_url_failed, result.url, result.reason)
+    }
+    val color = when (result) {
+        is DiagResult.Success -> MaterialTheme.colorScheme.onSurface
+        is DiagResult.Failure -> MaterialTheme.colorScheme.error
+    }
     Text(
         text = text,
         style = MaterialTheme.typography.bodyMedium,
         color = color,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .testTag(DiagnosticsTestTags.RESULT_PREFIX + result.url),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .testTag(DiagnosticsTestTags.RESULT_PREFIX + result.url),
     )
 }

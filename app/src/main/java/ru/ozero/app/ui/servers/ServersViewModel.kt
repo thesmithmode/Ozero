@@ -19,8 +19,7 @@ class ServersViewModel @Inject constructor(
     private val dao: ServerDao,
 ) : ViewModel() {
 
-    private val _uiState =
-        MutableStateFlow<ServersUiState>(ServersUiState.Loading)
+    private val _uiState = MutableStateFlow<ServersUiState>(ServersUiState.Loading)
     val uiState: StateFlow<ServersUiState> = _uiState.asStateFlow()
 
     private val entryId = MutableStateFlow<String?>(null)
@@ -30,12 +29,11 @@ class ServersViewModel @Inject constructor(
         combine(dao.observeAll(), entryId, exitId) { servers, entry, exit ->
             when {
                 servers.isEmpty() -> ServersUiState.Empty
-                else ->
-                    ServersUiState.Content(
-                        servers = servers,
-                        entryId = entry,
-                        exitId = exit,
-                    )
+                else -> ServersUiState.Content(
+                    servers = servers,
+                    entryId = entry,
+                    exitId = exit,
+                )
             }
         }.onEach { _uiState.value = it }.launchIn(viewModelScope)
     }
