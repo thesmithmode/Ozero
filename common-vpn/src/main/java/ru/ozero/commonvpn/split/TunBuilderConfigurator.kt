@@ -16,20 +16,26 @@ class TunBuilderConfigurator(
         when (config.mode) {
             SplitTunnelMode.ALL -> {
                 builder.addRoute("0.0.0.0", 0)
-                Log.i(TAG, "split-tunnel ALL — добавлен default route")
+                builder.addRoute(IPV6_DEFAULT, 0)
+                Log.i(TAG, "split-tunnel ALL — добавлен default route v4+v6")
             }
             SplitTunnelMode.BYPASS_LAN -> {
                 for (cidr in LanRoutes.BYPASS_LAN_IPV4) {
                     builder.addRoute(cidr.address, cidr.prefix)
                 }
-                Log.i(TAG, "split-tunnel BYPASS_LAN — ${LanRoutes.BYPASS_LAN_IPV4.size} routes")
+                // Глобальный IPv6 unicast (2000::/3) маршрутизируется через VPN.
+                // ULA (fc00::/7) и link-local (fe80::/10) исключены — это локальная сеть.
+                builder.addRoute(IPV6_GLOBAL_UNICAST, IPV6_GLOBAL_UNICAST_PREFIX)
+                Log.i(TAG, "split-tunnel BYPASS_LAN — ${LanRoutes.BYPASS_LAN_IPV4.size} v4 + 2000::/3 v6")
             }
             SplitTunnelMode.ALLOWLIST -> {
                 builder.addRoute("0.0.0.0", 0)
+                builder.addRoute(IPV6_DEFAULT, 0)
                 applyAllowed(builder, config.packages)
             }
             SplitTunnelMode.BLOCKLIST -> {
                 builder.addRoute("0.0.0.0", 0)
+                builder.addRoute(IPV6_DEFAULT, 0)
                 applyDisallowed(builder, config.packages)
             }
         }
@@ -69,5 +75,8 @@ class TunBuilderConfigurator(
 
     private companion object {
         const val TAG = "TunBuilderConfigurator"
+        const val IPV6_DEFAULT = "::"
+        const val IPV6_GLOBAL_UNICAST = "2000::"
+        const val IPV6_GLOBAL_UNICAST_PREFIX = 3
     }
 }
