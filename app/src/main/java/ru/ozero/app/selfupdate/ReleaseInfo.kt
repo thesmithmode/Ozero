@@ -12,6 +12,11 @@ data class ReleaseInfo(
     val sigUrl: String,
     val isPrerelease: Boolean = false,
     val publishedAt: String? = null,
+    /**
+     * Опциональный versionCode из GitHub release body (например, поле `version_code`).
+     * 0 = не предоставлен, downgrade-проверка по versionCode пропускается.
+     */
+    val versionCode: Long = 0L,
 ) {
     /** Парсит "vX.Y.Z[-rcN]" → Triple(major, minor, patch). */
     fun semver(): Triple<Int, Int, Int>? = parseSemver(tag)

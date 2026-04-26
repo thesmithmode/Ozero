@@ -312,6 +312,7 @@ class SettingsViewModelTest {
             ): Result = Result.FileError("test-stub")
         },
         currentVersion = "v0.1.0",
+        currentVersionCode = 1L,
         cacheDir = File("/tmp"),
     ) {
         var script: Flow<Progress> = emptyFlow()

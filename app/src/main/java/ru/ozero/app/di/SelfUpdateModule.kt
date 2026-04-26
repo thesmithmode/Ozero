@@ -85,14 +85,24 @@ object SelfUpdateModule {
         verifier = verifier,
         installer = installer,
         currentVersion = currentVersionName(ctx),
+        currentVersionCode = currentVersionCode(ctx),
         cacheDir = ctx.cacheDir,
     )
 
-    private fun currentVersionName(ctx: Context): String {
-        val pkg = ctx.packageName
-        val info = ctx.packageManager.getPackageInfo(pkg, 0)
-        return info.versionName ?: "0.0.0"
-    }
+    private fun currentVersionName(ctx: Context): String = runCatching {
+        val info = ctx.packageManager.getPackageInfo(ctx.packageName, 0)
+        info.versionName ?: "0.0.0"
+    }.getOrDefault("0.0.0")
+
+    private fun currentVersionCode(ctx: Context): Long = runCatching {
+        val info = ctx.packageManager.getPackageInfo(ctx.packageName, 0)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            info.longVersionCode
+        } else {
+            @Suppress("DEPRECATION")
+            info.versionCode.toLong()
+        }
+    }.getOrDefault(0L)
 
     private fun decodeHex(hex: String): ByteArray {
         require(hex.length % 2 == 0) { "hex длина должна быть чётной" }
