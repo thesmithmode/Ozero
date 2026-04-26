@@ -17,14 +17,14 @@ import org.json.JSONObject
  *   и подменить APK URL)
  * - Подпись APK верифицируется отдельно через Ed25519 (см. ApkUpdateVerifier)
  */
-class GithubReleaseFetcher(
+open class GithubReleaseFetcher(
     private val owner: String,
     private val repo: String,
     private val client: OkHttpClient = GithubPinnedClient.create(),
     private val baseUrl: String = "https://api.github.com",
 ) {
 
-    fun latest(): ReleaseInfo? {
+    open fun latest(): ReleaseInfo? {
         val req = Request.Builder()
             .url("$baseUrl/repos/$owner/$repo/releases/latest")
             .header("Accept", "application/vnd.github+json")

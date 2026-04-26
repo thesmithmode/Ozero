@@ -59,6 +59,12 @@
     <string name="settings_servers_summary">Выбор entry/exit пары и предпросмотр</string>
     <string name="settings_check_update_title">Проверить обновление</string>
     <string name="settings_check_update_summary">GitHub Releases · Ed25519 verify</string>
+    <string name="settings_update_state_checking">Проверка обновления…</string>
+    <string name="settings_update_state_downloading">Скачивание %1$d %%</string>
+    <string name="settings_update_state_verifying">Проверка подписи…</string>
+    <string name="settings_update_state_installing">Запуск установки…</string>
+    <string name="settings_update_state_uptodate">Версия актуальна</string>
+    <string name="settings_update_state_failed">Ошибка: %1$s. Нажмите для повтора</string>
 
     <!-- Tor on-demand модуль (RT.5.2) -->
     <string name="settings_section_tor">Tor (аварийный режим)</string>

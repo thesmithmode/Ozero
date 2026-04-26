@@ -27,7 +27,7 @@ import java.io.IOException
  *   Этот класс НЕ верифицирует подпись — он просто устанавливает что дали.
  *   Вызывающий обязан вызвать verify() перед install().
  */
-class SilentPackageInstaller(
+open class SilentPackageInstaller(
     private val context: Context,
     private val installer: PackageInstaller = context.packageManager.packageInstaller,
 ) {
@@ -49,7 +49,7 @@ class SilentPackageInstaller(
      * @param resultIntentAction кастомный action для broadcast, через который
      *  PackageInstaller сообщает финальный статус. Если null — используется DEFAULT_ACTION.
      */
-    suspend fun install(
+    open suspend fun install(
         apkFile: File,
         sessionName: String = DEFAULT_SESSION_NAME,
         resultIntentAction: String = DEFAULT_RESULT_ACTION,

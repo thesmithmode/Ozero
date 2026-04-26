@@ -15,7 +15,7 @@ import java.io.File
  *   4. publicKey 32 bytes (захардкожен в release-сборке)
  *   5. verify → true → запускаем PackageInstaller. false → удаляем APK, игнорим update.
  */
-class ApkUpdateVerifier(
+open class ApkUpdateVerifier(
     private val publicKey: ByteArray,
 ) {
 
@@ -25,7 +25,7 @@ class ApkUpdateVerifier(
         }
     }
 
-    fun verify(apkFile: File, signatureFile: File): Boolean {
+    open fun verify(apkFile: File, signatureFile: File): Boolean {
         if (!apkFile.exists() || !signatureFile.exists()) return false
         val signature = signatureFile.readBytes()
         if (signature.size != ED25519_SIG_LEN) return false

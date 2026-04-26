@@ -8,10 +8,27 @@ plugins {
 android {
     namespace = "ru.ozero.app"
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     defaultConfig {
         applicationId = "ru.ozero.app"
         versionCode = 1
         versionName = "0.1.0"
+        // Self-update (RT.6.2): owner/repo для GitHub Releases API.
+        buildConfigField("String", "UPDATE_GITHUB_OWNER", "\"thesmithmode\"")
+        buildConfigField("String", "UPDATE_GITHUB_REPO", "\"Ozero\"")
+        // Public key Ed25519 (hex, 64 символа = 32 байта). Заменяется при ротации
+        // ключа (см. docs/key-rotation.md). Сейчас placeholder — все нули, что
+        // означает: ни одна реальная подпись не пройдёт verify до прописывания
+        // настоящего ключа в release-сборку. Это намеренно: чтобы случайный APK
+        // не был установлен через Ed25519-обход.
+        buildConfigField(
+            "String",
+            "UPDATE_PUBLIC_KEY_HEX",
+            "\"0000000000000000000000000000000000000000000000000000000000000000\"",
+        )
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
         }
