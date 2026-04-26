@@ -44,6 +44,12 @@ class TorConfigBuilder {
         require(options.controlPort in MIN_PORT..MAX_PORT) { "controlPort вне диапазона" }
         require(options.socksPort != options.controlPort) { "socksPort == controlPort" }
         require(options.dataDir.isNotBlank()) { "dataDir пуст — задайте context.filesDir/tor" }
+        // torrc-injection guard: dataDir и excludeExitNodes идут в текстовый конфиг.
+        // CR/LF в значении → атакующий может встроить произвольную torrc-директиву.
+        require(!options.dataDir.contains(Regex("[\\n\\r]"))) { "dataDir содержит CR/LF (torrc injection)" }
+        for (node in options.excludeExitNodes) {
+            require(!node.contains(Regex("[\\n\\r,]"))) { "excludeExitNode '$node' содержит CR/LF/comma" }
+        }
 
         val sb = StringBuilder()
         // SocksPort и ControlPort биндятся на 127.0.0.1, иначе любое приложение в той же сети

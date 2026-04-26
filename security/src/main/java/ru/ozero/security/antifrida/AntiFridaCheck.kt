@@ -48,6 +48,8 @@ class AntiFridaCheck(
     }
 
     private companion object {
+        // "magisk" намеренно исключён: легитимные пользователи на Magisk-rooted девайсах
+        // получали false-positive. Root-detection — отдельная политика, не часть Frida-чека.
         val SIGNATURES = listOf(
             "frida-agent",
             "frida-gadget",
@@ -57,7 +59,6 @@ class AntiFridaCheck(
             "XposedBridge",
             "LSPosed",
             "EdXposed",
-            "magisk",
             "substrate",
         )
     }

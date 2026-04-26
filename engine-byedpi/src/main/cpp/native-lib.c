@@ -5,12 +5,16 @@
 #include <setjmp.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <stdatomic.h>
 
 #include "byedpi/error.h"
 #include "main.h"
 
 extern int server_fd;
-static int g_proxy_running = 0;
+/* Атомарный CAS-guard от двойного запуска: раньше int-флаг читался/писался
+ * без синхронизации, две параллельные jniStartProxy могли пройти guard
+ * одновременно и обе вызвать main() с гонкой на server_fd. */
+static atomic_int g_proxy_running = 0;
 
 struct params default_params = {
         .await_int = 10,
@@ -35,14 +39,19 @@ void reset_params(void) {
 
 JNIEXPORT jint JNICALL
 Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniStartProxy(JNIEnv *env, __attribute__((unused)) jobject thiz, jobjectArray args) {
-    if (g_proxy_running) {
+    /* CAS 0→1: только первый caller проходит, второй сразу получает -1. */
+    int expected = 0;
+    if (!atomic_compare_exchange_strong(&g_proxy_running, &expected, 1)) {
         return -1;
     }
 
     int argc = (*env)->GetArrayLength(env, args);
     char **argv = calloc(argc, sizeof(char *));
 
-    if (!argv) return -1;
+    if (!argv) {
+        atomic_store(&g_proxy_running, 0);
+        return -1;
+    }
 
     for (int i = 0; i < argc; i++) {
         jstring arg = (jstring) (*env)->GetObjectArrayElement(env, args, i);
@@ -54,29 +63,28 @@ Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniStartProxy(JNIEnv *env, __attribute__(
     }
 
     reset_params();
-    g_proxy_running = 1;
     optind = 1;
 
     int result = main(argc, argv);
 
-    g_proxy_running = 0;
     for (int i = 0; i < argc; i++) free(argv[i]);
     free(argv);
+    atomic_store(&g_proxy_running, 0);
 
     return result;
 }
 
 JNIEXPORT jint JNICALL
 Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniStopProxy(__attribute__((unused)) JNIEnv *env, __attribute__((unused)) jobject thiz) {
-    if (!g_proxy_running) return -1;
+    if (!atomic_load(&g_proxy_running)) return -1;
     shutdown(server_fd, SHUT_RDWR);
-    g_proxy_running = 0;
+    atomic_store(&g_proxy_running, 0);
     return 0;
 }
 
 JNIEXPORT jint JNICALL
 Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniForceClose(__attribute__((unused)) JNIEnv *env, __attribute__((unused)) jobject thiz) {
     if (close(server_fd) == -1) return -1;
-    g_proxy_running = 0;
+    atomic_store(&g_proxy_running, 0);
     return 0;
 }

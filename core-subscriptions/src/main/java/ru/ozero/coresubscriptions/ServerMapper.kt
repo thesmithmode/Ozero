@@ -72,8 +72,10 @@ class ServerMapper {
         }
 
     private fun stableId(uri: String): String {
+        // 16 байт = 128 бит → birthday-collision ~1% при 2^57 серверов (астрономически).
+        // Раньше 8 байт = 64 бит → ~1% при ~6e8 (по-прежнему много, но запас на будущее).
         val digest = MessageDigest.getInstance("SHA-256").digest(uri.toByteArray())
-        return digest.take(8).joinToString("") { "%02x".format(it) }
+        return digest.take(STABLE_ID_BYTES).joinToString("") { "%02x".format(it) }
     }
 
     private fun countryFromRemark(remark: String?): String? {
@@ -85,5 +87,6 @@ class ServerMapper {
 
     private companion object {
         const val UNKNOWN_COUNTRY = "XX"
+        const val STABLE_ID_BYTES = 16
     }
 }

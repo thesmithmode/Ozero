@@ -21,11 +21,9 @@ android {
         // Self-update (RT.6.2): owner/repo для GitHub Releases API.
         buildConfigField("String", "UPDATE_GITHUB_OWNER", "\"thesmithmode\"")
         buildConfigField("String", "UPDATE_GITHUB_REPO", "\"Ozero\"")
-        // Public key Ed25519 (hex, 64 символа = 32 байта). Заменяется при ротации
-        // ключа (см. docs/key-rotation.md). Сейчас placeholder — все нули, что
-        // означает: ни одна реальная подпись не пройдёт verify до прописывания
-        // настоящего ключа в release-сборку. Это намеренно: чтобы случайный APK
-        // не был установлен через Ed25519-обход.
+        // Placeholder для debug/test (все нули = self-update заблокирован, никакая
+        // подпись не пройдёт verify). Release ОБЯЗАН переопределить через
+        // UPDATE_PUBLIC_KEY_HEX env var (см. buildTypes.release ниже).
         buildConfigField(
             "String",
             "UPDATE_PUBLIC_KEY_HEX",
@@ -33,6 +31,20 @@ android {
         )
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+        }
+    }
+
+    buildTypes {
+        release {
+            // F4 hardening: release-сборка обязана получить реальный Ed25519 pubkey
+            // через env var UPDATE_PUBLIC_KEY_HEX (GitHub Secret в release.yml).
+            // Гвард-проверка ниже в taskGraph.whenReady — placeholder/пустое значение
+            // в release фейлит build, симметрично release-fail-without-signing.
+            val updateKey = providers.environmentVariable("UPDATE_PUBLIC_KEY_HEX").orNull
+                ?.takeIf { it.isNotBlank() }
+            if (updateKey != null) {
+                buildConfigField("String", "UPDATE_PUBLIC_KEY_HEX", "\"$updateKey\"")
+            }
         }
     }
 
@@ -55,6 +67,25 @@ android {
                     "META-INF/LGPL2.1",
                 )
         }
+    }
+}
+
+// Release-time enforcement: assembleRelease без UPDATE_PUBLIC_KEY_HEX env →
+// self-update будет permanently broken (ключ остаётся placeholder all-zeros).
+// Лучше fail-fast чем silent ship.
+gradle.taskGraph.whenReady {
+    val isRelease = allTasks.any { it.name.endsWith("Release") && it.name.contains("assemble") }
+    if (!isRelease) return@whenReady
+    val key = providers.environmentVariable("UPDATE_PUBLIC_KEY_HEX").orNull
+    val placeholder = "0000000000000000000000000000000000000000000000000000000000000000"
+    if (key.isNullOrBlank() || key == placeholder) {
+        throw GradleException(
+            "UPDATE_PUBLIC_KEY_HEX env var обязателен для release-сборки " +
+                "(self-update будет навсегда сломан). См. docs/key-rotation.md.",
+        )
+    }
+    require(key.length == 64 && key.all { it in "0123456789abcdefABCDEF" }) {
+        "UPDATE_PUBLIC_KEY_HEX должен быть 64 hex-символа (32 байта Ed25519), получено ${key.length}"
     }
 }
 

@@ -43,6 +43,20 @@ class AwgConfigBuilder {
         require(server.publicKey.isNotBlank()) { "PublicKey пустой" }
         require(server.jmin <= server.jmax) { "Jmin (${server.jmin}) > Jmax (${server.jmax})" }
 
+        // INI-injection guard: подписочный URI URL-декодируется (%0a → \n) — без проверки
+        // attacker может встроить произвольные INI-директивы (DNS/AllowedIPs) через
+        // строковые поля. Fail-closed: если любое поле содержит \r/\n — отказ.
+        fun assertNoCrlf(value: String, name: String) {
+            require('\n' !in value && '\r' !in value) { "$name содержит CR/LF (INI-injection?)" }
+        }
+        assertNoCrlf(server.privateKey, "PrivateKey")
+        assertNoCrlf(server.publicKey, "PublicKey")
+        server.presharedKey?.let { assertNoCrlf(it, "PresharedKey") }
+        assertNoCrlf(server.host, "Endpoint host")
+        server.addresses.forEach { assertNoCrlf(it, "Address") }
+        server.dns.forEach { assertNoCrlf(it, "DNS") }
+        server.allowedIps.forEach { assertNoCrlf(it, "AllowedIPs") }
+
         val anyH = server.h1 != 0L || server.h2 != 0L || server.h3 != 0L || server.h4 != 0L
         if (anyH) {
             val all = listOf(server.h1, server.h2, server.h3, server.h4)

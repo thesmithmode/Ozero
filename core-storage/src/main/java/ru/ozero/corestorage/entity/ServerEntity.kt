@@ -1,9 +1,16 @@
 package ru.ozero.corestorage.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "servers")
+@Entity(
+    tableName = "servers",
+    // Индексы для hot-path запросов: getLiveServers (WHERE isAlive),
+    // observeAll (ORDER BY priority). Без индексов — full-table scan,
+    // деградирует при тысячах серверов из harvester'а.
+    indices = [Index(value = ["isAlive"]), Index(value = ["priority"])],
+)
 data class ServerEntity(
     @PrimaryKey val id: String,
     val country: String,

@@ -47,6 +47,7 @@ class TorEngine(
     )
 
     @Volatile private var started: Boolean = false
+
     @Volatile private var activeSocksPort: Int = 0
     private val _stats = MutableStateFlow(EngineStats())
 

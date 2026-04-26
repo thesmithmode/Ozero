@@ -39,12 +39,12 @@
 }
 
 # ---------------------------------------------------------------------------
-# Anti-tamper: запрещаем переименование классов SecurityGuard и проверок —
-# атакующий должен явно знать, какой класс хукать. Если хотим чтобы они
-# тоже были obfuscated — комментим (рискуем сломать reflection из тестов).
+# Anti-tamper: SecurityGuard и ApkSignatureVerifier ОБФУСЦИРОВАНЫ полностью —
+# атакующий не может тривиально хукнуть Frida-скрипт по имени класса/метода.
+# Раньше -keep оставлял имена нетронутыми = бесплатный bypass всех проверок
+# (Frida скрипт `Java.use("ru.ozero.security.SecurityGuard").check.implementation = ...`).
+# Эти классы вызываются прямо из Kotlin-кода, рефлексия не нужна → R8 переименует.
 # ---------------------------------------------------------------------------
--keep class ru.ozero.security.SecurityGuard { *; }
--keep class ru.ozero.security.signature.ApkSignatureVerifier { *; }
 
 # ---------------------------------------------------------------------------
 # Hide source file names в стек-трейсах (затрудняет reverse engineering)

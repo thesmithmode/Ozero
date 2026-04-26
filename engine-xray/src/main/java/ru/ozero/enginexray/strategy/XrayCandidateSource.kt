@@ -87,8 +87,7 @@ class XrayCandidateSource(
         exitPairId: String,
         port: Int,
     ): Candidate? {
-        val transport = entry.transport.lowercase()
-        if (transport !in TRANSPORT_SAFE_2026 || entry.security.lowercase() != "reality") {
+        if (!entry.isSafe2026()) {
             Log.w(TAG, "пропуск double-hop entry — небезопасный transport/security")
             return null
         }
@@ -101,8 +100,7 @@ class XrayCandidateSource(
             Log.w(TAG, "double-hop exit не VLESS: ${exitEntity.protocol}")
             return null
         }
-        val exitTransport = exitParsed.server.transport.lowercase()
-        if (exitTransport !in TRANSPORT_SAFE_2026 || exitParsed.server.security.lowercase() != "reality") {
+        if (!exitParsed.server.isSafe2026()) {
             Log.w(TAG, "double-hop exit имеет небезопасный transport/security")
             return null
         }
@@ -115,18 +113,16 @@ class XrayCandidateSource(
     }
 
     private fun vlessCandidate(server: VlessServer, port: Int): Candidate? {
-        val transport = server.transport.lowercase()
-        if (transport !in TRANSPORT_SAFE_2026) {
-            Log.w(TAG, "пропуск VLESS — небезопасный transport=$transport")
-            return null
-        }
-        if (server.security.lowercase() != "reality") {
-            Log.w(TAG, "пропуск VLESS — security=${server.security} не Reality")
+        if (!server.isSafe2026()) {
+            Log.w(TAG, "пропуск VLESS — небезопасный transport=${server.transport}/security=${server.security}")
             return null
         }
         val json = runCatching { builder.build(server, port) }.getOrNull() ?: return null
         return Candidate(EngineId.XRAY, EngineConfig.Xray(json, port), Candidate.PRIORITY_XRAY_VLESS_REALITY)
     }
+
+    private fun VlessServer.isSafe2026(): Boolean =
+        transport.lowercase() in TRANSPORT_SAFE_2026 && security.lowercase() == "reality"
 
     companion object {
         const val DEFAULT_BASE_PORT = 10808

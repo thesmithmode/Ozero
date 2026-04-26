@@ -51,9 +51,11 @@ class AntiFridaCheckTest {
     }
 
     @Test
-    fun magiskDetected() {
-        val tainted = "7f00-7f01 r-xp 00 00 1 /sbin/.magisk/mirror/system/bin/sh"
-        assertTrue(check(tainted).isHookFrameworkPresent())
+    fun magiskNotDetected() {
+        // "magisk" исключён из SIGNATURES — root != hook framework, false-positive на легитимных
+        // Magisk-устройствах. Root-detection вынесен в отдельную политику.
+        val rooted = "7f00-7f01 r-xp 00 00 1 /sbin/.magisk/mirror/system/bin/sh"
+        assertFalse(check(rooted).isHookFrameworkPresent())
     }
 
     @Test

@@ -22,6 +22,9 @@ data class ReleaseInfo(
     fun semver(): Triple<Int, Int, Int>? = parseSemver(tag)
 
     fun isNewerThan(currentTag: String): Boolean {
+        // Pre-release не должен авто-устанавливаться в stable build: substringBefore('-')
+        // в parseSemver делал v2.0.0-rc1 эквивалентным v2.0.0, юзер silently получал rc-версию.
+        if (isPrerelease) return false
         val a = semver() ?: return false
         val b = parseSemver(currentTag) ?: return false
         return when {

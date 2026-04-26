@@ -47,8 +47,13 @@ class ApkSignatureVerifier(
             } else {
                 @Suppress("DEPRECATION")
                 val info = pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNATURES)
+
                 @Suppress("DEPRECATION")
-                info.signatures?.map { it.toByteArray() }
+                val sigs = info.signatures
+                // API 24-27: GET_SIGNATURES vulnerable к Janus / multi-signer bypass.
+                // Множественные signers = подозрительный паттерн (легитимный release одиночный).
+                // Fail-closed: считаем подпись невалидной если signers != 1.
+                if (sigs == null || sigs.size != 1) null else sigs.map { it.toByteArray() }
             }
         } catch (e: PackageManager.NameNotFoundException) {
             null

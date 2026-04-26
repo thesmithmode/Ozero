@@ -33,9 +33,7 @@ class CrashLogStore(
     fun directory(): File = dir.also { it.mkdirs() }
 
     /** Возвращает crash-файлы отсортированные от свежих к старым. */
-    fun list(): List<File> = dir.takeIf { it.exists() }
-        ?.listFiles()?.toList()?.sortedByDescending { it.lastModified() }
-        .orEmpty()
+    fun list(): List<File> = sortedFiles()
 
     fun write(thread: Thread, throwable: Throwable) {
         runCatching {
@@ -54,9 +52,12 @@ class CrashLogStore(
 
     /** Оставляет последние [MAX_FILES] crash-файлов, остальные удаляет. */
     private fun rotate() {
-        val files = dir.listFiles()?.sortedByDescending { it.lastModified() } ?: return
-        files.drop(MAX_FILES).forEach { runCatching { it.delete() } }
+        sortedFiles().drop(MAX_FILES).forEach { runCatching { it.delete() } }
     }
+
+    private fun sortedFiles(): List<File> = dir.takeIf { it.exists() }
+        ?.listFiles()?.sortedByDescending { it.lastModified() }
+        .orEmpty()
 
     companion object {
         const val DIR_NAME: String = "crashes"

@@ -76,8 +76,10 @@ class ApkUpdateVerifierTest {
     }
 
     private fun sign(privKey: ByteArray, message: ByteArray): ByteArray {
+        // ApkUpdateVerifier теперь использует verifyUpdate с domain prefix "ozero.update.v1:".
+        val prefixed = "ozero.update.v1:".toByteArray(Charsets.UTF_8) + message
         val signer = Ed25519Signer().apply { init(true, Ed25519PrivateKeyParameters(privKey, 0)) }
-        signer.update(message, 0, message.size)
+        signer.update(prefixed, 0, prefixed.size)
         return signer.generateSignature()
     }
 }
