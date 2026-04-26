@@ -123,7 +123,9 @@ dependencies {
 // E13.4: OWASP Dependency-Check конфигурация
 dependencyCheck {
     format = "ALL" // HTML + XML + JSON отчёты
-    failBuildOnCVSS = 11.0f // Не ломаем build по умолчанию, только аудит
+    // Падаем на HIGH и выше (CVSS >= 7.0). Раньше было 11.0f (выше максимума 10.0)
+    // = аудит был декоративным, никакой CVE не блокировал build.
+    failBuildOnCVSS = 7.0f
     suppressionFile = rootProject.file("owasp-suppressions.xml").takeIf { it.exists() }?.absolutePath
     nvd {
         // API ключ через переменную окружения NVD_API_KEY (из GH Secret)

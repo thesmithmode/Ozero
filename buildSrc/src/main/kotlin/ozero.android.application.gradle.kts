@@ -53,6 +53,9 @@ extensions.configure<BaseAppModuleExtension> {
                 storePassword = keystorePassword
                 this.keyAlias = keyAlias
                 this.keyPassword = keyPassword
+                // v1 (JAR signing) уязвим к Janus CVE-2017-13156 на API < 28.
+                // Отключаем явно, чтобы не зависеть от AGP-defaults.
+                enableV1Signing = false
                 enableV2Signing = true
                 enableV3Signing = true
             }
@@ -71,6 +74,22 @@ extensions.configure<BaseAppModuleExtension> {
             )
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
+            } else {
+                // CI/release-сборка ОБЯЗАНА быть подписана. Раньше неподписанный APK
+                // тихо собирался — теперь явный fail.
+                gradle.taskGraph.whenReady {
+                    val releaseTask = allTasks.find {
+                        it.name.contains("assembleRelease", ignoreCase = true) ||
+                            it.name.contains("bundleRelease", ignoreCase = true)
+                    }
+                    if (releaseTask != null) {
+                        throw GradleException(
+                            "Release build требует переменные окружения: " +
+                                "OZERO_KEYSTORE_PATH, OZERO_KEYSTORE_PASSWORD, " +
+                                "OZERO_KEY_ALIAS, OZERO_KEY_PASSWORD",
+                        )
+                    }
+                }
             }
         }
         debug {
@@ -135,6 +154,9 @@ extensions.configure<com.android.build.gradle.internal.dsl.BaseAppModuleExtensio
         abortOnError = true
         warningsAsErrors = false
         checkReleaseBuilds = true
-        disable += setOf("GradleDependency", "NewerVersionAvailable", "NewApi")
+        // NewApi не отключаем — иначе вызовы новых API на minSdk-устройствах
+        // упадут в рантайме без предупреждения. Отдельные места требующие
+        // новый API оборачивать @RequiresApi/Build.VERSION.SDK_INT-проверкой.
+        disable += setOf("GradleDependency", "NewerVersionAvailable")
     }
 }
