@@ -356,6 +356,10 @@ class SettingsViewModelTest {
         override suspend fun setManualEngine(engine: EngineId?) {
             manualEngineUpdates += engine
         }
+
+        override suspend fun setUrnetworkEnabled(enabled: Boolean) {}
+
+        override suspend fun setUrnetworkJwt(jwt: String?) {}
     }
 
     private class FakeSplitInstallClient(

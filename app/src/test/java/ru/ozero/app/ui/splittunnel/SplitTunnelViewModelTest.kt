@@ -160,5 +160,7 @@ class SplitTunnelViewModelTest {
         override suspend fun setAutoStart(enabled: Boolean) = Unit
 
         override suspend fun setManualEngine(engine: EngineId?) = Unit
+        override suspend fun setUrnetworkEnabled(enabled: Boolean) = Unit
+        override suspend fun setUrnetworkJwt(jwt: String?) = Unit
     }
 }

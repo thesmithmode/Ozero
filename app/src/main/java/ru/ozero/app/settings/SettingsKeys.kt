@@ -22,4 +22,10 @@ object SettingsKeys {
 
     // E16.3: timestamp последнего успешного probe (ms epoch). Re-probe раз в 24h.
     val BYDPI_LAST_PROBE_AT = androidx.datastore.preferences.core.longPreferencesKey("bydpi_last_probe_at")
+
+    // E15: URnetwork P2P fallback engine toggle (default: off до явного включения пользователем)
+    val URNETWORK_ENABLED = booleanPreferencesKey("urnetwork_enabled")
+
+    // E15: URnetwork JWT токен (от urnetwork.com аккаунта, null = не настроен)
+    val URNETWORK_JWT = stringPreferencesKey("urnetwork_jwt")
 }

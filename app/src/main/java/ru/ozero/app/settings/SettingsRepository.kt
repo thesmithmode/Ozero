@@ -19,6 +19,12 @@ interface SettingsRepository {
     suspend fun setAutoStart(enabled: Boolean)
 
     suspend fun setManualEngine(engine: EngineId?)
+
+    /** E15: включить/выключить URnetwork P2P fallback */
+    suspend fun setUrnetworkEnabled(enabled: Boolean)
+
+    /** E15: сохранить JWT токен URnetwork (null = очистить) */
+    suspend fun setUrnetworkJwt(jwt: String?)
 }
 
 class SettingsRepositoryImpl @Inject constructor(
@@ -52,11 +58,27 @@ class SettingsRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun setUrnetworkEnabled(enabled: Boolean) {
+        dataStore.edit { it[SettingsKeys.URNETWORK_ENABLED] = enabled }
+    }
+
+    override suspend fun setUrnetworkJwt(jwt: String?) {
+        dataStore.edit { prefs ->
+            if (jwt == null) {
+                prefs.remove(SettingsKeys.URNETWORK_JWT)
+            } else {
+                prefs[SettingsKeys.URNETWORK_JWT] = jwt
+            }
+        }
+    }
+
     private fun Preferences.toSettingsModel(): SettingsModel = SettingsModel(
         splitMode = readSplitMode(),
         ipv6Enabled = this[SettingsKeys.IPV6_ENABLED] ?: SettingsModel.DEFAULT_IPV6_ENABLED,
         autoStart = this[SettingsKeys.AUTO_START] ?: SettingsModel.DEFAULT_AUTO_START,
         manualEngine = readManualEngine(),
+        urnetworkEnabled = this[SettingsKeys.URNETWORK_ENABLED] ?: SettingsModel.DEFAULT_URNETWORK_ENABLED,
+        urnetworkJwt = this[SettingsKeys.URNETWORK_JWT],
     )
 
     private fun Preferences.readSplitMode(): SplitTunnelMode {
