@@ -42,12 +42,14 @@ import ru.ozero.coreapi.EngineId
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
+    onOpenAllowedApps: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     SettingsScreenContent(
         state = state,
         onBack = onBack,
+        onOpenAllowedApps = onOpenAllowedApps,
         onSplitModeChange = viewModel::onSplitModeChange,
         onIpv6Toggle = viewModel::onIpv6Toggle,
         onAutoStartToggle = viewModel::onAutoStartToggle,
@@ -60,6 +62,7 @@ fun SettingsScreen(
 fun SettingsScreenContent(
     state: SettingsUiState,
     onBack: () -> Unit,
+    onOpenAllowedApps: () -> Unit = {},
     onSplitModeChange: (SplitTunnelMode) -> Unit,
     onIpv6Toggle: (Boolean) -> Unit,
     onAutoStartToggle: (Boolean) -> Unit,
@@ -90,6 +93,7 @@ fun SettingsScreenContent(
                 ContentBody(
                     padding = padding,
                     model = state.model,
+                    onOpenAllowedApps = onOpenAllowedApps,
                     onSplitModeChange = onSplitModeChange,
                     onIpv6Toggle = onIpv6Toggle,
                     onAutoStartToggle = onAutoStartToggle,
@@ -116,6 +120,7 @@ private fun LoadingBody(padding: PaddingValues) {
 private fun ContentBody(
     padding: PaddingValues,
     model: SettingsModel,
+    onOpenAllowedApps: () -> Unit,
     onSplitModeChange: (SplitTunnelMode) -> Unit,
     onIpv6Toggle: (Boolean) -> Unit,
     onAutoStartToggle: (Boolean) -> Unit,
@@ -138,6 +143,7 @@ private fun ContentBody(
             NetworkSection(
                 ipv6Enabled = model.ipv6Enabled,
                 onIpv6Toggle = onIpv6Toggle,
+                onOpenAllowedApps = onOpenAllowedApps,
             )
         }
         item { SectionDivider() }
@@ -197,6 +203,7 @@ private fun ConnectionSection(
 private fun NetworkSection(
     ipv6Enabled: Boolean,
     onIpv6Toggle: (Boolean) -> Unit,
+    onOpenAllowedApps: () -> Unit,
 ) {
     SectionHeader(R.string.settings_section_network, SettingsTestTags.SECTION_NETWORK)
     SwitchRow(
@@ -208,10 +215,10 @@ private fun NetworkSection(
     )
     NavRow(
         title = stringResource(R.string.settings_allowed_apps_title),
-        summary = stringResource(R.string.settings_allowed_apps_summary),
+        summary = stringResource(R.string.settings_allowed_apps_open_summary),
         tag = SettingsTestTags.ALLOWED_APPS_ROW,
-        onClick = {},
-        enabled = false,
+        onClick = onOpenAllowedApps,
+        enabled = true,
     )
 }
 
