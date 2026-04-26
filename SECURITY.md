@@ -44,14 +44,17 @@
 ## Что in-scope
 
 - APK приложения (release и debug flavours)
-- Subscription backend (`sub.ozero.app`) — rate-limit abuse, YAML injection, подпись без валидации
 - Update channel (GitHub Releases) — supply chain, tampering
 - Native библиотеки (`.so` / `.aar`) — уязвимости анализа сборки (reproducibility break)
+- Bootstrap servers asset (`assets/bootstrap-servers.json`) — supply chain если кто-то закоммитит вредоносный URI
+- `PublicProxyHarvester` source-list (`assets/proxy-sources.json`) — DNS spoofing / MITM на public GitHub-репо
+- Парсер subscription URI — RCE через специально сформированный VLESS/Trojan URI
 
 ## Что out-of-scope
 
 - Уязвимости в upstream проектах (Xray, Tor, AmneziaWG и т.д.) — reportить в их соответствующие channels
 - Third-party серверы в пользовательских подписках (не наш scope)
+- ~~Subscription backend `sub.ozero.app`~~ — backend отсутствует (PLAN v4: server-less)
 - Device-level root attacks (game-over по threat model)
 - Social engineering пользователей
 

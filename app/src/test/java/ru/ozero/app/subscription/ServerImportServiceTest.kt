@@ -64,5 +64,8 @@ class ServerImportServiceTest {
             inserted.removeAll { it.id == id }
         }
         override suspend fun deleteAll() = inserted.clear()
+        override suspend fun setAlive(id: String, alive: Boolean, ts: Long) {
+            inserted.replaceAll { if (it.id == id) it.copy(isAlive = alive, lastCheckedAt = ts) else it }
+        }
     }
 }

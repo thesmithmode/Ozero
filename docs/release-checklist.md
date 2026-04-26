@@ -61,7 +61,7 @@ grep -r "ozero\|VLESS\|reality" /tmp/ozero-decompile/sources/ru/ozero/ | wc -l
 ### Network security
 
 - [ ] cleartext HTTP запросы блокируются (`usesCleartextTraffic="false"`)
-- [ ] Certificate pinning для `sub.ozero.app` — current + backup pin (RT.12.1)
+- [ ] (n/a в server-less архитектуре PLAN v4) ~~Certificate pinning для `sub.ozero.app`~~
 - [ ] User CA не доверяется (mitmproxy с пользовательским CA не работает)
 
 ### Permissions audit

@@ -75,7 +75,7 @@ Native-бинари (libxray.aar, libbyedpi.so, …) скачиваются ав
 
 - **GitHub Releases** — APK + SHA256 + Ed25519 signature (на каждый tag `v*.*.*`)
 - **F-Droid** — pending submission
-- **Веб**: `ozero.app` (pending)
+- **Веб**: GitHub Pages на этом репо (pending; собственный домен не планируется — server-less архитектура)
 - **Telegram**: канал анонсов + группа поддержки (pending)
 
 Google Play **не планируется** — censorship + блокировка VPN-приложений в политике.

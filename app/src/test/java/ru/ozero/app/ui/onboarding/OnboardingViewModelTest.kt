@@ -87,9 +87,9 @@ class OnboardingViewModelTest {
         }
     }
 
-    private class FakeBootstrap : FirstRunBootstrap() {
+    private class FakeBootstrap : FirstRunBootstrap {
         var invoked = false
-        override fun runIfFirstStart() {
+        override suspend fun runIfFirstStart() {
             invoked = true
         }
     }

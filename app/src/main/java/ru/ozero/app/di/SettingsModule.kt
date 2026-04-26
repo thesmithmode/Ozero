@@ -21,6 +21,8 @@ import ru.ozero.app.settings.SettingsRepository
 import ru.ozero.app.settings.SettingsRepositoryImpl
 import ru.ozero.app.settings.UserFlagsRepository
 import ru.ozero.app.settings.UserFlagsRepositoryImpl
+import ru.ozero.app.ui.onboarding.AssetsFirstRunBootstrap
+import ru.ozero.app.ui.onboarding.FirstRunBootstrap
 import javax.inject.Singleton
 
 @Module
@@ -53,4 +55,8 @@ abstract class SettingsModule {
     @Binds
     @Singleton
     abstract fun bindUserFlagsRepository(impl: UserFlagsRepositoryImpl): UserFlagsRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindFirstRunBootstrap(impl: AssetsFirstRunBootstrap): FirstRunBootstrap
 }

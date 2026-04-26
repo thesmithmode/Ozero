@@ -70,6 +70,11 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
+    // E16.1: WorkManager + Hilt-Work для periodic harvester job
+    implementation(libs.work.runtime.ktx)
+    implementation(libs.hilt.work)
+    ksp(libs.hilt.androidx.compiler)
+
     // DataStore — user preferences (Settings)
     implementation(libs.datastore.preferences)
 

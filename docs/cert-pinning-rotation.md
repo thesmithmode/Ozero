@@ -1,6 +1,12 @@
 # Cert Pinning Rotation Playbook (RT.12.1)
 
-> Действует для: `sub.ozero.app` (subscription distribution).
+> **Статус (PLAN v4, апрель 2026): не применяется в server-less архитектуре.**
+> Документ оставлен как playbook на случай возможного приватного backend в
+> будущем (private subscription для бета-каналов, например). Текущая архитектура
+> — server-less: source конфигов = публичные GitHub-репо (TLS GitHub),
+> self-update = GitHub Releases (TLS GitHub). Pinning GitHub'а — антипаттерн
+> (их CA rotation вне нашего контроля → brick).
+>
 > Конфиг: `app/src/main/res/xml/network_security_config.xml`.
 
 ## TL;DR
