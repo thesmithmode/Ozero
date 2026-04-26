@@ -33,7 +33,7 @@ class TorEngine(
     private val installer: DynamicTorInstaller,
     private val configBuilder: TorConfigBuilder = TorConfigBuilder(),
     private val bridges: List<TorBridge> = emptyList(),
-    private val buildOptions: TorBuildOptions = TorBuildOptions(),
+    private val buildOptions: TorBuildOptions,
 ) : Engine {
 
     override val id = EngineId.TOR
@@ -47,6 +47,7 @@ class TorEngine(
     )
 
     @Volatile private var started: Boolean = false
+    @Volatile private var activeSocksPort: Int = 0
     private val _stats = MutableStateFlow(EngineStats())
 
     override suspend fun start(config: EngineConfig): StartResult {
@@ -81,6 +82,7 @@ class TorEngine(
                 val code = delegate.startTor(torrc)
                 if (code == 0) {
                     started = true
+                    activeSocksPort = config.socksPort
                     StartResult.Success(socksPort = config.socksPort)
                 } else {
                     Log.e(TAG, "startTor код $code")
@@ -99,6 +101,7 @@ class TorEngine(
             runCatching { delegate.stopTor() }
                 .onFailure { Log.w(TAG, "stopTor исключение: ${it.message}") }
             started = false
+            activeSocksPort = 0
         }
     }
 
@@ -110,7 +113,7 @@ class TorEngine(
             return ProbeResult.Failure(reason = "tor не bootstrapped (${delegate.bootstrapPercent()}%)")
         }
         return try {
-            val latency = Socks5HandshakeProbe.probe("127.0.0.1", buildOptions.socksPort, timeoutMs = 5_000)
+            val latency = Socks5HandshakeProbe.probe("127.0.0.1", activeSocksPort, timeoutMs = 5_000)
             ProbeResult.Success(latencyMs = latency)
         } catch (e: Exception) {
             ProbeResult.Failure(reason = e.message ?: "connection refused")

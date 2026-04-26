@@ -3,6 +3,7 @@ package ru.ozero.app.di
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoMap
 import ru.ozero.app.di.stubs.StubLibAwgDelegate
@@ -95,7 +96,15 @@ object EngineModule {
     @IntoMap
     @EngineKey(EngineId.TOR)
     fun provideTorEngine(
+        @ApplicationContext context: android.content.Context,
         delegate: LibTorDelegate,
         installer: DynamicTorInstaller,
-    ): Engine = TorEngine(delegate = delegate, installer = installer)
+    ): Engine = TorEngine(
+        delegate = delegate,
+        installer = installer,
+        buildOptions = ru.ozero.enginetor.config.TorBuildOptions(
+            // dataDir в private app storage — protected от других приложений и rooted access
+            dataDir = java.io.File(context.filesDir, "tor").absolutePath,
+        ),
+    )
 }

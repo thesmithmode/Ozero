@@ -45,7 +45,13 @@ class TorBridgeUriParser {
         val fingerprint = params["fingerprint"]
             ?: return Result.failure(IllegalArgumentException("отсутствует fingerprint"))
 
-        val address = if (port == -1) host else "$host:$port"
+        // IPv6 hosts: java.net.URI.host возвращает значение БЕЗ квадратных скобок,
+        // но torrc требует [::1]:443. Распознаём IPv6 по наличию ':' в host.
+        val address = when {
+            port == -1 -> host
+            host.contains(':') -> "[$host]:$port"
+            else -> "$host:$port"
+        }
         val args = params.filterKeys { it != "fingerprint" }
 
         val remark = parsed.rawFragment

@@ -39,21 +39,19 @@ class NaiveEngine(
 
     override suspend fun start(config: EngineConfig): StartResult {
         require(config is EngineConfig.Naive) { "NaiveEngine требует EngineConfig.Naive" }
-        // EngineConfig.Naive хранит proxyUrl и socksPort — но NaiveEngine ожидает
-        // на вход уже собранный JSON-конфиг через Naive-specific обвязку. Поскольку
-        // упрощённый EngineConfig.Naive имеет только proxyUrl, кладём весь JSON в proxyUrl
-        // и парсим: если начинается с `{` — считаем конфигом, иначе строим обёртку.
-        val jsonConfig = if (config.proxyUrl.startsWith("{")) {
-            config.proxyUrl
-        } else {
-            JsonWriter.write(
-                linkedMapOf<String, Any?>(
-                    "listen" to "socks://127.0.0.1:${config.socksPort}",
-                    "proxy" to config.proxyUrl,
-                    "log" to "",
-                ),
-            )
+        // proxyUrl должен быть валидным URL (https://... / quic://...). Escape-hatch
+        // "если начинается с { — считать готовым JSON" удалён: атакующий мог передать
+        // произвольный JSON прямо в native CLI naiveproxy, минуя валидацию (host/user/pass).
+        require(!config.proxyUrl.trimStart().startsWith("{")) {
+            "proxyUrl не может быть JSON — используйте url-формат"
         }
+        val jsonConfig = JsonWriter.write(
+            linkedMapOf<String, Any?>(
+                "listen" to "socks://127.0.0.1:${config.socksPort}",
+                "proxy" to config.proxyUrl,
+                "log" to "",
+            ),
+        )
         if (jsonConfig.isBlank()) {
             Log.e(TAG, "start: пустой конфиг")
             return StartResult.Failure(reason = "конфиг пуст")
