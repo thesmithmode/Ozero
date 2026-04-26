@@ -58,10 +58,20 @@ class ProbeResult:
     error: str | None
 
 
+MAX_BODY_BYTES = 10 * 1024 * 1024  # 10 МБ — лимит против OOM от malicious source
+
+
 def fetch(url: str, timeout: float = 10.0) -> str:
+    parsed = urllib.parse.urlparse(url)
+    # SSRF guard: запрещаем file://, ftp://, gopher://, javascript: и пр.
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"disallowed URL scheme: {parsed.scheme}")
     req = urllib.request.Request(url, headers={"User-Agent": "ozero-harvest/1.0"})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.read().decode("utf-8", errors="replace")
+        body = resp.read(MAX_BODY_BYTES + 1)
+        if len(body) > MAX_BODY_BYTES:
+            raise ValueError(f"response too large (>{MAX_BODY_BYTES} bytes)")
+        return body.decode("utf-8", errors="replace")
 
 
 def parse_lines(body: str, fmt: str) -> list[str]:

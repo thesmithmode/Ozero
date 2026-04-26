@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
 
 OUT="${1:?Usage: keystore-gen.sh <out-dir>}"
 mkdir -p "$OUT"
@@ -17,17 +18,21 @@ KEY_PASS="$KS_PASS"
 
 KEYSTORE="$OUT/release.keystore"
 
+# Передаём пароли через env, не через -storepass/-keypass argv (видны в `ps aux`).
+export KS_PASS_ENV="$KS_PASS"
+export KEY_PASS_ENV="$KEY_PASS"
 keytool -genkey \
   -alias "$ALIAS" \
   -keyalg RSA \
   -keysize "$KEYSIZE" \
   -validity "$VALIDITY" \
   -keystore "$KEYSTORE" \
-  -storepass "$KS_PASS" \
-  -keypass "$KEY_PASS" \
+  -storepass:env KS_PASS_ENV \
+  -keypass:env KEY_PASS_ENV \
   -dname "$DNAME" \
   -storetype PKCS12 \
   -noprompt
+unset KS_PASS_ENV KEY_PASS_ENV
 
 chmod 600 "$KEYSTORE"
 

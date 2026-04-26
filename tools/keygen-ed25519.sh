@@ -11,6 +11,7 @@
 #   tools/keygen-ed25519.sh /tmp/ozero-keys
 #
 set -euo pipefail
+umask 077
 OUT="${1:-./out-keys}"
 mkdir -p "$OUT"
 PRIV="$OUT/private.pem"

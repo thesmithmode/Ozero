@@ -13,24 +13,33 @@ for f in "$PASS_FILE" "$GPG_PASS_FILE" "$PRIVATE_ASC" "$KEYSTORE"; do
   [[ -f "$f" ]] || { echo "Missing: $f"; exit 1; }
 done
 
-# Read passwords
-# shellcheck source=/dev/null
-source "$PASS_FILE"
+# Read passwords БЕЗ source: source выполняет произвольный shell-код из файла,
+# что = RCE если файл подделан. Парсим строки вида KEY=value через grep+cut.
+parse_kv() {
+  local key="$1"
+  grep -E "^${key}=" "$PASS_FILE" | head -n1 | cut -d= -f2-
+}
+KS_PASS="$(parse_kv KS_PASS)"
+KEY_PASS="$(parse_kv KEY_PASS)"
+KEY_ALIAS="$(parse_kv KEY_ALIAS)"
 GPG_PASS="$(cat "$GPG_PASS_FILE")"
+[[ -n "$KS_PASS" && -n "$KEY_PASS" && -n "$KEY_ALIAS" ]] || {
+  echo "Missing keys in $PASS_FILE"; exit 1
+}
 
 echo "Uploading secrets to $REPO..."
 
 # Keystore (base64-encoded)
 base64 -w0 "$KEYSTORE" | gh secret set RELEASE_KEYSTORE_BASE64 --repo "$REPO"
 
-# Keystore passwords
-gh secret set RELEASE_KEYSTORE_PASSWORD --repo "$REPO" --body "$KS_PASS"
-gh secret set RELEASE_KEY_ALIAS         --repo "$REPO" --body "$KEY_ALIAS"
-gh secret set RELEASE_KEY_PASSWORD      --repo "$REPO" --body "$KEY_PASS"
+# Keystore passwords — через stdin (--body передаёт через argv, видно в `ps aux`).
+printf '%s' "$KS_PASS"   | gh secret set RELEASE_KEYSTORE_PASSWORD --repo "$REPO"
+printf '%s' "$KEY_ALIAS" | gh secret set RELEASE_KEY_ALIAS         --repo "$REPO"
+printf '%s' "$KEY_PASS"  | gh secret set RELEASE_KEY_PASSWORD      --repo "$REPO"
 
 # GPG
 gh secret set RELEASE_GPG_PRIVATE_KEY --repo "$REPO" < "$PRIVATE_ASC"
-gh secret set RELEASE_GPG_PASSPHRASE  --repo "$REPO" --body "$GPG_PASS"
+printf '%s' "$GPG_PASS" | gh secret set RELEASE_GPG_PASSPHRASE  --repo "$REPO"
 
 echo "All 6 secrets uploaded."
 
