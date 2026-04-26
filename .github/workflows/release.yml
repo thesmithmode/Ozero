@@ -5,14 +5,16 @@ on:
     tags:
       - 'v*.*.*'
 
-permissions:
-  contents: write
+# Permissions на job-уровне — не глобально, чтобы не давать write-токен всем шагам.
+permissions: {}
 
 jobs:
   release:
     name: Build, sign, publish
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout code

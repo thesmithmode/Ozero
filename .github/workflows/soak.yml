@@ -55,8 +55,12 @@ jobs:
           REQUESTS_INPUT: ${{ github.event.inputs.requests }}
           API_LEVEL_INPUT: ${{ github.event.inputs.api-level }}
         run: |
-          echo "SOAK_REQUESTS=${REQUESTS_INPUT:-100}" >> "$GITHUB_ENV"
-          echo "SOAK_API_LEVEL=${API_LEVEL_INPUT:-33}" >> "$GITHUB_ENV"
+          REQUESTS="${REQUESTS_INPUT:-100}"
+          API_LEVEL="${API_LEVEL_INPUT:-33}"
+          if ! [[ "$REQUESTS" =~ ^[0-9]+$ ]]; then echo "::error::bad requests"; exit 1; fi
+          if ! [[ "$API_LEVEL" =~ ^[0-9]+$ ]]; then echo "::error::bad api-level"; exit 1; fi
+          echo "SOAK_REQUESTS=$REQUESTS" >> "$GITHUB_ENV"
+          echo "SOAK_API_LEVEL=$API_LEVEL" >> "$GITHUB_ENV"
 
       - name: Run soak on emulator
         uses: reactivecircus/android-emulator-runner@v2
