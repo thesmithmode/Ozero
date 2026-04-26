@@ -55,15 +55,24 @@ class XrayCandidateSource(
                 }
             }
             is ParsedServer.Hysteria2 -> {
-                val json = runCatching { builder.build(parsed.server, port) }.getOrNull() ?: return null
+                val json = runCatching { builder.build(parsed.server, port) }.getOrElse {
+                    Log.w(TAG, "пропуск Hy2 — ошибка конфига: ${it.message}")
+                    return null
+                }
                 Candidate(EngineId.XRAY, EngineConfig.Xray(json, port), Candidate.PRIORITY_XRAY_HYSTERIA2)
             }
             is ParsedServer.Trojan -> {
-                val json = runCatching { builder.build(parsed.server, port) }.getOrNull() ?: return null
+                val json = runCatching { builder.build(parsed.server, port) }.getOrElse {
+                    Log.w(TAG, "пропуск Trojan — ошибка конфига: ${it.message}")
+                    return null
+                }
                 Candidate(EngineId.XRAY, EngineConfig.Xray(json, port), Candidate.PRIORITY_XRAY_TROJAN)
             }
             is ParsedServer.Shadowsocks -> {
-                val json = runCatching { builder.build(parsed.server, port) }.getOrNull() ?: return null
+                val json = runCatching { builder.build(parsed.server, port) }.getOrElse {
+                    Log.w(TAG, "пропуск SS — ошибка конфига: ${it.message}")
+                    return null
+                }
                 Candidate(EngineId.XRAY, EngineConfig.Xray(json, port), Candidate.PRIORITY_XRAY_SHADOWSOCKS)
             }
             is ParsedServer.Error -> {

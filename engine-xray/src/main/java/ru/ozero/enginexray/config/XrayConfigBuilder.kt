@@ -142,7 +142,7 @@ class XrayConfigBuilder {
             "reality" -> {
                 stream["realitySettings"] = linkedMapOf<String, Any?>(
                     "show" to false,
-                    "fingerprint" to (s.fingerprint ?: "chrome"),
+                    "fingerprint" to validateFingerprint(s.fingerprint),
                     "serverName" to (s.sni ?: s.host),
                     "publicKey" to (s.publicKey ?: ""),
                     "shortId" to (s.shortId ?: ""),
@@ -152,7 +152,7 @@ class XrayConfigBuilder {
             "tls" -> {
                 stream["tlsSettings"] = linkedMapOf<String, Any?>(
                     "serverName" to (s.sni ?: s.host),
-                    "fingerprint" to (s.fingerprint ?: "chrome"),
+                    "fingerprint" to validateFingerprint(s.fingerprint),
                     "allowInsecure" to false,
                 )
             }
@@ -259,8 +259,18 @@ class XrayConfigBuilder {
         ),
     )
 
+    private fun validateFingerprint(fp: String?): String {
+        // Поддерживаемые Xray uTLS fingerprints. Невалидное значение → Xray молча падает,
+        // поэтому при пустом/неизвестном — fallback "chrome" (наиболее ходовой).
+        val normalized = fp?.lowercase()?.takeIf { it.isNotBlank() } ?: return "chrome"
+        return if (normalized in VALID_FINGERPRINTS) normalized else "chrome"
+    }
+
     private companion object {
-        const val TAG_ENTRY = "proxy"
+        val VALID_FINGERPRINTS = setOf(
+            "chrome", "firefox", "safari", "ios", "android", "edge", "qq", "random", "randomized",
+        )
+        const val TAG_ENTRY = "entry-proxy"
         const val TAG_EXIT = "exit-proxy"
     }
 }
