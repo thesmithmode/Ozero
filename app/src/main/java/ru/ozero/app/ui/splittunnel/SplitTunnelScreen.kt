@@ -1,5 +1,6 @@
 package ru.ozero.app.ui.splittunnel
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,6 +45,7 @@ fun SplitTunnelScreen(
     viewModel: SplitTunnelViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    BackHandler(onBack = onBack)
     SplitTunnelScreenContent(
         state = state,
         onBack = onBack,

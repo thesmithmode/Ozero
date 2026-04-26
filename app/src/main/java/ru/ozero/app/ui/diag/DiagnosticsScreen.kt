@@ -1,6 +1,13 @@
 package ru.ozero.app.ui.diag
 
+import android.content.Intent
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
+import android.widget.Toast
+import ru.ozero.app.data.CrashLogStore
+import java.io.File
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -39,6 +46,7 @@ fun DiagnosticsScreen(
     viewModel: DiagnosticsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    BackHandler(onBack = onBack)
     DiagnosticsScreenContent(
         state = state,
         onBack = onBack,
@@ -105,6 +113,7 @@ private fun IdleBody(
     padding: PaddingValues,
     onRun: () -> Unit,
 ) {
+    val context = LocalContext.current
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -126,7 +135,40 @@ private fun IdleBody(
         ) {
             Text(stringResource(R.string.diag_run))
         }
+        OutlinedButton(
+            onClick = {
+                exportCrashLog(context)
+            },
+            modifier = Modifier
+                .padding(top = 16.dp)
+                .testTag("diag_export_crashes"),
+        ) {
+            Text(stringResource(R.string.diag_export_crashes))
+        }
     }
+}
+
+/**
+ * RT.11.1: ACTION_SEND_MULTIPLE crash-файлов через FileProvider.
+ * Пользователь выбирает приложение для отправки (email, мессенджер, файлы).
+ */
+private fun exportCrashLog(context: android.content.Context) {
+    val crashesDir = File(context.filesDir, CrashLogStore.DIR_NAME)
+    val files = crashesDir.takeIf { it.exists() }?.listFiles()?.toList().orEmpty()
+    if (files.isEmpty()) {
+        Toast.makeText(context, R.string.diag_export_no_crashes, Toast.LENGTH_SHORT).show()
+        return
+    }
+    val authority = "${context.packageName}.fileprovider"
+    val uris = ArrayList<android.net.Uri>(
+        files.map { FileProvider.getUriForFile(context, authority, it) },
+    )
+    val send = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+        type = "text/plain"
+        putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(send, null))
 }
 
 @Composable

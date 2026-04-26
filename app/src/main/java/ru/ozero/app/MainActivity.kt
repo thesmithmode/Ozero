@@ -1,9 +1,14 @@
 package ru.ozero.app
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.net.VpnService
+import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -22,20 +27,40 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import ru.ozero.app.selfupdate.UpdateInstallEvent
 import ru.ozero.app.selfupdate.UpdateInstallEventBus
+import ru.ozero.app.settings.UserFlagsRepository
+import ru.ozero.app.subscription.ServerImportService
+import android.widget.Toast
 import ru.ozero.app.ui.MainScreen
 import ru.ozero.app.ui.MainViewModel
+import ru.ozero.app.ui.about.AboutScreen
 import ru.ozero.app.ui.diag.DiagnosticsScreen
+import ru.ozero.app.ui.onboarding.OnboardingScreen
+import ru.ozero.app.ui.permission.BatteryOptimization
 import ru.ozero.app.ui.servers.ServersScreen
 import ru.ozero.app.ui.settings.SettingsScreen
 import ru.ozero.app.ui.splittunnel.SplitTunnelScreen
 import ru.ozero.app.ui.theme.OzeroTheme
 import ru.ozero.commonvpn.OzeroVpnService
+import javax.inject.Inject
 
-enum class TopScreen { Main, Settings, Diagnostics, SplitTunnel, Servers }
+enum class TopScreen { Main, Settings, Diagnostics, SplitTunnel, Servers, About }
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
+
+    @Inject lateinit var userFlags: UserFlagsRepository
+
+    @Inject lateinit var serverImporter: ServerImportService
+
+    /**
+     * RT.7.3: launcher для system-диалога Doze whitelist'а. Result не обрабатываем —
+     * флаг batteryPromptShown ставится при показе, не при результате (UX: один раз).
+     */
+    private val batteryPromptLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            Log.i(TAG, "battery prompt result code=${result.resultCode}")
+        }
 
     /**
      * RT.6.1: запуск system-confirm-dialog'а PackageInstaller'а на Android 12+.
@@ -64,8 +89,26 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         observeSelfUpdateEvents()
+        handleSubscriptionIntent(intent)
         setContent {
             OzeroTheme {
+                // RT.9: gate. Пока флаг не прочитан — пустой экран (DataStore миллисекундно).
+                var checked by androidx.compose.runtime.remember {
+                    androidx.compose.runtime.mutableStateOf(false)
+                }
+                var showOnboarding by androidx.compose.runtime.remember {
+                    androidx.compose.runtime.mutableStateOf(false)
+                }
+                androidx.compose.runtime.LaunchedEffect(Unit) {
+                    val completed = userFlags.isOnboardingCompleted()
+                    showOnboarding = !completed
+                    checked = true
+                }
+                if (!checked) return@OzeroTheme
+                if (showOnboarding) {
+                    OnboardingScreen(onCompleted = { showOnboarding = false })
+                    return@OzeroTheme
+                }
                 var screen by rememberSaveable { mutableStateOf(TopScreen.Main) }
                 when (screen) {
                     TopScreen.Settings ->
@@ -73,6 +116,7 @@ class MainActivity : ComponentActivity() {
                             onBack = { screen = TopScreen.Main },
                             onOpenAllowedApps = { screen = TopScreen.SplitTunnel },
                             onOpenServers = { screen = TopScreen.Servers },
+                            onOpenAbout = { screen = TopScreen.About },
                         )
                     TopScreen.Diagnostics ->
                         DiagnosticsScreen(onBack = { screen = TopScreen.Main })
@@ -80,6 +124,8 @@ class MainActivity : ComponentActivity() {
                         SplitTunnelScreen(onBack = { screen = TopScreen.Settings })
                     TopScreen.Servers ->
                         ServersScreen(onBack = { screen = TopScreen.Settings })
+                    TopScreen.About ->
+                        AboutScreen(onBack = { screen = TopScreen.Settings })
                     TopScreen.Main ->
                         MainScreen(
                             viewModel = viewModel,
@@ -105,12 +151,89 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleSubscriptionIntent(intent)
+    }
+
+    /**
+     * RT.8.1/8.2: ловим VIEW (deeplink) и SEND (share text/plain) → достаём URI →
+     * ServerImportService → toast с результатом.
+     */
+    private fun handleSubscriptionIntent(intent: Intent?) {
+        if (intent == null) return
+        val raw: String? = when (intent.action) {
+            Intent.ACTION_VIEW -> intent.dataString
+            Intent.ACTION_SEND ->
+                if (intent.type == "text/plain") {
+                    intent.getStringExtra(Intent.EXTRA_TEXT)
+                } else {
+                    null
+                }
+            else -> null
+        }
+        if (raw.isNullOrBlank()) return
+        Log.i(TAG, "subscription intent action=${intent.action}")
+        lifecycleScope.launch {
+            when (val result = serverImporter.import(raw)) {
+                is ServerImportService.ImportResult.Ok ->
+                    Toast.makeText(
+                        this@MainActivity,
+                        getString(R.string.import_ok, result.entity.protocol),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+
+                is ServerImportService.ImportResult.Error ->
+                    Toast.makeText(
+                        this@MainActivity,
+                        getString(R.string.import_error, result.reason),
+                        Toast.LENGTH_LONG,
+                    ).show()
+            }
+        }
+    }
+
     private fun startVpnService() {
         startService(
             Intent(this, OzeroVpnService::class.java).apply {
                 action = OzeroVpnService.ACTION_START
             },
         )
+        maybeShowBatteryPrompt()
+    }
+
+    /**
+     * RT.7.3: после первого включения VPN — опционально предложить whitelist от Doze.
+     * Не блокирует подключение. Показывается ровно один раз (флаг в DataStore).
+     */
+    private fun maybeShowBatteryPrompt() {
+        lifecycleScope.launch {
+            val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return@launch
+            val isIgnoring = if (Build.VERSION.SDK_INT >= BatteryOptimization.MIN_SDK) {
+                pm.isIgnoringBatteryOptimizations(packageName)
+            } else {
+                true
+            }
+            val alreadyShown = userFlags.isBatteryPromptShown()
+            val state = BatteryOptimization.resolve(
+                sdkInt = Build.VERSION.SDK_INT,
+                isIgnoring = isIgnoring,
+                alreadyShown = alreadyShown,
+            )
+            if (state == BatteryOptimization.State.NeedsPrompt) {
+                userFlags.markBatteryPromptShown()
+                runCatching {
+                    @Suppress("BatteryLife")
+                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                        data = Uri.parse("package:$packageName")
+                    }
+                    batteryPromptLauncher.launch(intent)
+                }.onFailure { Log.w(TAG, "battery prompt launch failed", it) }
+            } else {
+                Log.i(TAG, "battery prompt skipped state=$state")
+            }
+        }
     }
 
     private fun observeSelfUpdateEvents() {

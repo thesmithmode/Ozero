@@ -1,5 +1,6 @@
 package ru.ozero.app.ui.servers
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,6 +46,7 @@ fun ServersScreen(
     viewModel: ServersViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    BackHandler(onBack = onBack)
     ServersScreenContent(
         state = state,
         onBack = onBack,
