@@ -3,6 +3,7 @@ package ru.ozero.app.subscription
 import android.content.Context
 import android.util.Log
 import androidx.hilt.work.HiltWorker
+import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -63,6 +64,9 @@ class HarvestWorker @AssistedInject constructor(
                 .setConstraints(
                     Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build(),
                 )
+                // Backoff 5 минут экспонента — иначе при сетевой деградации воркер
+                // ретраит каждые 30 секунд (default) → лишний расход батареи и трафика.
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 5L, TimeUnit.MINUTES)
                 .build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 NAME,

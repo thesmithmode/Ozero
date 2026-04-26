@@ -32,7 +32,10 @@ class CrashLogStore(
 
     fun directory(): File = dir.also { it.mkdirs() }
 
-    fun list(): List<File> = dir.takeIf { it.exists() }?.listFiles()?.toList().orEmpty()
+    /** Возвращает crash-файлы отсортированные от свежих к старым. */
+    fun list(): List<File> = dir.takeIf { it.exists() }
+        ?.listFiles()?.toList()?.sortedByDescending { it.lastModified() }
+        .orEmpty()
 
     fun write(thread: Thread, throwable: Throwable) {
         runCatching {
@@ -45,11 +48,19 @@ class CrashLogStore(
             PrintWriter(sw).use { throwable.printStackTrace(it) }
             file.writeText(sw.toString())
             Log.e(TAG, "crash → ${file.absolutePath}")
+            rotate()
         }.onFailure { Log.w(TAG, "crash write failed", it) }
+    }
+
+    /** Оставляет последние [MAX_FILES] crash-файлов, остальные удаляет. */
+    private fun rotate() {
+        val files = dir.listFiles()?.sortedByDescending { it.lastModified() } ?: return
+        files.drop(MAX_FILES).forEach { runCatching { it.delete() } }
     }
 
     companion object {
         const val DIR_NAME: String = "crashes"
         const val TAG: String = "CrashLogStore"
+        const val MAX_FILES: Int = 10
     }
 }
