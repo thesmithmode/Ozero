@@ -43,6 +43,7 @@ import ru.ozero.coreapi.EngineId
 fun SettingsScreen(
     onBack: () -> Unit,
     onOpenAllowedApps: () -> Unit,
+    onOpenServers: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -50,6 +51,7 @@ fun SettingsScreen(
         state = state,
         onBack = onBack,
         onOpenAllowedApps = onOpenAllowedApps,
+        onOpenServers = onOpenServers,
         onSplitModeChange = viewModel::onSplitModeChange,
         onIpv6Toggle = viewModel::onIpv6Toggle,
         onAutoStartToggle = viewModel::onAutoStartToggle,
@@ -63,6 +65,7 @@ fun SettingsScreenContent(
     state: SettingsUiState,
     onBack: () -> Unit,
     onOpenAllowedApps: () -> Unit = {},
+    onOpenServers: () -> Unit = {},
     onSplitModeChange: (SplitTunnelMode) -> Unit,
     onIpv6Toggle: (Boolean) -> Unit,
     onAutoStartToggle: (Boolean) -> Unit,
@@ -94,6 +97,7 @@ fun SettingsScreenContent(
                     padding = padding,
                     model = state.model,
                     onOpenAllowedApps = onOpenAllowedApps,
+                    onOpenServers = onOpenServers,
                     onSplitModeChange = onSplitModeChange,
                     onIpv6Toggle = onIpv6Toggle,
                     onAutoStartToggle = onAutoStartToggle,
@@ -121,6 +125,7 @@ private fun ContentBody(
     padding: PaddingValues,
     model: SettingsModel,
     onOpenAllowedApps: () -> Unit,
+    onOpenServers: () -> Unit,
     onSplitModeChange: (SplitTunnelMode) -> Unit,
     onIpv6Toggle: (Boolean) -> Unit,
     onAutoStartToggle: (Boolean) -> Unit,
@@ -136,6 +141,7 @@ private fun ContentBody(
                 manualEngine = model.manualEngine,
                 onSplitModeChange = onSplitModeChange,
                 onManualEngineSelect = onManualEngineSelect,
+                onOpenServers = onOpenServers,
             )
         }
         item { SectionDivider() }
@@ -166,6 +172,7 @@ private fun ConnectionSection(
     manualEngine: EngineId?,
     onSplitModeChange: (SplitTunnelMode) -> Unit,
     onManualEngineSelect: (EngineId?) -> Unit,
+    onOpenServers: () -> Unit,
 ) {
     SectionHeader(R.string.settings_section_connection, SettingsTestTags.SECTION_CONNECTION)
     SubsectionLabel(stringResource(R.string.settings_split_mode_label))
@@ -197,6 +204,13 @@ private fun ConnectionSection(
             onClick = { onManualEngineSelect(engine) },
         )
     }
+    NavRow(
+        title = stringResource(R.string.settings_servers_title),
+        summary = stringResource(R.string.settings_servers_summary),
+        tag = SettingsTestTags.SERVERS_ROW,
+        onClick = onOpenServers,
+        enabled = true,
+    )
 }
 
 @Composable

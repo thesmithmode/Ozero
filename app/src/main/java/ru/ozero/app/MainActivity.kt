@@ -16,12 +16,13 @@ import dagger.hilt.android.AndroidEntryPoint
 import ru.ozero.app.ui.MainScreen
 import ru.ozero.app.ui.MainViewModel
 import ru.ozero.app.ui.diag.DiagnosticsScreen
+import ru.ozero.app.ui.servers.ServersScreen
 import ru.ozero.app.ui.settings.SettingsScreen
 import ru.ozero.app.ui.splittunnel.SplitTunnelScreen
 import ru.ozero.app.ui.theme.OzeroTheme
 import ru.ozero.commonvpn.OzeroVpnService
 
-enum class TopScreen { Main, Settings, Diagnostics, SplitTunnel }
+enum class TopScreen { Main, Settings, Diagnostics, SplitTunnel, Servers }
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -50,11 +51,14 @@ class MainActivity : ComponentActivity() {
                         SettingsScreen(
                             onBack = { screen = TopScreen.Main },
                             onOpenAllowedApps = { screen = TopScreen.SplitTunnel },
+                            onOpenServers = { screen = TopScreen.Servers },
                         )
                     TopScreen.Diagnostics ->
                         DiagnosticsScreen(onBack = { screen = TopScreen.Main })
                     TopScreen.SplitTunnel ->
                         SplitTunnelScreen(onBack = { screen = TopScreen.Settings })
+                    TopScreen.Servers ->
+                        ServersScreen(onBack = { screen = TopScreen.Settings })
                     TopScreen.Main ->
                         MainScreen(
                             viewModel = viewModel,
