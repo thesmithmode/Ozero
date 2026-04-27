@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
@@ -51,6 +52,8 @@ class OzeroVpnService : android.net.VpnService() {
         private const val SESSION_NAME = "Ozero"
         private const val TAG = "OzeroVpnService"
         private const val PIPELINE_START_TIMEOUT_MS = 30_000L
+        private const val SHUTDOWN_TIMEOUT_MS = 3_000L
+        private const val SHUTDOWN_JOIN_TIMEOUT_MS = 3_500L
     }
 
     private var tunFd: ParcelFileDescriptor? = null
@@ -80,7 +83,17 @@ class OzeroVpnService : android.net.VpnService() {
         Log.i(TAG, "startVpn")
         // Foreground запускаем СРАЗУ — Android 8+ имеет 5-секундный deadline,
         // pipeline.start (probe + engine.start) может превысить его.
-        startForeground(NOTIFICATION_ID, buildNotification())
+        // Android 14+ (API 34): startForeground обязан получить тип FGS,
+        // совпадающий с manifest. Для VPN — specialUse + meta-data subtype=vpn.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(
+                NOTIFICATION_ID,
+                buildNotification(),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, buildNotification())
+        }
         val fd = buildTunBuilder().establish()
         if (fd == null) {
             Log.e(TAG, "TUN не установлен — VpnService.prepare не выдан?")
@@ -185,9 +198,22 @@ class OzeroVpnService : android.net.VpnService() {
         // остановлен ДО закрытия fd. Пропускаем если stopVpn() уже инициировал stop —
         // CAS guard защищает от double-stop pipeline.stop (UB в нативном hev-tunnel).
         if (stopping.compareAndSet(false, true)) {
-            runCatching {
-                runBlocking { pipeline.stop() }
-            }.onFailure { Log.w(TAG, "pipeline.stop in onDestroy threw", it) }
+            // Не используем runBlocking на Main thread (ANR). Запускаем shutdown на
+            // отдельном потоке и ждём строго ограниченное время — после этого fd
+            // закрываем в любом случае, чтобы система не держала TUN-интерфейс
+            // (иначе следующий VPN на устройстве не может подняться).
+            val shutdown = Thread({
+                runBlocking {
+                    runCatching {
+                        withTimeoutOrNull(SHUTDOWN_TIMEOUT_MS) { pipeline.stop() }
+                    }.onFailure { Log.w(TAG, "pipeline.stop in onDestroy threw", it) }
+                }
+            }, "OzeroVpn-shutdown")
+            shutdown.start()
+            shutdown.join(SHUTDOWN_JOIN_TIMEOUT_MS)
+            if (shutdown.isAlive) {
+                Log.w(TAG, "pipeline.stop не завершилась за ${SHUTDOWN_JOIN_TIMEOUT_MS}ms — продолжаем cleanup")
+            }
         }
         serviceScope.cancel()
         tunFd?.close()

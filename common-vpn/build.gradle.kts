@@ -6,6 +6,15 @@ plugins {
 
 android {
     namespace = "ru.ozero.commonvpn"
+
+    defaultConfig {
+        // libhev-socks5-tunnel.so собирается в release.yml workflow и кладётся
+        // в src/main/jniLibs/<abi>/. AGP пакует jniLibs автоматически. Список
+        // ABI должен совпадать с теми, под которые собирается .so в CI.
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+        }
+    }
 }
 
 dependencies {
