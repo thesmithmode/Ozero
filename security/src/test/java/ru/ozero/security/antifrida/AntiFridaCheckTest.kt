@@ -9,7 +9,10 @@ import kotlin.test.assertTrue
 class AntiFridaCheckTest {
 
     private fun check(maps: String?) = AntiFridaCheck(
-        reader = ProcMapsReader { block -> block(maps?.lineSequence() ?: emptySequence()) },
+        reader = object : ProcMapsReader {
+            override fun <R> useLines(block: (Sequence<String>) -> R): R =
+                block(maps?.lineSequence() ?: emptySequence())
+        },
     )
 
     @Test
