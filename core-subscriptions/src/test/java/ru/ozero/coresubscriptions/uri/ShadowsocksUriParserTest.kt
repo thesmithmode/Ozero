@@ -22,7 +22,7 @@ class ShadowsocksUriParserTest {
 
     @Test
     fun parsesBase64Uri() {
-                val uri = "ss://YWVzLTI1Ni1nY206c2VjcmV0cGFzcw==@host.io:8388#Remark"
+        val uri = "ss://YWVzLTI1Ni1nY206c2VjcmV0cGFzcw==@host.io:8388#Remark"
         val result = parser.parse(uri)
         assertIs<UriParseResult.Ok<ShadowsocksServer>>(result)
         assertEquals("aes-256-gcm", result.server.method)

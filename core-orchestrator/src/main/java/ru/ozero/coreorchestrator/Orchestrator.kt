@@ -11,7 +11,7 @@ class Orchestrator {
     val state: StateFlow<OrchestratorState> = _state.asStateFlow()
 
     fun dispatch(transition: OrchestratorTransition) {
-                        while (true) {
+        while (true) {
             val current = _state.value
             val next = reduce(current, transition)
             if (_state.compareAndSet(current, next)) {
@@ -24,7 +24,7 @@ class Orchestrator {
         }
     }
 
-        @Suppress("CyclomaticComplexMethod")
+    @Suppress("CyclomaticComplexMethod")
     private fun reduce(
         state: OrchestratorState,
         transition: OrchestratorTransition,
@@ -69,10 +69,10 @@ class Orchestrator {
             state is OrchestratorState.Disconnecting && transition is OrchestratorTransition.DisconnectComplete ->
                 OrchestratorState.Idle
 
-                                    state is OrchestratorState.Switching && transition is OrchestratorTransition.ConnectFailed ->
+            state is OrchestratorState.Switching && transition is OrchestratorTransition.ConnectFailed ->
                 OrchestratorState.Failed(transition.engineId, transition.reason)
 
-                                    state is OrchestratorState.Disconnecting && transition is OrchestratorTransition.Disconnect -> state
+            state is OrchestratorState.Disconnecting && transition is OrchestratorTransition.Disconnect -> state
             state is OrchestratorState.Idle && transition is OrchestratorTransition.Disconnect -> state
 
             else -> {

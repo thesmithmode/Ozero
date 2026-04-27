@@ -9,7 +9,7 @@ class AwgConfigBuilder {
         require(server.publicKey.isNotBlank()) { "PublicKey пустой" }
         require(server.jmin <= server.jmax) { "Jmin (${server.jmin}) > Jmax (${server.jmax})" }
 
-                                fun assertNoCrlf(value: String, name: String) {
+        fun assertNoCrlf(value: String, name: String) {
             require('\n' !in value && '\r' !in value) { "$name содержит CR/LF (INI-injection?)" }
         }
         assertNoCrlf(server.privateKey, "PrivateKey")

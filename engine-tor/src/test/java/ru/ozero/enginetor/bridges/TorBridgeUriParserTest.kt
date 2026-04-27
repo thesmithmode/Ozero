@@ -80,7 +80,7 @@ class TorBridgeUriParserTest {
     @Test
     fun argsSortedDeterministically() {
         val a = parser.parse("bridge://obfs4@h:443?fingerprint=F&z=1&a=2&m=3").getOrThrow()
-                val keys = a.args.keys.toList()
+        val keys = a.args.keys.toList()
         assertEquals(listOf("a", "m", "z"), keys)
     }
 }

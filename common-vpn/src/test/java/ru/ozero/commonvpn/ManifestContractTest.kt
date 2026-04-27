@@ -17,12 +17,12 @@ class ManifestContractTest {
 
     @Test
     fun `OzeroVpnService объявлен с foregroundServiceType specialUse или systemExempted`() {
-                                        val regex = Regex(
+        val regex = Regex(
             "<service[^>]*android:name=\"\\.OzeroVpnService\"[^>]*android:foregroundServiceType=\"([^\"]+)\"",
             RegexOption.DOT_MATCHES_ALL,
         )
         val match = regex.find(manifest)
-                val match2 = if (match == null) {
+        val match2 = if (match == null) {
             Regex(
                 "<service[^>]*android:foregroundServiceType=\"([^\"]+)\"[^>]*android:name=\"\\.OzeroVpnService\"",
                 RegexOption.DOT_MATCHES_ALL,
@@ -42,7 +42,7 @@ class ManifestContractTest {
     @Test
     fun `при specialUse есть meta-data subtype=vpn`() {
         if (!manifest.contains("foregroundServiceType=\"specialUse\"")) return
-                assertTrue(
+        assertTrue(
             manifest.contains("PROPERTY_SPECIAL_USE_FGS_SUBTYPE"),
             "При foregroundServiceType=\"specialUse\" требуется <property name=" +
                 "\"android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE\" value=\"vpn\"/>.",
@@ -51,7 +51,7 @@ class ManifestContractTest {
 
     @Test
     fun `BIND_VPN_SERVICE permission объявлен`() {
-                assertTrue(
+        assertTrue(
             manifest.contains("android.permission.BIND_VPN_SERVICE"),
             "VpnService должен иметь android:permission=\"android.permission.BIND_VPN_SERVICE\".",
         )
@@ -68,7 +68,7 @@ class ManifestContractTest {
 
     @Test
     fun `FOREGROUND_SERVICE_CONNECTED_DEVICE permission НЕ объявлен`() {
-                        assertEquals(
+        assertEquals(
             false,
             manifest.contains("FOREGROUND_SERVICE_CONNECTED_DEVICE"),
             "FOREGROUND_SERVICE_CONNECTED_DEVICE permission парный к connectedDevice типу — не нужен для VPN.",

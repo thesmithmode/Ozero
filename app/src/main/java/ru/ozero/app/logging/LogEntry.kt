@@ -8,7 +8,7 @@ enum class LogLevel(val short: Char) {
     ERROR('E');
 
     companion object {
-                fun fromShort(c: Char): LogLevel = when (c) {
+        fun fromShort(c: Char): LogLevel = when (c) {
             'V' -> TRACE
             'D' -> DEBUG
             'I' -> INFO

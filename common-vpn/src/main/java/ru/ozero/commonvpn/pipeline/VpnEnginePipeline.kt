@@ -21,7 +21,7 @@ class VpnEnginePipeline(
     private val socksHost: String = DEFAULT_SOCKS_HOST,
 ) {
 
-        @Volatile private var currentEngine: Engine? = null
+    @Volatile private var currentEngine: Engine? = null
 
     sealed class Result {
         data class Connected(val engineId: EngineId, val socksPort: Int) : Result()
@@ -37,7 +37,7 @@ class VpnEnginePipeline(
         val winner = pickWinner()
         if (winner == null) {
             Log.w(TAG, "no candidates with successful probe")
-                        orchestrator.dispatch(OrchestratorTransition.Disconnect)
+            orchestrator.dispatch(OrchestratorTransition.Disconnect)
             orchestrator.dispatch(OrchestratorTransition.DisconnectComplete)
             return Result.NoCandidates
         }
@@ -61,7 +61,7 @@ class VpnEnginePipeline(
         }
         currentEngine = null
         tunnelController.reset()
-                        if (orchestrator.state.value !is OrchestratorState.Idle) {
+        if (orchestrator.state.value !is OrchestratorState.Idle) {
             orchestrator.dispatch(OrchestratorTransition.Disconnect)
             orchestrator.dispatch(OrchestratorTransition.DisconnectComplete)
         }

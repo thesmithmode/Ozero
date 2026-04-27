@@ -32,9 +32,9 @@ class LogcatReader(private val buffer: LogBuffer) {
         scope.cancel()
     }
 
-        fun clearAll() {
+    fun clearAll() {
         runCatching {
-                        ProcessBuilder("logcat", "-c").redirectErrorStream(true).start().waitFor()
+            ProcessBuilder("logcat", "-c").redirectErrorStream(true).start().waitFor()
         }.onFailure { Log.w(TAG, "logcat -c failed", it) }
         buffer.clear()
     }

@@ -19,7 +19,7 @@ class ByeDpiStrategyGenerator(
         return null
     }
 
-        fun defaultStrategy(): ByeDpiStrategy = ByeDpiStrategy(DesyncMethod.SPLIT, splitAt = 1)
+    fun defaultStrategy(): ByeDpiStrategy = ByeDpiStrategy(DesyncMethod.SPLIT, splitAt = 1)
 
     private companion object {
         const val TAG = "ByeDpiStrategyGen"

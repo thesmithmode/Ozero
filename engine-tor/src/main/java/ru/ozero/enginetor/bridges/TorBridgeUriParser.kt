@@ -37,7 +37,7 @@ class TorBridgeUriParser {
         val fingerprint = params["fingerprint"]
             ?: return Result.failure(IllegalArgumentException("отсутствует fingerprint"))
 
-                        val address = when {
+        val address = when {
             port == -1 -> host
             host.contains(':') -> "[$host]:$port"
             else -> "$host:$port"
@@ -53,7 +53,7 @@ class TorBridgeUriParser {
                 transport = transport,
                 address = address,
                 fingerprint = fingerprint,
-                args = args.toSortedMap(), 
+                args = args.toSortedMap(),
                 remark = remark,
             ),
         )

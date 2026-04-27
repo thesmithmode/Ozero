@@ -3,7 +3,7 @@ package ru.ozero.security.antifrida
 import java.io.File
 
 interface ProcMapsReader {
-        fun <R> useLines(block: (Sequence<String>) -> R): R
+    fun <R> useLines(block: (Sequence<String>) -> R): R
 }
 
 private val DefaultReader = object : ProcMapsReader {
@@ -36,7 +36,7 @@ class AntiFridaCheck(
     }
 
     private companion object {
-                        val SIGNATURES = listOf(
+        val SIGNATURES = listOf(
             "frida-agent",
             "frida-gadget",
             "gum-js-loop",

@@ -49,7 +49,7 @@ class NaiveCandidateSource(
         const val DEFAULT_BASE_PORT = 12808
         const val DEFAULT_MAX = 5
 
-                        const val PRIORITY = 6
+        const val PRIORITY = 6
         private const val TAG = "NaiveCandidateSource"
     }
 }

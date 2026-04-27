@@ -24,7 +24,7 @@ class UrnetworkCandidateSource(
                     jwtToken = jwt,
                     apiUrl = apiUrl,
                     region = region,
-                                                                                mode = "consumer",
+                    mode = "consumer",
                 ),
                 priority = Candidate.PRIORITY_URNETWORK,
             ),

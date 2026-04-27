@@ -57,7 +57,7 @@ class AntiFridaCheckTest {
 
     @Test
     fun magiskNotDetected() {
-                        val rooted = "7f00-7f01 r-xp 00 00 1 /sbin/.magisk/mirror/system/bin/sh"
+        val rooted = "7f00-7f01 r-xp 00 00 1 /sbin/.magisk/mirror/system/bin/sh"
         assertFalse(check(rooted).isHookFrameworkPresent())
     }
 

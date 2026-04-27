@@ -55,9 +55,9 @@ class EngineApiTest {
 
     @Test
     fun startResultSuccess() {
-        val result = StartResult.Success(socksPort = 1080)
-        assertEquals(1080, result.socksPort)
+        val result: StartResult = StartResult.Success(socksPort = 1080)
         assertTrue(result is StartResult.Success)
+        assertEquals(1080, result.socksPort)
     }
 
     @Test
@@ -78,16 +78,16 @@ class EngineApiTest {
 
     @Test
     fun probeResultSuccess() {
-        val result = ProbeResult.Success(latencyMs = 150L)
-        assertEquals(150L, result.latencyMs)
+        val result: ProbeResult = ProbeResult.Success(latencyMs = 150L)
         assertTrue(result is ProbeResult.Success)
+        assertEquals(150L, result.latencyMs)
     }
 
     @Test
     fun probeResultFailure() {
-        val result = ProbeResult.Failure(reason = "Network unreachable")
-        assertEquals("Network unreachable", result.reason)
+        val result: ProbeResult = ProbeResult.Failure(reason = "Network unreachable")
         assertTrue(result is ProbeResult.Failure)
+        assertEquals("Network unreachable", result.reason)
     }
 
     @Test

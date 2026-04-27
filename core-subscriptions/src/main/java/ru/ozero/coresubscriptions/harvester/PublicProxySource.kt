@@ -9,15 +9,15 @@ data class PublicProxySource(
 )
 
 enum class SourceFormat {
-        LINES,
+    LINES,
 
-        BASE64_LINES,
+    BASE64_LINES,
 
-        JSON_ARRAY,
+    JSON_ARRAY,
 }
 
 enum class Region {
-        RU,
+    RU,
 
-        GLOBAL,
+    GLOBAL,
 }

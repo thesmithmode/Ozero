@@ -6,12 +6,12 @@ data class ReleaseInfo(
     val sigUrl: String,
     val isPrerelease: Boolean = false,
     val publishedAt: String? = null,
-        val versionCode: Long = 0L,
+    val versionCode: Long = 0L,
 ) {
-        fun semver(): Triple<Int, Int, Int>? = parseSemver(tag)
+    fun semver(): Triple<Int, Int, Int>? = parseSemver(tag)
 
     fun isNewerThan(currentTag: String): Boolean {
-                        if (isPrerelease) return false
+        if (isPrerelease) return false
         val a = semver() ?: return false
         val b = parseSemver(currentTag) ?: return false
         return when {

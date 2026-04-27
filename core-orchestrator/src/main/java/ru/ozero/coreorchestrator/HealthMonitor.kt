@@ -42,7 +42,7 @@ class HealthMonitor(
                 while (isActive) {
                     delay(probeIntervalMs)
                     val result = engine.probe()
-                                                            if (!isActive) return@launch
+                    if (!isActive) return@launch
                     if (result is ProbeResult.Failure) {
                         val fails = synchronized(lock) { ++consecutiveFails }
                         Log.w(TAG, "probe failed $fails/$failThreshold: ${result.reason}")
@@ -64,7 +64,7 @@ class HealthMonitor(
         }
     }
 
-        suspend fun stop() {
+    suspend fun stop() {
         val toJoin = synchronized(lock) {
             Log.i(TAG, "stop")
             val current = job

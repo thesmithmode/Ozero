@@ -25,7 +25,7 @@ class OzeroQuickTile : TileService() {
     }
 
     private fun startVpn() {
-                        ContextCompat.startForegroundService(
+        ContextCompat.startForegroundService(
             this,
             Intent(this, OzeroVpnService::class.java).apply {
                 action = OzeroVpnService.ACTION_START

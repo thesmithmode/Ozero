@@ -12,7 +12,7 @@ android {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
         }
     }
-    }
+}
 
 val generateTorChecksums =
     tasks.register("generateTorChecksums", GenerateTorChecksumsTask::class.java) {
@@ -37,8 +37,8 @@ dependencies {
     implementation(project(":common-vpn"))
     implementation(libs.bundles.coroutines)
 
-        implementation(libs.play.feature.delivery)
-        implementation(libs.coroutines.play.services)
+    implementation(libs.play.feature.delivery)
+    implementation(libs.coroutines.play.services)
 
     testImplementation(libs.bundles.junit5)
     testRuntimeOnly(libs.junit.jupiter.engine)

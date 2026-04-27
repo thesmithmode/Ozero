@@ -11,7 +11,7 @@ class LogExporter(private val context: Context) {
     fun export(entries: List<LogEntry>, minLevel: LogLevel): File {
         val dir = File(context.cacheDir, DIR_NAME).apply {
             mkdirs()
-                        listFiles()?.forEach { runCatching { it.delete() } }
+            listFiles()?.forEach { runCatching { it.delete() } }
         }
         val ts = TIMESTAMP_FORMAT.format(Date())
         val file = File(dir, "ozero-logs-$ts.txt")

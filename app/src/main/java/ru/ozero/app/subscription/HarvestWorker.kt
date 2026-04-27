@@ -39,7 +39,7 @@ class HarvestWorker @AssistedInject constructor(
         val r = harvester.harvest(sources)
         Log.i(TAG, "doWork harvest: parsed=${r.totalParsed} failed=${r.failedSources}")
 
-                val all = dao.getLiveServers() 
+        val all = dao.getLiveServers()
         val prober = LiveProber(dao)
         val ps = prober.probeAll(all)
         Log.i(TAG, "doWork probe: live=${ps.live} dead=${ps.dead} of ${ps.total}")
@@ -57,7 +57,7 @@ class HarvestWorker @AssistedInject constructor(
                 .setConstraints(
                     Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build(),
                 )
-                                                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 5L, TimeUnit.MINUTES)
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 5L, TimeUnit.MINUTES)
                 .build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 NAME,

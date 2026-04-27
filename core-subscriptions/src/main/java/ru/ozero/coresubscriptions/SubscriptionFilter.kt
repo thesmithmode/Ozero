@@ -10,7 +10,7 @@ class SubscriptionFilter {
             is ParsedServer.Hysteria2 -> true
             is ParsedServer.Trojan -> true
             is ParsedServer.Shadowsocks -> false
-                                    is ParsedServer.AmneziaWg -> parsed.server.hasObfuscation()
+            is ParsedServer.AmneziaWg -> parsed.server.hasObfuscation()
             is ParsedServer.Naive -> true
             is ParsedServer.Error -> false
         }

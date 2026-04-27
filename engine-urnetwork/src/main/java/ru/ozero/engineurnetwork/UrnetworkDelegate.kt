@@ -1,13 +1,13 @@
 package ru.ozero.engineurnetwork
 
 interface UrnetworkDelegate {
-        fun connect(jwtToken: String, apiUrl: String, region: String?, mode: UrnetworkMode): Boolean
+    fun connect(jwtToken: String, apiUrl: String, region: String?, mode: UrnetworkMode): Boolean
 
-        fun disconnect()
+    fun disconnect()
 
-        fun connectionStatus(): UrnetworkConnectionStatus
+    fun connectionStatus(): UrnetworkConnectionStatus
 
-        fun sdkVersion(): String
+    fun sdkVersion(): String
 }
 
 enum class UrnetworkConnectionStatus {
@@ -18,7 +18,7 @@ enum class UrnetworkConnectionStatus {
 }
 
 enum class UrnetworkMode {
-        CONSUMER,
+    CONSUMER,
 
-        PROVIDER,
+    PROVIDER,
 }

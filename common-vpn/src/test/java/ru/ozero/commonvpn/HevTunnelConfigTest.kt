@@ -13,7 +13,7 @@ class HevTunnelConfigTest {
     @Test
     fun `toYaml содержит обязательные поля upstream формата`() {
         val yaml = base().toYaml()
-                        assertTrue(yaml.contains("tunnel:"))
+        assertTrue(yaml.contains("tunnel:"))
         assertTrue(yaml.contains("socks5:"))
         assertTrue(yaml.contains("address: 127.0.0.1"))
         assertTrue(yaml.contains("port: 1080"))
@@ -29,20 +29,20 @@ class HevTunnelConfigTest {
 
     @Test
     fun `toYaml НЕ содержит несуществующих в upstream полей`() {
-                        val yaml = base().toYaml()
+        val yaml = base().toYaml()
         assertFalse(yaml.contains("fd:"), "tunnel.fd не существует в upstream — fd передаётся JNI-параметром")
         assertFalse(yaml.contains("dns:"), "секции dns нет в upstream conf — DNS resolve делает socks5 server")
     }
 
     @Test
     fun `toYaml содержит udp mode`() {
-                val yaml = base().toYaml()
+        val yaml = base().toYaml()
         assertTrue(yaml.contains("udp: 'udp'"))
     }
 
     @Test
     fun `default IPv6 в одинарных кавычках для libyaml`() {
-                val yaml = base().toYaml()
+        val yaml = base().toYaml()
         assertTrue(yaml.contains("ipv6: 'fd00"))
     }
 

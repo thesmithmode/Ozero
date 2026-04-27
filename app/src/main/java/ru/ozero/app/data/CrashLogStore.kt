@@ -23,7 +23,7 @@ class CrashLogStore(
 
     fun directory(): File = dir.also { it.mkdirs() }
 
-        fun list(): List<File> = sortedFiles()
+    fun list(): List<File> = sortedFiles()
 
     fun write(thread: Thread, throwable: Throwable) {
         runCatching {
@@ -34,7 +34,7 @@ class CrashLogStore(
             sw.append("thread=").append(thread.name).append('\n')
             sw.append("time=").append(ts).append('\n')
             PrintWriter(sw).use { throwable.printStackTrace(it) }
-                                                file.writeText(sanitize(sw.toString()))
+            file.writeText(sanitize(sw.toString()))
             Log.e(TAG, "crash → ${file.absolutePath}")
             rotate()
         }.onFailure { Log.w(TAG, "crash write failed", it) }
@@ -42,13 +42,13 @@ class CrashLogStore(
 
     internal fun sanitize(text: String): String {
         var out = text
-                out = USERINFO_URI.replace(out) { m -> "${m.groupValues[1]}://<redacted>@${m.groupValues[3]}" }
-                out = PROXY_URI.replace(out, "<redacted-uri>")
-                out = LONG_TOKEN.replace(out, "<redacted-token>")
+        out = USERINFO_URI.replace(out) { m -> "${m.groupValues[1]}://<redacted>@${m.groupValues[3]}" }
+        out = PROXY_URI.replace(out, "<redacted-uri>")
+        out = LONG_TOKEN.replace(out, "<redacted-token>")
         return out
     }
 
-        private fun rotate() {
+    private fun rotate() {
         sortedFiles().drop(MAX_FILES).forEach { runCatching { it.delete() } }
     }
 
@@ -61,15 +61,15 @@ class CrashLogStore(
         const val TAG: String = "CrashLogStore"
         const val MAX_FILES: Int = 10
 
-                private val USERINFO_URI = Regex(
+        private val USERINFO_URI = Regex(
             "(?i)(\\w+)://([^:/@\\s]+(?::[^@\\s]*)?)@([^\\s/]+)",
         )
 
-                private val PROXY_URI = Regex(
+        private val PROXY_URI = Regex(
             "(?i)\\b(vless|vmess|trojan|ss|hysteria2?|tuic|naive\\+https?|wireguard|awg)://\\S+",
         )
 
-                private val LONG_TOKEN = Regex(
+        private val LONG_TOKEN = Regex(
             "[A-Za-z0-9+/_=-]{32,}",
         )
     }

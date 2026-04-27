@@ -28,7 +28,7 @@ class OzeroVpnService : android.net.VpnService() {
 
     @Inject lateinit var pipeline: VpnEnginePipeline
 
-        private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     companion object {
         const val ACTION_START = "ru.ozero.vpn.ACTION_START"
@@ -38,7 +38,7 @@ class OzeroVpnService : android.net.VpnService() {
         const val TUN_ADDRESS = "10.10.10.10"
         const val TUN_PREFIX_LENGTH = 32
 
-                        const val TUN_ADDRESS_V6 = "fd00:ffff:ffff:ffff::1"
+        const val TUN_ADDRESS_V6 = "fd00:ffff:ffff:ffff::1"
         const val TUN_PREFIX_LENGTH_V6 = 64
         const val TUN_DNS = "127.0.0.1"
         const val TUN_MTU = 1500
@@ -51,12 +51,12 @@ class OzeroVpnService : android.net.VpnService() {
 
     private var tunFd: ParcelFileDescriptor? = null
 
-                private val starting = AtomicBoolean(false)
+    private val starting = AtomicBoolean(false)
     private val stopping = AtomicBoolean(false)
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(TAG, "onStartCommand action=${intent?.action}")
-                        when (intent?.action) {
+        when (intent?.action) {
             ACTION_STOP -> stopVpn()
             ACTION_START, null -> startVpn()
         }
@@ -69,7 +69,7 @@ class OzeroVpnService : android.net.VpnService() {
             return
         }
         Log.i(TAG, "startVpn")
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(
                 NOTIFICATION_ID,
                 buildNotification(),
@@ -88,7 +88,7 @@ class OzeroVpnService : android.net.VpnService() {
         tunFd = fd
         Log.i(TAG, "TUN established fd=${fd.fd}")
         serviceScope.launch {
-                                    try {
+            try {
                 val result = withTimeoutOrNull(PIPELINE_START_TIMEOUT_MS) {
                     runCatching { pipeline.start(tunFd = fd.fd) }
                         .onFailure { Log.e(TAG, "pipeline.start threw", it) }
@@ -99,7 +99,7 @@ class OzeroVpnService : android.net.VpnService() {
                     stopVpn()
                 }
             } finally {
-                                                                starting.set(false)
+                starting.set(false)
             }
         }
     }
@@ -110,8 +110,8 @@ class OzeroVpnService : android.net.VpnService() {
             return
         }
         Log.i(TAG, "stopVpn")
-                                        serviceScope.launch {
-                                    val finished = withTimeoutOrNull(SHUTDOWN_TIMEOUT_MS) {
+        serviceScope.launch {
+            val finished = withTimeoutOrNull(SHUTDOWN_TIMEOUT_MS) {
                 runCatching { pipeline.stop() }
                     .onFailure { Log.w(TAG, "pipeline.stop threw", it) }
             }
@@ -174,8 +174,8 @@ class OzeroVpnService : android.net.VpnService() {
 
     override fun onDestroy() {
         super.onDestroy()
-                                if (stopping.compareAndSet(false, true)) {
-                                                            val shutdown = Thread({
+        if (stopping.compareAndSet(false, true)) {
+            val shutdown = Thread({
                 runBlocking {
                     runCatching {
                         withTimeoutOrNull(SHUTDOWN_TIMEOUT_MS) { pipeline.stop() }

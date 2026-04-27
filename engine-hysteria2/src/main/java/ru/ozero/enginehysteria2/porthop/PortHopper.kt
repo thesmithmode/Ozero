@@ -37,7 +37,7 @@ class PortHopper(
         return (u32 % rangeSize).toInt() + range.first
     }
 
-        fun nextHopAt(epochSeconds: Long): Long {
+    fun nextHopAt(epochSeconds: Long): Long {
         val nextSlot = epochSeconds / intervalSeconds + 1
         return nextSlot * intervalSeconds
     }

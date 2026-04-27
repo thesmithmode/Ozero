@@ -30,6 +30,6 @@ class LogBuffer(private val capacity: Int = DEFAULT_CAPACITY) {
     fun size(): Int = synchronized(lock) { deque.size }
 
     companion object {
-                const val DEFAULT_CAPACITY: Int = 5000
+        const val DEFAULT_CAPACITY: Int = 5000
     }
 }

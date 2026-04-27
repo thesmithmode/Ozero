@@ -27,7 +27,7 @@ object SelfUpdateModule {
     @Named("github-api")
     fun provideGithubApiClient(): OkHttpClient = GithubPinnedClient.create()
 
-        @Provides
+    @Provides
     @Singleton
     @Named("github-cdn")
     fun provideGithubCdnClient(): OkHttpClient = OkHttpClient.Builder()

@@ -15,11 +15,11 @@ import ru.ozero.commonvpn.OzeroVpnService
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
-                                val pendingResult = goAsync()
+        val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 if (!isAutoStartEnabled(context)) return@launch
-                                                                                                if (VpnService.prepare(context) != null) {
+                if (VpnService.prepare(context) != null) {
                     Log.w(TAG, "auto-start пропущен: VpnService.prepare не выдан (нужен повторный grant в UI)")
                     return@launch
                 }

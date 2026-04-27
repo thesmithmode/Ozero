@@ -37,7 +37,7 @@ class OnboardingViewModel @Inject constructor(
         _state.value = _state.value.copy(completed = true)
         viewModelScope.launch {
             userFlags.markOnboardingCompleted()
-                                    bootstrap.runIfFirstStart()
+            bootstrap.runIfFirstStart()
         }
     }
 

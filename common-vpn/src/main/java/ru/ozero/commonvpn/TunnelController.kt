@@ -11,12 +11,12 @@ class TunnelController {
     val state: StateFlow<TunnelState> = _state.asStateFlow()
 
     fun onEngineStarted(socksPort: Int) {
-                Log.d(TAG, "engineStarted socksPort=$socksPort")
+        Log.d(TAG, "engineStarted socksPort=$socksPort")
         Log.i(TAG, "engineStarted")
         _state.value = TunnelState.Connected(socksPort)
     }
 
-        fun onEngineDied(reason: String) {
+    fun onEngineDied(reason: String) {
         Log.e(TAG, "engineDied reason=$reason kill-switch активен")
         _state.value = TunnelState.Dead(reason)
     }
@@ -32,7 +32,7 @@ class TunnelController {
         _state.value = TunnelState.Connected(socksPort)
     }
 
-        fun reset() {
+    fun reset() {
         Log.i(TAG, "reset")
         _state.value = TunnelState.Idle
     }

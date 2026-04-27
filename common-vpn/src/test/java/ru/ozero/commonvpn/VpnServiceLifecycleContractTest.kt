@@ -16,7 +16,7 @@ class VpnServiceLifecycleContractTest {
 
     @Test
     fun `runBlocking не вызывается без обёртки в отдельный поток`() {
-                                                val hasRunBlocking = source.contains("runBlocking")
+        val hasRunBlocking = source.contains("runBlocking")
         if (!hasRunBlocking) return
         assertTrue(
             source.contains("Thread(") && source.contains(".join("),
@@ -39,9 +39,9 @@ class VpnServiceLifecycleContractTest {
 
     @Test
     fun `tunFd close в onDestroy безусловный`() {
-                        val hasOnDestroy = source.contains("override fun onDestroy")
+        val hasOnDestroy = source.contains("override fun onDestroy")
         assertTrue(hasOnDestroy, "onDestroy должен быть переопределён.")
-                val onDestroyBody = source.substringAfter("override fun onDestroy")
+        val onDestroyBody = source.substringAfter("override fun onDestroy")
             .substringBefore("private companion object")
         assertTrue(
             onDestroyBody.contains("tunFd?.close()") || onDestroyBody.contains("tunFd!!.close()"),
@@ -51,7 +51,7 @@ class VpnServiceLifecycleContractTest {
 
     @Test
     fun `pipeline_stop защищён timeout-ом в shutdown path`() {
-                        val onDestroyBody = source.substringAfter("override fun onDestroy")
+        val onDestroyBody = source.substringAfter("override fun onDestroy")
             .substringBefore("private companion object")
         assertFalse(
             onDestroyBody.contains("runBlocking { pipeline.stop()") ||

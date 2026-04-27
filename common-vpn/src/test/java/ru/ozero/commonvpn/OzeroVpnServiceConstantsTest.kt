@@ -26,7 +26,7 @@ class OzeroVpnServiceConstantsTest {
 
     @Test
     fun tunAddressV6IsUla() {
-                assert(OzeroVpnService.TUN_ADDRESS_V6.startsWith("fd"))
+        assert(OzeroVpnService.TUN_ADDRESS_V6.startsWith("fd"))
     }
 
     @Test

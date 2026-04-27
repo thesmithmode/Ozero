@@ -45,11 +45,11 @@ class SocksProber(
     }
 
     fun interface HttpConnector {
-                suspend fun connect(target: ProbeTarget, socksPort: Int): Long
+        suspend fun connect(target: ProbeTarget, socksPort: Int): Long
     }
 
     class JdkHttpConnector(
-                                private val perLegTimeoutMs: Int = 2_000,
+        private val perLegTimeoutMs: Int = 2_000,
     ) : HttpConnector {
         override suspend fun connect(target: ProbeTarget, socksPort: Int): Long =
             withContext(Dispatchers.IO) {

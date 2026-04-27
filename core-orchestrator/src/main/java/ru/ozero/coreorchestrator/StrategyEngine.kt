@@ -12,7 +12,7 @@ data class Candidate(
     val engineId: EngineId,
     val config: EngineConfig,
     val priority: Int = PRIORITY_BYEDPI,
-        val requiresUdp: Boolean = false,
+    val requiresUdp: Boolean = false,
 ) {
     companion object {
         const val PRIORITY_HYSTERIA2_NATIVE = 11
@@ -23,7 +23,7 @@ data class Candidate(
         const val PRIORITY_XRAY_SHADOWSOCKS = 6
         const val PRIORITY_BYEDPI = 5
 
-                const val PRIORITY_URNETWORK = 2
+        const val PRIORITY_URNETWORK = 2
         const val PRIORITY_TOR = 1
     }
 }
@@ -36,7 +36,7 @@ class StrategyEngine(
     private val engines: Map<EngineId, Engine>,
     private val extraSources: List<CandidateSource> = emptyList(),
     private val parallelProbeCount: Int = DEFAULT_PARALLEL_PROBE,
-        private val udpReachable: () -> Boolean = { true },
+    private val udpReachable: () -> Boolean = { true },
 ) {
 
     suspend fun buildCandidates(): List<Candidate> {
@@ -55,7 +55,7 @@ class StrategyEngine(
             .sortedByDescending { it.priority }
     }
 
-        suspend fun pickBest(candidates: List<Candidate>): Candidate? {
+    suspend fun pickBest(candidates: List<Candidate>): Candidate? {
         if (candidates.isEmpty()) return null
         candidates.chunked(parallelProbeCount).forEach { batch ->
             val results = coroutineScope {

@@ -7,7 +7,7 @@ class TunBuilderConfigurator(
     private val packageName: String,
 ) {
 
-        fun apply(builder: VpnService.Builder, config: SplitTunnelConfig): VpnService.Builder {
+    fun apply(builder: VpnService.Builder, config: SplitTunnelConfig): VpnService.Builder {
         when (config.mode) {
             SplitTunnelMode.ALL -> {
                 builder.addRoute("0.0.0.0", 0)
@@ -18,7 +18,7 @@ class TunBuilderConfigurator(
                 for (cidr in LanRoutes.BYPASS_LAN_IPV4) {
                     builder.addRoute(cidr.address, cidr.prefix)
                 }
-                                                builder.addRoute(IPV6_GLOBAL_UNICAST, IPV6_GLOBAL_UNICAST_PREFIX)
+                builder.addRoute(IPV6_GLOBAL_UNICAST, IPV6_GLOBAL_UNICAST_PREFIX)
                 Log.i(TAG, "split-tunnel BYPASS_LAN — ${LanRoutes.BYPASS_LAN_IPV4.size} v4 + 2000::/3 v6")
             }
             SplitTunnelMode.ALLOWLIST -> {
@@ -38,13 +38,13 @@ class TunBuilderConfigurator(
     private fun applyAllowed(builder: VpnService.Builder, packages: Set<String>) {
         var added = 0
         for (pkg in packages) {
-            if (pkg == packageName) continue 
+            if (pkg == packageName) continue
             runCatching { builder.addAllowedApplication(pkg) }
                 .onSuccess { added++ }
                 .onFailure { Log.w(TAG, "addAllowedApplication failed для $pkg: ${it.message}") }
         }
         if (added == 0) {
-                                                runCatching { builder.addAllowedApplication(packageName) }
+            runCatching { builder.addAllowedApplication(packageName) }
                 .onFailure { Log.e(TAG, "не удалось добавить self в allowlist: ${it.message}") }
             Log.w(TAG, "ALLOWLIST пуст → kill-all (только self в фильтре)")
         } else {

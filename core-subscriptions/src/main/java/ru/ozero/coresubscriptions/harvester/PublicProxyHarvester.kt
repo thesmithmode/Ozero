@@ -26,7 +26,7 @@ class PublicProxyHarvester(
         var failed = 0
         val perSource = mutableListOf<PerSourceResult>()
         for (source in sources) {
-                        if (!source.url.startsWith("https://")) {
+            if (!source.url.startsWith("https://")) {
                 Log.w(TAG, "source ${source.id} non-HTTPS URL — skip")
                 failed++
                 perSource += PerSourceResult(source.id, parsedCount = 0, error = "non-HTTPS URL")
@@ -42,7 +42,7 @@ class PublicProxyHarvester(
         }
         if (perSource.any { it.parsedCount > 0 }) {
             val entities = perSource.flatMap { it.entities }
-                        val unique = entities.distinctBy { it.id }
+            val unique = entities.distinctBy { it.id }
             serverDao.upsertAll(unique)
             Log.i(TAG, "harvest OK: ${unique.size} unique entities из ${sources.size} sources ($failed failed)")
         } else {
@@ -58,7 +58,7 @@ class PublicProxyHarvester(
                 return PerSourceResult(source.id, parsedCount = 0, error = "HTTP ${resp.code}")
             }
             val respBody = resp.body ?: return PerSourceResult(source.id, 0, error = "empty body")
-                                                val src = respBody.source()
+            val src = respBody.source()
             val bytes = src.readByteString(MAX_BODY_BYTES)
             if (src.request(1L)) {
                 return PerSourceResult(source.id, 0, error = "body exceeds $MAX_BODY_BYTES bytes")
@@ -87,9 +87,9 @@ class PublicProxyHarvester(
         }
     }
 
-        private fun parseJsonArray(body: String): List<String> {
+    private fun parseJsonArray(body: String): List<String> {
         val arr: JSONArray = runCatching {
-                        val obj = JSONObject(body)
+            val obj = JSONObject(body)
             obj.optJSONArray("servers") ?: return emptyList()
         }.getOrElse {
             runCatching { JSONArray(body) }.getOrElse { return emptyList() }
@@ -112,7 +112,7 @@ class PublicProxyHarvester(
 
     private companion object {
         const val TAG = "PublicProxyHarvester"
-        const val MAX_BODY_BYTES = 4L * 1024 * 1024 
+        const val MAX_BODY_BYTES = 4L * 1024 * 1024
         const val MAX_ENTITIES_PER_SOURCE = 2000
     }
 }

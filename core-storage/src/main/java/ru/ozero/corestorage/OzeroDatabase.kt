@@ -15,7 +15,7 @@ import ru.ozero.corestorage.entity.ServerEntity
 
 @Database(
     entities = [ServerEntity::class, ConnectionLogEntity::class, AppSplitRule::class],
-        version = 3,
+    version = 3,
     exportSchema = true,
 )
 abstract class OzeroDatabase : RoomDatabase() {
@@ -26,14 +26,14 @@ abstract class OzeroDatabase : RoomDatabase() {
     companion object {
         const val DATABASE_NAME = "ozero.db"
 
-                private val MIGRATION_1_2: Migration =
+        private val MIGRATION_1_2: Migration =
             object : Migration(1, 2) {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE servers ADD COLUMN pairId TEXT DEFAULT NULL")
                 }
             }
 
-                private val MIGRATION_2_3: Migration =
+        private val MIGRATION_2_3: Migration =
             object : Migration(2, 3) {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("CREATE INDEX IF NOT EXISTS index_servers_isAlive ON servers(isAlive)")

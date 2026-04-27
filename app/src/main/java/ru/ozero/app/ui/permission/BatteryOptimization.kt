@@ -4,7 +4,7 @@ import android.os.Build
 
 object BatteryOptimization {
 
-        const val MIN_SDK = Build.VERSION_CODES.M
+    const val MIN_SDK = Build.VERSION_CODES.M
 
     const val PERMISSION = "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
 
@@ -19,12 +19,12 @@ object BatteryOptimization {
         }
 
     sealed class State {
-                data object NotApplicable : State()
+        data object NotApplicable : State()
 
-                data object AlreadyWhitelisted : State()
+        data object AlreadyWhitelisted : State()
 
-                data object Skip : State()
+        data object Skip : State()
 
-                data object NeedsPrompt : State()
+        data object NeedsPrompt : State()
     }
 }

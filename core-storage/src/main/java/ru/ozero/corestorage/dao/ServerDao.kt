@@ -30,6 +30,6 @@ interface ServerDao {
     @Query("DELETE FROM servers")
     suspend fun deleteAll()
 
-        @Query("UPDATE servers SET isAlive = :alive, lastCheckedAt = :ts WHERE id = :id")
+    @Query("UPDATE servers SET isAlive = :alive, lastCheckedAt = :ts WHERE id = :id")
     suspend fun setAlive(id: String, alive: Boolean, ts: Long)
 }

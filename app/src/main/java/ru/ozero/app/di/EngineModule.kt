@@ -92,7 +92,7 @@ object EngineModule {
         delegate = delegate,
         installer = installer,
         buildOptions = ru.ozero.enginetor.config.TorBuildOptions(
-                        dataDir = java.io.File(context.filesDir, "tor").absolutePath,
+            dataDir = java.io.File(context.filesDir, "tor").absolutePath,
         ),
     )
 }

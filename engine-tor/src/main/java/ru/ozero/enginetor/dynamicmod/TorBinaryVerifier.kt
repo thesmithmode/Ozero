@@ -27,7 +27,7 @@ class Sha256TorBinaryVerifier(
     override suspend fun verify(abi: String, libDir: File): VerifyResult {
         val expected = checksumsByAbi[abi]
         if (expected.isNullOrEmpty()) {
-                                    Log.e(TAG, "no expected checksums for abi=$abi — REJECT install")
+            Log.e(TAG, "no expected checksums for abi=$abi — REJECT install")
             return VerifyResult.UnknownAbi(abi)
         }
         for ((fileName, expectedSha) in expected) {
@@ -53,8 +53,8 @@ class Sha256TorBinaryVerifier(
         val md = MessageDigest.getInstance("SHA-256")
         DigestInputStream(file.inputStream(), md).use { dis ->
             val buf = ByteArray(BUFFER_SIZE)
-            while (dis.read(buf) >= 0) {
-                            }
+            @Suppress("ControlFlowWithEmptyBody")
+            while (dis.read(buf) >= 0) Unit
         }
         return md.digest().joinToString("") { "%02x".format(it) }
     }

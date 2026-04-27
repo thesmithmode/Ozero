@@ -29,7 +29,7 @@ class PortHopperTest {
     fun differentKeysProduceDifferentSequences() {
         val a = PortHopper("alpha", range, 30)
         val b = PortHopper("bravo", range, 30)
-                val matches = (0 until 200).count { i ->
+        val matches = (0 until 200).count { i ->
             a.portAt(i * 30L) == b.portAt(i * 30L)
         }
         assertTrue(matches < 200, "ключи дают идентичные последовательности — HMAC не работает")
@@ -38,7 +38,7 @@ class PortHopperTest {
     @Test
     fun stableWithinSameInterval() {
         val h = PortHopper("k", range, 30)
-                val p1 = h.portAt(90L)
+        val p1 = h.portAt(90L)
         val p2 = h.portAt(105L)
         val p3 = h.portAt(119L)
         assertEquals(p1, p2)
@@ -50,7 +50,7 @@ class PortHopperTest {
         val h = PortHopper("k", range, 30)
         val before = h.portAt(29L)
         val after = h.portAt(30L)
-                        val a90 = h.portAt(60L)
+        val a90 = h.portAt(60L)
         val a120 = h.portAt(90L)
         val changed = (before != after) || (after != a90) || (a90 != a120)
         assertTrue(changed, "порт не меняется на границах интервалов")
@@ -69,7 +69,7 @@ class PortHopperTest {
     @Test
     @Suppress("InvalidRange")
     fun rejectsInvalidRange() {
-                val ex = runCatching { PortHopper("k", 50000..20000, 30) }.exceptionOrNull()
+        val ex = runCatching { PortHopper("k", 50000..20000, 30) }.exceptionOrNull()
         assertTrue(ex is IllegalArgumentException)
     }
 
@@ -98,7 +98,7 @@ class PortHopperTest {
         val h = PortHopper("k", range, 30)
         val seen = HashSet<Int>()
         repeat(5000) { i -> seen += h.portAt(i * 30L) }
-                assertTrue(seen.size > 4000, "покрытие слишком узкое: ${seen.size}")
+        assertTrue(seen.size > 4000, "покрытие слишком узкое: ${seen.size}")
     }
 
     @Test

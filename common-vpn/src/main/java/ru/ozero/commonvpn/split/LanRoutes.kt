@@ -2,18 +2,18 @@ package ru.ozero.commonvpn.split
 
 object LanRoutes {
 
-        val BYPASS_LAN_IPV4: List<Cidr> = listOf(
+    val BYPASS_LAN_IPV4: List<Cidr> = listOf(
         Cidr("1.0.0.0", 8),
         Cidr("2.0.0.0", 7),
         Cidr("4.0.0.0", 6),
         Cidr("8.0.0.0", 7),
-                Cidr("11.0.0.0", 8),
+        Cidr("11.0.0.0", 8),
         Cidr("12.0.0.0", 6),
         Cidr("16.0.0.0", 4),
         Cidr("32.0.0.0", 3),
         Cidr("64.0.0.0", 3),
         Cidr("96.0.0.0", 6),
-                Cidr("100.128.0.0", 9),
+        Cidr("100.128.0.0", 9),
         Cidr("101.0.0.0", 8),
         Cidr("102.0.0.0", 7),
         Cidr("104.0.0.0", 5),
@@ -21,10 +21,10 @@ object LanRoutes {
         Cidr("128.0.0.0", 3),
         Cidr("160.0.0.0", 5),
         Cidr("168.0.0.0", 8),
-                Cidr("169.255.0.0", 16),
+        Cidr("169.255.0.0", 16),
         Cidr("170.0.0.0", 7),
         Cidr("172.0.0.0", 12),
-                Cidr("172.32.0.0", 11),
+        Cidr("172.32.0.0", 11),
         Cidr("172.64.0.0", 10),
         Cidr("172.128.0.0", 9),
         Cidr("173.0.0.0", 8),
@@ -33,7 +33,7 @@ object LanRoutes {
         Cidr("192.0.0.0", 9),
         Cidr("192.128.0.0", 11),
         Cidr("192.160.0.0", 13),
-                Cidr("192.169.0.0", 16),
+        Cidr("192.169.0.0", 16),
         Cidr("192.170.0.0", 15),
         Cidr("192.172.0.0", 14),
         Cidr("192.176.0.0", 12),
@@ -43,7 +43,7 @@ object LanRoutes {
         Cidr("196.0.0.0", 6),
         Cidr("200.0.0.0", 5),
         Cidr("208.0.0.0", 4),
-            )
+    )
 
     data class Cidr(val address: String, val prefix: Int)
 }

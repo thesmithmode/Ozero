@@ -43,7 +43,7 @@ class XrayEngine(
             try {
                 val code = delegate.startXray(config.configJson)
                 if (code == 0) {
-                                                            activeSocksPort = config.socksPort
+                    activeSocksPort = config.socksPort
                     Log.i(TAG, "started OK на порту ${config.socksPort}")
                     StartResult.Success(socksPort = config.socksPort)
                 } else {

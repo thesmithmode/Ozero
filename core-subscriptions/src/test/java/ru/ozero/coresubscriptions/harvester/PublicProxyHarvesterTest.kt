@@ -84,15 +84,15 @@ class PublicProxyHarvesterTest {
         val r = harvester.harvest(
             listOf(source(SourceFormat.LINES, id = "a"), source(SourceFormat.LINES, id = "b")),
         )
-        assertEquals(2, r.totalParsed) 
-        assertEquals(1, dao.inserted.size) 
+        assertEquals(2, r.totalParsed)
+        assertEquals(1, dao.inserted.size)
     }
 
     @Test
     fun `unknown scheme dropped silently`() = runTest {
         server.enqueue(MockResponse().setBody("foo://broken\n$sampleVless"))
         val r = harvester.harvest(listOf(source(SourceFormat.LINES)))
-        assertEquals(1, r.totalParsed) 
+        assertEquals(1, r.totalParsed)
         assertEquals(1, dao.inserted.size)
     }
 
