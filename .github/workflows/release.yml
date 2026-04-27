@@ -54,7 +54,7 @@ jobs:
             https://github.com/heiher/hev-socks5-tunnel.git \
             "$RUNNER_TEMP/hev-socks5-tunnel"
 
-      - name: Build libhev-socks5-tunnel.so (4 ABI)
+      - name: Build libhev-socks5-tunnel.so (4 ABI via ndk-build)
         env:
           NDK_PATH: ${{ steps.ndk.outputs.ndk-path }}
         run: |
@@ -63,29 +63,30 @@ jobs:
           OUT="common-vpn/src/main/jniLibs"
           mkdir -p "$OUT/arm64-v8a" "$OUT/armeabi-v7a" "$OUT/x86_64" "$OUT/x86"
 
+          # upstream сборка через ndk-build с Android.mk + Application.mk.
+          # APP_ABI и APP_PLATFORM переопределяем чтобы покрыть все 4 ABI которые
+          # требует Ozero (default Application.mk собирает только 2 ARM-варианта).
+          cd "$SRC"
+          "$NDK_PATH/ndk-build" \
+            NDK_PROJECT_PATH="$SRC" \
+            APP_BUILD_SCRIPT="$SRC/Android.mk" \
+            NDK_APPLICATION_MK="$SRC/Application.mk" \
+            APP_ABI="arm64-v8a armeabi-v7a x86_64 x86" \
+            APP_PLATFORM=android-24 \
+            -j"$(nproc)"
+
+          STRIP="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
           for ABI in arm64-v8a armeabi-v7a x86_64 x86; do
-            BUILD_DIR="$RUNNER_TEMP/hev-build-$ABI"
-            rm -rf "$BUILD_DIR"
-            mkdir -p "$BUILD_DIR"
-            cmake \
-              -S "$SRC" \
-              -B "$BUILD_DIR" \
-              -DCMAKE_TOOLCHAIN_FILE="$NDK_PATH/build/cmake/android.toolchain.cmake" \
-              -DANDROID_ABI="$ABI" \
-              -DANDROID_PLATFORM=android-24 \
-              -DCMAKE_BUILD_TYPE=Release \
-              -G "Unix Makefiles"
-            cmake --build "$BUILD_DIR" --parallel
-            SO_PATH=$(find "$BUILD_DIR" -name 'libhev-socks5-tunnel.so' -print -quit)
-            if [ -z "$SO_PATH" ]; then
-              echo "::error::libhev-socks5-tunnel.so не найден в $BUILD_DIR"
-              find "$BUILD_DIR" -name '*.so' || true
+            SO_SRC="$SRC/libs/$ABI/libhev-socks5-tunnel.so"
+            if [ ! -f "$SO_SRC" ]; then
+              echo "::error::libhev-socks5-tunnel.so не найден для $ABI"
+              find "$SRC/libs" -name '*.so' || true
               exit 1
             fi
-            cp "$SO_PATH" "$OUT/$ABI/libhev-socks5-tunnel.so"
-            "$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" \
-              "$OUT/$ABI/libhev-socks5-tunnel.so" || true
+            cp "$SO_SRC" "$GITHUB_WORKSPACE/$OUT/$ABI/libhev-socks5-tunnel.so"
+            "$STRIP" "$GITHUB_WORKSPACE/$OUT/$ABI/libhev-socks5-tunnel.so" || true
           done
+          cd "$GITHUB_WORKSPACE"
           echo "Built jniLibs:"
           ls -la "$OUT"/*/libhev-socks5-tunnel.so
 

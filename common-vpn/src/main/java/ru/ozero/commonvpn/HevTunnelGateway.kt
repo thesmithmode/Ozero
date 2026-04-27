@@ -18,10 +18,10 @@ interface HevTunnelGateway {
 
 /**
  * Production-реализация. Пишет YAML-конфиг во временный файл (upstream API
- * принимает path) и делегирует в [hev.HevSocks5Tunnel] (System.loadLibrary).
+ * принимает path) и делегирует в [hev.TProxyService] (System.loadLibrary).
  *
- * Upstream JNI symbol-naming требует точного `Java_hev_HevSocks5Tunnel_*`,
- * поэтому JNI-класс лежит в пакете `hev`.
+ * Upstream JNI ищет класс через FindClass(`hev/TProxyService`) и регистрирует
+ * методы через RegisterNatives — отсюда жёсткий contract на имя класса/пакета.
  *
  * Конструктор принимает [cacheDir] и нативные функции через лямбды чтобы класс
  * был тестируем без эмулятора (Context.cacheDir подставляется фабрикой ниже).
@@ -29,9 +29,12 @@ interface HevTunnelGateway {
 class NativeHevTunnelGateway(
     private val cacheDir: File,
     private val nativeStart: (configPath: String, fd: Int) -> Int = { path, fd ->
-        hev.HevSocks5Tunnel.TProxyStartService(path, fd)
+        hev.TProxyService.TProxyStartService(path, fd)
+        // upstream JNI возвращает void; считаем что отсутствие исключения = OK (0).
+        // Реальные ошибки старта он логирует в logcat и завершает thread.
+        0
     },
-    private val nativeStop: () -> Unit = { hev.HevSocks5Tunnel.TProxyStopService() },
+    private val nativeStop: () -> Unit = { hev.TProxyService.TProxyStopService() },
 ) : HevTunnelGateway {
 
     constructor(context: Context) : this(cacheDir = context.cacheDir)
