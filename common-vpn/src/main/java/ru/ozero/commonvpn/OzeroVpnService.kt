@@ -136,8 +136,15 @@ class OzeroVpnService : android.net.VpnService() {
         // stopForeground/stopSelf тоже после остановки pipeline, чтобы Service не был
         // убит планировщиком до завершения cleanup.
         serviceScope.launch {
-            runCatching { pipeline.stop() }
-                .onFailure { Log.w(TAG, "pipeline.stop threw", it) }
+            // Hard timeout зеркально onDestroy: native hev может зависнуть при misconfigured fd.
+            // Без timeout serviceScope блокирует close(tunFd) → next VPN start не поднимется.
+            val finished = withTimeoutOrNull(SHUTDOWN_TIMEOUT_MS) {
+                runCatching { pipeline.stop() }
+                    .onFailure { Log.w(TAG, "pipeline.stop threw", it) }
+            }
+            if (finished == null) {
+                Log.w(TAG, "pipeline.stop не завершилась за ${SHUTDOWN_TIMEOUT_MS}ms — закрываем fd")
+            }
             withContext(Dispatchers.Main) {
                 tunFd?.close()
                 tunFd = null
