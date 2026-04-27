@@ -49,6 +49,7 @@ fun SettingsScreen(
     onOpenAllowedApps: () -> Unit,
     onOpenServers: () -> Unit,
     onOpenAbout: () -> Unit = {},
+    onOpenLogs: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -64,6 +65,7 @@ fun SettingsScreen(
             onOpenAllowedApps = onOpenAllowedApps,
             onOpenServers = onOpenServers,
             onOpenAbout = onOpenAbout,
+            onOpenLogs = onOpenLogs,
         ),
         onSplitModeChange = viewModel::onSplitModeChange,
         onIpv6Toggle = viewModel::onIpv6Toggle,
@@ -206,7 +208,19 @@ private fun ContentBody(
             )
         }
         item { SectionDivider() }
+        item { LogsSection(onOpenLogs = nav.onOpenLogs) }
+        item { SectionDivider() }
         item { AboutSection(onOpenAbout = nav.onOpenAbout) }
+    }
+}
+
+@Composable
+private fun LogsSection(onOpenLogs: () -> Unit) {
+    androidx.compose.material3.OutlinedButton(
+        onClick = onOpenLogs,
+        modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
+    ) {
+        Text("Логи")
     }
 }
 
