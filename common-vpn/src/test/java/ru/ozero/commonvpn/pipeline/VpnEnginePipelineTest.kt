@@ -51,6 +51,23 @@ class VpnEnginePipelineTest {
         assertIs<OrchestratorState.Connected>(handle.orchestrator.state.value)
     }
 
+
+    @Test
+    fun `start does not redispatch Connect when orchestrator already probing`() = runTest {
+        val byedpi = FakeEngine(
+            id = EngineId.BYEDPI,
+            probeResult = ProbeResult.Success(latencyMs = 50),
+            startResult = StartResult.Success(socksPort = socksPort),
+        )
+        val handle = newPipeline(mapOf(EngineId.BYEDPI to byedpi as Engine))
+        handle.orchestrator.dispatch(ru.ozero.coreorchestrator.OrchestratorTransition.Connect)
+
+        val result = handle.start(tunFd)
+
+        assertIs<VpnEnginePipeline.Result.Connected>(result)
+        assertIs<OrchestratorState.Connected>(handle.orchestrator.state.value)
+    }
+
     @Test
     fun `start returns NoCandidates when strategy yields nothing successful`() = runTest {
         val byedpi = FakeEngine(
