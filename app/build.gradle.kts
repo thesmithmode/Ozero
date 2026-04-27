@@ -15,8 +15,8 @@ android {
 
     defaultConfig {
         applicationId = "ru.ozero.app"
-        versionCode = 8
-        versionName = "1.0.3"
+        versionCode = 9
+        versionName = "1.0.4"
         buildConfigField("String", "UPDATE_GITHUB_OWNER", "\"thesmithmode\"")
         buildConfigField("String", "UPDATE_GITHUB_REPO", "\"Ozero\"")
         buildConfigField(
