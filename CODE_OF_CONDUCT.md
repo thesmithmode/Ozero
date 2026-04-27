@@ -29,7 +29,7 @@
 
 ## Enforcement
 
-Maintainer (`@thesmithmode`) имеет право:
+Maintainer имеет право:
 - Удалять комментарии / commits / commits / PRs нарушающие CoC
 - Banить участников временно или постоянно
 

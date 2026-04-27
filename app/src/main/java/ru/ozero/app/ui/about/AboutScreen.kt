@@ -36,7 +36,6 @@ fun AboutScreen(onBack: () -> Unit) {
     val uri = LocalUriHandler.current
     val items = listOf(
         AboutLink(stringResource(R.string.about_repo), "https://github.com/thesmithmode/Ozero"),
-        AboutLink(stringResource(R.string.about_telegram), "https://t.me/ozero_vpn"),
         AboutLink(
             stringResource(R.string.about_privacy),
             "https://github.com/thesmithmode/Ozero/blob/main/docs/privacy.md",

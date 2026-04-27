@@ -70,7 +70,7 @@ Bounty-программы нет. Благодарность в `SECURITY-HALL-O
 
 ## Команда безопасности
 
-- Solo maintainer: `@thesmithmode`
+- Solo maintainer (см. репозиторий на GitHub)
 - Sec-audit: внешний (pending, после E10)
 
 ---

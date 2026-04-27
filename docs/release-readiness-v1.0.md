@@ -14,7 +14,7 @@
 | Git ref | `dev` @ `12137ac787b0b45fda66774a503ab275da07dcba` |
 | Последний коммит | `FIX: AntiFridaCheck — явная лямбда для File.useLines` |
 | Коммитов с момента отделения от `main` | **97** (`git rev-list --count main..dev`) |
-| Ответственный | thesmithmode |
+| Ответственный | maintainer |
 
 ---
 

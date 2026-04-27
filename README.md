@@ -4,7 +4,6 @@
 [![Release](https://img.shields.io/github/v/release/thesmithmode/Ozero?include_prereleases&sort=semver)](https://github.com/thesmithmode/Ozero/releases)
 [![F-Droid](https://img.shields.io/f-droid/v/ru.ozero.app.svg)](https://f-droid.org/packages/ru.ozero.app/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-[![Telegram](https://img.shields.io/badge/Telegram-Channel-26A5E4?logo=telegram)](https://t.me/ozero_app)
 
 **Один клик — интернет без границ.**
 
@@ -39,7 +38,7 @@ Ozero — Android-комбайн обхода блокировок и DPI-цен
 - **Internal kill-switch** — при сбое engine трафик блокируется (fail-closed), мимо TUN не идёт
 - **Ed25519-подписанные подписки** серверов (Ed25519 LTK + ротируемый SK — `docs/key-rotation.md`)
 - **Security-first**: anti-debug / anti-frida / signature check / R8 full + obfuscator-LLVM
-- **Free-to-use**, без Google Play (только F-Droid / GitHub Releases / Telegram)
+- **Free-to-use**, без Google Play (только F-Droid / GitHub Releases)
 
 ## Документация
 
@@ -76,7 +75,6 @@ Native-бинари (libxray.aar, libbyedpi.so, …) скачиваются ав
 - **GitHub Releases** — APK + SHA256 + Ed25519 signature (на каждый tag `v*.*.*`)
 - **F-Droid** — pending submission
 - **Веб**: GitHub Pages на этом репо (pending; собственный домен не планируется — server-less архитектура)
-- **Telegram**: канал анонсов + группа поддержки (pending)
 
 Google Play **не планируется** — censorship + блокировка VPN-приложений в политике.
 
