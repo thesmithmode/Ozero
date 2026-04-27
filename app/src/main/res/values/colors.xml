@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="launcher_bg">#061B36</color>
+    <color name="launcher_ring">#0F2E56</color>
+    <color name="launcher_wave_primary">#4FD5FF</color>
+    <color name="launcher_wave_secondary">#93E8FF</color>
+    <color name="launcher_center">#FFFFFF</color>
+</resources>
