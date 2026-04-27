@@ -8,7 +8,9 @@ import kotlin.test.assertTrue
 
 class AntiFridaCheckTest {
 
-    private fun check(maps: String?) = AntiFridaCheck(reader = { maps })
+    private fun check(maps: String?) = AntiFridaCheck(
+        reader = ProcMapsReader { block -> block(maps?.lineSequence() ?: emptySequence()) },
+    )
 
     @Test
     fun emptyMapsReturnsFalse() = assertFalse(check("").isHookFrameworkPresent())

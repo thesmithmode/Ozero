@@ -93,14 +93,21 @@ class OzeroVpnService : android.net.VpnService() {
         serviceScope.launch {
             // Hard timeout: native hev-tunnel может зависнуть на misconfigured fd —
             // без timeout serviceScope блокирует stop в onDestroy навечно.
-            val result = withTimeoutOrNull(PIPELINE_START_TIMEOUT_MS) {
-                runCatching { pipeline.start(tunFd = fd.fd) }
-                    .onFailure { Log.e(TAG, "pipeline.start threw", it) }
-                    .getOrNull()
-            }
-            if (result !is VpnEnginePipeline.Result.Connected) {
-                Log.w(TAG, "pipeline не подключился: $result, останавливаем")
-                stopVpn()
+            try {
+                val result = withTimeoutOrNull(PIPELINE_START_TIMEOUT_MS) {
+                    runCatching { pipeline.start(tunFd = fd.fd) }
+                        .onFailure { Log.e(TAG, "pipeline.start threw", it) }
+                        .getOrNull()
+                }
+                if (result !is VpnEnginePipeline.Result.Connected) {
+                    Log.w(TAG, "pipeline не подключился: $result, останавливаем")
+                    stopVpn()
+                }
+            } finally {
+                // Гарантируем сброс starting даже если stopVpn() пропустил CAS из-за
+                // параллельного stop (onDestroy / повторный ACTION_STOP) — иначе
+                // последующий ACTION_START заблокирован "уже запускается" навсегда.
+                starting.set(false)
             }
         }
     }
