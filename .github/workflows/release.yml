@@ -90,6 +90,32 @@ jobs:
           echo "Built jniLibs:"
           ls -la "$OUT"/*/libhev-socks5-tunnel.so
 
+      # Гарантия что собранная .so содержит ВСЕ JNI-symbols которые наш Kotlin
+      # ожидает. Если upstream API когда-нибудь поменяется — fail тут, не в
+      # runtime на телефоне юзера.
+      - name: Assert JNI symbols в libhev-socks5-tunnel.so
+        env:
+          NDK_PATH: ${{ steps.ndk.outputs.ndk-path }}
+        run: |
+          set -euo pipefail
+          NM="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
+          REQUIRED='JNI_OnLoad'
+          for ABI in arm64-v8a armeabi-v7a x86_64 x86; do
+            SO="common-vpn/src/main/jniLibs/$ABI/libhev-socks5-tunnel.so"
+            if [ ! -f "$SO" ]; then continue; fi
+            SYMS=$("$NM" -D --defined-only "$SO" || true)
+            for sym in $REQUIRED; do
+              if ! echo "$SYMS" | grep -q "$sym"; then
+                echo "::error::В $SO отсутствует JNI-symbol $sym"
+                exit 1
+              fi
+            done
+            # TProxyStartService / TProxyStopService регистрируются через RegisterNatives
+            # из JNI_OnLoad → не видны как отдельные exported symbols. Поэтому JNI_OnLoad
+            # — обязательный маркер что hev-jni.c скомпилирован (ANDROID define включился).
+          done
+          echo "JNI symbols OK на всех ABI"
+
       - name: Decode keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
@@ -115,6 +141,35 @@ jobs:
           OZERO_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
           UPDATE_PUBLIC_KEY_HEX: ${{ secrets.UPDATE_PUBLIC_KEY_HEX }}
         run: ./gradlew :app:assembleRelease --stacktrace
+
+      # Главный assertion: APK обязан содержать libhev-socks5-tunnel.so для
+      # ВСЕХ ABI которые перечислены в abiFilters. Прошлый релиз был зелёный
+      # на CI и крашился у юзеров — потому что эту проверку никто не делал.
+      - name: Assert APK содержит libhev-socks5-tunnel.so для всех ABI
+        run: |
+          set -euo pipefail
+          APK=$(find app/build/outputs/apk/release -name '*.apk' | head -n1)
+          if [ -z "$APK" ]; then
+            echo "::error::Release APK не собран"
+            exit 1
+          fi
+          echo "Проверяю $APK"
+          # Список ABI берём из AGP defaultConfig.ndk.abiFilters в app/build.gradle.kts.
+          # Если меняем abiFilters — синхронизируем здесь.
+          for ABI in arm64-v8a armeabi-v7a x86_64; do
+            if ! unzip -l "$APK" | grep -q "lib/$ABI/libhev-socks5-tunnel.so"; then
+              echo "::error::В APK отсутствует lib/$ABI/libhev-socks5-tunnel.so — VPN краш гарантирован"
+              unzip -l "$APK" | grep -E "lib/[^/]+/" | head -30
+              exit 1
+            fi
+            # Bonus: размер sanity-check (должен быть >50 КБ, иначе stripped до пустоты).
+            SIZE=$(unzip -l "$APK" "lib/$ABI/libhev-socks5-tunnel.so" | awk 'NR==4{print $1}')
+            if [ "$SIZE" -lt 50000 ]; then
+              echo "::error::libhev-socks5-tunnel.so для $ABI подозрительно мал ($SIZE байт)"
+              exit 1
+            fi
+          done
+          echo "APK содержит libhev на всех нужных ABI"
 
       - name: Collect artifacts
         env:
