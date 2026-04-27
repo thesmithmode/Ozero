@@ -60,7 +60,7 @@ class JniContractTest {
     }
 
     @Test
-    fun `loadLibrary имя совпадает с именем .so из release pipeline`() {
+    fun `loadLibrary имя совпадает с именем so-файла из release pipeline`() {
         // Если поменяешь имя в loadLibrary — добавь соответствующий шаг в release.yml
         // который собирает/копирует .so с этим именем в jniLibs/<abi>/.
         val source = File(moduleRoot, "src/main/java/hev/TProxyService.kt").readText()

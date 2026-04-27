@@ -49,6 +49,7 @@ data class HevTunnelConfig(
 
     private companion object {
         private const val DEFAULT_TUN_MTU: Int = 1500
+
         // Должны совпадать с TUN_ADDRESS / TUN_ADDRESS_V6 в OzeroVpnService —
         // hev открывает раздачу на этих IP в TUN-интерфейсе.
         private const val DEFAULT_TUN_IPV4: String = "10.10.10.10"
