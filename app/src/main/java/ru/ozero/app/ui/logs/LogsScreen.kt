@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AssistChip
@@ -85,6 +86,14 @@ internal fun LogsScreenContent(
                     }
                 },
                 actions = {
+                    IconButton(onClick = {
+                        val text = state.filtered.joinToString("\n") { e ->
+                            "${TS_FMT.format(Date(e.timestampMs))} ${e.level.short} ${e.tag}: ${e.message}"
+                        }
+                        copyToClipboard(ctx, "logs", text)
+                    }) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = "Копировать")
+                    }
                     IconButton(onClick = onClear) {
                         Icon(Icons.Default.Delete, contentDescription = "Очистить")
                     }
