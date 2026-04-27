@@ -8,6 +8,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
 import ru.ozero.app.data.CrashLogStore
+import ru.ozero.app.logging.BootDiagnostics
 import ru.ozero.app.logging.BootFileLogger
 import ru.ozero.app.logging.LogcatReader
 import ru.ozero.app.subscription.HarvestWorker
@@ -33,6 +34,7 @@ class OzeroApp : Application(), Configuration.Provider {
         super.attachBaseContext(base)
         BootFileLogger.init(base)
         installCrashHandler()
+        BootDiagnostics.installWtfHandler()
         BootFileLogger.info(
             TAG,
             "attachBaseContext sdk=${Build.VERSION.SDK_INT} " +
@@ -40,19 +42,20 @@ class OzeroApp : Application(), Configuration.Provider {
                 "device=${Build.MANUFACTURER}/${Build.MODEL} " +
                 "is64=${android.os.Process.is64Bit()}",
         )
-        runCatching {
+        BootDiagnostics.guardUnit("nativeLibraryDir dump") {
             val nativeDir = base.applicationInfo.nativeLibraryDir
             val libs = java.io.File(nativeDir).listFiles()
                 ?.joinToString(",") { "${it.name}(${it.length()}b)" } ?: "null"
             BootFileLogger.info(TAG, "nativeLibraryDir=$nativeDir libs=[$libs]")
-        }.onFailure { BootFileLogger.error(TAG, "nativeLibraryDir dump failed", it) }
-        runCatching {
+        }
+        BootDiagnostics.guardUnit("TProxyService probe") {
             BootFileLogger.info(
                 TAG,
                 "TProxyService.libraryLoaded=${hev.TProxyService.libraryLoaded} " +
                     "loadError=${hev.TProxyService.loadError}",
             )
-        }.onFailure { BootFileLogger.error(TAG, "TProxyService probe failed", it) }
+        }
+        BootDiagnostics.dumpExitReasons(base)
     }
 
     override fun onCreate() {
@@ -64,12 +67,10 @@ class OzeroApp : Application(), Configuration.Provider {
             throw t
         }
         BootFileLogger.info(TAG, "onCreate after super")
-        runCatching {
-            logcatReader.start()
-        }.onFailure { BootFileLogger.error(TAG, "logcatReader start failed", it) }
-        runCatching {
+        BootDiagnostics.guardUnit("logcatReader.start") { logcatReader.start() }
+        BootDiagnostics.guardUnit("HarvestWorker.enqueueUnique") {
             HarvestWorker.enqueueUnique(this)
-        }.onFailure { BootFileLogger.error(TAG, "HarvestWorker enqueue failed", it) }
+        }
         BootFileLogger.info(TAG, "onCreate done")
     }
 
