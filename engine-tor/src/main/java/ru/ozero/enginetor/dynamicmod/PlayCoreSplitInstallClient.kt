@@ -14,17 +14,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
-/**
- * Production-обёртка над PlayCore [SplitInstallManager].
- *
- * Маппит [SplitInstallSessionStatus] → [InstallResult]:
- * - DOWNLOADING / INSTALLING / PENDING / DOWNLOADED → [InstallResult.Installing]
- * - INSTALLED → [InstallResult.Installed] (закрывает Flow)
- * - FAILED / CANCELED / REQUIRES_USER_CONFIRMATION → [InstallResult.Failed] (закрывает Flow)
- *
- * Cancel корутины → cancelInstall(sessionId) — PlayCore не освобождает скачанный
- * payload до cancel, без него прервать загрузку нельзя.
- */
 class PlayCoreSplitInstallClient(
     private val manager: SplitInstallManager,
 ) : SplitInstallClient {
@@ -62,10 +51,7 @@ class PlayCoreSplitInstallClient(
                 }
 
                 SplitInstallSessionStatus.REQUIRES_USER_CONFIRMATION -> {
-                    // RT.5 не показывает UI-confirm: модуль ~200 МБ, требуется пользовательское
-                    // согласие на large download через системный диалог. Доставка этого диалога
-                    // — задача UI-слоя (Activity.startIntentSender) в RT.4. Пока считаем как Failed.
-                    trySend(InstallResult.Failed(reason = "user confirmation required"))
+                                                                                trySend(InstallResult.Failed(reason = "user confirmation required"))
                     close()
                 }
 
@@ -111,9 +97,7 @@ class PlayCoreSplitInstallClient(
         const val TAG = "PlayCoreSplitInstall"
         const val PERCENT_BASE = 100
 
-        // SplitInstallErrorCode задействован неявно через state.errorCode() — keep import
-        // живым чтобы рефакторинг не выкинул его при чистке (нужен для отладки кодов).
-        @Suppress("unused")
+                        @Suppress("unused")
         val ERROR_CODE_REF = SplitInstallErrorCode::class.java
     }
 }

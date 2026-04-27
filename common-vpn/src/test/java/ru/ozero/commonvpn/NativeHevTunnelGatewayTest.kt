@@ -55,8 +55,7 @@ class NativeHevTunnelGatewayTest {
             nativeStart = { _, _ -> 0 },
             nativeStop = { throw IllegalStateException("native stop failed") },
         )
-        // не должен пробрасывать — VpnService.onDestroy не должен крашиться от cleanup
-        gateway.stop()
+                gateway.stop()
     }
 
     @Test

@@ -16,10 +16,6 @@ import ru.ozero.coreapi.StartResult
 import ru.ozero.commonjson.JsonWriter
 import ru.ozero.coreorchestrator.probe.Socks5HandshakeProbe
 
-/**
- * NaiveProxy engine. HTTP/2 (или QUIC) CONNECT через Chromium net stack —
- * fingerprint TLS = реальный Chrome. Запускает subprocess naiveproxy с inline JSON конфигом.
- */
 class NaiveEngine(
     private val delegate: LibNaiveDelegate,
 ) : Engine {
@@ -28,7 +24,7 @@ class NaiveEngine(
 
     override val capabilities = EngineCapabilities(
         supportsTcp = true,
-        supportsUdp = false, // naive over HTTP/2 = TCP; QUIC variant обрабатывается прозрачно
+        supportsUdp = false, 
         supportsDoH = false,
         localOnly = false,
         requiresServer = true,
@@ -39,10 +35,7 @@ class NaiveEngine(
 
     override suspend fun start(config: EngineConfig): StartResult {
         require(config is EngineConfig.Naive) { "NaiveEngine требует EngineConfig.Naive" }
-        // proxyUrl должен быть валидным URL (https://... / quic://...). Escape-hatch
-        // "если начинается с { — считать готовым JSON" удалён: атакующий мог передать
-        // произвольный JSON прямо в native CLI naiveproxy, минуя валидацию (host/user/pass).
-        require(!config.proxyUrl.trimStart().startsWith("{")) {
+                                require(!config.proxyUrl.trimStart().startsWith("{")) {
             "proxyUrl не может быть JSON — используйте url-формат"
         }
         val jsonConfig = JsonWriter.write(

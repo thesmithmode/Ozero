@@ -7,14 +7,6 @@ import android.content.pm.PackageInstaller
 import android.os.Build
 import android.util.Log
 
-/**
- * Принимает result-broadcast от [PackageInstaller] и маршрутизирует в
- * [UpdateInstallEventBus]. PendingIntent на этот receiver формирует
- * [SilentPackageInstaller] при commit() сессии.
- *
- * Регистрация в AndroidManifest.xml (exported=false): broadcast приходит с
- * Intent.setPackage(this), внешним приложениям доступ не нужен.
- */
 class UpdateInstallResultReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {

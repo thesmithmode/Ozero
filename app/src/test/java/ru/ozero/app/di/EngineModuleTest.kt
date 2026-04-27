@@ -10,12 +10,7 @@ import kotlin.test.assertTrue
 
 class EngineModuleTest {
 
-    /**
-     * Каждый EngineId должен быть покрыт ровно одним @Provides @IntoMap @EngineKey
-     * методом в EngineModule. Защита от тихого пропуска движка при добавлении нового
-     * EngineId в enum — Hilt-граф иначе соберётся, но движок просто отсутствует в Map.
-     */
-    @Test
+        @Test
     fun `engine module covers every EngineId via @IntoMap`() {
         val moduleClass = EngineModule::class.java
         val coveredIds = moduleClass.declaredMethods

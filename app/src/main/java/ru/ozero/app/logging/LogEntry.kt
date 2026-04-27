@@ -1,9 +1,5 @@
 package ru.ozero.app.logging
 
-/**
- * Уровни логов в порядке возрастания серьёзности. Сортировка по [ordinal]
- * используется для фильтрации `>= selected`.
- */
 enum class LogLevel(val short: Char) {
     TRACE('V'),
     DEBUG('D'),
@@ -12,8 +8,7 @@ enum class LogLevel(val short: Char) {
     ERROR('E');
 
     companion object {
-        /** Маппинг символа из logcat -v threadtime в [LogLevel]. F (fatal) → ERROR. */
-        fun fromShort(c: Char): LogLevel = when (c) {
+                fun fromShort(c: Char): LogLevel = when (c) {
             'V' -> TRACE
             'D' -> DEBUG
             'I' -> INFO
@@ -24,10 +19,6 @@ enum class LogLevel(val short: Char) {
     }
 }
 
-/**
- * Одна строка лога. [timestampMs] — wall-clock в миллисекундах. [tag] и [message]
- * взяты из logcat без модификации, [pid] помогает отличать наш процесс от чужого.
- */
 data class LogEntry(
     val timestampMs: Long,
     val level: LogLevel,

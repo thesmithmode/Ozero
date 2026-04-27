@@ -3,8 +3,6 @@ plugins {
     id("ozero.binaries")
 }
 
-// libbyedpi.so для 4 ABI скачивается из GitHub Releases через ozero.binaries (RT.1.7).
-// Локальная сборка из submodule более не нужна — production использует prebuilt бинари.
 ozeroBinaries {
     artifact("libbyedpi-arm64-v8a.so")
     artifact("libbyedpi-armeabi-v7a.so")

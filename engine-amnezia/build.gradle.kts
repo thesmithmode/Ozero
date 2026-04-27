@@ -3,9 +3,6 @@ plugins {
     id("ozero.binaries")
 }
 
-// libamneziawg.aar собирается из amneziawg-go (форк wireguard-go от amnezia)
-// через gomobile bind в CI (RT.1.7.4). Скачивается preBuild с sha256 verify.
-// JNI integration (StartAwg/StopAwg/IsUp/Version) — RT.2/RT.3.
 ozeroBinaries {
     artifact("libamneziawg.aar")
 }
@@ -18,8 +15,7 @@ android {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
         }
     }
-    // ndkVersion and externalNativeBuild activated when CMakeLists.txt is added (E1+)
-}
+    }
 
 dependencies {
     implementation(project(":core-api"))

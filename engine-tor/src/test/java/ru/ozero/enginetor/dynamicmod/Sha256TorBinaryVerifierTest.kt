@@ -99,8 +99,7 @@ class Sha256TorBinaryVerifierTest {
     fun `ABI filter ignores files for other ABIs`() = runTest {
         val torBytes = "tor-arm64".toByteArray()
         writeBytes("libtor-arm64-v8a.so", torBytes)
-        // Файл x86 на диске «битый», но он не в наборе проверки arm64.
-        writeBytes("libtor-x86.so", "garbage".toByteArray())
+                writeBytes("libtor-x86.so", "garbage".toByteArray())
         val verifier = Sha256TorBinaryVerifier(
             mapOf(
                 "arm64-v8a" to mapOf("libtor-arm64-v8a.so" to sha256Hex(torBytes)),

@@ -9,16 +9,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
 
-/**
- * Оркестрирует self-update full-flow:
- *   fetch latest release → compare semver → download apk+sig → Ed25519 verify
- *   → PackageInstaller commit → терминальное событие.
- *
- * Flow эмитит [Progress] — UI мапит в [ru.ozero.app.ui.settings.UpdateUiState].
- *
- * Ошибки агрегируются как [Progress.Failed] с указанием [Stage]. Coordinator
- * не бросает исключения наружу — flow всегда завершается терминальным event.
- */
 open class UpdateCoordinator(
     private val fetcher: GithubReleaseFetcher,
     private val downloader: ApkDownloader,
@@ -29,11 +19,7 @@ open class UpdateCoordinator(
     private val cacheDir: File,
 ) {
 
-    /**
-     * Mutex против гонки параллельных check(). Иначе два concurrent download затирают
-     * один и тот же файл `ozero-update.apk` → verify проходит на смеси байт.
-     */
-    private val checkMutex = Mutex()
+        private val checkMutex = Mutex()
 
     sealed class Progress {
         data object Checking : Progress()
@@ -66,8 +52,7 @@ open class UpdateCoordinator(
         }
         Log.i(TAG, "latest release tag=${release.tag} apk=${release.apkUrl}")
 
-        // HTTPS-only: GitHub CDN URLs всегда https, любая http-схема = MITM/подмена.
-        if (!release.apkUrl.startsWith("https://") || !release.sigUrl.startsWith("https://")) {
+                if (!release.apkUrl.startsWith("https://") || !release.sigUrl.startsWith("https://")) {
             Log.e(TAG, "non-HTTPS URL в release info — REJECT")
             collector.emit(Progress.Failed(Progress.Stage.FETCH, "non-HTTPS URL в release"))
             return
@@ -79,11 +64,7 @@ open class UpdateCoordinator(
             return
         }
 
-        // Downgrade protection: даже если semver-tag выше, versionCode из manifest скачанного
-        // APK проверяется отдельно после verify. Здесь — pre-check по полю release.versionCode
-        // (если backend его выдаёт). Полная проверка versionCode из APK manifest требует парсинга
-        // AndroidManifest и ляжет на PackageInstaller, который вернёт INSTALL_FAILED_VERSION_DOWNGRADE.
-        if (release.versionCode > 0 && release.versionCode <= currentVersionCode) {
+                                        if (release.versionCode > 0 && release.versionCode <= currentVersionCode) {
             Log.w(TAG, "release versionCode=${release.versionCode} <= current=$currentVersionCode → REJECT")
             collector.emit(Progress.UpToDate)
             return
@@ -148,9 +129,7 @@ open class UpdateCoordinator(
                 }
             }
         } finally {
-            // PackageInstaller session уже скопировал байты — apk/sig в cacheDir не нужны.
-            // Раньше оставались висеть до OS cache eviction (50–200 МБ).
-            apk.delete()
+                                    apk.delete()
             sig.delete()
         }
     }

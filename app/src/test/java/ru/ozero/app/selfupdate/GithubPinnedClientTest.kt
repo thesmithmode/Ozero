@@ -35,8 +35,7 @@ class GithubPinnedClientTest {
         assertTrue(pins.size >= 3, "минимум 3 pins (leaf + intermediates) для ротационной устойчивости")
         for (pin in pins) {
             assertTrue(pin.startsWith("sha256/"), "pin должен быть в формате sha256/<base64>: $pin")
-            // Base64 SPKI sha256 = 32 байта → 44 символа base64 (с '=').
-            val b64 = pin.removePrefix("sha256/")
+                        val b64 = pin.removePrefix("sha256/")
             assertEquals(44, b64.length, "ожидается 44-символьный base64: $pin")
         }
     }
@@ -44,8 +43,7 @@ class GithubPinnedClientTest {
     @Test
     fun pinnerRejectsEmptyChain() {
         val client = GithubPinnedClient.create()
-        // Пустая цепочка → CertificatePinner кидает SSLPeerUnverifiedException.
-        val ex = runCatching {
+                val ex = runCatching {
             client.certificatePinner.check("api.github.com", emptyList())
         }.exceptionOrNull()
         assertTrue(ex != null, "пустая цепочка должна быть отвергнута")
@@ -53,8 +51,7 @@ class GithubPinnedClientTest {
 
     @Test
     fun urlBuilderAcceptsHttpsApiGithub() {
-        // Sanity: pinned host достижим через HTTPS URL builder.
-        val url = "https://${GithubPinnedClient.host()}/repos/owner/repo/releases/latest".toHttpUrl()
+                val url = "https://${GithubPinnedClient.host()}/repos/owner/repo/releases/latest".toHttpUrl()
         assertEquals("api.github.com", url.host)
         assertEquals("https", url.scheme)
     }

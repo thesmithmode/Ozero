@@ -8,12 +8,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * Гарантирует что snapshot bootstrap-servers.json подписан валидно текущим
- * `update-pubkey.pem`. Если этот тест красный — обновлять подпись через
- * `tools/sign_bootstrap.sh` (или аналог). Fail-closed на проде: в `AssetsFirstRunBootstrap`
- * импорт пропускается, но в репо такого допускать нельзя.
- */
 class BootstrapSignatureTest {
 
     private val json = File("src/main/assets/bootstrap-servers.json")

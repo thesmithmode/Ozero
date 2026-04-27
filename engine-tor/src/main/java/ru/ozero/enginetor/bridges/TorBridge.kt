@@ -1,15 +1,5 @@
 package ru.ozero.enginetor.bridges
 
-/**
- * Сериализованный bridge для torrc — Bridge transport addr fingerprint args.
- *
- * Поддерживаемые транспорты:
- * - obfs4 — TLS-обфускация
- * - snowflake — WebRTC через volunteer proxies
- * - webtunnel — HTTPS-туннель через CDN-fronting
- * - meek_lite — domain fronting
- * - conjure — refraction networking
- */
 data class TorBridge(
     val transport: String,
     val address: String,

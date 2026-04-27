@@ -1,8 +1,5 @@
 package ru.ozero.security.antiemu
 
-/**
- * Источник Build-полей для тестируемости.
- */
 data class DeviceFingerprint(
     val brand: String,
     val device: String,
@@ -13,24 +10,13 @@ data class DeviceFingerprint(
     val fingerprint: String,
 )
 
-/**
- * Эвристики обнаружения эмулятора по Build-полям. Не идеально (Genymotion с custom build
- * fingerprint обходит), но отсекает 95% setup'ов anti-cheat / DPI-bypass-fingerprinting.
- */
 class AntiEmulatorCheck(
     private val provider: () -> DeviceFingerprint = { realFingerprint() },
 ) {
 
     fun isEmulator(): Boolean = matchedReasons().isNotEmpty()
 
-    /**
-     * Список сработавших эвристик — для диагностики и логов.
-     *
-     * Эвристики содержат группы fingerprint-substring проверок (4+ OR на категорию):
-     * generic/unknown/vbox/test-keys, google_sdk/Emulator/SDK, Genymotion/unknown и т.п.
-     * Дробление потеряет атомарность правил детекции.
-     */
-    @Suppress("ComplexCondition")
+        @Suppress("ComplexCondition")
     fun matchedReasons(): List<String> {
         val f = provider()
         val reasons = mutableListOf<String>()

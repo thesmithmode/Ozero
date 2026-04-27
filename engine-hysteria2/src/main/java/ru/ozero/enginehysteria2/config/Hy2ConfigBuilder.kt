@@ -3,13 +3,6 @@ package ru.ozero.enginehysteria2.config
 import ru.ozero.commonjson.JsonWriter
 import ru.ozero.coresubscriptions.uri.Hysteria2Server
 
-/**
- * Сборщик клиентского JSON-конфига для apernet/hysteria v2.
- * Schema: server, auth, tls{sni,insecure,pinSHA256?}, obfs?{type,salamander{password}},
- * bandwidth?{up,down}, socks5{listen}, transport{type=udp, udp{hopInterval}}.
- *
- * Порядок ключей фиксирован (LinkedHashMap) — exact-match тесты + детерминированный hash конфига.
- */
 class Hy2ConfigBuilder {
 
     fun build(server: Hysteria2Server, options: Hy2BuildOptions): String {

@@ -8,12 +8,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
-/**
- * Хранит one-shot UX-флаги: «battery prompt уже показывался», «onboarding пройден».
- *
- * Изолирован от [SettingsRepository] — там настройки приложения с UI-контролом,
- * здесь — внутренние флаги без UI-toggle. Использует тот же DataStore (один файл).
- */
 interface UserFlagsRepository {
     val flags: Flow<UserFlags>
 

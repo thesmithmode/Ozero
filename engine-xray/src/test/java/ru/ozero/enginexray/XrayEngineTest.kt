@@ -121,8 +121,7 @@ class XrayEngineTest {
 
     @Test
     fun probeFailsAfterStartFailure() = runTest {
-        // Критично: неуспешный startXray не должен активировать порт для probe.
-        every { delegate.startXray(any()) } returns -1
+                every { delegate.startXray(any()) } returns -1
         engine.start(EngineConfig.Xray(configJson = """{"x":1}""", socksPort = 12345))
         val result = engine.probe()
         assertIs<ProbeResult.Failure>(result)

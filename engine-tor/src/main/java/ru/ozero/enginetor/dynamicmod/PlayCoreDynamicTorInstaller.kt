@@ -4,20 +4,6 @@ import android.util.Log
 import kotlinx.coroutines.flow.fold
 import java.io.File
 
-/**
- * Production [DynamicTorInstaller] для устройств с Google Play.
- *
- * Поведение:
- * 1. Если модуль уже установлен — verify эталонные SHA-256 (RT.5.3).
- *    Совпали → [InstallResult.AlreadyInstalled]. Иначе → deferredUninstall + Failed.
- * 2. Иначе — запросить установку через [SplitInstallClient.requestInstall],
- *    собрать терминальный результат Flow.
- *    Installed → verify; Ok → Installed, mismatch → deferredUninstall + Failed.
- *    Failed/синтетический Failed → пробрасываем без verify.
- *
- * Промежуточные [Installing] игнорируются — Engine не показывает прогресс,
- * UI-слой подписывается на Flow напрямую, если нужен progress bar.
- */
 class PlayCoreDynamicTorInstaller(
     private val client: SplitInstallClient,
     private val verifier: TorBinaryVerifier,
@@ -35,8 +21,7 @@ class PlayCoreDynamicTorInstaller(
         val raw = client.requestInstall(moduleName).fold(
             initial = InstallResult.Failed(reason = "no terminal emit") as InstallResult,
         ) { acc, value ->
-            // Прогресс-эмиты не интересуют, нужен только последний терминальный.
-            if (value is InstallResult.Installing) acc else value
+                        if (value is InstallResult.Installing) acc else value
         }
         return when (raw) {
             is InstallResult.Installed -> verifyAndMap(installedResult = InstallResult.Installed)

@@ -17,6 +17,5 @@ dependencies {
     testRuntimeOnly(libs.junit.jupiter.engine)
     testImplementation(libs.bundles.testing.unit)
     testImplementation(libs.okhttp.mockwebserver)
-    // org.json реальная импл для JVM unit-тестов (Android stubs бросают "Stub!").
-    testImplementation("org.json:json:20240303")
+        testImplementation("org.json:json:20240303")
 }

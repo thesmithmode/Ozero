@@ -261,7 +261,6 @@ class SettingsScreenTest {
     }
 
     private companion object {
-        // Sentinel value distinct from null & any EngineId — to detect "callback not invoked".
-        val SENTINEL: EngineId = EngineId.BYEDPI
+                val SENTINEL: EngineId = EngineId.BYEDPI
     }
 }

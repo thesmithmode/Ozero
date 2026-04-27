@@ -37,8 +37,7 @@ class TorConfigBuilderTest {
     @Test
     fun socksAndControlPortsBindToLocalhost() {
         val cfg = builder.build(emptyList(), opts())
-        // ControlPort на 0.0.0.0 = любое приложение в той же сети может NEWNYM
-        assertFalse(cfg.contains("ControlPort 9051\n"))
+                assertFalse(cfg.contains("ControlPort 9051\n"))
         assertFalse(cfg.contains("SocksPort 9050\n"))
         assertTrue(cfg.contains("ControlPort 127.0.0.1:9051"))
     }

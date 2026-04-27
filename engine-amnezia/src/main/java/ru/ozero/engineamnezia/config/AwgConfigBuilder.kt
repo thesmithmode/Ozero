@@ -2,40 +2,6 @@ package ru.ozero.engineamnezia.config
 
 import ru.ozero.coresubscriptions.uri.AmneziaWgServer
 
-/**
- * Сборщик INI-конфига AmneziaWG 2.0 (wg-quick формат + поля обфускации).
- *
- * Структура:
- * ```
- * [Interface]
- * PrivateKey = ...
- * Address    = 10.0.0.2/32
- * DNS        = 1.1.1.1, 8.8.8.8
- * MTU        = 1280
- * Jc         = 4
- * Jmin       = 40
- * Jmax       = 70
- * S1         = 0
- * S2         = 0
- * H1         = 0xAABBCCDD
- * H2         = 0x11223344
- * H3         = 99
- * H4         = 100
- *
- * [Peer]
- * PublicKey           = ...
- * PresharedKey        = ...
- * AllowedIPs          = 0.0.0.0/0, ::/0
- * Endpoint            = host:port
- * PersistentKeepalive = 25
- * ```
- *
- * Валидация:
- * - PrivateKey / PublicKey не пустые
- * - Jmin <= Jmax
- * - Если хотя бы один из H1..H4 ≠ 0 — все четыре уникальны и не равны нулю
- *   (требование протокола AmneziaWG: type-байты handshake должны различаться)
- */
 class AwgConfigBuilder {
 
     fun build(server: AmneziaWgServer): String {
@@ -43,10 +9,7 @@ class AwgConfigBuilder {
         require(server.publicKey.isNotBlank()) { "PublicKey пустой" }
         require(server.jmin <= server.jmax) { "Jmin (${server.jmin}) > Jmax (${server.jmax})" }
 
-        // INI-injection guard: подписочный URI URL-декодируется (%0a → \n) — без проверки
-        // attacker может встроить произвольные INI-директивы (DNS/AllowedIPs) через
-        // строковые поля. Fail-closed: если любое поле содержит \r/\n — отказ.
-        fun assertNoCrlf(value: String, name: String) {
+                                fun assertNoCrlf(value: String, name: String) {
             require('\n' !in value && '\r' !in value) { "$name содержит CR/LF (INI-injection?)" }
         }
         assertNoCrlf(server.privateKey, "PrivateKey")

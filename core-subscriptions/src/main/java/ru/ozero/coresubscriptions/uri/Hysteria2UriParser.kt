@@ -50,10 +50,7 @@ class Hysteria2UriParser {
         )
     }
 
-    /**
-     * Парсит `mport=20000-50000` → Pair(20000, 50000). Возвращает Pair(null,null) при ошибке.
-     */
-    private fun parseMport(s: String?): Pair<Int?, Int?> {
+        private fun parseMport(s: String?): Pair<Int?, Int?> {
         if (s.isNullOrBlank()) return null to null
         val parts = s.split('-')
         if (parts.size != 2) return null to null

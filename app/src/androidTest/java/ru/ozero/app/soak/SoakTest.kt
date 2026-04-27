@@ -13,17 +13,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.atomic.AtomicInteger
 
-/**
- * Soak test: гоняет N HTTP запросов с 1-секундным интервалом и собирает метрики.
- *
- * В CI запускается с OZERO_SOAK_REQUESTS=100 (уменьшенный вариант, ~10 мин).
- * Полный прогон (24h) только вручную / локально с OZERO_SOAK_REQUESTS=86400.
- *
- * Аргументы инструментации:
- *   OZERO_SOAK=1             — включить тест
- *   OZERO_SOAK_REQUESTS=N    — количество запросов (default 100)
- *   OZERO_SOAK_TARGET=URL    — цель HTTP запросов (default http://connectivitycheck.gstatic.com/generate_204)
- */
 @RunWith(AndroidJUnit4::class)
 class SoakTest {
 
@@ -89,8 +78,7 @@ class SoakTest {
                 successCount.incrementAndGet()
             } else {
                 dropCount.incrementAndGet()
-                // Retry один раз
-                if (doHttpRequest(targetUrl)) {
+                                if (doHttpRequest(targetUrl)) {
                     retryCount.incrementAndGet()
                     successCount.incrementAndGet()
                 } else {
@@ -103,8 +91,7 @@ class SoakTest {
                 Log.w(TAG, "ANR-like delay на запросе $i: ${elapsed}ms")
             }
 
-            // Замеряем память каждые 10 запросов
-            if (i % 10 == 0) {
+                        if (i % 10 == 0) {
                 Debug.getMemoryInfo(memInfo)
                 val currentMem = memInfo.totalPss.toLong()
                 if (currentMem > peakMemKb) {

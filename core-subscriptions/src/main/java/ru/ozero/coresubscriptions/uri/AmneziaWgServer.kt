@@ -1,17 +1,5 @@
 package ru.ozero.coresubscriptions.uri
 
-/**
- * AmneziaWG 2.0 — WireGuard с обфускацией.
- *
- * Поля JunkPackets / S1-S2 / H1-H4 — дополнения над стандартным WG, делающие
- * рукопожатие неотличимым для DPI:
- * - [jc]      — число junk-пакетов на handshake
- * - [jmin] / [jmax]  — диапазон размеров junk-пакетов в байтах
- * - [s1] / [s2]      — длины префиксов init/response пакетов
- * - [h1]..[h4]       — uint32 magic-заголовки (заменяют WG type bytes 1..4)
- *
- * Поля приватный/публичный/PSK ключ — base64 (43..44 chars без/с padding).
- */
 data class AmneziaWgServer(
     val privateKey: String,
     val publicKey: String,

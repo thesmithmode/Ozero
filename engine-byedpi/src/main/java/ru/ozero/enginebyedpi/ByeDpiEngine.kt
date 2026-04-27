@@ -43,9 +43,7 @@ class ByeDpiEngine(
             val args = buildArgs(config)
             val code = proxy.jniStartProxy(args)
             if (code == 0) {
-                // Порт активируется только ПОСЛЕ успешного старта, иначе probe может
-                // посчитать движок живым до того как jni подтвердил запуск.
-                activeSocksPort = config.socksPort
+                                                activeSocksPort = config.socksPort
                 Log.i(TAG, "started OK на порту ${config.socksPort}")
                 StartResult.Success(socksPort = config.socksPort)
             } else {
@@ -58,9 +56,7 @@ class ByeDpiEngine(
     override suspend fun stop() {
         Log.i(TAG, "stop")
         withContext(Dispatchers.IO) {
-            // runCatching: иначе JNI exception оставит engine в состоянии "активен" навсегда,
-            // блокируя повторный старт (AwgEngine.stop сделан так же).
-            runCatching { proxy.jniStopProxy() }
+                                    runCatching { proxy.jniStopProxy() }
                 .onFailure { Log.w(TAG, "jniStopProxy исключение: ${it.message}") }
             activeSocksPort = 0
         }

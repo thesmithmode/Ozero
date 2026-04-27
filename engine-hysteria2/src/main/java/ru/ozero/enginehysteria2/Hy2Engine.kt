@@ -15,11 +15,6 @@ import ru.ozero.coreapi.ProbeResult
 import ru.ozero.coreapi.StartResult
 import ru.ozero.coreorchestrator.probe.Socks5HandshakeProbe
 
-/**
- * Native Hysteria2 engine. UDP/QUIC + port-hopping + Salamander obfs.
- * Активный порт — локальный SOCKS5 listener из конфига; probe = TCP-connect к нему,
- * успех = native процесс действительно слушает.
- */
 class Hy2Engine(
     private val delegate: LibHy2Delegate,
 ) : Engine {

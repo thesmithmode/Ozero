@@ -108,8 +108,7 @@ class UpdateInstallResultReceiverTest {
 
         receiver.onReceive(context, intent)
 
-        // ничего не эмитим — replayCache пуст.
-        assertEquals(0, UpdateInstallEventBus.events.replayCache.size)
+                assertEquals(0, UpdateInstallEventBus.events.replayCache.size)
     }
 
     private companion object {

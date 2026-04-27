@@ -20,14 +20,6 @@ import ru.ozero.enginetor.config.TorConfigBuilder
 import ru.ozero.enginetor.dynamicmod.DynamicTorInstaller
 import ru.ozero.enginetor.dynamicmod.InstallResult
 
-/**
- * Tor engine с PT-bridges (obfs4 / snowflake / webtunnel / conjure / meek_lite).
- *
- * Особенности:
- * - Подгружает on-demand модуль `:dynamic_tor` через [installer] перед стартом.
- * - Собирает torrc динамически из bridges + ptBinaries.
- * - probe = TCP-connect к локальному SocksPort + проверка [delegate.isBootstrapped].
- */
 class TorEngine(
     private val delegate: LibTorDelegate,
     private val installer: DynamicTorInstaller,
@@ -43,7 +35,7 @@ class TorEngine(
         supportsUdp = false,
         supportsDoH = false,
         localOnly = false,
-        requiresServer = false, // bridges опциональны если direct TCP работает
+        requiresServer = false, 
     )
 
     @Volatile private var started: Boolean = false
@@ -54,8 +46,7 @@ class TorEngine(
     override suspend fun start(config: EngineConfig): StartResult {
         require(config is EngineConfig.Tor) { "TorEngine требует EngineConfig.Tor" }
 
-        // Шаг 1: убедиться что dynamic module установлен (~50 МБ скачивается по запросу).
-        when (val installResult = installer.ensureInstalled()) {
+                when (val installResult = installer.ensureInstalled()) {
             is InstallResult.Installed, InstallResult.AlreadyInstalled -> Unit
             is InstallResult.Failed -> {
                 Log.e(TAG, "dynamic_tor install failed: ${installResult.reason}")
@@ -67,8 +58,7 @@ class TorEngine(
             }
         }
 
-        // Шаг 2: собрать torrc.
-        val torrc = runCatching {
+                val torrc = runCatching {
             configBuilder.build(
                 bridges = bridges,
                 options = buildOptions.copy(socksPort = config.socksPort),

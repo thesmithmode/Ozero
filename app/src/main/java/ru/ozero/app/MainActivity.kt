@@ -35,6 +35,7 @@ import ru.ozero.app.ui.MainScreen
 import ru.ozero.app.ui.MainViewModel
 import ru.ozero.app.ui.about.AboutScreen
 import ru.ozero.app.ui.diag.DiagnosticsScreen
+import ru.ozero.app.ui.logs.BootLogScreen
 import ru.ozero.app.ui.logs.LogsScreen
 import ru.ozero.app.ui.onboarding.OnboardingScreen
 import ru.ozero.app.ui.permission.BatteryOptimization
@@ -45,7 +46,7 @@ import ru.ozero.app.ui.theme.OzeroTheme
 import ru.ozero.commonvpn.OzeroVpnService
 import javax.inject.Inject
 
-enum class TopScreen { Main, Settings, Diagnostics, SplitTunnel, Servers, About, Logs }
+enum class TopScreen { Main, Settings, Diagnostics, SplitTunnel, Servers, About, Logs, BootLog }
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -55,22 +56,12 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var serverImporter: ServerImportService
 
-    /**
-     * RT.7.3: launcher для system-диалога Doze whitelist'а. Result не обрабатываем —
-     * флаг batteryPromptShown ставится при показе, не при результате (UX: один раз).
-     */
-    private val batteryPromptLauncher =
+        private val batteryPromptLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             Log.i(TAG, "battery prompt result code=${result.resultCode}")
         }
 
-    /**
-     * RT.6.1: запуск system-confirm-dialog'а PackageInstaller'а на Android 12+.
-     * Получаем готовый Intent из broadcast'а STATUS_PENDING_USER_ACTION и
-     * стартуем его как Activity. Финальный статус прилетит в receiver отдельным
-     * broadcast'ом — result-callback нам не нужен.
-     */
-    private val updateConfirmLauncher =
+        private val updateConfirmLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             Log.i(TAG, "update confirm result code=${result.resultCode}")
         }
@@ -84,25 +75,18 @@ class MainActivity : ComponentActivity() {
                 viewModel.onVpnPermissionGranted()
                 startVpnService()
             } else {
-                // Permission denied — orchestrator остаётся в Idle, не трогаем его.
-            }
+                            }
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         observeSelfUpdateEvents()
-        // Идемпотентность: на rotation/process-restore onCreate fires снова с тем же
-        // intent — без guard'а ServerImportService.import выполнится повторно (Toast x2,
-        // лишние upsert). Обрабатываем только при первом создании Activity.
-        if (savedInstanceState == null) {
+                                if (savedInstanceState == null) {
             handleSubscriptionIntent(intent)
         }
         setContent {
             OzeroTheme {
-                // RT.9: gate. Пока флаг не прочитан — пустой экран (DataStore миллисекундно).
-                // rememberSaveable — иначе при повороте/process death gate-флаги
-                // ресетятся в false → DataStore читается заново → мигает пустой экран.
-                var checked by rememberSaveable { mutableStateOf(false) }
+                                                                var checked by rememberSaveable { mutableStateOf(false) }
                 var showOnboarding by rememberSaveable { mutableStateOf(false) }
                 LaunchedEffect(Unit) {
                     val completed = userFlags.isOnboardingCompleted()
@@ -123,9 +107,12 @@ class MainActivity : ComponentActivity() {
                             onOpenServers = { screen = TopScreen.Servers },
                             onOpenAbout = { screen = TopScreen.About },
                             onOpenLogs = { screen = TopScreen.Logs },
+                            onOpenBootLog = { screen = TopScreen.BootLog },
                         )
                     TopScreen.Logs ->
                         LogsScreen(onBack = { screen = TopScreen.Settings })
+                    TopScreen.BootLog ->
+                        BootLogScreen(onBack = { screen = TopScreen.Settings })
                     TopScreen.Diagnostics ->
                         DiagnosticsScreen(onBack = { screen = TopScreen.Main })
                     TopScreen.SplitTunnel ->
@@ -147,9 +134,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun onConnectClick() {
-        // Prepare ДО dispatch: разрешение запрашивается первым, только при OK переходим в Connect.
-        // Иначе orchestrator уйдёт в Probing до получения пермишна — race condition.
-        val vpnIntent = VpnService.prepare(this)
+                        val vpnIntent = VpnService.prepare(this)
         if (vpnIntent != null) {
             vpnPermissionLauncher.launch(vpnIntent)
         } else {
@@ -165,11 +150,7 @@ class MainActivity : ComponentActivity() {
         handleSubscriptionIntent(intent)
     }
 
-    /**
-     * RT.8.1/8.2: ловим VIEW (deeplink) и SEND (share text/plain) → достаём URI →
-     * ServerImportService → toast с результатом.
-     */
-    private fun handleSubscriptionIntent(intent: Intent?) {
+        private fun handleSubscriptionIntent(intent: Intent?) {
         if (intent == null) return
         val raw: String? = when (intent.action) {
             Intent.ACTION_VIEW -> intent.dataString
@@ -211,11 +192,7 @@ class MainActivity : ComponentActivity() {
         maybeShowBatteryPrompt()
     }
 
-    /**
-     * RT.7.3: после первого включения VPN — опционально предложить whitelist от Doze.
-     * Не блокирует подключение. Показывается ровно один раз (флаг в DataStore).
-     */
-    private fun maybeShowBatteryPrompt() {
+        private fun maybeShowBatteryPrompt() {
         lifecycleScope.launch {
             val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return@launch
             val isIgnoring = if (Build.VERSION.SDK_INT >= BatteryOptimization.MIN_SDK) {

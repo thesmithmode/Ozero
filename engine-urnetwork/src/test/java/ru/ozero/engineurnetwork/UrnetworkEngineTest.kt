@@ -26,8 +26,7 @@ class UrnetworkEngineTest {
         engine = UrnetworkEngine(delegate)
     }
 
-    // ------------------------------------------------------------------ id / capabilities
-
+    
     @Test
     fun engineIdIsUrnetwork() {
         assertEquals(EngineId.URNETWORK, engine.id)
@@ -41,8 +40,7 @@ class UrnetworkEngineTest {
         assertTrue(!caps.requiresServer, "URnetwork P2P не требует сервера")
     }
 
-    // ------------------------------------------------------------------ start validation
-
+    
     @Test
     fun startRequiresUrnetworkConfig() = runTest {
         val ex = runCatching { engine.start(EngineConfig.ByeDpi()) }.exceptionOrNull()
@@ -83,12 +81,10 @@ class UrnetworkEngineTest {
         assertIs<StartResult.Failure>(r)
     }
 
-    // ------------------------------------------------------------------ stop
-
+    
     @Test
     fun stopCallsDelegateDisconnect() = runTest {
-        // Запускаем сначала чтобы был activeSocksPort != 0
-        every { delegate.connect(any(), any(), any(), any()) } returns true
+                every { delegate.connect(any(), any(), any(), any()) } returns true
         every { delegate.connectionStatus() } returns UrnetworkConnectionStatus.CONNECTED
         engine.start(EngineConfig.Urnetwork(jwtToken = "test-jwt"))
 
@@ -98,12 +94,10 @@ class UrnetworkEngineTest {
 
     @Test
     fun stopIsIdempotentWithoutStart() = runTest {
-        // не должно бросать исключение
-        engine.stop()
+                engine.stop()
     }
 
-    // ------------------------------------------------------------------ probe
-
+    
     @Test
     fun probeFailsWhenNotStarted() = runTest {
         val r = engine.probe()
@@ -126,8 +120,8 @@ class UrnetworkEngineTest {
     fun probeFailsWhenDisconnected() = runTest {
         every { delegate.connect(any(), any(), any(), any()) } returns true
         every { delegate.connectionStatus() } returnsMany listOf(
-            UrnetworkConnectionStatus.CONNECTED, // для start (waitForConnected)
-            UrnetworkConnectionStatus.DISCONNECTED, // для probe
+            UrnetworkConnectionStatus.CONNECTED, 
+            UrnetworkConnectionStatus.DISCONNECTED, 
         )
         every { delegate.sdkVersion() } returns "test-sdk"
         engine.start(EngineConfig.Urnetwork(jwtToken = "test-jwt"))
@@ -136,8 +130,7 @@ class UrnetworkEngineTest {
         assertIs<ProbeResult.Failure>(r)
     }
 
-    // ------------------------------------------------------------------ mode parsing
-
+    
     @Test
     fun startPassesProviderModeToDelegate() = runTest {
         every { delegate.connect(any(), any(), any(), any()) } returns true
@@ -160,13 +153,11 @@ class UrnetworkEngineTest {
         verify { delegate.connect(any(), any(), any(), UrnetworkMode.CONSUMER) }
     }
 
-    // ------------------------------------------------------------------ stats
-
+    
     @Test
     fun statsFlowEmitsInitialValue() = runTest {
         val stats = engine.stats()
-        // StateFlow всегда содержит значение — берём первый элемент через first()
-        val first = stats.first()
+                val first = stats.first()
         assertIs<ru.ozero.coreapi.EngineStats>(first)
     }
 }

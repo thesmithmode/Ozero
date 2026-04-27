@@ -7,10 +7,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * Гарантирует что snapshot bootstrap-servers.json валиден и не содержит
- * placeholder URI. Регенерируется через `tools/harvest_snapshot.py`.
- */
 class BootstrapServersAssetTest {
 
     private val asset = File("src/main/assets/bootstrap-servers.json")

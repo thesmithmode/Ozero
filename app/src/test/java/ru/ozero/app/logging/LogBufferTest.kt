@@ -40,8 +40,7 @@ class LogBufferTest {
         val s1 = buf.entries.value
         buf.append(entry(2))
         val s2 = buf.entries.value
-        // Snapshot s1 не мутирует после второго append
-        assertEquals(1, s1.size)
+                assertEquals(1, s1.size)
         assertEquals(2, s2.size)
     }
 }

@@ -14,20 +14,6 @@ import java.net.InetSocketAddress
 import java.net.Socket
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * E16.2: проверка живости серверов после harvest.
- *
- * Минимальный probe = TCP-connect на host:port с таймаутом 3 сек. Это базовый
- * отсев — порт открыт != прокси работает, но мёртвые точно отсекаются. Полный
- * E2E probe (TLS handshake + HTTP request через прокси) — отдельный pass для
- * winning-engine в `StrategyEngine` (избегаем спам каждого VLESS-сервера полным
- * proxy-handshake'ом).
- *
- * Контракт:
- * - Параллелизм через coroutineScope.async (≤16 одновременно)
- * - Не падает если URI кривой (host extraction вернёт null → mark dead)
- * - Обновляет `isAlive` + `lastCheckedAt` через [ServerDao.setAlive]
- */
 class LiveProber(
     private val serverDao: ServerDao,
     private val now: () -> Long = System::currentTimeMillis,
@@ -35,9 +21,7 @@ class LiveProber(
 
     suspend fun probeAll(servers: List<ServerEntity>): ProbeStats {
         if (servers.isEmpty()) return ProbeStats(0, 0, 0)
-        // Семафор ограничивает реальный параллелизм: при 500+ серверах без него
-        // открывается 500 одновременных TCP-сокетов → fd exhaustion + сетевой шторм.
-        val sem = Semaphore(MAX_CONCURRENT)
+                        val sem = Semaphore(MAX_CONCURRENT)
         val results = coroutineScope {
             servers.map { srv ->
                 async(Dispatchers.IO) {
@@ -65,12 +49,7 @@ class LiveProber(
         }.getOrDefault(false)
     }
 
-    /**
-     * Извлекает host из URI. Для всех scheme (vless/hy2/trojan/ss/vmess) формат
-     * одинаковый: `<scheme>://<userinfo>@<host>:<port>?...`. Без полного парсинга —
-     * только host extraction.
-     */
-    private fun extractHost(uri: String): String? {
+        private fun extractHost(uri: String): String? {
         val schemeEnd = uri.indexOf("://")
         if (schemeEnd < 0) return null
         val rest = uri.substring(schemeEnd + 3)

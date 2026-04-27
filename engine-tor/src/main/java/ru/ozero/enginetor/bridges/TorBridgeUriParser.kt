@@ -4,14 +4,6 @@ import java.net.URI
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 
-/**
- * Парсит URI bridge:
- *   `bridge://<transport>@<addr>:<port>?fingerprint=...&<arg>=<val>...#name`
- *
- * Где transport ∈ {obfs4, snowflake, webtunnel, meek_lite, conjure}.
- * `fingerprint` — зарезервированный параметр, не попадает в torrc args.
- * Остальные query-пары становятся `key=value` в `Bridge ...` строке torrc.
- */
 class TorBridgeUriParser {
 
     fun parse(uri: String): Result<TorBridge> {
@@ -45,9 +37,7 @@ class TorBridgeUriParser {
         val fingerprint = params["fingerprint"]
             ?: return Result.failure(IllegalArgumentException("отсутствует fingerprint"))
 
-        // IPv6 hosts: java.net.URI.host возвращает значение БЕЗ квадратных скобок,
-        // но torrc требует [::1]:443. Распознаём IPv6 по наличию ':' в host.
-        val address = when {
+                        val address = when {
             port == -1 -> host
             host.contains(':') -> "[$host]:$port"
             else -> "$host:$port"
@@ -63,7 +53,7 @@ class TorBridgeUriParser {
                 transport = transport,
                 address = address,
                 fingerprint = fingerprint,
-                args = args.toSortedMap(), // детерминированный порядок для тестов
+                args = args.toSortedMap(), 
                 remark = remark,
             ),
         )

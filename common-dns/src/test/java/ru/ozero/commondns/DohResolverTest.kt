@@ -29,9 +29,7 @@ class DohResolverTest {
 
     @Test
     fun resolvesIpv4FromDnsMessage() = runTest {
-        // DoH response: A record pointing to 1.2.3.4
-        // Тело DNS-ответа собираем минимально (упрощённо: парсер умеет читать A records из RFC 1035 wire format)
-        val dnsResponse = buildDnsAResponse(host = "example.com", ipv4 = intArrayOf(1, 2, 3, 4))
+                        val dnsResponse = buildDnsAResponse(host = "example.com", ipv4 = intArrayOf(1, 2, 3, 4))
         server.enqueue(
             MockResponse()
                 .setResponseCode(200)
@@ -70,13 +68,12 @@ class DohResolverTest {
 
     @Test
     fun truncatedCompressionPointerReturnsEmpty() = runTest {
-        // Обрезанный DNS ответ с compression pointer на последнем байте — не должен упасть с OOB.
-        val truncated = byteArrayOf(
+                val truncated = byteArrayOf(
             0x12, 0x34, 0x81.toByte(), 0x80.toByte(),
-            0, 1, 0, 1, 0, 0, 0, 0, // header: qd=1 an=1
+            0, 1, 0, 1, 0, 0, 0, 0, 
             3, 'a'.code.toByte(), 'b'.code.toByte(), 'c'.code.toByte(), 0,
-            0, 1, 0, 1, // qtype/qclass
-            0xC0.toByte(), // обрезанный compression pointer: нет второго байта
+            0, 1, 0, 1, 
+            0xC0.toByte(), 
         )
         server.enqueue(
             MockResponse()
@@ -85,30 +82,24 @@ class DohResolverTest {
                 .setBody(Buffer().write(truncated)),
         )
         val result = resolver.resolve("abc")
-        // Обрезано → нет A записей → Failure (пустой результат маркируется как "нет A-записей")
-        assertIs<DohResult.Failure>(result)
+                assertIs<DohResult.Failure>(result)
     }
 
-    // DNS wire format: id(2) flags(2) qd(2)=1 an(2)=1 ns(2)=0 ar(2)=0
-    //                 question: qname labels, qtype=A(1), qclass=IN(1)
-    //                 answer: ptr 0xc00c, type=A, class=IN, ttl=60, rdlength=4, rdata=ip
-    private fun buildDnsAResponse(host: String, ipv4: IntArray): ByteArray {
+                private fun buildDnsAResponse(host: String, ipv4: IntArray): ByteArray {
         val buf = java.io.ByteArrayOutputStream()
-        buf.write(byteArrayOf(0x12, 0x34)) // id
-        buf.write(byteArrayOf(0x81.toByte(), 0x80.toByte())) // flags: standard response, no error
-        buf.write(byteArrayOf(0, 1, 0, 1, 0, 0, 0, 0)) // qd=1 an=1 ns=0 ar=0
-        // qname
-        host.split(".").forEach { label ->
+        buf.write(byteArrayOf(0x12, 0x34)) 
+        buf.write(byteArrayOf(0x81.toByte(), 0x80.toByte())) 
+        buf.write(byteArrayOf(0, 1, 0, 1, 0, 0, 0, 0)) 
+                host.split(".").forEach { label ->
             buf.write(label.length)
             buf.write(label.toByteArray())
         }
-        buf.write(0) // terminator
-        buf.write(byteArrayOf(0, 1, 0, 1)) // qtype=A qclass=IN
-        // answer: name pointer to offset 12 (start of question)
-        buf.write(byteArrayOf(0xc0.toByte(), 0x0c))
-        buf.write(byteArrayOf(0, 1, 0, 1)) // type=A class=IN
-        buf.write(byteArrayOf(0, 0, 0, 60)) // ttl=60
-        buf.write(byteArrayOf(0, 4)) // rdlength
+        buf.write(0) 
+        buf.write(byteArrayOf(0, 1, 0, 1)) 
+                buf.write(byteArrayOf(0xc0.toByte(), 0x0c))
+        buf.write(byteArrayOf(0, 1, 0, 1)) 
+        buf.write(byteArrayOf(0, 0, 0, 60)) 
+        buf.write(byteArrayOf(0, 4)) 
         ipv4.forEach { buf.write(it) }
         return buf.toByteArray()
     }

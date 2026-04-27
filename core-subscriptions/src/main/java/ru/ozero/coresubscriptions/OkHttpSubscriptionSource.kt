@@ -31,10 +31,7 @@ class OkHttpSubscriptionSource(
             SubscriptionFetchResult.Success(bodyResult.bytes, signature)
         }
 
-    // Вложенность обусловлена defensive HTTP read внутри response.use {}: проверка
-    // success → body null → лимит размера. Уплощение требует extract-method, который
-    // разрывает .use{} scope и усложняет lifecycle закрытия body.
-    @Suppress("NestedBlockDepth")
+                @Suppress("NestedBlockDepth")
     private fun fetchBytes(url: String): FetchBytesResult {
         val request = Request.Builder().url(url).build()
         return try {
@@ -48,9 +45,7 @@ class OkHttpSubscriptionSource(
                         FetchBytesResult.Ok(ByteArray(0))
                     } else {
                         val source = body.source()
-                        // Не доверяем Content-Length: пробуем запросить (limit+1) байт.
-                        // Если буфер их получает → тело > лимита → отбрасываем.
-                        if (source.request(maxBodyBytes + 1)) {
+                                                                        if (source.request(maxBodyBytes + 1)) {
                             Log.w(TAG, "тело > $maxBodyBytes байт для $url — отброшено")
                             FetchBytesResult.IoError("тело превысило лимит $maxBodyBytes")
                         } else {
@@ -80,6 +75,6 @@ class OkHttpSubscriptionSource(
 
     private companion object {
         const val TAG = "OkHttpSubscriptionSource"
-        const val DEFAULT_MAX_BODY_BYTES: Long = 4L * 1024 * 1024 // 4 МБ — подписка как правило <100 КБ
+        const val DEFAULT_MAX_BODY_BYTES: Long = 4L * 1024 * 1024 
     }
 }

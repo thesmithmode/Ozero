@@ -12,19 +12,6 @@ import ru.ozero.commoncrypto.Ed25519Verifier
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * RT.9.2 / E16.4: первичный bootstrap при первом запуске приложения.
- *
- * Server-less архитектура (PLAN v4): backend `sub.ozero.app` отсутствует. Источник
- * первичного списка серверов — `app/src/main/assets/bootstrap-servers.json`,
- * snapshot'нутый из публичных GitHub-репо живых прокси под РФ на момент tag.
- * После первого pull `PublicProxyHarvester` (E16.1) — bootstrap-серверы
- * переотмечаются как dead если устарели.
- *
- * Безопасность: snapshot подписан Ed25519, подпись `bootstrap-servers.json.sig`,
- * публичный ключ `update-pubkey.pem`. Fail-closed: если проверка не прошла —
- * импорт пропускается полностью (без crash, без частичного импорта).
- */
 interface FirstRunBootstrap {
     suspend fun runIfFirstStart()
 }

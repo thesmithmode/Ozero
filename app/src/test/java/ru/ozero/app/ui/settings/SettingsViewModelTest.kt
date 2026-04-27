@@ -191,8 +191,7 @@ class SettingsViewModelTest {
         val gate = CompletableDeferred<InstallResult>()
         torClient.flow = flow {
             emit(InstallResult.Installing(percent = 10))
-            // блок дальше до cancel
-            emit(gate.await())
+                        emit(gate.await())
         }
 
         viewModel.onInstallTor()
@@ -244,8 +243,7 @@ class SettingsViewModelTest {
         )
         viewModel.onCheckUpdate()
         advanceUntilIdle()
-        // Финал: Submitted маппится в Installing (system confirm-dialog ещё впереди).
-        assertEquals(UpdateUiState.Installing, viewModel.update.value)
+                assertEquals(UpdateUiState.Installing, viewModel.update.value)
     }
 
     @Test

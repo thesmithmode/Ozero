@@ -1,11 +1,5 @@
 package ru.ozero.commonjson
 
-/**
- * Мини JSON-сериализатор без внешних зависимостей. Сохраняет порядок ключей из
- * LinkedHashMap — детерминированный вывод для exact-match тестов конфигов движков.
- *
- * Поддерживает: Map<String, Any?>, List<Any?>, String, Number, Boolean, null.
- */
 object JsonWriter {
 
     fun write(value: Any?): String {

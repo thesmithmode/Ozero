@@ -13,16 +13,6 @@ import ru.ozero.coresubscriptions.uri.SubscriptionUriParser
 import ru.ozero.enginehysteria2.config.Hy2BuildOptions
 import ru.ozero.enginehysteria2.config.Hy2ConfigBuilder
 
-/**
- * Превращает Hy2-серверы из подписки в native Hy2-кандидаты с приоритетом
- * [Candidate.PRIORITY_HYSTERIA2_NATIVE]. UDP/QUIC + port-hopping → выше любых TCP.
- *
- * Каждому кандидату выделяется уникальный SOCKS-порт от [basePort], чтобы
- * StrategyEngine мог пробовать их параллельно без конфликта на одном порту.
- *
- * Кандидаты помечены `requiresUdp=true` — при CGNAT/UDP-фильтре StrategyEngine
- * отбросит их и продолжит TCP-fallback (engine-xray VLESS).
- */
 class Hy2CandidateSource(
     private val serverDao: ServerDao,
     private val parser: SubscriptionUriParser = SubscriptionUriParser(),

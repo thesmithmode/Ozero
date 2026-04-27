@@ -12,19 +12,6 @@ import java.net.URL
 import kotlin.test.assertContains
 import kotlin.test.assertIs
 
-/**
- * E2E instrumented тест для URnetwork engine.
- *
- * Требования:
- * - Env var URNETWORK_TEST_JWT должен быть задан (иначе тест пропускается)
- * - Реальный URnetworkSdk.aar должен быть подключён в engine-urnetwork/libs/
- * - Сетевой доступ к cloudflare.com/cdn-cgi/trace
- *
- * Запуск в CI: только когда URNETWORK_TEST_JWT задан в секретах.
- *
- * TODO (E15.4): полная реализация после сборки URnetworkSdk.aar в urnetwork-aar.yml.
- * Сейчас тест скипается из-за отсутствия JWT (в CI нет секрета).
- */
 @RunWith(AndroidJUnit4::class)
 class UrnetworkE2ETest {
 
@@ -48,16 +35,13 @@ class UrnetworkE2ETest {
             mode = "consumer",
         )
 
-        // start
-        val startResult = engine.start(config)
+                val startResult = engine.start(config)
         assertIs<StartResult.Success>(startResult, "URnetwork engine не смог подключиться")
 
         try {
-            // HTTP GET cloudflare trace
-            val response = URL("https://cloudflare.com/cdn-cgi/trace").readText()
+                        val response = URL("https://cloudflare.com/cdn-cgi/trace").readText()
 
-            // Проверяем стандартные поля Cloudflare trace
-            assertContains(response, "fl=", message = "Ответ не содержит fl= (поле Cloudflare)")
+                        assertContains(response, "fl=", message = "Ответ не содержит fl= (поле Cloudflare)")
             assertContains(response, "ip=", message = "Ответ не содержит ip= (IP клиента)")
         } finally {
             engine.stop()

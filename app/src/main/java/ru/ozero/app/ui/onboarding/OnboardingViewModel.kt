@@ -10,10 +10,6 @@ import kotlinx.coroutines.launch
 import ru.ozero.app.settings.UserFlagsRepository
 import javax.inject.Inject
 
-/**
- * RT.9.1: ViewModel для onboarding. Принимает действия Pager'а, при финише
- * пишет `onboarding_completed=true` и опционально вызывает bootstrap (RT.9.2).
- */
 @HiltViewModel
 class OnboardingViewModel @Inject constructor(
     private val userFlags: UserFlagsRepository,
@@ -41,9 +37,7 @@ class OnboardingViewModel @Inject constructor(
         _state.value = _state.value.copy(completed = true)
         viewModelScope.launch {
             userFlags.markOnboardingCompleted()
-            // RT.9.2: первый запуск → попытка fetch default subscription.
-            // Не блокирует UX; ошибка логируется, серверы добавятся при следующем sync.
-            bootstrap.runIfFirstStart()
+                                    bootstrap.runIfFirstStart()
         }
     }
 

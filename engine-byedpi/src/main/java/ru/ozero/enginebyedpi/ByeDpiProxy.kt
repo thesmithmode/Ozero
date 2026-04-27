@@ -11,11 +11,7 @@ class ByeDpiProxy {
     external fun jniForceClose(): Int
 
     companion object {
-        // Lazy load: если устройство не имеет нужный ABI (stripped APK / неподдерживаемая
-        // архитектура), UnsatisfiedLinkError будет в момент создания ByeDpiProxy(), что
-        // ломает DI-граф приложения. Грузим в init companion object — один раз на JVM,
-        // и оборачиваем чтобы движок мог вернуть StartResult.Failure вместо краша.
-        @JvmStatic
+                                        @JvmStatic
         var libraryLoaded: Boolean = false
             private set
 

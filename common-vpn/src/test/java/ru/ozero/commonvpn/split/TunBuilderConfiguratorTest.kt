@@ -27,13 +27,10 @@ class TunBuilderConfiguratorTest {
     fun bypassLanAddsAllNonPrivateRoutes() {
         val b = mockBuilder()
         configurator.apply(b, SplitTunnelConfig(mode = SplitTunnelMode.BYPASS_LAN))
-        // Не должно быть default route 0.0.0.0/0 целиком
-        verify(exactly = 0) { b.addRoute("0.0.0.0", 0) }
-        // Один из ожидаемых routes
-        verify { b.addRoute("8.0.0.0", 7) }
+                verify(exactly = 0) { b.addRoute("0.0.0.0", 0) }
+                verify { b.addRoute("8.0.0.0", 7) }
         verify { b.addRoute("1.0.0.0", 8) }
-        // IPv6 global unicast добавляется (ULA/link-local исключены)
-        verify(exactly = 1) { b.addRoute("2000::", 3) }
+                verify(exactly = 1) { b.addRoute("2000::", 3) }
     }
 
     @Test
@@ -110,9 +107,7 @@ class TunBuilderConfiguratorTest {
         every { b.addAllowedApplication(any()) } returns b
         configurator.apply(b, SplitTunnelConfig(mode = SplitTunnelMode.ALLOWLIST, packages = emptySet()))
         verify(exactly = 1) { b.addRoute("0.0.0.0", 0) }
-        // Пустой ALLOWLIST = kill-all: добавляется только self-package в фильтр
-        // (Android не направляет own VPN traffic в собственный TUN → 0 пакетов через VPN)
-        verify(exactly = 1) { b.addAllowedApplication("ru.ozero.app") }
+                        verify(exactly = 1) { b.addAllowedApplication("ru.ozero.app") }
     }
 
     @Test
@@ -130,7 +125,6 @@ class TunBuilderConfiguratorTest {
             ),
         )
         verify { b.addAllowedApplication("ok.pkg") }
-        // missing.pkg вызвался но обёрнут в runCatching — тест проверяет что выполнение продолжилось
-        confirmVerified()
+                confirmVerified()
     }
 }

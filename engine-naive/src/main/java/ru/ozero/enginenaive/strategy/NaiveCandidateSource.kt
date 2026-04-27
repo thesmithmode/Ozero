@@ -10,12 +10,6 @@ import ru.ozero.coresubscriptions.uri.ParsedServer
 import ru.ozero.coresubscriptions.uri.SubscriptionUriParser
 import ru.ozero.enginenaive.config.NaiveConfigBuilder
 
-/**
- * Превращает Naive-серверы из подписки в кандидаты NAIVE с приоритетом 6
- * (между AmneziaWG=7 и Xray-SS=6 — выше SS из-за Chrome-fingerprint).
- *
- * Naive — TCP (HTTP/2), не UDP-зависим. requiresUdp=false → не отбрасывается при CGNAT.
- */
 class NaiveCandidateSource(
     private val serverDao: ServerDao,
     private val parser: SubscriptionUriParser = SubscriptionUriParser(),
@@ -55,9 +49,7 @@ class NaiveCandidateSource(
         const val DEFAULT_BASE_PORT = 12808
         const val DEFAULT_MAX = 5
 
-        // Между Xray-SS (6) и AmneziaWG (7). Chrome-fingerprint надёжнее SS, но
-        // ниже WG-обфускации, потому что HTTP/2 сильнее зависит от стабильности TLS-handshake.
-        const val PRIORITY = 6
+                        const val PRIORITY = 6
         private const val TAG = "NaiveCandidateSource"
     }
 }

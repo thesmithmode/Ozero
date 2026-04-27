@@ -20,12 +20,6 @@ import ru.ozero.coresubscriptions.harvester.PublicProxyHarvester
 import java.util.concurrent.TimeUnit
 import javax.inject.Named
 
-/**
- * E16.1: periodic WorkManager job. Раз в 6 часов (по умолчанию) пуллит
- * sources из [ProxySourceRegistry] → [PublicProxyHarvester] → upsert в БД.
- * Constraints: только по сети (любой). Не требует charging / battery-not-low —
- * harvester лёгкий (HTTP GET + parser).
- */
 @HiltWorker
 class HarvestWorker @AssistedInject constructor(
     @Assisted appContext: Context,
@@ -45,8 +39,7 @@ class HarvestWorker @AssistedInject constructor(
         val r = harvester.harvest(sources)
         Log.i(TAG, "doWork harvest: parsed=${r.totalParsed} failed=${r.failedSources}")
 
-        // E16.2: после harvest — отсев dead через TCP-probe
-        val all = dao.getLiveServers() // изначально все upserted с isAlive=true
+                val all = dao.getLiveServers() 
         val prober = LiveProber(dao)
         val ps = prober.probeAll(all)
         Log.i(TAG, "doWork probe: live=${ps.live} dead=${ps.dead} of ${ps.total}")
@@ -64,9 +57,7 @@ class HarvestWorker @AssistedInject constructor(
                 .setConstraints(
                     Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build(),
                 )
-                // Backoff 5 минут экспонента — иначе при сетевой деградации воркер
-                // ретраит каждые 30 секунд (default) → лишний расход батареи и трафика.
-                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 5L, TimeUnit.MINUTES)
+                                                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 5L, TimeUnit.MINUTES)
                 .build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 NAME,

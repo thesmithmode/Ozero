@@ -66,8 +66,7 @@ class Hysteria2UriParserTest {
         assertEquals(false, result.server.insecure)
     }
 
-    // ---- E4: pinSHA256, multi-SNI, mport, bandwidth -----------------
-
+    
     @Test
     fun parsesPinSha256() {
         val r = parser.parse("hysteria2://p@h:443?pinSHA256=AB:CD:EF")

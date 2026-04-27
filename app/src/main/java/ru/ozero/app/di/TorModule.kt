@@ -18,18 +18,6 @@ import ru.ozero.enginetor.dynamicmod.TorBinaryVerifier
 import java.io.File
 import javax.inject.Singleton
 
-/**
- * Tor on-demand installer + SplitInstall клиент.
- *
- * - [DynamicTorInstaller] — PlayCore-реализация (RT.5.3). После доставки сверяет
- *   нативки с эталонными SHA-256; mismatch → deferredUninstall + Failed.
- * - [SplitInstallClient] — production-обёртка над PlayCore SplitInstallManager;
- *   используется UI-слоем (SettingsViewModel) для запуска on-demand загрузки
- *   и подписки на прогресс.
- *
- * Выделено в отдельный модуль чтобы android-test варианты могли подменить
- * @Provides на Fake* через @TestInstallIn без трогания EngineModule.
- */
 @Module
 @InstallIn(SingletonComponent::class)
 object TorModule {

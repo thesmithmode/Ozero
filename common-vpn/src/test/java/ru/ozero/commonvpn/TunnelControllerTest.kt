@@ -38,9 +38,7 @@ class TunnelControllerTest {
 
     @Test
     fun deadStateIsNotIdleKillSwitchInvariant() {
-        // Kill-switch: Dead != Idle. При Dead TUN остаётся открытым, блокируя трафик.
-        // При Idle TUN может быть закрыт. Эти состояния нельзя путать.
-        controller.onEngineStarted(1080)
+                        controller.onEngineStarted(1080)
         controller.onEngineDied("crash")
         assertTrue(controller.state.value is TunnelState.Dead)
         assertTrue(controller.state.value !is TunnelState.Idle)

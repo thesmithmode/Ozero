@@ -12,11 +12,7 @@ data class Candidate(
     val engineId: EngineId,
     val config: EngineConfig,
     val priority: Int = PRIORITY_BYEDPI,
-    /**
-     * Кандидату нужен исходящий UDP (QUIC). При CGNAT/UDP-фильтре провайдера
-     * StrategyEngine отфильтрует такие кандидаты и оставит TCP-fallback.
-     */
-    val requiresUdp: Boolean = false,
+        val requiresUdp: Boolean = false,
 ) {
     companion object {
         const val PRIORITY_HYSTERIA2_NATIVE = 11
@@ -27,17 +23,11 @@ data class Candidate(
         const val PRIORITY_XRAY_SHADOWSOCKS = 6
         const val PRIORITY_BYEDPI = 5
 
-        /** URnetwork P2P — fallback после всех primary engines, выше TOR */
-        const val PRIORITY_URNETWORK = 2
+                const val PRIORITY_URNETWORK = 2
         const val PRIORITY_TOR = 1
     }
 }
 
-/**
- * Источник дополнительных кандидатов (Xray из подписки, AmneziaWG, и т. п.).
- * Декомпозиция: сборку JSON-конфигов делает специфичный модуль (engine-xray),
- * StrategyEngine не зависит от деталей протоколов.
- */
 fun interface CandidateSource {
     suspend fun candidates(): List<Candidate>
 }
@@ -46,12 +36,7 @@ class StrategyEngine(
     private val engines: Map<EngineId, Engine>,
     private val extraSources: List<CandidateSource> = emptyList(),
     private val parallelProbeCount: Int = DEFAULT_PARALLEL_PROBE,
-    /**
-     * Доступен ли исходящий UDP. По умолчанию `true` (open NAT). При CGNAT/UDP-фильтре
-     * выставляется `false` извне (например, по результату `CgnatDetector`) — тогда
-     * `buildCandidates()` отфильтрует UDP-зависимые кандидаты (Hysteria2 native).
-     */
-    private val udpReachable: () -> Boolean = { true },
+        private val udpReachable: () -> Boolean = { true },
 ) {
 
     suspend fun buildCandidates(): List<Candidate> {
@@ -70,13 +55,7 @@ class StrategyEngine(
             .sortedByDescending { it.priority }
     }
 
-    /**
-     * Параллельный probe батчами по [parallelProbeCount]. Возвращает первый успешный
-     * (по приоритету в рамках батча) — переходит к следующему батчу только если
-     * весь текущий провалился. Раньше пробовали только top-N → если topN упал, юзер
-     * получал NoCandidates даже когда низкоприоритетный TOR/URnetwork был доступен.
-     */
-    suspend fun pickBest(candidates: List<Candidate>): Candidate? {
+        suspend fun pickBest(candidates: List<Candidate>): Candidate? {
         if (candidates.isEmpty()) return null
         candidates.chunked(parallelProbeCount).forEach { batch ->
             val results = coroutineScope {

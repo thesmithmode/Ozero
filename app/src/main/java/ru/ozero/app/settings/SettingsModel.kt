@@ -8,10 +8,8 @@ data class SettingsModel(
     val ipv6Enabled: Boolean = DEFAULT_IPV6_ENABLED,
     val autoStart: Boolean = DEFAULT_AUTO_START,
     val manualEngine: EngineId? = DEFAULT_MANUAL_ENGINE,
-    /** E15: URnetwork P2P fallback включён пользователем */
-    val urnetworkEnabled: Boolean = DEFAULT_URNETWORK_ENABLED,
-    /** E15: JWT токен для URnetwork (null = не настроен) */
-    val urnetworkJwt: String? = DEFAULT_URNETWORK_JWT,
+        val urnetworkEnabled: Boolean = DEFAULT_URNETWORK_ENABLED,
+        val urnetworkJwt: String? = DEFAULT_URNETWORK_JWT,
 ) {
     companion object {
         val DEFAULT_SPLIT_MODE: SplitTunnelMode = SplitTunnelMode.ALL

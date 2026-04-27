@@ -6,20 +6,12 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/**
- * Экспорт буфера в текстовый файл во временный cache. Android периодически
- * чистит cacheDir, плюс мы при каждом экспорте удаляем предыдущие файлы —
- * disk не разрастается.
- *
- * Возвращает абсолютный путь к новому файлу для FileProvider.getUriForFile.
- */
 class LogExporter(private val context: Context) {
 
     fun export(entries: List<LogEntry>, minLevel: LogLevel): File {
         val dir = File(context.cacheDir, DIR_NAME).apply {
             mkdirs()
-            // Чистим прошлые экспорты — каждый новый replace, не накапливаем.
-            listFiles()?.forEach { runCatching { it.delete() } }
+                        listFiles()?.forEach { runCatching { it.delete() } }
         }
         val ts = TIMESTAMP_FORMAT.format(Date())
         val file = File(dir, "ozero-logs-$ts.txt")
