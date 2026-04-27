@@ -6,14 +6,18 @@
     android:viewportHeight="108">
 
     <path
+        android:fillColor="#99FFFFFF"
+        android:pathData="M54,20 C38,20 26,32 26,48 C26,64 38,76 54,76 C70,76 82,64 82,48 C82,32 70,20 54,20 Z" />
+
+    <path
         android:fillColor="@color/launcher_wave_primary"
-        android:pathData="M22,62 C34,48 51,42 69,46 C80,49 88,55 94,64 L94,88 L22,88 Z" />
+        android:pathData="M14,68 C24,57 38,52 54,52 C70,52 84,57 94,68 L94,88 L14,88 Z" />
 
     <path
         android:fillColor="@color/launcher_wave_secondary"
-        android:pathData="M14,73 C28,61 46,56 63,58 C77,60 89,67 98,78 L98,94 L14,94 Z" />
+        android:pathData="M10,78 C22,66 38,60 54,60 C70,60 86,66 98,78 L98,94 L10,94 Z" />
 
     <path
         android:fillColor="@color/launcher_center"
-        android:pathData="M54,24 L64,44 L86,47 L70,63 L74,85 L54,74 L34,85 L38,63 L22,47 L44,44 Z" />
+        android:pathData="M54,34 C50,42 44,48 36,52 C44,54 50,58 54,66 C58,58 64,54 72,52 C64,48 58,42 54,34 Z" />
 </vector>

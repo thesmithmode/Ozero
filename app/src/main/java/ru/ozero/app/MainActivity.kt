@@ -24,8 +24,10 @@ import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineExceptionHandler
 import ru.ozero.app.logging.BootFileLogger
 import ru.ozero.app.logging.LogcatReader
 import ru.ozero.app.selfupdate.UpdateInstallEvent
@@ -83,6 +85,15 @@ class MainActivity : ComponentActivity() {
                 viewModel.onVpnPermissionDenied()
             }
         }
+
+    private val safeUiCoroutineHandler = CoroutineExceptionHandler { _, throwable ->
+        Log.e(TAG, "uncaught coroutine in MainActivity", throwable)
+        Toast.makeText(
+            this,
+            getString(R.string.import_error, throwable.message ?: "неизвестная ошибка"),
+            Toast.LENGTH_LONG,
+        ).show()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         runCatching { BootFileLogger.info(TAG, "onCreate before super") }
@@ -187,21 +198,37 @@ class MainActivity : ComponentActivity() {
         }
         if (raw.isNullOrBlank()) return
         Log.i(TAG, "subscription intent action=${intent.action}")
-        lifecycleScope.launch {
-            when (val result = serverImporter.import(raw)) {
-                is ServerImportService.ImportResult.Ok ->
+        lifecycleScope.launch(safeUiCoroutineHandler) {
+            if (raw.length > MAX_IMPORT_URI_LENGTH) {
+                Toast.makeText(
+                    this@MainActivity,
+                    getString(R.string.import_error, "слишком длинный URI"),
+                    Toast.LENGTH_LONG,
+                ).show()
+                return@launch
+            }
+            val result = runCatching { serverImporter.import(raw) }
+                .getOrElse { throwable ->
+                    Log.e(TAG, "subscription import crashed", throwable)
+                    ServerImportService.ImportResult.Error(
+                        throwable.message ?: "неизвестная ошибка импорта",
+                    )
+                }
+            when (result) {
+                is ServerImportService.ImportResult.Ok -> {
                     Toast.makeText(
                         this@MainActivity,
                         getString(R.string.import_ok, result.entity.protocol),
                         Toast.LENGTH_SHORT,
                     ).show()
-
-                is ServerImportService.ImportResult.Error ->
+                }
+                is ServerImportService.ImportResult.Error -> {
                     Toast.makeText(
                         this@MainActivity,
                         getString(R.string.import_error, result.reason),
                         Toast.LENGTH_LONG,
                     ).show()
+                }
             }
         }
     }
@@ -253,9 +280,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun observeSelfUpdateEvents() {
-        lifecycleScope.launch {
+        lifecycleScope.launch(safeUiCoroutineHandler) {
             UpdateInstallEventBus.events
                 .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
+                .catch { throwable ->
+                    Log.e(TAG, "self-update events flow failed", throwable)
+                }
                 .onEach { event ->
                     when (event) {
                         is UpdateInstallEvent.PendingUserAction -> {
@@ -278,5 +308,6 @@ class MainActivity : ComponentActivity() {
 
     private companion object {
         const val TAG = "MainActivity"
+        const val MAX_IMPORT_URI_LENGTH = 16 * 1024
     }
 }

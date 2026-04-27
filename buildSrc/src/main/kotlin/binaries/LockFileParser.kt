@@ -71,6 +71,11 @@ object LockFileParser {
             throw LockFileException("Artifact '$name' has destination=jniLibs but no abi in $path")
         }
         val downloadUrl = req("download_url")
+        val uri = runCatching { java.net.URI(downloadUrl) }
+            .getOrElse { throw LockFileException("Artifact '$name' has invalid download_url in $path") }
+        if (!uri.isAbsolute || uri.scheme != "https") {
+            throw LockFileException("Artifact '$name' download_url must be absolute https URL in $path")
+        }
         val sha256 = req("sha256")
         if (!SHA256_REGEX.matches(sha256)) {
             throw LockFileException(
@@ -78,6 +83,9 @@ object LockFileParser {
             )
         }
         val sizeBytes = reqLong("size_bytes")
+        if (sizeBytes <= 0L) {
+            throw LockFileException("Artifact '$name' size_bytes must be > 0 in $path")
+        }
         val sourceRepo = req("source_repo")
         val sourceCommit = req("source_commit")
 
