@@ -35,6 +35,60 @@ jobs:
         with:
           cache-read-only: true
 
+      - name: Setup Android NDK
+        id: ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r27c
+          add-to-path: false
+
+      # Build libhev-socks5-tunnel.so для 4 ABI прямо в job-е и кладём в
+      # common-vpn/src/main/jniLibs/<abi>/. Android Gradle plugin автоматически
+      # пакует jniLibs в APK. JNI symbol resolution требует чтобы Kotlin-класс
+      # назывался hev.HevSocks5Tunnel (см. common-vpn/.../hev/HevSocks5Tunnel.kt).
+      - name: Clone hev-socks5-tunnel (pinned)
+        env:
+          HEV_VERSION: '2.7.0'
+        run: |
+          git clone --depth 1 --recursive --branch "$HEV_VERSION" \
+            https://github.com/heiher/hev-socks5-tunnel.git \
+            "$RUNNER_TEMP/hev-socks5-tunnel"
+
+      - name: Build libhev-socks5-tunnel.so (4 ABI)
+        env:
+          NDK_PATH: ${{ steps.ndk.outputs.ndk-path }}
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/hev-socks5-tunnel"
+          OUT="common-vpn/src/main/jniLibs"
+          mkdir -p "$OUT/arm64-v8a" "$OUT/armeabi-v7a" "$OUT/x86_64" "$OUT/x86"
+
+          for ABI in arm64-v8a armeabi-v7a x86_64 x86; do
+            BUILD_DIR="$RUNNER_TEMP/hev-build-$ABI"
+            rm -rf "$BUILD_DIR"
+            mkdir -p "$BUILD_DIR"
+            cmake \
+              -S "$SRC" \
+              -B "$BUILD_DIR" \
+              -DCMAKE_TOOLCHAIN_FILE="$NDK_PATH/build/cmake/android.toolchain.cmake" \
+              -DANDROID_ABI="$ABI" \
+              -DANDROID_PLATFORM=android-24 \
+              -DCMAKE_BUILD_TYPE=Release \
+              -G "Unix Makefiles"
+            cmake --build "$BUILD_DIR" --parallel
+            SO_PATH=$(find "$BUILD_DIR" -name 'libhev-socks5-tunnel.so' -print -quit)
+            if [ -z "$SO_PATH" ]; then
+              echo "::error::libhev-socks5-tunnel.so не найден в $BUILD_DIR"
+              find "$BUILD_DIR" -name '*.so' || true
+              exit 1
+            fi
+            cp "$SO_PATH" "$OUT/$ABI/libhev-socks5-tunnel.so"
+            "$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" \
+              "$OUT/$ABI/libhev-socks5-tunnel.so" || true
+          done
+          echo "Built jniLibs:"
+          ls -la "$OUT"/*/libhev-socks5-tunnel.so
+
       - name: Decode keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}

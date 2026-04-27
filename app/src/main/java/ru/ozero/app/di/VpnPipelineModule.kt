@@ -1,8 +1,10 @@
 package ru.ozero.app.di
 
+import android.content.Context
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import ru.ozero.commonvpn.HevTunnelGateway
 import ru.ozero.commonvpn.NativeHevTunnelGateway
@@ -34,7 +36,9 @@ object VpnPipelineModule {
 
     @Provides
     @Singleton
-    fun provideHevTunnelGateway(): HevTunnelGateway = NativeHevTunnelGateway
+    fun provideHevTunnelGateway(
+        @ApplicationContext context: Context,
+    ): HevTunnelGateway = NativeHevTunnelGateway(context)
 
     @Provides
     @Singleton
