@@ -5,11 +5,11 @@ package hev
  *
  * Имена пакета и метода зафиксированы upstream'ом: JNI symbol resolution делается
  * по правилу `Java_<package>_<class>_<method>`, поэтому класс ОБЯЗАН лежать в
- * пакете `hev` и называться `HevSocks5Tunnel` — иначе symbols не подхватятся.
- *
- * Конфиг передаётся через путь к YAML-файлу + tun fd напрямую (не упаковывается
- * в YAML — upstream дублирует fd как параметр).
+ * пакете `hev`, называться `HevSocks5Tunnel`, а методы — иметь точные имена
+ * `TProxyStartService` / `TProxyStopService` / `TProxyGetStats`. CamelCase-style
+ * нарушает ktlint/detekt — подавлено @Suppress, переименование = NoSuchMethodError.
  */
+@Suppress("ktlint:standard:function-naming", "FunctionNaming")
 object HevSocks5Tunnel {
 
     init {
