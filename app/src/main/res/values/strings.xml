@@ -146,7 +146,6 @@
     <string name="about_title">О приложении</string>
     <string name="about_version">Версия %1$s</string>
     <string name="about_repo">Исходники на GitHub</string>
-    <string name="about_telegram">Канал в Telegram</string>
     <string name="about_privacy">Политика приватности</string>
     <string name="about_threat_model">Модель угроз</string>
     <string name="about_legal">Лицензии</string>

@@ -19,4 +19,4 @@ YYYY-MM-DD | reason | sk_old_pubkey_b64_short (first 12) | sk_new_pubkey_b64_sho
 
 | Дата | Причина | SK_old | SK_new | Оператор | Примечание |
 |------|---------|--------|--------|----------|------------|
-| _pending_ | initial | — | _will be added after E0.5_ | @thesmithmode | Первичная генерация ключа до v1.0.0 |
+| _pending_ | initial | — | _will be added after E0.5_ | maintainer | Первичная генерация ключа до v1.0.0 |

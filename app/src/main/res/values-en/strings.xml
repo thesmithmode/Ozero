@@ -146,7 +146,6 @@
     <string name="about_title">About</string>
     <string name="about_version">Version %1$s</string>
     <string name="about_repo">Source code on GitHub</string>
-    <string name="about_telegram">Telegram channel</string>
     <string name="about_privacy">Privacy policy</string>
     <string name="about_threat_model">Threat model</string>
     <string name="about_legal">Licenses</string>

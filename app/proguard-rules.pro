@@ -57,5 +57,30 @@
 -keep class ru.ozero.app.** { *; }
 -keep class ru.ozero.commonvpn.** { *; }
 
+-keep class ru.ozero.coreapi.** { *; }
+-keep class ru.ozero.coreorchestrator.** { *; }
+-keep class ru.ozero.corestorage.** { *; }
+-keep class ru.ozero.coresubscriptions.** { *; }
+
+-keep class ru.ozero.enginebyedpi.** { *; }
+-keep class ru.ozero.enginexray.** { *; }
+-keep class ru.ozero.engineamnezia.** { *; }
+-keep class ru.ozero.enginehysteria2.** { *; }
+-keep class ru.ozero.enginenaive.** { *; }
+-keep class ru.ozero.enginetor.** { *; }
+-keep class ru.ozero.engineurnetwork.** { *; }
+
+-keep class **_MapFactory { *; }
+-keep class **_InjectedMapFactory { *; }
+-keep class **_MapKeys { *; }
+-keep class androidx.hilt.work.HiltWorkerFactory { *; }
+-keep class androidx.hilt.work.** { *; }
+
+-keepattributes RuntimeVisibleAnnotations,RuntimeVisibleParameterAnnotations,AnnotationDefault
+
+-keep class com.google.android.play.core.splitinstall.** { *; }
+-keep interface com.google.android.play.core.splitinstall.** { *; }
+-dontwarn com.google.android.play.core.**
+
 -renamesourcefileattribute SourceFile
 -keepattributes SourceFile,LineNumberTable
