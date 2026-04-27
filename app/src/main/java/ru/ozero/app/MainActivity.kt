@@ -26,9 +26,11 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import ru.ozero.app.logging.LogcatReader
 import ru.ozero.app.selfupdate.UpdateInstallEvent
 import ru.ozero.app.selfupdate.UpdateInstallEventBus
 import ru.ozero.app.settings.UserFlagsRepository
+import ru.ozero.app.subscription.HarvestWorker
 import ru.ozero.app.subscription.ServerImportService
 import android.widget.Toast
 import ru.ozero.app.ui.MainScreen
@@ -56,6 +58,8 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var serverImporter: ServerImportService
 
+    @Inject lateinit var logcatReader: LogcatReader
+
     private val batteryPromptLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             Log.i(TAG, "battery prompt result code=${result.resultCode}")
@@ -79,6 +83,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        runCatching { logcatReader.start() }.onFailure { Log.w(TAG, "logcatReader.start failed", it) }
+        runCatching { HarvestWorker.enqueueUnique(applicationContext) }
+            .onFailure { Log.w(TAG, "HarvestWorker.enqueueUnique failed", it) }
         observeSelfUpdateEvents()
         if (savedInstanceState == null) {
             handleSubscriptionIntent(intent)
