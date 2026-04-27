@@ -72,6 +72,10 @@ open class SilentPackageInstaller(
         } catch (e: IOException) {
             Log.e(TAG, "createSession fail", e)
             return@withContext Result.IoError(sessionId = -1, reason = e.message ?: "createSession")
+        } catch (e: SecurityException) {
+            // OEM/MDM может отозвать REQUEST_INSTALL_PACKAGES в runtime даже при наличии в манифесте.
+            Log.e(TAG, "createSession denied by system", e)
+            return@withContext Result.IoError(sessionId = -1, reason = e.message ?: "createSession denied")
         }
 
         try {
@@ -86,6 +90,11 @@ open class SilentPackageInstaller(
             runCatching { installer.abandonSession(sessionId) }
                 .onFailure { Log.w(TAG, "abandonSession threw", it) }
             Result.IoError(sessionId = sessionId, reason = e.message ?: "session io")
+        } catch (e: SecurityException) {
+            Log.e(TAG, "session $sessionId security denied, abandoning", e)
+            runCatching { installer.abandonSession(sessionId) }
+                .onFailure { Log.w(TAG, "abandonSession threw", it) }
+            Result.IoError(sessionId = sessionId, reason = e.message ?: "session security")
         }
     }
 

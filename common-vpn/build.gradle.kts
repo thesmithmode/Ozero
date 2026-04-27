@@ -12,7 +12,10 @@ android {
         // в src/main/jniLibs/<abi>/. AGP пакует jniLibs автоматически. Список
         // ABI должен совпадать с теми, под которые собирается .so в CI.
         ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+            // Список синхронизирован с app/build.gradle.kts и release.yml APK assertion.
+            // x86 исключён: app не публикует x86, AGP всё равно вырезал бы x86 .so из APK
+            // по пересечению abiFilters → расхождение между модулями = шум в CI.
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
         }
     }
 }
