@@ -1,0 +1,4 @@
+-keep class hev.** { *; }
+-keep class ru.ozero.commonvpn.OzeroVpnService { *; }
+-keep class ru.ozero.commonvpn.OzeroVpnService$* { *; }
+-keepclasseswithmembernames class * { native <methods>; }

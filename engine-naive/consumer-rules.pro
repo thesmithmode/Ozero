@@ -1,0 +1,2 @@
+-keep class ru.ozero.enginenaive.LibNaiveDelegate { *; }
+-keepclasseswithmembernames class * { native <methods>; }
