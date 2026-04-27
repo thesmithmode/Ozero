@@ -31,7 +31,7 @@ class LiveProberTest {
 
     @Test
     fun `live server is marked alive`() = runTest {
-        serverSocket = ServerSocket(0) // any free port
+        serverSocket = ServerSocket(0) 
         val port = serverSocket!!.localPort
         val srv = vless(id = "s1", host = "127.0.0.1", port = port)
         val stats = prober.probeAll(listOf(srv))
@@ -43,8 +43,7 @@ class LiveProberTest {
 
     @Test
     fun `dead server is marked dead`() = runTest {
-        // Закрытый порт на localhost (заведомо недоступен)
-        val srv = vless(id = "s2", host = "127.0.0.1", port = 1) // privileged, никто не слушает
+                val srv = vless(id = "s2", host = "127.0.0.1", port = 1) 
         val stats = prober.probeAll(listOf(srv))
         assertEquals(0, stats.live)
         assertEquals(1, stats.dead)

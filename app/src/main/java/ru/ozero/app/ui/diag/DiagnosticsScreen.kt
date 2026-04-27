@@ -148,10 +148,6 @@ private fun IdleBody(
     }
 }
 
-/**
- * RT.11.1: ACTION_SEND_MULTIPLE crash-файлов через FileProvider.
- * Пользователь выбирает приложение для отправки (email, мессенджер, файлы).
- */
 private fun exportCrashLog(context: android.content.Context) {
     val crashesDir = File(context.filesDir, CrashLogStore.DIR_NAME)
     val files = crashesDir.takeIf { it.exists() }?.listFiles()?.toList().orEmpty()

@@ -43,9 +43,7 @@ class XrayEngine(
             try {
                 val code = delegate.startXray(config.configJson)
                 if (code == 0) {
-                    // Порт активен только ПОСЛЕ подтверждённого старта: probe не должен
-                    // считать движок живым если native инициализация упала.
-                    activeSocksPort = config.socksPort
+                                                            activeSocksPort = config.socksPort
                     Log.i(TAG, "started OK на порту ${config.socksPort}")
                     StartResult.Success(socksPort = config.socksPort)
                 } else {

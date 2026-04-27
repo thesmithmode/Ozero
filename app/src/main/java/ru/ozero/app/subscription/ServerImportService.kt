@@ -10,12 +10,6 @@ import ru.ozero.coresubscriptions.uri.SubscriptionUriParser
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * RT.8.1/8.2: импорт одного URI (deeplink или share-target) в локальную БД серверов.
- *
- * Pipeline такой же как у [ru.ozero.coresubscriptions.SubscriptionManager.sync],
- * но без fetch/Ed25519 — пользователь явно вставляет URI, доверие = действие.
- */
 @Singleton
 class ServerImportService @Inject constructor(
     private val serverDao: ServerDao,

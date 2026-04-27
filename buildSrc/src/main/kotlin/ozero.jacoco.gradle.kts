@@ -1,24 +1,13 @@
-/**
- * Convention plugin for JaCoCo code coverage with 90% gate (line + branch).
- *
- * Configures:
- * - JaCoCo plugin with version 0.8.12
- * - jacocoTestReport task (depends on testDebugUnitTest or test)
- * - jacocoTestCoverageVerification task with 90% line + branch threshold
- * - Excludes: generated code, DI, themes, placeholders, etc.
- */
 import java.math.BigDecimal
 
 plugins {
     jacoco
 }
 
-// JaCoCo version — keep in sync with gradle/libs.versions.toml [versions].jacoco
 jacoco {
     toolVersion = "0.8.12"
 }
 
-// Determine if this is an Android or pure Kotlin module
 val isAndroid = plugins.hasPlugin("com.android.application") || plugins.hasPlugin("com.android.library")
 
 val excludedClasses = listOf(
@@ -40,8 +29,6 @@ val excludedClasses = listOf(
     "**/Placeholder*.*"
 )
 
-// For Android modules the task does not exist yet — register it.
-// For pure JVM modules the jacoco plugin already registers jacocoTestReport — configure it.
 if (isAndroid) {
     tasks.register<JacocoReport>("jacocoTestReport") {
         group = "verification"
@@ -111,8 +98,7 @@ if (isAndroid) {
         }
     }
 } else {
-    // Pure JVM — jacoco plugin already registers jacocoTestReport, just configure it
-    tasks.named<JacocoReport>("jacocoTestReport") {
+        tasks.named<JacocoReport>("jacocoTestReport") {
         dependsOn("test")
 
         sourceDirectories.setFrom(
@@ -131,8 +117,7 @@ if (isAndroid) {
         }
     }
 
-    // jacocoTestCoverageVerification is also registered by jacoco plugin for JVM — configure it
-    tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
+        tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
         dependsOn("jacocoTestReport")
 
         sourceDirectories.setFrom(
@@ -165,7 +150,6 @@ if (isAndroid) {
     }
 }
 
-// For Android modules: configure testOptions
 if (isAndroid) {
     val android = extensions.findByName("android") as? com.android.build.gradle.BaseExtension
     android?.apply {

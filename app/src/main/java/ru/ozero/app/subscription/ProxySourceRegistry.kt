@@ -10,11 +10,6 @@ import ru.ozero.coresubscriptions.harvester.SourceFormat
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * E16.1: читает `app/src/main/assets/proxy-sources.json` и возвращает список
- * [PublicProxySource]. Изменение списка = перевыпуск APK; runtime-управление
- * (приоритет в выборке) — отдельная логика в `StrategyEngine`.
- */
 @Singleton
 class ProxySourceRegistry @Inject constructor(
     @ApplicationContext private val context: Context,

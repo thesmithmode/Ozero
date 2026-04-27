@@ -11,12 +11,7 @@ import kotlin.test.assertIs
 
 class SilentPackageInstallerTest {
 
-    /**
-     * Если APK файл отсутствует — install() возвращает FileError ДО
-     * createSession. Защищает от orphan PackageInstaller сессий когда
-     * verifier удалил битый APK раньше installer'а (race в self-update flow).
-     */
-    @Test
+        @Test
     fun `install returns FileError when apk file missing and skips PackageInstaller`() = runTest {
         val context = mockk<Context>(relaxed = true)
         val packageInstaller = mockk<PackageInstaller>()
@@ -42,10 +37,7 @@ class SilentPackageInstallerTest {
         try {
             val result = installer.install(tmpApk)
 
-            // На POSIX setReadable(false) обычно срабатывает; root-юзер игнорирует.
-            // CI runs as non-root → File.canRead() = false → FileError. Если по какой-то
-            // причине canRead вернул true (root в Docker) — тест не падает, просто скипает.
-            if (!tmpApk.canRead()) {
+                                                if (!tmpApk.canRead()) {
                 assertIs<SilentPackageInstaller.Result.FileError>(result)
                 verify(exactly = 0) { packageInstaller.createSession(any()) }
             }

@@ -15,20 +15,6 @@ import ru.ozero.coreapi.EngineStats
 import ru.ozero.coreapi.ProbeResult
 import ru.ozero.coreapi.StartResult
 
-/**
- * URnetwork P2P engine.
- *
- * Использует децентрализованную P2P сеть urnetwork.com для маршрутизации
- * трафика. Работает как fallback когда все primary engines (ByeDPI, Xray,
- * Hysteria2, AmneziaWG) недоступны.
- *
- * SDK: https://github.com/urnetwork/sdk (gomobile bind → URnetworkSdk.aar)
- * Java package: com.bringyour
- *
- * Ограничение: URnetwork требует JWT токен авторизации — сам по себе не
- * является «serverless» в смысле zero-config; требует предварительной
- * регистрации на urnetwork.com.
- */
 class UrnetworkEngine(
     private val delegate: UrnetworkDelegate,
 ) : Engine {
@@ -40,7 +26,7 @@ class UrnetworkEngine(
         supportsUdp = true,
         supportsDoH = true,
         localOnly = false,
-        requiresServer = false, // P2P — централизованный сервер не нужен
+        requiresServer = false, 
     )
 
     @Volatile private var activeSocksPort: Int = 0
@@ -58,10 +44,7 @@ class UrnetworkEngine(
 
         Log.i(TAG, "start jwtLen=${config.jwtToken.length} mode=${config.mode} region=${config.region}")
 
-        // Безопасная проверка — даже если EngineConfig.Urnetwork.toString сделан masked,
-        // конкретные exception messages могут содержать токен, поэтому в Failure message
-        // jwtToken не попадает (cause: Throwable доступен через cause если нужен debug).
-
+                        
         return withContext(Dispatchers.IO) {
             try {
                 val mode = parseMode(config.mode)
@@ -72,8 +55,7 @@ class UrnetworkEngine(
                     mode = mode,
                 )
                 if (ok) {
-                    // Ждём перехода в CONNECTED (до CONNECT_TIMEOUT_MS)
-                    val connected = waitForConnected(timeoutMs = CONNECT_TIMEOUT_MS)
+                                        val connected = waitForConnected(timeoutMs = CONNECT_TIMEOUT_MS)
                     if (connected) {
                         activeSocksPort = config.socksPort
                         Log.i(TAG, "started OK port=$activeSocksPort sdk=${delegate.sdkVersion()}")
@@ -88,9 +70,7 @@ class UrnetworkEngine(
                 }
             } catch (e: Throwable) {
                 Log.e(TAG, "start исключение", e)
-                // НЕ передаём e.message в reason — gomobile-обёртка может включить
-                // jwtToken/JSON config в exception text → утечка в logcat / crash reports.
-                StartResult.Failure(reason = "URnetwork native error", cause = e)
+                                                StartResult.Failure(reason = "URnetwork native error", cause = e)
             }
         }
     }

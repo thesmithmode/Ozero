@@ -5,14 +5,6 @@ import ru.ozero.security.antidebug.AntiDebugCheck
 import ru.ozero.security.antiemu.AntiEmulatorCheck
 import ru.ozero.security.antifrida.AntiFridaCheck
 
-/**
- * Композитор runtime-проверок.
- *
- * При запуске приложения вызвать `enforce()`; при первом тревожном сигнале — kill-switch:
- * - закрыть VPN tun (нельзя пускать трафик в инструментированном процессе)
- * - очистить in-memory ключи и подписки
- * - вернуть пустой UI
- */
 class SecurityGuard(
     private val antiDebug: AntiDebugCheck = AntiDebugCheck(),
     private val antiFrida: AntiFridaCheck = AntiFridaCheck(),
@@ -39,10 +31,7 @@ class SecurityGuard(
         when (val v = check()) {
             is Verdict.Clean -> Unit
             is Verdict.Compromised -> {
-                // Причины пишем ТОЛЬКО в Log.e (видно разработчику), не в exception.message.
-                // SecurityException.message попадает в crash-репорты (Crashlytics/Firebase) и
-                // может сообщить атакующему какие именно проверки сработали.
-                Log.e(TAG, "security: compromised env, причины=${v.reasons}")
+                                                                Log.e(TAG, "security: compromised env, причины=${v.reasons}")
                 throw SecurityException("compromised")
             }
         }

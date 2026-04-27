@@ -18,12 +18,7 @@ object OrchestratorModule {
     @Singleton
     fun provideOrchestrator(): Orchestrator = Orchestrator()
 
-    /**
-     * `@JvmSuppressWildcards` обязателен — без него Kotlin сгенерирует
-     * Map<EngineId, ? extends Engine>, а Hilt мульти-биндинг ожидает
-     * Map<EngineId, Engine>. Параметр не разрешится → InjectException.
-     */
-    @Provides
+        @Provides
     @Singleton
     fun provideStrategyEngine(
         engines: Map<EngineId, @JvmSuppressWildcards Engine>,

@@ -9,21 +9,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
 
-/**
- * Периодическая re-проверка [SecurityGuard].
- *
- * Одноразовая enforce()-проверка на старте уязвима к late-attach (frida/gdb
- * подключаются после прохождения проверки). Watchdog тикает каждые
- * [intervalMs] миллисекунд и при первом Compromised-вердикте вызывает
- * [onCompromised] — обычно в callback'е приложение должно убить TUN, очистить
- * ключи и завершиться.
- *
- * После триггера watchdog останавливается: повторно вызывать onCompromised
- * нет смысла, и ресурсы освобождаются.
- *
- * Контракт: безопасно вызывать [start] повторно — второй вызов игнорируется
- * пока активен job. [stop] завершает корутину детерминированно.
- */
 class SecurityWatchdog(
     private val guard: SecurityGuard,
     private val intervalMs: Long = DEFAULT_INTERVAL_MS,

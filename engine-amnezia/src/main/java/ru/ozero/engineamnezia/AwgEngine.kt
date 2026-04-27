@@ -14,11 +14,6 @@ import ru.ozero.coreapi.EngineStats
 import ru.ozero.coreapi.ProbeResult
 import ru.ozero.coreapi.StartResult
 
-/**
- * AmneziaWG 2.0 engine. WireGuard поверх UDP с обфускацией:
- * JunkPackets / S1-S2 / H1-H4. Tun-режим (нет SOCKS) — probe идёт через
- * delegate.isUp(), не через локальный сокет.
- */
 class AwgEngine(
     private val delegate: LibAwgDelegate,
 ) : Engine {

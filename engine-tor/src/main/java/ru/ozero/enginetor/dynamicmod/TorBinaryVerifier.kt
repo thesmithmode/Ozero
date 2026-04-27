@@ -5,14 +5,6 @@ import java.io.File
 import java.security.DigestInputStream
 import java.security.MessageDigest
 
-/**
- * Проверяет, что нативные .so из dynamic_tor split-pack физически совпадают
- * с эталонными SHA-256 из binaries.lock.yaml.
- *
- * Если PlayCore доставил повреждённый/подменённый бандл — verify вернёт
- * [VerifyResult.Corrupted]/[VerifyResult.Missing], installer вызовет
- * deferredUninstall и UI получит Failed.
- */
 interface TorBinaryVerifier {
     suspend fun verify(abi: String, libDir: File): VerifyResult
 }
@@ -28,10 +20,6 @@ sealed class VerifyResult {
     ) : VerifyResult()
 }
 
-/**
- * Прод-имплементация. checksumsByAbi: ABI → (file name → expected lower-hex SHA-256).
- * Карта строится build-time из binaries.lock.yaml (см. GenerateTorChecksumsTask).
- */
 class Sha256TorBinaryVerifier(
     private val checksumsByAbi: Map<String, Map<String, String>>,
 ) : TorBinaryVerifier {
@@ -39,9 +27,7 @@ class Sha256TorBinaryVerifier(
     override suspend fun verify(abi: String, libDir: File): VerifyResult {
         val expected = checksumsByAbi[abi]
         if (expected.isNullOrEmpty()) {
-            // Отсутствие checksum для ABI = supply-chain угроза: нельзя верифицировать
-            // подмену .so, поэтому отклоняем установку (раньше возвращали Ok → дыра).
-            Log.e(TAG, "no expected checksums for abi=$abi — REJECT install")
+                                    Log.e(TAG, "no expected checksums for abi=$abi — REJECT install")
             return VerifyResult.UnknownAbi(abi)
         }
         for ((fileName, expectedSha) in expected) {
@@ -68,8 +54,7 @@ class Sha256TorBinaryVerifier(
         DigestInputStream(file.inputStream(), md).use { dis ->
             val buf = ByteArray(BUFFER_SIZE)
             while (dis.read(buf) >= 0) {
-                // drain — digest internally accumulates
-            }
+                            }
         }
         return md.digest().joinToString("") { "%02x".format(it) }
     }

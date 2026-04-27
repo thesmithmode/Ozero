@@ -20,10 +20,6 @@ sealed class DiagResult {
     data class Failure(override val url: String, val reason: String) : DiagResult()
 }
 
-/**
- * HEAD-запрос к каждому URL через активный SOCKS-прокси Orchestrator. Параллельно (5 одновременно).
- * Используется в DiagnosticsScreen для теста "работает ли VPN".
- */
 class DiagnosticsTester(
     private val socksHost: String = "127.0.0.1",
     private val socksPort: Int,

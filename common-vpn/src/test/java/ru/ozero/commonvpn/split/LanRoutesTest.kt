@@ -22,8 +22,7 @@ class LanRoutesTest {
     private fun coveredBy(ip: String): Boolean =
         LanRoutes.BYPASS_LAN_IPV4.any { cidrCovers(it, ip) }
 
-    // ---- Excluded ranges should NOT be covered (LAN bypass) ------------
-
+    
     @Test fun rfc1918_10NotCovered() = assertFalse(coveredBy("10.0.0.1"))
 
     @Test fun rfc1918_172_16NotCovered() = assertFalse(coveredBy("172.16.5.5"))
@@ -44,8 +43,7 @@ class LanRoutesTest {
 
     @Test fun thisNetworkNotCovered() = assertFalse(coveredBy("0.0.0.5"))
 
-    // ---- Public IPs SHOULD be covered (go through VPN) ------------------
-
+    
     @Test fun googleDnsCovered() = assertTrue(coveredBy("8.8.8.8"))
 
     @Test fun cloudflareDnsCovered() = assertTrue(coveredBy("1.1.1.1"))

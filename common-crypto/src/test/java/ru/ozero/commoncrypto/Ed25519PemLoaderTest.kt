@@ -43,8 +43,7 @@ class Ed25519PemLoaderTest {
 
     @Test
     fun rejectsWrongAlgorithmDerPrefix() {
-        // RSA public key — другой DER-префикс.
-        val rsaPem = """
+                val rsaPem = """
             -----BEGIN PUBLIC KEY-----
             MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBALhqzqVmUzGS+RDJzTglNFRkw5szjGjm
             FkWN5Bc3GaPJ5zbBz+CaDNG5kKZNlvNpfQUxkWlpOZsH/H7g6n6e7GcCAwEAAQ==
@@ -55,14 +54,10 @@ class Ed25519PemLoaderTest {
         }
     }
 
-    /**
-     * Гарантирует что committed `app/src/main/assets/update-pubkey.pem`
-     * парсится текущим loader'ом — защита от случайной коммит-порчи ключа.
-     */
-    @Test
+        @Test
     fun assetUpdatePubkeyParses() {
         val asset = File("../app/src/main/assets/update-pubkey.pem")
-        if (!asset.exists()) return // Skip если запускают из root через --tests
+        if (!asset.exists()) return 
         val raw = Ed25519PemLoader.parsePublicKey(asset.readText())
         assertEquals(32, raw.size)
     }

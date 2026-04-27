@@ -6,16 +6,6 @@ import ru.ozero.coresubscriptions.uri.ShadowsocksServer
 import ru.ozero.coresubscriptions.uri.TrojanServer
 import ru.ozero.coresubscriptions.uri.VlessServer
 
-/**
- * Генератор Xray JSON-конфигов для поддерживаемых протоколов.
- *
- * Ограничения V1:
- *  - Один outbound + один SOCKS inbound на localhost.
- *  - Порядок ключей детерминирован (LinkedHashMap) — тесты сверяют exact-match.
- *  - Не валидирует криптографические поля сервера (это делает SubscriptionFilter).
- *
- * См. docs/backend.md и SPEC §4 для соответствия приоритетам StrategyEngine.
- */
 class XrayConfigBuilder {
 
     fun build(server: VlessServer, socksPort: Int): String {
@@ -57,18 +47,7 @@ class XrayConfigBuilder {
         return JsonWriter.write(root)
     }
 
-    /**
-     * Double-hop: entry outbound (RU) → exit outbound (foreign) → internet.
-     *
-     * Trafic flow: client → SOCKS inbound → entry outbound → entry server → exit outbound
-     *              (proxySettings.tag) → exit server → internet.
-     *
-     * Преимущество: ни entry-server, ни ISP не видят destination,
-     * exit-server не видит исходный IP клиента (видит entry-server). Защита от
-     * deanonymization: даже если entry-сервер скомпрометирован, exit-сервер не
-     * раскрывает реального клиента.
-     */
-    fun buildChain(entry: VlessServer, exit: VlessServer, socksPort: Int): String {
+        fun buildChain(entry: VlessServer, exit: VlessServer, socksPort: Int): String {
         require(socksPort in 1..65535) { "socksPort вне диапазона: $socksPort" }
         require(entry.host.isNotBlank()) { "entry.host пуст" }
         require(exit.host.isNotBlank()) { "exit.host пуст" }
@@ -87,8 +66,7 @@ class XrayConfigBuilder {
         val root = linkedMapOf<String, Any?>(
             "log" to log(),
             "inbounds" to listOf(socksInbound(socksPort)),
-            // Порядок outbound значим для tag-routing: entry должен быть default.
-            "outbounds" to listOf(entryOutbound, exitOutbound),
+                        "outbounds" to listOf(entryOutbound, exitOutbound),
         )
         return JsonWriter.write(root)
     }
@@ -106,8 +84,7 @@ class XrayConfigBuilder {
         return JsonWriter.write(root)
     }
 
-    // ---- outbounds ------------------------------------------------------
-
+    
     private fun vlessOutbound(s: VlessServer): Map<String, Any?> {
         val user = linkedMapOf<String, Any?>(
             "id" to s.uuid,
@@ -175,8 +152,7 @@ class XrayConfigBuilder {
                     "path" to (s.path ?: "/"),
                 )
             }
-            // tcp — без доп. settings
-        }
+                    }
         return stream
     }
 
@@ -244,8 +220,7 @@ class XrayConfigBuilder {
         )
     }
 
-    // ---- shared ---------------------------------------------------------
-
+    
     private fun log() = linkedMapOf<String, Any?>("loglevel" to "warning")
 
     private fun socksInbound(port: Int) = linkedMapOf<String, Any?>(
@@ -260,9 +235,7 @@ class XrayConfigBuilder {
     )
 
     private fun validateFingerprint(fp: String?): String {
-        // Поддерживаемые Xray uTLS fingerprints. Невалидное значение → Xray молча падает,
-        // поэтому при пустом/неизвестном — fallback "chrome" (наиболее ходовой).
-        val normalized = fp?.lowercase()?.takeIf { it.isNotBlank() } ?: return "chrome"
+                        val normalized = fp?.lowercase()?.takeIf { it.isNotBlank() } ?: return "chrome"
         return if (normalized in VALID_FINGERPRINTS) normalized else "chrome"
     }
 

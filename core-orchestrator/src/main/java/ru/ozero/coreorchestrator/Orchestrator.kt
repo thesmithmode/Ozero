@@ -11,9 +11,7 @@ class Orchestrator {
     val state: StateFlow<OrchestratorState> = _state.asStateFlow()
 
     fun dispatch(transition: OrchestratorTransition) {
-        // CAS-цикл защищает от гонки при конкурентном dispatch: если кто-то уже изменил
-        // состояние между чтением current и записью next — пересчитываем с актуальным.
-        while (true) {
+                        while (true) {
             val current = _state.value
             val next = reduce(current, transition)
             if (_state.compareAndSet(current, next)) {
@@ -26,12 +24,7 @@ class Orchestrator {
         }
     }
 
-    /**
-     * FSM reducer: 13 явных переходов состояний — табличное перечисление,
-     * CC отражает число валидных переходов, не реальную сложность. Рефактор
-     * (вынос в map/visitor) ухудшит читаемость state machine.
-     */
-    @Suppress("CyclomaticComplexMethod")
+        @Suppress("CyclomaticComplexMethod")
     private fun reduce(
         state: OrchestratorState,
         transition: OrchestratorTransition,
@@ -76,14 +69,10 @@ class Orchestrator {
             state is OrchestratorState.Disconnecting && transition is OrchestratorTransition.DisconnectComplete ->
                 OrchestratorState.Idle
 
-            // Switch failed mid-flight → Failed (раньше падало IllegalStateException,
-            // crash при network error в момент переключения движка).
-            state is OrchestratorState.Switching && transition is OrchestratorTransition.ConnectFailed ->
+                                    state is OrchestratorState.Switching && transition is OrchestratorTransition.ConnectFailed ->
                 OrchestratorState.Failed(transition.engineId, transition.reason)
 
-            // Idempotent stop: повторный Disconnect в Disconnecting/Idle — no-op.
-            // Защита от race "user dispatch + auto-stop on probe failure".
-            state is OrchestratorState.Disconnecting && transition is OrchestratorTransition.Disconnect -> state
+                                    state is OrchestratorState.Disconnecting && transition is OrchestratorTransition.Disconnect -> state
             state is OrchestratorState.Idle && transition is OrchestratorTransition.Disconnect -> state
 
             else -> {

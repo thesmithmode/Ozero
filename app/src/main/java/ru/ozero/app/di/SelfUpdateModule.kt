@@ -18,13 +18,6 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Named
 import javax.inject.Singleton
 
-/**
- * Hilt-биндинги self-update flow (RT.6.2).
- *
- * Все компоненты Singleton — coordinator stateless, безопасно делить.
- * Public key Ed25519 берётся из BuildConfig (release-сборка должна заменить
- * placeholder, см. docs/key-rotation.md).
- */
 @Module
 @InstallIn(SingletonComponent::class)
 object SelfUpdateModule {
@@ -34,12 +27,7 @@ object SelfUpdateModule {
     @Named("github-api")
     fun provideGithubApiClient(): OkHttpClient = GithubPinnedClient.create()
 
-    /**
-     * Отдельный client для скачивания APK с CDN GitHub (objects.githubusercontent.com).
-     * Без certificate pinning: CDN-сертификат меняется чаще api.github.com, а
-     * целостность APK обеспечивается Ed25519-подписью (defense via signature, не TLS).
-     */
-    @Provides
+        @Provides
     @Singleton
     @Named("github-cdn")
     fun provideGithubCdnClient(): OkHttpClient = OkHttpClient.Builder()

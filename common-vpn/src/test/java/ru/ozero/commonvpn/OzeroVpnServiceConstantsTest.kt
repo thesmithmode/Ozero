@@ -26,8 +26,7 @@ class OzeroVpnServiceConstantsTest {
 
     @Test
     fun tunAddressV6IsUla() {
-        // ULA fd00::/8 (RFC 4193) — приватный IPv6 для TUN
-        assert(OzeroVpnService.TUN_ADDRESS_V6.startsWith("fd"))
+                assert(OzeroVpnService.TUN_ADDRESS_V6.startsWith("fd"))
     }
 
     @Test

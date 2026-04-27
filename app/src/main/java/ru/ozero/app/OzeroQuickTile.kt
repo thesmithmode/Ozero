@@ -25,9 +25,7 @@ class OzeroQuickTile : TileService() {
     }
 
     private fun startVpn() {
-        // ContextCompat выбирает startForegroundService API 26+ или startService на API 24-25.
-        // Прямой startForegroundService требует minSdk 26 = NewApi lint-error при minSdk 24.
-        ContextCompat.startForegroundService(
+                        ContextCompat.startForegroundService(
             this,
             Intent(this, OzeroVpnService::class.java).apply {
                 action = OzeroVpnService.ACTION_START

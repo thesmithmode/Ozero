@@ -7,11 +7,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * Тестируется логика фильтрации/ротации файла без android.content.Context — он
- * абстрактный с десятками методов. [LogExporterTestable] использует ту же логику.
- * Production LogExporter оборачивает её передачей cacheDir из Hilt.
- */
 class LogExporterTest {
 
     @Test

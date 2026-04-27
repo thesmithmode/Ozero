@@ -2,14 +2,6 @@ package ru.ozero.coresubscriptions.uri
 
 import java.net.URI
 
-/**
- * URI: `awg://<privateKey-base64url>@<host>:<port>?publicKey=...&presharedKey=...
- *      &allowedIPs=0.0.0.0/0,::/0&address=10.0.0.2/32&dns=1.1.1.1
- *      &mtu=1280&keepalive=25&jc=4&jmin=40&jmax=70&s1=0&s2=0
- *      &h1=1&h2=2&h3=3&h4=4#remark`
- *
- * Списки CSV. Числа hex/dec. h1..h4 принимают и dec, и `0xDEADBEEF`.
- */
 class AmneziaWgUriParser {
 
     fun parse(uri: String): UriParseResult<AmneziaWgServer> {

@@ -14,18 +14,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 
-/**
- * Compose-обёртка вокруг [NotificationPermission].
- *
- * При первом composition на API 33+ — запрашивает разрешение через
- * system-dialog. Результат сохраняется в [rememberSaveable], чтобы config
- * change (поворот, dark mode) не повторял запрос.
- *
- * Возвращает [NotificationPermission.State] для отрисовки соответствующего UI:
- *   - Granted/NotApplicable: ничего не показываем
- *   - Denied: rationale + кнопка "открыть Settings"
- *   - NeedsRequest: автозапрос (LaunchedEffect)
- */
 @Composable
 fun rememberNotificationPermissionState(): NotificationPermission.State {
     val context = LocalContext.current

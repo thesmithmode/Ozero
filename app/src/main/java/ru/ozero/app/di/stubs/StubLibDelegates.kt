@@ -9,13 +9,6 @@ import ru.ozero.enginetor.dynamicmod.DynamicTorInstaller
 import ru.ozero.enginetor.dynamicmod.InstallResult
 import ru.ozero.enginexray.LibXrayDelegate
 
-/**
- * Заглушки native-делегатов. DI-граф собирается полностью, но все start* возвращают
- * ненулевой код — Engine.start() корректно отдаст StartResult.Failure. Реальные JNI-
- * реализации появятся в RT.6 (intent: подменить @Provides без затрагивания Engine).
- *
- * Лог уровня W чтобы было видно в logcat при попытке старта без реального бэкенда.
- */
 private const val NOT_IMPLEMENTED = -1
 private const val TAG = "StubLibDelegate"
 
@@ -71,10 +64,6 @@ class StubLibTorDelegate : LibTorDelegate {
     override fun version(): String = "stub"
 }
 
-/**
- * Stub-installer для устройств без Google Play и для тестов. Считает что бинари
- * уже доставлены (через APK splits / sideload). RT.5 заменит на PlayCoreInstaller.
- */
 class StubDynamicTorInstaller : DynamicTorInstaller {
     override suspend fun ensureInstalled(): InstallResult = InstallResult.AlreadyInstalled
 }

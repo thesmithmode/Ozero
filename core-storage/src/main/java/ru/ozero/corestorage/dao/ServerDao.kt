@@ -30,7 +30,6 @@ interface ServerDao {
     @Query("DELETE FROM servers")
     suspend fun deleteAll()
 
-    /** E16.2: отметить живость сервера после probe. */
-    @Query("UPDATE servers SET isAlive = :alive, lastCheckedAt = :ts WHERE id = :id")
+        @Query("UPDATE servers SET isAlive = :alive, lastCheckedAt = :ts WHERE id = :id")
     suspend fun setAlive(id: String, alive: Boolean, ts: Long)
 }

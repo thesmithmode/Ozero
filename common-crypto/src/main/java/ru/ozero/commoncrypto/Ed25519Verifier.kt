@@ -3,15 +3,6 @@ package ru.ozero.commoncrypto
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
 import org.bouncycastle.crypto.signers.Ed25519Signer
 
-/**
- * Ed25519 signature verifier для bootstrap snapshot и других подписанных артефактов.
- *
- * Использует BouncyCastle `Ed25519Signer` — стабильный API на JVM и Android API 21+,
- * без зависимости от `java.security.Provider` на старых Android.
- *
- * Fail-closed: любая ошибка (некорректная длина, кривой ключ, мусор в подписи)
- * → `false`, без exception.
- */
 object Ed25519Verifier {
     private const val SIG_SIZE = 64
     private const val PUBKEY_SIZE = 32

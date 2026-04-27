@@ -12,44 +12,20 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
 
-/**
- * Установщик скачанного и верифицированного APK через [PackageInstaller].
- *
- * Поведение:
- * - Создаёт MODE_FULL_INSTALL session, копирует байты APK через openWrite().
- * - Коммитит с IntentSender — system показывает install-confirmation UI
- *   (без UPDATE_PACKAGES_WITHOUT_USER_ACTION на Android 12+ диалог обязателен).
- * - Прерывание session при ошибке записи: abandon() вместо commit, чтобы
- *   PackageInstaller не оставил orphan staging directory на диске.
- *
- * Безопасность:
- *   APK должен быть предварительно проверен [ApkUpdateVerifier] (Ed25519).
- *   Этот класс НЕ верифицирует подпись — он просто устанавливает что дали.
- *   Вызывающий обязан вызвать verify() перед install().
- */
 open class SilentPackageInstaller(
     private val context: Context,
     private val installer: PackageInstaller = context.packageManager.packageInstaller,
 ) {
 
     sealed class Result {
-        /** Сессия успешно создана и зафиксирована. Дальше system покажет confirm-dialog. */
-        data class Submitted(val sessionId: Int) : Result()
+                data class Submitted(val sessionId: Int) : Result()
 
-        /** Файл APK не найден или нечитаем. До PackageInstaller дело не дошло. */
-        data class FileError(val reason: String) : Result()
+                data class FileError(val reason: String) : Result()
 
-        /** PackageInstaller вернул IOException на createSession / openWrite / commit. */
-        data class IoError(val sessionId: Int, val reason: String) : Result()
+                data class IoError(val sessionId: Int, val reason: String) : Result()
     }
 
-    /**
-     * @param apkFile файл APK для установки. Должен существовать и быть читаемым.
-     * @param sessionName идентификатор session — попадает в logs PackageInstaller.
-     * @param resultIntentAction кастомный action для broadcast, через который
-     *  PackageInstaller сообщает финальный статус. Если null — используется DEFAULT_ACTION.
-     */
-    open suspend fun install(
+        open suspend fun install(
         apkFile: File,
         sessionName: String = DEFAULT_SESSION_NAME,
         resultIntentAction: String = DEFAULT_RESULT_ACTION,
@@ -73,8 +49,7 @@ open class SilentPackageInstaller(
             Log.e(TAG, "createSession fail", e)
             return@withContext Result.IoError(sessionId = -1, reason = e.message ?: "createSession")
         } catch (e: SecurityException) {
-            // OEM/MDM может отозвать REQUEST_INSTALL_PACKAGES в runtime даже при наличии в манифесте.
-            Log.e(TAG, "createSession denied by system", e)
+                        Log.e(TAG, "createSession denied by system", e)
             return@withContext Result.IoError(sessionId = -1, reason = e.message ?: "createSession denied")
         }
 
@@ -103,9 +78,7 @@ open class SilentPackageInstaller(
         apkFile: File,
         sessionName: String,
     ) {
-        // setStagingProgress принимает только аппроксимацию — точный progress
-        // PackageInstaller отдаёт через ProgressListener, нам он не нужен.
-        session.openWrite(sessionName, 0, apkFile.length()).use { sink ->
+                        session.openWrite(sessionName, 0, apkFile.length()).use { sink ->
             apkFile.inputStream().use { src ->
                 src.copyTo(sink, bufferSize = COPY_BUFFER)
                 session.fsync(sink)

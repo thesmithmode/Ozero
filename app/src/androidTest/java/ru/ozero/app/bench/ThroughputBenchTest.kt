@@ -9,15 +9,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 
-/**
- * Throughput benchmark test.
- *
- * Запускается только при OZERO_BENCH=1 (через instrumentation arguments).
- * В CI запускается через workflow throughput-bench.yml.
- *
- * Результаты сохраняются в /sdcard/throughput-results.json и
- * вытаскиваются как артефакт CI.
- */
 @RunWith(AndroidJUnit4::class)
 class ThroughputBenchTest {
 
@@ -40,8 +31,7 @@ class ThroughputBenchTest {
 
         Log.i(TAG, "Запускаю throughput bench...")
 
-        // Запускаем несколько HTTP запросов к iperf3-compatible endpoint
-        val results = runThroughputProbes()
+                val results = runThroughputProbes()
 
         val json = buildResultJson(results)
         File(OUTPUT_FILE).writeText(json)
@@ -53,10 +43,9 @@ class ThroughputBenchTest {
     private fun runThroughputProbes(): ThroughputStats {
         val measurements = mutableListOf<Double>()
 
-        // Измеряем пропускную способность через серию download тестов
-        val testUrl = "http://10.0.2.2:5201" // iperf3 сервер на хосте эмулятора
+                val testUrl = "http://10.0.2.2:5201" 
         val sampleCount = 10
-        val chunkSizeBytes = 1_024 * 64 // 64KB chunks
+        val chunkSizeBytes = 1_024 * 64 
 
         repeat(sampleCount) { i ->
             try {
@@ -80,8 +69,7 @@ class ThroughputBenchTest {
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Sample $i ошибка: ${e.message}")
-                // Добавляем 0 при ошибке для корректного p95
-                measurements.add(0.0)
+                                measurements.add(0.0)
             }
         }
 

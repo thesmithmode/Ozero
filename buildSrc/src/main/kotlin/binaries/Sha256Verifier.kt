@@ -19,8 +19,7 @@ object Sha256Verifier {
         DigestInputStream(input, md).use { dis ->
             val buf = ByteArray(BUFFER_SIZE)
             while (dis.read(buf) >= 0) {
-                // drain stream — digest accumulates inside DigestInputStream
-            }
+                            }
         }
         return md.digest().joinToString("") { "%02x".format(it) }
     }

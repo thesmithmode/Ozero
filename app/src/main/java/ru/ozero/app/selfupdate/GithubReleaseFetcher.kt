@@ -5,18 +5,6 @@ import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 
-/**
- * Тянет latest release с GitHub Releases API.
- * URL по умолчанию: https://api.github.com/repos/OWNER/REPO/releases/latest
- * apk и apk.sig ассеты определяются по суффиксу имени.
- *
- * Безопасность:
- * - HTTPS обязателен (network_security_config с E10 запрещает cleartext)
- * - Сertificate pinning api.github.com через [GithubPinnedClient] — защита от
- *   compromised CA (любой публично доверенный CA мог бы выпустить mitm-сертификат
- *   и подменить APK URL)
- * - Подпись APK верифицируется отдельно через Ed25519 (см. ApkUpdateVerifier)
- */
 open class GithubReleaseFetcher(
     private val owner: String,
     private val repo: String,
@@ -25,10 +13,7 @@ open class GithubReleaseFetcher(
 ) {
 
     init {
-        // Certificate pinner внутри [GithubPinnedClient] закреплён на api.github.com.
-        // Подмена baseUrl через конструктор не должна обходить pinning — fail-fast здесь
-        // лучше чем silently отвалившийся pinning или MITM на чужом host.
-        require(baseUrl == "https://api.github.com") {
+                                require(baseUrl == "https://api.github.com") {
             "GithubReleaseFetcher.baseUrl должен быть https://api.github.com"
         }
     }
@@ -59,20 +44,16 @@ open class GithubReleaseFetcher(
             val a = assets.getJSONObject(i)
             val name = a.optString("name")
             val url = a.optString("browser_download_url")
-            // Валидация схемы — отбрасываем file://, http://, ftp://, javascript: и пр.
-            if (!url.startsWith("https://")) continue
+                        if (!url.startsWith("https://")) continue
             when {
                 name.endsWith(".apk") && !name.endsWith(".apk.sig") -> apkUrls += url
                 name.endsWith(".apk.sig") -> sigUrls += url
             }
         }
-        // Fail-closed: множественные .apk = неоднозначность (split-APK / атакующий
-        // добавил второй ассет). Раньше брали последний — атакующая поверхность.
-        if (apkUrls.size != 1 || sigUrls.size != 1) return null
+                        if (apkUrls.size != 1 || sigUrls.size != 1) return null
         val apkUrl = apkUrls.single()
         val sigUrl = sigUrls.single()
-        // Опциональный versionCode из release body (формат: "version_code: 12345" или JSON-блок).
-        val versionCode = obj.optLong("version_code", 0L)
+                val versionCode = obj.optLong("version_code", 0L)
             .takeIf { it > 0 }
             ?: parseVersionCodeFromBody(obj.optString("body"))
         return ReleaseInfo(
@@ -86,8 +67,7 @@ open class GithubReleaseFetcher(
     }
 
     private fun parseVersionCodeFromBody(body: String): Long {
-        // Поддерживаем строку вида "version_code: 12345" в release body
-        val m = Regex("""version_code:\s*(\d+)""", RegexOption.IGNORE_CASE).find(body)
+                val m = Regex("""version_code:\s*(\d+)""", RegexOption.IGNORE_CASE).find(body)
         return m?.groupValues?.get(1)?.toLongOrNull() ?: 0L
     }
 }

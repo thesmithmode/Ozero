@@ -20,9 +20,6 @@ import ru.ozero.app.logging.LogcatReader
 import java.io.File
 import javax.inject.Inject
 
-/**
- * UI-state экрана логов. [filtered] — буфер уже отрезан по [minLevel].
- */
 data class LogsUiState(
     val minLevel: LogLevel = LogLevel.INFO,
     val filtered: List<LogEntry> = emptyList(),

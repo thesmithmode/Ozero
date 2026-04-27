@@ -10,16 +10,6 @@ import java.net.InetSocketAddress
 import java.net.Proxy
 import java.net.URL
 
-/**
- * SOCKS-probe без поднятия TUN-интерфейса.
- *
- * Engine стартует как локальный SOCKS5 сервер на 127.0.0.1:[socksPort],
- * прообер делает HEAD/GET через `Proxy(SOCKS, ...)` к probe-target
- * и измеряет реальный E2E latency.
- *
- * Контракт: первый успешный target → Success(latency). Иначе → Failure
- * с причиной последней попытки.
- */
 class SocksProber(
     private val targets: List<ProbeTarget> = DEFAULT_TARGETS,
     private val timeoutMs: Long = 5_000L,
@@ -55,15 +45,11 @@ class SocksProber(
     }
 
     fun interface HttpConnector {
-        /** Возвращает latency в мс, кидает исключение при сетевой ошибке. */
-        suspend fun connect(target: ProbeTarget, socksPort: Int): Long
+                suspend fun connect(target: ProbeTarget, socksPort: Int): Long
     }
 
     class JdkHttpConnector(
-        // Внутренние таймауты ≤ половины timeoutMs из withTimeoutOrNull, чтобы дать
-        // connect/read шанс отработать до внешней отмены (раньше connect=4s+read=4s
-        // = 8s, при timeoutMs=5000 внешний выключатель срабатывал первым).
-        private val perLegTimeoutMs: Int = 2_000,
+                                private val perLegTimeoutMs: Int = 2_000,
     ) : HttpConnector {
         override suspend fun connect(target: ProbeTarget, socksPort: Int): Long =
             withContext(Dispatchers.IO) {

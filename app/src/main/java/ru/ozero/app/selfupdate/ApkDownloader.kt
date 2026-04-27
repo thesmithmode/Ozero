@@ -10,18 +10,6 @@ import okhttp3.Request
 import java.io.File
 import java.io.IOException
 
-/**
- * Скачивает APK + Ed25519-подпись (apk.sig) с GitHub Releases CDN.
- *
- * Безопасность:
- * - HTTPS обязателен (network_security_config E10).
- * - Pinning отдельный: APK-asset GitHub отдаётся с CDN [objects.githubusercontent.com],
- *   у которого пины могут меняться чаще, чем у api.github.com. Целостность APK
- *   обеспечивается Ed25519-подписью (см. [ApkUpdateVerifier]) — это authoritative
- *   защита, TLS-pin был бы defense-in-depth.
- * - Лимит размера: APK ≤ [maxApkBytes] (по умолчанию 200 МБ),
- *   подпись ≤ [maxSigBytes] (4 КБ). Защита от bomb-response от mitm.
- */
 open class ApkDownloader(
     private val client: OkHttpClient,
     private val maxApkBytes: Long = DEFAULT_MAX_APK_BYTES,
@@ -29,14 +17,11 @@ open class ApkDownloader(
 ) {
 
     sealed class Event {
-        /** Прогресс скачивания APK в процентах (0..100). Подпись не вносит в прогресс — она копеечная. */
-        data class Progress(val percent: Int) : Event()
+                data class Progress(val percent: Int) : Event()
 
-        /** Оба файла скачаны и сохранены. */
-        data class Success(val apk: File, val sig: File) : Event()
+                data class Success(val apk: File, val sig: File) : Event()
 
-        /** Сетевая, файловая или sanity-check ошибка. */
-        data class Failed(val reason: String) : Event()
+                data class Failed(val reason: String) : Event()
     }
 
     open fun download(apkUrl: String, sigUrl: String, destDir: File): Flow<Event> = flow {
@@ -48,9 +33,7 @@ open class ApkDownloader(
         }
         val apkFile = File(destDir, APK_NAME)
         val sigFile = File(destDir, SIG_NAME)
-        // Если предыдущий файл залочен (open file handle от другого download) и удалить
-        // не удаётся — нельзя продолжать: corrupt-mix старых и новых байт пройдёт verify.
-        if (apkFile.exists() && !apkFile.delete()) {
+                        if (apkFile.exists() && !apkFile.delete()) {
             Log.e(TAG, "не удалось удалить старый apk: ${apkFile.absolutePath}")
             emit(Event.Failed("apk locked, перезапустите приложение"))
             return@flow
@@ -100,8 +83,7 @@ open class ApkDownloader(
         return resp.body ?: throw IOException("empty body")
     }
 
-    /** Возвращает размер из header или -1 если неизвестен. Падает если total превышает лимит. */
-    private fun headerSize(body: okhttp3.ResponseBody, sizeLimit: Long): Long {
+        private fun headerSize(body: okhttp3.ResponseBody, sizeLimit: Long): Long {
         val total = body.contentLength().takeIf { it > 0 } ?: -1L
         if (total > sizeLimit) throw SizeLimitException("size $total > limit $sizeLimit")
         return total

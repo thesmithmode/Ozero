@@ -90,8 +90,7 @@ class GenerateTorChecksumsTaskTest {
         assertThat(content).contains("libiptproxy-arm64-v8a.so")
         assertThat(content).contains("a".repeat(64))
         assertThat(content).contains("c".repeat(64))
-        // byedpi must be filtered out
-        assertThat(content).doesNotContain("libbyedpi")
+                assertThat(content).doesNotContain("libbyedpi")
         assertThat(content).doesNotContain("d".repeat(64))
     }
 

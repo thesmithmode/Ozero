@@ -28,12 +28,7 @@ class OzeroVpnService : android.net.VpnService() {
 
     @Inject lateinit var pipeline: VpnEnginePipeline
 
-    /**
-     * Service-scoped coroutine для async операций pipeline (probe + engine.start
-     * могут занять секунды). SupervisorJob — failure одного launch не валит scope.
-     * Отменяется в onDestroy чтобы pipeline.start не выполнился после stop сервиса.
-     */
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     companion object {
         const val ACTION_START = "ru.ozero.vpn.ACTION_START"
@@ -43,9 +38,7 @@ class OzeroVpnService : android.net.VpnService() {
         const val TUN_ADDRESS = "10.10.10.10"
         const val TUN_PREFIX_LENGTH = 32
 
-        // IPv6 ULA (RFC 4193) для TUN: должен быть назначен иначе VpnService.Builder
-        // не маршрутизирует IPv6 в туннель и весь IPv6-трафик утекает мимо VPN.
-        const val TUN_ADDRESS_V6 = "fd00:ffff:ffff:ffff::1"
+                        const val TUN_ADDRESS_V6 = "fd00:ffff:ffff:ffff::1"
         const val TUN_PREFIX_LENGTH_V6 = 64
         const val TUN_DNS = "127.0.0.1"
         const val TUN_MTU = 1500
@@ -58,17 +51,12 @@ class OzeroVpnService : android.net.VpnService() {
 
     private var tunFd: ParcelFileDescriptor? = null
 
-    // Idempotency guards: повторный ACTION_START или START_STICKY redelivery не должны
-    // запускать второй pipeline (утечка fd, double-init); повторный stop не должен
-    // вызывать pipeline.stop дважды (UB в нативном hev-tunnel).
-    private val starting = AtomicBoolean(false)
+                private val starting = AtomicBoolean(false)
     private val stopping = AtomicBoolean(false)
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(TAG, "onStartCommand action=${intent?.action}")
-        // При null intent (восстановление после OOM со START_STICKY) поднимаем VPN
-        // заново — иначе foreground notification потеряется и сервис зависнет мёртвым.
-        when (intent?.action) {
+                        when (intent?.action) {
             ACTION_STOP -> stopVpn()
             ACTION_START, null -> startVpn()
         }
@@ -81,11 +69,7 @@ class OzeroVpnService : android.net.VpnService() {
             return
         }
         Log.i(TAG, "startVpn")
-        // Foreground запускаем СРАЗУ — Android 8+ имеет 5-секундный deadline,
-        // pipeline.start (probe + engine.start) может превысить его.
-        // Android 14+ (API 34): startForeground обязан получить тип FGS,
-        // совпадающий с manifest. Для VPN — specialUse + meta-data subtype=vpn.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(
                 NOTIFICATION_ID,
                 buildNotification(),
@@ -104,9 +88,7 @@ class OzeroVpnService : android.net.VpnService() {
         tunFd = fd
         Log.i(TAG, "TUN established fd=${fd.fd}")
         serviceScope.launch {
-            // Hard timeout: native hev-tunnel может зависнуть на misconfigured fd —
-            // без timeout serviceScope блокирует stop в onDestroy навечно.
-            try {
+                                    try {
                 val result = withTimeoutOrNull(PIPELINE_START_TIMEOUT_MS) {
                     runCatching { pipeline.start(tunFd = fd.fd) }
                         .onFailure { Log.e(TAG, "pipeline.start threw", it) }
@@ -117,10 +99,7 @@ class OzeroVpnService : android.net.VpnService() {
                     stopVpn()
                 }
             } finally {
-                // Гарантируем сброс starting даже если stopVpn() пропустил CAS из-за
-                // параллельного stop (onDestroy / повторный ACTION_STOP) — иначе
-                // последующий ACTION_START заблокирован "уже запускается" навсегда.
-                starting.set(false)
+                                                                starting.set(false)
             }
         }
     }
@@ -131,14 +110,8 @@ class OzeroVpnService : android.net.VpnService() {
             return
         }
         Log.i(TAG, "stopVpn")
-        // ВСЁ последовательно в одной корутине: pipeline.stop() ДОЛЖНА завершиться
-        // ДО закрытия tunFd, иначе hev-tunnel читает из уже закрытого fd → native crash.
-        // stopForeground/stopSelf тоже после остановки pipeline, чтобы Service не был
-        // убит планировщиком до завершения cleanup.
-        serviceScope.launch {
-            // Hard timeout зеркально onDestroy: native hev может зависнуть при misconfigured fd.
-            // Без timeout serviceScope блокирует close(tunFd) → next VPN start не поднимется.
-            val finished = withTimeoutOrNull(SHUTDOWN_TIMEOUT_MS) {
+                                        serviceScope.launch {
+                                    val finished = withTimeoutOrNull(SHUTDOWN_TIMEOUT_MS) {
                 runCatching { pipeline.stop() }
                     .onFailure { Log.w(TAG, "pipeline.stop threw", it) }
             }
@@ -201,15 +174,8 @@ class OzeroVpnService : android.net.VpnService() {
 
     override fun onDestroy() {
         super.onDestroy()
-        // Kill-switch гарантия: при force-stop / OOM-kill системы pipeline должен быть
-        // остановлен ДО закрытия fd. Пропускаем если stopVpn() уже инициировал stop —
-        // CAS guard защищает от double-stop pipeline.stop (UB в нативном hev-tunnel).
-        if (stopping.compareAndSet(false, true)) {
-            // Не используем runBlocking на Main thread (ANR). Запускаем shutdown на
-            // отдельном потоке и ждём строго ограниченное время — после этого fd
-            // закрываем в любом случае, чтобы система не держала TUN-интерфейс
-            // (иначе следующий VPN на устройстве не может подняться).
-            val shutdown = Thread({
+                                if (stopping.compareAndSet(false, true)) {
+                                                            val shutdown = Thread({
                 runBlocking {
                     runCatching {
                         withTimeoutOrNull(SHUTDOWN_TIMEOUT_MS) { pipeline.stop() }

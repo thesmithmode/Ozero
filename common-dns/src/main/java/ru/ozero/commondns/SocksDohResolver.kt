@@ -6,14 +6,6 @@ import java.net.InetSocketAddress
 import java.net.Proxy
 import java.util.concurrent.TimeUnit
 
-/**
- * DoH-резолвер, идущий через локальный SOCKS5-прокси (например, активный Xray).
- *
- * Используется как primary резолвер в [DnsResolverChain] когда работает Xray:
- * DNS-запрос инкапсулируется в Xray-туннель и не утекает в обход.
- *
- * Privacy: hostname НЕ логируется. Только endpoint и socksPort.
- */
 class SocksDohResolver(socksPort: Int, endpoint: String = DohResolver.CLOUDFLARE_ENDPOINT, timeoutMs: Long = 5_000L) {
     private val delegate: DohResolver
 

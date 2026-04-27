@@ -30,8 +30,7 @@ class ApkUpdateVerifierTest {
         val (priv, pub) = generateKeyPair()
         val apk = (tmp / "ozero.apk").toFile().apply { writeBytes(byteArrayOf(0x01, 0x02, 0x03)) }
         val sig = (tmp / "ozero.apk.sig").toFile().apply { writeBytes(sign(priv, apk.readBytes())) }
-        // Тампер: 0x99 (153) выходит за диапазон Byte (-128..127), требует .toByte()
-        apk.writeBytes(byteArrayOf(0x01, 0x02, 0x99.toByte()))
+                apk.writeBytes(byteArrayOf(0x01, 0x02, 0x99.toByte()))
         val verifier = ApkUpdateVerifier(pub)
         assertFalse(verifier.verify(apk, sig))
     }
@@ -76,8 +75,7 @@ class ApkUpdateVerifierTest {
     }
 
     private fun sign(privKey: ByteArray, message: ByteArray): ByteArray {
-        // ApkUpdateVerifier теперь использует verifyUpdate с domain prefix "ozero.update.v1:".
-        val prefixed = "ozero.update.v1:".toByteArray(Charsets.UTF_8) + message
+                val prefixed = "ozero.update.v1:".toByteArray(Charsets.UTF_8) + message
         val signer = Ed25519Signer().apply { init(true, Ed25519PrivateKeyParameters(privKey, 0)) }
         signer.update(prefixed, 0, prefixed.size)
         return signer.generateSignature()

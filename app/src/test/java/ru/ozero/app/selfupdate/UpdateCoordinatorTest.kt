@@ -159,8 +159,7 @@ class UpdateCoordinatorTest {
         val terminal = events.last()
         val submitted = assertIs<UpdateCoordinator.Progress.Submitted>(terminal)
         assertEquals(42, submitted.sessionId)
-        // Order check
-        val expectedSequence = listOf(
+                val expectedSequence = listOf(
             UpdateCoordinator.Progress.Checking,
             UpdateCoordinator.Progress.Downloading(0),
             UpdateCoordinator.Progress.Downloading(50),

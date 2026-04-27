@@ -13,17 +13,6 @@ import kotlinx.coroutines.launch
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
-/**
- * Читает logcat собственного процесса в фоне и кладёт распарсенные строки в
- * [LogBuffer]. На API 16+ apps могут читать только свой process logcat без
- * READ_LOGS permission (sandboxed) — это нам и нужно.
- *
- * Перезапускает logcat при падении (kill, full buffer overflow) с backoff.
- * Останавливается при cancel scope (например через [stop]).
- *
- * Безопасность: ProcessBuilder с массивом argv (без shell-интерпретации),
- * аргумент --pid формируется из Process.myPid() (int) — никакого user-input.
- */
 class LogcatReader(private val buffer: LogBuffer) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -43,11 +32,9 @@ class LogcatReader(private val buffer: LogBuffer) {
         scope.cancel()
     }
 
-    /** Очистка system-logcat ring и in-memory buffer. */
-    fun clearAll() {
+        fun clearAll() {
         runCatching {
-            // -c очищает logcat ring чтобы не присыпало старыми строками.
-            ProcessBuilder("logcat", "-c").redirectErrorStream(true).start().waitFor()
+                        ProcessBuilder("logcat", "-c").redirectErrorStream(true).start().waitFor()
         }.onFailure { Log.w(TAG, "logcat -c failed", it) }
         buffer.clear()
     }

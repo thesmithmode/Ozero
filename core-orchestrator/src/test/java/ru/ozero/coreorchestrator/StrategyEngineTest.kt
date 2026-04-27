@@ -52,8 +52,7 @@ class StrategyEngineTest {
         val strategy = StrategyEngine(emptyMap(), extraSources = listOf(source))
         val candidates = strategy.buildCandidates()
 
-        // Xray VLESS+Reality (10) → Hysteria2 (9) → SS (6) → ByeDpi (5)
-        assertEquals(
+                assertEquals(
             listOf(
                 Candidate.PRIORITY_XRAY_VLESS_REALITY,
                 Candidate.PRIORITY_XRAY_HYSTERIA2,
@@ -76,9 +75,7 @@ class StrategyEngineTest {
 
     @Test
     fun pickBestPrefersHigherPriorityEvenIfSlower() = runTest {
-        // Высокоприоритетный Xray VLESS отвечает медленнее, низкоприоритетный ByeDpi — быстрее.
-        // pickBest должен выбрать Xray, потому что awaitAll → firstOrNull по orig order (priority desc).
-        val xrayEngine = mockEngine(ProbeResult.Success(latencyMs = 200L), delayMs = 30L)
+                        val xrayEngine = mockEngine(ProbeResult.Success(latencyMs = 200L), delayMs = 30L)
         val byeDpiEngine = mockEngine(ProbeResult.Success(latencyMs = 10L), delayMs = 5L)
         val strategy = StrategyEngine(
             mapOf(EngineId.XRAY to xrayEngine, EngineId.BYEDPI to byeDpiEngine),
@@ -98,8 +95,7 @@ class StrategyEngineTest {
         val lowEngine = mockEngine(ProbeResult.Success(latencyMs = 10L))
         val byeDpiEngine = mockEngine(ProbeResult.Success(latencyMs = 5L))
 
-        // 4 кандидата: top-3 пробуются, четвёртый (ByeDpi с приоритетом 5) — нет.
-        val strategy = StrategyEngine(
+                val strategy = StrategyEngine(
             engines = mapOf(
                 EngineId.XRAY to highEngine,
                 EngineId.AMNEZIA to midEngine,
@@ -120,10 +116,8 @@ class StrategyEngineTest {
         val result = strategy.pickBest(candidates)
 
         assertNotNull(result)
-        // NAIVE — третий по приоритету с success.
-        assertEquals(EngineId.NAIVE, result.engineId)
-        // ByeDpi (4-й) probe не должен вызываться вообще.
-        coVerify(exactly = 0) { byeDpiEngine.probe() }
+                assertEquals(EngineId.NAIVE, result.engineId)
+                coVerify(exactly = 0) { byeDpiEngine.probe() }
     }
 
     @Test
@@ -150,8 +144,7 @@ class StrategyEngineTest {
         assertNull(result)
     }
 
-    // ---- E4: UDP / CGNAT фильтр --------------------------------------
-
+    
     @Test
     fun udpReachableTrueKeepsHysteria2Candidate() = runTest {
         val hy2 = Candidate(
@@ -185,8 +178,7 @@ class StrategyEngineTest {
         )
         val list = strategy.buildCandidates()
         assertTrue(list.none { it.engineId == EngineId.HYSTERIA2 }, "Hy2 не отфильтрован при CGNAT")
-        // VLESS остаётся как fallback
-        assertEquals(EngineId.XRAY, list[0].engineId)
+                assertEquals(EngineId.XRAY, list[0].engineId)
     }
 
     @Test
@@ -198,14 +190,12 @@ class StrategyEngineTest {
             udpReachable = { false },
         )
         val list = strategy.buildCandidates()
-        assertEquals(2, list.size) // VLESS + ByeDpi
+        assertEquals(2, list.size) 
     }
 
     @Test
     fun pickBestRunsProbesInParallelNotSequentially() = runTest {
-        // 3 движка по 100мс каждый. Sequential = 300мс, parallel ~100мс.
-        // Используем виртуальное время runTest: currentTime отражает sumDelay.
-        val slow1 = mockEngine(ProbeResult.Failure("slow1"), delayMs = 100L)
+                        val slow1 = mockEngine(ProbeResult.Failure("slow1"), delayMs = 100L)
         val slow2 = mockEngine(ProbeResult.Failure("slow2"), delayMs = 100L)
         val slow3 = mockEngine(ProbeResult.Success(latencyMs = 1L), delayMs = 100L)
 
@@ -231,7 +221,6 @@ class StrategyEngineTest {
         val elapsed = testScheduler.currentTime - tStart
 
         assertNotNull(result)
-        // Параллельно должно занимать ~100мс, не 300мс. Допуск: < 250мс.
-        assertTrue(elapsed < 250L, "ожидался parallel probe (~100мс), получено ${elapsed}мс")
+                assertTrue(elapsed < 250L, "ожидался parallel probe (~100мс), получено ${elapsed}мс")
     }
 }

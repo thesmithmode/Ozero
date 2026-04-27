@@ -1,14 +1,3 @@
-/**
- * Convention plugin for the :app module (com.android.application).
- *
- * Configures:
- * - compileSdk / minSdk / targetSdk
- * - JVM 17 source/target compatibility
- * - Kotlin K2 compiler + composeCompiler plugin
- * - Default proguard files
- * - JaCoCo code coverage with 90% gate
- * - Test options for unit tests
- */
 import com.android.build.gradle.internal.dsl.BaseAppModuleExtension
 import org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension
 
@@ -53,9 +42,7 @@ extensions.configure<BaseAppModuleExtension> {
                 storePassword = keystorePassword
                 this.keyAlias = keyAlias
                 this.keyPassword = keyPassword
-                // v1 (JAR signing) уязвим к Janus CVE-2017-13156 на API < 28.
-                // Отключаем явно, чтобы не зависеть от AGP-defaults.
-                enableV1Signing = false
+                                                enableV1Signing = false
                 enableV2Signing = true
                 enableV3Signing = true
             }
@@ -65,9 +52,7 @@ extensions.configure<BaseAppModuleExtension> {
     buildTypes {
         release {
             isMinifyEnabled = true
-            // E13.3: shrinkResources убирает unused resources из APK (меньше surface
-            // для reverse engineering, меньше размер).
-            isShrinkResources = true
+                                    isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -75,9 +60,7 @@ extensions.configure<BaseAppModuleExtension> {
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
             } else {
-                // CI/release-сборка ОБЯЗАНА быть подписана. Раньше неподписанный APK
-                // тихо собирался — теперь явный fail.
-                gradle.taskGraph.whenReady {
+                                                gradle.taskGraph.whenReady {
                     val releaseTask = allTasks.find {
                         it.name.contains("assembleRelease", ignoreCase = true) ||
                             it.name.contains("bundleRelease", ignoreCase = true)
@@ -119,8 +102,7 @@ extensions.configure<BaseAppModuleExtension> {
 extensions.configure<KotlinAndroidProjectExtension> {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        // Enable K2 (default in Kotlin 2.0+, explicit for clarity)
-        freeCompilerArgs.addAll(
+                freeCompilerArgs.addAll(
             "-opt-in=kotlin.RequiresOptIn",
             "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
         )
@@ -154,9 +136,6 @@ extensions.configure<com.android.build.gradle.internal.dsl.BaseAppModuleExtensio
         abortOnError = true
         warningsAsErrors = false
         checkReleaseBuilds = true
-        // NewApi не отключаем — иначе вызовы новых API на minSdk-устройствах
-        // упадут в рантайме без предупреждения. Отдельные места требующие
-        // новый API оборачивать @RequiresApi/Build.VERSION.SDK_INT-проверкой.
-        disable += setOf("GradleDependency", "NewerVersionAvailable")
+                                disable += setOf("GradleDependency", "NewerVersionAvailable")
     }
 }

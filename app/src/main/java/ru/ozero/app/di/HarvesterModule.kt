@@ -12,12 +12,6 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Named
 import javax.inject.Singleton
 
-/**
- * E16.1: DI для PublicProxyHarvester.
- *
- * `@Named("harvester")` OkHttpClient — без pinning'а (PLAN v4 раздел 0.6:
- * GitHub TLS, system trust, pinning GitHub'а = антипаттерн → brick).
- */
 @Module
 @InstallIn(SingletonComponent::class)
 object HarvesterModule {
@@ -30,10 +24,7 @@ object HarvesterModule {
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    // Hilt MissingBinding fix: ServerImportService.@Inject constructor с default-параметрами
-    // не использует defaults — Hilt требует явный binding для каждого аргумента.
-    // Эти типы stateless, безопасно как @Singleton.
-    @Provides
+                @Provides
     @Singleton
     fun provideSubscriptionUriParser(): SubscriptionUriParser = SubscriptionUriParser()
 

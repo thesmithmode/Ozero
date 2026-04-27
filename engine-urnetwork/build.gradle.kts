@@ -2,12 +2,6 @@ plugins {
     id("ozero.android.library")
 }
 
-// URnetworkSdk.aar собирается из urnetwork/sdk через gomobile bind в CI
-// (workflow urnetwork-aar.yml). Локально — stub/mock для unit-тестов.
-// Для сборки с реальным AAR: поместить URnetworkSdk.aar в engine-urnetwork/libs/
-// и раскомментировать строку ниже.
-// implementation(files("libs/URnetworkSdk.aar"))
-
 android {
     namespace = "ru.ozero.engineurnetwork"
 
@@ -23,8 +17,7 @@ dependencies {
     implementation(project(":core-orchestrator"))
     implementation(libs.bundles.coroutines)
 
-    // URnetworkSdk.aar подключается только если файл присутствует (CI скачивает его)
-    val aarFile = file("libs/URnetworkSdk.aar")
+        val aarFile = file("libs/URnetworkSdk.aar")
     if (aarFile.exists()) {
         implementation(files("libs/URnetworkSdk.aar"))
     }

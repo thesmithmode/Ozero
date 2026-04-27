@@ -16,10 +16,7 @@ class BinaryDownloader(
     private val retryDelaysMs: List<Long> = listOf(3000L, 9000L, 27000L),
     private val httpClient: HttpClient =
         HttpClient.newBuilder()
-            // NORMAL: следует HTTPS→HTTPS, не downgrade'ится в HTTP. Раньше ALWAYS позволял
-            // attacker'у через DNS/CDN-redirect увести на http://, минуя любой будущий
-            // certificate-pinning слой (SHA-256 catches corrupt payload, но post-write).
-            .followRedirects(HttpClient.Redirect.NORMAL)
+                                                .followRedirects(HttpClient.Redirect.NORMAL)
             .connectTimeout(Duration.ofSeconds(30))
             .build(),
 ) {

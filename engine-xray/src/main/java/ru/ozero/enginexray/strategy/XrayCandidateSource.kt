@@ -12,16 +12,6 @@ import ru.ozero.coresubscriptions.uri.SubscriptionUriParser
 import ru.ozero.coresubscriptions.uri.VlessServer
 import ru.ozero.enginexray.config.XrayConfigBuilder
 
-/**
- * Превращает live-серверы из подписки в Xray-кандидаты с приоритетами по SPEC §4.3.
- *
- * Каждому кандидату выделяется уникальный SOCKS-порт начиная с [basePort],
- * чтобы StrategyEngine мог пробовать их параллельно, не конфликтуя на одном порту.
- *
- * Фильтрация: VLESS+Reality допускается только с transport ∈ TRANSPORT_SAFE_2026
- * (xhttp / grpc / ws — SPEC §4.3, security=tls/reality задаётся отдельно).
- * Остальные транспорты выбрасываются.
- */
 class XrayCandidateSource(
     private val serverDao: ServerDao,
     private val parser: SubscriptionUriParser = SubscriptionUriParser(),

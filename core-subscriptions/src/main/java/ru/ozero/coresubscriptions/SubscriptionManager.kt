@@ -55,8 +55,7 @@ class SubscriptionManager(
         }
 
         if (entities.isEmpty()) {
-            // Защита от "нулевого обновления": пустой live-список не должен сносить БД.
-            Log.w(TAG, "нет live серверов — не трогаем БД")
+                        Log.w(TAG, "нет live серверов — не трогаем БД")
             return SubscriptionSyncResult.Error("нет живых серверов в подписке")
         }
 

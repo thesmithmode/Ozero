@@ -3,9 +3,6 @@ plugins {
     id("ozero.binaries")
 }
 
-// libhysteria2.aar собирается из apernet/hysteria v2 через gomobile bind
-// (RT.1.7.5). Скачивается preBuild с sha256 verify. JNI integration —
-// RT.2/RT.3.
 ozeroBinaries {
     artifact("libhysteria2.aar")
 }

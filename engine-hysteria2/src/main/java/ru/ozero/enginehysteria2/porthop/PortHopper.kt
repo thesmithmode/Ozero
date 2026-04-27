@@ -3,16 +3,6 @@ package ru.ozero.enginehysteria2.porthop
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
-/**
- * Port-hopping для Hysteria2: детерминированный для пары (authKey, epoch/interval) и
- * непредсказуемый для DPI без authKey. Используется HMAC-SHA256 — клиент и сервер,
- * зная общий [authKey], получают одинаковый порт в каждом окне длиной [intervalSeconds].
- *
- * Алгоритм:
- *   slot = epochSeconds / intervalSeconds
- *   raw  = HMAC-SHA256(authKey, BE(slot))[0..3]  // первые 4 байта
- *   port = (raw mod (range.last - range.first + 1)) + range.first
- */
 class PortHopper(
     private val authKey: String,
     private val range: IntRange,
@@ -47,8 +37,7 @@ class PortHopper(
         return (u32 % rangeSize).toInt() + range.first
     }
 
-    /** Время (epoch sec) ближайшей будущей границы окна. */
-    fun nextHopAt(epochSeconds: Long): Long {
+        fun nextHopAt(epochSeconds: Long): Long {
         val nextSlot = epochSeconds / intervalSeconds + 1
         return nextSlot * intervalSeconds
     }

@@ -10,11 +10,6 @@ import ru.ozero.coresubscriptions.uri.ParsedServer
 import ru.ozero.coresubscriptions.uri.SubscriptionUriParser
 import ru.ozero.engineamnezia.config.AwgConfigBuilder
 
-/**
- * Превращает AmneziaWG-серверы из подписки в кандидаты с приоритетом
- * [Candidate.PRIORITY_AMNEZIA]=7. UDP-зависимый: requiresUdp=true → отфильтрован
- * StrategyEngine при CGNAT (как и Hy2 native).
- */
 class AwgCandidateSource(
     private val serverDao: ServerDao,
     private val parser: SubscriptionUriParser = SubscriptionUriParser(),

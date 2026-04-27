@@ -2,12 +2,6 @@ package ru.ozero.commoncrypto
 
 import java.util.Base64
 
-/**
- * Парсит Ed25519 PEM (X.509 SubjectPublicKeyInfo, как выдаёт `openssl pkey -pubout`)
- * и извлекает 32-байтовый raw публичный ключ.
- *
- * Формат: 12-байтовый DER-префикс `302a300506032b6570032100` + 32 байта raw ключа.
- */
 object Ed25519PemLoader {
     private const val PEM_HEADER = "-----BEGIN PUBLIC KEY-----"
     private const val PEM_FOOTER = "-----END PUBLIC KEY-----"

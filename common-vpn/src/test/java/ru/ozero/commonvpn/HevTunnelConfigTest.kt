@@ -13,9 +13,7 @@ class HevTunnelConfigTest {
     @Test
     fun `toYaml содержит обязательные поля upstream формата`() {
         val yaml = base().toYaml()
-        // Контракт upstream conf/main.yml — обязательные ключи tunnel, socks5,
-        // socks5.address, socks5.port. Без них parser возвращает -1.
-        assertTrue(yaml.contains("tunnel:"))
+                        assertTrue(yaml.contains("tunnel:"))
         assertTrue(yaml.contains("socks5:"))
         assertTrue(yaml.contains("address: 127.0.0.1"))
         assertTrue(yaml.contains("port: 1080"))
@@ -31,24 +29,20 @@ class HevTunnelConfigTest {
 
     @Test
     fun `toYaml НЕ содержит несуществующих в upstream полей`() {
-        // Прошлый regression: писали tunnel.fd (поля нет в upstream parser) и
-        // целую секцию dns: (тоже нет — DNS-resolution делает SOCKS5 server).
-        val yaml = base().toYaml()
+                        val yaml = base().toYaml()
         assertFalse(yaml.contains("fd:"), "tunnel.fd не существует в upstream — fd передаётся JNI-параметром")
         assertFalse(yaml.contains("dns:"), "секции dns нет в upstream conf — DNS resolve делает socks5 server")
     }
 
     @Test
     fun `toYaml содержит udp mode`() {
-        // hev-socks5-tunnel поддерживает UDP-relay через socks5.udp = udp|tcp.
-        val yaml = base().toYaml()
+                val yaml = base().toYaml()
         assertTrue(yaml.contains("udp: 'udp'"))
     }
 
     @Test
     fun `default IPv6 в одинарных кавычках для libyaml`() {
-        // libyaml требует quoting для строк с двоеточиями (IPv6).
-        val yaml = base().toYaml()
+                val yaml = base().toYaml()
         assertTrue(yaml.contains("ipv6: 'fd00"))
     }
 

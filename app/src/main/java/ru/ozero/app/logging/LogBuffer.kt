@@ -5,12 +5,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.ArrayDeque
 
-/**
- * In-memory циркулярный буфер логов. Не пишет на диск — место не засирается.
- * При превышении [capacity] выкидывает самые старые записи.
- *
- * Thread-safe: операции под `synchronized(lock)`. UI читает через [entries].
- */
 class LogBuffer(private val capacity: Int = DEFAULT_CAPACITY) {
 
     private val lock = Any()
@@ -36,7 +30,6 @@ class LogBuffer(private val capacity: Int = DEFAULT_CAPACITY) {
     fun size(): Int = synchronized(lock) { deque.size }
 
     companion object {
-        // 5000 строк ≈ 1-3 МБ RAM. Сбрасывается при kill процесса — диск не трогаем.
-        const val DEFAULT_CAPACITY: Int = 5000
+                const val DEFAULT_CAPACITY: Int = 5000
     }
 }

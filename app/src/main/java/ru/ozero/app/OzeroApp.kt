@@ -1,11 +1,14 @@
 package ru.ozero.app
 
 import android.app.Application
+import android.content.Context
+import android.os.Build
 import android.util.Log
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
 import ru.ozero.app.data.CrashLogStore
+import ru.ozero.app.logging.BootFileLogger
 import ru.ozero.app.logging.LogcatReader
 import ru.ozero.app.subscription.HarvestWorker
 import javax.inject.Inject
@@ -26,30 +29,45 @@ class OzeroApp : Application(), Configuration.Provider {
             .setMinimumLoggingLevel(Log.INFO)
             .build()
 
-    override fun onCreate() {
-        super.onCreate()
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(base)
+        BootFileLogger.init(base)
         installCrashHandler()
-        // In-memory ring buffer для UI-вкладки логов. Не пишет на диск, при
-        // kill процесса очищается. Старт сразу — чтобы захватить ранние логи.
-        logcatReader.start()
-        // E16.1: запускаем periodic harvester. KEEP-policy → не пересоздаёт
-        // существующий job при каждом старте, schedule сохраняется между
-        // запусками приложения и перезагрузками.
-        HarvestWorker.enqueueUnique(this)
+        BootFileLogger.info(
+            TAG,
+            "attachBaseContext sdk=${Build.VERSION.SDK_INT} " +
+                "abi=${Build.SUPPORTED_ABIS.joinToString()}",
+        )
     }
 
-    /**
-     * RT.11.1: подменяем uncaught handler. Логируем в локальный store,
-     * затем делегируем дальше — system-default покажет ANR-диалог
-     * и убьёт процесс. Никаких сетевых запросов, никаких внешних SDK.
-     */
+    override fun onCreate() {
+        BootFileLogger.info(TAG, "onCreate before super")
+        try {
+            super.onCreate()
+        } catch (t: Throwable) {
+            BootFileLogger.error(TAG, "super.onCreate threw", t)
+            throw t
+        }
+        BootFileLogger.info(TAG, "onCreate after super")
+        runCatching {
+            logcatReader.start()
+        }.onFailure { BootFileLogger.error(TAG, "logcatReader start failed", it) }
+        runCatching {
+            HarvestWorker.enqueueUnique(this)
+        }.onFailure { BootFileLogger.error(TAG, "HarvestWorker enqueue failed", it) }
+        BootFileLogger.info(TAG, "onCreate done")
+    }
+
     private fun installCrashHandler() {
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            BootFileLogger.error(TAG, "UNCAUGHT thread=${thread.name}", throwable)
             try {
-                crashLogStore.write(thread, throwable)
+                if (::crashLogStore.isInitialized) {
+                    crashLogStore.write(thread, throwable)
+                }
             } catch (t: Throwable) {
-                Log.e(TAG, "crashLog write failed", t)
+                BootFileLogger.error(TAG, "crashLogStore.write failed", t)
             }
             if (previous != null) {
                 previous.uncaughtException(thread, throwable)

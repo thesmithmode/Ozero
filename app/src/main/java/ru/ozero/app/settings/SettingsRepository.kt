@@ -20,11 +20,9 @@ interface SettingsRepository {
 
     suspend fun setManualEngine(engine: EngineId?)
 
-    /** E15: включить/выключить URnetwork P2P fallback */
-    suspend fun setUrnetworkEnabled(enabled: Boolean)
+        suspend fun setUrnetworkEnabled(enabled: Boolean)
 
-    /** E15: сохранить JWT токен URnetwork (null = очистить) */
-    suspend fun setUrnetworkJwt(jwt: String?)
+        suspend fun setUrnetworkJwt(jwt: String?)
 }
 
 class SettingsRepositoryImpl @Inject constructor(

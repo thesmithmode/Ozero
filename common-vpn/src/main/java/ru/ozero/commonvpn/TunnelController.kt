@@ -11,14 +11,12 @@ class TunnelController {
     val state: StateFlow<TunnelState> = _state.asStateFlow()
 
     fun onEngineStarted(socksPort: Int) {
-        // Не логируем порт в info — читается через READ_LOGS/ADB. Только debug.
-        Log.d(TAG, "engineStarted socksPort=$socksPort")
+                Log.d(TAG, "engineStarted socksPort=$socksPort")
         Log.i(TAG, "engineStarted")
         _state.value = TunnelState.Connected(socksPort)
     }
 
-    // TUN fd не закрывается — kill-switch активен, трафик блокируется на уровне TUN
-    fun onEngineDied(reason: String) {
+        fun onEngineDied(reason: String) {
         Log.e(TAG, "engineDied reason=$reason kill-switch активен")
         _state.value = TunnelState.Dead(reason)
     }
@@ -34,12 +32,7 @@ class TunnelController {
         _state.value = TunnelState.Connected(socksPort)
     }
 
-    /**
-     * Предусловие: вызывающий должен закрыть TUN fd ДО вызова reset().
-     * Иначе kill-switch сломается: Idle предполагает что TUN закрыт и трафик уходит наружу без VPN.
-     * Гарантия инварианта — ответственность OzeroVpnService.stopVpn.
-     */
-    fun reset() {
+        fun reset() {
         Log.i(TAG, "reset")
         _state.value = TunnelState.Idle
     }

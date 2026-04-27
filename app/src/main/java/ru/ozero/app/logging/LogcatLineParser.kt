@@ -3,17 +3,6 @@ package ru.ozero.app.logging
 import java.util.Calendar
 import java.util.regex.Pattern
 
-/**
- * Парсер одной строки `logcat -v threadtime` в [LogEntry].
- *
- * Формат threadtime:
- * `MM-DD HH:MM:SS.sss  PID  TID LEVEL TAG: message`
- * Пример: `04-27 10:32:18.421  1234  5678 I OzeroVpn: startVpn`
- *
- * Год logcat не выводит — подставляем текущий, плюс защита от переноса через
- * новый год: если месяц строки больше текущего на >6, считаем что это прошлый
- * год (актуально только при просмотре буфера через 1 января).
- */
 object LogcatLineParser {
 
     private val PATTERN: Pattern = Pattern.compile(

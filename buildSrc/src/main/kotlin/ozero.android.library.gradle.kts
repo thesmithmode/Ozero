@@ -1,14 +1,3 @@
-/**
- * Convention plugin for Android library modules (com.android.library).
- *
- * Configures:
- * - compileSdk / minSdk
- * - JVM 17
- * - Kotlin K2 compiler options
- * - BuildConfig disabled (set globally via gradle.properties)
- * - JaCoCo code coverage with 90% gate
- * - Test options for unit tests
- */
 import com.android.build.gradle.LibraryExtension
 import org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension
 

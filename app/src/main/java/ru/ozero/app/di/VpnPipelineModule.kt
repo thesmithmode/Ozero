@@ -16,16 +16,6 @@ import ru.ozero.coreorchestrator.Orchestrator
 import ru.ozero.coreorchestrator.StrategyEngine
 import javax.inject.Singleton
 
-/**
- * Биндинги для [VpnEnginePipeline] и его зависимостей.
- *
- * [TunnelController] — Singleton: VPN-тоннель один на app. Compose-UI и
- * VpnService читают одну и ту же StateFlow.
- *
- * [HevTunnelGateway] биндится на [NativeHevTunnelGateway] — production-обёртка
- * над hev-socks5-tunnel JNI. AndroidTest-вариант сможет подменить через
- * @TestInstallIn → FakeHevTunnelGateway без зачёта реальной нативки.
- */
 @Module
 @InstallIn(SingletonComponent::class)
 object VpnPipelineModule {

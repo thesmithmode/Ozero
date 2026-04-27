@@ -28,17 +28,6 @@ import ru.ozero.enginexray.LibXrayDelegate
 import ru.ozero.enginexray.XrayEngine
 import javax.inject.Singleton
 
-/**
- * Multibinding всех Engine-имплементаций под общий Map<EngineId, Engine>.
- *
- * @IntoMap + @EngineKey даёт расширяемость: новый engine = новый @Provides
- * метод, ничего не меняется в OrchestratorModule. EngineModuleTest проверяет
- * рефлексией что все EngineId.entries покрыты.
- *
- * Native-делегаты пока stub'ы (см. StubLibDelegates) — реальные JNI bindings
- * подменим в RT.6 без затрагивания логики Engine. Tor-installer тоже stub до
- * RT.5 (PlayCore SplitInstall).
- */
 @Module
 @InstallIn(SingletonComponent::class)
 object EngineModule {
@@ -103,8 +92,7 @@ object EngineModule {
         delegate = delegate,
         installer = installer,
         buildOptions = ru.ozero.enginetor.config.TorBuildOptions(
-            // dataDir в private app storage — protected от других приложений и rooted access
-            dataDir = java.io.File(context.filesDir, "tor").absolutePath,
+                        dataDir = java.io.File(context.filesDir, "tor").absolutePath,
         ),
     )
 }

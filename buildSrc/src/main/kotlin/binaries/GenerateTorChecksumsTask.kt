@@ -11,13 +11,6 @@ import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import java.io.File
 
-/**
- * Генерирует Kotlin object [ru.ozero.enginetor.dynamicmod.TorBinaryChecksums]
- * с эталонными SHA-256 для libtor-* и libiptproxy-* из binaries.lock.yaml.
- *
- * Используется engine-tor: после SplitInstall'а dynamic_tor нативки сверяются
- * с этими хешами; mismatch → deferredUninstall + Failed.
- */
 abstract class GenerateTorChecksumsTask : DefaultTask() {
     @get:InputFile
     @get:PathSensitive(PathSensitivity.RELATIVE)

@@ -15,11 +15,9 @@ class AssetsFirstRunBootstrapTest {
     fun `import skips placeholder URIs`() = runTest {
         val dao = FakeServerDao()
         val importer = ServerImportService(dao)
-        // Прямой тест ServerImportService — bootstrap-JSON парсится в инструменталке.
-        val placeholder = "vless://uuid@example.invalid:443?security=reality&pbk=PLACEHOLDER" +
+                val placeholder = "vless://uuid@example.invalid:443?security=reality&pbk=PLACEHOLDER" +
             "&fp=chrome&sni=example.com&type=tcp&flow=xtls-rprx-vision#placeholder"
-        // placeholder URI парсится валидно, но "contains placeholder" → bootstrap его пропустит
-        assertTrue(placeholder.contains("placeholder"))
+                assertTrue(placeholder.contains("placeholder"))
     }
 
     @Test

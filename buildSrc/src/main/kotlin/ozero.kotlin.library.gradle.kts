@@ -1,13 +1,3 @@
-/**
- * Convention plugin for pure Kotlin/JVM modules (no Android SDK dependency).
- *
- * Used by :core-api and any future platform-agnostic modules.
- *
- * Configures:
- * - JVM 17 toolchain
- * - Kotlin K2 compiler options
- * - JaCoCo code coverage with 90% gate
- */
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 
 plugins {

@@ -1,8 +1,3 @@
-/**
- * Convention plugin for Android dynamic-feature modules (com.android.dynamic-feature).
- *
- * Mirrors ozero.android.library settings so feature modules don't duplicate JVM/Kotlin config.
- */
 import com.android.build.api.dsl.DynamicFeatureExtension
 import org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension
 

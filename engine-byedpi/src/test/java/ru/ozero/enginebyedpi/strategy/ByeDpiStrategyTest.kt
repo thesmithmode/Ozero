@@ -91,7 +91,7 @@ class ByeDpiStrategyGeneratorTest {
             s.splitAt == 2
         }
         assertEquals(2, winner?.splitAt)
-        assertEquals(2, calls) // первая failed, вторая ok, третья skipped
+        assertEquals(2, calls) 
     }
 
     @Test

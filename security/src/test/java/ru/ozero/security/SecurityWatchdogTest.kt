@@ -133,7 +133,7 @@ class SecurityWatchdogTest {
         )
 
         watchdog.start(scope)
-        watchdog.start(scope) // второй вызов должен быть no-op (без второй корутины)
+        watchdog.start(scope) 
         assertTrue(watchdog.isRunning())
         watchdog.stop()
     }
@@ -157,10 +157,8 @@ class SecurityWatchdogTest {
         scope.advanceTimeBy(200)
         scope.advanceUntilIdle()
 
-        // Падение callback'а не должно убить scope.
-        assertFalse(watchdog.isRunning(), "watchdog завершился штатно после Compromised")
-        // Sanity: scope ещё активен и можно запускать новые корутины.
-        var executed = false
+                assertFalse(watchdog.isRunning(), "watchdog завершился штатно после Compromised")
+                var executed = false
         scope.launch(dispatcher) {
             delay(100)
             executed = true

@@ -2,14 +2,8 @@ package ru.ozero.security.antifrida
 
 import java.io.File
 
-/**
- * Поставщик `/proc/self/maps` для тестируемости.
- * Callback-форма гарантирует true-streaming: line-by-line без материализации
- * всего содержимого в память (maps больших процессов — несколько МБ).
- */
 interface ProcMapsReader {
-    /** Передаёт ленивый Sequence<String> в block; ресурс закрывается после возврата. */
-    fun <R> useLines(block: (Sequence<String>) -> R): R
+        fun <R> useLines(block: (Sequence<String>) -> R): R
 }
 
 private val DefaultReader = object : ProcMapsReader {
@@ -19,18 +13,6 @@ private val DefaultReader = object : ProcMapsReader {
         }.getOrElse { block(emptySequence()) }
 }
 
-/**
- * Детектит Frida / Xposed / Substrate hooks по `/proc/self/maps` —
- * frida-server и frida-gadget оставляют узнаваемые maps:
- *  - `frida-agent-<arch>.so`
- *  - `frida-gadget`
- *  - `gum-js-loop`
- *  - `gmain` (frida script thread)
- *  - `linjector`
- *  - `XposedBridge.jar`
- *  - `LSPosed`
- *  - `re.frida.server`
- */
 class AntiFridaCheck(
     private val reader: ProcMapsReader = DefaultReader,
 ) {
@@ -54,9 +36,7 @@ class AntiFridaCheck(
     }
 
     private companion object {
-        // "magisk" намеренно исключён: легитимные пользователи на Magisk-rooted девайсах
-        // получали false-positive. Root-detection — отдельная политика, не часть Frida-чека.
-        val SIGNATURES = listOf(
+                        val SIGNATURES = listOf(
             "frida-agent",
             "frida-gadget",
             "gum-js-loop",

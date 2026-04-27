@@ -13,8 +13,7 @@ ksp {
 
 dependencies {
     implementation(project(":core-api"))
-    // api: RoomDatabase — публичный супертип OzeroDatabase, потребителю нужен на classpath.
-    api(libs.bundles.room)
+        api(libs.bundles.room)
     ksp(libs.room.compiler)
     implementation(libs.bundles.coroutines)
 

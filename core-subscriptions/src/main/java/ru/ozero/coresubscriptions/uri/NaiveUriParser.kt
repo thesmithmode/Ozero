@@ -4,17 +4,9 @@ import java.net.URI
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 
-/**
- * Парсер `naive+https://user:pass@host:port#remark` (и `naive+quic://...`).
- *
- * `naive+` — префикс к подсхеме, отличающий формат от обычных HTTPS-ссылок и
- * совместимый с upstream-конвенцией klzgrad/naiveproxy.
- */
 class NaiveUriParser {
 
-    // Guard-clause парсер: каждая проверка возвращает специфичную ошибку.
-    // Объединение в общий error path потеряет контекст для пользователя.
-    @Suppress("ReturnCount")
+            @Suppress("ReturnCount")
     fun parse(uri: String): UriParseResult<NaiveServer> {
         if (!uri.startsWith("naive+")) return UriParseResult.Error("scheme не naive+")
 

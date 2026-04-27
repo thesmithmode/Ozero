@@ -8,8 +8,7 @@ class CgnatDetectorTest {
     private fun detect(vararg ips: String): NatStatus =
         CgnatDetector(provider = { ips.toList() }).detect()
 
-    // ---- CGNAT (RFC 6598: 100.64.0.0/10 = 100.64.0.0 .. 100.127.255.255) ----
-
+    
     @Test fun cgnatLowerBoundary() = assertEquals(NatStatus.CGNAT, detect("100.64.0.0"))
 
     @Test fun cgnatUpperBoundary() = assertEquals(NatStatus.CGNAT, detect("100.127.255.255"))
@@ -26,8 +25,7 @@ class CgnatDetectorTest {
         assertEquals(NatStatus.OPEN, detect("100.128.0.0"))
     }
 
-    // ---- private RFC1918 → UNKNOWN (нужен STUN, отложен на E9) ----
-
+    
     @Test fun privateClassA() = assertEquals(NatStatus.UNKNOWN, detect("10.0.0.5"))
 
     @Test fun privateClassB() = assertEquals(NatStatus.UNKNOWN, detect("172.16.0.10"))
@@ -36,18 +34,15 @@ class CgnatDetectorTest {
 
     @Test fun linkLocal() = assertEquals(NatStatus.UNKNOWN, detect("169.254.1.1"))
 
-    // ---- public → OPEN ----
-
+    
     @Test fun publicIpv4() = assertEquals(NatStatus.OPEN, detect("8.8.8.8"))
 
-    // ---- IPv6 (нет понятия CGNAT) ----
-
+    
     @Test fun ipv6UlaTreatedAsUnknown() = assertEquals(NatStatus.UNKNOWN, detect("fc00::1"))
 
     @Test fun ipv6PublicIsOpen() = assertEquals(NatStatus.OPEN, detect("2001:db8::1"))
 
-    // ---- комбинации ----
-
+    
     @Test
     fun cgnatBeatsPrivate() {
         assertEquals(NatStatus.CGNAT, detect("192.168.1.10", "100.64.5.5"))
@@ -60,9 +55,7 @@ class CgnatDetectorTest {
 
     @Test
     fun cgnatBeatsPublic() {
-        // На мобиле публичного нет, есть только CGNAT — детектор должен ответить CGNAT
-        // даже если в списке вдруг оказался публичный (например VPN-туннель уже поднят).
-        assertEquals(NatStatus.CGNAT, detect("100.96.0.1", "8.8.8.8"))
+                        assertEquals(NatStatus.CGNAT, detect("100.96.0.1", "8.8.8.8"))
     }
 
     @Test fun emptyListUnknown() = assertEquals(NatStatus.UNKNOWN, detect())
