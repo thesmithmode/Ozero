@@ -1,6 +1,11 @@
 package ru.ozero.app.ui.logs
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
+import android.os.Build
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,6 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
@@ -51,6 +57,9 @@ fun BootLogScreen(onBack: () -> Unit) {
                     IconButton(onClick = { content = BootFileLogger.read() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Обновить")
                     }
+                    IconButton(onClick = { copyToClipboard(ctx, "boot.log", content) }) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = "Копировать")
+                    }
                     IconButton(onClick = {
                         BootFileLogger.clear()
                         content = ""
@@ -91,5 +100,17 @@ fun BootLogScreen(onBack: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
             )
         }
+    }
+}
+
+internal fun copyToClipboard(context: Context, label: String, text: String) {
+    if (text.isBlank()) {
+        Toast.makeText(context, "Пусто — нечего копировать", Toast.LENGTH_SHORT).show()
+        return
+    }
+    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    cm.setPrimaryClip(ClipData.newPlainText(label, text))
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+        Toast.makeText(context, "Скопировано (${text.length} симв.)", Toast.LENGTH_SHORT).show()
     }
 }
