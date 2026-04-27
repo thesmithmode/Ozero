@@ -6,6 +6,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import android.util.Log
 import okhttp3.OkHttpClient
 import ru.ozero.app.BuildConfig
 import ru.ozero.app.selfupdate.ApkDownloader
@@ -52,7 +53,12 @@ object SelfUpdateModule {
     @Provides
     @Singleton
     fun provideApkVerifier(): ApkUpdateVerifier =
-        ApkUpdateVerifier(publicKey = decodeHex(BuildConfig.UPDATE_PUBLIC_KEY_HEX))
+        runCatching {
+            ApkUpdateVerifier(publicKey = decodeHex(BuildConfig.UPDATE_PUBLIC_KEY_HEX))
+        }.getOrElse { throwable ->
+            Log.e(TAG, "Invalid UPDATE_PUBLIC_KEY_HEX, self-update verify disabled", throwable)
+            ApkUpdateVerifier(publicKey = ByteArray(32))
+        }
 
     @Provides
     @Singleton
@@ -95,7 +101,14 @@ object SelfUpdateModule {
     private fun decodeHex(hex: String): ByteArray {
         require(hex.length % 2 == 0) { "hex длина должна быть чётной" }
         return ByteArray(hex.length / 2) { i ->
-            ((Character.digit(hex[i * 2], 16) shl 4) or Character.digit(hex[i * 2 + 1], 16)).toByte()
+            val hi = Character.digit(hex[i * 2], 16)
+            val lo = Character.digit(hex[i * 2 + 1], 16)
+            require(hi >= 0 && lo >= 0) {
+                "hex содержит не-hex символы на позиции ${i * 2}"
+            }
+            ((hi shl 4) or lo).toByte()
         }
     }
+
+    private const val TAG = "SelfUpdateModule"
 }
