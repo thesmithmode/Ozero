@@ -26,6 +26,7 @@ class OzeroApp : Application(), Configuration.Provider {
         super.attachBaseContext(base)
         runCatching {
             BootFileLogger.init(base)
+            BootDiagnostics.installUncaughtHandler()
             BootFileLogger.info(
                 TAG,
                 "attachBaseContext sdk=${Build.VERSION.SDK_INT} " +
