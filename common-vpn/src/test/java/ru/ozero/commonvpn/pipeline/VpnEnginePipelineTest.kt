@@ -20,7 +20,6 @@ import ru.ozero.coreorchestrator.Orchestrator
 import ru.ozero.coreorchestrator.OrchestratorState
 import ru.ozero.coreorchestrator.StrategyEngine
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
