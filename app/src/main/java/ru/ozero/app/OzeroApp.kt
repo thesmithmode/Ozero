@@ -36,8 +36,23 @@ class OzeroApp : Application(), Configuration.Provider {
         BootFileLogger.info(
             TAG,
             "attachBaseContext sdk=${Build.VERSION.SDK_INT} " +
-                "abi=${Build.SUPPORTED_ABIS.joinToString()}",
+                "abi=${Build.SUPPORTED_ABIS.joinToString()} " +
+                "device=${Build.MANUFACTURER}/${Build.MODEL} " +
+                "is64=${android.os.Process.is64Bit()}",
         )
+        runCatching {
+            val nativeDir = base.applicationInfo.nativeLibraryDir
+            val libs = java.io.File(nativeDir).listFiles()
+                ?.joinToString(",") { "${it.name}(${it.length()}b)" } ?: "null"
+            BootFileLogger.info(TAG, "nativeLibraryDir=$nativeDir libs=[$libs]")
+        }.onFailure { BootFileLogger.error(TAG, "nativeLibraryDir dump failed", it) }
+        runCatching {
+            BootFileLogger.info(
+                TAG,
+                "TProxyService.libraryLoaded=${hev.TProxyService.libraryLoaded} " +
+                    "loadError=${hev.TProxyService.loadError}",
+            )
+        }.onFailure { BootFileLogger.error(TAG, "TProxyService probe failed", it) }
     }
 
     override fun onCreate() {
