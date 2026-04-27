@@ -67,7 +67,6 @@ class VpnEnginePipeline(
         }
     }
 
-
     private fun ensureConnectTransition() {
         when (orchestrator.state.value) {
             is OrchestratorState.Idle,
