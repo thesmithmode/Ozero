@@ -47,6 +47,7 @@ import ru.ozero.app.ui.settings.SettingsScreen
 import ru.ozero.app.ui.splittunnel.SplitTunnelScreen
 import ru.ozero.app.ui.theme.OzeroTheme
 import ru.ozero.commonvpn.OzeroVpnService
+import ru.ozero.coreorchestrator.OrchestratorState
 import javax.inject.Inject
 
 enum class TopScreen { Main, Settings, Diagnostics, SplitTunnel, Servers, About, Logs, BootLog }
@@ -76,9 +77,10 @@ class MainActivity : ComponentActivity() {
             ActivityResultContracts.StartActivityForResult(),
         ) { result ->
             if (result.resultCode == Activity.RESULT_OK) {
-                viewModel.onConnectClick()
                 viewModel.onVpnPermissionGranted()
                 startVpnService()
+            } else {
+                viewModel.onVpnPermissionDenied()
             }
         }
 
@@ -144,11 +146,22 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun onConnectClick() {
+        when (viewModel.state.value) {
+            is OrchestratorState.Connected -> {
+                viewModel.onConnectClick()
+                stopVpnService()
+            }
+            is OrchestratorState.Idle, is OrchestratorState.Failed -> requestVpnAndStart()
+            else -> Unit
+        }
+    }
+
+    private fun requestVpnAndStart() {
+        viewModel.onConnectClick()
         val vpnIntent = VpnService.prepare(this)
         if (vpnIntent != null) {
             vpnPermissionLauncher.launch(vpnIntent)
         } else {
-            viewModel.onConnectClick()
             viewModel.onVpnPermissionGranted()
             startVpnService()
         }
@@ -191,6 +204,15 @@ class MainActivity : ComponentActivity() {
                     ).show()
             }
         }
+    }
+
+
+    private fun stopVpnService() {
+        startService(
+            Intent(this, OzeroVpnService::class.java).apply {
+                action = OzeroVpnService.ACTION_STOP
+            },
+        )
     }
 
     private fun startVpnService() {

@@ -59,16 +59,26 @@ class PlayCoreSplitInstallClient(
             }
         }
         manager.registerListener(listener)
-        manager.startInstall(request)
-            .addOnSuccessListener { id ->
-                sessionId = id
-                Log.i(TAG, "install request module=$moduleName session=$id")
+        runCatching { manager.startInstall(request) }
+            .onSuccess { task ->
+                task
+                    .addOnSuccessListener { id ->
+                        sessionId = id
+                        Log.i(TAG, "install request module=$moduleName session=$id")
+                    }
+                    .addOnFailureListener { e ->
+                        val reason = (e as? com.google.android.play.core.splitinstall.SplitInstallException)
+                            ?.let { "code=${it.errorCode}" }
+                            ?: e.message.orEmpty()
+                        trySend(InstallResult.Failed(reason = reason.ifEmpty { "startInstall failed" }))
+                        close(e)
+                    }
             }
-            .addOnFailureListener { e ->
+            .onFailure { e ->
                 val reason = (e as? com.google.android.play.core.splitinstall.SplitInstallException)
                     ?.let { "code=${it.errorCode}" }
                     ?: e.message.orEmpty()
-                trySend(InstallResult.Failed(reason = reason.ifEmpty { "startInstall failed" }))
+                trySend(InstallResult.Failed(reason = reason.ifEmpty { "startInstall crashed" }))
                 close(e)
             }
         awaitClose {

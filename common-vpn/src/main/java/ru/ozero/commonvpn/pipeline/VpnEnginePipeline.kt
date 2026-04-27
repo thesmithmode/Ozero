@@ -32,7 +32,7 @@ class VpnEnginePipeline(
 
     suspend fun start(tunFd: Int): Result {
         Log.i(TAG, "start tunFd=$tunFd")
-        orchestrator.dispatch(OrchestratorTransition.Connect)
+        ensureConnectTransition()
 
         val winner = pickWinner()
         if (winner == null) {
@@ -64,6 +64,25 @@ class VpnEnginePipeline(
         if (orchestrator.state.value !is OrchestratorState.Idle) {
             orchestrator.dispatch(OrchestratorTransition.Disconnect)
             orchestrator.dispatch(OrchestratorTransition.DisconnectComplete)
+        }
+    }
+
+
+    private fun ensureConnectTransition() {
+        when (orchestrator.state.value) {
+            is OrchestratorState.Idle,
+            is OrchestratorState.Failed,
+            -> orchestrator.dispatch(OrchestratorTransition.Connect)
+
+            is OrchestratorState.Probing,
+            is OrchestratorState.Connecting,
+            -> Unit
+
+            else -> {
+                orchestrator.dispatch(OrchestratorTransition.Disconnect)
+                orchestrator.dispatch(OrchestratorTransition.DisconnectComplete)
+                orchestrator.dispatch(OrchestratorTransition.Connect)
+            }
         }
     }
 
