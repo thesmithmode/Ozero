@@ -34,7 +34,6 @@ class OzeroApp : Application(), Configuration.Provider {
         super.attachBaseContext(base)
         BootFileLogger.init(base)
         installCrashHandler()
-        BootDiagnostics.installWtfHandler()
         BootFileLogger.info(
             TAG,
             "attachBaseContext sdk=${Build.VERSION.SDK_INT} " +

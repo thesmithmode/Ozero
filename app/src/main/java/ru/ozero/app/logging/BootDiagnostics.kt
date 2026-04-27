@@ -4,7 +4,6 @@ import android.app.ActivityManager
 import android.app.ApplicationExitInfo
 import android.content.Context
 import android.os.Build
-import android.util.Log
 import kotlinx.coroutines.CoroutineExceptionHandler
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -39,19 +38,6 @@ object BootDiagnostics {
                 t,
             )
         }
-
-    fun installWtfHandler() {
-        guardUnit("installWtfHandler") {
-            val handler = Log.TerribleFailureHandler { tag, what, _ ->
-                BootFileLogger.error(TAG, "WTF tag=$tag msg=${what.message}", what)
-            }
-            val previous = Log.setWtfHandler(handler)
-            BootFileLogger.info(
-                TAG,
-                "wtfHandler installed (previous=${previous?.let { it::class.java.name }})",
-            )
-        }
-    }
 
     fun dumpExitReasons(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
