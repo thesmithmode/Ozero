@@ -11,9 +11,9 @@ import java.io.InputStreamReader
 
 object BootDiagnostics {
 
-    private const val TAG = "BootDiag"
+    const val TAG = "BootDiag"
 
-    inline fun <T> guard(name: String, default: T, block: () -> T): T {
+    fun <T> guard(name: String, default: T, block: () -> T): T {
         val started = System.nanoTime()
         return try {
             val result = block()
@@ -27,21 +27,29 @@ object BootDiagnostics {
         }
     }
 
-    inline fun guardUnit(name: String, block: () -> Unit) {
+    fun guardUnit(name: String, block: () -> Unit) {
         guard(name, Unit, block)
     }
 
     val coroutineHandler: CoroutineExceptionHandler =
         CoroutineExceptionHandler { ctx, t ->
-            BootFileLogger.error(TAG, "coroutine uncaught name=${ctx[kotlinx.coroutines.CoroutineName]?.name}", t)
+            BootFileLogger.error(
+                TAG,
+                "coroutine uncaught name=${ctx[kotlinx.coroutines.CoroutineName]?.name}",
+                t,
+            )
         }
 
     fun installWtfHandler() {
         guardUnit("installWtfHandler") {
-            val previous = Log.setWtfHandler { tag, what, _ ->
+            val handler = Log.TerribleFailureHandler { tag, what, _ ->
                 BootFileLogger.error(TAG, "WTF tag=$tag msg=${what.message}", what)
             }
-            BootFileLogger.info(TAG, "wtfHandler installed (previous=${previous?.javaClass?.name})")
+            val previous = Log.setWtfHandler(handler)
+            BootFileLogger.info(
+                TAG,
+                "wtfHandler installed (previous=${previous?.let { it::class.java.name }})",
+            )
         }
     }
 
