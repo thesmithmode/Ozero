@@ -29,7 +29,7 @@ class DohResolverTest {
 
     @Test
     fun resolvesIpv4FromDnsMessage() = runTest {
-                        val dnsResponse = buildDnsAResponse(host = "example.com", ipv4 = intArrayOf(1, 2, 3, 4))
+        val dnsResponse = buildDnsAResponse(host = "example.com", ipv4 = intArrayOf(1, 2, 3, 4))
         server.enqueue(
             MockResponse()
                 .setResponseCode(200)
@@ -68,12 +68,12 @@ class DohResolverTest {
 
     @Test
     fun truncatedCompressionPointerReturnsEmpty() = runTest {
-                val truncated = byteArrayOf(
+        val truncated = byteArrayOf(
             0x12, 0x34, 0x81.toByte(), 0x80.toByte(),
-            0, 1, 0, 1, 0, 0, 0, 0, 
+            0, 1, 0, 1, 0, 0, 0, 0,
             3, 'a'.code.toByte(), 'b'.code.toByte(), 'c'.code.toByte(), 0,
-            0, 1, 0, 1, 
-            0xC0.toByte(), 
+            0, 1, 0, 1,
+            0xC0.toByte(),
         )
         server.enqueue(
             MockResponse()
@@ -82,24 +82,24 @@ class DohResolverTest {
                 .setBody(Buffer().write(truncated)),
         )
         val result = resolver.resolve("abc")
-                assertIs<DohResult.Failure>(result)
+        assertIs<DohResult.Failure>(result)
     }
 
-                private fun buildDnsAResponse(host: String, ipv4: IntArray): ByteArray {
+    private fun buildDnsAResponse(host: String, ipv4: IntArray): ByteArray {
         val buf = java.io.ByteArrayOutputStream()
-        buf.write(byteArrayOf(0x12, 0x34)) 
-        buf.write(byteArrayOf(0x81.toByte(), 0x80.toByte())) 
-        buf.write(byteArrayOf(0, 1, 0, 1, 0, 0, 0, 0)) 
-                host.split(".").forEach { label ->
+        buf.write(byteArrayOf(0x12, 0x34))
+        buf.write(byteArrayOf(0x81.toByte(), 0x80.toByte()))
+        buf.write(byteArrayOf(0, 1, 0, 1, 0, 0, 0, 0))
+        host.split(".").forEach { label ->
             buf.write(label.length)
             buf.write(label.toByteArray())
         }
-        buf.write(0) 
-        buf.write(byteArrayOf(0, 1, 0, 1)) 
-                buf.write(byteArrayOf(0xc0.toByte(), 0x0c))
-        buf.write(byteArrayOf(0, 1, 0, 1)) 
-        buf.write(byteArrayOf(0, 0, 0, 60)) 
-        buf.write(byteArrayOf(0, 4)) 
+        buf.write(0)
+        buf.write(byteArrayOf(0, 1, 0, 1))
+        buf.write(byteArrayOf(0xc0.toByte(), 0x0c))
+        buf.write(byteArrayOf(0, 1, 0, 1))
+        buf.write(byteArrayOf(0, 0, 0, 60))
+        buf.write(byteArrayOf(0, 4))
         ipv4.forEach { buf.write(it) }
         return buf.toByteArray()
     }

@@ -152,7 +152,7 @@ private fun LevelSelector(
 @Composable
 private fun LogList(entries: List<LogEntry>, padding: PaddingValues) {
     val listState = rememberLazyListState()
-        LaunchedEffect(entries.size) {
+    LaunchedEffect(entries.size) {
         if (entries.isNotEmpty()) {
             val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
             if (lastVisible >= entries.size - 5) {

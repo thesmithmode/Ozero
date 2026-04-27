@@ -8,8 +8,8 @@ data class SettingsModel(
     val ipv6Enabled: Boolean = DEFAULT_IPV6_ENABLED,
     val autoStart: Boolean = DEFAULT_AUTO_START,
     val manualEngine: EngineId? = DEFAULT_MANUAL_ENGINE,
-        val urnetworkEnabled: Boolean = DEFAULT_URNETWORK_ENABLED,
-        val urnetworkJwt: String? = DEFAULT_URNETWORK_JWT,
+    val urnetworkEnabled: Boolean = DEFAULT_URNETWORK_ENABLED,
+    val urnetworkJwt: String? = DEFAULT_URNETWORK_JWT,
 ) {
     companion object {
         val DEFAULT_SPLIT_MODE: SplitTunnelMode = SplitTunnelMode.ALL

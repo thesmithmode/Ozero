@@ -55,7 +55,7 @@ class NativeHevTunnelGatewayTest {
             nativeStart = { _, _ -> 0 },
             nativeStop = { throw IllegalStateException("native stop failed") },
         )
-                gateway.stop()
+        gateway.stop()
     }
 
     @Test

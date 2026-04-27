@@ -19,7 +19,7 @@ data class HevTunnelConfig(
         require(udpMode in setOf("udp", "tcp")) { "udpMode должен быть udp или tcp: $udpMode" }
     }
 
-        fun toYaml(): String =
+    fun toYaml(): String =
         """
         tunnel:
           mtu: $tunMtu
@@ -34,11 +34,11 @@ data class HevTunnelConfig(
     private companion object {
         private const val DEFAULT_TUN_MTU: Int = 1500
 
-                        private const val DEFAULT_TUN_IPV4: String = "10.10.10.10"
+        private const val DEFAULT_TUN_IPV4: String = "10.10.10.10"
         private const val DEFAULT_TUN_IPV6: String = "fd00:ffff:ffff:ffff::1"
         private const val DEFAULT_UDP_MODE: String = "udp"
 
-                private val ADDRESS_REGEX = Regex("^[a-zA-Z0-9._:-]+$")
+        private val ADDRESS_REGEX = Regex("^[a-zA-Z0-9._:-]+$")
 
         fun isSafeAddress(addr: String): Boolean = ADDRESS_REGEX.matches(addr)
     }

@@ -35,7 +35,7 @@ class TorEngine(
         supportsUdp = false,
         supportsDoH = false,
         localOnly = false,
-        requiresServer = false, 
+        requiresServer = false,
     )
 
     @Volatile private var started: Boolean = false
@@ -46,7 +46,7 @@ class TorEngine(
     override suspend fun start(config: EngineConfig): StartResult {
         require(config is EngineConfig.Tor) { "TorEngine требует EngineConfig.Tor" }
 
-                when (val installResult = installer.ensureInstalled()) {
+        when (val installResult = installer.ensureInstalled()) {
             is InstallResult.Installed, InstallResult.AlreadyInstalled -> Unit
             is InstallResult.Failed -> {
                 Log.e(TAG, "dynamic_tor install failed: ${installResult.reason}")
@@ -58,7 +58,7 @@ class TorEngine(
             }
         }
 
-                val torrc = runCatching {
+        val torrc = runCatching {
             configBuilder.build(
                 bridges = bridges,
                 options = buildOptions.copy(socksPort = config.socksPort),

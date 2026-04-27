@@ -24,7 +24,7 @@ class NaiveEngine(
 
     override val capabilities = EngineCapabilities(
         supportsTcp = true,
-        supportsUdp = false, 
+        supportsUdp = false,
         supportsDoH = false,
         localOnly = false,
         requiresServer = true,
@@ -35,7 +35,7 @@ class NaiveEngine(
 
     override suspend fun start(config: EngineConfig): StartResult {
         require(config is EngineConfig.Naive) { "NaiveEngine требует EngineConfig.Naive" }
-                                require(!config.proxyUrl.trimStart().startsWith("{")) {
+        require(!config.proxyUrl.trimStart().startsWith("{")) {
             "proxyUrl не может быть JSON — используйте url-формат"
         }
         val jsonConfig = JsonWriter.write(

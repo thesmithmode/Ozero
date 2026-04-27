@@ -121,7 +121,7 @@ class XrayEngineTest {
 
     @Test
     fun probeFailsAfterStartFailure() = runTest {
-                every { delegate.startXray(any()) } returns -1
+        every { delegate.startXray(any()) } returns -1
         engine.start(EngineConfig.Xray(configJson = """{"x":1}""", socksPort = 12345))
         val result = engine.probe()
         assertIs<ProbeResult.Failure>(result)

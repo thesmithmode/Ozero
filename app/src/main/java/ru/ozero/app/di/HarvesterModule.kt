@@ -24,7 +24,7 @@ object HarvesterModule {
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
-                @Provides
+    @Provides
     @Singleton
     fun provideSubscriptionUriParser(): SubscriptionUriParser = SubscriptionUriParser()
 

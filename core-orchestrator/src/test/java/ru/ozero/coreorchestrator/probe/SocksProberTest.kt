@@ -26,7 +26,7 @@ class SocksProberTest {
 
         assertTrue(result is ProbeResult.Success)
         assertEquals(42L, (result as ProbeResult.Success).latencyMs)
-                assertEquals(listOf("youtube.com"), seen)
+        assertEquals(listOf("youtube.com"), seen)
     }
 
     @Test
@@ -60,7 +60,7 @@ class SocksProberTest {
         val connector = SocksProber.HttpConnector { target, _ ->
             seen += target.host
             if (target.host == "youtube.com") {
-                delay(10_000) 
+                delay(10_000)
                 0L
             } else {
                 50L

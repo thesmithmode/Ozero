@@ -26,19 +26,19 @@ class CgnatDetector(
 
     private fun Inet4Address.isCgnat(): Boolean {
         val b = address
-                if ((b[0].toInt() and 0xFF) != 100) return false
+        if ((b[0].toInt() and 0xFF) != 100) return false
         val second = b[1].toInt() and 0xFF
         return second in 64..127
     }
 
     private fun InetAddress.isPublic(): Boolean {
-                        @Suppress("ComplexCondition")
+        @Suppress("ComplexCondition")
         if (isLoopbackAddress || isLinkLocalAddress || isAnyLocalAddress || isMulticastAddress) return false
-        if (isSiteLocalAddress) return false 
+        if (isSiteLocalAddress) return false
         if (this is Inet4Address && isCgnat()) return false
         if (this is Inet6Address) {
             val firstByte = address[0].toInt() and 0xFF
-                        if (firstByte and 0xFE == 0xFC) return false
+            if (firstByte and 0xFE == 0xFC) return false
         }
         return true
     }

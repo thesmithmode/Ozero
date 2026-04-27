@@ -116,7 +116,7 @@ class ByeDpiEngineTest {
 
     @Test
     fun probeFailsAfterStartFailure() = runTest {
-                every { proxy.jniStartProxy(any()) } returns -1
+        every { proxy.jniStartProxy(any()) } returns -1
         engine.start(EngineConfig.ByeDpi(socksPort = 12345))
         val result = engine.probe()
         assertIs<ProbeResult.Failure>(result)

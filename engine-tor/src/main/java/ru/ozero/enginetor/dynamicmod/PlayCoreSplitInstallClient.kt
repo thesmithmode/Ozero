@@ -51,7 +51,7 @@ class PlayCoreSplitInstallClient(
                 }
 
                 SplitInstallSessionStatus.REQUIRES_USER_CONFIRMATION -> {
-                                                                                trySend(InstallResult.Failed(reason = "user confirmation required"))
+                    trySend(InstallResult.Failed(reason = "user confirmation required"))
                     close()
                 }
 
@@ -97,7 +97,7 @@ class PlayCoreSplitInstallClient(
         const val TAG = "PlayCoreSplitInstall"
         const val PERCENT_BASE = 100
 
-                        @Suppress("unused")
+        @Suppress("unused")
         val ERROR_CODE_REF = SplitInstallErrorCode::class.java
     }
 }

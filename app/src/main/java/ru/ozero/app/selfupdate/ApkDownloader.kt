@@ -17,11 +17,11 @@ open class ApkDownloader(
 ) {
 
     sealed class Event {
-                data class Progress(val percent: Int) : Event()
+        data class Progress(val percent: Int) : Event()
 
-                data class Success(val apk: File, val sig: File) : Event()
+        data class Success(val apk: File, val sig: File) : Event()
 
-                data class Failed(val reason: String) : Event()
+        data class Failed(val reason: String) : Event()
     }
 
     open fun download(apkUrl: String, sigUrl: String, destDir: File): Flow<Event> = flow {
@@ -33,7 +33,7 @@ open class ApkDownloader(
         }
         val apkFile = File(destDir, APK_NAME)
         val sigFile = File(destDir, SIG_NAME)
-                        if (apkFile.exists() && !apkFile.delete()) {
+        if (apkFile.exists() && !apkFile.delete()) {
             Log.e(TAG, "не удалось удалить старый apk: ${apkFile.absolutePath}")
             emit(Event.Failed("apk locked, перезапустите приложение"))
             return@flow
@@ -83,7 +83,7 @@ open class ApkDownloader(
         return resp.body ?: throw IOException("empty body")
     }
 
-        private fun headerSize(body: okhttp3.ResponseBody, sizeLimit: Long): Long {
+    private fun headerSize(body: okhttp3.ResponseBody, sizeLimit: Long): Long {
         val total = body.contentLength().takeIf { it > 0 } ?: -1L
         if (total > sizeLimit) throw SizeLimitException("size $total > limit $sizeLimit")
         return total

@@ -21,7 +21,7 @@ class PlayCoreDynamicTorInstaller(
         val raw = client.requestInstall(moduleName).fold(
             initial = InstallResult.Failed(reason = "no terminal emit") as InstallResult,
         ) { acc, value ->
-                        if (value is InstallResult.Installing) acc else value
+            if (value is InstallResult.Installing) acc else value
         }
         return when (raw) {
             is InstallResult.Installed -> verifyAndMap(installedResult = InstallResult.Installed)

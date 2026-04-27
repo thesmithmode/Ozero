@@ -31,7 +31,7 @@ class SecurityGuard(
         when (val v = check()) {
             is Verdict.Clean -> Unit
             is Verdict.Compromised -> {
-                                                                Log.e(TAG, "security: compromised env, причины=${v.reasons}")
+                Log.e(TAG, "security: compromised env, причины=${v.reasons}")
                 throw SecurityException("compromised")
             }
         }

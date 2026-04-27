@@ -22,7 +22,7 @@ object UpdateInstallEventBus {
         }
     }
 
-        fun reset() {
+    fun reset() {
         _events.resetReplayCache()
     }
 }

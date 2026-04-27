@@ -26,7 +26,6 @@ class UrnetworkEngineTest {
         engine = UrnetworkEngine(delegate)
     }
 
-    
     @Test
     fun engineIdIsUrnetwork() {
         assertEquals(EngineId.URNETWORK, engine.id)
@@ -40,7 +39,6 @@ class UrnetworkEngineTest {
         assertTrue(!caps.requiresServer, "URnetwork P2P не требует сервера")
     }
 
-    
     @Test
     fun startRequiresUrnetworkConfig() = runTest {
         val ex = runCatching { engine.start(EngineConfig.ByeDpi()) }.exceptionOrNull()
@@ -81,10 +79,9 @@ class UrnetworkEngineTest {
         assertIs<StartResult.Failure>(r)
     }
 
-    
     @Test
     fun stopCallsDelegateDisconnect() = runTest {
-                every { delegate.connect(any(), any(), any(), any()) } returns true
+        every { delegate.connect(any(), any(), any(), any()) } returns true
         every { delegate.connectionStatus() } returns UrnetworkConnectionStatus.CONNECTED
         engine.start(EngineConfig.Urnetwork(jwtToken = "test-jwt"))
 
@@ -94,10 +91,9 @@ class UrnetworkEngineTest {
 
     @Test
     fun stopIsIdempotentWithoutStart() = runTest {
-                engine.stop()
+        engine.stop()
     }
 
-    
     @Test
     fun probeFailsWhenNotStarted() = runTest {
         val r = engine.probe()
@@ -120,8 +116,8 @@ class UrnetworkEngineTest {
     fun probeFailsWhenDisconnected() = runTest {
         every { delegate.connect(any(), any(), any(), any()) } returns true
         every { delegate.connectionStatus() } returnsMany listOf(
-            UrnetworkConnectionStatus.CONNECTED, 
-            UrnetworkConnectionStatus.DISCONNECTED, 
+            UrnetworkConnectionStatus.CONNECTED,
+            UrnetworkConnectionStatus.DISCONNECTED,
         )
         every { delegate.sdkVersion() } returns "test-sdk"
         engine.start(EngineConfig.Urnetwork(jwtToken = "test-jwt"))
@@ -130,7 +126,6 @@ class UrnetworkEngineTest {
         assertIs<ProbeResult.Failure>(r)
     }
 
-    
     @Test
     fun startPassesProviderModeToDelegate() = runTest {
         every { delegate.connect(any(), any(), any(), any()) } returns true
@@ -153,11 +148,10 @@ class UrnetworkEngineTest {
         verify { delegate.connect(any(), any(), any(), UrnetworkMode.CONSUMER) }
     }
 
-    
     @Test
     fun statsFlowEmitsInitialValue() = runTest {
         val stats = engine.stats()
-                val first = stats.first()
+        val first = stats.first()
         assertIs<ru.ozero.coreapi.EngineStats>(first)
     }
 }

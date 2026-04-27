@@ -5,5 +5,5 @@ sealed class TunnelState {
     data class Connected(val socksPort: Int) : TunnelState()
     data object Disconnecting : TunnelState()
 
-        data class Dead(val reason: String) : TunnelState()
+    data class Dead(val reason: String) : TunnelState()
 }

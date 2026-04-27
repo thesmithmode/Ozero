@@ -43,7 +43,7 @@ class ByeDpiEngine(
             val args = buildArgs(config)
             val code = proxy.jniStartProxy(args)
             if (code == 0) {
-                                                activeSocksPort = config.socksPort
+                activeSocksPort = config.socksPort
                 Log.i(TAG, "started OK на порту ${config.socksPort}")
                 StartResult.Success(socksPort = config.socksPort)
             } else {
@@ -56,7 +56,7 @@ class ByeDpiEngine(
     override suspend fun stop() {
         Log.i(TAG, "stop")
         withContext(Dispatchers.IO) {
-                                    runCatching { proxy.jniStopProxy() }
+            runCatching { proxy.jniStopProxy() }
                 .onFailure { Log.w(TAG, "jniStopProxy исключение: ${it.message}") }
             activeSocksPort = 0
         }

@@ -17,7 +17,7 @@ open class ApkUpdateVerifier(
         if (!apkFile.exists() || !signatureFile.exists()) return false
         val signature = signatureFile.readBytes()
         if (signature.size != ED25519_SIG_LEN) return false
-                                return apkFile.inputStream().buffered().use { stream ->
+        return apkFile.inputStream().buffered().use { stream ->
             SubscriptionVerifier.verifyUpdate(stream, signature, publicKey)
         }
     }

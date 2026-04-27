@@ -18,7 +18,7 @@ object OrchestratorModule {
     @Singleton
     fun provideOrchestrator(): Orchestrator = Orchestrator()
 
-        @Provides
+    @Provides
     @Singleton
     fun provideStrategyEngine(
         engines: Map<EngineId, @JvmSuppressWildcards Engine>,

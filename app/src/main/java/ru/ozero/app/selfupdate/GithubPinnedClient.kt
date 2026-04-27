@@ -8,10 +8,10 @@ object GithubPinnedClient {
 
     private const val HOST = "api.github.com"
 
-        private val PINS = listOf(
-                "sha256/tt9RksdSBGiieTiyWkU8g3MOmCrfMcvXDGC4ZALs9rg=",
-                "sha256/ZSagvDzjltLkewXEBuDxIzpW/dpVw1Juvvmd0hhkzdY=",
-                "sha256/sLVjNUaFYfW7n6EtgBeEpjOlcnBdNPMrZDRF36iwBdE=",
+    private val PINS = listOf(
+        "sha256/tt9RksdSBGiieTiyWkU8g3MOmCrfMcvXDGC4ZALs9rg=",
+        "sha256/ZSagvDzjltLkewXEBuDxIzpW/dpVw1Juvvmd0hhkzdY=",
+        "sha256/sLVjNUaFYfW7n6EtgBeEpjOlcnBdNPMrZDRF36iwBdE=",
     )
 
     fun create(): OkHttpClient {
@@ -26,7 +26,7 @@ object GithubPinnedClient {
             .build()
     }
 
-        fun pins(): List<String> = PINS.toList()
+    fun pins(): List<String> = PINS.toList()
 
     fun host(): String = HOST
 }

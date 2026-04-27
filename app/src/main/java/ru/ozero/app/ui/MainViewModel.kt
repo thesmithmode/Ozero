@@ -32,8 +32,7 @@ class MainViewModel @Inject constructor(private val orchestrator: Orchestrator) 
         }
     }
 
-    fun onVpnPermissionGranted() {
-            }
+    fun onVpnPermissionGranted() = Unit
 
     fun onVpnPermissionDenied() {
         val current = state.value

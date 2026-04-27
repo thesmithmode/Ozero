@@ -13,7 +13,7 @@ open class GithubReleaseFetcher(
 ) {
 
     init {
-                                require(baseUrl == "https://api.github.com") {
+        require(baseUrl == "https://api.github.com") {
             "GithubReleaseFetcher.baseUrl должен быть https://api.github.com"
         }
     }
@@ -44,16 +44,16 @@ open class GithubReleaseFetcher(
             val a = assets.getJSONObject(i)
             val name = a.optString("name")
             val url = a.optString("browser_download_url")
-                        if (!url.startsWith("https://")) continue
+            if (!url.startsWith("https://")) continue
             when {
                 name.endsWith(".apk") && !name.endsWith(".apk.sig") -> apkUrls += url
                 name.endsWith(".apk.sig") -> sigUrls += url
             }
         }
-                        if (apkUrls.size != 1 || sigUrls.size != 1) return null
+        if (apkUrls.size != 1 || sigUrls.size != 1) return null
         val apkUrl = apkUrls.single()
         val sigUrl = sigUrls.single()
-                val versionCode = obj.optLong("version_code", 0L)
+        val versionCode = obj.optLong("version_code", 0L)
             .takeIf { it > 0 }
             ?: parseVersionCodeFromBody(obj.optString("body"))
         return ReleaseInfo(
@@ -67,7 +67,7 @@ open class GithubReleaseFetcher(
     }
 
     private fun parseVersionCodeFromBody(body: String): Long {
-                val m = Regex("""version_code:\s*(\d+)""", RegexOption.IGNORE_CASE).find(body)
+        val m = Regex("""version_code:\s*(\d+)""", RegexOption.IGNORE_CASE).find(body)
         return m?.groupValues?.get(1)?.toLongOrNull() ?: 0L
     }
 }

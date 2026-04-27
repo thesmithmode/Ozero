@@ -59,7 +59,7 @@ class SubscriptionManagerTest {
 
         val result = manager().sync("https://sub.example/servers.json")
         assertIs<SubscriptionSyncResult.Ok>(result)
-                        assertEquals(2, result.liveCount)
+        assertEquals(2, result.liveCount)
         coVerify { dao.upsertAll(match { it.size == 2 }) }
     }
 
@@ -93,7 +93,7 @@ class SubscriptionManagerTest {
 
     @Test
     fun verifierIsWiredToBouncyCastle() {
-                val result = SubscriptionVerifier.verify(
+        val result = SubscriptionVerifier.verify(
             message = ByteArray(0),
             signature = ByteArray(64),
             publicKey = ByteArray(32),

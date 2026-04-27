@@ -6,7 +6,7 @@ import java.nio.charset.StandardCharsets
 
 class NaiveUriParser {
 
-            @Suppress("ReturnCount")
+    @Suppress("ReturnCount")
     fun parse(uri: String): UriParseResult<NaiveServer> {
         if (!uri.startsWith("naive+")) return UriParseResult.Error("scheme не naive+")
 

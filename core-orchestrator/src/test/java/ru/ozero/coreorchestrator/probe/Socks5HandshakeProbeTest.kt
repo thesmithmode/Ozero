@@ -27,12 +27,12 @@ class Socks5HandshakeProbeTest {
                 val client = srv.accept()
                 client.use { c ->
                     val ins = c.getInputStream()
-                                        val ver = ins.read()
+                    val ver = ins.read()
                     val n = ins.read()
                     repeat(n) { ins.read() }
                     require(ver == 0x05)
                     val out = c.getOutputStream()
-                                        out.write(byteArrayOf(0x05, 0x00))
+                    out.write(byteArrayOf(0x05, 0x00))
                     out.flush()
                 }
             }
@@ -71,7 +71,7 @@ class Socks5HandshakeProbeTest {
                 val client = srv.accept()
                 client.use { c ->
                     c.getInputStream().read(ByteArray(8))
-                                        c.getOutputStream().write(byteArrayOf(0x05, 0xFF.toByte()))
+                    c.getOutputStream().write(byteArrayOf(0x05, 0xFF.toByte()))
                     c.getOutputStream().flush()
                 }
             }
@@ -86,7 +86,7 @@ class Socks5HandshakeProbeTest {
 
     @Test
     fun throwsOnRefusedConnection() = runTest {
-                val free = ServerSocket(0).use { it.localPort }
+        val free = ServerSocket(0).use { it.localPort }
         assertThrows(IOException::class.java) {
             kotlinx.coroutines.runBlocking {
                 Socks5HandshakeProbe.probe("127.0.0.1", free, timeoutMs = 1_000)
@@ -100,7 +100,7 @@ class Socks5HandshakeProbeTest {
         thread(start = true, isDaemon = true) {
             runCatching {
                 val client: Socket = srv.accept()
-                                Thread.sleep(2_000)
+                Thread.sleep(2_000)
                 client.close()
             }
         }

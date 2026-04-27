@@ -19,7 +19,7 @@ open class UpdateCoordinator(
     private val cacheDir: File,
 ) {
 
-        private val checkMutex = Mutex()
+    private val checkMutex = Mutex()
 
     sealed class Progress {
         data object Checking : Progress()
@@ -52,7 +52,7 @@ open class UpdateCoordinator(
         }
         Log.i(TAG, "latest release tag=${release.tag} apk=${release.apkUrl}")
 
-                if (!release.apkUrl.startsWith("https://") || !release.sigUrl.startsWith("https://")) {
+        if (!release.apkUrl.startsWith("https://") || !release.sigUrl.startsWith("https://")) {
             Log.e(TAG, "non-HTTPS URL в release info — REJECT")
             collector.emit(Progress.Failed(Progress.Stage.FETCH, "non-HTTPS URL в release"))
             return
@@ -64,7 +64,7 @@ open class UpdateCoordinator(
             return
         }
 
-                                        if (release.versionCode > 0 && release.versionCode <= currentVersionCode) {
+        if (release.versionCode > 0 && release.versionCode <= currentVersionCode) {
             Log.w(TAG, "release versionCode=${release.versionCode} <= current=$currentVersionCode → REJECT")
             collector.emit(Progress.UpToDate)
             return
@@ -129,7 +129,7 @@ open class UpdateCoordinator(
                 }
             }
         } finally {
-                                    apk.delete()
+            apk.delete()
             sig.delete()
         }
     }

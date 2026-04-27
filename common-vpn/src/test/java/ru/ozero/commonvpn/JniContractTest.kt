@@ -27,7 +27,7 @@ class JniContractTest {
     @Test
     fun `external fun TProxyStartService имеет сигнатуру (String, Int) Unit`() {
         val source = File(moduleRoot, "src/main/java/hev/TProxyService.kt").readText()
-                        val pattern = "external\\s+fun\\s+TProxyStartService\\s*\\(" +
+        val pattern = "external\\s+fun\\s+TProxyStartService\\s*\\(" +
             "\\s*\\w+\\s*:\\s*String\\s*,\\s*\\w+\\s*:\\s*Int\\s*\\)(?!\\s*:)"
         val ok = Regex(pattern).containsMatchIn(source)
         assertTrue(
@@ -49,7 +49,7 @@ class JniContractTest {
 
     @Test
     fun `loadLibrary имя совпадает с именем so-файла из release pipeline`() {
-                        val source = File(moduleRoot, "src/main/java/hev/TProxyService.kt").readText()
+        val source = File(moduleRoot, "src/main/java/hev/TProxyService.kt").readText()
         assertTrue(
             source.contains("System.loadLibrary(\"hev-socks5-tunnel\")"),
             "loadLibrary должен принимать ровно \"hev-socks5-tunnel\" — release.yml собирает upstream под этим именем.",
@@ -58,7 +58,7 @@ class JniContractTest {
 
     @Test
     fun `NativeHevTunnelGateway адаптирует upstream void return в Int rc`() {
-                                val source = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/HevTunnelGateway.kt").readText()
+        val source = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/HevTunnelGateway.kt").readText()
         assertTrue(
             source.contains("hev.TProxyService.TProxyStartService"),
             "NativeHevTunnelGateway должен делегировать в hev.TProxyService.TProxyStartService.",

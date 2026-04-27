@@ -49,7 +49,7 @@ class UrnetworkConfigTest {
 
     @Test
     fun isSubclassOfEngineConfig() {
-        val config = EngineConfig.Urnetwork(jwtToken = "jwt")
-        assert(config is EngineConfig)
+        val config: EngineConfig = EngineConfig.Urnetwork(jwtToken = "jwt")
+        assert(config is EngineConfig.Urnetwork)
     }
 }

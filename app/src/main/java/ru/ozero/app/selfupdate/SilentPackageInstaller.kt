@@ -18,14 +18,14 @@ open class SilentPackageInstaller(
 ) {
 
     sealed class Result {
-                data class Submitted(val sessionId: Int) : Result()
+        data class Submitted(val sessionId: Int) : Result()
 
-                data class FileError(val reason: String) : Result()
+        data class FileError(val reason: String) : Result()
 
-                data class IoError(val sessionId: Int, val reason: String) : Result()
+        data class IoError(val sessionId: Int, val reason: String) : Result()
     }
 
-        open suspend fun install(
+    open suspend fun install(
         apkFile: File,
         sessionName: String = DEFAULT_SESSION_NAME,
         resultIntentAction: String = DEFAULT_RESULT_ACTION,
@@ -49,7 +49,7 @@ open class SilentPackageInstaller(
             Log.e(TAG, "createSession fail", e)
             return@withContext Result.IoError(sessionId = -1, reason = e.message ?: "createSession")
         } catch (e: SecurityException) {
-                        Log.e(TAG, "createSession denied by system", e)
+            Log.e(TAG, "createSession denied by system", e)
             return@withContext Result.IoError(sessionId = -1, reason = e.message ?: "createSession denied")
         }
 
@@ -78,7 +78,7 @@ open class SilentPackageInstaller(
         apkFile: File,
         sessionName: String,
     ) {
-                        session.openWrite(sessionName, 0, apkFile.length()).use { sink ->
+        session.openWrite(sessionName, 0, apkFile.length()).use { sink ->
             apkFile.inputStream().use { src ->
                 src.copyTo(sink, bufferSize = COPY_BUFFER)
                 session.fsync(sink)

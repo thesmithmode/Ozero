@@ -133,7 +133,7 @@ class SecurityWatchdogTest {
         )
 
         watchdog.start(scope)
-        watchdog.start(scope) 
+        watchdog.start(scope)
         assertTrue(watchdog.isRunning())
         watchdog.stop()
     }
@@ -157,8 +157,8 @@ class SecurityWatchdogTest {
         scope.advanceTimeBy(200)
         scope.advanceUntilIdle()
 
-                assertFalse(watchdog.isRunning(), "watchdog завершился штатно после Compromised")
-                var executed = false
+        assertFalse(watchdog.isRunning(), "watchdog завершился штатно после Compromised")
+        var executed = false
         scope.launch(dispatcher) {
             delay(100)
             executed = true

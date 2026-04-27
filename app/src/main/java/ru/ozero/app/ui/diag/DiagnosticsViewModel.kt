@@ -66,7 +66,7 @@ class DiagnosticsViewModel @Inject constructor(
 
     private fun onOrchestratorState(state: OrchestratorState) {
         if (state is OrchestratorState.Connected) {
-                        if (_uiState.value !is DiagnosticsUiState.Running &&
+            if (_uiState.value !is DiagnosticsUiState.Running &&
                 _uiState.value !is DiagnosticsUiState.Done
             ) {
                 _uiState.value = DiagnosticsUiState.Idle

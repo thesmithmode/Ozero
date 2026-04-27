@@ -55,7 +55,7 @@ class SubscriptionManager(
         }
 
         if (entities.isEmpty()) {
-                        Log.w(TAG, "нет live серверов — не трогаем БД")
+            Log.w(TAG, "нет live серверов — не трогаем БД")
             return SubscriptionSyncResult.Error("нет живых серверов в подписке")
         }
 

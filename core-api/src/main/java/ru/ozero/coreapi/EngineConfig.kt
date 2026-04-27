@@ -31,14 +31,14 @@ sealed class EngineConfig {
         val socksPort: Int = 1080
     ) : EngineConfig()
 
-        data class Urnetwork(
+    data class Urnetwork(
         val jwtToken: String,
         val apiUrl: String = "https://api.urnetwork.com",
         val region: String? = null,
         val mode: String = "consumer",
         val socksPort: Int = 10810,
     ) : EngineConfig() {
-                override fun toString(): String =
+        override fun toString(): String =
             "Urnetwork(jwtToken=***, apiUrl=$apiUrl, region=$region, mode=$mode, socksPort=$socksPort)"
     }
 }

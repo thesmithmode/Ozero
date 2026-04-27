@@ -15,9 +15,9 @@ class ApkSignatureVerifier(
         return sigs.any { sha256(it).equals(expectedSha256Hex, ignoreCase = true) }
     }
 
-        fun currentSignatureSha256(): String? = loadSignatures()?.firstOrNull()?.let(::sha256)
+    fun currentSignatureSha256(): String? = loadSignatures()?.firstOrNull()?.let(::sha256)
 
-                @Suppress("SwallowedException")
+    @Suppress("SwallowedException")
     private fun loadSignatures(): List<ByteArray>? {
         val pm = context.packageManager
         return try {
@@ -28,14 +28,14 @@ class ApkSignatureVerifier(
                     PackageManager.GET_SIGNING_CERTIFICATES,
                 )
                 val sigInfo = info.signingInfo ?: return null
-                                                                sigInfo.apkContentsSigners.map { it.toByteArray() }
+                sigInfo.apkContentsSigners.map { it.toByteArray() }
             } else {
                 @Suppress("DEPRECATION")
                 val info = pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNATURES)
 
                 @Suppress("DEPRECATION")
                 val sigs = info.signatures
-                                                                if (sigs == null || sigs.size != 1) null else sigs.map { it.toByteArray() }
+                if (sigs == null || sigs.size != 1) null else sigs.map { it.toByteArray() }
             }
         } catch (e: PackageManager.NameNotFoundException) {
             null

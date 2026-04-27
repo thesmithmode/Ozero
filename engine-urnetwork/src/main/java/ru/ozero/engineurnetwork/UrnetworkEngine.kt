@@ -26,7 +26,7 @@ class UrnetworkEngine(
         supportsUdp = true,
         supportsDoH = true,
         localOnly = false,
-        requiresServer = false, 
+        requiresServer = false,
     )
 
     @Volatile private var activeSocksPort: Int = 0
@@ -44,7 +44,6 @@ class UrnetworkEngine(
 
         Log.i(TAG, "start jwtLen=${config.jwtToken.length} mode=${config.mode} region=${config.region}")
 
-                        
         return withContext(Dispatchers.IO) {
             try {
                 val mode = parseMode(config.mode)
@@ -55,7 +54,7 @@ class UrnetworkEngine(
                     mode = mode,
                 )
                 if (ok) {
-                                        val connected = waitForConnected(timeoutMs = CONNECT_TIMEOUT_MS)
+                    val connected = waitForConnected(timeoutMs = CONNECT_TIMEOUT_MS)
                     if (connected) {
                         activeSocksPort = config.socksPort
                         Log.i(TAG, "started OK port=$activeSocksPort sdk=${delegate.sdkVersion()}")
@@ -70,7 +69,7 @@ class UrnetworkEngine(
                 }
             } catch (e: Throwable) {
                 Log.e(TAG, "start исключение", e)
-                                                StartResult.Failure(reason = "URnetwork native error", cause = e)
+                StartResult.Failure(reason = "URnetwork native error", cause = e)
             }
         }
     }

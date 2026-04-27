@@ -50,7 +50,7 @@ class Hysteria2UriParser {
         )
     }
 
-        private fun parseMport(s: String?): Pair<Int?, Int?> {
+    private fun parseMport(s: String?): Pair<Int?, Int?> {
         if (s.isNullOrBlank()) return null to null
         val parts = s.split('-')
         if (parts.size != 2) return null to null

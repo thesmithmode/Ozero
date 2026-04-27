@@ -11,7 +11,7 @@ class ByeDpiProxy {
     external fun jniForceClose(): Int
 
     companion object {
-                                        @JvmStatic
+        @JvmStatic
         var libraryLoaded: Boolean = false
             private set
 

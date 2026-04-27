@@ -27,10 +27,10 @@ class TunBuilderConfiguratorTest {
     fun bypassLanAddsAllNonPrivateRoutes() {
         val b = mockBuilder()
         configurator.apply(b, SplitTunnelConfig(mode = SplitTunnelMode.BYPASS_LAN))
-                verify(exactly = 0) { b.addRoute("0.0.0.0", 0) }
-                verify { b.addRoute("8.0.0.0", 7) }
+        verify(exactly = 0) { b.addRoute("0.0.0.0", 0) }
+        verify { b.addRoute("8.0.0.0", 7) }
         verify { b.addRoute("1.0.0.0", 8) }
-                verify(exactly = 1) { b.addRoute("2000::", 3) }
+        verify(exactly = 1) { b.addRoute("2000::", 3) }
     }
 
     @Test
@@ -107,7 +107,7 @@ class TunBuilderConfiguratorTest {
         every { b.addAllowedApplication(any()) } returns b
         configurator.apply(b, SplitTunnelConfig(mode = SplitTunnelMode.ALLOWLIST, packages = emptySet()))
         verify(exactly = 1) { b.addRoute("0.0.0.0", 0) }
-                        verify(exactly = 1) { b.addAllowedApplication("ru.ozero.app") }
+        verify(exactly = 1) { b.addAllowedApplication("ru.ozero.app") }
     }
 
     @Test
@@ -125,6 +125,6 @@ class TunBuilderConfiguratorTest {
             ),
         )
         verify { b.addAllowedApplication("ok.pkg") }
-                confirmVerified()
+        confirmVerified()
     }
 }

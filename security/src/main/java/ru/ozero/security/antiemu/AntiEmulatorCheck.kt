@@ -16,7 +16,7 @@ class AntiEmulatorCheck(
 
     fun isEmulator(): Boolean = matchedReasons().isNotEmpty()
 
-        @Suppress("ComplexCondition")
+    @Suppress("ComplexCondition")
     fun matchedReasons(): List<String> {
         val f = provider()
         val reasons = mutableListOf<String>()

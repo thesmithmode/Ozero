@@ -122,7 +122,7 @@ class Hy2ConfigBuilderTest {
         val cfg1 = builder.build(sampleServer(), Hy2BuildOptions(socksPort = 10809))
         val cfg2 = builder.build(sampleServer(), Hy2BuildOptions(socksPort = 10809))
         assertEquals(cfg1, cfg2)
-                val iServer = cfg1.indexOf("\"server\"")
+        val iServer = cfg1.indexOf("\"server\"")
         val iAuth = cfg1.indexOf("\"auth\"")
         val iTls = cfg1.indexOf("\"tls\"")
         val iObfs = cfg1.indexOf("\"obfs\"")

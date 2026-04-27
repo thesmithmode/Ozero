@@ -149,7 +149,7 @@ class AwgConfigBuilderTest {
     @Test
     fun rejectsPartialMagicHeaders() {
         val ex = runCatching {
-                        builder.build(sample().copy(h1 = 1, h2 = 0, h3 = 0, h4 = 0))
+            builder.build(sample().copy(h1 = 1, h2 = 0, h3 = 0, h4 = 0))
         }.exceptionOrNull()
         assertTrue(ex is IllegalArgumentException)
     }

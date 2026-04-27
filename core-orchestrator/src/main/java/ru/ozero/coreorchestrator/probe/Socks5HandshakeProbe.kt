@@ -29,7 +29,7 @@ object Socks5HandshakeProbe {
                 }
 
                 val out = socket.getOutputStream()
-                                out.write(byteArrayOf(SOCKS_VERSION, 0x01, METHOD_NO_AUTH))
+                out.write(byteArrayOf(SOCKS_VERSION, 0x01, METHOD_NO_AUTH))
                 out.flush()
 
                 val ins = socket.getInputStream()

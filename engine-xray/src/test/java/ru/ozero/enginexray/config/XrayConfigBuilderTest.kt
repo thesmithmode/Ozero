@@ -13,7 +13,6 @@ class XrayConfigBuilderTest {
 
     private val builder = XrayConfigBuilder()
 
-    
     @Test
     fun socksInboundOnLocalhost() {
         val cfg = builder.build(sampleVless(), socksPort = 10808)
@@ -29,7 +28,6 @@ class XrayConfigBuilderTest {
         assertTrue(ex is IllegalArgumentException)
     }
 
-    
     @Test
     fun vlessRealityXhttpCanonical() {
         val s = VlessServer(
@@ -105,7 +103,6 @@ class XrayConfigBuilderTest {
         assertTrue(ex is IllegalArgumentException)
     }
 
-    
     @Test
     fun hysteria2BasicConfig() {
         val s = Hysteria2Server(
@@ -142,7 +139,6 @@ class XrayConfigBuilderTest {
         assertTrue(cfg.contains(""""allowInsecure":true"""))
     }
 
-    
     @Test
     fun trojanConfig() {
         val s = TrojanServer(
@@ -165,7 +161,6 @@ class XrayConfigBuilderTest {
         assertTrue(cfg.contains(""""serverName":"peer.local""""))
     }
 
-    
     @Test
     fun shadowsocksConfig() {
         val s = ShadowsocksServer(
@@ -190,7 +185,6 @@ class XrayConfigBuilderTest {
         assertTrue(ex is IllegalArgumentException)
     }
 
-    
     @Test
     fun vlessRealityGrpcExactJson() {
         val s = VlessServer(
@@ -221,7 +215,6 @@ class XrayConfigBuilderTest {
         assertEquals(expected, builder.build(s, 1080))
     }
 
-    
     @Test
     fun chainHasTwoOutboundsWithCorrectTags() {
         val entry = sampleVless().copy(host = "ru-entry.example.com", port = 443)
@@ -229,7 +222,7 @@ class XrayConfigBuilderTest {
         val cfg = builder.buildChain(entry, exit, socksPort = 10808)
         assertTrue(cfg.contains(""""tag":"proxy""""))
         assertTrue(cfg.contains(""""tag":"exit-proxy""""))
-                assertTrue(cfg.contains(""""proxySettings":{"tag":"exit-proxy"}"""), cfg)
+        assertTrue(cfg.contains(""""proxySettings":{"tag":"exit-proxy"}"""), cfg)
     }
 
     @Test
@@ -237,7 +230,7 @@ class XrayConfigBuilderTest {
         val entry = sampleVless().copy(host = "ru1.com")
         val exit = sampleVless().copy(host = "nl1.com", uuid = "EXIT")
         val cfg = builder.buildChain(entry, exit, 10808)
-                val iEntry = cfg.indexOf(""""tag":"proxy"""")
+        val iEntry = cfg.indexOf(""""tag":"proxy"""")
         val iExit = cfg.indexOf(""""tag":"exit-proxy"""")
         assertTrue(iEntry > 0 && iExit > iEntry, cfg)
     }

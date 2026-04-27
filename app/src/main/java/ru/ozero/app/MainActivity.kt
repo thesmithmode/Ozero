@@ -56,12 +56,12 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var serverImporter: ServerImportService
 
-        private val batteryPromptLauncher =
+    private val batteryPromptLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             Log.i(TAG, "battery prompt result code=${result.resultCode}")
         }
 
-        private val updateConfirmLauncher =
+    private val updateConfirmLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             Log.i(TAG, "update confirm result code=${result.resultCode}")
         }
@@ -74,19 +74,18 @@ class MainActivity : ComponentActivity() {
                 viewModel.onConnectClick()
                 viewModel.onVpnPermissionGranted()
                 startVpnService()
-            } else {
-                            }
+            }
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         observeSelfUpdateEvents()
-                                if (savedInstanceState == null) {
+        if (savedInstanceState == null) {
             handleSubscriptionIntent(intent)
         }
         setContent {
             OzeroTheme {
-                                                                var checked by rememberSaveable { mutableStateOf(false) }
+                var checked by rememberSaveable { mutableStateOf(false) }
                 var showOnboarding by rememberSaveable { mutableStateOf(false) }
                 LaunchedEffect(Unit) {
                     val completed = userFlags.isOnboardingCompleted()
@@ -134,7 +133,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun onConnectClick() {
-                        val vpnIntent = VpnService.prepare(this)
+        val vpnIntent = VpnService.prepare(this)
         if (vpnIntent != null) {
             vpnPermissionLauncher.launch(vpnIntent)
         } else {
@@ -150,7 +149,7 @@ class MainActivity : ComponentActivity() {
         handleSubscriptionIntent(intent)
     }
 
-        private fun handleSubscriptionIntent(intent: Intent?) {
+    private fun handleSubscriptionIntent(intent: Intent?) {
         if (intent == null) return
         val raw: String? = when (intent.action) {
             Intent.ACTION_VIEW -> intent.dataString
@@ -192,7 +191,7 @@ class MainActivity : ComponentActivity() {
         maybeShowBatteryPrompt()
     }
 
-        private fun maybeShowBatteryPrompt() {
+    private fun maybeShowBatteryPrompt() {
         lifecycleScope.launch {
             val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return@launch
             val isIgnoring = if (Build.VERSION.SDK_INT >= BatteryOptimization.MIN_SDK) {

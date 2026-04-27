@@ -35,13 +35,13 @@ class UrnetworkE2ETest {
             mode = "consumer",
         )
 
-                val startResult = engine.start(config)
+        val startResult = engine.start(config)
         assertIs<StartResult.Success>(startResult, "URnetwork engine не смог подключиться")
 
         try {
-                        val response = URL("https://cloudflare.com/cdn-cgi/trace").readText()
+            val response = URL("https://cloudflare.com/cdn-cgi/trace").readText()
 
-                        assertContains(response, "fl=", message = "Ответ не содержит fl= (поле Cloudflare)")
+            assertContains(response, "fl=", message = "Ответ не содержит fl= (поле Cloudflare)")
             assertContains(response, "ip=", message = "Ответ не содержит ip= (IP клиента)")
         } finally {
             engine.stop()

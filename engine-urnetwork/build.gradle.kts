@@ -17,7 +17,7 @@ dependencies {
     implementation(project(":core-orchestrator"))
     implementation(libs.bundles.coroutines)
 
-        val aarFile = file("libs/URnetworkSdk.aar")
+    val aarFile = file("libs/URnetworkSdk.aar")
     if (aarFile.exists()) {
         implementation(files("libs/URnetworkSdk.aar"))
     }

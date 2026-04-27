@@ -6,7 +6,7 @@ import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "servers",
-                indices = [Index(value = ["isAlive"]), Index(value = ["priority"])],
+    indices = [Index(value = ["isAlive"]), Index(value = ["priority"])],
 )
 data class ServerEntity(
     @PrimaryKey val id: String,
@@ -18,5 +18,5 @@ data class ServerEntity(
     val priority: Int = 10,
     val isAlive: Boolean = true,
     val lastCheckedAt: Long = 0L,
-        val pairId: String? = null
+    val pairId: String? = null
 )

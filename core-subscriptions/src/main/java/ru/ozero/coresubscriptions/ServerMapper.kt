@@ -72,13 +72,13 @@ class ServerMapper {
         }
 
     private fun stableId(uri: String): String {
-                        val digest = MessageDigest.getInstance("SHA-256").digest(uri.toByteArray())
+        val digest = MessageDigest.getInstance("SHA-256").digest(uri.toByteArray())
         return digest.take(STABLE_ID_BYTES).joinToString("") { "%02x".format(it) }
     }
 
     private fun countryFromRemark(remark: String?): String? {
         if (remark.isNullOrBlank()) return null
-                val first = remark.substringBefore("-").takeIf { it.length == 2 } ?: return null
+        val first = remark.substringBefore("-").takeIf { it.length == 2 } ?: return null
         return first.uppercase()
     }
 

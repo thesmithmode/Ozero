@@ -13,7 +13,7 @@ class NativeHevTunnelGateway(
     private val cacheDir: File,
     private val nativeStart: (configPath: String, fd: Int) -> Int = { path, fd ->
         hev.TProxyService.TProxyStartService(path, fd)
-                        0
+        0
     },
     private val nativeStop: () -> Unit = { hev.TProxyService.TProxyStopService() },
 ) : HevTunnelGateway {
@@ -34,7 +34,7 @@ class NativeHevTunnelGateway(
     }
 
     private fun writeConfig(config: HevTunnelConfig): File {
-                        if (!cacheDir.exists()) cacheDir.mkdirs()
+        if (!cacheDir.exists()) cacheDir.mkdirs()
         val file = File(cacheDir, CONFIG_FILE)
         file.writeText(config.toYaml())
         return file

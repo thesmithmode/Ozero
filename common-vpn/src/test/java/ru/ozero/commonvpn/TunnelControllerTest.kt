@@ -38,7 +38,7 @@ class TunnelControllerTest {
 
     @Test
     fun deadStateIsNotIdleKillSwitchInvariant() {
-                        controller.onEngineStarted(1080)
+        controller.onEngineStarted(1080)
         controller.onEngineDied("crash")
         assertTrue(controller.state.value is TunnelState.Dead)
         assertTrue(controller.state.value !is TunnelState.Idle)

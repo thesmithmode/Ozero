@@ -21,7 +21,7 @@ class LiveProber(
 
     suspend fun probeAll(servers: List<ServerEntity>): ProbeStats {
         if (servers.isEmpty()) return ProbeStats(0, 0, 0)
-                        val sem = Semaphore(MAX_CONCURRENT)
+        val sem = Semaphore(MAX_CONCURRENT)
         val results = coroutineScope {
             servers.map { srv ->
                 async(Dispatchers.IO) {
@@ -49,7 +49,7 @@ class LiveProber(
         }.getOrDefault(false)
     }
 
-        private fun extractHost(uri: String): String? {
+    private fun extractHost(uri: String): String? {
         val schemeEnd = uri.indexOf("://")
         if (schemeEnd < 0) return null
         val rest = uri.substring(schemeEnd + 3)

@@ -20,9 +20,9 @@ interface SettingsRepository {
 
     suspend fun setManualEngine(engine: EngineId?)
 
-        suspend fun setUrnetworkEnabled(enabled: Boolean)
+    suspend fun setUrnetworkEnabled(enabled: Boolean)
 
-        suspend fun setUrnetworkJwt(jwt: String?)
+    suspend fun setUrnetworkJwt(jwt: String?)
 }
 
 class SettingsRepositoryImpl @Inject constructor(
