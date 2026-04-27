@@ -82,10 +82,12 @@ class CrashLogStore(
         private val USERINFO_URI = Regex(
             "(?i)(\\w+)://([^:/@\\s]+(?::[^@\\s]*)?)@([^\\s/]+)",
         )
+
         // Голые proxy-схемы без user-info — режем целиком URI до пробела/конца строки.
         private val PROXY_URI = Regex(
             "(?i)\\b(vless|vmess|trojan|ss|hysteria2?|tuic|naive\\+https?|wireguard|awg)://\\S+",
         )
+
         // Base64/Base64URL/Hex блок 32+ символов — характерно для ключей и подписей.
         private val LONG_TOKEN = Regex(
             "[A-Za-z0-9+/_=-]{32,}",
