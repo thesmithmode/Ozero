@@ -21,11 +21,16 @@ class JniContractTest {
     @Test
     fun `class TProxyService существует в пакете hev`() {
         val expected = File(moduleRoot, "src/main/java/hev/TProxyService.kt")
-        assertTrue(expected.exists(), "Файл $expected отсутствует. Upstream JNI вызывает FindClass('hev/TProxyService') — путь и имя жёсткие, переименование = NoSuchMethodError при первом вызове VPN.")
+        assertTrue(
+            expected.exists(),
+            "Файл $expected отсутствует. Upstream JNI вызывает FindClass('hev/TProxyService') — " +
+                "путь и имя жёсткие, переименование = NoSuchMethodError при первом вызове VPN.",
+        )
         val source = expected.readText()
         assertTrue(
             source.contains("package hev") && source.contains("object TProxyService"),
-            "Класс должен быть `package hev` + `object TProxyService`. Иначе RegisterNatives в hev-jni.c не найдёт класс.",
+            "Класс должен быть `package hev` + `object TProxyService`. " +
+                "Иначе RegisterNatives в hev-jni.c не найдёт класс.",
         )
     }
 
@@ -34,13 +39,13 @@ class JniContractTest {
         val source = File(moduleRoot, "src/main/java/hev/TProxyService.kt").readText()
         // Upstream registers:  TProxyStartService(Ljava/lang/String;I)V
         // Любая другая сигнатура (return Int, разные параметры) = UnsatisfiedLinkError в runtime.
-        val ok = Regex(
-            "external\\s+fun\\s+TProxyStartService\\s*\\(\\s*\\w+\\s*:\\s*String\\s*,\\s*\\w+\\s*:\\s*Int\\s*\\)(?!\\s*:)",
-        ).containsMatchIn(source)
+        val pattern = "external\\s+fun\\s+TProxyStartService\\s*\\(" +
+            "\\s*\\w+\\s*:\\s*String\\s*,\\s*\\w+\\s*:\\s*Int\\s*\\)(?!\\s*:)"
+        val ok = Regex(pattern).containsMatchIn(source)
         assertTrue(
             ok,
-            "TProxyStartService должна быть `external fun TProxyStartService(path: String, fd: Int)` без return type — upstream возвращает void. " +
-                "Если меняешь — синхронизируй с upstream src/hev-jni.c в heiher/hev-socks5-tunnel.",
+            "TProxyStartService должна быть `external fun TProxyStartService(path: String, fd: Int)` " +
+                "без return type — upstream возвращает void. Синхронизируй с heiher/hev-socks5-tunnel src/hev-jni.c.",
         )
     }
 
@@ -48,7 +53,10 @@ class JniContractTest {
     fun `external fun TProxyStopService имеет сигнатуру () Unit`() {
         val source = File(moduleRoot, "src/main/java/hev/TProxyService.kt").readText()
         val ok = Regex("external\\s+fun\\s+TProxyStopService\\s*\\(\\s*\\)(?!\\s*:)").containsMatchIn(source)
-        assertTrue(ok, "TProxyStopService должна быть `external fun TProxyStopService()` без параметров и без return type.")
+        assertTrue(
+            ok,
+            "TProxyStopService должна быть `external fun TProxyStopService()` без параметров и без return type.",
+        )
     }
 
     @Test

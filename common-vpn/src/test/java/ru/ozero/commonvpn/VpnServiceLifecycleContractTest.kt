@@ -33,7 +33,8 @@ class VpnServiceLifecycleContractTest {
         if (!hasRunBlocking) return
         assertTrue(
             source.contains("Thread(") && source.contains(".join("),
-            "runBlocking присутствует в OzeroVpnService — обязательно обернуть в отдельный Thread с join+timeout, иначе ANR на Main thread (особенно в onDestroy при kill-switch). См. предыдущий регресс.",
+            "runBlocking присутствует в OzeroVpnService — обязательно обернуть в отдельный Thread с join+timeout, " +
+                "иначе ANR на Main thread (особенно в onDestroy при kill-switch). См. предыдущий регресс.",
         )
     }
 
@@ -44,7 +45,8 @@ class VpnServiceLifecycleContractTest {
             source.contains("FOREGROUND_SERVICE_TYPE_SYSTEM_EXEMPTED")
         assertTrue(
             mentionsApi34 && mentionsType,
-            "На Android 14+ (UPSIDE_DOWN_CAKE) startForeground обязан получить ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE — иначе MissingForegroundServiceTypeException.",
+            "На Android 14+ (UPSIDE_DOWN_CAKE) startForeground обязан получить " +
+                "ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE — иначе MissingForegroundServiceTypeException.",
         )
     }
 
@@ -72,7 +74,8 @@ class VpnServiceLifecycleContractTest {
         assertFalse(
             onDestroyBody.contains("runBlocking { pipeline.stop()") ||
                 Regex("runBlocking\\s*\\{\\s*pipeline\\.stop\\(\\)\\s*\\}").containsMatchIn(onDestroyBody),
-            "Нельзя `runBlocking { pipeline.stop() }` без timeout — ANR на Main thread. Используй withTimeoutOrNull или Thread+join+timeout.",
+            "Нельзя `runBlocking { pipeline.stop() }` без timeout — ANR на Main thread. " +
+                "Используй withTimeoutOrNull или Thread+join+timeout.",
         )
     }
 }

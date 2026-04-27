@@ -46,7 +46,8 @@ class ManifestContractTest {
         val resolved = assertNotNull(type, "У <service .OzeroVpnService> должен быть android:foregroundServiceType")
         assertTrue(
             resolved in setOf("specialUse", "systemExempted"),
-            "foregroundServiceType=\"$resolved\" недопустим для VPN: connectedDevice требует USB/Bluetooth, dataSync/mediaProcessing/etc не подходят. Используй specialUse + meta-data subtype=vpn.",
+            "foregroundServiceType=\"$resolved\" недопустим для VPN: connectedDevice требует USB/Bluetooth, " +
+                "dataSync/mediaProcessing/etc не подходят. Используй specialUse + meta-data subtype=vpn.",
         )
     }
 
@@ -56,7 +57,8 @@ class ManifestContractTest {
         // Android 14+ требует <property> name=PROPERTY_SPECIAL_USE_FGS_SUBTYPE для type=specialUse
         assertTrue(
             manifest.contains("PROPERTY_SPECIAL_USE_FGS_SUBTYPE"),
-            "При foregroundServiceType=\"specialUse\" требуется <property name=\"android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE\" value=\"vpn\"/>.",
+            "При foregroundServiceType=\"specialUse\" требуется <property name=" +
+                "\"android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE\" value=\"vpn\"/>.",
         )
     }
 
@@ -73,7 +75,8 @@ class ManifestContractTest {
     fun `intent-filter android_net_VpnService присутствует`() {
         assertTrue(
             manifest.contains("android.net.VpnService"),
-            "Без <action android:name=\"android.net.VpnService\"/> система не покажет наш сервис в системном диалоге выбора VPN.",
+            "Без <action android:name=\"android.net.VpnService\"/> система не покажет наш сервис " +
+                "в системном диалоге выбора VPN.",
         )
     }
 
