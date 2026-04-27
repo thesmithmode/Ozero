@@ -40,7 +40,7 @@ class OzeroVpnService : android.net.VpnService() {
 
         const val TUN_ADDRESS_V6 = "fd00:ffff:ffff:ffff::1"
         const val TUN_PREFIX_LENGTH_V6 = 64
-        const val TUN_DNS = "127.0.0.1"
+        const val TUN_DNS = "1.1.1.1"
         const val TUN_MTU = 1500
         private const val SESSION_NAME = "Ozero"
         private const val TAG = "OzeroVpnService"

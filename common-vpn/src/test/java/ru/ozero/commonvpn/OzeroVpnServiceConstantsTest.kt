@@ -35,8 +35,11 @@ class OzeroVpnServiceConstantsTest {
     }
 
     @Test
-    fun tunDnsIsLocalhost() {
-        assertEquals("127.0.0.1", OzeroVpnService.TUN_DNS)
+    fun tunDnsIsNotLoopback() {
+        val addr = java.net.InetAddress.getByName(OzeroVpnService.TUN_DNS)
+        assert(!addr.isLoopbackAddress()) {
+            "TUN_DNS must not be a loopback address"
+        }
     }
 
     @Test
