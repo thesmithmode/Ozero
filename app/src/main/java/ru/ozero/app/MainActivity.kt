@@ -206,7 +206,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-
     private fun stopVpnService() {
         startService(
             Intent(this, OzeroVpnService::class.java).apply {

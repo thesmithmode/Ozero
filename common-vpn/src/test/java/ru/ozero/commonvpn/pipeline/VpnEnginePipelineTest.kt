@@ -51,7 +51,6 @@ class VpnEnginePipelineTest {
         assertIs<OrchestratorState.Connected>(handle.orchestrator.state.value)
     }
 
-
     @Test
     fun `start does not redispatch Connect when orchestrator already probing`() = runTest {
         val byedpi = FakeEngine(
