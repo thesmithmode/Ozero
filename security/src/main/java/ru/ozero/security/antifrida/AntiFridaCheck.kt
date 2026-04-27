@@ -14,7 +14,9 @@ interface ProcMapsReader {
 
 private val DefaultReader = object : ProcMapsReader {
     override fun <R> useLines(block: (Sequence<String>) -> R): R =
-        runCatching { File("/proc/self/maps").useLines(block) }.getOrElse { block(emptySequence()) }
+        runCatching {
+            File("/proc/self/maps").useLines { lines -> block(lines) }
+        }.getOrElse { block(emptySequence()) }
 }
 
 /**
