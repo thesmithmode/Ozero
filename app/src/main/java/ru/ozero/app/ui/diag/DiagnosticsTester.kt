@@ -10,6 +10,7 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import ru.ozero.coreapi.LogSanitizer
 import java.net.Proxy
 import java.net.InetSocketAddress
 import java.util.concurrent.TimeUnit
@@ -48,11 +49,11 @@ class DiagnosticsTester(
         try {
             client.newCall(req).execute().use { resp ->
                 val latency = System.currentTimeMillis() - start
-                Log.d(TAG, "diag $url: HTTP ${resp.code} ${latency}ms")
+                Log.d(TAG, "diag ${LogSanitizer.redactUrl(url)}: HTTP ${resp.code} ${latency}ms")
                 DiagResult.Success(url, latency, resp.code)
             }
         } catch (e: Exception) {
-            Log.w(TAG, "diag $url failed: ${e.message}")
+            Log.w(TAG, "diag ${LogSanitizer.redactUrl(url)} failed: ${e.message}")
             DiagResult.Failure(url, e.message ?: "unknown")
         }
     }

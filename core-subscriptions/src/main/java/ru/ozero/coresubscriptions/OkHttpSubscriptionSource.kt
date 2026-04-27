@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import ru.ozero.coreapi.LogSanitizer
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
@@ -21,7 +22,7 @@ class OkHttpSubscriptionSource(
 
     override suspend fun fetch(url: String): SubscriptionFetchResult =
         withContext(Dispatchers.IO) {
-            Log.i(TAG, "fetch $url")
+            Log.i(TAG, "fetch ${LogSanitizer.redactUrl(url)}")
             val bodyResult = fetchBytes(url)
             if (bodyResult !is FetchBytesResult.Ok) {
                 return@withContext toFailure(bodyResult)
@@ -34,10 +35,11 @@ class OkHttpSubscriptionSource(
     @Suppress("NestedBlockDepth")
     private fun fetchBytes(url: String): FetchBytesResult {
         val request = Request.Builder().url(url).build()
+        val safeUrl = LogSanitizer.redactUrl(url)
         return try {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    Log.w(TAG, "HTTP ${response.code} для $url")
+                    Log.w(TAG, "HTTP ${response.code} для $safeUrl")
                     FetchBytesResult.HttpError(response.code)
                 } else {
                     val body = response.body
@@ -46,7 +48,7 @@ class OkHttpSubscriptionSource(
                     } else {
                         val source = body.source()
                         if (source.request(maxBodyBytes + 1)) {
-                            Log.w(TAG, "тело > $maxBodyBytes байт для $url — отброшено")
+                            Log.w(TAG, "тело > $maxBodyBytes байт для $safeUrl — отброшено")
                             FetchBytesResult.IoError("тело превысило лимит $maxBodyBytes")
                         } else {
                             FetchBytesResult.Ok(source.readByteArray())
@@ -55,7 +57,7 @@ class OkHttpSubscriptionSource(
                 }
             }
         } catch (e: IOException) {
-            Log.w(TAG, "IO fail $url: ${e.message}")
+            Log.w(TAG, "IO fail $safeUrl: ${e.message}")
             FetchBytesResult.IoError(e.message ?: "network error")
         }
     }

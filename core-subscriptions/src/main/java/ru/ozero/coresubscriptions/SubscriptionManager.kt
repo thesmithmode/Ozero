@@ -2,6 +2,7 @@ package ru.ozero.coresubscriptions
 
 import android.util.Log
 import ru.ozero.commoncrypto.SubscriptionVerifier
+import ru.ozero.coreapi.LogSanitizer
 import ru.ozero.corestorage.dao.ServerDao
 import ru.ozero.corestorage.entity.ServerEntity
 import ru.ozero.coresubscriptions.uri.SubscriptionUriParser
@@ -24,7 +25,7 @@ class SubscriptionManager(
 ) {
 
     suspend fun sync(url: String): SubscriptionSyncResult {
-        Log.i(TAG, "sync $url")
+        Log.i(TAG, "sync ${LogSanitizer.redactUrl(url)}")
         val fetch = source.fetch(url)
         if (fetch is SubscriptionFetchResult.Failure) {
             return SubscriptionSyncResult.Error("fetch: ${fetch.reason}")
