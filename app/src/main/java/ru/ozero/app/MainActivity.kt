@@ -35,6 +35,7 @@ import ru.ozero.app.ui.MainScreen
 import ru.ozero.app.ui.MainViewModel
 import ru.ozero.app.ui.about.AboutScreen
 import ru.ozero.app.ui.diag.DiagnosticsScreen
+import ru.ozero.app.ui.logs.LogsScreen
 import ru.ozero.app.ui.onboarding.OnboardingScreen
 import ru.ozero.app.ui.permission.BatteryOptimization
 import ru.ozero.app.ui.servers.ServersScreen
@@ -44,7 +45,7 @@ import ru.ozero.app.ui.theme.OzeroTheme
 import ru.ozero.commonvpn.OzeroVpnService
 import javax.inject.Inject
 
-enum class TopScreen { Main, Settings, Diagnostics, SplitTunnel, Servers, About }
+enum class TopScreen { Main, Settings, Diagnostics, SplitTunnel, Servers, About, Logs }
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -121,7 +122,10 @@ class MainActivity : ComponentActivity() {
                             onOpenAllowedApps = { screen = TopScreen.SplitTunnel },
                             onOpenServers = { screen = TopScreen.Servers },
                             onOpenAbout = { screen = TopScreen.About },
+                            onOpenLogs = { screen = TopScreen.Logs },
                         )
+                    TopScreen.Logs ->
+                        LogsScreen(onBack = { screen = TopScreen.Settings })
                     TopScreen.Diagnostics ->
                         DiagnosticsScreen(onBack = { screen = TopScreen.Main })
                     TopScreen.SplitTunnel ->
