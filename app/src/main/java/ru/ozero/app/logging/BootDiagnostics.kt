@@ -39,6 +39,26 @@ object BootDiagnostics {
             )
         }
 
+    @Volatile
+    private var uncaughtInstalled: Boolean = false
+
+    fun installUncaughtHandler() {
+        if (uncaughtInstalled) return
+        uncaughtInstalled = true
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            runCatching {
+                BootFileLogger.error(
+                    TAG,
+                    "uncaught thread=${thread.name} tid=${thread.id} type=${throwable.javaClass.name}",
+                    throwable,
+                )
+            }
+            runCatching { previous?.uncaughtException(thread, throwable) }
+        }
+        BootFileLogger.info(TAG, "uncaught handler installed (chain=${previous?.javaClass?.name})")
+    }
+
     fun dumpExitReasons(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             BootFileLogger.info(TAG, "exitReasons skipped (sdk<30)")
