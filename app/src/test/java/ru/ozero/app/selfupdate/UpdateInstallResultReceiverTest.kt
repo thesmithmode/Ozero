@@ -108,7 +108,7 @@ class UpdateInstallResultReceiverTest {
 
         receiver.onReceive(context, intent)
 
-                assertEquals(0, UpdateInstallEventBus.events.replayCache.size)
+        assertEquals(0, UpdateInstallEventBus.events.replayCache.size)
     }
 
     private companion object {

@@ -52,7 +52,7 @@ class OnboardingViewModelTest {
         vm.onNext()
         assertEquals(2, vm.state.value.pageIndex)
         vm.onNext()
-        assertEquals(2, vm.state.value.pageIndex) 
+        assertEquals(2, vm.state.value.pageIndex)
     }
 
     @Test

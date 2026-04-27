@@ -43,7 +43,7 @@ class Ed25519PemLoaderTest {
 
     @Test
     fun rejectsWrongAlgorithmDerPrefix() {
-                val rsaPem = """
+        val rsaPem = """
             -----BEGIN PUBLIC KEY-----
             MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBALhqzqVmUzGS+RDJzTglNFRkw5szjGjm
             FkWN5Bc3GaPJ5zbBz+CaDNG5kKZNlvNpfQUxkWlpOZsH/H7g6n6e7GcCAwEAAQ==
@@ -54,10 +54,10 @@ class Ed25519PemLoaderTest {
         }
     }
 
-        @Test
+    @Test
     fun assetUpdatePubkeyParses() {
         val asset = File("../app/src/main/assets/update-pubkey.pem")
-        if (!asset.exists()) return 
+        if (!asset.exists()) return
         val raw = Ed25519PemLoader.parsePublicKey(asset.readText())
         assertEquals(32, raw.size)
     }

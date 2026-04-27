@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 
 class EngineModuleTest {
 
-        @Test
+    @Test
     fun `engine module covers every EngineId via @IntoMap`() {
         val moduleClass = EngineModule::class.java
         val coveredIds = moduleClass.declaredMethods

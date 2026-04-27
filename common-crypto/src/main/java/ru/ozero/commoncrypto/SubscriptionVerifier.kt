@@ -10,13 +10,13 @@ object SubscriptionVerifier {
     private val UPDATE_DOMAIN = "ozero.update.v1:".toByteArray(Charsets.UTF_8)
     private const val STREAM_CHUNK_BYTES = 64 * 1024
 
-        fun verifyBootstrap(message: ByteArray, signature: ByteArray, publicKey: ByteArray): Boolean =
+    fun verifyBootstrap(message: ByteArray, signature: ByteArray, publicKey: ByteArray): Boolean =
         verify(BOOTSTRAP_DOMAIN + message, signature, publicKey)
 
-        fun verifyUpdate(message: ByteArray, signature: ByteArray, publicKey: ByteArray): Boolean =
+    fun verifyUpdate(message: ByteArray, signature: ByteArray, publicKey: ByteArray): Boolean =
         verify(UPDATE_DOMAIN + message, signature, publicKey)
 
-        @Suppress("SwallowedException")
+    @Suppress("SwallowedException")
     fun verifyUpdate(messageStream: InputStream, signature: ByteArray, publicKey: ByteArray): Boolean {
         if (signature.size != 64 || publicKey.size != 32) return false
         return try {
@@ -51,11 +51,11 @@ object SubscriptionVerifier {
             signer.update(message, 0, message.size)
             signer.verifySignature(signature)
         } catch (e: IllegalArgumentException) {
-                        false
+            false
         } catch (e: org.bouncycastle.crypto.DataLengthException) {
             false
         } catch (e: RuntimeException) {
-                        false
+            false
         }
     }
 }

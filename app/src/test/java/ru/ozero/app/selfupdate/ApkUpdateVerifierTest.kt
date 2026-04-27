@@ -30,7 +30,7 @@ class ApkUpdateVerifierTest {
         val (priv, pub) = generateKeyPair()
         val apk = (tmp / "ozero.apk").toFile().apply { writeBytes(byteArrayOf(0x01, 0x02, 0x03)) }
         val sig = (tmp / "ozero.apk.sig").toFile().apply { writeBytes(sign(priv, apk.readBytes())) }
-                apk.writeBytes(byteArrayOf(0x01, 0x02, 0x99.toByte()))
+        apk.writeBytes(byteArrayOf(0x01, 0x02, 0x99.toByte()))
         val verifier = ApkUpdateVerifier(pub)
         assertFalse(verifier.verify(apk, sig))
     }
@@ -75,7 +75,7 @@ class ApkUpdateVerifierTest {
     }
 
     private fun sign(privKey: ByteArray, message: ByteArray): ByteArray {
-                val prefixed = "ozero.update.v1:".toByteArray(Charsets.UTF_8) + message
+        val prefixed = "ozero.update.v1:".toByteArray(Charsets.UTF_8) + message
         val signer = Ed25519Signer().apply { init(true, Ed25519PrivateKeyParameters(privKey, 0)) }
         signer.update(prefixed, 0, prefixed.size)
         return signer.generateSignature()

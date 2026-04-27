@@ -11,7 +11,7 @@ import kotlin.test.assertIs
 
 class SilentPackageInstallerTest {
 
-        @Test
+    @Test
     fun `install returns FileError when apk file missing and skips PackageInstaller`() = runTest {
         val context = mockk<Context>(relaxed = true)
         val packageInstaller = mockk<PackageInstaller>()
@@ -37,7 +37,7 @@ class SilentPackageInstallerTest {
         try {
             val result = installer.install(tmpApk)
 
-                                                if (!tmpApk.canRead()) {
+            if (!tmpApk.canRead()) {
                 assertIs<SilentPackageInstaller.Result.FileError>(result)
                 verify(exactly = 0) { packageInstaller.createSession(any()) }
             }

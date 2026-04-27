@@ -261,6 +261,6 @@ class SettingsScreenTest {
     }
 
     private companion object {
-                val SENTINEL: EngineId = EngineId.BYEDPI
+        val SENTINEL: EngineId = EngineId.BYEDPI
     }
 }

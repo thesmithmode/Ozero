@@ -78,7 +78,7 @@ class SoakTest {
                 successCount.incrementAndGet()
             } else {
                 dropCount.incrementAndGet()
-                                if (doHttpRequest(targetUrl)) {
+                if (doHttpRequest(targetUrl)) {
                     retryCount.incrementAndGet()
                     successCount.incrementAndGet()
                 } else {
@@ -91,7 +91,7 @@ class SoakTest {
                 Log.w(TAG, "ANR-like delay на запросе $i: ${elapsed}ms")
             }
 
-                        if (i % 10 == 0) {
+            if (i % 10 == 0) {
                 Debug.getMemoryInfo(memInfo)
                 val currentMem = memInfo.totalPss.toLong()
                 if (currentMem > peakMemKb) {

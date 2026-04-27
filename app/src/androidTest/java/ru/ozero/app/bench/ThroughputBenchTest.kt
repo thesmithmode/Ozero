@@ -31,7 +31,7 @@ class ThroughputBenchTest {
 
         Log.i(TAG, "Запускаю throughput bench...")
 
-                val results = runThroughputProbes()
+        val results = runThroughputProbes()
 
         val json = buildResultJson(results)
         File(OUTPUT_FILE).writeText(json)
@@ -43,9 +43,9 @@ class ThroughputBenchTest {
     private fun runThroughputProbes(): ThroughputStats {
         val measurements = mutableListOf<Double>()
 
-                val testUrl = "http://10.0.2.2:5201" 
+        val testUrl = "http://10.0.2.2:5201"
         val sampleCount = 10
-        val chunkSizeBytes = 1_024 * 64 
+        val chunkSizeBytes = 1_024 * 64
 
         repeat(sampleCount) { i ->
             try {
@@ -69,7 +69,7 @@ class ThroughputBenchTest {
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Sample $i ошибка: ${e.message}")
-                                measurements.add(0.0)
+                measurements.add(0.0)
             }
         }
 

@@ -67,7 +67,7 @@ class CrashLogStoreTest {
     @Test
     fun `sanitize redacts long token`() {
         val store = CrashLogStore(tmp)
-        val token = "AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHHIIIIJJJJ" 
+        val token = "AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHHIIIIJJJJ"
         val raw = "key=$token end"
         val out = store.sanitize(raw)
         assertTrue(!out.contains(token), "токен не вырезан: $out")

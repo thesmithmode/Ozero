@@ -3,7 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
-        id("org.owasp.dependencycheck")
+    id("org.owasp.dependencycheck")
 }
 
 android {
@@ -17,9 +17,9 @@ android {
         applicationId = "ru.ozero.app"
         versionCode = 1
         versionName = "0.1.0"
-                buildConfigField("String", "UPDATE_GITHUB_OWNER", "\"thesmithmode\"")
+        buildConfigField("String", "UPDATE_GITHUB_OWNER", "\"thesmithmode\"")
         buildConfigField("String", "UPDATE_GITHUB_REPO", "\"Ozero\"")
-                                buildConfigField(
+        buildConfigField(
             "String",
             "UPDATE_PUBLIC_KEY_HEX",
             "\"0000000000000000000000000000000000000000000000000000000000000000\"",
@@ -31,7 +31,7 @@ android {
 
     buildTypes {
         release {
-                                                            val updateKey = providers.environmentVariable("UPDATE_PUBLIC_KEY_HEX").orNull
+            val updateKey = providers.environmentVariable("UPDATE_PUBLIC_KEY_HEX").orNull
                 ?.takeIf { it.isNotBlank() }
             if (updateKey != null) {
                 buildConfigField("String", "UPDATE_PUBLIC_KEY_HEX", "\"$updateKey\"")
@@ -39,7 +39,6 @@ android {
         }
     }
 
-                
     packaging {
         resources {
             excludes +=
@@ -72,25 +71,25 @@ gradle.taskGraph.whenReady {
 }
 
 dependencies {
-        implementation(libs.core.ktx)
+    implementation(libs.core.ktx)
 
-        implementation(platform(libs.compose.bom))
+    implementation(platform(libs.compose.bom))
     implementation(libs.bundles.compose)
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
 
-        implementation(libs.hilt.android)
+    implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
-        implementation(libs.work.runtime.ktx)
+    implementation(libs.work.runtime.ktx)
     implementation(libs.hilt.work)
     ksp(libs.hilt.androidx.compiler)
 
-        implementation(libs.datastore.preferences)
+    implementation(libs.datastore.preferences)
 
-        implementation(libs.bundles.coroutines)
+    implementation(libs.bundles.coroutines)
 
-        implementation(project(":core-api"))
+    implementation(project(":core-api"))
     implementation(project(":core-orchestrator"))
     implementation(project(":core-subscriptions"))
     implementation(project(":core-storage"))
@@ -102,14 +101,14 @@ dependencies {
     implementation(project(":engine-hysteria2"))
     implementation(project(":engine-naive"))
     implementation(project(":engine-urnetwork"))
-            implementation(project(":engine-tor"))
+    implementation(project(":engine-tor"))
     implementation(project(":security"))
 
-                    implementation(libs.play.feature.delivery)
+    implementation(libs.play.feature.delivery)
 
-        implementation(libs.bundles.okhttp)
+    implementation(libs.bundles.okhttp)
 
-        testImplementation(libs.bundles.junit5)
+    testImplementation(libs.bundles.junit5)
     testRuntimeOnly(libs.junit.jupiter.engine)
     testImplementation(libs.bundles.testing.unit)
     testImplementation(libs.bundles.bouncycastle)
@@ -119,10 +118,10 @@ dependencies {
 }
 
 dependencyCheck {
-    format = "ALL" 
-            failBuildOnCVSS = 7.0f
+    format = "ALL"
+    failBuildOnCVSS = 7.0f
     suppressionFile = rootProject.file("owasp-suppressions.xml").takeIf { it.exists() }?.absolutePath
     nvd {
-                apiKey = providers.environmentVariable("NVD_API_KEY").orNull ?: ""
+        apiKey = providers.environmentVariable("NVD_API_KEY").orNull ?: ""
     }
 }
