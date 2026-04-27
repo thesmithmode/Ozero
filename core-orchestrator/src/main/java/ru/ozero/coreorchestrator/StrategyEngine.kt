@@ -62,7 +62,14 @@ class StrategyEngine(
                 batch.map { c ->
                     async {
                         val engine = engines[c.engineId]
-                        val res: ProbeResult = engine?.probe() ?: ProbeResult.Failure("engine отсутствует")
+                        val res: ProbeResult = when (engine) {
+                            null -> ProbeResult.Failure("engine отсутствует")
+                            else ->
+                                runCatching { engine.probe() }
+                                    .getOrElse { t ->
+                                        ProbeResult.Failure("probe exception: ${t.message ?: t::class.simpleName}")
+                                    }
+                        }
                         c to res
                     }
                 }.awaitAll()

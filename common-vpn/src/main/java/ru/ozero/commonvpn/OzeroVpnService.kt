@@ -121,23 +121,27 @@ class OzeroVpnService : android.net.VpnService() {
         Log.i(TAG, "stopVpn")
         startJobRef.getAndSet(null)?.cancel()
         serviceScope.launch {
-            val finished = withTimeoutOrNull(SHUTDOWN_TIMEOUT_MS) {
-                runCatching { pipeline.stop() }
-                    .onFailure { Log.w(TAG, "pipeline.stop threw", it) }
-            }
-            if (finished == null) {
-                Log.w(TAG, "pipeline.stop не завершилась за ${SHUTDOWN_TIMEOUT_MS}ms — закрываем fd")
-            }
-            withContext(Dispatchers.Main) {
-                closeTunFd()
-                starting.set(false)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                } else {
-                    @Suppress("DEPRECATION")
-                    stopForeground(true)
+            try {
+                val finished = withTimeoutOrNull(SHUTDOWN_TIMEOUT_MS) {
+                    runCatching { pipeline.stop() }
+                        .onFailure { Log.w(TAG, "pipeline.stop threw", it) }
                 }
-                stopSelf()
+                if (finished == null) {
+                    Log.w(TAG, "pipeline.stop не завершилась за ${SHUTDOWN_TIMEOUT_MS}ms — закрываем fd")
+                }
+                withContext(Dispatchers.Main) {
+                    closeTunFd()
+                    starting.set(false)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        stopForeground(true)
+                    }
+                    stopSelf()
+                }
+            } finally {
+                stopping.set(false)
             }
         }
     }
