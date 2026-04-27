@@ -7,13 +7,14 @@ import java.io.File
  * Callback-форма гарантирует true-streaming: line-by-line без материализации
  * всего содержимого в память (maps больших процессов — несколько МБ).
  */
-fun interface ProcMapsReader {
+interface ProcMapsReader {
     /** Передаёт ленивый Sequence<String> в block; ресурс закрывается после возврата. */
     fun <R> useLines(block: (Sequence<String>) -> R): R
 }
 
-private val DefaultReader = ProcMapsReader { block ->
-    runCatching { File("/proc/self/maps").useLines(block) }.getOrElse { block(emptySequence()) }
+private val DefaultReader = object : ProcMapsReader {
+    override fun <R> useLines(block: (Sequence<String>) -> R): R =
+        runCatching { File("/proc/self/maps").useLines(block) }.getOrElse { block(emptySequence()) }
 }
 
 /**
