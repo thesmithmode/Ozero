@@ -8,6 +8,7 @@ import ru.ozero.commonvpn.TunnelController
 import ru.ozero.coreapi.Engine
 import ru.ozero.coreapi.EngineId
 import ru.ozero.coreapi.StartResult
+import ru.ozero.coreorchestrator.Candidate
 import ru.ozero.coreorchestrator.Orchestrator
 import ru.ozero.coreorchestrator.OrchestratorState
 import ru.ozero.coreorchestrator.OrchestratorTransition
@@ -38,34 +39,47 @@ class VpnEnginePipeline(
         Log.i(TAG, "start tunFd=$tunFd")
         ensureCleanStart()
 
-        val winner = pickWinner()
+        val candidates = strategy.buildCandidates()
+        val winner = strategy.pickBest(candidates)
         if (winner == null) {
-            Log.w(TAG, "no candidates with successful probe")
-            orchestrator.dispatch(OrchestratorTransition.Disconnect)
-            orchestrator.dispatch(OrchestratorTransition.DisconnectComplete)
-            return Result.NoCandidates
+            val fallback = candidates.firstOrNull { it.engineId == EngineId.BYEDPI } ?: candidates.firstOrNull()
+            if (fallback == null) {
+                Log.w(TAG, "no candidates available")
+                orchestrator.dispatch(OrchestratorTransition.Disconnect)
+                orchestrator.dispatch(OrchestratorTransition.DisconnectComplete)
+                return Result.NoCandidates
+            }
+            Log.w(
+                TAG,
+                "no successful probe, fallback to ${fallback.engineId} (best-effort start without probe)",
+            )
+            orchestrator.dispatch(OrchestratorTransition.ProbeComplete(fallback.engineId))
+            return startCandidate(fallback, tunFd)
         }
         orchestrator.dispatch(OrchestratorTransition.ProbeComplete(winner.engineId))
+        return startCandidate(winner, tunFd)
+    }
 
-        val engine = engines[winner.engineId]
-            ?: return failConnect(winner.engineId, "engine не найден в DI map")
+    private suspend fun startCandidate(candidate: Candidate, tunFd: Int): Result {
+        val engine = engines[candidate.engineId]
+            ?: return failConnect(candidate.engineId, "engine не найден в DI map")
 
         currentEngine.set(engine)
         val startResult = try {
-            engine.start(winner.config)
+            engine.start(candidate.config)
         } catch (ce: CancellationException) {
             currentEngine.set(null)
             throw ce
         } catch (t: Throwable) {
             currentEngine.set(null)
-            return failConnect(winner.engineId, "engine.start threw: ${t.message}")
+            return failConnect(candidate.engineId, "engine.start threw: ${t.message}")
         }
         return when (startResult) {
             is StartResult.Failure -> {
                 currentEngine.set(null)
-                failConnect(winner.engineId, startResult.reason)
+                failConnect(candidate.engineId, startResult.reason)
             }
-            is StartResult.Success -> bringTunnelUp(engine, winner.engineId, startResult.socksPort, tunFd)
+            is StartResult.Success -> bringTunnelUp(engine, candidate.engineId, startResult.socksPort, tunFd)
         }
     }
 
@@ -103,8 +117,6 @@ class VpnEnginePipeline(
             }
         }
     }
-
-    private suspend fun pickWinner() = strategy.pickBest(strategy.buildCandidates())
 
     private fun failConnect(engineId: EngineId, reason: String): Result.EngineFailed {
         Log.w(TAG, "engine $engineId fail: $reason")

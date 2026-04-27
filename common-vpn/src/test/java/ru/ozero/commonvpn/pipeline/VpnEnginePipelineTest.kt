@@ -68,19 +68,34 @@ class VpnEnginePipelineTest {
     }
 
     @Test
-    fun `start returns NoCandidates when strategy yields nothing successful`() = runTest {
+    fun `start falls back to byedpi when all probes failed`() = runTest {
         val byedpi = FakeEngine(
             id = EngineId.BYEDPI,
             probeResult = ProbeResult.Failure("no socks"),
-            startResult = StartResult.Failure(reason = "unused"),
+            startResult = StartResult.Success(socksPort = socksPort),
         )
         val handle = newPipeline(mapOf(EngineId.BYEDPI to byedpi as Engine))
 
         val result = handle.start(tunFd)
 
-        assertIs<VpnEnginePipeline.Result.NoCandidates>(result)
-        assertFalse(byedpi.startCalled, "engine.start не должен вызываться без winner")
-        assertNull(handle.tunnelGateway.startedConfig)
+        assertIs<VpnEnginePipeline.Result.Connected>(result)
+        assertTrue(byedpi.startCalled, "fallback должен вызвать engine.start")
+        assertNotNull(handle.tunnelGateway.startedConfig)
+    }
+
+    @Test
+    fun `start handles probe exception and still falls back to byedpi`() = runTest {
+        val byedpi = FakeEngine(
+            id = EngineId.BYEDPI,
+            startResult = StartResult.Success(socksPort = socksPort),
+            probeThrow = IllegalStateException("boom"),
+        )
+        val handle = newPipeline(mapOf(EngineId.BYEDPI to byedpi as Engine))
+
+        val result = handle.start(tunFd)
+
+        assertIs<VpnEnginePipeline.Result.Connected>(result)
+        assertTrue(byedpi.startCalled, "fallback после probe exception должен запустить engine")
     }
 
     @Test
@@ -194,8 +209,9 @@ class VpnEnginePipelineTest {
 
     private class FakeEngine(
         override val id: EngineId,
-        private val probeResult: ProbeResult,
+        private val probeResult: ProbeResult = ProbeResult.Success(latencyMs = 10),
         private val startResult: StartResult,
+        private val probeThrow: Throwable? = null,
     ) : Engine {
         override val capabilities = EngineCapabilities(
             supportsTcp = true,
@@ -214,7 +230,10 @@ class VpnEnginePipelineTest {
         override suspend fun stop() {
             stopCalled = true
         }
-        override suspend fun probe(): ProbeResult = probeResult
+        override suspend fun probe(): ProbeResult {
+            probeThrow?.let { throw it }
+            return probeResult
+        }
         override fun stats(): Flow<EngineStats> = _stats.asStateFlow()
     }
 }
