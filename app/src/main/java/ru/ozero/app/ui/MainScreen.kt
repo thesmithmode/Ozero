@@ -82,7 +82,6 @@ fun MainScreen(
                 is OrchestratorState.Probing,
                 is OrchestratorState.Connecting,
                 is OrchestratorState.Disconnecting,
-                is OrchestratorState.Switching,
                 -> {
                     val loadingDesc = stringResource(R.string.a11y_loading)
                     CircularProgressIndicator(
@@ -113,7 +112,6 @@ private fun StatusLabel(state: OrchestratorState) {
         is OrchestratorState.Probing -> R.string.main_status_probing
         is OrchestratorState.Connecting -> R.string.main_status_connecting
         is OrchestratorState.Connected -> R.string.main_status_connected
-        is OrchestratorState.Switching -> R.string.main_status_switching
         is OrchestratorState.Failed -> R.string.main_status_failed
         is OrchestratorState.Disconnecting -> R.string.main_status_disconnecting
     }

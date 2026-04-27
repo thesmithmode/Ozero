@@ -38,7 +38,7 @@
     <string name="settings_language_ru">Русский</string>
     <string name="settings_language_en">English</string>
 
-    <!-- Settings — RT.4.1 -->
+    <!-- Settings -->
     <string name="settings_section_connection">Подключение</string>
     <string name="settings_section_network">Сеть</string>
     <string name="settings_section_security">Безопасность</string>
@@ -53,7 +53,7 @@
     <string name="settings_auto_start_title">Автозапуск при загрузке</string>
     <string name="settings_auto_start_summary">VPN включится автоматически после перезагрузки</string>
     <string name="settings_allowed_apps_title">Список приложений</string>
-    <string name="settings_allowed_apps_summary">Откроется в RT.4.4</string>
+    <string name="settings_allowed_apps_summary">Откроется в TBD</string>
     <string name="settings_allowed_apps_open_summary">Выбор приложений и режим Split-tunnel</string>
     <string name="settings_servers_title">Серверы / Double-hop</string>
     <string name="settings_servers_summary">Выбор entry/exit пары и предпросмотр</string>
@@ -66,7 +66,7 @@
     <string name="settings_update_state_uptodate">Версия актуальна</string>
     <string name="settings_update_state_failed">Ошибка: %1$s. Нажмите для повтора</string>
 
-    <!-- Tor on-demand модуль (RT.5.2) -->
+    <!-- Tor on-demand модуль -->
     <string name="settings_section_tor">Tor (аварийный режим)</string>
     <string name="settings_tor_summary">Доставка ~50 МБ через Google Play. Используется когда основные движки заблокированы.</string>
     <string name="settings_tor_install">Скачать</string>
@@ -127,11 +127,11 @@
     <string name="a11y_disconnect_button">Отключить VPN</string>
     <string name="a11y_engine_active">Сейчас активен движок %1$s</string>
 
-    <!-- RT.8.1/8.2: deeplink/share import -->
+    <!-- deeplink/share import -->
     <string name="import_ok">Сервер %1$s добавлен</string>
     <string name="import_error">Импорт не удался: %1$s</string>
 
-    <!-- RT.9: onboarding -->
+    <!-- onboarding -->
     <string name="onboarding_title_1">Зачем Ozero</string>
     <string name="onboarding_body_1">Свободный доступ к интернету в условиях блокировок. Открытый код, без телеметрии.</string>
     <string name="onboarding_title_2">Как работает</string>
@@ -142,7 +142,7 @@
     <string name="onboarding_finish">Начать</string>
     <string name="onboarding_skip">Пропустить</string>
 
-    <!-- RT.10.2: about -->
+    <!-- about -->
     <string name="about_title">О приложении</string>
     <string name="about_version">Версия %1$s</string>
     <string name="about_repo">Исходники на GitHub</string>
@@ -150,7 +150,7 @@
     <string name="about_threat_model">Модель угроз</string>
     <string name="about_legal">Лицензии</string>
 
-    <!-- RT.11.1: crash log export -->
+    <!-- crash log export -->
     <string name="diag_export_crashes">Экспорт crash log</string>
     <string name="diag_export_no_crashes">Crash log пуст</string>
 </resources>

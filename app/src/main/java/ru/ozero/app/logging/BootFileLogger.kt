@@ -46,7 +46,15 @@ object BootFileLogger {
         targetRef.get()?.let { runCatching { it.writeText("") } }
     }
 
-    fun read(): String = targetRef.get()?.takeIf { it.exists() }?.readText().orEmpty()
+    fun read(): String = targetRef.get()?.takeIf { it.exists() }?.readText().orEmpty().let(::sanitize)
+
+    private val appPathRegex = Regex("/data/[a-zA-Z_]+/~~[A-Za-z0-9_=-]+/[A-Za-z0-9_.=-]+")
+    private val hexHashRegex = Regex("\\b[a-f0-9]{16,}\\b")
+
+    private fun sanitize(text: String): String =
+        text
+            .replace(appPathRegex, "<app-path>")
+            .replace(hexHashRegex, "<hash>")
 
     @Synchronized
     private fun log(level: String, tag: String, msg: String, t: Throwable? = null) {

@@ -57,26 +57,6 @@ class OrchestratorTest {
     }
 
     @Test
-    fun connectedSwitchToTransitionsToSwitching() {
-        connectTo(EngineId.BYEDPI)
-        orchestrator.dispatch(OrchestratorTransition.SwitchTo(EngineId.XRAY))
-        val state = orchestrator.state.value
-        assertIs<OrchestratorState.Switching>(state)
-        assertEquals(EngineId.BYEDPI, state.from)
-        assertEquals(EngineId.XRAY, state.to)
-    }
-
-    @Test
-    fun switchCompleteTransitionsToConnected() {
-        connectTo(EngineId.BYEDPI)
-        orchestrator.dispatch(OrchestratorTransition.SwitchTo(EngineId.XRAY))
-        orchestrator.dispatch(OrchestratorTransition.SwitchComplete(EngineId.XRAY, 10808))
-        val state = orchestrator.state.value
-        assertIs<OrchestratorState.Connected>(state)
-        assertEquals(EngineId.XRAY, state.engineId)
-    }
-
-    @Test
     fun connectedDisconnectTransitionsToDisconnecting() {
         connectTo(EngineId.BYEDPI)
         orchestrator.dispatch(OrchestratorTransition.Disconnect)

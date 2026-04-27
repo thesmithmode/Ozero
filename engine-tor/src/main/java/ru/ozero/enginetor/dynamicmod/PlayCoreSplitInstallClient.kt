@@ -13,6 +13,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import java.util.concurrent.atomic.AtomicInteger
 
 class PlayCoreSplitInstallClient(
     private val manager: SplitInstallManager,
@@ -25,9 +26,10 @@ class PlayCoreSplitInstallClient(
 
     override fun requestInstall(moduleName: String): Flow<InstallResult> = callbackFlow {
         val request = SplitInstallRequest.newBuilder().addModule(moduleName).build()
-        var sessionId = 0
+        val sessionId = AtomicInteger(0)
         val listener = SplitInstallStateUpdatedListener { state: SplitInstallSessionState ->
-            if (state.sessionId() != sessionId) return@SplitInstallStateUpdatedListener
+            val knownId = sessionId.get()
+            if (knownId != 0 && state.sessionId() != knownId) return@SplitInstallStateUpdatedListener
             when (state.status()) {
                 SplitInstallSessionStatus.PENDING,
                 SplitInstallSessionStatus.DOWNLOADING,
@@ -63,7 +65,7 @@ class PlayCoreSplitInstallClient(
             .onSuccess { task ->
                 task
                     .addOnSuccessListener { id ->
-                        sessionId = id
+                        sessionId.set(id)
                         Log.i(TAG, "install request module=$moduleName session=$id")
                     }
                     .addOnFailureListener { e ->
@@ -83,8 +85,9 @@ class PlayCoreSplitInstallClient(
             }
         awaitClose {
             manager.unregisterListener(listener)
-            if (sessionId != 0) {
-                runCatching { manager.cancelInstall(sessionId) }
+            val id = sessionId.get()
+            if (id != 0) {
+                runCatching { manager.cancelInstall(id) }
                     .onFailure { Log.w(TAG, "cancelInstall threw", it) }
             }
         }
