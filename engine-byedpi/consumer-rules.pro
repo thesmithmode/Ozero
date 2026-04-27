@@ -1,0 +1,2 @@
+-keep class ru.ozero.enginebyedpi.ByeDpiProxy { *; }
+-keepclasseswithmembernames class * { native <methods>; }

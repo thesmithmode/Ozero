@@ -1,0 +1,2 @@
+-keep class ru.ozero.enginexray.LibXrayDelegate { *; }
+-keepclasseswithmembernames class * { native <methods>; }

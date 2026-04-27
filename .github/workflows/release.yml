@@ -171,6 +171,28 @@ jobs:
           done
           echo "APK содержит libhev на всех нужных ABI"
 
+      - name: Assert dex содержит hev/TProxyService и native bridge классы
+        run: |
+          set -euo pipefail
+          APK=$(find app/build/outputs/apk/release -name '*.apk' | head -n1)
+          WORK="$RUNNER_TEMP/apk-extract"
+          rm -rf "$WORK" && mkdir -p "$WORK"
+          unzip -q "$APK" "classes*.dex" -d "$WORK"
+          REQUIRED_CLASSES=(
+            "Lhev/TProxyService;"
+            "Lru/ozero/enginebyedpi/ByeDpiProxy;"
+            "Lru/ozero/commonvpn/OzeroVpnService;"
+            "Lru/ozero/app/OzeroApp;"
+            "Lru/ozero/app/MainActivity;"
+          )
+          for cls in "${REQUIRED_CLASSES[@]}"; do
+            if ! grep -aor "$cls" "$WORK"/classes*.dex | head -n1 | grep -q "$cls"; then
+              echo "::error::В classes.dex отсутствует $cls — R8 удалил/переупаковал, native abort гарантирован"
+              exit 1
+            fi
+          done
+          echo "Native bridge классы сохранены R8 после minify"
+
       - name: Collect artifacts
         env:
           TAG: ${{ github.ref_name }}

@@ -1,0 +1,3 @@
+-keep class ru.ozero.engineurnetwork.UrnetworkSdkDelegate { *; }
+-keep class ru.ozero.engineurnetwork.UrnetworkDelegate { *; }
+-keepclasseswithmembernames class * { native <methods>; }

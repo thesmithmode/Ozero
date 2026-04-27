@@ -6,6 +6,12 @@
 -keep class ru.ozero.enginenaive.LibNaiveDelegate { *; }
 -keep class ru.ozero.enginetor.LibTorDelegate { *; }
 
+-keep class hev.** { *; }
+-keep class ru.ozero.enginebyedpi.ByeDpiProxy { *; }
+
+-keepclasseswithmembernames class * { native <methods>; }
+-keepclasseswithmembers class * { native <methods>; }
+
 -keep,allowobfuscation @interface dagger.hilt.android.AndroidEntryPoint
 -keep,allowobfuscation @interface dagger.hilt.android.HiltAndroidApp
 -keep class dagger.hilt.** { *; }
@@ -16,18 +22,23 @@
 -keep class **_Factory { *; }
 -keep class **_MembersInjector { *; }
 -keep class **_GeneratedInjector { *; }
+-keep class **_AssistedFactory { *; }
+-keep class **_AssistedFactory_Impl { *; }
+-keep @dagger.assisted.AssistedInject class * { <init>(...); }
 -keepclasseswithmembers class * { @javax.inject.Inject <init>(...); }
 -keepclassmembers class * { @javax.inject.Inject <fields>; }
 -keepclassmembers class * { @dagger.hilt.android.lifecycle.HiltViewModel <init>(...); }
+-keepclassmembers class * { @dagger.assisted.AssistedInject <init>(...); }
 
 -keep class * extends androidx.work.Worker { <init>(...); }
 -keep class * extends androidx.work.CoroutineWorker { <init>(...); }
 -keep class * extends androidx.work.ListenableWorker { <init>(...); }
+-keep @androidx.hilt.work.HiltWorker class * { <init>(...); }
 
 -keep class kotlinx.coroutines.** { *; }
 -dontwarn kotlinx.coroutines.**
 
--keepattributes *Annotation*, InnerClasses
+-keepattributes *Annotation*, InnerClasses, EnclosingMethod, Signature
 -dontnote kotlinx.serialization.AnnotationsKt
 
 -keep class androidx.compose.runtime.** { *; }
@@ -36,6 +47,3 @@
 
 -renamesourcefileattribute SourceFile
 -keepattributes SourceFile,LineNumberTable
-
--allowaccessmodification
--repackageclasses 'o'
