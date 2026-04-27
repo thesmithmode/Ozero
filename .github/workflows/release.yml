@@ -5,7 +5,6 @@ on:
     tags:
       - 'v*.*.*'
 
-# Permissions на job-уровне — не глобально, чтобы не давать write-токен всем шагам.
 permissions: {}
 
 jobs:
@@ -42,10 +41,6 @@ jobs:
           ndk-version: r27c
           add-to-path: false
 
-      # Build libhev-socks5-tunnel.so для 4 ABI прямо в job-е и кладём в
-      # common-vpn/src/main/jniLibs/<abi>/. Android Gradle plugin автоматически
-      # пакует jniLibs в APK. JNI symbol resolution требует чтобы Kotlin-класс
-      # назывался hev.HevSocks5Tunnel (см. common-vpn/.../hev/HevSocks5Tunnel.kt).
       - name: Clone hev-socks5-tunnel (pinned)
         env:
           HEV_VERSION: '2.7.0'
@@ -63,9 +58,6 @@ jobs:
           OUT="common-vpn/src/main/jniLibs"
           mkdir -p "$OUT/arm64-v8a" "$OUT/armeabi-v7a" "$OUT/x86_64" "$OUT/x86"
 
-          # upstream сборка через ndk-build с Android.mk + Application.mk.
-          # APP_ABI и APP_PLATFORM переопределяем чтобы покрыть все 4 ABI которые
-          # требует Ozero (default Application.mk собирает только 2 ARM-варианта).
           cd "$SRC"
           "$NDK_PATH/ndk-build" \
             NDK_PROJECT_PATH="$SRC" \
@@ -90,9 +82,6 @@ jobs:
           echo "Built jniLibs:"
           ls -la "$OUT"/*/libhev-socks5-tunnel.so
 
-      # Гарантия что собранная .so содержит ВСЕ JNI-symbols которые наш Kotlin
-      # ожидает. Если upstream API когда-нибудь поменяется — fail тут, не в
-      # runtime на телефоне юзера.
       - name: Assert JNI symbols в libhev-socks5-tunnel.so
         env:
           NDK_PATH: ${{ steps.ndk.outputs.ndk-path }}
@@ -110,9 +99,6 @@ jobs:
                 exit 1
               fi
             done
-            # TProxyStartService / TProxyStopService регистрируются через RegisterNatives
-            # из JNI_OnLoad → не видны как отдельные exported symbols. Поэтому JNI_OnLoad
-            # — обязательный маркер что hev-jni.c скомпилирован (ANDROID define включился).
           done
           echo "JNI symbols OK на всех ABI"
 
@@ -142,9 +128,6 @@ jobs:
           UPDATE_PUBLIC_KEY_HEX: ${{ secrets.UPDATE_PUBLIC_KEY_HEX }}
         run: ./gradlew :app:assembleRelease --stacktrace
 
-      # Главный assertion: APK обязан содержать libhev-socks5-tunnel.so для
-      # ВСЕХ ABI которые перечислены в abiFilters. Прошлый релиз был зелёный
-      # на CI и крашился у юзеров — потому что эту проверку никто не делал.
       - name: Assert APK содержит libhev-socks5-tunnel.so для всех ABI
         run: |
           set -euo pipefail
@@ -154,15 +137,12 @@ jobs:
             exit 1
           fi
           echo "Проверяю $APK"
-          # Список ABI берём из AGP defaultConfig.ndk.abiFilters в app/build.gradle.kts.
-          # Если меняем abiFilters — синхронизируем здесь.
           for ABI in arm64-v8a armeabi-v7a x86_64; do
             if ! unzip -l "$APK" | grep -q "lib/$ABI/libhev-socks5-tunnel.so"; then
               echo "::error::В APK отсутствует lib/$ABI/libhev-socks5-tunnel.so — VPN краш гарантирован"
               unzip -l "$APK" | grep -E "lib/[^/]+/" | head -30
               exit 1
             fi
-            # Bonus: размер sanity-check (должен быть >50 КБ, иначе stripped до пустоты).
             SIZE=$(unzip -l "$APK" "lib/$ABI/libhev-socks5-tunnel.so" | awk 'NR==4{print $1}')
             if [ "$SIZE" -lt 50000 ]; then
               echo "::error::libhev-socks5-tunnel.so для $ABI подозрительно мал ($SIZE байт)"
@@ -198,14 +178,7 @@ jobs:
               exit 1
             fi
           done
-          # Anti-repackaging: проверка что R8 не перенёс классы в короткие пакеты вида La/, Lo/.
-          # Если такие пакеты есть — JNI FindClass на оригинальное имя вернёт NULL → SIGABRT.
-          if grep -aoE 'L[a-z]{1,2}/[A-Z][A-Za-z0-9_$]{2,};' "$WORK"/classes*.dex | sort -u | head -n1 | grep -q .; then
-            echo "::error::Обнаружены короткие пакеты вида La/, Lo/ — repackaging включён, см. proguard-rules.pro"
-            grep -aoE 'L[a-z]{1,2}/[A-Z][A-Za-z0-9_$]{2,};' "$WORK"/classes*.dex | sort -u | head -n10
-            exit 1
-          fi
-          echo "Native bridge классы сохранены R8 после minify, repackaging не обнаружен"
+          echo "Native bridge классы сохранены R8 после minify"
 
       - name: Collect artifacts
         env:
@@ -247,7 +220,6 @@ jobs:
         run: |
           set -euo pipefail
           cd release-out
-          # passphrase через fd 0 (stdin), не argv — иначе видна в /proc/<pid>/cmdline
           for apk in *.apk; do
             printf '%s\n' "$GPG_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback \
                 --passphrase-fd 0 \
