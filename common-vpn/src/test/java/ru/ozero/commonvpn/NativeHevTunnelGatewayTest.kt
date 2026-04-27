@@ -53,7 +53,7 @@ class NativeHevTunnelGatewayTest {
         val gateway = NativeHevTunnelGateway(
             cacheDir = tmp,
             nativeStart = { _, _ -> 0 },
-            nativeStop = { throw RuntimeException("native stop failed") },
+            nativeStop = { throw IllegalStateException("native stop failed") },
         )
         // не должен пробрасывать — VpnService.onDestroy не должен крашиться от cleanup
         gateway.stop()
