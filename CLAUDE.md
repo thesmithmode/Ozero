@@ -20,7 +20,7 @@
 ## Workflow
 
 - Ветки: короткие `fix/`, `feat/`, `refactor/`. Одна задача = одна ветка от dev.
-- CI зелёный → squash-merge в dev → удалить ветку (локально+remote). Не висеть на side-branch.
+- **Сразу после `git push` side-ветки → squash-merge в dev → удалить ветку (локально+remote) → ТОЛЬКО ПОТОМ ждать CI на dev.** Никогда не ждать CI на side-ветке.
 - main не трогать без явной команды.
 - Релизы: тег `v*.*.*` на dev → release.yml соберёт APK.
 
