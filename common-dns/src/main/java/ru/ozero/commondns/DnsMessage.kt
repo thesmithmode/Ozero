@@ -13,17 +13,17 @@ internal object DnsMessage {
 
     private fun buildQuery(hostname: String, qtype: Int): ByteArray {
         val buf = ByteArrayOutputStream()
-                                val id = ByteArray(2)
+        val id = ByteArray(2)
         random.nextBytes(id)
         buf.write(id)
-        buf.write(byteArrayOf(0x01, 0x00)) 
-        buf.write(byteArrayOf(0, 1, 0, 0, 0, 0, 0, 0)) 
+        buf.write(byteArrayOf(0x01, 0x00))
+        buf.write(byteArrayOf(0, 1, 0, 0, 0, 0, 0, 0))
         hostname.split(".").forEach { label ->
             buf.write(label.length)
             buf.write(label.toByteArray())
         }
         buf.write(0)
-        buf.write(byteArrayOf(0, (qtype and 0xFF).toByte(), 0, 1)) 
+        buf.write(byteArrayOf(0, (qtype and 0xFF).toByte(), 0, 1))
         return buf.toByteArray()
     }
 
@@ -37,7 +37,7 @@ internal object DnsMessage {
         if (anCount == 0) return emptyList()
 
         var offset = 12
-                offset = skipName(body, offset) + 4
+        offset = skipName(body, offset) + 4
 
         val result = mutableListOf<String>()
         repeat(anCount) {
@@ -75,14 +75,14 @@ internal object DnsMessage {
 
     private fun skipName(body: ByteArray, start: Int): Int {
         var offset = start
-                var iter = 0
+        var iter = 0
         while (offset < body.size) {
             if (iter++ > MAX_LABEL_ITER) return body.size
             val len = body[offset].toInt() and 0xFF
             when {
                 len == 0 -> return offset + 1
                 len and 0xC0 == 0xC0 -> {
-                                        if (offset + 1 >= body.size) return body.size
+                    if (offset + 1 >= body.size) return body.size
                     return offset + 2
                 }
                 else -> offset += len + 1

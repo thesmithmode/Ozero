@@ -67,7 +67,7 @@ class GithubReleaseFetcherTest {
 
     @Test
     fun rejectsMultipleApks() {
-                val json = """
+        val json = """
             {"tag_name":"v1.0.0","assets":[
               {"name":"o-arm64.apk","browser_download_url":"https://e.com/a1.apk"},
               {"name":"o-x86.apk","browser_download_url":"https://e.com/a2.apk"},

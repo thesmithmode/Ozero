@@ -15,9 +15,9 @@ class AssetsFirstRunBootstrapTest {
     fun `import skips placeholder URIs`() = runTest {
         val dao = FakeServerDao()
         val importer = ServerImportService(dao)
-                val placeholder = "vless://uuid@example.invalid:443?security=reality&pbk=PLACEHOLDER" +
+        val placeholder = "vless://uuid@example.invalid:443?security=reality&pbk=PLACEHOLDER" +
             "&fp=chrome&sni=example.com&type=tcp&flow=xtls-rprx-vision#placeholder"
-                assertTrue(placeholder.contains("placeholder"))
+        assertTrue(placeholder.contains("placeholder"))
     }
 
     @Test
