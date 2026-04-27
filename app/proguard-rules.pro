@@ -14,6 +14,7 @@
 
 -keep,allowobfuscation @interface dagger.hilt.android.AndroidEntryPoint
 -keep,allowobfuscation @interface dagger.hilt.android.HiltAndroidApp
+-keep,allowobfuscation @interface dagger.hilt.android.lifecycle.HiltViewModel
 -keep class dagger.hilt.** { *; }
 -keep class * extends dagger.hilt.android.internal.managers.ApplicationComponentManager { *; }
 -keep class hilt_aggregated_deps.** { *; }
@@ -34,7 +35,8 @@
 -keep @dagger.assisted.AssistedInject class * { <init>(...); }
 -keepclasseswithmembers class * { @javax.inject.Inject <init>(...); }
 -keepclassmembers class * { @javax.inject.Inject <fields>; }
--keepclassmembers class * { @dagger.hilt.android.lifecycle.HiltViewModel <init>(...); }
+-keep @dagger.hilt.android.lifecycle.HiltViewModel class * extends androidx.lifecycle.ViewModel { <init>(...); }
+-keepnames @dagger.hilt.android.lifecycle.HiltViewModel class * extends androidx.lifecycle.ViewModel
 -keepclassmembers class * { @dagger.assisted.AssistedInject <init>(...); }
 
 -keep class * extends androidx.work.Worker { <init>(...); }
