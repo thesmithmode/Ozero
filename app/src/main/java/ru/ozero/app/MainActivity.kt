@@ -26,6 +26,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import ru.ozero.app.logging.BootFileLogger
 import ru.ozero.app.logging.LogcatReader
 import ru.ozero.app.selfupdate.UpdateInstallEvent
 import ru.ozero.app.selfupdate.UpdateInstallEventBus
@@ -82,7 +83,9 @@ class MainActivity : ComponentActivity() {
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        runCatching { BootFileLogger.info(TAG, "onCreate before super") }
         super.onCreate(savedInstanceState)
+        runCatching { BootFileLogger.info(TAG, "onCreate after super (Hilt inject done)") }
         runCatching { logcatReader.start() }.onFailure { Log.w(TAG, "logcatReader.start failed", it) }
         runCatching { HarvestWorker.enqueueUnique(applicationContext) }
             .onFailure { Log.w(TAG, "HarvestWorker.enqueueUnique failed", it) }
@@ -90,6 +93,7 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) {
             handleSubscriptionIntent(intent)
         }
+        runCatching { BootFileLogger.info(TAG, "onCreate before setContent") }
         setContent {
             OzeroTheme {
                 var checked by rememberSaveable { mutableStateOf(false) }
