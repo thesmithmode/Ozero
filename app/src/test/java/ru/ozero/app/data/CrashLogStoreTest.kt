@@ -46,4 +46,38 @@ class CrashLogStoreTest {
         }
         assertTrue(store.list().size >= 1)
     }
+
+    @Test
+    fun `sanitize redacts proxy URI`() {
+        val store = CrashLogStore(tmp)
+        val raw = "fail at vless://uuid-1@example.com:443?pbk=secret end"
+        val out = store.sanitize(raw)
+        assertTrue(!out.contains("uuid-1"), "user-info не вырезан: $out")
+        assertTrue(!out.contains("example.com:443"), "host vless должен быть заменён proxy uri masker")
+    }
+
+    @Test
+    fun `sanitize redacts user-info in https URI`() {
+        val store = CrashLogStore(tmp)
+        val raw = "url https://user:p@ssw0rd@host.example/path"
+        val out = store.sanitize(raw)
+        assertTrue(!out.contains("user:p@ssw0rd"), "https user-info не вырезан: $out")
+    }
+
+    @Test
+    fun `sanitize redacts long token`() {
+        val store = CrashLogStore(tmp)
+        val token = "AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHHIIIIJJJJ" // 40 chars
+        val raw = "key=$token end"
+        val out = store.sanitize(raw)
+        assertTrue(!out.contains(token), "токен не вырезан: $out")
+    }
+
+    @Test
+    fun `sanitize keeps normal stack trace lines`() {
+        val store = CrashLogStore(tmp)
+        val frame = "at ru.ozero.commoncrypto.SubscriptionVerifier.verifyUpdate(SubscriptionVerifier.kt:42)"
+        val out = store.sanitize(frame)
+        assertEquals(frame, out)
+    }
 }

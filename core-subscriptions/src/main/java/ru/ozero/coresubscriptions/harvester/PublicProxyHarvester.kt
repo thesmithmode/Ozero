@@ -106,7 +106,11 @@ class PublicProxyHarvester(
         }
     }
 
-    /** Парсер `{ "servers": ["uri", ...] }` или верхнего массива через org.json (надёжно). */
+    /**
+     * Парсер `{ "servers": ["uri", ...] }` или верхнего массива через org.json.
+     * Лимит [MAX_ENTITIES_PER_SOURCE] применяется один раз — через `.take()` в общей
+     * цепочке `harvestOne`. Здесь только парсим, без cap.
+     */
     private fun parseJsonArray(body: String): List<String> {
         val arr: JSONArray = runCatching {
             // Сначала пробуем как JSON-объект с полем servers
@@ -115,10 +119,7 @@ class PublicProxyHarvester(
         }.getOrElse {
             runCatching { JSONArray(body) }.getOrElse { return emptyList() }
         }
-        val cap = minOf(arr.length(), MAX_ENTITIES_PER_SOURCE)
-        return buildList(cap) {
-            for (i in 0 until cap) add(arr.optString(i))
-        }
+        return List(arr.length()) { i -> arr.optString(i) }
     }
 
     data class HarvestResult(

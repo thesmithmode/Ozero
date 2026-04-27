@@ -24,6 +24,15 @@ open class GithubReleaseFetcher(
     private val baseUrl: String = "https://api.github.com",
 ) {
 
+    init {
+        // Certificate pinner внутри [GithubPinnedClient] закреплён на api.github.com.
+        // Подмена baseUrl через конструктор не должна обходить pinning — fail-fast здесь
+        // лучше чем silently отвалившийся pinning или MITM на чужом host.
+        require(baseUrl == "https://api.github.com") {
+            "GithubReleaseFetcher.baseUrl должен быть https://api.github.com"
+        }
+    }
+
     open fun latest(): ReleaseInfo? {
         val req = Request.Builder()
             .url("$baseUrl/repos/$owner/$repo/releases/latest")

@@ -2,17 +2,18 @@ package ru.ozero.security.antifrida
 
 import java.io.File
 
-/** Поставщик `/proc/self/maps` для тестируемости. */
+/**
+ * Поставщик `/proc/self/maps` для тестируемости.
+ * Callback-форма гарантирует true-streaming: line-by-line без материализации
+ * всего содержимого в память (maps больших процессов — несколько МБ).
+ */
 fun interface ProcMapsReader {
-    fun read(): String?
+    /** Передаёт ленивый Sequence<String> в block; ресурс закрывается после возврата. */
+    fun <R> useLines(block: (Sequence<String>) -> R): R
 }
 
-private val DefaultReader = ProcMapsReader {
-    // Стримим вместо readText() — /proc/self/maps больших процессов несколько МБ,
-    // полная загрузка в память не нужна для substring-поиска.
-    runCatching {
-        File("/proc/self/maps").bufferedReader().use { it.readText() }
-    }.getOrNull()
+private val DefaultReader = ProcMapsReader { block ->
+    runCatching { File("/proc/self/maps").useLines(block) }.getOrElse { block(emptySequence()) }
 }
 
 /**
@@ -31,20 +32,22 @@ class AntiFridaCheck(
     private val reader: ProcMapsReader = DefaultReader,
 ) {
 
-    fun isHookFrameworkPresent(): Boolean {
-        val maps = reader.read() ?: return false
-        // Ранний выход на первом совпадении — большие maps больше не сканируются полностью.
-        for (line in maps.lineSequence()) {
+    fun isHookFrameworkPresent(): Boolean = reader.useLines { lines ->
+        for (line in lines) {
             for (sig in SIGNATURES) {
-                if (line.contains(sig, ignoreCase = true)) return true
+                if (line.contains(sig, ignoreCase = true)) return@useLines true
             }
         }
-        return false
+        false
     }
 
-    fun firstSignatureMatch(): String? {
-        val maps = reader.read() ?: return null
-        return SIGNATURES.firstOrNull { maps.contains(it, ignoreCase = true) }
+    fun firstSignatureMatch(): String? = reader.useLines { lines ->
+        for (line in lines) {
+            for (sig in SIGNATURES) {
+                if (line.contains(sig, ignoreCase = true)) return@useLines sig
+            }
+        }
+        null
     }
 
     private companion object {

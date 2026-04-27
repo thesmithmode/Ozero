@@ -9,7 +9,6 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import ru.ozero.commonvpn.OzeroVpnService
 
@@ -20,7 +19,7 @@ class BootReceiver : BroadcastReceiver() {
         // обращения может быть пропущена в main thread → дефолт false и auto-start
         // не сработает. Уносим в IO-scope с pendingResult.finish().
         val pendingResult = goAsync()
-        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+        CoroutineScope(Dispatchers.IO).launch {
             try {
                 if (!isAutoStartEnabled(context)) return@launch
                 // VpnService.prepare() возвращает не-null Intent если разрешение НЕ выдано.
