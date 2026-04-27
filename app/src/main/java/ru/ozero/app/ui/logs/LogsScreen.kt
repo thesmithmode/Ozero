@@ -98,9 +98,11 @@ internal fun LogsScreenContent(
                                 putExtra(Intent.EXTRA_STREAM, uri)
                                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                             }
-                            ctx.startActivity(Intent.createChooser(intent, "Сохранить логи").apply {
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            })
+                            ctx.startActivity(
+                                Intent.createChooser(intent, "Сохранить логи").apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                },
+                            )
                         }
                     }) {
                         Icon(Icons.Default.Share, contentDescription = "Сохранить / поделиться")
