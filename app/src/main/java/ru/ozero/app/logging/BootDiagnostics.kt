@@ -42,7 +42,7 @@ object BootDiagnostics {
     @Volatile
     private var uncaughtInstalled: Boolean = false
 
-    fun installUncaughtHandler() {
+    fun installUncaughtHandler(crashSink: ((Thread, Throwable) -> Unit)? = null) {
         if (uncaughtInstalled) return
         uncaughtInstalled = true
         val previous = Thread.getDefaultUncaughtExceptionHandler()
@@ -53,6 +53,9 @@ object BootDiagnostics {
                     "uncaught thread=${thread.name} tid=${thread.id} type=${throwable.javaClass.name}",
                     throwable,
                 )
+            }
+            if (crashSink != null) {
+                runCatching { crashSink(thread, throwable) }
             }
             runCatching { previous?.uncaughtException(thread, throwable) }
         }

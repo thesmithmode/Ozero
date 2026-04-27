@@ -4,7 +4,6 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Intent
-import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
@@ -59,11 +58,17 @@ class OzeroVpnService : android.net.VpnService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(TAG, "onStartCommand action=${intent?.action}")
-        when (intent?.action) {
-            ACTION_STOP -> stopVpn()
-            ACTION_START, null -> startVpn()
+        return try {
+            when (intent?.action) {
+                ACTION_STOP -> stopVpn()
+                ACTION_START, null -> startVpn()
+            }
+            START_STICKY
+        } catch (t: Throwable) {
+            Log.e(TAG, "onStartCommand threw", t)
+            runCatching { stopVpn() }
+            START_NOT_STICKY
         }
-        return START_STICKY
     }
 
     private fun startVpn() {
@@ -72,16 +77,22 @@ class OzeroVpnService : android.net.VpnService() {
             return
         }
         Log.i(TAG, "startVpn")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(
-                NOTIFICATION_ID,
-                buildNotification(),
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
-            )
-        } else {
+        try {
             startForeground(NOTIFICATION_ID, buildNotification())
+        } catch (t: Throwable) {
+            Log.e(TAG, "startForeground threw", t)
+            starting.set(false)
+            stopVpn()
+            return
         }
-        val fd = buildTunBuilder().establish()
+        val fd = try {
+            buildTunBuilder().establish()
+        } catch (t: Throwable) {
+            Log.e(TAG, "VpnService.Builder.establish threw", t)
+            starting.set(false)
+            stopVpn()
+            return
+        }
         if (fd == null) {
             Log.e(TAG, "TUN не установлен — VpnService.prepare не выдан?")
             starting.set(false)
@@ -152,11 +163,12 @@ class OzeroVpnService : android.net.VpnService() {
     ): Builder {
         val builder = Builder()
             .addAddress(TUN_ADDRESS, TUN_PREFIX_LENGTH)
-            .addAddress(TUN_ADDRESS_V6, TUN_PREFIX_LENGTH_V6)
             .addDnsServer(TUN_DNS)
             .setMtu(TUN_MTU)
             .setSession(SESSION_NAME)
             .setBlocking(true)
+        runCatching { builder.addAddress(TUN_ADDRESS_V6, TUN_PREFIX_LENGTH_V6) }
+            .onFailure { Log.w(TAG, "IPv6 TUN address rejected, IPv4-only", it) }
         ru.ozero.commonvpn.split.TunBuilderConfigurator(packageName)
             .apply(builder, splitConfig)
         return builder

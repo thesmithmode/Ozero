@@ -7,6 +7,7 @@ import android.util.Log
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
+import ru.ozero.app.data.CrashLogStore
 import ru.ozero.app.logging.BootDiagnostics
 import ru.ozero.app.logging.BootFileLogger
 import javax.inject.Inject
@@ -26,7 +27,10 @@ class OzeroApp : Application(), Configuration.Provider {
         super.attachBaseContext(base)
         runCatching {
             BootFileLogger.init(base)
-            BootDiagnostics.installUncaughtHandler()
+            val crashStore = runCatching { CrashLogStore(base.filesDir) }.getOrNull()
+            BootDiagnostics.installUncaughtHandler(
+                crashSink = crashStore?.let { store -> { t, e -> store.write(t, e) } },
+            )
             BootFileLogger.info(
                 TAG,
                 "attachBaseContext sdk=${Build.VERSION.SDK_INT} " +
@@ -41,12 +45,6 @@ class OzeroApp : Application(), Configuration.Provider {
         runCatching { BootFileLogger.info(TAG, "onCreate before super") }
         super.onCreate()
         runCatching { BootFileLogger.info(TAG, "onCreate after super") }
-        runCatching {
-            System.loadLibrary("hev-socks5-tunnel")
-            BootFileLogger.info(TAG, "hev-socks5-tunnel loaded eagerly")
-        }.onFailure {
-            BootFileLogger.error(TAG, "hev-socks5-tunnel eager load failed", it)
-        }
     }
 
     private companion object {

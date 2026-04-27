@@ -14,7 +14,7 @@ private const val TAG = "StubLibDelegate"
 
 class StubLibXrayDelegate : LibXrayDelegate {
     override fun startXray(configJson: String): Int {
-        Log.w(TAG, "xray stub: start не реализован (RT.6 заменит на JNI)")
+        Log.w(TAG, "xray stub: start не реализован (нативный движок не подключён)")
         return NOT_IMPLEMENTED
     }
     override fun stopXray(): Int = 0
@@ -24,7 +24,7 @@ class StubLibXrayDelegate : LibXrayDelegate {
 
 class StubLibAwgDelegate : LibAwgDelegate {
     override fun startAwg(configIni: String): Int {
-        Log.w(TAG, "awg stub: start не реализован (RT.6 заменит на JNI)")
+        Log.w(TAG, "awg stub: start не реализован (нативный движок не подключён)")
         return NOT_IMPLEMENTED
     }
     override fun stopAwg(): Int = 0
@@ -35,7 +35,7 @@ class StubLibAwgDelegate : LibAwgDelegate {
 
 class StubLibHy2Delegate : LibHy2Delegate {
     override fun startHy2(configJson: String): Int {
-        Log.w(TAG, "hy2 stub: start не реализован (RT.6 заменит на JNI)")
+        Log.w(TAG, "hy2 stub: start не реализован (нативный движок не подключён)")
         return NOT_IMPLEMENTED
     }
     override fun stopHy2(): Int = 0
@@ -45,7 +45,7 @@ class StubLibHy2Delegate : LibHy2Delegate {
 
 class StubLibNaiveDelegate : LibNaiveDelegate {
     override fun startNaive(configJson: String): Int {
-        Log.w(TAG, "naive stub: start не реализован (RT.6 заменит на JNI)")
+        Log.w(TAG, "naive stub: start не реализован (нативный движок не подключён)")
         return NOT_IMPLEMENTED
     }
     override fun stopNaive(): Int = 0
@@ -55,7 +55,7 @@ class StubLibNaiveDelegate : LibNaiveDelegate {
 
 class StubLibTorDelegate : LibTorDelegate {
     override fun startTor(torrc: String): Int {
-        Log.w(TAG, "tor stub: start не реализован (RT.6 заменит на JNI)")
+        Log.w(TAG, "tor stub: start не реализован (нативный движок не подключён)")
         return NOT_IMPLEMENTED
     }
     override fun stopTor(): Int = 0
