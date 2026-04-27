@@ -14,7 +14,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
@@ -24,6 +23,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -57,8 +57,8 @@ fun BootLogScreen(onBack: () -> Unit) {
                     IconButton(onClick = { content = BootFileLogger.read() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Обновить")
                     }
-                    IconButton(onClick = { copyToClipboard(ctx, "boot.log", content) }) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = "Копировать")
+                    TextButton(onClick = { copyToClipboard(ctx, "boot.log", content) }) {
+                        Text("Копировать")
                     }
                     IconButton(onClick = {
                         BootFileLogger.clear()
