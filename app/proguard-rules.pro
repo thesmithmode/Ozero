@@ -17,13 +17,20 @@
 -keep class dagger.hilt.** { *; }
 -keep class * extends dagger.hilt.android.internal.managers.ApplicationComponentManager { *; }
 -keep class hilt_aggregated_deps.** { *; }
+-keep class ru.ozero.app.OzeroApp { *; }
+-keep class ru.ozero.app.MainActivity { *; }
+-keep class ru.ozero.app.Hilt_* { *; }
+-keep class ru.ozero.**.Hilt_* { *; }
 -keep class **_HiltModules** { *; }
 -keep class **_HiltModules_*Factory { *; }
+-keep class **_HiltComponents { *; }
+-keep class **_HiltComponents$* { *; }
 -keep class **_Factory { *; }
 -keep class **_MembersInjector { *; }
 -keep class **_GeneratedInjector { *; }
 -keep class **_AssistedFactory { *; }
 -keep class **_AssistedFactory_Impl { *; }
+-keep class Dagger* { *; }
 -keep @dagger.assisted.AssistedInject class * { <init>(...); }
 -keepclasseswithmembers class * { @javax.inject.Inject <init>(...); }
 -keepclassmembers class * { @javax.inject.Inject <fields>; }
@@ -34,6 +41,8 @@
 -keep class * extends androidx.work.CoroutineWorker { <init>(...); }
 -keep class * extends androidx.work.ListenableWorker { <init>(...); }
 -keep @androidx.hilt.work.HiltWorker class * { <init>(...); }
+-keep class * implements androidx.work.Configuration$Provider { *; }
+-keep class * extends androidx.startup.Initializer { *; }
 
 -keep class kotlinx.coroutines.** { *; }
 -dontwarn kotlinx.coroutines.**
@@ -43,7 +52,8 @@
 
 -keep class androidx.compose.runtime.** { *; }
 
--keepnames class ru.ozero.**
+-keep class ru.ozero.app.** { *; }
+-keep class ru.ozero.commonvpn.** { *; }
 
 -renamesourcefileattribute SourceFile
 -keepattributes SourceFile,LineNumberTable

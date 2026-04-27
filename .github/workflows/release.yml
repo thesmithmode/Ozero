@@ -183,7 +183,14 @@ jobs:
             "Lru/ozero/enginebyedpi/ByeDpiProxy;"
             "Lru/ozero/commonvpn/OzeroVpnService;"
             "Lru/ozero/app/OzeroApp;"
+            "Lru/ozero/app/Hilt_OzeroApp;"
             "Lru/ozero/app/MainActivity;"
+            "Lru/ozero/enginexray/LibXrayDelegate;"
+            "Lru/ozero/enginetor/LibTorDelegate;"
+            "Lru/ozero/engineamnezia/LibAwgDelegate;"
+            "Lru/ozero/enginehysteria2/LibHy2Delegate;"
+            "Lru/ozero/enginenaive/LibNaiveDelegate;"
+            "Lru/ozero/engineurnetwork/UrnetworkSdkDelegate;"
           )
           for cls in "${REQUIRED_CLASSES[@]}"; do
             if ! grep -aor "$cls" "$WORK"/classes*.dex | head -n1 | grep -q "$cls"; then
@@ -191,7 +198,14 @@ jobs:
               exit 1
             fi
           done
-          echo "Native bridge классы сохранены R8 после minify"
+          # Anti-repackaging: проверка что R8 не перенёс классы в короткие пакеты вида La/, Lo/.
+          # Если такие пакеты есть — JNI FindClass на оригинальное имя вернёт NULL → SIGABRT.
+          if grep -aoE 'L[a-z]{1,2}/[A-Z][A-Za-z0-9_$]{2,};' "$WORK"/classes*.dex | sort -u | head -n1 | grep -q .; then
+            echo "::error::Обнаружены короткие пакеты вида La/, Lo/ — repackaging включён, см. proguard-rules.pro"
+            grep -aoE 'L[a-z]{1,2}/[A-Z][A-Za-z0-9_$]{2,};' "$WORK"/classes*.dex | sort -u | head -n10
+            exit 1
+          fi
+          echo "Native bridge классы сохранены R8 после minify, repackaging не обнаружен"
 
       - name: Collect artifacts
         env:
