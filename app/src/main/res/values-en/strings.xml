@@ -38,7 +38,7 @@
     <string name="settings_language_ru">Русский</string>
     <string name="settings_language_en">English</string>
 
-    <!-- Settings — RT.4.1 -->
+    <!-- Settings -->
     <string name="settings_section_connection">Connection</string>
     <string name="settings_section_network">Network</string>
     <string name="settings_section_security">Security</string>
@@ -53,7 +53,7 @@
     <string name="settings_auto_start_title">Start on boot</string>
     <string name="settings_auto_start_summary">VPN turns on automatically after reboot</string>
     <string name="settings_allowed_apps_title">App list</string>
-    <string name="settings_allowed_apps_summary">Coming in RT.4.4</string>
+    <string name="settings_allowed_apps_summary">Coming in TBD</string>
     <string name="settings_allowed_apps_open_summary">Pick apps and Split-tunnel mode</string>
     <string name="settings_servers_title">Servers / Double-hop</string>
     <string name="settings_servers_summary">Pick entry/exit pair and preview</string>
@@ -66,7 +66,7 @@
     <string name="settings_update_state_uptodate">Already up to date</string>
     <string name="settings_update_state_failed">Error: %1$s. Tap to retry</string>
 
-    <!-- Tor on-demand module (RT.5.2) -->
+    <!-- Tor on-demand module -->
     <string name="settings_section_tor">Tor (emergency mode)</string>
     <string name="settings_tor_summary">Delivers ~50 MB via Google Play. Used when main engines are blocked.</string>
     <string name="settings_tor_install">Download</string>
@@ -127,11 +127,11 @@
     <string name="a11y_disconnect_button">Disconnect VPN</string>
     <string name="a11y_engine_active">Active engine: %1$s</string>
 
-    <!-- RT.8.1/8.2 -->
+    <!-- -->
     <string name="import_ok">Server %1$s added</string>
     <string name="import_error">Import failed: %1$s</string>
 
-    <!-- RT.9 -->
+    
     <string name="onboarding_title_1">Why Ozero</string>
     <string name="onboarding_body_1">Free internet access under censorship. Open-source, zero telemetry.</string>
     <string name="onboarding_title_2">How it works</string>
@@ -142,7 +142,7 @@
     <string name="onboarding_finish">Start</string>
     <string name="onboarding_skip">Skip</string>
 
-    <!-- RT.10.2 -->
+    
     <string name="about_title">About</string>
     <string name="about_version">Version %1$s</string>
     <string name="about_repo">Source code on GitHub</string>
@@ -150,7 +150,7 @@
     <string name="about_threat_model">Threat model</string>
     <string name="about_legal">Licenses</string>
 
-    <!-- RT.11.1 -->
+    
     <string name="diag_export_crashes">Export crash log</string>
     <string name="diag_export_no_crashes">Crash log is empty</string>
 </resources>

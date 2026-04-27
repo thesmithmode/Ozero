@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
-    <!-- RT.11.1: экспорт crash log из filesDir/crashes/ через ACTION_SEND -->
+    <!-- экспорт crash log из filesDir/crashes/ через ACTION_SEND -->
     <files-path name="crashes" path="crashes/" />
     <!-- Live-логи: cacheDir/logs/ — Android сам периодически чистит cache. -->
     <cache-path name="logs" path="logs/" />

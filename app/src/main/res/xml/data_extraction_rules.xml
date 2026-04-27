@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- E10: запрет cloud / device backup для подписок, ключей, БД. -->
+<!-- запрет cloud / device backup для подписок, ключей, БД. -->
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="root" />

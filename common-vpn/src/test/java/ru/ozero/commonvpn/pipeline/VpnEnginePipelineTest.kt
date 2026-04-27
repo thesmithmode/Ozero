@@ -116,6 +116,26 @@ class VpnEnginePipelineTest {
     }
 
     @Test
+    fun `start from Connected state physically stops previous engine before reconnect`() = runTest {
+        val byedpi = FakeEngine(
+            id = EngineId.BYEDPI,
+            probeResult = ProbeResult.Success(latencyMs = 50),
+            startResult = StartResult.Success(socksPort = socksPort),
+        )
+        val handle = newPipeline(mapOf(EngineId.BYEDPI to byedpi as Engine))
+        handle.start(tunFd)
+        assertIs<OrchestratorState.Connected>(handle.orchestrator.state.value)
+        byedpi.stopCalled = false
+        handle.tunnelGateway.stopCalled = false
+
+        val result = handle.start(tunFd)
+
+        assertIs<VpnEnginePipeline.Result.Connected>(result)
+        assertTrue(byedpi.stopCalled, "previous engine.stop должен вызваться перед reconnect")
+        assertTrue(handle.tunnelGateway.stopCalled, "previous tunnel.stop должен вызваться перед reconnect")
+    }
+
+    @Test
     fun `stop tears down tunnel and engine and resets controllers`() = runTest {
         val byedpi = FakeEngine(
             id = EngineId.BYEDPI,

@@ -42,12 +42,6 @@ class Orchestrator {
             state is OrchestratorState.Connecting && transition is OrchestratorTransition.ConnectFailed ->
                 OrchestratorState.Failed(transition.engineId, transition.reason)
 
-            state is OrchestratorState.Connected && transition is OrchestratorTransition.SwitchTo ->
-                OrchestratorState.Switching(from = state.engineId, to = transition.engineId)
-
-            state is OrchestratorState.Switching && transition is OrchestratorTransition.SwitchComplete ->
-                OrchestratorState.Connected(transition.engineId, transition.socksPort)
-
             state is OrchestratorState.Connected && transition is OrchestratorTransition.Disconnect ->
                 OrchestratorState.Disconnecting
 
@@ -63,23 +57,12 @@ class Orchestrator {
             state is OrchestratorState.Connecting && transition is OrchestratorTransition.Disconnect ->
                 OrchestratorState.Disconnecting
 
-            state is OrchestratorState.Switching && transition is OrchestratorTransition.Disconnect ->
-                OrchestratorState.Disconnecting
-
             state is OrchestratorState.Disconnecting && transition is OrchestratorTransition.DisconnectComplete ->
                 OrchestratorState.Idle
 
-            state is OrchestratorState.Switching && transition is OrchestratorTransition.ConnectFailed ->
-                OrchestratorState.Failed(transition.engineId, transition.reason)
-
-            state is OrchestratorState.Disconnecting && transition is OrchestratorTransition.Disconnect -> state
-            state is OrchestratorState.Idle && transition is OrchestratorTransition.Disconnect -> state
-
             else -> {
-                Log.e(TAG, "invalid: ${state::class.simpleName} + ${transition::class.simpleName}")
-                throw IllegalStateException(
-                    "Недопустимый переход: ${state::class.simpleName} + ${transition::class.simpleName}"
-                )
+                Log.w(TAG, "ignored invalid: ${state::class.simpleName} + ${transition::class.simpleName}")
+                state
             }
         }
 

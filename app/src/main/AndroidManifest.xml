@@ -11,11 +11,11 @@
     <!-- Android 13 (API 33+): runtime-permission, без неё system-tray notification VPN не покажет -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Android 8+ (API 26+): self-update через PackageInstaller (RT.7) — иначе install upd APK падает -->
+    <!-- Android 8+ (API 26+): self-update через PackageInstaller — иначе install upd APK падает -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!--
-        RT.7.3: опциональный whitelist от Doze. Без permission'а system отказывает в
+        опциональный whitelist от Doze. Без permission'а system отказывает в
         ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS Intent'е (SecurityException).
         Prompt показывается один раз — VPN работает и без него, но с Doze possible drops.
     -->
@@ -38,7 +38,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Ozero"
         android:usesCleartextTraffic="false"
-        android:enableOnBackInvokedCallback="true"><!-- RT.7.4: Predictive Back на Android 14+ -->
+        android:enableOnBackInvokedCallback="true"><!-- Predictive Back на Android 14+ -->
 
         <activity
             android:name=".MainActivity"
@@ -49,7 +49,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- RT.8.1: deeplinks для импорта одиночных серверов через VPN-схемы -->
+            <!-- deeplinks для импорта одиночных серверов через VPN-схемы -->
             <intent-filter android:label="@string/app_name">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -64,7 +64,7 @@
                 <data android:scheme="awg" />
             </intent-filter>
 
-            <!-- RT.8.1: HTTPS-deeplink на subscription-домен (autoVerify требует assetlinks.json) -->
+            <!-- HTTPS-deeplink на subscription-домен (autoVerify требует assetlinks.json) -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -72,7 +72,7 @@
                 <data android:scheme="https" android:host="sub.ozero.app" />
             </intent-filter>
 
-            <!-- RT.8.2: share-target для текста подписки -->
+            <!-- share-target для текста подписки -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -88,7 +88,7 @@
             </intent-filter>
         </receiver>
 
-        <!-- RT.6.1: result-broadcast от PackageInstaller.commit() при self-update -->
+        <!-- result-broadcast от PackageInstaller.commit() при self-update -->
         <receiver
             android:name=".selfupdate.UpdateInstallResultReceiver"
             android:exported="false">
@@ -97,7 +97,7 @@
             </intent-filter>
         </receiver>
 
-        <!-- E16.1: отключаем default WorkManager auto-init, используем custom Configuration.Provider в OzeroApp -->
+        <!-- отключаем default WorkManager auto-init, используем custom Configuration.Provider в OzeroApp -->
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"
@@ -109,7 +109,7 @@
                 tools:node="remove" />
         </provider>
 
-        <!-- RT.11.1: FileProvider для экспорта crash log из filesDir/crashes/ -->
+        <!-- FileProvider для экспорта crash log из filesDir/crashes/ -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

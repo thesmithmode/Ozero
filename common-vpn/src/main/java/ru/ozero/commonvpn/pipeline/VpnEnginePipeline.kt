@@ -1,6 +1,7 @@
 package ru.ozero.commonvpn.pipeline
 
 import android.util.Log
+import kotlinx.coroutines.CancellationException
 import ru.ozero.commonvpn.HevTunnelConfig
 import ru.ozero.commonvpn.HevTunnelGateway
 import ru.ozero.commonvpn.TunnelController
@@ -11,6 +12,8 @@ import ru.ozero.coreorchestrator.Orchestrator
 import ru.ozero.coreorchestrator.OrchestratorState
 import ru.ozero.coreorchestrator.OrchestratorTransition
 import ru.ozero.coreorchestrator.StrategyEngine
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 class VpnEnginePipeline(
     private val engines: Map<EngineId, Engine>,
@@ -21,7 +24,8 @@ class VpnEnginePipeline(
     private val socksHost: String = DEFAULT_SOCKS_HOST,
 ) {
 
-    @Volatile private var currentEngine: Engine? = null
+    private val currentEngine = AtomicReference<Engine?>(null)
+    private val tunnelStarted = AtomicBoolean(false)
 
     sealed class Result {
         data class Connected(val engineId: EngineId, val socksPort: Int) : Result()
@@ -32,7 +36,7 @@ class VpnEnginePipeline(
 
     suspend fun start(tunFd: Int): Result {
         Log.i(TAG, "start tunFd=$tunFd")
-        ensureConnectTransition()
+        ensureCleanStart()
 
         val winner = pickWinner()
         if (winner == null) {
@@ -46,20 +50,35 @@ class VpnEnginePipeline(
         val engine = engines[winner.engineId]
             ?: return failConnect(winner.engineId, "engine не найден в DI map")
 
-        return when (val startResult = engine.start(winner.config)) {
-            is StartResult.Failure -> failConnect(winner.engineId, startResult.reason)
+        currentEngine.set(engine)
+        val startResult = try {
+            engine.start(winner.config)
+        } catch (ce: CancellationException) {
+            currentEngine.set(null)
+            throw ce
+        } catch (t: Throwable) {
+            currentEngine.set(null)
+            return failConnect(winner.engineId, "engine.start threw: ${t.message}")
+        }
+        return when (startResult) {
+            is StartResult.Failure -> {
+                currentEngine.set(null)
+                failConnect(winner.engineId, startResult.reason)
+            }
             is StartResult.Success -> bringTunnelUp(engine, winner.engineId, startResult.socksPort, tunFd)
         }
     }
 
     suspend fun stop() {
         Log.i(TAG, "stop")
-        tunnelGateway.stop()
-        currentEngine?.let { eng ->
+        if (tunnelStarted.compareAndSet(true, false)) {
+            runCatching { tunnelGateway.stop() }
+                .onFailure { Log.e(TAG, "tunnelGateway.stop() threw", it) }
+        }
+        currentEngine.getAndSet(null)?.let { eng ->
             runCatching { eng.stop() }
                 .onFailure { Log.e(TAG, "engine.stop() threw", it) }
         }
-        currentEngine = null
         tunnelController.reset()
         if (orchestrator.state.value !is OrchestratorState.Idle) {
             orchestrator.dispatch(OrchestratorTransition.Disconnect)
@@ -67,7 +86,7 @@ class VpnEnginePipeline(
         }
     }
 
-    private fun ensureConnectTransition() {
+    private suspend fun ensureCleanStart() {
         when (orchestrator.state.value) {
             is OrchestratorState.Idle,
             is OrchestratorState.Failed,
@@ -78,8 +97,8 @@ class VpnEnginePipeline(
             -> Unit
 
             else -> {
-                orchestrator.dispatch(OrchestratorTransition.Disconnect)
-                orchestrator.dispatch(OrchestratorTransition.DisconnectComplete)
+                Log.w(TAG, "start in dirty state ${orchestrator.state.value::class.simpleName} → physical stop first")
+                stop()
                 orchestrator.dispatch(OrchestratorTransition.Connect)
             }
         }
@@ -100,15 +119,26 @@ class VpnEnginePipeline(
         tunFd: Int,
     ): Result {
         val config = HevTunnelConfig(tunFd = tunFd, socksAddress = socksHost, socksPort = socksPort)
-        val code = tunnelGateway.start(config)
+        tunnelStarted.set(true)
+        val code = try {
+            tunnelGateway.start(config)
+        } catch (t: Throwable) {
+            tunnelStarted.set(false)
+            currentEngine.set(null)
+            runCatching { engine.stop() }
+                .onFailure { Log.e(TAG, "engine.stop rollback threw", it) }
+            orchestrator.dispatch(OrchestratorTransition.ConnectFailed(engineId, "tunnel threw: ${t.message}"))
+            throw t
+        }
         if (code != 0) {
             Log.e(TAG, "hev tunnel start failed code=$code, rolling back engine")
+            tunnelStarted.set(false)
+            currentEngine.set(null)
             runCatching { engine.stop() }
                 .onFailure { Log.e(TAG, "engine.stop rollback threw", it) }
             orchestrator.dispatch(OrchestratorTransition.ConnectFailed(engineId, "tunnel code=$code"))
             return Result.TunnelFailed(engineId, code)
         }
-        currentEngine = engine
         tunnelController.onEngineStarted(socksPort)
         orchestrator.dispatch(OrchestratorTransition.ConnectSuccess(engineId, socksPort))
         Log.i(TAG, "connected engine=$engineId socksPort=$socksPort")

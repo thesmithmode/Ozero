@@ -41,6 +41,12 @@ class OzeroApp : Application(), Configuration.Provider {
         runCatching { BootFileLogger.info(TAG, "onCreate before super") }
         super.onCreate()
         runCatching { BootFileLogger.info(TAG, "onCreate after super") }
+        runCatching {
+            System.loadLibrary("hev-socks5-tunnel")
+            BootFileLogger.info(TAG, "hev-socks5-tunnel loaded eagerly")
+        }.onFailure {
+            BootFileLogger.error(TAG, "hev-socks5-tunnel eager load failed", it)
+        }
     }
 
     private companion object {
