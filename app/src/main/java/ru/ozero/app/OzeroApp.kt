@@ -59,7 +59,6 @@ class OzeroApp : Application(), Configuration.Provider {
         }
     }
 
-
     private fun shouldStartSecurityWatchdog(): Boolean =
         !BuildConfig.DEBUG && !isRobolectricRuntime()
 

@@ -210,16 +210,29 @@ class SettingsViewModelTest {
         val autoStartUpdates = mutableListOf<Boolean>()
         val manualEngineUpdates = mutableListOf<EngineId?>()
 
-        fun emit(model: SettingsModel) { flow.value = model }
+        fun emit(model: SettingsModel) {
+            flow.value = model
+        }
 
         override val settings: Flow<SettingsModel> = flow {
             flow.collect { value -> if (value != null) emit(value) }
         }
 
-        override suspend fun setSplitMode(mode: SplitTunnelMode) { splitModeUpdates += mode }
-        override suspend fun setIpv6Enabled(enabled: Boolean) { ipv6Updates += enabled }
-        override suspend fun setAutoStart(enabled: Boolean) { autoStartUpdates += enabled }
-        override suspend fun setManualEngine(engine: EngineId?) { manualEngineUpdates += engine }
+        override suspend fun setSplitMode(mode: SplitTunnelMode) {
+            splitModeUpdates += mode
+        }
+
+        override suspend fun setIpv6Enabled(enabled: Boolean) {
+            ipv6Updates += enabled
+        }
+
+        override suspend fun setAutoStart(enabled: Boolean) {
+            autoStartUpdates += enabled
+        }
+
+        override suspend fun setManualEngine(engine: EngineId?) {
+            manualEngineUpdates += engine
+        }
         override suspend fun setUrnetworkEnabled(enabled: Boolean) = Unit
         override suspend fun setUrnetworkJwt(jwt: String?) = Unit
     }
