@@ -6,9 +6,9 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import ru.ozero.security.SecurityGuard
+import ru.ozero.security.SecurityStateHolder
 import ru.ozero.security.SecurityWatchdog
 import javax.inject.Singleton
-import kotlin.system.exitProcess
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -20,14 +20,18 @@ object SecurityModule {
 
     @Provides
     @Singleton
-    fun provideSecurityWatchdog(guard: SecurityGuard): SecurityWatchdog =
-        SecurityWatchdog(
+    fun provideSecurityWatchdog(guard: SecurityGuard): SecurityWatchdog {
+        lateinit var watchdog: SecurityWatchdog
+        watchdog = SecurityWatchdog(
             guard = guard,
             onCompromised = { reasons ->
-                Log.e(TAG, "compromised: $reasons — завершаем")
-                exitProcess(1)
+                Log.e(TAG, "compromised env detected: $reasons — VPN disabled")
+                SecurityStateHolder.signal(reasons)
+                watchdog.stop()
             },
         )
+        return watchdog
+    }
 
     private const val TAG = "SecurityModule"
 }

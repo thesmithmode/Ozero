@@ -64,9 +64,9 @@ class AntiEmulatorCheckTest {
     }
 
     @Test
-    fun testKeysDetected() {
+    fun testKeysIgnored() {
         val f = realDevice.copy(fingerprint = "samsung/x/y:10/Z:user/test-keys")
-        assertTrue(check(f).isEmulator())
+        assertFalse(check(f).isEmulator())
     }
 
     @Test

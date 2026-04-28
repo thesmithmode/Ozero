@@ -42,16 +42,16 @@ class VpnEnginePipeline(
         val candidates = strategy.buildCandidates()
         val winner = strategy.pickBest(candidates)
         if (winner == null) {
-            val fallback = candidates.firstOrNull { it.engineId == EngineId.BYEDPI } ?: candidates.firstOrNull()
+            val fallback = candidates.firstOrNull { it.engineId == EngineId.BYEDPI }
             if (fallback == null) {
-                Log.w(TAG, "no candidates available")
+                Log.w(TAG, "no BYEDPI candidate available, refusing best-effort fallback to non-BYEDPI engine")
                 orchestrator.dispatch(OrchestratorTransition.Disconnect)
                 orchestrator.dispatch(OrchestratorTransition.DisconnectComplete)
                 return Result.NoCandidates
             }
             Log.w(
                 TAG,
-                "no successful probe, fallback to ${fallback.engineId} (best-effort start without probe)",
+                "no successful probe, fallback to BYEDPI (best-effort start without probe)",
             )
             orchestrator.dispatch(OrchestratorTransition.ProbeComplete(fallback.engineId))
             return startCandidate(fallback, tunFd)

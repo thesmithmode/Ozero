@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicReference
 import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_START
 import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_STOP
 import ru.ozero.commonvpn.pipeline.VpnEnginePipeline
+import ru.ozero.security.SecurityStateHolder
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -76,13 +77,26 @@ class OzeroVpnService : android.net.VpnService() {
             Log.w(TAG, "startVpn ignored — идет остановка предыдущей сессии")
             return
         }
+        if (SecurityStateHolder.isCompromised) {
+            Log.w(TAG, "startVpn refused — security compromised: ${SecurityStateHolder.compromised.value}")
+            stopSelf()
+            return
+        }
         if (!starting.compareAndSet(false, true)) {
             Log.w(TAG, "startVpn ignored — уже запущен/запускается")
             return
         }
         Log.i(TAG, "startVpn")
         try {
-            startForeground(NOTIFICATION_ID, buildNotification())
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    buildNotification(),
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, buildNotification())
+            }
         } catch (t: Throwable) {
             Log.e(TAG, "startForeground threw", t)
             starting.set(false)
@@ -228,7 +242,8 @@ class OzeroVpnService : android.net.VpnService() {
             }
         }
         serviceScope.cancel()
-        closeTunFd()
+        val tunFd = tunFdRef.getAndSet(null)
+        tunFd?.close()
     }
 
     private fun closeTunFd(fd: ParcelFileDescriptor? = tunFdRef.getAndSet(null)) {

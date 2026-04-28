@@ -22,8 +22,7 @@ class AntiEmulatorCheck(
         val reasons = mutableListOf<String>()
         if (f.fingerprint.startsWith("generic") ||
             f.fingerprint.startsWith("unknown") ||
-            f.fingerprint.contains("vbox") ||
-            f.fingerprint.contains("test-keys")
+            f.fingerprint.contains("vbox")
         ) {
             reasons += "fingerprint=${f.fingerprint}"
         }

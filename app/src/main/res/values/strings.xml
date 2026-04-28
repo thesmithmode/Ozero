@@ -122,6 +122,7 @@
     <!-- deeplink/share import -->
     <string name="import_ok">Сервер %1$s добавлен</string>
     <string name="import_error">Импорт не удался: %1$s</string>
+    <string name="security_blocked">VPN запуск заблокирован: обнаружено вмешательство в среду исполнения</string>
 
     <!-- onboarding -->
     <string name="onboarding_title_1">Зачем Ozero</string>

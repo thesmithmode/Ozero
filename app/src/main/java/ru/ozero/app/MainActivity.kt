@@ -50,6 +50,7 @@ import ru.ozero.app.ui.splittunnel.SplitTunnelScreen
 import ru.ozero.app.ui.theme.OzeroTheme
 import ru.ozero.commonvpn.OzeroVpnService
 import ru.ozero.coreorchestrator.OrchestratorState
+import ru.ozero.security.SecurityStateHolder
 import javax.inject.Inject
 
 enum class TopScreen { Main, Settings, Diagnostics, SplitTunnel, Servers, About, Logs, BootLog }
@@ -168,6 +169,15 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestVpnAndStart() {
+        if (SecurityStateHolder.isCompromised) {
+            Log.w(TAG, "VPN start refused — security compromised: ${SecurityStateHolder.compromised.value}")
+            Toast.makeText(
+                this,
+                getString(R.string.security_blocked),
+                Toast.LENGTH_LONG,
+            ).show()
+            return
+        }
         viewModel.onConnectClick()
         val vpnIntent = VpnService.prepare(this)
         if (vpnIntent != null) {
