@@ -52,8 +52,19 @@ class OzeroApp : Application(), Configuration.Provider {
         runCatching { BootFileLogger.info(TAG, "onCreate before super") }
         super.onCreate()
         runCatching { BootFileLogger.info(TAG, "onCreate after super") }
-        runCatching { securityWatchdog.start(appScope) }
+        if (shouldStartSecurityWatchdog()) {
+            runCatching { securityWatchdog.start(appScope) }
+        } else {
+            runCatching { BootFileLogger.info(TAG, "security watchdog skipped in debug/test runtime") }
+        }
     }
+
+
+    private fun shouldStartSecurityWatchdog(): Boolean =
+        !BuildConfig.DEBUG && !isRobolectricRuntime()
+
+    private fun isRobolectricRuntime(): Boolean =
+        runCatching { Class.forName("org.robolectric.RuntimeEnvironment") }.isSuccess
 
     private companion object {
         const val TAG = "OzeroApp"
