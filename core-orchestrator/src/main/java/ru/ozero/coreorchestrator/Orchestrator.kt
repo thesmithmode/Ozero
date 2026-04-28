@@ -4,6 +4,7 @@ import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import ru.ozero.coreapi.PersistentLoggers
 
 class Orchestrator {
 
@@ -19,6 +20,7 @@ class Orchestrator {
                 val tr = transition::class.simpleName
                 val to = next::class.simpleName
                 Log.i(TAG, "transition $from + $tr → $to")
+                PersistentLoggers.instance?.info(TAG, "$from + $tr → $to")
                 return
             }
         }

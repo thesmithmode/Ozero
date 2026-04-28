@@ -12,14 +12,19 @@ class TunBuilderConfigurator(
             SplitTunnelMode.ALL -> {
                 builder.addRoute("0.0.0.0", 0)
                 builder.addRoute(IPV6_DEFAULT, 0)
-                Log.i(TAG, "split-tunnel ALL — добавлен default route v4+v6")
+                excludeSelfFromTun(builder)
+                Log.i(TAG, "split-tunnel ALL — добавлен default route v4+v6, self исключён")
             }
             SplitTunnelMode.BYPASS_LAN -> {
                 for (cidr in LanRoutes.BYPASS_LAN_IPV4) {
                     builder.addRoute(cidr.address, cidr.prefix)
                 }
                 builder.addRoute(IPV6_GLOBAL_UNICAST, IPV6_GLOBAL_UNICAST_PREFIX)
-                Log.i(TAG, "split-tunnel BYPASS_LAN — ${LanRoutes.BYPASS_LAN_IPV4.size} v4 + 2000::/3 v6")
+                excludeSelfFromTun(builder)
+                Log.i(
+                    TAG,
+                    "split-tunnel BYPASS_LAN — ${LanRoutes.BYPASS_LAN_IPV4.size} v4 + 2000::/3 v6, self исключён",
+                )
             }
             SplitTunnelMode.ALLOWLIST -> {
                 builder.addRoute("0.0.0.0", 0)
@@ -29,10 +34,16 @@ class TunBuilderConfigurator(
             SplitTunnelMode.BLOCKLIST -> {
                 builder.addRoute("0.0.0.0", 0)
                 builder.addRoute(IPV6_DEFAULT, 0)
+                excludeSelfFromTun(builder)
                 applyDisallowed(builder, config.packages)
             }
         }
         return builder
+    }
+
+    private fun excludeSelfFromTun(builder: VpnService.Builder) {
+        runCatching { builder.addDisallowedApplication(packageName) }
+            .onFailure { Log.e(TAG, "addDisallowedApplication self failed: ${it.message}") }
     }
 
     private fun applyAllowed(builder: VpnService.Builder, packages: Set<String>) {

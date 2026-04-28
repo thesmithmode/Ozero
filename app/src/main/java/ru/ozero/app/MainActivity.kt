@@ -158,6 +158,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        runCatching { BootFileLogger.info(TAG, "onCreate after setContent") }
     }
 
     private fun onConnectClick() {

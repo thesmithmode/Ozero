@@ -7,6 +7,7 @@ import ru.ozero.commonvpn.HevTunnelGateway
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.coreapi.Engine
 import ru.ozero.coreapi.EngineId
+import ru.ozero.coreapi.PersistentLoggers
 import ru.ozero.coreapi.StartResult
 import ru.ozero.coreorchestrator.Candidate
 import ru.ozero.coreorchestrator.Orchestrator
@@ -37,14 +38,24 @@ class VpnEnginePipeline(
 
     suspend fun start(tunFd: Int): Result {
         Log.i(TAG, "start tunFd=$tunFd")
+        PersistentLoggers.instance?.info(TAG, "pipeline.start tunFd=$tunFd")
         ensureCleanStart()
 
         val candidates = strategy.buildCandidates()
+        PersistentLoggers.instance?.info(
+            TAG,
+            "candidates=${candidates.map { it.engineId }}",
+        )
         val winner = strategy.pickBest(candidates)
+        PersistentLoggers.instance?.info(
+            TAG,
+            "winner=${winner?.engineId ?: "none"}",
+        )
         if (winner == null) {
             val fallback = candidates.firstOrNull { it.engineId == EngineId.BYEDPI }
             if (fallback == null) {
                 Log.w(TAG, "no BYEDPI candidate available, refusing best-effort fallback to non-BYEDPI engine")
+                PersistentLoggers.instance?.warn(TAG, "no BYEDPI candidate — abort")
                 orchestrator.dispatch(OrchestratorTransition.Disconnect)
                 orchestrator.dispatch(OrchestratorTransition.DisconnectComplete)
                 return Result.NoCandidates
@@ -53,6 +64,7 @@ class VpnEnginePipeline(
                 TAG,
                 "no successful probe, fallback to BYEDPI (best-effort start without probe)",
             )
+            PersistentLoggers.instance?.info(TAG, "fallback BYEDPI (best-effort)")
             orchestrator.dispatch(OrchestratorTransition.ProbeComplete(fallback.engineId))
             return startCandidate(fallback, tunFd)
         }
@@ -74,6 +86,7 @@ class VpnEnginePipeline(
             currentEngine.set(null)
             return failConnect(candidate.engineId, "engine.start threw: ${t.message}")
         }
+        PersistentLoggers.instance?.info(TAG, "engine ${candidate.engineId} start → $startResult")
         return when (startResult) {
             is StartResult.Failure -> {
                 currentEngine.set(null)

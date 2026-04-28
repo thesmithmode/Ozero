@@ -1,6 +1,7 @@
 package ru.ozero.app.di.stubs
 
 import android.util.Log
+import ru.ozero.coreapi.PersistentLoggers
 import ru.ozero.engineamnezia.LibAwgDelegate
 import ru.ozero.enginehysteria2.LibHy2Delegate
 import ru.ozero.enginenaive.LibNaiveDelegate
@@ -10,9 +11,15 @@ import ru.ozero.enginexray.LibXrayDelegate
 private const val NOT_IMPLEMENTED = -1
 private const val TAG = "StubLibDelegate"
 
+private fun reportStubStart(engine: String) {
+    val msg = "$engine: native delegate not wired in this build → ByeDpi fallback"
+    Log.w(TAG, msg)
+    PersistentLoggers.instance?.warn(TAG, msg)
+}
+
 class StubLibXrayDelegate : LibXrayDelegate {
     override fun startXray(configJson: String): Int {
-        Log.w(TAG, "xray stub: start не реализован (нативный движок не подключён)")
+        reportStubStart("xray")
         return NOT_IMPLEMENTED
     }
     override fun stopXray(): Int = 0
@@ -22,7 +29,7 @@ class StubLibXrayDelegate : LibXrayDelegate {
 
 class StubLibAwgDelegate : LibAwgDelegate {
     override fun startAwg(configIni: String): Int {
-        Log.w(TAG, "awg stub: start не реализован (нативный движок не подключён)")
+        reportStubStart("amnezia-wg")
         return NOT_IMPLEMENTED
     }
     override fun stopAwg(): Int = 0
@@ -33,7 +40,7 @@ class StubLibAwgDelegate : LibAwgDelegate {
 
 class StubLibHy2Delegate : LibHy2Delegate {
     override fun startHy2(configJson: String): Int {
-        Log.w(TAG, "hy2 stub: start не реализован (нативный движок не подключён)")
+        reportStubStart("hysteria2")
         return NOT_IMPLEMENTED
     }
     override fun stopHy2(): Int = 0
@@ -43,7 +50,7 @@ class StubLibHy2Delegate : LibHy2Delegate {
 
 class StubLibNaiveDelegate : LibNaiveDelegate {
     override fun startNaive(configJson: String): Int {
-        Log.w(TAG, "naive stub: start не реализован (нативный движок не подключён)")
+        reportStubStart("naive")
         return NOT_IMPLEMENTED
     }
     override fun stopNaive(): Int = 0
@@ -53,7 +60,7 @@ class StubLibNaiveDelegate : LibNaiveDelegate {
 
 class StubLibTorDelegate : LibTorDelegate {
     override fun startTor(torrc: String): Int {
-        Log.w(TAG, "tor stub: start не реализован (нативный движок не подключён)")
+        reportStubStart("tor")
         return NOT_IMPLEMENTED
     }
     override fun stopTor(): Int = 0

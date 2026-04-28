@@ -6,6 +6,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import ru.ozero.coreapi.Engine
 import ru.ozero.coreapi.EngineId
+import ru.ozero.coreorchestrator.CandidateSource
 import ru.ozero.coreorchestrator.Orchestrator
 import ru.ozero.coreorchestrator.StrategyEngine
 import javax.inject.Singleton
@@ -22,5 +23,6 @@ object OrchestratorModule {
     @Singleton
     fun provideStrategyEngine(
         engines: Map<EngineId, @JvmSuppressWildcards Engine>,
-    ): StrategyEngine = StrategyEngine(engines)
+        candidateSources: Set<@JvmSuppressWildcards CandidateSource>,
+    ): StrategyEngine = StrategyEngine(engines, extraSources = candidateSources.toList())
 }

@@ -2,6 +2,7 @@ package ru.ozero.commonvpn
 
 import android.content.Context
 import android.util.Log
+import ru.ozero.coreapi.PersistentLoggers
 import java.io.File
 
 interface HevTunnelGateway {
@@ -23,13 +24,23 @@ class NativeHevTunnelGateway(
     override fun start(config: HevTunnelConfig): Int {
         if (!hev.TProxyService.libraryLoaded) {
             Log.e(TAG, "libhev-socks5-tunnel не загружена: ${hev.TProxyService.loadError}")
+            PersistentLoggers.instance?.error(
+                TAG,
+                "libhev not loaded: ${hev.TProxyService.loadError}",
+            )
             return -1
         }
         val configFile = writeConfig(config)
         Log.i(TAG, "TProxyStartService path=${configFile.absolutePath} fd=${config.tunFd}")
-        return runCatching { nativeStart(configFile.absolutePath, config.tunFd) }
-            .onFailure { Log.e(TAG, "TProxyStartService threw", it) }
+        PersistentLoggers.instance?.info(TAG, "TProxyStartService fd=${config.tunFd}")
+        val code = runCatching { nativeStart(configFile.absolutePath, config.tunFd) }
+            .onFailure {
+                Log.e(TAG, "TProxyStartService threw", it)
+                PersistentLoggers.instance?.error(TAG, "TProxyStartService threw", it)
+            }
             .getOrElse { -1 }
+        PersistentLoggers.instance?.info(TAG, "TProxyStartService → code=$code")
+        return code
     }
 
     override fun stop() {
