@@ -122,8 +122,9 @@
     <!-- -->
     <string name="import_ok">Server %1$s added</string>
     <string name="import_error">Import failed: %1$s</string>
+    <string name="security_blocked">VPN start blocked: runtime tampering detected</string>
 
-    
+
     <string name="onboarding_title_1">Why Ozero</string>
     <string name="onboarding_body_1">Free internet access under censorship. Open-source, zero telemetry.</string>
     <string name="onboarding_title_2">How it works</string>
