@@ -107,8 +107,3 @@ Native-бинари для CI приходят с GitHub Releases по `binaries
 | Канал | Статус |
 |-------|--------|
 | GitHub Releases | живой (debug-APK на каждый dev push, signed на tag `v*.*.*`) |
-| F-Droid | pending submission |
-| Telegram | pending |
-| Сайт `ozero.app` | pending |
-
-Google Play не планируется (политика блокировки VPN-приложений + censorship).
