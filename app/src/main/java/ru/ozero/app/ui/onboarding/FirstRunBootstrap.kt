@@ -48,21 +48,34 @@ class AssetsFirstRunBootstrap @Inject constructor(
                 val json = JSONObject(String(raw, Charsets.UTF_8))
                 val arr = json.optJSONArray("servers") ?: return@runCatching
                 var imported = 0
+                var skippedInsecure = 0
                 for (i in 0 until arr.length()) {
                     val uri = arr.optString(i).orEmpty()
                     if (uri.isBlank() || uri.contains("placeholder")) continue
+                    if (isInsecureUri(uri)) {
+                        skippedInsecure++
+                        continue
+                    }
                     val result = importer.import(uri)
                     if (result is ServerImportService.ImportResult.Ok) imported++
                 }
-                Log.i(TAG, "bootstrap from $ASSET_NAME → imported=$imported / total=${arr.length()}")
+                Log.i(
+                    TAG,
+                    "bootstrap from $ASSET_NAME → imported=$imported / total=${arr.length()} skippedInsecure=$skippedInsecure",
+                )
             }.onFailure { Log.w(TAG, "bootstrap failed", it) }
         }
     }
+
+    private fun isInsecureUri(uri: String): Boolean =
+        INSECURE_PARAM_REGEX.containsMatchIn(uri)
 
     private companion object {
         const val TAG = "AssetsFirstRunBootstrap"
         const val ASSET_NAME = "bootstrap-servers.json"
         const val SIG_NAME = "bootstrap-servers.json.sig"
         const val PUBKEY_NAME = "update-pubkey.pem"
+
+        val INSECURE_PARAM_REGEX = Regex("[?&](allowInsecure|insecure)=1(?:&|#|$)")
     }
 }

@@ -48,11 +48,19 @@ object BootFileLogger {
 
     fun read(): String = targetRef.get()?.takeIf { it.exists() }?.readText().orEmpty().let(::sanitize)
 
+    private val userinfoUriRegex = Regex(
+        "(?i)(\\w+)://([^:/@\\s]+(?::[^@\\s]*)?)@([^\\s/]+)",
+    )
+    private val proxyUriRegex = Regex(
+        "(?i)\\b(vless|vmess|trojan|ss|hysteria2?|tuic|naive\\+https?|wireguard|awg)://\\S+",
+    )
     private val appPathRegex = Regex("/data/[a-zA-Z_]+/~~[A-Za-z0-9_=-]+/[A-Za-z0-9_.=-]+")
     private val hexHashRegex = Regex("\\b[a-f0-9]{16,}\\b")
 
     private fun sanitize(text: String): String =
         text
+            .let { userinfoUriRegex.replace(it) { m -> "${m.groupValues[1]}://<redacted>@${m.groupValues[3]}" } }
+            .let { proxyUriRegex.replace(it, "<redacted-uri>") }
             .replace(appPathRegex, "<app-path>")
             .replace(hexHashRegex, "<hash>")
 

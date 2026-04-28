@@ -78,9 +78,5 @@
 
 -keepattributes RuntimeVisibleAnnotations,RuntimeVisibleParameterAnnotations,AnnotationDefault
 
--keep class com.google.android.play.core.splitinstall.** { *; }
--keep interface com.google.android.play.core.splitinstall.** { *; }
--dontwarn com.google.android.play.core.**
-
 -renamesourcefileattribute SourceFile
 -keepattributes SourceFile,LineNumberTable

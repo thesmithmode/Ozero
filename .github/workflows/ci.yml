@@ -48,7 +48,7 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' }}
 
-      - name: Download native binaries (RT.1.7)
+      - name: Download native binaries
         run: ./gradlew :engine-byedpi:downloadBinaries --stacktrace
 
       - name: Setup Python for build-tools tests
@@ -63,7 +63,10 @@ jobs:
         run: python3 -m unittest discover -s build-tools/tests -p 'test_*.py' -v
 
       - name: Run ktlint, detekt, lint, build, and tests
-        run: ./gradlew ktlintCheck detekt lint assembleDebug testDebugUnitTest jacocoTestReport jacocoTestCoverageVerification --stacktrace --continue
+        run: ./gradlew ktlintCheck detekt lint assembleDebug testDebugUnitTest --stacktrace
+
+      - name: Run coverage report and gate
+        run: ./gradlew jacocoTestReport jacocoTestCoverageVerification --stacktrace
 
       - name: Upload debug APK
         if: always()
