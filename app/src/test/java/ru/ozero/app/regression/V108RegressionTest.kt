@@ -99,6 +99,29 @@ class V108RegressionTest {
         )
     }
 
+
+    @Test
+    fun vpnService_startBlockedWhileStopping() {
+        val body = funBody(read(VPN_SERVICE), "startVpn")
+        assertTrue(
+            body.contains("if (stopping.get())"),
+            "startVpn должен блокироваться пока stopVpn не завершил cleanup — иначе race закрывает новый TUN fd.",
+        )
+    }
+
+    @Test
+    fun vpnService_stopCapturesFdBeforeAsyncCleanup() {
+        val body = funBody(read(VPN_SERVICE), "stopVpn")
+        assertTrue(
+            body.contains("val fdToClose = tunFdRef.getAndSet(null)"),
+            "stopVpn должен захватывать текущий tunFd до async cleanup, чтобы не закрыть FD новой сессии.",
+        )
+        assertTrue(
+            body.contains("closeTunFd(fdToClose)"),
+            "stopVpn должен закрывать только захваченный fdToClose после pipeline.stop.",
+        )
+    }
+
     @Test
     fun subscriptionLogs_redactRawUrl() {
         val files = listOf(

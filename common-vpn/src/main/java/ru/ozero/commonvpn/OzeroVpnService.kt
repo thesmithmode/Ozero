@@ -72,6 +72,10 @@ class OzeroVpnService : android.net.VpnService() {
     }
 
     private fun startVpn() {
+        if (stopping.get()) {
+            Log.w(TAG, "startVpn ignored — идет остановка предыдущей сессии")
+            return
+        }
         if (!starting.compareAndSet(false, true)) {
             Log.w(TAG, "startVpn ignored — уже запущен/запускается")
             return
@@ -131,6 +135,7 @@ class OzeroVpnService : android.net.VpnService() {
         }
         Log.i(TAG, "stopVpn")
         startJobRef.getAndSet(null)?.cancel()
+        val fdToClose = tunFdRef.getAndSet(null)
         serviceScope.launch {
             try {
                 val finished = withTimeoutOrNull(SHUTDOWN_TIMEOUT_MS) {
@@ -141,7 +146,7 @@ class OzeroVpnService : android.net.VpnService() {
                     Log.w(TAG, "pipeline.stop не завершилась за ${SHUTDOWN_TIMEOUT_MS}ms — закрываем fd")
                 }
                 withContext(Dispatchers.Main) {
-                    closeTunFd()
+                    closeTunFd(fdToClose)
                     starting.set(false)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -222,7 +227,7 @@ class OzeroVpnService : android.net.VpnService() {
         closeTunFd()
     }
 
-    private fun closeTunFd() {
-        tunFdRef.getAndSet(null)?.close()
+    private fun closeTunFd(fd: ParcelFileDescriptor? = tunFdRef.getAndSet(null)) {
+        fd?.close()
     }
 }
