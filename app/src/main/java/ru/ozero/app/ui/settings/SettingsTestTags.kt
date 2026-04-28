@@ -22,11 +22,4 @@ object SettingsTestTags {
     const val SERVERS_ROW = "servers_row"
     const val CHECK_UPDATE_ROW = "check_update_row"
 
-    const val SECTION_TOR = "settings_section_tor"
-    const val TOR_INSTALL_BUTTON = "tor_install_button"
-    const val TOR_CANCEL_BUTTON = "tor_cancel_button"
-    const val TOR_RETRY_BUTTON = "tor_retry_button"
-    const val TOR_PROGRESS = "tor_progress"
-    const val TOR_INSTALLED_LABEL = "tor_installed_label"
-    const val TOR_FAILED_LABEL = "tor_failed_label"
 }

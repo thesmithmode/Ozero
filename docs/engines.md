@@ -88,7 +88,7 @@ NaiveProxy исполняется как subprocess (`Runtime.exec`), не Go-б
 | Capabilities | TCP=true, UDP=false, localOnly=false, requiresServer=false |
 | Build | `build_tor.sh` (download+extract из Maven AAR, без gomobile) |
 | Lock tag | `tor-<sha8>` (несёт оба engine — `tor` + `iptproxy`, два manifest'а) |
-| Доставка | On-demand через `:dynamic_tor` (PlayCore SplitInstall, ~200 МБ) |
+| Доставка | Встроено в основной APK/ABI-артефакты (без PlayCore SplitInstall) |
 
 Bridges подаются в `EngineConfig.Tor.bridges: List<String>`.
 

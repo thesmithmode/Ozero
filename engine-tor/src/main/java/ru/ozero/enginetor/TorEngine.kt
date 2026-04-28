@@ -17,12 +17,9 @@ import ru.ozero.coreorchestrator.probe.Socks5HandshakeProbe
 import ru.ozero.enginetor.bridges.TorBridge
 import ru.ozero.enginetor.config.TorBuildOptions
 import ru.ozero.enginetor.config.TorConfigBuilder
-import ru.ozero.enginetor.dynamicmod.DynamicTorInstaller
-import ru.ozero.enginetor.dynamicmod.InstallResult
 
 class TorEngine(
     private val delegate: LibTorDelegate,
-    private val installer: DynamicTorInstaller,
     private val configBuilder: TorConfigBuilder = TorConfigBuilder(),
     private val bridges: List<TorBridge> = emptyList(),
     private val buildOptions: TorBuildOptions,
@@ -45,18 +42,6 @@ class TorEngine(
 
     override suspend fun start(config: EngineConfig): StartResult {
         require(config is EngineConfig.Tor) { "TorEngine требует EngineConfig.Tor" }
-
-        when (val installResult = installer.ensureInstalled()) {
-            is InstallResult.Installed, InstallResult.AlreadyInstalled -> Unit
-            is InstallResult.Failed -> {
-                Log.e(TAG, "dynamic_tor install failed: ${installResult.reason}")
-                return StartResult.Failure(reason = "dynamic_tor: ${installResult.reason}")
-            }
-            is InstallResult.Installing -> {
-                Log.e(TAG, "dynamic_tor ещё устанавливается (${installResult.percent}%)")
-                return StartResult.Failure(reason = "dynamic_tor устанавливается, повторите позже")
-            }
-        }
 
         val torrc = runCatching {
             configBuilder.build(

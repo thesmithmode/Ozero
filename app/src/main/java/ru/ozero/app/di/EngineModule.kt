@@ -23,7 +23,6 @@ import ru.ozero.enginenaive.LibNaiveDelegate
 import ru.ozero.enginenaive.NaiveEngine
 import ru.ozero.enginetor.LibTorDelegate
 import ru.ozero.enginetor.TorEngine
-import ru.ozero.enginetor.dynamicmod.DynamicTorInstaller
 import ru.ozero.enginexray.LibXrayDelegate
 import ru.ozero.enginexray.XrayEngine
 import javax.inject.Singleton
@@ -87,10 +86,8 @@ object EngineModule {
     fun provideTorEngine(
         @ApplicationContext context: android.content.Context,
         delegate: LibTorDelegate,
-        installer: DynamicTorInstaller,
     ): Engine = TorEngine(
         delegate = delegate,
-        installer = installer,
         buildOptions = ru.ozero.enginetor.config.TorBuildOptions(
             dataDir = java.io.File(context.filesDir, "tor").absolutePath,
         ),

@@ -67,14 +67,6 @@
     <string name="settings_update_state_failed">Error: %1$s. Tap to retry</string>
 
     <!-- Tor on-demand module -->
-    <string name="settings_section_tor">Tor (emergency mode)</string>
-    <string name="settings_tor_summary">Delivers ~50 MB via Google Play. Used when main engines are blocked.</string>
-    <string name="settings_tor_install">Download</string>
-    <string name="settings_tor_cancel">Cancel</string>
-    <string name="settings_tor_retry">Retry</string>
-    <string name="settings_tor_installed">Tor installed</string>
-    <string name="settings_tor_progress">Downloading… %1$d %%</string>
-    <string name="settings_tor_failed">Install error: %1$s</string>
     <string name="settings_about_version">Version %1$s</string>
     <string name="settings_about_summary">Open-source VPN. Details in Privacy / Threat model.</string>
     <string name="settings_back">Back</string>

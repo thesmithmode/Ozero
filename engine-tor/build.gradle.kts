@@ -37,9 +37,6 @@ dependencies {
     implementation(project(":common-vpn"))
     implementation(libs.bundles.coroutines)
 
-    implementation(libs.play.feature.delivery)
-    implementation(libs.coroutines.play.services)
-
     testImplementation(libs.bundles.junit5)
     testRuntimeOnly(libs.junit.jupiter.engine)
     testImplementation(libs.bundles.testing.unit)
