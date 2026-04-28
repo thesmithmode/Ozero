@@ -1,6 +1,5 @@
 package ru.ozero.enginetor
 
-import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -14,8 +13,6 @@ import ru.ozero.coreapi.ProbeResult
 import ru.ozero.coreapi.StartResult
 import ru.ozero.enginetor.bridges.TorBridge
 import ru.ozero.enginetor.config.TorBuildOptions
-import ru.ozero.enginetor.dynamicmod.DynamicTorInstaller
-import ru.ozero.enginetor.dynamicmod.InstallResult
 import java.net.ServerSocket
 import kotlin.concurrent.thread
 import kotlin.test.assertEquals
@@ -24,19 +21,16 @@ import kotlin.test.assertTrue
 
 class TorEngineTest {
     private lateinit var delegate: LibTorDelegate
-    private lateinit var installer: DynamicTorInstaller
 
     @BeforeEach
     fun setUp() {
         delegate = mockk(relaxed = true)
-        installer = mockk()
-        coEvery { installer.ensureInstalled() } returns InstallResult.Installed
     }
 
     private fun engine(
         bridges: List<TorBridge> = emptyList(),
         options: TorBuildOptions = TorBuildOptions(socksPort = 9050, controlPort = 9051, dataDir = "/tmp/tor"),
-    ) = TorEngine(delegate, installer, bridges = bridges, buildOptions = options)
+    ) = TorEngine(delegate, bridges = bridges, buildOptions = options)
 
     @Test fun engineIdIsTor() = assertEquals(EngineId.TOR, engine().id)
 
@@ -44,21 +38,6 @@ class TorEngineTest {
     fun startRequiresTorConfig() = runTest {
         val ex = runCatching { engine().start(EngineConfig.ByeDpi()) }.exceptionOrNull()
         assertIs<IllegalArgumentException>(ex)
-    }
-
-    @Test
-    fun startFailsWhenInstallerFails() = runTest {
-        coEvery { installer.ensureInstalled() } returns InstallResult.Failed("disk full")
-        val r = engine().start(EngineConfig.Tor(socksPort = 9050))
-        assertIs<StartResult.Failure>(r)
-        assertTrue(r.reason.contains("disk full"))
-    }
-
-    @Test
-    fun startFailsWhileInstalling() = runTest {
-        coEvery { installer.ensureInstalled() } returns InstallResult.Installing(percent = 42)
-        val r = engine().start(EngineConfig.Tor(socksPort = 9050))
-        assertIs<StartResult.Failure>(r)
     }
 
     @Test
@@ -152,7 +131,6 @@ class TorEngineTest {
         every { delegate.startTor(capture(cfg)) } returns 0
         TorEngine(
             delegate,
-            installer,
             bridges = listOf(bridge),
             buildOptions = TorBuildOptions(
                 socksPort = 9050, controlPort = 9051, dataDir = "/tmp/tor",

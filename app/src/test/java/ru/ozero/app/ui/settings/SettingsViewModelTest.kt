@@ -29,8 +29,6 @@ import ru.ozero.app.settings.SettingsModel
 import ru.ozero.app.settings.SettingsRepository
 import ru.ozero.commonvpn.split.SplitTunnelMode
 import ru.ozero.coreapi.EngineId
-import ru.ozero.enginetor.dynamicmod.InstallResult
-import ru.ozero.enginetor.dynamicmod.SplitInstallClient
 import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -40,7 +38,6 @@ class SettingsViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
     private lateinit var repository: FakeSettingsRepository
-    private lateinit var torClient: FakeSplitInstallClient
     private lateinit var coordinator: FakeUpdateCoordinator
     private lateinit var viewModel: SettingsViewModel
 
@@ -48,9 +45,8 @@ class SettingsViewModelTest {
     fun setUp() {
         Dispatchers.setMain(dispatcher)
         repository = FakeSettingsRepository()
-        torClient = FakeSplitInstallClient()
         coordinator = FakeUpdateCoordinator()
-        viewModel = SettingsViewModel(repository, torClient, coordinator)
+        viewModel = SettingsViewModel(repository, coordinator)
     }
 
     @AfterEach
@@ -124,126 +120,12 @@ class SettingsViewModelTest {
         advanceUntilIdle()
         viewModel.onManualEngineSelect(null)
         advanceUntilIdle()
-
         assertEquals(listOf(EngineId.HYSTERIA2, null), repository.manualEngineUpdates)
-    }
-
-    @Test
-    fun `tor initial state is Installed when module already present`() {
-        torClient = FakeSplitInstallClient(installed = setOf("dynamic_tor"))
-        viewModel = SettingsViewModel(repository, torClient, coordinator)
-
-        assertEquals(TorInstallUiState.Installed, viewModel.torInstall.value)
-    }
-
-    @Test
-    fun `tor initial state is NotInstalled when module absent`() {
-        assertEquals(TorInstallUiState.NotInstalled, viewModel.torInstall.value)
-    }
-
-    @Test
-    fun `onInstallTor emits Installing percents and Installed on terminal`() = runTest {
-        torClient.flow = flowOf(
-            InstallResult.Installing(percent = 25),
-            InstallResult.Installing(percent = 80),
-            InstallResult.Installed,
-        )
-
-        viewModel.onInstallTor()
-        advanceUntilIdle()
-
-        assertEquals(TorInstallUiState.Installed, viewModel.torInstall.value)
-        assertEquals(1, torClient.requestCount)
-    }
-
-    @Test
-    fun `onInstallTor sets Failed when client emits Failed`() = runTest {
-        torClient.flow = flowOf(
-            InstallResult.Installing(percent = 30),
-            InstallResult.Failed(reason = "code=-100"),
-        )
-
-        viewModel.onInstallTor()
-        advanceUntilIdle()
-
-        val state = viewModel.torInstall.value
-        val failed = assertIs<TorInstallUiState.Failed>(state)
-        assertEquals("code=-100", failed.reason)
-    }
-
-    @Test
-    fun `onInstallTor propagates checksum mismatch reason from Failed`() = runTest {
-        val reason = "checksum mismatch: libtor-arm64-v8a.so expected=39e1e4b1… actual=deadbeef…"
-        torClient.flow = flowOf(
-            InstallResult.Installing(percent = 90),
-            InstallResult.Failed(reason = reason),
-        )
-
-        viewModel.onInstallTor()
-        advanceUntilIdle()
-
-        val failed = assertIs<TorInstallUiState.Failed>(viewModel.torInstall.value)
-        assertEquals(reason, failed.reason)
-    }
-
-    @Test
-    fun `onCancelTor cancels job and resets to NotInstalled`() = runTest {
-        val gate = CompletableDeferred<InstallResult>()
-        torClient.flow = flow {
-            emit(InstallResult.Installing(percent = 10))
-            emit(gate.await())
-        }
-
-        viewModel.onInstallTor()
-        advanceUntilIdle()
-        assertIs<TorInstallUiState.Installing>(viewModel.torInstall.value)
-
-        viewModel.onCancelTor()
-        advanceUntilIdle()
-
-        assertEquals(TorInstallUiState.NotInstalled, viewModel.torInstall.value)
-    }
-
-    @Test
-    fun `onInstallTor is idempotent when already Installed`() = runTest {
-        torClient = FakeSplitInstallClient(installed = setOf("dynamic_tor"))
-        viewModel = SettingsViewModel(repository, torClient, coordinator)
-
-        viewModel.onInstallTor()
-        advanceUntilIdle()
-
-        assertEquals(TorInstallUiState.Installed, viewModel.torInstall.value)
-        assertEquals(0, torClient.requestCount)
     }
 
     @Test
     fun `update initial state Idle`() = runTest {
         assertEquals(UpdateUiState.Idle, viewModel.update.value)
-    }
-
-    @Test
-    fun `onCheckUpdate maps Checking and UpToDate`() = runTest {
-        coordinator.script = flowOf(
-            UpdateCoordinator.Progress.Checking,
-            UpdateCoordinator.Progress.UpToDate,
-        )
-        viewModel.onCheckUpdate()
-        advanceUntilIdle()
-        assertEquals(UpdateUiState.UpToDate, viewModel.update.value)
-    }
-
-    @Test
-    fun `onCheckUpdate maps Downloading percent`() = runTest {
-        coordinator.script = flowOf(
-            UpdateCoordinator.Progress.Checking,
-            UpdateCoordinator.Progress.Downloading(42),
-            UpdateCoordinator.Progress.Verifying,
-            UpdateCoordinator.Progress.Installing,
-            UpdateCoordinator.Progress.Submitted(sessionId = 1),
-        )
-        viewModel.onCheckUpdate()
-        advanceUntilIdle()
-        assertEquals(UpdateUiState.Installing, viewModel.update.value)
     }
 
     @Test
@@ -303,11 +185,8 @@ class SettingsViewModelTest {
         installer = object : SilentPackageInstaller(
             mockk<Context>(relaxed = true), mockk<PackageInstaller>(relaxed = true),
         ) {
-            override suspend fun install(
-                apkFile: File,
-                sessionName: String,
-                resultIntentAction: String,
-            ): Result = Result.FileError("test-stub")
+            override suspend fun install(apkFile: File, sessionName: String, resultIntentAction: String): Result =
+                Result.FileError("test-stub")
         },
         currentVersion = "v0.1.0",
         currentVersionCode = 1L,
@@ -316,6 +195,7 @@ class SettingsViewModelTest {
         var script: Flow<Progress> = emptyFlow()
         var calls: Int = 0
             private set
+
         override fun check(): Flow<Progress> {
             calls += 1
             return script
@@ -330,50 +210,17 @@ class SettingsViewModelTest {
         val autoStartUpdates = mutableListOf<Boolean>()
         val manualEngineUpdates = mutableListOf<EngineId?>()
 
-        override val settings: Flow<SettingsModel> = kotlinx.coroutines.flow.flow {
-            flow.collect { value ->
-                if (value != null) emit(value)
-            }
+        fun emit(model: SettingsModel) { flow.value = model }
+
+        override val settings: Flow<SettingsModel> = flow {
+            flow.collect { value -> if (value != null) emit(value) }
         }
 
-        suspend fun emit(model: SettingsModel) {
-            flow.value = model
-        }
-
-        override suspend fun setSplitMode(mode: SplitTunnelMode) {
-            splitModeUpdates += mode
-        }
-
-        override suspend fun setIpv6Enabled(enabled: Boolean) {
-            ipv6Updates += enabled
-        }
-
-        override suspend fun setAutoStart(enabled: Boolean) {
-            autoStartUpdates += enabled
-        }
-
-        override suspend fun setManualEngine(engine: EngineId?) {
-            manualEngineUpdates += engine
-        }
-
-        override suspend fun setUrnetworkEnabled(enabled: Boolean) {}
-
-        override suspend fun setUrnetworkJwt(jwt: String?) {}
-    }
-
-    private class FakeSplitInstallClient(
-        installed: Set<String> = emptySet(),
-    ) : SplitInstallClient {
-        override val installedModules: Set<String> = installed
-        var flow: Flow<InstallResult> = flowOf()
-        var requestCount: Int = 0
-            private set
-
-        override fun requestInstall(moduleName: String): Flow<InstallResult> {
-            requestCount += 1
-            return flow
-        }
-
-        override suspend fun deferredUninstall(moduleName: String) = Unit
+        override suspend fun setSplitMode(mode: SplitTunnelMode) { splitModeUpdates += mode }
+        override suspend fun setIpv6Enabled(enabled: Boolean) { ipv6Updates += enabled }
+        override suspend fun setAutoStart(enabled: Boolean) { autoStartUpdates += enabled }
+        override suspend fun setManualEngine(engine: EngineId?) { manualEngineUpdates += engine }
+        override suspend fun setUrnetworkEnabled(enabled: Boolean) = Unit
+        override suspend fun setUrnetworkJwt(jwt: String?) = Unit
     }
 }

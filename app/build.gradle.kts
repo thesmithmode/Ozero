@@ -104,8 +104,6 @@ dependencies {
     implementation(project(":engine-tor"))
     implementation(project(":security"))
 
-    implementation(libs.play.feature.delivery)
-
     implementation(libs.bundles.okhttp)
 
     testImplementation(libs.bundles.junit5)

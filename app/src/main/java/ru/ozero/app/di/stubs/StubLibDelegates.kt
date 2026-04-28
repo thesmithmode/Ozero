@@ -5,8 +5,6 @@ import ru.ozero.engineamnezia.LibAwgDelegate
 import ru.ozero.enginehysteria2.LibHy2Delegate
 import ru.ozero.enginenaive.LibNaiveDelegate
 import ru.ozero.enginetor.LibTorDelegate
-import ru.ozero.enginetor.dynamicmod.DynamicTorInstaller
-import ru.ozero.enginetor.dynamicmod.InstallResult
 import ru.ozero.enginexray.LibXrayDelegate
 
 private const val NOT_IMPLEMENTED = -1
@@ -62,8 +60,4 @@ class StubLibTorDelegate : LibTorDelegate {
     override fun isBootstrapped(): Boolean = false
     override fun bootstrapPercent(): Int = 0
     override fun version(): String = "stub"
-}
-
-class StubDynamicTorInstaller : DynamicTorInstaller {
-    override suspend fun ensureInstalled(): InstallResult = InstallResult.AlreadyInstalled
 }

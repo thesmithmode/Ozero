@@ -59,7 +59,7 @@
 
 **app + dynamic features:**
 - `app` — entry point, DI граф, MainActivity + Compose UI, self-update
-- `dynamic_tor` — on-demand модуль (~200 МБ нативки), доставляется PlayCore SplitInstall
+- Tor поставляется статически в релизных APK/AAB без PlayCore SplitInstall.
 - `security` — anti-debug / anti-frida / signature-check
 - `buildSrc` — Gradle convention plugins (`ozero.android.application`, `ozero.android.library`, `ozero.dynamic.feature`, `ozero.binaries`)
 
@@ -70,10 +70,6 @@ EngineModule          @IntoMap @EngineKey(EngineId.X)
                       → Map<EngineId, Engine>  (6 engines)
                       ↑
                       Stub*Delegates (JNI заменит в RT.6)
-
-TorModule             DynamicTorInstaller
-                      → StubDynamicTorInstaller
-                      (RT.5 PlayCoreDynamicTorInstaller готов в engine-tor)
 
 OrchestratorModule    Orchestrator + StrategyEngine
                       ← Map<EngineId, @JvmSuppressWildcards Engine>

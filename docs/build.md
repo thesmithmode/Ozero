@@ -32,7 +32,7 @@ Native-бинари (libxray.aar, libbyedpi.so, …) скачиваются ав
 ## 3. Структура билда
 
 - `:app` — base APK + все engine модули как `implementation`
-- `:dynamic_tor` — on-demand модуль (~200 МБ нативки), доставляется PlayCore SplitInstall на устройстве
+- Tor включается в релизные артефакты статически, без on-demand модулей PlayCore.
 - `:engine-byedpi/xray/amnezia/hysteria2/naive/tor` — обёртки native + `Engine` реализация
 - `:core-*`, `:common-*`, `:security`, `:buildSrc` — shared
 
