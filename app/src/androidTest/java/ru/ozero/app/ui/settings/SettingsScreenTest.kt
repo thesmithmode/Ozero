@@ -144,7 +144,7 @@ class SettingsScreenTest {
         assert(captured == EngineId.HYSTERIA2) { "expected HYSTERIA2, got $captured" }
     }
 
-        private fun renderContent(model: SettingsModel) {
+    private fun renderContent(model: SettingsModel) {
         composeRule.setContent {
             OzeroTheme {
                 SettingsScreenContent(

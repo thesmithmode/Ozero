@@ -114,7 +114,7 @@ fun SettingsScreenContent(
                 ContentBody(
                     padding = padding,
                     model = state.model,
-                                updateState = updateState,
+                    updateState = updateState,
                     nav = nav,
                     onSplitModeChange = onSplitModeChange,
                     onIpv6Toggle = onIpv6Toggle,

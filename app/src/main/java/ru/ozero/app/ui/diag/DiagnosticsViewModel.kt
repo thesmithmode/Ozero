@@ -77,5 +77,4 @@ class DiagnosticsViewModel @Inject constructor(
             _uiState.value = DiagnosticsUiState.NotConnected
         }
     }
-
 }

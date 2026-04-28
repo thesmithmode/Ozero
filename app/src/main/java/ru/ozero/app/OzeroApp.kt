@@ -20,6 +20,7 @@ import javax.inject.Inject
 class OzeroApp : Application(), Configuration.Provider {
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
+
     @Inject lateinit var securityWatchdog: SecurityWatchdog
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

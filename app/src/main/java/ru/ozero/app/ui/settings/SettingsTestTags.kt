@@ -21,5 +21,4 @@ object SettingsTestTags {
     const val ALLOWED_APPS_ROW = "allowed_apps_row"
     const val SERVERS_ROW = "servers_row"
     const val CHECK_UPDATE_ROW = "check_update_row"
-
 }
