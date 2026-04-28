@@ -68,8 +68,8 @@
 
     <!-- Tor on-demand модуль -->
     <string name="settings_section_tor">Tor (аварийный режим)</string>
-    <string name="settings_tor_summary">Доставка ~50 МБ через Google Play. Используется когда основные движки заблокированы.</string>
-    <string name="settings_tor_install">Скачать</string>
+    <string name="settings_tor_summary">Установка ~50 МБ Tor-модуля через Google Play. Работает только для приложения, установленного из Play.</string>
+    <string name="settings_tor_install">Установить Tor-модуль</string>
     <string name="settings_tor_cancel">Отменить</string>
     <string name="settings_tor_retry">Повторить</string>
     <string name="settings_tor_installed">Tor установлен</string>

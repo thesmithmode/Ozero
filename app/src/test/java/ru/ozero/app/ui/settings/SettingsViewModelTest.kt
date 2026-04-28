@@ -187,6 +187,34 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun `onInstallTor maps APP_NOT_OWNED reason to friendly text`() = runTest {
+        torClient.flow = flowOf(InstallResult.Failed(reason = "code=-15"))
+
+        viewModel.onInstallTor()
+        advanceUntilIdle()
+
+        val failed = assertIs<TorInstallUiState.Failed>(viewModel.torInstall.value)
+        assertEquals(
+            "Tor-модуль ставится только для версии из Google Play (ошибка APP_NOT_OWNED).",
+            failed.reason,
+        )
+    }
+
+    @Test
+    fun `onInstallTor catches upstream exception and sets Failed instead of crash`() = runTest {
+        torClient.flow = flow { throw IllegalStateException("code=-15") }
+
+        viewModel.onInstallTor()
+        advanceUntilIdle()
+
+        val failed = assertIs<TorInstallUiState.Failed>(viewModel.torInstall.value)
+        assertEquals(
+            "Tor-модуль ставится только для версии из Google Play (ошибка APP_NOT_OWNED).",
+            failed.reason,
+        )
+    }
+
+    @Test
     fun `onCancelTor cancels job and resets to NotInstalled`() = runTest {
         val gate = CompletableDeferred<InstallResult>()
         torClient.flow = flow {

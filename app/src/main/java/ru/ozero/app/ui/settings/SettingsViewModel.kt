@@ -71,15 +71,22 @@ class SettingsViewModel @Inject constructor(
         if (_torInstall.value is TorInstallUiState.Installed) return
         installJob?.cancel()
         installJob = viewModelScope.launch {
-            torClient.requestInstall(TOR_MODULE_NAME).collect { result ->
-                _torInstall.value = when (result) {
-                    InstallResult.AlreadyInstalled, InstallResult.Installed ->
-                        TorInstallUiState.Installed
-                    is InstallResult.Installing ->
-                        TorInstallUiState.Installing(percent = result.percent)
-                    is InstallResult.Failed ->
-                        TorInstallUiState.Failed(reason = result.reason)
+            runCatching {
+                torClient.requestInstall(TOR_MODULE_NAME).collect { result ->
+                    _torInstall.value = when (result) {
+                        InstallResult.AlreadyInstalled, InstallResult.Installed ->
+                            TorInstallUiState.Installed
+                        is InstallResult.Installing ->
+                            TorInstallUiState.Installing(percent = result.percent)
+                        is InstallResult.Failed ->
+                            TorInstallUiState.Failed(reason = mapTorInstallFailureReason(result.reason))
+                    }
                 }
+            }.onFailure { error ->
+                Log.e(TAG, "tor install crashed", error)
+                _torInstall.value = TorInstallUiState.Failed(
+                    reason = mapTorInstallFailureReason(error.message.orEmpty()),
+                )
             }
         }
     }
@@ -133,5 +140,14 @@ class SettingsViewModel @Inject constructor(
         const val STOP_TIMEOUT_MS = 5_000L
         const val TOR_MODULE_NAME = "dynamic_tor"
         const val TAG = "SettingsViewModel"
+        const val APP_NOT_OWNED_CODE = "code=-15"
+        const val APP_NOT_OWNED_MESSAGE =
+            "Tor-модуль ставится только для версии из Google Play (ошибка APP_NOT_OWNED)."
+    }
+
+    private fun mapTorInstallFailureReason(reason: String): String {
+        val normalized = reason.trim()
+        if (normalized.contains(APP_NOT_OWNED_CODE)) return APP_NOT_OWNED_MESSAGE
+        return normalized.ifEmpty { "unknown install error" }
     }
 }
