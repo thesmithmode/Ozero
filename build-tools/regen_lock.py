@@ -34,6 +34,7 @@ ENGINE_CONFIGS = {
     "byedpi": {
         "filename_re": re.compile(r"^libbyedpi-(?P<abi>[a-z0-9_-]+)\.so$"),
         "destination": "jniLibs",
+        "target_filename": "libbyedpi.so",
     },
     "xray": {
         "filename_re": re.compile(r"^libxray\.aar$"),
@@ -62,12 +63,12 @@ ENGINE_CONFIGS = {
 }
 
 
-# Order of keys when writing artifact entries — keeps lock human-diffable.
 _KEY_ORDER = (
     "name",
     "engine",
     "abi",
     "destination",
+    "target_filename",
     "download_url",
     "sha256",
     "size_bytes",
@@ -110,6 +111,7 @@ def build_artifact_entries(engine, tag, repo, manifest_path, meta, artifacts):
     cfg = ENGINE_CONFIGS[engine]
     name_re = cfg["filename_re"]
     destination = cfg["destination"]
+    target_filename = cfg.get("target_filename")
     source_repo = meta.get("source_repo", "")
     source_commit = meta.get("source_commit", "")
     base_dir = os.path.dirname(os.path.abspath(manifest_path))
@@ -135,6 +137,8 @@ def build_artifact_entries(engine, tag, repo, manifest_path, meta, artifacts):
         }
         if abi is not None:
             entry["abi"] = abi
+        if target_filename is not None:
+            entry["target_filename"] = target_filename
         entries.append(entry)
     return entries
 

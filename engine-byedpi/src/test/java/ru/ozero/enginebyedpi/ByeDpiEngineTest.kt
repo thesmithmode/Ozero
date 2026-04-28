@@ -40,37 +40,67 @@ class ByeDpiEngineTest {
     }
 
     @Test
-    fun startSuccessWhenJniReturnsZero() = runTest {
-        every { proxy.jniStartProxy(any()) } returns 0
-        val result = engine.start(EngineConfig.ByeDpi(socksPort = 1080))
-        assertIs<StartResult.Success>(result)
-        assertEquals(1080, result.socksPort)
+    fun startSuccessWhenSocksPortReady() = runTest {
+        val server = ServerSocket(0)
+        val port = server.localPort
+        server.acceptSocks5InBackground()
+        try {
+            every { proxy.jniStartProxy(any()) } answers {
+                Thread.sleep(60_000)
+                0
+            }
+            val result = engine.start(EngineConfig.ByeDpi(socksPort = port))
+            assertIs<StartResult.Success>(result)
+            assertEquals(port, result.socksPort)
+        } finally {
+            server.close()
+        }
     }
 
     @Test
-    fun startFailureWhenJniReturnsNonZero() = runTest {
+    fun startFailureWhenSocksPortNeverOpens() = runTest {
         every { proxy.jniStartProxy(any()) } returns -1
-        val result = engine.start(EngineConfig.ByeDpi())
+        val result = engine.start(EngineConfig.ByeDpi(socksPort = 19998))
         assertIs<StartResult.Failure>(result)
     }
 
     @Test
     fun startArgsIncludePortFlag() = runTest {
-        every { proxy.jniStartProxy(any()) } returns 0
-        engine.start(EngineConfig.ByeDpi(socksPort = 2080))
-        verify {
-            proxy.jniStartProxy(
-                match { args -> args.contains("-p") && args.contains("2080") }
-            )
+        val server = ServerSocket(0)
+        val port = server.localPort
+        server.acceptSocks5InBackground()
+        try {
+            every { proxy.jniStartProxy(any()) } answers {
+                Thread.sleep(60_000)
+                0
+            }
+            engine.start(EngineConfig.ByeDpi(socksPort = port))
+            verify {
+                proxy.jniStartProxy(
+                    match { args -> args.contains("-p") && args.contains(port.toString()) }
+                )
+            }
+        } finally {
+            server.close()
         }
     }
 
     @Test
     fun stopCallsJniStopProxy() = runTest {
-        every { proxy.jniStartProxy(any()) } returns 0
-        engine.start(EngineConfig.ByeDpi())
-        engine.stop()
-        verify { proxy.jniStopProxy() }
+        val server = ServerSocket(0)
+        val port = server.localPort
+        server.acceptSocks5InBackground()
+        try {
+            every { proxy.jniStartProxy(any()) } answers {
+                Thread.sleep(60_000)
+                0
+            }
+            engine.start(EngineConfig.ByeDpi(socksPort = port))
+            engine.stop()
+            verify { proxy.jniStopProxy() }
+        } finally {
+            server.close()
+        }
     }
 
     @Test
@@ -83,9 +113,12 @@ class ByeDpiEngineTest {
     fun probeSuccessWhenSocketListens() = runTest {
         val server = ServerSocket(0)
         val port = server.localPort
-        server.acceptSocks5InBackground()
+        server.acceptSocks5InBackground(repeat = 2)
         try {
-            every { proxy.jniStartProxy(any()) } returns 0
+            every { proxy.jniStartProxy(any()) } answers {
+                Thread.sleep(60_000)
+                0
+            }
             engine.start(EngineConfig.ByeDpi(socksPort = port))
             val result = engine.probe()
             assertIs<ProbeResult.Success>(result)
@@ -94,13 +127,15 @@ class ByeDpiEngineTest {
         }
     }
 
-    private fun ServerSocket.acceptSocks5InBackground() {
+    private fun ServerSocket.acceptSocks5InBackground(repeat: Int = 1) {
         thread(isDaemon = true) {
             runCatching {
-                accept().use { c ->
-                    c.getInputStream().read(ByteArray(8))
-                    c.getOutputStream().write(byteArrayOf(0x05, 0x00))
-                    c.getOutputStream().flush()
+                repeat(repeat) {
+                    accept().use { c ->
+                        c.getInputStream().read(ByteArray(8))
+                        c.getOutputStream().write(byteArrayOf(0x05, 0x00))
+                        c.getOutputStream().flush()
+                    }
                 }
             }
         }
@@ -125,12 +160,22 @@ class ByeDpiEngineTest {
 
     @Test
     fun startWithBlankArgsDoesNotPassEmptyToken() = runTest {
-        every { proxy.jniStartProxy(any()) } returns 0
-        engine.start(EngineConfig.ByeDpi(args = "", socksPort = 1080))
-        verify {
-            proxy.jniStartProxy(
-                match { args -> args.none { it.isEmpty() } },
-            )
+        val server = ServerSocket(0)
+        val port = server.localPort
+        server.acceptSocks5InBackground()
+        try {
+            every { proxy.jniStartProxy(any()) } answers {
+                Thread.sleep(60_000)
+                0
+            }
+            engine.start(EngineConfig.ByeDpi(args = "", socksPort = port))
+            verify {
+                proxy.jniStartProxy(
+                    match { args -> args.none { it.isEmpty() } },
+                )
+            }
+        } finally {
+            server.close()
         }
     }
 }

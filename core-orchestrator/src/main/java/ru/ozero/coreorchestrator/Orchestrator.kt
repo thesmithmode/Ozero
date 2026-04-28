@@ -42,6 +42,12 @@ class Orchestrator {
             state is OrchestratorState.Connecting && transition is OrchestratorTransition.ConnectFailed ->
                 OrchestratorState.Failed(transition.engineId, transition.reason)
 
+            state is OrchestratorState.Probing && transition is OrchestratorTransition.ConnectFailed ->
+                OrchestratorState.Failed(transition.engineId, transition.reason)
+
+            state is OrchestratorState.Probing && transition is OrchestratorTransition.ConnectSuccess ->
+                OrchestratorState.Connected(transition.engineId, transition.socksPort)
+
             state is OrchestratorState.Connected && transition is OrchestratorTransition.Disconnect ->
                 OrchestratorState.Disconnecting
 

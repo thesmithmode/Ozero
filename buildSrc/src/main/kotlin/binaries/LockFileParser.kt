@@ -89,6 +89,8 @@ object LockFileParser {
         val sourceRepo = req("source_repo")
         val sourceCommit = req("source_commit")
 
+        val targetFilename = (m["target_filename"] as? String)?.takeIf { it.isNotBlank() }
+
         return Artifact(
             name = name,
             engine = engine,
@@ -99,6 +101,7 @@ object LockFileParser {
             sizeBytes = sizeBytes,
             sourceRepo = sourceRepo,
             sourceCommit = sourceCommit,
+            targetFilename = targetFilename,
         )
     }
 }

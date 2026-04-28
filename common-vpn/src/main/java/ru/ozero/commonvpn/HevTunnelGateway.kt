@@ -21,6 +21,10 @@ class NativeHevTunnelGateway(
     constructor(context: Context) : this(cacheDir = context.cacheDir)
 
     override fun start(config: HevTunnelConfig): Int {
+        if (!hev.TProxyService.libraryLoaded) {
+            Log.e(TAG, "libhev-socks5-tunnel не загружена: ${hev.TProxyService.loadError}")
+            return -1
+        }
         val configFile = writeConfig(config)
         Log.i(TAG, "TProxyStartService path=${configFile.absolutePath} fd=${config.tunFd}")
         return runCatching { nativeStart(configFile.absolutePath, config.tunFd) }
