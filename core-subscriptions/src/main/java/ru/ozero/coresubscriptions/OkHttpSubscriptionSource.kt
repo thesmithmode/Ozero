@@ -17,6 +17,8 @@ class OkHttpSubscriptionSource(
             .connectTimeout(timeoutMs, TimeUnit.MILLISECONDS)
             .readTimeout(timeoutMs, TimeUnit.MILLISECONDS)
             .callTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+            .followRedirects(false)
+            .followSslRedirects(false)
             .build(),
 ) : SubscriptionSource {
 

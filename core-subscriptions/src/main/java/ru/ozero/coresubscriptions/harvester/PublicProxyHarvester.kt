@@ -10,6 +10,7 @@ import org.json.JSONObject
 import ru.ozero.corestorage.dao.ServerDao
 import ru.ozero.corestorage.entity.ServerEntity
 import ru.ozero.coresubscriptions.ServerMapper
+import ru.ozero.coresubscriptions.SubscriptionFilter
 import ru.ozero.coresubscriptions.uri.ParsedServer
 import ru.ozero.coresubscriptions.uri.SubscriptionUriParser
 import java.util.Base64
@@ -19,6 +20,7 @@ class PublicProxyHarvester(
     private val serverDao: ServerDao,
     private val parser: SubscriptionUriParser = SubscriptionUriParser(),
     private val mapper: ServerMapper = ServerMapper(),
+    private val filter: SubscriptionFilter = SubscriptionFilter(),
 ) {
 
     suspend fun harvest(sources: List<PublicProxySource>): HarvestResult = withContext(Dispatchers.IO) {
@@ -79,7 +81,8 @@ class PublicProxyHarvester(
                 .filter { it.isNotEmpty() && !it.startsWith("#") }
                 .mapNotNull { uri ->
                     val parsed = parser.parse(uri)
-                    if (parsed is ParsedServer.Error) null else mapper.toEntity(parsed, uri)
+                    if (parsed is ParsedServer.Error || !filter.isSupported(parsed)) null
+                    else mapper.toEntity(parsed, uri)
                 }
                 .take(MAX_ENTITIES_PER_SOURCE)
                 .toList()

@@ -15,42 +15,48 @@ class SubscriptionFilterTest {
     @Test
     fun vlessRealityIsLive() {
         val s = vless(security = "reality", transport = "xhttp")
-        assertTrue(filter.isLiveIn2026(ParsedServer.Vless(s)))
+        assertTrue(filter.isSupported(ParsedServer.Vless(s)))
     }
 
     @Test
     fun vlessWithoutRealityIsDead() {
         val s = vless(security = "none", transport = "tcp")
-        assertFalse(filter.isLiveIn2026(ParsedServer.Vless(s)))
+        assertFalse(filter.isSupported(ParsedServer.Vless(s)))
     }
 
     @Test
     fun vlessTlsGrpcIsDead() {
         val s = vless(security = "tls", transport = "grpc")
-        assertFalse(filter.isLiveIn2026(ParsedServer.Vless(s)))
+        assertFalse(filter.isSupported(ParsedServer.Vless(s)))
     }
 
     @Test
     fun hysteria2IsLive() {
         val s = Hysteria2Server(password = "p", host = "h", port = 443)
-        assertTrue(filter.isLiveIn2026(ParsedServer.Hysteria2(s)))
+        assertTrue(filter.isSupported(ParsedServer.Hysteria2(s)))
+    }
+
+    @Test
+    fun hysteria2InsecureIsRejected() {
+        val s = Hysteria2Server(password = "p", host = "h", port = 443, insecure = true)
+        assertFalse(filter.isSupported(ParsedServer.Hysteria2(s)))
     }
 
     @Test
     fun trojanAnyIsLive() {
         val s = TrojanServer(password = "p", host = "h", port = 443)
-        assertTrue(filter.isLiveIn2026(ParsedServer.Trojan(s)))
+        assertTrue(filter.isSupported(ParsedServer.Trojan(s)))
     }
 
     @Test
     fun shadowsocksIsDead() {
         val s = ShadowsocksServer(method = "aes-256-gcm", password = "p", host = "h", port = 8388)
-        assertFalse(filter.isLiveIn2026(ParsedServer.Shadowsocks(s)))
+        assertFalse(filter.isSupported(ParsedServer.Shadowsocks(s)))
     }
 
     @Test
     fun errorIsDead() {
-        assertFalse(filter.isLiveIn2026(ParsedServer.Error("malformed")))
+        assertFalse(filter.isSupported(ParsedServer.Error("malformed")))
     }
 
     private fun vless(security: String, transport: String): VlessServer =

@@ -7,15 +7,22 @@ import android.util.Log
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import ru.ozero.app.data.CrashLogStore
 import ru.ozero.app.logging.BootDiagnostics
 import ru.ozero.app.logging.BootFileLogger
+import ru.ozero.security.SecurityWatchdog
 import javax.inject.Inject
 
 @HiltAndroidApp
 class OzeroApp : Application(), Configuration.Provider {
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
+    @Inject lateinit var securityWatchdog: SecurityWatchdog
+
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
@@ -45,6 +52,7 @@ class OzeroApp : Application(), Configuration.Provider {
         runCatching { BootFileLogger.info(TAG, "onCreate before super") }
         super.onCreate()
         runCatching { BootFileLogger.info(TAG, "onCreate after super") }
+        runCatching { securityWatchdog.start(appScope) }
     }
 
     private companion object {

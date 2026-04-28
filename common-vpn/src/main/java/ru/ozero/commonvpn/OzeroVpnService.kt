@@ -106,6 +106,10 @@ class OzeroVpnService : android.net.VpnService() {
         tunFdRef.set(fd)
         Log.i(TAG, "TUN established fd=${fd.fd}")
         val job = serviceScope.launch {
+            if (stopping.get()) {
+                starting.set(false)
+                return@launch
+            }
             try {
                 val result = withTimeoutOrNull(PIPELINE_START_TIMEOUT_MS) {
                     try {

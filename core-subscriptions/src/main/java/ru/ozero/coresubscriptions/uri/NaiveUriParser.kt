@@ -38,11 +38,16 @@ class NaiveUriParser {
         val port = parsed.port
         if (port == -1) return UriParseResult.Error("отсутствует port")
 
+        val username = URLDecoder.decode(rawUser, StandardCharsets.UTF_8)
+        val password = URLDecoder.decode(rawPass, StandardCharsets.UTF_8)
+        if ('@' in username || '@' in password) {
+            return UriParseResult.Error("недопустимый символ в credentials")
+        }
         return UriParseResult.Ok(
             NaiveServer(
                 scheme = subScheme,
-                username = URLDecoder.decode(rawUser, StandardCharsets.UTF_8),
-                password = URLDecoder.decode(rawPass, StandardCharsets.UTF_8),
+                username = username,
+                password = password,
                 host = host,
                 port = port,
                 remark = decodeFragment(parsed.rawFragment),

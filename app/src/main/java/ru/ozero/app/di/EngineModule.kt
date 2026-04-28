@@ -1,5 +1,6 @@
 package ru.ozero.app.di
 
+import android.content.Context
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -84,7 +85,7 @@ object EngineModule {
     @IntoMap
     @EngineKey(EngineId.TOR)
     fun provideTorEngine(
-        @ApplicationContext context: android.content.Context,
+        @ApplicationContext context: Context,
         delegate: LibTorDelegate,
     ): Engine = TorEngine(
         delegate = delegate,

@@ -34,6 +34,8 @@ object SelfUpdateModule {
     fun provideGithubCdnClient(): OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
+        .followRedirects(false)
+        .followSslRedirects(false)
         .build()
 
     @Provides
@@ -56,8 +58,9 @@ object SelfUpdateModule {
         runCatching {
             ApkUpdateVerifier(publicKey = decodeHex(BuildConfig.UPDATE_PUBLIC_KEY_HEX))
         }.getOrElse { throwable ->
-            Log.e(TAG, "Invalid UPDATE_PUBLIC_KEY_HEX, self-update verify disabled", throwable)
-            ApkUpdateVerifier(publicKey = ByteArray(32))
+            Log.e(TAG, "Invalid UPDATE_PUBLIC_KEY_HEX, self-update disabled", throwable)
+            val randomKey = ByteArray(32).also { java.security.SecureRandom().nextBytes(it) }
+            ApkUpdateVerifier(publicKey = randomKey)
         }
 
     @Provides

@@ -28,21 +28,21 @@ class AwgEngine(
         requiresServer = true,
     )
 
-    @Volatile private var startedSocksPort: Int = 0
+    @Volatile private var activeSocksPort: Int = 0
     private val _stats = MutableStateFlow(EngineStats())
 
     override suspend fun start(config: EngineConfig): StartResult {
         require(config is EngineConfig.Amnezia) { "AwgEngine требует EngineConfig.Amnezia" }
         if (config.configJson.isBlank()) {
-            Log.e(TAG, "start: пустой configIni")
-            return StartResult.Failure(reason = "configIni пуст")
+            Log.e(TAG, "start: пустой configJson")
+            return StartResult.Failure(reason = "configJson пуст")
         }
         Log.i(TAG, "start cfgLen=${config.configJson.length}")
         return withContext(Dispatchers.IO) {
             try {
                 val code = delegate.startAwg(config.configJson)
                 if (code == 0) {
-                    startedSocksPort = config.socksPort
+                    activeSocksPort = config.socksPort
                     Log.i(TAG, "started OK")
                     StartResult.Success(socksPort = config.socksPort)
                 } else {
@@ -61,12 +61,12 @@ class AwgEngine(
         withContext(Dispatchers.IO) {
             runCatching { delegate.stopAwg() }
                 .onFailure { Log.w(TAG, "stopAwg исключение: ${it.message}") }
-            startedSocksPort = 0
+            activeSocksPort = 0
         }
     }
 
     override suspend fun probe(): ProbeResult {
-        if (startedSocksPort == 0) {
+        if (activeSocksPort == 0) {
             Log.w(TAG, "probe: движок не запущен")
             return ProbeResult.Failure(reason = "движок не запущен")
         }

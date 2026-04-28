@@ -27,10 +27,10 @@ class SubscriptionManager(
     suspend fun sync(url: String): SubscriptionSyncResult {
         Log.i(TAG, "sync ${LogSanitizer.redactUrl(url)}")
         val fetch = source.fetch(url)
-        if (fetch is SubscriptionFetchResult.Failure) {
-            return SubscriptionSyncResult.Error("fetch: ${fetch.reason}")
+        val success = when (fetch) {
+            is SubscriptionFetchResult.Success -> fetch
+            is SubscriptionFetchResult.Failure -> return SubscriptionSyncResult.Error("fetch: ${fetch.reason}")
         }
-        val success = fetch as SubscriptionFetchResult.Success
 
         val signature = success.signature
             ?: return SubscriptionSyncResult.Error("отсутствует подпись")
@@ -50,7 +50,7 @@ class SubscriptionManager(
         val entities = mutableListOf<ServerEntity>()
         for (line in lines) {
             val parsed = parser.parse(line)
-            if (!filter.isLiveIn2026(parsed)) continue
+            if (!filter.isSupported(parsed)) continue
             val entity = mapper.toEntity(parsed, line) ?: continue
             entities += entity
         }

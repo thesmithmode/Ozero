@@ -12,12 +12,6 @@ open class GithubReleaseFetcher(
     private val baseUrl: String = "https://api.github.com",
 ) {
 
-    init {
-        require(baseUrl == "https://api.github.com") {
-            "GithubReleaseFetcher.baseUrl должен быть https://api.github.com"
-        }
-    }
-
     open fun latest(): ReleaseInfo? {
         val req = Request.Builder()
             .url("$baseUrl/repos/$owner/$repo/releases/latest")

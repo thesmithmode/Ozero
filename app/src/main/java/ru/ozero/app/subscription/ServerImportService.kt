@@ -28,8 +28,8 @@ class ServerImportService @Inject constructor(
             Log.w(TAG, "parse error: ${parsed.reason}")
             return ImportResult.Error(parsed.reason)
         }
-        if (!filter.isLiveIn2026(parsed)) {
-            Log.w(TAG, "import REJECT: protocol/config не пройдёт ТСПУ в 2026")
+        if (!filter.isSupported(parsed)) {
+            Log.w(TAG, "import REJECT: protocol/config не пройдёт ТСПУ")
             return ImportResult.Error("протокол/конфиг не пройдёт фильтрацию (нужен Reality/Hy2/Trojan/Naive/AWG2)")
         }
         val entity: ServerEntity = mapper.toEntity(parsed, trimmed)

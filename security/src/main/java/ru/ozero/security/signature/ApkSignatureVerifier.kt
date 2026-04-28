@@ -28,7 +28,9 @@ class ApkSignatureVerifier(
                     PackageManager.GET_SIGNING_CERTIFICATES,
                 )
                 val sigInfo = info.signingInfo ?: return null
-                sigInfo.apkContentsSigners.map { it.toByteArray() }
+                val sigs = sigInfo.apkContentsSigners.map { it.toByteArray() }
+                if (sigs.size != 1) return null
+                sigs
             } else {
                 @Suppress("DEPRECATION")
                 val info = pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNATURES)

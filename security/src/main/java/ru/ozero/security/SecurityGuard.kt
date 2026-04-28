@@ -9,7 +9,7 @@ class SecurityGuard(
     private val antiDebug: AntiDebugCheck = AntiDebugCheck(),
     private val antiFrida: AntiFridaCheck = AntiFridaCheck(),
     private val antiEmu: AntiEmulatorCheck = AntiEmulatorCheck(),
-    private val isReleaseBuild: () -> Boolean = { !android.os.Build.TYPE.equals("eng") },
+    private val isReleaseBuild: () -> Boolean = { android.os.Build.TYPE != "eng" },
 ) {
 
     sealed class Verdict {

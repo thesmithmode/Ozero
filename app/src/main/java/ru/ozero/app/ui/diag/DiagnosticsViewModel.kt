@@ -41,7 +41,7 @@ class DiagnosticsViewModel @Inject constructor(
         if (current !is OrchestratorState.Connected) return
         runJob?.cancel()
         runJob = viewModelScope.launch {
-            _uiState.value = DiagnosticsUiState.Running(total = TOTAL_URLS, completed = 0)
+            _uiState.value = DiagnosticsUiState.Running(total = DiagnosticTargets.URLS.size, completed = 0)
             try {
                 val results = engine.runAll(current.socksPort)
                 _uiState.value = DiagnosticsUiState.Done(results)
@@ -78,7 +78,4 @@ class DiagnosticsViewModel @Inject constructor(
         }
     }
 
-    private companion object {
-        const val TOTAL_URLS = 20
-    }
 }

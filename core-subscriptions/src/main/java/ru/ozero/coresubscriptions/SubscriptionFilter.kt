@@ -4,10 +4,10 @@ import ru.ozero.coresubscriptions.uri.ParsedServer
 
 class SubscriptionFilter {
 
-    fun isLiveIn2026(parsed: ParsedServer): Boolean =
+    fun isSupported(parsed: ParsedServer): Boolean =
         when (parsed) {
             is ParsedServer.Vless -> parsed.server.security == "reality"
-            is ParsedServer.Hysteria2 -> true
+            is ParsedServer.Hysteria2 -> !parsed.server.insecure
             is ParsedServer.Trojan -> true
             is ParsedServer.Shadowsocks -> false
             is ParsedServer.AmneziaWg -> parsed.server.hasObfuscation()
