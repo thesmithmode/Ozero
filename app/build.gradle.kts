@@ -1,3 +1,23 @@
+import java.io.ByteArrayOutputStream
+
+fun gitVersionName(): String = runCatching {
+    val out = ByteArrayOutputStream()
+    exec {
+        commandLine("git", "describe", "--tags", "--match", "v*.*.*", "--abbrev=0")
+        standardOutput = out
+    }
+    out.toString().trim().removePrefix("v")
+}.getOrDefault("0.0.0")
+
+fun gitVersionCode(): Int = runCatching {
+    val out = ByteArrayOutputStream()
+    exec {
+        commandLine("git", "rev-list", "--count", "HEAD")
+        standardOutput = out
+    }
+    out.toString().trim().toInt()
+}.getOrDefault(1)
+
 plugins {
     id("ozero.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
@@ -15,8 +35,8 @@ android {
 
     defaultConfig {
         applicationId = "ru.ozero.app"
-        versionCode = 15
-        versionName = "1.0.10"
+        versionCode = gitVersionCode()
+        versionName = gitVersionName()
         buildConfigField("String", "UPDATE_GITHUB_OWNER", "\"thesmithmode\"")
         buildConfigField("String", "UPDATE_GITHUB_REPO", "\"Ozero\"")
         buildConfigField(
