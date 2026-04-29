@@ -1,10 +1,10 @@
 package ru.ozero.app.di
 
 import dagger.Module
-import ru.ozero.app.logging.AppLogger
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import ru.ozero.app.logging.AppLogger
 import ru.ozero.security.SecurityGuard
 import ru.ozero.security.SecurityStateHolder
 import ru.ozero.security.SecurityWatchdog
