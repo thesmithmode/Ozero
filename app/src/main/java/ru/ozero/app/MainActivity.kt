@@ -44,8 +44,10 @@ import ru.ozero.app.ui.diag.DiagnosticsScreen
 import ru.ozero.app.ui.logs.LogsScreen
 import ru.ozero.app.ui.onboarding.OnboardingScreen
 import ru.ozero.app.ui.permission.BatteryOptimization
+import ru.ozero.app.ui.servers.ManualServerScreen
 import ru.ozero.app.ui.servers.ServersScreen
 import ru.ozero.app.ui.settings.SettingsScreen
+import ru.ozero.app.ui.settings.engines.ByeDpiEngineSettingsScreen
 import ru.ozero.app.ui.splittunnel.SplitTunnelScreen
 import ru.ozero.app.ui.theme.OzeroTheme
 import ru.ozero.commonvpn.OzeroVpnService
@@ -53,7 +55,17 @@ import ru.ozero.coreorchestrator.OrchestratorState
 import ru.ozero.security.SecurityStateHolder
 import javax.inject.Inject
 
-enum class TopScreen { Main, Settings, Diagnostics, SplitTunnel, Servers, About, Logs }
+enum class TopScreen {
+    Main,
+    Settings,
+    Diagnostics,
+    SplitTunnel,
+    Servers,
+    About,
+    Logs,
+    ByeDpiEngineSettings,
+    ManualServer,
+}
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -142,6 +154,8 @@ class MainActivity : ComponentActivity() {
                             onOpenServers = { screen = TopScreen.Servers },
                             onOpenAbout = { screen = TopScreen.About },
                             onOpenLogs = { screen = TopScreen.Logs },
+                            onOpenByeDpiEngineSettings = { screen = TopScreen.ByeDpiEngineSettings },
+                            onOpenManualServer = { screen = TopScreen.ManualServer },
                         )
                     TopScreen.Logs ->
                         LogsScreen(onBack = { screen = TopScreen.Settings })
@@ -153,6 +167,10 @@ class MainActivity : ComponentActivity() {
                         ServersScreen(onBack = { screen = TopScreen.Settings })
                     TopScreen.About ->
                         AboutScreen(onBack = { screen = TopScreen.Settings })
+                    TopScreen.ByeDpiEngineSettings ->
+                        ByeDpiEngineSettingsScreen(onBack = { screen = TopScreen.Settings })
+                    TopScreen.ManualServer ->
+                        ManualServerScreen(onBack = { screen = TopScreen.Settings })
                     TopScreen.Main ->
                         MainScreen(
                             viewModel = viewModel,

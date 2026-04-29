@@ -47,6 +47,8 @@ fun SettingsScreen(
     onOpenServers: () -> Unit,
     onOpenAbout: () -> Unit = {},
     onOpenLogs: () -> Unit = {},
+    onOpenByeDpiEngineSettings: () -> Unit = {},
+    onOpenManualServer: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -61,6 +63,8 @@ fun SettingsScreen(
             onOpenServers = onOpenServers,
             onOpenAbout = onOpenAbout,
             onOpenLogs = onOpenLogs,
+            onOpenByeDpiEngineSettings = onOpenByeDpiEngineSettings,
+            onOpenManualServer = onOpenManualServer,
         ),
         onSplitModeChange = viewModel::onSplitModeChange,
         onIpv6Toggle = viewModel::onIpv6Toggle,
@@ -164,6 +168,13 @@ private fun ContentBody(
         }
         item { SectionDivider() }
         item {
+            EnginesSection(
+                onOpenByeDpi = nav.onOpenByeDpiEngineSettings,
+                onOpenManualServer = nav.onOpenManualServer,
+            )
+        }
+        item { SectionDivider() }
+        item {
             NetworkSection(
                 ipv6Enabled = model.ipv6Enabled,
                 onIpv6Toggle = onIpv6Toggle,
@@ -189,6 +200,27 @@ private fun ContentBody(
         item { SectionDivider() }
         item { AboutSection(onOpenAbout = nav.onOpenAbout) }
     }
+}
+
+@Composable
+private fun EnginesSection(
+    onOpenByeDpi: () -> Unit,
+    onOpenManualServer: () -> Unit,
+) {
+    NavRow(
+        title = "ByeDPI args",
+        summary = "Настройки обхода ТСПУ",
+        tag = "settings_byedpi_engine_row",
+        onClick = onOpenByeDpi,
+        enabled = true,
+    )
+    NavRow(
+        title = "Добавить сервер вручную",
+        summary = "VLESS / Trojan / Hysteria2 / Shadowsocks URI",
+        tag = "settings_manual_server_row",
+        onClick = onOpenManualServer,
+        enabled = true,
+    )
 }
 
 @Composable
