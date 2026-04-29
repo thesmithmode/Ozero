@@ -321,11 +321,6 @@ private fun UpdatesSection(
 @Composable
 private fun AboutSection(onOpenAbout: () -> Unit) {
     SectionHeader(R.string.settings_section_about, SettingsTestTags.SECTION_ABOUT)
-    Text(
-        text = stringResource(R.string.settings_about_summary),
-        style = MaterialTheme.typography.bodyMedium,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-    )
     NavRow(
         title = stringResource(R.string.about_title),
         summary = "",

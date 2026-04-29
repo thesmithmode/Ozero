@@ -68,7 +68,6 @@
 
     <!-- Tor on-demand module -->
     <string name="settings_about_version">Version %1$s</string>
-    <string name="settings_about_summary">Open-source VPN. Details in Privacy / Threat model.</string>
     <string name="settings_back">Back</string>
     <string name="settings_open">Open settings</string>
 
@@ -139,8 +138,6 @@
     <string name="about_title">About</string>
     <string name="about_version">Version %1$s</string>
     <string name="about_repo">Source code on GitHub</string>
-    <string name="about_privacy">Privacy policy</string>
-    <string name="about_threat_model">Threat model</string>
     <string name="about_legal">Licenses</string>
 
     

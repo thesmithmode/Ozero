@@ -37,14 +37,6 @@ fun AboutScreen(onBack: () -> Unit) {
     val items = listOf(
         AboutLink(stringResource(R.string.about_repo), "https://github.com/thesmithmode/Ozero"),
         AboutLink(
-            stringResource(R.string.about_privacy),
-            "https://github.com/thesmithmode/Ozero/blob/main/docs/privacy.md",
-        ),
-        AboutLink(
-            stringResource(R.string.about_threat_model),
-            "https://github.com/thesmithmode/Ozero/blob/main/docs/threat-model.md",
-        ),
-        AboutLink(
             stringResource(R.string.about_legal),
             "https://github.com/thesmithmode/Ozero/blob/main/LICENSE",
         ),

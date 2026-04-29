@@ -68,7 +68,6 @@
 
     <!-- Tor on-demand модуль -->
     <string name="settings_about_version">Версия %1$s</string>
-    <string name="settings_about_summary">Open-source VPN. Подробности в Privacy / Threat model.</string>
     <string name="settings_back">Назад</string>
     <string name="settings_open">Открыть настройки</string>
 
@@ -139,8 +138,6 @@
     <string name="about_title">О приложении</string>
     <string name="about_version">Версия %1$s</string>
     <string name="about_repo">Исходники на GitHub</string>
-    <string name="about_privacy">Политика приватности</string>
-    <string name="about_threat_model">Модель угроз</string>
     <string name="about_legal">Лицензии</string>
 
     <!-- crash log export -->
