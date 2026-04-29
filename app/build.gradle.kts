@@ -1,22 +1,12 @@
-import java.io.ByteArrayOutputStream
+val gitVersionName: String = providers.exec {
+    commandLine("git", "describe", "--tags", "--match", "v*.*.*", "--abbrev=0")
+    isIgnoreExitValue = true
+}.standardOutput.asText.get().trim().removePrefix("v").ifEmpty { "0.0.0" }
 
-fun gitVersionName(): String = runCatching {
-    val out = ByteArrayOutputStream()
-    exec {
-        commandLine("git", "describe", "--tags", "--match", "v*.*.*", "--abbrev=0")
-        standardOutput = out
-    }
-    out.toString().trim().removePrefix("v")
-}.getOrDefault("0.0.0")
-
-fun gitVersionCode(): Int = runCatching {
-    val out = ByteArrayOutputStream()
-    exec {
-        commandLine("git", "rev-list", "--count", "HEAD")
-        standardOutput = out
-    }
-    out.toString().trim().toInt()
-}.getOrDefault(1)
+val gitVersionCode: Int = providers.exec {
+    commandLine("git", "rev-list", "--count", "HEAD")
+    isIgnoreExitValue = true
+}.standardOutput.asText.get().trim().toIntOrNull() ?: 1
 
 plugins {
     id("ozero.android.application")
@@ -35,8 +25,8 @@ android {
 
     defaultConfig {
         applicationId = "ru.ozero.app"
-        versionCode = gitVersionCode()
-        versionName = gitVersionName()
+        versionCode = gitVersionCode
+        versionName = gitVersionName
         buildConfigField("String", "UPDATE_GITHUB_OWNER", "\"thesmithmode\"")
         buildConfigField("String", "UPDATE_GITHUB_REPO", "\"Ozero\"")
         buildConfigField(
