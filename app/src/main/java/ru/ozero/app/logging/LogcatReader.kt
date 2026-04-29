@@ -40,7 +40,9 @@ class LogcatReader(private val buffer: LogBuffer) {
     }
 
     private suspend fun runLoop() {
+        buffer.append(diagnostic(LogLevel.INFO, "LogcatReader started pid=${Process.myPid()}"))
         var attempt = 0
+        var everReadLines = false
         while (scope.isActive) {
             val process = runCatching {
                 ProcessBuilder(
@@ -49,30 +51,43 @@ class LogcatReader(private val buffer: LogBuffer) {
                     "threadtime",
                     "--pid=${Process.myPid()}",
                 ).redirectErrorStream(true).start()
-            }.onFailure { Log.e(TAG, "logcat spawn failed", it) }.getOrNull()
+            }.onFailure {
+                Log.e(TAG, "logcat spawn failed", it)
+                if (!everReadLines) buffer.append(diagnostic(LogLevel.ERROR, "logcat spawn failed: ${it.message}"))
+            }.getOrNull()
 
             if (process == null) {
                 delay(backoffMs(attempt++))
                 continue
             }
 
+            var linesRead = 0
             try {
                 BufferedReader(InputStreamReader(process.inputStream, Charsets.UTF_8)).useLines { lines ->
                     for (raw in lines) {
                         if (!scope.isActive) break
                         val entry = LogcatLineParser.parse(raw)
-                        if (entry != null) buffer.append(entry)
+                        if (entry != null) { buffer.append(entry); linesRead++ }
                     }
                 }
-                attempt = 0
+                if (linesRead == 0 && !everReadLines) {
+                    buffer.append(diagnostic(LogLevel.WARN, "logcat exited with 0 lines — device restricts log access. Logs via AppLogger still work."))
+                }
+                if (linesRead > 0) {
+                    everReadLines = true
+                    attempt = 0
+                }
             } catch (t: Throwable) {
                 Log.w(TAG, "logcat read error", t)
+                if (!everReadLines) buffer.append(diagnostic(LogLevel.WARN, "logcat read error: ${t.message}"))
             } finally {
                 runCatching { process.destroy() }
             }
             if (scope.isActive) delay(backoffMs(attempt++))
         }
     }
+
+    private fun diagnostic(level: LogLevel, msg: String) = LogEntry.now(level, TAG, msg)
 
     private fun backoffMs(attempt: Int): Long {
         val base = 250L

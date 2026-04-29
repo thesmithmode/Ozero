@@ -25,4 +25,14 @@ data class LogEntry(
     val tag: String,
     val pid: Int,
     val message: String,
-)
+) {
+    companion object {
+        fun now(level: LogLevel, tag: String, message: String) = LogEntry(
+            timestampMs = System.currentTimeMillis(),
+            level = level,
+            tag = tag,
+            pid = android.os.Process.myPid(),
+            message = message,
+        )
+    }
+}

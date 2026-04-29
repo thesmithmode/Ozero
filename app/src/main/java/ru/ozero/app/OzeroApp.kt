@@ -11,8 +11,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import ru.ozero.app.data.CrashLogStore
+import ru.ozero.app.logging.AppLogger
 import ru.ozero.app.logging.BootDiagnostics
 import ru.ozero.app.logging.BootFileLogger
+import ru.ozero.app.logging.LogBuffer
 import ru.ozero.security.SecurityWatchdog
 import javax.inject.Inject
 
@@ -22,6 +24,8 @@ class OzeroApp : Application(), Configuration.Provider {
     @Inject lateinit var workerFactory: HiltWorkerFactory
 
     @Inject lateinit var securityWatchdog: SecurityWatchdog
+
+    @Inject lateinit var logBuffer: LogBuffer
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -52,7 +56,11 @@ class OzeroApp : Application(), Configuration.Provider {
     override fun onCreate() {
         runCatching { BootFileLogger.info(TAG, "onCreate before super") }
         super.onCreate()
-        runCatching { BootFileLogger.info(TAG, "onCreate after super") }
+        runCatching {
+            AppLogger.attach(logBuffer)
+            BootFileLogger.info(TAG, "onCreate after super")
+            AppLogger.i(TAG, "app started pid=${android.os.Process.myPid()} sdk=${Build.VERSION.SDK_INT} ${Build.MANUFACTURER}/${Build.MODEL}")
+        }.onFailure { BootFileLogger.error(TAG, "AppLogger.attach failed", it) }
         if (shouldStartSecurityWatchdog()) {
             runCatching { securityWatchdog.start(appScope) }
         } else {

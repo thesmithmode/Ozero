@@ -1,7 +1,7 @@
 package ru.ozero.app.di
 
-import android.util.Log
 import dagger.Module
+import ru.ozero.app.logging.AppLogger
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
@@ -25,7 +25,7 @@ object SecurityModule {
         watchdog = SecurityWatchdog(
             guard = guard,
             onCompromised = { reasons ->
-                Log.e(TAG, "compromised env detected: $reasons — VPN disabled")
+                AppLogger.e(TAG, "security compromised: $reasons — VPN disabled")
                 SecurityStateHolder.signal(reasons)
                 watchdog.stop()
             },

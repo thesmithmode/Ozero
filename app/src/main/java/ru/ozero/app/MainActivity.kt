@@ -9,7 +9,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -28,6 +27,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineExceptionHandler
+import ru.ozero.app.logging.AppLogger
 import ru.ozero.app.logging.BootFileLogger
 import ru.ozero.app.logging.LogcatReader
 import ru.ozero.app.selfupdate.UpdateInstallEvent
@@ -67,12 +67,12 @@ class MainActivity : ComponentActivity() {
 
     private val batteryPromptLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            Log.i(TAG, "battery prompt result code=${result.resultCode}")
+            AppLogger.i(TAG, "battery prompt result code=${result.resultCode}")
         }
 
     private val updateConfirmLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            Log.i(TAG, "update confirm result code=${result.resultCode}")
+            AppLogger.i(TAG, "update confirm result code=${result.resultCode}")
         }
 
     private val vpnPermissionLauncher =
@@ -88,7 +88,7 @@ class MainActivity : ComponentActivity() {
         }
 
     private val safeUiCoroutineHandler = CoroutineExceptionHandler { _, throwable ->
-        Log.e(TAG, "uncaught coroutine in MainActivity", throwable)
+        AppLogger.e(TAG, "uncaught coroutine in MainActivity", throwable)
         Toast.makeText(
             this,
             getString(R.string.import_error, throwable.message ?: "неизвестная ошибка"),
@@ -100,9 +100,9 @@ class MainActivity : ComponentActivity() {
         runCatching { BootFileLogger.info(TAG, "onCreate before super") }
         super.onCreate(savedInstanceState)
         runCatching { BootFileLogger.info(TAG, "onCreate after super (Hilt inject done)") }
-        runCatching { logcatReader.start() }.onFailure { Log.w(TAG, "logcatReader.start failed", it) }
+        runCatching { logcatReader.start() }.onFailure { AppLogger.w(TAG, "logcatReader.start failed", it) }
         runCatching { HarvestWorker.enqueueUnique(applicationContext) }
-            .onFailure { Log.w(TAG, "HarvestWorker.enqueueUnique failed", it) }
+            .onFailure { AppLogger.w(TAG, "HarvestWorker.enqueueUnique failed", it) }
         observeSelfUpdateEvents()
         if (savedInstanceState == null) {
             handleSubscriptionIntent(intent)
@@ -170,7 +170,7 @@ class MainActivity : ComponentActivity() {
 
     private fun requestVpnAndStart() {
         if (SecurityStateHolder.isCompromised) {
-            Log.w(TAG, "VPN start refused — security compromised: ${SecurityStateHolder.compromised.value}")
+            AppLogger.w(TAG, "VPN start refused — security compromised: ${SecurityStateHolder.compromised.value}")
             Toast.makeText(
                 this,
                 getString(R.string.security_blocked),
@@ -207,7 +207,7 @@ class MainActivity : ComponentActivity() {
             else -> null
         }
         if (raw.isNullOrBlank()) return
-        Log.i(TAG, "subscription intent action=${intent.action}")
+        AppLogger.i(TAG, "subscription intent action=${intent.action}")
         lifecycleScope.launch(safeUiCoroutineHandler) {
             if (raw.length > MAX_IMPORT_URI_LENGTH) {
                 Toast.makeText(
@@ -219,7 +219,7 @@ class MainActivity : ComponentActivity() {
             }
             val result = runCatching { serverImporter.import(raw) }
                 .getOrElse { throwable ->
-                    Log.e(TAG, "subscription import crashed", throwable)
+                    AppLogger.e(TAG, "subscription import crashed", throwable)
                     ServerImportService.ImportResult.Error(
                         throwable.message ?: "неизвестная ошибка импорта",
                     )
@@ -282,9 +282,9 @@ class MainActivity : ComponentActivity() {
                         data = Uri.parse("package:$packageName")
                     }
                     batteryPromptLauncher.launch(intent)
-                }.onFailure { Log.w(TAG, "battery prompt launch failed", it) }
+                }.onFailure { AppLogger.w(TAG, "battery prompt launch failed", it) }
             } else {
-                Log.i(TAG, "battery prompt skipped state=$state")
+                AppLogger.i(TAG, "battery prompt skipped state=$state")
             }
         }
     }
@@ -294,18 +294,18 @@ class MainActivity : ComponentActivity() {
             UpdateInstallEventBus.events
                 .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
                 .catch { throwable ->
-                    Log.e(TAG, "self-update events flow failed", throwable)
+                    AppLogger.e(TAG, "self-update events flow failed", throwable)
                 }
                 .onEach { event ->
                     when (event) {
                         is UpdateInstallEvent.PendingUserAction -> {
-                            Log.i(TAG, "self-update PendingUserAction → launch confirm")
+                            AppLogger.i(TAG, "self-update PendingUserAction → launch confirm")
                             updateConfirmLauncher.launch(event.intent)
                         }
                         is UpdateInstallEvent.Success ->
-                            Log.i(TAG, "self-update Success session=${event.sessionId}")
+                            AppLogger.i(TAG, "self-update Success session=${event.sessionId}")
                         is UpdateInstallEvent.Failure ->
-                            Log.w(
+                            AppLogger.w(
                                 TAG,
                                 "self-update Failure session=${event.sessionId} " +
                                     "status=${event.statusCode} message=${event.message}",
