@@ -1,109 +1,21 @@
 package ru.ozero.app.logging
 
 import android.content.Context
-import android.os.Process
-import android.util.Log
 import ru.ozero.coreapi.PersistentLogger
-import ru.ozero.coreapi.PersistentLoggers
 import java.io.File
-import java.io.PrintWriter
-import java.io.RandomAccessFile
-import java.io.StringWriter
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.concurrent.atomic.AtomicReference
 
 object BootFileLogger : PersistentLogger {
 
-    private const val TAG = "BootFile"
-    private const val DIR = "debug"
-    private const val FILE = "boot.log"
-    private const val PREV = "boot.log.prev"
-    private const val MAX_BYTES = 1_000_000L
+    fun init(context: Context) = UnifiedLogger.init(context)
 
-    private val targetRef = AtomicReference<File?>(null)
-    private val tsFmt = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
+    fun file(): File? = UnifiedLogger.file()
 
-    @Synchronized
-    fun init(context: Context) {
-        if (targetRef.get() != null) return
-        runCatching {
-            val dir = File(context.filesDir, DIR).apply { mkdirs() }
-            val file = File(dir, FILE)
-            rotateIfTooLarge(file)
-            targetRef.set(file)
-            PersistentLoggers.instance = this
-            log("INFO", TAG, "init pid=${Process.myPid()}")
-        }.onFailure { Log.e(TAG, "init failed", it) }
-    }
+    fun debug(tag: String, msg: String) = UnifiedLogger.debug(tag, msg)
+    override fun info(tag: String, msg: String) = UnifiedLogger.info(tag, msg)
+    override fun warn(tag: String, msg: String, t: Throwable?) = UnifiedLogger.warn(tag, msg, t)
+    override fun error(tag: String, msg: String, t: Throwable?) = UnifiedLogger.error(tag, msg, t)
 
-    fun file(): File? = targetRef.get()
+    fun clear() = UnifiedLogger.clear()
 
-    fun debug(tag: String, msg: String) = log("DEBUG", tag, msg)
-    override fun info(tag: String, msg: String) = log("INFO", tag, msg)
-    override fun warn(tag: String, msg: String, t: Throwable?) = log("WARN", tag, msg, t)
-    override fun error(tag: String, msg: String, t: Throwable?) = log("ERROR", tag, msg, t)
-
-    @Synchronized
-    fun clear() {
-        targetRef.get()?.let { runCatching { it.writeText("") } }
-    }
-
-    fun read(): String = targetRef.get()?.takeIf { it.exists() }?.readText().orEmpty().let(::sanitize)
-
-    private val userinfoUriRegex = Regex(
-        "(?i)(\\w+)://([^:/@\\s]+(?::[^@\\s]*)?)@([^\\s/]+)",
-    )
-    private val proxyUriRegex = Regex(
-        "(?i)\\b(vless|vmess|trojan|ss|hysteria2?|tuic|naive\\+https?|wireguard|awg)://\\S+",
-    )
-    private val appPathRegex = Regex("/data/[a-zA-Z_]+/~~[A-Za-z0-9_=-]+/[A-Za-z0-9_.=-]+")
-    private val hexHashRegex = Regex("\\b[a-f0-9]{16,}\\b")
-
-    private fun sanitize(text: String): String =
-        text
-            .let { userinfoUriRegex.replace(it) { m -> "${m.groupValues[1]}://<redacted>@${m.groupValues[3]}" } }
-            .let { proxyUriRegex.replace(it, "<redacted-uri>") }
-            .replace(appPathRegex, "<app-path>")
-            .replace(hexHashRegex, "<hash>")
-
-    @Synchronized
-    private fun log(level: String, tag: String, msg: String, t: Throwable? = null) {
-        when (level) {
-            "ERROR" -> Log.e(tag, msg, t)
-            "WARN" -> Log.w(tag, msg, t)
-            "DEBUG" -> Log.d(tag, msg)
-            else -> Log.i(tag, msg)
-        }
-        val target = targetRef.get() ?: return
-        runCatching {
-            val sb = StringBuilder()
-            sb.append(tsFmt.format(Date()))
-                .append(' ').append(level)
-                .append(" [").append(Thread.currentThread().name).append("] ")
-                .append(tag).append(": ").append(msg).append('\n')
-            if (t != null) {
-                val sw = StringWriter()
-                PrintWriter(sw).use { t.printStackTrace(it) }
-                sb.append(sw.toString())
-            }
-            RandomAccessFile(target, "rw").use { raf ->
-                raf.seek(raf.length())
-                raf.write(sb.toString().toByteArray(Charsets.UTF_8))
-                raf.fd.sync()
-            }
-            if (target.length() > MAX_BYTES) rotateIfTooLarge(target)
-        }
-    }
-
-    private fun rotateIfTooLarge(file: File) {
-        if (!file.exists() || file.length() <= MAX_BYTES) return
-        val prev = File(file.parentFile, PREV)
-        runCatching {
-            if (prev.exists()) prev.delete()
-            file.renameTo(prev)
-            file.createNewFile()
-        }
-    }
+    fun read(): String = UnifiedLogger.read()
 }

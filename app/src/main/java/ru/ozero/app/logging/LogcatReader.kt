@@ -69,6 +69,7 @@ class LogcatReader(private val buffer: LogBuffer) {
                         val entry = LogcatLineParser.parse(raw)
                         if (entry != null) {
                             buffer.append(entry)
+                            UnifiedLogger.writeRawSync("LOGCAT $raw")
                             linesRead++
                         }
                     }

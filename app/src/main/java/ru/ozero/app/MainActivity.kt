@@ -41,7 +41,6 @@ import ru.ozero.app.ui.MainScreen
 import ru.ozero.app.ui.MainViewModel
 import ru.ozero.app.ui.about.AboutScreen
 import ru.ozero.app.ui.diag.DiagnosticsScreen
-import ru.ozero.app.ui.logs.BootLogScreen
 import ru.ozero.app.ui.logs.LogsScreen
 import ru.ozero.app.ui.onboarding.OnboardingScreen
 import ru.ozero.app.ui.permission.BatteryOptimization
@@ -54,7 +53,7 @@ import ru.ozero.coreorchestrator.OrchestratorState
 import ru.ozero.security.SecurityStateHolder
 import javax.inject.Inject
 
-enum class TopScreen { Main, Settings, Diagnostics, SplitTunnel, Servers, About, Logs, BootLog }
+enum class TopScreen { Main, Settings, Diagnostics, SplitTunnel, Servers, About, Logs }
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -143,12 +142,9 @@ class MainActivity : ComponentActivity() {
                             onOpenServers = { screen = TopScreen.Servers },
                             onOpenAbout = { screen = TopScreen.About },
                             onOpenLogs = { screen = TopScreen.Logs },
-                            onOpenBootLog = { screen = TopScreen.BootLog },
                         )
                     TopScreen.Logs ->
                         LogsScreen(onBack = { screen = TopScreen.Settings })
-                    TopScreen.BootLog ->
-                        BootLogScreen(onBack = { screen = TopScreen.Settings })
                     TopScreen.Diagnostics ->
                         DiagnosticsScreen(onBack = { screen = TopScreen.Main })
                     TopScreen.SplitTunnel ->
@@ -278,7 +274,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun stopVpnService() {
-        startService(
+        ContextCompat.startForegroundService(
+            this,
             Intent(this, OzeroVpnService::class.java).apply {
                 action = OzeroVpnService.ACTION_STOP
             },
@@ -286,8 +283,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startVpnService() {
-        runCatching { BootFileLogger.info(TAG, "startService(OzeroVpnService, ACTION_START)") }
-        startService(
+        runCatching { BootFileLogger.info(TAG, "startForegroundService(OzeroVpnService, ACTION_START)") }
+        ContextCompat.startForegroundService(
+            this,
             Intent(this, OzeroVpnService::class.java).apply {
                 action = OzeroVpnService.ACTION_START
             },

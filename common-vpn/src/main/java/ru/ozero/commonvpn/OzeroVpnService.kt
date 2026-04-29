@@ -76,7 +76,11 @@ class OzeroVpnService : android.net.VpnService() {
             "onStartCommand entry action=${intent?.action} flags=$flags startId=$startId",
         )
         Log.i(TAG, "onStartCommand action=${intent?.action}")
-        PersistentLoggers.instance?.info(TAG, "onStartCommand action=${intent?.action}")
+        val foregroundOk = enterForegroundOrLog()
+        if (!foregroundOk) {
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
         return try {
             if (!::pipeline.isInitialized) {
                 Log.e(TAG, "pipeline not injected — Hilt graph failure")
@@ -91,6 +95,7 @@ class OzeroVpnService : android.net.VpnService() {
             START_STICKY
         } catch (t: Throwable) {
             Log.e(TAG, "onStartCommand threw", t)
+            PersistentLoggers.instance?.error(TAG, "onStartCommand threw", t)
             runCatching { stopVpn() }
             START_NOT_STICKY
         }
@@ -99,11 +104,16 @@ class OzeroVpnService : android.net.VpnService() {
     private fun startVpn() {
         if (stopping.get()) {
             Log.w(TAG, "startVpn ignored — идет остановка предыдущей сессии")
+            stopVpn()
             return
         }
         if (SecurityStateHolder.isCompromised) {
             Log.w(TAG, "startVpn refused — security compromised: ${SecurityStateHolder.compromised.value}")
-            stopSelf()
+            PersistentLoggers.instance?.warn(
+                TAG,
+                "startVpn refused — security compromised: ${SecurityStateHolder.compromised.value}",
+            )
+            stopVpn()
             return
         }
         if (!starting.compareAndSet(false, true)) {
@@ -111,24 +121,6 @@ class OzeroVpnService : android.net.VpnService() {
             return
         }
         Log.i(TAG, "startVpn")
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                startForeground(
-                    NOTIFICATION_ID,
-                    buildNotification(),
-                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
-                )
-            } else {
-                startForeground(NOTIFICATION_ID, buildNotification())
-            }
-            PersistentLoggers.instance?.info(TAG, "startForeground OK")
-        } catch (t: Throwable) {
-            Log.e(TAG, "startForeground threw", t)
-            PersistentLoggers.instance?.error(TAG, "startForeground threw", t)
-            starting.set(false)
-            stopVpn()
-            return
-        }
         val fd = try {
             buildTunBuilder().establish()
         } catch (t: Throwable) {
@@ -278,5 +270,33 @@ class OzeroVpnService : android.net.VpnService() {
 
     private fun closeTunFd(fd: ParcelFileDescriptor? = tunFdRef.getAndSet(null)) {
         fd?.close()
+    }
+
+    private fun enterForegroundOrLog(): Boolean {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                val notification = buildNotification()
+                val specialUse = android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                val fallback = android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MANIFEST
+                try {
+                    startForeground(NOTIFICATION_ID, notification, specialUse)
+                } catch (t: Throwable) {
+                    PersistentLoggers.instance?.warn(
+                        TAG,
+                        "startForeground specialUse failed → fallback to manifest type",
+                        t,
+                    )
+                    startForeground(NOTIFICATION_ID, notification, fallback)
+                }
+            } else {
+                startForeground(NOTIFICATION_ID, buildNotification())
+            }
+            PersistentLoggers.instance?.info(TAG, "startForeground OK (early)")
+            true
+        } catch (t: Throwable) {
+            Log.e(TAG, "startForeground threw on entry", t)
+            PersistentLoggers.instance?.error(TAG, "startForeground threw on entry", t)
+            false
+        }
     }
 }

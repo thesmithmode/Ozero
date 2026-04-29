@@ -47,7 +47,6 @@ fun SettingsScreen(
     onOpenServers: () -> Unit,
     onOpenAbout: () -> Unit = {},
     onOpenLogs: () -> Unit = {},
-    onOpenBootLog: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -62,7 +61,6 @@ fun SettingsScreen(
             onOpenServers = onOpenServers,
             onOpenAbout = onOpenAbout,
             onOpenLogs = onOpenLogs,
-            onOpenBootLog = onOpenBootLog,
         ),
         onSplitModeChange = viewModel::onSplitModeChange,
         onIpv6Toggle = viewModel::onIpv6Toggle,
@@ -189,8 +187,6 @@ private fun ContentBody(
         item { SectionDivider() }
         item { LogsSection(onOpenLogs = nav.onOpenLogs) }
         item { SectionDivider() }
-        item { BootLogSection(onOpenBootLog = nav.onOpenBootLog) }
-        item { SectionDivider() }
         item { AboutSection(onOpenAbout = nav.onOpenAbout) }
     }
 }
@@ -202,16 +198,6 @@ private fun LogsSection(onOpenLogs: () -> Unit) {
         modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
     ) {
         Text("Логи")
-    }
-}
-
-@Composable
-private fun BootLogSection(onOpenBootLog: () -> Unit) {
-    androidx.compose.material3.OutlinedButton(
-        onClick = onOpenBootLog,
-        modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
-    ) {
-        Text("Boot log (persistent)")
     }
 }
 
