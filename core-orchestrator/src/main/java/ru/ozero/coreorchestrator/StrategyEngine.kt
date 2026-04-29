@@ -3,6 +3,7 @@ package ru.ozero.coreorchestrator
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import ru.ozero.coreapi.ByeDpiArgsSource
 import ru.ozero.coreapi.Engine
 import ru.ozero.coreapi.EngineConfig
 import ru.ozero.coreapi.EngineId
@@ -37,6 +38,7 @@ class StrategyEngine(
     private val extraSources: List<CandidateSource> = emptyList(),
     private val parallelProbeCount: Int = DEFAULT_PARALLEL_PROBE,
     private val udpReachable: () -> Boolean = { true },
+    private val byedpiArgsSource: ByeDpiArgsSource? = null,
 ) {
 
     suspend fun buildCandidates(): List<Candidate> {
@@ -44,9 +46,10 @@ class StrategyEngine(
         for (source in extraSources) {
             list += source.candidates()
         }
+        val byedpiArgs = byedpiArgsSource?.winningArgs()?.takeIf { it.isNotBlank() }
         list += Candidate(
             engineId = EngineId.BYEDPI,
-            config = EngineConfig.ByeDpi(),
+            config = if (byedpiArgs != null) EngineConfig.ByeDpi(args = byedpiArgs) else EngineConfig.ByeDpi(),
             priority = Candidate.PRIORITY_BYEDPI,
         )
         val udpOk = udpReachable()

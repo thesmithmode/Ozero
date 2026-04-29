@@ -10,6 +10,7 @@ data class SettingsModel(
     val manualEngine: EngineId? = DEFAULT_MANUAL_ENGINE,
     val urnetworkEnabled: Boolean = DEFAULT_URNETWORK_ENABLED,
     val urnetworkJwt: String? = DEFAULT_URNETWORK_JWT,
+    val byedpiWinningArgs: String? = DEFAULT_BYEDPI_WINNING_ARGS,
 ) {
     companion object {
         val DEFAULT_SPLIT_MODE: SplitTunnelMode = SplitTunnelMode.ALL
@@ -18,6 +19,7 @@ data class SettingsModel(
         val DEFAULT_MANUAL_ENGINE: EngineId? = null
         const val DEFAULT_URNETWORK_ENABLED: Boolean = false
         val DEFAULT_URNETWORK_JWT: String? = null
+        val DEFAULT_BYEDPI_WINNING_ARGS: String? = null
 
         val DEFAULT: SettingsModel = SettingsModel()
     }

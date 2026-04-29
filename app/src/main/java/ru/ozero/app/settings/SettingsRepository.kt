@@ -23,6 +23,8 @@ interface SettingsRepository {
     suspend fun setUrnetworkEnabled(enabled: Boolean)
 
     suspend fun setUrnetworkJwt(jwt: String?)
+
+    suspend fun setByedpiWinningArgs(args: String?)
 }
 
 class SettingsRepositoryImpl @Inject constructor(
@@ -70,6 +72,16 @@ class SettingsRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun setByedpiWinningArgs(args: String?) {
+        dataStore.edit { prefs ->
+            if (args.isNullOrBlank()) {
+                prefs.remove(SettingsKeys.BYDPI_WINNING_ARGS)
+            } else {
+                prefs[SettingsKeys.BYDPI_WINNING_ARGS] = args
+            }
+        }
+    }
+
     private fun Preferences.toSettingsModel(): SettingsModel = SettingsModel(
         splitMode = readSplitMode(),
         ipv6Enabled = this[SettingsKeys.IPV6_ENABLED] ?: SettingsModel.DEFAULT_IPV6_ENABLED,
@@ -77,6 +89,7 @@ class SettingsRepositoryImpl @Inject constructor(
         manualEngine = readManualEngine(),
         urnetworkEnabled = this[SettingsKeys.URNETWORK_ENABLED] ?: SettingsModel.DEFAULT_URNETWORK_ENABLED,
         urnetworkJwt = this[SettingsKeys.URNETWORK_JWT],
+        byedpiWinningArgs = this[SettingsKeys.BYDPI_WINNING_ARGS],
     )
 
     private fun Preferences.readSplitMode(): SplitTunnelMode {

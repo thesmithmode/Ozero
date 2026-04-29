@@ -157,6 +157,30 @@ class SettingsRepositoryTest {
         assertNull(repository.settings.first().urnetworkJwt)
     }
 
+    @Test
+    fun `byedpi winning args null by default`() = runTest {
+        assertNull(repository.settings.first().byedpiWinningArgs)
+    }
+
+    @Test
+    fun `setByedpiWinningArgs persists и null или blank очищает`() = runTest {
+        val customArgs = "-Ku -An -At -o1 -d4+s"
+        repository.setByedpiWinningArgs(customArgs)
+        assertEquals(customArgs, repository.settings.first().byedpiWinningArgs)
+
+        repository.setByedpiWinningArgs(null)
+        assertNull(repository.settings.first().byedpiWinningArgs)
+
+        repository.setByedpiWinningArgs(customArgs)
+        assertEquals(customArgs, repository.settings.first().byedpiWinningArgs)
+
+        repository.setByedpiWinningArgs("   ")
+        assertNull(
+            repository.settings.first().byedpiWinningArgs,
+            "Пустые/whitespace args должны очищать override — иначе пользователь сломает byedpi пустым полем.",
+        )
+    }
+
     private class FakeAutoStartGateway : AutoStartGateway {
         val invocations = mutableListOf<Boolean>()
 
