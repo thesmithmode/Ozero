@@ -67,11 +67,16 @@ class LogcatReader(private val buffer: LogBuffer) {
                     for (raw in lines) {
                         if (!scope.isActive) break
                         val entry = LogcatLineParser.parse(raw)
-                        if (entry != null) { buffer.append(entry); linesRead++ }
+                        if (entry != null) {
+                            buffer.append(entry)
+                            linesRead++
+                        }
                     }
                 }
                 if (linesRead == 0 && !everReadLines) {
-                    buffer.append(diagnostic(LogLevel.WARN, "logcat exited with 0 lines — device restricts log access. Logs via AppLogger still work."))
+                    buffer.append(
+                        diagnostic(LogLevel.WARN, "logcat exited with 0 lines — device restricts log access. AppLogger still works."),
+                    )
                 }
                 if (linesRead > 0) {
                     everReadLines = true

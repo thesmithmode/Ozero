@@ -10,11 +10,30 @@ object AppLogger {
         buffer = b
     }
 
-    fun v(tag: String, msg: String) { Log.v(tag, msg); emit(LogLevel.TRACE, tag, msg) }
-    fun d(tag: String, msg: String) { Log.d(tag, msg); emit(LogLevel.DEBUG, tag, msg) }
-    fun i(tag: String, msg: String) { Log.i(tag, msg); emit(LogLevel.INFO, tag, msg) }
-    fun w(tag: String, msg: String) { Log.w(tag, msg); emit(LogLevel.WARN, tag, msg) }
-    fun e(tag: String, msg: String) { Log.e(tag, msg); emit(LogLevel.ERROR, tag, msg) }
+    fun v(tag: String, msg: String) {
+        Log.v(tag, msg)
+        emit(LogLevel.TRACE, tag, msg)
+    }
+
+    fun d(tag: String, msg: String) {
+        Log.d(tag, msg)
+        emit(LogLevel.DEBUG, tag, msg)
+    }
+
+    fun i(tag: String, msg: String) {
+        Log.i(tag, msg)
+        emit(LogLevel.INFO, tag, msg)
+    }
+
+    fun w(tag: String, msg: String) {
+        Log.w(tag, msg)
+        emit(LogLevel.WARN, tag, msg)
+    }
+
+    fun e(tag: String, msg: String) {
+        Log.e(tag, msg)
+        emit(LogLevel.ERROR, tag, msg)
+    }
 
     fun w(tag: String, msg: String, t: Throwable) {
         Log.w(tag, msg, t)

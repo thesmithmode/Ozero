@@ -59,7 +59,8 @@ class OzeroApp : Application(), Configuration.Provider {
         runCatching {
             AppLogger.attach(logBuffer)
             BootFileLogger.info(TAG, "onCreate after super")
-            AppLogger.i(TAG, "app started pid=${android.os.Process.myPid()} sdk=${Build.VERSION.SDK_INT} ${Build.MANUFACTURER}/${Build.MODEL}")
+            val pid = android.os.Process.myPid()
+            AppLogger.i(TAG, "app started pid=$pid sdk=${Build.VERSION.SDK_INT} ${Build.MANUFACTURER}/${Build.MODEL}")
         }.onFailure { BootFileLogger.error(TAG, "AppLogger.attach failed", it) }
         if (shouldStartSecurityWatchdog()) {
             runCatching { securityWatchdog.start(appScope) }
