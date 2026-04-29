@@ -76,7 +76,7 @@ class ByeDpiEngineSettingsViewModelTest {
         vm.onArgsChange("-Ku -An -d4")
         vm.onSave()
         advanceUntilIdle()
-        assertEquals(listOf("-Ku -An -d4"), repo.byedpiUpdates)
+        assertEquals(listOf<String?>("-Ku -An -d4"), repo.byedpiUpdates)
     }
 
     @Test
