@@ -7,7 +7,10 @@ import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -51,6 +54,7 @@ class HarvestWorker @AssistedInject constructor(
 
     companion object {
         const val NAME = "ozero-harvest"
+        const val ONESHOT_NAME = "ozero-harvest-oneshot"
         private const val TAG = "HarvestWorker"
         private const val INTERVAL_HOURS = 6L
 
@@ -64,6 +68,21 @@ class HarvestWorker @AssistedInject constructor(
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 NAME,
                 ExistingPeriodicWorkPolicy.KEEP,
+                req,
+            )
+        }
+
+        fun enqueueOneShotExpedited(context: Context) {
+            val req = OneTimeWorkRequestBuilder<HarvestWorker>()
+                .setConstraints(
+                    Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build(),
+                )
+                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 1L, TimeUnit.MINUTES)
+                .build()
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                ONESHOT_NAME,
+                ExistingWorkPolicy.KEEP,
                 req,
             )
         }

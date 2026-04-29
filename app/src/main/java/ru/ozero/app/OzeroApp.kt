@@ -10,11 +10,14 @@ import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import ru.ozero.app.data.CrashLogStore
 import ru.ozero.app.logging.AppLogger
 import ru.ozero.app.logging.BootDiagnostics
 import ru.ozero.app.logging.BootFileLogger
 import ru.ozero.app.logging.LogBuffer
+import ru.ozero.app.subscription.HarvestWorker
+import ru.ozero.app.ui.onboarding.FirstRunBootstrap
 import ru.ozero.security.SecurityWatchdog
 import javax.inject.Inject
 
@@ -26,6 +29,8 @@ class OzeroApp : Application(), Configuration.Provider {
     @Inject lateinit var securityWatchdog: SecurityWatchdog
 
     @Inject lateinit var logBuffer: LogBuffer
+
+    @Inject lateinit var firstRunBootstrap: FirstRunBootstrap
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -67,6 +72,12 @@ class OzeroApp : Application(), Configuration.Provider {
         } else {
             runCatching { BootFileLogger.info(TAG, "security watchdog skipped in debug/test runtime") }
         }
+        appScope.launch {
+            runCatching { firstRunBootstrap.runIfFirstStart() }
+                .onFailure { BootFileLogger.warn(TAG, "firstRunBootstrap.runIfFirstStart failed", it) }
+        }
+        runCatching { HarvestWorker.enqueueOneShotExpedited(this) }
+            .onFailure { BootFileLogger.warn(TAG, "HarvestWorker.enqueueOneShotExpedited failed", it) }
     }
 
     private fun shouldStartSecurityWatchdog(): Boolean =
