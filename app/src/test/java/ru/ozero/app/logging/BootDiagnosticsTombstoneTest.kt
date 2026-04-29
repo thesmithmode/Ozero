@@ -92,7 +92,9 @@ class BootDiagnosticsTombstoneTest {
     @Test
     fun `dumpExitReasons CRASH_JVM и ANR используют BufferedReader (текстовый трейс)`() {
         val src = readSelfSource()
-        val textBranch = src.substringAfter("REASON_ANR ||").substringBefore("if (info.reason == ApplicationExitInfo.REASON_SIGNALED)")
+        val textBranch = src
+            .substringAfter("REASON_ANR ||")
+            .substringBefore("if (info.reason == ApplicationExitInfo.REASON_SIGNALED)")
         assertContains(textBranch, "BufferedReader", "JVM/ANR трейсы — текст, должен читаться построчно")
     }
 

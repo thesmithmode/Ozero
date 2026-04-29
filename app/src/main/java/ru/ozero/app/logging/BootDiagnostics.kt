@@ -151,18 +151,19 @@ object BootDiagnostics {
             if (v in 0x20..0x7E) {
                 current.append(v.toChar())
             } else {
-                if (current.length >= minLen) {
-                    if (out.isNotEmpty()) out.append('\n')
-                    out.append(current)
-                }
-                current.setLength(0)
+                flushRun(out, current, minLen)
             }
         }
+        flushRun(out, current, minLen)
+        return out.toString()
+    }
+
+    private fun flushRun(out: StringBuilder, current: StringBuilder, minLen: Int) {
         if (current.length >= minLen) {
             if (out.isNotEmpty()) out.append('\n')
             out.append(current)
         }
-        return out.toString()
+        current.setLength(0)
     }
 
     internal fun signalToString(signal: Int): String = when (signal) {
