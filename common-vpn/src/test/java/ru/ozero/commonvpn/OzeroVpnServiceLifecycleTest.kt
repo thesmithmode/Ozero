@@ -171,4 +171,80 @@ class OzeroVpnServiceLifecycleTest {
             "stopVpn должен извлечь TUN fd из tunFdRef через getAndSet(null) — атомарно, до launch.",
         )
     }
+
+    @Test
+    fun `stopVpn использует Thread+join для блокирующего pipeline_stop`() {
+        val stopVpnBody = source.substringAfter("private fun stopVpn()")
+            .substringBefore("\n    internal fun buildTunBuilder")
+        val threadIdx = stopVpnBody.indexOf("Thread({")
+        val runBlockingIdx = stopVpnBody.indexOf("runBlocking {", threadIdx)
+        val pipelineStopIdx = stopVpnBody.indexOf("pipeline.stop()", runBlockingIdx)
+        val joinIdx = stopVpnBody.indexOf(".join(SHUTDOWN_JOIN_TIMEOUT_MS)", pipelineStopIdx)
+        val ordered = threadIdx > 0 &&
+            runBlockingIdx > threadIdx &&
+            pipelineStopIdx > runBlockingIdx &&
+            joinIdx > pipelineStopIdx
+        assertTrue(
+            ordered,
+            "stopVpn обязан запускать pipeline.stop() в Thread с runBlocking + join(SHUTDOWN_JOIN_TIMEOUT_MS) — " +
+                "withTimeoutOrNull не отменяет blocking JNI без suspension point, поток висит, stopSelf не вызывается.",
+        )
+    }
+
+    @Test
+    fun `stopVpn force-kill процесс при зависании pipeline_stop`() {
+        val stopVpnBody = source.substringAfter("private fun stopVpn()")
+            .substringBefore("\n    internal fun buildTunBuilder")
+        val isAliveIdx = stopVpnBody.indexOf("shutdown.isAlive")
+        val killIdx = stopVpnBody.indexOf("processKiller.kill(Process.myPid())", isAliveIdx)
+        assertTrue(
+            isAliveIdx in 0 until killIdx,
+            "stopVpn обязан вызывать processKiller.kill(Process.myPid()) если shutdown.isAlive после join — " +
+                "это единственный способ освободить foreground service slot когда blocking JNI завис, " +
+                "иначе процесс висит до OOM/FORCE_STOP (полевой тест Nubia: 37 сек).",
+        )
+    }
+
+    @Test
+    fun `stopVpn использует Handler getMainLooper для stopForeground+stopSelf`() {
+        val stopVpnBody = source.substringAfter("private fun stopVpn()")
+            .substringBefore("\n    internal fun buildTunBuilder")
+        val handlerIdx = stopVpnBody.indexOf("Handler(Looper.getMainLooper()).post")
+        val stopForegroundIdx = stopVpnBody.indexOf("stopForeground(", handlerIdx)
+        val stopSelfIdx = stopVpnBody.indexOf("stopSelf()", stopForegroundIdx)
+        assertTrue(
+            handlerIdx > 0 && stopForegroundIdx > handlerIdx && stopSelfIdx > stopForegroundIdx,
+            "stopForeground+stopSelf должны выполняться через Handler(Looper.getMainLooper()).post — " +
+                "withContext(Dispatchers.Main) убран чтобы не зависеть от coroutine cancellation семантики.",
+        )
+    }
+
+    @Test
+    fun `onDestroy эскалирует force-kill при зависании shutdown`() {
+        val onDestroyBody = source.substringAfter("override fun onDestroy()")
+            .substringBefore("\n    private fun closeTunFd")
+        val isAliveIdx = onDestroyBody.indexOf("shutdown.isAlive")
+        val killIdx = onDestroyBody.indexOf("processKiller.kill(Process.myPid())", isAliveIdx)
+        assertTrue(
+            isAliveIdx in 0 until killIdx,
+            "onDestroy обязан вызывать processKiller.kill(Process.myPid()) если shutdown thread жив после join — " +
+                "иначе процесс остаётся в зомби-состоянии после Service.onDestroy и блокирует следующий старт.",
+        )
+    }
+
+    @Test
+    fun `ProcessKiller интерфейс присутствует и инжектируется`() {
+        assertTrue(
+            source.contains("fun interface ProcessKiller"),
+            "ProcessKiller должен быть fun interface — для тестируемости через перегрузку поля.",
+        )
+        assertTrue(
+            source.contains("internal var processKiller: ProcessKiller"),
+            "OzeroVpnService должен иметь internal var processKiller — overridable из теста.",
+        )
+        assertTrue(
+            source.contains("Process.killProcess(pid)"),
+            "default ProcessKiller обязан звать android.os.Process.killProcess(pid) — реальная kill.",
+        )
+    }
 }

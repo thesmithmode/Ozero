@@ -5,7 +5,10 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Intent
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.ParcelFileDescriptor
+import android.os.Process
 import android.util.Log
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -15,7 +18,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
@@ -26,12 +28,18 @@ import ru.ozero.coreapi.PersistentLoggers
 import ru.ozero.security.SecurityStateHolder
 import javax.inject.Inject
 
+fun interface ProcessKiller {
+    fun kill(pid: Int)
+}
+
 @AndroidEntryPoint
 class OzeroVpnService : android.net.VpnService() {
 
     @Inject lateinit var pipeline: VpnEnginePipeline
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    internal var processKiller: ProcessKiller = ProcessKiller { pid -> Process.killProcess(pid) }
 
     companion object {
         const val ACTION_START = "ru.ozero.vpn.ACTION_START"
@@ -48,8 +56,7 @@ class OzeroVpnService : android.net.VpnService() {
         private const val SESSION_NAME = "Ozero"
         private const val TAG = "OzeroVpnService"
         private const val PIPELINE_START_TIMEOUT_MS = 30_000L
-        private const val SHUTDOWN_TIMEOUT_MS = 3_000L
-        private const val SHUTDOWN_JOIN_TIMEOUT_MS = 3_500L
+        private const val SHUTDOWN_JOIN_TIMEOUT_MS = 2_500L
     }
 
     override fun onCreate() {
@@ -193,19 +200,25 @@ class OzeroVpnService : android.net.VpnService() {
         val fdToClose = tunFdRef.getAndSet(null)
         closeTunFd(fdToClose)
         serviceScope.launch {
-            try {
-                val finished = withTimeoutOrNull(SHUTDOWN_TIMEOUT_MS) {
+            val shutdown = Thread({
+                runBlocking {
                     runCatching { pipeline.stop() }
                         .onFailure { Log.w(TAG, "pipeline.stop threw", it) }
                 }
-                if (finished == null) {
-                    Log.w(TAG, "pipeline.stop не завершилась за ${SHUTDOWN_TIMEOUT_MS}ms — продолжаем cleanup")
-                    PersistentLoggers.instance?.warn(
-                        TAG,
-                        "pipeline.stop timeout ${SHUTDOWN_TIMEOUT_MS}ms — JNI nativeStop возможно завис",
-                    )
-                }
-                withContext(Dispatchers.Main) {
+            }, "OzeroVpn-stop")
+            shutdown.start()
+            shutdown.join(SHUTDOWN_JOIN_TIMEOUT_MS)
+            if (shutdown.isAlive) {
+                Log.e(TAG, "pipeline.stop hung > ${SHUTDOWN_JOIN_TIMEOUT_MS}ms — force-killing process")
+                PersistentLoggers.instance?.error(
+                    TAG,
+                    "pipeline.stop hung > ${SHUTDOWN_JOIN_TIMEOUT_MS}ms — force-killing process",
+                )
+                processKiller.kill(Process.myPid())
+                return@launch
+            }
+            Handler(Looper.getMainLooper()).post {
+                try {
                     starting.set(false)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -214,9 +227,9 @@ class OzeroVpnService : android.net.VpnService() {
                         stopForeground(true)
                     }
                     stopSelf()
+                } finally {
+                    stopping.set(false)
                 }
-            } finally {
-                stopping.set(false)
             }
         }
     }
@@ -271,15 +284,20 @@ class OzeroVpnService : android.net.VpnService() {
         if (stopping.compareAndSet(false, true)) {
             val shutdown = Thread({
                 runBlocking {
-                    runCatching {
-                        withTimeoutOrNull(SHUTDOWN_TIMEOUT_MS) { pipeline.stop() }
-                    }.onFailure { Log.w(TAG, "pipeline.stop in onDestroy threw", it) }
+                    runCatching { pipeline.stop() }
+                        .onFailure { Log.w(TAG, "pipeline.stop in onDestroy threw", it) }
                 }
             }, "OzeroVpn-shutdown")
             shutdown.start()
             shutdown.join(SHUTDOWN_JOIN_TIMEOUT_MS)
             if (shutdown.isAlive) {
-                Log.w(TAG, "pipeline.stop не завершилась за ${SHUTDOWN_JOIN_TIMEOUT_MS}ms — продолжаем cleanup")
+                Log.e(TAG, "pipeline.stop hung in onDestroy > ${SHUTDOWN_JOIN_TIMEOUT_MS}ms — force-killing")
+                PersistentLoggers.instance?.error(
+                    TAG,
+                    "pipeline.stop hung in onDestroy > ${SHUTDOWN_JOIN_TIMEOUT_MS}ms — force-killing",
+                )
+                processKiller.kill(Process.myPid())
+                return
             }
         }
         serviceScope.cancel()
