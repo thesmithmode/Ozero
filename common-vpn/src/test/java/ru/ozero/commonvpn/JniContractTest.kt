@@ -64,4 +64,29 @@ class JniContractTest {
             "NativeHevTunnelGateway должен делегировать в hev.TProxyService.TProxyStartService.",
         )
     }
+
+    @Test
+    fun `release_yml собирает libhev с APP_CFLAGS=-DPKGNAME=hev`() {
+        val candidates = sequenceOf(
+            File(moduleRoot, ".github/workflows/release.yml"),
+            File(moduleRoot.parentFile, ".github/workflows/release.yml"),
+        )
+        val releaseYml = candidates.firstOrNull { it.exists() }
+        assertTrue(
+            releaseYml != null,
+            "release.yml не найден в ${candidates.toList()}. " +
+                "Тест должен запускаться из repo root или module root.",
+        )
+        val text = releaseYml!!.readText()
+        assertTrue(
+            text.contains("APP_CFLAGS=\"-DPKGNAME=hev\"") ||
+                text.contains("APP_CFLAGS='-DPKGNAME=hev'") ||
+                text.contains("APP_CFLAGS=-DPKGNAME=hev"),
+            "release.yml должен передавать APP_CFLAGS=-DPKGNAME=hev в ndk-build. " +
+                "Без этого upstream src/hev-jni.c использует default PKGNAME=hev/htproxy и " +
+                "ищет класс hev/htproxy/TProxyService — FindClass=NULL → " +
+                "RegisterNatives(NULL,...) → ART JniAbort при первом старте VPN. " +
+                "См. heiher/hev-socks5-tunnel src/hev-jni.c L24-26.",
+        )
+    }
 }

@@ -43,7 +43,7 @@ jobs:
             common-vpn/src/main/jniLibs/armeabi-v7a/libhev-socks5-tunnel.so
             common-vpn/src/main/jniLibs/x86_64/libhev-socks5-tunnel.so
             common-vpn/src/main/jniLibs/x86/libhev-socks5-tunnel.so
-          key: libhev-2.7.0-ndk-r27c-platform-android-24-v1
+          key: libhev-2.7.0-ndk-r27c-platform-android-24-pkgname-hev-v2
 
       - name: Setup Android NDK
         id: ndk
@@ -78,6 +78,7 @@ jobs:
             NDK_APPLICATION_MK="$SRC/Application.mk" \
             APP_ABI="arm64-v8a armeabi-v7a x86_64 x86" \
             APP_PLATFORM=android-24 \
+            APP_CFLAGS="-DPKGNAME=hev" \
             -j"$(nproc)"
 
           STRIP="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
@@ -114,6 +115,21 @@ jobs:
             done
           done
           echo "JNI symbols OK на всех ABI"
+
+      - name: Assert PKGNAME=hev зашит в libhev-socks5-tunnel.so
+        run: |
+          set -euo pipefail
+          for ABI in arm64-v8a armeabi-v7a x86_64 x86; do
+            SO="common-vpn/src/main/jniLibs/$ABI/libhev-socks5-tunnel.so"
+            if [ ! -f "$SO" ]; then continue; fi
+            if ! strings "$SO" | grep -qx 'hev/TProxyService'; then
+              echo "::error::В $SO нет literal 'hev/TProxyService' — PKGNAME не передан в ndk-build, JNI_OnLoad упадёт с ART JniAbort"
+              echo "Найденные TProxyService-related strings:"
+              strings "$SO" | grep -i 'tproxy\|hev/' || true
+              exit 1
+            fi
+          done
+          echo "PKGNAME=hev зашит корректно — FindClass найдёт hev/TProxyService"
 
       - name: Decode keystore
         env:

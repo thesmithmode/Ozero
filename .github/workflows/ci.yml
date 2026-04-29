@@ -269,12 +269,17 @@ jobs:
             NDK_APPLICATION_MK="$SRC/Application.mk" \
             APP_ABI="arm64-v8a armeabi-v7a x86_64 x86" \
             APP_PLATFORM=android-24 \
+            APP_CFLAGS="-DPKGNAME=hev" \
             -j"$(nproc)"
           STRIP="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
           for ABI in arm64-v8a armeabi-v7a x86_64 x86; do
             SO_SRC="$SRC/libs/$ABI/libhev-socks5-tunnel.so"
             cp "$SO_SRC" "$GITHUB_WORKSPACE/$OUT/$ABI/libhev-socks5-tunnel.so"
             "$STRIP" "$GITHUB_WORKSPACE/$OUT/$ABI/libhev-socks5-tunnel.so" || true
+            if ! strings "$GITHUB_WORKSPACE/$OUT/$ABI/libhev-socks5-tunnel.so" | grep -qx 'hev/TProxyService'; then
+              echo "::error::PKGNAME не зашит в libhev для $ABI — JNI_OnLoad упадёт ART JniAbort"
+              exit 1
+            fi
           done
 
       - name: Decode keystore
