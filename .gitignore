@@ -4,8 +4,7 @@
 .scratch/
 
 # AI-агенты и IDE (локальные, не для репо)
-.claude/
-CLAUDE.md
+.claude/*
 .gemini/
 GEMINI.md
 opencode.json
@@ -119,3 +118,9 @@ env/
 *.log
 Thumbs.db
 build-tools/upstream-bumps.md
+
+# === wiki-init ===
+!.claude/settings.json
+!CLAUDE.md
+!.memory/AGENTS.md
+# === /wiki-init ===
