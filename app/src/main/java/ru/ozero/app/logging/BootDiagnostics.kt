@@ -91,6 +91,13 @@ object BootDiagnostics {
                         }
                     }.onFailure { BootFileLogger.warn(TAG, "trace read failed pid=${info.pid}", it) }
                 }
+                if (info.reason == ApplicationExitInfo.REASON_SIGNALED) {
+                    val signalName = signalToString(info.status)
+                    BootFileLogger.warn(
+                        TAG,
+                        "signaled pid=${info.pid} signal=$signalName(${info.status}) desc=${info.description}",
+                    )
+                }
             }
         }
     }
@@ -111,6 +118,19 @@ object BootDiagnostics {
         ApplicationExitInfo.REASON_DEPENDENCY_DIED -> "DEPENDENCY_DIED"
         ApplicationExitInfo.REASON_OTHER -> "OTHER"
         else -> "code=$reason"
+    }
+
+    internal fun signalToString(signal: Int): String = when (signal) {
+        1 -> "SIGHUP"
+        2 -> "SIGINT"
+        3 -> "SIGQUIT"
+        6 -> "SIGABRT"
+        9 -> "SIGKILL"
+        11 -> "SIGSEGV"
+        13 -> "SIGPIPE"
+        15 -> "SIGTERM"
+        19 -> "SIGSTOP"
+        else -> "signal=$signal"
     }
 
     private const val MAX_REASONS = 10

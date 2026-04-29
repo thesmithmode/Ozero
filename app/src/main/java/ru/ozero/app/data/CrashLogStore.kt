@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
+import java.io.FileOutputStream
 import java.io.PrintWriter
 import java.io.StringWriter
 import java.text.SimpleDateFormat
@@ -34,7 +35,10 @@ class CrashLogStore(
             sw.append("thread=").append(thread.name).append('\n')
             sw.append("time=").append(ts).append('\n')
             PrintWriter(sw).use { throwable.printStackTrace(it) }
-            file.writeText(sanitize(sw.toString()))
+            FileOutputStream(file).use { fos ->
+                fos.write(sanitize(sw.toString()).toByteArray(Charsets.UTF_8))
+                fos.fd.sync()
+            }
             Log.e(TAG, "crash → ${file.absolutePath}")
             rotate()
         }.onFailure { Log.w(TAG, "crash write failed", it) }

@@ -18,6 +18,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
@@ -88,6 +89,12 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+    private val notificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            runCatching { BootFileLogger.info(TAG, "notificationPermissionLauncher result granted=$granted") }
+            proceedToVpnRequest()
+        }
+
     private val safeUiCoroutineHandler = CoroutineExceptionHandler { _, throwable ->
         AppLogger.e(TAG, "uncaught coroutine in MainActivity", throwable)
         Toast.makeText(
@@ -109,11 +116,13 @@ class MainActivity : ComponentActivity() {
             handleSubscriptionIntent(intent)
         }
         runCatching { BootFileLogger.info(TAG, "onCreate before setContent") }
+        runCatching { BootFileLogger.info(TAG, "before composition trigger") }
         setContent {
             OzeroTheme {
                 var checked by rememberSaveable { mutableStateOf(false) }
                 var showOnboarding by rememberSaveable { mutableStateOf(false) }
                 LaunchedEffect(Unit) {
+                    runCatching { BootFileLogger.info(TAG, "composition entry (LaunchedEffect first run)") }
                     val completed = runCatching { userFlags.isOnboardingCompleted() }
                         .onFailure { AppLogger.w(TAG, "isOnboardingCompleted threw — пропускаю онбординг", it) }
                         .getOrDefault(true)
@@ -186,6 +195,21 @@ class MainActivity : ComponentActivity() {
             ).show()
             return
         }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val granted = ContextCompat.checkSelfPermission(
+                this,
+                android.Manifest.permission.POST_NOTIFICATIONS,
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (!granted) {
+                runCatching { BootFileLogger.info(TAG, "POST_NOTIFICATIONS not granted → request") }
+                notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                return
+            }
+        }
+        proceedToVpnRequest()
+    }
+
+    private fun proceedToVpnRequest() {
         viewModel.onConnectClick()
         val vpnIntent = VpnService.prepare(this)
         if (vpnIntent != null) {

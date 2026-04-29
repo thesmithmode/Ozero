@@ -52,6 +52,18 @@ class OzeroVpnService : android.net.VpnService() {
         private const val SHUTDOWN_JOIN_TIMEOUT_MS = 3_500L
     }
 
+    override fun onCreate() {
+        runCatching { PersistentLoggers.instance?.info(TAG, "onCreate before super") }
+        try {
+            super.onCreate()
+        } catch (t: Throwable) {
+            runCatching { Log.e(TAG, "super.onCreate threw — Hilt graph failure", t) }
+            runCatching { PersistentLoggers.instance?.error(TAG, "super.onCreate threw — Hilt graph failure", t) }
+            throw t
+        }
+        runCatching { PersistentLoggers.instance?.info(TAG, "onCreate after super (Hilt inject done)") }
+    }
+
     private val tunFdRef = AtomicReference<ParcelFileDescriptor?>(null)
     private val startJobRef = AtomicReference<Job?>(null)
 
@@ -59,9 +71,19 @@ class OzeroVpnService : android.net.VpnService() {
     private val stopping = AtomicBoolean(false)
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        PersistentLoggers.instance?.info(
+            TAG,
+            "onStartCommand entry action=${intent?.action} flags=$flags startId=$startId",
+        )
         Log.i(TAG, "onStartCommand action=${intent?.action}")
         PersistentLoggers.instance?.info(TAG, "onStartCommand action=${intent?.action}")
         return try {
+            if (!::pipeline.isInitialized) {
+                Log.e(TAG, "pipeline not injected — Hilt graph failure")
+                PersistentLoggers.instance?.error(TAG, "pipeline not injected — Hilt graph failure")
+                stopSelf(startId)
+                return START_NOT_STICKY
+            }
             when (intent?.action) {
                 ACTION_STOP -> stopVpn()
                 ACTION_START, null -> startVpn()

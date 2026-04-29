@@ -15,6 +15,7 @@ import java.io.IOException
 open class SilentPackageInstaller(
     private val context: Context,
     private val installer: PackageInstaller = context.packageManager.packageInstaller,
+    private val sdkInt: () -> Int = { Build.VERSION.SDK_INT },
 ) {
 
     sealed class Result {
@@ -23,6 +24,8 @@ open class SilentPackageInstaller(
         data class FileError(val reason: String) : Result()
 
         data class IoError(val sessionId: Int, val reason: String) : Result()
+
+        data class PermissionDenied(val reason: String) : Result()
     }
 
     open suspend fun install(
@@ -30,6 +33,15 @@ open class SilentPackageInstaller(
         sessionName: String = DEFAULT_SESSION_NAME,
         resultIntentAction: String = DEFAULT_RESULT_ACTION,
     ): Result = withContext(Dispatchers.IO) {
+        if (sdkInt() >= Build.VERSION_CODES.O) {
+            if (!context.packageManager.canRequestPackageInstalls()) {
+                Log.e(TAG, "user did not grant install-packages right")
+                return@withContext Result.PermissionDenied(
+                    "REQUEST_INSTALL_PACKAGES not granted by user",
+                )
+            }
+        }
+
         if (!apkFile.exists() || !apkFile.canRead()) {
             Log.e(TAG, "apk недоступен: ${apkFile.absolutePath}")
             return@withContext Result.FileError("apk недоступен: ${apkFile.absolutePath}")
@@ -38,7 +50,7 @@ open class SilentPackageInstaller(
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
             .apply {
                 setAppPackageName(context.packageName)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (sdkInt() >= Build.VERSION_CODES.S) {
                     setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_REQUIRED)
                 }
             }
@@ -88,7 +100,7 @@ open class SilentPackageInstaller(
 
     private fun buildResultSender(sessionId: Int, action: String): IntentSender {
         val intent = Intent(action).setPackage(context.packageName)
-        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        val flags = if (sdkInt() >= Build.VERSION_CODES.S) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
         } else {
             PendingIntent.FLAG_UPDATE_CURRENT

@@ -3,18 +3,7 @@ name: CI
 on:
   push:
     branches:
-      - main
-      - dev
-      - 'feat/**'
-      - 'fix/**'
-      - 'claude/**'
-      - 'refactor/**'
-      - 'chore/**'
-      - 'hotfix/**'
-  pull_request:
-    branches:
-      - main
-      - dev
+      - '**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -25,6 +14,7 @@ jobs:
     name: Fast checks (style, python, shell)
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    if: ${{ github.ref != 'refs/heads/main' }}
     permissions:
       contents: read
 
@@ -86,7 +76,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: fast-checks
-    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main' || github.event_name == 'pull_request' }}
+    if: ${{ github.ref == 'refs/heads/dev' }}
     permissions:
       contents: read
       checks: write
@@ -156,7 +146,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: fast-checks
-    if: ${{ github.ref == 'refs/heads/dev' || github.event_name == 'pull_request' }}
+    if: ${{ github.ref == 'refs/heads/dev' }}
     permissions:
       contents: read
 
@@ -192,7 +182,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: fast-checks
-    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main' }}
+    if: ${{ github.ref == 'refs/heads/dev' }}
     permissions:
       contents: read
       security-events: write
@@ -231,8 +221,7 @@ jobs:
     name: Build signed release APK (main only)
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    needs: full-tests
-    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+    if: ${{ github.ref == 'refs/heads/main' }}
     permissions:
       contents: read
 

@@ -127,6 +127,10 @@ open class UpdateCoordinator(
                     Log.e(TAG, "installer IoError sid=${res.sessionId}: ${res.reason}")
                     collector.emit(Progress.Failed(Progress.Stage.INSTALL, res.reason))
                 }
+                is SilentPackageInstaller.Result.PermissionDenied -> {
+                    Log.e(TAG, "installer PermissionDenied: ${res.reason}")
+                    collector.emit(Progress.Failed(Progress.Stage.INSTALL, res.reason))
+                }
             }
         } finally {
             apk.delete()

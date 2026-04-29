@@ -7,6 +7,7 @@ import ru.ozero.coreapi.PersistentLogger
 import ru.ozero.coreapi.PersistentLoggers
 import java.io.File
 import java.io.PrintWriter
+import java.io.RandomAccessFile
 import java.io.StringWriter
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -87,7 +88,11 @@ object BootFileLogger : PersistentLogger {
                 PrintWriter(sw).use { t.printStackTrace(it) }
                 sb.append(sw.toString())
             }
-            target.appendText(sb.toString())
+            RandomAccessFile(target, "rw").use { raf ->
+                raf.seek(raf.length())
+                raf.write(sb.toString().toByteArray(Charsets.UTF_8))
+                raf.fd.sync()
+            }
             if (target.length() > MAX_BYTES) rotateIfTooLarge(target)
         }
     }
