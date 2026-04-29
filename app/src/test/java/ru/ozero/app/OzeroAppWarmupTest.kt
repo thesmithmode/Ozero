@@ -2,6 +2,7 @@ package ru.ozero.app
 
 import org.junit.jupiter.api.Test
 import java.io.File
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class OzeroAppWarmupTest {
@@ -14,30 +15,32 @@ class OzeroAppWarmupTest {
     }
 
     @Test
-    fun `onCreate включает warmup-libs guard для ранней детекции загрузки`() {
+    fun `onCreate не делает eager-touch ByeDpiProxy`() {
         val onCreateBody = funBody(source, "onCreate")
-        assertTrue(
-            onCreateBody.contains("warmup-libs"),
-            "onCreate должен warmup'ить byedpi+hev — lazy loadLibrary рискует крашнуть в connect-флоу " +
-                "(SIGSEGV ловится только через ApplicationExitInfo, тогда уже поздно)",
-        )
-        assertTrue(
-            onCreateBody.contains("ByeDpiProxy.libraryLoaded"),
-            "warmup обязан touchнуть ByeDpiProxy.libraryLoaded чтобы триггернуть init-блок",
-        )
-        assertTrue(
-            onCreateBody.contains("hev.TProxyService.libraryLoaded"),
-            "warmup обязан touchнуть hev.TProxyService.libraryLoaded чтобы триггернуть init-блок",
+        assertFalse(
+            onCreateBody.contains("ByeDpiProxy"),
+            "onCreate не должен упоминать ByeDpiProxy — companion object init выполнит loadLibrary " +
+                "при первом обращении и SIGSEGV в JNI_OnLoad убьёт процесс до показа UI",
         )
     }
 
     @Test
-    fun `warmup обёрнут в guardUnit для безопасности процесса старта`() {
+    fun `onCreate не делает eager-touch TProxyService`() {
         val onCreateBody = funBody(source, "onCreate")
-        assertTrue(
-            onCreateBody.contains("BootDiagnostics.guardUnit(\"warmup-libs\""),
-            "warmup ОБЯЗАН быть в guardUnit — иначе exception в loadLibrary убьёт процесс ДО того " +
-                "как мы залогируем что произошло",
+        assertFalse(
+            onCreateBody.contains("TProxyService"),
+            "onCreate не должен упоминать hev.TProxyService — object init выполнит loadLibrary " +
+                "и SIGSEGV в JNI_OnLoad убьёт процесс до показа UI",
+        )
+    }
+
+    @Test
+    fun `onCreate не содержит упоминаний warmup-libs`() {
+        val onCreateBody = funBody(source, "onCreate")
+        assertFalse(
+            onCreateBody.contains("warmup-libs"),
+            "warmup-libs стратегия отключена — нативки грузятся лениво через loadOnce() " +
+                "при первом VPN-старте",
         )
     }
 

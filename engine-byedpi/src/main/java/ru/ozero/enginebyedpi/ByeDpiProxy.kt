@@ -15,23 +15,41 @@ class ByeDpiProxy {
         private const val TAG = "ByeDpiProxy"
 
         @JvmStatic
+        @Volatile
         var libraryLoaded: Boolean = false
             private set
 
         @JvmStatic
+        @Volatile
         var loadError: String? = null
             private set
 
-        init {
-            try {
-                System.loadLibrary("byedpi")
-                libraryLoaded = true
-                PersistentLoggers.instance?.info(TAG, "libbyedpi loaded")
-            } catch (e: UnsatisfiedLinkError) {
-                loadError = e.message
-                Log.e(TAG, "loadLibrary failed: ${e.message}")
-                PersistentLoggers.instance?.error(TAG, "loadLibrary failed: ${e.message}", e)
-                libraryLoaded = false
+        @Volatile
+        private var loadAttempted: Boolean = false
+        private val loadLock = Any()
+
+        @JvmStatic
+        fun loadOnce() {
+            if (loadAttempted) return
+            synchronized(loadLock) {
+                if (loadAttempted) return
+                try {
+                    System.loadLibrary("byedpi")
+                    libraryLoaded = true
+                    runCatching { PersistentLoggers.instance?.info(TAG, "libbyedpi loaded") }
+                } catch (e: UnsatisfiedLinkError) {
+                    loadError = e.message ?: e.javaClass.simpleName
+                    libraryLoaded = false
+                    Log.e(TAG, "loadLibrary failed: $loadError")
+                    runCatching { PersistentLoggers.instance?.error(TAG, "loadLibrary failed: $loadError", e) }
+                } catch (e: SecurityException) {
+                    loadError = e.message ?: e.javaClass.simpleName
+                    libraryLoaded = false
+                    Log.e(TAG, "loadLibrary denied: $loadError")
+                    runCatching { PersistentLoggers.instance?.error(TAG, "loadLibrary denied: $loadError", e) }
+                } finally {
+                    loadAttempted = true
+                }
             }
         }
     }

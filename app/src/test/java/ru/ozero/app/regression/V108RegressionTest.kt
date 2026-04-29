@@ -13,7 +13,36 @@ class V108RegressionTest {
         assertFalse(
             onCreate.contains("loadLibrary"),
             "OzeroApp.onCreate eagerly грузит native — JNI_OnLoad SIGSEGV не ловится " +
-                "runCatching и убивает процесс на старте (regression v1.0.5).",
+                "runCatching и убивает процесс на старте.",
+        )
+        assertFalse(
+            onCreate.contains("ByeDpiProxy") || onCreate.contains("TProxyService"),
+            "OzeroApp.onCreate trigger'ит class init у ByeDpiProxy/TProxyService → loadLibrary в их " +
+                "init-блоках выполняется eagerly. Нативки должны грузиться lazy через loadOnce() " +
+                "при первом VPN-старте, не в Application.onCreate.",
+        )
+    }
+
+    @Test
+    fun byedpiProxy_noLoadLibraryInInit() {
+        val src = read(BYEDPI_PROXY)
+        val initBlocks = Regex("init\\s*\\{[^}]*loadLibrary", RegexOption.DOT_MATCHES_ALL)
+        assertFalse(
+            initBlocks.containsMatchIn(src),
+            "ByeDpiProxy.companion init не должен звать System.loadLibrary — Hilt создаёт ByeDpiProxy " +
+                "в SingletonComponent при super.onCreate(), что триггерит class init и SIGSEGV " +
+                "в JNI_OnLoad убивает процесс ДО Application.onCreate.",
+        )
+    }
+
+    @Test
+    fun tproxyService_noLoadLibraryInInit() {
+        val src = read(TPROXY_SERVICE)
+        val initBlocks = Regex("(?<!fun\\s)init\\s*\\{[^}]*loadLibrary", RegexOption.DOT_MATCHES_ALL)
+        assertFalse(
+            initBlocks.containsMatchIn(src),
+            "hev.TProxyService.init не должен звать System.loadLibrary — должен быть только loadOnce() " +
+                "вызываемый из VPN-сервиса перед TProxyStartService.",
         )
     }
 
@@ -178,6 +207,8 @@ class V108RegressionTest {
         const val BOOT_DIAGNOSTICS = "app/src/main/java/ru/ozero/app/logging/BootDiagnostics.kt"
         const val VPN_SERVICE = "common-vpn/src/main/java/ru/ozero/commonvpn/OzeroVpnService.kt"
         const val VPN_MANIFEST = "common-vpn/src/main/AndroidManifest.xml"
+        const val BYEDPI_PROXY = "engine-byedpi/src/main/java/ru/ozero/enginebyedpi/ByeDpiProxy.kt"
+        const val TPROXY_SERVICE = "common-vpn/src/main/java/hev/TProxyService.kt"
         const val SUB_HTTP_SOURCE =
             "core-subscriptions/src/main/java/ru/ozero/coresubscriptions/OkHttpSubscriptionSource.kt"
         const val SUB_MANAGER =

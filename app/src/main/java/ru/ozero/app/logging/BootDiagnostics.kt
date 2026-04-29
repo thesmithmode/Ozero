@@ -13,6 +13,7 @@ object BootDiagnostics {
 
     const val TAG = "BootDiag"
 
+    /** Ловит только Throwable. SIGSEGV/SIGABRT в JNI_OnLoad обходит JVM stack — не оборачивать loadLibrary. */
     fun <T> guard(name: String, default: T, block: () -> T): T {
         val started = System.nanoTime()
         return try {

@@ -42,9 +42,10 @@ class ByeDpiEngine(
 
     override suspend fun start(config: EngineConfig): StartResult {
         require(config is EngineConfig.ByeDpi) { "ByeDpiEngine требует EngineConfig.ByeDpi" }
+        ByeDpiProxy.loadOnce()
         if (!ByeDpiProxy.libraryLoaded) {
             Log.e(TAG, "native lib не загружена — устройство не поддерживает или stripped APK")
-            return StartResult.Failure(reason = "byedpi native library не загружена")
+            return StartResult.Failure(reason = "byedpi native library не загружена: ${ByeDpiProxy.loadError}")
         }
         Log.i(TAG, "start socksPort=${config.socksPort} args=${config.args}")
         val args = buildArgs(config)

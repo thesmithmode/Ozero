@@ -26,6 +26,7 @@ class NativeHevTunnelGateway(
     private val dupedRef = AtomicReference<ParcelFileDescriptor?>(null)
 
     override fun start(config: HevTunnelConfig): Int {
+        hev.TProxyService.loadOnce()
         PersistentLoggers.instance?.info(
             TAG,
             "start entry libraryLoaded=${hev.TProxyService.libraryLoaded} loadError=${hev.TProxyService.loadError}",

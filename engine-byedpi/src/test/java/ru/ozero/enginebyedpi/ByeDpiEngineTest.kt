@@ -1,9 +1,14 @@
 package ru.ozero.enginebyedpi
 
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.runs
+import io.mockk.unmockkObject
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.coreapi.EngineConfig
@@ -22,7 +27,16 @@ class ByeDpiEngineTest {
     @BeforeEach
     fun setUp() {
         proxy = mockk(relaxed = true)
+        mockkObject(ByeDpiProxy.Companion)
+        every { ByeDpiProxy.loadOnce() } just runs
+        every { ByeDpiProxy.libraryLoaded } returns true
+        every { ByeDpiProxy.loadError } returns null
         engine = ByeDpiEngine(proxy)
+    }
+
+    @AfterEach
+    fun tearDown() {
+        unmockkObject(ByeDpiProxy.Companion)
     }
 
     @Test

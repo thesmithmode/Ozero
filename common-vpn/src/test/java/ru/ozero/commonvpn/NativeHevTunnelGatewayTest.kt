@@ -3,8 +3,14 @@ package ru.ozero.commonvpn
 import android.os.ParcelFileDescriptor
 import io.mockk.confirmVerified
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.runs
+import io.mockk.unmockkObject
 import io.mockk.verify
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
@@ -14,6 +20,19 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class NativeHevTunnelGatewayTest {
+
+    @BeforeEach
+    fun setUp() {
+        mockkObject(hev.TProxyService)
+        every { hev.TProxyService.loadOnce() } just runs
+        every { hev.TProxyService.libraryLoaded } returns true
+        every { hev.TProxyService.loadError } returns null
+    }
+
+    @AfterEach
+    fun tearDown() {
+        unmockkObject(hev.TProxyService)
+    }
 
     private fun pair(originalFd: Int, dupedFd: Int): Pair<ParcelFileDescriptor, ParcelFileDescriptor> {
         val duped: ParcelFileDescriptor = mockk(relaxed = true) {

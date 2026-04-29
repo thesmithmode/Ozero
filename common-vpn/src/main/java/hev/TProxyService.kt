@@ -18,25 +18,38 @@ object TProxyService {
     var loadError: String? = null
         private set
 
-    init {
-        Log.i(TAG, "loadLibrary begin")
-        runCatching { PersistentLoggers.instance?.info(TAG, "loadLibrary begin") }
-        try {
-            System.loadLibrary("hev-socks5-tunnel")
-            libraryLoaded = true
-            Log.i(TAG, "libhev-socks5-tunnel loaded OK")
-            runCatching { PersistentLoggers.instance?.info(TAG, "libhev-socks5-tunnel loaded OK") }
-        } catch (e: UnsatisfiedLinkError) {
-            loadError = e.message ?: e.javaClass.simpleName
-            Log.e(TAG, "libhev-socks5-tunnel load FAILED: $loadError")
-            runCatching {
-                PersistentLoggers.instance?.error(TAG, "libhev-socks5-tunnel load FAILED: $loadError", e)
-            }
-        } catch (e: SecurityException) {
-            loadError = e.message ?: e.javaClass.simpleName
-            Log.e(TAG, "libhev-socks5-tunnel load denied: $loadError")
-            runCatching {
-                PersistentLoggers.instance?.error(TAG, "libhev-socks5-tunnel load denied: $loadError", e)
+    @Volatile
+    private var loadAttempted: Boolean = false
+    private val loadLock = Any()
+
+    @JvmStatic
+    fun loadOnce() {
+        if (loadAttempted) return
+        synchronized(loadLock) {
+            if (loadAttempted) return
+            Log.i(TAG, "loadLibrary begin")
+            runCatching { PersistentLoggers.instance?.info(TAG, "loadLibrary begin") }
+            try {
+                System.loadLibrary("hev-socks5-tunnel")
+                libraryLoaded = true
+                Log.i(TAG, "libhev-socks5-tunnel loaded OK")
+                runCatching { PersistentLoggers.instance?.info(TAG, "libhev-socks5-tunnel loaded OK") }
+            } catch (e: UnsatisfiedLinkError) {
+                loadError = e.message ?: e.javaClass.simpleName
+                libraryLoaded = false
+                Log.e(TAG, "libhev-socks5-tunnel load FAILED: $loadError")
+                runCatching {
+                    PersistentLoggers.instance?.error(TAG, "libhev-socks5-tunnel load FAILED: $loadError", e)
+                }
+            } catch (e: SecurityException) {
+                loadError = e.message ?: e.javaClass.simpleName
+                libraryLoaded = false
+                Log.e(TAG, "libhev-socks5-tunnel load denied: $loadError")
+                runCatching {
+                    PersistentLoggers.instance?.error(TAG, "libhev-socks5-tunnel load denied: $loadError", e)
+                }
+            } finally {
+                loadAttempted = true
             }
         }
     }
