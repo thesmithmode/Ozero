@@ -198,6 +198,7 @@ class OzeroVpnService : android.net.VpnService() {
         Log.i(TAG, "stopVpn")
         startJobRef.getAndSet(null)?.cancel()
         val fdToClose = tunFdRef.getAndSet(null)
+        closeTunFd(fdToClose)
         serviceScope.launch {
             try {
                 val finished = withTimeoutOrNull(SHUTDOWN_TIMEOUT_MS) {
@@ -205,10 +206,13 @@ class OzeroVpnService : android.net.VpnService() {
                         .onFailure { Log.w(TAG, "pipeline.stop threw", it) }
                 }
                 if (finished == null) {
-                    Log.w(TAG, "pipeline.stop не завершилась за ${SHUTDOWN_TIMEOUT_MS}ms — закрываем fd")
+                    Log.w(TAG, "pipeline.stop не завершилась за ${SHUTDOWN_TIMEOUT_MS}ms — продолжаем cleanup")
+                    PersistentLoggers.instance?.warn(
+                        TAG,
+                        "pipeline.stop timeout ${SHUTDOWN_TIMEOUT_MS}ms — JNI nativeStop возможно завис",
+                    )
                 }
                 withContext(Dispatchers.Main) {
-                    closeTunFd(fdToClose)
                     starting.set(false)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                         stopForeground(STOP_FOREGROUND_REMOVE)

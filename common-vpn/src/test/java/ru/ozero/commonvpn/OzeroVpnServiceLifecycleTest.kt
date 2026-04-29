@@ -147,4 +147,28 @@ class OzeroVpnServiceLifecycleTest {
         assertTrue(tail.contains("libraryLoaded="), "должен логировать результат — успех/нет")
         assertTrue(tail.contains("loadError="), "должен логировать loadError — текст UnsatisfiedLinkError")
     }
+
+    @Test
+    fun `stopVpn закрывает TUN fd ДО запуска корутины с pipeline_stop`() {
+        val stopVpnBody = source.substringAfter("private fun stopVpn()")
+            .substringBefore("\n    internal fun buildTunBuilder")
+        val closeFdIdx = stopVpnBody.indexOf("closeTunFd(")
+        val launchIdx = stopVpnBody.indexOf("serviceScope.launch")
+        assertTrue(
+            closeFdIdx in 0 until launchIdx,
+            "stopVpn обязан вызвать closeTunFd(...) ДО serviceScope.launch — иначе upstream hev " +
+                "worker thread читает оригинальный TUN fd, EOF не приходит, pthread_join в nativeStop " +
+                "зависает на минуты (полевой тест Nubia: 59 сек до FORCE STOP).",
+        )
+    }
+
+    @Test
+    fun `stopVpn передаёт fdToClose в closeTunFd через локальную переменную`() {
+        val stopVpnBody = source.substringAfter("private fun stopVpn()")
+            .substringBefore("\n    internal fun buildTunBuilder")
+        assertTrue(
+            stopVpnBody.contains("tunFdRef.getAndSet(null)"),
+            "stopVpn должен извлечь TUN fd из tunFdRef через getAndSet(null) — атомарно, до launch.",
+        )
+    }
 }

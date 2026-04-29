@@ -90,9 +90,9 @@ class NativeHevTunnelGateway(
     }
 
     override fun stop() {
+        closeDuped()
         runCatching { nativeStop() }
             .onFailure { Log.w(TAG, "TProxyStopService threw", it) }
-        closeDuped()
     }
 
     private fun closeDuped() {
