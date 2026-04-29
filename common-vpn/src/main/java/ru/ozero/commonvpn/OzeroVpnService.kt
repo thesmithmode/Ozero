@@ -121,6 +121,14 @@ class OzeroVpnService : android.net.VpnService() {
             return
         }
         Log.i(TAG, "startVpn")
+        runCatching {
+            Log.i(TAG, "preload native libs (main thread)")
+            PersistentLoggers.instance?.info(TAG, "preload native libs (main thread)")
+            hev.TProxyService.loadOnce()
+        }.onFailure {
+            Log.w(TAG, "TProxyService preload threw", it)
+            PersistentLoggers.instance?.warn(TAG, "TProxyService preload threw", it)
+        }
         val fd = try {
             buildTunBuilder().establish()
         } catch (t: Throwable) {

@@ -82,4 +82,41 @@ class OzeroVpnServiceLifecycleTest {
             "Guard на pipeline обязан вернуть START_NOT_STICKY — нет смысла рестартовать сломанный graph.",
         )
     }
+
+    @Test
+    fun `startVpn preload-ит hev TProxyService на main thread до serviceScope launch`() {
+        val startVpnBody = source.substringAfter("private fun startVpn()")
+            .substringBefore("private fun stopVpn()")
+        val preloadIdx = startVpnBody.indexOf("hev.TProxyService.loadOnce()")
+        val launchIdx = startVpnBody.indexOf("serviceScope.launch")
+        assertTrue(
+            preloadIdx in 0 until launchIdx,
+            "startVpn обязан вызвать hev.TProxyService.loadOnce() ДО serviceScope.launch — " +
+                "loadLibrary на coroutine worker thread триггерит SIGSEGV в vendor libglnubia.so " +
+                "(nubia::Messager::timerLoop) на Nubia/RedMagic. Preload на main thread обходит race " +
+                "vendor performance monitor с loader callback. См. v1.0.3 fix.",
+        )
+    }
+
+    @Test
+    fun `startVpn preload TProxyService не обёрнут в withContext или Dispatchers`() {
+        val startVpnBody = source.substringAfter("private fun startVpn()")
+            .substringBefore("private fun stopVpn()")
+        val preloadIdx = startVpnBody.indexOf("hev.TProxyService.loadOnce()")
+        check(preloadIdx >= 0) { "preload missing — запусти соседний тест preload-ит-hev сначала" }
+        val launchIdx = startVpnBody.indexOf("serviceScope.launch")
+        check(launchIdx > preloadIdx) { "preload должен быть до launch" }
+        val beforeLaunch = startVpnBody.substring(0, launchIdx)
+        val withContextIdx = beforeLaunch.indexOf("withContext(", preloadIdx - 200)
+        if (withContextIdx in 0 until preloadIdx) {
+            val tail = beforeLaunch.substring(withContextIdx)
+            val closes = tail.substring(0, preloadIdx - withContextIdx).count { it == '}' }
+            val opens = tail.substring(0, preloadIdx - withContextIdx).count { it == '{' }
+            assertTrue(
+                closes >= opens,
+                "preload TProxyService обязан выполняться на main thread (контекст onStartCommand→startVpn). " +
+                    "Не оборачивать в withContext(Dispatchers.IO/Default/...) — иначе vendor SIGSEGV вернётся.",
+            )
+        }
+    }
 }
