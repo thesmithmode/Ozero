@@ -33,14 +33,15 @@ class SentinelLogsRegressionTest {
     }
 
     @Test
-    fun `gateway start первой строкой логирует libraryLoaded флаг`() {
+    fun `gateway start логирует libraryLoaded ДО проверки isLoaded`() {
         val body = funBody(gatewaySrc, "start")
-        val libraryLoadedIdx = body.indexOf("start entry libraryLoaded=")
+        val libraryLoadedIdx = body.indexOf("libraryLoaded=")
         val checkIdx = body.indexOf("if (!hev.TProxyService.libraryLoaded)")
         assertTrue(
             libraryLoadedIdx in 0 until checkIdx,
-            "gateway.start должен логировать libraryLoaded ДО проверки — иначе lazy loadLibrary " +
-                "может крашнуть на этапе проверки и мы не узнаем причину",
+            "gateway.start должен логировать libraryLoaded ДО проверки isLoaded — иначе lazy " +
+                "loadLibrary может крашнуть на этапе проверки и мы не узнаем причину. " +
+                "Сейчас лог: 'checkpoint loadOnce returned dt=...ms libraryLoaded=\$loaded'.",
         )
     }
 

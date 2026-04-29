@@ -36,19 +36,11 @@ object TProxyService {
                 "device=${Build.MANUFACTURER}/${Build.BRAND}/${Build.MODEL} " +
                 "sdk=${Build.VERSION.SDK_INT}"
             Log.i(TAG, "loadLibrary begin $ctx")
-            runCatching { PersistentLoggers.instance?.info(TAG, "loadLibrary begin $ctx") }
-            runCatching { dumpVendorMaps() }
             try {
                 System.loadLibrary("hev-socks5-tunnel")
                 libraryLoaded = true
                 val dtMs = (System.nanoTime() - t0) / 1_000_000
                 Log.i(TAG, "libhev-socks5-tunnel loaded OK dt=${dtMs}ms")
-                runCatching {
-                    PersistentLoggers.instance?.info(
-                        TAG,
-                        "libhev-socks5-tunnel loaded OK dt=${dtMs}ms",
-                    )
-                }
             } catch (e: UnsatisfiedLinkError) {
                 loadError = e.message ?: e.javaClass.simpleName
                 libraryLoaded = false
@@ -61,6 +53,7 @@ object TProxyService {
                         e,
                     )
                 }
+                runCatching { dumpVendorMaps() }
             } catch (e: SecurityException) {
                 loadError = e.message ?: e.javaClass.simpleName
                 libraryLoaded = false
@@ -73,6 +66,7 @@ object TProxyService {
                         e,
                     )
                 }
+                runCatching { dumpVendorMaps() }
             } catch (e: Throwable) {
                 loadError = "${e.javaClass.simpleName}: ${e.message ?: "no message"}"
                 libraryLoaded = false
@@ -85,6 +79,7 @@ object TProxyService {
                         e,
                     )
                 }
+                runCatching { dumpVendorMaps() }
             } finally {
                 loadAttempted = true
             }

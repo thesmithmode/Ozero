@@ -126,15 +126,9 @@ class OzeroVpnService : android.net.VpnService() {
             val isMain = android.os.Looper.myLooper() === android.os.Looper.getMainLooper()
             val t0 = System.nanoTime()
             Log.i(TAG, "preload begin thread=$tName main=$isMain")
-            PersistentLoggers.instance?.info(TAG, "preload begin thread=$tName main=$isMain")
             hev.TProxyService.loadOnce()
             val dtMs = (System.nanoTime() - t0) / 1_000_000
             Log.i(
-                TAG,
-                "preload done dt=${dtMs}ms libraryLoaded=${hev.TProxyService.libraryLoaded} " +
-                    "loadError=${hev.TProxyService.loadError}",
-            )
-            PersistentLoggers.instance?.info(
                 TAG,
                 "preload done dt=${dtMs}ms libraryLoaded=${hev.TProxyService.libraryLoaded} " +
                     "loadError=${hev.TProxyService.loadError}",
@@ -161,7 +155,6 @@ class OzeroVpnService : android.net.VpnService() {
         }
         tunFdRef.set(fd)
         Log.i(TAG, "TUN established fd=${fd.fd}")
-        PersistentLoggers.instance?.info(TAG, "TUN established fd=${fd.fd}")
         val job = serviceScope.launch {
             if (stopping.get()) {
                 starting.set(false)
@@ -178,7 +171,7 @@ class OzeroVpnService : android.net.VpnService() {
                         null
                     }
                 }
-                PersistentLoggers.instance?.info(TAG, "pipeline.start result=$result")
+                Log.i(TAG, "pipeline.start result=$result")
                 if (result !is VpnEnginePipeline.Result.Connected) {
                     Log.w(TAG, "pipeline не подключился: $result, останавливаем")
                     stopVpn()
@@ -307,6 +300,7 @@ class OzeroVpnService : android.net.VpnService() {
                 try {
                     startForeground(NOTIFICATION_ID, notification, specialUse)
                 } catch (t: Throwable) {
+                    Log.w(TAG, "startForeground specialUse failed → fallback to manifest type", t)
                     PersistentLoggers.instance?.warn(
                         TAG,
                         "startForeground specialUse failed → fallback to manifest type",
@@ -317,7 +311,7 @@ class OzeroVpnService : android.net.VpnService() {
             } else {
                 startForeground(NOTIFICATION_ID, buildNotification())
             }
-            PersistentLoggers.instance?.info(TAG, "startForeground OK (early)")
+            Log.i(TAG, "startForeground OK (early)")
             true
         } catch (t: Throwable) {
             Log.e(TAG, "startForeground threw on entry", t)

@@ -110,11 +110,24 @@ class TProxyServiceLogTest {
     }
 
     @Test
-    fun `loadOnce дампит vendor maps до loadLibrary`() {
+    fun `loadOnce dumpVendorMaps только на error path не на success`() {
         val body = funBody(source, "loadOnce")
-        val dumpIdx = body.indexOf("dumpVendorMaps")
-        val loadIdx = body.indexOf("System.loadLibrary")
-        assertTrue(dumpIdx in 0 until loadIdx, "vendor maps дамп ОБЯЗАН быть до System.loadLibrary")
+        val tryStart = body.indexOf("try {")
+        val tryBlockEnd = body.indexOf("} catch", tryStart)
+        check(tryStart >= 0 && tryBlockEnd > tryStart) { "try-блок не найден" }
+        val tryBlock = body.substring(tryStart, tryBlockEnd)
+        assertFalse(
+            tryBlock.contains("dumpVendorMaps"),
+            "dumpVendorMaps НЕ должен звониться на success path — это ~30 строк /proc/self/maps " +
+                "на каждый cold start. После v1.0.3 фикса libhev грузится OK и дамп vendor maps " +
+                "избыточен. Звать только в catch блоках для диагностики реальных load failures.",
+        )
+        val catchBlocks = body.substring(tryBlockEnd)
+        assertTrue(
+            catchBlocks.contains("dumpVendorMaps"),
+            "dumpVendorMaps должен звониться в catch блоках — нужен для диагностики Nubia/RedMagic " +
+                "vendor library races на failure path.",
+        )
     }
 
     @Test

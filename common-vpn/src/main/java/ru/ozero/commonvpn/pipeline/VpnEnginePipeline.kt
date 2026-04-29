@@ -39,19 +39,12 @@ class VpnEnginePipeline(
 
     suspend fun start(tunPfd: ParcelFileDescriptor): Result {
         Log.i(TAG, "start tunFd=${tunPfd.fd}")
-        PersistentLoggers.instance?.info(TAG, "pipeline.start tunFd=${tunPfd.fd}")
         ensureCleanStart()
 
         val candidates = strategy.buildCandidates()
-        PersistentLoggers.instance?.info(
-            TAG,
-            "candidates=${candidates.map { it.engineId }}",
-        )
+        Log.i(TAG, "candidates=${candidates.map { it.engineId }}")
         val winner = strategy.pickBest(candidates)
-        PersistentLoggers.instance?.info(
-            TAG,
-            "winner=${winner?.engineId ?: "none"}",
-        )
+        Log.i(TAG, "winner=${winner?.engineId ?: "none"}")
         if (winner == null) {
             val fallback = candidates.firstOrNull { it.engineId == EngineId.BYEDPI }
             if (fallback == null) {
@@ -61,11 +54,7 @@ class VpnEnginePipeline(
                 orchestrator.dispatch(OrchestratorTransition.DisconnectComplete)
                 return Result.NoCandidates
             }
-            Log.w(
-                TAG,
-                "no successful probe, fallback to BYEDPI (best-effort start without probe)",
-            )
-            PersistentLoggers.instance?.info(TAG, "fallback BYEDPI (best-effort)")
+            Log.w(TAG, "fallback BYEDPI (best-effort start without probe)")
             orchestrator.dispatch(OrchestratorTransition.ProbeComplete(fallback.engineId))
             return startCandidate(fallback, tunPfd)
         }
@@ -87,7 +76,7 @@ class VpnEnginePipeline(
             currentEngine.set(null)
             return failConnect(candidate.engineId, "engine.start threw: ${t.message}")
         }
-        PersistentLoggers.instance?.info(TAG, "engine ${candidate.engineId} start → $startResult")
+        Log.i(TAG, "engine ${candidate.engineId} start → $startResult")
         return when (startResult) {
             is StartResult.Failure -> {
                 currentEngine.set(null)
@@ -144,13 +133,10 @@ class VpnEnginePipeline(
         socksPort: Int,
         tunPfd: ParcelFileDescriptor,
     ): Result {
-        PersistentLoggers.instance?.info(
-            TAG,
-            "bringTunnelUp entry engine=$engineId socks=$socksPort tunFd=${tunPfd.fd}",
-        )
+        Log.i(TAG, "bringTunnelUp entry engine=$engineId socks=$socksPort tunFd=${tunPfd.fd}")
         val config = HevTunnelConfig(tunPfd = tunPfd, socksAddress = socksHost, socksPort = socksPort)
         tunnelStarted.set(true)
-        PersistentLoggers.instance?.info(TAG, "tunnelGateway.start invoking")
+        Log.i(TAG, "tunnelGateway.start invoking")
         val code = try {
             tunnelGateway.start(config)
         } catch (t: Throwable) {

@@ -58,15 +58,25 @@ class NativeHevTunnelGatewayLogTest {
     }
 
     @Test
-    fun `все checkpoints дублируются в PersistentLoggers для boot log`() {
-        val checkpointCount = Regex("checkpoint ").findAll(startBody).count()
-        val persistentCount = Regex("PersistentLoggers\\.instance\\?\\.info\\(\\s*TAG,\\s*\"checkpoint ")
-            .findAll(startBody)
-            .count()
+    fun `pre-nativeStart дублируется в PersistentLoggers для boot log`() {
         assertTrue(
-            persistentCount >= checkpointCount / 2,
-            "checkpoints должны попадать в PersistentLoggers (boot.log) — иначе при native crash логи теряются. " +
-                "checkpoints=$checkpointCount, persistent=$persistentCount",
+            startBody.contains("PersistentLoggers.instance?.info(TAG, \"pre-nativeStart"),
+            "pre-nativeStart обязан попадать в boot.log через PersistentLoggers.info — это последняя " +
+                "строка перед blocking JNI TProxyStartService. Если нативка зависает, эта запись " +
+                "укажет точный момент входа в JNI.",
+        )
+    }
+
+    @Test
+    fun `success-path checkpoints не дублируют Log_i и PersistentLoggers_info`() {
+        val successInfoDups = Regex(
+            "Log\\.i\\([^)]*checkpoint [^)]*\\)\\s*\\n\\s*PersistentLoggers\\.instance\\?\\.info",
+        ).findAll(startBody).count()
+        assertTrue(
+            successInfoDups == 0,
+            "Не должно быть пар Log.i + PersistentLoggers.info для success-checkpoints. " +
+                "UnifiedLogger уже пишет в logcat и в файл — двойной канал избыточен. " +
+                "Найдено пар: $successInfoDups.",
         )
     }
 
