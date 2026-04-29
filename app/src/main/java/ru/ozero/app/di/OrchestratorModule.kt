@@ -10,6 +10,7 @@ import ru.ozero.app.settings.SettingsRepository
 import ru.ozero.coreapi.ByeDpiArgsSource
 import ru.ozero.coreapi.Engine
 import ru.ozero.coreapi.EngineId
+import ru.ozero.coreapi.ManualEngineSource
 import ru.ozero.coreorchestrator.CandidateSource
 import ru.ozero.coreorchestrator.Orchestrator
 import ru.ozero.coreorchestrator.StrategyEngine
@@ -32,13 +33,22 @@ object OrchestratorModule {
 
     @Provides
     @Singleton
+    fun provideManualEngineSource(repo: SettingsRepository): ManualEngineSource =
+        ManualEngineSource {
+            repo.settings.map { it.manualEngine }.firstOrNull()
+        }
+
+    @Provides
+    @Singleton
     fun provideStrategyEngine(
         engines: Map<EngineId, @JvmSuppressWildcards Engine>,
         candidateSources: Set<@JvmSuppressWildcards CandidateSource>,
         byedpiArgsSource: ByeDpiArgsSource,
+        manualEngineSource: ManualEngineSource,
     ): StrategyEngine = StrategyEngine(
         engines = engines,
         extraSources = candidateSources.toList(),
         byedpiArgsSource = byedpiArgsSource,
+        manualEngineSource = manualEngineSource,
     )
 }

@@ -43,6 +43,20 @@ class VpnEnginePipeline(
 
         val candidates = strategy.buildCandidates()
         Log.i(TAG, "candidates=${candidates.map { it.engineId }}")
+        val manual = strategy.manualEngine()
+        if (manual != null) {
+            Log.i(TAG, "manual engine=$manual — bypass probe")
+            val pick = candidates.firstOrNull { it.engineId == manual }
+            if (pick == null) {
+                Log.w(TAG, "manual engine=$manual: no candidates available (need server in DB)")
+                PersistentLoggers.instance?.warn(TAG, "manual engine=$manual: no candidates")
+                orchestrator.dispatch(OrchestratorTransition.Disconnect)
+                orchestrator.dispatch(OrchestratorTransition.DisconnectComplete)
+                return Result.NoCandidates
+            }
+            orchestrator.dispatch(OrchestratorTransition.ProbeComplete(pick.engineId))
+            return startCandidate(pick, tunPfd)
+        }
         val winner = strategy.pickBest(candidates)
         Log.i(TAG, "winner=${winner?.engineId ?: "none"}")
         if (winner == null) {

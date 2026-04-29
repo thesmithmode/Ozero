@@ -7,6 +7,7 @@ import ru.ozero.coreapi.ByeDpiArgsSource
 import ru.ozero.coreapi.Engine
 import ru.ozero.coreapi.EngineConfig
 import ru.ozero.coreapi.EngineId
+import ru.ozero.coreapi.ManualEngineSource
 import ru.ozero.coreapi.ProbeResult
 
 data class Candidate(
@@ -39,7 +40,10 @@ class StrategyEngine(
     private val parallelProbeCount: Int = DEFAULT_PARALLEL_PROBE,
     private val udpReachable: () -> Boolean = { true },
     private val byedpiArgsSource: ByeDpiArgsSource? = null,
+    private val manualEngineSource: ManualEngineSource? = null,
 ) {
+
+    suspend fun manualEngine(): EngineId? = manualEngineSource?.current()
 
     suspend fun buildCandidates(): List<Candidate> {
         val list = mutableListOf<Candidate>()
@@ -53,9 +57,11 @@ class StrategyEngine(
             priority = Candidate.PRIORITY_BYEDPI,
         )
         val udpOk = udpReachable()
-        return list
+        val filtered = list
             .filter { udpOk || !it.requiresUdp }
             .sortedByDescending { it.priority }
+        val manual = manualEngineSource?.current()
+        return if (manual != null) filtered.filter { it.engineId == manual } else filtered
     }
 
     suspend fun pickBest(candidates: List<Candidate>): Candidate? {
