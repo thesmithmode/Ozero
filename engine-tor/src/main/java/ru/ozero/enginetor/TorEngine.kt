@@ -23,6 +23,7 @@ class TorEngine(
     private val configBuilder: TorConfigBuilder = TorConfigBuilder(),
     private val bridges: List<TorBridge> = emptyList(),
     private val buildOptions: TorBuildOptions,
+    private val defaultBridges: List<TorBridge> = emptyList(),
 ) : Engine {
 
     override val id = EngineId.TOR
@@ -43,16 +44,17 @@ class TorEngine(
     override suspend fun start(config: EngineConfig): StartResult {
         require(config is EngineConfig.Tor) { "TorEngine требует EngineConfig.Tor" }
 
+        val effectiveBridges = bridges.ifEmpty { defaultBridges }
         val torrc = runCatching {
             configBuilder.build(
-                bridges = bridges,
+                bridges = effectiveBridges,
                 options = buildOptions.copy(socksPort = config.socksPort),
             )
         }.getOrElse {
             return StartResult.Failure(reason = "torrc build: ${it.message}", cause = it)
         }
 
-        Log.i(TAG, "start socksPort=${config.socksPort} bridges=${bridges.size}")
+        Log.i(TAG, "start socksPort=${config.socksPort} bridges=${effectiveBridges.size}")
         return withContext(Dispatchers.IO) {
             try {
                 val code = delegate.startTor(torrc)

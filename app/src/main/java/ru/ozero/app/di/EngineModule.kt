@@ -24,6 +24,7 @@ import ru.ozero.enginenaive.LibNaiveDelegate
 import ru.ozero.enginenaive.NaiveEngine
 import ru.ozero.enginetor.LibTorDelegate
 import ru.ozero.enginetor.TorEngine
+import ru.ozero.enginetor.bridges.TorBridgesJsonParser
 import ru.ozero.enginexray.LibXrayDelegate
 import ru.ozero.enginexray.XrayEngine
 import javax.inject.Singleton
@@ -92,5 +93,13 @@ object EngineModule {
         buildOptions = ru.ozero.enginetor.config.TorBuildOptions(
             dataDir = java.io.File(context.filesDir, "tor").absolutePath,
         ),
+        defaultBridges = loadTorDefaultBridges(context),
     )
+
+    private fun loadTorDefaultBridges(context: Context): List<ru.ozero.enginetor.bridges.TorBridge> =
+        runCatching {
+            context.assets.open("tor-default-bridges.json")
+                .bufferedReader()
+                .use { it.readText() }
+        }.map { TorBridgesJsonParser.parse(it) }.getOrDefault(emptyList())
 }

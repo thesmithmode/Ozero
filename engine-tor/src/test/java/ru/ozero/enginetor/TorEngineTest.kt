@@ -140,4 +140,55 @@ class TorEngineTest {
         assertTrue(cfg.captured.contains("UseBridges 1"))
         assertTrue(cfg.captured.contains("Bridge obfs4 1.1.1.1:443 FP cert=C iat-mode=0"))
     }
+
+    @Test
+    fun startUsesDefaultBridgesWhenUserBridgesEmpty() = runTest {
+        val defaultBridge = TorBridge(
+            transport = "obfs4",
+            address = "9.9.9.9:443",
+            fingerprint = "DEFAULT",
+            args = sortedMapOf("cert" to "DC"),
+        )
+        every { delegate.startTor(any()) } returns 0
+        val cfg = slot<String>()
+        every { delegate.startTor(capture(cfg)) } returns 0
+        TorEngine(
+            delegate,
+            bridges = emptyList(),
+            buildOptions = TorBuildOptions(
+                socksPort = 9050, controlPort = 9051, dataDir = "/tmp/tor",
+                ptBinaries = mapOf("obfs4" to "/lib/obfs4proxy"),
+            ),
+            defaultBridges = listOf(defaultBridge),
+        ).start(EngineConfig.Tor(socksPort = 9050))
+        assertTrue(
+            cfg.captured.contains("Bridge obfs4 9.9.9.9:443 DEFAULT"),
+            "когда user bridges пуст, должны подставиться defaultBridges из assets — " +
+                "иначе Tor в РФ не подключится (direct DPI блок).",
+        )
+    }
+
+    @Test
+    fun `start prioritises user bridges over default когда оба заданы`() = runTest {
+        val userBridge = TorBridge(
+            transport = "obfs4", address = "1.1.1.1:443", fingerprint = "USER",
+        )
+        val defaultBridge = TorBridge(
+            transport = "obfs4", address = "9.9.9.9:443", fingerprint = "DEFAULT",
+        )
+        every { delegate.startTor(any()) } returns 0
+        val cfg = slot<String>()
+        every { delegate.startTor(capture(cfg)) } returns 0
+        TorEngine(
+            delegate,
+            bridges = listOf(userBridge),
+            buildOptions = TorBuildOptions(
+                socksPort = 9050, controlPort = 9051, dataDir = "/tmp/tor",
+                ptBinaries = mapOf("obfs4" to "/lib/obfs4proxy"),
+            ),
+            defaultBridges = listOf(defaultBridge),
+        ).start(EngineConfig.Tor(socksPort = 9050))
+        assertTrue(cfg.captured.contains("USER"), "user bridge должен оказаться в torrc")
+        assertTrue(!cfg.captured.contains("DEFAULT"), "default не должен mixать-ся когда user задал свой")
+    }
 }
