@@ -75,7 +75,10 @@ class LogcatReader(private val buffer: LogBuffer) {
                 }
                 if (linesRead == 0 && !everReadLines) {
                     buffer.append(
-                        diagnostic(LogLevel.WARN, "logcat exited with 0 lines — device restricts log access. AppLogger still works."),
+                        diagnostic(
+                            LogLevel.WARN,
+                            "logcat exited with 0 lines — device restricts log access. AppLogger still works.",
+                        ),
                     )
                 }
                 if (linesRead > 0) {
