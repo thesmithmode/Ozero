@@ -1,9 +1,12 @@
 package hev
 
 import android.util.Log
+import ru.ozero.coreapi.PersistentLoggers
 
 @Suppress("ktlint:standard:function-naming", "FunctionNaming")
 object TProxyService {
+
+    private const val TAG = "TProxyService"
 
     @JvmStatic
     @Volatile
@@ -16,16 +19,25 @@ object TProxyService {
         private set
 
     init {
+        Log.i(TAG, "loadLibrary begin")
+        runCatching { PersistentLoggers.instance?.info(TAG, "loadLibrary begin") }
         try {
             System.loadLibrary("hev-socks5-tunnel")
             libraryLoaded = true
-            Log.i("TProxyService", "libhev-socks5-tunnel loaded OK")
+            Log.i(TAG, "libhev-socks5-tunnel loaded OK")
+            runCatching { PersistentLoggers.instance?.info(TAG, "libhev-socks5-tunnel loaded OK") }
         } catch (e: UnsatisfiedLinkError) {
             loadError = e.message ?: e.javaClass.simpleName
-            Log.e("TProxyService", "libhev-socks5-tunnel load FAILED: $loadError")
+            Log.e(TAG, "libhev-socks5-tunnel load FAILED: $loadError")
+            runCatching {
+                PersistentLoggers.instance?.error(TAG, "libhev-socks5-tunnel load FAILED: $loadError", e)
+            }
         } catch (e: SecurityException) {
             loadError = e.message ?: e.javaClass.simpleName
-            Log.e("TProxyService", "libhev-socks5-tunnel load denied: $loadError")
+            Log.e(TAG, "libhev-socks5-tunnel load denied: $loadError")
+            runCatching {
+                PersistentLoggers.instance?.error(TAG, "libhev-socks5-tunnel load denied: $loadError", e)
+            }
         }
     }
 

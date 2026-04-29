@@ -62,6 +62,16 @@ class OzeroApp : Application(), Configuration.Provider {
             val pid = android.os.Process.myPid()
             AppLogger.i(TAG, "app started pid=$pid sdk=${Build.VERSION.SDK_INT} ${Build.MANUFACTURER}/${Build.MODEL}")
         }.onFailure { BootFileLogger.error(TAG, "AppLogger.attach failed", it) }
+        BootDiagnostics.guardUnit("warmup-libs") {
+            val byedpiLoaded = ru.ozero.enginebyedpi.ByeDpiProxy.libraryLoaded
+            val byedpiErr = ru.ozero.enginebyedpi.ByeDpiProxy.loadError
+            val hevLoaded = hev.TProxyService.libraryLoaded
+            val hevErr = hev.TProxyService.loadError
+            BootFileLogger.info(
+                TAG,
+                "warmup-libs byedpi=$byedpiLoaded(err=$byedpiErr) hev=$hevLoaded(err=$hevErr)",
+            )
+        }
         if (shouldStartSecurityWatchdog()) {
             runCatching { securityWatchdog.start(appScope) }
         } else {

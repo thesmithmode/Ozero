@@ -6,6 +6,7 @@ import android.content.Context
 import android.os.Build
 import kotlinx.coroutines.CoroutineExceptionHandler
 import java.io.BufferedReader
+import java.io.File
 import java.io.InputStreamReader
 
 object BootDiagnostics {
@@ -80,8 +81,23 @@ object BootDiagnostics {
                 val msg = "exit pid=${info.pid} reason=$reasonName status=${info.status} " +
                     "importance=${info.importance} ts=${info.timestamp} desc=${info.description}"
                 BootFileLogger.info(TAG, msg)
-                if (info.reason == ApplicationExitInfo.REASON_CRASH_NATIVE ||
-                    info.reason == ApplicationExitInfo.REASON_ANR ||
+                if (info.reason == ApplicationExitInfo.REASON_CRASH_NATIVE) {
+                    runCatching {
+                        info.traceInputStream?.use { stream ->
+                            val bytes = stream.readBytes()
+                            val debugDir = File(context.filesDir, "debug")
+                            val saved = saveTombstone(debugDir, info.pid, info.timestamp, bytes)
+                            BootFileLogger.error(
+                                TAG,
+                                "tombstone saved pid=${info.pid} bytes=${bytes.size} path=${saved.absolutePath}",
+                            )
+                            val symbols = extractAsciiStrings(bytes)
+                            if (symbols.isNotEmpty()) {
+                                BootFileLogger.error(TAG, "tombstone symbols pid=${info.pid}:\n$symbols")
+                            }
+                        }
+                    }.onFailure { BootFileLogger.warn(TAG, "tombstone read failed pid=${info.pid}", it) }
+                } else if (info.reason == ApplicationExitInfo.REASON_ANR ||
                     info.reason == ApplicationExitInfo.REASON_CRASH
                 ) {
                     runCatching {
@@ -118,6 +134,35 @@ object BootDiagnostics {
         ApplicationExitInfo.REASON_DEPENDENCY_DIED -> "DEPENDENCY_DIED"
         ApplicationExitInfo.REASON_OTHER -> "OTHER"
         else -> "code=$reason"
+    }
+
+    internal fun saveTombstone(debugDir: File, pid: Int, timestamp: Long, bytes: ByteArray): File {
+        if (!debugDir.exists()) debugDir.mkdirs()
+        val file = File(debugDir, "tombstone-$pid-$timestamp.pb")
+        file.writeBytes(bytes)
+        return file
+    }
+
+    internal fun extractAsciiStrings(bytes: ByteArray, minLen: Int = 6): String {
+        val out = StringBuilder()
+        val current = StringBuilder()
+        for (b in bytes) {
+            val v = b.toInt() and 0xFF
+            if (v in 0x20..0x7E) {
+                current.append(v.toChar())
+            } else {
+                if (current.length >= minLen) {
+                    if (out.isNotEmpty()) out.append('\n')
+                    out.append(current)
+                }
+                current.setLength(0)
+            }
+        }
+        if (current.length >= minLen) {
+            if (out.isNotEmpty()) out.append('\n')
+            out.append(current)
+        }
+        return out.toString()
     }
 
     internal fun signalToString(signal: Int): String = when (signal) {

@@ -1,5 +1,8 @@
 package ru.ozero.commonvpn
 
+import android.os.ParcelFileDescriptor
+import io.mockk.every
+import io.mockk.mockk
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import kotlin.test.assertEquals
@@ -8,7 +11,11 @@ import kotlin.test.assertTrue
 
 class HevTunnelConfigTest {
 
-    private fun base() = HevTunnelConfig(tunFd = 7, socksAddress = "127.0.0.1", socksPort = 1080)
+    private fun pfd(fd: Int): ParcelFileDescriptor = mockk {
+        every { this@mockk.fd } returns fd
+    }
+
+    private fun base() = HevTunnelConfig(tunPfd = pfd(7), socksAddress = "127.0.0.1", socksPort = 1080)
 
     @Test
     fun `toYaml содержит обязательные поля upstream формата`() {
@@ -51,23 +58,23 @@ class HevTunnelConfigTest {
         val original = base()
         val copy = original.copy(socksPort = 2080)
         assertEquals(2080, copy.socksPort)
-        assertEquals(7, copy.tunFd)
+        assertEquals(7, copy.tunPfd.fd)
     }
 
     @Test
-    fun `rejects invalid tunFd`() {
+    fun `rejects negative tunFd`() {
         assertThrows<IllegalArgumentException> {
-            HevTunnelConfig(tunFd = -1, socksAddress = "127.0.0.1", socksPort = 1080)
+            HevTunnelConfig(tunPfd = pfd(-1), socksAddress = "127.0.0.1", socksPort = 1080)
         }
     }
 
     @Test
     fun `rejects invalid port`() {
         assertThrows<IllegalArgumentException> {
-            HevTunnelConfig(tunFd = 5, socksAddress = "127.0.0.1", socksPort = 0)
+            HevTunnelConfig(tunPfd = pfd(5), socksAddress = "127.0.0.1", socksPort = 0)
         }
         assertThrows<IllegalArgumentException> {
-            HevTunnelConfig(tunFd = 5, socksAddress = "127.0.0.1", socksPort = 65536)
+            HevTunnelConfig(tunPfd = pfd(5), socksAddress = "127.0.0.1", socksPort = 65536)
         }
     }
 
@@ -75,7 +82,7 @@ class HevTunnelConfigTest {
     fun `rejects yaml injection in address`() {
         assertThrows<IllegalArgumentException> {
             HevTunnelConfig(
-                tunFd = 5,
+                tunPfd = pfd(5),
                 socksAddress = "127.0.0.1\n  evil: true",
                 socksPort = 1080,
             )
@@ -85,14 +92,51 @@ class HevTunnelConfigTest {
     @Test
     fun `rejects invalid mtu`() {
         assertThrows<IllegalArgumentException> {
-            HevTunnelConfig(tunFd = 5, socksAddress = "127.0.0.1", socksPort = 1080, tunMtu = 100)
+            HevTunnelConfig(tunPfd = pfd(5), socksAddress = "127.0.0.1", socksPort = 1080, tunMtu = 100)
         }
     }
 
     @Test
     fun `rejects invalid udpMode`() {
         assertThrows<IllegalArgumentException> {
-            HevTunnelConfig(tunFd = 5, socksAddress = "127.0.0.1", socksPort = 1080, udpMode = "invalid")
+            HevTunnelConfig(tunPfd = pfd(5), socksAddress = "127.0.0.1", socksPort = 1080, udpMode = "invalid")
         }
+    }
+
+    @Test
+    fun `rejects out of range mtu high`() {
+        assertThrows<IllegalArgumentException> {
+            HevTunnelConfig(tunPfd = pfd(5), socksAddress = "127.0.0.1", socksPort = 1080, tunMtu = 70000)
+        }
+    }
+
+    @Test
+    fun `rejects yaml injection in ipv4`() {
+        assertThrows<IllegalArgumentException> {
+            HevTunnelConfig(
+                tunPfd = pfd(5),
+                socksAddress = "127.0.0.1",
+                socksPort = 1080,
+                tunIpv4 = "10.0.0.1\nevil: y",
+            )
+        }
+    }
+
+    @Test
+    fun `rejects yaml injection in ipv6`() {
+        assertThrows<IllegalArgumentException> {
+            HevTunnelConfig(
+                tunPfd = pfd(5),
+                socksAddress = "127.0.0.1",
+                socksPort = 1080,
+                tunIpv6 = "fd00:: ' \nevil: y",
+            )
+        }
+    }
+
+    @Test
+    fun `accepts tcp udpMode`() {
+        val cfg = HevTunnelConfig(tunPfd = pfd(5), socksAddress = "127.0.0.1", socksPort = 1080, udpMode = "tcp")
+        assertTrue(cfg.toYaml().contains("udp: 'tcp'"))
     }
 }

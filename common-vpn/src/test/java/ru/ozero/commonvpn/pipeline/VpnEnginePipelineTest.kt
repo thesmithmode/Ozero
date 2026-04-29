@@ -1,5 +1,8 @@
 package ru.ozero.commonvpn.pipeline
 
+import android.os.ParcelFileDescriptor
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +33,10 @@ class VpnEnginePipelineTest {
     private val tunFd = 42
     private val socksPort = 1080
 
+    private fun pfd(fd: Int = tunFd): ParcelFileDescriptor = mockk {
+        every { this@mockk.fd } returns fd
+    }
+
     @Test
     fun `start picks engine with successful probe and brings tunnel up`() = runTest {
         val byedpi = FakeEngine(
@@ -38,13 +45,14 @@ class VpnEnginePipelineTest {
             startResult = StartResult.Success(socksPort = socksPort),
         )
         val handle = newPipeline(mapOf(EngineId.BYEDPI to byedpi as Engine))
+        val pfd = pfd()
 
-        val result = handle.start(tunFd)
+        val result = handle.start(pfd)
 
         assertIs<VpnEnginePipeline.Result.Connected>(result)
         assertTrue(byedpi.startCalled, "engine.start должен вызваться")
         val cfg = assertNotNull(handle.tunnelGateway.startedConfig, "hev-tunnel должен подняться")
-        assertEquals(tunFd, cfg.tunFd)
+        assertEquals(tunFd, cfg.tunPfd.fd)
         assertEquals(socksPort, cfg.socksPort)
         assertIs<TunnelState.Connected>(handle.tunnelController.state.value)
         assertIs<OrchestratorState.Connected>(handle.orchestrator.state.value)
@@ -60,7 +68,7 @@ class VpnEnginePipelineTest {
         val handle = newPipeline(mapOf(EngineId.BYEDPI to byedpi as Engine))
         handle.orchestrator.dispatch(ru.ozero.coreorchestrator.OrchestratorTransition.Connect)
 
-        val result = handle.start(tunFd)
+        val result = handle.start(pfd())
 
         assertIs<VpnEnginePipeline.Result.Connected>(result)
         assertIs<OrchestratorState.Connected>(handle.orchestrator.state.value)
@@ -75,7 +83,7 @@ class VpnEnginePipelineTest {
         )
         val handle = newPipeline(mapOf(EngineId.BYEDPI to byedpi as Engine))
 
-        val result = handle.start(tunFd)
+        val result = handle.start(pfd())
 
         assertIs<VpnEnginePipeline.Result.Connected>(result)
         assertTrue(byedpi.startCalled, "fallback должен вызвать engine.start")
@@ -91,7 +99,7 @@ class VpnEnginePipelineTest {
         )
         val handle = newPipeline(mapOf(EngineId.BYEDPI to byedpi as Engine))
 
-        val result = handle.start(tunFd)
+        val result = handle.start(pfd())
 
         assertIs<VpnEnginePipeline.Result.Connected>(result)
         assertTrue(byedpi.startCalled, "fallback после probe exception должен запустить engine")
@@ -106,7 +114,7 @@ class VpnEnginePipelineTest {
         )
         val handle = newPipeline(mapOf(EngineId.BYEDPI to byedpi as Engine))
 
-        val result = handle.start(tunFd)
+        val result = handle.start(pfd())
 
         assertIs<VpnEnginePipeline.Result.EngineFailed>(result)
         assertNull(handle.tunnelGateway.startedConfig, "tunnel не поднимается при engine fail")
@@ -123,7 +131,7 @@ class VpnEnginePipelineTest {
         val gateway = FakeHevGateway(returnCode = 1)
         val handle = newPipeline(mapOf(EngineId.BYEDPI to byedpi as Engine), gateway)
 
-        val result = handle.start(tunFd)
+        val result = handle.start(pfd())
 
         assertIs<VpnEnginePipeline.Result.TunnelFailed>(result)
         assertTrue(byedpi.stopCalled, "engine откатили после провала туннеля")
@@ -137,12 +145,12 @@ class VpnEnginePipelineTest {
             startResult = StartResult.Success(socksPort = socksPort),
         )
         val handle = newPipeline(mapOf(EngineId.BYEDPI to byedpi as Engine))
-        handle.start(tunFd)
+        handle.start(pfd())
         assertIs<OrchestratorState.Connected>(handle.orchestrator.state.value)
         byedpi.stopCalled = false
         handle.tunnelGateway.stopCalled = false
 
-        val result = handle.start(tunFd)
+        val result = handle.start(pfd())
 
         assertIs<VpnEnginePipeline.Result.Connected>(result)
         assertTrue(byedpi.stopCalled, "previous engine.stop должен вызваться перед reconnect")
@@ -158,7 +166,7 @@ class VpnEnginePipelineTest {
         )
         val handle = newPipeline(mapOf(EngineId.BYEDPI to byedpi as Engine))
 
-        handle.start(tunFd)
+        handle.start(pfd())
         handle.stop()
 
         assertTrue(handle.tunnelGateway.stopCalled, "hev-tunnel.stop должен вызваться")
@@ -190,7 +198,7 @@ class VpnEnginePipelineTest {
         val tunnelController: TunnelController,
         val orchestrator: Orchestrator,
     ) {
-        suspend fun start(tunFd: Int) = pipeline.start(tunFd)
+        suspend fun start(tunPfd: ParcelFileDescriptor) = pipeline.start(tunPfd)
         suspend fun stop() = pipeline.stop()
     }
 

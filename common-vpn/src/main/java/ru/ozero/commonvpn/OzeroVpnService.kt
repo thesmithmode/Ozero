@@ -148,7 +148,7 @@ class OzeroVpnService : android.net.VpnService() {
             try {
                 val result = withTimeoutOrNull(PIPELINE_START_TIMEOUT_MS) {
                     try {
-                        pipeline.start(tunFd = fd.fd)
+                        pipeline.start(tunPfd = fd)
                     } catch (ce: kotlinx.coroutines.CancellationException) {
                         throw ce
                     } catch (t: Throwable) {

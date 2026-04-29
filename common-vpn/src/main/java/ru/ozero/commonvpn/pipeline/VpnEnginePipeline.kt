@@ -1,5 +1,6 @@
 package ru.ozero.commonvpn.pipeline
 
+import android.os.ParcelFileDescriptor
 import android.util.Log
 import kotlinx.coroutines.CancellationException
 import ru.ozero.commonvpn.HevTunnelConfig
@@ -36,9 +37,9 @@ class VpnEnginePipeline(
         data class TunnelFailed(val engineId: EngineId, val code: Int) : Result()
     }
 
-    suspend fun start(tunFd: Int): Result {
-        Log.i(TAG, "start tunFd=$tunFd")
-        PersistentLoggers.instance?.info(TAG, "pipeline.start tunFd=$tunFd")
+    suspend fun start(tunPfd: ParcelFileDescriptor): Result {
+        Log.i(TAG, "start tunFd=${tunPfd.fd}")
+        PersistentLoggers.instance?.info(TAG, "pipeline.start tunFd=${tunPfd.fd}")
         ensureCleanStart()
 
         val candidates = strategy.buildCandidates()
@@ -66,13 +67,13 @@ class VpnEnginePipeline(
             )
             PersistentLoggers.instance?.info(TAG, "fallback BYEDPI (best-effort)")
             orchestrator.dispatch(OrchestratorTransition.ProbeComplete(fallback.engineId))
-            return startCandidate(fallback, tunFd)
+            return startCandidate(fallback, tunPfd)
         }
         orchestrator.dispatch(OrchestratorTransition.ProbeComplete(winner.engineId))
-        return startCandidate(winner, tunFd)
+        return startCandidate(winner, tunPfd)
     }
 
-    private suspend fun startCandidate(candidate: Candidate, tunFd: Int): Result {
+    private suspend fun startCandidate(candidate: Candidate, tunPfd: ParcelFileDescriptor): Result {
         val engine = engines[candidate.engineId]
             ?: return failConnect(candidate.engineId, "engine не найден в DI map")
 
@@ -92,7 +93,7 @@ class VpnEnginePipeline(
                 currentEngine.set(null)
                 failConnect(candidate.engineId, startResult.reason)
             }
-            is StartResult.Success -> bringTunnelUp(engine, candidate.engineId, startResult.socksPort, tunFd)
+            is StartResult.Success -> bringTunnelUp(engine, candidate.engineId, startResult.socksPort, tunPfd)
         }
     }
 
@@ -141,10 +142,15 @@ class VpnEnginePipeline(
         engine: Engine,
         engineId: EngineId,
         socksPort: Int,
-        tunFd: Int,
+        tunPfd: ParcelFileDescriptor,
     ): Result {
-        val config = HevTunnelConfig(tunFd = tunFd, socksAddress = socksHost, socksPort = socksPort)
+        PersistentLoggers.instance?.info(
+            TAG,
+            "bringTunnelUp entry engine=$engineId socks=$socksPort tunFd=${tunPfd.fd}",
+        )
+        val config = HevTunnelConfig(tunPfd = tunPfd, socksAddress = socksHost, socksPort = socksPort)
         tunnelStarted.set(true)
+        PersistentLoggers.instance?.info(TAG, "tunnelGateway.start invoking")
         val code = try {
             tunnelGateway.start(config)
         } catch (t: Throwable) {

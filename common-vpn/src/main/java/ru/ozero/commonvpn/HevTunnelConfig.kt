@@ -1,7 +1,9 @@
 package ru.ozero.commonvpn
 
+import android.os.ParcelFileDescriptor
+
 data class HevTunnelConfig(
-    val tunFd: Int,
+    val tunPfd: ParcelFileDescriptor,
     val socksAddress: String,
     val socksPort: Int,
     val tunMtu: Int = DEFAULT_TUN_MTU,
@@ -10,7 +12,7 @@ data class HevTunnelConfig(
     val udpMode: String = DEFAULT_UDP_MODE,
 ) {
     init {
-        require(tunFd >= 0) { "tunFd должен быть неотрицательным" }
+        require(tunPfd.fd >= 0) { "tunPfd.fd должен быть неотрицательным" }
         require(socksPort in 1..65535) { "socksPort вне диапазона: $socksPort" }
         require(tunMtu in 576..65535) { "tunMtu вне разумного диапазона: $tunMtu" }
         require(isSafeAddress(socksAddress)) { "socksAddress содержит недопустимые символы" }
