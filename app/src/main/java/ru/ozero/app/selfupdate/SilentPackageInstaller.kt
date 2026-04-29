@@ -1,5 +1,6 @@
 package ru.ozero.app.selfupdate
 
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -28,6 +29,7 @@ open class SilentPackageInstaller(
         data class PermissionDenied(val reason: String) : Result()
     }
 
+    @SuppressLint("NewApi")
     open suspend fun install(
         apkFile: File,
         sessionName: String = DEFAULT_SESSION_NAME,
