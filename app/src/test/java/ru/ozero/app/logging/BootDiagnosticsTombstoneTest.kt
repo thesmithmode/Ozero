@@ -81,8 +81,12 @@ class BootDiagnosticsTombstoneTest {
     fun `dumpExitReasons CRASH_NATIVE branch использует saveTombstone и extractAsciiStrings`() {
         val src = readSelfSource()
         val nativeBranch = src.substringAfter("REASON_CRASH_NATIVE)").substringBefore("else if (info.reason")
-        assertContains(nativeBranch, "saveTombstone(", "CRASH_NATIVE ветка обязана сохранять бинарь")
-        assertContains(nativeBranch, "extractAsciiStrings(", "CRASH_NATIVE ветка обязана извлекать читаемые ASCII")
+        assertContains(nativeBranch, "saveTombstone(", message = "CRASH_NATIVE ветка обязана сохранять бинарь")
+        assertContains(
+            nativeBranch,
+            "extractAsciiStrings(",
+            message = "CRASH_NATIVE ветка обязана извлекать читаемые ASCII",
+        )
         assertTrue(
             !nativeBranch.contains("BufferedReader"),
             "CRASH_NATIVE НЕ должен читать через BufferedReader — это бинарный protobuf, выход — каракули",
@@ -95,7 +99,7 @@ class BootDiagnosticsTombstoneTest {
         val textBranch = src
             .substringAfter("REASON_ANR ||")
             .substringBefore("if (info.reason == ApplicationExitInfo.REASON_SIGNALED)")
-        assertContains(textBranch, "BufferedReader", "JVM/ANR трейсы — текст, должен читаться построчно")
+        assertContains(textBranch, "BufferedReader", message = "JVM/ANR трейсы — текст, должен читаться построчно")
     }
 
     private fun readSelfSource(): String {
