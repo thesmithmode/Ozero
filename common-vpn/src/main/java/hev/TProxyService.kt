@@ -73,6 +73,18 @@ object TProxyService {
                         e,
                     )
                 }
+            } catch (e: Throwable) {
+                loadError = "${e.javaClass.simpleName}: ${e.message ?: "no message"}"
+                libraryLoaded = false
+                val dtMs = (System.nanoTime() - t0) / 1_000_000
+                Log.e(TAG, "libhev-socks5-tunnel load THROWN dt=${dtMs}ms: $loadError", e)
+                runCatching {
+                    PersistentLoggers.instance?.error(
+                        TAG,
+                        "libhev-socks5-tunnel load THROWN dt=${dtMs}ms: $loadError",
+                        e,
+                    )
+                }
             } finally {
                 loadAttempted = true
             }
@@ -105,4 +117,7 @@ object TProxyService {
 
     @JvmStatic
     external fun TProxyStopService()
+
+    @JvmStatic
+    external fun TProxyGetStats(): LongArray
 }

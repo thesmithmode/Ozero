@@ -48,6 +48,20 @@ class JniContractTest {
     }
 
     @Test
+    fun `external fun TProxyGetStats имеет сигнатуру () LongArray`() {
+        val source = File(moduleRoot, "src/main/java/hev/TProxyService.kt").readText()
+        val pattern = "external\\s+fun\\s+TProxyGetStats\\s*\\(\\s*\\)\\s*:\\s*LongArray"
+        val ok = Regex(pattern).containsMatchIn(source)
+        assertTrue(
+            ok,
+            "TProxyGetStats обязан быть `external fun TProxyGetStats(): LongArray` — " +
+                "upstream src/hev-jni.c регистрирует 3 native метода (StartService, StopService, GetStats). " +
+                "Если Kotlin-объявление отсутствует, RegisterNatives бросает NoSuchMethodError при " +
+                "System.loadLibrary, libhev не грузится, VPN тоннель не поднимается.",
+        )
+    }
+
+    @Test
     fun `loadLibrary имя совпадает с именем so-файла из release pipeline`() {
         val source = File(moduleRoot, "src/main/java/hev/TProxyService.kt").readText()
         assertTrue(

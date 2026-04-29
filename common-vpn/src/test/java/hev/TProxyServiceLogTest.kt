@@ -39,6 +39,26 @@ class TProxyServiceLogTest {
     }
 
     @Test
+    fun `loadOnce ловит generic Throwable и сохраняет loadError`() {
+        val loadOnceBody = funBody(source, "loadOnce")
+        assertTrue(
+            loadOnceBody.contains("catch (e: Throwable)") ||
+                loadOnceBody.contains("catch(e: Throwable)") ||
+                loadOnceBody.contains("catch (e: java.lang.Throwable)"),
+            "loadOnce обязан иметь catch (e: Throwable) — System.loadLibrary может бросить " +
+                "NoSuchMethodError (RegisterNatives mismatch), LinkageError, ClassNotFoundException и т.д. " +
+                "Без generic catch loadError остаётся null, libraryLoaded=false, и NativeHevTunnel " +
+                "репортит 'libhev not loaded: null' вместо реальной причины.",
+        )
+        val loadErrorAssignments = Regex("loadError\\s*=\\s*").findAll(loadOnceBody).count()
+        assertTrue(
+            loadErrorAssignments >= 3,
+            "loadError должен заполняться во всех catch-блоках (минимум 3: UnsatisfiedLinkError, " +
+                "SecurityException, Throwable). Найдено присваиваний: $loadErrorAssignments",
+        )
+    }
+
+    @Test
     fun `loadOnce идемпотентен через loadAttempted флаг`() {
         val loadOnceBody = funBody(source, "loadOnce")
         assertTrue(
