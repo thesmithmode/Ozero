@@ -112,15 +112,7 @@ class OzeroVpnService : android.net.VpnService() {
         }
         Log.i(TAG, "startVpn")
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                startForeground(
-                    NOTIFICATION_ID,
-                    buildNotification(),
-                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
-                )
-            } else {
-                startForeground(NOTIFICATION_ID, buildNotification())
-            }
+            startForegroundCompat(buildNotification())
             PersistentLoggers.instance?.info(TAG, "startForeground OK")
         } catch (t: Throwable) {
             Log.e(TAG, "startForeground threw", t)
@@ -225,6 +217,27 @@ class OzeroVpnService : android.net.VpnService() {
         ru.ozero.commonvpn.split.TunBuilderConfigurator(packageName)
             .apply(builder, splitConfig)
         return builder
+    }
+
+    private fun startForegroundCompat(notification: Notification) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(NOTIFICATION_ID, notification)
+            return
+        }
+
+        val specialUse = android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+        val fallback = android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MANIFEST
+
+        runCatching {
+            startForeground(NOTIFICATION_ID, notification, specialUse)
+        }.onFailure { firstError ->
+            PersistentLoggers.instance?.warn(
+                TAG,
+                "startForeground specialUse failed, fallback to manifest type",
+                firstError,
+            )
+            startForeground(NOTIFICATION_ID, notification, fallback)
+        }.getOrThrow()
     }
 
     private fun buildNotification(): Notification {
