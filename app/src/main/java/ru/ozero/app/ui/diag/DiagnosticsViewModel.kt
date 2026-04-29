@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import ru.ozero.coreorchestrator.Orchestrator
 import ru.ozero.coreorchestrator.OrchestratorState
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 
 private const val TAG = "DiagnosticsVM"
@@ -41,9 +42,16 @@ class DiagnosticsViewModel @Inject constructor(
         if (current !is OrchestratorState.Connected) return
         runJob?.cancel()
         runJob = viewModelScope.launch {
-            _uiState.value = DiagnosticsUiState.Running(total = DiagnosticTargets.URLS.size, completed = 0)
+            val total = DiagnosticTargets.URLS.size
+            val completed = AtomicInteger(0)
+            _uiState.value = DiagnosticsUiState.Running(total = total, completed = 0)
             try {
-                val results = engine.runAll(current.socksPort)
+                val results = engine.runAll(current.socksPort) {
+                    _uiState.value = DiagnosticsUiState.Running(
+                        total = total,
+                        completed = completed.incrementAndGet(),
+                    )
+                }
                 _uiState.value = DiagnosticsUiState.Done(results)
             } catch (e: CancellationException) {
                 throw e

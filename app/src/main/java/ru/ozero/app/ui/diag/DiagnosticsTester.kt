@@ -37,9 +37,18 @@ class DiagnosticsTester(
             .build()
     }
 
-    suspend fun runAll(urls: List<String> = DiagnosticTargets.URLS): List<DiagResult> = coroutineScope {
+    suspend fun runAll(
+        urls: List<String> = DiagnosticTargets.URLS,
+        onTestDone: (DiagResult) -> Unit = {},
+    ): List<DiagResult> = coroutineScope {
         urls.map { url ->
-            async(Dispatchers.IO) { semaphore.withPermit { test(url) } }
+            async(Dispatchers.IO) {
+                semaphore.withPermit {
+                    val result = test(url)
+                    onTestDone(result)
+                    result
+                }
+            }
         }.awaitAll()
     }
 

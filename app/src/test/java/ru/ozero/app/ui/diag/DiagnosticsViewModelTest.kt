@@ -130,6 +130,35 @@ class DiagnosticsViewModelTest {
         assertIs<DiagnosticsUiState.NotConnected>(viewModel.uiState.value)
     }
 
+    @Test
+    fun `onRun эмитит Running(completed=N) на каждый onTestDone callback`() = runTest {
+        connect(socksPort = 1080)
+        advanceUntilIdle()
+
+        val progressEngine = ProgressEmittingEngine()
+        val vm = DiagnosticsViewModel(orchestrator, progressEngine)
+
+        vm.onRun()
+        advanceUntilIdle()
+        assertIs<DiagnosticsUiState.Running>(vm.uiState.value)
+
+        progressEngine.emitOne(DiagResult.Success("https://a", 100, 200))
+        advanceUntilIdle()
+        val s1 = vm.uiState.value
+        assertIs<DiagnosticsUiState.Running>(s1)
+        assertEquals(1, s1.completed, "после первого onTestDone completed=1")
+
+        progressEngine.emitOne(DiagResult.Success("https://b", 110, 200))
+        advanceUntilIdle()
+        val s2 = vm.uiState.value
+        assertIs<DiagnosticsUiState.Running>(s2)
+        assertEquals(2, s2.completed, "после второго onTestDone completed=2")
+
+        progressEngine.complete()
+        advanceUntilIdle()
+        assertIs<DiagnosticsUiState.Done>(vm.uiState.value)
+    }
+
     private fun connect(socksPort: Int) {
         orchestrator.dispatch(OrchestratorTransition.Connect)
         orchestrator.dispatch(OrchestratorTransition.ProbeComplete(EngineId.BYEDPI))
@@ -141,10 +170,30 @@ class DiagnosticsViewModelTest {
         var lastPort = -1
         val deferred = CompletableDeferred<List<DiagResult>>()
 
-        override suspend fun runAll(socksPort: Int): List<DiagResult> {
+        override suspend fun runAll(socksPort: Int, onTestDone: (DiagResult) -> Unit): List<DiagResult> {
             invocations++
             lastPort = socksPort
             return deferred.await()
+        }
+    }
+
+    private class ProgressEmittingEngine : DiagnosticsEngine {
+        private val results = mutableListOf<DiagResult>()
+        private var callback: ((DiagResult) -> Unit)? = null
+        private val done = CompletableDeferred<List<DiagResult>>()
+
+        override suspend fun runAll(socksPort: Int, onTestDone: (DiagResult) -> Unit): List<DiagResult> {
+            callback = onTestDone
+            return done.await()
+        }
+
+        fun emitOne(r: DiagResult) {
+            results += r
+            callback?.invoke(r)
+        }
+
+        fun complete() {
+            done.complete(results.toList())
         }
     }
 }
