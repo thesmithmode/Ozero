@@ -235,5 +235,6 @@ class SettingsViewModelTest {
         }
         override suspend fun setUrnetworkEnabled(enabled: Boolean) = Unit
         override suspend fun setUrnetworkJwt(jwt: String?) = Unit
+        override suspend fun setByedpiWinningArgs(args: String?) = Unit
     }
 }
