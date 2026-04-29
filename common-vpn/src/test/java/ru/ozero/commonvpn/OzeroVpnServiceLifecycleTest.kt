@@ -119,4 +119,32 @@ class OzeroVpnServiceLifecycleTest {
             )
         }
     }
+
+    @Test
+    fun `startVpn preload логирует thread name main looper для диагностики`() {
+        val startVpnBody = source.substringAfter("private fun startVpn()")
+            .substringBefore("private fun stopVpn()")
+        val preloadIdx = startVpnBody.indexOf("hev.TProxyService.loadOnce()")
+        check(preloadIdx >= 0) { "preload missing" }
+        val window = startVpnBody.substring(maxOf(0, preloadIdx - 500), preloadIdx)
+        assertTrue(window.contains("preload begin"), "preload должен иметь begin лог")
+        assertTrue(window.contains("Thread.currentThread().name"), "preload должен логировать имя треда")
+        assertTrue(
+            window.contains("Looper.myLooper()") && window.contains("Looper.getMainLooper()"),
+            "preload должен логировать isMain — диагностика Nubia race",
+        )
+    }
+
+    @Test
+    fun `startVpn preload логирует timing и libraryLoaded после loadOnce`() {
+        val startVpnBody = source.substringAfter("private fun startVpn()")
+            .substringBefore("private fun stopVpn()")
+        val preloadIdx = startVpnBody.indexOf("hev.TProxyService.loadOnce()")
+        check(preloadIdx >= 0) { "preload missing" }
+        val tail = startVpnBody.substring(preloadIdx, minOf(startVpnBody.length, preloadIdx + 800))
+        assertTrue(tail.contains("preload done"), "должен логировать done после loadOnce")
+        assertTrue(tail.contains("dt="), "должен логировать timing — отличить мгновенный краш от deadlock")
+        assertTrue(tail.contains("libraryLoaded="), "должен логировать результат — успех/нет")
+        assertTrue(tail.contains("loadError="), "должен логировать loadError — текст UnsatisfiedLinkError")
+    }
 }

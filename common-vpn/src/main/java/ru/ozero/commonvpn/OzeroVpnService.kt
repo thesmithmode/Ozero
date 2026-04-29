@@ -122,9 +122,23 @@ class OzeroVpnService : android.net.VpnService() {
         }
         Log.i(TAG, "startVpn")
         runCatching {
-            Log.i(TAG, "preload native libs (main thread)")
-            PersistentLoggers.instance?.info(TAG, "preload native libs (main thread)")
+            val tName = Thread.currentThread().name
+            val isMain = android.os.Looper.myLooper() === android.os.Looper.getMainLooper()
+            val t0 = System.nanoTime()
+            Log.i(TAG, "preload begin thread=$tName main=$isMain")
+            PersistentLoggers.instance?.info(TAG, "preload begin thread=$tName main=$isMain")
             hev.TProxyService.loadOnce()
+            val dtMs = (System.nanoTime() - t0) / 1_000_000
+            Log.i(
+                TAG,
+                "preload done dt=${dtMs}ms libraryLoaded=${hev.TProxyService.libraryLoaded} " +
+                    "loadError=${hev.TProxyService.loadError}",
+            )
+            PersistentLoggers.instance?.info(
+                TAG,
+                "preload done dt=${dtMs}ms libraryLoaded=${hev.TProxyService.libraryLoaded} " +
+                    "loadError=${hev.TProxyService.loadError}",
+            )
         }.onFailure {
             Log.w(TAG, "TProxyService preload threw", it)
             PersistentLoggers.instance?.warn(TAG, "TProxyService preload threw", it)

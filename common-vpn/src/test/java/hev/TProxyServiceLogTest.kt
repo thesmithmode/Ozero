@@ -65,6 +65,50 @@ class TProxyServiceLogTest {
         )
     }
 
+    @Test
+    fun `loadOnce логирует thread name id main looper для диагностики Nubia race`() {
+        val body = funBody(source, "loadOnce")
+        assertTrue(body.contains("thread="), "должен логировать имя треда")
+        assertTrue(body.contains("tid="), "должен логировать thread id")
+        assertTrue(body.contains("main="), "должен логировать isMainLooper — критично для Nubia/RedMagic")
+        assertTrue(body.contains("Looper.getMainLooper()"), "должен сравнивать с main looper")
+    }
+
+    @Test
+    fun `loadOnce логирует Build manufacturer brand model для device fingerprint`() {
+        val body = funBody(source, "loadOnce")
+        assertTrue(body.contains("Build.MANUFACTURER"), "device fingerprint обязателен — Nubia-specific краш")
+        assertTrue(body.contains("Build.BRAND"), "BRAND нужен — RedMagic vs обычный Nubia")
+        assertTrue(body.contains("Build.MODEL"), "MODEL нужен — какой именно девайс")
+    }
+
+    @Test
+    fun `loadOnce логирует timing dt в ms для load library`() {
+        val body = funBody(source, "loadOnce")
+        assertTrue(body.contains("dt="), "timing нужен — отличить мгновенный краш от deadlock")
+        assertTrue(body.contains("System.nanoTime()"), "timing через nanoTime")
+    }
+
+    @Test
+    fun `loadOnce дампит vendor maps до loadLibrary`() {
+        val body = funBody(source, "loadOnce")
+        val dumpIdx = body.indexOf("dumpVendorMaps")
+        val loadIdx = body.indexOf("System.loadLibrary")
+        assertTrue(dumpIdx in 0 until loadIdx, "vendor maps дамп ОБЯЗАН быть до System.loadLibrary")
+    }
+
+    @Test
+    fun `dumpVendorMaps читает proc self maps и фильтрует vendor keywords`() {
+        assertTrue(source.contains("/proc/self/maps"), "должен читать /proc/self/maps")
+        assertTrue(
+            source.contains("\"nubia\"") &&
+                source.contains("\"glnubia\"") &&
+                source.contains("\"perf\""),
+            "ключевые слова nubia/glnubia/perf должны фильтроваться",
+        )
+        assertTrue(source.contains("MAX_MAPS_LINES"), "должен ограничить вывод чтобы не флудить boot.log")
+    }
+
     private fun funBody(src: String, name: String): String {
         val patterns = listOf("fun $name(", "fun $name (")
         var idx = -1

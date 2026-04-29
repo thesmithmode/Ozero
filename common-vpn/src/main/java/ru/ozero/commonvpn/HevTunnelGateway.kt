@@ -26,10 +26,16 @@ class NativeHevTunnelGateway(
     private val dupedRef = AtomicReference<ParcelFileDescriptor?>(null)
 
     override fun start(config: HevTunnelConfig): Int {
+        val tName = Thread.currentThread().name
+        Log.i(TAG, "start entry thread=$tName originalFd=${config.tunPfd.fd}")
+        PersistentLoggers.instance?.info(TAG, "start entry thread=$tName originalFd=${config.tunPfd.fd}")
+
+        val tLoad0 = System.nanoTime()
         hev.TProxyService.loadOnce()
+        val tLoadMs = (System.nanoTime() - tLoad0) / 1_000_000
         PersistentLoggers.instance?.info(
             TAG,
-            "start entry libraryLoaded=${hev.TProxyService.libraryLoaded} loadError=${hev.TProxyService.loadError}",
+            "checkpoint loadOnce returned dt=${tLoadMs}ms libraryLoaded=${hev.TProxyService.libraryLoaded} loadError=${hev.TProxyService.loadError}",
         )
         if (!hev.TProxyService.libraryLoaded) {
             Log.e(TAG, "libhev-socks5-tunnel не загружена: ${hev.TProxyService.loadError}")
@@ -39,6 +45,9 @@ class NativeHevTunnelGateway(
             )
             return -1
         }
+
+        Log.i(TAG, "checkpoint pre-dup")
+        PersistentLoggers.instance?.info(TAG, "checkpoint pre-dup")
         val duped = try {
             config.tunPfd.dup()
         } catch (t: Throwable) {
@@ -46,18 +55,32 @@ class NativeHevTunnelGateway(
             PersistentLoggers.instance?.error(TAG, "tunPfd.dup() threw", t)
             return -1
         }
+        Log.i(TAG, "checkpoint post-dup newFd=${duped.fd}")
+        PersistentLoggers.instance?.info(TAG, "checkpoint post-dup newFd=${duped.fd}")
         closeDuped()
         dupedRef.set(duped)
+
+        Log.i(TAG, "checkpoint pre-writeConfig")
+        PersistentLoggers.instance?.info(TAG, "checkpoint pre-writeConfig")
         val configFile = writeConfig(config)
-        Log.i(TAG, "TProxyStartService path=${configFile.absolutePath} fd=${duped.fd}")
-        PersistentLoggers.instance?.info(TAG, "TProxyStartService fd=${duped.fd}")
+        Log.i(TAG, "checkpoint post-writeConfig path=${configFile.absolutePath} bytes=${configFile.length()}")
+        PersistentLoggers.instance?.info(
+            TAG,
+            "checkpoint post-writeConfig path=${configFile.absolutePath} bytes=${configFile.length()}",
+        )
+
+        Log.i(TAG, "checkpoint pre-nativeStart fd=${duped.fd}")
+        PersistentLoggers.instance?.info(TAG, "checkpoint pre-nativeStart fd=${duped.fd}")
+        val tNative0 = System.nanoTime()
         val code = runCatching { nativeStart(configFile.absolutePath, duped.fd) }
             .onFailure {
                 Log.e(TAG, "TProxyStartService threw", it)
                 PersistentLoggers.instance?.error(TAG, "TProxyStartService threw", it)
             }
             .getOrElse { -1 }
-        PersistentLoggers.instance?.info(TAG, "TProxyStartService → code=$code")
+        val tNativeMs = (System.nanoTime() - tNative0) / 1_000_000
+        Log.i(TAG, "checkpoint post-nativeStart code=$code dt=${tNativeMs}ms")
+        PersistentLoggers.instance?.info(TAG, "checkpoint post-nativeStart code=$code dt=${tNativeMs}ms")
         if (code != 0) {
             closeDuped()
         }

@@ -1,5 +1,7 @@
 package hev
 
+import android.os.Build
+import android.os.Looper
 import android.util.Log
 import ru.ozero.coreapi.PersistentLoggers
 
@@ -27,32 +29,72 @@ object TProxyService {
         if (loadAttempted) return
         synchronized(loadLock) {
             if (loadAttempted) return
-            Log.i(TAG, "loadLibrary begin")
-            runCatching { PersistentLoggers.instance?.info(TAG, "loadLibrary begin") }
+            val t0 = System.nanoTime()
+            val thread = Thread.currentThread()
+            val isMain = Looper.myLooper() === Looper.getMainLooper()
+            val ctx = "thread=${thread.name} tid=${thread.id} main=$isMain " +
+                "device=${Build.MANUFACTURER}/${Build.BRAND}/${Build.MODEL} " +
+                "sdk=${Build.VERSION.SDK_INT}"
+            Log.i(TAG, "loadLibrary begin $ctx")
+            runCatching { PersistentLoggers.instance?.info(TAG, "loadLibrary begin $ctx") }
+            runCatching { dumpVendorMaps() }
             try {
                 System.loadLibrary("hev-socks5-tunnel")
                 libraryLoaded = true
-                Log.i(TAG, "libhev-socks5-tunnel loaded OK")
-                runCatching { PersistentLoggers.instance?.info(TAG, "libhev-socks5-tunnel loaded OK") }
+                val dtMs = (System.nanoTime() - t0) / 1_000_000
+                Log.i(TAG, "libhev-socks5-tunnel loaded OK dt=${dtMs}ms")
+                runCatching {
+                    PersistentLoggers.instance?.info(
+                        TAG,
+                        "libhev-socks5-tunnel loaded OK dt=${dtMs}ms",
+                    )
+                }
             } catch (e: UnsatisfiedLinkError) {
                 loadError = e.message ?: e.javaClass.simpleName
                 libraryLoaded = false
-                Log.e(TAG, "libhev-socks5-tunnel load FAILED: $loadError")
+                val dtMs = (System.nanoTime() - t0) / 1_000_000
+                Log.e(TAG, "libhev-socks5-tunnel load FAILED dt=${dtMs}ms: $loadError")
                 runCatching {
-                    PersistentLoggers.instance?.error(TAG, "libhev-socks5-tunnel load FAILED: $loadError", e)
+                    PersistentLoggers.instance?.error(
+                        TAG,
+                        "libhev-socks5-tunnel load FAILED dt=${dtMs}ms: $loadError",
+                        e,
+                    )
                 }
             } catch (e: SecurityException) {
                 loadError = e.message ?: e.javaClass.simpleName
                 libraryLoaded = false
-                Log.e(TAG, "libhev-socks5-tunnel load denied: $loadError")
+                val dtMs = (System.nanoTime() - t0) / 1_000_000
+                Log.e(TAG, "libhev-socks5-tunnel load denied dt=${dtMs}ms: $loadError")
                 runCatching {
-                    PersistentLoggers.instance?.error(TAG, "libhev-socks5-tunnel load denied: $loadError", e)
+                    PersistentLoggers.instance?.error(
+                        TAG,
+                        "libhev-socks5-tunnel load denied dt=${dtMs}ms: $loadError",
+                        e,
+                    )
                 }
             } finally {
                 loadAttempted = true
             }
         }
     }
+
+    private fun dumpVendorMaps() {
+        val keywords = listOf("nubia", "glnubia", "perf", "tencent", "game", "booster", "libgl")
+        val matches = mutableListOf<String>()
+        java.io.File("/proc/self/maps").bufferedReader().useLines { seq ->
+            for (line in seq) {
+                if (matches.size >= MAX_MAPS_LINES) break
+                val lower = line.lowercase()
+                if (keywords.any { it in lower }) matches.add(line)
+            }
+        }
+        val payload = if (matches.isEmpty()) "proc/maps vendor: none" else "proc/maps vendor:\n${matches.joinToString("\n")}"
+        Log.i(TAG, payload)
+        runCatching { PersistentLoggers.instance?.info(TAG, payload) }
+    }
+
+    private const val MAX_MAPS_LINES = 30
 
     @JvmStatic
     external fun TProxyStartService(configPath: String, fd: Int)
