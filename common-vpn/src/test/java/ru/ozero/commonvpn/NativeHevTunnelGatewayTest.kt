@@ -33,7 +33,11 @@ class NativeHevTunnelGatewayTest {
         var capturedPath: String? = null
         val gateway = NativeHevTunnelGateway(
             cacheDir = tmp,
-            nativeStart = { path, fd -> capturedPath = path; capturedFd = fd; 0 },
+            nativeStart = { path, fd ->
+                capturedPath = path
+                capturedFd = fd
+                0
+            },
             nativeStop = {},
         )
         val cfg = HevTunnelConfig(tunPfd = original, socksAddress = "127.0.0.1", socksPort = 1080)
@@ -106,7 +110,10 @@ class NativeHevTunnelGatewayTest {
         var nativeCalled = false
         val gateway = NativeHevTunnelGateway(
             cacheDir = tmp,
-            nativeStart = { _, _ -> nativeCalled = true; 0 },
+            nativeStart = { _, _ ->
+                nativeCalled = true
+                0
+            },
             nativeStop = {},
         )
 
