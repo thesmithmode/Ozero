@@ -89,7 +89,11 @@ object TProxyService {
                 if (keywords.any { it in lower }) matches.add(line)
             }
         }
-        val payload = if (matches.isEmpty()) "proc/maps vendor: none" else "proc/maps vendor:\n${matches.joinToString("\n")}"
+        val payload = if (matches.isEmpty()) {
+            "proc/maps vendor: none"
+        } else {
+            "proc/maps vendor:\n${matches.joinToString("\n")}"
+        }
         Log.i(TAG, payload)
         runCatching { PersistentLoggers.instance?.info(TAG, payload) }
     }
