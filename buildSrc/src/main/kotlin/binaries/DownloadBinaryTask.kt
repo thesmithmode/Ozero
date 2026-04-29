@@ -68,9 +68,11 @@ abstract class DownloadBinaryTask : DefaultTask() {
         }
     }
 
-    private fun resolveDestination(moduleDir: Path, art: Artifact): Path =
-        when (art.destination) {
-            Destination.LIBS -> moduleDir.resolve("libs/${art.name}")
-            Destination.JNI_LIBS -> moduleDir.resolve("src/main/jniLibs/${art.abi}/${art.name}")
+    private fun resolveDestination(moduleDir: Path, art: Artifact): Path {
+        val finalName = art.targetFilename ?: art.name
+        return when (art.destination) {
+            Destination.LIBS -> moduleDir.resolve("libs/$finalName")
+            Destination.JNI_LIBS -> moduleDir.resolve("src/main/jniLibs/${art.abi}/$finalName")
         }
+    }
 }

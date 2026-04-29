@@ -1,10 +1,15 @@
 package ru.ozero.enginebyedpi
 
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.ozero.coreapi.Engine
 import ru.ozero.coreapi.EngineCapabilities
@@ -14,6 +19,7 @@ import ru.ozero.coreapi.EngineStats
 import ru.ozero.coreapi.ProbeResult
 import ru.ozero.coreapi.StartResult
 import ru.ozero.coreorchestrator.probe.Socks5HandshakeProbe
+import java.util.concurrent.atomic.AtomicReference
 
 class ByeDpiEngine(
     private val proxy: ByeDpiProxy = ByeDpiProxy(),
@@ -31,6 +37,8 @@ class ByeDpiEngine(
 
     @Volatile private var activeSocksPort: Int = 0
     private val _stats = MutableStateFlow(EngineStats())
+    private val proxyScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val proxyJobRef = AtomicReference<Job?>(null)
 
     override suspend fun start(config: EngineConfig): StartResult {
         require(config is EngineConfig.ByeDpi) { "ByeDpiEngine требует EngineConfig.ByeDpi" }
@@ -39,18 +47,44 @@ class ByeDpiEngine(
             return StartResult.Failure(reason = "byedpi native library не загружена")
         }
         Log.i(TAG, "start socksPort=${config.socksPort} args=${config.args}")
-        return withContext(Dispatchers.IO) {
-            val args = buildArgs(config)
-            val code = proxy.jniStartProxy(args)
-            if (code == 0) {
-                activeSocksPort = config.socksPort
-                Log.i(TAG, "started OK на порту ${config.socksPort}")
-                StartResult.Success(socksPort = config.socksPort)
+        val args = buildArgs(config)
+        val proxyJob = proxyScope.launch {
+            val code = runCatching { proxy.jniStartProxy(args) }
+                .onFailure { Log.e(TAG, "jniStartProxy threw", it) }
+                .getOrElse { -1 }
+            if (code != 0) {
+                Log.e(TAG, "jniStartProxy завершился с кодом $code")
             } else {
-                Log.e(TAG, "jniStartProxy код $code")
-                StartResult.Failure(reason = "jniStartProxy вернул код $code")
+                Log.i(TAG, "jniStartProxy event-loop завершён нормально")
             }
+            activeSocksPort = 0
         }
+        proxyJobRef.getAndSet(proxyJob)?.cancel()
+
+        val readyAt = withContext(Dispatchers.IO) {
+            waitSocksReady(config.socksPort)
+        }
+        return if (readyAt > 0) {
+            activeSocksPort = config.socksPort
+            Log.i(TAG, "started OK socksPort=${config.socksPort} readyMs=$readyAt")
+            StartResult.Success(socksPort = config.socksPort)
+        } else {
+            Log.e(TAG, "byedpi не вышел на порт ${config.socksPort} за ${READY_TIMEOUT_MS}ms")
+            runCatching { proxy.jniStopProxy() }
+            proxyJob.cancel()
+            StartResult.Failure(reason = "byedpi не открыл socks порт ${config.socksPort}")
+        }
+    }
+
+    private suspend fun waitSocksReady(port: Int): Long {
+        val started = System.currentTimeMillis()
+        while (System.currentTimeMillis() - started < READY_TIMEOUT_MS) {
+            val ok = runCatching { Socks5HandshakeProbe.probe("127.0.0.1", port, READY_PROBE_TIMEOUT_MS) }
+                .isSuccess
+            if (ok) return System.currentTimeMillis() - started
+            delay(READY_RETRY_MS)
+        }
+        return -1
     }
 
     override suspend fun stop() {
@@ -58,6 +92,7 @@ class ByeDpiEngine(
         withContext(Dispatchers.IO) {
             runCatching { proxy.jniStopProxy() }
                 .onFailure { Log.w(TAG, "jniStopProxy исключение: ${it.message}") }
+            proxyJobRef.getAndSet(null)?.cancel()
             activeSocksPort = 0
         }
     }
@@ -91,5 +126,8 @@ class ByeDpiEngine(
 
     private companion object {
         const val TAG = "ByeDpiEngine"
+        const val READY_TIMEOUT_MS = 5_000L
+        const val READY_PROBE_TIMEOUT_MS = 500
+        const val READY_RETRY_MS = 100L
     }
 }

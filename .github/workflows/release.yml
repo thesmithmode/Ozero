@@ -151,6 +151,24 @@ jobs:
           done
           echo "APK содержит libhev на всех нужных ABI"
 
+      - name: Assert APK содержит libbyedpi.so без abi-суффикса для всех ABI
+        run: |
+          set -euo pipefail
+          APK=$(find app/build/outputs/apk/release -name '*.apk' | head -n1)
+          for ABI in arm64-v8a armeabi-v7a x86_64; do
+            if ! unzip -l "$APK" | grep -q "lib/$ABI/libbyedpi.so"; then
+              echo "::error::В APK отсутствует lib/$ABI/libbyedpi.so"
+              unzip -l "$APK" | grep -E "lib/$ABI/" || true
+              exit 1
+            fi
+            SIZE=$(unzip -l "$APK" "lib/$ABI/libbyedpi.so" | awk 'NR==4{print $1}')
+            if [ "$SIZE" -lt 50000 ]; then
+              echo "::error::libbyedpi.so для $ABI подозрительно мал ($SIZE байт)"
+              exit 1
+            fi
+          done
+          echo "APK содержит libbyedpi.so на всех нужных ABI"
+
       - name: Assert dex содержит hev/TProxyService и native bridge классы
         run: |
           set -euo pipefail
@@ -162,6 +180,10 @@ jobs:
             "Lhev/TProxyService;"
             "Lru/ozero/enginebyedpi/ByeDpiProxy;"
             "Lru/ozero/commonvpn/OzeroVpnService;"
+            "Lru/ozero/commonvpn/split/TunBuilderConfigurator;"
+            "Lru/ozero/coreapi/PersistentLoggers;"
+            "Lru/ozero/coreapi/PersistentLogger;"
+            "Lru/ozero/app/logging/BootFileLogger;"
             "Lru/ozero/app/OzeroApp;"
             "Lru/ozero/app/Hilt_OzeroApp;"
             "Lru/ozero/app/MainActivity;"

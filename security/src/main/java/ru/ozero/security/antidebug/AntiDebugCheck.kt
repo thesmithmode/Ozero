@@ -14,10 +14,11 @@ class AntiDebugCheck(
     private val reader: ProcStatusReader = DefaultReader,
     private val javaDebuggerAttached: () -> Boolean = { android.os.Debug.isDebuggerConnected() },
     private val isReleaseBuild: () -> Boolean = { android.os.Build.TYPE == "user" },
+    private val tracerPidEnabled: Boolean = false,
 ) {
 
     fun isDebuggerAttached(): Boolean {
-        if (tracerPidNonZero()) return true
+        if (tracerPidEnabled && tracerPidNonZero()) return true
         if (isReleaseBuild() && javaDebuggerAttached()) return true
         return false
     }

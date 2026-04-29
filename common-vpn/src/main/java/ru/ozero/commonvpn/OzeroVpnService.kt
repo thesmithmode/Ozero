@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicReference
 import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_START
 import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_STOP
 import ru.ozero.commonvpn.pipeline.VpnEnginePipeline
+import ru.ozero.coreapi.PersistentLoggers
 import ru.ozero.security.SecurityStateHolder
 import javax.inject.Inject
 
@@ -59,6 +60,7 @@ class OzeroVpnService : android.net.VpnService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(TAG, "onStartCommand action=${intent?.action}")
+        PersistentLoggers.instance?.info(TAG, "onStartCommand action=${intent?.action}")
         return try {
             when (intent?.action) {
                 ACTION_STOP -> stopVpn()
@@ -97,8 +99,10 @@ class OzeroVpnService : android.net.VpnService() {
             } else {
                 startForeground(NOTIFICATION_ID, buildNotification())
             }
+            PersistentLoggers.instance?.info(TAG, "startForeground OK")
         } catch (t: Throwable) {
             Log.e(TAG, "startForeground threw", t)
+            PersistentLoggers.instance?.error(TAG, "startForeground threw", t)
             starting.set(false)
             stopVpn()
             return
@@ -107,18 +111,21 @@ class OzeroVpnService : android.net.VpnService() {
             buildTunBuilder().establish()
         } catch (t: Throwable) {
             Log.e(TAG, "VpnService.Builder.establish threw", t)
+            PersistentLoggers.instance?.error(TAG, "Builder.establish threw", t)
             starting.set(false)
             stopVpn()
             return
         }
         if (fd == null) {
             Log.e(TAG, "TUN не установлен — VpnService.prepare не выдан?")
+            PersistentLoggers.instance?.error(TAG, "establish returned null — permission revoked?")
             starting.set(false)
             stopVpn()
             return
         }
         tunFdRef.set(fd)
         Log.i(TAG, "TUN established fd=${fd.fd}")
+        PersistentLoggers.instance?.info(TAG, "TUN established fd=${fd.fd}")
         val job = serviceScope.launch {
             if (stopping.get()) {
                 starting.set(false)
@@ -135,6 +142,7 @@ class OzeroVpnService : android.net.VpnService() {
                         null
                     }
                 }
+                PersistentLoggers.instance?.info(TAG, "pipeline.start result=$result")
                 if (result !is VpnEnginePipeline.Result.Connected) {
                     Log.w(TAG, "pipeline не подключился: $result, останавливаем")
                     stopVpn()

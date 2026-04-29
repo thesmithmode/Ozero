@@ -79,6 +79,7 @@ class MainActivity : ComponentActivity() {
         registerForActivityResult(
             ActivityResultContracts.StartActivityForResult(),
         ) { result ->
+            runCatching { BootFileLogger.info(TAG, "vpnPermissionLauncher result code=${result.resultCode}") }
             if (result.resultCode == Activity.RESULT_OK) {
                 viewModel.onVpnPermissionGranted()
                 startVpnService()
@@ -113,7 +114,9 @@ class MainActivity : ComponentActivity() {
                 var checked by rememberSaveable { mutableStateOf(false) }
                 var showOnboarding by rememberSaveable { mutableStateOf(false) }
                 LaunchedEffect(Unit) {
-                    val completed = userFlags.isOnboardingCompleted()
+                    val completed = runCatching { userFlags.isOnboardingCompleted() }
+                        .onFailure { AppLogger.w(TAG, "isOnboardingCompleted threw — пропускаю онбординг", it) }
+                        .getOrDefault(true)
                     showOnboarding = !completed
                     checked = true
                 }
@@ -155,10 +158,13 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        runCatching { BootFileLogger.info(TAG, "onCreate after setContent") }
     }
 
     private fun onConnectClick() {
-        when (viewModel.state.value) {
+        val current = viewModel.state.value
+        runCatching { BootFileLogger.info(TAG, "onConnectClick state=${current::class.simpleName}") }
+        when (current) {
             is OrchestratorState.Connected -> {
                 viewModel.onConnectClick()
                 stopVpnService()
@@ -170,7 +176,9 @@ class MainActivity : ComponentActivity() {
 
     private fun requestVpnAndStart() {
         if (SecurityStateHolder.isCompromised) {
-            AppLogger.w(TAG, "VPN start refused — security compromised: ${SecurityStateHolder.compromised.value}")
+            val reasons = SecurityStateHolder.compromised.value
+            AppLogger.w(TAG, "VPN start refused — security compromised: $reasons")
+            runCatching { BootFileLogger.info(TAG, "VPN start refused — security compromised: $reasons") }
             Toast.makeText(
                 this,
                 getString(R.string.security_blocked),
@@ -181,8 +189,10 @@ class MainActivity : ComponentActivity() {
         viewModel.onConnectClick()
         val vpnIntent = VpnService.prepare(this)
         if (vpnIntent != null) {
+            runCatching { BootFileLogger.info(TAG, "VpnService.prepare → permission dialog") }
             vpnPermissionLauncher.launch(vpnIntent)
         } else {
+            runCatching { BootFileLogger.info(TAG, "VpnService.prepare null → startVpnService") }
             viewModel.onVpnPermissionGranted()
             startVpnService()
         }
@@ -252,6 +262,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startVpnService() {
+        runCatching { BootFileLogger.info(TAG, "startService(OzeroVpnService, ACTION_START)") }
         startService(
             Intent(this, OzeroVpnService::class.java).apply {
                 action = OzeroVpnService.ACTION_START

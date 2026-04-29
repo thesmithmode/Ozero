@@ -3,6 +3,8 @@ package ru.ozero.app.logging
 import android.content.Context
 import android.os.Process
 import android.util.Log
+import ru.ozero.coreapi.PersistentLogger
+import ru.ozero.coreapi.PersistentLoggers
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
@@ -11,7 +13,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicReference
 
-object BootFileLogger {
+object BootFileLogger : PersistentLogger {
 
     private const val TAG = "BootFile"
     private const val DIR = "debug"
@@ -30,6 +32,7 @@ object BootFileLogger {
             val file = File(dir, FILE)
             rotateIfTooLarge(file)
             targetRef.set(file)
+            PersistentLoggers.instance = this
             log("INFO", TAG, "init pid=${Process.myPid()}")
         }.onFailure { Log.e(TAG, "init failed", it) }
     }
@@ -37,9 +40,9 @@ object BootFileLogger {
     fun file(): File? = targetRef.get()
 
     fun debug(tag: String, msg: String) = log("DEBUG", tag, msg)
-    fun info(tag: String, msg: String) = log("INFO", tag, msg)
-    fun warn(tag: String, msg: String, t: Throwable? = null) = log("WARN", tag, msg, t)
-    fun error(tag: String, msg: String, t: Throwable? = null) = log("ERROR", tag, msg, t)
+    override fun info(tag: String, msg: String) = log("INFO", tag, msg)
+    override fun warn(tag: String, msg: String, t: Throwable?) = log("WARN", tag, msg, t)
+    override fun error(tag: String, msg: String, t: Throwable?) = log("ERROR", tag, msg, t)
 
     @Synchronized
     fun clear() {

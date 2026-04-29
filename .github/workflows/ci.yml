@@ -8,6 +8,9 @@ on:
       - 'feat/**'
       - 'fix/**'
       - 'claude/**'
+      - 'refactor/**'
+      - 'chore/**'
+      - 'hotfix/**'
   pull_request:
     branches:
       - main
@@ -18,10 +21,72 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-test:
-    name: Build and Test
+  fast-checks:
+    name: Fast checks (style, python, shell)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v3
+
+      - name: Setup Gradle with caching
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' }}
+
+      - name: ktlint + detekt
+        run: ./gradlew ktlintCheck detekt --stacktrace
+
+      - name: Setup Python for build-tools tests
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install build-tools test dependencies
+        run: pip install --quiet pyyaml
+
+      - name: Run build-tools Python tests (regen_lock)
+        run: python3 -m unittest discover -s build-tools/tests -p 'test_*.py' -v
+
+      - name: shellcheck + bash syntax (build_*.sh)
+        run: |
+          bash -n build-tools/build_hysteria2.sh
+          bash -n build-tools/build_amneziawg.sh
+          bash -n build-tools/build_naive.sh
+          bash -n build-tools/build_tor.sh
+          bash -n tools/build-urnetwork-aar.sh
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends shellcheck
+          shellcheck -S warning build-tools/build_hysteria2.sh
+          shellcheck -S warning build-tools/build_amneziawg.sh
+          shellcheck -S warning build-tools/build_naive.sh
+          shellcheck -S warning build-tools/build_tor.sh
+          shellcheck -S warning tools/build-urnetwork-aar.sh
+
+      - name: Validate Dockerfile syntax (hadolint)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: build-tools/Dockerfile
+          failure-threshold: error
+
+  full-tests:
+    name: Tests + lint + assembleDebug + coverage
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    needs: fast-checks
+    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main' || github.event_name == 'pull_request' }}
     permissions:
       contents: read
       checks: write
@@ -40,9 +105,6 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Validate Gradle wrapper
-        uses: gradle/actions/wrapper-validation@v3
-
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -51,21 +113,10 @@ jobs:
       - name: Download native binaries
         run: ./gradlew :engine-byedpi:downloadBinaries --stacktrace
 
-      - name: Setup Python for build-tools tests
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+      - name: Run lint, assembleDebug, tests
+        run: ./gradlew lint assembleDebug testDebugUnitTest --stacktrace
 
-      - name: Install build-tools test dependencies
-        run: pip install --quiet pyyaml
-
-      - name: Run build-tools Python tests (regen_lock)
-        run: python3 -m unittest discover -s build-tools/tests -p 'test_*.py' -v
-
-      - name: Run ktlint, detekt, lint, build, and tests
-        run: ./gradlew ktlintCheck detekt lint assembleDebug testDebugUnitTest --stacktrace
-
-      - name: Run coverage report and gate
+      - name: Coverage report and gate
         run: ./gradlew jacocoTestReport jacocoTestCoverageVerification --stacktrace
 
       - name: Upload debug APK
@@ -104,6 +155,8 @@ jobs:
     name: Build (${{ matrix.abi }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    needs: fast-checks
+    if: ${{ github.ref == 'refs/heads/dev' || github.event_name == 'pull_request' }}
     permissions:
       contents: read
 
@@ -134,41 +187,12 @@ jobs:
       - name: Build for ${{ matrix.abi }}
         run: ./gradlew assembleDebug -PabiFilter=${{ matrix.abi }} --stacktrace --continue
 
-  xray-builder-image:
-    name: Xray Builder Scripts (verify)
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: shellcheck + bash syntax (build_*.sh)
-        run: |
-          bash -n build-tools/build_hysteria2.sh
-          bash -n build-tools/build_amneziawg.sh
-          bash -n build-tools/build_naive.sh
-          bash -n build-tools/build_tor.sh
-          bash -n tools/build-urnetwork-aar.sh
-          sudo apt-get update && sudo apt-get install -y --no-install-recommends shellcheck
-          shellcheck -S warning build-tools/build_hysteria2.sh
-          shellcheck -S warning build-tools/build_amneziawg.sh
-          shellcheck -S warning build-tools/build_naive.sh
-          shellcheck -S warning build-tools/build_tor.sh
-          shellcheck -S warning tools/build-urnetwork-aar.sh
-
-      - name: Validate Dockerfile syntax (hadolint)
-        uses: hadolint/hadolint-action@v3.1.0
-        with:
-          dockerfile: build-tools/Dockerfile
-          failure-threshold: error
-
   security-scan:
-    name: Security Scan
+    name: Security Scan (CodeQL)
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    needs: fast-checks
+    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main' }}
     permissions:
       contents: read
       security-events: write
@@ -202,3 +226,108 @@ jobs:
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v3
+
+  release-build:
+    name: Build signed release APK (main only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: full-tests
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle with caching
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: true
+
+      - name: Setup Android NDK
+        id: ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r27c
+          add-to-path: false
+
+      - name: Clone hev-socks5-tunnel (pinned)
+        env:
+          HEV_VERSION: '2.7.0'
+        run: |
+          git clone --depth 1 --recursive --branch "$HEV_VERSION" \
+            https://github.com/heiher/hev-socks5-tunnel.git \
+            "$RUNNER_TEMP/hev-socks5-tunnel"
+
+      - name: Build libhev-socks5-tunnel.so (4 ABI via ndk-build)
+        env:
+          NDK_PATH: ${{ steps.ndk.outputs.ndk-path }}
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/hev-socks5-tunnel"
+          OUT="common-vpn/src/main/jniLibs"
+          mkdir -p "$OUT/arm64-v8a" "$OUT/armeabi-v7a" "$OUT/x86_64" "$OUT/x86"
+          cd "$SRC"
+          "$NDK_PATH/ndk-build" \
+            NDK_PROJECT_PATH="$SRC" \
+            APP_BUILD_SCRIPT="$SRC/Android.mk" \
+            NDK_APPLICATION_MK="$SRC/Application.mk" \
+            APP_ABI="arm64-v8a armeabi-v7a x86_64 x86" \
+            APP_PLATFORM=android-24 \
+            -j"$(nproc)"
+          STRIP="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
+          for ABI in arm64-v8a armeabi-v7a x86_64 x86; do
+            SO_SRC="$SRC/libs/$ABI/libhev-socks5-tunnel.so"
+            cp "$SO_SRC" "$GITHUB_WORKSPACE/$OUT/$ABI/libhev-socks5-tunnel.so"
+            "$STRIP" "$GITHUB_WORKSPACE/$OUT/$ABI/libhev-socks5-tunnel.so" || true
+          done
+
+      - name: Decode keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::Secret RELEASE_KEYSTORE_BASE64 is empty"
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          echo "OZERO_KEYSTORE_PATH=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+
+      - name: Build signed release APK
+        env:
+          OZERO_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          OZERO_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          OZERO_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          UPDATE_PUBLIC_KEY_HEX: ${{ secrets.UPDATE_PUBLIC_KEY_HEX }}
+        run: ./gradlew :app:assembleRelease --stacktrace
+
+      - name: Assert APK содержит libhev и libbyedpi на всех ABI
+        run: |
+          set -euo pipefail
+          APK=$(find app/build/outputs/apk/release -name '*.apk' | head -n1)
+          for ABI in arm64-v8a armeabi-v7a x86_64; do
+            for LIB in libhev-socks5-tunnel.so libbyedpi.so; do
+              if ! unzip -l "$APK" | grep -q "lib/$ABI/$LIB"; then
+                echo "::error::В APK отсутствует lib/$ABI/$LIB"
+                exit 1
+              fi
+            done
+          done
+
+      - name: Upload release APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk-main
+          path: app/build/outputs/apk/release/*.apk
+          retention-days: 30

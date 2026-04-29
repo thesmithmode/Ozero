@@ -15,6 +15,7 @@ data class Artifact(
     val sizeBytes: Long,
     val sourceRepo: String,
     val sourceCommit: String,
+    val targetFilename: String? = null,
 )
 
 data class LockFile(

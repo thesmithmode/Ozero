@@ -6,11 +6,17 @@ import kotlin.test.assertTrue
 
 class AntiDebugCheckTest {
 
-    private fun checker(status: String?, javaDebugger: Boolean = false, release: Boolean = true) =
+    private fun checker(
+        status: String?,
+        javaDebugger: Boolean = false,
+        release: Boolean = true,
+        tracerPidEnabled: Boolean = true,
+    ) =
         AntiDebugCheck(
             reader = { status },
             javaDebuggerAttached = { javaDebugger },
             isReleaseBuild = { release },
+            tracerPidEnabled = tracerPidEnabled,
         )
 
     private val cleanStatus = """
@@ -35,7 +41,12 @@ class AntiDebugCheckTest {
     @Test
     fun tracedStatusReturnsTrue() {
         assertTrue(checker(tracedStatus).tracerPidNonZero())
-        assertTrue(checker(tracedStatus).isDebuggerAttached())
+        assertTrue(checker(tracedStatus, tracerPidEnabled = true).isDebuggerAttached())
+    }
+
+    @Test
+    fun tracerPidIgnoredWhenDisabled() {
+        assertFalse(checker(tracedStatus, tracerPidEnabled = false).isDebuggerAttached())
     }
 
     @Test
