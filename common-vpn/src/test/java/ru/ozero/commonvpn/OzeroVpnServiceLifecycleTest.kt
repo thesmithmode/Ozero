@@ -40,7 +40,9 @@ class OzeroVpnServiceLifecycleTest {
     fun `onStartCommand guard на chainOrchestrator возвращает START_NOT_STICKY`() {
         val body = source.substringAfter("override fun onStartCommand").substringBefore("private fun startVpn()")
         assertTrue(body.contains("::chainOrchestrator.isInitialized"))
-        val guardBlock = body.substringAfter("::chainOrchestrator.isInitialized").substringBefore("when (intent?.action)")
+        val guardBlock = body
+            .substringAfter("::chainOrchestrator.isInitialized")
+            .substringBefore("when (intent?.action)")
         assertTrue(guardBlock.contains("stopSelf(startId)"))
         assertTrue(guardBlock.contains("START_NOT_STICKY"))
     }
