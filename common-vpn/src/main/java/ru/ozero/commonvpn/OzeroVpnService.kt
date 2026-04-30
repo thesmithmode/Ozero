@@ -286,6 +286,7 @@ class OzeroVpnService : android.net.VpnService() {
                 try {
                     startForeground(NOTIFICATION_ID, n, su)
                 } catch (t: Throwable) {
+                    Log.w(TAG, "startForeground SPECIAL_USE rejected, fallback to MANIFEST type", t)
                     startForeground(NOTIFICATION_ID, n, fb)
                 }
             } else {

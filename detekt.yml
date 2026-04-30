@@ -86,6 +86,9 @@ naming:
       - 'androidx.compose.runtime.Composable'
       - 'Preview'
       - 'androidx.compose.ui.tooling.preview.Preview'
+    excludes:
+      - '**/ui/**'
+      - '**/theme/**'
   VariableNaming:
     active: true
     variablePattern: '[a-z][A-Za-z0-9]*'
