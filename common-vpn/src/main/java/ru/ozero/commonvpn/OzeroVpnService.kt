@@ -48,6 +48,8 @@ class OzeroVpnService : android.net.VpnService() {
 
     @Inject lateinit var sessionStatsRecorder: SessionStatsRecorder
 
+    @Inject lateinit var splitTunnelRulesProvider: SplitTunnelRulesProvider
+
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val sessionIdRef = AtomicReference<Long>(-1L)
     private val sessionStartMsRef = AtomicReference<Long>(0L)
@@ -137,8 +139,17 @@ class OzeroVpnService : android.net.VpnService() {
         }.getOrNull()
         val ipv6Enabled = settings?.ipv6Enabled ?: false
         val customDnsServers = settings?.customDnsServers.orEmpty()
+        val splitPackages = runCatching {
+            runBlocking { splitTunnelRulesProvider.activePackages() }
+        }.getOrDefault(emptySet())
+        val splitMode = settings?.splitMode ?: ru.ozero.enginescore.settings.SplitTunnelMode.ALL
+        val splitConfig = ru.ozero.commonvpn.split.SplitTunnelConfig(
+            mode = splitMode,
+            packages = splitPackages,
+        )
         val fd = try {
             buildTunBuilder(
+                splitConfig = splitConfig,
                 ipv6Enabled = ipv6Enabled,
                 customDnsServers = customDnsServers,
             ).establish()
