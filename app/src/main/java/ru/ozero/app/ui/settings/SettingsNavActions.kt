@@ -7,4 +7,5 @@ data class SettingsNavActions(
     val onOpenLogs: () -> Unit = {},
     val onOpenByeDpiEngineSettings: () -> Unit = {},
     val onOpenManualServer: () -> Unit = {},
+    val onOpenStatsHistory: () -> Unit = {},
 )

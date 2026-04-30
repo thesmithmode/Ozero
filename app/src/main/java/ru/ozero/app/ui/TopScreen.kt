@@ -10,4 +10,5 @@ enum class TopScreen {
     Logs,
     ByeDpiEngineSettings,
     ManualServer,
+    StatsHistory,
 }

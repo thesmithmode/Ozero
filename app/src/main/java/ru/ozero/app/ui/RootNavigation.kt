@@ -13,6 +13,7 @@ import ru.ozero.app.ui.servers.ServersScreen
 import ru.ozero.app.ui.settings.SettingsScreen
 import ru.ozero.app.ui.settings.engines.ByeDpiEngineSettingsScreen
 import ru.ozero.app.ui.splittunnel.SplitTunnelScreen
+import ru.ozero.app.ui.stats.StatsHistoryScreen
 
 @Composable
 fun RootNavigation(
@@ -30,6 +31,7 @@ fun RootNavigation(
                 onOpenLogs = { screen = TopScreen.Logs },
                 onOpenByeDpiEngineSettings = { screen = TopScreen.ByeDpiEngineSettings },
                 onOpenManualServer = { screen = TopScreen.ManualServer },
+                onOpenStatsHistory = { screen = TopScreen.StatsHistory },
             )
         TopScreen.Logs ->
             LogsScreen(onBack = { screen = TopScreen.Settings })
@@ -45,6 +47,8 @@ fun RootNavigation(
             ByeDpiEngineSettingsScreen(onBack = { screen = TopScreen.Settings })
         TopScreen.ManualServer ->
             ManualServerScreen(onBack = { screen = TopScreen.Settings })
+        TopScreen.StatsHistory ->
+            StatsHistoryScreen(onBack = { screen = TopScreen.Settings })
         TopScreen.Main ->
             MainScreen(
                 viewModel = viewModel,

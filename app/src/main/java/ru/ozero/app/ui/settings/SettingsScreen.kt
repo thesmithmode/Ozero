@@ -49,6 +49,7 @@ fun SettingsScreen(
     onOpenLogs: () -> Unit = {},
     onOpenByeDpiEngineSettings: () -> Unit = {},
     onOpenManualServer: () -> Unit = {},
+    onOpenStatsHistory: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -63,6 +64,7 @@ fun SettingsScreen(
             onOpenLogs = onOpenLogs,
             onOpenByeDpiEngineSettings = onOpenByeDpiEngineSettings,
             onOpenManualServer = onOpenManualServer,
+            onOpenStatsHistory = onOpenStatsHistory,
         ),
         onSplitModeChange = viewModel::onSplitModeChange,
         onIpv6Toggle = viewModel::onIpv6Toggle,
@@ -177,10 +179,23 @@ private fun ContentBody(
             )
         }
         item { SectionDivider() }
+        item { StatsHistorySection(onOpenStats = nav.onOpenStatsHistory) }
+        item { SectionDivider() }
         item { LogsSection(onOpenLogs = nav.onOpenLogs) }
         item { SectionDivider() }
         item { AboutSection(onOpenAbout = nav.onOpenAbout) }
     }
+}
+
+@Composable
+private fun StatsHistorySection(onOpenStats: () -> Unit) {
+    NavRow(
+        title = "История сессий",
+        summary = "Сохранённые VPN-сессии со статистикой трафика",
+        tag = "settings_stats_history_row",
+        onClick = onOpenStats,
+        enabled = true,
+    )
 }
 
 @Composable
