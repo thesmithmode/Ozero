@@ -14,6 +14,7 @@ on:
           - amneziawg
           - hysteria2
           - tor
+          - xray
   push:
     branches:
       - 'feat/**'
@@ -26,6 +27,7 @@ on:
       - 'build-tools/build_amneziawg.sh'
       - 'build-tools/build_hysteria2.sh'
       - 'build-tools/build_tor.sh'
+      - 'build-tools/build_xray.sh'
       - 'build-tools/regen_lock.py'
 
 jobs:
