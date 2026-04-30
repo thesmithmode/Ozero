@@ -82,6 +82,7 @@ gradle.taskGraph.whenReady {
 
 dependencies {
     implementation(libs.core.ktx)
+    implementation(libs.appcompat)
 
     implementation(platform(libs.compose.bom))
     implementation(libs.bundles.compose)

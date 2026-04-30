@@ -209,6 +209,33 @@ class SettingsRepositoryTest {
         assertEquals(listOf("8.8.8.8", "1.1.1.1"), repository.settings.first().customDnsServers)
     }
 
+    @Test
+    fun `uiLocaleTag default null`() = runTest {
+        assertNull(repository.settings.first().uiLocaleTag)
+    }
+
+    @Test
+    fun `setUiLocaleTag persists tag`() = runTest {
+        repository.setUiLocaleTag("ru")
+        assertEquals("ru", repository.settings.first().uiLocaleTag)
+        repository.setUiLocaleTag("zh-CN")
+        assertEquals("zh-CN", repository.settings.first().uiLocaleTag)
+    }
+
+    @Test
+    fun `setUiLocaleTag null clears`() = runTest {
+        repository.setUiLocaleTag("en")
+        repository.setUiLocaleTag(null)
+        assertNull(repository.settings.first().uiLocaleTag)
+    }
+
+    @Test
+    fun `setUiLocaleTag blank clears`() = runTest {
+        repository.setUiLocaleTag("en")
+        repository.setUiLocaleTag("   ")
+        assertNull(repository.settings.first().uiLocaleTag)
+    }
+
     private class FakeAutoStartGateway : AutoStartGateway {
         val invocations = mutableListOf<Boolean>()
 

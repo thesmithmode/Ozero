@@ -26,4 +26,6 @@ interface SettingsRepository {
     suspend fun setHostsMode(mode: HostsMode)
 
     suspend fun setHosts(hosts: List<String>)
+
+    suspend fun setUiLocaleTag(tag: String?)
 }

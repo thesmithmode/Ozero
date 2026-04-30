@@ -6,6 +6,7 @@ ksp = "2.0.20-1.0.25"
 
 # AndroidX
 coreKtx = "1.13.1"
+appcompat = "1.7.0"
 
 # Compose
 composeBom = "2024.09.01"
@@ -50,6 +51,7 @@ jacoco = "0.8.12"
 [libraries]
 # AndroidX
 core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
+appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
 
 # Kotlin
 kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }

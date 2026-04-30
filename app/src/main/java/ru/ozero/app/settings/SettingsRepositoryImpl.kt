@@ -96,6 +96,16 @@ class SettingsRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun setUiLocaleTag(tag: String?) {
+        dataStore.edit { prefs ->
+            if (tag.isNullOrBlank()) {
+                prefs.remove(SettingsKeys.UI_LOCALE_TAG)
+            } else {
+                prefs[SettingsKeys.UI_LOCALE_TAG] = tag
+            }
+        }
+    }
+
     private fun Preferences.toSettingsModel(): SettingsModel = SettingsModel(
         splitMode = readSplitMode(),
         ipv6Enabled = this[SettingsKeys.IPV6_ENABLED] ?: SettingsModel.DEFAULT_IPV6_ENABLED,
@@ -107,6 +117,7 @@ class SettingsRepositoryImpl @Inject constructor(
         customDnsServers = readCustomDnsServers(),
         hostsMode = readHostsMode(),
         hosts = readHosts(),
+        uiLocaleTag = this[SettingsKeys.UI_LOCALE_TAG],
     )
 
     private fun Preferences.readCustomDnsServers(): List<String> {
