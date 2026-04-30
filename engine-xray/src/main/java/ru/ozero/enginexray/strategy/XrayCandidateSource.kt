@@ -112,12 +112,13 @@ class XrayCandidateSource(
     }
 
     private fun VlessServer.isSafe2026(): Boolean =
-        transport.lowercase() in TRANSPORT_SAFE_2026 && security.lowercase() == "reality"
+        transport.lowercase() in TRANSPORT_SAFE_2026 && security.lowercase() in SECURITY_SAFE_2026
 
     companion object {
         const val DEFAULT_BASE_PORT = 10808
         const val DEFAULT_MAX = 5
         private const val TAG = "XrayCandidateSource"
         val TRANSPORT_SAFE_2026 = setOf("tcp", "xhttp", "grpc", "ws")
+        val SECURITY_SAFE_2026 = setOf("reality", "tls")
     }
 }

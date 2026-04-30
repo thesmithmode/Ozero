@@ -165,6 +165,8 @@ class ServersViewModelTest {
         override suspend fun getLiveServers(): List<ServerEntity> =
             flow.value.filter { it.isAlive }
 
+        override suspend fun getAllServers(): List<ServerEntity> = flow.value
+
         override suspend fun findById(id: String): ServerEntity? =
             flow.value.firstOrNull { it.id == id }
 

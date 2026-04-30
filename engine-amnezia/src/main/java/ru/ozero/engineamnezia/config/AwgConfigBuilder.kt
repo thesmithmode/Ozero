@@ -8,6 +8,10 @@ class AwgConfigBuilder {
         require(server.privateKey.isNotBlank()) { "PrivateKey пустой" }
         require(server.publicKey.isNotBlank()) { "PublicKey пустой" }
         require(server.jmin <= server.jmax) { "Jmin (${server.jmin}) > Jmax (${server.jmax})" }
+        require(server.mtu in MIN_MTU..MAX_MTU) { "MTU вне диапазона [$MIN_MTU..$MAX_MTU]: ${server.mtu}" }
+        require(server.addresses.isNotEmpty()) { "addresses пуст — Address обязателен" }
+        require(server.host.isNotBlank()) { "Endpoint host пуст" }
+        require(server.port in MIN_PORT..MAX_PORT) { "Endpoint port вне диапазона: ${server.port}" }
 
         fun assertNoCrlf(value: String, name: String) {
             require('\n' !in value && '\r' !in value) { "$name содержит CR/LF (INI-injection?)" }
@@ -64,5 +68,12 @@ class AwgConfigBuilder {
             sb.appendLine("PersistentKeepalive = ${server.persistentKeepalive}")
         }
         return sb.toString()
+    }
+
+    private companion object {
+        const val MIN_MTU = 576
+        const val MAX_MTU = 1500
+        const val MIN_PORT = 1
+        const val MAX_PORT = 65535
     }
 }

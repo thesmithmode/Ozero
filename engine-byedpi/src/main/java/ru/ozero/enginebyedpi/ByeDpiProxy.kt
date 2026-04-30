@@ -47,6 +47,11 @@ class ByeDpiProxy {
                     libraryLoaded = false
                     Log.e(TAG, "loadLibrary denied: $loadError")
                     runCatching { PersistentLoggers.instance?.error(TAG, "loadLibrary denied: $loadError", e) }
+                } catch (e: Throwable) {
+                    loadError = "${e.javaClass.simpleName}: ${e.message ?: "no message"}"
+                    libraryLoaded = false
+                    Log.e(TAG, "loadLibrary THROWN: $loadError", e)
+                    runCatching { PersistentLoggers.instance?.error(TAG, "loadLibrary THROWN: $loadError", e) }
                 } finally {
                     loadAttempted = true
                 }

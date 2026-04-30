@@ -4,6 +4,7 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import ru.ozero.coresubscriptions.ServerMapper
 import ru.ozero.coresubscriptions.SubscriptionFilter
@@ -16,14 +17,25 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object HarvesterModule {
 
+    private const val USER_AGENT = "Ozero/1.0 (Android; SubscriptionHarvester)"
+
+    private val userAgentInterceptor = Interceptor { chain ->
+        val req = chain.request().newBuilder()
+            .header("User-Agent", USER_AGENT)
+            .header("Accept", "*/*")
+            .build()
+        chain.proceed(req)
+    }
+
     @Provides
     @Singleton
     @Named("harvester")
     fun provideHarvesterClient(): OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
-        .followRedirects(false)
-        .followSslRedirects(false)
+        .followRedirects(true)
+        .followSslRedirects(true)
+        .addInterceptor(userAgentInterceptor)
         .build()
 
     @Provides

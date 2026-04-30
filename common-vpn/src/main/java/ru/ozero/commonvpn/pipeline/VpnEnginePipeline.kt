@@ -175,6 +175,8 @@ class VpnEnginePipeline(
         } catch (t: Throwable) {
             tunnelStarted.set(false)
             currentEngine.set(null)
+            runCatching { tunnelGateway.stop() }
+                .onFailure { Log.e(TAG, "tunnelGateway.stop rollback threw", it) }
             runCatching { engine.stop() }
                 .onFailure { Log.e(TAG, "engine.stop rollback threw", it) }
             orchestrator.dispatch(OrchestratorTransition.ConnectFailed(engineId, "tunnel threw: ${t.message}"))

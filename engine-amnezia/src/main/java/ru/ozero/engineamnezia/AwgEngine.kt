@@ -13,6 +13,7 @@ import ru.ozero.coreapi.EngineId
 import ru.ozero.coreapi.EngineStats
 import ru.ozero.coreapi.ProbeResult
 import ru.ozero.coreapi.StartResult
+import java.util.concurrent.atomic.AtomicBoolean
 
 class AwgEngine(
     private val delegate: LibAwgDelegate,
@@ -28,7 +29,7 @@ class AwgEngine(
         requiresServer = true,
     )
 
-    @Volatile private var activeSocksPort: Int = 0
+    private val started = AtomicBoolean(false)
     private val _stats = MutableStateFlow(EngineStats())
 
     override suspend fun start(config: EngineConfig): StartResult {
@@ -42,7 +43,7 @@ class AwgEngine(
             try {
                 val code = delegate.startAwg(config.configJson)
                 if (code == 0) {
-                    activeSocksPort = config.socksPort
+                    started.set(true)
                     Log.i(TAG, "started OK")
                     StartResult.Success(socksPort = config.socksPort)
                 } else {
@@ -61,12 +62,12 @@ class AwgEngine(
         withContext(Dispatchers.IO) {
             runCatching { delegate.stopAwg() }
                 .onFailure { Log.w(TAG, "stopAwg исключение: ${it.message}") }
-            activeSocksPort = 0
+            started.set(false)
         }
     }
 
     override suspend fun probe(): ProbeResult {
-        if (activeSocksPort == 0) {
+        if (!started.get()) {
             Log.w(TAG, "probe: движок не запущен")
             return ProbeResult.Failure(reason = "движок не запущен")
         }

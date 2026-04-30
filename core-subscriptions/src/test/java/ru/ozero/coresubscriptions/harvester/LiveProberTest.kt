@@ -89,6 +89,7 @@ class LiveProberTest {
         override suspend fun upsertAll(servers: List<ServerEntity>) {}
         override fun observeAll(): Flow<List<ServerEntity>> = throw NotImplementedError()
         override suspend fun getLiveServers(): List<ServerEntity> = emptyList()
+        override suspend fun getAllServers(): List<ServerEntity> = emptyList()
         override suspend fun findById(id: String): ServerEntity? = null
         override suspend fun deleteById(id: String) {}
         override suspend fun deleteAll() {}

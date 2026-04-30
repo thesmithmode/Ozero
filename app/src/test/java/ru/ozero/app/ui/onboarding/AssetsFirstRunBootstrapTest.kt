@@ -41,6 +41,7 @@ class AssetsFirstRunBootstrapTest {
         }
         override fun observeAll(): Flow<List<ServerEntity>> = throw NotImplementedError()
         override suspend fun getLiveServers(): List<ServerEntity> = inserted.toList()
+        override suspend fun getAllServers(): List<ServerEntity> = inserted.toList()
         override suspend fun findById(id: String): ServerEntity? =
             inserted.firstOrNull { it.id == id }
         override suspend fun deleteById(id: String) {

@@ -6,7 +6,7 @@ import java.security.MessageDigest
 
 class ServerMapper {
 
-    fun toEntity(parsed: ParsedServer, originalUri: String): ServerEntity? =
+    fun toEntity(parsed: ParsedServer, originalUri: String, priority: Int = DEFAULT_PRIORITY): ServerEntity? =
         when (parsed) {
             is ParsedServer.Vless ->
                 ServerEntity(
@@ -16,6 +16,7 @@ class ServerMapper {
                     protocol = "vless",
                     uri = originalUri,
                     port = parsed.server.port,
+                    priority = priority,
                 )
 
             is ParsedServer.Hysteria2 ->
@@ -26,6 +27,7 @@ class ServerMapper {
                     protocol = "hysteria2",
                     uri = originalUri,
                     port = parsed.server.port,
+                    priority = priority,
                 )
 
             is ParsedServer.Trojan ->
@@ -36,6 +38,7 @@ class ServerMapper {
                     protocol = "trojan",
                     uri = originalUri,
                     port = parsed.server.port,
+                    priority = priority,
                 )
 
             is ParsedServer.Shadowsocks ->
@@ -46,6 +49,7 @@ class ServerMapper {
                     protocol = "shadowsocks",
                     uri = originalUri,
                     port = parsed.server.port,
+                    priority = priority,
                 )
 
             is ParsedServer.AmneziaWg ->
@@ -56,6 +60,7 @@ class ServerMapper {
                     protocol = "amneziawg",
                     uri = originalUri,
                     port = parsed.server.port,
+                    priority = priority,
                 )
 
             is ParsedServer.Naive ->
@@ -66,6 +71,7 @@ class ServerMapper {
                     protocol = "naive",
                     uri = originalUri,
                     port = parsed.server.port,
+                    priority = priority,
                 )
 
             is ParsedServer.Error -> null
@@ -85,5 +91,6 @@ class ServerMapper {
     private companion object {
         const val UNKNOWN_COUNTRY = "XX"
         const val STABLE_ID_BYTES = 16
+        const val DEFAULT_PRIORITY = 10
     }
 }

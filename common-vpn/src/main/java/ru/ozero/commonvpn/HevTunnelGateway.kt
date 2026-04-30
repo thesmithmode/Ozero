@@ -67,6 +67,7 @@ class NativeHevTunnelGateway(
             .onFailure {
                 Log.e(TAG, "TProxyStartService threw", it)
                 PersistentLoggers.instance?.error(TAG, "TProxyStartService threw", it)
+                closeDuped()
             }
             .getOrElse { -1 }
         val tNativeMs = (System.nanoTime() - tNative0) / 1_000_000

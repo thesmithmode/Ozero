@@ -15,11 +15,14 @@ interface ServerDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(servers: List<ServerEntity>)
 
-    @Query("SELECT * FROM servers ORDER BY priority DESC")
+    @Query("SELECT * FROM servers ORDER BY priority ASC, lastCheckedAt DESC")
     fun observeAll(): Flow<List<ServerEntity>>
 
-    @Query("SELECT * FROM servers WHERE isAlive = 1 ORDER BY priority DESC")
+    @Query("SELECT * FROM servers WHERE isAlive = 1 ORDER BY priority ASC, lastCheckedAt DESC")
     suspend fun getLiveServers(): List<ServerEntity>
+
+    @Query("SELECT * FROM servers ORDER BY priority ASC, lastCheckedAt DESC")
+    suspend fun getAllServers(): List<ServerEntity>
 
     @Query("SELECT * FROM servers WHERE id = :id LIMIT 1")
     suspend fun findById(id: String): ServerEntity?

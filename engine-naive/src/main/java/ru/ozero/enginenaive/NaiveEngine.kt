@@ -35,16 +35,18 @@ class NaiveEngine(
 
     override suspend fun start(config: EngineConfig): StartResult {
         require(config is EngineConfig.Naive) { "NaiveEngine требует EngineConfig.Naive" }
-        require(!config.proxyUrl.trimStart().startsWith("{")) {
-            "proxyUrl не может быть JSON — используйте url-формат"
+        val trimmed = config.proxyUrl.trimStart()
+        val jsonConfig = if (trimmed.startsWith("{")) {
+            config.proxyUrl
+        } else {
+            JsonWriter.write(
+                linkedMapOf<String, Any?>(
+                    "listen" to "socks://127.0.0.1:${config.socksPort}",
+                    "proxy" to config.proxyUrl,
+                    "log" to "",
+                ),
+            )
         }
-        val jsonConfig = JsonWriter.write(
-            linkedMapOf<String, Any?>(
-                "listen" to "socks://127.0.0.1:${config.socksPort}",
-                "proxy" to config.proxyUrl,
-                "log" to "",
-            ),
-        )
         if (jsonConfig.isBlank()) {
             Log.e(TAG, "start: пустой конфиг")
             return StartResult.Failure(reason = "конфиг пуст")

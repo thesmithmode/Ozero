@@ -84,7 +84,7 @@ class PublicProxyHarvester(
                     if (parsed is ParsedServer.Error || !filter.isSupported(parsed)) {
                         null
                     } else {
-                        mapper.toEntity(parsed, uri)
+                        mapper.toEntity(parsed, uri, source.priority)
                     }
                 }
                 .take(MAX_ENTITIES_PER_SOURCE)

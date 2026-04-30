@@ -73,7 +73,11 @@ class ByeDpiEngine(
         } else {
             Log.e(TAG, "byedpi не вышел на порт ${config.socksPort} за ${READY_TIMEOUT_MS}ms")
             runCatching { proxy.jniStopProxy() }
+                .onFailure { Log.w(TAG, "jniStopProxy on failure: ${it.message}") }
+            runCatching { proxy.jniForceClose() }
+                .onFailure { Log.w(TAG, "jniForceClose on failure: ${it.message}") }
             proxyJob.cancel()
+            proxyJobRef.compareAndSet(proxyJob, null)
             StartResult.Failure(reason = "byedpi не открыл socks порт ${config.socksPort}")
         }
     }

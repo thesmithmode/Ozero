@@ -7,7 +7,6 @@ ozeroBinaries {
     artifact("libbyedpi-arm64-v8a.so")
     artifact("libbyedpi-armeabi-v7a.so")
     artifact("libbyedpi-x86_64.so")
-    artifact("libbyedpi-x86.so")
 }
 
 android {
@@ -15,7 +14,7 @@ android {
 
     defaultConfig {
         ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
         }
     }
 }

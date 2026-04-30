@@ -44,7 +44,7 @@ class HarvestWorker @AssistedInject constructor(
         val r = harvester.harvest(sources)
         Log.i(TAG, "doWork harvest: parsed=${r.totalParsed} failed=${r.failedSources}")
 
-        val all = dao.getLiveServers()
+        val all = dao.getAllServers()
         val prober = LiveProber(dao)
         val ps = prober.probeAll(all)
         Log.i(TAG, "doWork probe: live=${ps.live} dead=${ps.dead} of ${ps.total}")

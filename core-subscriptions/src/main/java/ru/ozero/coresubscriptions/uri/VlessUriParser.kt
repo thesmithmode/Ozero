@@ -15,8 +15,9 @@ class VlessUriParser {
 
         val userInfo = parsed.userInfo
         if (userInfo.isNullOrBlank()) return UriParseResult.Error("отсутствует UUID")
-        val host = parsed.host
-        if (host.isNullOrBlank()) return UriParseResult.Error("отсутствует host")
+        val rawHost = parsed.host
+        if (rawHost.isNullOrBlank()) return UriParseResult.Error("отсутствует host")
+        val host = rawHost.removePrefix("[").removeSuffix("]")
         val port = parsed.port
         if (port == -1) return UriParseResult.Error("отсутствует port")
 
