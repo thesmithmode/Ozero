@@ -111,7 +111,7 @@ class ChainOrchestratorTest {
         val orch = ChainOrchestrator(setOf(byedpi, xray))
         orch.start(
             listOf(
-                ChainStep(EngineId.BYEDPI, EngineConfig.ByeDpi(1080)),
+                ChainStep(EngineId.BYEDPI, EngineConfig.ByeDpi(socksPort = 1080)),
                 ChainStep(EngineId.XRAY, EngineConfig.Xray("{}", 10808)),
             ),
         )
@@ -135,7 +135,7 @@ class ChainOrchestratorTest {
         val r = orch.start(
             listOf(
                 ChainStep(EngineId.XRAY, EngineConfig.Xray("{}", 10808)),
-                ChainStep(EngineId.BYEDPI, EngineConfig.ByeDpi(1080)),
+                ChainStep(EngineId.BYEDPI, EngineConfig.ByeDpi(socksPort = 1080)),
             ),
         )
         assertIs<ChainResult.Failure>(r)
@@ -172,7 +172,7 @@ class ChainOrchestratorTest {
     fun stop_canBeCalledTwice_withoutDoubleStop() = runTest {
         val byedpi = FakePlugin(EngineId.BYEDPI, listOf(StartResult.Success(socksPort = 1080)))
         val orch = ChainOrchestrator(setOf(byedpi))
-        orch.start(listOf(ChainStep(EngineId.BYEDPI, EngineConfig.ByeDpi(1080))))
+        orch.start(listOf(ChainStep(EngineId.BYEDPI, EngineConfig.ByeDpi(socksPort = 1080))))
         orch.stop()
         orch.stop()
         assertEquals(1, byedpi.stopCalls)
