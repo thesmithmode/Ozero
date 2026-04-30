@@ -145,7 +145,7 @@ class ByeDpiEngine(
                 .takeIf { it.isNotEmpty() }
                 ?.split("\\s+".toRegex())
                 .orEmpty()
-        return (listOf("-p", config.socksPort.toString()) + extra).toTypedArray()
+        return (listOf("ciadpi", "--ip", "127.0.0.1", "-p", config.socksPort.toString()) + extra).toTypedArray()
     }
 
     private companion object {

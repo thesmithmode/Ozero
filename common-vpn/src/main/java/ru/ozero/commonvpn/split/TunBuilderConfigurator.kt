@@ -11,29 +11,25 @@ class TunBuilderConfigurator(
         when (config.mode) {
             SplitTunnelMode.ALL -> {
                 builder.addRoute("0.0.0.0", 0)
-                builder.addRoute(IPV6_DEFAULT, 0)
                 excludeSelfFromTun(builder)
-                PersistentLoggers.info(TAG, "split-tunnel ALL — добавлен default route v4+v6, self исключён")
+                PersistentLoggers.info(TAG, "split-tunnel ALL — добавлен default route v4, self исключён")
             }
             SplitTunnelMode.BYPASS_LAN -> {
                 for (cidr in LanRoutes.BYPASS_LAN_IPV4) {
                     builder.addRoute(cidr.address, cidr.prefix)
                 }
-                builder.addRoute(IPV6_GLOBAL_UNICAST, IPV6_GLOBAL_UNICAST_PREFIX)
                 excludeSelfFromTun(builder)
                 PersistentLoggers.info(
                     TAG,
-                    "split-tunnel BYPASS_LAN — ${LanRoutes.BYPASS_LAN_IPV4.size} v4 + 2000::/3 v6, self исключён",
+                    "split-tunnel BYPASS_LAN — ${LanRoutes.BYPASS_LAN_IPV4.size} v4 routes, self исключён",
                 )
             }
             SplitTunnelMode.ALLOWLIST -> {
                 builder.addRoute("0.0.0.0", 0)
-                builder.addRoute(IPV6_DEFAULT, 0)
                 applyAllowed(builder, config.packages)
             }
             SplitTunnelMode.BLOCKLIST -> {
                 builder.addRoute("0.0.0.0", 0)
-                builder.addRoute(IPV6_DEFAULT, 0)
                 excludeSelfFromTun(builder)
                 applyDisallowed(builder, config.packages)
             }
@@ -76,8 +72,5 @@ class TunBuilderConfigurator(
 
     private companion object {
         const val TAG = "TunBuilderConfigurator"
-        const val IPV6_DEFAULT = "::"
-        const val IPV6_GLOBAL_UNICAST = "2000::"
-        const val IPV6_GLOBAL_UNICAST_PREFIX = 3
     }
 }

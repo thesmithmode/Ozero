@@ -48,7 +48,7 @@ serviceScope.launch {
 }
 ```
 
-`establish()` создаёт TUN device через `VpnService.Builder` — `addAddress(10.10.10.10/32)`, `addDnsServer(127.0.0.1)`, `setMtu(1500)`. Без `prepare()`-permission `establish()` вернёт null — сервис останавливается.
+`establish()` создаёт TUN device через `VpnService.Builder` — `addAddress(10.10.10.10/32)`, `addDnsServer(...)`, `setMetered(false)` (Q+). MTU не задаётся явно — Android берёт link-layer default (≈1500 на cellular). Без `prepare()`-permission `establish()` вернёт null — сервис останавливается.
 
 `serviceScope` = `SupervisorJob() + Dispatchers.IO`. Cancel в `onDestroy` — pipeline.start не выполнится после смерти сервиса.
 

@@ -51,11 +51,6 @@ class OzeroVpnServiceConstantsTest {
     }
 
     @Test
-    fun tunMtuMatchesByeByeDpi() {
-        assertEquals(8500, OzeroVpnService.TUN_MTU)
-    }
-
-    @Test
     fun notificationIdIsPositive() {
         assert(OzeroVpnService.NOTIFICATION_ID > 0)
     }

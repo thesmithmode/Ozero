@@ -57,7 +57,6 @@ class OzeroVpnService : android.net.VpnService() {
         const val TUN_ADDRESS_V6 = "fd00::1"
         const val TUN_PREFIX_LENGTH_V6 = 128
         val TUN_DNS_SERVERS: List<String> = PublicDnsServers.IPV4
-        const val TUN_MTU = 8500
         private const val SESSION_NAME = "Ozero"
         private const val TAG = "OzeroVpnService"
         private const val CHAIN_START_TIMEOUT_MS = 30_000L
@@ -325,10 +324,11 @@ class OzeroVpnService : android.net.VpnService() {
     ): Builder {
         val builder = Builder()
             .addAddress(TUN_ADDRESS, TUN_PREFIX_LENGTH)
-            .setMtu(TUN_MTU)
             .setSession(SESSION_NAME)
         TUN_DNS_SERVERS.forEach { builder.addDnsServer(it) }
-        runCatching { builder.addAddress(TUN_ADDRESS_V6, TUN_PREFIX_LENGTH_V6) }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            runCatching { builder.setMetered(false) }
+        }
         ru.ozero.commonvpn.split.TunBuilderConfigurator(packageName).apply(builder, splitConfig)
         return builder
     }

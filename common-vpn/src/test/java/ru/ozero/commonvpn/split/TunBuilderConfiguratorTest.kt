@@ -14,48 +14,48 @@ class TunBuilderConfiguratorTest {
     private fun mockBuilder(): VpnService.Builder = mockk(relaxed = true)
 
     @Test
-    fun allModeAddsDefaultRoute() {
+    fun allModeAddsDefaultRouteV4Only() {
         val b = mockBuilder()
         every { b.addDisallowedApplication(any()) } returns b
         configurator.apply(b, SplitTunnelConfig(mode = SplitTunnelMode.ALL))
         verify(exactly = 1) { b.addRoute("0.0.0.0", 0) }
-        verify(exactly = 1) { b.addRoute("::", 0) }
+        verify(exactly = 0) { b.addRoute("::", 0) }
         verify(exactly = 0) { b.addAllowedApplication(any()) }
         verify(exactly = 1) { b.addDisallowedApplication("ru.ozero.app") }
     }
 
     @Test
-    fun bypassLanAddsAllNonPrivateRoutes() {
+    fun bypassLanAddsV4RoutesOnly() {
         val b = mockBuilder()
         every { b.addDisallowedApplication(any()) } returns b
         configurator.apply(b, SplitTunnelConfig(mode = SplitTunnelMode.BYPASS_LAN))
         verify(exactly = 0) { b.addRoute("0.0.0.0", 0) }
         verify { b.addRoute("8.0.0.0", 7) }
         verify { b.addRoute("1.0.0.0", 8) }
-        verify(exactly = 1) { b.addRoute("2000::", 3) }
+        verify(exactly = 0) { b.addRoute("2000::", 3) }
         verify(exactly = 1) { b.addDisallowedApplication("ru.ozero.app") }
     }
 
     @Test
-    fun allowlistAddsIpv6DefaultRoute() {
+    fun allowlistDoesNotAddIpv6Route() {
         val b = mockBuilder()
         every { b.addAllowedApplication(any()) } returns b
         configurator.apply(
             b,
             SplitTunnelConfig(mode = SplitTunnelMode.ALLOWLIST, packages = setOf("com.x")),
         )
-        verify(exactly = 1) { b.addRoute("::", 0) }
+        verify(exactly = 0) { b.addRoute("::", 0) }
     }
 
     @Test
-    fun blocklistAddsIpv6DefaultRoute() {
+    fun blocklistDoesNotAddIpv6Route() {
         val b = mockBuilder()
         every { b.addDisallowedApplication(any()) } returns b
         configurator.apply(
             b,
             SplitTunnelConfig(mode = SplitTunnelMode.BLOCKLIST, packages = setOf("com.x")),
         )
-        verify(exactly = 1) { b.addRoute("::", 0) }
+        verify(exactly = 0) { b.addRoute("::", 0) }
     }
 
     @Test
