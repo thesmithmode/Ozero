@@ -14,6 +14,8 @@ internal fun parseQuery(raw: String): Map<String, String> =
         key to value
     }.toMap()
 
-internal fun decodeFragment(raw: String?): String? =
-    raw?.let { runCatching { URLDecoder.decode(it, StandardCharsets.UTF_8) }.getOrElse { it } }
-        ?.takeIf { it.isNotEmpty() }
+internal fun decodeFragment(raw: String?): String? {
+    if (raw == null) return null
+    val decoded = runCatching { URLDecoder.decode(raw, StandardCharsets.UTF_8) }.getOrElse { raw }
+    return decoded.takeIf { it.isNotEmpty() }
+}
