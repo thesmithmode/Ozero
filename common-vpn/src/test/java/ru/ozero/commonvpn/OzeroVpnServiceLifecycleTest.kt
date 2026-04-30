@@ -83,14 +83,31 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `stopVpn закрывает TUN fd ДО запуска корутины shutdown`() {
-        val body = source.substringAfter("private fun stopVpn()").substringBefore("private suspend fun performShutdown")
-        val closeFdIdx = body.indexOf("tunFdRef.getAndSet(null)")
-        val launchIdx = body.indexOf("serviceScope.launch")
+    fun `performShutdown stop order — chainOrchestrator ПЕРЕД tunnelGateway`() {
+        val body = source.substringAfter("private suspend fun performShutdown()")
+            .substringBefore("internal fun buildTunBuilder")
+        val chainIdx = body.indexOf("chainOrchestrator.stop()")
+        val nativeIdx = body.indexOf("tunnelGateway.stop()")
         assertTrue(
-            closeFdIdx in 0 until launchIdx,
-            "stopVpn обязан закрыть TUN fd через tunFdRef.getAndSet(null) ДО serviceScope.launch — " +
-                "иначе hev worker читает fd, EOF не приходит, nativeStop зависает.",
+            chainIdx in 0 until nativeIdx,
+            "Phase A2: chainOrchestrator.stop() (byedpi) ОБЯЗАН быть ПЕРЕД tunnelGateway.stop() " +
+                "(libhev). Иначе libhev event-loop ждёт outstanding socks5 connections к byedpi → " +
+                "TProxyStopService зависает > 3000ms → abandoned thread → reconnect deadlock на " +
+                "libhev singleton. Reference: ByeDPIAndroid/ByeByeDPI делают proxy→tun2socks.",
+        )
+    }
+
+    @Test
+    fun `performShutdown закрывает TUN fd ПОСЛЕ tunnelGateway_stop в finally`() {
+        val body = source.substringAfter("private suspend fun performShutdown()")
+            .substringBefore("internal fun buildTunBuilder")
+        val nativeIdx = body.indexOf("tunnelGateway.stop()")
+        val closeIdx = body.indexOf("tunFdRef.getAndSet(null)?.close()")
+        assertTrue(
+            nativeIdx in 0 until closeIdx,
+            "Phase A4: tunFd закрывается ПОСЛЕ tunnelGateway.stop() (libhev). Сначала kill byedpi " +
+                "→ libhev завершается на ECONNREFUSED → потом native stop → потом close fd. Этот " +
+                "порядок симметричен ByeByeDPI stopTun2Socks(): TProxyStopService → tunFd.close().",
         )
     }
 

@@ -42,10 +42,13 @@ class VpnServiceLifecycleContractTest {
         val hasOnDestroy = source.contains("override fun onDestroy")
         assertTrue(hasOnDestroy, "onDestroy должен быть переопределён.")
         val onDestroyBody = source.substringAfter("override fun onDestroy")
-            .substringBefore("private companion object")
+            .substringBefore("private fun enterForegroundOrLog")
         assertTrue(
-            onDestroyBody.contains("tunFd?.close()") || onDestroyBody.contains("tunFd!!.close()"),
-            "В onDestroy должно быть `tunFd?.close()` после остановки pipeline (kill-switch).",
+            onDestroyBody.contains("tunFdRef.getAndSet(null)?.close()") ||
+                onDestroyBody.contains("tunFd?.close()") ||
+                onDestroyBody.contains("tunFd!!.close()"),
+            "В onDestroy должно закрываться TUN fd (через tunFdRef.getAndSet(null)?.close() или " +
+                "tunFd?.close()) — kill-switch инвариант.",
         )
     }
 

@@ -7,6 +7,7 @@ import kotlin.test.assertTrue
 class SentinelLogsRegressionTest {
 
     private val gatewaySrc by lazy { read("src/main/java/ru/ozero/commonvpn/HevTunnelGateway.kt") }
+    private val serviceSrc by lazy { read("src/main/java/ru/ozero/commonvpn/OzeroVpnService.kt") }
 
     @Test
     fun `gateway start логирует libraryLoaded ДО проверки isLoaded`() {
@@ -16,40 +17,44 @@ class SentinelLogsRegressionTest {
         assertTrue(
             libraryLoadedIdx in 0 until checkIdx,
             "gateway.start должен логировать libraryLoaded ДО проверки isLoaded — иначе lazy " +
-                "loadLibrary может крашнуть на этапе проверки и мы не узнаем причину. " +
-                "Сейчас лог: 'checkpoint loadOnce returned dt=...ms libraryLoaded=\$loaded'.",
+                "loadLibrary может крашнуть на этапе проверки и мы не узнаем причину.",
         )
     }
 
     @Test
-    fun `gateway dup TUN fd перед nativeStart`() {
+    fun `gateway передаёт raw tunPfd_fd в nativeStart (no dup)`() {
         val body = funBody(gatewaySrc, "start")
-        val dupIdx = body.indexOf("config.tunPfd.dup()")
-        val nativeIdx = body.indexOf("nativeStart(")
         assertTrue(
-            dupIdx in 0 until nativeIdx,
-            "Gateway обязан dup'ать TUN fd перед nativeStart — иначе ParcelFileDescriptor.close() " +
-                "со стороны Service инвалидирует fd под носом у libhev → SIGSEGV",
+            !body.contains(".dup()"),
+            "Phase A4: dup() удалён. ByeDPIAndroid/ByeByeDPI передают raw fd.fd в native. " +
+                "Закрытие fd — ответственность OzeroVpnService.tunFdRef в performShutdown finally.",
         )
-    }
-
-    @Test
-    fun `gateway передаёт duped fd в nativeStart, не оригинал`() {
-        val body = funBody(gatewaySrc, "start")
-        val nativePattern = Regex("nativeStart\\([^,]+,\\s*duped\\.fd\\)")
+        val nativePattern = Regex("nativeStart\\([^,]+,\\s*fd\\)")
         assertTrue(
             nativePattern.containsMatchIn(body),
-            "В nativeStart должен передаваться duped.fd — оригинальный config.tunPfd.fd под управлением Service",
+            "В nativeStart должен передаваться raw fd (val fd = config.tunPfd.fd, потом nativeStart(path, fd)).",
         )
     }
 
     @Test
-    fun `gateway stop закрывает duped pfd`() {
+    fun `gateway stop делегирует close fd на сервис`() {
         val stopBody = funBody(gatewaySrc, "stop")
         assertTrue(
-            stopBody.contains("closeDuped()"),
-            "stop обязан закрывать duped pfd — иначе утечка fd на каждый connect/disconnect цикл",
+            !stopBody.contains("closeDuped") && !stopBody.contains(".close()"),
+            "Phase A4: gateway больше не закрывает fd. Только nativeStop. Закрытие fd живёт в " +
+                "OzeroVpnService.performShutdown finally — после chainOrchestrator.stop() + tunnelGateway.stop().",
         )
+        assertTrue(stopBody.contains("nativeStop"), "stop обязан вызвать nativeStop")
+    }
+
+    @Test
+    fun `service performShutdown закрывает tunFd ПОСЛЕ tunnelGateway_stop`() {
+        val body = serviceSrc.substringAfter("private suspend fun performShutdown()")
+            .substringBefore("internal fun buildTunBuilder")
+        val nativeIdx = body.indexOf("tunnelGateway.stop()")
+        val closeIdx = body.indexOf("tunFdRef.getAndSet(null)?.close()")
+        assertTrue(nativeIdx >= 0, "tunnelGateway.stop() должен присутствовать в performShutdown")
+        assertTrue(closeIdx > nativeIdx, "tunFd close обязан быть ПОСЛЕ tunnelGateway.stop()")
     }
 
     private fun read(rel: String): String {

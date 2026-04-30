@@ -13,8 +13,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import ru.ozero.commondns.PublicDnsServers
 import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_START
 import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_STOP
 import ru.ozero.enginescore.ChainOrchestrator
@@ -54,13 +56,14 @@ class OzeroVpnService : android.net.VpnService() {
         const val TUN_PREFIX_LENGTH = 32
         const val TUN_ADDRESS_V6 = "fd00::1"
         const val TUN_PREFIX_LENGTH_V6 = 128
-        const val TUN_DNS = "100.64.0.1"
+        val TUN_DNS_SERVERS: List<String> = PublicDnsServers.IPV4
         const val TUN_MTU = 8500
         private const val SESSION_NAME = "Ozero"
         private const val TAG = "OzeroVpnService"
         private const val CHAIN_START_TIMEOUT_MS = 30_000L
-        private const val NATIVE_STOP_TIMEOUT_MS = 3_000L
         private const val CHAIN_STOP_TIMEOUT_MS = 3_000L
+        private const val NATIVE_STOP_TIMEOUT_MS = 3_000L
+        private const val STATS_LOG_INTERVAL_MS = 5_000L
     }
 
     override fun onCreate() {
@@ -76,6 +79,7 @@ class OzeroVpnService : android.net.VpnService() {
 
     private val tunFdRef = AtomicReference<ParcelFileDescriptor?>(null)
     private val startJobRef = AtomicReference<Job?>(null)
+    private val statsJobRef = AtomicReference<Job?>(null)
     private val starting = AtomicBoolean(false)
     private val stopping = AtomicBoolean(false)
 
@@ -189,6 +193,7 @@ class OzeroVpnService : android.net.VpnService() {
                 }
                 tunnelController.onEngineStarted(EngineId.BYEDPI, chainResult.finalSocksPort)
                 PersistentLoggers.info(TAG, "connected socksPort=${chainResult.finalSocksPort}")
+                startStatsLogger()
             } finally {
                 starting.set(false)
             }
@@ -196,18 +201,67 @@ class OzeroVpnService : android.net.VpnService() {
         startJobRef.set(job)
     }
 
+    private fun startStatsLogger() {
+        statsJobRef.getAndSet(null)?.cancel()
+        val job = serviceScope.launch {
+            var prevTx = 0L
+            var prevRx = 0L
+            try {
+                while (true) {
+                    delay(STATS_LOG_INTERVAL_MS)
+                    val stats = runCatching { hev.TProxyService.TProxyGetStats() }.getOrNull()
+                    if (stats == null || stats.size < 4) {
+                        PersistentLoggers.warn(TAG, "TunnelStats: TProxyGetStats unavailable")
+                        continue
+                    }
+                    val txPackets = stats[0]
+                    val rxPackets = stats[1]
+                    val txBytes = stats[2]
+                    val rxBytes = stats[3]
+                    val dTx = txBytes - prevTx
+                    val dRx = rxBytes - prevRx
+                    PersistentLoggers.info(
+                        TAG,
+                        "TunnelStats tx=${txBytes}B/$txPackets pkts rx=${rxBytes}B/$rxPackets pkts " +
+                            "Δtx=${dTx}B Δrx=${dRx}B",
+                    )
+                    prevTx = txBytes
+                    prevRx = rxBytes
+                }
+            } catch (ce: kotlinx.coroutines.CancellationException) {
+                throw ce
+            } catch (t: Throwable) {
+                PersistentLoggers.warn(TAG, "stats logger threw: ${t.message}")
+            }
+        }
+        statsJobRef.set(job)
+    }
+
     private fun stopVpn() {
         if (!stopping.compareAndSet(false, true)) return
         PersistentLoggers.info(TAG, "stopVpn entry")
         tunnelController.onDisconnecting()
         startJobRef.getAndSet(null)?.cancel()
-        runCatching { tunFdRef.getAndSet(null)?.close() }
+        statsJobRef.getAndSet(null)?.cancel()
         serviceScope.launch { performShutdown() }
     }
 
     private suspend fun performShutdown() {
         PersistentLoggers.info(TAG, "performShutdown begin")
         try {
+            statsJobRef.getAndSet(null)?.cancel()
+
+            val chainStopJob = serviceScope.launch {
+                runCatching { chainOrchestrator.stop() }
+                    .onFailure { PersistentLoggers.warn(TAG, "chainOrchestrator.stop threw: ${it.message}") }
+            }
+            val chainOk = withTimeoutOrNull(CHAIN_STOP_TIMEOUT_MS) { chainStopJob.join() }
+            if (chainOk == null) {
+                PersistentLoggers.warn(TAG, "chainOrchestrator.stop hung > ${CHAIN_STOP_TIMEOUT_MS}ms")
+            } else {
+                PersistentLoggers.info(TAG, "chainOrchestrator.stop completed")
+            }
+
             val nativeStopThread = Thread({
                 runCatching { tunnelGateway.stop() }
                     .onFailure { PersistentLoggers.warn(TAG, "tunnelGateway.stop threw: ${it.message}") }
@@ -224,12 +278,8 @@ class OzeroVpnService : android.net.VpnService() {
                 PersistentLoggers.info(TAG, "native tunnel stop completed")
             }
 
-            val chainStopJob = serviceScope.launch {
-                runCatching { chainOrchestrator.stop() }
-                    .onFailure { PersistentLoggers.warn(TAG, "chainOrchestrator.stop threw: ${it.message}") }
-            }
-            withTimeoutOrNull(CHAIN_STOP_TIMEOUT_MS) { chainStopJob.join() }
-                ?: PersistentLoggers.warn(TAG, "chainOrchestrator.stop hung > ${CHAIN_STOP_TIMEOUT_MS}ms")
+            runCatching { tunFdRef.getAndSet(null)?.close() }
+                .onFailure { PersistentLoggers.warn(TAG, "tunFd.close threw: ${it.message}") }
         } finally {
             tunnelController.reset()
             starting.set(false)
@@ -251,10 +301,9 @@ class OzeroVpnService : android.net.VpnService() {
     ): Builder {
         val builder = Builder()
             .addAddress(TUN_ADDRESS, TUN_PREFIX_LENGTH)
-            .addDnsServer(TUN_DNS)
             .setMtu(TUN_MTU)
             .setSession(SESSION_NAME)
-            .setBlocking(true)
+        TUN_DNS_SERVERS.forEach { builder.addDnsServer(it) }
         runCatching { builder.addAddress(TUN_ADDRESS_V6, TUN_PREFIX_LENGTH_V6) }
         ru.ozero.commonvpn.split.TunBuilderConfigurator(packageName).apply(builder, splitConfig)
         return builder

@@ -16,10 +16,13 @@ class NativeHevTunnelGatewayLogTest {
     private val startBody by lazy { funBody(source, "start") }
 
     @Test
-    fun `start entry log содержит thread name и originalFd`() {
+    fun `start entry log содержит thread name и fd`() {
         assertTrue(startBody.contains("start entry"), "start должен иметь entry лог")
-        assertTrue(startBody.contains("Thread.currentThread().name"), "должен логировать имя треда — Nubia диагностика")
-        assertTrue(startBody.contains("originalFd="), "должен логировать original tunPfd.fd")
+        assertTrue(
+            startBody.contains("Thread.currentThread().name"),
+            "должен логировать имя треда — Nubia/RedMagic диагностика",
+        )
+        assertTrue(startBody.contains("fd="), "должен логировать tunPfd.fd")
     }
 
     @Test
@@ -33,20 +36,10 @@ class NativeHevTunnelGatewayLogTest {
     }
 
     @Test
-    fun `start checkpoints обрамляют dup pre и post с newFd`() {
-        assertTrue(startBody.contains("checkpoint pre-dup"), "pre-dup checkpoint")
-        assertTrue(startBody.contains("checkpoint post-dup"), "post-dup checkpoint")
-        assertTrue(startBody.contains("newFd="), "post-dup должен показать новый fd после dup")
-        val pre = startBody.indexOf("checkpoint pre-dup")
-        val post = startBody.indexOf("checkpoint post-dup")
-        assertTrue(pre in 0 until post, "pre-dup перед post-dup")
-    }
-
-    @Test
     fun `start checkpoints обрамляют writeConfig`() {
         assertTrue(startBody.contains("checkpoint pre-writeConfig"), "pre-writeConfig checkpoint")
         assertTrue(startBody.contains("checkpoint post-writeConfig"), "post-writeConfig checkpoint")
-        assertTrue(startBody.contains("path=") && startBody.contains("bytes="), "post-writeConfig: path+size файла")
+        assertTrue(startBody.contains("path=") && startBody.contains("bytes="), "post-writeConfig: path+size")
     }
 
     @Test
@@ -72,9 +65,21 @@ class NativeHevTunnelGatewayLogTest {
         val directLogCalls = Regex("\\bLog\\.[idew]\\(").findAll(startBody).count()
         assertTrue(
             directLogCalls == 0,
-            "start не должен использовать android.util.Log напрямую — только UnifiedLogger через " +
-                "PersistentLoggers.instance. UnifiedLogger пишет в logcat и в файл одним вызовом — " +
-                "двойной канал избыточен. Найдено прямых Log.x: $directLogCalls.",
+            "start не должен использовать android.util.Log — только PersistentLoggers (UnifiedLogger). " +
+                "Прямых Log.x найдено: $directLogCalls",
+        )
+    }
+
+    @Test
+    fun `start больше не делает dup — raw tunPfd_fd передаётся в native`() {
+        assertTrue(
+            !startBody.contains(".dup()"),
+            "Phase A4: dup() убран. Теперь передаём raw config.tunPfd.fd в native. " +
+                "Симметрия с ByeDPIAndroid/ByeByeDPI. Закрытие fd — ответственность OzeroVpnService.",
+        )
+        assertTrue(
+            !startBody.contains("dupedRef"),
+            "dupedRef instance field removed — gateway больше не владеет fd lifecycle.",
         )
     }
 
