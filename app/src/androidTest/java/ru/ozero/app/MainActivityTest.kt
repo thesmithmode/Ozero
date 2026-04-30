@@ -50,6 +50,8 @@ class MainActivityTest {
 
     @Test
     fun connectedStateShowsDisconnectButton() {
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
         tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
 
         composeRule

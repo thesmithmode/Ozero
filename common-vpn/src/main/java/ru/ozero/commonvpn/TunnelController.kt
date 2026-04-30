@@ -10,35 +10,71 @@ class TunnelController {
 
     private val _state = MutableStateFlow<TunnelState>(TunnelState.Idle)
     val state: StateFlow<TunnelState> = _state.asStateFlow()
+    private val lock = Any()
 
-    fun onProbing() {
-        PersistentLoggers.info(TAG, "probing")
-        _state.value = TunnelState.Probing
+    fun onProbing() = transition(TunnelState.Probing)
+
+    fun onConnecting(engineId: EngineId) = transition(TunnelState.Connecting(engineId))
+
+    fun onEngineStarted(engineId: EngineId, socksPort: Int) =
+        transition(TunnelState.Connected(engineId, socksPort))
+
+    fun onEngineDied(engineId: EngineId, reason: String) =
+        transition(TunnelState.Failed(engineId, reason), markError = true)
+
+    fun onDisconnecting() = transition(TunnelState.Disconnecting)
+
+    fun reset() = transition(TunnelState.Idle)
+
+    private fun transition(target: TunnelState, markError: Boolean = false) {
+        synchronized(lock) {
+            val current = _state.value
+            if (current == target) return
+            if (!isAllowed(current, target)) {
+                PersistentLoggers.warn(
+                    TAG,
+                    "invalid transition ${name(current)} → ${name(target)} ignored",
+                )
+                return
+            }
+            if (markError) {
+                PersistentLoggers.error(TAG, "${name(current)} → ${name(target)}")
+            } else {
+                PersistentLoggers.info(TAG, "${name(current)} → ${name(target)}")
+            }
+            _state.value = target
+        }
     }
 
-    fun onConnecting(engineId: EngineId) {
-        PersistentLoggers.info(TAG, "connecting engine=$engineId")
-        _state.value = TunnelState.Connecting(engineId)
+    private fun isAllowed(from: TunnelState, to: TunnelState): Boolean = when (from) {
+        is TunnelState.Idle -> to is TunnelState.Probing
+        is TunnelState.Probing ->
+            to is TunnelState.Connecting ||
+                to is TunnelState.Failed ||
+                to is TunnelState.Disconnecting
+        is TunnelState.Connecting ->
+            to is TunnelState.Connected ||
+                to is TunnelState.Failed ||
+                to is TunnelState.Disconnecting
+        is TunnelState.Connected ->
+            to is TunnelState.Disconnecting ||
+                to is TunnelState.Failed
+        is TunnelState.Disconnecting ->
+            to is TunnelState.Idle ||
+                to is TunnelState.Failed
+        is TunnelState.Failed ->
+            to is TunnelState.Probing ||
+                to is TunnelState.Idle ||
+                to is TunnelState.Disconnecting
     }
 
-    fun onEngineStarted(engineId: EngineId, socksPort: Int) {
-        PersistentLoggers.info(TAG, "engineStarted engine=$engineId socksPort=$socksPort")
-        _state.value = TunnelState.Connected(engineId, socksPort)
-    }
-
-    fun onEngineDied(engineId: EngineId, reason: String) {
-        PersistentLoggers.error(TAG, "engineDied engine=$engineId reason=$reason kill-switch активен")
-        _state.value = TunnelState.Failed(engineId, reason)
-    }
-
-    fun onDisconnecting() {
-        PersistentLoggers.info(TAG, "disconnecting")
-        _state.value = TunnelState.Disconnecting
-    }
-
-    fun reset() {
-        PersistentLoggers.info(TAG, "reset")
-        _state.value = TunnelState.Idle
+    private fun name(s: TunnelState): String = when (s) {
+        is TunnelState.Idle -> "Idle"
+        is TunnelState.Probing -> "Probing"
+        is TunnelState.Connecting -> "Connecting(${s.engineId})"
+        is TunnelState.Connected -> "Connected(${s.engineId}, port=${s.socksPort})"
+        is TunnelState.Failed -> "Failed(${s.engineId}, ${s.reason})"
+        is TunnelState.Disconnecting -> "Disconnecting"
     }
 
     private companion object {

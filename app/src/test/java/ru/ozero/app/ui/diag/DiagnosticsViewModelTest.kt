@@ -123,6 +123,7 @@ class DiagnosticsViewModelTest {
         advanceUntilIdle()
         assertIs<DiagnosticsUiState.Running>(viewModel.uiState.value)
 
+        tunnelController.onDisconnecting()
         tunnelController.reset()
         advanceUntilIdle()
 
@@ -159,6 +160,8 @@ class DiagnosticsViewModelTest {
     }
 
     private fun connect(socksPort: Int) {
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
         tunnelController.onEngineStarted(EngineId.BYEDPI, socksPort)
     }
 

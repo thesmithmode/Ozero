@@ -21,16 +21,31 @@ class TunnelControllerTest {
     }
 
     @Test
-    fun engineStartedTransitionsToConnected() {
-        controller.onEngineStarted(engineId = EngineId.BYEDPI, socksPort = 1080)
-        val state = controller.state.value
-        assertIs<TunnelState.Connected>(state)
-        assertEquals(EngineId.BYEDPI, state.engineId)
-        assertEquals(1080, state.socksPort)
+    fun fullHappyPath_idleProbingConnectingConnectedDisconnectingIdle() {
+        controller.onProbing()
+        assertIs<TunnelState.Probing>(controller.state.value)
+
+        controller.onConnecting(EngineId.BYEDPI)
+        val connecting = controller.state.value
+        assertIs<TunnelState.Connecting>(connecting)
+        assertEquals(EngineId.BYEDPI, connecting.engineId)
+
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        val connected = controller.state.value
+        assertIs<TunnelState.Connected>(connected)
+        assertEquals(1080, connected.socksPort)
+
+        controller.onDisconnecting()
+        assertIs<TunnelState.Disconnecting>(controller.state.value)
+
+        controller.reset()
+        assertIs<TunnelState.Idle>(controller.state.value)
     }
 
     @Test
-    fun engineDeathTransitionsToFailed() {
+    fun engineDeathFromConnectedTransitionsToFailed() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
         controller.onEngineStarted(EngineId.BYEDPI, 1080)
         controller.onEngineDied(EngineId.BYEDPI, "process exited with code 1")
         val state = controller.state.value
@@ -41,35 +56,150 @@ class TunnelControllerTest {
 
     @Test
     fun failedStateIsNotIdleKillSwitchInvariant() {
-        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        controller.onProbing()
         controller.onEngineDied(EngineId.BYEDPI, "crash")
         assertTrue(controller.state.value is TunnelState.Failed)
         assertTrue(controller.state.value !is TunnelState.Idle)
     }
 
     @Test
-    fun probingThenConnectingThenConnected() {
+    fun failedCanRetryViaProbing() {
+        controller.onProbing()
+        controller.onEngineDied(EngineId.BYEDPI, "crash")
+        assertIs<TunnelState.Failed>(controller.state.value)
+
         controller.onProbing()
         assertIs<TunnelState.Probing>(controller.state.value)
-        controller.onConnecting(EngineId.BYEDPI)
-        val connecting = controller.state.value
-        assertIs<TunnelState.Connecting>(connecting)
-        assertEquals(EngineId.BYEDPI, connecting.engineId)
+    }
+
+    @Test
+    fun invalidIdleToConnectedIgnored() {
         controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        assertIs<TunnelState.Idle>(controller.state.value)
+    }
+
+    @Test
+    fun invalidIdleToConnectingIgnored() {
+        controller.onConnecting(EngineId.BYEDPI)
+        assertIs<TunnelState.Idle>(controller.state.value)
+    }
+
+    @Test
+    fun invalidIdleToDisconnectingIgnored() {
+        controller.onDisconnecting()
+        assertIs<TunnelState.Idle>(controller.state.value)
+    }
+
+    @Test
+    fun invalidConnectedToConnectingIgnored() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        controller.onConnecting(EngineId.BYEDPI)
+        val state = controller.state.value
+        assertIs<TunnelState.Connected>(state)
+        assertEquals(1080, state.socksPort)
+    }
+
+    @Test
+    fun invalidConnectedToProbingIgnored() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        controller.onProbing()
         assertIs<TunnelState.Connected>(controller.state.value)
     }
 
     @Test
-    fun disconnectingTransition() {
+    fun invalidProbingToConnectedIgnored() {
+        controller.onProbing()
         controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        assertIs<TunnelState.Probing>(controller.state.value)
+    }
+
+    @Test
+    fun idempotentDuplicateConnecting() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        controller.onConnecting(EngineId.BYEDPI)
+        val state = controller.state.value
+        assertIs<TunnelState.Connecting>(state)
+        assertEquals(EngineId.BYEDPI, state.engineId)
+    }
+
+    @Test
+    fun idempotentDuplicateDisconnecting() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        controller.onDisconnecting()
         controller.onDisconnecting()
         assertIs<TunnelState.Disconnecting>(controller.state.value)
     }
 
     @Test
-    fun resetReturnsToIdle() {
+    fun probingCanGoToFailedDirectly() {
+        controller.onProbing()
+        controller.onEngineDied(EngineId.BYEDPI, "no engines available")
+        assertIs<TunnelState.Failed>(controller.state.value)
+    }
+
+    @Test
+    fun connectingCanGoToFailedDirectly() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        controller.onEngineDied(EngineId.BYEDPI, "engine start timeout")
+        assertIs<TunnelState.Failed>(controller.state.value)
+    }
+
+    @Test
+    fun disconnectingCanResetToIdle() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
         controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        controller.onDisconnecting()
         controller.reset()
         assertIs<TunnelState.Idle>(controller.state.value)
+    }
+
+    @Test
+    fun invalidConnectedToIdleIgnored() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        controller.reset()
+        assertIs<TunnelState.Connected>(controller.state.value)
+    }
+
+    @Test
+    fun failedCanGoToIdleViaReset() {
+        controller.onProbing()
+        controller.onEngineDied(EngineId.BYEDPI, "crash")
+        controller.reset()
+        assertIs<TunnelState.Idle>(controller.state.value)
+    }
+
+    @Test
+    fun connectedCanGoDirectToFailed() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        controller.onEngineDied(EngineId.BYEDPI, "engine died after connected")
+        assertIs<TunnelState.Failed>(controller.state.value)
+    }
+
+    @Test
+    fun probingCanCancelToDisconnecting() {
+        controller.onProbing()
+        controller.onDisconnecting()
+        assertIs<TunnelState.Disconnecting>(controller.state.value)
+    }
+
+    @Test
+    fun connectingCanCancelToDisconnecting() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        controller.onDisconnecting()
+        assertIs<TunnelState.Disconnecting>(controller.state.value)
     }
 }

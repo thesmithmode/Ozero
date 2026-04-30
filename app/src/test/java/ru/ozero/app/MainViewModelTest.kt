@@ -48,6 +48,8 @@ class MainViewModelTest {
 
     @Test
     fun stateMirrorsTunnelControllerConnected() = runTest {
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
         tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
         advanceUntilIdle()
         assertIs<TunnelState.Connected>(viewModel.state.value)
@@ -64,6 +66,7 @@ class MainViewModelTest {
 
     @Test
     fun onVpnPermissionDeniedFromConnectingMovesToFailed() = runTest {
+        tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.BYEDPI)
         advanceUntilIdle()
         viewModel.onVpnPermissionDenied()
