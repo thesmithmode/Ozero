@@ -184,6 +184,7 @@ private fun StatusLabel(state: TunnelState) {
         is TunnelState.Failed -> state.engineId.name
         else -> null
     }
+    val failedReason = (state as? TunnelState.Failed)?.reason
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = stringResource(labelRes),
@@ -195,6 +196,15 @@ private fun StatusLabel(state: TunnelState) {
                 text = engine,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            )
+        }
+        if (failedReason != null && failedReason.isNotBlank()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = failedReason,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.testTag(MainScreenTestTags.FAILED_REASON),
             )
         }
     }
