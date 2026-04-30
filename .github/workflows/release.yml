@@ -250,6 +250,9 @@ jobs:
             "Lru/ozero/enginenaive/"
             "Lru/ozero/engineurnetwork/"
             "StubLib"
+            "StubEngine"
+            "StubPlugin"
+            "StubByeDpi"
           )
           for cls in "${FORBIDDEN_CLASSES[@]}"; do
             if grep -aor "$cls" "$WORK"/classes*.dex | head -n1 | grep -q "$cls"; then
