@@ -52,14 +52,15 @@ class OzeroVpnService : android.net.VpnService() {
         const val NOTIFICATION_ID = 1
         const val TUN_ADDRESS = "10.10.10.10"
         const val TUN_PREFIX_LENGTH = 32
-        const val TUN_ADDRESS_V6 = "fd00:ffff:ffff:ffff::1"
-        const val TUN_PREFIX_LENGTH_V6 = 64
+        const val TUN_ADDRESS_V6 = "fd00::1"
+        const val TUN_PREFIX_LENGTH_V6 = 128
         const val TUN_DNS = "100.64.0.1"
-        const val TUN_MTU = 1500
+        const val TUN_MTU = 8500
         private const val SESSION_NAME = "Ozero"
         private const val TAG = "OzeroVpnService"
         private const val CHAIN_START_TIMEOUT_MS = 30_000L
-        private const val SHUTDOWN_TIMEOUT_MS = 6_000L
+        private const val NATIVE_STOP_TIMEOUT_MS = 3_000L
+        private const val CHAIN_STOP_TIMEOUT_MS = 3_000L
     }
 
     override fun onCreate() {
@@ -205,20 +206,43 @@ class OzeroVpnService : android.net.VpnService() {
     }
 
     private suspend fun performShutdown() {
-        withTimeoutOrNull(SHUTDOWN_TIMEOUT_MS) {
-            runCatching { tunnelGateway.stop() }
-            runCatching { chainOrchestrator.stop() }
-        } ?: PersistentLoggers.warn(TAG, "shutdown hung > ${SHUTDOWN_TIMEOUT_MS}ms")
-        tunnelController.reset()
-        starting.set(false)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            stopForeground(STOP_FOREGROUND_REMOVE)
-        } else {
-            @Suppress("DEPRECATION")
-            stopForeground(true)
+        PersistentLoggers.info(TAG, "performShutdown begin")
+        try {
+            val nativeStopThread = Thread({
+                runCatching { tunnelGateway.stop() }
+                    .onFailure { PersistentLoggers.warn(TAG, "tunnelGateway.stop threw: ${it.message}") }
+            }, "ozero-native-stop")
+            nativeStopThread.isDaemon = true
+            nativeStopThread.start()
+            nativeStopThread.join(NATIVE_STOP_TIMEOUT_MS)
+            if (nativeStopThread.isAlive) {
+                PersistentLoggers.warn(
+                    TAG,
+                    "native tunnel stop hung > ${NATIVE_STOP_TIMEOUT_MS}ms — abandon thread",
+                )
+            } else {
+                PersistentLoggers.info(TAG, "native tunnel stop completed")
+            }
+
+            val chainStopJob = serviceScope.launch {
+                runCatching { chainOrchestrator.stop() }
+                    .onFailure { PersistentLoggers.warn(TAG, "chainOrchestrator.stop threw: ${it.message}") }
+            }
+            withTimeoutOrNull(CHAIN_STOP_TIMEOUT_MS) { chainStopJob.join() }
+                ?: PersistentLoggers.warn(TAG, "chainOrchestrator.stop hung > ${CHAIN_STOP_TIMEOUT_MS}ms")
+        } finally {
+            tunnelController.reset()
+            starting.set(false)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+            stopSelf()
+            stopping.set(false)
+            PersistentLoggers.info(TAG, "performShutdown end")
         }
-        stopSelf()
-        stopping.set(false)
     }
 
     internal fun buildTunBuilder(

@@ -27,6 +27,8 @@ data class HevTunnelConfig(
           mtu: $tunMtu
           ipv4: $tunIpv4
           ipv6: '$tunIpv6'
+        misc:
+          task-stack-size: 81920
         socks5:
           address: $socksAddress
           port: $socksPort
@@ -34,10 +36,10 @@ data class HevTunnelConfig(
         """.trimIndent() + "\n"
 
     private companion object {
-        private const val DEFAULT_TUN_MTU: Int = 1500
+        private const val DEFAULT_TUN_MTU: Int = 8500
 
         private const val DEFAULT_TUN_IPV4: String = "10.10.10.10"
-        private const val DEFAULT_TUN_IPV6: String = "fd00:ffff:ffff:ffff::1"
+        private const val DEFAULT_TUN_IPV6: String = "fd00::1"
         private const val DEFAULT_UDP_MODE: String = "udp"
 
         private val ADDRESS_REGEX = Regex("^[a-zA-Z0-9._:-]+$")

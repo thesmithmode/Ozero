@@ -24,14 +24,14 @@ class HevTunnelConfigTest {
         assertTrue(yaml.contains("socks5:"))
         assertTrue(yaml.contains("address: 127.0.0.1"))
         assertTrue(yaml.contains("port: 1080"))
-        assertTrue(yaml.contains("mtu: 1500"))
+        assertTrue(yaml.contains("mtu: 8500"))
     }
 
     @Test
     fun `toYaml содержит IPv4 и IPv6 для tunnel секции`() {
         val yaml = base().toYaml()
         assertTrue(yaml.contains("ipv4: 10.10.10.10"))
-        assertTrue(yaml.contains("ipv6: 'fd00:ffff:ffff:ffff::1'"))
+        assertTrue(yaml.contains("ipv6: 'fd00::1'"))
     }
 
     @Test

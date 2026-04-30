@@ -43,8 +43,8 @@ class OzeroVpnServiceConstantsTest {
     }
 
     @Test
-    fun tunMtuIsStandard() {
-        assertEquals(1500, OzeroVpnService.TUN_MTU)
+    fun tunMtuMatchesByeByeDpi() {
+        assertEquals(8500, OzeroVpnService.TUN_MTU)
     }
 
     @Test
