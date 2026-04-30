@@ -11,9 +11,8 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import ru.ozero.commonvpn.TunnelController
 import ru.ozero.enginescore.EngineId
-import ru.ozero.coreorchestrator.Orchestrator
-import ru.ozero.coreorchestrator.OrchestratorTransition
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
@@ -22,16 +21,16 @@ import kotlin.test.assertTrue
 class DiagnosticsViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
-    private lateinit var orchestrator: Orchestrator
+    private lateinit var tunnelController: TunnelController
     private lateinit var engine: FakeDiagnosticsEngine
     private lateinit var viewModel: DiagnosticsViewModel
 
     @BeforeEach
     fun setUp() {
         Dispatchers.setMain(dispatcher)
-        orchestrator = Orchestrator()
+        tunnelController = TunnelController()
         engine = FakeDiagnosticsEngine()
-        viewModel = DiagnosticsViewModel(orchestrator, engine)
+        viewModel = DiagnosticsViewModel(tunnelController, engine)
     }
 
     @AfterEach
@@ -40,12 +39,12 @@ class DiagnosticsViewModelTest {
     }
 
     @Test
-    fun `initial state is NotConnected when orchestrator Idle`() {
+    fun `initial state is NotConnected when tunnel Idle`() {
         assertIs<DiagnosticsUiState.NotConnected>(viewModel.uiState.value)
     }
 
     @Test
-    fun `state becomes Idle when orchestrator transitions to Connected`() = runTest {
+    fun `state becomes Idle when tunnel transitions to Connected`() = runTest {
         connect(socksPort = 1080)
         advanceUntilIdle()
 
@@ -124,7 +123,7 @@ class DiagnosticsViewModelTest {
         advanceUntilIdle()
         assertIs<DiagnosticsUiState.Running>(viewModel.uiState.value)
 
-        orchestrator.dispatch(OrchestratorTransition.Disconnect)
+        tunnelController.reset()
         advanceUntilIdle()
 
         assertIs<DiagnosticsUiState.NotConnected>(viewModel.uiState.value)
@@ -136,7 +135,7 @@ class DiagnosticsViewModelTest {
         advanceUntilIdle()
 
         val progressEngine = ProgressEmittingEngine()
-        val vm = DiagnosticsViewModel(orchestrator, progressEngine)
+        val vm = DiagnosticsViewModel(tunnelController, progressEngine)
 
         vm.onRun()
         advanceUntilIdle()
@@ -160,9 +159,7 @@ class DiagnosticsViewModelTest {
     }
 
     private fun connect(socksPort: Int) {
-        orchestrator.dispatch(OrchestratorTransition.Connect)
-        orchestrator.dispatch(OrchestratorTransition.ProbeComplete(EngineId.BYEDPI))
-        orchestrator.dispatch(OrchestratorTransition.ConnectSuccess(EngineId.BYEDPI, socksPort))
+        tunnelController.onEngineStarted(EngineId.BYEDPI, socksPort)
     }
 
     private class FakeDiagnosticsEngine : DiagnosticsEngine {

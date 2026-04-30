@@ -1,4 +1,4 @@
-plugins {
+﻿plugins {
     id("ozero.android.library")
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
@@ -16,7 +16,6 @@ android {
 
 dependencies {
     implementation(project(":engines-core"))
-    implementation(project(":core-api"))
     implementation(project(":security"))
     implementation(libs.bundles.coroutines)
 

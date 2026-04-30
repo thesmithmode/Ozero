@@ -147,6 +147,7 @@ class OzeroVpnService : android.net.VpnService() {
                 return@launch
             }
             try {
+                tunnelController.onProbing()
                 val chainResult = withTimeoutOrNull(CHAIN_START_TIMEOUT_MS) {
                     try {
                         chainOrchestrator.start(listOf(ChainStep(EngineId.BYEDPI, EngineConfig.ByeDpi())))
@@ -159,10 +160,11 @@ class OzeroVpnService : android.net.VpnService() {
                 }
                 Log.i(TAG, "chain result=$chainResult")
                 if (chainResult !is ChainResult.Success) {
-                    tunnelController.onEngineDied(chainResult?.toString() ?: "timeout")
+                    tunnelController.onEngineDied(EngineId.BYEDPI, chainResult?.toString() ?: "timeout")
                     stopVpn()
                     return@launch
                 }
+                tunnelController.onConnecting(EngineId.BYEDPI)
                 val code = try {
                     tunnelGateway.start(
                         HevTunnelConfig(
@@ -180,11 +182,11 @@ class OzeroVpnService : android.net.VpnService() {
                 if (code != 0) {
                     Log.e(TAG, "tunnel start failed code=$code")
                     runCatching { chainOrchestrator.stop() }
-                    tunnelController.onEngineDied("tunnel code=$code")
+                    tunnelController.onEngineDied(EngineId.BYEDPI, "tunnel code=$code")
                     stopVpn()
                     return@launch
                 }
-                tunnelController.onEngineStarted(chainResult.finalSocksPort)
+                tunnelController.onEngineStarted(EngineId.BYEDPI, chainResult.finalSocksPort)
                 Log.i(TAG, "connected socksPort=${chainResult.finalSocksPort}")
             } finally {
                 starting.set(false)
@@ -196,6 +198,7 @@ class OzeroVpnService : android.net.VpnService() {
     private fun stopVpn() {
         if (!stopping.compareAndSet(false, true)) return
         Log.i(TAG, "stopVpn entry")
+        tunnelController.onDisconnecting()
         startJobRef.getAndSet(null)?.cancel()
         runCatching { tunFdRef.getAndSet(null)?.close() }
         serviceScope.launch { performShutdown() }

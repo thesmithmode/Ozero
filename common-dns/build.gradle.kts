@@ -1,4 +1,4 @@
-plugins {
+﻿plugins {
     id("ozero.android.library")
 }
 
@@ -7,7 +7,6 @@ android {
 }
 
 dependencies {
-    implementation(project(":core-api"))
     implementation(libs.bundles.coroutines)
     implementation(libs.okhttp.core)
 

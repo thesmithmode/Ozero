@@ -39,7 +39,7 @@ import ru.ozero.app.ui.permission.BatteryOptimization
 import ru.ozero.app.ui.theme.OzeroTheme
 import ru.ozero.app.vpn.EngineSettingsRestartObserver
 import ru.ozero.commonvpn.OzeroVpnService
-import ru.ozero.coreorchestrator.OrchestratorState
+import ru.ozero.commonvpn.TunnelState
 import ru.ozero.security.SecurityStateHolder
 import javax.inject.Inject
 
@@ -121,11 +121,11 @@ class MainActivity : ComponentActivity() {
         val current = viewModel.state.value
         runCatching { BootFileLogger.info(TAG, "onConnectClick state=${current::class.simpleName}") }
         when (current) {
-            is OrchestratorState.Connected -> {
+            is TunnelState.Connected -> {
                 viewModel.onConnectClick()
                 stopVpnService()
             }
-            is OrchestratorState.Idle, is OrchestratorState.Failed -> requestVpnAndStart()
+            is TunnelState.Idle, is TunnelState.Failed -> requestVpnAndStart()
             else -> Unit
         }
     }
@@ -227,7 +227,7 @@ class MainActivity : ComponentActivity() {
                 stopVpnService()
                 withTimeoutOrNull(5_000L) {
                     viewModel.state.first {
-                        it is OrchestratorState.Idle || it is OrchestratorState.Failed
+                        it is TunnelState.Idle || it is TunnelState.Failed
                     }
                 }
                 startVpnService()

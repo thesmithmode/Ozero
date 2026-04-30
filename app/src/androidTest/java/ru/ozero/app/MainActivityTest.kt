@@ -12,8 +12,8 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import ru.ozero.coreorchestrator.Orchestrator
-import ru.ozero.coreorchestrator.OrchestratorTransition
+import ru.ozero.commonvpn.TunnelController
+import ru.ozero.enginescore.EngineId
 import javax.inject.Inject
 
 @HiltAndroidTest
@@ -26,7 +26,7 @@ class MainActivityTest {
     val composeRule = createAndroidComposeRule<MainActivity>()
 
     @Inject
-    lateinit var orchestrator: Orchestrator
+    lateinit var tunnelController: TunnelController
 
     @Before
     fun setUp() {
@@ -50,9 +50,7 @@ class MainActivityTest {
 
     @Test
     fun connectedStateShowsDisconnectButton() {
-        orchestrator.dispatch(OrchestratorTransition.Connect)
-        orchestrator.dispatch(OrchestratorTransition.ProbeComplete(ru.ozero.enginescore.EngineId.BYEDPI))
-        orchestrator.dispatch(OrchestratorTransition.ConnectSuccess(ru.ozero.enginescore.EngineId.BYEDPI, 1080))
+        tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
 
         composeRule
             .onNodeWithContentDescription("Отключить VPN")

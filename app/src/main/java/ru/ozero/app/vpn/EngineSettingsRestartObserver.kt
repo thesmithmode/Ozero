@@ -5,13 +5,13 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import ru.ozero.app.settings.SettingsModel
+import ru.ozero.commonvpn.TunnelState
 import ru.ozero.commonvpn.split.SplitTunnelMode
 import ru.ozero.enginescore.EngineId
-import ru.ozero.coreorchestrator.OrchestratorState
 
 class EngineSettingsRestartObserver(
     settingsFlow: Flow<SettingsModel>,
-    private val vpnStateProvider: () -> OrchestratorState,
+    private val vpnStateProvider: () -> TunnelState,
     private val onRestartConnected: suspend (Snapshot) -> Unit,
 ) {
     data class Snapshot(
@@ -27,7 +27,7 @@ class EngineSettingsRestartObserver(
         .drop(1)
 
     suspend fun handle(snapshot: Snapshot) {
-        if (vpnStateProvider() is OrchestratorState.Connected) {
+        if (vpnStateProvider() is TunnelState.Connected) {
             onRestartConnected(snapshot)
         }
     }

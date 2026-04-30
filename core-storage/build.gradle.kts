@@ -1,4 +1,4 @@
-plugins {
+﻿plugins {
     id("ozero.android.library")
     alias(libs.plugins.ksp)
 }
@@ -12,7 +12,6 @@ ksp {
 }
 
 dependencies {
-    implementation(project(":core-api"))
     api(libs.bundles.room)
     ksp(libs.room.compiler)
     implementation(libs.bundles.coroutines)

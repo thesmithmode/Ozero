@@ -11,8 +11,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import ru.ozero.coreorchestrator.Orchestrator
-import ru.ozero.coreorchestrator.OrchestratorState
+import ru.ozero.commonvpn.TunnelController
+import ru.ozero.commonvpn.TunnelState
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 
@@ -20,7 +20,7 @@ private const val TAG = "DiagnosticsVM"
 
 @HiltViewModel
 class DiagnosticsViewModel @Inject constructor(
-    private val orchestrator: Orchestrator,
+    private val tunnelController: TunnelController,
     private val engine: DiagnosticsEngine,
 ) : ViewModel() {
 
@@ -31,15 +31,15 @@ class DiagnosticsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            orchestrator.state.collectLatest { state ->
-                onOrchestratorState(state)
+            tunnelController.state.collectLatest { state ->
+                onTunnelState(state)
             }
         }
     }
 
     fun onRun() {
-        val current = orchestrator.state.value
-        if (current !is OrchestratorState.Connected) return
+        val current = tunnelController.state.value
+        if (current !is TunnelState.Connected) return
         runJob?.cancel()
         runJob = viewModelScope.launch {
             val total = DiagnosticTargets.URLS.size
@@ -65,15 +65,15 @@ class DiagnosticsViewModel @Inject constructor(
     fun onStop() {
         runJob?.cancel()
         runJob = null
-        if (orchestrator.state.value is OrchestratorState.Connected) {
+        if (tunnelController.state.value is TunnelState.Connected) {
             _uiState.value = DiagnosticsUiState.Idle
         } else {
             _uiState.value = DiagnosticsUiState.NotConnected
         }
     }
 
-    private fun onOrchestratorState(state: OrchestratorState) {
-        if (state is OrchestratorState.Connected) {
+    private fun onTunnelState(state: TunnelState) {
+        if (state is TunnelState.Connected) {
             if (_uiState.value !is DiagnosticsUiState.Running &&
                 _uiState.value !is DiagnosticsUiState.Done
             ) {

@@ -1,4 +1,4 @@
--keep class ru.ozero.coreapi.** { *; }
+-keep class ru.ozero.enginescore.** { *; }
 -keep class ru.ozero.commonvpn.OzeroVpnService { *; }
 -keep class ru.ozero.commonvpn.HevTunnelGateway { *; }
 
@@ -56,10 +56,7 @@
 -keep class ru.ozero.app.logging.BootDiagnostics { *; }
 -keep class ru.ozero.commonvpn.** { *; }
 
--keep class ru.ozero.coreapi.** { *; }
--keep class ru.ozero.coreorchestrator.** { *; }
 -keep class ru.ozero.corestorage.** { *; }
--keep class ru.ozero.coresubscriptions.** { *; }
 
 -keep class ru.ozero.enginebyedpi.** { *; }
 

@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test
 import ru.ozero.app.settings.SettingsModel
 import ru.ozero.commonvpn.split.SplitTunnelMode
 import ru.ozero.enginescore.EngineId
-import ru.ozero.coreorchestrator.OrchestratorState
+import ru.ozero.commonvpn.TunnelState
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -99,7 +99,7 @@ class EngineSettingsRestartObserverTest {
     @Test
     fun `handle invokes restart only when state is Connected`() = runTest {
         val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
-        val state = MutableStateFlow<OrchestratorState>(OrchestratorState.Idle)
+        val state = MutableStateFlow<TunnelState>(TunnelState.Idle)
         val restarts = mutableListOf<EngineSettingsRestartObserver.Snapshot>()
         val observer = EngineSettingsRestartObserver(
             settingsFlow = flow,
@@ -116,21 +116,21 @@ class EngineSettingsRestartObserverTest {
         observer.handle(snapshot)
         assertTrue(restarts.isEmpty(), "no restart while Idle")
 
-        state.value = OrchestratorState.Connected(EngineId.BYEDPI, 1080)
+        state.value = TunnelState.Connected(EngineId.BYEDPI, 1080)
         observer.handle(snapshot)
         assertEquals(listOf(snapshot), restarts, "restart fires when Connected")
     }
 
     private fun newObserver(
         flow: MutableSharedFlow<SettingsModel>,
-        stateProvider: () -> OrchestratorState,
+        stateProvider: () -> TunnelState,
     ): EngineSettingsRestartObserver = EngineSettingsRestartObserver(
         settingsFlow = flow,
         vpnStateProvider = stateProvider,
         onRestartConnected = {},
     )
 
-    private fun alwaysConnected(): () -> OrchestratorState = {
-        OrchestratorState.Connected(engineId = EngineId.BYEDPI, socksPort = 1080)
+    private fun alwaysConnected(): () -> TunnelState = {
+        TunnelState.Connected(engineId = EngineId.BYEDPI, socksPort = 1080)
     }
 }

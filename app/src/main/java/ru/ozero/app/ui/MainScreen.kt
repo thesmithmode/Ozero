@@ -30,7 +30,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
-import ru.ozero.coreorchestrator.OrchestratorState
+import ru.ozero.commonvpn.TunnelState
 
 @Composable
 fun MainScreen(
@@ -79,9 +79,9 @@ fun MainScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             when (state) {
-                is OrchestratorState.Probing,
-                is OrchestratorState.Connecting,
-                is OrchestratorState.Disconnecting,
+                is TunnelState.Probing,
+                is TunnelState.Connecting,
+                is TunnelState.Disconnecting,
                 -> {
                     val loadingDesc = stringResource(R.string.a11y_loading)
                     CircularProgressIndicator(
@@ -89,7 +89,7 @@ fun MainScreen(
                     )
                 }
                 else -> {
-                    val isConnected = state is OrchestratorState.Connected
+                    val isConnected = state is TunnelState.Connected
                     val buttonDesc = stringResource(
                         if (isConnected) R.string.a11y_disconnect_button else R.string.a11y_connect_button,
                     )
@@ -106,19 +106,19 @@ fun MainScreen(
 }
 
 @Composable
-private fun StatusLabel(state: OrchestratorState) {
+private fun StatusLabel(state: TunnelState) {
     val labelRes = when (state) {
-        is OrchestratorState.Idle -> R.string.main_status_disconnected
-        is OrchestratorState.Probing -> R.string.main_status_probing
-        is OrchestratorState.Connecting -> R.string.main_status_connecting
-        is OrchestratorState.Connected -> R.string.main_status_connected
-        is OrchestratorState.Failed -> R.string.main_status_failed
-        is OrchestratorState.Disconnecting -> R.string.main_status_disconnecting
+        is TunnelState.Idle -> R.string.main_status_disconnected
+        is TunnelState.Probing -> R.string.main_status_probing
+        is TunnelState.Connecting -> R.string.main_status_connecting
+        is TunnelState.Connected -> R.string.main_status_connected
+        is TunnelState.Failed -> R.string.main_status_failed
+        is TunnelState.Disconnecting -> R.string.main_status_disconnecting
     }
     val engine = when (state) {
-        is OrchestratorState.Connecting -> state.engineId.name
-        is OrchestratorState.Connected -> state.engineId.name
-        is OrchestratorState.Failed -> state.engineId.name
+        is TunnelState.Connecting -> state.engineId.name
+        is TunnelState.Connected -> state.engineId.name
+        is TunnelState.Failed -> state.engineId.name
         else -> null
     }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
