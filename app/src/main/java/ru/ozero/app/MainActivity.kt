@@ -24,9 +24,14 @@ import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.CoroutineExceptionHandler
 import ru.ozero.app.logging.AppLogger
 import ru.ozero.app.logging.BootFileLogger
@@ -74,6 +79,8 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var userFlags: UserFlagsRepository
 
     @Inject lateinit var serverImporter: ServerImportService
+
+    @Inject lateinit var settingsRepository: ru.ozero.app.settings.SettingsRepository
 
     @Inject lateinit var logcatReader: LogcatReader
 
@@ -123,6 +130,7 @@ class MainActivity : ComponentActivity() {
         runCatching { HarvestWorker.enqueueUnique(applicationContext) }
             .onFailure { AppLogger.w(TAG, "HarvestWorker.enqueueUnique failed", it) }
         observeSelfUpdateEvents()
+        observeLiveEngineSettingsChanges()
         if (savedInstanceState == null) {
             handleSubscriptionIntent(intent)
         }
@@ -340,6 +348,29 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun observeLiveEngineSettingsChanges() {
+        lifecycleScope.launch(safeUiCoroutineHandler) {
+            combine(
+                settingsRepository.settings.map { it.manualEngine },
+                settingsRepository.settings.map { it.byedpiWinningArgs?.trim() },
+            ) { manual, byedpiArgs -> manual to byedpiArgs }
+                .distinctUntilChanged()
+                .drop(1)
+                .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
+                .collect { (manual, byedpiArgs) ->
+                    val state = viewModel.state.value
+                    if (state is OrchestratorState.Connected) {
+                        AppLogger.i(
+                            TAG,
+                            "engine settings changed while connected → restart manual=$manual args=$byedpiArgs",
+                        )
+                        stopVpnService()
+                        delay(300)
+                        startVpnService()
+                    }
+                }
+        }
+    }
     private fun observeSelfUpdateEvents() {
         lifecycleScope.launch(safeUiCoroutineHandler) {
             UpdateInstallEventBus.events
