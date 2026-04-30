@@ -24,7 +24,6 @@ import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
@@ -351,19 +350,18 @@ class MainActivity : ComponentActivity() {
 
     private fun observeLiveEngineSettingsChanges() {
         lifecycleScope.launch(safeUiCoroutineHandler) {
-            combine(
-                settingsRepository.settings.map { it.manualEngine },
-                settingsRepository.settings.map { it.byedpiWinningArgs?.trim() },
-            ) { manual, byedpiArgs -> manual to byedpiArgs }
+            settingsRepository.settings
+                .map { Quad(it.manualEngine, it.byedpiWinningArgs?.trim(), it.splitMode, it.ipv6Enabled) }
                 .distinctUntilChanged()
                 .drop(1)
                 .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
-                .collect { (manual, byedpiArgs) ->
+                .collect { snapshot ->
                     val state = viewModel.state.value
                     if (state is OrchestratorState.Connected) {
                         AppLogger.i(
                             TAG,
-                            "engine settings changed while connected → restart manual=$manual args=$byedpiArgs",
+                            "engine settings changed while connected → restart " +
+                                "manual=${snapshot.a} args=${snapshot.b} split=${snapshot.c} ipv6=${snapshot.d}",
                         )
                         stopVpnService()
                         withTimeoutOrNull(5_000L) {
@@ -376,6 +374,8 @@ class MainActivity : ComponentActivity() {
                 }
         }
     }
+
+    private data class Quad<A, B, C, D>(val a: A, val b: B, val c: C, val d: D)
     private fun observeSelfUpdateEvents() {
         lifecycleScope.launch(safeUiCoroutineHandler) {
             UpdateInstallEventBus.events

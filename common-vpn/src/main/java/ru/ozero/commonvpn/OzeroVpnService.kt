@@ -51,7 +51,7 @@ class OzeroVpnService : android.net.VpnService() {
 
         const val TUN_ADDRESS_V6 = "fd00:ffff:ffff:ffff::1"
         const val TUN_PREFIX_LENGTH_V6 = 64
-        const val TUN_DNS = "1.1.1.1"
+        const val TUN_DNS = "100.64.0.1"
         const val TUN_MTU = 1500
         private const val SESSION_NAME = "Ozero"
         private const val TAG = "OzeroVpnService"
@@ -164,6 +164,10 @@ class OzeroVpnService : android.net.VpnService() {
         Log.i(TAG, "TUN established fd=${fd.fd}")
         val job = serviceScope.launch {
             if (stopping.get()) {
+                Log.w(TAG, "launch обнаружил stopping=true — закрываем установленный fd")
+                runCatching { fd.close() }
+                    .onFailure { Log.w(TAG, "fd.close() в pre-launch threw", it) }
+                tunFdRef.compareAndSet(fd, null)
                 starting.set(false)
                 return@launch
             }
@@ -253,6 +257,14 @@ class OzeroVpnService : android.net.VpnService() {
     }
 
     private fun buildNotification(): Notification {
+        val contentIntent = packageManager.getLaunchIntentForPackage(packageName)?.let { launch ->
+            android.app.PendingIntent.getActivity(
+                this,
+                0,
+                launch,
+                android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
@@ -260,18 +272,20 @@ class OzeroVpnService : android.net.VpnService() {
                 NotificationManager.IMPORTANCE_LOW,
             )
             getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
-            return Notification.Builder(this, CHANNEL_ID)
+            val builder = Notification.Builder(this, CHANNEL_ID)
                 .setContentTitle("Ozero VPN активен")
                 .setSmallIcon(android.R.drawable.ic_lock_lock)
                 .setOngoing(true)
-                .build()
+            if (contentIntent != null) builder.setContentIntent(contentIntent)
+            return builder.build()
         } else {
             @Suppress("DEPRECATION")
-            return Notification.Builder(this)
+            val builder = Notification.Builder(this)
                 .setContentTitle("Ozero VPN активен")
                 .setSmallIcon(android.R.drawable.ic_lock_lock)
                 .setOngoing(true)
-                .build()
+            if (contentIntent != null) builder.setContentIntent(contentIntent)
+            return builder.build()
         }
     }
 
@@ -281,8 +295,7 @@ class OzeroVpnService : android.net.VpnService() {
     }
 
     override fun onDestroy() {
-        super.onDestroy()
-        if (stopping.compareAndSet(false, true)) {
+        if (stopping.compareAndSet(false, true) && ::pipeline.isInitialized) {
             val shutdown = Thread({
                 runBlocking {
                     runCatching { pipeline.stop() }
@@ -301,7 +314,9 @@ class OzeroVpnService : android.net.VpnService() {
         }
         serviceScope.cancel()
         val tunFd = tunFdRef.getAndSet(null)
-        tunFd?.close()
+        runCatching { tunFd?.close() }
+            .onFailure { Log.w(TAG, "tunFd.close in onDestroy threw", it) }
+        super.onDestroy()
     }
 
     private fun closeTunFd(fd: ParcelFileDescriptor? = tunFdRef.getAndSet(null)) {

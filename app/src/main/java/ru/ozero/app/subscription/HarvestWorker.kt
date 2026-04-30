@@ -67,7 +67,7 @@ class HarvestWorker @AssistedInject constructor(
                 .build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 NAME,
-                ExistingPeriodicWorkPolicy.KEEP,
+                ExistingPeriodicWorkPolicy.UPDATE,
                 req,
             )
         }
@@ -82,7 +82,7 @@ class HarvestWorker @AssistedInject constructor(
                 .build()
             WorkManager.getInstance(context).enqueueUniqueWork(
                 ONESHOT_NAME,
-                ExistingWorkPolicy.KEEP,
+                ExistingWorkPolicy.REPLACE,
                 req,
             )
         }

@@ -7,10 +7,13 @@ internal fun parseQuery(raw: String): Map<String, String> =
     raw.split("&").mapNotNull { pair ->
         val idx = pair.indexOf('=')
         if (idx == -1) return@mapNotNull null
-        val key = URLDecoder.decode(pair.substring(0, idx), StandardCharsets.UTF_8)
-        val value = URLDecoder.decode(pair.substring(idx + 1), StandardCharsets.UTF_8)
+        val keyRaw = pair.substring(0, idx)
+        val valueRaw = pair.substring(idx + 1)
+        val key = runCatching { URLDecoder.decode(keyRaw, StandardCharsets.UTF_8) }.getOrElse { keyRaw }
+        val value = runCatching { URLDecoder.decode(valueRaw, StandardCharsets.UTF_8) }.getOrElse { valueRaw }
         key to value
     }.toMap()
 
 internal fun decodeFragment(raw: String?): String? =
-    raw?.let { URLDecoder.decode(it, StandardCharsets.UTF_8) }?.takeIf { it.isNotEmpty() }
+    raw?.let { runCatching { URLDecoder.decode(it, StandardCharsets.UTF_8) }.getOrElse { it } }
+        ?.takeIf { it.isNotEmpty() }
