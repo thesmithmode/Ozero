@@ -3,6 +3,7 @@ package ru.ozero.enginescore.settings
 import kotlinx.coroutines.flow.Flow
 import ru.ozero.enginescore.EngineId
 
+@Suppress("TooManyFunctions")
 interface SettingsRepository {
     val settings: Flow<SettingsModel>
 

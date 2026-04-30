@@ -14,6 +14,7 @@ import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginescore.settings.SplitTunnelMode
 import javax.inject.Inject
 
+@Suppress("TooManyFunctions")
 class SettingsRepositoryImpl @Inject constructor(
     private val dataStore: DataStore<Preferences>,
     private val autoStartGateway: AutoStartGateway,
