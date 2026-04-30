@@ -1,10 +1,12 @@
 # PLAN.md — Ozero roadmap
 
-## Статус (2026-04-30)
+## Статус (2026-04-30 evening — autonom session)
 
-- **dev**: 9193580 (P1.A-H done, P1.G logging migration done, detekt fix)
-- **v0.0.1**: ребилд после CI green на 9193580
-- **Architecture review (2026-04-30)**: 5 структурных пробелов идентифицированы
+- **feature**: 8202f45 (W1-W3.5 partial closed, full CI на feature)
+- **v0.0.1**: tagged. v0.0.2-* — pre-release working, traffic + reconnect через Phase A retags
+- **Wave A done**: log noise + proguard cleanup + JaCoCo 0.90 + CI feature full + ABI alignment + Manifest cleanup + Failed.reason render + stagnation detector + hev YAML log-level + dependency audit (Ktor removed)
+- **W3.5 partial**: parser + 75-strategy asset + SocksProbeClient + AutoStrategyPicker logic + research docs. UI/DI integration deferred (требует device verify).
+- **W2.x design docs**: manual DI design в `.memory/concepts/manual-di-design.md` (research-only, implementation требует device).
 
 ## Phase 1 — clean-start refactor
 
@@ -18,8 +20,8 @@
 | P1.F | ✅ | DELETE :core-api, :core-subscriptions, :common-json |
 | P1.G | ✅ | Logging unification — PersistentLoggers везде |
 | P1.H | ✅ | MainActivity decompose (≤120 строк) |
-| P1.I | ⏳ | Tests — Sentinels + Logging contract |
-| P1.J | ⏳ | Cleanup — proguard, JaCoCo 0.90, sentinel checks |
+| P1.I | ✅ | Tests — Sentinels + Logging contract (NoStubsInProductionDiTest + LoggingContractTest + BootFileLoggerPersistenceTest) |
+| P1.J | ✅ | Cleanup — proguard Log.* keep, ci.yml stub sentinel, JaCoCo 0.90 |
 
 ### P1.I (pending)
 - I.1 NoStubsInProductionDiTest — sentinel против stub-движков в проде
@@ -112,6 +114,17 @@
 
 ## Текущая работа (живая)
 
-- ⏳ CI на 9193580 → green → тег v0.0.1 → release
-- ⏳ Юзер тестит APK → даёт логи → диагностика #54/#55
-- 🟢 Параллельно: можно начать P1.I (тесты-сентинели) — изолированная задача
+- ✅ v0.0.1 tagged + retag-6 working
+- ✅ Wave A cleanup полностью закрыта (W1.1-W1.4, W3.6, W3.9, W5.1-W5.9)
+- ⏳ Wave B (UI features W3.1-W3.4, W3.7, W3.8) — требует cross-module SettingsRepository → :common-vpn flow
+- ⏳ Wave C (W2.A manual DI implementation, W2.B process isolation, W2.C native crash) — требует device verify
+- ⏳ Wave D (W4.x Xray AAR + multi-engine) — заблокировано gomobile build pipeline
+- ⏳ Wave E (W6.x AmneziaWG/Hy2/Naive/Tor/URnetwork engines) — после W4.2
+
+## Следующая сессия (с device)
+
+1. W2.2 implementation manual DI (по design doc `.memory/concepts/manual-di-design.md`)
+2. W2.4 emulator smoke job — необходимо для верификации W2.x
+3. W3.5.5/W3.5.6 — auto-test UI integration (после W2.4 emulator готов)
+4. W3.x cross-module — IPv6 toggle, custom DNS, ByeDPI editor — все требуют SettingsRepository → service flow
+5. W4.1 Xray AAR research — gomobile build, NDK r27, reproducibility
