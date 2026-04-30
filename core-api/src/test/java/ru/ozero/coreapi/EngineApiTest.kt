@@ -41,7 +41,10 @@ class EngineApiTest {
     @Test
     fun byeDpiDefaultArgs() {
         val config = EngineConfig.ByeDpi()
-        assertEquals("-Ku -a1 -An -o1 -At,r,s -d1", config.args)
+        assertEquals(
+            "-s1 -q1 -a1 -Y -Ar -a1 -s5 -o2 -At -f-1 -r1+s -a1 -As -s1 -o1+s -s-1 -a1",
+            config.args,
+        )
         assertEquals(1080, config.socksPort)
     }
 
