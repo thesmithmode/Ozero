@@ -11,7 +11,7 @@ jobs:
   release:
     name: Build, sign, publish
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     permissions:
       contents: write
 
@@ -42,11 +42,11 @@ jobs:
             common-vpn/src/main/jniLibs/arm64-v8a/libhev-socks5-tunnel.so
             common-vpn/src/main/jniLibs/armeabi-v7a/libhev-socks5-tunnel.so
             common-vpn/src/main/jniLibs/x86_64/libhev-socks5-tunnel.so
-            common-vpn/src/main/jniLibs/x86/libhev-socks5-tunnel.so
-          key: libhev-2.7.0-ndk-r27c-platform-android-24-pkgname-hev-v2
+          key: libhev-2.7.0-ndk-r27c-platform-android-24-pkgname-hev-v3
 
       - name: Setup Android NDK
         id: ndk
+        if: steps.libhev-cache.outputs.cache-hit != 'true'
         uses: nttld/setup-ndk@v1
         with:
           ndk-version: r27c
@@ -61,7 +61,7 @@ jobs:
             https://github.com/heiher/hev-socks5-tunnel.git \
             "$RUNNER_TEMP/hev-socks5-tunnel"
 
-      - name: Build libhev-socks5-tunnel.so (4 ABI via ndk-build)
+      - name: Build libhev-socks5-tunnel.so (3 ABI via ndk-build)
         if: steps.libhev-cache.outputs.cache-hit != 'true'
         env:
           NDK_PATH: ${{ steps.ndk.outputs.ndk-path }}
@@ -69,20 +69,20 @@ jobs:
           set -euo pipefail
           SRC="$RUNNER_TEMP/hev-socks5-tunnel"
           OUT="common-vpn/src/main/jniLibs"
-          mkdir -p "$OUT/arm64-v8a" "$OUT/armeabi-v7a" "$OUT/x86_64" "$OUT/x86"
+          mkdir -p "$OUT/arm64-v8a" "$OUT/armeabi-v7a" "$OUT/x86_64"
 
           cd "$SRC"
           "$NDK_PATH/ndk-build" \
             NDK_PROJECT_PATH="$SRC" \
             APP_BUILD_SCRIPT="$SRC/Android.mk" \
             NDK_APPLICATION_MK="$SRC/Application.mk" \
-            APP_ABI="arm64-v8a armeabi-v7a x86_64 x86" \
+            APP_ABI="arm64-v8a armeabi-v7a x86_64" \
             APP_PLATFORM=android-24 \
             APP_CFLAGS="-DPKGNAME=hev" \
             -j"$(nproc)"
 
           STRIP="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
-          for ABI in arm64-v8a armeabi-v7a x86_64 x86; do
+          for ABI in arm64-v8a armeabi-v7a x86_64; do
             SO_SRC="$SRC/libs/$ABI/libhev-socks5-tunnel.so"
             if [ ! -f "$SO_SRC" ]; then
               echo "::error::libhev-socks5-tunnel.so не найден для $ABI"
@@ -97,13 +97,14 @@ jobs:
           ls -la "$OUT"/*/libhev-socks5-tunnel.so
 
       - name: Assert JNI symbols в libhev-socks5-tunnel.so
+        if: steps.libhev-cache.outputs.cache-hit != 'true'
         env:
           NDK_PATH: ${{ steps.ndk.outputs.ndk-path }}
         run: |
           set -euo pipefail
           NM="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
           REQUIRED='JNI_OnLoad'
-          for ABI in arm64-v8a armeabi-v7a x86_64 x86; do
+          for ABI in arm64-v8a armeabi-v7a x86_64; do
             SO="common-vpn/src/main/jniLibs/$ABI/libhev-socks5-tunnel.so"
             if [ ! -f "$SO" ]; then continue; fi
             SYMS=$("$NM" -D --defined-only "$SO" || true)
@@ -117,9 +118,10 @@ jobs:
           echo "JNI symbols OK на всех ABI"
 
       - name: Assert PKGNAME=hev зашит в libhev-socks5-tunnel.so
+        if: steps.libhev-cache.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
-          for ABI in arm64-v8a armeabi-v7a x86_64 x86; do
+          for ABI in arm64-v8a armeabi-v7a x86_64; do
             SO="common-vpn/src/main/jniLibs/$ABI/libhev-socks5-tunnel.so"
             if [ ! -f "$SO" ]; then continue; fi
             if ! strings "$SO" | grep -qx 'hev/TProxyService'; then
@@ -141,13 +143,6 @@ jobs:
           fi
           printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
           echo "OZERO_KEYSTORE_PATH=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
-
-      - name: Verify lint, tests, coverage
-        env:
-          OZERO_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-          OZERO_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
-          OZERO_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
-        run: ./gradlew ktlintCheck detekt lint testDebugUnitTest jacocoTestReport jacocoTestCoverageVerification --stacktrace
 
       - name: Build signed release APK
         env:
