@@ -1,6 +1,5 @@
 package ru.ozero.enginebyedpi
 
-import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -64,7 +63,7 @@ class ByeDpiEngine(
             if (code != 0) {
                 PersistentLoggers.error(TAG, "jniStartProxy завершился с кодом $code")
             } else {
-                Log.i(TAG, "jniStartProxy event-loop завершён нормально")
+                PersistentLoggers.info(TAG, "jniStartProxy event-loop завершён нормально")
             }
             activeSocksPort = 0
         }
@@ -130,7 +129,7 @@ class ByeDpiEngine(
         }
         return try {
             val latency = Socks5HandshakeProbe.probe("127.0.0.1", port, timeoutMs = 3_000)
-            Log.i(TAG, "probe OK latency=${latency}ms")
+            PersistentLoggers.info(TAG, "probe OK latency=${latency}ms")
             ProbeResult.Success(latencyMs = latency)
         } catch (e: Exception) {
             PersistentLoggers.warn(TAG, "probe failed: ${e.message}")

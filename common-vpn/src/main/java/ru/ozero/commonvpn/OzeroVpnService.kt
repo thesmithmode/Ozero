@@ -7,7 +7,6 @@ import android.content.Intent
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.os.Process
-import android.util.Log
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -64,14 +63,14 @@ class OzeroVpnService : android.net.VpnService() {
     }
 
     override fun onCreate() {
-        Log.i(TAG, "onCreate before super")
+        PersistentLoggers.info(TAG, "onCreate before super")
         try {
             super.onCreate()
         } catch (t: Throwable) {
-            PersistentLoggers.error(TAG, "super.onCreate threw — Hilt graph failure: ${t.message}")
+            PersistentLoggers.error(TAG, "super.onCreate threw — Hilt graph failure: ${t.message}", t)
             throw t
         }
-        Log.i(TAG, "onCreate after super (Hilt inject done)")
+        PersistentLoggers.info(TAG, "onCreate after super (Hilt inject done)")
     }
 
     private val tunFdRef = AtomicReference<ParcelFileDescriptor?>(null)
@@ -80,7 +79,7 @@ class OzeroVpnService : android.net.VpnService() {
     private val stopping = AtomicBoolean(false)
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.i(TAG, "onStartCommand action=${intent?.action} startId=$startId")
+        PersistentLoggers.info(TAG, "onStartCommand action=${intent?.action} startId=$startId")
         val foregroundOk = enterForegroundOrLog()
         if (!foregroundOk) {
             stopSelf(startId)
@@ -265,13 +264,13 @@ class OzeroVpnService : android.net.VpnService() {
     }
 
     override fun onRevoke() {
-        Log.i(TAG, "onRevoke — VPN permission revoked")
+        PersistentLoggers.warn(TAG, "onRevoke — VPN permission revoked")
         stopVpn()
         super.onRevoke()
     }
 
     override fun onDestroy() {
-        Log.i(TAG, "onDestroy entry")
+        PersistentLoggers.info(TAG, "onDestroy entry")
         if (stopping.compareAndSet(false, true)) serviceScope.launch { performShutdown() }
         serviceScope.cancel()
         runCatching { tunFdRef.getAndSet(null)?.close() }
@@ -293,10 +292,10 @@ class OzeroVpnService : android.net.VpnService() {
             } else {
                 startForeground(NOTIFICATION_ID, buildNotification())
             }
-            Log.i(TAG, "startForeground OK")
+            PersistentLoggers.info(TAG, "startForeground OK")
             true
         } catch (t: Throwable) {
-            PersistentLoggers.error(TAG, "startForeground threw: ${t.message}")
+            PersistentLoggers.error(TAG, "startForeground threw: ${t.message}", t)
             false
         }
     }
