@@ -185,6 +185,30 @@ class SettingsRepositoryTest {
         )
     }
 
+    @Test
+    fun `customDnsServers default empty list`() = runTest {
+        assertTrue(repository.settings.first().customDnsServers.isEmpty())
+    }
+
+    @Test
+    fun `setCustomDnsServers persists list`() = runTest {
+        repository.setCustomDnsServers(listOf("8.8.8.8", "1.1.1.1"))
+        assertEquals(listOf("8.8.8.8", "1.1.1.1"), repository.settings.first().customDnsServers)
+    }
+
+    @Test
+    fun `setCustomDnsServers empty list очищает`() = runTest {
+        repository.setCustomDnsServers(listOf("8.8.8.8"))
+        repository.setCustomDnsServers(emptyList())
+        assertTrue(repository.settings.first().customDnsServers.isEmpty())
+    }
+
+    @Test
+    fun `setCustomDnsServers trims и фильтрует blank entries`() = runTest {
+        repository.setCustomDnsServers(listOf("  8.8.8.8  ", "", "   ", "1.1.1.1"))
+        assertEquals(listOf("8.8.8.8", "1.1.1.1"), repository.settings.first().customDnsServers)
+    }
+
     private class FakeAutoStartGateway : AutoStartGateway {
         val invocations = mutableListOf<Boolean>()
 

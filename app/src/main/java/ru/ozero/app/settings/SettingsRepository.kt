@@ -68,6 +68,17 @@ class SettingsRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun setCustomDnsServers(servers: List<String>) {
+        dataStore.edit { prefs ->
+            val cleaned = servers.map { it.trim() }.filter { it.isNotEmpty() }
+            if (cleaned.isEmpty()) {
+                prefs.remove(SettingsKeys.CUSTOM_DNS_SERVERS)
+            } else {
+                prefs[SettingsKeys.CUSTOM_DNS_SERVERS] = cleaned.joinToString(",")
+            }
+        }
+    }
+
     private fun Preferences.toSettingsModel(): SettingsModel = SettingsModel(
         splitMode = readSplitMode(),
         ipv6Enabled = this[SettingsKeys.IPV6_ENABLED] ?: SettingsModel.DEFAULT_IPV6_ENABLED,
@@ -76,7 +87,13 @@ class SettingsRepositoryImpl @Inject constructor(
         urnetworkEnabled = this[SettingsKeys.URNETWORK_ENABLED] ?: SettingsModel.DEFAULT_URNETWORK_ENABLED,
         urnetworkJwt = this[SettingsKeys.URNETWORK_JWT],
         byedpiWinningArgs = this[SettingsKeys.BYDPI_WINNING_ARGS],
+        customDnsServers = readCustomDnsServers(),
     )
+
+    private fun Preferences.readCustomDnsServers(): List<String> {
+        val raw = this[SettingsKeys.CUSTOM_DNS_SERVERS] ?: return SettingsModel.DEFAULT_CUSTOM_DNS_SERVERS
+        return raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+    }
 
     private fun Preferences.readSplitMode(): SplitTunnelMode {
         val raw = this[SettingsKeys.SPLIT_MODE] ?: return SettingsModel.DEFAULT_SPLIT_MODE

@@ -10,6 +10,7 @@ data class SettingsModel(
     val urnetworkEnabled: Boolean = DEFAULT_URNETWORK_ENABLED,
     val urnetworkJwt: String? = DEFAULT_URNETWORK_JWT,
     val byedpiWinningArgs: String? = DEFAULT_BYEDPI_WINNING_ARGS,
+    val customDnsServers: List<String> = DEFAULT_CUSTOM_DNS_SERVERS,
 ) {
     companion object {
         val DEFAULT_SPLIT_MODE: SplitTunnelMode = SplitTunnelMode.ALL
@@ -19,6 +20,7 @@ data class SettingsModel(
         const val DEFAULT_URNETWORK_ENABLED: Boolean = false
         val DEFAULT_URNETWORK_JWT: String? = null
         val DEFAULT_BYEDPI_WINNING_ARGS: String? = null
+        val DEFAULT_CUSTOM_DNS_SERVERS: List<String> = emptyList()
 
         val DEFAULT: SettingsModel = SettingsModel()
     }

@@ -112,6 +112,7 @@ class EngineSettingsRestartObserverTest {
             byedpiWinningArgs = null,
             splitMode = SplitTunnelMode.ALL,
             ipv6Enabled = false,
+            customDnsServers = emptyList(),
         )
         observer.handle(snapshot)
         assertTrue(restarts.isEmpty(), "no restart while Idle")

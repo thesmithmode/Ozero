@@ -19,4 +19,6 @@ interface SettingsRepository {
     suspend fun setUrnetworkJwt(jwt: String?)
 
     suspend fun setByedpiWinningArgs(args: String?)
+
+    suspend fun setCustomDnsServers(servers: List<String>)
 }

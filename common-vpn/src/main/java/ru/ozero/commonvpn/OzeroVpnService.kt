@@ -133,11 +133,16 @@ class OzeroVpnService : android.net.VpnService() {
             .onFailure { PersistentLoggers.warn(TAG, "TProxyService.loadOnce threw: ${it.message}") }
         PersistentLoggers.info(TAG, "loadOnce done libraryLoaded=${hev.TProxyService.libraryLoaded}")
 
-        val ipv6Enabled = runCatching {
-            runBlocking { settingsRepository.settings.first().ipv6Enabled }
-        }.getOrDefault(false)
+        val settings = runCatching {
+            runBlocking { settingsRepository.settings.first() }
+        }.getOrNull()
+        val ipv6Enabled = settings?.ipv6Enabled ?: false
+        val customDnsServers = settings?.customDnsServers.orEmpty()
         val fd = try {
-            buildTunBuilder(ipv6Enabled = ipv6Enabled).establish()
+            buildTunBuilder(
+                ipv6Enabled = ipv6Enabled,
+                customDnsServers = customDnsServers,
+            ).establish()
         } catch (t: Throwable) {
             PersistentLoggers.error(TAG, "establish threw: ${t.message}")
             starting.set(false)
@@ -333,6 +338,7 @@ class OzeroVpnService : android.net.VpnService() {
         splitConfig: ru.ozero.commonvpn.split.SplitTunnelConfig =
             ru.ozero.commonvpn.split.SplitTunnelConfig(),
         ipv6Enabled: Boolean = false,
+        customDnsServers: List<String> = emptyList(),
     ): Builder {
         val builder = Builder()
             .addAddress(TUN_ADDRESS, TUN_PREFIX_LENGTH)
@@ -341,7 +347,11 @@ class OzeroVpnService : android.net.VpnService() {
             builder.addAddress(TUN_ADDRESS_V6, TUN_PREFIX_LENGTH_V6)
             builder.addRoute("::", 0)
         }
-        TUN_DNS_SERVERS.forEach { builder.addDnsServer(it) }
+        val dnsServers = if (customDnsServers.isNotEmpty()) customDnsServers else TUN_DNS_SERVERS
+        dnsServers.forEach { dns ->
+            runCatching { builder.addDnsServer(dns) }
+                .onFailure { PersistentLoggers.warn(TAG, "addDnsServer rejected '$dns': ${it.message}") }
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             runCatching { builder.setMetered(false) }
         }

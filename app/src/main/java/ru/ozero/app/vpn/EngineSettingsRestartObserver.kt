@@ -19,10 +19,19 @@ class EngineSettingsRestartObserver(
         val byedpiWinningArgs: String?,
         val splitMode: SplitTunnelMode,
         val ipv6Enabled: Boolean,
+        val customDnsServers: List<String>,
     )
 
     val triggers: Flow<Snapshot> = settingsFlow
-        .map { Snapshot(it.manualEngine, it.byedpiWinningArgs?.trim(), it.splitMode, it.ipv6Enabled) }
+        .map {
+            Snapshot(
+                manualEngine = it.manualEngine,
+                byedpiWinningArgs = it.byedpiWinningArgs?.trim(),
+                splitMode = it.splitMode,
+                ipv6Enabled = it.ipv6Enabled,
+                customDnsServers = it.customDnsServers,
+            )
+        }
         .distinctUntilChanged()
         .drop(1)
 
