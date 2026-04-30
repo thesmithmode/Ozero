@@ -14,7 +14,11 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import ru.ozero.commonvpn.split.SplitTunnelMode
+import ru.ozero.enginescore.settings.AutoStartGateway
+import ru.ozero.enginescore.settings.SettingsKeys
+import ru.ozero.enginescore.settings.SettingsModel
+import ru.ozero.enginescore.settings.SettingsRepository
+import ru.ozero.enginescore.settings.SplitTunnelMode
 import ru.ozero.enginescore.EngineId
 import java.io.File
 import kotlin.test.assertEquals

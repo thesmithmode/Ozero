@@ -8,6 +8,7 @@ android {
 
 dependencies {
     implementation(libs.bundles.coroutines)
+    implementation(libs.datastore.preferences.core)
 
     testImplementation(libs.bundles.junit5)
     testRuntimeOnly(libs.junit.jupiter.engine)

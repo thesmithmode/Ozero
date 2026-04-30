@@ -1,31 +1,17 @@
-﻿package ru.ozero.app.settings
+package ru.ozero.app.settings
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import ru.ozero.commonvpn.split.SplitTunnelMode
 import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.settings.AutoStartGateway
+import ru.ozero.enginescore.settings.SettingsKeys
+import ru.ozero.enginescore.settings.SettingsModel
+import ru.ozero.enginescore.settings.SettingsRepository
+import ru.ozero.enginescore.settings.SplitTunnelMode
 import javax.inject.Inject
-
-interface SettingsRepository {
-    val settings: Flow<SettingsModel>
-
-    suspend fun setSplitMode(mode: SplitTunnelMode)
-
-    suspend fun setIpv6Enabled(enabled: Boolean)
-
-    suspend fun setAutoStart(enabled: Boolean)
-
-    suspend fun setManualEngine(engine: EngineId?)
-
-    suspend fun setUrnetworkEnabled(enabled: Boolean)
-
-    suspend fun setUrnetworkJwt(jwt: String?)
-
-    suspend fun setByedpiWinningArgs(args: String?)
-}
 
 class SettingsRepositoryImpl @Inject constructor(
     private val dataStore: DataStore<Preferences>,

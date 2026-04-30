@@ -14,10 +14,10 @@ import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import ru.ozero.app.settings.AutoStartGateway
+import ru.ozero.enginescore.settings.AutoStartGateway
 import ru.ozero.app.settings.BootReceiverAutoStartGateway
-import ru.ozero.app.settings.SettingsKeys
-import ru.ozero.app.settings.SettingsRepository
+import ru.ozero.enginescore.settings.SettingsKeys
+import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.app.settings.SettingsRepositoryImpl
 import ru.ozero.app.settings.UserFlagsRepository
 import ru.ozero.app.settings.UserFlagsRepositoryImpl

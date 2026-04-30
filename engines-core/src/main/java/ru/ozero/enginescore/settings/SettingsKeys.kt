@@ -1,6 +1,7 @@
-package ru.ozero.app.settings
+package ru.ozero.enginescore.settings
 
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 
 object SettingsKeys {
@@ -16,10 +17,8 @@ object SettingsKeys {
     val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
 
     val BYDPI_WINNING_ARGS = stringPreferencesKey("bydpi_winning_args")
-
-    val BYDPI_LAST_PROBE_AT = androidx.datastore.preferences.core.longPreferencesKey("bydpi_last_probe_at")
+    val BYDPI_LAST_PROBE_AT = longPreferencesKey("bydpi_last_probe_at")
 
     val URNETWORK_ENABLED = booleanPreferencesKey("urnetwork_enabled")
-
     val URNETWORK_JWT = stringPreferencesKey("urnetwork_jwt")
 }

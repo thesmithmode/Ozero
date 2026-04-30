@@ -1,7 +1,6 @@
-﻿package ru.ozero.app.settings
+package ru.ozero.enginescore.settings
 
 import ru.ozero.enginescore.EngineId
-import ru.ozero.commonvpn.split.SplitTunnelMode
 
 data class SettingsModel(
     val splitMode: SplitTunnelMode = DEFAULT_SPLIT_MODE,

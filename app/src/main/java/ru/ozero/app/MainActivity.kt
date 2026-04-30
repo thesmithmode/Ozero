@@ -32,7 +32,7 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var userFlags: UserFlagsRepository
 
-    @Inject lateinit var settingsRepository: ru.ozero.app.settings.SettingsRepository
+    @Inject lateinit var settingsRepository: ru.ozero.enginescore.settings.SettingsRepository
 
     @Inject lateinit var logcatReader: LogcatReader
 

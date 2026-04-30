@@ -1,0 +1,22 @@
+package ru.ozero.enginescore.settings
+
+import kotlinx.coroutines.flow.Flow
+import ru.ozero.enginescore.EngineId
+
+interface SettingsRepository {
+    val settings: Flow<SettingsModel>
+
+    suspend fun setSplitMode(mode: SplitTunnelMode)
+
+    suspend fun setIpv6Enabled(enabled: Boolean)
+
+    suspend fun setAutoStart(enabled: Boolean)
+
+    suspend fun setManualEngine(engine: EngineId?)
+
+    suspend fun setUrnetworkEnabled(enabled: Boolean)
+
+    suspend fun setUrnetworkJwt(jwt: String?)
+
+    suspend fun setByedpiWinningArgs(args: String?)
+}
