@@ -149,7 +149,12 @@ class VpnEnginePipeline(
     ): Result {
         Log.i(TAG, "bringTunnelUp entry engine=$engineId socks=$socksPort tunFd=${tunPfd.fd}")
         val udpMode = if (engine.capabilities.supportsUdp) "udp" else "tcp"
-        val config = HevTunnelConfig(tunPfd = tunPfd, socksAddress = socksHost, socksPort = socksPort, udpMode = udpMode)
+        val config = HevTunnelConfig(
+            tunPfd = tunPfd,
+            socksAddress = socksHost,
+            socksPort = socksPort,
+            udpMode = udpMode,
+        )
         tunnelStarted.set(true)
         Log.i(TAG, "tunnelGateway.start invoking")
         val code = try {
