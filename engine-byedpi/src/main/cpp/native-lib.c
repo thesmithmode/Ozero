@@ -45,19 +45,22 @@ Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniStartProxy(JNIEnv *env, __attribute__(
         return -1;
     }
 
-    int argc = (*env)->GetArrayLength(env, args);
-    char **argv = calloc(argc, sizeof(char *));
+    int user_argc = (*env)->GetArrayLength(env, args);
+    int argc = user_argc + 1;
+    char **argv = calloc((size_t)argc + 1u, sizeof(char *));
 
     if (!argv) {
         atomic_store(&g_proxy_running, 0);
         return -1;
     }
 
-    for (int i = 0; i < argc; i++) {
+    argv[0] = strdup("byedpi");
+
+    for (int i = 0; i < user_argc; i++) {
         jstring arg = (jstring) (*env)->GetObjectArrayElement(env, args, i);
-        if (!arg) { argv[i] = NULL; continue; }
+        if (!arg) { argv[i + 1] = NULL; continue; }
         const char *arg_str = (*env)->GetStringUTFChars(env, arg, 0);
-        argv[i] = arg_str ? strdup(arg_str) : NULL;
+        argv[i + 1] = arg_str ? strdup(arg_str) : NULL;
         if (arg_str) (*env)->ReleaseStringUTFChars(env, arg, arg_str);
         (*env)->DeleteLocalRef(env, arg);
     }
@@ -77,14 +80,12 @@ Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniStartProxy(JNIEnv *env, __attribute__(
 JNIEXPORT jint JNICALL
 Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniStopProxy(__attribute__((unused)) JNIEnv *env, __attribute__((unused)) jobject thiz) {
     if (!atomic_load(&g_proxy_running)) return -1;
-    shutdown(server_fd, SHUT_RDWR);
-    atomic_store(&g_proxy_running, 0);
-    return 0;
+    if (server_fd < 0) return -1;
+    return shutdown(server_fd, SHUT_RDWR);
 }
 
 JNIEXPORT jint JNICALL
 Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniForceClose(__attribute__((unused)) JNIEnv *env, __attribute__((unused)) jobject thiz) {
-    if (close(server_fd) == -1) return -1;
-    atomic_store(&g_proxy_running, 0);
-    return 0;
+    if (server_fd < 0) return -1;
+    return close(server_fd);
 }
