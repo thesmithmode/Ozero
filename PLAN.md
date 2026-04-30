@@ -147,6 +147,17 @@ W3.0 atomic refactor: SettingsRepository interface + SettingsModel + SettingsKey
 - [!] W5.10 race conditions pickBest+waitSocksReady — **blocked W4.2**
 - [ ] W8.1 feature ветка финал — squash-ready audit (после всех waves)
 
+### Pre-squash gate (concerns из review feature → dev 2026-05-01)
+
+- [!] **C3 Migration_4_5 runtime test** — **CRITICAL pre-squash**. Без runtime SQL verify migration v4→5 = risk install-over-upgrade у v0.0.1 юзеров. Robolectric + androidx.room:room-testing + JUnit 5↔4 interop. MIGRATION_4_5 → internal/public.
+- [!] C1 runBlocking ×2 main thread в OzeroVpnService.startVpn — теоретический ANR. Fix: preload @Volatile cache в onCreate. Defer (warm DataStore <10ms).
+- [!] C2 HealthMonitor scope leak — Singleton lifetime acceptable. Не критично.
+- [!] C4 SessionStatsRecorder finalStatus всегда DISCONNECTED — FAILED case не distinguished. Minor.
+- [!] M4 SessionStatsRecorder.startSession id=-1 silent fail — добавить PersistentLoggers.warn. Minor.
+- [!] C5 build_xray.sh не tested — research deliverable, device session.
+
+Полный review doc: `.memory/knowledge/concepts/feature-branch-code-review-2026-05-01.md`.
+
 ---
 
 ## Порядок следующей сессии (когда юзер вернётся с device)
