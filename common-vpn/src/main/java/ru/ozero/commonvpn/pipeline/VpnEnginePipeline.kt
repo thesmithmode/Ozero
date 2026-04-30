@@ -102,13 +102,13 @@ class VpnEnginePipeline(
 
     suspend fun stop() {
         Log.i(TAG, "stop")
-        if (tunnelStarted.compareAndSet(true, false)) {
-            runCatching { tunnelGateway.stop() }
-                .onFailure { Log.e(TAG, "tunnelGateway.stop() threw", it) }
-        }
         currentEngine.getAndSet(null)?.let { eng ->
             runCatching { eng.stop() }
                 .onFailure { Log.e(TAG, "engine.stop() threw", it) }
+        }
+        if (tunnelStarted.compareAndSet(true, false)) {
+            runCatching { tunnelGateway.stop() }
+                .onFailure { Log.e(TAG, "tunnelGateway.stop() threw", it) }
         }
         tunnelController.reset()
         if (orchestrator.state.value !is OrchestratorState.Idle) {
@@ -148,7 +148,8 @@ class VpnEnginePipeline(
         tunPfd: ParcelFileDescriptor,
     ): Result {
         Log.i(TAG, "bringTunnelUp entry engine=$engineId socks=$socksPort tunFd=${tunPfd.fd}")
-        val config = HevTunnelConfig(tunPfd = tunPfd, socksAddress = socksHost, socksPort = socksPort)
+        val udpMode = if (engine.capabilities.supportsUdp) "udp" else "tcp"
+        val config = HevTunnelConfig(tunPfd = tunPfd, socksAddress = socksHost, socksPort = socksPort, udpMode = udpMode)
         tunnelStarted.set(true)
         Log.i(TAG, "tunnelGateway.start invoking")
         val code = try {

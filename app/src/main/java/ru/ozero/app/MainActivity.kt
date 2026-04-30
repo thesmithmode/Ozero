@@ -27,11 +27,12 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.CoroutineExceptionHandler
 import ru.ozero.app.logging.AppLogger
 import ru.ozero.app.logging.BootFileLogger
@@ -365,7 +366,11 @@ class MainActivity : ComponentActivity() {
                             "engine settings changed while connected → restart manual=$manual args=$byedpiArgs",
                         )
                         stopVpnService()
-                        delay(300)
+                        withTimeoutOrNull(5_000L) {
+                            viewModel.state.first {
+                                it is OrchestratorState.Idle || it is OrchestratorState.Failed
+                            }
+                        }
                         startVpnService()
                     }
                 }

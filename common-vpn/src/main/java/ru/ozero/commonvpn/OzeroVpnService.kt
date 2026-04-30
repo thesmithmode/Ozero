@@ -198,7 +198,6 @@ class OzeroVpnService : android.net.VpnService() {
         Log.i(TAG, "stopVpn")
         startJobRef.getAndSet(null)?.cancel()
         val fdToClose = tunFdRef.getAndSet(null)
-        closeTunFd(fdToClose)
         serviceScope.launch {
             val shutdown = Thread({
                 runBlocking {
@@ -208,6 +207,7 @@ class OzeroVpnService : android.net.VpnService() {
             }, "OzeroVpn-stop")
             shutdown.start()
             shutdown.join(SHUTDOWN_JOIN_TIMEOUT_MS)
+            closeTunFd(fdToClose)
             if (shutdown.isAlive) {
                 Log.e(TAG, "pipeline.stop hung > ${SHUTDOWN_JOIN_TIMEOUT_MS}ms — force-killing process")
                 PersistentLoggers.instance?.error(
