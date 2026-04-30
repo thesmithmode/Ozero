@@ -1,2 +1,0 @@
--keep class ru.ozero.engineamnezia.LibAwgDelegate { *; }
--keepclasseswithmembernames class * { native <methods>; }

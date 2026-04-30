@@ -1,7 +1,6 @@
 package ru.ozero.enginebyedpi
 
 import android.util.Log
-import ru.ozero.coreapi.PersistentLoggers
 
 class ByeDpiProxy {
 
@@ -36,22 +35,19 @@ class ByeDpiProxy {
                 try {
                     System.loadLibrary("byedpi")
                     libraryLoaded = true
-                    runCatching { PersistentLoggers.instance?.info(TAG, "libbyedpi loaded") }
+                    Log.i(TAG, "libbyedpi loaded")
                 } catch (e: UnsatisfiedLinkError) {
                     loadError = e.message ?: e.javaClass.simpleName
                     libraryLoaded = false
                     Log.e(TAG, "loadLibrary failed: $loadError")
-                    runCatching { PersistentLoggers.instance?.error(TAG, "loadLibrary failed: $loadError", e) }
                 } catch (e: SecurityException) {
                     loadError = e.message ?: e.javaClass.simpleName
                     libraryLoaded = false
                     Log.e(TAG, "loadLibrary denied: $loadError")
-                    runCatching { PersistentLoggers.instance?.error(TAG, "loadLibrary denied: $loadError", e) }
                 } catch (e: Throwable) {
                     loadError = "${e.javaClass.simpleName}: ${e.message ?: "no message"}"
                     libraryLoaded = false
-                    Log.e(TAG, "loadLibrary THROWN: $loadError", e)
-                    runCatching { PersistentLoggers.instance?.error(TAG, "loadLibrary THROWN: $loadError", e) }
+                    Log.e(TAG, "loadLibrary THROWN: $loadError")
                 } finally {
                     loadAttempted = true
                 }

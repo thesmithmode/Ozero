@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.Flow
 interface Engine {
     val id: EngineId
     val capabilities: EngineCapabilities
-    suspend fun start(config: EngineConfig): StartResult
+    suspend fun start(config: EngineConfig, upstream: Upstream = Upstream.None): StartResult
     suspend fun stop()
     suspend fun probe(): ProbeResult
     fun stats(): Flow<EngineStats>

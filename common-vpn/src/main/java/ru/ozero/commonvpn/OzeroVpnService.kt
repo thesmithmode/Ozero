@@ -5,8 +5,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Intent
 import android.os.Build
-import android.os.Handler
-import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.os.Process
 import android.util.Log
@@ -17,15 +15,17 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicReference
 import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_START
 import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_STOP
-import ru.ozero.commonvpn.pipeline.VpnEnginePipeline
-import ru.ozero.coreapi.PersistentLoggers
+import ru.ozero.enginescore.ChainOrchestrator
+import ru.ozero.enginescore.ChainResult
+import ru.ozero.enginescore.ChainStep
+import ru.ozero.enginescore.EngineConfig
+import ru.ozero.enginescore.EngineId
 import ru.ozero.security.SecurityStateHolder
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 
 fun interface ProcessKiller {
@@ -35,7 +35,11 @@ fun interface ProcessKiller {
 @AndroidEntryPoint
 class OzeroVpnService : android.net.VpnService() {
 
-    @Inject lateinit var pipeline: VpnEnginePipeline
+    @Inject lateinit var chainOrchestrator: ChainOrchestrator
+
+    @Inject lateinit var tunnelGateway: HevTunnelGateway
+
+    @Inject lateinit var tunnelController: TunnelController
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -48,50 +52,42 @@ class OzeroVpnService : android.net.VpnService() {
         const val NOTIFICATION_ID = 1
         const val TUN_ADDRESS = "10.10.10.10"
         const val TUN_PREFIX_LENGTH = 32
-
         const val TUN_ADDRESS_V6 = "fd00:ffff:ffff:ffff::1"
         const val TUN_PREFIX_LENGTH_V6 = 64
         const val TUN_DNS = "100.64.0.1"
         const val TUN_MTU = 1500
         private const val SESSION_NAME = "Ozero"
         private const val TAG = "OzeroVpnService"
-        private const val PIPELINE_START_TIMEOUT_MS = 30_000L
-        private const val SHUTDOWN_JOIN_TIMEOUT_MS = 2_500L
+        private const val CHAIN_START_TIMEOUT_MS = 30_000L
+        private const val SHUTDOWN_TIMEOUT_MS = 6_000L
     }
 
     override fun onCreate() {
-        runCatching { PersistentLoggers.instance?.info(TAG, "onCreate before super") }
+        Log.i(TAG, "onCreate before super")
         try {
             super.onCreate()
         } catch (t: Throwable) {
-            runCatching { Log.e(TAG, "super.onCreate threw — Hilt graph failure", t) }
-            runCatching { PersistentLoggers.instance?.error(TAG, "super.onCreate threw — Hilt graph failure", t) }
+            Log.e(TAG, "super.onCreate threw — Hilt graph failure: ${t.message}")
             throw t
         }
-        runCatching { PersistentLoggers.instance?.info(TAG, "onCreate after super (Hilt inject done)") }
+        Log.i(TAG, "onCreate after super (Hilt inject done)")
     }
 
     private val tunFdRef = AtomicReference<ParcelFileDescriptor?>(null)
     private val startJobRef = AtomicReference<Job?>(null)
-
     private val starting = AtomicBoolean(false)
     private val stopping = AtomicBoolean(false)
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        PersistentLoggers.instance?.info(
-            TAG,
-            "onStartCommand entry action=${intent?.action} flags=$flags startId=$startId",
-        )
-        Log.i(TAG, "onStartCommand action=${intent?.action}")
+        Log.i(TAG, "onStartCommand action=${intent?.action} startId=$startId")
         val foregroundOk = enterForegroundOrLog()
         if (!foregroundOk) {
             stopSelf(startId)
             return START_NOT_STICKY
         }
         return try {
-            if (!::pipeline.isInitialized) {
-                Log.e(TAG, "pipeline not injected — Hilt graph failure")
-                PersistentLoggers.instance?.error(TAG, "pipeline not injected — Hilt graph failure")
+            if (!::chainOrchestrator.isInitialized) {
+                Log.e(TAG, "chainOrchestrator not injected — Hilt graph failure")
                 stopSelf(startId)
                 return START_NOT_STICKY
             }
@@ -101,8 +97,7 @@ class OzeroVpnService : android.net.VpnService() {
             }
             START_STICKY
         } catch (t: Throwable) {
-            Log.e(TAG, "onStartCommand threw", t)
-            PersistentLoggers.instance?.error(TAG, "onStartCommand threw", t)
+            Log.e(TAG, "onStartCommand threw: ${t.message}")
             runCatching { stopVpn() }
             START_NOT_STICKY
         }
@@ -110,83 +105,87 @@ class OzeroVpnService : android.net.VpnService() {
 
     private fun startVpn() {
         if (stopping.get()) {
-            Log.w(TAG, "startVpn ignored — идет остановка предыдущей сессии")
             stopVpn()
             return
         }
         if (SecurityStateHolder.isCompromised) {
-            Log.w(TAG, "startVpn refused — security compromised: ${SecurityStateHolder.compromised.value}")
-            PersistentLoggers.instance?.warn(
-                TAG,
-                "startVpn refused — security compromised: ${SecurityStateHolder.compromised.value}",
-            )
             stopVpn()
             return
         }
-        if (!starting.compareAndSet(false, true)) {
-            Log.w(TAG, "startVpn ignored — уже запущен/запускается")
-            return
-        }
-        Log.i(TAG, "startVpn")
-        runCatching {
-            val tName = Thread.currentThread().name
-            val isMain = android.os.Looper.myLooper() === android.os.Looper.getMainLooper()
-            val t0 = System.nanoTime()
-            Log.i(TAG, "preload begin thread=$tName main=$isMain")
-            hev.TProxyService.loadOnce()
-            val dtMs = (System.nanoTime() - t0) / 1_000_000
-            Log.i(
-                TAG,
-                "preload done dt=${dtMs}ms libraryLoaded=${hev.TProxyService.libraryLoaded} " +
-                    "loadError=${hev.TProxyService.loadError}",
-            )
-        }.onFailure {
-            Log.w(TAG, "TProxyService preload threw", it)
-            PersistentLoggers.instance?.warn(TAG, "TProxyService preload threw", it)
-        }
+        if (!starting.compareAndSet(false, true)) return
+        Log.i(TAG, "startVpn entry")
+
+        val tName = Thread.currentThread().name
+        val isMain = android.os.Looper.myLooper() === android.os.Looper.getMainLooper()
+        Log.i(TAG, "loadOnce begin thread=$tName main=$isMain")
+        runCatching { hev.TProxyService.loadOnce() }
+            .onFailure { Log.w(TAG, "TProxyService.loadOnce threw: ${it.message}") }
+        Log.i(TAG, "loadOnce done libraryLoaded=${hev.TProxyService.libraryLoaded}")
+
         val fd = try {
             buildTunBuilder().establish()
         } catch (t: Throwable) {
-            Log.e(TAG, "VpnService.Builder.establish threw", t)
-            PersistentLoggers.instance?.error(TAG, "Builder.establish threw", t)
+            Log.e(TAG, "establish threw: ${t.message}")
             starting.set(false)
             stopVpn()
             return
         }
         if (fd == null) {
-            Log.e(TAG, "TUN не установлен — VpnService.prepare не выдан?")
-            PersistentLoggers.instance?.error(TAG, "establish returned null — permission revoked?")
+            Log.e(TAG, "establish returned null — permission revoked?")
             starting.set(false)
             stopVpn()
             return
         }
         tunFdRef.set(fd)
         Log.i(TAG, "TUN established fd=${fd.fd}")
+
         val job = serviceScope.launch {
             if (stopping.get()) {
-                Log.w(TAG, "launch обнаружил stopping=true — закрываем установленный fd")
                 runCatching { fd.close() }
-                    .onFailure { Log.w(TAG, "fd.close() в pre-launch threw", it) }
                 tunFdRef.compareAndSet(fd, null)
                 starting.set(false)
                 return@launch
             }
             try {
-                val result = withTimeoutOrNull(PIPELINE_START_TIMEOUT_MS) {
+                val chainResult = withTimeoutOrNull(CHAIN_START_TIMEOUT_MS) {
                     try {
-                        pipeline.start(tunPfd = fd)
+                        chainOrchestrator.start(listOf(ChainStep(EngineId.BYEDPI, EngineConfig.ByeDpi())))
                     } catch (ce: kotlinx.coroutines.CancellationException) {
                         throw ce
                     } catch (t: Throwable) {
-                        Log.e(TAG, "pipeline.start threw", t)
+                        Log.e(TAG, "chain.start threw: ${t.message}")
                         null
                     }
                 }
-                Log.i(TAG, "pipeline.start result=$result")
-                if (result !is VpnEnginePipeline.Result.Connected) {
-                    Log.w(TAG, "pipeline не подключился: $result, останавливаем")
+                Log.i(TAG, "chain result=$chainResult")
+                if (chainResult !is ChainResult.Success) {
+                    tunnelController.onEngineDied(chainResult?.toString() ?: "timeout")
                     stopVpn()
+                    return@launch
                 }
+                val code = try {
+                    tunnelGateway.start(
+                        HevTunnelConfig(
+                            tunPfd = fd,
+                            socksAddress = "127.0.0.1",
+                            socksPort = chainResult.finalSocksPort,
+                        ),
+                    )
+                } catch (t: Throwable) {
+                    Log.e(TAG, "tunnelGateway.start threw: ${t.message}")
+                    runCatching { chainOrchestrator.stop() }
+                    stopVpn()
+                    return@launch
+                }
+                if (code != 0) {
+                    Log.e(TAG, "tunnel start failed code=$code")
+                    runCatching { chainOrchestrator.stop() }
+                    tunnelController.onEngineDied("tunnel code=$code")
+                    stopVpn()
+                    return@launch
+                }
+                tunnelController.onEngineStarted(chainResult.finalSocksPort)
+                Log.i(TAG, "connected socksPort=${chainResult.finalSocksPort}")
             } finally {
                 starting.set(false)
             }
@@ -195,48 +194,28 @@ class OzeroVpnService : android.net.VpnService() {
     }
 
     private fun stopVpn() {
-        if (!stopping.compareAndSet(false, true)) {
-            Log.w(TAG, "stopVpn ignored — уже останавливается")
-            return
-        }
-        Log.i(TAG, "stopVpn")
+        if (!stopping.compareAndSet(false, true)) return
+        Log.i(TAG, "stopVpn entry")
         startJobRef.getAndSet(null)?.cancel()
-        val fdToClose = tunFdRef.getAndSet(null)
-        serviceScope.launch {
-            val shutdown = Thread({
-                runBlocking {
-                    runCatching { pipeline.stop() }
-                        .onFailure { Log.w(TAG, "pipeline.stop threw", it) }
-                }
-            }, "OzeroVpn-stop").apply { isDaemon = true }
-            shutdown.start()
-            shutdown.join(SHUTDOWN_JOIN_TIMEOUT_MS)
-            closeTunFd(fdToClose)
-            if (shutdown.isAlive) {
-                Log.w(
-                    TAG,
-                    "pipeline.stop hung > ${SHUTDOWN_JOIN_TIMEOUT_MS}ms — leak daemon, продолжаем stopSelf",
-                )
-                PersistentLoggers.instance?.warn(
-                    TAG,
-                    "pipeline.stop hung > ${SHUTDOWN_JOIN_TIMEOUT_MS}ms — leak daemon, no force-kill",
-                )
-            }
-            Handler(Looper.getMainLooper()).post {
-                try {
-                    starting.set(false)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                        stopForeground(STOP_FOREGROUND_REMOVE)
-                    } else {
-                        @Suppress("DEPRECATION")
-                        stopForeground(true)
-                    }
-                    stopSelf()
-                } finally {
-                    stopping.set(false)
-                }
-            }
+        runCatching { tunFdRef.getAndSet(null)?.close() }
+        serviceScope.launch { performShutdown() }
+    }
+
+    private suspend fun performShutdown() {
+        withTimeoutOrNull(SHUTDOWN_TIMEOUT_MS) {
+            runCatching { tunnelGateway.stop() }
+            runCatching { chainOrchestrator.stop() }
+        } ?: Log.w(TAG, "shutdown hung > ${SHUTDOWN_TIMEOUT_MS}ms")
+        tunnelController.reset()
+        starting.set(false)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+            @Suppress("DEPRECATION")
+            stopForeground(true)
         }
+        stopSelf()
+        stopping.set(false)
     }
 
     internal fun buildTunBuilder(
@@ -250,104 +229,69 @@ class OzeroVpnService : android.net.VpnService() {
             .setSession(SESSION_NAME)
             .setBlocking(true)
         runCatching { builder.addAddress(TUN_ADDRESS_V6, TUN_PREFIX_LENGTH_V6) }
-            .onFailure { Log.w(TAG, "IPv6 TUN address rejected, IPv4-only", it) }
-        ru.ozero.commonvpn.split.TunBuilderConfigurator(packageName)
-            .apply(builder, splitConfig)
+        ru.ozero.commonvpn.split.TunBuilderConfigurator(packageName).apply(builder, splitConfig)
         return builder
     }
 
     private fun buildNotification(): Notification {
-        val contentIntent = packageManager.getLaunchIntentForPackage(packageName)?.let { launch ->
+        val contentIntent = packageManager.getLaunchIntentForPackage(packageName)?.let {
             android.app.PendingIntent.getActivity(
-                this,
-                0,
-                launch,
+                this, 0, it,
                 android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT,
             )
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "Ozero VPN",
-                NotificationManager.IMPORTANCE_LOW,
+            getSystemService(NotificationManager::class.java)?.createNotificationChannel(
+                NotificationChannel(CHANNEL_ID, "Ozero VPN", NotificationManager.IMPORTANCE_LOW),
             )
-            getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
-            val builder = Notification.Builder(this, CHANNEL_ID)
+            return Notification.Builder(this, CHANNEL_ID)
                 .setContentTitle("Ozero VPN активен")
                 .setSmallIcon(android.R.drawable.ic_lock_lock)
                 .setOngoing(true)
-            if (contentIntent != null) builder.setContentIntent(contentIntent)
-            return builder.build()
-        } else {
-            @Suppress("DEPRECATION")
-            val builder = Notification.Builder(this)
-                .setContentTitle("Ozero VPN активен")
-                .setSmallIcon(android.R.drawable.ic_lock_lock)
-                .setOngoing(true)
-            if (contentIntent != null) builder.setContentIntent(contentIntent)
-            return builder.build()
+                .apply { if (contentIntent != null) setContentIntent(contentIntent) }
+                .build()
         }
+        @Suppress("DEPRECATION")
+        return Notification.Builder(this)
+            .setContentTitle("Ozero VPN активен")
+            .setSmallIcon(android.R.drawable.ic_lock_lock)
+            .setOngoing(true)
+            .apply { if (contentIntent != null) setContentIntent(contentIntent) }
+            .build()
     }
 
     override fun onRevoke() {
-        Log.i(TAG, "onRevoke")
+        Log.i(TAG, "onRevoke — VPN permission revoked")
         stopVpn()
+        super.onRevoke()
     }
 
     override fun onDestroy() {
-        if (stopping.compareAndSet(false, true) && ::pipeline.isInitialized) {
-            val shutdown = Thread({
-                runBlocking {
-                    runCatching { pipeline.stop() }
-                        .onFailure { Log.w(TAG, "pipeline.stop in onDestroy threw", it) }
-                }
-            }, "OzeroVpn-shutdown").apply { isDaemon = true }
-            shutdown.start()
-            shutdown.join(SHUTDOWN_JOIN_TIMEOUT_MS)
-            if (shutdown.isAlive) {
-                Log.w(TAG, "pipeline.stop hung in onDestroy > ${SHUTDOWN_JOIN_TIMEOUT_MS}ms — leak daemon")
-                PersistentLoggers.instance?.warn(
-                    TAG,
-                    "pipeline.stop hung in onDestroy > ${SHUTDOWN_JOIN_TIMEOUT_MS}ms — leak daemon",
-                )
-            }
-        }
+        Log.i(TAG, "onDestroy entry")
+        if (stopping.compareAndSet(false, true)) serviceScope.launch { performShutdown() }
         serviceScope.cancel()
-        val tunFd = tunFdRef.getAndSet(null)
-        runCatching { tunFd?.close() }
-            .onFailure { Log.w(TAG, "tunFd.close in onDestroy threw", it) }
+        runCatching { tunFdRef.getAndSet(null)?.close() }
         super.onDestroy()
-    }
-
-    private fun closeTunFd(fd: ParcelFileDescriptor? = tunFdRef.getAndSet(null)) {
-        fd?.close()
     }
 
     private fun enterForegroundOrLog(): Boolean {
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                val notification = buildNotification()
-                val specialUse = android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-                val fallback = android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MANIFEST
+                val n = buildNotification()
+                val su = android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                val fb = android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MANIFEST
                 try {
-                    startForeground(NOTIFICATION_ID, notification, specialUse)
+                    startForeground(NOTIFICATION_ID, n, su)
                 } catch (t: Throwable) {
-                    Log.w(TAG, "startForeground specialUse failed → fallback to manifest type", t)
-                    PersistentLoggers.instance?.warn(
-                        TAG,
-                        "startForeground specialUse failed → fallback to manifest type",
-                        t,
-                    )
-                    startForeground(NOTIFICATION_ID, notification, fallback)
+                    startForeground(NOTIFICATION_ID, n, fb)
                 }
             } else {
                 startForeground(NOTIFICATION_ID, buildNotification())
             }
-            Log.i(TAG, "startForeground OK (early)")
+            Log.i(TAG, "startForeground OK")
             true
         } catch (t: Throwable) {
-            Log.e(TAG, "startForeground threw on entry", t)
-            PersistentLoggers.instance?.error(TAG, "startForeground threw on entry", t)
+            Log.e(TAG, "startForeground threw: ${t.message}")
             false
         }
     }

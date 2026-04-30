@@ -87,7 +87,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: kotlin-style
-    if: ${{ github.ref == 'refs/heads/dev' }}
+    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/clean-start' }}
     permissions:
       contents: read
 
@@ -126,7 +126,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: kotlin-style
-    if: ${{ github.ref == 'refs/heads/dev' }}
+    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/clean-start' }}
     permissions:
       contents: read
 
@@ -168,7 +168,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: kotlin-style
-    if: ${{ github.ref == 'refs/heads/dev' }}
+    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/clean-start' }}
     permissions:
       contents: read
       checks: write
@@ -269,6 +269,7 @@ jobs:
             APP_ABI="arm64-v8a armeabi-v7a x86_64 x86" \
             APP_PLATFORM=android-24 \
             APP_CFLAGS="-DPKGNAME=hev" \
+            APP_LDFLAGS="-Wl,-z,max-page-size=16384,-z,common-page-size=16384" \
             -j"$(nproc)"
           STRIP="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
           for ABI in arm64-v8a armeabi-v7a x86_64 x86; do
@@ -279,6 +280,25 @@ jobs:
               echo "::error::PKGNAME не зашит в libhev для $ABI — JNI_OnLoad упадёт ART JniAbort"
               exit 1
             fi
+          done
+
+      - name: Assert 16KB page-size alignment в arm64/x86_64 libhev
+        env:
+          NDK_PATH: ${{ steps.ndk.outputs.ndk-path }}
+        run: |
+          set -euo pipefail
+          READELF="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          REQUIRED_ALIGN=16384
+          for ABI in arm64-v8a x86_64; do
+            SO="common-vpn/src/main/jniLibs/$ABI/libhev-socks5-tunnel.so"
+            if [ ! -f "$SO" ]; then continue; fi
+            ALIGN_HEX=$("$READELF" -lW "$SO" | awk '/^\s*LOAD/ {print $NF; exit}')
+            ALIGN_DEC=$(printf '%d' "$ALIGN_HEX")
+            if [ "$ALIGN_DEC" -lt "$REQUIRED_ALIGN" ]; then
+              echo "::error::$SO имеет LOAD-segment alignment=$ALIGN_HEX (<$REQUIRED_ALIGN) — Android 15+ Pixel 9 (16KB pages) откажется грузить, dlopen UnsatisfiedLinkError"
+              exit 1
+            fi
+            echo "$ABI: LOAD alignment=$ALIGN_HEX (>=0x4000) — Android 15 16KB compatible"
           done
 
       - name: Decode keystore

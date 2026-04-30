@@ -52,11 +52,9 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val updateState by viewModel.update.collectAsStateWithLifecycle()
     BackHandler(onBack = onBack)
     SettingsScreenContent(
         state = state,
-        updateState = updateState,
         onBack = onBack,
         nav = SettingsNavActions(
             onOpenAllowedApps = onOpenAllowedApps,
@@ -70,10 +68,6 @@ fun SettingsScreen(
         onIpv6Toggle = viewModel::onIpv6Toggle,
         onAutoStartToggle = viewModel::onAutoStartToggle,
         onManualEngineSelect = viewModel::onManualEngineSelect,
-        updateActions = UpdateActions(
-            onCheck = viewModel::onCheckUpdate,
-            onReset = viewModel::onResetUpdate,
-        ),
     )
 }
 
@@ -82,14 +76,12 @@ fun SettingsScreen(
 @Composable
 fun SettingsScreenContent(
     state: SettingsUiState,
-    updateState: UpdateUiState = UpdateUiState.Idle,
     onBack: () -> Unit,
     nav: SettingsNavActions = SettingsNavActions(onOpenAllowedApps = {}, onOpenServers = {}),
     onSplitModeChange: (SplitTunnelMode) -> Unit,
     onIpv6Toggle: (Boolean) -> Unit,
     onAutoStartToggle: (Boolean) -> Unit,
     onManualEngineSelect: (EngineId?) -> Unit,
-    updateActions: UpdateActions = UpdateActions(onCheck = {}, onReset = {}),
 ) {
     Scaffold(
         modifier = Modifier.testTag(SettingsTestTags.SCREEN),
@@ -116,13 +108,11 @@ fun SettingsScreenContent(
                 ContentBody(
                     padding = padding,
                     model = state.model,
-                    updateState = updateState,
                     nav = nav,
                     onSplitModeChange = onSplitModeChange,
                     onIpv6Toggle = onIpv6Toggle,
                     onAutoStartToggle = onAutoStartToggle,
                     onManualEngineSelect = onManualEngineSelect,
-                    updateActions = updateActions,
                 )
         }
     }
@@ -145,13 +135,11 @@ private fun LoadingBody(padding: PaddingValues) {
 private fun ContentBody(
     padding: PaddingValues,
     model: SettingsModel,
-    updateState: UpdateUiState,
     nav: SettingsNavActions,
     onSplitModeChange: (SplitTunnelMode) -> Unit,
     onIpv6Toggle: (Boolean) -> Unit,
     onAutoStartToggle: (Boolean) -> Unit,
     onManualEngineSelect: (EngineId?) -> Unit,
-    updateActions: UpdateActions,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
@@ -186,13 +174,6 @@ private fun ContentBody(
             SecuritySection(
                 autoStart = model.autoStart,
                 onAutoStartToggle = onAutoStartToggle,
-            )
-        }
-        item { SectionDivider() }
-        item {
-            UpdatesSection(
-                state = updateState,
-                onCheck = updateActions.onCheck,
             )
         }
         item { SectionDivider() }
@@ -315,38 +296,6 @@ private fun SecuritySection(
         checked = autoStart,
         tag = SettingsTestTags.AUTO_START_SWITCH,
         onCheckedChange = onAutoStartToggle,
-    )
-}
-
-@Composable
-private fun UpdatesSection(
-    state: UpdateUiState,
-    onCheck: () -> Unit,
-) {
-    SectionHeader(R.string.settings_section_updates, SettingsTestTags.SECTION_UPDATES)
-    val summary = when (state) {
-        UpdateUiState.Idle -> stringResource(R.string.settings_check_update_summary)
-        UpdateUiState.Checking -> stringResource(R.string.settings_update_state_checking)
-        is UpdateUiState.Downloading ->
-            stringResource(R.string.settings_update_state_downloading, state.percent)
-        UpdateUiState.Verifying -> stringResource(R.string.settings_update_state_verifying)
-        UpdateUiState.Installing -> stringResource(R.string.settings_update_state_installing)
-        UpdateUiState.UpToDate -> stringResource(R.string.settings_update_state_uptodate)
-        is UpdateUiState.Failed ->
-            stringResource(R.string.settings_update_state_failed, state.reason)
-    }
-    val enabled = when (state) {
-        UpdateUiState.Idle, UpdateUiState.UpToDate -> true
-        is UpdateUiState.Failed -> true
-        UpdateUiState.Checking, UpdateUiState.Verifying, UpdateUiState.Installing -> false
-        is UpdateUiState.Downloading -> false
-    }
-    NavRow(
-        title = stringResource(R.string.settings_check_update_title),
-        summary = summary,
-        tag = SettingsTestTags.CHECK_UPDATE_ROW,
-        onClick = onCheck,
-        enabled = enabled,
     )
 }
 

@@ -2,7 +2,6 @@ package hev
 
 import android.os.Build
 import android.os.Looper
-import android.util.Log
 import ru.ozero.coreapi.PersistentLoggers
 
 @Suppress("ktlint:standard:function-naming", "FunctionNaming")
@@ -35,50 +34,41 @@ object TProxyService {
             val ctx = "thread=${thread.name} tid=${thread.id} main=$isMain " +
                 "device=${Build.MANUFACTURER}/${Build.BRAND}/${Build.MODEL} " +
                 "sdk=${Build.VERSION.SDK_INT}"
-            Log.i(TAG, "loadLibrary begin $ctx")
+            PersistentLoggers.instance?.info(TAG, "loadLibrary begin $ctx")
             try {
                 System.loadLibrary("hev-socks5-tunnel")
                 libraryLoaded = true
                 val dtMs = (System.nanoTime() - t0) / 1_000_000
-                Log.i(TAG, "libhev-socks5-tunnel loaded OK dt=${dtMs}ms")
+                PersistentLoggers.instance?.info(TAG, "libhev-socks5-tunnel loaded OK dt=${dtMs}ms")
             } catch (e: UnsatisfiedLinkError) {
                 loadError = e.message ?: e.javaClass.simpleName
                 libraryLoaded = false
                 val dtMs = (System.nanoTime() - t0) / 1_000_000
-                Log.e(TAG, "libhev-socks5-tunnel load FAILED dt=${dtMs}ms: $loadError")
-                runCatching {
-                    PersistentLoggers.instance?.error(
-                        TAG,
-                        "libhev-socks5-tunnel load FAILED dt=${dtMs}ms: $loadError",
-                        e,
-                    )
-                }
+                PersistentLoggers.instance?.error(
+                    TAG,
+                    "libhev-socks5-tunnel load FAILED dt=${dtMs}ms: $loadError",
+                    e,
+                )
                 runCatching { dumpVendorMaps() }
             } catch (e: SecurityException) {
                 loadError = e.message ?: e.javaClass.simpleName
                 libraryLoaded = false
                 val dtMs = (System.nanoTime() - t0) / 1_000_000
-                Log.e(TAG, "libhev-socks5-tunnel load denied dt=${dtMs}ms: $loadError")
-                runCatching {
-                    PersistentLoggers.instance?.error(
-                        TAG,
-                        "libhev-socks5-tunnel load denied dt=${dtMs}ms: $loadError",
-                        e,
-                    )
-                }
+                PersistentLoggers.instance?.error(
+                    TAG,
+                    "libhev-socks5-tunnel load denied dt=${dtMs}ms: $loadError",
+                    e,
+                )
                 runCatching { dumpVendorMaps() }
             } catch (e: Throwable) {
                 loadError = "${e.javaClass.simpleName}: ${e.message ?: "no message"}"
                 libraryLoaded = false
                 val dtMs = (System.nanoTime() - t0) / 1_000_000
-                Log.e(TAG, "libhev-socks5-tunnel load THROWN dt=${dtMs}ms: $loadError", e)
-                runCatching {
-                    PersistentLoggers.instance?.error(
-                        TAG,
-                        "libhev-socks5-tunnel load THROWN dt=${dtMs}ms: $loadError",
-                        e,
-                    )
-                }
+                PersistentLoggers.instance?.error(
+                    TAG,
+                    "libhev-socks5-tunnel load THROWN dt=${dtMs}ms: $loadError",
+                    e,
+                )
                 runCatching { dumpVendorMaps() }
             } finally {
                 loadAttempted = true
@@ -101,8 +91,7 @@ object TProxyService {
         } else {
             "proc/maps vendor:\n${matches.joinToString("\n")}"
         }
-        Log.i(TAG, payload)
-        runCatching { PersistentLoggers.instance?.info(TAG, payload) }
+        PersistentLoggers.instance?.info(TAG, payload)
     }
 
     private const val MAX_MAPS_LINES = 30

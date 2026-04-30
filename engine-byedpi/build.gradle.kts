@@ -20,8 +20,7 @@ android {
 }
 
 dependencies {
-    implementation(project(":core-api"))
-    implementation(project(":core-orchestrator"))
+    implementation(project(":engines-core"))
     implementation(project(":common-vpn"))
     implementation(libs.bundles.coroutines)
 

@@ -15,10 +15,13 @@ import ru.ozero.coreapi.EngineConfig
 import ru.ozero.coreapi.EngineId
 import ru.ozero.coreapi.ProbeResult
 import ru.ozero.coreapi.StartResult
+import ru.ozero.coreapi.Upstream
 import java.net.ServerSocket
 import kotlin.concurrent.thread
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class ByeDpiEngineTest {
     private lateinit var proxy: ByeDpiProxy
@@ -170,6 +173,42 @@ class ByeDpiEngineTest {
         val result = engine.probe()
         assertIs<ProbeResult.Failure>(result)
         assertEquals("движок не запущен", result.reason)
+    }
+
+    @Test
+    fun buildArgs_noUpstreamFlag_terminalProxy() {
+        val args = engine.buildArgs(EngineConfig.ByeDpi(socksPort = 1080)).toList()
+        assertTrue(
+            args.none { it == "-x" || it.startsWith("--proxy") },
+            "ByeDPI terminal proxy — никаких upstream флагов в args: $args",
+        )
+    }
+
+    @Test
+    fun capabilitiesSupportsUpstreamSocksFalse() {
+        assertEquals(false, engine.capabilities.supportsUpstreamSocks, "ByeDPI = terminal proxy")
+    }
+
+    @Test
+    fun startRejectsSocks5Upstream_terminalProxy() = runTest {
+        every { proxy.jniStartProxy(any()) } returns 0
+        assertFailsWith<IllegalArgumentException> {
+            engine.start(
+                EngineConfig.ByeDpi(socksPort = 1080),
+                Upstream.Socks5("127.0.0.1", 9050),
+            )
+        }
+    }
+
+    @Test
+    fun startRejectsHttpUpstream_terminalProxy() = runTest {
+        every { proxy.jniStartProxy(any()) } returns 0
+        assertFailsWith<IllegalArgumentException> {
+            engine.start(
+                EngineConfig.ByeDpi(socksPort = 1080),
+                Upstream.Http("proxy.example", 8080),
+            )
+        }
     }
 
     @Test

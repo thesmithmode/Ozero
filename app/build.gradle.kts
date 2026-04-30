@@ -99,6 +99,7 @@ dependencies {
 
     implementation(libs.bundles.coroutines)
 
+    implementation(project(":engines-core"))
     implementation(project(":core-api"))
     implementation(project(":core-orchestrator"))
     implementation(project(":core-subscriptions"))
@@ -106,12 +107,6 @@ dependencies {
     implementation(project(":common-vpn"))
     implementation(project(":common-crypto"))
     implementation(project(":engine-byedpi"))
-    implementation(project(":engine-xray"))
-    implementation(project(":engine-amnezia"))
-    implementation(project(":engine-hysteria2"))
-    implementation(project(":engine-naive"))
-    implementation(project(":engine-urnetwork"))
-    implementation(project(":engine-tor"))
     implementation(project(":security"))
 
     implementation(libs.bundles.okhttp)

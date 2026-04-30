@@ -15,8 +15,8 @@ android {
 }
 
 dependencies {
+    implementation(project(":engines-core"))
     implementation(project(":core-api"))
-    implementation(project(":core-orchestrator"))
     implementation(project(":security"))
     implementation(libs.bundles.coroutines)
 

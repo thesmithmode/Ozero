@@ -10,7 +10,6 @@ import ru.ozero.app.ui.splittunnel.AppListProvider
 import ru.ozero.app.ui.splittunnel.DefaultAppListProvider
 import ru.ozero.corestorage.OzeroDatabase
 import ru.ozero.corestorage.dao.AppSplitRuleDao
-import ru.ozero.corestorage.dao.ConnectionLogDao
 import ru.ozero.corestorage.dao.ServerDao
 import javax.inject.Singleton
 
@@ -26,9 +25,6 @@ object StorageModule {
 
     @Provides
     fun provideServerDao(database: OzeroDatabase): ServerDao = database.serverDao()
-
-    @Provides
-    fun provideConnectionLogDao(database: OzeroDatabase): ConnectionLogDao = database.connectionLogDao()
 
     @Provides
     fun provideAppSplitRuleDao(database: OzeroDatabase): AppSplitRuleDao = database.appSplitRuleDao()

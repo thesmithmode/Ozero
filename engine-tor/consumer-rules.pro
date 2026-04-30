@@ -1,2 +1,0 @@
--keep class ru.ozero.enginetor.LibTorDelegate { *; }
--keepclasseswithmembernames class * { native <methods>; }

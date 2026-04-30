@@ -42,7 +42,7 @@ jobs:
             common-vpn/src/main/jniLibs/arm64-v8a/libhev-socks5-tunnel.so
             common-vpn/src/main/jniLibs/armeabi-v7a/libhev-socks5-tunnel.so
             common-vpn/src/main/jniLibs/x86_64/libhev-socks5-tunnel.so
-          key: libhev-2.7.0-ndk-r27c-platform-android-24-pkgname-hev-v3
+          key: libhev-2.7.0-ndk-r27c-platform-android-24-pkgname-hev-16kb-v4
 
       - name: Setup Android NDK
         id: ndk
@@ -79,6 +79,7 @@ jobs:
             APP_ABI="arm64-v8a armeabi-v7a x86_64" \
             APP_PLATFORM=android-24 \
             APP_CFLAGS="-DPKGNAME=hev" \
+            APP_LDFLAGS="-Wl,-z,max-page-size=16384,-z,common-page-size=16384" \
             -j"$(nproc)"
 
           STRIP="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
@@ -132,6 +133,26 @@ jobs:
             fi
           done
           echo "PKGNAME=hev зашит корректно — FindClass найдёт hev/TProxyService"
+
+      - name: Assert 16KB page-size alignment в arm64/x86_64 libhev
+        if: steps.libhev-cache.outputs.cache-hit != 'true'
+        env:
+          NDK_PATH: ${{ steps.ndk.outputs.ndk-path }}
+        run: |
+          set -euo pipefail
+          READELF="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          REQUIRED_ALIGN=16384
+          for ABI in arm64-v8a x86_64; do
+            SO="common-vpn/src/main/jniLibs/$ABI/libhev-socks5-tunnel.so"
+            if [ ! -f "$SO" ]; then continue; fi
+            ALIGN_HEX=$("$READELF" -lW "$SO" | awk '/^\s*LOAD/ {print $NF; exit}')
+            ALIGN_DEC=$(printf '%d' "$ALIGN_HEX")
+            if [ "$ALIGN_DEC" -lt "$REQUIRED_ALIGN" ]; then
+              echo "::error::$SO имеет LOAD-segment alignment=$ALIGN_HEX (<$REQUIRED_ALIGN) — Android 15+ Pixel 9 (16KB pages) откажется грузить, dlopen UnsatisfiedLinkError"
+              exit 1
+            fi
+            echo "$ABI: LOAD alignment=$ALIGN_HEX (>=0x4000) — Android 15 16KB compatible"
+          done
 
       - name: Decode keystore
         env:
@@ -204,19 +225,16 @@ jobs:
             "Lhev/TProxyService;"
             "Lru/ozero/enginebyedpi/ByeDpiProxy;"
             "Lru/ozero/commonvpn/OzeroVpnService;"
+            "Lru/ozero/commonvpn/HevTunnelGateway;"
             "Lru/ozero/commonvpn/split/TunBuilderConfigurator;"
             "Lru/ozero/coreapi/PersistentLoggers;"
             "Lru/ozero/coreapi/PersistentLogger;"
             "Lru/ozero/app/logging/BootFileLogger;"
+            "Lru/ozero/app/logging/UnifiedLogger;"
+            "Lru/ozero/app/logging/BootDiagnostics;"
             "Lru/ozero/app/OzeroApp;"
             "Lru/ozero/app/Hilt_OzeroApp;"
             "Lru/ozero/app/MainActivity;"
-            "Lru/ozero/enginexray/LibXrayDelegate;"
-            "Lru/ozero/enginetor/LibTorDelegate;"
-            "Lru/ozero/engineamnezia/LibAwgDelegate;"
-            "Lru/ozero/enginehysteria2/LibHy2Delegate;"
-            "Lru/ozero/enginenaive/LibNaiveDelegate;"
-            "Lru/ozero/engineurnetwork/UrnetworkSdkDelegate;"
           )
           for cls in "${REQUIRED_CLASSES[@]}"; do
             if ! grep -aor "$cls" "$WORK"/classes*.dex | head -n1 | grep -q "$cls"; then
@@ -224,7 +242,22 @@ jobs:
               exit 1
             fi
           done
-          echo "Native bridge классы сохранены R8 после minify"
+          FORBIDDEN_CLASSES=(
+            "Lru/ozero/enginexray/"
+            "Lru/ozero/enginetor/"
+            "Lru/ozero/engineamnezia/"
+            "Lru/ozero/enginehysteria2/"
+            "Lru/ozero/enginenaive/"
+            "Lru/ozero/engineurnetwork/"
+            "StubLib"
+          )
+          for cls in "${FORBIDDEN_CLASSES[@]}"; do
+            if grep -aor "$cls" "$WORK"/classes*.dex | head -n1 | grep -q "$cls"; then
+              echo "::error::В classes.dex обнаружен $cls — engine-* модули должны быть удалены в Phase 0"
+              exit 1
+            fi
+          done
+          echo "Native bridge классы сохранены R8, удалённые engine-* отсутствуют"
 
       - name: Collect artifacts
         env:

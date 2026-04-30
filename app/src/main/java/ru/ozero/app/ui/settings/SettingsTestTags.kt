@@ -8,7 +8,6 @@ object SettingsTestTags {
     const val SECTION_CONNECTION = "settings_section_connection"
     const val SECTION_NETWORK = "settings_section_network"
     const val SECTION_SECURITY = "settings_section_security"
-    const val SECTION_UPDATES = "settings_section_updates"
     const val SECTION_ABOUT = "settings_section_about"
 
     const val SPLIT_MODE_PREFIX = "split_mode_"
@@ -20,5 +19,4 @@ object SettingsTestTags {
 
     const val ALLOWED_APPS_ROW = "allowed_apps_row"
     const val SERVERS_ROW = "servers_row"
-    const val CHECK_UPDATE_ROW = "check_update_row"
 }

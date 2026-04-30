@@ -7,20 +7,17 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import ru.ozero.corestorage.dao.AppSplitRuleDao
-import ru.ozero.corestorage.dao.ConnectionLogDao
 import ru.ozero.corestorage.dao.ServerDao
 import ru.ozero.corestorage.entity.AppSplitRule
-import ru.ozero.corestorage.entity.ConnectionLogEntity
 import ru.ozero.corestorage.entity.ServerEntity
 
 @Database(
-    entities = [ServerEntity::class, ConnectionLogEntity::class, AppSplitRule::class],
-    version = 3,
+    entities = [ServerEntity::class, AppSplitRule::class],
+    version = 4,
     exportSchema = true,
 )
 abstract class OzeroDatabase : RoomDatabase() {
     abstract fun serverDao(): ServerDao
-    abstract fun connectionLogDao(): ConnectionLogDao
     abstract fun appSplitRuleDao(): AppSplitRuleDao
 
     companion object {
@@ -41,9 +38,16 @@ abstract class OzeroDatabase : RoomDatabase() {
                 }
             }
 
+        private val MIGRATION_3_4: Migration =
+            object : Migration(3, 4) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("DROP TABLE IF EXISTS connection_logs")
+                }
+            }
+
         fun create(context: Context): OzeroDatabase =
             Room.databaseBuilder(context, OzeroDatabase::class.java, DATABASE_NAME)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
     }
 }

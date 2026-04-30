@@ -12,19 +12,20 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import ru.ozero.coreapi.Engine
-import ru.ozero.coreapi.EngineCapabilities
-import ru.ozero.coreapi.EngineConfig
-import ru.ozero.coreapi.EngineId
-import ru.ozero.coreapi.EngineStats
-import ru.ozero.coreapi.ProbeResult
-import ru.ozero.coreapi.StartResult
-import ru.ozero.coreorchestrator.probe.Socks5HandshakeProbe
+import ru.ozero.enginescore.EngineCapabilities
+import ru.ozero.enginescore.EngineConfig
+import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.EnginePlugin
+import ru.ozero.enginescore.EngineStats
+import ru.ozero.enginescore.ProbeResult
+import ru.ozero.enginescore.StartResult
+import ru.ozero.enginescore.Upstream
+import ru.ozero.enginescore.probe.Socks5HandshakeProbe
 import java.util.concurrent.atomic.AtomicReference
 
 class ByeDpiEngine(
     private val proxy: ByeDpiProxy = ByeDpiProxy(),
-) : Engine {
+) : EnginePlugin {
 
     override val id = EngineId.BYEDPI
 
@@ -34,6 +35,7 @@ class ByeDpiEngine(
         supportsDoH = false,
         localOnly = true,
         requiresServer = false,
+        supportsUpstreamSocks = false,
     )
 
     @Volatile private var activeSocksPort: Int = 0
@@ -41,8 +43,12 @@ class ByeDpiEngine(
     private val proxyScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val proxyJobRef = AtomicReference<Job?>(null)
 
-    override suspend fun start(config: EngineConfig): StartResult {
+    override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
         require(config is EngineConfig.ByeDpi) { "ByeDpiEngine требует EngineConfig.ByeDpi" }
+        require(upstream is Upstream.None) {
+            "ByeDpiEngine — terminal proxy (нет --proxy/-x в getopt_long). " +
+                "Может быть только head of chain или standalone, не принимает upstream"
+        }
         ByeDpiProxy.loadOnce()
         if (!ByeDpiProxy.libraryLoaded) {
             Log.e(TAG, "native lib не загружена — устройство не поддерживает или stripped APK")
@@ -52,7 +58,7 @@ class ByeDpiEngine(
         val args = buildArgs(config)
         val proxyJob = proxyScope.launch {
             val code = runCatching { proxy.jniStartProxy(args) }
-                .onFailure { Log.e(TAG, "jniStartProxy threw", it) }
+                .onFailure { Log.e(TAG, "jniStartProxy threw: ${it.message}") }
                 .getOrElse { -1 }
             if (code != 0) {
                 Log.e(TAG, "jniStartProxy завершился с кодом $code")
@@ -123,7 +129,7 @@ class ByeDpiEngine(
         }
         return try {
             val latency = Socks5HandshakeProbe.probe("127.0.0.1", port, timeoutMs = 3_000)
-            Log.d(TAG, "probe OK latency=${latency}ms")
+            Log.i(TAG, "probe OK latency=${latency}ms")
             ProbeResult.Success(latencyMs = latency)
         } catch (e: Exception) {
             Log.w(TAG, "probe failed: ${e.message}")
@@ -133,7 +139,7 @@ class ByeDpiEngine(
 
     override fun stats(): Flow<EngineStats> = _stats.asStateFlow()
 
-    private fun buildArgs(config: EngineConfig.ByeDpi): Array<String> {
+    internal fun buildArgs(config: EngineConfig.ByeDpi): Array<String> {
         val extra =
             config.args.trim()
                 .takeIf { it.isNotEmpty() }

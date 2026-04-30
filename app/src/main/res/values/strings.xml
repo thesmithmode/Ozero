@@ -118,9 +118,7 @@
     <string name="a11y_disconnect_button">Отключить VPN</string>
     <string name="a11y_engine_active">Сейчас активен движок %1$s</string>
 
-    <!-- deeplink/share import -->
-    <string name="import_ok">Сервер %1$s добавлен</string>
-    <string name="import_error">Импорт не удался: %1$s</string>
+    <string name="error_generic">Ошибка</string>
     <string name="security_blocked">VPN запуск заблокирован: обнаружено вмешательство в среду исполнения</string>
 
     <!-- onboarding -->

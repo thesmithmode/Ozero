@@ -1,10 +1,6 @@
 -keep class ru.ozero.coreapi.** { *; }
 -keep class ru.ozero.commonvpn.OzeroVpnService { *; }
--keep class ru.ozero.engineamnezia.LibAwgDelegate { *; }
--keep class ru.ozero.enginehysteria2.LibHy2Delegate { *; }
--keep class ru.ozero.enginexray.LibXrayDelegate { *; }
--keep class ru.ozero.enginenaive.LibNaiveDelegate { *; }
--keep class ru.ozero.enginetor.LibTorDelegate { *; }
+-keep class ru.ozero.commonvpn.HevTunnelGateway { *; }
 
 -keep class hev.** { *; }
 -keep class ru.ozero.enginebyedpi.ByeDpiProxy { *; }
@@ -55,6 +51,9 @@
 -keep class androidx.compose.runtime.** { *; }
 
 -keep class ru.ozero.app.** { *; }
+-keep class ru.ozero.app.logging.BootFileLogger { *; }
+-keep class ru.ozero.app.logging.UnifiedLogger { *; }
+-keep class ru.ozero.app.logging.BootDiagnostics { *; }
 -keep class ru.ozero.commonvpn.** { *; }
 
 -keep class ru.ozero.coreapi.** { *; }
@@ -63,12 +62,6 @@
 -keep class ru.ozero.coresubscriptions.** { *; }
 
 -keep class ru.ozero.enginebyedpi.** { *; }
--keep class ru.ozero.enginexray.** { *; }
--keep class ru.ozero.engineamnezia.** { *; }
--keep class ru.ozero.enginehysteria2.** { *; }
--keep class ru.ozero.enginenaive.** { *; }
--keep class ru.ozero.enginetor.** { *; }
--keep class ru.ozero.engineurnetwork.** { *; }
 
 -keep class **_MapFactory { *; }
 -keep class **_InjectedMapFactory { *; }

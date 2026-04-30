@@ -23,6 +23,7 @@ dependencyResolutionManagement {
 rootProject.name = "Ozero"
 
 include(":app")
+include(":engines-core")
 include(":core-api")
 include(":core-orchestrator")
 include(":core-subscriptions")
@@ -32,10 +33,4 @@ include(":common-dns")
 include(":common-crypto")
 include(":common-json")
 include(":engine-byedpi")
-include(":engine-xray")
-include(":engine-hysteria2")
-include(":engine-amnezia")
-include(":engine-tor")
-include(":engine-naive")
-include(":engine-urnetwork")
 include(":security")

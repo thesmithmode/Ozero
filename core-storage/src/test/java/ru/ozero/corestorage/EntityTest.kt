@@ -2,11 +2,9 @@ package ru.ozero.corestorage
 
 import org.junit.jupiter.api.Test
 import ru.ozero.corestorage.entity.AppSplitRule
-import ru.ozero.corestorage.entity.ConnectionLogEntity
 import ru.ozero.corestorage.entity.ServerEntity
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class EntityTest {
@@ -82,33 +80,6 @@ class EntityTest {
         assertFalse(modified.isAlive)
         assertEquals(10, original.priority)
         assertTrue(original.isAlive)
-    }
-
-    @Test
-    fun connectionLogEntityDefaultId() {
-        val log = ConnectionLogEntity(
-            engineId = "engine-1",
-            connectedAt = 1000L
-        )
-
-        assertEquals(0L, log.id)
-        assertEquals("engine-1", log.engineId)
-        assertEquals(1000L, log.connectedAt)
-    }
-
-    @Test
-    fun connectionLogEntityNullableFields() {
-        val log = ConnectionLogEntity(
-            engineId = "engine-1",
-            connectedAt = 1000L,
-            disconnectedAt = null,
-            disconnectReason = null
-        )
-
-        assertNull(log.disconnectedAt)
-        assertNull(log.disconnectReason)
-        assertEquals(0L, log.bytesIn)
-        assertEquals(0L, log.bytesOut)
     }
 
     @Test

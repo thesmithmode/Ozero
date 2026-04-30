@@ -44,7 +44,6 @@ class SettingsScreenTest {
         composeRule.onNodeWithTag(SettingsTestTags.SECTION_CONNECTION).assertIsDisplayed()
         composeRule.onNodeWithTag(SettingsTestTags.SECTION_NETWORK).assertIsDisplayed()
         composeRule.onNodeWithTag(SettingsTestTags.SECTION_SECURITY).assertIsDisplayed()
-        composeRule.onNodeWithTag(SettingsTestTags.SECTION_UPDATES).assertIsDisplayed()
         composeRule.onNodeWithTag(SettingsTestTags.SECTION_ABOUT).assertIsDisplayed()
     }
 
@@ -122,8 +121,8 @@ class SettingsScreenTest {
     }
 
     @Test
-    fun manualEngineAutoSelectedWhenModelEngineIsNull() {
-        var captured: EngineId? = SENTINEL
+    fun manualEngineByedpiClickInvokesCallback() {
+        var clicked = false
         composeRule.setContent {
             OzeroTheme {
                 SettingsScreenContent(
@@ -132,16 +131,16 @@ class SettingsScreenTest {
                     onSplitModeChange = {},
                     onIpv6Toggle = {},
                     onAutoStartToggle = {},
-                    onManualEngineSelect = { captured = it },
+                    onManualEngineSelect = { if (it == EngineId.BYEDPI) clicked = true },
                 )
             }
         }
 
         composeRule
-            .onNodeWithTag(SettingsTestTags.MANUAL_ENGINE_PREFIX + EngineId.HYSTERIA2.name)
+            .onNodeWithTag(SettingsTestTags.MANUAL_ENGINE_PREFIX + EngineId.BYEDPI.name)
             .performClick()
 
-        assert(captured == EngineId.HYSTERIA2) { "expected HYSTERIA2, got $captured" }
+        assert(clicked) { "BYEDPI radio click did not invoke callback" }
     }
 
     private fun renderContent(model: SettingsModel) {
@@ -157,9 +156,5 @@ class SettingsScreenTest {
                 )
             }
         }
-    }
-
-    private companion object {
-        val SENTINEL: EngineId = EngineId.BYEDPI
     }
 }

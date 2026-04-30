@@ -2,7 +2,6 @@ package ru.ozero.commonvpn
 
 import android.content.Context
 import android.os.ParcelFileDescriptor
-import android.util.Log
 import ru.ozero.coreapi.PersistentLoggers
 import java.io.File
 import java.util.concurrent.atomic.AtomicReference
@@ -27,51 +26,53 @@ class NativeHevTunnelGateway(
 
     override fun start(config: HevTunnelConfig): Int {
         val tName = Thread.currentThread().name
-        Log.i(TAG, "start entry thread=$tName originalFd=${config.tunPfd.fd}")
+        PersistentLoggers.instance?.info(TAG, "start entry thread=$tName originalFd=${config.tunPfd.fd}")
 
         val tLoad0 = System.nanoTime()
         hev.TProxyService.loadOnce()
         val tLoadMs = (System.nanoTime() - tLoad0) / 1_000_000
         val loaded = hev.TProxyService.libraryLoaded
         val loadErr = hev.TProxyService.loadError
-        Log.d(TAG, "checkpoint loadOnce returned dt=${tLoadMs}ms libraryLoaded=$loaded loadError=$loadErr")
+        PersistentLoggers.instance?.info(
+            TAG,
+            "checkpoint loadOnce returned dt=${tLoadMs}ms libraryLoaded=$loaded loadError=$loadErr",
+        )
         if (!hev.TProxyService.libraryLoaded) {
-            Log.e(TAG, "libhev-socks5-tunnel не загружена: ${hev.TProxyService.loadError}")
             PersistentLoggers.instance?.error(
                 TAG,
-                "libhev not loaded: ${hev.TProxyService.loadError}",
+                "libhev-socks5-tunnel не загружена: ${hev.TProxyService.loadError}",
             )
             return -1
         }
 
-        Log.d(TAG, "checkpoint pre-dup")
+        PersistentLoggers.instance?.info(TAG, "checkpoint pre-dup")
         val duped = try {
             config.tunPfd.dup()
         } catch (t: Throwable) {
-            Log.e(TAG, "tunPfd.dup() threw", t)
             PersistentLoggers.instance?.error(TAG, "tunPfd.dup() threw", t)
             return -1
         }
-        Log.d(TAG, "checkpoint post-dup newFd=${duped.fd}")
+        PersistentLoggers.instance?.info(TAG, "checkpoint post-dup newFd=${duped.fd}")
         closeDuped()
         dupedRef.set(duped)
 
-        Log.d(TAG, "checkpoint pre-writeConfig")
+        PersistentLoggers.instance?.info(TAG, "checkpoint pre-writeConfig")
         val configFile = writeConfig(config)
-        Log.d(TAG, "checkpoint post-writeConfig path=${configFile.absolutePath} bytes=${configFile.length()}")
+        PersistentLoggers.instance?.info(
+            TAG,
+            "checkpoint post-writeConfig path=${configFile.absolutePath} bytes=${configFile.length()}",
+        )
 
-        Log.i(TAG, "checkpoint pre-nativeStart fd=${duped.fd}")
-        PersistentLoggers.instance?.info(TAG, "pre-nativeStart fd=${duped.fd}")
+        PersistentLoggers.instance?.info(TAG, "checkpoint pre-nativeStart fd=${duped.fd}")
         val tNative0 = System.nanoTime()
         val code = runCatching { nativeStart(configFile.absolutePath, duped.fd) }
             .onFailure {
-                Log.e(TAG, "TProxyStartService threw", it)
                 PersistentLoggers.instance?.error(TAG, "TProxyStartService threw", it)
                 closeDuped()
             }
             .getOrElse { -1 }
         val tNativeMs = (System.nanoTime() - tNative0) / 1_000_000
-        Log.i(TAG, "checkpoint post-nativeStart code=$code dt=${tNativeMs}ms")
+        PersistentLoggers.instance?.info(TAG, "checkpoint post-nativeStart code=$code dt=${tNativeMs}ms")
         if (code != 0) {
             closeDuped()
         }
@@ -81,13 +82,13 @@ class NativeHevTunnelGateway(
     override fun stop() {
         closeDuped()
         runCatching { nativeStop() }
-            .onFailure { Log.w(TAG, "TProxyStopService threw", it) }
+            .onFailure { PersistentLoggers.instance?.warn(TAG, "TProxyStopService threw", it) }
     }
 
     private fun closeDuped() {
         dupedRef.getAndSet(null)?.let { pfd ->
             runCatching { pfd.close() }
-                .onFailure { Log.w(TAG, "duped pfd.close threw", it) }
+                .onFailure { PersistentLoggers.instance?.warn(TAG, "duped pfd.close threw", it) }
         }
     }
 

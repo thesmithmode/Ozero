@@ -23,62 +23,32 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.CoroutineExceptionHandler
 import ru.ozero.app.logging.AppLogger
 import ru.ozero.app.logging.BootFileLogger
 import ru.ozero.app.logging.LogcatReader
-import ru.ozero.app.selfupdate.UpdateInstallEvent
-import ru.ozero.app.selfupdate.UpdateInstallEventBus
 import ru.ozero.app.settings.UserFlagsRepository
 import ru.ozero.app.subscription.HarvestWorker
-import ru.ozero.app.subscription.ServerImportService
 import android.widget.Toast
-import ru.ozero.app.ui.MainScreen
 import ru.ozero.app.ui.MainViewModel
-import ru.ozero.app.ui.about.AboutScreen
-import ru.ozero.app.ui.diag.DiagnosticsScreen
-import ru.ozero.app.ui.logs.LogsScreen
+import ru.ozero.app.ui.RootNavigation
 import ru.ozero.app.ui.onboarding.OnboardingScreen
 import ru.ozero.app.ui.permission.BatteryOptimization
-import ru.ozero.app.ui.servers.ManualServerScreen
-import ru.ozero.app.ui.servers.ServersScreen
-import ru.ozero.app.ui.settings.SettingsScreen
-import ru.ozero.app.ui.settings.engines.ByeDpiEngineSettingsScreen
-import ru.ozero.app.ui.splittunnel.SplitTunnelScreen
 import ru.ozero.app.ui.theme.OzeroTheme
+import ru.ozero.app.vpn.EngineSettingsRestartObserver
 import ru.ozero.commonvpn.OzeroVpnService
 import ru.ozero.coreorchestrator.OrchestratorState
 import ru.ozero.security.SecurityStateHolder
 import javax.inject.Inject
-
-enum class TopScreen {
-    Main,
-    Settings,
-    Diagnostics,
-    SplitTunnel,
-    Servers,
-    About,
-    Logs,
-    ByeDpiEngineSettings,
-    ManualServer,
-}
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
 
     @Inject lateinit var userFlags: UserFlagsRepository
-
-    @Inject lateinit var serverImporter: ServerImportService
 
     @Inject lateinit var settingsRepository: ru.ozero.app.settings.SettingsRepository
 
@@ -87,11 +57,6 @@ class MainActivity : ComponentActivity() {
     private val batteryPromptLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             AppLogger.i(TAG, "battery prompt result code=${result.resultCode}")
-        }
-
-    private val updateConfirmLauncher =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            AppLogger.i(TAG, "update confirm result code=${result.resultCode}")
         }
 
     private val vpnPermissionLauncher =
@@ -117,7 +82,7 @@ class MainActivity : ComponentActivity() {
         AppLogger.e(TAG, "uncaught coroutine in MainActivity", throwable)
         Toast.makeText(
             this,
-            getString(R.string.import_error, throwable.message ?: "неизвестная ошибка"),
+            throwable.message ?: getString(R.string.error_generic),
             Toast.LENGTH_LONG,
         ).show()
     }
@@ -129,11 +94,7 @@ class MainActivity : ComponentActivity() {
         runCatching { logcatReader.start() }.onFailure { AppLogger.w(TAG, "logcatReader.start failed", it) }
         runCatching { HarvestWorker.enqueueUnique(applicationContext) }
             .onFailure { AppLogger.w(TAG, "HarvestWorker.enqueueUnique failed", it) }
-        observeSelfUpdateEvents()
         observeLiveEngineSettingsChanges()
-        if (savedInstanceState == null) {
-            handleSubscriptionIntent(intent)
-        }
         runCatching { BootFileLogger.info(TAG, "onCreate before setContent") }
         runCatching { BootFileLogger.info(TAG, "before composition trigger") }
         setContent {
@@ -153,40 +114,7 @@ class MainActivity : ComponentActivity() {
                     OnboardingScreen(onCompleted = { showOnboarding = false })
                     return@OzeroTheme
                 }
-                var screen by rememberSaveable { mutableStateOf(TopScreen.Main) }
-                when (screen) {
-                    TopScreen.Settings ->
-                        SettingsScreen(
-                            onBack = { screen = TopScreen.Main },
-                            onOpenAllowedApps = { screen = TopScreen.SplitTunnel },
-                            onOpenServers = { screen = TopScreen.Servers },
-                            onOpenAbout = { screen = TopScreen.About },
-                            onOpenLogs = { screen = TopScreen.Logs },
-                            onOpenByeDpiEngineSettings = { screen = TopScreen.ByeDpiEngineSettings },
-                            onOpenManualServer = { screen = TopScreen.ManualServer },
-                        )
-                    TopScreen.Logs ->
-                        LogsScreen(onBack = { screen = TopScreen.Settings })
-                    TopScreen.Diagnostics ->
-                        DiagnosticsScreen(onBack = { screen = TopScreen.Main })
-                    TopScreen.SplitTunnel ->
-                        SplitTunnelScreen(onBack = { screen = TopScreen.Settings })
-                    TopScreen.Servers ->
-                        ServersScreen(onBack = { screen = TopScreen.Settings })
-                    TopScreen.About ->
-                        AboutScreen(onBack = { screen = TopScreen.Settings })
-                    TopScreen.ByeDpiEngineSettings ->
-                        ByeDpiEngineSettingsScreen(onBack = { screen = TopScreen.Settings })
-                    TopScreen.ManualServer ->
-                        ManualServerScreen(onBack = { screen = TopScreen.Settings })
-                    TopScreen.Main ->
-                        MainScreen(
-                            viewModel = viewModel,
-                            onConnectClick = ::onConnectClick,
-                            onOpenSettings = { screen = TopScreen.Settings },
-                            onOpenDiagnostics = { screen = TopScreen.Diagnostics },
-                        )
-                }
+                RootNavigation(viewModel = viewModel, onConnectClick = ::onConnectClick)
             }
         }
         runCatching { BootFileLogger.info(TAG, "onCreate after setContent") }
@@ -244,61 +172,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        handleSubscriptionIntent(intent)
-    }
-
-    private fun handleSubscriptionIntent(intent: Intent?) {
-        if (intent == null) return
-        val raw: String? = when (intent.action) {
-            Intent.ACTION_VIEW -> intent.dataString
-            Intent.ACTION_SEND ->
-                if (intent.type == "text/plain") {
-                    intent.getStringExtra(Intent.EXTRA_TEXT)
-                } else {
-                    null
-                }
-            else -> null
-        }
-        if (raw.isNullOrBlank()) return
-        AppLogger.i(TAG, "subscription intent action=${intent.action}")
-        lifecycleScope.launch(safeUiCoroutineHandler) {
-            if (raw.length > MAX_IMPORT_URI_LENGTH) {
-                Toast.makeText(
-                    this@MainActivity,
-                    getString(R.string.import_error, "слишком длинный URI"),
-                    Toast.LENGTH_LONG,
-                ).show()
-                return@launch
-            }
-            val result = runCatching { serverImporter.import(raw) }
-                .getOrElse { throwable ->
-                    AppLogger.e(TAG, "subscription import crashed", throwable)
-                    ServerImportService.ImportResult.Error(
-                        throwable.message ?: "неизвестная ошибка импорта",
-                    )
-                }
-            when (result) {
-                is ServerImportService.ImportResult.Ok -> {
-                    Toast.makeText(
-                        this@MainActivity,
-                        getString(R.string.import_ok, result.entity.protocol),
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                }
-                is ServerImportService.ImportResult.Error -> {
-                    Toast.makeText(
-                        this@MainActivity,
-                        getString(R.string.import_error, result.reason),
-                        Toast.LENGTH_LONG,
-                    ).show()
-                }
-            }
-        }
-    }
-
     private fun stopVpnService() {
         ContextCompat.startForegroundService(
             this,
@@ -349,62 +222,28 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun observeLiveEngineSettingsChanges() {
-        lifecycleScope.launch(safeUiCoroutineHandler) {
-            settingsRepository.settings
-                .map { Quad(it.manualEngine, it.byedpiWinningArgs?.trim(), it.splitMode, it.ipv6Enabled) }
-                .distinctUntilChanged()
-                .drop(1)
-                .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
-                .collect { snapshot ->
-                    val state = viewModel.state.value
-                    if (state is OrchestratorState.Connected) {
-                        AppLogger.i(
-                            TAG,
-                            "engine settings changed while connected → restart " +
-                                "manual=${snapshot.a} args=${snapshot.b} split=${snapshot.c} ipv6=${snapshot.d}",
-                        )
-                        stopVpnService()
-                        withTimeoutOrNull(5_000L) {
-                            viewModel.state.first {
-                                it is OrchestratorState.Idle || it is OrchestratorState.Failed
-                            }
-                        }
-                        startVpnService()
+        val observer = EngineSettingsRestartObserver(
+            settingsFlow = settingsRepository.settings,
+            vpnStateProvider = { viewModel.state.value },
+            onRestartConnected = { snapshot ->
+                AppLogger.i(TAG, "engine settings changed while connected → restart $snapshot")
+                stopVpnService()
+                withTimeoutOrNull(5_000L) {
+                    viewModel.state.first {
+                        it is OrchestratorState.Idle || it is OrchestratorState.Failed
                     }
                 }
-        }
-    }
-
-    private data class Quad<A, B, C, D>(val a: A, val b: B, val c: C, val d: D)
-    private fun observeSelfUpdateEvents() {
+                startVpnService()
+            },
+        )
         lifecycleScope.launch(safeUiCoroutineHandler) {
-            UpdateInstallEventBus.events
+            observer.triggers
                 .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
-                .catch { throwable ->
-                    AppLogger.e(TAG, "self-update events flow failed", throwable)
-                }
-                .onEach { event ->
-                    when (event) {
-                        is UpdateInstallEvent.PendingUserAction -> {
-                            AppLogger.i(TAG, "self-update PendingUserAction → launch confirm")
-                            updateConfirmLauncher.launch(event.intent)
-                        }
-                        is UpdateInstallEvent.Success ->
-                            AppLogger.i(TAG, "self-update Success session=${event.sessionId}")
-                        is UpdateInstallEvent.Failure ->
-                            AppLogger.w(
-                                TAG,
-                                "self-update Failure session=${event.sessionId} " +
-                                    "status=${event.statusCode} message=${event.message}",
-                            )
-                    }
-                }
-                .collect()
+                .collect { observer.handle(it) }
         }
     }
 
     private companion object {
         const val TAG = "MainActivity"
-        const val MAX_IMPORT_URI_LENGTH = 16 * 1024
     }
 }

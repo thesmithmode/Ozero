@@ -58,9 +58,9 @@ class NativeHevTunnelGatewayLogTest {
     }
 
     @Test
-    fun `pre-nativeStart дублируется в PersistentLoggers для boot log`() {
+    fun `pre-nativeStart попадает в boot log через PersistentLoggers`() {
         assertTrue(
-            startBody.contains("PersistentLoggers.instance?.info(TAG, \"pre-nativeStart"),
+            startBody.contains("PersistentLoggers.instance?.info(TAG, \"checkpoint pre-nativeStart"),
             "pre-nativeStart обязан попадать в boot.log через PersistentLoggers.info — это последняя " +
                 "строка перед blocking JNI TProxyStartService. Если нативка зависает, эта запись " +
                 "укажет точный момент входа в JNI.",
@@ -68,15 +68,13 @@ class NativeHevTunnelGatewayLogTest {
     }
 
     @Test
-    fun `success-path checkpoints не дублируют Log_i и PersistentLoggers_info`() {
-        val successInfoDups = Regex(
-            "Log\\.i\\([^)]*checkpoint [^)]*\\)\\s*\\n\\s*PersistentLoggers\\.instance\\?\\.info",
-        ).findAll(startBody).count()
+    fun `start не использует android_util_Log напрямую`() {
+        val directLogCalls = Regex("\\bLog\\.[idew]\\(").findAll(startBody).count()
         assertTrue(
-            successInfoDups == 0,
-            "Не должно быть пар Log.i + PersistentLoggers.info для success-checkpoints. " +
-                "UnifiedLogger уже пишет в logcat и в файл — двойной канал избыточен. " +
-                "Найдено пар: $successInfoDups.",
+            directLogCalls == 0,
+            "start не должен использовать android.util.Log напрямую — только UnifiedLogger через " +
+                "PersistentLoggers.instance. UnifiedLogger пишет в logcat и в файл одним вызовом — " +
+                "двойной канал избыточен. Найдено прямых Log.x: $directLogCalls.",
         )
     }
 

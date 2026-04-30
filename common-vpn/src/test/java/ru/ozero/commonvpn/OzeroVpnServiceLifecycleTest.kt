@@ -2,6 +2,7 @@ package ru.ozero.commonvpn
 
 import org.junit.jupiter.api.Test
 import java.io.File
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class OzeroVpnServiceLifecycleTest {
@@ -15,80 +16,40 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `onCreate переопределён и вызывает super`() {
-        assertTrue(
-            source.contains("override fun onCreate()"),
-            "OzeroVpnService должен переопределять onCreate() для диагностики Hilt инжекта.",
-        )
-        val onCreateBody = source.substringAfter("override fun onCreate()").substringBefore("\n    private val")
-        assertTrue(
-            onCreateBody.contains("super.onCreate()"),
-            "onCreate обязан вызывать super.onCreate() — иначе Hilt не запустит инжект.",
-        )
+        assertTrue(source.contains("override fun onCreate()"))
+        val body = source.substringAfter("override fun onCreate()").substringBefore("private val tunFdRef")
+        assertTrue(body.contains("super.onCreate()"))
     }
 
     @Test
-    fun `onCreate логирует before и after super через PersistentLoggers`() {
-        val onCreateBody = source.substringAfter("override fun onCreate()").substringBefore("\n    private val")
-        assertTrue(
-            onCreateBody.contains("onCreate before super"),
-            "onCreate должен логировать момент ДО super.onCreate() для диагностики падений Hilt.",
-        )
-        assertTrue(
-            onCreateBody.contains("onCreate after super"),
-            "onCreate должен логировать момент ПОСЛЕ super.onCreate() (Hilt инжект завершён).",
-        )
-        val beforeIdx = onCreateBody.indexOf("before super")
-        val superIdx = onCreateBody.indexOf("super.onCreate()")
-        val afterIdx = onCreateBody.indexOf("after super")
-        assertTrue(
-            beforeIdx in 0 until superIdx && superIdx < afterIdx,
-            "Порядок логов в onCreate должен быть: before super → super.onCreate() → after super.",
-        )
+    fun `onCreate логирует before и after super`() {
+        val body = source.substringAfter("override fun onCreate()").substringBefore("private val tunFdRef")
+        val beforeIdx = body.indexOf("onCreate before super")
+        val superIdx = body.indexOf("super.onCreate()")
+        val afterIdx = body.indexOf("onCreate after super")
+        assertTrue(beforeIdx in 0 until superIdx && superIdx < afterIdx)
     }
 
     @Test
-    fun `onStartCommand имеет entry-log первой строкой`() {
-        val onStartBody = source.substringAfter("override fun onStartCommand")
-            .substringBefore("private fun startVpn()")
-        val entryIdx = onStartBody.indexOf("onStartCommand entry action=")
-        val legacyIdx = onStartBody.indexOf("Log.i(TAG, \"onStartCommand action=")
-        assertTrue(
-            entryIdx >= 0,
-            "onStartCommand должен начинаться с entry-лога через PersistentLoggers " +
-                "для диагностики проблем доставки intent.",
-        )
-        assertTrue(
-            legacyIdx > entryIdx,
-            "Entry-лог обязан стоять ПЕРЕД остальной логикой и старым Log.i(TAG, ...).",
-        )
+    fun `onStartCommand имеет entry-log`() {
+        val body = source.substringAfter("override fun onStartCommand").substringBefore("private fun startVpn()")
+        assertTrue(body.contains("onStartCommand action="))
     }
 
     @Test
-    fun `onStartCommand guard на неинжекченный pipeline возвращает START_NOT_STICKY`() {
-        val onStartBody = source.substringAfter("override fun onStartCommand")
-            .substringBefore("private fun startVpn()")
-        assertTrue(
-            onStartBody.contains("::pipeline.isInitialized"),
-            "onStartCommand должен проверять `::pipeline.isInitialized` — иначе при сбое " +
-                "Hilt graph crash будет неинформативным UninitializedPropertyAccessException.",
-        )
-        val guardBlock = onStartBody.substringAfter("::pipeline.isInitialized").substringBefore("when (intent?.action)")
-        assertTrue(
-            guardBlock.contains("stopSelf(startId)"),
-            "Guard на pipeline обязан вызвать stopSelf(startId) — освободить service slot.",
-        )
-        assertTrue(
-            guardBlock.contains("START_NOT_STICKY"),
-            "Guard на pipeline обязан вернуть START_NOT_STICKY — нет смысла рестартовать сломанный graph.",
-        )
+    fun `onStartCommand guard на chainOrchestrator возвращает START_NOT_STICKY`() {
+        val body = source.substringAfter("override fun onStartCommand").substringBefore("private fun startVpn()")
+        assertTrue(body.contains("::chainOrchestrator.isInitialized"))
+        val guardBlock = body.substringAfter("::chainOrchestrator.isInitialized").substringBefore("when (intent?.action)")
+        assertTrue(guardBlock.contains("stopSelf(startId)"))
+        assertTrue(guardBlock.contains("START_NOT_STICKY"))
     }
 
     @Test
     fun `startVpn preload-ит hev TProxyService на main thread до serviceScope launch`() {
-        val startVpnBody = source.substringAfter("private fun startVpn()")
-            .substringBefore("private fun stopVpn()")
-        val preloadIdx = startVpnBody.indexOf("hev.TProxyService.loadOnce()")
-        val launchIdx = startVpnBody.indexOf("serviceScope.launch")
+        val body = source.substringAfter("private fun startVpn()").substringBefore("private fun stopVpn()")
+        val preloadIdx = body.indexOf("hev.TProxyService.loadOnce()")
+        val launchIdx = body.indexOf("serviceScope.launch")
         assertTrue(
             preloadIdx in 0 until launchIdx,
             "startVpn обязан вызвать hev.TProxyService.loadOnce() ДО serviceScope.launch — " +
@@ -99,146 +60,54 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `startVpn preload TProxyService не обёрнут в withContext или Dispatchers`() {
-        val startVpnBody = source.substringAfter("private fun startVpn()")
-            .substringBefore("private fun stopVpn()")
-        val preloadIdx = startVpnBody.indexOf("hev.TProxyService.loadOnce()")
-        check(preloadIdx >= 0) { "preload missing — запусти соседний тест preload-ит-hev сначала" }
-        val launchIdx = startVpnBody.indexOf("serviceScope.launch")
-        check(launchIdx > preloadIdx) { "preload должен быть до launch" }
-        val beforeLaunch = startVpnBody.substring(0, launchIdx)
-        val withContextIdx = beforeLaunch.indexOf("withContext(", preloadIdx - 200)
-        if (withContextIdx in 0 until preloadIdx) {
-            val tail = beforeLaunch.substring(withContextIdx)
-            val closes = tail.substring(0, preloadIdx - withContextIdx).count { it == '}' }
-            val opens = tail.substring(0, preloadIdx - withContextIdx).count { it == '{' }
-            assertTrue(
-                closes >= opens,
-                "preload TProxyService обязан выполняться на main thread (контекст onStartCommand→startVpn). " +
-                    "Не оборачивать в withContext(Dispatchers.IO/Default/...) — иначе vendor SIGSEGV вернётся.",
-            )
-        }
-    }
-
-    @Test
-    fun `startVpn preload логирует thread name main looper для диагностики`() {
-        val startVpnBody = source.substringAfter("private fun startVpn()")
-            .substringBefore("private fun stopVpn()")
-        val preloadIdx = startVpnBody.indexOf("hev.TProxyService.loadOnce()")
+    fun `startVpn preload логирует thread name и main looper`() {
+        val body = source.substringAfter("private fun startVpn()").substringBefore("private fun stopVpn()")
+        val preloadIdx = body.indexOf("hev.TProxyService.loadOnce()")
         check(preloadIdx >= 0) { "preload missing" }
-        val window = startVpnBody.substring(maxOf(0, preloadIdx - 500), preloadIdx)
-        assertTrue(window.contains("preload begin"), "preload должен иметь begin лог")
-        assertTrue(window.contains("Thread.currentThread().name"), "preload должен логировать имя треда")
-        assertTrue(
-            window.contains("Looper.myLooper()") && window.contains("Looper.getMainLooper()"),
-            "preload должен логировать isMain — диагностика Nubia race",
-        )
+        val window = body.substring(maxOf(0, preloadIdx - 500), preloadIdx)
+        assertTrue(window.contains("loadOnce begin"))
+        assertTrue(window.contains("Thread.currentThread().name"))
+        assertTrue(window.contains("Looper.myLooper()") && window.contains("Looper.getMainLooper()"))
     }
 
     @Test
-    fun `startVpn preload логирует timing и libraryLoaded после loadOnce`() {
-        val startVpnBody = source.substringAfter("private fun startVpn()")
-            .substringBefore("private fun stopVpn()")
-        val preloadIdx = startVpnBody.indexOf("hev.TProxyService.loadOnce()")
+    fun `startVpn preload логирует libraryLoaded после loadOnce`() {
+        val body = source.substringAfter("private fun startVpn()").substringBefore("private fun stopVpn()")
+        val preloadIdx = body.indexOf("hev.TProxyService.loadOnce()")
         check(preloadIdx >= 0) { "preload missing" }
-        val tail = startVpnBody.substring(preloadIdx, minOf(startVpnBody.length, preloadIdx + 800))
-        assertTrue(tail.contains("preload done"), "должен логировать done после loadOnce")
-        assertTrue(tail.contains("dt="), "должен логировать timing — отличить мгновенный краш от deadlock")
-        assertTrue(tail.contains("libraryLoaded="), "должен логировать результат — успех/нет")
-        assertTrue(tail.contains("loadError="), "должен логировать loadError — текст UnsatisfiedLinkError")
+        val tail = body.substring(preloadIdx, minOf(body.length, preloadIdx + 800))
+        assertTrue(tail.contains("loadOnce done"))
+        assertTrue(tail.contains("libraryLoaded="))
     }
 
     @Test
-    fun `stopVpn закрывает TUN fd ДО запуска корутины с pipeline_stop`() {
-        val stopVpnBody = source.substringAfter("private fun stopVpn()")
-            .substringBefore("\n    internal fun buildTunBuilder")
-        val closeFdIdx = stopVpnBody.indexOf("closeTunFd(")
-        val launchIdx = stopVpnBody.indexOf("serviceScope.launch")
+    fun `stopVpn закрывает TUN fd ДО запуска корутины shutdown`() {
+        val body = source.substringAfter("private fun stopVpn()").substringBefore("private suspend fun performShutdown")
+        val closeFdIdx = body.indexOf("tunFdRef.getAndSet(null)")
+        val launchIdx = body.indexOf("serviceScope.launch")
         assertTrue(
             closeFdIdx in 0 until launchIdx,
-            "stopVpn обязан вызвать closeTunFd(...) ДО serviceScope.launch — иначе upstream hev " +
-                "worker thread читает оригинальный TUN fd, EOF не приходит, pthread_join в nativeStop " +
-                "зависает на минуты (полевой тест Nubia: 59 сек до FORCE STOP).",
+            "stopVpn обязан закрыть TUN fd через tunFdRef.getAndSet(null) ДО serviceScope.launch — " +
+                "иначе hev worker читает fd, EOF не приходит, nativeStop зависает.",
         )
     }
 
     @Test
-    fun `stopVpn передаёт fdToClose в closeTunFd через локальную переменную`() {
-        val stopVpnBody = source.substringAfter("private fun stopVpn()")
-            .substringBefore("\n    internal fun buildTunBuilder")
-        assertTrue(
-            stopVpnBody.contains("tunFdRef.getAndSet(null)"),
-            "stopVpn должен извлечь TUN fd из tunFdRef через getAndSet(null) — атомарно, до launch.",
-        )
+    fun `stopVpn не force-killит процесс`() {
+        val body = source.substringAfter("private fun stopVpn()").substringBefore("private suspend fun performShutdown")
+        assertFalse(body.contains("processKiller.kill(Process.myPid())"))
     }
 
     @Test
-    fun `stopVpn использует Thread+join для блокирующего pipeline_stop`() {
-        val stopVpnBody = source.substringAfter("private fun stopVpn()")
-            .substringBefore("\n    internal fun buildTunBuilder")
-        val threadIdx = stopVpnBody.indexOf("Thread({")
-        val runBlockingIdx = stopVpnBody.indexOf("runBlocking {", threadIdx)
-        val pipelineStopIdx = stopVpnBody.indexOf("pipeline.stop()", runBlockingIdx)
-        val joinIdx = stopVpnBody.indexOf(".join(SHUTDOWN_JOIN_TIMEOUT_MS)", pipelineStopIdx)
-        val ordered = threadIdx > 0 &&
-            runBlockingIdx > threadIdx &&
-            pipelineStopIdx > runBlockingIdx &&
-            joinIdx > pipelineStopIdx
-        assertTrue(
-            ordered,
-            "stopVpn обязан запускать pipeline.stop() в Thread с runBlocking + join(SHUTDOWN_JOIN_TIMEOUT_MS) — " +
-                "withTimeoutOrNull не отменяет blocking JNI без suspension point, поток висит, stopSelf не вызывается.",
-        )
+    fun `onDestroy не force-killит процесс`() {
+        val body = source.substringAfter("override fun onDestroy()").substringBefore("private fun enterForegroundOrLog")
+        assertFalse(body.contains("processKiller.kill(Process.myPid())"))
     }
 
     @Test
-    fun `stopVpn использует daemon Thread + leak-on-hang вместо force-kill`() {
-        val stopVpnBody = source.substringAfter("private fun stopVpn()")
-            .substringBefore("\n    internal fun buildTunBuilder")
-        assertTrue(
-            stopVpnBody.contains("isDaemon = true"),
-            "stopVpn shutdown Thread обязан быть daemon — иначе висящий native thread держит процесс. " +
-                "Daemon thread позволяет процессу нормально завершиться даже если pipeline.stop() зависла.",
-        )
-        assertTrue(
-            !stopVpnBody.contains("processKiller.kill(Process.myPid())"),
-            "stopVpn НЕ должен force-killить процесс — этот подход вызывает SIGKILL у пользователя при каждом " +
-                "disconnect. Вместо этого daemon thread leak + stopSelf для нормального освобождения foreground slot.",
-        )
-        val isAliveIdx = stopVpnBody.indexOf("shutdown.isAlive")
-        val warnIdx = stopVpnBody.indexOf("Log.w(TAG", isAliveIdx)
-        assertTrue(
-            isAliveIdx in 0 until warnIdx,
-            "stopVpn должен логировать warning о hang (для диагностики), но НЕ убивать процесс.",
-        )
-    }
-
-    @Test
-    fun `stopVpn использует Handler getMainLooper для stopForeground+stopSelf`() {
-        val stopVpnBody = source.substringAfter("private fun stopVpn()")
-            .substringBefore("\n    internal fun buildTunBuilder")
-        val handlerIdx = stopVpnBody.indexOf("Handler(Looper.getMainLooper()).post")
-        val stopForegroundIdx = stopVpnBody.indexOf("stopForeground(", handlerIdx)
-        val stopSelfIdx = stopVpnBody.indexOf("stopSelf()", stopForegroundIdx)
-        assertTrue(
-            handlerIdx > 0 && stopForegroundIdx > handlerIdx && stopSelfIdx > stopForegroundIdx,
-            "stopForeground+stopSelf должны выполняться через Handler(Looper.getMainLooper()).post — " +
-                "withContext(Dispatchers.Main) убран чтобы не зависеть от coroutine cancellation семантики.",
-        )
-    }
-
-    @Test
-    fun `onDestroy daemon-leak вместо force-kill при зависании shutdown`() {
-        val onDestroyBody = source.substringAfter("override fun onDestroy()")
-            .substringBefore("\n    private fun closeTunFd")
-        assertTrue(
-            onDestroyBody.contains("isDaemon = true"),
-            "onDestroy shutdown Thread обязан быть daemon — иначе висит процесс после Service.onDestroy.",
-        )
-        assertTrue(
-            !onDestroyBody.contains("processKiller.kill(Process.myPid())"),
-            "onDestroy НЕ должен force-killить процесс — Service.onDestroy уже последняя точка lifecycle, " +
-                "force-kill только хуже (зомби в TaskManager). Daemon thread + serviceScope.cancel() достаточно.",
-        )
+    fun `onRevoke переопределён и вызывает stopVpn`() {
+        val body = source.substringAfter("override fun onRevoke()").substringBefore("override fun onDestroy()")
+        assertTrue(body.contains("stopVpn()"))
+        assertTrue(body.contains("super.onRevoke()"))
     }
 }

@@ -1,2 +1,0 @@
--keep class ru.ozero.enginehysteria2.LibHy2Delegate { *; }
--keepclasseswithmembernames class * { native <methods>; }
