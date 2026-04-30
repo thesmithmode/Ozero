@@ -33,7 +33,7 @@ class HealthMonitorTest {
         val mon = HealthMonitor(
             intervalMs = 100L,
             failuresBeforeDegraded = 3,
-            probe = { _, _, _ -> throw RuntimeException("connection refused") },
+            probe = { _, _, _ -> throw java.io.IOException("connection refused") },
         )
         mon.start(socksPort = 1080)
         advanceTimeBy(250L)
@@ -46,7 +46,7 @@ class HealthMonitorTest {
         val mon = HealthMonitor(
             intervalMs = 100L,
             failuresBeforeDegraded = 3,
-            probe = { _, _, _ -> throw RuntimeException("connection refused") },
+            probe = { _, _, _ -> throw java.io.IOException("connection refused") },
         )
         mon.start(socksPort = 1080)
         advanceTimeBy(450L)
@@ -61,7 +61,7 @@ class HealthMonitorTest {
             intervalMs = 100L,
             failuresBeforeDegraded = 3,
             probe = { _, _, _ ->
-                if (failNext) throw RuntimeException("fail") else 10L
+                if (failNext) throw java.io.IOException("fail") else 10L
             },
         )
         mon.start(socksPort = 1080)
