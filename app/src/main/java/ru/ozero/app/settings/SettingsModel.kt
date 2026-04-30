@@ -1,6 +1,6 @@
-package ru.ozero.app.settings
+﻿package ru.ozero.app.settings
 
-import ru.ozero.coreapi.EngineId
+import ru.ozero.enginescore.EngineId
 import ru.ozero.commonvpn.split.SplitTunnelMode
 
 data class SettingsModel(

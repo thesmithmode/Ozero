@@ -1,11 +1,11 @@
-package ru.ozero.app.logging
+﻿package ru.ozero.app.logging
 
 import android.content.Context
 import android.os.Build
 import android.os.Process
 import android.util.Log
-import ru.ozero.coreapi.PersistentLogger
-import ru.ozero.coreapi.PersistentLoggers
+import ru.ozero.enginescore.PersistentLogger
+import ru.ozero.enginescore.PersistentLoggers
 import java.io.File
 import java.io.PrintWriter
 import java.io.RandomAccessFile

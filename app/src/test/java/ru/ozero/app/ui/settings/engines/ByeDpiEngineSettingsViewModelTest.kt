@@ -1,4 +1,4 @@
-package ru.ozero.app.ui.settings.engines
+﻿package ru.ozero.app.ui.settings.engines
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -16,8 +16,8 @@ import org.junit.jupiter.api.Test
 import ru.ozero.app.settings.SettingsModel
 import ru.ozero.app.settings.SettingsRepository
 import ru.ozero.commonvpn.split.SplitTunnelMode
-import ru.ozero.coreapi.EngineConfig
-import ru.ozero.coreapi.EngineId
+import ru.ozero.enginescore.EngineConfig
+import ru.ozero.enginescore.EngineId
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull

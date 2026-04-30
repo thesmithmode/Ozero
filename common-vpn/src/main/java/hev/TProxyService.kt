@@ -1,8 +1,8 @@
-package hev
+﻿package hev
 
 import android.os.Build
 import android.os.Looper
-import ru.ozero.coreapi.PersistentLoggers
+import ru.ozero.enginescore.PersistentLoggers
 
 @Suppress("ktlint:standard:function-naming", "FunctionNaming")
 object TProxyService {

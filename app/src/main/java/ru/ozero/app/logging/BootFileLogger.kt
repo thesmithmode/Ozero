@@ -1,7 +1,7 @@
-package ru.ozero.app.logging
+﻿package ru.ozero.app.logging
 
 import android.content.Context
-import ru.ozero.coreapi.PersistentLogger
+import ru.ozero.enginescore.PersistentLogger
 import java.io.File
 
 object BootFileLogger : PersistentLogger {

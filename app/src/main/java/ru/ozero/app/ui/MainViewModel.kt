@@ -1,4 +1,4 @@
-package ru.ozero.app.ui
+﻿package ru.ozero.app.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -6,7 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
-import ru.ozero.coreapi.EngineId
+import ru.ozero.enginescore.EngineId
 import ru.ozero.coreorchestrator.Orchestrator
 import ru.ozero.coreorchestrator.OrchestratorState
 import ru.ozero.coreorchestrator.OrchestratorTransition

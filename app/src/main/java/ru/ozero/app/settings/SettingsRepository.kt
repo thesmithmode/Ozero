@@ -1,4 +1,4 @@
-package ru.ozero.app.settings
+﻿package ru.ozero.app.settings
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -6,7 +6,7 @@ import androidx.datastore.preferences.core.edit
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import ru.ozero.commonvpn.split.SplitTunnelMode
-import ru.ozero.coreapi.EngineId
+import ru.ozero.enginescore.EngineId
 import javax.inject.Inject
 
 interface SettingsRepository {

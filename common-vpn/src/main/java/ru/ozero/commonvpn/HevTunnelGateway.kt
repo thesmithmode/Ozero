@@ -1,8 +1,8 @@
-package ru.ozero.commonvpn
+﻿package ru.ozero.commonvpn
 
 import android.content.Context
 import android.os.ParcelFileDescriptor
-import ru.ozero.coreapi.PersistentLoggers
+import ru.ozero.enginescore.PersistentLoggers
 import java.io.File
 import java.util.concurrent.atomic.AtomicReference
 

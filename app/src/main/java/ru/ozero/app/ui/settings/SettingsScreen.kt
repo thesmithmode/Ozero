@@ -1,4 +1,4 @@
-package ru.ozero.app.ui.settings
+﻿package ru.ozero.app.ui.settings
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
@@ -38,7 +38,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
 import ru.ozero.app.settings.SettingsModel
 import ru.ozero.commonvpn.split.SplitTunnelMode
-import ru.ozero.coreapi.EngineId
+import ru.ozero.enginescore.EngineId
 
 @Composable
 fun SettingsScreen(

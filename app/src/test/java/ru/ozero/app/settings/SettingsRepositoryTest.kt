@@ -1,4 +1,4 @@
-package ru.ozero.app.settings
+﻿package ru.ozero.app.settings
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -15,7 +15,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import ru.ozero.commonvpn.split.SplitTunnelMode
-import ru.ozero.coreapi.EngineId
+import ru.ozero.enginescore.EngineId
 import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

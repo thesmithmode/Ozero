@@ -31,7 +31,6 @@ import ru.ozero.app.logging.AppLogger
 import ru.ozero.app.logging.BootFileLogger
 import ru.ozero.app.logging.LogcatReader
 import ru.ozero.app.settings.UserFlagsRepository
-import ru.ozero.app.subscription.HarvestWorker
 import android.widget.Toast
 import ru.ozero.app.ui.MainViewModel
 import ru.ozero.app.ui.RootNavigation
@@ -92,8 +91,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         runCatching { BootFileLogger.info(TAG, "onCreate after super (Hilt inject done)") }
         runCatching { logcatReader.start() }.onFailure { AppLogger.w(TAG, "logcatReader.start failed", it) }
-        runCatching { HarvestWorker.enqueueUnique(applicationContext) }
-            .onFailure { AppLogger.w(TAG, "HarvestWorker.enqueueUnique failed", it) }
         observeLiveEngineSettingsChanges()
         runCatching { BootFileLogger.info(TAG, "onCreate before setContent") }
         runCatching { BootFileLogger.info(TAG, "before composition trigger") }

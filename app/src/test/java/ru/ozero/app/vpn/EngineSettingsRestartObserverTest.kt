@@ -1,4 +1,4 @@
-package ru.ozero.app.vpn
+﻿package ru.ozero.app.vpn
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -16,7 +16,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.app.settings.SettingsModel
 import ru.ozero.commonvpn.split.SplitTunnelMode
-import ru.ozero.coreapi.EngineId
+import ru.ozero.enginescore.EngineId
 import ru.ozero.coreorchestrator.OrchestratorState
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

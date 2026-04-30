@@ -1,4 +1,4 @@
-package ru.ozero.app
+﻿package ru.ozero.app
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -51,8 +51,8 @@ class MainActivityTest {
     @Test
     fun connectedStateShowsDisconnectButton() {
         orchestrator.dispatch(OrchestratorTransition.Connect)
-        orchestrator.dispatch(OrchestratorTransition.ProbeComplete(ru.ozero.coreapi.EngineId.BYEDPI))
-        orchestrator.dispatch(OrchestratorTransition.ConnectSuccess(ru.ozero.coreapi.EngineId.BYEDPI, 1080))
+        orchestrator.dispatch(OrchestratorTransition.ProbeComplete(ru.ozero.enginescore.EngineId.BYEDPI))
+        orchestrator.dispatch(OrchestratorTransition.ConnectSuccess(ru.ozero.enginescore.EngineId.BYEDPI, 1080))
 
         composeRule
             .onNodeWithContentDescription("Отключить VPN")

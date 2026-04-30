@@ -1,13 +1,10 @@
 package ru.ozero.app.ui.servers
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
-import ru.ozero.app.subscription.ServerImportService
 import javax.inject.Inject
 
 sealed interface ManualServerUiState {
@@ -21,9 +18,7 @@ sealed interface ManualServerUiState {
 }
 
 @HiltViewModel
-class ManualServerViewModel @Inject constructor(
-    private val importer: ServerImportService,
-) : ViewModel() {
+class ManualServerViewModel @Inject constructor() : ViewModel() {
 
     private val _uiState = MutableStateFlow<ManualServerUiState>(ManualServerUiState.Idle())
     val uiState: StateFlow<ManualServerUiState> = _uiState.asStateFlow()
@@ -49,17 +44,7 @@ class ManualServerViewModel @Inject constructor(
             _uiState.value = ManualServerUiState.Error(reason = "пустой URI", uri = uri)
             return
         }
-        _uiState.value = ManualServerUiState.Importing(uri)
-        viewModelScope.launch {
-            val result = runCatching { importer.import(uri) }
-                .getOrElse { ServerImportService.ImportResult.Error(it.message ?: "import failed") }
-            _uiState.value = when (result) {
-                is ServerImportService.ImportResult.Ok ->
-                    ManualServerUiState.Success(protocol = result.entity.protocol)
-                is ServerImportService.ImportResult.Error ->
-                    ManualServerUiState.Error(reason = result.reason, uri = uri)
-            }
-        }
+        _uiState.value = ManualServerUiState.Error(reason = "импорт недоступен в этой версии", uri = uri)
     }
 
     fun onDismissResult() {

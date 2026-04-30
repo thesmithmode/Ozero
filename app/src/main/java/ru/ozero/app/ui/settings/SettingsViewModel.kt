@@ -1,4 +1,4 @@
-package ru.ozero.app.ui.settings
+﻿package ru.ozero.app.ui.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ru.ozero.app.settings.SettingsRepository
 import ru.ozero.commonvpn.split.SplitTunnelMode
-import ru.ozero.coreapi.EngineId
+import ru.ozero.enginescore.EngineId
 import javax.inject.Inject
 
 @HiltViewModel

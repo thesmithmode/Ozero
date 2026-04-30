@@ -1,4 +1,4 @@
-package ru.ozero.app
+﻿package ru.ozero.app
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -46,8 +46,8 @@ class MainViewModelTest {
     @Test
     fun onConnectClickFromConnectedTransitionsToDisconnecting() {
         orchestrator.dispatch(OrchestratorTransition.Connect)
-        orchestrator.dispatch(OrchestratorTransition.ProbeComplete(ru.ozero.coreapi.EngineId.BYEDPI))
-        orchestrator.dispatch(OrchestratorTransition.ConnectSuccess(ru.ozero.coreapi.EngineId.BYEDPI, 1080))
+        orchestrator.dispatch(OrchestratorTransition.ProbeComplete(ru.ozero.enginescore.EngineId.BYEDPI))
+        orchestrator.dispatch(OrchestratorTransition.ConnectSuccess(ru.ozero.enginescore.EngineId.BYEDPI, 1080))
         viewModel.onConnectClick()
         assertIs<OrchestratorState.Disconnecting>(viewModel.state.value)
     }

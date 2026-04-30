@@ -1,4 +1,4 @@
-package ru.ozero.app.ui.splittunnel
+﻿package ru.ozero.app.ui.splittunnel
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test
 import ru.ozero.app.settings.SettingsModel
 import ru.ozero.app.settings.SettingsRepository
 import ru.ozero.commonvpn.split.SplitTunnelMode
-import ru.ozero.coreapi.EngineId
+import ru.ozero.enginescore.EngineId
 import ru.ozero.corestorage.dao.AppSplitRuleDao
 import ru.ozero.corestorage.entity.AppSplitRule
 import kotlin.test.assertEquals

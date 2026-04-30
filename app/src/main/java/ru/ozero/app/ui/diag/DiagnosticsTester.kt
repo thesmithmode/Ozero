@@ -1,4 +1,4 @@
-package ru.ozero.app.ui.diag
+﻿package ru.ozero.app.ui.diag
 
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
@@ -10,7 +10,7 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import ru.ozero.coreapi.LogSanitizer
+import ru.ozero.enginescore.LogSanitizer
 import java.net.Proxy
 import java.net.InetSocketAddress
 import java.util.concurrent.TimeUnit

@@ -16,7 +16,6 @@ import ru.ozero.app.logging.AppLogger
 import ru.ozero.app.logging.BootDiagnostics
 import ru.ozero.app.logging.BootFileLogger
 import ru.ozero.app.logging.LogBuffer
-import ru.ozero.app.subscription.HarvestWorker
 import ru.ozero.app.ui.onboarding.FirstRunBootstrap
 import ru.ozero.security.SecurityWatchdog
 import javax.inject.Inject
@@ -76,8 +75,6 @@ class OzeroApp : Application(), Configuration.Provider {
             runCatching { firstRunBootstrap.runIfFirstStart() }
                 .onFailure { BootFileLogger.warn(TAG, "firstRunBootstrap.runIfFirstStart failed", it) }
         }
-        runCatching { HarvestWorker.enqueueOneShotExpedited(this) }
-            .onFailure { BootFileLogger.warn(TAG, "HarvestWorker.enqueueOneShotExpedited failed", it) }
     }
 
     private fun shouldStartSecurityWatchdog(): Boolean =

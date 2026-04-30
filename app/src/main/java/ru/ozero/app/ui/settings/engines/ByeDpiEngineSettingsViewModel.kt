@@ -1,4 +1,4 @@
-package ru.ozero.app.ui.settings.engines
+﻿package ru.ozero.app.ui.settings.engines
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import ru.ozero.app.settings.SettingsRepository
-import ru.ozero.coreapi.EngineConfig
+import ru.ozero.enginescore.EngineConfig
 import javax.inject.Inject
 
 sealed interface ByeDpiSettingsUiState {

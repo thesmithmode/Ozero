@@ -1,4 +1,4 @@
-package ru.ozero.enginebyedpi
+﻿package ru.ozero.enginebyedpi
 
 import io.mockk.every
 import io.mockk.just
@@ -11,11 +11,11 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import ru.ozero.coreapi.EngineConfig
-import ru.ozero.coreapi.EngineId
-import ru.ozero.coreapi.ProbeResult
-import ru.ozero.coreapi.StartResult
-import ru.ozero.coreapi.Upstream
+import ru.ozero.enginescore.EngineConfig
+import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.ProbeResult
+import ru.ozero.enginescore.StartResult
+import ru.ozero.enginescore.Upstream
 import java.net.ServerSocket
 import kotlin.concurrent.thread
 import kotlin.test.assertEquals

@@ -1,4 +1,4 @@
-package ru.ozero.app.ui.diag
+﻿package ru.ozero.app.ui.diag
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -11,7 +11,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import ru.ozero.coreapi.EngineId
+import ru.ozero.enginescore.EngineId
 import ru.ozero.coreorchestrator.Orchestrator
 import ru.ozero.coreorchestrator.OrchestratorTransition
 import kotlin.test.assertEquals

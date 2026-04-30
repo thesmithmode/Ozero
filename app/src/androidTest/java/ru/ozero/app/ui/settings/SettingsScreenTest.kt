@@ -1,4 +1,4 @@
-package ru.ozero.app.ui.settings
+﻿package ru.ozero.app.ui.settings
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -11,7 +11,7 @@ import org.junit.runner.RunWith
 import ru.ozero.app.settings.SettingsModel
 import ru.ozero.app.ui.theme.OzeroTheme
 import ru.ozero.commonvpn.split.SplitTunnelMode
-import ru.ozero.coreapi.EngineId
+import ru.ozero.enginescore.EngineId
 
 @RunWith(AndroidJUnit4::class)
 class SettingsScreenTest {

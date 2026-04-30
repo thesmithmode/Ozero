@@ -1,4 +1,4 @@
-package ru.ozero.app.vpn
+﻿package ru.ozero.app.vpn
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import ru.ozero.app.settings.SettingsModel
 import ru.ozero.commonvpn.split.SplitTunnelMode
-import ru.ozero.coreapi.EngineId
+import ru.ozero.enginescore.EngineId
 import ru.ozero.coreorchestrator.OrchestratorState
 
 class EngineSettingsRestartObserver(
