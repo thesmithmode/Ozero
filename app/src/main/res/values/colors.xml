@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="launcher_bg">#061B36</color>
-    <color name="launcher_ring">#0F2E56</color>
-    <color name="launcher_wave_primary">#4FD5FF</color>
-    <color name="launcher_wave_secondary">#93E8FF</color>
+    <color name="launcher_bg">#000000</color>
+    <color name="launcher_ring">#E8E8E8</color>
+    <color name="launcher_wave_primary">#D8D8D8</color>
+    <color name="launcher_wave_secondary">#B0B0B0</color>
+    <color name="launcher_wave_tertiary">#888888</color>
+    <color name="launcher_wave_quaternary">#5A5A5A</color>
     <color name="launcher_center">#FFFFFF</color>
 </resources>

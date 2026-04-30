@@ -1,12 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/launcher_bg" />
-    <item>
-        <shape android:shape="oval">
-            <size
-                android:width="88dp"
-                android:height="88dp" />
-            <solid android:color="@color/launcher_ring" />
-        </shape>
-    </item>
 </layer-list>

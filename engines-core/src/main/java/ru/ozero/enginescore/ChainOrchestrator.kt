@@ -1,6 +1,5 @@
 package ru.ozero.enginescore
 
-import android.util.Log
 import kotlinx.coroutines.CancellationException
 
 class ChainOrchestrator(
@@ -18,7 +17,7 @@ class ChainOrchestrator(
             val plugin = engines.firstOrNull { it.id == step.engineId }
                 ?: return rollback(idx, "engine ${step.engineId} not found in registry")
             if (upstream !is Upstream.None && !plugin.capabilities.supportsUpstreamSocks) {
-                Log.w(TAG, "step $idx ${step.engineId} cannot accept upstream — terminal-only engine")
+                PersistentLoggers.warn(TAG, "step $idx ${step.engineId} cannot accept upstream — terminal-only engine")
                 return rollback(
                     idx,
                     "engine ${step.engineId} terminal-only (supportsUpstreamSocks=false), " +
@@ -26,26 +25,26 @@ class ChainOrchestrator(
                 )
             }
             val r = try {
-                Log.i(TAG, "step[$idx] ${step.engineId} start upstream=$upstream")
+                PersistentLoggers.info(TAG, "step[$idx] ${step.engineId} start upstream=$upstream")
                 plugin.start(step.config, upstream)
             } catch (ce: CancellationException) {
-                Log.w(TAG, "step $idx ${step.engineId} cancelled, rollback")
+                PersistentLoggers.warn(TAG, "step $idx ${step.engineId} cancelled, rollback")
                 stop()
                 throw ce
             } catch (t: Throwable) {
-                Log.e(TAG, "step $idx ${step.engineId} threw: ${t.message}")
+                PersistentLoggers.error(TAG, "step $idx ${step.engineId} threw: ${t.message}")
                 return rollback(idx, "step $idx ${step.engineId} threw: ${t.message}")
             }
             when (r) {
                 is StartResult.Failure -> {
-                    Log.w(TAG, "step $idx ${step.engineId} failed: ${r.reason}")
+                    PersistentLoggers.warn(TAG, "step $idx ${step.engineId} failed: ${r.reason}")
                     return rollback(idx, r.reason)
                 }
                 is StartResult.Success -> {
                     started.add(plugin)
                     lastSocksPort = r.socksPort
                     upstream = Upstream.Socks5(host = LOOPBACK, port = r.socksPort)
-                    Log.i(TAG, "step[$idx] ${step.engineId} success socksPort=${r.socksPort}")
+                    PersistentLoggers.info(TAG, "step[$idx] ${step.engineId} success socksPort=${r.socksPort}")
                 }
             }
         }
@@ -61,7 +60,7 @@ class ChainOrchestrator(
             } catch (ce: CancellationException) {
                 throw ce
             } catch (t: Throwable) {
-                Log.w(TAG, "stop ${plugin.id} threw: ${t.message}")
+                PersistentLoggers.warn(TAG, "stop ${plugin.id} threw: ${t.message}")
             }
         }
     }

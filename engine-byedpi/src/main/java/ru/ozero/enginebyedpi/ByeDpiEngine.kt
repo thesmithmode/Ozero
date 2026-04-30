@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.enginescore.EngineCapabilities
+import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
@@ -51,17 +52,17 @@ class ByeDpiEngine(
         }
         ByeDpiProxy.loadOnce()
         if (!ByeDpiProxy.libraryLoaded) {
-            Log.e(TAG, "native lib не загружена — устройство не поддерживает или stripped APK")
+            PersistentLoggers.error(TAG, "native lib не загружена — устройство не поддерживает или stripped APK")
             return StartResult.Failure(reason = "byedpi native library не загружена: ${ByeDpiProxy.loadError}")
         }
-        Log.i(TAG, "start socksPort=${config.socksPort} args=${config.args}")
+        PersistentLoggers.info(TAG, "start socksPort=${config.socksPort} args=${config.args}")
         val args = buildArgs(config)
         val proxyJob = proxyScope.launch {
             val code = runCatching { proxy.jniStartProxy(args) }
-                .onFailure { Log.e(TAG, "jniStartProxy threw: ${it.message}") }
+                .onFailure { PersistentLoggers.error(TAG, "jniStartProxy threw: ${it.message}") }
                 .getOrElse { -1 }
             if (code != 0) {
-                Log.e(TAG, "jniStartProxy завершился с кодом $code")
+                PersistentLoggers.error(TAG, "jniStartProxy завершился с кодом $code")
             } else {
                 Log.i(TAG, "jniStartProxy event-loop завершён нормально")
             }
@@ -74,14 +75,14 @@ class ByeDpiEngine(
         }
         return if (readyAt > 0) {
             activeSocksPort = config.socksPort
-            Log.i(TAG, "started OK socksPort=${config.socksPort} readyMs=$readyAt")
+            PersistentLoggers.info(TAG, "started OK socksPort=${config.socksPort} readyMs=$readyAt")
             StartResult.Success(socksPort = config.socksPort)
         } else {
-            Log.e(TAG, "byedpi не вышел на порт ${config.socksPort} за ${READY_TIMEOUT_MS}ms")
+            PersistentLoggers.error(TAG, "byedpi не вышел на порт ${config.socksPort} за ${READY_TIMEOUT_MS}ms")
             runCatching { proxy.jniStopProxy() }
-                .onFailure { Log.w(TAG, "jniStopProxy on failure: ${it.message}") }
+                .onFailure { PersistentLoggers.warn(TAG, "jniStopProxy on failure: ${it.message}") }
             runCatching { proxy.jniForceClose() }
-                .onFailure { Log.w(TAG, "jniForceClose on failure: ${it.message}") }
+                .onFailure { PersistentLoggers.warn(TAG, "jniForceClose on failure: ${it.message}") }
             proxyJob.cancel()
             proxyJobRef.compareAndSet(proxyJob, null)
             StartResult.Failure(reason = "byedpi не открыл socks порт ${config.socksPort}")
@@ -100,10 +101,10 @@ class ByeDpiEngine(
     }
 
     override suspend fun stop() {
-        Log.i(TAG, "stop")
+        PersistentLoggers.info(TAG, "stop")
         withContext(Dispatchers.IO) {
             runCatching { proxy.jniStopProxy() }
-                .onFailure { Log.w(TAG, "jniStopProxy исключение: ${it.message}") }
+                .onFailure { PersistentLoggers.warn(TAG, "jniStopProxy исключение: ${it.message}") }
             val job = proxyJobRef.getAndSet(null)
             if (job != null) {
                 val completed = withTimeoutOrNull(STOP_GRACE_MS) {
@@ -111,9 +112,9 @@ class ByeDpiEngine(
                     true
                 }
                 if (completed == null) {
-                    Log.w(TAG, "proxyJob не завершился за ${STOP_GRACE_MS}ms — jniForceClose")
+                    PersistentLoggers.warn(TAG, "proxyJob не завершился за ${STOP_GRACE_MS}ms — jniForceClose")
                     runCatching { proxy.jniForceClose() }
-                        .onFailure { Log.w(TAG, "jniForceClose исключение: ${it.message}") }
+                        .onFailure { PersistentLoggers.warn(TAG, "jniForceClose исключение: ${it.message}") }
                     job.cancel()
                 }
             }
@@ -124,7 +125,7 @@ class ByeDpiEngine(
     override suspend fun probe(): ProbeResult {
         val port = activeSocksPort
         if (port == 0) {
-            Log.w(TAG, "probe: движок не запущен")
+            PersistentLoggers.warn(TAG, "probe: движок не запущен")
             return ProbeResult.Failure(reason = "движок не запущен")
         }
         return try {
@@ -132,7 +133,7 @@ class ByeDpiEngine(
             Log.i(TAG, "probe OK latency=${latency}ms")
             ProbeResult.Success(latencyMs = latency)
         } catch (e: Exception) {
-            Log.w(TAG, "probe failed: ${e.message}")
+            PersistentLoggers.warn(TAG, "probe failed: ${e.message}")
             ProbeResult.Failure(reason = e.message ?: "connection refused")
         }
     }
