@@ -20,6 +20,10 @@ object EnginesModule {
 
     @Provides
     @Singleton
+    fun provideByeDpiEngineDirect(proxy: ByeDpiProxy): ByeDpiEngine = ByeDpiEngine(proxy)
+
+    @Provides
+    @Singleton
     @IntoSet
-    fun provideByeDpiEngine(proxy: ByeDpiProxy): EnginePlugin = ByeDpiEngine(proxy)
+    fun provideByeDpiEngine(byeDpiEngine: ByeDpiEngine): EnginePlugin = byeDpiEngine
 }
