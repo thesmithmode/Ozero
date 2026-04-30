@@ -305,11 +305,17 @@ class OzeroVpnService : android.net.VpnService() {
         if (!stopping.compareAndSet(false, true)) return
         stopSignal.set(true)
         PersistentLoggers.info(TAG, "stopVpn entry")
+        val priorState = tunnelController.state.value
         tunnelController.onDisconnecting()
         startJobRef.getAndSet(null)?.cancel()
         statsJobRef.getAndSet(null)?.cancel()
         runCatching { healthMonitor.stop() }
-        recordSessionEnd(SessionStatsRecorder.Status.DISCONNECTED)
+        val endStatus = if (priorState is TunnelState.Failed) {
+            SessionStatsRecorder.Status.FAILED
+        } else {
+            SessionStatsRecorder.Status.DISCONNECTED
+        }
+        recordSessionEnd(endStatus)
         serviceScope.launch { performShutdown() }
     }
 
@@ -454,6 +460,7 @@ class OzeroVpnService : android.net.VpnService() {
     override fun onDestroy() {
         PersistentLoggers.info(TAG, "onDestroy entry")
         if (stopping.compareAndSet(false, true)) serviceScope.launch { performShutdown() }
+        runCatching { healthMonitor.shutdown() }
         serviceScope.cancel()
         runCatching { tunFdRef.getAndSet(null)?.close() }
         super.onDestroy()
