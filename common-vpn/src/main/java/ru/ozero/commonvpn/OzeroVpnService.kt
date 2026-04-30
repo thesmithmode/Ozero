@@ -50,6 +50,8 @@ class OzeroVpnService : android.net.VpnService() {
 
     @Inject lateinit var splitTunnelRulesProvider: SplitTunnelRulesProvider
 
+    @Inject lateinit var healthMonitor: HealthMonitor
+
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val sessionIdRef = AtomicReference<Long>(-1L)
     private val sessionStartMsRef = AtomicReference<Long>(0L)
@@ -229,6 +231,7 @@ class OzeroVpnService : android.net.VpnService() {
                     sessionStatsRecorder.startSession(EngineId.BYEDPI.name, nowMs)
                 }.getOrDefault(-1L)
                 sessionIdRef.set(id)
+                runCatching { healthMonitor.start(chainResult.finalSocksPort) }
                 startStatsLogger()
             } finally {
                 starting.set(false)
@@ -305,6 +308,7 @@ class OzeroVpnService : android.net.VpnService() {
         tunnelController.onDisconnecting()
         startJobRef.getAndSet(null)?.cancel()
         statsJobRef.getAndSet(null)?.cancel()
+        runCatching { healthMonitor.stop() }
         recordSessionEnd(SessionStatsRecorder.Status.DISCONNECTED)
         serviceScope.launch { performShutdown() }
     }

@@ -9,6 +9,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import ru.ozero.app.data.RoomSessionStatsRecorder
 import ru.ozero.app.data.RoomSplitTunnelRulesProvider
+import ru.ozero.commonvpn.HealthMonitor
 import ru.ozero.commonvpn.HevTunnelGateway
 import ru.ozero.commonvpn.NativeHevTunnelGateway
 import ru.ozero.commonvpn.SessionStatsRecorder
@@ -37,6 +38,10 @@ object VpnModule {
     fun provideChainOrchestrator(
         engines: Set<@JvmSuppressWildcards EnginePlugin>,
     ): ChainOrchestrator = ChainOrchestrator(engines = engines)
+
+    @Provides
+    @Singleton
+    fun provideHealthMonitor(): HealthMonitor = HealthMonitor()
 }
 
 @Module
