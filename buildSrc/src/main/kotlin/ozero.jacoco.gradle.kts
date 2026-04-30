@@ -60,7 +60,7 @@ if (isAndroid) {
 
     tasks.register<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
         group = "verification"
-        description = "Verify JaCoCo code coverage meets 80% gate (line + branch) — temporary Phase 0 floor, raise to 90 after Phase 1"
+        description = "Verify JaCoCo code coverage meets 90% gate (line + branch)"
         dependsOn("jacocoTestReport")
 
         sourceDirectories.setFrom(
@@ -84,7 +84,7 @@ if (isAndroid) {
                 limit {
                     counter = "LINE"
                     value = "COVEREDRATIO"
-                    minimum = BigDecimal("0.80")
+                    minimum = BigDecimal("0.90")
                 }
             }
             rule {
@@ -92,7 +92,7 @@ if (isAndroid) {
                 limit {
                     counter = "BRANCH"
                     value = "COVEREDRATIO"
-                    minimum = BigDecimal("0.80")
+                    minimum = BigDecimal("0.90")
                 }
             }
         }
@@ -135,7 +135,7 @@ if (isAndroid) {
                 limit {
                     counter = "LINE"
                     value = "COVEREDRATIO"
-                    minimum = BigDecimal("0.80")
+                    minimum = BigDecimal("0.90")
                 }
             }
             rule {
@@ -143,7 +143,7 @@ if (isAndroid) {
                 limit {
                     counter = "BRANCH"
                     value = "COVEREDRATIO"
-                    minimum = BigDecimal("0.80")
+                    minimum = BigDecimal("0.90")
                 }
             }
         }
