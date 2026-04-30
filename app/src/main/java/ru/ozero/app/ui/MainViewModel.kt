@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
+import ru.ozero.commonvpn.TunnelStats
 import ru.ozero.enginescore.EngineId
 import javax.inject.Inject
 
@@ -20,6 +21,13 @@ class MainViewModel @Inject constructor(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
             initialValue = TunnelState.Idle,
+        )
+
+    val stats: StateFlow<TunnelStats?> =
+        tunnelController.stats.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = null,
         )
 
     fun onConnectClick() = Unit

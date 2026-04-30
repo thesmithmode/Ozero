@@ -10,6 +10,8 @@ class TunnelController {
 
     private val _state = MutableStateFlow<TunnelState>(TunnelState.Idle)
     val state: StateFlow<TunnelState> = _state.asStateFlow()
+    private val _stats = MutableStateFlow<TunnelStats?>(null)
+    val stats: StateFlow<TunnelStats?> = _stats.asStateFlow()
     private val lock = Any()
 
     fun onProbing() = transition(TunnelState.Probing)
@@ -24,7 +26,14 @@ class TunnelController {
 
     fun onDisconnecting() = transition(TunnelState.Disconnecting)
 
-    fun reset() = transition(TunnelState.Idle)
+    fun reset() {
+        _stats.value = null
+        transition(TunnelState.Idle)
+    }
+
+    fun updateStats(stats: TunnelStats) {
+        _stats.value = stats
+    }
 
     private fun transition(target: TunnelState, markError: Boolean = false) {
         synchronized(lock) {

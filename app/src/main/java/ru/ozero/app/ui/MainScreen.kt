@@ -30,7 +30,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
+import ru.ozero.commonvpn.BytesFormatter
 import ru.ozero.commonvpn.TunnelState
+import ru.ozero.commonvpn.TunnelStats
 
 @Composable
 fun MainScreen(
@@ -40,6 +42,7 @@ fun MainScreen(
     onOpenDiagnostics: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val stats by viewModel.stats.collectAsStateWithLifecycle()
 
     Box(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -76,6 +79,11 @@ fun MainScreen(
                 StatusLabel(s)
             }
 
+            if (state is TunnelState.Connected && stats != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                TrafficStatsLabel(stats!!)
+            }
+
             Spacer(modifier = Modifier.height(32.dp))
 
             when (state) {
@@ -103,6 +111,18 @@ fun MainScreen(
             }
         }
     }
+}
+
+@Composable
+private fun TrafficStatsLabel(stats: TunnelStats) {
+    val rx = BytesFormatter.humanReadable(stats.rxBytes)
+    val tx = BytesFormatter.humanReadable(stats.txBytes)
+    Text(
+        text = "↓ $rx  ↑ $tx",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+        modifier = Modifier.testTag(MainScreenTestTags.TRAFFIC_STATS),
+    )
 }
 
 @Composable

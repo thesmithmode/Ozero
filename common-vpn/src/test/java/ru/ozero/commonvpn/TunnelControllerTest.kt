@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineId
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TunnelControllerTest {
@@ -201,5 +202,42 @@ class TunnelControllerTest {
         controller.onConnecting(EngineId.BYEDPI)
         controller.onDisconnecting()
         assertIs<TunnelState.Disconnecting>(controller.state.value)
+    }
+
+    @Test
+    fun statsInitiallyNull() {
+        assertNull(controller.stats.value)
+    }
+
+    @Test
+    fun updateStatsPublishesSnapshot() {
+        val snapshot = TunnelStats(
+            txPackets = 10,
+            txBytes = 1024,
+            rxPackets = 20,
+            rxBytes = 4096,
+            timestampMs = 1000,
+        )
+        controller.updateStats(snapshot)
+        assertEquals(snapshot, controller.stats.value)
+    }
+
+    @Test
+    fun resetClearsStats() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        controller.updateStats(
+            TunnelStats(
+                txPackets = 1,
+                txBytes = 100,
+                rxPackets = 2,
+                rxBytes = 200,
+                timestampMs = 500,
+            ),
+        )
+        controller.onDisconnecting()
+        controller.reset()
+        assertNull(controller.stats.value, "reset() обязан очистить stats — иначе stale значения мелькают на reconnect")
     }
 }

@@ -82,6 +82,7 @@ class OzeroVpnService : android.net.VpnService() {
     private val statsJobRef = AtomicReference<Job?>(null)
     private val starting = AtomicBoolean(false)
     private val stopping = AtomicBoolean(false)
+    private val stopSignal = AtomicBoolean(false)
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         PersistentLoggers.info(TAG, "onStartCommand action=${intent?.action} startId=$startId")
@@ -118,6 +119,7 @@ class OzeroVpnService : android.net.VpnService() {
             return
         }
         if (!starting.compareAndSet(false, true)) return
+        stopSignal.set(false)
         PersistentLoggers.info(TAG, "startVpn entry")
 
         val tName = Thread.currentThread().name
@@ -209,22 +211,33 @@ class OzeroVpnService : android.net.VpnService() {
             try {
                 while (true) {
                     delay(STATS_LOG_INTERVAL_MS)
-                    val stats = runCatching { hev.TProxyService.TProxyGetStats() }.getOrNull()
-                    if (stats == null || stats.size < 4) {
+                    if (stopSignal.get()) return@launch
+                    val raw = runCatching { hev.TProxyService.TProxyGetStats() }.getOrNull()
+                    if (raw == null || raw.size < 4) {
                         PersistentLoggers.warn(TAG, "TunnelStats: TProxyGetStats unavailable")
                         continue
                     }
-                    val txPackets = stats[0]
-                    val rxPackets = stats[1]
-                    val txBytes = stats[2]
-                    val rxBytes = stats[3]
+                    val txPackets = raw[0]
+                    val txBytes = raw[1]
+                    val rxPackets = raw[2]
+                    val rxBytes = raw[3]
                     val dTx = txBytes - prevTx
                     val dRx = rxBytes - prevRx
+                    val snapshot = TunnelStats(
+                        txPackets = txPackets,
+                        txBytes = txBytes,
+                        rxPackets = rxPackets,
+                        rxBytes = rxBytes,
+                        timestampMs = System.currentTimeMillis(),
+                    )
+                    tunnelController.updateStats(snapshot)
                     PersistentLoggers.info(
                         TAG,
-                        "TunnelStats tx=${txBytes}B/$txPackets pkts rx=${rxBytes}B/$rxPackets pkts " +
-                            "Δtx=${dTx}B Δrx=${dRx}B",
+                        "TunnelStats tx=${BytesFormatter.humanReadable(txBytes)}/$txPackets pkts " +
+                            "rx=${BytesFormatter.humanReadable(rxBytes)}/$rxPackets pkts " +
+                            "Δtx=${BytesFormatter.humanReadable(dTx)} Δrx=${BytesFormatter.humanReadable(dRx)}",
                     )
+                    updateNotificationWithStats(txBytes, rxBytes)
                     prevTx = txBytes
                     prevRx = rxBytes
                 }
@@ -237,8 +250,19 @@ class OzeroVpnService : android.net.VpnService() {
         statsJobRef.set(job)
     }
 
+    private fun updateNotificationWithStats(txBytes: Long, rxBytes: Long) {
+        if (stopSignal.get()) return
+        runCatching {
+            val nm = getSystemService(NotificationManager::class.java) ?: return
+            val text = "↓ ${BytesFormatter.humanReadable(rxBytes)}  ↑ ${BytesFormatter.humanReadable(txBytes)}"
+            val n = buildNotification(text)
+            nm.notify(NOTIFICATION_ID, n)
+        }.onFailure { PersistentLoggers.warn(TAG, "updateNotificationWithStats: ${it.message}") }
+    }
+
     private fun stopVpn() {
         if (!stopping.compareAndSet(false, true)) return
+        stopSignal.set(true)
         PersistentLoggers.info(TAG, "stopVpn entry")
         tunnelController.onDisconnecting()
         startJobRef.getAndSet(null)?.cancel()
@@ -309,7 +333,7 @@ class OzeroVpnService : android.net.VpnService() {
         return builder
     }
 
-    private fun buildNotification(): Notification {
+    private fun buildNotification(contentText: String? = null): Notification {
         val contentIntent = packageManager.getLaunchIntentForPackage(packageName)?.let {
             android.app.PendingIntent.getActivity(
                 this, 0, it,
@@ -324,7 +348,11 @@ class OzeroVpnService : android.net.VpnService() {
                 .setContentTitle("Ozero VPN активен")
                 .setSmallIcon(android.R.drawable.ic_lock_lock)
                 .setOngoing(true)
-                .apply { if (contentIntent != null) setContentIntent(contentIntent) }
+                .setOnlyAlertOnce(true)
+                .apply {
+                    if (contentText != null) setContentText(contentText)
+                    if (contentIntent != null) setContentIntent(contentIntent)
+                }
                 .build()
         }
         @Suppress("DEPRECATION")
@@ -332,7 +360,11 @@ class OzeroVpnService : android.net.VpnService() {
             .setContentTitle("Ozero VPN активен")
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setOngoing(true)
-            .apply { if (contentIntent != null) setContentIntent(contentIntent) }
+            .setOnlyAlertOnce(true)
+            .apply {
+                if (contentText != null) setContentText(contentText)
+                if (contentIntent != null) setContentIntent(contentIntent)
+            }
             .build()
     }
 

@@ -13,8 +13,11 @@ import org.junit.jupiter.api.Test
 import ru.ozero.app.ui.MainViewModel
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
+import ru.ozero.commonvpn.TunnelStats
 import ru.ozero.enginescore.EngineId
+import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModelTest {
@@ -79,5 +82,24 @@ class MainViewModelTest {
         viewModel.onVpnPermissionDenied()
         advanceUntilIdle()
         assertIs<TunnelState.Idle>(tunnelController.state.value)
+    }
+
+    @Test
+    fun statsInitiallyNull() {
+        assertNull(viewModel.stats.value)
+    }
+
+    @Test
+    fun statsMirrorsTunnelController() = runTest {
+        val snapshot = TunnelStats(
+            txPackets = 5,
+            txBytes = 256,
+            rxPackets = 10,
+            rxBytes = 1024,
+            timestampMs = 42,
+        )
+        tunnelController.updateStats(snapshot)
+        advanceUntilIdle()
+        assertEquals(snapshot, viewModel.stats.value)
     }
 }
