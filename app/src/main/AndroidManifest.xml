@@ -21,13 +21,6 @@
     -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
-    <!--
-        ACCESS_NETWORK_STATE: probe-логика (CGNAT detector, network type) опирается на
-        ConnectivityManager.getNetworkCapabilities — без permission возвращает null,
-        StrategyEngine.udpReachable не сможет принять решение.
-    -->
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-
     <application
         android:name=".OzeroApp"
         android:allowBackup="false"
