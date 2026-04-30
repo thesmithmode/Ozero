@@ -200,8 +200,10 @@ private fun AutoTestSection(
                             verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             val percent = (score.successRate * 100).toInt()
+                            val summary = "$percent% (${score.successCount}/${score.totalProbes}) · " +
+                                "${score.avgDurationMs}ms"
                             Text(
-                                text = "$percent% (${score.successCount}/${score.totalProbes}) · ${score.avgDurationMs}ms",
+                                text = summary,
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                             Text(

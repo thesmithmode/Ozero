@@ -110,4 +110,3 @@ private fun SessionCard(session: SessionStatsEntity) {
         }
     }
 }
-
