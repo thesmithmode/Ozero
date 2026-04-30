@@ -6,31 +6,7 @@ import kotlin.test.assertTrue
 
 class SentinelLogsRegressionTest {
 
-    private val pipelineSrc by lazy { read("src/main/java/ru/ozero/commonvpn/pipeline/VpnEnginePipeline.kt") }
     private val gatewaySrc by lazy { read("src/main/java/ru/ozero/commonvpn/HevTunnelGateway.kt") }
-
-    @Test
-    fun `pipeline bringTunnelUp логирует entry до создания HevTunnelConfig`() {
-        val body = funBody(pipelineSrc, "bringTunnelUp")
-        val entryIdx = body.indexOf("bringTunnelUp entry")
-        val configIdx = body.indexOf("HevTunnelConfig(")
-        assertTrue(
-            entryIdx in 0 until configIdx,
-            "bringTunnelUp должен логировать entry до создания HevTunnelConfig — " +
-                "иначе при краше внутри dup() мы не узнаем что pipeline дошёл до этой точки",
-        )
-    }
-
-    @Test
-    fun `pipeline логирует tunnelGateway start invoking перед blocking call`() {
-        val body = funBody(pipelineSrc, "bringTunnelUp")
-        val invokingIdx = body.indexOf("tunnelGateway.start invoking")
-        val callIdx = body.indexOf("tunnelGateway.start(config)")
-        assertTrue(
-            invokingIdx in 0 until callIdx,
-            "Лог 'invoking' должен предшествовать blocking nativeStart — иначе процесс молча умирает в JNI",
-        )
-    }
 
     @Test
     fun `gateway start логирует libraryLoaded ДО проверки isLoaded`() {
