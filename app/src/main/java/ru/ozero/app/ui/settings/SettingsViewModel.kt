@@ -43,6 +43,13 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { repository.setManualEngine(engine) }
     }
 
+    fun onUiLocaleSelect(tag: String?) {
+        viewModelScope.launch {
+            repository.setUiLocaleTag(tag)
+            LocaleApplier.apply(tag)
+        }
+    }
+
     private companion object {
         const val STOP_TIMEOUT_MS = 5_000L
     }
