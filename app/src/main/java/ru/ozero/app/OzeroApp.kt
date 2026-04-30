@@ -58,18 +58,12 @@ class OzeroApp : Application(), Configuration.Provider {
     }
 
     override fun onCreate() {
-        runCatching { BootFileLogger.info(TAG, "onCreate before super") }
         super.onCreate()
         runCatching {
             AppLogger.attach(logBuffer)
-            BootFileLogger.info(TAG, "onCreate after super")
-            val pid = android.os.Process.myPid()
-            AppLogger.i(TAG, "app started pid=$pid sdk=${Build.VERSION.SDK_INT} ${Build.MANUFACTURER}/${Build.MODEL}")
         }.onFailure { BootFileLogger.error(TAG, "AppLogger.attach failed", it) }
         if (shouldStartSecurityWatchdog()) {
             runCatching { securityWatchdog.start(appScope) }
-        } else {
-            runCatching { BootFileLogger.info(TAG, "security watchdog skipped in debug/test runtime") }
         }
         appScope.launch {
             runCatching { firstRunBootstrap.runIfFirstStart() }

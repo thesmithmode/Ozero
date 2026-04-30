@@ -194,7 +194,6 @@ class OzeroVpnService : android.net.VpnService() {
                     return@launch
                 }
                 tunnelController.onEngineStarted(EngineId.BYEDPI, chainResult.finalSocksPort)
-                PersistentLoggers.info(TAG, "connected socksPort=${chainResult.finalSocksPort}")
                 startStatsLogger()
             } finally {
                 starting.set(false)

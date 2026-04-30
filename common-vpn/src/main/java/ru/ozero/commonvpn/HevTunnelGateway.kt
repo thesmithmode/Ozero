@@ -21,19 +21,8 @@ class NativeHevTunnelGateway(
     constructor(context: Context) : this(cacheDir = context.cacheDir)
 
     override fun start(config: HevTunnelConfig): Int {
-        val tName = Thread.currentThread().name
         val fd = config.tunPfd.fd
-        PersistentLoggers.instance?.info(TAG, "start entry thread=$tName fd=$fd")
-
-        val tLoad0 = System.nanoTime()
         hev.TProxyService.loadOnce()
-        val tLoadMs = (System.nanoTime() - tLoad0) / 1_000_000
-        val loaded = hev.TProxyService.libraryLoaded
-        val loadErr = hev.TProxyService.loadError
-        PersistentLoggers.instance?.info(
-            TAG,
-            "checkpoint loadOnce returned dt=${tLoadMs}ms libraryLoaded=$loaded loadError=$loadErr",
-        )
         if (!hev.TProxyService.libraryLoaded) {
             PersistentLoggers.instance?.error(
                 TAG,

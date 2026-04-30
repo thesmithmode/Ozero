@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.app.logging.AppLogger
-import ru.ozero.app.logging.BootFileLogger
 import ru.ozero.app.logging.LogcatReader
 import ru.ozero.app.settings.UserFlagsRepository
 import ru.ozero.app.ui.MainViewModel
@@ -45,9 +44,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        runCatching { BootFileLogger.info(TAG, "onCreate before super") }
         super.onCreate(savedInstanceState)
-        runCatching { BootFileLogger.info(TAG, "onCreate after super (Hilt inject done)") }
         runCatching { logcatReader.start() }.onFailure { AppLogger.w(TAG, "logcatReader.start failed", it) }
 
         val vpnPermissionLauncher = registerForActivityResult(
@@ -72,7 +69,6 @@ class MainActivity : ComponentActivity() {
         )
 
         observeLiveEngineSettingsChanges()
-        runCatching { BootFileLogger.info(TAG, "onCreate before setContent") }
         setContent {
             OzeroTheme {
                 OnboardingGate(userFlags = userFlags) {
@@ -80,7 +76,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        runCatching { BootFileLogger.info(TAG, "onCreate after setContent") }
     }
 
     private fun observeLiveEngineSettingsChanges() {
