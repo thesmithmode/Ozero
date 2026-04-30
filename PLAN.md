@@ -1,130 +1,159 @@
 # PLAN.md — Ozero roadmap
 
-## Статус (2026-04-30 evening — autonom session)
+Засечки `[x]` = done. `[~]` = частично/research. `[ ]` = pending. `[!]` = требует особое внимание (риск, device verify, cross-module).
 
-- **feature**: 8202f45 (W1-W3.5 partial closed, full CI на feature)
-- **v0.0.1**: tagged. v0.0.2-* — pre-release working, traffic + reconnect через Phase A retags
-- **Wave A done**: log noise + proguard cleanup + JaCoCo 0.90 + CI feature full + ABI alignment + Manifest cleanup + Failed.reason render + stagnation detector + hev YAML log-level + dependency audit (Ktor removed)
-- **W3.5 partial**: parser + 75-strategy asset + SocksProbeClient + AutoStrategyPicker logic + research docs. UI/DI integration deferred (требует device verify).
-- **W2.x design docs**: manual DI design в `.memory/concepts/manual-di-design.md` (research-only, implementation требует device).
+## Статус (2026-04-30)
 
-## Phase 1 — clean-start refactor
+- **feature** ahead of dev: 17 commits autonomous session
+- **v0.0.1** tagged + retag-6 working (live speed UI)
+- **CI feature** = full pipeline (kotlin-style + Python + assembleDebug + lint + Tests+coverage)
+- **JaCoCo gate**: 0.90 LINE + 0.90 BRANCH
 
-| ID | Status | Описание |
-|----|--------|----------|
-| P1.A | ✅ | Создать модуль `:engines-core` |
-| P1.B | ✅ | ByeDpiEngine implements EnginePlugin |
-| P1.C | ✅ | DELETE Pipeline + StrategyEngine + Orchestrator |
-| P1.D | ✅ | OzeroVpnService rewrite через ChainOrchestrator |
-| P1.E | ✅ | Hilt @IntoMap → @IntoSet |
-| P1.F | ✅ | DELETE :core-api, :core-subscriptions, :common-json |
-| P1.G | ✅ | Logging unification — PersistentLoggers везде |
-| P1.H | ✅ | MainActivity decompose (≤120 строк) |
-| P1.I | ✅ | Tests — Sentinels + Logging contract (NoStubsInProductionDiTest + LoggingContractTest + BootFileLoggerPersistenceTest) |
-| P1.J | ✅ | Cleanup — proguard Log.* keep, ci.yml stub sentinel, JaCoCo 0.90 |
+---
 
-### P1.I (pending)
-- I.1 NoStubsInProductionDiTest — sentinel против stub-движков в проде
-- I.2 LoggingContractTest — все warn/error попадают в boot.log
-- I.3 BootFileLoggerPersistenceTest — файл переживает onDestroy
+## Phase 0 — clean-start refactor (DONE)
 
-### P1.J (pending)
-- J.1 proguard-rules.pro cleanup
-- J.2 release.yml dex assertions cleanup
-- J.3 JaCoCo gate 0.80 → 0.90
+- [x] P1.A создать модуль `:engines-core`
+- [x] P1.B ByeDpiEngine implements EnginePlugin
+- [x] P1.C DELETE Pipeline + StrategyEngine + Orchestrator
+- [x] P1.D OzeroVpnService rewrite через ChainOrchestrator
+- [x] P1.E Hilt @IntoMap → @IntoSet
+- [x] P1.F DELETE :core-api, :core-subscriptions, :common-json
+- [x] P1.G Logging unification — PersistentLoggers везде
+- [x] P1.H MainActivity decompose (≤120 строк)
+- [x] P1.I Sentinels + Logging contract tests (NoStubsInProductionDi + LoggingContract + BootFileLoggerPersistence)
+- [x] P1.J proguard + dex assertions + JaCoCo 0.90
 
-## v0.0.1 BUGFIX (требует логи новой сборки)
+---
 
-| ID | Status | Описание |
-|----|--------|----------|
-| #53 | ✅ | Удалить старый релиз + тег |
-| #54 | ⏳ | DPI не пробрасывает трафик — diagnosis pending logs |
-| #55 | ⏳ | Disconnect VPN бесконечный спиннер — diagnosis pending logs |
-| #56 | ✅ | App icon — silver Ω logo |
+## Wave A — autonomous cleanup (DONE 2026-04-30)
 
-## Phase 2 — структурные пробелы (architecture review 2026-04-30)
+- [x] W1.1 commit log noise cleanup — `Log.i/d` достаточно для success-events
+- [x] W1.2 proguard-rules.pro: Log.* keep + commoncrypto/commondns + bouncycastle
+- [x] W1.3 release.yml dex FORBIDDEN sentinel расширен (+StubEngine/StubPlugin/StubByeDpi)
+- [x] W1.4 JaCoCo gate 0.80 → 0.90
+- [x] W3.6 stats stagnation detector + UI badge (TDD: 7 tests, EWMA + threshold 30s)
+- [x] W3.9 hev YAML log-level configurable, default warn
+- [x] W5.1 MainScreen рендерит Failed.reason под engine name
+- [x] W5.2 dependency bloat audit + Ktor remove (5 unused libraries)
+- [x] W5.4 ShadowsocksUriParser удалён (Phase 0 уже)
+- [x] W5.5 ACCESS_NETWORK_STATE permission + obsolete CgnatDetector комментарий удалены
+- [x] W5.6 HarvestWorker dual enqueue (Phase 0 уже)
+- [x] W5.7 ci.yml feature ветка получает full CI (app-lint/assemble/test-coverage)
+- [x] W5.8 ci.yml libhev cache + ABI унификация на 3 (без x86)
+- [x] W5.9 TunnelController dead methods cleanup (Phase 0 уже)
 
-Под multi-engine VPN с native deps нынешний стек *undersized*. 5 задач из ревью.
+---
 
-### P2.A — Manual DI для `:common-vpn` (КРИТИЧНО)
-- **Проблема**: Hilt provider бросает в `super.onCreate()` → service умер до боевой логики → boot.log пуст → диагностика = 0. Knowledge base зафиксировал 2× (`hilt-di-native-library-failure`, `compose-launchedeffect-crash-invisibility`).
-- **Цель**: VpnService и Engine plugins создаются через `ServiceLocator` или manual factory. Hilt остаётся для UI слоя.
-- **Acceptance**:
-  - OzeroVpnService.onCreate() не зависит от `@AndroidEntryPoint`
-  - Любая ошибка инициализации движка пишется в boot.log ДО throw
-  - Test: симулировать failed engine init → boot.log содержит причину
-- **Scope**: HiltVpnModule → ServiceLocator pattern, EnginePlugin Set инициализируется явно
-- **Riskiness**: высокая, тронет все DI bindings в `:common-vpn`/`:engine-byedpi`
+## Wave B — auto-strategy picker (W3.5)
 
-### P2.B — Process isolation `android:process=":vpn"`
-- **Проблема**: ByeDPI SIGSEGV в native = весь процесс умер = MainActivity тоже. UI и engine в одном процессе.
-- **Цель**: VpnService + engine plugins в отдельном процессе. Краш engine ≠ краш UI.
-- **Acceptance**:
-  - AndroidManifest: `<service ... android:process=":vpn">`
-  - MultiDex/Hilt + multi-process нюансы решены (Hilt не рекомендуется → подкрепляет P2.A)
-  - Test: kill -SIGSEGV на VPN process → MainActivity жива
-- **Scope**: AndroidManifest, BootFileLogger init на process-level, IPC контракт между UI и service (Messenger/AIDL)
-- **Riskiness**: высокая, IPC сериализация state, lifecycle в 2× процесса
+- [x] W3.5.1 research ByeByeDPI auto-strategy → `.memory/concepts/byedpi-auto-strategy-research.md`
+- [x] W3.5.2 ByeDpiStrategy data class + 75-strategy asset + ByeDpiStrategiesParser (10 tests)
+- [x] W3.5.3 HttpSocksProbeClient с content-length проверкой (10 tests)
+- [x] W3.5.4 AutoStrategyPicker orchestrator (7 tests)
+- [!] W3.5.5 UI Auto-test button + progress dialog — **требует device verify**
+- [!] W3.5.6 wiring engine-byedpi + DI — **factory class + Context.assets reader, нужен smoke-test**
 
-### P2.C — Native crash reporting (.so SIGSEGV visibility)
-- **Проблема**: Краш в .so → ART tombstone в logcat → boot.log пуст. У anti-DPI половина риска в native libs (libbyedpi, libhev-socks5-tunnel, future libxray, libhy2). Без visibility = чёрный ящик.
-- **Цель**: breakpad-style minidump на SIGSEGV/SIGABRT, dump → filesDir/crash/, отображение в Settings → Crash log.
-- **Acceptance**:
-  - Sentry Native / Breakpad подключён или собственный sigaction handler с unwind
-  - Forced crash в test → minidump сохранён
-  - UI показывает stack trace в Settings → Crash log
-- **Scope**: новый модуль `:common-crash`, JNI bridge, signal handler init в Application/process start
-- **Riskiness**: средняя, signal handlers тонкая работа
+---
 
-### P2.D — On-device smoke на CI emulator
-- **Проблема**: Coverage 0.80 зелёный, runtime сломан (#54/#55). Unit-тесты не ловят VPN regression. Юзер ловит — это плохо.
-- **Цель**: Github-hosted emulator в CI: install APK → start VPN → ping → traffic test → stop. Или Firebase Test Lab если бесплатный quota хватает.
-- **Acceptance**:
-  - `.github/workflows/smoke.yml` matrix [api-30, api-33]
-  - Шаги: emulator boot → install debug APK → adb shell am startservice → curl через VPN tun → assert HTTP 200
-  - Длительность ≤15 мин
-- **Scope**: CI workflow, debug build с smoke-friendly endpoint
-- **Riskiness**: низкая, чисто infrastructure
+## Phase 2 — структурные пробелы (research-only пока)
 
-### P2.E — TunnelController state machine enforcement
-- **Проблема**: TunnelState sealed class есть, но переходы не валидируются. `onConnecting → onConnecting → onEngineDied` принимается без ошибки. Race conditions в UI spinner (баг #55 возможно отсюда).
-- **Цель**: allowed transitions матрица + assert. `onProbing → Connecting → Connected` единственный happy path. Любой невалидный transition = throw + log.
-- **Acceptance**:
-  - `TunnelController.transition(from, to)` гейт
-  - Test: каждый невалидный переход → IllegalStateException
-  - UI spinner расходится корректно при `Failed`
-- **Scope**: `:common-vpn/TunnelController.kt`, тесты
-- **Riskiness**: низкая, локальная задача
+Все Phase 2 задачи рискованные. Реализация — после установки CI emulator (W2.4) который позволит верифицировать без юзера.
 
-## Приоритет Phase 2
+- [x] W2.1 manual DI design doc → `.memory/concepts/manual-di-design.md`
+- [!] W2.2 P2.A manual DI implementation для `:common-vpn` — **высокая ризковость, advisor + decompose на atomic шаги перед началом**
+- [!] W2.3 P2.A tests boot.log invariant
+- [!] W2.4 P2.D on-device smoke на CI emulator — **критичный gate для всех остальных Phase 2**
+- [!] W2.5 P2.B process isolation `android:process=":vpn"` — **высокая ризковость, IPC контракт**
+- [!] W2.6 P2.C native crash reporting (Breakpad/Sentry Native)
+- [x] P2.E TunnelController state machine enforcement (закрыто в Phase 0 commits)
 
-1. **P2.A → P2.E** (state machine — простая, ловит #55) — параллельно после v0.0.1 retest
-2. **P2.A** (manual DI) — после v0.0.1 закрыт, КРИТИЧНО для будущей диагностики
-3. **P2.D** (CI smoke) — после P2.A, blocking для релизов
-4. **P2.C** (native crash) — после P2.A/D, блокирует следующие движки (Xray/Hy2)
-5. **P2.B** (process isolation) — последним, самая ризковая, требует P2.A
+### Особое внимание перед стартом Phase 2
 
-## Phase 3 — multi-engine (после Phase 2)
+- AUDIT.md P5 (Phase 0 reject): shutdown шаблон `Thread+runBlocking+isDaemon=true+Handler(getMainLooper()).post` ЗАЩИЩЁН тестом `OzeroVpnServiceLifecycleTest`. **Не переписывать**. Manual DI рефакторинг должен оставить shutdown логику нетронутой.
+- `loadOnce()` для libhev — только main thread. Защищено `OzeroVpnServiceLifecycleTest`.
+- HEV PKGNAME=hev зашит в .so — защищено `JniContractTest`.
 
-- Xray VLESS+Reality engine plugin
-- Hysteria2 engine plugin
-- AmneziaWG2 engine plugin
-- ChainOrchestrator real chains (не single-engine)
-- Auto chain switcher (geo-binding + DPI conditions)
+---
 
-## Текущая работа (живая)
+## Wave C — UI features требующие cross-module flow
 
-- ✅ v0.0.1 tagged + retag-6 working
-- ✅ Wave A cleanup полностью закрыта (W1.1-W1.4, W3.6, W3.9, W5.1-W5.9)
-- ⏳ Wave B (UI features W3.1-W3.4, W3.7, W3.8) — требует cross-module SettingsRepository → :common-vpn flow
-- ⏳ Wave C (W2.A manual DI implementation, W2.B process isolation, W2.C native crash) — требует device verify
-- ⏳ Wave D (W4.x Xray AAR + multi-engine) — заблокировано gomobile build pipeline
-- ⏳ Wave E (W6.x AmneziaWG/Hy2/Naive/Tor/URnetwork engines) — после W4.2
+VpnIntentLauncher должен инжектить SettingsRepository → передавать snapshot через Intent extras в OzeroVpnService. Без этого UI настройки не применяются. Decompose: extract IntentSettings data class в `:common-vpn`, MainActivity collects settings.first() перед start.
 
-## Следующая сессия (с device)
+- [!] W3.1 stats persistence + history UI — **Room migration v4→v5, blocked W2.4 для verify**
+- [!] W3.2 custom DNS UI (E2/F2) — **cross-module flow**
+- [!] W3.3 IPv6 toggle UI (F3) — **cross-module flow**
+- [!] W3.4 ByeDPI UI editor ~15 prefs (F4) — **большой UI scope, но pure-DataStore**
+- [!] W3.7 hosts whitelist/blacklist mgmt (F6) — **cross-module + ByeDPI args integration `-H file`**
+- [!] W3.8 autostart toggle (F8) — **BootReceiver + WorkManager OneTimeWorkRequest, cross-module DataStore**
 
-1. W2.2 implementation manual DI (по design doc `.memory/concepts/manual-di-design.md`)
-2. W2.4 emulator smoke job — необходимо для верификации W2.x
-3. W3.5.5/W3.5.6 — auto-test UI integration (после W2.4 emulator готов)
-4. W3.x cross-module — IPv6 toggle, custom DNS, ByeDPI editor — все требуют SettingsRepository → service flow
-5. W4.1 Xray AAR research — gomobile build, NDK r27, reproducibility
+---
+
+## Wave D — Xray + multi-engine
+
+Все блокированы W4.2 (требует Xray AAR build). gomobile cross-compile в CI — research перед стартом, потом реализация.
+
+- [!] W4.1 Xray AAR build pipeline research — **gomobile bind, NDK r27 cross-compile, reproducibility verify**
+- [!] W4.2 Xray engine real binding (engine-xray) — **blocked W4.1, требует device verify**
+- [!] W4.3 ChainOrchestrator multi-step UI builder — **blocked W4.2**
+- [!] W4.4 PublicProxyHarvester restoration (E16.1) — **blocked W4.2**
+- [!] W4.5 bootstrap-servers.json freeze (E16.4) — **blocked W4.4**
+
+---
+
+## Wave E — other engines (после Wave D)
+
+Все require Xray AAR pipeline pattern.
+
+- [!] W6.1 AmneziaWG2 engine — **blocked W4.2**
+- [!] W6.2 Hysteria2 engine — **blocked W4.2**
+- [!] W6.3 NaiveProxy engine — **research: возможен ли Android NDK build**
+- [!] W6.4 Tor + Snowflake (Dynamic Feature Module) — **blocked W4.2**
+- [!] W6.5 URnetwork P2P engine (E15) — **blocked W4.2, urnetwork/sdk gomobile**
+
+---
+
+## Wave F — post-multi-engine
+
+- [!] W7.1 HealthMonitor restoration — **blocked Wave E (нужно ≥2 рабочих engines)**
+- [!] W7.2 SubscriptionManager + signed sub URLs — **blocked W4.4**
+- [!] W7.3 Diagnostics screen (probe 20 URLs) — **blocked Wave D**
+- [!] W7.4 split-tunnel per-app (Android 10+) — **cross-module flow**
+
+---
+
+## Wave G — finalize
+
+- [!] W5.3 SecurityGuard MVP exclude — **invasive cross-module delete (~7 файлов), advisor перед стартом**
+- [!] W5.10 race conditions pickBest+waitSocksReady — **blocked W4.2**
+- [ ] W8.1 feature ветка финал — squash-ready audit (после всех waves)
+
+---
+
+## Порядок следующей сессии (когда юзер вернётся с device)
+
+Каждая задача ниже — atomic. Если оказывается сложной (cross-module, риск регрессии) — обязательно advisor + декомпозиция перед код-fix. Цель: чистая надёжная реализация без заглушек.
+
+1. **W2.4 emulator smoke** (low-risk инфраструктура): `.github/workflows/smoke.yml` matrix api-30/33. Боковая ветка от feature чтобы CI настроить, потом merge. После этого все Phase 2 verifiable автономно.
+2. **W2.2 manual DI implementation** (high-risk): atomic шаги W2.2.1-W2.2.5 из design doc. Каждый шаг — отдельный commit + verify через emulator smoke (W2.4).
+3. **W2.3 manual DI tests** — boot.log invariant + NoHiltAnnotationsTest sentinel.
+4. **W3.5.5 + W3.5.6** auto-test UI/DI integration. Использует AutoStrategyPickerFactory который читает Context.assets.
+5. **W2.5 process isolation** (high-risk): `android:process=":vpn"`. Требует Messenger IPC. После W2.2 (manual DI готов).
+6. **W2.6 native crash minidumps**: подключить Breakpad. После W2.5.
+7. **Cross-module W3.x**: рефакторинг VpnIntentLauncher → IntentSettings data class в `:common-vpn`. Затем W3.3 IPv6 toggle, W3.2 custom DNS, W3.4 ByeDPI editor, W3.1 stats persistence (Room migration), W3.7 hosts mgmt, W3.8 autostart.
+8. **W4.1 Xray AAR research**: gomobile, NDK, reproducibility. Без advisor + 2-3 итераций ресерча в код не лезть.
+9. **W4.2-W4.5**: Xray engine + chain UI + harvester + bootstrap.
+10. **Wave E** other engines в порядке приоритета: AWG2 → Hy2 → URnetwork → Tor → Naive (если Android build solvable).
+11. **Wave F**: HealthMonitor + SubscriptionManager + Diagnostics + split-tunnel.
+12. **Wave G finalize**: SecurityGuard delete + race conditions + squash audit.
+
+---
+
+## Defaults для разработки
+
+- Каждая задача с `[!]` — **обязательный advisor() перед стартом** для проверки подхода + декомпозиция на atomic шаги.
+- TDD строго: failing test → impl → green.
+- CI watch через `gh run watch`, не sleep.
+- Коммиты в `feature` ветку — частые, каждый atomic. Push после verify локально невозможен (CLAUDE.md `feedback_no_local_tests`) — push сразу + watch CI.
+- Никаких заглушек/stubs в production. Sentinel test (`NoStubsInProductionDi`) защищает.
+- Cross-module changes — extract data class в shared module, не передавать через Hilt graph если не Sure.

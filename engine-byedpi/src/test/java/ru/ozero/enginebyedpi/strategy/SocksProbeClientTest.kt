@@ -41,7 +41,7 @@ class SocksProbeClientTest {
     )
 
     @Test
-    fun `success когда actual >= declared length`() = runTest {
+    fun `success когда actual not less than declared length`() = runTest {
         val body = ByteArray(100) { it.toByte() }
         val opener = { _: URL, _: Proxy -> fakeConnection(200, 100L, body) }
         val result = client(opener).probe("example.com")
@@ -52,7 +52,7 @@ class SocksProbeClientTest {
     }
 
     @Test
-    fun `success когда declared <= 0 (chunked encoding или unknown)`() = runTest {
+    fun `success когда declared zero or less (chunked encoding или unknown)`() = runTest {
         val body = ByteArray(50)
         val opener = { _: URL, _: Proxy -> fakeConnection(200, -1L, body) }
         val result = client(opener).probe("example.com")
