@@ -2,7 +2,7 @@ package ru.ozero.coreapi
 
 sealed class EngineConfig {
     data class ByeDpi(
-        val args: String = "-Ku -a1 -An -o1 -At,r,s -d1",
+        val args: String = "-s1 -q1 -a1 -Y -Ar -a1 -s5 -o2 -At -f-1 -r1+s -a1 -As -s1 -o1+s -s-1 -a1",
         val socksPort: Int = 1080
     ) : EngineConfig()
 

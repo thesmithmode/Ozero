@@ -118,6 +118,6 @@ class XrayCandidateSource(
         const val DEFAULT_BASE_PORT = 10808
         const val DEFAULT_MAX = 5
         private const val TAG = "XrayCandidateSource"
-        val TRANSPORT_SAFE_2026 = setOf("xhttp", "grpc", "ws")
+        val TRANSPORT_SAFE_2026 = setOf("tcp", "xhttp", "grpc", "ws")
     }
 }

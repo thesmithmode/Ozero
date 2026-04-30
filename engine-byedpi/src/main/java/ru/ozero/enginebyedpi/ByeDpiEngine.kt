@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.coreapi.Engine
 import ru.ozero.coreapi.EngineCapabilities
 import ru.ozero.coreapi.EngineConfig
@@ -93,7 +94,19 @@ class ByeDpiEngine(
         withContext(Dispatchers.IO) {
             runCatching { proxy.jniStopProxy() }
                 .onFailure { Log.w(TAG, "jniStopProxy исключение: ${it.message}") }
-            proxyJobRef.getAndSet(null)?.cancel()
+            val job = proxyJobRef.getAndSet(null)
+            if (job != null) {
+                val completed = withTimeoutOrNull(STOP_GRACE_MS) {
+                    job.join()
+                    true
+                }
+                if (completed == null) {
+                    Log.w(TAG, "proxyJob не завершился за ${STOP_GRACE_MS}ms — jniForceClose")
+                    runCatching { proxy.jniForceClose() }
+                        .onFailure { Log.w(TAG, "jniForceClose исключение: ${it.message}") }
+                    job.cancel()
+                }
+            }
             activeSocksPort = 0
         }
     }
@@ -130,5 +143,6 @@ class ByeDpiEngine(
         const val READY_TIMEOUT_MS = 5_000L
         const val READY_PROBE_TIMEOUT_MS = 500
         const val READY_RETRY_MS = 100L
+        const val STOP_GRACE_MS = 1_500L
     }
 }

@@ -204,18 +204,19 @@ class OzeroVpnService : android.net.VpnService() {
                     runCatching { pipeline.stop() }
                         .onFailure { Log.w(TAG, "pipeline.stop threw", it) }
                 }
-            }, "OzeroVpn-stop")
+            }, "OzeroVpn-stop").apply { isDaemon = true }
             shutdown.start()
             shutdown.join(SHUTDOWN_JOIN_TIMEOUT_MS)
             closeTunFd(fdToClose)
             if (shutdown.isAlive) {
-                Log.e(TAG, "pipeline.stop hung > ${SHUTDOWN_JOIN_TIMEOUT_MS}ms — force-killing process")
-                PersistentLoggers.instance?.error(
+                Log.w(
                     TAG,
-                    "pipeline.stop hung > ${SHUTDOWN_JOIN_TIMEOUT_MS}ms — force-killing process",
+                    "pipeline.stop hung > ${SHUTDOWN_JOIN_TIMEOUT_MS}ms — leak daemon, продолжаем stopSelf",
                 )
-                processKiller.kill(Process.myPid())
-                return@launch
+                PersistentLoggers.instance?.warn(
+                    TAG,
+                    "pipeline.stop hung > ${SHUTDOWN_JOIN_TIMEOUT_MS}ms — leak daemon, no force-kill",
+                )
             }
             Handler(Looper.getMainLooper()).post {
                 try {
@@ -287,17 +288,15 @@ class OzeroVpnService : android.net.VpnService() {
                     runCatching { pipeline.stop() }
                         .onFailure { Log.w(TAG, "pipeline.stop in onDestroy threw", it) }
                 }
-            }, "OzeroVpn-shutdown")
+            }, "OzeroVpn-shutdown").apply { isDaemon = true }
             shutdown.start()
             shutdown.join(SHUTDOWN_JOIN_TIMEOUT_MS)
             if (shutdown.isAlive) {
-                Log.e(TAG, "pipeline.stop hung in onDestroy > ${SHUTDOWN_JOIN_TIMEOUT_MS}ms — force-killing")
-                PersistentLoggers.instance?.error(
+                Log.w(TAG, "pipeline.stop hung in onDestroy > ${SHUTDOWN_JOIN_TIMEOUT_MS}ms — leak daemon")
+                PersistentLoggers.instance?.warn(
                     TAG,
-                    "pipeline.stop hung in onDestroy > ${SHUTDOWN_JOIN_TIMEOUT_MS}ms — force-killing",
+                    "pipeline.stop hung in onDestroy > ${SHUTDOWN_JOIN_TIMEOUT_MS}ms — leak daemon",
                 )
-                processKiller.kill(Process.myPid())
-                return
             }
         }
         serviceScope.cancel()

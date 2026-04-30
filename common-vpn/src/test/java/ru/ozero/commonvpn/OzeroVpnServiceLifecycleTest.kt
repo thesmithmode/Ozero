@@ -192,16 +192,24 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `stopVpn force-kill процесс при зависании pipeline_stop`() {
+    fun `stopVpn использует daemon Thread + leak-on-hang вместо force-kill`() {
         val stopVpnBody = source.substringAfter("private fun stopVpn()")
             .substringBefore("\n    internal fun buildTunBuilder")
-        val isAliveIdx = stopVpnBody.indexOf("shutdown.isAlive")
-        val killIdx = stopVpnBody.indexOf("processKiller.kill(Process.myPid())", isAliveIdx)
         assertTrue(
-            isAliveIdx in 0 until killIdx,
-            "stopVpn обязан вызывать processKiller.kill(Process.myPid()) если shutdown.isAlive после join — " +
-                "это единственный способ освободить foreground service slot когда blocking JNI завис, " +
-                "иначе процесс висит до OOM/FORCE_STOP (полевой тест Nubia: 37 сек).",
+            stopVpnBody.contains("isDaemon = true"),
+            "stopVpn shutdown Thread обязан быть daemon — иначе висящий native thread держит процесс. " +
+                "Daemon thread позволяет процессу нормально завершиться даже если pipeline.stop() зависла.",
+        )
+        assertTrue(
+            !stopVpnBody.contains("processKiller.kill(Process.myPid())"),
+            "stopVpn НЕ должен force-killить процесс — этот подход вызывает SIGKILL у пользователя при каждом " +
+                "disconnect. Вместо этого daemon thread leak + stopSelf для нормального освобождения foreground slot.",
+        )
+        val isAliveIdx = stopVpnBody.indexOf("shutdown.isAlive")
+        val warnIdx = stopVpnBody.indexOf("Log.w(TAG", isAliveIdx)
+        assertTrue(
+            isAliveIdx in 0 until warnIdx,
+            "stopVpn должен логировать warning о hang (для диагностики), но НЕ убивать процесс.",
         )
     }
 
@@ -220,31 +228,17 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `onDestroy эскалирует force-kill при зависании shutdown`() {
+    fun `onDestroy daemon-leak вместо force-kill при зависании shutdown`() {
         val onDestroyBody = source.substringAfter("override fun onDestroy()")
             .substringBefore("\n    private fun closeTunFd")
-        val isAliveIdx = onDestroyBody.indexOf("shutdown.isAlive")
-        val killIdx = onDestroyBody.indexOf("processKiller.kill(Process.myPid())", isAliveIdx)
         assertTrue(
-            isAliveIdx in 0 until killIdx,
-            "onDestroy обязан вызывать processKiller.kill(Process.myPid()) если shutdown thread жив после join — " +
-                "иначе процесс остаётся в зомби-состоянии после Service.onDestroy и блокирует следующий старт.",
-        )
-    }
-
-    @Test
-    fun `ProcessKiller интерфейс присутствует и инжектируется`() {
-        assertTrue(
-            source.contains("fun interface ProcessKiller"),
-            "ProcessKiller должен быть fun interface — для тестируемости через перегрузку поля.",
+            onDestroyBody.contains("isDaemon = true"),
+            "onDestroy shutdown Thread обязан быть daemon — иначе висит процесс после Service.onDestroy.",
         )
         assertTrue(
-            source.contains("internal var processKiller: ProcessKiller"),
-            "OzeroVpnService должен иметь internal var processKiller — overridable из теста.",
-        )
-        assertTrue(
-            source.contains("Process.killProcess(pid)"),
-            "default ProcessKiller обязан звать android.os.Process.killProcess(pid) — реальная kill.",
+            !onDestroyBody.contains("processKiller.kill(Process.myPid())"),
+            "onDestroy НЕ должен force-killить процесс — Service.onDestroy уже последняя точка lifecycle, " +
+                "force-kill только хуже (зомби в TaskManager). Daemon thread + serviceScope.cancel() достаточно.",
         )
     }
 }

@@ -3,6 +3,7 @@ package ru.ozero.commonvpn.pipeline
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.commonvpn.HevTunnelConfig
 import ru.ozero.commonvpn.HevTunnelGateway
 import ru.ozero.commonvpn.TunnelController
@@ -103,12 +104,24 @@ class VpnEnginePipeline(
     suspend fun stop() {
         Log.i(TAG, "stop")
         currentEngine.getAndSet(null)?.let { eng ->
-            runCatching { eng.stop() }
-                .onFailure { Log.e(TAG, "engine.stop() threw", it) }
+            val ok = withTimeoutOrNull(ENGINE_STOP_TIMEOUT_MS) {
+                runCatching { eng.stop() }
+                    .onFailure { Log.e(TAG, "engine.stop() threw", it) }
+                true
+            }
+            if (ok == null) {
+                Log.w(TAG, "engine.stop() timeout ${ENGINE_STOP_TIMEOUT_MS}ms — продолжаем, tunnel ВСЕГДА закрываем")
+            }
         }
         if (tunnelStarted.compareAndSet(true, false)) {
-            runCatching { tunnelGateway.stop() }
-                .onFailure { Log.e(TAG, "tunnelGateway.stop() threw", it) }
+            val ok = withTimeoutOrNull(TUNNEL_STOP_TIMEOUT_MS) {
+                runCatching { tunnelGateway.stop() }
+                    .onFailure { Log.e(TAG, "tunnelGateway.stop() threw", it) }
+                true
+            }
+            if (ok == null) {
+                Log.w(TAG, "tunnelGateway.stop() timeout ${TUNNEL_STOP_TIMEOUT_MS}ms — fd закрыт, hev умрёт сама")
+            }
         }
         tunnelController.reset()
         if (orchestrator.state.value !is OrchestratorState.Idle) {
@@ -185,5 +198,7 @@ class VpnEnginePipeline(
     private companion object {
         const val TAG = "VpnEnginePipeline"
         const val DEFAULT_SOCKS_HOST = "127.0.0.1"
+        const val ENGINE_STOP_TIMEOUT_MS = 2_500L
+        const val TUNNEL_STOP_TIMEOUT_MS = 3_000L
     }
 }

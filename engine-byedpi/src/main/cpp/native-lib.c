@@ -86,6 +86,12 @@ Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniStopProxy(__attribute__((unused)) JNIE
 
 JNIEXPORT jint JNICALL
 Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniForceClose(__attribute__((unused)) JNIEnv *env, __attribute__((unused)) jobject thiz) {
-    if (server_fd < 0) return -1;
-    return close(server_fd);
+    if (server_fd < 0) {
+        atomic_store(&g_proxy_running, 0);
+        return -1;
+    }
+    int rc = close(server_fd);
+    server_fd = -1;
+    atomic_store(&g_proxy_running, 0);
+    return rc;
 }
