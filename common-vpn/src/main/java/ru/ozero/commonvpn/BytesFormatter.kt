@@ -21,4 +21,31 @@ object BytesFormatter {
         val signed = if (bytes < 0) -value else value
         return String.format(Locale.US, "%.1f %s", signed, UNITS[unit])
     }
+
+    fun humanReadablePerSec(bytesPerSec: Double): String {
+        if (bytesPerSec <= 0.0) return "0 B/s"
+        val abs = abs(bytesPerSec)
+        if (abs < UNIT_STEP) return String.format(Locale.US, "%.0f B/s", bytesPerSec)
+        var value = abs
+        var unit = 0
+        while (value >= UNIT_STEP && unit < UNITS.size - 1) {
+            value /= UNIT_STEP
+            unit++
+        }
+        val signed = if (bytesPerSec < 0) -value else value
+        return String.format(Locale.US, "%.1f %s/s", signed, UNITS[unit])
+    }
+
+    fun durationHms(ms: Long): String {
+        if (ms <= 0L) return "00:00"
+        val totalSec = ms / 1000
+        val h = totalSec / 3600
+        val m = (totalSec % 3600) / 60
+        val s = totalSec % 60
+        return if (h > 0) {
+            String.format(Locale.US, "%d:%02d:%02d", h, m, s)
+        } else {
+            String.format(Locale.US, "%02d:%02d", m, s)
+        }
+    }
 }

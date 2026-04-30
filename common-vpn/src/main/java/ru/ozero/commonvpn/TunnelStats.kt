@@ -6,4 +6,7 @@ data class TunnelStats(
     val rxPackets: Long,
     val rxBytes: Long,
     val timestampMs: Long,
+    val bpsIn: Double = 0.0,
+    val bpsOut: Double = 0.0,
+    val sessionStartMs: Long = 0L,
 )

@@ -14,6 +14,8 @@
     <string name="main_status_disconnecting">Disconnecting…</string>
     <string name="main_status_failed">Error</string>
     <string name="main_active_engine">Active engine: %1$s</string>
+    <string name="stats_session">Session: ↓ %1$s ↑ %2$s</string>
+    <string name="stats_uptime">Uptime: %1$s</string>
 
     <!-- Tabs -->
     <string name="tab_main">Home</string>

@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineId
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -220,6 +221,42 @@ class TunnelControllerTest {
         )
         controller.updateStats(snapshot)
         assertEquals(snapshot, controller.stats.value)
+    }
+
+    @Test
+    fun updateStatsCalculatesBpsFromDelta() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        controller.updateStats(
+            TunnelStats(
+                txPackets = 0, txBytes = 0, rxPackets = 0, rxBytes = 0, timestampMs = 1000,
+            ),
+        )
+        controller.updateStats(
+            TunnelStats(
+                txPackets = 10, txBytes = 1024, rxPackets = 20, rxBytes = 2048, timestampMs = 2000,
+            ),
+        )
+        val snapshot = controller.stats.value
+        assertNotNull(snapshot)
+        assertTrue(snapshot.bpsIn > 0.0, "bpsIn должен быть > 0 после второго sample")
+        assertTrue(snapshot.bpsOut > 0.0, "bpsOut должен быть > 0 после второго sample")
+        assertEquals(2048L, snapshot.rxBytes)
+    }
+
+    @Test
+    fun onEngineStartedSetsSessionStartMs() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        val before = System.currentTimeMillis()
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        controller.updateStats(
+            TunnelStats(txPackets = 0, txBytes = 0, rxPackets = 0, rxBytes = 0, timestampMs = before + 100),
+        )
+        val snapshot = controller.stats.value
+        assertNotNull(snapshot)
+        assertTrue(snapshot.sessionStartMs >= before, "sessionStartMs должен быть установлен в onEngineStarted")
     }
 
     @Test

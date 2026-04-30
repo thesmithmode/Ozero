@@ -62,7 +62,8 @@ class OzeroVpnService : android.net.VpnService() {
         private const val CHAIN_START_TIMEOUT_MS = 30_000L
         private const val CHAIN_STOP_TIMEOUT_MS = 3_000L
         private const val NATIVE_STOP_TIMEOUT_MS = 3_000L
-        private const val STATS_LOG_INTERVAL_MS = 5_000L
+        private const val STATS_SAMPLE_INTERVAL_MS = 1_000L
+        private const val STATS_NOTIFY_LOG_EVERY = 5
     }
 
     override fun onCreate() {
@@ -207,9 +208,10 @@ class OzeroVpnService : android.net.VpnService() {
         val job = serviceScope.launch {
             var prevTx = 0L
             var prevRx = 0L
+            var tickCount = 0
             try {
                 while (true) {
-                    delay(STATS_LOG_INTERVAL_MS)
+                    delay(STATS_SAMPLE_INTERVAL_MS)
                     if (stopSignal.get()) return@launch
                     val raw = runCatching { hev.TProxyService.TProxyGetStats() }.getOrNull()
                     if (raw == null || raw.size < 4) {
@@ -220,8 +222,6 @@ class OzeroVpnService : android.net.VpnService() {
                     val txBytes = raw[1]
                     val rxPackets = raw[2]
                     val rxBytes = raw[3]
-                    val dTx = txBytes - prevTx
-                    val dRx = rxBytes - prevRx
                     val snapshot = TunnelStats(
                         txPackets = txPackets,
                         txBytes = txBytes,
@@ -230,15 +230,20 @@ class OzeroVpnService : android.net.VpnService() {
                         timestampMs = System.currentTimeMillis(),
                     )
                     tunnelController.updateStats(snapshot)
-                    PersistentLoggers.info(
-                        TAG,
-                        "TunnelStats tx=${BytesFormatter.humanReadable(txBytes)}/$txPackets pkts " +
-                            "rx=${BytesFormatter.humanReadable(rxBytes)}/$rxPackets pkts " +
-                            "Δtx=${BytesFormatter.humanReadable(dTx)} Δrx=${BytesFormatter.humanReadable(dRx)}",
-                    )
-                    updateNotificationWithStats(txBytes, rxBytes)
-                    prevTx = txBytes
-                    prevRx = rxBytes
+                    tickCount++
+                    if (tickCount % STATS_NOTIFY_LOG_EVERY == 0) {
+                        val dTx = txBytes - prevTx
+                        val dRx = rxBytes - prevRx
+                        PersistentLoggers.info(
+                            TAG,
+                            "TunnelStats tx=${BytesFormatter.humanReadable(txBytes)}/$txPackets pkts " +
+                                "rx=${BytesFormatter.humanReadable(rxBytes)}/$rxPackets pkts " +
+                                "Δtx=${BytesFormatter.humanReadable(dTx)} Δrx=${BytesFormatter.humanReadable(dRx)}",
+                        )
+                        updateNotificationWithStats(txBytes, rxBytes)
+                        prevTx = txBytes
+                        prevRx = rxBytes
+                    }
                 }
             } catch (ce: kotlinx.coroutines.CancellationException) {
                 throw ce
