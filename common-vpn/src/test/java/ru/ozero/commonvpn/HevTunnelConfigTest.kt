@@ -139,4 +139,33 @@ class HevTunnelConfigTest {
         val cfg = HevTunnelConfig(tunPfd = pfd(5), socksAddress = "127.0.0.1", socksPort = 1080, udpMode = "tcp")
         assertTrue(cfg.toYaml().contains("udp: 'tcp'"))
     }
+
+    @Test
+    fun `default toYaml содержит log-level warn`() {
+        val yaml = base().toYaml()
+        assertTrue(yaml.contains("log-level: warn"), "default log-level=warn снижает native spam")
+    }
+
+    @Test
+    fun `custom hevLogLevel прописывается в misc`() {
+        val cfg = HevTunnelConfig(
+            tunPfd = pfd(5),
+            socksAddress = "127.0.0.1",
+            socksPort = 1080,
+            hevLogLevel = "info",
+        )
+        assertTrue(cfg.toYaml().contains("log-level: info"))
+    }
+
+    @Test
+    fun `rejects invalid hevLogLevel`() {
+        assertThrows<IllegalArgumentException> {
+            HevTunnelConfig(
+                tunPfd = pfd(5),
+                socksAddress = "127.0.0.1",
+                socksPort = 1080,
+                hevLogLevel = "trace",
+            )
+        }
+    }
 }
