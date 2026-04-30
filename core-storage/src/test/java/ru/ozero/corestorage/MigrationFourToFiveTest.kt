@@ -5,7 +5,7 @@ import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class Migration_4_5_Test {
+class MigrationFourToFiveTest {
 
     private val source by lazy {
         val moduleRoot = File(System.getProperty("user.dir") ?: ".")
