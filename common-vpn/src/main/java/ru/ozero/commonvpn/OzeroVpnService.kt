@@ -47,7 +47,11 @@ class OzeroVpnService : android.net.VpnService() {
 
     @Inject lateinit var settingsRepository: ru.ozero.enginescore.settings.SettingsRepository
 
+    @Inject lateinit var sessionStatsRecorder: SessionStatsRecorder
+
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val sessionIdRef = AtomicReference<Long>(-1L)
+    private val sessionStartMsRef = AtomicReference<Long>(0L)
 
     internal var processKiller: ProcessKiller = ProcessKiller { pid -> Process.killProcess(pid) }
 
@@ -213,6 +217,12 @@ class OzeroVpnService : android.net.VpnService() {
                     return@launch
                 }
                 tunnelController.onEngineStarted(EngineId.BYEDPI, chainResult.finalSocksPort)
+                val nowMs = System.currentTimeMillis()
+                sessionStartMsRef.set(nowMs)
+                val id = runCatching {
+                    sessionStatsRecorder.startSession(EngineId.BYEDPI.name, nowMs)
+                }.getOrDefault(-1L)
+                sessionIdRef.set(id)
                 startStatsLogger()
             } finally {
                 starting.set(false)
@@ -289,7 +299,31 @@ class OzeroVpnService : android.net.VpnService() {
         tunnelController.onDisconnecting()
         startJobRef.getAndSet(null)?.cancel()
         statsJobRef.getAndSet(null)?.cancel()
+        recordSessionEnd(SessionStatsRecorder.Status.DISCONNECTED)
         serviceScope.launch { performShutdown() }
+    }
+
+    private fun recordSessionEnd(status: SessionStatsRecorder.Status) {
+        val id = sessionIdRef.getAndSet(-1L)
+        if (id < 0) return
+        val startMs = sessionStartMsRef.getAndSet(0L)
+        val nowMs = System.currentTimeMillis()
+        val durationMs = if (startMs > 0L) (nowMs - startMs).coerceAtLeast(0L) else 0L
+        val lastStats = tunnelController.stats.value
+        val rxBytes = lastStats?.rxBytes ?: 0L
+        val txBytes = lastStats?.txBytes ?: 0L
+        serviceScope.launch {
+            runCatching {
+                sessionStatsRecorder.endSession(
+                    id = id,
+                    endedAt = nowMs,
+                    rxBytes = rxBytes,
+                    txBytes = txBytes,
+                    durationMs = durationMs,
+                    status = status,
+                )
+            }.onFailure { PersistentLoggers.warn(TAG, "endSession threw: ${it.message}") }
+        }
     }
 
     private suspend fun performShutdown() {
