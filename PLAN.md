@@ -2,21 +2,25 @@
 
 Засечки `[x]` = done. `[~]` = частично/research. `[ ]` = pending. `[!]` = требует особое внимание (риск, device verify, cross-module).
 
-## Статус (2026-04-30 evening — autonom session 33+ commits)
+## Статус (2026-05-01 — autonom session 47+ commits)
 
-- **feature** ahead of dev: 33+ commits autonomous session
+- **feature** ahead of dev: 47+ commits autonomous session
 - **v0.0.1** tagged + retag-6 working (live speed UI)
 - **CI feature** = full pipeline (kotlin-style + Python + assembleDebug + lint + Tests+coverage)
 - **JaCoCo gate**: 0.90 LINE + 0.90 BRANCH
 
-### Закрыто в session
+### Closed (37 / 14 pending)
 
 - **Wave A cleanup** полностью (W1.1-W1.4, W3.6, W3.9, W5.1, W5.2, W5.4-W5.9)
-- **Wave B auto-strategy** (W3.5.1-W3.5.6 — picker logic + tests + UI/DI factory)
-- **Wave C UI** real impl (W3.0 SettingsRepository → :engines-core, W3.2 custom DNS, W3.3 IPv6 toggle, W3.4 ByeDPI editor, W3.7 hosts white/black backend, W3.8 autostart wired)
-- **Wave Stats** (W3.1.a Room v4→5, W3.1.b TunnelController persists, W3.1.c StatsHistory UI)
-- **W5.3 SecurityGuard** удалён (:security модуль, ~26 файлов deleted)
-- **W2.1 manual DI design** doc + research
+- **Wave B auto-strategy** (W3.5.1-W3.5.6 — picker logic + tests + UI factory + DI)
+- **Wave C UI** real impl через atomic refactor W3.0 SettingsRepository → :engines-core (W3.2 custom DNS, W3.3 IPv6 toggle, W3.4 ByeDPI editor, W3.7 hosts white/black backend + ByeDPI -H args, W3.8 autostart wired)
+- **Wave Stats** (W3.1.a Room v4→5 + Migration sentinel, W3.1.b TunnelController persists через SessionStatsRecorder + RoomImpl, W3.1.c StatsHistoryViewModel + Compose Screen + nav)
+- **Wave G W5.3 SecurityGuard** удалён (:security модуль, ~26 файлов)
+- **Wave F partial**: W7.1 HealthMonitor restoration (periodic SOCKS5 probe + DEGRADED detection + 7 unit tests), W7.3 Diagnostics screen verified (20 URLs + Tester + ViewModel), W7.4 split-tunnel per-app applies (SplitTunnelRulesProvider interface + RoomImpl)
+- **W2.1 manual DI design** doc + research (research-only, impl device-required)
+- **W4.1 partial**: build_xray.sh template + binaries.yml extension + research doc (full AAR build = device session)
+- **W9.1 language picker scaffold + UI**: DataStore + LocaleApplier + ViewModel + LanguageSection RadioButton 12 options
+- **Code review concerns**: C2 (HealthMonitor scope leak fixed), C4 (FAILED status distinguish fixed), M4 (warn missing id fixed). C1/C3/C5 deferred с обоснованием
 
 ---
 
@@ -135,8 +139,8 @@ W3.0 atomic refactor: SettingsRepository interface + SettingsModel + SettingsKey
 
 ## Wave H — i18n локализация UI
 
-- [!] W9.1 step выбора языка UI в Onboarding + Settings — **расширить settings_language_* (system/ru/en уже есть). Locale switching через AppCompat `AppCompatDelegate.setApplicationLocales(LocaleListCompat)` (не require restart). Persist в DataStore key UI_LOCALE_TAG.**
-- [!] W9.2 переводы на топ-10 языков. Сейчас: ru (default values/), en (values-en/). **Добавить**: values-zh-rCN/ (Mandarin), values-es/ (Spanish), values-ar/ (Arabic — RTL), values-fr/ (French), values-hi/ (Hindi), values-pt/ (Portuguese), values-id/ (Indonesian), values-de/ (German), values-ja/ (Japanese). **Подход**: machine translation базовая + native speaker review для финальной полировки. Для всех string resource keys из values/strings.xml (~80 keys). Lint warning MissingTranslation выявит gap'ы.
+- [x] W9.1 language picker — DataStore UI_LOCALE_TAG + SettingsModel.uiLocaleTag + Repository.setUiLocaleTag + LocaleApplier (AppCompatDelegate.setApplicationLocales) + ViewModel.onUiLocaleSelect + LanguageSection RadioButton 12 options (System + RU + EN + 9 topа). 9 string keys в values/strings.xml + values-en/.
+- [!] W9.2 переводы на топ-10 языков. Сейчас: ru (default values/), en (values-en/). **Добавить**: values-zh-rCN/ (Mandarin), values-es/ (Spanish), values-ar/ (Arabic — RTL), values-fr/ (French), values-hi/ (Hindi), values-pt/ (Portuguese), values-id/ (Indonesian), values-de/ (German), values-ja/ (Japanese). **Подход**: machine translation базовая + native speaker review для финальной полировки. Для всех string resource keys из values/strings.xml (~90 keys). Lint warning MissingTranslation выявит gap'ы.
 - [!] W9.3 RTL layout audit — values-ar/ требует mirror layout. Compose `LocalLayoutDirection`. Test screens на RTL preview.
 
 ---
