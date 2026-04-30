@@ -29,6 +29,8 @@ class LoggingContractTest {
 
     private val rawLogPattern = Regex("""\bLog\.(e|w|wtf)\(""")
 
+    private val skipDirs = setOf("build", ".git", ".gradle", ".memory", "node_modules", ".claude")
+
     @Test
     fun `production code uses PersistentLoggers for warn-error, raw android-util-Log only on whitelist`() {
         val repoRoot = locateRepoRoot()
@@ -95,9 +97,7 @@ class LoggingContractTest {
         val result = mutableListOf<File>()
         repoRoot.walkTopDown()
             .onEnter { dir ->
-                val name = dir.name
-                name != "build" && name != ".git" && name != ".gradle" && name != ".memory" &&
-                    name != "node_modules" && name != ".claude"
+                dir.name !in skipDirs
             }
             .forEach { f ->
                 if (!f.isFile || !f.name.endsWith(".kt")) return@forEach
