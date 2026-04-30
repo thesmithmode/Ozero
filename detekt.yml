@@ -89,6 +89,8 @@ naming:
     excludes:
       - '**/ui/**'
       - '**/theme/**'
+      - '**/test/**'
+      - '**/androidTest/**'
   VariableNaming:
     active: true
     variablePattern: '[a-z][A-Za-z0-9]*'
