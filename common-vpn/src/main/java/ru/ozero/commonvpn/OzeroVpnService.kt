@@ -27,7 +27,6 @@ import ru.ozero.enginescore.ChainResult
 import ru.ozero.enginescore.ChainStep
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
-import ru.ozero.security.SecurityStateHolder
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
@@ -119,10 +118,6 @@ class OzeroVpnService : android.net.VpnService() {
 
     private fun startVpn() {
         if (stopping.get()) {
-            stopVpn()
-            return
-        }
-        if (SecurityStateHolder.isCompromised) {
             stopVpn()
             return
         }

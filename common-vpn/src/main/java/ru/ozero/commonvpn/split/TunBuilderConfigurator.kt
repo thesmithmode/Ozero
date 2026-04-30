@@ -2,6 +2,7 @@ package ru.ozero.commonvpn.split
 
 import android.net.VpnService
 import ru.ozero.enginescore.PersistentLoggers
+import ru.ozero.enginescore.settings.SplitTunnelMode
 
 class TunBuilderConfigurator(
     private val packageName: String,

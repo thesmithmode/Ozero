@@ -122,7 +122,6 @@
     <string name="a11y_engine_active">Active engine: %1$s</string>
 
     <string name="error_generic">Error</string>
-    <string name="security_blocked">VPN start blocked: runtime tampering detected</string>
 
 
     <string name="onboarding_title_1">Why Ozero</string>

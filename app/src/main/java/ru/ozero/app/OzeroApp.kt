@@ -17,15 +17,12 @@ import ru.ozero.app.logging.BootDiagnostics
 import ru.ozero.app.logging.BootFileLogger
 import ru.ozero.app.logging.LogBuffer
 import ru.ozero.app.ui.onboarding.FirstRunBootstrap
-import ru.ozero.security.SecurityWatchdog
 import javax.inject.Inject
 
 @HiltAndroidApp
 class OzeroApp : Application(), Configuration.Provider {
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
-
-    @Inject lateinit var securityWatchdog: SecurityWatchdog
 
     @Inject lateinit var logBuffer: LogBuffer
 
@@ -62,20 +59,11 @@ class OzeroApp : Application(), Configuration.Provider {
         runCatching {
             AppLogger.attach(logBuffer)
         }.onFailure { BootFileLogger.error(TAG, "AppLogger.attach failed", it) }
-        if (shouldStartSecurityWatchdog()) {
-            runCatching { securityWatchdog.start(appScope) }
-        }
         appScope.launch {
             runCatching { firstRunBootstrap.runIfFirstStart() }
                 .onFailure { BootFileLogger.warn(TAG, "firstRunBootstrap.runIfFirstStart failed", it) }
         }
     }
-
-    private fun shouldStartSecurityWatchdog(): Boolean =
-        !BuildConfig.DEBUG && !isRobolectricRuntime()
-
-    private fun isRobolectricRuntime(): Boolean =
-        runCatching { Class.forName("org.robolectric.RuntimeEnvironment") }.isSuccess
 
     private companion object {
         const val TAG = "OzeroApp"

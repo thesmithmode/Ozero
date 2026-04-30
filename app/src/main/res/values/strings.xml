@@ -122,7 +122,6 @@
     <string name="a11y_engine_active">Сейчас активен движок %1$s</string>
 
     <string name="error_generic">Ошибка</string>
-    <string name="security_blocked">VPN запуск заблокирован: обнаружено вмешательство в среду исполнения</string>
 
     <!-- onboarding -->
     <string name="onboarding_title_1">Зачем Ozero</string>

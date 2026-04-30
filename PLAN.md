@@ -110,6 +110,7 @@ VpnIntentLauncher должен инжектить SettingsRepository → пер�
 - [!] W6.3 NaiveProxy engine — **research: возможен ли Android NDK build**
 - [!] W6.4 Tor + Snowflake (Dynamic Feature Module) — **blocked W4.2**
 - [!] W6.5 URnetwork P2P engine (E15) — **blocked W4.2, urnetwork/sdk gomobile**
+- [!] W6.6 FPTN engine — **новый протокол. github.com/fptn-project/fptn — клиент-серверный VPN с ключом. Decompose: a) AAR build pipeline (research нужен — gomobile? C++ NDK?), b) FptnEngine: EnginePlugin, c) UI — input field "FPTN ключ" в ManualServerScreen или отдельный engine settings, d) DI wiring. blocked W4.2 (engine pattern проверен на Xray)**
 
 ---
 

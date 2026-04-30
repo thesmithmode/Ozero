@@ -104,7 +104,6 @@ dependencies {
     implementation(project(":common-vpn"))
     implementation(project(":common-crypto"))
     implementation(project(":engine-byedpi"))
-    implementation(project(":security"))
 
     implementation(libs.bundles.okhttp)
 
