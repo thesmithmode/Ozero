@@ -167,9 +167,16 @@ class OzeroVpnService : android.net.VpnService() {
             }
             try {
                 tunnelController.onProbing()
+                val byedpiConfig = EngineConfig.ByeDpi(
+                    args = settings?.byedpiWinningArgs?.takeIf { it.isNotBlank() }
+                        ?: EngineConfig.ByeDpi().args,
+                    hostsMode = settings?.hostsMode
+                        ?: ru.ozero.enginescore.settings.HostsMode.DISABLED,
+                    hosts = settings?.hosts.orEmpty(),
+                )
                 val chainResult = withTimeoutOrNull(CHAIN_START_TIMEOUT_MS) {
                     try {
-                        chainOrchestrator.start(listOf(ChainStep(EngineId.BYEDPI, EngineConfig.ByeDpi())))
+                        chainOrchestrator.start(listOf(ChainStep(EngineId.BYEDPI, byedpiConfig)))
                     } catch (ce: kotlinx.coroutines.CancellationException) {
                         throw ce
                     } catch (t: Throwable) {

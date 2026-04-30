@@ -21,4 +21,8 @@ interface SettingsRepository {
     suspend fun setByedpiWinningArgs(args: String?)
 
     suspend fun setCustomDnsServers(servers: List<String>)
+
+    suspend fun setHostsMode(mode: HostsMode)
+
+    suspend fun setHosts(hosts: List<String>)
 }

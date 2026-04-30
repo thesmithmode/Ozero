@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.settings.AutoStartGateway
+import ru.ozero.enginescore.settings.HostsMode
 import ru.ozero.enginescore.settings.SettingsKeys
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
@@ -79,6 +80,21 @@ class SettingsRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun setHostsMode(mode: HostsMode) {
+        dataStore.edit { it[SettingsKeys.HOSTS_MODE] = mode.name }
+    }
+
+    override suspend fun setHosts(hosts: List<String>) {
+        dataStore.edit { prefs ->
+            val cleaned = hosts.map { it.trim() }.filter { it.isNotEmpty() }
+            if (cleaned.isEmpty()) {
+                prefs.remove(SettingsKeys.HOSTS_LIST)
+            } else {
+                prefs[SettingsKeys.HOSTS_LIST] = cleaned.joinToString(",")
+            }
+        }
+    }
+
     private fun Preferences.toSettingsModel(): SettingsModel = SettingsModel(
         splitMode = readSplitMode(),
         ipv6Enabled = this[SettingsKeys.IPV6_ENABLED] ?: SettingsModel.DEFAULT_IPV6_ENABLED,
@@ -88,10 +104,22 @@ class SettingsRepositoryImpl @Inject constructor(
         urnetworkJwt = this[SettingsKeys.URNETWORK_JWT],
         byedpiWinningArgs = this[SettingsKeys.BYDPI_WINNING_ARGS],
         customDnsServers = readCustomDnsServers(),
+        hostsMode = readHostsMode(),
+        hosts = readHosts(),
     )
 
     private fun Preferences.readCustomDnsServers(): List<String> {
         val raw = this[SettingsKeys.CUSTOM_DNS_SERVERS] ?: return SettingsModel.DEFAULT_CUSTOM_DNS_SERVERS
+        return raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+    }
+
+    private fun Preferences.readHostsMode(): HostsMode {
+        val raw = this[SettingsKeys.HOSTS_MODE] ?: return SettingsModel.DEFAULT_HOSTS_MODE
+        return runCatching { HostsMode.valueOf(raw) }.getOrDefault(SettingsModel.DEFAULT_HOSTS_MODE)
+    }
+
+    private fun Preferences.readHosts(): List<String> {
+        val raw = this[SettingsKeys.HOSTS_LIST] ?: return SettingsModel.DEFAULT_HOSTS
         return raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
     }
 

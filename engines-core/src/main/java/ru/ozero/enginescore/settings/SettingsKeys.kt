@@ -23,4 +23,7 @@ object SettingsKeys {
     val URNETWORK_JWT = stringPreferencesKey("urnetwork_jwt")
 
     val CUSTOM_DNS_SERVERS = stringPreferencesKey("custom_dns_servers")
+
+    val HOSTS_MODE = stringPreferencesKey("hosts_mode")
+    val HOSTS_LIST = stringPreferencesKey("hosts_list")
 }
