@@ -7,7 +7,6 @@ import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
 import androidx.core.content.ContextCompat
-import ru.ozero.app.logging.AppLogger
 import ru.ozero.app.logging.BootFileLogger
 import ru.ozero.app.ui.MainViewModel
 import ru.ozero.commonvpn.OzeroVpnService
