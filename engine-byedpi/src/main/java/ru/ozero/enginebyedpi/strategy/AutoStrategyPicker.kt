@@ -108,5 +108,6 @@ class AutoStrategyPicker(
     companion object {
         const val START_TIMEOUT_MS: Long = 6_000L
         const val BETWEEN_STRATEGY_DELAY_MS: Long = 500L
+        private const val TAG: String = "AutoStrategyPicker"
     }
 }
