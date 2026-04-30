@@ -11,6 +11,7 @@ import ru.ozero.app.ui.splittunnel.DefaultAppListProvider
 import ru.ozero.corestorage.OzeroDatabase
 import ru.ozero.corestorage.dao.AppSplitRuleDao
 import ru.ozero.corestorage.dao.ServerDao
+import ru.ozero.corestorage.dao.SessionStatsDao
 import javax.inject.Singleton
 
 @Module
@@ -28,6 +29,9 @@ object StorageModule {
 
     @Provides
     fun provideAppSplitRuleDao(database: OzeroDatabase): AppSplitRuleDao = database.appSplitRuleDao()
+
+    @Provides
+    fun provideSessionStatsDao(database: OzeroDatabase): SessionStatsDao = database.sessionStatsDao()
 }
 
 @Module
