@@ -14,7 +14,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.commondns.PublicDnsServers
 import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_START
@@ -42,6 +44,8 @@ class OzeroVpnService : android.net.VpnService() {
     @Inject lateinit var tunnelGateway: HevTunnelGateway
 
     @Inject lateinit var tunnelController: TunnelController
+
+    @Inject lateinit var settingsRepository: ru.ozero.enginescore.settings.SettingsRepository
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -129,8 +133,11 @@ class OzeroVpnService : android.net.VpnService() {
             .onFailure { PersistentLoggers.warn(TAG, "TProxyService.loadOnce threw: ${it.message}") }
         PersistentLoggers.info(TAG, "loadOnce done libraryLoaded=${hev.TProxyService.libraryLoaded}")
 
+        val ipv6Enabled = runCatching {
+            runBlocking { settingsRepository.settings.first().ipv6Enabled }
+        }.getOrDefault(false)
         val fd = try {
-            buildTunBuilder().establish()
+            buildTunBuilder(ipv6Enabled = ipv6Enabled).establish()
         } catch (t: Throwable) {
             PersistentLoggers.error(TAG, "establish threw: ${t.message}")
             starting.set(false)
@@ -325,10 +332,15 @@ class OzeroVpnService : android.net.VpnService() {
     internal fun buildTunBuilder(
         splitConfig: ru.ozero.commonvpn.split.SplitTunnelConfig =
             ru.ozero.commonvpn.split.SplitTunnelConfig(),
+        ipv6Enabled: Boolean = false,
     ): Builder {
         val builder = Builder()
             .addAddress(TUN_ADDRESS, TUN_PREFIX_LENGTH)
             .setSession(SESSION_NAME)
+        if (ipv6Enabled) {
+            builder.addAddress(TUN_ADDRESS_V6, TUN_PREFIX_LENGTH_V6)
+            builder.addRoute("::", 0)
+        }
         TUN_DNS_SERVERS.forEach { builder.addDnsServer(it) }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             runCatching { builder.setMetered(false) }
