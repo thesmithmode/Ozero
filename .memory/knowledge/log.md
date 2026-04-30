@@ -17,3 +17,15 @@
 - Result: SKIPPED — daily log contains only memory flush entries (all "Nothing worth saving" or flush error), no sessions or extractable knowledge
 - Articles created: (none)
 - Articles updated: (none)
+
+## [2026-04-30T22:00:00+03:00] compile | 2026-04-30.md (manual notes added)
+- Source: daily/2026-04-30.md
+- Articles created: [[concepts/v001-dpi-bypass-fix-chain]], [[concepts/tun-mtu-dual-layer]], [[concepts/byedpi-auto-strategy-testing]], [[concepts/libhev-tunnel-stats]], [[concepts/vpnservice-builder-traps]]
+- Connections created: [[connections/byedpi-reference-parity]]
+- Articles updated: [[concepts/nubia-rom-permission-enforcement]] (added setMetered finding)
+- Note: [[concepts/byedpi-args-parsing]] already existed from earlier in this session, not re-created
+
+## [2026-04-30T22:06:14+03:00] compile | 2026-04-30.md (session 22:06 — wiki maintenance)
+- Source: daily/2026-04-30.md
+- Articles created: (none)
+- Articles updated: [[concepts/wiki-knowledge-base]] (added flush hook unreliability, compact-before-clear ordering, operational lessons)

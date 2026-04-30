@@ -4,8 +4,9 @@ aliases: [memory-system, claude-memory-compiler, knowledge-vault]
 tags: [tooling, knowledge-management, wiki]
 sources:
   - "daily/2026-04-29.md"
+  - "daily/2026-04-30.md"
 created: 2026-04-29
-updated: 2026-04-29
+updated: 2026-04-30
 ---
 
 # Wiki Knowledge Base Setup
@@ -19,6 +20,7 @@ Ozero uses a personal knowledge base system based on the claude-memory-compiler 
 - Daily logs are the immutable source; knowledge articles are the compiled output
 - The system uses Claude Agent SDK for compilation, not RAG — index-guided retrieval at personal scale
 - `.gitignore` is configured to include `.memory/` in version control while excluding runtime state
+- Auto-flush hooks (`session-end.py`, `pre-compact.py`) are unreliable — may write "Nothing worth saving" even in productive sessions; daily logs require manual verification before compile
 
 ## Details
 
@@ -28,6 +30,14 @@ The setup was performed using the `/wiki-init` skill, which cloned `coleam00/cla
 
 The system supports three operations: compile (daily logs to knowledge articles), query (ask the knowledge base), and lint (health checks for consistency). All operations use the Claude Agent SDK with tool access for file operations.
 
+### Operational Lessons (2026-04-30)
+
+The auto-flush hooks proved unreliable during the v0.0.1 development day. Despite 14 flush attempts across a highly productive session (9 VPN fixes, native debugging, architecture research), all hooks wrote "Nothing worth saving" or threw errors. The entire day's knowledge had to be manually transcribed into the daily log before compilation. This revealed a structural weakness: the flush process relies on Claude Agent SDK to judge conversation value, but short or fragmented transcripts (common during rapid iteration) may not contain enough context for accurate value assessment.
+
+The correct operational sequence for wiki maintenance is: compact first (creates new articles from daily logs), then clear/lint second (validates the newly created articles). Running lint before compact produces false positives for broken links — articles referenced in daily logs haven't been created yet.
+
+Broken links in compile output are expected when a daily log references concepts that will become articles during that same compile pass. The compiler creates articles sequentially, so early articles may reference later ones before they exist. A post-compile lint resolves these.
+
 ## Related Concepts
 
 - [[concepts/ci-workflow-discipline]] - The CI workflow that the wiki documents and tracks
@@ -36,3 +46,4 @@ The system supports three operations: compile (daily logs to knowledge articles)
 ## Sources
 
 - [[daily/2026-04-29.md]] - `/wiki-init` executed, .memory/ + hooks + .gitignore configured
+- [[daily/2026-04-30.md]] - Auto-flush hook unreliability discovered; compact-before-clear ordering established; 14 failed flushes in productive session
