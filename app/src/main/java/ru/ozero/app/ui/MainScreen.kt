@@ -51,6 +51,7 @@ fun MainScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val stats by viewModel.stats.collectAsStateWithLifecycle()
+    val stagnant by viewModel.stagnant.collectAsStateWithLifecycle()
 
     Box(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -90,6 +91,15 @@ fun MainScreen(
             if (state is TunnelState.Connected && stats != null) {
                 Spacer(modifier = Modifier.height(16.dp))
                 TrafficStatsCard(stats!!)
+                if (stagnant) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(R.string.main_stagnation_warning),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.testTag(MainScreenTestTags.STAGNATION_BADGE),
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(32.dp))

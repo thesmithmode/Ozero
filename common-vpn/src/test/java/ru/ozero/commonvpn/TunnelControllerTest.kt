@@ -260,6 +260,70 @@ class TunnelControllerTest {
     }
 
     @Test
+    fun stagnantInitiallyFalse() {
+        assertEquals(false, controller.stagnant.value)
+    }
+
+    @Test
+    fun stagnantTrueWhenConnectedAndStatsFlatPastThreshold() {
+        var clock = 1_000L
+        val mon = StatsStagnationMonitor(thresholdMs = 30_000L, nowMs = { clock })
+        val ctl = TunnelController(stagnationMonitor = mon)
+        ctl.onProbing()
+        ctl.onConnecting(EngineId.BYEDPI)
+        ctl.onEngineStarted(EngineId.BYEDPI, 1080)
+        ctl.updateStats(TunnelStats(0, 100, 0, 200, clock))
+        clock += 30_001L
+        ctl.updateStats(TunnelStats(0, 100, 0, 200, clock))
+        assertEquals(true, ctl.stagnant.value)
+    }
+
+    @Test
+    fun stagnantFalseWhenStatsChange() {
+        var clock = 1_000L
+        val mon = StatsStagnationMonitor(thresholdMs = 30_000L, nowMs = { clock })
+        val ctl = TunnelController(stagnationMonitor = mon)
+        ctl.onProbing()
+        ctl.onConnecting(EngineId.BYEDPI)
+        ctl.onEngineStarted(EngineId.BYEDPI, 1080)
+        ctl.updateStats(TunnelStats(0, 100, 0, 200, clock))
+        clock += 30_001L
+        ctl.updateStats(TunnelStats(0, 100, 0, 200, clock))
+        assertEquals(true, ctl.stagnant.value)
+        clock += 1_000L
+        ctl.updateStats(TunnelStats(0, 150, 0, 200, clock))
+        assertEquals(false, ctl.stagnant.value)
+    }
+
+    @Test
+    fun stagnantNotEmittedWhenNotConnected() {
+        var clock = 1_000L
+        val mon = StatsStagnationMonitor(thresholdMs = 30_000L, nowMs = { clock })
+        val ctl = TunnelController(stagnationMonitor = mon)
+        ctl.updateStats(TunnelStats(0, 100, 0, 200, clock))
+        clock += 30_001L
+        ctl.updateStats(TunnelStats(0, 100, 0, 200, clock))
+        assertEquals(false, ctl.stagnant.value, "не Connected — stagnation не emit")
+    }
+
+    @Test
+    fun resetClearsStagnantFlag() {
+        var clock = 1_000L
+        val mon = StatsStagnationMonitor(thresholdMs = 30_000L, nowMs = { clock })
+        val ctl = TunnelController(stagnationMonitor = mon)
+        ctl.onProbing()
+        ctl.onConnecting(EngineId.BYEDPI)
+        ctl.onEngineStarted(EngineId.BYEDPI, 1080)
+        ctl.updateStats(TunnelStats(0, 100, 0, 200, clock))
+        clock += 30_001L
+        ctl.updateStats(TunnelStats(0, 100, 0, 200, clock))
+        assertEquals(true, ctl.stagnant.value)
+        ctl.onDisconnecting()
+        ctl.reset()
+        assertEquals(false, ctl.stagnant.value)
+    }
+
+    @Test
     fun resetClearsStats() {
         controller.onProbing()
         controller.onConnecting(EngineId.BYEDPI)

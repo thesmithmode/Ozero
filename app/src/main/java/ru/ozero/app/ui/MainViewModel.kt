@@ -30,6 +30,13 @@ class MainViewModel @Inject constructor(
             initialValue = null,
         )
 
+    val stagnant: StateFlow<Boolean> =
+        tunnelController.stagnant.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = false,
+        )
+
     fun onConnectClick() = Unit
 
     fun onVpnPermissionGranted() = Unit
