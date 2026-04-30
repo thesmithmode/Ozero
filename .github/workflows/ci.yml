@@ -35,7 +35,7 @@ jobs:
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v4
         with:
-          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' }}
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' }}
 
       - name: ktlint + detekt
         run: ./gradlew ktlintCheck detekt --stacktrace
@@ -87,7 +87,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: kotlin-style
-    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/clean-start' }}
+    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' }}
     permissions:
       contents: read
 
@@ -108,7 +108,7 @@ jobs:
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v4
         with:
-          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' }}
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' }}
 
       - name: Run Android lint
         run: ./gradlew lint --stacktrace
@@ -126,7 +126,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: kotlin-style
-    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/clean-start' }}
+    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' }}
     permissions:
       contents: read
 
@@ -147,7 +147,7 @@ jobs:
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v4
         with:
-          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' }}
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' }}
 
       - name: Download native binaries
         run: ./gradlew :engine-byedpi:downloadBinaries --stacktrace
@@ -168,7 +168,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: kotlin-style
-    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/clean-start' }}
+    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' }}
     permissions:
       contents: read
       checks: write
@@ -190,7 +190,7 @@ jobs:
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v4
         with:
-          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' }}
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' }}
 
       - name: testDebugUnitTest + coverage report and gate
         run: ./gradlew testDebugUnitTest jacocoTestReport jacocoTestCoverageVerification --stacktrace
