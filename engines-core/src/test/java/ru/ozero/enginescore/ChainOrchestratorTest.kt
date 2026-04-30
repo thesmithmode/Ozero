@@ -98,20 +98,46 @@ class ChainOrchestratorTest {
     @Test
     fun stop_callsEnginesInReverseOrder() = runTest {
         val callOrder = mutableListOf<EngineId>()
-        val byedpi = FakePlugin(EngineId.BYEDPI, listOf(StartResult.Success(socksPort = 1080)), onStop = { callOrder.add(EngineId.BYEDPI) })
-        val xray = FakePlugin(EngineId.XRAY, listOf(StartResult.Success(socksPort = 10808)), onStop = { callOrder.add(EngineId.XRAY) })
+        val byedpi = FakePlugin(
+            EngineId.BYEDPI,
+            listOf(StartResult.Success(socksPort = 1080)),
+            onStop = { callOrder.add(EngineId.BYEDPI) },
+        )
+        val xray = FakePlugin(
+            EngineId.XRAY,
+            listOf(StartResult.Success(socksPort = 10808)),
+            onStop = { callOrder.add(EngineId.XRAY) },
+        )
         val orch = ChainOrchestrator(setOf(byedpi, xray))
-        orch.start(listOf(ChainStep(EngineId.BYEDPI, EngineConfig.ByeDpi(1080)), ChainStep(EngineId.XRAY, EngineConfig.Xray("{}", 10808))))
+        orch.start(
+            listOf(
+                ChainStep(EngineId.BYEDPI, EngineConfig.ByeDpi(1080)),
+                ChainStep(EngineId.XRAY, EngineConfig.Xray("{}", 10808)),
+            ),
+        )
         orch.stop()
         assertEquals(listOf(EngineId.XRAY, EngineId.BYEDPI), callOrder)
     }
 
     @Test
     fun start_secondStepNotSupportsUpstream_rejectedAndRolledBack() = runTest {
-        val xray = FakePlugin(EngineId.XRAY, listOf(StartResult.Success(socksPort = 10808)), supportsUpstreamSocks = true)
-        val byedpi = FakePlugin(EngineId.BYEDPI, listOf(StartResult.Success(socksPort = 1080)), supportsUpstreamSocks = false)
+        val xray = FakePlugin(
+            EngineId.XRAY,
+            listOf(StartResult.Success(socksPort = 10808)),
+            supportsUpstreamSocks = true,
+        )
+        val byedpi = FakePlugin(
+            EngineId.BYEDPI,
+            listOf(StartResult.Success(socksPort = 1080)),
+            supportsUpstreamSocks = false,
+        )
         val orch = ChainOrchestrator(setOf(xray, byedpi))
-        val r = orch.start(listOf(ChainStep(EngineId.XRAY, EngineConfig.Xray("{}", 10808)), ChainStep(EngineId.BYEDPI, EngineConfig.ByeDpi(1080))))
+        val r = orch.start(
+            listOf(
+                ChainStep(EngineId.XRAY, EngineConfig.Xray("{}", 10808)),
+                ChainStep(EngineId.BYEDPI, EngineConfig.ByeDpi(1080)),
+            ),
+        )
         assertIs<ChainResult.Failure>(r)
         assertEquals(1, r.failedAtIndex)
         assertTrue(r.reason.contains("terminal-only"))
@@ -121,10 +147,23 @@ class ChainOrchestratorTest {
 
     @Test
     fun start_supportsUpstreamSocks_secondStepAccepted() = runTest {
-        val xray1 = FakePlugin(EngineId.XRAY, listOf(StartResult.Success(socksPort = 10808)), supportsUpstreamSocks = true)
-        val xray2 = FakePlugin(EngineId.HYSTERIA2, listOf(StartResult.Success(socksPort = 10809)), supportsUpstreamSocks = true)
+        val xray1 = FakePlugin(
+            EngineId.XRAY,
+            listOf(StartResult.Success(socksPort = 10808)),
+            supportsUpstreamSocks = true,
+        )
+        val xray2 = FakePlugin(
+            EngineId.HYSTERIA2,
+            listOf(StartResult.Success(socksPort = 10809)),
+            supportsUpstreamSocks = true,
+        )
         val orch = ChainOrchestrator(setOf(xray1, xray2))
-        val r = orch.start(listOf(ChainStep(EngineId.XRAY, EngineConfig.Xray("{}", 10808)), ChainStep(EngineId.HYSTERIA2, EngineConfig.Hysteria2("{}", 10809))))
+        val r = orch.start(
+            listOf(
+                ChainStep(EngineId.XRAY, EngineConfig.Xray("{}", 10808)),
+                ChainStep(EngineId.HYSTERIA2, EngineConfig.Hysteria2("{}", 10809)),
+            ),
+        )
         assertIs<ChainResult.Success>(r)
         assertEquals(Upstream.Socks5("127.0.0.1", 10808), xray2.startCalls[0].second)
     }
@@ -145,20 +184,40 @@ class ChainOrchestratorTest {
         private val onStop: () -> Unit = {},
         supportsUpstreamSocks: Boolean = true,
     ) : EnginePlugin {
-        override val capabilities = EngineCapabilities(true, false, false, false, false, supportsUpstreamSocks)
+        override val capabilities =
+            EngineCapabilities(true, false, false, false, false, supportsUpstreamSocks)
         val startCalls = mutableListOf<Pair<EngineConfig, Upstream>>()
-        var stopCalls = 0; private set
-        override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult { startCalls.add(config to upstream); return startResults[startCalls.size - 1] }
-        override suspend fun stop() { stopCalls++; onStop() }
+        var stopCalls = 0
+            private set
+
+        override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
+            startCalls.add(config to upstream)
+            return startResults[startCalls.size - 1]
+        }
+
+        override suspend fun stop() {
+            stopCalls++
+            onStop()
+        }
+
         override suspend fun probe(): ProbeResult = ProbeResult.Failure("not used")
+
         override fun stats(): Flow<EngineStats> = flowOf(EngineStats())
     }
 
-    private class ThrowingPlugin(override val id: EngineId, private val toThrow: Throwable) : EnginePlugin {
+    private class ThrowingPlugin(
+        override val id: EngineId,
+        private val toThrow: Throwable,
+    ) : EnginePlugin {
         override val capabilities = EngineCapabilities(true, false, false, false, false)
-        override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult = throw toThrow
+
+        override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult =
+            throw toThrow
+
         override suspend fun stop() = Unit
+
         override suspend fun probe(): ProbeResult = ProbeResult.Failure("not used")
+
         override fun stats(): Flow<EngineStats> = flowOf(EngineStats())
     }
 }
