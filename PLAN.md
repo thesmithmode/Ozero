@@ -133,6 +133,14 @@ W3.0 atomic refactor: SettingsRepository interface + SettingsModel + SettingsKey
 
 ---
 
+## Wave H — i18n локализация UI
+
+- [!] W9.1 step выбора языка UI в Onboarding + Settings — **расширить settings_language_* (system/ru/en уже есть). Locale switching через AppCompat `AppCompatDelegate.setApplicationLocales(LocaleListCompat)` (не require restart). Persist в DataStore key UI_LOCALE_TAG.**
+- [!] W9.2 переводы на топ-10 языков. Сейчас: ru (default values/), en (values-en/). **Добавить**: values-zh-rCN/ (Mandarin), values-es/ (Spanish), values-ar/ (Arabic — RTL), values-fr/ (French), values-hi/ (Hindi), values-pt/ (Portuguese), values-id/ (Indonesian), values-de/ (German), values-ja/ (Japanese). **Подход**: machine translation базовая + native speaker review для финальной полировки. Для всех string resource keys из values/strings.xml (~80 keys). Lint warning MissingTranslation выявит gap'ы.
+- [!] W9.3 RTL layout audit — values-ar/ требует mirror layout. Compose `LocalLayoutDirection`. Test screens на RTL preview.
+
+---
+
 ## Wave G — finalize
 
 - [x] W5.3 SecurityGuard MVP exclude — :security модуль удалён (~26 файлов deleted, AntiDebug/AntiEmu/AntiFrida + Watchdog + Holder + Module + Manifest + tests)
