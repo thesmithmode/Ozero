@@ -5,6 +5,12 @@
 -keep class hev.** { *; }
 -keep class ru.ozero.enginebyedpi.ByeDpiProxy { *; }
 
+-keep class android.util.Log { *; }
+-keep class ru.ozero.commoncrypto.** { *; }
+-keep class ru.ozero.commondns.** { *; }
+-keep class org.bouncycastle.** { *; }
+-dontwarn org.bouncycastle.**
+
 -keepclasseswithmembernames class * { native <methods>; }
 -keepclasseswithmembers class * { native <methods>; }
 
