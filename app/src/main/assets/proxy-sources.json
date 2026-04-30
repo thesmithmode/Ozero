@@ -1,5 +1,5 @@
 {
-  "_comment": "Публичные GitHub-репо живых прокси. Verified 2026-04-30. RU-источники: igareck (VLESS+Reality, проверены в РФ). GLOBAL: barry-far, mahdibland, epodonios, mhditaheri, freefq, pawdroid.",
+  "_comment": "Публичные GitHub-репо живых прокси. Verified 2026-04-30. RU-источники: igareck (VLESS+Reality, проверены в РФ). GLOBAL: barry-far, mahdibland, epodonios, mhditaheri, freefq, pawdroid. jsDelivr-зеркала добавлены как fallback на случай блокировки raw.githubusercontent.com в РФ.",
   "_updated": "2026-04-30",
   "sources": [
     {
@@ -31,53 +31,81 @@
       "priority": 4
     },
     {
+      "id": "igareck-vless-ru-mobile-jsdelivr",
+      "url": "https://cdn.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt",
+      "format": "LINES",
+      "region": "RU",
+      "priority": 5
+    },
+    {
+      "id": "igareck-black-vless-ru-jsdelivr",
+      "url": "https://cdn.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS.txt",
+      "format": "LINES",
+      "region": "RU",
+      "priority": 6
+    },
+    {
+      "id": "igareck-black-vless-ru-mobile-jsdelivr",
+      "url": "https://cdn.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt",
+      "format": "LINES",
+      "region": "RU",
+      "priority": 7
+    },
+    {
       "id": "barry-far-sub1",
       "url": "https://raw.githubusercontent.com/barry-far/V2ray-Config/main/Sub1.txt",
       "format": "LINES",
       "region": "GLOBAL",
-      "priority": 5
+      "priority": 8
     },
     {
       "id": "barry-far-sub2",
       "url": "https://raw.githubusercontent.com/barry-far/V2ray-Config/main/Sub2.txt",
       "format": "LINES",
       "region": "GLOBAL",
-      "priority": 6
+      "priority": 9
+    },
+    {
+      "id": "barry-far-sub1-jsdelivr",
+      "url": "https://cdn.jsdelivr.net/gh/barry-far/V2ray-Config@main/Sub1.txt",
+      "format": "LINES",
+      "region": "GLOBAL",
+      "priority": 10
     },
     {
       "id": "mahdibland-aggregator",
       "url": "https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_merge.txt",
       "format": "BASE64_LINES",
       "region": "GLOBAL",
-      "priority": 7
+      "priority": 11
     },
     {
       "id": "epodonios-all",
       "url": "https://raw.githubusercontent.com/Epodonios/v2ray-configs/main/All_Configs_Sub.txt",
       "format": "LINES",
       "region": "GLOBAL",
-      "priority": 8
+      "priority": 12
     },
     {
       "id": "mhditaheri-mix",
       "url": "https://raw.githubusercontent.com/MhdiTaheri/V2rayCollector_Py/main/sub/Mix/mix.txt",
       "format": "LINES",
       "region": "GLOBAL",
-      "priority": 9
+      "priority": 13
     },
     {
       "id": "freefq-v2",
       "url": "https://raw.githubusercontent.com/freefq/free/master/v2",
       "format": "BASE64_LINES",
       "region": "GLOBAL",
-      "priority": 10
+      "priority": 14
     },
     {
       "id": "pawdroid-sub",
       "url": "https://raw.githubusercontent.com/Pawdroid/Free-servers/main/sub",
       "format": "BASE64_LINES",
       "region": "GLOBAL",
-      "priority": 11
+      "priority": 15
     }
   ]
 }
