@@ -235,7 +235,7 @@ class OzeroVpnService : android.net.VpnService() {
         return chainResult
     }
 
-    private fun startNativeTunnel(fd: ParcelFileDescriptor, socksPort: Int): Boolean {
+    private suspend fun startNativeTunnel(fd: ParcelFileDescriptor, socksPort: Int): Boolean {
         val code = try {
             tunnelGateway.start(
                 HevTunnelConfig(tunPfd = fd, socksAddress = "127.0.0.1", socksPort = socksPort),
