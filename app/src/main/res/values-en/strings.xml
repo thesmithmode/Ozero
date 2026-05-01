@@ -150,7 +150,17 @@
     <string name="about_repo">Source code on GitHub</string>
     <string name="about_legal">Licenses</string>
 
-    
+
     <string name="diag_export_crashes">Export crash log</string>
     <string name="diag_export_no_crashes">Crash log is empty</string>
+
+    <!-- Stats history -->
+    <string name="stats_history_title">Session history</string>
+    <string name="stats_history_summary">Saved VPN sessions with traffic stats</string>
+    <string name="stats_history_empty">No saved sessions</string>
+    <string name="stats_history_status_running">Active</string>
+    <string name="stats_history_status_disconnected">Disconnected</string>
+    <string name="stats_history_status_failed">Failed</string>
+    <string name="stats_history_status_label">Status: %1$s</string>
+    <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
 </resources>

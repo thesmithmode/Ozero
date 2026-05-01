@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import ru.ozero.app.di.AutoStrategyPickerFactory
+import ru.ozero.commonvpn.TunnelController
+import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginebyedpi.strategy.PickResult
 import ru.ozero.enginebyedpi.strategy.StrategyScore
 import ru.ozero.enginescore.settings.SettingsRepository
@@ -41,6 +43,7 @@ sealed interface ByeDpiSettingsUiState {
 class ByeDpiEngineSettingsViewModel @Inject constructor(
     private val repository: SettingsRepository,
     private val pickerFactory: AutoStrategyPickerFactory,
+    private val tunnelController: TunnelController,
 ) : ViewModel() {
 
     private val defaultArgs = EngineConfig.ByeDpi().args
@@ -92,6 +95,12 @@ class ByeDpiEngineSettingsViewModel @Inject constructor(
 
     fun onStartAutoTest() {
         if (_autoTestState.value is AutoTestUiState.Running) return
+        if (tunnelController.state.value !is TunnelState.Idle) {
+            _autoTestState.value = AutoTestUiState.Failed(
+                "Отключите VPN перед auto-тестом — порт SOCKS5 занят активной сессией.",
+            )
+            return
+        }
         _autoTestState.value = AutoTestUiState.Running(current = 0, total = 0, lastCommand = null)
         autoTestJob = viewModelScope.launch {
             val picker = runCatching { pickerFactory.create() }.getOrElse {

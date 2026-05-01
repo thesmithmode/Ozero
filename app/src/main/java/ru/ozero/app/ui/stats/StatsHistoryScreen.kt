@@ -25,9 +25,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import ru.ozero.app.R
 import ru.ozero.commonvpn.BytesFormatter
 import ru.ozero.corestorage.entity.SessionStatsEntity
 import java.text.SimpleDateFormat
@@ -46,7 +48,7 @@ fun StatsHistoryScreen(
         modifier = Modifier.testTag("stats_history"),
         topBar = {
             TopAppBar(
-                title = { Text("История сессий") },
+                title = { Text(stringResource(R.string.stats_history_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
@@ -62,7 +64,7 @@ fun StatsHistoryScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    text = "Нет сохранённых сессий",
+                    text = stringResource(R.string.stats_history_empty),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
@@ -86,6 +88,7 @@ private fun SessionCard(session: SessionStatsEntity) {
     val durationStr = BytesFormatter.durationHms(session.durationMs)
     val rxStr = BytesFormatter.humanReadable(session.rxBytes)
     val txStr = BytesFormatter.humanReadable(session.txBytes)
+    val statusLabel = stringResource(statusLabelRes(session.finalStatus))
     Card(
         modifier = Modifier.fillMaxWidth().testTag("session_card"),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -99,14 +102,20 @@ private fun SessionCard(session: SessionStatsEntity) {
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text(
-                text = "↓ $rxStr   ↑ $txStr",
+                text = stringResource(R.string.stats_history_traffic, rxStr, txStr),
                 style = MaterialTheme.typography.bodySmall,
             )
             Text(
-                text = "Статус: ${session.finalStatus}",
+                text = stringResource(R.string.stats_history_status_label, statusLabel),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
+}
+
+private fun statusLabelRes(finalStatus: String): Int = when (finalStatus.lowercase(Locale.ROOT)) {
+    "running" -> R.string.stats_history_status_running
+    "failed" -> R.string.stats_history_status_failed
+    else -> R.string.stats_history_status_disconnected
 }

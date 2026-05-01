@@ -250,8 +250,8 @@ private fun LanguageSection(
 @Composable
 private fun StatsHistorySection(onOpenStats: () -> Unit) {
     NavRow(
-        title = "История сессий",
-        summary = "Сохранённые VPN-сессии со статистикой трафика",
+        title = stringResource(R.string.stats_history_title),
+        summary = stringResource(R.string.stats_history_summary),
         tag = "settings_stats_history_row",
         onClick = onOpenStats,
         enabled = true,

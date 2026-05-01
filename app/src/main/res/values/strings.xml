@@ -153,4 +153,14 @@
     <!-- crash log export -->
     <string name="diag_export_crashes">Экспорт crash log</string>
     <string name="diag_export_no_crashes">Crash log пуст</string>
+
+    <!-- Stats history -->
+    <string name="stats_history_title">История сессий</string>
+    <string name="stats_history_summary">Сохранённые VPN-сессии со статистикой трафика</string>
+    <string name="stats_history_empty">Нет сохранённых сессий</string>
+    <string name="stats_history_status_running">Активна</string>
+    <string name="stats_history_status_disconnected">Отключена</string>
+    <string name="stats_history_status_failed">Сбой</string>
+    <string name="stats_history_status_label">Статус: %1$s</string>
+    <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
 </resources>

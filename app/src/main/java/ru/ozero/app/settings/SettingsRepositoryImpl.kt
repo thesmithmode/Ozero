@@ -72,7 +72,9 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override suspend fun setCustomDnsServers(servers: List<String>) {
         dataStore.edit { prefs ->
-            val cleaned = servers.map { it.trim() }.filter { it.isNotEmpty() }
+            val cleaned = servers
+                .map { it.trim() }
+                .filter { it.isNotEmpty() && isValidDnsAddress(it) }
             if (cleaned.isEmpty()) {
                 prefs.remove(SettingsKeys.CUSTOM_DNS_SERVERS)
             } else {
@@ -87,7 +89,9 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override suspend fun setHosts(hosts: List<String>) {
         dataStore.edit { prefs ->
-            val cleaned = hosts.map { it.trim() }.filter { it.isNotEmpty() }
+            val cleaned = hosts
+                .map { it.trim() }
+                .filter { it.isNotEmpty() && isValidHostname(it) }
             if (cleaned.isEmpty()) {
                 prefs.remove(SettingsKeys.HOSTS_LIST)
             } else {
@@ -144,5 +148,27 @@ class SettingsRepositoryImpl @Inject constructor(
     private fun Preferences.readManualEngine(): EngineId? {
         val raw = this[SettingsKeys.MANUAL_ENGINE] ?: return null
         return runCatching { EngineId.valueOf(raw) }.getOrNull()
+    }
+
+    private companion object {
+        private val HOSTNAME_REGEX = Regex("^[a-zA-Z0-9.\\-_:]+$")
+
+        fun isValidDnsAddress(value: String): Boolean {
+            if (value.contains(',')) return false
+            return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                runCatching { android.net.InetAddresses.isNumericAddress(value) }.getOrDefault(false)
+            } else {
+                @Suppress("DEPRECATION")
+                android.util.Patterns.IP_ADDRESS.matcher(value).matches() || isLikelyIpv6(value)
+            }
+        }
+
+        fun isValidHostname(value: String): Boolean {
+            if (value.length > 253) return false
+            return HOSTNAME_REGEX.matches(value)
+        }
+
+        private fun isLikelyIpv6(value: String): Boolean =
+            value.contains(':') && value.all { it.isLetterOrDigit() || it == ':' || it == '.' }
     }
 }
