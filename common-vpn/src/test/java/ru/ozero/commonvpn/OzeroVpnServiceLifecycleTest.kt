@@ -129,4 +129,40 @@ class OzeroVpnServiceLifecycleTest {
         assertTrue(body.contains("stopVpn()"))
         assertTrue(body.contains("super.onRevoke()"))
     }
+
+    @Test
+    fun `startVpn не делает runBlocking (C1 закрыт через preload-cache в onCreate)`() {
+        val body = source.substringAfter("private fun startVpn()").substringBefore("private fun startStatsLogger")
+        assertFalse(
+            body.contains("runBlocking"),
+            "startVpn не должен использовать runBlocking — settings и split-packages обязаны " +
+                "читаться из @Volatile preload-кэша (cachedSettings / cachedSplitPackages), " +
+                "наполняемого в onCreate через serviceScope.launch. См. C1 review concern.",
+        )
+        assertTrue(
+            body.contains("cachedSettings") && body.contains("cachedSplitPackages"),
+            "startVpn обязан читать cachedSettings и cachedSplitPackages вместо runBlocking.",
+        )
+    }
+
+    @Test
+    fun `onCreate запускает settings preload через serviceScope`() {
+        val onCreateBody = source.substringAfter("override fun onCreate()")
+            .substringBefore("private fun startSettingsCachePreload")
+        assertTrue(
+            onCreateBody.contains("startSettingsCachePreload()"),
+            "onCreate обязан вызвать startSettingsCachePreload() — иначе cachedSettings null " +
+                "и первый startVpn использует defaults.",
+        )
+        val preloadBody = source.substringAfter("private fun startSettingsCachePreload()")
+            .substringBefore("private val tunFdRef")
+        assertTrue(
+            preloadBody.contains("settingsRepository.settings.collect"),
+            "preload обязан collect() Flow settingsRepository, чтобы кэш обновлялся при изменениях.",
+        )
+        assertTrue(
+            preloadBody.contains("splitTunnelRulesProvider.activePackages()"),
+            "preload обязан читать split-packages для cachedSplitPackages.",
+        )
+    }
 }

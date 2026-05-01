@@ -14,9 +14,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.commondns.PublicDnsServers
 import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_START
@@ -56,6 +54,14 @@ class OzeroVpnService : android.net.VpnService() {
     private val sessionIdRef = AtomicReference<Long>(-1L)
     private val sessionStartMsRef = AtomicReference<Long>(0L)
 
+    // C1 fix: preload settings/split-rules в onCreate, чтобы startVpn (на main thread)
+    // не делал runBlocking — DataStore и Room dao могли занимать ~50ms на cold start.
+    @Volatile
+    private var cachedSettings: ru.ozero.enginescore.settings.SettingsModel? = null
+
+    @Volatile
+    private var cachedSplitPackages: Set<String> = emptySet()
+
     internal var processKiller: ProcessKiller = ProcessKiller { pid -> Process.killProcess(pid) }
 
     companion object {
@@ -86,6 +92,22 @@ class OzeroVpnService : android.net.VpnService() {
             throw t
         }
         PersistentLoggers.info(TAG, "onCreate after super (Hilt inject done)")
+        startSettingsCachePreload()
+    }
+
+    private fun startSettingsCachePreload() {
+        if (!::settingsRepository.isInitialized) return
+        serviceScope.launch {
+            runCatching {
+                settingsRepository.settings.collect { cachedSettings = it }
+            }.onFailure { PersistentLoggers.warn(TAG, "settings cache preload threw: ${it.message}") }
+        }
+        if (!::splitTunnelRulesProvider.isInitialized) return
+        serviceScope.launch {
+            runCatching {
+                cachedSplitPackages = splitTunnelRulesProvider.activePackages()
+            }.onFailure { PersistentLoggers.warn(TAG, "split packages preload threw: ${it.message}") }
+        }
     }
 
     private val tunFdRef = AtomicReference<ParcelFileDescriptor?>(null)
@@ -136,15 +158,20 @@ class OzeroVpnService : android.net.VpnService() {
             .onFailure { PersistentLoggers.warn(TAG, "TProxyService.loadOnce threw: ${it.message}") }
         PersistentLoggers.info(TAG, "loadOnce done libraryLoaded=${hev.TProxyService.libraryLoaded}")
 
-        val settings = runCatching {
-            runBlocking { settingsRepository.settings.first() }
-        }.getOrNull()
+        // Читаем preload-кэш — без runBlocking на main thread.
+        // Если preload ещё не завершился (race на cold start) — defaults безопасны:
+        // splitMode=ALL, ipv6=false, customDns=empty (= public DNS).
+        val settings = cachedSettings
         val ipv6Enabled = settings?.ipv6Enabled ?: false
         val customDnsServers = settings?.customDnsServers.orEmpty()
-        val splitPackages = runCatching {
-            runBlocking { splitTunnelRulesProvider.activePackages() }
-        }.getOrDefault(emptySet())
+        val splitPackages = cachedSplitPackages
         val splitMode = settings?.splitMode ?: ru.ozero.enginescore.settings.SplitTunnelMode.ALL
+        // Refresh split-packages в фоне: если юзер изменил правила через UI и
+        // переподключился, следующий старт увидит свежий cache.
+        serviceScope.launch {
+            runCatching { cachedSplitPackages = splitTunnelRulesProvider.activePackages() }
+                .onFailure { PersistentLoggers.warn(TAG, "split packages refresh threw: ${it.message}") }
+        }
         val splitConfig = ru.ozero.commonvpn.split.SplitTunnelConfig(
             mode = splitMode,
             packages = splitPackages,
