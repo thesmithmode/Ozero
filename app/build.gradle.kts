@@ -23,10 +23,6 @@ android {
         buildConfig = true
     }
 
-    lint {
-        checkReleaseBuilds = false
-    }
-
     defaultConfig {
         applicationId = "ru.ozero.app"
         versionCode = gitVersionCode
@@ -111,6 +107,15 @@ dependencies {
     implementation(project(":engine-byedpi"))
     implementation(project(":engine-urnetwork"))
     implementation(project(":engine-warp"))
+
+    implementation(
+        fileTree(
+            mapOf(
+                "dir" to rootProject.file("engine-urnetwork/libs"),
+                "include" to listOf("*.aar", "*.jar"),
+            ),
+        ),
+    )
 
     implementation(libs.bundles.okhttp)
 

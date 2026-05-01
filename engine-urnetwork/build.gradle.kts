@@ -6,33 +6,6 @@ android {
     namespace = "ru.ozero.engineurnetwork"
 }
 
-// AGP отказывается паковать local .aar в любой AAR/lint bundle для library
-// модуля. engine-urnetwork никем не consume'ится как .aar — это internal
-// library project с classes for app модуль. Disable все AAR bundle/lint
-// tasks; compileDebugKotlin, testDebugUnitTest, jacocoTestReport остаются.
-afterEvaluate {
-    tasks.matching {
-        it.name.matches(Regex("bundle.*Aar")) ||
-            it.name.matches(Regex("generate.*LintModel")) ||
-            it.name.matches(Regex("generate.*LintReportModel")) ||
-            it.name.matches(Regex("lintAnalyze.*AndroidTest")) ||
-            it.name.matches(Regex("lintReport.*AndroidTest")) ||
-            it.name.matches(Regex("lintVitalAnalyze.*AndroidTest")) ||
-            it.name.matches(Regex("lintAnalyze.*UnitTest")) ||
-            it.name.matches(Regex("lintReport.*UnitTest")) ||
-            it.name.matches(Regex("lintVitalAnalyze.*UnitTest")) ||
-            it.name == "lintAnalyzeDebug" ||
-            it.name == "lintAnalyzeRelease" ||
-            it.name == "lintReportDebug" ||
-            it.name == "lintReportRelease" ||
-            it.name == "lintDebug" ||
-            it.name == "lintRelease" ||
-            it.name == "lint"
-    }.configureEach {
-        enabled = false
-    }
-}
-
 dependencies {
     implementation(project(":engines-core"))
     implementation(project(":common-vpn"))
@@ -41,11 +14,14 @@ dependencies {
     implementation(libs.hilt.android)
     implementation(libs.datastore.preferences)
 
-    // Локальные AAR из scripts/build_wireguard_android.sh + tools/build-urnetwork-aar.sh.
-    // Если папка libs/ пуста (Stub-режим, AAR ещё не собраны) — fileTree
-    // резолвится в пустой набор и конфигурация не падает. Stub bridge остаётся
-    // активным провайдером в WarpModule/UrnetworkModule.
-    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar", "*.jar"))))
+    // AGP 4.1+ запрещает упаковку local AAR в bundleReleaseLocalLintAar/AAR
+    // библиотеки (Direct local .aar file dependencies are not supported when
+    // building an AAR). Поэтому AAR здесь только compileOnly — engine-urnetwork
+    // компилируется против SDK типов, но не пытается их паковать. Runtime
+    // classpath получает их через app:implementation(fileTree("engine-urnetwork/libs")).
+    // Если папка пуста (Stub-режим до CI download) — fileTree резолвится в
+    // пустой набор, конфигурация не падает, StubUrnetworkSdkBridge активен.
+    compileOnly(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar", "*.jar"))))
 
     testImplementation(libs.bundles.junit5)
     testRuntimeOnly(libs.junit.jupiter.engine)

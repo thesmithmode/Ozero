@@ -138,8 +138,8 @@ jobs:
       - name: assembleDebug
         run: ./gradlew assembleDebug --stacktrace
 
-      - name: compileReleaseKotlin (smoke — release classpath resolution without keystore)
-        run: ./gradlew :app:compileReleaseKotlin --stacktrace
+      - name: lintVitalAnalyzeRelease (smoke — release-path lint without keystore)
+        run: ./gradlew :app:lintVitalAnalyzeRelease --stacktrace
 
       - name: Upload debug APK
         if: always()
