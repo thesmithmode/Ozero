@@ -2,25 +2,25 @@
 
 Засечки `[x]` = done. `[~]` = частично/research. `[ ]` = pending. `[!]` = требует особое внимание (риск, device verify, cross-module).
 
-## Статус (2026-05-01 — autonom session 47+ commits)
+## Статус (2026-05-01 — autonom session 47+ commits + pre-release fix wave)
 
-- **feature** ahead of dev: 47+ commits autonomous session
+- **feature** ahead of dev: 52 commits (47 autonom + 5 release-readiness fix)
 - **v0.0.1** tagged + retag-6 working (live speed UI)
 - **CI feature** = full pipeline (kotlin-style + Python + assembleDebug + lint + Tests+coverage)
 - **JaCoCo gate**: 0.90 LINE + 0.90 BRANCH
 
-### Closed (37 / 14 pending)
+### Closed (42 / 9 pending)
 
 - **Wave A cleanup** полностью (W1.1-W1.4, W3.6, W3.9, W5.1, W5.2, W5.4-W5.9)
 - **Wave B auto-strategy** (W3.5.1-W3.5.6 — picker logic + tests + UI factory + DI)
 - **Wave C UI** real impl через atomic refactor W3.0 SettingsRepository → :engines-core (W3.2 custom DNS, W3.3 IPv6 toggle, W3.4 ByeDPI editor, W3.7 hosts white/black backend + ByeDPI -H args, W3.8 autostart wired)
 - **Wave Stats** (W3.1.a Room v4→5 + Migration sentinel, W3.1.b TunnelController persists через SessionStatsRecorder + RoomImpl, W3.1.c StatsHistoryViewModel + Compose Screen + nav)
 - **Wave G W5.3 SecurityGuard** удалён (:security модуль, ~26 файлов)
-- **Wave F partial**: W7.1 HealthMonitor restoration (periodic SOCKS5 probe + DEGRADED detection + 7 unit tests), W7.3 Diagnostics screen verified (20 URLs + Tester + ViewModel), W7.4 split-tunnel per-app applies (SplitTunnelRulesProvider interface + RoomImpl)
+- **Wave F partial**: W7.1 HealthMonitor restoration (periodic SOCKS5 probe + DEGRADED detection + UI badge + 7 unit tests), W7.3 Diagnostics screen verified (20 URLs + Tester + ViewModel), W7.4 split-tunnel per-app applies (SplitTunnelRulesProvider interface + RoomImpl)
 - **W2.1 manual DI design** doc + research (research-only, impl device-required)
 - **W4.1 partial**: build_xray.sh template + binaries.yml extension + research doc (full AAR build = device session)
-- **W9.1 language picker scaffold + UI**: DataStore + LocaleApplier + ViewModel + LanguageSection RadioButton 12 options
-- **Code review concerns**: C2 (HealthMonitor scope leak fixed), C4 (FAILED status distinguish fixed), M4 (warn missing id fixed). C1/C3/C5 deferred с обоснованием
+- **W9.1 language picker scaffold + UI**: DataStore + LocaleApplier + ViewModel + LanguageSection. До W9.2 показываем только RU+EN (LocaleApplier.SUPPORTED_TAGS), 9 unsupported tags скрыты.
+- **Code review concerns**: C1 (runBlocking removed via @Volatile preload-cache), C2 (HealthMonitor scope leak fixed), C3 (Migration_4_5 runtime test через Robolectric), C4 (FAILED status distinguish fixed), M4 (warn missing id fixed), M5 (HealthMonitor UI badge wired). C5 deferred (build_xray.sh research-only).
 
 ---
 
@@ -130,16 +130,16 @@ W3.0 atomic refactor: SettingsRepository interface + SettingsModel + SettingsKey
 
 ## Wave F — post-multi-engine
 
-- [!] W7.1 HealthMonitor restoration — **blocked Wave E (нужно ≥2 рабочих engines)**
+- [x] W7.1 HealthMonitor restoration + UI badge — periodic SOCKS5 probe (30s), DEGRADED после 3 consecutive fails, MainScreen рендерит бейдж "Соединение нестабильно" под TrafficStatsCard.
 - [!] W7.2 SubscriptionManager + signed sub URLs — **blocked W4.4**
-- [!] W7.3 Diagnostics screen (probe 20 URLs) — **blocked Wave D**
-- [!] W7.4 split-tunnel per-app (Android 10+) — **cross-module flow**
+- [x] W7.3 Diagnostics screen (probe 20 URLs) — Tester + ViewModel + Compose Screen.
+- [x] W7.4 split-tunnel per-app — SplitTunnelRulesProvider interface + RoomImpl, applies в OzeroVpnService.
 
 ---
 
 ## Wave H — i18n локализация UI
 
-- [x] W9.1 language picker — DataStore UI_LOCALE_TAG + SettingsModel.uiLocaleTag + Repository.setUiLocaleTag + LocaleApplier (AppCompatDelegate.setApplicationLocales) + ViewModel.onUiLocaleSelect + LanguageSection RadioButton 12 options (System + RU + EN + 9 topа). 9 string keys в values/strings.xml + values-en/.
+- [x] W9.1 language picker — DataStore UI_LOCALE_TAG + SettingsModel.uiLocaleTag + Repository.setUiLocaleTag + LocaleApplier (AppCompatDelegate.setApplicationLocales) + ViewModel.onUiLocaleSelect + LanguageSection RadioButton. **До W9.2 показываем только System + RU + EN (LocaleApplier.SUPPORTED_TAGS)** — 9 unsupported tags скрыты, чтобы юзер не выбрал например китайский и не получил EN fallback (UX hygiene). 9 unused string keys (settings_language_zh_cn ... settings_language_ja) сохранены в values/strings.xml + values-en/ для W9.2.
 - [!] W9.2 переводы на топ-10 языков. Сейчас: ru (default values/), en (values-en/). **Добавить**: values-zh-rCN/ (Mandarin), values-es/ (Spanish), values-ar/ (Arabic — RTL), values-fr/ (French), values-hi/ (Hindi), values-pt/ (Portuguese), values-id/ (Indonesian), values-de/ (German), values-ja/ (Japanese). **Подход**: machine translation базовая + native speaker review для финальной полировки. Для всех string resource keys из values/strings.xml (~90 keys). Lint warning MissingTranslation выявит gap'ы.
 - [!] W9.3 RTL layout audit — values-ar/ требует mirror layout. Compose `LocalLayoutDirection`. Test screens на RTL preview.
 
@@ -151,16 +151,25 @@ W3.0 atomic refactor: SettingsRepository interface + SettingsModel + SettingsKey
 - [!] W5.10 race conditions pickBest+waitSocksReady — **blocked W4.2**
 - [ ] W8.1 feature ветка финал — squash-ready audit (после всех waves)
 
-### Pre-squash gate (concerns из review feature → dev 2026-05-01)
+### Pre-squash gate (closed pre-release 2026-05-01)
 
-- [!] **C3 Migration_4_5 runtime test** — **CRITICAL pre-squash**. Без runtime SQL verify migration v4→5 = risk install-over-upgrade у v0.0.1 юзеров. Robolectric + androidx.room:room-testing + JUnit 5↔4 interop. MIGRATION_4_5 → internal/public.
-- [!] C1 runBlocking ×2 main thread в OzeroVpnService.startVpn — теоретический ANR. Fix: preload @Volatile cache в onCreate. Defer (warm DataStore <10ms).
-- [!] C2 HealthMonitor scope leak — Singleton lifetime acceptable. Не критично.
-- [!] C4 SessionStatsRecorder finalStatus всегда DISCONNECTED — FAILED case не distinguished. Minor.
-- [!] M4 SessionStatsRecorder.startSession id=-1 silent fail — добавить PersistentLoggers.warn. Minor.
+- [x] **C3 Migration_4_5 runtime test** — Robolectric + JUnit Vintage interop. `MigrationFourToFiveRuntimeTest` (6 тестов) запускает реальный SQLite через FrameworkSQLiteOpenHelperFactory: schema-create, column types, INSERT/SELECT с DEFAULT, preserves v4 data, idempotent, finalStatus values.
+- [x] C1 runBlocking ×2 в startVpn — заменено на `@Volatile cachedSettings/cachedSplitPackages` preload в `onCreate` через `serviceScope.launch { settings.collect { } }`. Defaults safe при race на cold start.
+- [x] C2 HealthMonitor scope leak — `OzeroVpnService.onDestroy → healthMonitor.shutdown()`.
+- [x] C4 SessionStatsRecorder finalStatus — `if (priorState is TunnelState.Failed) FAILED else DISCONNECTED`.
+- [x] M4 SessionStatsRecorder.startSession id=-1 — `PersistentLoggers.warn` добавлен.
+- [x] M5 HealthMonitor half-feature — UI badge wired в MainScreen.
 - [!] C5 build_xray.sh не tested — research deliverable, device session.
 
 Полный review doc: `.memory/knowledge/concepts/feature-branch-code-review-2026-05-01.md`.
+
+### v0.0.2-1 release readiness
+
+- [x] Все critical/medium concerns закрыты (C1, C3, M5).
+- [x] Hilt-граф компилится (NoStubsInProductionDi sentinel).
+- [x] Sentinel-тесты для C1/C3/M5: `OzeroVpnServiceLifecycleTest`, `MigrationFourToFiveRuntimeTest`, `MainViewModelTest`.
+- [ ] **device smoke install-over-upgrade** v0.0.1 → v0.0.2-1 — manual session, единственный gate перед `git tag -a v0.0.2-1`. Verify: app не крашит на первом open, StatsHistoryScreen открывается, prev split-rules выживают, logcat показывает `Migration_4_5` без `IllegalStateException`.
+- [ ] git tag -a v0.0.2-1 после device smoke (versionName тянется из `gitVersionName`, версия не зашита в build.gradle).
 
 ---
 

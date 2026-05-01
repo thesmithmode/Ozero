@@ -1,6 +1,34 @@
 # Code review feature → dev (2026-05-01, autonomous session)
 
-**Scope**: 38 commits ahead of dev, 125 файлов, +3703/-1100 lines.
+**Scope**: 47 commits ahead of dev (initial review) + 5 release-readiness fix commits.
+
+## Update 2026-05-01 (post-fix wave для v0.0.2-1)
+
+Все Critical / Medium concerns закрыты. Pre-release wave 5 коммитов:
+
+- `FIX(C3): Migration_4_5 runtime test — Robolectric SQLite` — sentinel был source-pattern, теперь runtime через `FrameworkSQLiteOpenHelperFactory`. 6 тестов покрывают schema, defaults, preserve v4 data, idempotent, finalStatus values. Зависимости: `androidx.room:room-testing`, `org.robolectric:robolectric` 4.13, `junit-vintage-engine` (interop JUnit 5 platform ↔ JUnit 4 @Rule).
+- `FIX(C1): preload settings/split в onCreate — убрать runBlocking из startVpn` — `@Volatile cachedSettings` (collect Flow) + `cachedSplitPackages` (one-shot fetch + refresh при каждом startVpn). Defaults safe при race на cold start.
+- `FEAT(W7.1 UI): MainScreen badge для HealthMonitor DEGRADED` — закрыт M5. `MainViewModel.healthStatus` StateFlow + UI бейдж рядом со stagnation badge.
+- `FIX(W9.1): LanguageSection only RU/EN до W9.2 — UX hygiene` — `LocaleApplier.SUPPORTED_TAGS = ["", "ru", "en"]`. 9 unsupported language tags скрыты до W9.2 (machine translation).
+- `DOCS(plan)` — PLAN.md и review-doc актуализированы.
+
+Финальный статус concerns:
+- C1 ✅ closed (preload-cache)
+- C2 ✅ closed (shutdown в onDestroy, ранее)
+- C3 ✅ closed (runtime test)
+- C4 ✅ closed (FAILED distinguish, ранее)
+- C5 ⏸ deferred (build_xray.sh research-only, device session)
+- M4 ✅ closed (warn missing id, ранее)
+- M5 ✅ closed (HealthMonitor UI badge)
+
+Единственный manual gate перед `git tag -a v0.0.2-1`: device smoke
+install-over-upgrade v0.0.1 → v0.0.2-1.
+
+---
+
+## Initial review
+
+**Initial scope**: 38 commits ahead of dev, 125 файлов, +3703/-1100 lines.
 
 ## Findings
 
