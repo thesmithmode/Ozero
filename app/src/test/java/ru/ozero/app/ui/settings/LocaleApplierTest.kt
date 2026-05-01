@@ -6,7 +6,7 @@ import kotlin.test.assertTrue
 
 /**
  * До W9.2 (machine translations + native review) UI обязан показывать только
- * языки, для которых есть `values-*/strings.xml`. Любой расширенный список
+ * языки, для которых есть values-LANG strings.xml. Любой расширенный список
  * = регрессия — юзер выбирает например китайский, а получает английский
  * fallback.
  */
