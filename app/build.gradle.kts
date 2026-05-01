@@ -23,6 +23,10 @@ android {
         buildConfig = true
     }
 
+    lint {
+        checkDependencies = false
+    }
+
     defaultConfig {
         applicationId = "ru.ozero.app"
         versionCode = gitVersionCode
