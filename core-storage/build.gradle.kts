@@ -5,6 +5,10 @@
 
 android {
     namespace = "ru.ozero.corestorage"
+
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 ksp {
@@ -19,4 +23,11 @@ dependencies {
     testImplementation(libs.bundles.junit5)
     testRuntimeOnly(libs.junit.jupiter.engine)
     testImplementation(libs.bundles.testing.unit)
+
+    // Migration runtime verification (C3): Room MigrationTestHelper это JUnit 4 @Rule,
+    // поэтому нужен Vintage engine для interop с JUnit 5 platform.
+    testImplementation(libs.junit4)
+    testImplementation(libs.room.testing)
+    testImplementation(libs.robolectric)
+    testRuntimeOnly(libs.junit.vintage.engine)
 }
