@@ -203,7 +203,10 @@ private fun LanguageSection(
     currentTag: String?,
     onSelect: (String?) -> Unit,
 ) {
-    val locales = listOf(
+    // Показываем только опции, для которых есть values-* перевод
+    // (LocaleApplier.SUPPORTED_TAGS). Прочие опции — задача W9.2.
+    // Пустой tag = system default, маппится в `null` для onSelect.
+    val allLocales = listOf(
         null to R.string.settings_language_system,
         SettingsModel.LOCALE_RU to R.string.settings_language_ru,
         SettingsModel.LOCALE_EN to R.string.settings_language_en,
@@ -217,6 +220,8 @@ private fun LanguageSection(
         SettingsModel.LOCALE_DE to R.string.settings_language_de,
         SettingsModel.LOCALE_JA to R.string.settings_language_ja,
     )
+    val supported = LocaleApplier.SUPPORTED_TAGS.toSet()
+    val locales = allLocales.filter { (tag, _) -> (tag ?: "") in supported }
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = stringResource(R.string.settings_language_title),
