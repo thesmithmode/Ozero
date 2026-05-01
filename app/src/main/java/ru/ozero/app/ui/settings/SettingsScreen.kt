@@ -203,9 +203,6 @@ private fun LanguageSection(
     currentTag: String?,
     onSelect: (String?) -> Unit,
 ) {
-    // Показываем только опции, для которых есть values-* перевод
-    // (LocaleApplier.SUPPORTED_TAGS). Прочие опции — задача W9.2.
-    // Пустой tag = system default, маппится в `null` для onSelect.
     val allLocales = listOf(
         null to R.string.settings_language_system,
         SettingsModel.LOCALE_RU to R.string.settings_language_ru,

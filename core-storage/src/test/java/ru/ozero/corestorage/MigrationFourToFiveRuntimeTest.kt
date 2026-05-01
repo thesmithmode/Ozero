@@ -4,23 +4,17 @@ import android.content.Context
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
-import androidx.test.core.app.ApplicationProvider
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * Runtime-проверка [OzeroDatabase.MIGRATION_4_5] через реальный SQLite (Robolectric JVM SQLite).
- *
- * Закрывает C3 review concern: до этого теста миграция была покрыта только source-pattern regex,
- * что не ловило бы битый SQL синтаксис до первого install-over-upgrade у v0.0.1 юзеров.
- */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33], manifest = Config.NONE)
 class MigrationFourToFiveRuntimeTest {
@@ -30,7 +24,7 @@ class MigrationFourToFiveRuntimeTest {
 
     @Before
     fun setUp() {
-        val ctx = ApplicationProvider.getApplicationContext<Context>()
+        val ctx: Context = RuntimeEnvironment.getApplication()
         val configuration = SupportSQLiteOpenHelper.Configuration.builder(ctx)
             .name(null) // in-memory
             .callback(object : SupportSQLiteOpenHelper.Callback(V4_VERSION) {
@@ -134,7 +128,7 @@ class MigrationFourToFiveRuntimeTest {
 
     @Test
     fun migration_preserves_existing_v4_data() {
-        // Симулируем v0.0.1 юзера с накопленными данными.
+        // Pre-existing user data на схеме v4 обязана выживать после миграции.
         db.execSQL(
             "INSERT INTO servers (host, port, isAlive, priority, pairId) " +
                 "VALUES ('example.com', 443, 1, 10, 'pair-1')",

@@ -4,21 +4,15 @@ import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * До W9.2 (machine translations + native review) UI обязан показывать только
- * языки, для которых есть values-LANG strings.xml. Любой расширенный список
- * = регрессия — юзер выбирает например китайский, а получает английский
- * fallback.
- */
 class LocaleApplierTest {
 
     @Test
-    fun `SUPPORTED_TAGS содержит ровно system + RU + EN до W9_2`() {
+    fun `SUPPORTED_TAGS содержит ровно system + RU + EN`() {
         assertEquals(
             listOf("", "ru", "en"),
             LocaleApplier.SUPPORTED_TAGS,
-            "Расширение списка требует добавления values-* перевода (W9.2). " +
-                "Просто добавить tag без перевода = регрессия (юзер видит EN fallback).",
+            "Расширение списка требует одновременного добавления values-* перевода — иначе юзер " +
+                "выбирает язык, а получает values-en fallback.",
         )
     }
 

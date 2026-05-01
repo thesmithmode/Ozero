@@ -87,6 +87,16 @@
             </intent-filter>
         </service>
 
+        <!-- AppCompat per-app locale persistence на API 24-32 (на API 33+ работает системный LocaleManager). -->
+        <service
+            android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"
+            android:enabled="false"
+            android:exported="false">
+            <meta-data
+                android:name="autoStoreLocales"
+                android:value="true" />
+        </service>
+
     </application>
 
 </manifest>

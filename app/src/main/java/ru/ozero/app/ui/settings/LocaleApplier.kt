@@ -2,16 +2,12 @@ package ru.ozero.app.ui.settings
 
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
+import ru.ozero.enginescore.PersistentLoggers
 
 object LocaleApplier {
 
-    /**
-     * BCP 47 теги, для которых уже существует values-* перевод. Любой другой
-     * выбор приведёт к фолбэку на values-en/. Расширение списка — задача W9.2
-     * (машинные переводы + ручной review).
-     *
-     * Пустая строка = "system default" (без явного override).
-     */
+    private const val TAG = "LocaleApplier"
+
     val SUPPORTED_TAGS: List<String> = listOf("", "ru", "en")
 
     fun apply(localeTag: String?) {
@@ -20,6 +16,7 @@ object LocaleApplier {
         } else {
             LocaleListCompat.forLanguageTags(localeTag)
         }
-        AppCompatDelegate.setApplicationLocales(locales)
+        runCatching { AppCompatDelegate.setApplicationLocales(locales) }
+            .onFailure { PersistentLoggers.warn(TAG, "setApplicationLocales failed: ${it.message}") }
     }
 }

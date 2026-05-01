@@ -57,7 +57,7 @@ class OzeroVpnServiceLifecycleTest {
             "startVpn обязан вызвать hev.TProxyService.loadOnce() ДО serviceScope.launch — " +
                 "loadLibrary на coroutine worker thread триггерит SIGSEGV в vendor libglnubia.so " +
                 "(nubia::Messager::timerLoop) на Nubia/RedMagic. Preload на main thread обходит race " +
-                "vendor performance monitor с loader callback. См. v1.0.3 fix.",
+                "vendor performance monitor с loader callback.",
         )
     }
 
@@ -90,10 +90,10 @@ class OzeroVpnServiceLifecycleTest {
         val nativeIdx = body.indexOf("tunnelGateway.stop()")
         assertTrue(
             chainIdx in 0 until nativeIdx,
-            "Phase A2: chainOrchestrator.stop() (byedpi) ОБЯЗАН быть ПЕРЕД tunnelGateway.stop() " +
-                "(libhev). Иначе libhev event-loop ждёт outstanding socks5 connections к byedpi → " +
+            "chainOrchestrator.stop() (byedpi) ОБЯЗАН быть ПЕРЕД tunnelGateway.stop() (libhev). " +
+                "Иначе libhev event-loop ждёт outstanding socks5 connections к byedpi → " +
                 "TProxyStopService зависает > 3000ms → abandoned thread → reconnect deadlock на " +
-                "libhev singleton. Reference: ByeDPIAndroid/ByeByeDPI делают proxy→tun2socks.",
+                "libhev singleton.",
         )
     }
 
@@ -105,9 +105,8 @@ class OzeroVpnServiceLifecycleTest {
         val closeIdx = body.indexOf("tunFdRef.getAndSet(null)?.close()")
         assertTrue(
             nativeIdx in 0 until closeIdx,
-            "Phase A4: tunFd закрывается ПОСЛЕ tunnelGateway.stop() (libhev). Сначала kill byedpi " +
-                "→ libhev завершается на ECONNREFUSED → потом native stop → потом close fd. Этот " +
-                "порядок симметричен ByeByeDPI stopTun2Socks(): TProxyStopService → tunFd.close().",
+            "tunFd закрывается ПОСЛЕ tunnelGateway.stop() (libhev). Сначала kill byedpi → " +
+                "libhev завершается на ECONNREFUSED → потом native stop → потом close fd.",
         )
     }
 
@@ -131,38 +130,48 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `startVpn не делает runBlocking (C1 закрыт через preload-cache в onCreate)`() {
+    fun `startVpn не блокирует main thread runBlocking-ом`() {
         val body = source.substringAfter("private fun startVpn()").substringBefore("private fun startStatsLogger")
         assertFalse(
             body.contains("runBlocking"),
-            "startVpn не должен использовать runBlocking — settings и split-packages обязаны " +
-                "читаться из @Volatile preload-кэша (cachedSettings / cachedSplitPackages), " +
-                "наполняемого в onCreate через serviceScope.launch. См. C1 review concern.",
-        )
-        assertTrue(
-            body.contains("cachedSettings") && body.contains("cachedSplitPackages"),
-            "startVpn обязан читать cachedSettings и cachedSplitPackages вместо runBlocking.",
+            "startVpn не должен использовать runBlocking. settings и split-packages читаются " +
+                "из serviceScope.launch (IO) через withTimeoutOrNull + first()/activePackages().",
         )
     }
 
     @Test
-    fun `onCreate запускает settings preload через serviceScope`() {
-        val onCreateBody = source.substringAfter("override fun onCreate()")
-            .substringBefore("private fun startSettingsCachePreload")
+    fun `startVpn читает свежие settings и split-packages из IO scope`() {
+        val body = source.substringAfter("private fun startVpn()").substringBefore("private fun startStatsLogger")
         assertTrue(
-            onCreateBody.contains("startSettingsCachePreload()"),
-            "onCreate обязан вызвать startSettingsCachePreload() — иначе cachedSettings null " +
-                "и первый startVpn использует defaults.",
-        )
-        val preloadBody = source.substringAfter("private fun startSettingsCachePreload()")
-            .substringBefore("private val tunFdRef")
-        assertTrue(
-            preloadBody.contains("settingsRepository.settings.collect"),
-            "preload обязан collect() Flow settingsRepository, чтобы кэш обновлялся при изменениях.",
+            body.contains("settingsRepository.settings.first()"),
+            "startVpn обязан дочитывать settings.first() свежими — cold-start defaults сломают " +
+                "custom DNS / split / hosts / winning-args.",
         )
         assertTrue(
-            preloadBody.contains("splitTunnelRulesProvider.activePackages()"),
-            "preload обязан читать split-packages для cachedSplitPackages.",
+            body.contains("splitTunnelRulesProvider.activePackages()"),
+            "startVpn обязан читать activePackages() свежими на каждый connect — иначе изменение " +
+                "split-rules видно только со второго reconnect.",
+        )
+        assertTrue(
+            body.contains("withTimeoutOrNull"),
+            "Чтение settings/split обязано быть под withTimeoutOrNull — DataStore corruption не " +
+                "должен зависать VPN start.",
+        )
+    }
+
+    @Test
+    fun `onDestroy не shutdown-ит singleton HealthMonitor`() {
+        val body = source.substringAfter("override fun onDestroy()").substringBefore("private fun enterForegroundOrLog")
+        assertFalse(
+            body.contains("healthMonitor.shutdown()"),
+            "HealthMonitor — @Singleton, его внутренний scope живёт всё время процесса. shutdown() " +
+                "в onDestroy сделает scope cancelled навсегда → следующий connect не запустит probe → " +
+                "DEGRADED badge никогда не покажется. Используй stop().",
+        )
+        assertTrue(
+            body.contains("healthMonitor.stop()"),
+            "onDestroy обязан вызвать healthMonitor.stop() — сбросит status в UNKNOWN и cancel " +
+                "текущий probe job, не убивая сам scope.",
         )
     }
 }
