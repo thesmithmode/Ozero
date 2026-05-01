@@ -137,112 +137,122 @@ class OzeroVpnService : android.net.VpnService() {
         PersistentLoggers.info(TAG, "loadOnce done libraryLoaded=${hev.TProxyService.libraryLoaded}")
 
         val job = serviceScope.launch {
-            if (stopping.get()) {
-                starting.set(false)
-                return@launch
-            }
-            val settings = withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
-                runCatching { settingsRepository.settings.first() }.getOrNull()
-            }
-            val splitPackages = withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
-                runCatching { splitTunnelRulesProvider.activePackages() }.getOrNull()
-            } ?: emptySet()
-            val ipv6Enabled = settings?.ipv6Enabled ?: false
-            val customDnsServers = settings?.customDnsServers.orEmpty()
-            val splitMode = settings?.splitMode ?: ru.ozero.enginescore.settings.SplitTunnelMode.ALL
-            val splitConfig = ru.ozero.commonvpn.split.SplitTunnelConfig(
-                mode = splitMode,
-                packages = splitPackages,
-            )
-
-            val fd = try {
-                buildTunBuilder(
-                    splitConfig = splitConfig,
-                    ipv6Enabled = ipv6Enabled,
-                    customDnsServers = customDnsServers,
-                ).establish()
-            } catch (t: Throwable) {
-                PersistentLoggers.error(TAG, "establish threw: ${t.message}")
-                starting.set(false)
-                stopVpn()
-                return@launch
-            }
-            if (fd == null) {
-                PersistentLoggers.error(TAG, "establish returned null — permission revoked?")
-                starting.set(false)
-                stopVpn()
-                return@launch
-            }
-            tunFdRef.set(fd)
-            PersistentLoggers.info(TAG, "TUN established fd=${fd.fd}")
-
-            if (stopping.get()) {
-                runCatching { fd.close() }
-                tunFdRef.compareAndSet(fd, null)
-                starting.set(false)
-                return@launch
-            }
             try {
-                tunnelController.onProbing()
-                val byedpiConfig = EngineConfig.ByeDpi(
-                    args = settings?.byedpiWinningArgs?.takeIf { it.isNotBlank() }
-                        ?: EngineConfig.ByeDpi().args,
-                    hostsMode = settings?.hostsMode
-                        ?: ru.ozero.enginescore.settings.HostsMode.DISABLED,
-                    hosts = settings?.hosts.orEmpty(),
-                )
-                val chainResult = withTimeoutOrNull(CHAIN_START_TIMEOUT_MS) {
-                    try {
-                        chainOrchestrator.start(listOf(ChainStep(EngineId.BYEDPI, byedpiConfig)))
-                    } catch (ce: kotlinx.coroutines.CancellationException) {
-                        throw ce
-                    } catch (t: Throwable) {
-                        PersistentLoggers.error(TAG, "chain.start threw: ${t.message}")
-                        null
-                    }
-                }
-                PersistentLoggers.info(TAG, "chain result=$chainResult")
-                if (chainResult !is ChainResult.Success) {
-                    tunnelController.onEngineDied(EngineId.BYEDPI, chainResult?.toString() ?: "timeout")
-                    stopVpn()
-                    return@launch
-                }
-                tunnelController.onConnecting(EngineId.BYEDPI)
-                val code = try {
-                    tunnelGateway.start(
-                        HevTunnelConfig(
-                            tunPfd = fd,
-                            socksAddress = "127.0.0.1",
-                            socksPort = chainResult.finalSocksPort,
-                        ),
-                    )
-                } catch (t: Throwable) {
-                    PersistentLoggers.error(TAG, "tunnelGateway.start threw: ${t.message}")
-                    runCatching { chainOrchestrator.stop() }
-                    stopVpn()
-                    return@launch
-                }
-                if (code != 0) {
-                    PersistentLoggers.error(TAG, "tunnel start failed code=$code")
-                    runCatching { chainOrchestrator.stop() }
-                    tunnelController.onEngineDied(EngineId.BYEDPI, "tunnel code=$code")
-                    stopVpn()
-                    return@launch
-                }
-                tunnelController.onEngineStarted(EngineId.BYEDPI, chainResult.finalSocksPort)
-                val nowMs = System.currentTimeMillis()
-                sessionStartMsRef.set(nowMs)
-                val id = runCatching {
-                    sessionStatsRecorder.startSession(EngineId.BYEDPI.name, nowMs)
-                }.getOrDefault(-1L)
-                sessionIdRef.set(id)
-                runCatching { healthMonitor.start(chainResult.finalSocksPort) }
-                startStatsLogger()
+                runStartSequence()
             } finally {
                 starting.set(false)
             }
         }
         startJobRef.set(job)
+    }
+
+    private suspend fun runStartSequence() {
+        if (stopping.get()) return
+        val settings = withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
+            runCatching { settingsRepository.settings.first() }.getOrNull()
+        }
+        val splitPackages = withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
+            runCatching { splitTunnelRulesProvider.activePackages() }.getOrNull()
+        } ?: emptySet()
+        val splitConfig = ru.ozero.commonvpn.split.SplitTunnelConfig(
+            mode = settings?.splitMode ?: ru.ozero.enginescore.settings.SplitTunnelMode.ALL,
+            packages = splitPackages,
+        )
+
+        val fd = establishTun(
+            splitConfig,
+            ipv6 = settings?.ipv6Enabled ?: false,
+            customDns = settings?.customDnsServers.orEmpty(),
+        ) ?: return
+        if (stopping.get()) {
+            runCatching { fd.close() }
+            tunFdRef.compareAndSet(fd, null)
+            return
+        }
+
+        tunnelController.onProbing()
+        val byedpiConfig = EngineConfig.ByeDpi(
+            args = settings?.byedpiWinningArgs?.takeIf { it.isNotBlank() }
+                ?: EngineConfig.ByeDpi().args,
+            hostsMode = settings?.hostsMode ?: ru.ozero.enginescore.settings.HostsMode.DISABLED,
+            hosts = settings?.hosts.orEmpty(),
+        )
+        val chainResult = startChain(byedpiConfig) ?: return
+        if (!startNativeTunnel(fd, chainResult.finalSocksPort)) return
+
+        tunnelController.onEngineStarted(EngineId.BYEDPI, chainResult.finalSocksPort)
+        val nowMs = System.currentTimeMillis()
+        sessionStartMsRef.set(nowMs)
+        sessionIdRef.set(
+            runCatching { sessionStatsRecorder.startSession(EngineId.BYEDPI.name, nowMs) }.getOrDefault(-1L),
+        )
+        runCatching { healthMonitor.start(chainResult.finalSocksPort) }
+        startStatsLogger()
+    }
+
+    private fun establishTun(
+        splitConfig: ru.ozero.commonvpn.split.SplitTunnelConfig,
+        ipv6: Boolean,
+        customDns: List<String>,
+    ): ParcelFileDescriptor? {
+        val fd = try {
+            buildTunBuilder(splitConfig = splitConfig, ipv6Enabled = ipv6, customDnsServers = customDns)
+                .establish()
+        } catch (t: Throwable) {
+            PersistentLoggers.error(TAG, "establish threw: ${t.message}")
+            stopVpn()
+            return null
+        }
+        if (fd == null) {
+            PersistentLoggers.error(TAG, "establish returned null — permission revoked?")
+            stopVpn()
+            return null
+        }
+        tunFdRef.set(fd)
+        PersistentLoggers.info(TAG, "TUN established fd=${fd.fd}")
+        return fd
+    }
+
+    private suspend fun startChain(byedpiConfig: EngineConfig.ByeDpi): ChainResult.Success? {
+        val chainResult = withTimeoutOrNull(CHAIN_START_TIMEOUT_MS) {
+            try {
+                chainOrchestrator.start(listOf(ChainStep(EngineId.BYEDPI, byedpiConfig)))
+            } catch (ce: kotlinx.coroutines.CancellationException) {
+                throw ce
+            } catch (t: Throwable) {
+                PersistentLoggers.error(TAG, "chain.start threw: ${t.message}")
+                null
+            }
+        }
+        PersistentLoggers.info(TAG, "chain result=$chainResult")
+        if (chainResult !is ChainResult.Success) {
+            tunnelController.onEngineDied(EngineId.BYEDPI, chainResult?.toString() ?: "timeout")
+            stopVpn()
+            return null
+        }
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        return chainResult
+    }
+
+    private fun startNativeTunnel(fd: ParcelFileDescriptor, socksPort: Int): Boolean {
+        val code = try {
+            tunnelGateway.start(
+                HevTunnelConfig(tunPfd = fd, socksAddress = "127.0.0.1", socksPort = socksPort),
+            )
+        } catch (t: Throwable) {
+            PersistentLoggers.error(TAG, "tunnelGateway.start threw: ${t.message}")
+            runCatching { chainOrchestrator.stop() }
+            stopVpn()
+            return false
+        }
+        if (code != 0) {
+            PersistentLoggers.error(TAG, "tunnel start failed code=$code")
+            runCatching { chainOrchestrator.stop() }
+            tunnelController.onEngineDied(EngineId.BYEDPI, "tunnel code=$code")
+            stopVpn()
+            return false
+        }
+        return true
     }
 
     private fun startStatsLogger() {
