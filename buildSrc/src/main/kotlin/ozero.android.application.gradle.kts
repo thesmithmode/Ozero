@@ -62,8 +62,7 @@ extensions.configure<BaseAppModuleExtension> {
             } else {
                                                 gradle.taskGraph.whenReady {
                     val releaseTask = allTasks.find {
-                        it.name.contains("assembleRelease", ignoreCase = true) ||
-                            it.name.contains("bundleRelease", ignoreCase = true)
+                        it.path == ":app:assembleRelease" || it.path == ":app:bundleRelease"
                     }
                     if (releaseTask != null) {
                         throw GradleException(
