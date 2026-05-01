@@ -24,7 +24,7 @@ android {
     }
 
     lint {
-        checkDependencies = false
+        checkReleaseBuilds = false
     }
 
     defaultConfig {
