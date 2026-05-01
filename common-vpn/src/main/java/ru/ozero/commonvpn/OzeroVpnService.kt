@@ -52,6 +52,8 @@ class OzeroVpnService : android.net.VpnService() {
 
     @Inject lateinit var healthMonitor: HealthMonitor
 
+    @Inject lateinit var enginePlugins: Set<@JvmSuppressWildcards ru.ozero.enginescore.EnginePlugin>
+
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val sessionIdRef = AtomicReference<Long>(-1L)
     private val sessionStartMsRef = AtomicReference<Long>(0L)
@@ -172,24 +174,34 @@ class OzeroVpnService : android.net.VpnService() {
         }
 
         tunnelController.onProbing()
-        val byedpiConfig = EngineConfig.ByeDpi(
-            args = settings?.byedpiWinningArgs?.takeIf { it.isNotBlank() }
-                ?: EngineConfig.ByeDpi().args,
-            hostsMode = settings?.hostsMode ?: ru.ozero.enginescore.settings.HostsMode.DISABLED,
-            hosts = settings?.hosts.orEmpty(),
-        )
-        val chainResult = startChain(byedpiConfig) ?: return
-        if (!startNativeTunnel(fd, chainResult.finalSocksPort)) return
+        val activeEngineId = settings?.manualEngine ?: EngineId.BYEDPI
+        val activeConfig = buildEngineConfig(activeEngineId, settings)
+        if (activeConfig == null) {
+            PersistentLoggers.error(
+                TAG,
+                "manual engine $activeEngineId не имеет конфига — отказ без fallback (manual selection)",
+            )
+            tunnelController.onEngineDied(activeEngineId, "no config for manual engine")
+            stopVpn()
+            return
+        }
+        val chainResult = startChain(activeEngineId, activeConfig) ?: return
+        if (!routeTrafficForEngine(activeEngineId, fd, chainResult.finalSocksPort)) return
 
-        tunnelController.onEngineStarted(EngineId.BYEDPI, chainResult.finalSocksPort)
+        tunnelController.onEngineStarted(activeEngineId, chainResult.finalSocksPort)
         val nowMs = System.currentTimeMillis()
         sessionStartMsRef.set(nowMs)
         sessionIdRef.set(
-            runCatching { sessionStatsRecorder.startSession(EngineId.BYEDPI.name, nowMs) }.getOrDefault(-1L),
+            runCatching { sessionStatsRecorder.startSession(activeEngineId.name, nowMs) }.getOrDefault(-1L),
         )
         runCatching { healthMonitor.start(chainResult.finalSocksPort) }
         startStatsLogger()
     }
+
+    private fun buildEngineConfig(
+        engineId: EngineId,
+        settings: ru.ozero.enginescore.settings.SettingsModel?,
+    ): EngineConfig? = ManualEngineConfigBuilder.build(engineId, settings)
 
     private fun establishTun(
         splitConfig: ru.ozero.commonvpn.split.SplitTunnelConfig,
@@ -214,10 +226,10 @@ class OzeroVpnService : android.net.VpnService() {
         return fd
     }
 
-    private suspend fun startChain(byedpiConfig: EngineConfig.ByeDpi): ChainResult.Success? {
+    private suspend fun startChain(engineId: EngineId, config: EngineConfig): ChainResult.Success? {
         val chainResult = withTimeoutOrNull(CHAIN_START_TIMEOUT_MS) {
             try {
-                chainOrchestrator.start(listOf(ChainStep(EngineId.BYEDPI, byedpiConfig)))
+                chainOrchestrator.start(listOf(ChainStep(engineId, config)))
             } catch (ce: kotlinx.coroutines.CancellationException) {
                 throw ce
             } catch (t: Throwable) {
@@ -225,17 +237,44 @@ class OzeroVpnService : android.net.VpnService() {
                 null
             }
         }
-        PersistentLoggers.info(TAG, "chain result=$chainResult")
+        PersistentLoggers.info(TAG, "chain result=$chainResult engineId=$engineId")
         if (chainResult !is ChainResult.Success) {
-            tunnelController.onEngineDied(EngineId.BYEDPI, chainResult?.toString() ?: "timeout")
+            tunnelController.onEngineDied(engineId, chainResult?.toString() ?: "timeout")
             stopVpn()
             return null
         }
-        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onConnecting(engineId)
         return chainResult
     }
 
-    private suspend fun startNativeTunnel(fd: ParcelFileDescriptor, socksPort: Int): Boolean {
+    private suspend fun routeTrafficForEngine(
+        engineId: EngineId,
+        fd: ParcelFileDescriptor,
+        socksPort: Int,
+    ): Boolean {
+        val engine = enginePlugins.firstOrNull { it.id == engineId }
+        if (engine is ru.ozero.enginescore.TunFdAcceptor) {
+            val rawFd = fd.detachFd()
+            tunFdRef.compareAndSet(fd, null)
+            return when (val r = engine.attachTun(rawFd)) {
+                ru.ozero.enginescore.TunAttachResult.Success -> true
+                is ru.ozero.enginescore.TunAttachResult.Failure -> {
+                    PersistentLoggers.error(TAG, "attachTun failed: ${r.reason}")
+                    runCatching { chainOrchestrator.stop() }
+                    tunnelController.onEngineDied(engineId, "attachTun: ${r.reason}")
+                    stopVpn()
+                    false
+                }
+            }
+        }
+        return startNativeTunnel(engineId, fd, socksPort)
+    }
+
+    private suspend fun startNativeTunnel(
+        engineId: EngineId,
+        fd: ParcelFileDescriptor,
+        socksPort: Int,
+    ): Boolean {
         val code = try {
             tunnelGateway.start(
                 HevTunnelConfig(tunPfd = fd, socksAddress = "127.0.0.1", socksPort = socksPort),
@@ -249,7 +288,7 @@ class OzeroVpnService : android.net.VpnService() {
         if (code != 0) {
             PersistentLoggers.error(TAG, "tunnel start failed code=$code")
             runCatching { chainOrchestrator.stop() }
-            tunnelController.onEngineDied(EngineId.BYEDPI, "tunnel code=$code")
+            tunnelController.onEngineDied(engineId, "tunnel code=$code")
             stopVpn()
             return false
         }

@@ -23,6 +23,15 @@
     <string name="tab_main">Главная</string>
     <string name="tab_settings">Настройки</string>
     <string name="tab_diagnostics">Диагностика</string>
+    <string name="tab_servers">Локация</string>
+    <string name="tab_stats">Статистика</string>
+    <string name="tab_subs">Подписка</string>
+    <string name="tab_engine">Движок</string>
+
+    <!-- Subscriptions -->
+    <string name="subs_screen_title">Подписка</string>
+    <string name="subs_placeholder_title">В разработке</string>
+    <string name="subs_placeholder_body">Премиум-функции и пожертвования появятся в следующих релизах.</string>
 
     <!-- Settings -->
     <string name="settings_title">Настройки</string>
@@ -176,9 +185,10 @@
     <string name="urnetwork_consent_accept">Я понимаю, включить</string>
     <string name="urnetwork_consent_revoke">Отозвать согласие</string>
     <string name="urnetwork_wallet_label">Solana-кошелёк</string>
-    <string name="urnetwork_wallet_using_preset">Используется кошелёк автора Ozero. Токены за ваш exit-node трафик идут на развитие проекта. Введите свой Solana-кошелёк ниже, чтобы получать токены самому.</string>
+    <string name="urnetwork_wallet_hint">Введите ваш Solana-адрес, чтобы получать токены за свой exit-node трафик. Если оставить поле пустым — токены не начисляются.</string>
+    <string name="urnetwork_wallet_placeholder">Solana base58 адрес (32-44 символа)</string>
     <string name="urnetwork_wallet_save">Сохранить</string>
-    <string name="urnetwork_wallet_reset">Сбросить на предустановленный</string>
+    <string name="urnetwork_wallet_reset">Очистить</string>
     <string name="urnetwork_wallet_invalid">Невалидный Solana-адрес (32-44 символа base58)</string>
     <string name="settings_urnetwork_title">URnetwork</string>
     <string name="settings_urnetwork_summary">P2P mesh — exit-node + Solana-кошелёк</string>

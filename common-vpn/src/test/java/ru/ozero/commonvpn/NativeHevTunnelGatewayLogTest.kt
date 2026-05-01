@@ -27,8 +27,8 @@ class NativeHevTunnelGatewayLogTest {
 
     @Test
     fun `start checkpoint после loadOnce с timing и libraryLoaded`() {
-        val loadIdx = startBody.indexOf("hev.TProxyService.loadOnce()")
-        check(loadIdx >= 0) { "loadOnce missing" }
+        val loadIdx = startBody.indexOf("loader.loadOnce()")
+        check(loadIdx >= 0) { "loader.loadOnce() missing — TProxyLoader interface обязан вызываться в start" }
         val tail = startBody.substring(loadIdx, minOf(startBody.length, loadIdx + 800))
         assertTrue(tail.contains("checkpoint loadOnce returned"), "должен иметь checkpoint после loadOnce")
         assertTrue(tail.contains("dt="), "timing после loadOnce")
@@ -84,7 +84,7 @@ class NativeHevTunnelGatewayLogTest {
     }
 
     private fun funBody(src: String, name: String): String {
-        val patterns = listOf("override fun $name(", "fun $name(", "fun $name (")
+        val patterns = listOf("override fun $name(", "override suspend fun $name(", "fun $name(", "fun $name (")
         var idx = -1
         for (p in patterns) {
             idx = src.indexOf(p)

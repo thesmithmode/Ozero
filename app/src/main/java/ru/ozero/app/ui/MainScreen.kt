@@ -4,21 +4,20 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,16 +26,24 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.delay
 import ru.ozero.app.R
+import ru.ozero.app.ui.components.BottomDock
+import ru.ozero.app.ui.components.DockTab
+import ru.ozero.app.ui.components.OzeroBackground
+import ru.ozero.app.ui.components.OzeroBackgroundState
+import ru.ozero.app.ui.components.PowerDisc
+import ru.ozero.app.ui.components.PowerDiscState
+import ru.ozero.app.ui.theme.OzeroPalette
 import ru.ozero.commonvpn.BytesFormatter
 import ru.ozero.commonvpn.HealthMonitor
 import ru.ozero.commonvpn.TunnelState
@@ -47,88 +54,113 @@ fun MainScreen(
     viewModel: MainViewModel,
     onConnectClick: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenServers: () -> Unit = {},
+    onOpenStats: () -> Unit = {},
+    onOpenSubs: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val stats by viewModel.stats.collectAsStateWithLifecycle()
     val stagnant by viewModel.stagnant.collectAsStateWithLifecycle()
     val healthStatus by viewModel.healthStatus.collectAsStateWithLifecycle()
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Row(
+    val powerState = state.toPowerDiscState()
+    val backgroundState = state.toBackgroundState()
+    val isConnected = state is TunnelState.Connected
+    val statsValue = stats
+
+    OzeroBackground(state = backgroundState) {
+        Column(
             modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(8.dp),
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            IconButton(
-                onClick = onOpenSettings,
-                modifier = Modifier.testTag(MainScreenTestTags.OPEN_SETTINGS),
+            Spacer(modifier = Modifier.height(20.dp))
+
+            AnimatedContent(targetState = state, label = "status") { s -> StatusLabel(s) }
+
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Settings,
-                    contentDescription = stringResource(R.string.tab_settings),
+                PowerDisc(
+                    state = powerState,
+                    onClick = onConnectClick,
+                    modifier = Modifier.semantics {
+                        contentDescription = if (isConnected) "disconnect" else "connect"
+                    },
                 )
             }
-        }
 
-        Column(
-            modifier = Modifier.fillMaxSize().padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            AnimatedContent(targetState = state, label = "status") { s ->
-                StatusLabel(s)
-            }
-
-            if (state is TunnelState.Connected && stats != null) {
-                Spacer(modifier = Modifier.height(16.dp))
-                TrafficStatsCard(stats!!)
-                if (stagnant) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = stringResource(R.string.main_stagnation_warning),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.testTag(MainScreenTestTags.STAGNATION_BADGE),
-                    )
-                }
-                if (healthStatus == HealthMonitor.Status.DEGRADED) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = stringResource(R.string.main_health_degraded),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.testTag(MainScreenTestTags.HEALTH_DEGRADED_BADGE),
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            when (state) {
-                is TunnelState.Probing,
-                is TunnelState.Connecting,
-                is TunnelState.Disconnecting,
-                -> {
-                    val loadingDesc = stringResource(R.string.a11y_loading)
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(48.dp).semantics { contentDescription = loadingDesc },
-                    )
-                }
-                else -> {
-                    val isConnected = state is TunnelState.Connected
-                    val buttonDesc = stringResource(
-                        if (isConnected) R.string.a11y_disconnect_button else R.string.a11y_connect_button,
-                    )
-                    Button(
-                        onClick = onConnectClick,
-                        modifier = Modifier.semantics { contentDescription = buttonDesc },
-                    ) {
-                        Text(stringResource(if (isConnected) R.string.main_disconnect else R.string.main_connect))
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (isConnected && statsValue != null) {
+                    TrafficStatsCard(statsValue)
+                    if (stagnant) {
+                        Text(
+                            text = stringResource(R.string.main_stagnation_warning),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.testTag(MainScreenTestTags.STAGNATION_BADGE),
+                        )
+                    }
+                    if (healthStatus == HealthMonitor.Status.DEGRADED) {
+                        Text(
+                            text = stringResource(R.string.main_health_degraded),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.testTag(MainScreenTestTags.HEALTH_DEGRADED_BADGE),
+                        )
                     }
                 }
+                BottomDock(
+                    tabs = simpleDockTabs(),
+                    activeTabId = DOCK_TAB_HOME,
+                    onTabSelected = { id ->
+                        when (id) {
+                            DOCK_TAB_SERVERS -> onOpenServers()
+                            DOCK_TAB_STATS -> onOpenStats()
+                            DOCK_TAB_SUBS -> onOpenSubs()
+                            DOCK_TAB_SETTINGS -> onOpenSettings()
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(8.dp))
             }
         }
     }
+}
+
+@Composable
+private fun simpleDockTabs(): List<DockTab> = listOf(
+    DockTab(DOCK_TAB_HOME, Icons.Filled.Home, stringResource(R.string.tab_main)),
+    DockTab(DOCK_TAB_SERVERS, Icons.Filled.LocationOn, stringResource(R.string.tab_servers)),
+    DockTab(DOCK_TAB_STATS, Icons.Filled.Info, stringResource(R.string.tab_stats)),
+    DockTab(DOCK_TAB_SUBS, Icons.Filled.Star, stringResource(R.string.tab_subs)),
+    DockTab(DOCK_TAB_SETTINGS, Icons.Filled.Settings, stringResource(R.string.tab_settings)),
+)
+
+private fun TunnelState.toPowerDiscState(): PowerDiscState = when (this) {
+    is TunnelState.Connected -> PowerDiscState.Connected
+    is TunnelState.Probing,
+    is TunnelState.Connecting,
+    is TunnelState.Disconnecting,
+    -> PowerDiscState.Connecting
+    is TunnelState.Idle, is TunnelState.Failed -> PowerDiscState.Off
+}
+
+private fun TunnelState.toBackgroundState(): OzeroBackgroundState = when (this) {
+    is TunnelState.Connected -> OzeroBackgroundState.Connected
+    is TunnelState.Probing,
+    is TunnelState.Connecting,
+    is TunnelState.Disconnecting,
+    -> OzeroBackgroundState.Connecting
+    is TunnelState.Idle, is TunnelState.Failed -> OzeroBackgroundState.Off
 }
 
 @Composable
@@ -151,8 +183,9 @@ private fun TrafficStatsCard(stats: TunnelStats) {
             .fillMaxWidth()
             .testTag(MainScreenTestTags.TRAFFIC_STATS),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            containerColor = OzeroPalette.GlassFill,
         ),
+        shape = RoundedCornerShape(20.dp),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -160,19 +193,17 @@ private fun TrafficStatsCard(stats: TunnelStats) {
         ) {
             Text(
                 text = "↓ $rxSpeed   ↑ $txSpeed",
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
             )
-            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = stringResource(R.string.stats_session, rxTotal, txTotal),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+                color = OzeroPalette.Text2,
             )
-            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = stringResource(R.string.stats_uptime, uptime),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                color = OzeroPalette.Text3,
             )
         }
     }
@@ -198,18 +229,17 @@ private fun StatusLabel(state: TunnelState) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = stringResource(labelRes),
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
+            color = OzeroPalette.Text,
         )
         if (engine != null) {
-            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = engine,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                style = MaterialTheme.typography.bodySmall,
+                color = OzeroPalette.Text3,
             )
         }
         if (failedReason != null && failedReason.isNotBlank()) {
-            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = failedReason,
                 style = MaterialTheme.typography.bodySmall,
@@ -219,3 +249,9 @@ private fun StatusLabel(state: TunnelState) {
         }
     }
 }
+
+private const val DOCK_TAB_HOME = "home"
+private const val DOCK_TAB_SERVERS = "servers"
+private const val DOCK_TAB_STATS = "stats"
+private const val DOCK_TAB_SUBS = "subs"
+private const val DOCK_TAB_SETTINGS = "settings"

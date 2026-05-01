@@ -11,6 +11,7 @@ interface HevTunnelGateway {
 
 class NativeHevTunnelGateway(
     private val cacheDir: File,
+    private val loader: TProxyLoader = DefaultTProxyLoader,
     private val nativeStart: (configPath: String, fd: Int) -> Int = { path, fd ->
         hev.TProxyService.TProxyStartService(path, fd)
         0
@@ -22,11 +23,22 @@ class NativeHevTunnelGateway(
 
     override fun start(config: HevTunnelConfig): Int {
         val fd = config.tunPfd.fd
-        hev.TProxyService.loadOnce()
-        if (!hev.TProxyService.libraryLoaded) {
+        PersistentLoggers.instance?.info(
+            TAG,
+            "start entry thread=${Thread.currentThread().name} fd=$fd",
+        )
+
+        val tLoad0 = System.nanoTime()
+        loader.loadOnce()
+        val tLoadMs = (System.nanoTime() - tLoad0) / 1_000_000
+        PersistentLoggers.instance?.info(
+            TAG,
+            "checkpoint loadOnce returned dt=${tLoadMs}ms libraryLoaded=${loader.libraryLoaded}",
+        )
+        if (!loader.libraryLoaded) {
             PersistentLoggers.instance?.error(
                 TAG,
-                "libhev-socks5-tunnel не загружена: ${hev.TProxyService.loadError}",
+                "libhev-socks5-tunnel не загружена: ${loader.loadError}",
             )
             return -1
         }
@@ -64,4 +76,16 @@ class NativeHevTunnelGateway(
         const val TAG = "NativeHevTunnel"
         const val CONFIG_FILE = "hev-socks5-tunnel.yaml"
     }
+}
+
+interface TProxyLoader {
+    fun loadOnce()
+    val libraryLoaded: Boolean
+    val loadError: String?
+}
+
+internal object DefaultTProxyLoader : TProxyLoader {
+    override fun loadOnce() = hev.TProxyService.loadOnce()
+    override val libraryLoaded: Boolean get() = hev.TProxyService.libraryLoaded
+    override val loadError: String? get() = hev.TProxyService.loadError
 }

@@ -57,7 +57,7 @@ class ByeDpiEngine(
         PersistentLoggers.info(TAG, "start socksPort=${config.socksPort} args=${config.args}")
         val args = buildArgs(config)
         val proxyJob = proxyScope.launch {
-            val code = runCatching { proxy.jniStartProxy(args) }
+            val code = runCatching { proxy.startProxy(args) }
                 .onFailure { PersistentLoggers.error(TAG, "jniStartProxy threw: ${it.message}") }
                 .getOrElse { -1 }
             if (code != 0) {
@@ -78,9 +78,9 @@ class ByeDpiEngine(
             StartResult.Success(socksPort = config.socksPort)
         } else {
             PersistentLoggers.error(TAG, "byedpi не вышел на порт ${config.socksPort} за ${READY_TIMEOUT_MS}ms")
-            runCatching { proxy.jniStopProxy() }
+            runCatching { proxy.stopProxy() }
                 .onFailure { PersistentLoggers.warn(TAG, "jniStopProxy on failure: ${it.message}") }
-            runCatching { proxy.jniForceClose() }
+            runCatching { proxy.forceClose() }
                 .onFailure { PersistentLoggers.warn(TAG, "jniForceClose on failure: ${it.message}") }
             proxyJob.cancel()
             proxyJobRef.compareAndSet(proxyJob, null)
@@ -102,7 +102,7 @@ class ByeDpiEngine(
     override suspend fun stop() {
         PersistentLoggers.info(TAG, "stop")
         withContext(Dispatchers.IO) {
-            runCatching { proxy.jniStopProxy() }
+            runCatching { proxy.stopProxy() }
                 .onFailure { PersistentLoggers.warn(TAG, "jniStopProxy исключение: ${it.message}") }
             val job = proxyJobRef.getAndSet(null)
             if (job != null) {
@@ -112,7 +112,7 @@ class ByeDpiEngine(
                 }
                 if (completed == null) {
                     PersistentLoggers.warn(TAG, "proxyJob не завершился за ${STOP_GRACE_MS}ms — jniForceClose")
-                    runCatching { proxy.jniForceClose() }
+                    runCatching { proxy.forceClose() }
                         .onFailure { PersistentLoggers.warn(TAG, "jniForceClose исключение: ${it.message}") }
                     job.cancel()
                 }

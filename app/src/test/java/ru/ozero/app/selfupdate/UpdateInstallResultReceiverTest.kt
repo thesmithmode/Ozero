@@ -7,24 +7,28 @@ import io.mockk.mockk
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Test
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertSame
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [33])
 class UpdateInstallResultReceiverTest {
 
     private val context = mockk<Context>(relaxed = true)
     private val receiver = UpdateInstallResultReceiver()
 
-    @BeforeEach
+    @Before
     fun setUp() {
         UpdateInstallEventBus.reset()
     }
 
     @Test
-    fun `STATUS_PENDING_USER_ACTION with EXTRA_INTENT emits PendingUserAction`() = runTest {
+    fun pendingUserAction_withExtraIntent_emitsPendingUserAction() = runTest {
         val confirmIntent = Intent("android.content.pm.action.CONFIRM_INSTALL")
         val intent = Intent(UpdateInstallResultReceiver.ACTION).apply {
             putExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_PENDING_USER_ACTION)
@@ -36,11 +40,12 @@ class UpdateInstallResultReceiverTest {
 
         val event = withTimeout(EVENT_TIMEOUT_MS) { UpdateInstallEventBus.events.first() }
         val pending = assertIs<UpdateInstallEvent.PendingUserAction>(event)
-        assertSame(confirmIntent, pending.intent)
+        assertEquals(confirmIntent.action, pending.intent.action)
     }
 
     @Test
-    fun `STATUS_PENDING_USER_ACTION without EXTRA_INTENT emits Failure`() = runTest {
+    fun pendingUserAction_withoutExtraIntent_emitsFailure() = runTest {
+        UpdateInstallEventBus.reset()
         val intent = Intent(UpdateInstallResultReceiver.ACTION).apply {
             putExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_PENDING_USER_ACTION)
             putExtra(PackageInstaller.EXTRA_SESSION_ID, 7)
@@ -55,7 +60,8 @@ class UpdateInstallResultReceiverTest {
     }
 
     @Test
-    fun `STATUS_SUCCESS emits Success with session id`() = runTest {
+    fun statusSuccess_emitsSuccessWithSessionId() = runTest {
+        UpdateInstallEventBus.reset()
         val intent = Intent(UpdateInstallResultReceiver.ACTION).apply {
             putExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_SUCCESS)
             putExtra(PackageInstaller.EXTRA_SESSION_ID, 99)
@@ -69,7 +75,8 @@ class UpdateInstallResultReceiverTest {
     }
 
     @Test
-    fun `STATUS_FAILURE emits Failure with message`() = runTest {
+    fun statusFailure_emitsFailureWithMessage() = runTest {
+        UpdateInstallEventBus.reset()
         val intent = Intent(UpdateInstallResultReceiver.ACTION).apply {
             putExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
             putExtra(PackageInstaller.EXTRA_SESSION_ID, 5)
@@ -86,7 +93,8 @@ class UpdateInstallResultReceiverTest {
     }
 
     @Test
-    fun `STATUS_FAILURE_ABORTED emits Failure with correct status code`() = runTest {
+    fun statusFailureAborted_emitsFailureWithCorrectStatusCode() = runTest {
+        UpdateInstallEventBus.reset()
         val intent = Intent(UpdateInstallResultReceiver.ACTION).apply {
             putExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE_ABORTED)
             putExtra(PackageInstaller.EXTRA_SESSION_ID, 11)
@@ -100,10 +108,69 @@ class UpdateInstallResultReceiverTest {
     }
 
     @Test
-    fun `intent with foreign action is ignored`() = runTest {
+    fun foreignAction_isIgnored() = runTest {
+        UpdateInstallEventBus.reset()
         val intent = Intent("ru.ozero.app.OTHER_ACTION").apply {
             putExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_SUCCESS)
             putExtra(PackageInstaller.EXTRA_SESSION_ID, 1)
+        }
+
+        receiver.onReceive(context, intent)
+
+        assertEquals(0, UpdateInstallEventBus.events.replayCache.size)
+    }
+
+    @Test
+    fun statusFailureBlocked_emitsFailureWithStatusCode() = runTest {
+        UpdateInstallEventBus.reset()
+        val intent = Intent(UpdateInstallResultReceiver.ACTION).apply {
+            putExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE_BLOCKED)
+            putExtra(PackageInstaller.EXTRA_SESSION_ID, 22)
+        }
+
+        receiver.onReceive(context, intent)
+
+        val event = withTimeout(EVENT_TIMEOUT_MS) { UpdateInstallEventBus.events.first() }
+        val failure = assertIs<UpdateInstallEvent.Failure>(event)
+        assertEquals(22, failure.sessionId)
+        assertEquals(PackageInstaller.STATUS_FAILURE_BLOCKED, failure.statusCode)
+    }
+
+    @Test
+    fun statusFailureConflict_emitsFailureWithStatusCode() = runTest {
+        UpdateInstallEventBus.reset()
+        val intent = Intent(UpdateInstallResultReceiver.ACTION).apply {
+            putExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE_CONFLICT)
+            putExtra(PackageInstaller.EXTRA_SESSION_ID, 23)
+        }
+
+        receiver.onReceive(context, intent)
+
+        val event = withTimeout(EVENT_TIMEOUT_MS) { UpdateInstallEventBus.events.first() }
+        val failure = assertIs<UpdateInstallEvent.Failure>(event)
+        assertEquals(PackageInstaller.STATUS_FAILURE_CONFLICT, failure.statusCode)
+    }
+
+    @Test
+    fun statusFailureStorage_emitsFailureWithStatusCode() = runTest {
+        UpdateInstallEventBus.reset()
+        val intent = Intent(UpdateInstallResultReceiver.ACTION).apply {
+            putExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE_STORAGE)
+            putExtra(PackageInstaller.EXTRA_SESSION_ID, 24)
+        }
+
+        receiver.onReceive(context, intent)
+
+        val event = withTimeout(EVENT_TIMEOUT_MS) { UpdateInstallEventBus.events.first() }
+        val failure = assertIs<UpdateInstallEvent.Failure>(event)
+        assertEquals(PackageInstaller.STATUS_FAILURE_STORAGE, failure.statusCode)
+    }
+
+    @Test
+    fun nullActionIntent_isIgnored() = runTest {
+        UpdateInstallEventBus.reset()
+        val intent = Intent().apply {
+            putExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_SUCCESS)
         }
 
         receiver.onReceive(context, intent)

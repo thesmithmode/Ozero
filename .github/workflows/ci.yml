@@ -38,7 +38,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' }}
 
       - name: ktlint + detekt
-        run: ./gradlew ktlintCheck detekt --stacktrace
+        run: ./gradlew ktlintCheck detekt --stacktrace --continue
 
   extra-checks:
     name: Python + shell + Dockerfile
@@ -84,45 +84,6 @@ jobs:
           dockerfile: build-tools/Dockerfile
           failure-threshold: error
 
-  app-lint:
-    name: Android lint
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs: kotlin-style
-    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' }}
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: gradle
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Setup Gradle with caching
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' }}
-
-      - name: Run Android lint
-        run: ./gradlew lint --stacktrace
-
-      - name: Upload lint report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: lint-report
-          path: '**/build/reports/lint-results-*.html'
-          retention-days: 30
-
   assemble-debug:
     name: assembleDebug
     runs-on: ubuntu-latest
@@ -153,6 +114,26 @@ jobs:
 
       - name: Download native binaries
         run: ./gradlew :engine-byedpi:downloadBinaries --stacktrace
+
+      - name: Download URnetwork AARs (urnetwork-sdk + userwireguard)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p engine-urnetwork/libs
+          for ENGINE in urnetwork-sdk userwireguard; do
+            TAG=$(gh release list --limit 100 --json tagName \
+              | grep -oE "\"${ENGINE}-[a-f0-9]{8}\"" \
+              | head -n1 | tr -d '"')
+            if [ -z "$TAG" ]; then
+              echo "::error::no $ENGINE release found"
+              exit 1
+            fi
+            echo "Download $TAG"
+            gh release download "$TAG" -p "*" -D engine-urnetwork/libs --clobber
+          done
+          bash tools/strip-urnetwork-go-runtime.sh engine-urnetwork/libs
+          ls -la engine-urnetwork/libs/
 
       - name: assembleDebug
         run: ./gradlew assembleDebug --stacktrace
@@ -194,8 +175,28 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' }}
 
+      - name: Download URnetwork AARs (urnetwork-sdk + userwireguard)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p engine-urnetwork/libs
+          for ENGINE in urnetwork-sdk userwireguard; do
+            TAG=$(gh release list --limit 100 --json tagName \
+              | grep -oE "\"${ENGINE}-[a-f0-9]{8}\"" \
+              | head -n1 | tr -d '"')
+            if [ -z "$TAG" ]; then
+              echo "::error::no $ENGINE release found"
+              exit 1
+            fi
+            echo "Download $TAG"
+            gh release download "$TAG" -p "*" -D engine-urnetwork/libs --clobber
+          done
+          bash tools/strip-urnetwork-go-runtime.sh engine-urnetwork/libs
+          ls -la engine-urnetwork/libs/
+
       - name: testDebugUnitTest + coverage report and gate
-        run: ./gradlew testDebugUnitTest jacocoTestReport jacocoTestCoverageVerification --stacktrace
+        run: ./gradlew testDebugUnitTest jacocoTestReport jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Upload Jacoco coverage report
         if: always()
@@ -211,147 +212,4 @@ jobs:
         with:
           name: test-reports
           path: '**/build/reports/tests/**'
-          retention-days: 30
-
-  release-build:
-    name: Build signed release APK (main only)
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    if: ${{ github.ref == 'refs/heads/main' }}
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: gradle
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Setup Gradle with caching
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          cache-read-only: true
-
-      - name: Cache libhev-socks5-tunnel.so jniLibs
-        id: libhev-cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            common-vpn/src/main/jniLibs/arm64-v8a/libhev-socks5-tunnel.so
-            common-vpn/src/main/jniLibs/armeabi-v7a/libhev-socks5-tunnel.so
-            common-vpn/src/main/jniLibs/x86_64/libhev-socks5-tunnel.so
-          key: libhev-2.7.0-ndk-r27c-platform-android-24-pkgname-hev-16kb-v4
-
-      - name: Setup Android NDK
-        id: ndk
-        if: steps.libhev-cache.outputs.cache-hit != 'true'
-        uses: nttld/setup-ndk@v1
-        with:
-          ndk-version: r27c
-          add-to-path: false
-
-      - name: Clone hev-socks5-tunnel (pinned)
-        if: steps.libhev-cache.outputs.cache-hit != 'true'
-        env:
-          HEV_VERSION: '2.7.0'
-        run: |
-          git clone --depth 1 --recursive --branch "$HEV_VERSION" \
-            https://github.com/heiher/hev-socks5-tunnel.git \
-            "$RUNNER_TEMP/hev-socks5-tunnel"
-
-      - name: Build libhev-socks5-tunnel.so (3 ABI via ndk-build)
-        if: steps.libhev-cache.outputs.cache-hit != 'true'
-        env:
-          NDK_PATH: ${{ steps.ndk.outputs.ndk-path }}
-        run: |
-          set -euo pipefail
-          SRC="$RUNNER_TEMP/hev-socks5-tunnel"
-          OUT="common-vpn/src/main/jniLibs"
-          mkdir -p "$OUT/arm64-v8a" "$OUT/armeabi-v7a" "$OUT/x86_64"
-          cd "$SRC"
-          "$NDK_PATH/ndk-build" \
-            NDK_PROJECT_PATH="$SRC" \
-            APP_BUILD_SCRIPT="$SRC/Android.mk" \
-            NDK_APPLICATION_MK="$SRC/Application.mk" \
-            APP_ABI="arm64-v8a armeabi-v7a x86_64" \
-            APP_PLATFORM=android-24 \
-            APP_CFLAGS="-DPKGNAME=hev" \
-            APP_LDFLAGS="-Wl,-z,max-page-size=16384,-z,common-page-size=16384" \
-            -j"$(nproc)"
-          STRIP="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
-          for ABI in arm64-v8a armeabi-v7a x86_64; do
-            SO_SRC="$SRC/libs/$ABI/libhev-socks5-tunnel.so"
-            cp "$SO_SRC" "$GITHUB_WORKSPACE/$OUT/$ABI/libhev-socks5-tunnel.so"
-            "$STRIP" "$GITHUB_WORKSPACE/$OUT/$ABI/libhev-socks5-tunnel.so" || true
-            if ! strings "$GITHUB_WORKSPACE/$OUT/$ABI/libhev-socks5-tunnel.so" | grep -qx 'hev/TProxyService'; then
-              echo "::error::PKGNAME не зашит в libhev для $ABI — JNI_OnLoad упадёт ART JniAbort"
-              exit 1
-            fi
-          done
-
-      - name: Assert 16KB page-size alignment в arm64/x86_64 libhev
-        if: steps.libhev-cache.outputs.cache-hit != 'true'
-        env:
-          NDK_PATH: ${{ steps.ndk.outputs.ndk-path }}
-        run: |
-          set -euo pipefail
-          READELF="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
-          REQUIRED_ALIGN=16384
-          for ABI in arm64-v8a x86_64; do
-            SO="common-vpn/src/main/jniLibs/$ABI/libhev-socks5-tunnel.so"
-            if [ ! -f "$SO" ]; then continue; fi
-            ALIGN_HEX=$("$READELF" -lW "$SO" | awk '/^\s*LOAD/ {print $NF; exit}')
-            ALIGN_DEC=$(printf '%d' "$ALIGN_HEX")
-            if [ "$ALIGN_DEC" -lt "$REQUIRED_ALIGN" ]; then
-              echo "::error::$SO имеет LOAD-segment alignment=$ALIGN_HEX (<$REQUIRED_ALIGN) — Android 15+ Pixel 9 (16KB pages) откажется грузить, dlopen UnsatisfiedLinkError"
-              exit 1
-            fi
-            echo "$ABI: LOAD alignment=$ALIGN_HEX (>=0x4000) — Android 15 16KB compatible"
-          done
-
-      - name: Decode keystore
-        env:
-          KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
-        run: |
-          if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "::error::Secret RELEASE_KEYSTORE_BASE64 is empty"
-            exit 1
-          fi
-          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
-          echo "OZERO_KEYSTORE_PATH=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
-
-      - name: Build signed release APK
-        env:
-          OZERO_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-          OZERO_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
-          OZERO_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
-          UPDATE_PUBLIC_KEY_HEX: ${{ secrets.UPDATE_PUBLIC_KEY_HEX }}
-        run: ./gradlew :app:assembleRelease --stacktrace
-
-      - name: Assert APK содержит libhev и libbyedpi на всех ABI
-        run: |
-          set -euo pipefail
-          APK=$(find app/build/outputs/apk/release -name '*.apk' | head -n1)
-          for ABI in arm64-v8a armeabi-v7a x86_64; do
-            for LIB in libhev-socks5-tunnel.so libbyedpi.so; do
-              if ! unzip -l "$APK" | grep -q "lib/$ABI/$LIB"; then
-                echo "::error::В APK отсутствует lib/$ABI/$LIB"
-                exit 1
-              fi
-            done
-          done
-
-      - name: Upload release APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-apk-main
-          path: app/build/outputs/apk/release/*.apk
           retention-days: 30

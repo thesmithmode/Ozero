@@ -5,6 +5,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -40,22 +41,25 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `initial state is Loading until repository emits`() = runTest {
+    fun `initial state is Loading until repository emits`() = runTest(dispatcher) {
         assertIs<SettingsUiState.Loading>(viewModel.uiState.value)
     }
 
     @Test
-    fun `emits Content with default settings when repository emits default`() = runTest {
+    fun `emits Content with default settings when repository emits default`() = runTest(dispatcher) {
+        val collector = launch { viewModel.uiState.collect {} }
         repository.emit(SettingsModel.DEFAULT)
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
         assertIs<SettingsUiState.Content>(state)
         assertEquals(SettingsModel.DEFAULT, state.model)
+        collector.cancel()
     }
 
     @Test
-    fun `emits Content with new model when repository emits update`() = runTest {
+    fun `emits Content with new model when repository emits update`() = runTest(dispatcher) {
+        val collector = launch { viewModel.uiState.collect {} }
         repository.emit(SettingsModel.DEFAULT)
         advanceUntilIdle()
 
@@ -71,10 +75,11 @@ class SettingsViewModelTest {
         val state = viewModel.uiState.value
         assertIs<SettingsUiState.Content>(state)
         assertEquals(updated, state.model)
+        collector.cancel()
     }
 
     @Test
-    fun `onSplitModeChange forwards to repository`() = runTest {
+    fun `onSplitModeChange forwards to repository`() = runTest(dispatcher) {
         viewModel.onSplitModeChange(SplitTunnelMode.BYPASS_LAN)
         advanceUntilIdle()
 
@@ -82,7 +87,7 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `onIpv6Toggle forwards to repository`() = runTest {
+    fun `onIpv6Toggle forwards to repository`() = runTest(dispatcher) {
         viewModel.onIpv6Toggle(true)
         advanceUntilIdle()
         viewModel.onIpv6Toggle(false)
@@ -92,7 +97,7 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `onAutoStartToggle forwards to repository`() = runTest {
+    fun `onAutoStartToggle forwards to repository`() = runTest(dispatcher) {
         viewModel.onAutoStartToggle(true)
         advanceUntilIdle()
 
@@ -100,7 +105,7 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `onManualEngineSelect forwards engine and null clears`() = runTest {
+    fun `onManualEngineSelect forwards engine and null clears`() = runTest(dispatcher) {
         viewModel.onManualEngineSelect(EngineId.BYEDPI)
         advanceUntilIdle()
         viewModel.onManualEngineSelect(null)

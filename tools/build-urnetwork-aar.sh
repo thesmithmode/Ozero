@@ -96,6 +96,24 @@ go mod edit -replace="github.com/urnetwork/connect=$CONNECT_DIR"
 if [[ -d "$GLOG_DIR" ]]; then
     go mod edit -replace="github.com/urnetwork/glog=$GLOG_DIR"
 fi
+
+# Добавляем dep golang.org/x/mobile (без него прямой gomobile bind на sdk
+# падает "no Go package in golang.org/x/mobile/bind"). Затем кладём
+# bind_dep.go с blank import, чтобы go mod tidy не tidy'нул эту dep.
+GOMOBILE_PIN="${GOMOBILE_VERSION:-v0.0.0-20260410095206-2cfb76559b7b}"
+go mod edit -require="golang.org/x/mobile@${GOMOBILE_PIN}"
+cat > "$SDK_DIR/bind_dep.go" <<'GOEOF'
+// Package sdk: bind_dep.go forces dependency on golang.org/x/mobile/bind
+// so that `gomobile bind github.com/urnetwork/sdk` resolves it.
+//
+// Doc comments must remain ASCII: gobind transcribes them into generated Java
+// sources and gomobile invokes javac without explicit -encoding UTF-8.
+package sdk
+
+import _ "golang.org/x/mobile/bind"
+GOEOF
+
+go mod tidy
 go mod download
 
 # --- gomobile init ---
@@ -108,7 +126,12 @@ gomobile init
 mkdir -p "$RUNNER_TEMP/aar-out"
 AAR_PATH="$RUNNER_TEMP/aar-out/URnetworkSdk.aar"
 
-log "Запускаем gomobile bind..."
+log "Запускаем gomobile bind на github.com/urnetwork/sdk..."
+# JAVA_TOOL_OPTIONS подхватывается javac (запускается gomobile внутри)
+# и устанавливает file.encoding=UTF-8. Без этого javac на Linux fall back
+# на US-ASCII и падает на не-ASCII chars в Java doc-comments, которые
+# gobind транскрибирует из Go source.
+export JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8"
 gomobile bind \
     -target "$ANDROID_TARGETS" \
     -androidapi "$ANDROID_API" \

@@ -91,9 +91,9 @@ class OnboardingViewModelTest {
 
     @Test
     fun `onLocaleSelect persists tag in repository`() = runTest {
-        vm.onLocaleSelect("zh-rCN")
+        vm.onLocaleSelect("zh-CN")
         advanceUntilIdle()
-        assertEquals(listOf<String?>("zh-rCN"), settings.localeWrites)
+        assertEquals(listOf<String?>("zh-CN"), settings.localeWrites)
     }
 
     @Test

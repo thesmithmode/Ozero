@@ -114,6 +114,7 @@ dependencies {
     testRuntimeOnly(libs.junit.jupiter.engine)
     testImplementation(libs.bundles.testing.unit)
     testImplementation(libs.bundles.bouncycastle)
+    testImplementation(libs.json)
 
     testImplementation(libs.junit4)
     testImplementation(libs.robolectric)

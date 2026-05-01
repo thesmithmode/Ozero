@@ -33,7 +33,7 @@ okhttp = "4.12.0"
 wireguardAndroid = "1.0.20230706"
 
 # Crypto
-bouncycastle = "1.79"
+bouncycastle = "1.80"
 
 # WorkManager + Hilt-Work (E16.1 PublicProxyHarvester periodic job)
 work = "2.9.1"
@@ -143,6 +143,9 @@ robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectr
 # JUnit 4 + Vintage engine для Room MigrationTestHelper (он @Rule = JUnit 4)
 junit4 = { module = "junit:junit", version = "4.13.2" }
 junit-vintage-engine = { module = "org.junit.vintage:junit-vintage-engine", version.ref = "junitJupiter" }
+
+# org.json — реальная JVM реализация поверх Android stub (testImplementation only)
+json = { module = "org.json:json", version = "20240303" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

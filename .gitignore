@@ -66,6 +66,9 @@ obj/
 jni/obj/
 **/jni/obj/
 
+# urnetwork SDK AARs — собираются CI, скачиваются из gh release в engine-urnetwork/libs/
+engine-urnetwork/libs/
+
 # Keystore (НИКОГДА НЕ КОММИТИТЬ RELEASE)
 *.jks
 *.keystore

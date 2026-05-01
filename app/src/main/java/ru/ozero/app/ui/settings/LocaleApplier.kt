@@ -12,7 +12,7 @@ object LocaleApplier {
         "",
         "ru",
         "en",
-        "zh-rCN",
+        "zh-CN",
         "es",
         "ar",
         "fr",

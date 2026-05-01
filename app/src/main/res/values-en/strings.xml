@@ -176,9 +176,10 @@
     <string name="urnetwork_consent_accept">I understand, enable</string>
     <string name="urnetwork_consent_revoke">Revoke consent</string>
     <string name="urnetwork_wallet_label">Solana wallet</string>
-    <string name="urnetwork_wallet_using_preset">Using the Ozero author\'s wallet. Tokens earned from your exit-node traffic support the project. Enter your own Solana wallet below to earn tokens for yourself.</string>
+    <string name="urnetwork_wallet_hint">Enter your Solana address to receive tokens for your exit-node traffic. Leave empty to skip earning.</string>
+    <string name="urnetwork_wallet_placeholder">Solana base58 address (32-44 chars)</string>
     <string name="urnetwork_wallet_save">Save</string>
-    <string name="urnetwork_wallet_reset">Reset to preset</string>
+    <string name="urnetwork_wallet_reset">Clear</string>
     <string name="urnetwork_wallet_invalid">Invalid Solana address (32-44 base58 chars)</string>
     <string name="settings_urnetwork_title">URnetwork</string>
     <string name="settings_urnetwork_summary">P2P mesh — exit-node + Solana wallet</string>

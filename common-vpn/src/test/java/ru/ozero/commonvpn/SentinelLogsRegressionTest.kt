@@ -13,7 +13,7 @@ class SentinelLogsRegressionTest {
     fun `gateway start логирует libraryLoaded ДО проверки isLoaded`() {
         val body = funBody(gatewaySrc, "start")
         val libraryLoadedIdx = body.indexOf("libraryLoaded=")
-        val checkIdx = body.indexOf("if (!hev.TProxyService.libraryLoaded)")
+        val checkIdx = body.indexOf("if (!loader.libraryLoaded)")
         assertTrue(
             libraryLoadedIdx in 0 until checkIdx,
             "gateway.start должен логировать libraryLoaded ДО проверки isLoaded — иначе lazy " +
@@ -65,7 +65,7 @@ class SentinelLogsRegressionTest {
     }
 
     private fun funBody(src: String, name: String): String {
-        val patterns = listOf("fun $name(", "suspend fun $name(", "override fun $name(", "override suspend fun $name(")
+        val patterns = listOf("override fun $name(", "override suspend fun $name(", "fun $name(", "suspend fun $name(")
         var idx = -1
         for (p in patterns) {
             idx = src.indexOf(p)

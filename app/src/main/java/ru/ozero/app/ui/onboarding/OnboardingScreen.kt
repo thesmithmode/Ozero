@@ -138,7 +138,7 @@ private fun LanguageStep(
             null to R.string.settings_language_system,
             "ru" to R.string.settings_language_ru,
             "en" to R.string.settings_language_en,
-            "zh-rCN" to R.string.settings_language_zh_cn,
+            "zh-CN" to R.string.settings_language_zh_cn,
             "es" to R.string.settings_language_es,
             "ar" to R.string.settings_language_ar,
             "fr" to R.string.settings_language_fr,

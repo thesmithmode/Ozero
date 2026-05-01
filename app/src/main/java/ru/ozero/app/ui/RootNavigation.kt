@@ -3,6 +3,7 @@ package ru.ozero.app.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import ru.ozero.app.ui.about.AboutScreen
@@ -17,6 +18,7 @@ import ru.ozero.app.ui.settings.engines.WarpEngineSettingsScreen
 import ru.ozero.app.ui.splittunnel.SplitTunnelScreen
 import ru.ozero.app.ui.stats.StatsHistoryScreen
 import ru.ozero.app.ui.strategy.StrategyTestScreen
+import ru.ozero.app.ui.subs.SubscriptionsScreen
 
 @Composable
 fun RootNavigation(
@@ -24,55 +26,53 @@ fun RootNavigation(
     onConnectClick: () -> Unit,
 ) {
     var screen by rememberSaveable { mutableStateOf(TopScreen.Main) }
+    val backStack = remember { mutableListOf<TopScreen>() }
+    fun navigate(target: TopScreen) {
+        backStack.add(screen)
+        screen = target
+    }
+    fun back() {
+        screen = if (backStack.isNotEmpty()) backStack.removeAt(backStack.size - 1) else TopScreen.Main
+    }
     when (screen) {
         TopScreen.Settings ->
             SettingsScreen(
-                onBack = { screen = TopScreen.Main },
-                onOpenAllowedApps = { screen = TopScreen.SplitTunnel },
-                onOpenServers = { screen = TopScreen.Servers },
-                onOpenAbout = { screen = TopScreen.About },
-                onOpenLogs = { screen = TopScreen.Logs },
-                onOpenByeDpiEngineSettings = { screen = TopScreen.ByeDpiEngineSettings },
-                onOpenUrnetworkSettings = { screen = TopScreen.UrnetworkEngineSettings },
-                onOpenWarpSettings = { screen = TopScreen.WarpEngineSettings },
-                onOpenManualServer = { screen = TopScreen.ManualServer },
-                onOpenStatsHistory = { screen = TopScreen.StatsHistory },
-                onOpenDiagnostics = { screen = TopScreen.Diagnostics },
+                onBack = { back() },
+                onOpenAllowedApps = { navigate(TopScreen.SplitTunnel) },
+                onOpenServers = { navigate(TopScreen.Servers) },
+                onOpenAbout = { navigate(TopScreen.About) },
+                onOpenLogs = { navigate(TopScreen.Logs) },
+                onOpenByeDpiEngineSettings = { navigate(TopScreen.ByeDpiEngineSettings) },
+                onOpenUrnetworkSettings = { navigate(TopScreen.UrnetworkEngineSettings) },
+                onOpenWarpSettings = { navigate(TopScreen.WarpEngineSettings) },
+                onOpenManualServer = { navigate(TopScreen.ManualServer) },
+                onOpenStatsHistory = { navigate(TopScreen.StatsHistory) },
+                onOpenDiagnostics = { navigate(TopScreen.Diagnostics) },
             )
-        TopScreen.Logs ->
-            LogsScreen(onBack = { screen = TopScreen.Settings })
-        TopScreen.Diagnostics ->
-            DiagnosticsScreen(onBack = { screen = TopScreen.Settings })
-        TopScreen.SplitTunnel ->
-            SplitTunnelScreen(onBack = { screen = TopScreen.Settings })
-        TopScreen.Servers ->
-            ServersScreen(onBack = { screen = TopScreen.Settings })
-        TopScreen.About ->
-            AboutScreen(onBack = { screen = TopScreen.Settings })
+        TopScreen.Logs -> LogsScreen(onBack = { back() })
+        TopScreen.Diagnostics -> DiagnosticsScreen(onBack = { back() })
+        TopScreen.SplitTunnel -> SplitTunnelScreen(onBack = { back() })
+        TopScreen.Servers -> ServersScreen(onBack = { back() })
+        TopScreen.About -> AboutScreen(onBack = { back() })
         TopScreen.ByeDpiEngineSettings ->
             ByeDpiEngineSettingsScreen(
-                onBack = { screen = TopScreen.Settings },
-                onOpenStrategyTest = { screen = TopScreen.StrategyTest },
+                onBack = { back() },
+                onOpenStrategyTest = { navigate(TopScreen.StrategyTest) },
             )
-        TopScreen.UrnetworkEngineSettings ->
-            UrnetworkEngineSettingsScreen(
-                onBack = { screen = TopScreen.Settings },
-            )
-        TopScreen.WarpEngineSettings ->
-            WarpEngineSettingsScreen(
-                onBack = { screen = TopScreen.Settings },
-            )
-        TopScreen.StrategyTest ->
-            StrategyTestScreen(onBack = { screen = TopScreen.ByeDpiEngineSettings })
-        TopScreen.ManualServer ->
-            ManualServerScreen(onBack = { screen = TopScreen.Settings })
-        TopScreen.StatsHistory ->
-            StatsHistoryScreen(onBack = { screen = TopScreen.Settings })
+        TopScreen.UrnetworkEngineSettings -> UrnetworkEngineSettingsScreen(onBack = { back() })
+        TopScreen.WarpEngineSettings -> WarpEngineSettingsScreen(onBack = { back() })
+        TopScreen.StrategyTest -> StrategyTestScreen(onBack = { back() })
+        TopScreen.ManualServer -> ManualServerScreen(onBack = { back() })
+        TopScreen.StatsHistory -> StatsHistoryScreen(onBack = { back() })
+        TopScreen.Subscriptions -> SubscriptionsScreen(onBack = { back() })
         TopScreen.Main ->
             MainScreen(
                 viewModel = viewModel,
                 onConnectClick = onConnectClick,
-                onOpenSettings = { screen = TopScreen.Settings },
+                onOpenSettings = { navigate(TopScreen.Settings) },
+                onOpenServers = { navigate(TopScreen.Servers) },
+                onOpenStats = { navigate(TopScreen.StatsHistory) },
+                onOpenSubs = { navigate(TopScreen.Subscriptions) },
             )
     }
 }

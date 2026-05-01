@@ -3,10 +3,6 @@ package ru.ozero.commonvpn
 import android.os.ParcelFileDescriptor
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.mockkObject
-import io.mockk.unmockkObject
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
@@ -14,17 +10,10 @@ import kotlin.test.assertEquals
 
 class HevTunnelGatewayShutdownOrderTest {
 
-    @BeforeEach
-    fun setUp() {
-        mockkObject(hev.TProxyService)
-        every { hev.TProxyService.loadOnce() } answers {}
-        every { hev.TProxyService.libraryLoaded } returns true
-        every { hev.TProxyService.loadError } returns null
-    }
-
-    @AfterEach
-    fun tearDown() {
-        unmockkObject(hev.TProxyService)
+    private val loader = object : TProxyLoader {
+        override fun loadOnce() = Unit
+        override val libraryLoaded: Boolean = true
+        override val loadError: String? = null
     }
 
     private fun pfd(fd: Int): ParcelFileDescriptor = mockk(relaxed = true) {
@@ -36,6 +25,7 @@ class HevTunnelGatewayShutdownOrderTest {
         val events = mutableListOf<String>()
         val gateway = NativeHevTunnelGateway(
             cacheDir = tmp,
+            loader = loader,
             nativeStart = { _, _ -> 0 },
             nativeStop = { events.add("nativeStop") },
         )
@@ -57,6 +47,7 @@ class HevTunnelGatewayShutdownOrderTest {
         var stopCalled = 0
         val gateway = NativeHevTunnelGateway(
             cacheDir = tmp,
+            loader = loader,
             nativeStart = { _, _ -> 0 },
             nativeStop = { stopCalled++ },
         )
@@ -71,6 +62,7 @@ class HevTunnelGatewayShutdownOrderTest {
         var nativeStops = 0
         val gateway = NativeHevTunnelGateway(
             cacheDir = tmp,
+            loader = loader,
             nativeStart = { _, _ -> 0 },
             nativeStop = { nativeStops++ },
         )

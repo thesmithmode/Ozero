@@ -209,7 +209,7 @@ class ChainOrchestratorTest {
         override val id: EngineId,
         private val toThrow: Throwable,
     ) : EnginePlugin {
-        override val capabilities = EngineCapabilities(true, false, false, false, false)
+        override val capabilities = EngineCapabilities(true, false, false, false, false, true)
 
         override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult =
             throw toThrow

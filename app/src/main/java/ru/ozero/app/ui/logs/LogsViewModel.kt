@@ -18,6 +18,7 @@ import ru.ozero.app.logging.LogBuffer
 import ru.ozero.app.logging.LogcatReader
 import ru.ozero.app.logging.UnifiedLogger
 import javax.inject.Inject
+import kotlin.coroutines.CoroutineContext
 
 data class LogsUiState(
     val tail: String = "",
@@ -30,6 +31,8 @@ class LogsViewModel @Inject constructor(
     @Suppress("UnusedPrivateMember") private val buffer: LogBuffer,
     private val reader: LogcatReader,
 ) : ViewModel() {
+
+    internal var ioContext: CoroutineContext = Dispatchers.IO
 
     private val _refresh = MutableStateFlow(0L)
     val refresh: StateFlow<Long> = _refresh.asStateFlow()
@@ -47,7 +50,7 @@ class LogsViewModel @Inject constructor(
         }
     }
 
-    private suspend fun snapshot(): LogsUiState = withContext(Dispatchers.IO) {
+    private suspend fun snapshot(): LogsUiState = withContext(ioContext) {
         LogsUiState(
             tail = UnifiedLogger.readTail(),
             fileSize = UnifiedLogger.fileSize(),
@@ -58,7 +61,7 @@ class LogsViewModel @Inject constructor(
     fun copyAll(): String = UnifiedLogger.read()
 
     fun clear() {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioContext) {
             reader.clearAll()
             UnifiedLogger.clear()
             _refresh.value = System.currentTimeMillis()

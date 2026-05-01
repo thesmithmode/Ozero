@@ -15,7 +15,7 @@ class OzeroVpnServiceIpv6Test {
 
     @Test
     fun `buildTunBuilder принимает ipv6Enabled параметр`() {
-        val sig = source.substringAfter("internal fun buildTunBuilder").substringBefore(":")
+        val sig = source.substringAfter("internal fun buildTunBuilder").substringBefore("): Builder")
         assertTrue(
             sig.contains("ipv6Enabled"),
             "buildTunBuilder обязан иметь параметр ipv6Enabled для conditional IPv6 routes",

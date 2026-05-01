@@ -43,7 +43,7 @@ class ByeDpiEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `после init Content имеет default args если savedArgs null`() = runTest {
+    fun `после init Content имеет default args если savedArgs null`() = runTest(dispatcher) {
         advanceUntilIdle()
         val state = vm.uiState.value
         assertIs<ByeDpiSettingsUiState.Content>(state)
@@ -53,7 +53,7 @@ class ByeDpiEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `Content показывает savedArgs если есть`() = runTest {
+    fun `Content показывает savedArgs если есть`() = runTest(dispatcher) {
         repo.emit(SettingsModel.DEFAULT.copy(byedpiWinningArgs = "-Ku -An"))
         advanceUntilIdle()
         val state = vm.uiState.value as ByeDpiSettingsUiState.Content
@@ -62,7 +62,7 @@ class ByeDpiEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `onArgsChange меняет args, dirty=true`() = runTest {
+    fun `onArgsChange меняет args, dirty=true`() = runTest(dispatcher) {
         advanceUntilIdle()
         vm.onArgsChange("-Ku -An -d4")
         val state = vm.uiState.value as ByeDpiSettingsUiState.Content
@@ -71,7 +71,7 @@ class ByeDpiEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `onSave с custom args сохраняет в repository`() = runTest {
+    fun `onSave с custom args сохраняет в repository`() = runTest(dispatcher) {
         advanceUntilIdle()
         vm.onArgsChange("-Ku -An -d4")
         vm.onSave()
@@ -80,7 +80,7 @@ class ByeDpiEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `onSave с default args записывает null (clear override)`() = runTest {
+    fun `onSave с default args записывает null (clear override)`() = runTest(dispatcher) {
         advanceUntilIdle()
         vm.onArgsChange(EngineConfig.ByeDpi().args)
         vm.onSave()
@@ -89,7 +89,7 @@ class ByeDpiEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `onResetToDefault сбрасывает args на default и сохраняет null`() = runTest {
+    fun `onResetToDefault сбрасывает args на default и сохраняет null`() = runTest(dispatcher) {
         repo.emit(SettingsModel.DEFAULT.copy(byedpiWinningArgs = "-X"))
         advanceUntilIdle()
         vm.onResetToDefault()

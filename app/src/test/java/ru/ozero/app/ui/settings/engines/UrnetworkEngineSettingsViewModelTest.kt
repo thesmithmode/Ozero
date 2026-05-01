@@ -51,12 +51,36 @@ class UrnetworkEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `init при null override показывает PRESET_WALLET и isUsingPreset=true`() = runTest {
+    fun `init при null override НЕ раскрывает PRESET_WALLET в UI state`() = runTest {
         advanceUntilIdle()
         val s = vm.uiState.value as UrnetworkSettingsUiState.Content
-        assertEquals(UrnetworkDefaults.PRESET_WALLET, s.currentWallet)
+        assertEquals("", s.currentWallet)
+        assertEquals("", s.editedWallet)
         assertTrue(s.isUsingPreset)
         assertFalse(s.consentGranted)
+    }
+
+    @Test
+    fun `PRESET_WALLET не утекает в editedWallet ни в одном пути init`() = runTest {
+        advanceUntilIdle()
+        val s = vm.uiState.value as UrnetworkSettingsUiState.Content
+        assertFalse(
+            s.editedWallet.contains(UrnetworkDefaults.PRESET_WALLET),
+            "PRESET_WALLET виден юзеру в поле — утечка дефолтного реферального кошелька в UI.",
+        )
+        assertFalse(
+            s.currentWallet.contains(UrnetworkDefaults.PRESET_WALLET),
+            "PRESET_WALLET exposed через currentWallet — утечка в UI.",
+        )
+    }
+
+    @Test
+    fun `onSaveWallet с пустой строкой сбрасывает override в null`() = runTest {
+        store.setOverrideRaw("AAAAbbbbCCCCdddd1111222233334444555566667777")
+        advanceUntilIdle()
+        vm.onSaveWallet("")
+        advanceUntilIdle()
+        assertEquals(listOf<String?>(null), store.setOverrideCalls)
     }
 
     @Test
@@ -162,6 +186,11 @@ class UrnetworkEngineSettingsViewModelTest {
         override suspend fun revokeConsent() {
             revokeConsentCalls++
             consent.value = false
+        }
+        private val byJwtFlow = MutableStateFlow<String?>(null)
+        override fun byJwt(): Flow<String?> = byJwtFlow
+        override suspend fun setByJwt(value: String?) {
+            byJwtFlow.value = value
         }
     }
 }

@@ -1,5 +1,6 @@
 package ru.ozero.commonvpn
 
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -19,6 +20,7 @@ class HealthMonitor(
     private val probeTimeoutMs: Int = DEFAULT_PROBE_TIMEOUT_MS,
     private val failuresBeforeDegraded: Int = DEFAULT_FAILURES_BEFORE_DEGRADED,
     private val proxyHost: String = "127.0.0.1",
+    dispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val probe: suspend (host: String, port: Int, timeoutMs: Int) -> Long = { h, p, t ->
         Socks5HandshakeProbe.probe(h, p, t)
     },
@@ -26,7 +28,7 @@ class HealthMonitor(
 
     enum class Status { UNKNOWN, HEALTHY, DEGRADED }
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private val _status = MutableStateFlow(Status.UNKNOWN)
     val status: StateFlow<Status> = _status.asStateFlow()
     private var job: Job? = null

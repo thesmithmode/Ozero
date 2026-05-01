@@ -95,6 +95,11 @@ extensions.configure<BaseAppModuleExtension> {
         unitTests {
             isIncludeAndroidResources = true
             isReturnDefaultValues = true
+            all {
+                it.useJUnitPlatform()
+                it.maxParallelForks =
+                    (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
+            }
         }
     }
 }

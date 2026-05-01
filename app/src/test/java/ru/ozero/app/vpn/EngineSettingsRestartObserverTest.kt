@@ -37,12 +37,13 @@ class EngineSettingsRestartObserverTest {
     }
 
     @Test
-    fun `triggers drops first emission`() = runTest {
+    fun `triggers drops first emission`() = runTest(dispatcher) {
         val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
         val observer = newObserver(flow, alwaysConnected())
 
         val collected = mutableListOf<EngineSettingsRestartObserver.Snapshot>()
         val job = launch { observer.triggers.toList(collected) }
+        advanceUntilIdle()
 
         flow.emit(SettingsModel.DEFAULT)
         advanceUntilIdle()
@@ -52,12 +53,13 @@ class EngineSettingsRestartObserverTest {
     }
 
     @Test
-    fun `triggers emits snapshot when watched fields change`() = runTest {
+    fun `triggers emits snapshot when watched fields change`() = runTest(dispatcher) {
         val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
         val observer = newObserver(flow, alwaysConnected())
 
         val collected = mutableListOf<EngineSettingsRestartObserver.Snapshot>()
         val job = launch { observer.triggers.toList(collected) }
+        advanceUntilIdle()
 
         flow.emit(SettingsModel.DEFAULT)
         flow.emit(
@@ -80,12 +82,13 @@ class EngineSettingsRestartObserverTest {
     }
 
     @Test
-    fun `triggers ignores changes outside the watched set`() = runTest {
+    fun `triggers ignores changes outside the watched set`() = runTest(dispatcher) {
         val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
         val observer = newObserver(flow, alwaysConnected())
 
         val collected = mutableListOf<EngineSettingsRestartObserver.Snapshot>()
         val job = launch { observer.triggers.toList(collected) }
+        advanceUntilIdle()
 
         flow.emit(SettingsModel.DEFAULT)
         flow.emit(SettingsModel.DEFAULT.copy(autoStart = true))
@@ -97,7 +100,7 @@ class EngineSettingsRestartObserverTest {
     }
 
     @Test
-    fun `handle invokes restart only when state is Connected`() = runTest {
+    fun `handle invokes restart only when state is Connected`() = runTest(dispatcher) {
         val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
         val state = MutableStateFlow<TunnelState>(TunnelState.Idle)
         val restarts = mutableListOf<EngineSettingsRestartObserver.Snapshot>()

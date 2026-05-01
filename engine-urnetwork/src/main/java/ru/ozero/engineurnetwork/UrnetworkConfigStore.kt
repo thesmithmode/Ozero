@@ -9,4 +9,6 @@ interface UrnetworkConfigStore {
     fun consentGranted(): Flow<Boolean>
     suspend fun markConsentGranted()
     suspend fun revokeConsent()
+    fun byJwt(): Flow<String?>
+    suspend fun setByJwt(value: String?)
 }

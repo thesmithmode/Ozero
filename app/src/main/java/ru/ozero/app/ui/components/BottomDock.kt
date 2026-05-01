@@ -1,0 +1,125 @@
+@file:Suppress("MatchingDeclarationName")
+
+package ru.ozero.app.ui.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import ru.ozero.app.ui.theme.OzeroPalette
+
+data class DockTab(
+    val id: String,
+    val icon: ImageVector,
+    val label: String,
+)
+
+@Composable
+fun BottomDock(
+    tabs: List<DockTab>,
+    activeTabId: String,
+    onTabSelected: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .testTag(BOTTOM_DOCK_TEST_TAG)
+            .clip(RoundedCornerShape(DOCK_RADIUS_DP.dp))
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.06f),
+                        Color.White.copy(alpha = 0.03f),
+                    ),
+                ),
+            )
+            .border(
+                width = 0.5.dp,
+                color = OzeroPalette.GlassEdge,
+                shape = RoundedCornerShape(DOCK_RADIUS_DP.dp),
+            )
+            .padding(horizontal = DOCK_PADDING_HORIZONTAL_DP.dp, vertical = DOCK_PADDING_VERTICAL_DP.dp),
+        horizontalArrangement = Arrangement.spacedBy(DOCK_GAP_DP.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        tabs.forEach { tab ->
+            DockButton(
+                tab = tab,
+                isActive = tab.id == activeTabId,
+                onClick = { onTabSelected(tab.id) },
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("$BOTTOM_DOCK_TAB_TEST_TAG_PREFIX${tab.id}"),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DockButton(
+    tab: DockTab,
+    isActive: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val tint = if (isActive) MaterialTheme.colorScheme.onSurface else OzeroPalette.Text2
+    val background = if (isActive) Color.White.copy(alpha = 0.10f) else Color.Transparent
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(DOCK_BUTTON_RADIUS_DP.dp))
+            .background(background)
+            .clickable(onClick = onClick)
+            .padding(vertical = DOCK_BUTTON_VERTICAL_PADDING_DP.dp, horizontal = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(
+            imageVector = tab.icon,
+            contentDescription = tab.label,
+            tint = tint,
+            modifier = Modifier.size(DOCK_ICON_SIZE_DP.dp),
+        )
+        Spacer(modifier = Modifier.height(3.dp))
+        Text(
+            text = tab.label,
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 10.5.sp,
+            ),
+            color = tint,
+            maxLines = 1,
+        )
+    }
+}
+
+private const val DOCK_RADIUS_DP: Int = 28
+private const val DOCK_BUTTON_RADIUS_DP: Int = 22
+private const val DOCK_PADDING_HORIZONTAL_DP: Int = 8
+private const val DOCK_PADDING_VERTICAL_DP: Int = 6
+private const val DOCK_GAP_DP: Int = 2
+private const val DOCK_ICON_SIZE_DP: Int = 21
+private const val DOCK_BUTTON_VERTICAL_PADDING_DP: Int = 8
+
+const val BOTTOM_DOCK_TEST_TAG: String = "bottom_dock"
+const val BOTTOM_DOCK_TAB_TEST_TAG_PREFIX: String = "bottom_dock_tab_"

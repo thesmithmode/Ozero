@@ -6,6 +6,33 @@ android {
     namespace = "ru.ozero.engineurnetwork"
 }
 
+// AGP отказывается паковать local .aar в любой AAR/lint bundle для library
+// модуля. engine-urnetwork никем не consume'ится как .aar — это internal
+// library project с classes for app модуль. Disable все AAR bundle/lint
+// tasks; compileDebugKotlin, testDebugUnitTest, jacocoTestReport остаются.
+afterEvaluate {
+    tasks.matching {
+        it.name.matches(Regex("bundle.*Aar")) ||
+            it.name.matches(Regex("generate.*LintModel")) ||
+            it.name.matches(Regex("generate.*LintReportModel")) ||
+            it.name.matches(Regex("lintAnalyze.*AndroidTest")) ||
+            it.name.matches(Regex("lintReport.*AndroidTest")) ||
+            it.name.matches(Regex("lintVitalAnalyze.*AndroidTest")) ||
+            it.name.matches(Regex("lintAnalyze.*UnitTest")) ||
+            it.name.matches(Regex("lintReport.*UnitTest")) ||
+            it.name.matches(Regex("lintVitalAnalyze.*UnitTest")) ||
+            it.name == "lintAnalyzeDebug" ||
+            it.name == "lintAnalyzeRelease" ||
+            it.name == "lintReportDebug" ||
+            it.name == "lintReportRelease" ||
+            it.name == "lintDebug" ||
+            it.name == "lintRelease" ||
+            it.name == "lint"
+    }.configureEach {
+        enabled = false
+    }
+}
+
 dependencies {
     implementation(project(":engines-core"))
     implementation(project(":common-vpn"))

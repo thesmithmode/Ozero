@@ -39,11 +39,10 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
             override to consent
         }
             .onEach { (override, consent) ->
-                val current = override ?: UrnetworkDefaults.PRESET_WALLET
                 val prev = _uiState.value as? UrnetworkSettingsUiState.Content
                 _uiState.value = UrnetworkSettingsUiState.Content(
-                    currentWallet = current,
-                    editedWallet = prev?.editedWallet ?: current,
+                    currentWallet = override.orEmpty(),
+                    editedWallet = prev?.editedWallet ?: override.orEmpty(),
                     isUsingPreset = override == null,
                     consentGranted = consent,
                     errorMessage = prev?.errorMessage,
@@ -59,7 +58,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
 
     fun onSaveWallet(text: String) {
         val trimmed = text.trim()
-        if (trimmed == UrnetworkDefaults.PRESET_WALLET) {
+        if (trimmed.isEmpty() || trimmed == UrnetworkDefaults.PRESET_WALLET) {
             viewModelScope.launch { store.setWalletOverride(null) }
             return
         }

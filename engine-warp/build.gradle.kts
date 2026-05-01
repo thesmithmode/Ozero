@@ -20,4 +20,5 @@ dependencies {
     testRuntimeOnly(libs.junit.jupiter.engine)
     testImplementation(libs.bundles.testing.unit)
     testImplementation(libs.datastore.preferences.core)
+    testImplementation(libs.json)
 }

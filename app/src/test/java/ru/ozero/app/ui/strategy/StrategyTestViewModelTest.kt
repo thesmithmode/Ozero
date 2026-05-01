@@ -72,10 +72,10 @@ class StrategyTestViewModelTest {
         byeDpiEngine = engine,
         probeFactory = { probe },
         tunnelController = tunnel,
-    )
+    ).also { it.ioDispatcher = dispatcher }
 
     @Test
-    fun `init loads 74 strategies from asset`() = runTest {
+    fun `init loads 74 strategies from asset`() = runTest(dispatcher) {
         val vm = newVm()
         advanceUntilIdle()
         val list = vm.strategies.value
@@ -85,7 +85,7 @@ class StrategyTestViewModelTest {
     }
 
     @Test
-    fun `onStart guarded if VPN running emits errorMessage`() = runTest {
+    fun `onStart guarded if VPN running emits errorMessage`() = runTest(dispatcher) {
         tunnel.onProbing()
         tunnel.onConnecting(EngineId.BYEDPI)
         tunnel.onEngineStarted(EngineId.BYEDPI, socksPort = 1080)
@@ -99,19 +99,22 @@ class StrategyTestViewModelTest {
     }
 
     @Test
-    fun `onStart with idle tunnel begins test loop`() = runTest {
+    fun `onStart with idle tunnel begins test loop`() = runTest(dispatcher) {
+        probe.delayMs = 1_000L
         val vm = newVm()
         advanceUntilIdle()
         vm.onStart()
-        advanceTimeBy(50L)
         runCurrent()
         assertTrue(vm.isRunning.value)
-        advanceUntilIdle()
+        advanceTimeBy(500L)
+        runCurrent()
         assertTrue(engine.startCount >= 1)
+        vm.onStop()
+        advanceUntilIdle()
     }
 
     @Test
-    fun `onApply persists args via repository`() = runTest {
+    fun `onApply persists args via repository`() = runTest(dispatcher) {
         val vm = newVm()
         advanceUntilIdle()
         val cmd = "-Ku -An -d4"
@@ -121,7 +124,7 @@ class StrategyTestViewModelTest {
     }
 
     @Test
-    fun `during run individual strategy progress updates currentProgress`() = runTest {
+    fun `during run individual strategy progress updates currentProgress`() = runTest(dispatcher) {
         assets = FakeAssetSource(strategies = listOf("-cmd1", "-cmd2"), sites = listOf("a", "b"))
         probe.successFor = { site, _ -> site == "a" }
         val vm = newVm()
@@ -137,7 +140,7 @@ class StrategyTestViewModelTest {
     }
 
     @Test
-    fun `after all complete strategies sorted by successPercentage descending`() = runTest {
+    fun `after all complete strategies sorted by successPercentage descending`() = runTest(dispatcher) {
         assets = FakeAssetSource(strategies = listOf("-loser", "-winner"), sites = listOf("s1"))
         probe.successFor = { _, cmd -> cmd.contains("winner") }
         val vm = newVm()
@@ -154,7 +157,7 @@ class StrategyTestViewModelTest {
     }
 
     @Test
-    fun `onStop cancels job and sets isRunning false`() = runTest {
+    fun `onStop cancels job and sets isRunning false`() = runTest(dispatcher) {
         assets = FakeAssetSource(
             strategies = (1..20).map { "-cmd$it" },
             sites = listOf("a", "b"),
@@ -172,7 +175,7 @@ class StrategyTestViewModelTest {
     }
 
     @Test
-    fun `onApply mid-test does not stop test loop`() = runTest {
+    fun `onApply mid-test does not stop test loop`() = runTest(dispatcher) {
         assets = FakeAssetSource(strategies = listOf("-a", "-b", "-c"), sites = listOf("s1"))
         probe.delayMs = 100L
         val vm = newVm()

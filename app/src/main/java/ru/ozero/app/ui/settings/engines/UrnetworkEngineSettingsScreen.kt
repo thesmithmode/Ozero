@@ -133,16 +133,15 @@ private fun WalletBlock(
         text = stringResource(R.string.urnetwork_wallet_label),
         style = MaterialTheme.typography.titleSmall,
     )
-    if (content.isUsingPreset) {
-        Text(
-            text = stringResource(R.string.urnetwork_wallet_using_preset),
-            style = MaterialTheme.typography.bodySmall,
-        )
-    }
+    Text(
+        text = stringResource(R.string.urnetwork_wallet_hint),
+        style = MaterialTheme.typography.bodySmall,
+    )
     OutlinedTextField(
         value = content.editedWallet,
         onValueChange = onWalletChange,
         label = { Text(stringResource(R.string.urnetwork_wallet_label)) },
+        placeholder = { Text(stringResource(R.string.urnetwork_wallet_placeholder)) },
         isError = content.errorMessage != null,
         modifier = Modifier
             .fillMaxWidth()

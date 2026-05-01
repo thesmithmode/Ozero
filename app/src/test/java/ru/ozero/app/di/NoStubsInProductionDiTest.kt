@@ -89,4 +89,38 @@ class NoStubsInProductionDiTest {
         }
         assertEquals("ru.ozero.enginebyedpi.ByeDpiProxy", cls)
     }
+
+    @Test
+    fun `UrnetworkModule binds RealUrnetworkSdkBridge — not Stub`() {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val f = File(moduleRoot, "src/main/java/ru/ozero/app/di/UrnetworkModule.kt")
+        assertTrue(f.exists(), "UrnetworkModule.kt не найден: $f")
+        val src = f.readText()
+        assertTrue(
+            src.contains("RealUrnetworkSdkBridge"),
+            "UrnetworkModule обязан биндить RealUrnetworkSdkBridge — Stub режим запрещён в production.",
+        )
+        assertFalse(
+            Regex("""=\s*StubUrnetworkSdkBridge\s*\(""").containsMatchIn(src),
+            "UrnetworkModule не должен инстанциировать StubUrnetworkSdkBridge — Real bridge активирован, " +
+                "AAR качаются в CI step (см. .github/workflows/ci.yml).",
+        )
+    }
+
+    @Test
+    fun `UrnetworkModule binds RealUrnetworkAuthService — not Unimplemented`() {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val f = File(moduleRoot, "src/main/java/ru/ozero/app/di/UrnetworkModule.kt")
+        assertTrue(f.exists(), "UrnetworkModule.kt не найден: $f")
+        val src = f.readText()
+        assertTrue(
+            src.contains("RealUrnetworkAuthService"),
+            "UrnetworkModule обязан биндить RealUrnetworkAuthService — Unimplemented режим запрещён.",
+        )
+        assertFalse(
+            Regex("""=\s*UnimplementedUrnetworkAuthService\s*\(""").containsMatchIn(src),
+            "UrnetworkModule не должен инстанциировать UnimplementedUrnetworkAuthService — " +
+                "Real service активирован, использует SDK Api через NetworkSpace.",
+        )
+    }
 }

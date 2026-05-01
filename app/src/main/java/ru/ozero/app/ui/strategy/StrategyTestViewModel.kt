@@ -3,6 +3,7 @@ package ru.ozero.app.ui.strategy
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
@@ -39,6 +40,8 @@ class StrategyTestViewModel @Inject constructor(
     private val tunnelController: TunnelController,
 ) : ViewModel() {
 
+    internal var ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+
     private val _strategies = MutableStateFlow<List<StrategyResult>>(emptyList())
     val strategies: StateFlow<List<StrategyResult>> = _strategies.asStateFlow()
 
@@ -52,10 +55,10 @@ class StrategyTestViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            val previous = withContext(Dispatchers.IO) {
+            val previous = withContext(ioDispatcher) {
                 runCatching { resultsStore.load() }.getOrDefault(emptyList())
             }
-            val commands = withContext(Dispatchers.IO) {
+            val commands = withContext(ioDispatcher) {
                 runCatching { assetSource.loadStrategies() }.getOrDefault(emptyList())
             }
             val byCmd = previous.associateBy { it.command }
@@ -77,7 +80,7 @@ class StrategyTestViewModel @Inject constructor(
         }
         _isRunning.value = true
         testJob = viewModelScope.launch {
-            val sites = withContext(Dispatchers.IO) {
+            val sites = withContext(ioDispatcher) {
                 runCatching { assetSource.loadSites() }.getOrDefault(emptyList())
             }
             if (sites.isEmpty()) {
@@ -97,7 +100,7 @@ class StrategyTestViewModel @Inject constructor(
                 runLoop(sites)
             } finally {
                 _strategies.value = _strategies.value.sortedByDescending { it.successPercentage }
-                withContext(Dispatchers.IO) {
+                withContext(ioDispatcher) {
                     runCatching { resultsStore.save(_strategies.value) }
                 }
                 _isRunning.value = false

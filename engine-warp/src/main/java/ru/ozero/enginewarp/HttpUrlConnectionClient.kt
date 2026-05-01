@@ -41,7 +41,7 @@ class HttpUrlConnectionClient(
     }
 
     private companion object {
-        const val DEFAULT_TIMEOUT_MS = 15_000
+        const val DEFAULT_TIMEOUT_MS = 30_000
         val HTTP_OK_RANGE = 200..299
     }
 }

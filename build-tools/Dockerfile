@@ -86,10 +86,10 @@ ENV ANDROID_NDK_HOME=/opt/android-ndk
 ARG ANDROID_PLATFORM=android-24
 ARG ANDROID_BUILD_TOOLS=34.0.0
 ARG ANDROID_CMDLINE_TOOLS=11076708
-# SHA-256 cmdline-tools обязателен при сборке. Получить можно с
-# https://developer.android.com/studio (раздел "Command line tools only" → SHA-256).
-# Передавать через --build-arg ANDROID_CMDLINE_TOOLS_SHA256=<hex64>. Без него build падает.
-ARG ANDROID_CMDLINE_TOOLS_SHA256
+# SHA-256 для commandlinetools-linux-11076708_latest.zip (Google official).
+# Источник: https://developer.android.com/studio#command-tools
+# Override через --build-arg ANDROID_CMDLINE_TOOLS_SHA256=<hex64>.
+ARG ANDROID_CMDLINE_TOOLS_SHA256=2d2d50857e4eb553af5a6dc3ad507a17adf43d115264b1afc116f95c92e5e258
 
 RUN test -n "${ANDROID_CMDLINE_TOOLS_SHA256}" \
     && mkdir -p /opt/android-sdk/cmdline-tools \

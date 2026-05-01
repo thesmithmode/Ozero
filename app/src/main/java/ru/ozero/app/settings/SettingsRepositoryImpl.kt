@@ -152,23 +152,19 @@ class SettingsRepositoryImpl @Inject constructor(
 
     private companion object {
         private val HOSTNAME_REGEX = Regex("^[a-zA-Z0-9.\\-_:]+$")
+        private const val IPV4_OCTET = "(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)"
+        private val IPV4_REGEX = Regex("^(?:$IPV4_OCTET\\.){3}$IPV4_OCTET$")
+        private val IPV6_HEX_REGEX = Regex("^[0-9a-fA-F:.]+$")
 
         fun isValidDnsAddress(value: String): Boolean {
             if (value.contains(',')) return false
-            return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                runCatching { android.net.InetAddresses.isNumericAddress(value) }.getOrDefault(false)
-            } else {
-                @Suppress("DEPRECATION")
-                android.util.Patterns.IP_ADDRESS.matcher(value).matches() || isLikelyIpv6(value)
-            }
+            if (IPV4_REGEX.matches(value)) return true
+            return value.contains(':') && IPV6_HEX_REGEX.matches(value)
         }
 
         fun isValidHostname(value: String): Boolean {
             if (value.length > 253) return false
             return HOSTNAME_REGEX.matches(value)
         }
-
-        private fun isLikelyIpv6(value: String): Boolean =
-            value.contains(':') && value.all { it.isLetterOrDigit() || it == ':' || it == '.' }
     }
 }

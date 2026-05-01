@@ -14,10 +14,14 @@ class OzeroDatabaseMigrationTest {
     }
 
     @Test
-    fun `database version 4 после удаления ConnectionLog`() {
+    fun `database version не ниже 4 после удаления ConnectionLog`() {
+        val versionMatch = Regex("""version\s*=\s*(\d+)""").find(source)
+        val version = versionMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
         assertTrue(
-            source.contains("version = 4"),
-            "OzeroDatabase должен быть version=4 после удаления ConnectionLog таблицы.",
+            version >= 4,
+            "OzeroDatabase version=$version, ожидается >=4 (ConnectionLog удалён в migration_3_4). " +
+                "Sentinel relaxed чтобы будущие миграции не ломали проверку — important invariant " +
+                "это >=4, не ровно =4.",
         )
     }
 

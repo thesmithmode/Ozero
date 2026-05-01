@@ -36,12 +36,15 @@ object UnifiedLogger : PersistentLogger {
             rotateIfTooLarge(file)
             targetRef.set(file)
             PersistentLoggers.instance = this
+            val abi = runCatching { Build.SUPPORTED_ABIS?.joinToString().orEmpty() }.getOrDefault("")
+            val manufacturer = Build.MANUFACTURER ?: "unknown"
+            val model = Build.MODEL ?: "unknown"
             log(
                 "INFO",
                 TAG,
                 "init pid=${Process.myPid()} path=${file.absolutePath} " +
-                    "sdk=${Build.VERSION.SDK_INT} abi=${Build.SUPPORTED_ABIS.joinToString()} " +
-                    "device=${Build.MANUFACTURER}/${Build.MODEL}",
+                    "sdk=${Build.VERSION.SDK_INT} abi=$abi " +
+                    "device=$manufacturer/$model",
             )
         }.onFailure { Log.e(TAG, "init failed", it) }
     }

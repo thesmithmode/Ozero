@@ -62,7 +62,7 @@ class ByeDpiEngineTest {
         val port = server.localPort
         server.acceptSocks5InBackground()
         try {
-            every { proxy.jniStartProxy(any()) } answers {
+            every { proxy.startProxy(any()) } answers {
                 Thread.sleep(60_000)
                 0
             }
@@ -76,7 +76,7 @@ class ByeDpiEngineTest {
 
     @Test
     fun startFailureWhenSocksPortNeverOpens() = runTest {
-        every { proxy.jniStartProxy(any()) } returns -1
+        every { proxy.startProxy(any()) } returns -1
         val result = engine.start(EngineConfig.ByeDpi(socksPort = 19998))
         assertIs<StartResult.Failure>(result)
     }
@@ -87,13 +87,13 @@ class ByeDpiEngineTest {
         val port = server.localPort
         server.acceptSocks5InBackground()
         try {
-            every { proxy.jniStartProxy(any()) } answers {
+            every { proxy.startProxy(any()) } answers {
                 Thread.sleep(60_000)
                 0
             }
             engine.start(EngineConfig.ByeDpi(socksPort = port))
             verify {
-                proxy.jniStartProxy(
+                proxy.startProxy(
                     match { args -> args.contains("-p") && args.contains(port.toString()) }
                 )
             }
@@ -108,13 +108,13 @@ class ByeDpiEngineTest {
         val port = server.localPort
         server.acceptSocks5InBackground()
         try {
-            every { proxy.jniStartProxy(any()) } answers {
+            every { proxy.startProxy(any()) } answers {
                 Thread.sleep(60_000)
                 0
             }
             engine.start(EngineConfig.ByeDpi(socksPort = port))
             engine.stop()
-            verify { proxy.jniStopProxy() }
+            verify { proxy.stopProxy() }
         } finally {
             server.close()
         }
@@ -132,7 +132,7 @@ class ByeDpiEngineTest {
         val port = server.localPort
         server.acceptSocks5InBackground(repeat = 2)
         try {
-            every { proxy.jniStartProxy(any()) } answers {
+            every { proxy.startProxy(any()) } answers {
                 Thread.sleep(60_000)
                 0
             }
@@ -160,7 +160,7 @@ class ByeDpiEngineTest {
 
     @Test
     fun probeFailsWhenNoSocketListening() = runTest {
-        every { proxy.jniStartProxy(any()) } returns 0
+        every { proxy.startProxy(any()) } returns 0
         engine.start(EngineConfig.ByeDpi(socksPort = 19999))
         val result = engine.probe()
         assertIs<ProbeResult.Failure>(result)
@@ -168,7 +168,7 @@ class ByeDpiEngineTest {
 
     @Test
     fun probeFailsAfterStartFailure() = runTest {
-        every { proxy.jniStartProxy(any()) } returns -1
+        every { proxy.startProxy(any()) } returns -1
         engine.start(EngineConfig.ByeDpi(socksPort = 12345))
         val result = engine.probe()
         assertIs<ProbeResult.Failure>(result)
@@ -247,7 +247,7 @@ class ByeDpiEngineTest {
 
     @Test
     fun startRejectsSocks5Upstream_terminalProxy() = runTest {
-        every { proxy.jniStartProxy(any()) } returns 0
+        every { proxy.startProxy(any()) } returns 0
         assertFailsWith<IllegalArgumentException> {
             engine.start(
                 EngineConfig.ByeDpi(socksPort = 1080),
@@ -258,7 +258,7 @@ class ByeDpiEngineTest {
 
     @Test
     fun startRejectsHttpUpstream_terminalProxy() = runTest {
-        every { proxy.jniStartProxy(any()) } returns 0
+        every { proxy.startProxy(any()) } returns 0
         assertFailsWith<IllegalArgumentException> {
             engine.start(
                 EngineConfig.ByeDpi(socksPort = 1080),
@@ -273,13 +273,13 @@ class ByeDpiEngineTest {
         val port = server.localPort
         server.acceptSocks5InBackground()
         try {
-            every { proxy.jniStartProxy(any()) } answers {
+            every { proxy.startProxy(any()) } answers {
                 Thread.sleep(60_000)
                 0
             }
             engine.start(EngineConfig.ByeDpi(args = "", socksPort = port))
             verify {
-                proxy.jniStartProxy(
+                proxy.startProxy(
                     match { args -> args.none { it.isEmpty() } },
                 )
             }

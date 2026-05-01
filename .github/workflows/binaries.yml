@@ -16,6 +16,7 @@ on:
           - tor
           - xray
           - userwireguard
+          - urnetwork-sdk
   push:
     branches:
       - 'feat/**'
@@ -72,6 +73,9 @@ jobs:
               ;;
             userwireguard)
               FILES="build-tools/Dockerfile scripts/build_wireguard_android.sh"
+              ;;
+            urnetwork-sdk)
+              FILES="build-tools/Dockerfile tools/build-urnetwork-aar.sh"
               ;;
             *)
               echo "Unknown artifact: $ARTIFACT" >&2
@@ -171,6 +175,28 @@ jobs:
             bash scripts/build_wireguard_android.sh
 
       # ---------------------------------------------------------------------
+      # urnetwork-sdk build (Go + gomobile bind URnetworkSdk.aar)
+      # F7 (engine-urnetwork) API layer: account, connect URL discovery,
+      # gateway selection. Source: github.com/urnetwork/sdk
+      # ---------------------------------------------------------------------
+      - name: Build urnetwork-sdk Docker image
+        if: env.ARTIFACT == 'urnetwork-sdk'
+        run: docker build -t ozero-xray -f build-tools/Dockerfile build-tools/
+
+      - name: Build URnetworkSdk AAR (multi-ABI)
+        if: env.ARTIFACT == 'urnetwork-sdk'
+        run: |
+          docker run --rm \
+            -v "$PWD:/src" \
+            -w /src \
+            -e REPO_ROOT=/src \
+            -e RUNNER_TEMP=/tmp/urnetwork-build \
+            -e OUTPUT_DIR=/src/out/urnetwork-sdk \
+            -e ANDROID_TARGETS="android/arm64,android/arm,android/amd64" \
+            ozero-xray \
+            bash tools/build-urnetwork-aar.sh
+
+      # ---------------------------------------------------------------------
       # tor build (download tor-android + IPtProxy AAR из Maven Central,
       # extract jni/<abi>/*.so, 4 ABI)
       # ---------------------------------------------------------------------
@@ -267,6 +293,27 @@ jobs:
           files: |
             out/hysteria2/libhysteria2.aar
             out/hysteria2/manifest.txt
+          fail_on_unmatched_files: true
+          prerelease: true
+
+      - name: Upload urnetwork-sdk assets
+        if: env.ARTIFACT == 'urnetwork-sdk' && github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        env:
+          GH_TAG: ${{ steps.tag.outputs.tag }}
+        with:
+          tag_name: ${{ env.GH_TAG }}
+          name: Native binaries ${{ env.GH_TAG }}
+          body: |
+            Auto-built native binaries.
+
+            Engine: urnetwork-sdk (F7 URnetwork API layer)
+            Source: github.com/urnetwork/sdk
+            Commit: ${{ github.sha }}
+          files: |
+            out/urnetwork-sdk/URnetworkSdk.aar
+            out/urnetwork-sdk/URnetworkSdk.aar.sha256
+            out/urnetwork-sdk/manifest.txt
           fail_on_unmatched_files: true
           prerelease: true
 

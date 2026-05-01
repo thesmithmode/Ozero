@@ -16,9 +16,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import ru.ozero.engineurnetwork.DataStoreUrnetworkConfigStore
 import ru.ozero.engineurnetwork.EngineUrnetwork
-import ru.ozero.engineurnetwork.StubUrnetworkSdkBridge
+import ru.ozero.engineurnetwork.RealUrnetworkSdkBridge
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
+import ru.ozero.engineurnetwork.auth.RealUrnetworkAuthService
+import ru.ozero.engineurnetwork.auth.UrnetworkAuthService
 import ru.ozero.enginescore.EnginePlugin
 import javax.inject.Qualifier
 import javax.inject.Singleton
@@ -50,20 +52,9 @@ object UrnetworkModule {
 
     @Provides
     @Singleton
-    fun provideUrnetworkSdkBridge(): UrnetworkSdkBridge = StubUrnetworkSdkBridge()
-
-    // Switch to real urnetwork/userwireguard binding (engine-urnetwork/libs/userwireguard.aar
-    // собирается scripts/build_wireguard_android.sh; URnetworkSdk.aar — tools/build-urnetwork-aar.sh).
-    // Активировать когда оба AAR собраны и RealUrnetworkSdkBridge реализован:
-    //
-    // @Provides
-    // @Singleton
-    // fun provideUrnetworkSdkBridge(
-    //     @ApplicationContext context: Context,
-    // ): UrnetworkSdkBridge = RealUrnetworkSdkBridge(context)
-    //
-    // См. README engine-urnetwork — оба AAR (URnetworkSdk + userwireguard)
-    // должны быть в engine-urnetwork/libs/ до включения switch.
+    fun provideUrnetworkSdkBridge(
+        @ApplicationContext context: Context,
+    ): UrnetworkSdkBridge = RealUrnetworkSdkBridge(context)
 
     @Provides
     @Singleton
@@ -71,5 +62,12 @@ object UrnetworkModule {
     fun provideEngineUrnetwork(
         store: UrnetworkConfigStore,
         bridge: UrnetworkSdkBridge,
-    ): EnginePlugin = EngineUrnetwork(store, bridge)
+        authService: UrnetworkAuthService,
+    ): EnginePlugin = EngineUrnetwork(store, bridge, authService)
+
+    @Provides
+    @Singleton
+    fun provideUrnetworkAuthService(
+        @ApplicationContext context: Context,
+    ): UrnetworkAuthService = RealUrnetworkAuthService(context)
 }

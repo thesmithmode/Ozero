@@ -1,7 +1,6 @@
 package ru.ozero.commonvpn.split
 
 import android.net.VpnService
-import io.mockk.confirmVerified
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -129,7 +128,7 @@ class TunBuilderConfiguratorTest {
                 packages = setOf("missing.pkg", "ok.pkg"),
             ),
         )
-        verify { b.addAllowedApplication("ok.pkg") }
-        confirmVerified()
+        verify(exactly = 1) { b.addAllowedApplication("missing.pkg") }
+        verify(exactly = 1) { b.addAllowedApplication("ok.pkg") }
     }
 }

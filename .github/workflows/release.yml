@@ -165,6 +165,24 @@ jobs:
           printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
           echo "OZERO_KEYSTORE_PATH=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
 
+      - name: Download URnetwork AARs (urnetwork-sdk + userwireguard)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p engine-urnetwork/libs
+          for ENGINE in urnetwork-sdk userwireguard; do
+            TAG=$(gh release list --limit 100 --json tagName \
+              | grep -oE "\"${ENGINE}-[a-f0-9]{8}\"" \
+              | head -n1 | tr -d '"')
+            if [ -z "$TAG" ]; then
+              echo "::error::no $ENGINE release found"
+              exit 1
+            fi
+            gh release download "$TAG" -p "*" -D engine-urnetwork/libs --clobber
+          done
+          bash tools/strip-urnetwork-go-runtime.sh engine-urnetwork/libs
+
       - name: Build signed release APK
         env:
           OZERO_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
@@ -248,11 +266,11 @@ jobs:
             "Lru/ozero/engineamnezia/"
             "Lru/ozero/enginehysteria2/"
             "Lru/ozero/enginenaive/"
-            "Lru/ozero/engineurnetwork/"
             "StubLib"
             "StubEngine"
             "StubPlugin"
             "StubByeDpi"
+            "StubUrnetworkSdkBridge"
           )
           for cls in "${FORBIDDEN_CLASSES[@]}"; do
             if grep -aor "$cls" "$WORK"/classes*.dex | head -n1 | grep -q "$cls"; then

@@ -80,3 +80,17 @@ Ozero — **обёртка-аггрегатор над набором рабоч
 
 - `.claude/Контекст/Architect.md` — карта связей между модулями + неочевидные решения (loadOnce/main thread, PKGNAME, два слоя Engine+Delegate, и т.д.). Обновлять при изменении модулей или появлении новых неочевидных инвариантов. Не превращать в ридми — только связи и обоснования.
 - `.claude/Контекст/AUDIT.md` — append-only журнал findings (P1…P##). Не суммаризировать в новый план без явной команды юзера.
+
+<!-- === rules:start === -->
+## Внешние правила (thesmithmode/rules — отфильтровано под Ozero)
+
+Подтянуто скиллом `/rules`. Из 16 правил в репо — оставлено 5 релевантных Android/Kotlin/Compose проекту. Остальные (Next.js, Python, Postgres jobs, OAuth, billing, web-i18n, web-analytics, payments) **намеренно не скачаны** — для Ozero они дезориентируют. Re-run `/rules` обновит снапшот, но фильтр придётся применить заново вручную.
+
+- [`context7.md`](C:/Soft/Projects/Ozero/.claude/rules/context7.md) — **Закон.** Всегда использовать `context7` MCP при работе с любой библиотекой/SDK: установка, импорты, конфиг, обновления, дебаг. Применять для AndroidX, Compose, Hilt, Kotlin coroutines, Gradle plugins, и т.д.
+- [`tests.md`](C:/Soft/Projects/Ozero/.claude/rules/tests.md) — **Закон с поправкой.** AAA-паттерн, exhaustive edge-cases (null/empty/boundary/invalid types/race/auth/pagination). Coverage порог в Ozero **≥90%** (`feedback_tdd_coverage_logs`), не 95-100% из правила. Чек-лист "что тестировать" применять полностью.
+- [`folders.md`](C:/Soft/Projects/Ozero/.claude/rules/folders.md) — **Дух применим, буква нет.** Принцип "разделение по сервисам" в Ozero реализован через 9 gradle-модулей (`app`, `engines-core`, `core-storage`, `common-{vpn,dns,crypto}`, `engine-{byedpi,urnetwork,warp}`). Новый движок = новый `engine-*` модуль, не файлы в `app/`. Текст правила про `frontend/backend/worker/` — игнорить, у нас Android single-APK.
+- [`git.md`](C:/Soft/Projects/Ozero/.claude/rules/git.md) — **Только reference, НЕ закон.** В правиле: `develop` default + PR `develop→main`. У Ozero: `dev` default, ветки `feat/`/`fix/` от `dev`, **squash-merge без PR** (см. global `feedback_no_pull_requests`), main только по явной команде. При конфликте — побеждают глобальные/проектные правила.
+- [`translate.md`](C:/Soft/Projects/Ozero/.claude/rules/translate.md) — **Только baseline-локали.** Из правила берём список обязательных локалей: `ru`, `en`, `es`, `pt`. Архитектура (Next.js URL-locales, namespaced JSON) **не применима** — у Ozero Android `values-{en,es,pt}/strings.xml`. Сейчас активны только `ru`+`en` (W9.1), расширение до `es`+`pt` в W9.2.
+
+**Не скачаны как нерелевантные:** `frontend.md` (Next.js), `python.md` (uv/beartype), `api.md` (HTTP `/llms.txt`), `auth.md` (Google OAuth+JWT), `analytics.md` (Plausible+GTM+YM web), `jobs.md` (Postgres queue), `limits-and-credits.md` (credit ledger), `payments.md`+`yookassa.md`+`lemonsqueezy.md` (биллинг), `main.md` (манифест web-стека).
+<!-- === rules:end === -->

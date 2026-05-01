@@ -40,9 +40,14 @@ class ByeDpiEngineSettingsViewModel @Inject constructor(
         repository.settings
             .onEach { model ->
                 val saved = model.byedpiWinningArgs
-                val current = (_uiState.value as? ByeDpiSettingsUiState.Content)?.args
+                val previous = _uiState.value as? ByeDpiSettingsUiState.Content
+                val nextArgs = when {
+                    previous == null -> saved ?: defaultArgs
+                    previous.args != (previous.savedArgs ?: previous.defaultArgs) -> previous.args
+                    else -> saved ?: defaultArgs
+                }
                 _uiState.value = ByeDpiSettingsUiState.Content(
-                    args = current ?: saved ?: defaultArgs,
+                    args = nextArgs,
                     savedArgs = saved,
                     defaultArgs = defaultArgs,
                 )

@@ -2,13 +2,7 @@ package ru.ozero.commonvpn
 
 import android.os.ParcelFileDescriptor
 import io.mockk.every
-import io.mockk.just
 import io.mockk.mockk
-import io.mockk.mockkObject
-import io.mockk.runs
-import io.mockk.unmockkObject
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
@@ -18,17 +12,10 @@ import kotlin.test.assertTrue
 
 class NativeHevTunnelGatewayTest {
 
-    @BeforeEach
-    fun setUp() {
-        mockkObject(hev.TProxyService)
-        every { hev.TProxyService.loadOnce() } just runs
-        every { hev.TProxyService.libraryLoaded } returns true
-        every { hev.TProxyService.loadError } returns null
-    }
-
-    @AfterEach
-    fun tearDown() {
-        unmockkObject(hev.TProxyService)
+    private val loader = object : TProxyLoader {
+        override fun loadOnce() = Unit
+        override val libraryLoaded: Boolean = true
+        override val loadError: String? = null
     }
 
     private fun pfd(fd: Int): ParcelFileDescriptor = mockk(relaxed = true) {
@@ -42,6 +29,7 @@ class NativeHevTunnelGatewayTest {
         var capturedPath: String? = null
         val gateway = NativeHevTunnelGateway(
             cacheDir = tmp,
+            loader = loader,
             nativeStart = { path, fd ->
                 capturedPath = path
                 capturedFd = fd
@@ -65,6 +53,7 @@ class NativeHevTunnelGatewayTest {
         var stopCalled = false
         val gateway = NativeHevTunnelGateway(
             cacheDir = tmp,
+            loader = loader,
             nativeStart = { _, _ -> 0 },
             nativeStop = { stopCalled = true },
         )
@@ -80,6 +69,7 @@ class NativeHevTunnelGatewayTest {
         val tun = pfd(42)
         val gateway = NativeHevTunnelGateway(
             cacheDir = tmp,
+            loader = loader,
             nativeStart = { _, _ -> 7 },
             nativeStop = {},
         )
@@ -94,6 +84,7 @@ class NativeHevTunnelGatewayTest {
         val tun = pfd(42)
         val gateway = NativeHevTunnelGateway(
             cacheDir = tmp,
+            loader = loader,
             nativeStart = { _, _ -> throw UnsatisfiedLinkError("libhev not found") },
             nativeStop = {},
         )
@@ -104,12 +95,38 @@ class NativeHevTunnelGatewayTest {
     }
 
     @Test
+    fun `start возвращает -1 если loader libraryLoaded=false`(@TempDir tmp: File) {
+        val failedLoader = object : TProxyLoader {
+            override fun loadOnce() = Unit
+            override val libraryLoaded: Boolean = false
+            override val loadError: String? = "library load failed: dlopen ENOENT"
+        }
+        val tun = pfd(42)
+        var nativeCalled = false
+        val gateway = NativeHevTunnelGateway(
+            cacheDir = tmp,
+            loader = failedLoader,
+            nativeStart = { _, _ ->
+                nativeCalled = true
+                0
+            },
+            nativeStop = {},
+        )
+
+        val rc = gateway.start(HevTunnelConfig(tunPfd = tun, socksAddress = "127.0.0.1", socksPort = 1080))
+
+        assertEquals(-1, rc)
+        assertTrue(!nativeCalled, "nativeStart не должен вызываться если library не загружена")
+    }
+
+    @Test
     fun `повторный start с другим fd — оба вызова идут в native с raw fd`(@TempDir tmp: File) {
         val tun1 = pfd(11)
         val tun2 = pfd(22)
         val captured = mutableListOf<Int>()
         val gateway = NativeHevTunnelGateway(
             cacheDir = tmp,
+            loader = loader,
             nativeStart = { _, fd ->
                 captured.add(fd)
                 0
@@ -127,6 +144,7 @@ class NativeHevTunnelGatewayTest {
         val tun = pfd(42)
         val gateway = NativeHevTunnelGateway(
             cacheDir = tmp,
+            loader = loader,
             nativeStart = { _, _ -> 0 },
             nativeStop = { throw IllegalStateException("native stop failed") },
         )
@@ -142,6 +160,7 @@ class NativeHevTunnelGatewayTest {
         assertTrue(!nested.exists())
         val gateway = NativeHevTunnelGateway(
             cacheDir = nested,
+            loader = loader,
             nativeStart = { _, _ -> 0 },
             nativeStop = {},
         )
