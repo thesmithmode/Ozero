@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
     <!-- App -->
     <string name="app_name">Ozero</string>
 
@@ -61,6 +61,7 @@
     <string name="settings_manual_engine_title">Выбор движка</string>
     <string name="settings_manual_engine_summary">Авто — Ozero сам выберет лучший</string>
     <string name="settings_manual_engine_auto">Авто</string>
+    <string name="engine_wip_badge">в разработке</string>
     <string name="settings_ipv6_title">IPv6</string>
     <string name="settings_ipv6_summary">Маршрутизировать IPv6 через VPN</string>
     <string name="settings_auto_start_title">Автозапуск при загрузке</string>
@@ -134,6 +135,8 @@
     <string name="error_generic">Ошибка</string>
 
     <!-- onboarding -->
+    <string name="onboarding_language_title">Выберите язык</string>
+    <string name="onboarding_language_body">Можно изменить позже в настройках</string>
     <string name="onboarding_title_1">Зачем Ozero</string>
     <string name="onboarding_body_1">Свободный доступ к интернету в условиях блокировок. Открытый код, без телеметрии.</string>
     <string name="onboarding_title_2">Как работает</string>
@@ -153,6 +156,44 @@
     <!-- crash log export -->
     <string name="diag_export_crashes">Экспорт crash log</string>
     <string name="diag_export_no_crashes">Crash log пуст</string>
+
+    <!-- Strategy test -->
+    <string name="strategy_test_title">Подбор стратегий</string>
+    <string name="strategy_test_open">Подбор стратегий</string>
+    <string name="strategy_test_summary">Тестирует стратегии ByeDPI на тестовых сайтах через локальный SOCKS5. Применить можно любую в любой момент.</string>
+    <string name="strategy_test_start">Старт</string>
+    <string name="strategy_test_stop">Стоп</string>
+    <string name="strategy_test_apply">Применить</string>
+    <string name="strategy_test_applied_toast">Стратегия применена</string>
+    <string name="strategy_test_vpn_running_error">VPN активен. Остановите соединение перед запуском теста стратегий.</string>
+    <string name="strategy_test_no_sites">Список тестовых сайтов пуст.</string>
+    <string name="strategy_test_error_close">Закрыть</string>
+
+    <!-- URnetwork -->
+    <string name="urnetwork_settings_title">URnetwork</string>
+    <string name="urnetwork_consent_warning_title">Внимание</string>
+    <string name="urnetwork_consent_warning_body">URnetwork — P2P-сеть, в которой каждый участник может работать как exit-node. Если вы включите URnetwork, ваше устройство будет передавать чужой трафик в открытый интернет от своего IP-адреса. Это может приводить к подозрениям со стороны провайдера и юридическим рискам в некоторых юрисдикциях. Включайте только если понимаете последствия. За exit-node трафик начисляются токены URx на Solana-кошелёк.</string>
+    <string name="urnetwork_consent_accept">Я понимаю, включить</string>
+    <string name="urnetwork_consent_revoke">Отозвать согласие</string>
+    <string name="urnetwork_wallet_label">Solana-кошелёк</string>
+    <string name="urnetwork_wallet_using_preset">Используется кошелёк автора Ozero. Токены за ваш exit-node трафик идут на развитие проекта. Введите свой Solana-кошелёк ниже, чтобы получать токены самому.</string>
+    <string name="urnetwork_wallet_save">Сохранить</string>
+    <string name="urnetwork_wallet_reset">Сбросить на предустановленный</string>
+    <string name="urnetwork_wallet_invalid">Невалидный Solana-адрес (32-44 символа base58)</string>
+    <string name="settings_urnetwork_title">URnetwork</string>
+    <string name="settings_urnetwork_summary">P2P mesh — exit-node + Solana-кошелёк</string>
+
+    <!-- WARP -->
+    <string name="warp_settings_title">WARP</string>
+    <string name="settings_warp_title">WARP</string>
+    <string name="settings_warp_summary">Cloudflare WARP — авто-конфиг</string>
+    <string name="warp_no_config">Конфиг не сгенерирован</string>
+    <string name="warp_generate">Сгенерировать</string>
+    <string name="warp_regenerate">Перегенерировать</string>
+    <string name="warp_clear">Удалить</string>
+    <string name="warp_registering">Регистрация…</string>
+    <string name="warp_endpoint_label">Endpoint:</string>
+    <string name="warp_license_label">Лицензия:</string>
 
     <!-- Stats history -->
     <string name="stats_history_title">История сессий</string>

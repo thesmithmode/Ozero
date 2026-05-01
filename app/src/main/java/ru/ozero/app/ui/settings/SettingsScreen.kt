@@ -1,4 +1,6 @@
-﻿package ru.ozero.app.ui.settings
+﻿@file:Suppress("TooManyFunctions", "LongParameterList")
+
+package ru.ozero.app.ui.settings
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
@@ -48,8 +50,11 @@ fun SettingsScreen(
     onOpenAbout: () -> Unit = {},
     onOpenLogs: () -> Unit = {},
     onOpenByeDpiEngineSettings: () -> Unit = {},
+    onOpenUrnetworkSettings: () -> Unit = {},
+    onOpenWarpSettings: () -> Unit = {},
     onOpenManualServer: () -> Unit = {},
     onOpenStatsHistory: () -> Unit = {},
+    onOpenDiagnostics: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -63,8 +68,11 @@ fun SettingsScreen(
             onOpenAbout = onOpenAbout,
             onOpenLogs = onOpenLogs,
             onOpenByeDpiEngineSettings = onOpenByeDpiEngineSettings,
+            onOpenUrnetworkSettings = onOpenUrnetworkSettings,
+            onOpenWarpSettings = onOpenWarpSettings,
             onOpenManualServer = onOpenManualServer,
             onOpenStatsHistory = onOpenStatsHistory,
+            onOpenDiagnostics = onOpenDiagnostics,
         ),
         onSplitModeChange = viewModel::onSplitModeChange,
         onIpv6Toggle = viewModel::onIpv6Toggle,
@@ -164,6 +172,8 @@ private fun ContentBody(
         item {
             EnginesSection(
                 onOpenByeDpi = nav.onOpenByeDpiEngineSettings,
+                onOpenUrnetwork = nav.onOpenUrnetworkSettings,
+                onOpenWarp = nav.onOpenWarpSettings,
                 onOpenManualServer = nav.onOpenManualServer,
             )
         }
@@ -184,6 +194,8 @@ private fun ContentBody(
         }
         item { SectionDivider() }
         item { StatsHistorySection(onOpenStats = nav.onOpenStatsHistory) }
+        item { SectionDivider() }
+        item { DiagnosticsSection(onOpenDiagnostics = nav.onOpenDiagnostics) }
         item { SectionDivider() }
         item {
             LanguageSection(
@@ -259,8 +271,21 @@ private fun StatsHistorySection(onOpenStats: () -> Unit) {
 }
 
 @Composable
+private fun DiagnosticsSection(onOpenDiagnostics: () -> Unit) {
+    NavRow(
+        title = stringResource(R.string.diag_title),
+        summary = stringResource(R.string.diag_idle_hint),
+        tag = "settings_diagnostics_row",
+        onClick = onOpenDiagnostics,
+        enabled = true,
+    )
+}
+
+@Composable
 private fun EnginesSection(
     onOpenByeDpi: () -> Unit,
+    onOpenUrnetwork: () -> Unit,
+    onOpenWarp: () -> Unit,
     onOpenManualServer: () -> Unit,
 ) {
     NavRow(
@@ -268,6 +293,26 @@ private fun EnginesSection(
         summary = "Настройки обхода ТСПУ",
         tag = "settings_byedpi_engine_row",
         onClick = onOpenByeDpi,
+        enabled = true,
+    )
+    NavRow(
+        title = stringResource(R.string.settings_urnetwork_title),
+        summary = stringResource(R.string.settings_urnetwork_summary),
+        tag = "settings_urnetwork_row",
+        onClick = onOpenUrnetwork,
+        enabled = true,
+    )
+    val warpTitle = if (EngineId.WARP.isStub) {
+        stringResource(R.string.settings_warp_title) +
+            " (${stringResource(R.string.engine_wip_badge)})"
+    } else {
+        stringResource(R.string.settings_warp_title)
+    }
+    NavRow(
+        title = warpTitle,
+        summary = stringResource(R.string.settings_warp_summary),
+        tag = "settings_warp_row",
+        onClick = onOpenWarp,
         enabled = true,
     )
     NavRow(
@@ -320,9 +365,14 @@ private fun ConnectionSection(
         onClick = { onManualEngineSelect(null) },
     )
     EngineId.entries.forEach { engine ->
+        val label = if (engine.isStub) {
+            "${engine.displayName} (${stringResource(R.string.engine_wip_badge)})"
+        } else {
+            engine.displayName
+        }
         RadioRow(
             selected = manualEngine == engine,
-            label = engine.name,
+            label = label,
             tag = SettingsTestTags.MANUAL_ENGINE_PREFIX + engine.name,
             onClick = { onManualEngineSelect(engine) },
         )

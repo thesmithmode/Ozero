@@ -6,6 +6,9 @@ data class SettingsNavActions(
     val onOpenAbout: () -> Unit = {},
     val onOpenLogs: () -> Unit = {},
     val onOpenByeDpiEngineSettings: () -> Unit = {},
+    val onOpenUrnetworkSettings: () -> Unit = {},
+    val onOpenWarpSettings: () -> Unit = {},
     val onOpenManualServer: () -> Unit = {},
     val onOpenStatsHistory: () -> Unit = {},
+    val onOpenDiagnostics: () -> Unit = {},
 )

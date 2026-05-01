@@ -59,4 +59,12 @@ sealed class EngineConfig {
         override fun toString(): String =
             "Urnetwork(jwtToken=***, apiUrl=$apiUrl, region=$region, mode=$mode, socksPort=$socksPort)"
     }
+
+    data object Warp : EngineConfig() {
+        override val engineId = EngineId.WARP
+    }
+
+    data object Fptn : EngineConfig() {
+        override val engineId = EngineId.FPTN
+    }
 }

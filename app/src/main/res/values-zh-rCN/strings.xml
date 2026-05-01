@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ozero</string>
+
+    <string name="main_connect">连接</string>
+    <string name="main_disconnect">断开</string>
+    <string name="main_status_disconnected">已断开</string>
+    <string name="main_status_probing">正在搜索路由…</string>
+    <string name="main_status_connecting">正在连接…</string>
+    <string name="main_status_connected">已连接</string>
+    <string name="main_status_switching">切换中…</string>
+    <string name="main_status_disconnecting">断开中…</string>
+    <string name="main_status_failed">错误</string>
+    <string name="main_active_engine">当前引擎: %1$s</string>
+    <string name="stats_session">会话: ↓ %1$s ↑ %2$s</string>
+    <string name="stats_uptime">运行时间: %1$s</string>
+    <string name="main_stagnation_warning">已 30 秒无流量</string>
+    <string name="main_health_degraded">连接不稳定</string>
+
+    <string name="tab_main">主页</string>
+    <string name="tab_settings">设置</string>
+    <string name="tab_diagnostics">诊断</string>
+
+    <string name="settings_title">设置</string>
+    <string name="settings_split_tunnel_title">分应用代理</string>
+    <string name="settings_split_tunnel_summary">选择哪些应用走 VPN</string>
+    <string name="settings_split_mode_all">所有应用</string>
+    <string name="settings_split_mode_bypass_lan">局域网除外</string>
+    <string name="settings_split_mode_allowlist">仅选定应用</string>
+    <string name="settings_split_mode_blocklist">除选定应用外</string>
+    <string name="settings_dh_title">双跳</string>
+    <string name="settings_dh_summary">入口 → 出口。防去匿名化,代价是延迟</string>
+    <string name="settings_subscription_title">订阅</string>
+    <string name="settings_subscription_url_hint">订阅地址 (https://…)</string>
+    <string name="settings_subscription_refresh">刷新</string>
+    <string name="settings_language_title">语言</string>
+    <string name="settings_language_system">系统</string>
+    <string name="settings_language_ru">Русский</string>
+    <string name="settings_language_en">English</string>
+    <string name="settings_language_zh_cn">中文 (简体)</string>
+    <string name="settings_language_es">Español</string>
+    <string name="settings_language_ar">العربية</string>
+    <string name="settings_language_fr">Français</string>
+    <string name="settings_language_hi">हिन्दी</string>
+    <string name="settings_language_pt">Português</string>
+    <string name="settings_language_id">Indonesia</string>
+    <string name="settings_language_de">Deutsch</string>
+    <string name="settings_language_ja">日本語</string>
+
+    <string name="settings_section_connection">连接</string>
+    <string name="settings_section_network">网络</string>
+    <string name="settings_section_security">安全</string>
+    <string name="settings_section_updates">更新</string>
+    <string name="settings_section_about">关于</string>
+    <string name="settings_split_mode_label">分应用代理模式</string>
+    <string name="settings_manual_engine_title">引擎选择</string>
+    <string name="settings_manual_engine_summary">自动 — Ozero 选择最佳引擎</string>
+    <string name="settings_manual_engine_auto">自动</string>
+    <string name="engine_wip_badge">开发中</string>
+    <string name="settings_ipv6_title">IPv6</string>
+    <string name="settings_ipv6_summary">IPv6 流量走 VPN</string>
+    <string name="settings_auto_start_title">开机自启</string>
+    <string name="settings_auto_start_summary">重启后自动开启 VPN</string>
+    <string name="settings_allowed_apps_title">应用列表</string>
+    <string name="settings_allowed_apps_summary">即将推出</string>
+    <string name="settings_allowed_apps_open_summary">选择应用与分应用模式</string>
+    <string name="settings_servers_title">服务器 / 双跳</string>
+    <string name="settings_servers_summary">选择入口/出口对并预览</string>
+    <string name="settings_check_update_title">检查更新</string>
+    <string name="settings_check_update_summary">GitHub Releases · Ed25519 校验</string>
+    <string name="settings_update_state_checking">正在检查更新…</string>
+    <string name="settings_update_state_downloading">下载中 %1$d %%</string>
+    <string name="settings_update_state_verifying">校验签名…</string>
+    <string name="settings_update_state_installing">启动安装…</string>
+    <string name="settings_update_state_uptodate">已是最新版本</string>
+    <string name="settings_update_state_failed">错误: %1$s。点击重试</string>
+
+    <string name="settings_about_version">版本 %1$s</string>
+    <string name="settings_back">返回</string>
+    <string name="settings_open">打开设置</string>
+
+    <string name="diag_title">诊断</string>
+    <string name="diag_run">运行测试</string>
+    <string name="diag_stop">停止</string>
+    <string name="diag_running">测试中… %1$d / %2$d URL</string>
+    <string name="diag_summary">%1$d ✓ / %2$d ✗,共 %3$d</string>
+    <string name="diag_url_ok">%1$s — %2$d ms</string>
+    <string name="diag_url_failed">%1$s — 错误: %2$s</string>
+    <string name="diag_not_connected">VPN 未连接。请先连接再运行测试。</string>
+    <string name="diag_idle_hint">测试将通过当前 SOCKS 代理发送 20 个 URL。</string>
+    <string name="diag_back">返回</string>
+
+    <string name="split_tunnel_title">应用列表</string>
+    <string name="split_tunnel_back">返回</string>
+    <string name="split_tunnel_search_hint">搜索应用…</string>
+    <string name="split_tunnel_no_apps">未找到应用</string>
+    <string name="split_tunnel_system_app">系统</string>
+    <string name="split_tunnel_short_all">全部</string>
+    <string name="split_tunnel_short_bypass_lan">局域网除外</string>
+    <string name="split_tunnel_short_allowlist">允许列表</string>
+    <string name="split_tunnel_short_blocklist">阻止列表</string>
+
+    <string name="servers_title">服务器 — 双跳</string>
+    <string name="servers_back">返回</string>
+    <string name="servers_empty">无服务器,请先导入订阅。</string>
+    <string name="servers_entry_label">入口服务器</string>
+    <string name="servers_exit_label">出口服务器</string>
+    <string name="servers_save">保存</string>
+    <string name="servers_clear">清除</string>
+    <string name="servers_preview_title">链路</string>
+    <string name="servers_preview_format">%1$s/%2$s → %3$s/%4$s</string>
+    <string name="servers_preview_unset">请选择入口与出口</string>
+
+    <string name="error_subscription_invalid">订阅已损坏或签名密钥不匹配</string>
+    <string name="error_no_servers">订阅中没有可用服务器</string>
+    <string name="error_compromised_env">检测到不安全环境 — VPN 未启动</string>
+
+    <string name="a11y_status_indicator">VPN 状态指示器</string>
+    <string name="a11y_loading">加载中</string>
+    <string name="a11y_connect_button">连接 VPN</string>
+    <string name="a11y_disconnect_button">断开 VPN</string>
+    <string name="a11y_engine_active">当前引擎: %1$s</string>
+
+    <string name="error_generic">错误</string>
+
+    <string name="onboarding_language_title">选择语言</string>
+    <string name="onboarding_language_body">稍后可在设置中更改</string>
+    <string name="onboarding_title_1">为什么选 Ozero</string>
+    <string name="onboarding_body_1">在审查环境下自由访问互联网。开源,零遥测。</string>
+    <string name="onboarding_title_2">工作原理</string>
+    <string name="onboarding_body_2">多引擎 (Xray, Hysteria2, ByeDPI, AmneziaWG, Tor) 根据网络自动选择。</string>
+    <string name="onboarding_title_3">VPN 授权</string>
+    <string name="onboarding_body_3">Ozero 需要 Android VPN 模式。隧道仅在本设备运行。</string>
+    <string name="onboarding_next">下一步</string>
+    <string name="onboarding_finish">开始</string>
+    <string name="onboarding_skip">跳过</string>
+
+    <string name="about_title">关于</string>
+    <string name="about_version">版本 %1$s</string>
+    <string name="about_repo">GitHub 源代码</string>
+    <string name="about_legal">许可证</string>
+
+    <string name="diag_export_crashes">导出崩溃日志</string>
+    <string name="diag_export_no_crashes">崩溃日志为空</string>
+
+    <string name="stats_history_title">会话历史</string>
+    <string name="stats_history_summary">已保存的 VPN 会话与流量统计</string>
+    <string name="stats_history_empty">无已保存会话</string>
+    <string name="stats_history_status_running">活动中</string>
+    <string name="stats_history_status_disconnected">已断开</string>
+    <string name="stats_history_status_failed">失败</string>
+    <string name="stats_history_status_label">状态: %1$s</string>
+    <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
+</resources>

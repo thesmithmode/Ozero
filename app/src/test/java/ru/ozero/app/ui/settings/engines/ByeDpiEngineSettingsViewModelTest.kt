@@ -12,10 +12,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
-import io.mockk.mockk
 import org.junit.jupiter.api.Test
-import ru.ozero.app.di.AutoStrategyPickerFactory
-import ru.ozero.commonvpn.TunnelController
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginescore.settings.SplitTunnelMode
@@ -37,7 +34,7 @@ class ByeDpiEngineSettingsViewModelTest {
     fun setUp() {
         Dispatchers.setMain(dispatcher)
         repo = FakeSettingsRepository()
-        vm = ByeDpiEngineSettingsViewModel(repo, mockk<AutoStrategyPickerFactory>(relaxed = true), TunnelController())
+        vm = ByeDpiEngineSettingsViewModel(repo)
     }
 
     @AfterEach

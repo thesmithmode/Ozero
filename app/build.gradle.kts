@@ -105,6 +105,8 @@ dependencies {
     implementation(project(":common-vpn"))
     implementation(project(":common-crypto"))
     implementation(project(":engine-byedpi"))
+    implementation(project(":engine-urnetwork"))
+    implementation(project(":engine-warp"))
 
     implementation(libs.bundles.okhttp)
 
@@ -112,6 +114,10 @@ dependencies {
     testRuntimeOnly(libs.junit.jupiter.engine)
     testImplementation(libs.bundles.testing.unit)
     testImplementation(libs.bundles.bouncycastle)
+
+    testImplementation(libs.junit4)
+    testImplementation(libs.robolectric)
+    testRuntimeOnly(libs.junit.vintage.engine)
     androidTestImplementation(libs.bundles.testing.android)
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)

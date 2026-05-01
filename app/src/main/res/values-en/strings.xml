@@ -61,6 +61,7 @@
     <string name="settings_manual_engine_title">Engine selection</string>
     <string name="settings_manual_engine_summary">Auto — Ozero picks the best</string>
     <string name="settings_manual_engine_auto">Auto</string>
+    <string name="engine_wip_badge">WIP</string>
     <string name="settings_ipv6_title">IPv6</string>
     <string name="settings_ipv6_summary">Route IPv6 through VPN</string>
     <string name="settings_auto_start_title">Start on boot</string>
@@ -134,6 +135,8 @@
     <string name="error_generic">Error</string>
 
 
+    <string name="onboarding_language_title">Choose language</string>
+    <string name="onboarding_language_body">You can change it later in Settings</string>
     <string name="onboarding_title_1">Why Ozero</string>
     <string name="onboarding_body_1">Free internet access under censorship. Open-source, zero telemetry.</string>
     <string name="onboarding_title_2">How it works</string>
@@ -153,6 +156,44 @@
 
     <string name="diag_export_crashes">Export crash log</string>
     <string name="diag_export_no_crashes">Crash log is empty</string>
+
+    <!-- Strategy test -->
+    <string name="strategy_test_title">Strategy picker</string>
+    <string name="strategy_test_open">Strategy picker</string>
+    <string name="strategy_test_summary">Tests ByeDPI strategies against probe sites through a local SOCKS5. Any strategy can be applied at any time.</string>
+    <string name="strategy_test_start">Start</string>
+    <string name="strategy_test_stop">Stop</string>
+    <string name="strategy_test_apply">Apply</string>
+    <string name="strategy_test_applied_toast">Strategy applied</string>
+    <string name="strategy_test_vpn_running_error">VPN is active. Stop it before running the strategy test.</string>
+    <string name="strategy_test_no_sites">Test sites list is empty.</string>
+    <string name="strategy_test_error_close">Close</string>
+
+    <!-- URnetwork -->
+    <string name="urnetwork_settings_title">URnetwork</string>
+    <string name="urnetwork_consent_warning_title">Warning</string>
+    <string name="urnetwork_consent_warning_body">URnetwork is a P2P network where every participant can act as an exit node. If you enable URnetwork, your device will relay other users\' traffic to the open internet from your own IP address. This may attract attention from your ISP and carries legal risks in some jurisdictions. Enable only if you understand the consequences. URx tokens on Solana are credited for exit-node traffic.</string>
+    <string name="urnetwork_consent_accept">I understand, enable</string>
+    <string name="urnetwork_consent_revoke">Revoke consent</string>
+    <string name="urnetwork_wallet_label">Solana wallet</string>
+    <string name="urnetwork_wallet_using_preset">Using the Ozero author\'s wallet. Tokens earned from your exit-node traffic support the project. Enter your own Solana wallet below to earn tokens for yourself.</string>
+    <string name="urnetwork_wallet_save">Save</string>
+    <string name="urnetwork_wallet_reset">Reset to preset</string>
+    <string name="urnetwork_wallet_invalid">Invalid Solana address (32-44 base58 chars)</string>
+    <string name="settings_urnetwork_title">URnetwork</string>
+    <string name="settings_urnetwork_summary">P2P mesh — exit-node + Solana wallet</string>
+
+    <!-- WARP -->
+    <string name="warp_settings_title">WARP</string>
+    <string name="settings_warp_title">WARP</string>
+    <string name="settings_warp_summary">Cloudflare WARP — auto-config</string>
+    <string name="warp_no_config">Config not generated</string>
+    <string name="warp_generate">Generate</string>
+    <string name="warp_regenerate">Regenerate</string>
+    <string name="warp_clear">Clear</string>
+    <string name="warp_registering">Registering…</string>
+    <string name="warp_endpoint_label">Endpoint:</string>
+    <string name="warp_license_label">License:</string>
 
     <!-- Stats history -->
     <string name="stats_history_title">Session history</string>

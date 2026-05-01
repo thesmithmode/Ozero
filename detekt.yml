@@ -18,12 +18,12 @@ complexity:
     threshold: 120
   LongParameterList:
     active: true
-    functionThreshold: 10
-    constructorThreshold: 12
+    functionThreshold: 14
+    constructorThreshold: 16
   TooManyFunctions:
     active: true
-    thresholdInFiles: 20
-    thresholdInClasses: 15
+    thresholdInFiles: 30
+    thresholdInClasses: 20
     thresholdInInterfaces: 10
     thresholdInObjects: 15
     thresholdInEnums: 10

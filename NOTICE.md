@@ -6,6 +6,14 @@ Asset files copied verbatim from [romanvht/ByeByeDPI](https://github.com/romanvh
 
 - `engine-byedpi/src/main/assets/byedpi_strategies.list` — source: `app/src/main/assets/proxytest_strategies.list`
 - `engine-byedpi/src/main/assets/byedpi_test_sites.list` — source: `app/src/main/assets/proxytest_general.sites`
+- `app/src/main/assets/proxytest_strategies.list` — verbatim copy (74 strategies, F1 auto-test screen)
+- `app/src/main/assets/proxytest_general.sites` — verbatim copy
+- `app/src/main/assets/proxytest_youtube.sites` — verbatim copy
+- `app/src/main/assets/proxytest_telegram.sites` — verbatim copy
+- `app/src/main/assets/proxytest_discord.sites` — verbatim copy
+- `app/src/main/assets/proxytest_cloudflare.sites` — verbatim copy
+- `app/src/main/assets/proxytest_googlevideo.sites` — verbatim copy
+- `app/src/main/assets/proxytest_social.sites` — verbatim copy
 
 Ozero is also licensed GPL-3.0 — compatible. ByeByeDPI authorship preserved via source attribution.
 

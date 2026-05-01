@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ozero</string>
+
+    <string name="main_connect">कनेक्ट करें</string>
+    <string name="main_disconnect">डिस्कनेक्ट</string>
+    <string name="main_status_disconnected">डिस्कनेक्टेड</string>
+    <string name="main_status_probing">मार्ग खोज रहा है…</string>
+    <string name="main_status_connecting">कनेक्ट हो रहा है…</string>
+    <string name="main_status_connected">कनेक्टेड</string>
+    <string name="main_status_switching">बदल रहा है…</string>
+    <string name="main_status_disconnecting">डिस्कनेक्ट हो रहा है…</string>
+    <string name="main_status_failed">त्रुटि</string>
+    <string name="main_active_engine">सक्रिय इंजन: %1$s</string>
+    <string name="stats_session">सत्र: ↓ %1$s ↑ %2$s</string>
+    <string name="stats_uptime">समय: %1$s</string>
+    <string name="main_stagnation_warning">30 सेकंड से कोई ट्रैफ़िक नहीं</string>
+    <string name="main_health_degraded">कनेक्शन अस्थिर</string>
+
+    <string name="tab_main">मुख्य</string>
+    <string name="tab_settings">सेटिंग्स</string>
+    <string name="tab_diagnostics">डायग्नोस्टिक</string>
+
+    <string name="settings_title">सेटिंग्स</string>
+    <string name="settings_split_tunnel_title">स्प्लिट टनल</string>
+    <string name="settings_split_tunnel_summary">कौन से ऐप VPN से जाएँगे</string>
+    <string name="settings_split_mode_all">सभी ऐप</string>
+    <string name="settings_split_mode_bypass_lan">लोकल नेटवर्क छोड़कर सब</string>
+    <string name="settings_split_mode_allowlist">केवल चयनित ऐप</string>
+    <string name="settings_split_mode_blocklist">चयनित को छोड़कर सब</string>
+    <string name="settings_dh_title">डबल-हॉप</string>
+    <string name="settings_dh_summary">प्रवेश → निकास. डि-एनॉनिमाइज़ेशन से बचाव, कीमत: लेटेन्सी</string>
+    <string name="settings_subscription_title">सब्सक्रिप्शन</string>
+    <string name="settings_subscription_url_hint">सब्सक्रिप्शन URL (https://…)</string>
+    <string name="settings_subscription_refresh">रीफ्रेश</string>
+    <string name="settings_language_title">भाषा</string>
+    <string name="settings_language_system">सिस्टम</string>
+    <string name="settings_language_ru">Русский</string>
+    <string name="settings_language_en">English</string>
+    <string name="settings_language_zh_cn">中文 (简体)</string>
+    <string name="settings_language_es">Español</string>
+    <string name="settings_language_ar">العربية</string>
+    <string name="settings_language_fr">Français</string>
+    <string name="settings_language_hi">हिन्दी</string>
+    <string name="settings_language_pt">Português</string>
+    <string name="settings_language_id">Indonesia</string>
+    <string name="settings_language_de">Deutsch</string>
+    <string name="settings_language_ja">日本語</string>
+
+    <string name="settings_section_connection">कनेक्शन</string>
+    <string name="settings_section_network">नेटवर्क</string>
+    <string name="settings_section_security">सुरक्षा</string>
+    <string name="settings_section_updates">अपडेट</string>
+    <string name="settings_section_about">के बारे में</string>
+    <string name="settings_split_mode_label">स्प्लिट-टनल मोड</string>
+    <string name="settings_manual_engine_title">इंजन चुनें</string>
+    <string name="settings_manual_engine_summary">ऑटो — Ozero सबसे अच्छा चुनेगा</string>
+    <string name="settings_manual_engine_auto">ऑटो</string>
+    <string name="engine_wip_badge">विकासाधीन</string>
+    <string name="settings_ipv6_title">IPv6</string>
+    <string name="settings_ipv6_summary">IPv6 को VPN से रूट करें</string>
+    <string name="settings_auto_start_title">बूट पर शुरू</string>
+    <string name="settings_auto_start_summary">रीस्टार्ट के बाद VPN ख़ुद शुरू हो जाएगा</string>
+    <string name="settings_allowed_apps_title">ऐप सूची</string>
+    <string name="settings_allowed_apps_summary">जल्द आ रहा है</string>
+    <string name="settings_allowed_apps_open_summary">ऐप और स्प्लिट-टनल मोड चुनें</string>
+    <string name="settings_servers_title">सर्वर / डबल-हॉप</string>
+    <string name="settings_servers_summary">प्रवेश/निकास जोड़ी चुनें और देखें</string>
+    <string name="settings_check_update_title">अपडेट जाँचें</string>
+    <string name="settings_check_update_summary">GitHub Releases · Ed25519 सत्यापन</string>
+    <string name="settings_update_state_checking">अपडेट जाँच रहा है…</string>
+    <string name="settings_update_state_downloading">डाउनलोड %1$d %%</string>
+    <string name="settings_update_state_verifying">हस्ताक्षर सत्यापन…</string>
+    <string name="settings_update_state_installing">इंस्टॉल शुरू…</string>
+    <string name="settings_update_state_uptodate">पहले से अपडेट है</string>
+    <string name="settings_update_state_failed">त्रुटि: %1$s. पुनः प्रयास के लिए टैप करें</string>
+
+    <string name="settings_about_version">संस्करण %1$s</string>
+    <string name="settings_back">वापस</string>
+    <string name="settings_open">सेटिंग्स खोलें</string>
+
+    <string name="diag_title">डायग्नोस्टिक</string>
+    <string name="diag_run">परीक्षण चलाएँ</string>
+    <string name="diag_stop">रोकें</string>
+    <string name="diag_running">परीक्षण… %1$d / %2$d URL</string>
+    <string name="diag_summary">%1$d ✓ / %2$d ✗ कुल %3$d में</string>
+    <string name="diag_url_ok">%1$s — %2$d ms</string>
+    <string name="diag_url_failed">%1$s — त्रुटि: %2$s</string>
+    <string name="diag_not_connected">VPN कनेक्ट नहीं है। पहले कनेक्ट करें।</string>
+    <string name="diag_idle_hint">परीक्षण सक्रिय SOCKS प्रॉक्सी से 20 URL भेजेगा।</string>
+    <string name="diag_back">वापस</string>
+
+    <string name="split_tunnel_title">ऐप सूची</string>
+    <string name="split_tunnel_back">वापस</string>
+    <string name="split_tunnel_search_hint">ऐप खोजें…</string>
+    <string name="split_tunnel_no_apps">कोई ऐप नहीं</string>
+    <string name="split_tunnel_system_app">सिस्टम</string>
+    <string name="split_tunnel_short_all">सभी</string>
+    <string name="split_tunnel_short_bypass_lan">LAN बायपास</string>
+    <string name="split_tunnel_short_allowlist">अनुमत</string>
+    <string name="split_tunnel_short_blocklist">अवरुद्ध</string>
+
+    <string name="servers_title">सर्वर — डबल-हॉप</string>
+    <string name="servers_back">वापस</string>
+    <string name="servers_empty">कोई सर्वर नहीं। सब्सक्रिप्शन इम्पोर्ट करें।</string>
+    <string name="servers_entry_label">प्रवेश सर्वर</string>
+    <string name="servers_exit_label">निकास सर्वर</string>
+    <string name="servers_save">जोड़ी सहेजें</string>
+    <string name="servers_clear">जोड़ी साफ़</string>
+    <string name="servers_preview_title">शृंखला</string>
+    <string name="servers_preview_format">%1$s/%2$s → %3$s/%4$s</string>
+    <string name="servers_preview_unset">प्रवेश और निकास चुनें</string>
+
+    <string name="error_subscription_invalid">सब्सक्रिप्शन ख़राब है या ग़लत कुंजी से हस्ताक्षरित</string>
+    <string name="error_no_servers">सब्सक्रिप्शन में कोई सक्रिय सर्वर नहीं</string>
+    <string name="error_compromised_env">असुरक्षित वातावरण मिला — VPN शुरू नहीं हुआ</string>
+
+    <string name="a11y_status_indicator">VPN स्थिति संकेतक</string>
+    <string name="a11y_loading">लोड हो रहा है</string>
+    <string name="a11y_connect_button">VPN कनेक्ट</string>
+    <string name="a11y_disconnect_button">VPN डिस्कनेक्ट</string>
+    <string name="a11y_engine_active">सक्रिय इंजन: %1$s</string>
+
+    <string name="error_generic">त्रुटि</string>
+
+    <string name="onboarding_language_title">भाषा चुनें</string>
+    <string name="onboarding_language_body">आप बाद में सेटिंग्स में बदल सकते हैं</string>
+    <string name="onboarding_title_1">Ozero क्यों</string>
+    <string name="onboarding_body_1">सेंसरशिप के तहत मुक्त इंटरनेट. ओपन-सोर्स, बिना टेलीमेट्री।</string>
+    <string name="onboarding_title_2">कैसे काम करता है</string>
+    <string name="onboarding_body_2">कई इंजन (Xray, Hysteria2, ByeDPI, AmneziaWG, Tor) नेटवर्क के अनुसार चुने जाते हैं।</string>
+    <string name="onboarding_title_3">VPN अनुमति</string>
+    <string name="onboarding_body_3">Ozero को Android VPN मोड चाहिए। टनल डिवाइस पर ही रहता है।</string>
+    <string name="onboarding_next">आगे</string>
+    <string name="onboarding_finish">शुरू करें</string>
+    <string name="onboarding_skip">छोड़ें</string>
+
+    <string name="about_title">के बारे में</string>
+    <string name="about_version">संस्करण %1$s</string>
+    <string name="about_repo">GitHub पर सोर्स</string>
+    <string name="about_legal">लाइसेंस</string>
+
+    <string name="diag_export_crashes">क्रैश लॉग एक्सपोर्ट</string>
+    <string name="diag_export_no_crashes">क्रैश लॉग खाली है</string>
+
+    <string name="stats_history_title">सत्र इतिहास</string>
+    <string name="stats_history_summary">सहेजे गए VPN सत्र, ट्रैफ़िक के साथ</string>
+    <string name="stats_history_empty">कोई सहेजा सत्र नहीं</string>
+    <string name="stats_history_status_running">सक्रिय</string>
+    <string name="stats_history_status_disconnected">डिस्कनेक्टेड</string>
+    <string name="stats_history_status_failed">विफल</string>
+    <string name="stats_history_status_label">स्थिति: %1$s</string>
+    <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
+</resources>

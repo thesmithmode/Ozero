@@ -15,6 +15,7 @@ on:
           - hysteria2
           - tor
           - xray
+          - userwireguard
   push:
     branches:
       - 'feat/**'
@@ -29,6 +30,7 @@ on:
       - 'build-tools/build_tor.sh'
       - 'build-tools/build_xray.sh'
       - 'build-tools/regen_lock.py'
+      - 'scripts/build_wireguard_android.sh'
 
 jobs:
   build:
@@ -67,6 +69,9 @@ jobs:
               ;;
             tor)
               FILES="build-tools/build_tor.sh build-tools/regen_lock.py"
+              ;;
+            userwireguard)
+              FILES="build-tools/Dockerfile scripts/build_wireguard_android.sh"
               ;;
             *)
               echo "Unknown artifact: $ARTIFACT" >&2
@@ -143,6 +148,27 @@ jobs:
             -e ANDROID_TARGETS="android/arm64,android/arm,android/386,android/amd64" \
             ozero-xray \
             bash build-tools/build_hysteria2.sh
+
+      # ---------------------------------------------------------------------
+      # userwireguard build (Go + gomobile bind → AAR, multi-ABI)
+      # F7 (engine-urnetwork) tunnel layer. См. scripts/build_wireguard_android.sh.
+      # F2 (engine-warp) НЕ использует этот AAR — там Maven com.wireguard.android:tunnel.
+      # ---------------------------------------------------------------------
+      - name: Build userwireguard Docker image
+        if: env.ARTIFACT == 'userwireguard'
+        run: docker build -t ozero-xray -f build-tools/Dockerfile build-tools/
+
+      - name: Build userwireguard AAR (multi-ABI)
+        if: env.ARTIFACT == 'userwireguard'
+        run: |
+          docker run --rm \
+            -v "$PWD:/src" \
+            -w /src \
+            -e REPO_ROOT=/src \
+            -e OUTPUT_DIR=/src/out/userwireguard \
+            -e ANDROID_TARGETS="android/arm64,android/arm,android/amd64" \
+            ozero-xray \
+            bash scripts/build_wireguard_android.sh
 
       # ---------------------------------------------------------------------
       # tor build (download tor-android + IPtProxy AAR из Maven Central,
@@ -241,6 +267,27 @@ jobs:
           files: |
             out/hysteria2/libhysteria2.aar
             out/hysteria2/manifest.txt
+          fail_on_unmatched_files: true
+          prerelease: true
+
+      - name: Upload userwireguard assets
+        if: env.ARTIFACT == 'userwireguard' && github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        env:
+          GH_TAG: ${{ steps.tag.outputs.tag }}
+        with:
+          tag_name: ${{ env.GH_TAG }}
+          name: Native binaries ${{ env.GH_TAG }}
+          body: |
+            Auto-built native binaries.
+
+            Engine: userwireguard (F7 URnetwork tunnel layer)
+            Source: github.com/urnetwork/userwireguard
+            Commit: ${{ github.sha }}
+          files: |
+            out/userwireguard/userwireguard.aar
+            out/userwireguard/userwireguard.aar.sha256
+            out/userwireguard/userwireguard.manifest.txt
           fail_on_unmatched_files: true
           prerelease: true
 

@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -48,7 +47,6 @@ fun MainScreen(
     viewModel: MainViewModel,
     onConnectClick: () -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenDiagnostics: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val stats by viewModel.stats.collectAsStateWithLifecycle()
@@ -61,15 +59,6 @@ fun MainScreen(
                 .align(Alignment.TopEnd)
                 .padding(8.dp),
         ) {
-            IconButton(
-                onClick = onOpenDiagnostics,
-                modifier = Modifier.testTag(MainScreenTestTags.OPEN_DIAGNOSTICS),
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Build,
-                    contentDescription = stringResource(R.string.tab_diagnostics),
-                )
-            }
             IconButton(
                 onClick = onOpenSettings,
                 modifier = Modifier.testTag(MainScreenTestTags.OPEN_SETTINGS),

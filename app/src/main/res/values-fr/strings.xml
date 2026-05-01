@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ozero</string>
+
+    <string name="main_connect">Connecter</string>
+    <string name="main_disconnect">Déconnecter</string>
+    <string name="main_status_disconnected">Déconnecté</string>
+    <string name="main_status_probing">Recherche d\'un itinéraire…</string>
+    <string name="main_status_connecting">Connexion…</string>
+    <string name="main_status_connected">Connecté</string>
+    <string name="main_status_switching">Changement…</string>
+    <string name="main_status_disconnecting">Déconnexion…</string>
+    <string name="main_status_failed">Erreur</string>
+    <string name="main_active_engine">Moteur actif : %1$s</string>
+    <string name="stats_session">Session : ↓ %1$s ↑ %2$s</string>
+    <string name="stats_uptime">Durée : %1$s</string>
+    <string name="main_stagnation_warning">Aucun trafic depuis 30 secondes</string>
+    <string name="main_health_degraded">Connexion instable</string>
+
+    <string name="tab_main">Accueil</string>
+    <string name="tab_settings">Réglages</string>
+    <string name="tab_diagnostics">Diagnostic</string>
+
+    <string name="settings_title">Réglages</string>
+    <string name="settings_split_tunnel_title">Tunnel divisé</string>
+    <string name="settings_split_tunnel_summary">Quelles apps passent par le VPN</string>
+    <string name="settings_split_mode_all">Toutes les apps</string>
+    <string name="settings_split_mode_bypass_lan">Tout sauf le réseau local</string>
+    <string name="settings_split_mode_allowlist">Apps sélectionnées uniquement</string>
+    <string name="settings_split_mode_blocklist">Tout sauf les apps sélectionnées</string>
+    <string name="settings_dh_title">Double saut</string>
+    <string name="settings_dh_summary">Entrée → Sortie. Anti-désanonymisation, coût : latence</string>
+    <string name="settings_subscription_title">Abonnement</string>
+    <string name="settings_subscription_url_hint">URL d\'abonnement (https://…)</string>
+    <string name="settings_subscription_refresh">Actualiser</string>
+    <string name="settings_language_title">Langue</string>
+    <string name="settings_language_system">Système</string>
+    <string name="settings_language_ru">Русский</string>
+    <string name="settings_language_en">English</string>
+    <string name="settings_language_zh_cn">中文 (简体)</string>
+    <string name="settings_language_es">Español</string>
+    <string name="settings_language_ar">العربية</string>
+    <string name="settings_language_fr">Français</string>
+    <string name="settings_language_hi">हिन्दी</string>
+    <string name="settings_language_pt">Português</string>
+    <string name="settings_language_id">Indonesia</string>
+    <string name="settings_language_de">Deutsch</string>
+    <string name="settings_language_ja">日本語</string>
+
+    <string name="settings_section_connection">Connexion</string>
+    <string name="settings_section_network">Réseau</string>
+    <string name="settings_section_security">Sécurité</string>
+    <string name="settings_section_updates">Mises à jour</string>
+    <string name="settings_section_about">À propos</string>
+    <string name="settings_split_mode_label">Mode tunnel divisé</string>
+    <string name="settings_manual_engine_title">Choix du moteur</string>
+    <string name="settings_manual_engine_summary">Auto — Ozero choisit le meilleur</string>
+    <string name="settings_manual_engine_auto">Auto</string>
+    <string name="engine_wip_badge">en cours</string>
+    <string name="settings_ipv6_title">IPv6</string>
+    <string name="settings_ipv6_summary">Router IPv6 via le VPN</string>
+    <string name="settings_auto_start_title">Démarrage au boot</string>
+    <string name="settings_auto_start_summary">Le VPN démarre automatiquement après redémarrage</string>
+    <string name="settings_allowed_apps_title">Liste d\'apps</string>
+    <string name="settings_allowed_apps_summary">Bientôt</string>
+    <string name="settings_allowed_apps_open_summary">Choisir les apps et le mode tunnel</string>
+    <string name="settings_servers_title">Serveurs / Double saut</string>
+    <string name="settings_servers_summary">Choisir une paire entrée/sortie et la prévisualiser</string>
+    <string name="settings_check_update_title">Vérifier la mise à jour</string>
+    <string name="settings_check_update_summary">GitHub Releases · vérification Ed25519</string>
+    <string name="settings_update_state_checking">Vérification de la mise à jour…</string>
+    <string name="settings_update_state_downloading">Téléchargement %1$d %%</string>
+    <string name="settings_update_state_verifying">Vérification de la signature…</string>
+    <string name="settings_update_state_installing">Démarrage de l\'installation…</string>
+    <string name="settings_update_state_uptodate">Déjà à jour</string>
+    <string name="settings_update_state_failed">Erreur : %1$s. Touchez pour réessayer</string>
+
+    <string name="settings_about_version">Version %1$s</string>
+    <string name="settings_back">Retour</string>
+    <string name="settings_open">Ouvrir les réglages</string>
+
+    <string name="diag_title">Diagnostic</string>
+    <string name="diag_run">Lancer le test</string>
+    <string name="diag_stop">Arrêter</string>
+    <string name="diag_running">Test… %1$d / %2$d URLs</string>
+    <string name="diag_summary">%1$d ✓ / %2$d ✗ sur %3$d</string>
+    <string name="diag_url_ok">%1$s — %2$d ms</string>
+    <string name="diag_url_failed">%1$s — erreur : %2$s</string>
+    <string name="diag_not_connected">VPN non connecté. Connectez-vous d\'abord.</string>
+    <string name="diag_idle_hint">Le test envoie 20 URLs via le proxy SOCKS actif.</string>
+    <string name="diag_back">Retour</string>
+
+    <string name="split_tunnel_title">Liste d\'apps</string>
+    <string name="split_tunnel_back">Retour</string>
+    <string name="split_tunnel_search_hint">Rechercher des apps…</string>
+    <string name="split_tunnel_no_apps">Aucune app</string>
+    <string name="split_tunnel_system_app">Système</string>
+    <string name="split_tunnel_short_all">Toutes</string>
+    <string name="split_tunnel_short_bypass_lan">Hors LAN</string>
+    <string name="split_tunnel_short_allowlist">Autorisées</string>
+    <string name="split_tunnel_short_blocklist">Bloquées</string>
+
+    <string name="servers_title">Serveurs — Double saut</string>
+    <string name="servers_back">Retour</string>
+    <string name="servers_empty">Aucun serveur. Importez un abonnement.</string>
+    <string name="servers_entry_label">Serveur d\'entrée</string>
+    <string name="servers_exit_label">Serveur de sortie</string>
+    <string name="servers_save">Enregistrer la paire</string>
+    <string name="servers_clear">Effacer la paire</string>
+    <string name="servers_preview_title">Chaîne</string>
+    <string name="servers_preview_format">%1$s/%2$s → %3$s/%4$s</string>
+    <string name="servers_preview_unset">Sélectionnez entrée et sortie</string>
+
+    <string name="error_subscription_invalid">Abonnement corrompu ou signé avec une mauvaise clé</string>
+    <string name="error_no_servers">Aucun serveur actif dans l\'abonnement</string>
+    <string name="error_compromised_env">Environnement compromis détecté — VPN non démarré</string>
+
+    <string name="a11y_status_indicator">Indicateur d\'état VPN</string>
+    <string name="a11y_loading">Chargement</string>
+    <string name="a11y_connect_button">Connecter VPN</string>
+    <string name="a11y_disconnect_button">Déconnecter VPN</string>
+    <string name="a11y_engine_active">Moteur actif : %1$s</string>
+
+    <string name="error_generic">Erreur</string>
+
+    <string name="onboarding_language_title">Choisir la langue</string>
+    <string name="onboarding_language_body">Modifiable plus tard dans les Réglages</string>
+    <string name="onboarding_title_1">Pourquoi Ozero</string>
+    <string name="onboarding_body_1">Accès libre à internet sous censure. Open-source, sans télémétrie.</string>
+    <string name="onboarding_title_2">Comment ça marche</string>
+    <string name="onboarding_body_2">Plusieurs moteurs (Xray, Hysteria2, ByeDPI, AmneziaWG, Tor) choisis automatiquement.</string>
+    <string name="onboarding_title_3">Permission VPN</string>
+    <string name="onboarding_body_3">Ozero a besoin du mode VPN d\'Android. Le tunnel reste sur l\'appareil.</string>
+    <string name="onboarding_next">Suivant</string>
+    <string name="onboarding_finish">Démarrer</string>
+    <string name="onboarding_skip">Passer</string>
+
+    <string name="about_title">À propos</string>
+    <string name="about_version">Version %1$s</string>
+    <string name="about_repo">Code source sur GitHub</string>
+    <string name="about_legal">Licences</string>
+
+    <string name="diag_export_crashes">Exporter le journal de plantage</string>
+    <string name="diag_export_no_crashes">Le journal de plantage est vide</string>
+
+    <string name="stats_history_title">Historique des sessions</string>
+    <string name="stats_history_summary">Sessions VPN enregistrées avec stats</string>
+    <string name="stats_history_empty">Aucune session enregistrée</string>
+    <string name="stats_history_status_running">Active</string>
+    <string name="stats_history_status_disconnected">Déconnectée</string>
+    <string name="stats_history_status_failed">Échouée</string>
+    <string name="stats_history_status_label">État : %1$s</string>
+    <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
+</resources>

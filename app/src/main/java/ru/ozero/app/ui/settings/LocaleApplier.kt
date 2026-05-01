@@ -8,7 +8,19 @@ object LocaleApplier {
 
     private const val TAG = "LocaleApplier"
 
-    val SUPPORTED_TAGS: List<String> = listOf("", "ru", "en")
+    val SUPPORTED_TAGS: List<String> = listOf(
+        "",
+        "ru",
+        "en",
+        "zh-rCN",
+        "es",
+        "ar",
+        "fr",
+        "hi",
+        "pt",
+        "de",
+        "ja",
+    )
 
     fun apply(localeTag: String?) {
         val locales = if (localeTag.isNullOrBlank()) {

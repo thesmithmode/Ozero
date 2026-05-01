@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ozero</string>
+
+    <string name="main_connect">接続</string>
+    <string name="main_disconnect">切断</string>
+    <string name="main_status_disconnected">切断済み</string>
+    <string name="main_status_probing">経路を検索中…</string>
+    <string name="main_status_connecting">接続中…</string>
+    <string name="main_status_connected">接続済み</string>
+    <string name="main_status_switching">切替中…</string>
+    <string name="main_status_disconnecting">切断中…</string>
+    <string name="main_status_failed">エラー</string>
+    <string name="main_active_engine">使用中のエンジン: %1$s</string>
+    <string name="stats_session">セッション: ↓ %1$s ↑ %2$s</string>
+    <string name="stats_uptime">経過時間: %1$s</string>
+    <string name="main_stagnation_warning">30秒間トラフィックなし</string>
+    <string name="main_health_degraded">接続が不安定</string>
+
+    <string name="tab_main">ホーム</string>
+    <string name="tab_settings">設定</string>
+    <string name="tab_diagnostics">診断</string>
+
+    <string name="settings_title">設定</string>
+    <string name="settings_split_tunnel_title">スプリットトンネル</string>
+    <string name="settings_split_tunnel_summary">VPN を通すアプリ</string>
+    <string name="settings_split_mode_all">すべてのアプリ</string>
+    <string name="settings_split_mode_bypass_lan">ローカルネット以外</string>
+    <string name="settings_split_mode_allowlist">選択したアプリのみ</string>
+    <string name="settings_split_mode_blocklist">選択以外のすべて</string>
+    <string name="settings_dh_title">ダブルホップ</string>
+    <string name="settings_dh_summary">入口 → 出口。匿名性向上、代償: 遅延</string>
+    <string name="settings_subscription_title">サブスクリプション</string>
+    <string name="settings_subscription_url_hint">URL (https://…)</string>
+    <string name="settings_subscription_refresh">更新</string>
+    <string name="settings_language_title">言語</string>
+    <string name="settings_language_system">システム</string>
+    <string name="settings_language_ru">Русский</string>
+    <string name="settings_language_en">English</string>
+    <string name="settings_language_zh_cn">中文 (简体)</string>
+    <string name="settings_language_es">Español</string>
+    <string name="settings_language_ar">العربية</string>
+    <string name="settings_language_fr">Français</string>
+    <string name="settings_language_hi">हिन्दी</string>
+    <string name="settings_language_pt">Português</string>
+    <string name="settings_language_id">Indonesia</string>
+    <string name="settings_language_de">Deutsch</string>
+    <string name="settings_language_ja">日本語</string>
+
+    <string name="settings_section_connection">接続</string>
+    <string name="settings_section_network">ネットワーク</string>
+    <string name="settings_section_security">セキュリティ</string>
+    <string name="settings_section_updates">アップデート</string>
+    <string name="settings_section_about">情報</string>
+    <string name="settings_split_mode_label">スプリットトンネル モード</string>
+    <string name="settings_manual_engine_title">エンジン選択</string>
+    <string name="settings_manual_engine_summary">自動 — Ozero が最適を選びます</string>
+    <string name="settings_manual_engine_auto">自動</string>
+    <string name="engine_wip_badge">開発中</string>
+    <string name="settings_ipv6_title">IPv6</string>
+    <string name="settings_ipv6_summary">IPv6 を VPN 経由</string>
+    <string name="settings_auto_start_title">起動時に開始</string>
+    <string name="settings_auto_start_summary">再起動後に VPN が自動的に開始</string>
+    <string name="settings_allowed_apps_title">アプリ一覧</string>
+    <string name="settings_allowed_apps_summary">近日公開</string>
+    <string name="settings_allowed_apps_open_summary">アプリとスプリットトンネルを選択</string>
+    <string name="settings_servers_title">サーバー / ダブルホップ</string>
+    <string name="settings_servers_summary">入口/出口ペアを選択してプレビュー</string>
+    <string name="settings_check_update_title">更新を確認</string>
+    <string name="settings_check_update_summary">GitHub Releases · Ed25519 検証</string>
+    <string name="settings_update_state_checking">更新を確認中…</string>
+    <string name="settings_update_state_downloading">ダウンロード %1$d %%</string>
+    <string name="settings_update_state_verifying">署名を検証中…</string>
+    <string name="settings_update_state_installing">インストーラ起動…</string>
+    <string name="settings_update_state_uptodate">最新です</string>
+    <string name="settings_update_state_failed">エラー: %1$s。タップで再試行</string>
+
+    <string name="settings_about_version">バージョン %1$s</string>
+    <string name="settings_back">戻る</string>
+    <string name="settings_open">設定を開く</string>
+
+    <string name="diag_title">診断</string>
+    <string name="diag_run">テスト実行</string>
+    <string name="diag_stop">停止</string>
+    <string name="diag_running">テスト中… %1$d / %2$d URL</string>
+    <string name="diag_summary">%1$d ✓ / %2$d ✗ (合計 %3$d)</string>
+    <string name="diag_url_ok">%1$s — %2$d ms</string>
+    <string name="diag_url_failed">%1$s — エラー: %2$s</string>
+    <string name="diag_not_connected">VPN 未接続。接続後にテスト。</string>
+    <string name="diag_idle_hint">アクティブな SOCKS プロキシ経由で 20 URL を送信します。</string>
+    <string name="diag_back">戻る</string>
+
+    <string name="split_tunnel_title">アプリ一覧</string>
+    <string name="split_tunnel_back">戻る</string>
+    <string name="split_tunnel_search_hint">アプリ検索…</string>
+    <string name="split_tunnel_no_apps">アプリなし</string>
+    <string name="split_tunnel_system_app">システム</string>
+    <string name="split_tunnel_short_all">全</string>
+    <string name="split_tunnel_short_bypass_lan">LAN除外</string>
+    <string name="split_tunnel_short_allowlist">許可</string>
+    <string name="split_tunnel_short_blocklist">遮断</string>
+
+    <string name="servers_title">サーバー — ダブルホップ</string>
+    <string name="servers_back">戻る</string>
+    <string name="servers_empty">サーバーなし。サブスクリプションをインポートしてください。</string>
+    <string name="servers_entry_label">入口サーバー</string>
+    <string name="servers_exit_label">出口サーバー</string>
+    <string name="servers_save">ペアを保存</string>
+    <string name="servers_clear">ペアを消去</string>
+    <string name="servers_preview_title">チェーン</string>
+    <string name="servers_preview_format">%1$s/%2$s → %3$s/%4$s</string>
+    <string name="servers_preview_unset">入口と出口を選択</string>
+
+    <string name="error_subscription_invalid">サブスクリプションが破損しているか鍵が一致しません</string>
+    <string name="error_no_servers">サブスクリプションに有効なサーバーがありません</string>
+    <string name="error_compromised_env">安全でない環境を検出 — VPN 未起動</string>
+
+    <string name="a11y_status_indicator">VPN ステータスインジケーター</string>
+    <string name="a11y_loading">読み込み中</string>
+    <string name="a11y_connect_button">VPN 接続</string>
+    <string name="a11y_disconnect_button">VPN 切断</string>
+    <string name="a11y_engine_active">使用中のエンジン: %1$s</string>
+
+    <string name="error_generic">エラー</string>
+
+    <string name="onboarding_language_title">言語を選択</string>
+    <string name="onboarding_language_body">後で設定から変更できます</string>
+    <string name="onboarding_title_1">なぜ Ozero</string>
+    <string name="onboarding_body_1">検閲下でも自由なインターネット。オープンソース、テレメトリなし。</string>
+    <string name="onboarding_title_2">仕組み</string>
+    <string name="onboarding_body_2">複数のエンジン (Xray, Hysteria2, ByeDPI, AmneziaWG, Tor) を自動選択。</string>
+    <string name="onboarding_title_3">VPN 許可</string>
+    <string name="onboarding_body_3">Ozero は Android の VPN モードを使います。トンネルは端末内で完結します。</string>
+    <string name="onboarding_next">次へ</string>
+    <string name="onboarding_finish">開始</string>
+    <string name="onboarding_skip">スキップ</string>
+
+    <string name="about_title">情報</string>
+    <string name="about_version">バージョン %1$s</string>
+    <string name="about_repo">GitHub のソースコード</string>
+    <string name="about_legal">ライセンス</string>
+
+    <string name="diag_export_crashes">クラッシュログをエクスポート</string>
+    <string name="diag_export_no_crashes">クラッシュログは空です</string>
+
+    <string name="stats_history_title">セッション履歴</string>
+    <string name="stats_history_summary">VPN セッションとトラフィック統計</string>
+    <string name="stats_history_empty">保存されたセッションなし</string>
+    <string name="stats_history_status_running">アクティブ</string>
+    <string name="stats_history_status_disconnected">切断</string>
+    <string name="stats_history_status_failed">失敗</string>
+    <string name="stats_history_status_label">状態: %1$s</string>
+    <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
+</resources>

@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ozero</string>
+
+    <string name="main_connect">Verbinden</string>
+    <string name="main_disconnect">Trennen</string>
+    <string name="main_status_disconnected">Getrennt</string>
+    <string name="main_status_probing">Suche Route…</string>
+    <string name="main_status_connecting">Verbinde…</string>
+    <string name="main_status_connected">Verbunden</string>
+    <string name="main_status_switching">Wechsel…</string>
+    <string name="main_status_disconnecting">Trenne…</string>
+    <string name="main_status_failed">Fehler</string>
+    <string name="main_active_engine">Aktives Modul: %1$s</string>
+    <string name="stats_session">Sitzung: ↓ %1$s ↑ %2$s</string>
+    <string name="stats_uptime">Laufzeit: %1$s</string>
+    <string name="main_stagnation_warning">Kein Traffic seit 30 Sekunden</string>
+    <string name="main_health_degraded">Verbindung instabil</string>
+
+    <string name="tab_main">Start</string>
+    <string name="tab_settings">Einstellungen</string>
+    <string name="tab_diagnostics">Diagnose</string>
+
+    <string name="settings_title">Einstellungen</string>
+    <string name="settings_split_tunnel_title">Split-Tunnel</string>
+    <string name="settings_split_tunnel_summary">Welche Apps nutzen das VPN</string>
+    <string name="settings_split_mode_all">Alle Apps</string>
+    <string name="settings_split_mode_bypass_lan">Alle außer lokales Netz</string>
+    <string name="settings_split_mode_allowlist">Nur ausgewählte Apps</string>
+    <string name="settings_split_mode_blocklist">Alle außer ausgewählte</string>
+    <string name="settings_dh_title">Doppelhop</string>
+    <string name="settings_dh_summary">Eingang → Ausgang. Anti-Deanonymisierung, Kosten: Latenz</string>
+    <string name="settings_subscription_title">Abonnement</string>
+    <string name="settings_subscription_url_hint">Abonnement-URL (https://…)</string>
+    <string name="settings_subscription_refresh">Aktualisieren</string>
+    <string name="settings_language_title">Sprache</string>
+    <string name="settings_language_system">System</string>
+    <string name="settings_language_ru">Русский</string>
+    <string name="settings_language_en">English</string>
+    <string name="settings_language_zh_cn">中文 (简体)</string>
+    <string name="settings_language_es">Español</string>
+    <string name="settings_language_ar">العربية</string>
+    <string name="settings_language_fr">Français</string>
+    <string name="settings_language_hi">हिन्दी</string>
+    <string name="settings_language_pt">Português</string>
+    <string name="settings_language_id">Indonesia</string>
+    <string name="settings_language_de">Deutsch</string>
+    <string name="settings_language_ja">日本語</string>
+
+    <string name="settings_section_connection">Verbindung</string>
+    <string name="settings_section_network">Netzwerk</string>
+    <string name="settings_section_security">Sicherheit</string>
+    <string name="settings_section_updates">Updates</string>
+    <string name="settings_section_about">Über</string>
+    <string name="settings_split_mode_label">Split-Tunnel-Modus</string>
+    <string name="settings_manual_engine_title">Modul-Auswahl</string>
+    <string name="settings_manual_engine_summary">Auto — Ozero wählt das beste</string>
+    <string name="settings_manual_engine_auto">Auto</string>
+    <string name="engine_wip_badge">in Arbeit</string>
+    <string name="settings_ipv6_title">IPv6</string>
+    <string name="settings_ipv6_summary">IPv6 über VPN routen</string>
+    <string name="settings_auto_start_title">Beim Boot starten</string>
+    <string name="settings_auto_start_summary">VPN startet automatisch nach Neustart</string>
+    <string name="settings_allowed_apps_title">App-Liste</string>
+    <string name="settings_allowed_apps_summary">Demnächst</string>
+    <string name="settings_allowed_apps_open_summary">Apps und Split-Tunnel-Modus wählen</string>
+    <string name="settings_servers_title">Server / Doppelhop</string>
+    <string name="settings_servers_summary">Eingang/Ausgang-Paar wählen und prüfen</string>
+    <string name="settings_check_update_title">Update suchen</string>
+    <string name="settings_check_update_summary">GitHub Releases · Ed25519-Prüfung</string>
+    <string name="settings_update_state_checking">Suche Update…</string>
+    <string name="settings_update_state_downloading">Lade %1$d %%</string>
+    <string name="settings_update_state_verifying">Prüfe Signatur…</string>
+    <string name="settings_update_state_installing">Starte Installer…</string>
+    <string name="settings_update_state_uptodate">Bereits aktuell</string>
+    <string name="settings_update_state_failed">Fehler: %1$s. Tippen für Wiederholung</string>
+
+    <string name="settings_about_version">Version %1$s</string>
+    <string name="settings_back">Zurück</string>
+    <string name="settings_open">Einstellungen öffnen</string>
+
+    <string name="diag_title">Diagnose</string>
+    <string name="diag_run">Test starten</string>
+    <string name="diag_stop">Stop</string>
+    <string name="diag_running">Test… %1$d / %2$d URLs</string>
+    <string name="diag_summary">%1$d ✓ / %2$d ✗ von %3$d</string>
+    <string name="diag_url_ok">%1$s — %2$d ms</string>
+    <string name="diag_url_failed">%1$s — Fehler: %2$s</string>
+    <string name="diag_not_connected">VPN nicht verbunden. Erst verbinden, dann Test.</string>
+    <string name="diag_idle_hint">Der Test sendet 20 URLs über den aktiven SOCKS-Proxy.</string>
+    <string name="diag_back">Zurück</string>
+
+    <string name="split_tunnel_title">App-Liste</string>
+    <string name="split_tunnel_back">Zurück</string>
+    <string name="split_tunnel_search_hint">Apps suchen…</string>
+    <string name="split_tunnel_no_apps">Keine Apps</string>
+    <string name="split_tunnel_system_app">System</string>
+    <string name="split_tunnel_short_all">Alle</string>
+    <string name="split_tunnel_short_bypass_lan">Ohne LAN</string>
+    <string name="split_tunnel_short_allowlist">Erlaubt</string>
+    <string name="split_tunnel_short_blocklist">Blockiert</string>
+
+    <string name="servers_title">Server — Doppelhop</string>
+    <string name="servers_back">Zurück</string>
+    <string name="servers_empty">Keine Server. Erst Abonnement importieren.</string>
+    <string name="servers_entry_label">Eingangsserver</string>
+    <string name="servers_exit_label">Ausgangsserver</string>
+    <string name="servers_save">Paar speichern</string>
+    <string name="servers_clear">Paar löschen</string>
+    <string name="servers_preview_title">Kette</string>
+    <string name="servers_preview_format">%1$s/%2$s → %3$s/%4$s</string>
+    <string name="servers_preview_unset">Eingang und Ausgang wählen</string>
+
+    <string name="error_subscription_invalid">Abonnement beschädigt oder mit falschem Schlüssel signiert</string>
+    <string name="error_no_servers">Keine aktiven Server im Abonnement</string>
+    <string name="error_compromised_env">Unsichere Umgebung erkannt — VPN nicht gestartet</string>
+
+    <string name="a11y_status_indicator">VPN-Statusanzeige</string>
+    <string name="a11y_loading">Lädt</string>
+    <string name="a11y_connect_button">VPN verbinden</string>
+    <string name="a11y_disconnect_button">VPN trennen</string>
+    <string name="a11y_engine_active">Aktives Modul: %1$s</string>
+
+    <string name="error_generic">Fehler</string>
+
+    <string name="onboarding_language_title">Sprache wählen</string>
+    <string name="onboarding_language_body">Später in den Einstellungen änderbar</string>
+    <string name="onboarding_title_1">Warum Ozero</string>
+    <string name="onboarding_body_1">Freier Internetzugang unter Zensur. Open-Source, ohne Telemetrie.</string>
+    <string name="onboarding_title_2">Wie es funktioniert</string>
+    <string name="onboarding_body_2">Mehrere Module (Xray, Hysteria2, ByeDPI, AmneziaWG, Tor) werden automatisch gewählt.</string>
+    <string name="onboarding_title_3">VPN-Erlaubnis</string>
+    <string name="onboarding_body_3">Ozero benötigt Androids VPN-Modus. Der Tunnel bleibt auf dem Gerät.</string>
+    <string name="onboarding_next">Weiter</string>
+    <string name="onboarding_finish">Starten</string>
+    <string name="onboarding_skip">Überspringen</string>
+
+    <string name="about_title">Über</string>
+    <string name="about_version">Version %1$s</string>
+    <string name="about_repo">Quellcode auf GitHub</string>
+    <string name="about_legal">Lizenzen</string>
+
+    <string name="diag_export_crashes">Crash-Log exportieren</string>
+    <string name="diag_export_no_crashes">Crash-Log ist leer</string>
+
+    <string name="stats_history_title">Sitzungsverlauf</string>
+    <string name="stats_history_summary">Gespeicherte VPN-Sitzungen mit Traffic-Stats</string>
+    <string name="stats_history_empty">Keine gespeicherten Sitzungen</string>
+    <string name="stats_history_status_running">Aktiv</string>
+    <string name="stats_history_status_disconnected">Getrennt</string>
+    <string name="stats_history_status_failed">Fehlgeschlagen</string>
+    <string name="stats_history_status_label">Status: %1$s</string>
+    <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
+</resources>

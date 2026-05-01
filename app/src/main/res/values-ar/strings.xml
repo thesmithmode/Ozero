@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ozero</string>
+
+    <string name="main_connect">اتصال</string>
+    <string name="main_disconnect">قطع الاتصال</string>
+    <string name="main_status_disconnected">غير متصل</string>
+    <string name="main_status_probing">جارٍ البحث عن مسار…</string>
+    <string name="main_status_connecting">جارٍ الاتصال…</string>
+    <string name="main_status_connected">متصل</string>
+    <string name="main_status_switching">جارٍ التبديل…</string>
+    <string name="main_status_disconnecting">جارٍ قطع الاتصال…</string>
+    <string name="main_status_failed">خطأ</string>
+    <string name="main_active_engine">المحرك النشط: %1$s</string>
+    <string name="stats_session">الجلسة: ↓ %1$s ↑ %2$s</string>
+    <string name="stats_uptime">المدة: %1$s</string>
+    <string name="main_stagnation_warning">لا توجد حركة بيانات منذ 30 ثانية</string>
+    <string name="main_health_degraded">الاتصال غير مستقر</string>
+
+    <string name="tab_main">الرئيسية</string>
+    <string name="tab_settings">الإعدادات</string>
+    <string name="tab_diagnostics">التشخيص</string>
+
+    <string name="settings_title">الإعدادات</string>
+    <string name="settings_split_tunnel_title">النفق المقسم</string>
+    <string name="settings_split_tunnel_summary">ما التطبيقات التي تمر عبر VPN</string>
+    <string name="settings_split_mode_all">جميع التطبيقات</string>
+    <string name="settings_split_mode_bypass_lan">الكل ما عدا الشبكة المحلية</string>
+    <string name="settings_split_mode_allowlist">التطبيقات المختارة فقط</string>
+    <string name="settings_split_mode_blocklist">الكل ما عدا المختارة</string>
+    <string name="settings_dh_title">قفزة مزدوجة</string>
+    <string name="settings_dh_summary">دخول → خروج. حماية ضد الكشف، التكلفة: زمن الاستجابة</string>
+    <string name="settings_subscription_title">الاشتراك</string>
+    <string name="settings_subscription_url_hint">رابط الاشتراك (https://…)</string>
+    <string name="settings_subscription_refresh">تحديث</string>
+    <string name="settings_language_title">اللغة</string>
+    <string name="settings_language_system">النظام</string>
+    <string name="settings_language_ru">Русский</string>
+    <string name="settings_language_en">English</string>
+    <string name="settings_language_zh_cn">中文 (简体)</string>
+    <string name="settings_language_es">Español</string>
+    <string name="settings_language_ar">العربية</string>
+    <string name="settings_language_fr">Français</string>
+    <string name="settings_language_hi">हिन्दी</string>
+    <string name="settings_language_pt">Português</string>
+    <string name="settings_language_id">Indonesia</string>
+    <string name="settings_language_de">Deutsch</string>
+    <string name="settings_language_ja">日本語</string>
+
+    <string name="settings_section_connection">الاتصال</string>
+    <string name="settings_section_network">الشبكة</string>
+    <string name="settings_section_security">الأمان</string>
+    <string name="settings_section_updates">التحديثات</string>
+    <string name="settings_section_about">حول</string>
+    <string name="settings_split_mode_label">وضع النفق المقسم</string>
+    <string name="settings_manual_engine_title">اختيار المحرك</string>
+    <string name="settings_manual_engine_summary">تلقائي — Ozero يختار الأفضل</string>
+    <string name="settings_manual_engine_auto">تلقائي</string>
+    <string name="engine_wip_badge">قيد التطوير</string>
+    <string name="settings_ipv6_title">IPv6</string>
+    <string name="settings_ipv6_summary">توجيه IPv6 عبر VPN</string>
+    <string name="settings_auto_start_title">التشغيل عند الإقلاع</string>
+    <string name="settings_auto_start_summary">VPN يعمل تلقائياً بعد إعادة التشغيل</string>
+    <string name="settings_allowed_apps_title">قائمة التطبيقات</string>
+    <string name="settings_allowed_apps_summary">قريباً</string>
+    <string name="settings_allowed_apps_open_summary">اختر التطبيقات ووضع النفق</string>
+    <string name="settings_servers_title">الخوادم / قفزة مزدوجة</string>
+    <string name="settings_servers_summary">اختر زوج دخول/خروج وعاينه</string>
+    <string name="settings_check_update_title">التحقق من التحديث</string>
+    <string name="settings_check_update_summary">GitHub Releases · تحقق Ed25519</string>
+    <string name="settings_update_state_checking">جارٍ التحقق من التحديث…</string>
+    <string name="settings_update_state_downloading">التنزيل %1$d %%</string>
+    <string name="settings_update_state_verifying">التحقق من التوقيع…</string>
+    <string name="settings_update_state_installing">بدء التثبيت…</string>
+    <string name="settings_update_state_uptodate">الإصدار محدّث</string>
+    <string name="settings_update_state_failed">خطأ: %1$s. اضغط للمحاولة مجدداً</string>
+
+    <string name="settings_about_version">الإصدار %1$s</string>
+    <string name="settings_back">رجوع</string>
+    <string name="settings_open">فتح الإعدادات</string>
+
+    <string name="diag_title">التشخيص</string>
+    <string name="diag_run">تشغيل الاختبار</string>
+    <string name="diag_stop">إيقاف</string>
+    <string name="diag_running">جارٍ الاختبار… %1$d / %2$d روابط</string>
+    <string name="diag_summary">%1$d ✓ / %2$d ✗ من %3$d</string>
+    <string name="diag_url_ok">%1$s — %2$d ms</string>
+    <string name="diag_url_failed">%1$s — خطأ: %2$s</string>
+    <string name="diag_not_connected">VPN غير متصل. اتصل أولاً ثم شغّل الاختبار.</string>
+    <string name="diag_idle_hint">الاختبار يرسل 20 رابطاً عبر بروكسي SOCKS النشط.</string>
+    <string name="diag_back">رجوع</string>
+
+    <string name="split_tunnel_title">قائمة التطبيقات</string>
+    <string name="split_tunnel_back">رجوع</string>
+    <string name="split_tunnel_search_hint">بحث في التطبيقات…</string>
+    <string name="split_tunnel_no_apps">لا توجد تطبيقات</string>
+    <string name="split_tunnel_system_app">نظام</string>
+    <string name="split_tunnel_short_all">الكل</string>
+    <string name="split_tunnel_short_bypass_lan">بدون LAN</string>
+    <string name="split_tunnel_short_allowlist">قائمة سماح</string>
+    <string name="split_tunnel_short_blocklist">قائمة حظر</string>
+
+    <string name="servers_title">الخوادم — قفزة مزدوجة</string>
+    <string name="servers_back">رجوع</string>
+    <string name="servers_empty">لا خوادم. استورد اشتراكاً أولاً.</string>
+    <string name="servers_entry_label">خادم الدخول</string>
+    <string name="servers_exit_label">خادم الخروج</string>
+    <string name="servers_save">حفظ الزوج</string>
+    <string name="servers_clear">مسح الزوج</string>
+    <string name="servers_preview_title">السلسلة</string>
+    <string name="servers_preview_format">%1$s/%2$s → %3$s/%4$s</string>
+    <string name="servers_preview_unset">اختر الدخول والخروج</string>
+
+    <string name="error_subscription_invalid">الاشتراك تالف أو مُوقَّع بمفتاح خاطئ</string>
+    <string name="error_no_servers">لا خوادم نشطة في الاشتراك</string>
+    <string name="error_compromised_env">تم رصد بيئة غير آمنة — لم يبدأ VPN</string>
+
+    <string name="a11y_status_indicator">مؤشر حالة VPN</string>
+    <string name="a11y_loading">جارٍ التحميل</string>
+    <string name="a11y_connect_button">الاتصال بـ VPN</string>
+    <string name="a11y_disconnect_button">قطع VPN</string>
+    <string name="a11y_engine_active">المحرك النشط: %1$s</string>
+
+    <string name="error_generic">خطأ</string>
+
+    <string name="onboarding_language_title">اختر اللغة</string>
+    <string name="onboarding_language_body">يمكنك تغييرها لاحقاً في الإعدادات</string>
+    <string name="onboarding_title_1">لماذا Ozero</string>
+    <string name="onboarding_body_1">وصول مفتوح للإنترنت تحت الرقابة. مفتوح المصدر، بلا تتبع.</string>
+    <string name="onboarding_title_2">كيف يعمل</string>
+    <string name="onboarding_body_2">عدة محركات (Xray, Hysteria2, ByeDPI, AmneziaWG, Tor) تُختار تلقائياً.</string>
+    <string name="onboarding_title_3">إذن VPN</string>
+    <string name="onboarding_body_3">Ozero يحتاج وضع VPN في أندرويد. النفق يبقى على الجهاز.</string>
+    <string name="onboarding_next">التالي</string>
+    <string name="onboarding_finish">ابدأ</string>
+    <string name="onboarding_skip">تخطٍ</string>
+
+    <string name="about_title">حول</string>
+    <string name="about_version">الإصدار %1$s</string>
+    <string name="about_repo">الكود المصدري على GitHub</string>
+    <string name="about_legal">التراخيص</string>
+
+    <string name="diag_export_crashes">تصدير سجل الأعطال</string>
+    <string name="diag_export_no_crashes">سجل الأعطال فارغ</string>
+
+    <string name="stats_history_title">سجل الجلسات</string>
+    <string name="stats_history_summary">جلسات VPN محفوظة مع إحصائيات الحركة</string>
+    <string name="stats_history_empty">لا جلسات محفوظة</string>
+    <string name="stats_history_status_running">نشطة</string>
+    <string name="stats_history_status_disconnected">مقطوعة</string>
+    <string name="stats_history_status_failed">فشلت</string>
+    <string name="stats_history_status_label">الحالة: %1$s</string>
+    <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
+</resources>

@@ -9,6 +9,9 @@ enum class TopScreen {
     About,
     Logs,
     ByeDpiEngineSettings,
+    UrnetworkEngineSettings,
+    WarpEngineSettings,
+    StrategyTest,
     ManualServer,
     StatsHistory,
 }
