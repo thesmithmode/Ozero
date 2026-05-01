@@ -2,6 +2,7 @@ package ru.ozero.commonvpn.split
 
 import android.net.VpnService
 import ru.ozero.enginescore.PersistentLoggers
+import ru.ozero.enginescore.settings.SplitTunnelMode
 
 class TunBuilderConfigurator(
     private val packageName: String,
@@ -44,12 +45,14 @@ class TunBuilderConfigurator(
 
     private fun applyAllowed(builder: VpnService.Builder, packages: Set<String>) {
         var added = 0
+        var failed = 0
         for (pkg in packages) {
             if (pkg == packageName) continue
             runCatching { builder.addAllowedApplication(pkg) }
                 .onSuccess { added++ }
-                .onFailure { PersistentLoggers.warn(TAG, "addAllowedApplication failed для $pkg: ${it.message}") }
+                .onFailure { failed++ }
         }
+        if (failed > 0) PersistentLoggers.warn(TAG, "addAllowedApplication failed для $failed пакетов")
         if (added == 0) {
             runCatching { builder.addAllowedApplication(packageName) }
                 .onFailure { PersistentLoggers.error(TAG, "не удалось добавить self в allowlist: ${it.message}") }
@@ -61,12 +64,14 @@ class TunBuilderConfigurator(
 
     private fun applyDisallowed(builder: VpnService.Builder, packages: Set<String>) {
         var added = 0
+        var failed = 0
         for (pkg in packages) {
             if (pkg == packageName) continue
             runCatching { builder.addDisallowedApplication(pkg) }
                 .onSuccess { added++ }
-                .onFailure { PersistentLoggers.warn(TAG, "addDisallowedApplication failed для $pkg: ${it.message}") }
+                .onFailure { failed++ }
         }
+        if (failed > 0) PersistentLoggers.warn(TAG, "addDisallowedApplication failed для $failed пакетов")
         PersistentLoggers.info(TAG, "BLOCKLIST применён: $added пакетов")
     }
 

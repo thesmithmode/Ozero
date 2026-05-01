@@ -55,7 +55,8 @@ class NoStubsInProductionDiTest {
     @Test
     fun `provideByeDpiEngine returns real ByeDpiEngine in production package`() {
         val proxy = mockk<ByeDpiProxy>(relaxed = true)
-        val plugin: EnginePlugin = EnginesModule.provideByeDpiEngine(proxy)
+        val byeDpi = EnginesModule.provideByeDpiEngineDirect(proxy)
+        val plugin: EnginePlugin = EnginesModule.provideByeDpiEngine(byeDpi)
 
         assertEquals(EngineId.BYEDPI, plugin.id)
         assertTrue(

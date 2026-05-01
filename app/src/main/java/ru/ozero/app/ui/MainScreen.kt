@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
 import ru.ozero.commonvpn.BytesFormatter
+import ru.ozero.commonvpn.HealthMonitor
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.commonvpn.TunnelStats
 
@@ -51,6 +52,8 @@ fun MainScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val stats by viewModel.stats.collectAsStateWithLifecycle()
+    val stagnant by viewModel.stagnant.collectAsStateWithLifecycle()
+    val healthStatus by viewModel.healthStatus.collectAsStateWithLifecycle()
 
     Box(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -90,6 +93,24 @@ fun MainScreen(
             if (state is TunnelState.Connected && stats != null) {
                 Spacer(modifier = Modifier.height(16.dp))
                 TrafficStatsCard(stats!!)
+                if (stagnant) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(R.string.main_stagnation_warning),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.testTag(MainScreenTestTags.STAGNATION_BADGE),
+                    )
+                }
+                if (healthStatus == HealthMonitor.Status.DEGRADED) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(R.string.main_health_degraded),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.testTag(MainScreenTestTags.HEALTH_DEGRADED_BADGE),
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -184,6 +205,7 @@ private fun StatusLabel(state: TunnelState) {
         is TunnelState.Failed -> state.engineId.name
         else -> null
     }
+    val failedReason = (state as? TunnelState.Failed)?.reason
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = stringResource(labelRes),
@@ -195,6 +217,15 @@ private fun StatusLabel(state: TunnelState) {
                 text = engine,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            )
+        }
+        if (failedReason != null && failedReason.isNotBlank()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = failedReason,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.testTag(MainScreenTestTags.FAILED_REASON),
             )
         }
     }

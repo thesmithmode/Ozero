@@ -4,9 +4,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
-import ru.ozero.app.settings.SettingsModel
+import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.commonvpn.TunnelState
-import ru.ozero.commonvpn.split.SplitTunnelMode
+import ru.ozero.enginescore.settings.SplitTunnelMode
 import ru.ozero.enginescore.EngineId
 
 class EngineSettingsRestartObserver(
@@ -19,10 +19,19 @@ class EngineSettingsRestartObserver(
         val byedpiWinningArgs: String?,
         val splitMode: SplitTunnelMode,
         val ipv6Enabled: Boolean,
+        val customDnsServers: List<String>,
     )
 
     val triggers: Flow<Snapshot> = settingsFlow
-        .map { Snapshot(it.manualEngine, it.byedpiWinningArgs?.trim(), it.splitMode, it.ipv6Enabled) }
+        .map {
+            Snapshot(
+                manualEngine = it.manualEngine,
+                byedpiWinningArgs = it.byedpiWinningArgs?.trim(),
+                splitMode = it.splitMode,
+                ipv6Enabled = it.ipv6Enabled,
+                customDnsServers = it.customDnsServers,
+            )
+        }
         .distinctUntilChanged()
         .drop(1)
 

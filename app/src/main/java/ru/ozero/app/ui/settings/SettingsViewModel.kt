@@ -8,8 +8,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import ru.ozero.app.settings.SettingsRepository
-import ru.ozero.commonvpn.split.SplitTunnelMode
+import ru.ozero.enginescore.settings.SettingsRepository
+import ru.ozero.enginescore.settings.SplitTunnelMode
 import ru.ozero.enginescore.EngineId
 import javax.inject.Inject
 
@@ -41,6 +41,13 @@ class SettingsViewModel @Inject constructor(
 
     fun onManualEngineSelect(engine: EngineId?) {
         viewModelScope.launch { repository.setManualEngine(engine) }
+    }
+
+    fun onUiLocaleSelect(tag: String?) {
+        viewModelScope.launch {
+            repository.setUiLocaleTag(tag)
+            LocaleApplier.apply(tag)
+        }
     }
 
     private companion object {

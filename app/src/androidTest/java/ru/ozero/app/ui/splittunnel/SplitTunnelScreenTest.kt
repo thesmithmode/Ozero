@@ -10,7 +10,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import ru.ozero.app.ui.theme.OzeroTheme
-import ru.ozero.commonvpn.split.SplitTunnelMode
+import ru.ozero.enginescore.settings.SplitTunnelMode
 
 @RunWith(AndroidJUnit4::class)
 class SplitTunnelScreenTest {

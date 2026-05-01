@@ -14,7 +14,11 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import ru.ozero.commonvpn.split.SplitTunnelMode
+import ru.ozero.enginescore.settings.AutoStartGateway
+import ru.ozero.enginescore.settings.SettingsKeys
+import ru.ozero.enginescore.settings.SettingsModel
+import ru.ozero.enginescore.settings.SettingsRepository
+import ru.ozero.enginescore.settings.SplitTunnelMode
 import ru.ozero.enginescore.EngineId
 import java.io.File
 import kotlin.test.assertEquals
@@ -179,6 +183,57 @@ class SettingsRepositoryTest {
             repository.settings.first().byedpiWinningArgs,
             "Пустые/whitespace args должны очищать override — иначе пользователь сломает byedpi пустым полем.",
         )
+    }
+
+    @Test
+    fun `customDnsServers default empty list`() = runTest {
+        assertTrue(repository.settings.first().customDnsServers.isEmpty())
+    }
+
+    @Test
+    fun `setCustomDnsServers persists list`() = runTest {
+        repository.setCustomDnsServers(listOf("8.8.8.8", "1.1.1.1"))
+        assertEquals(listOf("8.8.8.8", "1.1.1.1"), repository.settings.first().customDnsServers)
+    }
+
+    @Test
+    fun `setCustomDnsServers empty list очищает`() = runTest {
+        repository.setCustomDnsServers(listOf("8.8.8.8"))
+        repository.setCustomDnsServers(emptyList())
+        assertTrue(repository.settings.first().customDnsServers.isEmpty())
+    }
+
+    @Test
+    fun `setCustomDnsServers trims и фильтрует blank entries`() = runTest {
+        repository.setCustomDnsServers(listOf("  8.8.8.8  ", "", "   ", "1.1.1.1"))
+        assertEquals(listOf("8.8.8.8", "1.1.1.1"), repository.settings.first().customDnsServers)
+    }
+
+    @Test
+    fun `uiLocaleTag default null`() = runTest {
+        assertNull(repository.settings.first().uiLocaleTag)
+    }
+
+    @Test
+    fun `setUiLocaleTag persists tag`() = runTest {
+        repository.setUiLocaleTag("ru")
+        assertEquals("ru", repository.settings.first().uiLocaleTag)
+        repository.setUiLocaleTag("zh-CN")
+        assertEquals("zh-CN", repository.settings.first().uiLocaleTag)
+    }
+
+    @Test
+    fun `setUiLocaleTag null clears`() = runTest {
+        repository.setUiLocaleTag("en")
+        repository.setUiLocaleTag(null)
+        assertNull(repository.settings.first().uiLocaleTag)
+    }
+
+    @Test
+    fun `setUiLocaleTag blank clears`() = runTest {
+        repository.setUiLocaleTag("en")
+        repository.setUiLocaleTag("   ")
+        assertNull(repository.settings.first().uiLocaleTag)
     }
 
     private class FakeAutoStartGateway : AutoStartGateway {

@@ -1,6 +1,6 @@
 package ru.ozero.app.ui.splittunnel
 
-import ru.ozero.commonvpn.split.SplitTunnelMode
+import ru.ozero.enginescore.settings.SplitTunnelMode
 
 sealed interface SplitTunnelUiState {
     data object Loading : SplitTunnelUiState

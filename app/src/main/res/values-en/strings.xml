@@ -16,6 +16,8 @@
     <string name="main_active_engine">Active engine: %1$s</string>
     <string name="stats_session">Session: ↓ %1$s ↑ %2$s</string>
     <string name="stats_uptime">Uptime: %1$s</string>
+    <string name="main_stagnation_warning">No traffic for 30 seconds</string>
+    <string name="main_health_degraded">Connection unstable</string>
 
     <!-- Tabs -->
     <string name="tab_main">Home</string>
@@ -39,6 +41,15 @@
     <string name="settings_language_system">System</string>
     <string name="settings_language_ru">Русский</string>
     <string name="settings_language_en">English</string>
+    <string name="settings_language_zh_cn">中文 (简体)</string>
+    <string name="settings_language_es">Español</string>
+    <string name="settings_language_ar">العربية</string>
+    <string name="settings_language_fr">Français</string>
+    <string name="settings_language_hi">हिन्दी</string>
+    <string name="settings_language_pt">Português</string>
+    <string name="settings_language_id">Indonesia</string>
+    <string name="settings_language_de">Deutsch</string>
+    <string name="settings_language_ja">日本語</string>
 
     <!-- Settings -->
     <string name="settings_section_connection">Connection</string>
@@ -121,7 +132,6 @@
     <string name="a11y_engine_active">Active engine: %1$s</string>
 
     <string name="error_generic">Error</string>
-    <string name="security_blocked">VPN start blocked: runtime tampering detected</string>
 
 
     <string name="onboarding_title_1">Why Ozero</string>
@@ -140,7 +150,17 @@
     <string name="about_repo">Source code on GitHub</string>
     <string name="about_legal">Licenses</string>
 
-    
+
     <string name="diag_export_crashes">Export crash log</string>
     <string name="diag_export_no_crashes">Crash log is empty</string>
+
+    <!-- Stats history -->
+    <string name="stats_history_title">Session history</string>
+    <string name="stats_history_summary">Saved VPN sessions with traffic stats</string>
+    <string name="stats_history_empty">No saved sessions</string>
+    <string name="stats_history_status_running">Active</string>
+    <string name="stats_history_status_disconnected">Disconnected</string>
+    <string name="stats_history_status_failed">Failed</string>
+    <string name="stats_history_status_label">Status: %1$s</string>
+    <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
 </resources>

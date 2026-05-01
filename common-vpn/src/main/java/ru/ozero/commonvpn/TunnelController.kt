@@ -6,12 +6,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.PersistentLoggers
 
-class TunnelController {
+class TunnelController(
+    private val stagnationMonitor: StatsStagnationMonitor = StatsStagnationMonitor(),
+) {
 
     private val _state = MutableStateFlow<TunnelState>(TunnelState.Idle)
     val state: StateFlow<TunnelState> = _state.asStateFlow()
     private val _stats = MutableStateFlow<TunnelStats?>(null)
     val stats: StateFlow<TunnelStats?> = _stats.asStateFlow()
+    private val _stagnant = MutableStateFlow(false)
+    val stagnant: StateFlow<Boolean> = _stagnant.asStateFlow()
     private val lock = Any()
     private var sessionStartMs: Long = 0L
     private var prevTxBytes: Long = 0L
@@ -31,6 +35,8 @@ class TunnelController {
         prevTimestampMs = 0L
         smoothedBpsIn = 0.0
         smoothedBpsOut = 0.0
+        stagnationMonitor.reset()
+        _stagnant.value = false
         transition(TunnelState.Connected(engineId, socksPort))
     }
 
@@ -41,12 +47,14 @@ class TunnelController {
 
     fun reset() {
         _stats.value = null
+        _stagnant.value = false
         sessionStartMs = 0L
         prevTxBytes = 0L
         prevRxBytes = 0L
         prevTimestampMs = 0L
         smoothedBpsIn = 0.0
         smoothedBpsOut = 0.0
+        stagnationMonitor.reset()
         transition(TunnelState.Idle)
     }
 
@@ -73,6 +81,14 @@ class TunnelController {
                 bpsOut = smoothedBpsOut,
                 sessionStartMs = sessionStartMs,
             )
+            val isConnected = _state.value is TunnelState.Connected
+            val newlyStagnant = isConnected && stagnationMonitor.observe(raw.txBytes, raw.rxBytes)
+            if (newlyStagnant != _stagnant.value) {
+                _stagnant.value = newlyStagnant
+                if (newlyStagnant) {
+                    PersistentLoggers.warn(TAG, "stagnation detected: tx/rx flat for >= threshold")
+                }
+            }
         }
     }
 

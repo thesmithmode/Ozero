@@ -145,7 +145,22 @@ class ByeDpiEngine(
                 .takeIf { it.isNotEmpty() }
                 ?.split("\\s+".toRegex())
                 .orEmpty()
-        return (listOf("ciadpi", "--ip", "127.0.0.1", "-p", config.socksPort.toString()) + extra).toTypedArray()
+        val hostsArgs = buildHostsArgs(config)
+        return (
+            listOf("ciadpi", "--ip", "127.0.0.1", "-p", config.socksPort.toString()) + extra + hostsArgs
+            ).toTypedArray()
+    }
+
+    internal fun buildHostsArgs(config: EngineConfig.ByeDpi): List<String> {
+        if (config.hostsMode == ru.ozero.enginescore.settings.HostsMode.DISABLED) return emptyList()
+        val cleaned = config.hosts.map { it.trim() }.filter { it.isNotEmpty() }
+        if (cleaned.isEmpty()) return emptyList()
+        val hostStr = ":" + cleaned.joinToString(" ")
+        return when (config.hostsMode) {
+            ru.ozero.enginescore.settings.HostsMode.BLACKLIST -> listOf("-H$hostStr", "-An")
+            ru.ozero.enginescore.settings.HostsMode.WHITELIST -> listOf("-H$hostStr")
+            ru.ozero.enginescore.settings.HostsMode.DISABLED -> emptyList()
+        }
     }
 
     private companion object {

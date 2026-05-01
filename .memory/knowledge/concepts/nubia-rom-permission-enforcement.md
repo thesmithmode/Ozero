@@ -4,8 +4,9 @@ aliases: [nubia-redmagic-quirks, nubia-android-15]
 tags: [android, vendor-rom, nubia, permissions, crash-diagnosis]
 sources:
   - "daily/2026-04-29.md"
+  - "daily/2026-04-30.md"
 created: 2026-04-29
-updated: 2026-04-29
+updated: 2026-04-30
 ---
 
 # Nubia ROM Permission Enforcement Quirks
@@ -30,14 +31,18 @@ For Ozero VPN specifically, two Nubia-related issues have been documented:
 
 2. **v1.0.5 silent crash**: The VPN toggle click never reached `onConnectClick`, and no persistent log was written. Multiple hypotheses were evaluated (LaunchedEffect exception, Hilt DI graph failure, POST_NOTIFICATIONS, FGS specialUse), but the root cause remains unconfirmed. Nubia-specific permission enforcement is suspected as a contributing factor.
 
-The practical takeaway is that any change to the app startup path, native library loading, or foreground service lifecycle must be tested on real Nubia hardware before shipping.
+3. **v0.0.1 metered VPN throttle**: Nubia ROM aggressively throttles VPN connections marked as metered. Without `VpnService.Builder.setMetered(false)` (API Q+), throughput is unstable. ByeByeDPI calls `setMetered(false)` on Q+; Ozero initially omitted it. This was fix #8 in the v0.0.1 retag cycle.
+
+The practical takeaway is that any change to the app startup path, native library loading, foreground service lifecycle, or VPN Builder configuration must be tested on real Nubia hardware before shipping.
 
 ## Related Concepts
 
 - [[concepts/android-silent-crash-diagnosis]] - The methodology used to investigate the Nubia-specific silent crash
 - [[concepts/hilt-di-native-library-failure]] - Native library loading issues may be compounded by Nubia ROM behavior
 - [[concepts/compose-launchedeffect-crash-invisibility]] - The primary hypothesis for the silent crash on this device
+- [[concepts/vpnservice-builder-traps]] - setMetered(false) is a Builder configuration trap specific to Nubia
 
 ## Sources
 
 - [[daily/2026-04-29.md]] - Silent crash investigation on Nubia NX729J; v1.0.3 SIGSEGV history referenced; Nubia ROM strictness identified as factor requiring real-device testing
+- [[daily/2026-04-30.md]] - setMetered(false) identified as fix #8 for Nubia metered VPN throttle during v0.0.1 retag cycle

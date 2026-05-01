@@ -35,7 +35,7 @@ jobs:
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v4
         with:
-          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' }}
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' }}
 
       - name: ktlint + detekt
         run: ./gradlew ktlintCheck detekt --stacktrace
@@ -87,7 +87,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: kotlin-style
-    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/clean-start' }}
+    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' }}
     permissions:
       contents: read
 
@@ -108,7 +108,7 @@ jobs:
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v4
         with:
-          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' }}
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' }}
 
       - name: Run Android lint
         run: ./gradlew lint --stacktrace
@@ -126,7 +126,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: kotlin-style
-    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/clean-start' }}
+    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' }}
     permissions:
       contents: read
 
@@ -147,7 +147,7 @@ jobs:
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v4
         with:
-          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' }}
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' }}
 
       - name: Download native binaries
         run: ./gradlew :engine-byedpi:downloadBinaries --stacktrace
@@ -168,7 +168,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: kotlin-style
-    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/clean-start' }}
+    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' }}
     permissions:
       contents: read
       checks: write
@@ -190,7 +190,7 @@ jobs:
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v4
         with:
-          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' }}
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' }}
 
       - name: testDebugUnitTest + coverage report and gate
         run: ./gradlew testDebugUnitTest jacocoTestReport jacocoTestCoverageVerification --stacktrace
@@ -238,14 +238,26 @@ jobs:
         with:
           cache-read-only: true
 
+      - name: Cache libhev-socks5-tunnel.so jniLibs
+        id: libhev-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            common-vpn/src/main/jniLibs/arm64-v8a/libhev-socks5-tunnel.so
+            common-vpn/src/main/jniLibs/armeabi-v7a/libhev-socks5-tunnel.so
+            common-vpn/src/main/jniLibs/x86_64/libhev-socks5-tunnel.so
+          key: libhev-2.7.0-ndk-r27c-platform-android-24-pkgname-hev-16kb-v4
+
       - name: Setup Android NDK
         id: ndk
+        if: steps.libhev-cache.outputs.cache-hit != 'true'
         uses: nttld/setup-ndk@v1
         with:
           ndk-version: r27c
           add-to-path: false
 
       - name: Clone hev-socks5-tunnel (pinned)
+        if: steps.libhev-cache.outputs.cache-hit != 'true'
         env:
           HEV_VERSION: '2.7.0'
         run: |
@@ -253,26 +265,27 @@ jobs:
             https://github.com/heiher/hev-socks5-tunnel.git \
             "$RUNNER_TEMP/hev-socks5-tunnel"
 
-      - name: Build libhev-socks5-tunnel.so (4 ABI via ndk-build)
+      - name: Build libhev-socks5-tunnel.so (3 ABI via ndk-build)
+        if: steps.libhev-cache.outputs.cache-hit != 'true'
         env:
           NDK_PATH: ${{ steps.ndk.outputs.ndk-path }}
         run: |
           set -euo pipefail
           SRC="$RUNNER_TEMP/hev-socks5-tunnel"
           OUT="common-vpn/src/main/jniLibs"
-          mkdir -p "$OUT/arm64-v8a" "$OUT/armeabi-v7a" "$OUT/x86_64" "$OUT/x86"
+          mkdir -p "$OUT/arm64-v8a" "$OUT/armeabi-v7a" "$OUT/x86_64"
           cd "$SRC"
           "$NDK_PATH/ndk-build" \
             NDK_PROJECT_PATH="$SRC" \
             APP_BUILD_SCRIPT="$SRC/Android.mk" \
             NDK_APPLICATION_MK="$SRC/Application.mk" \
-            APP_ABI="arm64-v8a armeabi-v7a x86_64 x86" \
+            APP_ABI="arm64-v8a armeabi-v7a x86_64" \
             APP_PLATFORM=android-24 \
             APP_CFLAGS="-DPKGNAME=hev" \
             APP_LDFLAGS="-Wl,-z,max-page-size=16384,-z,common-page-size=16384" \
             -j"$(nproc)"
           STRIP="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
-          for ABI in arm64-v8a armeabi-v7a x86_64 x86; do
+          for ABI in arm64-v8a armeabi-v7a x86_64; do
             SO_SRC="$SRC/libs/$ABI/libhev-socks5-tunnel.so"
             cp "$SO_SRC" "$GITHUB_WORKSPACE/$OUT/$ABI/libhev-socks5-tunnel.so"
             "$STRIP" "$GITHUB_WORKSPACE/$OUT/$ABI/libhev-socks5-tunnel.so" || true
@@ -283,6 +296,7 @@ jobs:
           done
 
       - name: Assert 16KB page-size alignment в arm64/x86_64 libhev
+        if: steps.libhev-cache.outputs.cache-hit != 'true'
         env:
           NDK_PATH: ${{ steps.ndk.outputs.ndk-path }}
         run: |

@@ -10,6 +10,7 @@ data class HevTunnelConfig(
     val tunIpv4: String = DEFAULT_TUN_IPV4,
     val tunIpv6: String = DEFAULT_TUN_IPV6,
     val udpMode: String = DEFAULT_UDP_MODE,
+    val hevLogLevel: String = DEFAULT_HEV_LOG_LEVEL,
 ) {
     init {
         require(tunPfd.fd >= 0) { "tunPfd.fd должен быть неотрицательным" }
@@ -19,6 +20,9 @@ data class HevTunnelConfig(
         require(isSafeAddress(tunIpv4)) { "tunIpv4 содержит недопустимые символы" }
         require(isSafeAddress(tunIpv6)) { "tunIpv6 содержит недопустимые символы" }
         require(udpMode in setOf("udp", "tcp")) { "udpMode должен быть udp или tcp: $udpMode" }
+        require(hevLogLevel in HEV_LOG_LEVELS) {
+            "hevLogLevel должен быть одним из $HEV_LOG_LEVELS: $hevLogLevel"
+        }
     }
 
     fun toYaml(): String =
@@ -29,6 +33,7 @@ data class HevTunnelConfig(
           ipv6: '$tunIpv6'
         misc:
           task-stack-size: 81920
+          log-level: $hevLogLevel
         socks5:
           address: $socksAddress
           port: $socksPort
@@ -41,8 +46,10 @@ data class HevTunnelConfig(
         private const val DEFAULT_TUN_IPV4: String = "10.10.10.10"
         private const val DEFAULT_TUN_IPV6: String = "fd00::1"
         private const val DEFAULT_UDP_MODE: String = "udp"
+        private const val DEFAULT_HEV_LOG_LEVEL: String = "warn"
 
         private val ADDRESS_REGEX = Regex("^[a-zA-Z0-9._:-]+$")
+        private val HEV_LOG_LEVELS = setOf("debug", "info", "warn", "error")
 
         fun isSafeAddress(addr: String): Boolean = ADDRESS_REGEX.matches(addr)
     }

@@ -8,9 +8,9 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import ru.ozero.app.settings.SettingsModel
+import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.app.ui.theme.OzeroTheme
-import ru.ozero.commonvpn.split.SplitTunnelMode
+import ru.ozero.enginescore.settings.SplitTunnelMode
 import ru.ozero.enginescore.EngineId
 
 @RunWith(AndroidJUnit4::class)

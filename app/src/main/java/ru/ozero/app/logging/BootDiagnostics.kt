@@ -17,10 +17,7 @@ object BootDiagnostics {
     fun <T> guard(name: String, default: T, block: () -> T): T {
         val started = System.nanoTime()
         return try {
-            val result = block()
-            val ms = (System.nanoTime() - started) / 1_000_000
-            BootFileLogger.debug(TAG, "$name OK (${ms}ms)")
-            result
+            block()
         } catch (t: Throwable) {
             val ms = (System.nanoTime() - started) / 1_000_000
             BootFileLogger.error(TAG, "$name FAILED after ${ms}ms", t)
@@ -61,21 +58,14 @@ object BootDiagnostics {
             }
             runCatching { previous?.uncaughtException(thread, throwable) }
         }
-        BootFileLogger.info(TAG, "uncaught handler installed (chain=${previous?.javaClass?.name})")
     }
 
     fun dumpExitReasons(context: Context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-            BootFileLogger.info(TAG, "exitReasons skipped (sdk<30)")
-            return
-        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
         guardUnit("dumpExitReasons") {
             val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return@guardUnit
             val list = am.getHistoricalProcessExitReasons(context.packageName, 0, MAX_REASONS)
-            if (list.isEmpty()) {
-                BootFileLogger.info(TAG, "exitReasons empty")
-                return@guardUnit
-            }
+            if (list.isEmpty()) return@guardUnit
             BootFileLogger.info(TAG, "exitReasons count=${list.size}")
             for (info in list) {
                 val reasonName = reasonToString(info.reason)

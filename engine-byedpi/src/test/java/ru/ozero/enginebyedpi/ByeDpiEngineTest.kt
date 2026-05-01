@@ -185,6 +185,62 @@ class ByeDpiEngineTest {
     }
 
     @Test
+    fun buildHostsArgs_disabledMode_returnsEmpty() {
+        val args = engine.buildHostsArgs(
+            EngineConfig.ByeDpi(
+                hostsMode = ru.ozero.enginescore.settings.HostsMode.DISABLED,
+                hosts = listOf("youtube.com"),
+            ),
+        )
+        assertEquals(emptyList(), args)
+    }
+
+    @Test
+    fun buildHostsArgs_emptyList_returnsEmpty() {
+        val args = engine.buildHostsArgs(
+            EngineConfig.ByeDpi(
+                hostsMode = ru.ozero.enginescore.settings.HostsMode.WHITELIST,
+                hosts = emptyList(),
+            ),
+        )
+        assertEquals(emptyList(), args)
+    }
+
+    @Test
+    fun buildHostsArgs_whitelistMode_addsHflag() {
+        val args = engine.buildHostsArgs(
+            EngineConfig.ByeDpi(
+                hostsMode = ru.ozero.enginescore.settings.HostsMode.WHITELIST,
+                hosts = listOf("youtube.com", "discord.com"),
+            ),
+        )
+        assertEquals(listOf("-H:youtube.com discord.com"), args)
+    }
+
+    @Test
+    fun buildHostsArgs_blacklistMode_addsHflagAndAn() {
+        val args = engine.buildHostsArgs(
+            EngineConfig.ByeDpi(
+                hostsMode = ru.ozero.enginescore.settings.HostsMode.BLACKLIST,
+                hosts = listOf("ads.example.com"),
+            ),
+        )
+        assertEquals(listOf("-H:ads.example.com", "-An"), args)
+    }
+
+    @Test
+    fun buildArgs_includesHostsArgsAtEnd() {
+        val args = engine.buildArgs(
+            EngineConfig.ByeDpi(
+                socksPort = 1080,
+                hostsMode = ru.ozero.enginescore.settings.HostsMode.WHITELIST,
+                hosts = listOf("youtube.com"),
+            ),
+        ).toList()
+        assertTrue(args.contains("-H:youtube.com"))
+    }
+
+    @Test
     fun capabilitiesSupportsUpstreamSocksFalse() {
         assertEquals(false, engine.capabilities.supportsUpstreamSocks, "ByeDPI = terminal proxy")
     }

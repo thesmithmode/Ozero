@@ -14,8 +14,8 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import ru.ozero.app.settings.SettingsModel
-import ru.ozero.commonvpn.split.SplitTunnelMode
+import ru.ozero.enginescore.settings.SettingsModel
+import ru.ozero.enginescore.settings.SplitTunnelMode
 import ru.ozero.enginescore.EngineId
 import ru.ozero.commonvpn.TunnelState
 import kotlin.test.assertEquals
@@ -112,6 +112,7 @@ class EngineSettingsRestartObserverTest {
             byedpiWinningArgs = null,
             splitMode = SplitTunnelMode.ALL,
             ipv6Enabled = false,
+            customDnsServers = emptyList(),
         )
         observer.handle(snapshot)
         assertTrue(restarts.isEmpty(), "no restart while Idle")

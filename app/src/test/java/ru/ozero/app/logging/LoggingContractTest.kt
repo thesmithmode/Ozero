@@ -23,8 +23,6 @@ class LoggingContractTest {
         "engines-core/src/main/java/ru/ozero/enginescore/probe/Socks5HandshakeProbe.kt",
         "common-dns/src/main/java/ru/ozero/commondns/DnsResolver.kt",
         "common-dns/src/main/java/ru/ozero/commondns/DohResolver.kt",
-        "security/src/main/java/ru/ozero/security/SecurityGuard.kt",
-        "security/src/main/java/ru/ozero/security/SecurityWatchdog.kt",
     )
 
     private val rawLogPattern = Regex("""\bLog\.(e|w|wtf)\(""")

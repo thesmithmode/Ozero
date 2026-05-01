@@ -11,6 +11,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.app.ui.MainViewModel
+import ru.ozero.commonvpn.HealthMonitor
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.commonvpn.TunnelStats
@@ -23,13 +24,15 @@ import kotlin.test.assertNull
 class MainViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private lateinit var tunnelController: TunnelController
+    private lateinit var healthMonitor: HealthMonitor
     private lateinit var viewModel: MainViewModel
 
     @BeforeEach
     fun setUp() {
         Dispatchers.setMain(dispatcher)
         tunnelController = TunnelController()
-        viewModel = MainViewModel(tunnelController)
+        healthMonitor = HealthMonitor()
+        viewModel = MainViewModel(tunnelController, healthMonitor)
     }
 
     @AfterEach
@@ -101,5 +104,10 @@ class MainViewModelTest {
         tunnelController.updateStats(snapshot)
         advanceUntilIdle()
         assertEquals(snapshot, viewModel.stats.value)
+    }
+
+    @Test
+    fun healthStatusInitiallyUnknown() {
+        assertEquals(HealthMonitor.Status.UNKNOWN, viewModel.healthStatus.value)
     }
 }

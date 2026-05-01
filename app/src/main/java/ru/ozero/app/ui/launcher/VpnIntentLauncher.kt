@@ -7,14 +7,10 @@ import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
 import androidx.core.content.ContextCompat
-import android.widget.Toast
-import ru.ozero.app.R
-import ru.ozero.app.logging.AppLogger
 import ru.ozero.app.logging.BootFileLogger
 import ru.ozero.app.ui.MainViewModel
 import ru.ozero.commonvpn.OzeroVpnService
 import ru.ozero.commonvpn.TunnelState
-import ru.ozero.security.SecurityStateHolder
 
 class VpnIntentLauncher(
     private val activity: ComponentActivity,
@@ -72,13 +68,6 @@ class VpnIntentLauncher(
     }
 
     private fun requestVpnAndStart() {
-        if (SecurityStateHolder.isCompromised) {
-            val reasons = SecurityStateHolder.compromised.value
-            AppLogger.w(TAG, "VPN start refused — security compromised: $reasons")
-            runCatching { BootFileLogger.info(TAG, "VPN start refused — security compromised: $reasons") }
-            Toast.makeText(activity, activity.getString(R.string.security_blocked), Toast.LENGTH_LONG).show()
-            return
-        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val granted = ContextCompat.checkSelfPermission(
                 activity,

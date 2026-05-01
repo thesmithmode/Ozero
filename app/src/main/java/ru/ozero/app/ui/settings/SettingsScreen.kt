@@ -36,8 +36,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
-import ru.ozero.app.settings.SettingsModel
-import ru.ozero.commonvpn.split.SplitTunnelMode
+import ru.ozero.enginescore.settings.SettingsModel
+import ru.ozero.enginescore.settings.SplitTunnelMode
 import ru.ozero.enginescore.EngineId
 
 @Composable
@@ -49,6 +49,7 @@ fun SettingsScreen(
     onOpenLogs: () -> Unit = {},
     onOpenByeDpiEngineSettings: () -> Unit = {},
     onOpenManualServer: () -> Unit = {},
+    onOpenStatsHistory: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -63,11 +64,13 @@ fun SettingsScreen(
             onOpenLogs = onOpenLogs,
             onOpenByeDpiEngineSettings = onOpenByeDpiEngineSettings,
             onOpenManualServer = onOpenManualServer,
+            onOpenStatsHistory = onOpenStatsHistory,
         ),
         onSplitModeChange = viewModel::onSplitModeChange,
         onIpv6Toggle = viewModel::onIpv6Toggle,
         onAutoStartToggle = viewModel::onAutoStartToggle,
         onManualEngineSelect = viewModel::onManualEngineSelect,
+        onUiLocaleSelect = viewModel::onUiLocaleSelect,
     )
 }
 
@@ -82,6 +85,7 @@ fun SettingsScreenContent(
     onIpv6Toggle: (Boolean) -> Unit,
     onAutoStartToggle: (Boolean) -> Unit,
     onManualEngineSelect: (EngineId?) -> Unit,
+    onUiLocaleSelect: (String?) -> Unit = {},
 ) {
     Scaffold(
         modifier = Modifier.testTag(SettingsTestTags.SCREEN),
@@ -113,6 +117,7 @@ fun SettingsScreenContent(
                     onIpv6Toggle = onIpv6Toggle,
                     onAutoStartToggle = onAutoStartToggle,
                     onManualEngineSelect = onManualEngineSelect,
+                    onUiLocaleSelect = onUiLocaleSelect,
                 )
         }
     }
@@ -140,6 +145,7 @@ private fun ContentBody(
     onIpv6Toggle: (Boolean) -> Unit,
     onAutoStartToggle: (Boolean) -> Unit,
     onManualEngineSelect: (EngineId?) -> Unit,
+    onUiLocaleSelect: (String?) -> Unit = {},
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
@@ -177,10 +183,79 @@ private fun ContentBody(
             )
         }
         item { SectionDivider() }
+        item { StatsHistorySection(onOpenStats = nav.onOpenStatsHistory) }
+        item { SectionDivider() }
+        item {
+            LanguageSection(
+                currentTag = model.uiLocaleTag,
+                onSelect = onUiLocaleSelect,
+            )
+        }
+        item { SectionDivider() }
         item { LogsSection(onOpenLogs = nav.onOpenLogs) }
         item { SectionDivider() }
         item { AboutSection(onOpenAbout = nav.onOpenAbout) }
     }
+}
+
+@Composable
+private fun LanguageSection(
+    currentTag: String?,
+    onSelect: (String?) -> Unit,
+) {
+    val allLocales = listOf(
+        null to R.string.settings_language_system,
+        SettingsModel.LOCALE_RU to R.string.settings_language_ru,
+        SettingsModel.LOCALE_EN to R.string.settings_language_en,
+        SettingsModel.LOCALE_ZH_CN to R.string.settings_language_zh_cn,
+        SettingsModel.LOCALE_ES to R.string.settings_language_es,
+        SettingsModel.LOCALE_AR to R.string.settings_language_ar,
+        SettingsModel.LOCALE_FR to R.string.settings_language_fr,
+        SettingsModel.LOCALE_HI to R.string.settings_language_hi,
+        SettingsModel.LOCALE_PT to R.string.settings_language_pt,
+        SettingsModel.LOCALE_ID to R.string.settings_language_id,
+        SettingsModel.LOCALE_DE to R.string.settings_language_de,
+        SettingsModel.LOCALE_JA to R.string.settings_language_ja,
+    )
+    val supported = LocaleApplier.SUPPORTED_TAGS.toSet()
+    val locales = allLocales.filter { (tag, _) -> (tag ?: "") in supported }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = stringResource(R.string.settings_language_title),
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+        locales.forEach { (tag, labelRes) ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .selectable(
+                        selected = currentTag == tag,
+                        onClick = { onSelect(tag) },
+                        role = Role.RadioButton,
+                    )
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(selected = currentTag == tag, onClick = null)
+                Text(
+                    text = stringResource(labelRes),
+                    modifier = Modifier.padding(start = 12.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatsHistorySection(onOpenStats: () -> Unit) {
+    NavRow(
+        title = stringResource(R.string.stats_history_title),
+        summary = stringResource(R.string.stats_history_summary),
+        tag = "settings_stats_history_row",
+        onClick = onOpenStats,
+        enabled = true,
+    )
 }
 
 @Composable

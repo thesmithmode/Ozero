@@ -82,6 +82,7 @@ gradle.taskGraph.whenReady {
 
 dependencies {
     implementation(libs.core.ktx)
+    implementation(libs.appcompat)
 
     implementation(platform(libs.compose.bom))
     implementation(libs.bundles.compose)
@@ -104,7 +105,6 @@ dependencies {
     implementation(project(":common-vpn"))
     implementation(project(":common-crypto"))
     implementation(project(":engine-byedpi"))
-    implementation(project(":security"))
 
     implementation(libs.bundles.okhttp)
 
