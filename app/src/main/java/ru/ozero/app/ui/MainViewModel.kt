@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
+import ru.ozero.commonvpn.HealthMonitor
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.commonvpn.TunnelStats
@@ -15,6 +16,7 @@ import javax.inject.Inject
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val tunnelController: TunnelController,
+    private val healthMonitor: HealthMonitor,
 ) : ViewModel() {
     val state: StateFlow<TunnelState> =
         tunnelController.state.stateIn(
@@ -35,6 +37,13 @@ class MainViewModel @Inject constructor(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
             initialValue = false,
+        )
+
+    val healthStatus: StateFlow<HealthMonitor.Status> =
+        healthMonitor.status.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = HealthMonitor.Status.UNKNOWN,
         )
 
     fun onConnectClick() = Unit

@@ -17,6 +17,7 @@
     <string name="stats_session">Session: ↓ %1$s ↑ %2$s</string>
     <string name="stats_uptime">Uptime: %1$s</string>
     <string name="main_stagnation_warning">No traffic for 30 seconds</string>
+    <string name="main_health_degraded">Connection unstable</string>
 
     <!-- Tabs -->
     <string name="tab_main">Home</string>

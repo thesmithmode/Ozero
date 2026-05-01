@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
 import ru.ozero.commonvpn.BytesFormatter
+import ru.ozero.commonvpn.HealthMonitor
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.commonvpn.TunnelStats
 
@@ -52,6 +53,7 @@ fun MainScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val stats by viewModel.stats.collectAsStateWithLifecycle()
     val stagnant by viewModel.stagnant.collectAsStateWithLifecycle()
+    val healthStatus by viewModel.healthStatus.collectAsStateWithLifecycle()
 
     Box(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -98,6 +100,15 @@ fun MainScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.testTag(MainScreenTestTags.STAGNATION_BADGE),
+                    )
+                }
+                if (healthStatus == HealthMonitor.Status.DEGRADED) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(R.string.main_health_degraded),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.testTag(MainScreenTestTags.HEALTH_DEGRADED_BADGE),
                     )
                 }
             }
