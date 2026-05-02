@@ -43,10 +43,9 @@ class EngineUrnetwork(
             "EngineUrnetwork не принимает upstream — supportsUpstreamSocks=false"
         }
 
-        val consent = configStore.consentGranted().first()
-        if (!consent) {
-            PersistentLoggers.warn(TAG, "start aborted — URnetwork consent not granted")
-            return StartResult.Failure(reason = "URnetwork consent not granted")
+        if (!configStore.consentGranted().first()) {
+            configStore.markConsentGranted()
+            PersistentLoggers.info(TAG, "guest mode — consent auto-granted on first connect")
         }
 
         val byJwt = ensureGuestJwt() ?: return StartResult.Failure(

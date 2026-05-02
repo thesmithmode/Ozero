@@ -98,9 +98,9 @@ class RealUrnetworkSdkBridgeContractTest {
         }
         val runCatchingCount = stopBlock.split("runCatching").size - 1
         assertTrue(
-            runCatchingCount >= 5,
+            runCatchingCount >= 4,
             "Каждый close() обязан в runCatching — exception в одной cleanup не должен останавливать " +
-                "остальные. Найдено runCatching=$runCatchingCount, ожидалось ≥5.",
+                "остальные. Найдено runCatching=$runCatchingCount, ожидалось ≥4 (userwireguard удалён).",
         )
     }
 

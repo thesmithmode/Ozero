@@ -17,21 +17,30 @@ import kotlin.test.assertTrue
 class UrnetworkConsentSentinelTest {
 
     @Test
-    fun `EngineUrnetwork_start без consent НИКОГДА не дёргает bridge_start или auth`() = runTest {
+    fun `EngineUrnetwork_start без consent auto-grants и продолжает (guest mode — нет явного юзер-данных)`() = runTest {
         val bridge = SpyBridge()
         val auth = SpyAuthService()
-        val store = AlwaysNoConsentStore()
+        val store = SpyConsentStore()
         val engine = EngineUrnetwork(store, bridge, auth)
 
-        val result = engine.start(
-            EngineConfig.Urnetwork(jwtToken = ""),
-            Upstream.None,
-        )
+        engine.start(EngineConfig.Urnetwork(jwtToken = ""), Upstream.None)
 
-        val failure = assertIs<StartResult.Failure>(result)
-        assertTrue(failure.reason.contains("consent", ignoreCase = true))
-        assertEquals(0, bridge.startCalls)
-        assertEquals(0, auth.acquireCalls)
+        assertEquals(1, store.grantCalls, "Auto-grant должен сработать ровно один раз на первый connect")
+        assertEquals(1, auth.acquireCalls, "Auth вызывается после auto-grant")
+        assertEquals(1, bridge.startCalls, "Bridge стартует после получения guest JWT")
+    }
+
+    @Test
+    fun `EngineUrnetwork_start с уже выданным consent не вызывает повторный grant`() = runTest {
+        val bridge = SpyBridge()
+        val auth = SpyAuthService()
+        val store = SpyConsentStore(initialConsent = true)
+        val engine = EngineUrnetwork(store, bridge, auth)
+
+        engine.start(EngineConfig.Urnetwork(jwtToken = ""), Upstream.None)
+
+        assertEquals(0, store.grantCalls, "Повторный grant не должен вызываться если consent уже есть")
+        assertEquals(1, bridge.startCalls)
     }
 
     private class SpyAuthService : UrnetworkAuthService {
@@ -42,18 +51,20 @@ class UrnetworkConsentSentinelTest {
         }
     }
 
-    private class AlwaysNoConsentStore : UrnetworkConfigStore {
-        private val override = MutableStateFlow<String?>(null)
-        override fun walletAddress(): Flow<String> = override.map { UrnetworkDefaults.PRESET_WALLET }
-        override fun walletOverride(): Flow<String?> = override
-        override suspend fun setWalletOverride(value: String?) {
-            override.value = value
-        }
-        override fun consentGranted(): Flow<Boolean> = MutableStateFlow(false)
-        override suspend fun markConsentGranted() = error("sentinel")
-        override suspend fun revokeConsent() = Unit
-        override fun byJwt(): Flow<String?> = MutableStateFlow(null)
-        override suspend fun setByJwt(value: String?) = Unit
+    private class SpyConsentStore(initialConsent: Boolean = false) : UrnetworkConfigStore {
+        private val walletOverrideState = MutableStateFlow<String?>(null)
+        private val consentState = MutableStateFlow(initialConsent)
+        private val jwtState = MutableStateFlow<String?>(null)
+        var grantCalls: Int = 0
+
+        override fun walletAddress(): Flow<String> = walletOverrideState.map { UrnetworkDefaults.PRESET_WALLET }
+        override fun walletOverride(): Flow<String?> = walletOverrideState
+        override suspend fun setWalletOverride(value: String?) { walletOverrideState.value = value }
+        override fun consentGranted(): Flow<Boolean> = consentState
+        override suspend fun markConsentGranted() { grantCalls++; consentState.value = true }
+        override suspend fun revokeConsent() { consentState.value = false }
+        override fun byJwt(): Flow<String?> = jwtState
+        override suspend fun setByJwt(value: String?) { jwtState.value = value }
     }
 
     private class SpyBridge : UrnetworkSdkBridge {
