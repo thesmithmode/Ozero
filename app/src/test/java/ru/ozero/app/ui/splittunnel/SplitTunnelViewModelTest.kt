@@ -108,6 +108,54 @@ class SplitTunnelViewModelTest {
     }
 
     @Test
+    fun `selectedCount reflects included apps`() = runTest {
+        dao.emit(
+            listOf(
+                AppSplitRule("com.user.foo", isExcluded = false),
+                AppSplitRule("com.user.bar", isExcluded = false),
+            ),
+        )
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value as SplitTunnelUiState.Content
+        assertEquals(2, state.selectedCount)
+    }
+
+    @Test
+    fun `selectedCount zero when no rules`() = runTest {
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value as SplitTunnelUiState.Content
+        assertEquals(0, state.selectedCount)
+    }
+
+    @Test
+    fun `onClearAll deletes all rules`() = runTest {
+        dao.emit(
+            listOf(
+                AppSplitRule("com.user.foo", isExcluded = false),
+                AppSplitRule("com.user.bar", isExcluded = false),
+            ),
+        )
+        advanceUntilIdle()
+
+        viewModel.onClearAll()
+        advanceUntilIdle()
+
+        assertEquals(listOf("com.user.foo", "com.user.bar").sorted(), dao.deletes.sorted())
+    }
+
+    @Test
+    fun `onClearAll noop when no rules`() = runTest {
+        advanceUntilIdle()
+
+        viewModel.onClearAll()
+        advanceUntilIdle()
+
+        assertEquals(emptyList<String>(), dao.deletes)
+    }
+
+    @Test
     fun `onQuery filters apps case-insensitive`() = runTest {
         advanceUntilIdle()
 
