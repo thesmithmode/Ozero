@@ -39,8 +39,11 @@ class RealCurve25519KeyPairGeneratorTest {
         val (priv, pub) = gen.generate()
 
         assertTrue(!priv.contains("stub"), "Private key не должен быть stub-литералом")
-        assertTrue(!pub.contains("stub"), "Public key не должен быть stub-литералом — Cloudflare WARP " +
-            "register отвергает их с 400 invalid public key. Sentinel против регрессии StubWireguardKeyPairGenerator.")
+        assertTrue(
+            !pub.contains("stub"),
+            "Public key не должен быть stub-литералом — Cloudflare WARP register отвергает их с 400 " +
+                "invalid public key. Sentinel против регрессии StubWireguardKeyPairGenerator.",
+        )
     }
 
     @Test

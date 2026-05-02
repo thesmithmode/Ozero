@@ -50,7 +50,7 @@ object UrnetworkModule {
         @UrnetworkPrefs dataStore: DataStore<Preferences>,
     ): UrnetworkConfigStore = DataStoreUrnetworkConfigStore(dataStore)
 
-    // TODO(v0.0.2-5): вернуть RealUrnetworkSdkBridge после rebuild AAR.
+    // TODO(v0.0.2-5): вернуть RealUrnetworkSdkBridge(context) после rebuild AAR.
     // URnetworkSdk.aar и userwireguard.aar — два независимых gomobile bind проекта,
     // каждый содержит свою lib/*/libgojni.so + go.Seq.class. AGP merge перезаписывает
     // одну .so → JNI registration теряется → "No implementation found for Sdk._init()".
@@ -58,9 +58,7 @@ object UrnetworkModule {
     // → одна совместная libgojni.so. Out of scope для v0.0.2-4 — Go toolchain работа.
     @Provides
     @Singleton
-    fun provideUrnetworkSdkBridge(
-        @ApplicationContext context: Context,
-    ): UrnetworkSdkBridge = StubUrnetworkSdkBridge()
+    fun provideUrnetworkSdkBridge(): UrnetworkSdkBridge = StubUrnetworkSdkBridge()
 
     @Provides
     @Singleton
