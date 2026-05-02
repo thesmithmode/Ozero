@@ -7,7 +7,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import javax.inject.Inject
 
 sealed interface UrnetworkSettingsUiState {
@@ -16,9 +15,7 @@ sealed interface UrnetworkSettingsUiState {
 }
 
 @HiltViewModel
-class UrnetworkEngineSettingsViewModel @Inject constructor(
-    private val store: UrnetworkConfigStore,
-) : ViewModel() {
+class UrnetworkEngineSettingsViewModel @Inject constructor() : ViewModel() {
 
     private val _uiState = MutableStateFlow<UrnetworkSettingsUiState>(UrnetworkSettingsUiState.Loading)
     val uiState: StateFlow<UrnetworkSettingsUiState> = _uiState.asStateFlow()

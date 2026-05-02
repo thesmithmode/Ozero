@@ -55,7 +55,9 @@ class UrnetworkConsentSentinelTest {
         override fun walletOverride(): Flow<String?> = MutableStateFlow(null)
         override suspend fun setWalletOverride(value: String?) = Unit
         override fun byJwt(): Flow<String?> = jwtFlow
-        override suspend fun setByJwt(value: String?) { jwtFlow.value = value }
+        override suspend fun setByJwt(value: String?) {
+            jwtFlow.value = value
+        }
     }
 
     private class SpyBridge : UrnetworkSdkBridge {
