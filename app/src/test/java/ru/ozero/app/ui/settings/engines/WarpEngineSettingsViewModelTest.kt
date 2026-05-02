@@ -56,12 +56,14 @@ class WarpEngineSettingsViewModelTest {
 
     @Test
     fun `init подхватывает saved config из store без auto-trigger`() = runTest {
+        val freshAuto = FakeAutoConfig()
         store.setRaw(SAMPLE)
+        val freshVm = WarpEngineSettingsViewModel(store, freshAuto)
         advanceUntilIdle()
-        assertEquals(SAMPLE, vm.uiState.value.currentConfig)
+        assertEquals(SAMPLE, freshVm.uiState.value.currentConfig)
         assertEquals(
             0,
-            auto.callCount,
+            freshAuto.callCount,
             "Если config уже в store — auto-trigger НЕ срабатывает",
         )
     }
