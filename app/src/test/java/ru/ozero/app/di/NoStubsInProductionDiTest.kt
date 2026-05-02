@@ -91,19 +91,26 @@ class NoStubsInProductionDiTest {
     }
 
     @Test
-    fun `UrnetworkModule binds RealUrnetworkSdkBridge — not Stub`() {
+    fun `UrnetworkModule temporarily binds Stub — TODO марк обязателен`() {
+        // v0.0.2-4: temporary revert на StubUrnetworkSdkBridge из-за libgojni.so collision
+        // между URnetworkSdk.aar и userwireguard.aar (оба gomobile bind, оба ship libgojni).
+        // AGP merge перезаписывает .so → "No implementation found for Sdk._init()".
+        // Sentinel этого теста — гарантировать что TODO не потерян: когда AAR rebuilt
+        // с merged go-modules, тест должен быть инвертирован обратно (assert Real, not Stub).
         val moduleRoot = File(System.getProperty("user.dir") ?: ".")
         val f = File(moduleRoot, "src/main/java/ru/ozero/app/di/UrnetworkModule.kt")
         assertTrue(f.exists(), "UrnetworkModule.kt не найден: $f")
         val src = f.readText()
         assertTrue(
-            src.contains("RealUrnetworkSdkBridge"),
-            "UrnetworkModule обязан биндить RealUrnetworkSdkBridge — Stub режим запрещён в production.",
-        )
-        assertFalse(
             Regex("""=\s*StubUrnetworkSdkBridge\s*\(""").containsMatchIn(src),
-            "UrnetworkModule не должен инстанциировать StubUrnetworkSdkBridge — Real bridge активирован, " +
-                "AAR качаются в CI step (см. .github/workflows/ci.yml).",
+            "v0.0.2-4: UrnetworkModule обязан биндить StubUrnetworkSdkBridge до rebuild AAR. " +
+                "Если AAR fixed (один gomobile bind с обоими go-modules) — обнови этот тест " +
+                "и DI binding на RealUrnetworkSdkBridge.",
+        )
+        assertTrue(
+            src.contains("TODO(v0.0.2-5)") || src.contains("TODO(v0.0.3)"),
+            "UrnetworkModule.provideUrnetworkSdkBridge ОБЯЗАН иметь TODO marker для возврата к Real bridge " +
+                "после rebuild AAR. Без TODO забудем восстановить.",
         )
     }
 

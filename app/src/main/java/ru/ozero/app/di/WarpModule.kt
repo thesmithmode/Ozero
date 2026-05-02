@@ -20,8 +20,8 @@ import ru.ozero.enginewarp.DataStoreWarpConfigStore
 import ru.ozero.enginewarp.EngineWarp
 import ru.ozero.enginewarp.HttpClient
 import ru.ozero.enginewarp.HttpUrlConnectionClient
+import ru.ozero.enginewarp.RealCurve25519KeyPairGenerator
 import ru.ozero.enginewarp.StubWarpSdkBridge
-import ru.ozero.enginewarp.StubWireguardKeyPairGenerator
 import ru.ozero.enginewarp.WarpAutoConfig
 import ru.ozero.enginewarp.WarpConfigStore
 import ru.ozero.enginewarp.WarpSdkBridge
@@ -61,7 +61,7 @@ object WarpModule {
     @Provides
     @Singleton
     fun provideWireguardKeyPairGenerator(): WireguardKeyPairGenerator =
-        StubWireguardKeyPairGenerator()
+        RealCurve25519KeyPairGenerator()
 
     @Provides
     @Singleton

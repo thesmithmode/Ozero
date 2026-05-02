@@ -43,7 +43,7 @@ class HevTunnelGatewayShutdownOrderTest {
     }
 
     @Test
-    fun `stop без предшествующего start не ломается`(@TempDir tmp: File) {
+    fun `stop без предшествующего start не вызывает nativeStop`(@TempDir tmp: File) {
         var stopCalled = 0
         val gateway = NativeHevTunnelGateway(
             cacheDir = tmp,
@@ -54,11 +54,33 @@ class HevTunnelGatewayShutdownOrderTest {
 
         gateway.stop()
 
-        assertEquals(1, stopCalled, "nativeStop вызывается даже без start — гарантия teardown")
+        assertEquals(
+            0,
+            stopCalled,
+            "TProxyStopService без предшествующего TProxyStartService блокирует libhev mutex " +
+                "(следующий start висит). Sentinel против регрессии: chain failed at step 0 → " +
+                "performShutdown.tunnelGateway.stop() → next BYEDPI start hung forever.",
+        )
     }
 
     @Test
-    fun `stop вызывается дважды подряд — обе ветки доходят до nativeStop`(@TempDir tmp: File) {
+    fun `stop после failed start не вызывает nativeStop`(@TempDir tmp: File) {
+        var stopCalled = 0
+        val gateway = NativeHevTunnelGateway(
+            cacheDir = tmp,
+            loader = loader,
+            nativeStart = { _, _ -> -1 },
+            nativeStop = { stopCalled++ },
+        )
+        gateway.start(HevTunnelConfig(tunPfd = pfd(1), socksAddress = "127.0.0.1", socksPort = 1080))
+
+        gateway.stop()
+
+        assertEquals(0, stopCalled, "Failed start (code != 0) не помечает gateway как started")
+    }
+
+    @Test
+    fun `stop после успешного start вызывает nativeStop ровно один раз`(@TempDir tmp: File) {
         var nativeStops = 0
         val gateway = NativeHevTunnelGateway(
             cacheDir = tmp,
@@ -71,6 +93,6 @@ class HevTunnelGatewayShutdownOrderTest {
         gateway.stop()
         gateway.stop()
 
-        assertEquals(2, nativeStops, "stop идемпотентен — каждый вызов уходит в native")
+        assertEquals(1, nativeStops, "stop идемпотентен — повторный вызов skip'ается через started flag")
     }
 }
