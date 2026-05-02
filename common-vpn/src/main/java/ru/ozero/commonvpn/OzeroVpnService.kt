@@ -16,6 +16,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.commondns.PublicDnsServers
 import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_START
@@ -256,12 +257,23 @@ class OzeroVpnService : android.net.VpnService() {
         if (engine is ru.ozero.enginescore.TunFdAcceptor) {
             val rawFd = fd.detachFd()
             tunFdRef.compareAndSet(fd, null)
-            return when (val r = engine.attachTun(rawFd)) {
+            val result = try {
+                engine.attachTun(rawFd)
+            } catch (t: Throwable) {
+                runCatching { android.system.Os.close(rawFd) }
+                PersistentLoggers.error(TAG, "attachTun threw, fd closed: ${t.message}")
+                runCatching { chainOrchestrator.stop() }
+                tunnelController.onEngineDied(engineId, "attachTun threw: ${t.message}")
+                stopVpn()
+                return false
+            }
+            return when (result) {
                 ru.ozero.enginescore.TunAttachResult.Success -> true
                 is ru.ozero.enginescore.TunAttachResult.Failure -> {
-                    PersistentLoggers.error(TAG, "attachTun failed: ${r.reason}")
+                    runCatching { android.system.Os.close(rawFd) }
+                    PersistentLoggers.error(TAG, "attachTun failed: ${result.reason}")
                     runCatching { chainOrchestrator.stop() }
-                    tunnelController.onEngineDied(engineId, "attachTun: ${r.reason}")
+                    tunnelController.onEngineDied(engineId, "attachTun: ${result.reason}")
                     stopVpn()
                     false
                 }
@@ -514,7 +526,9 @@ class OzeroVpnService : android.net.VpnService() {
 
     override fun onDestroy() {
         PersistentLoggers.info(TAG, "onDestroy entry")
-        if (stopping.compareAndSet(false, true)) serviceScope.launch { performShutdown() }
+        if (stopping.compareAndSet(false, true)) {
+            runBlocking(Dispatchers.IO) { performShutdown() }
+        }
         runCatching { healthMonitor.stop() }
         serviceScope.cancel()
         runCatching { tunFdRef.getAndSet(null)?.close() }

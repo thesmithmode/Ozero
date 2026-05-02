@@ -10,6 +10,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 import ru.ozero.enginescore.PersistentLoggers
 import java.io.IOException
+import java.util.Base64
 
 // 78 serverless-зеркал вместо api.cloudflareclient.com (блокируется ТСПУ); ключи генерирует сервер.
 class ProxyWarpAutoConfig(
@@ -79,7 +80,9 @@ class ProxyWarpAutoConfig(
     private fun CoroutineScope.spawnMirror(url: String): Deferred<Result<WarpConfig>> =
         async {
             try {
-                val httpResult = httpClient.postJson(url, REQUEST_BODY, userAgent)
+                val httpResult = withTimeoutOrNull(PER_MIRROR_TIMEOUT_MS) {
+                    httpClient.postJson(url, REQUEST_BODY, userAgent)
+                } ?: return@async Result.failure(IOException("mirror timeout: $url"))
                 if (httpResult.isFailure) {
                     return@async Result.failure(
                         httpResult.exceptionOrNull()
@@ -121,6 +124,14 @@ class ProxyWarpAutoConfig(
         if (!json.optBoolean("success", true)) {
             PersistentLoggers.warn(TAG, "mirror reported failure: ${json.optString("message", "")}")
             return null
+        }
+        json.optJSONObject("content")?.let { content ->
+            val b64 = content.optString("configBase64", "")
+            if (b64.isNotBlank()) {
+                return runCatching {
+                    String(Base64.getDecoder().decode(b64), Charsets.UTF_8)
+                }.getOrNull()?.let { findInterfaceBlock(it) ?: it }
+            }
         }
         sequenceOf("data", "config", "wireguard", "conf").forEach { key ->
             findInterfaceBlock(json.optString(key))?.let { return it }
@@ -232,9 +243,10 @@ class ProxyWarpAutoConfig(
         const val DEFAULT_CONCURRENCY = 8
         const val DEFAULT_TOTAL_BUDGET_MS = 240_000L
         const val DEFAULT_MTU = 1280
+        const val PER_MIRROR_TIMEOUT_MS = 45_000L
         const val REQUEST_BODY =
             "{\"selectedServices\":[],\"siteMode\":\"all\"," +
-                "\"deviceType\":\"computer\",\"allowScreenshotsAndRecording\":true}"
+                "\"deviceType\":\"computer\",\"endpoint\":\"162.159.195.1:500\"}"
 
         val DEFAULT_MIRRORS: List<String> = listOf(
             "https://vless-portal.netlify.app/api/warp",

@@ -171,6 +171,20 @@ W3.0 atomic refactor: SettingsRepository interface + SettingsModel + SettingsKey
 - [ ] **device smoke install-over-upgrade** v0.0.1 → v0.0.2-1 — manual session, единственный gate перед `git tag -a v0.0.2-1`. Verify: app не крашит на первом open, StatsHistoryScreen открывается, prev split-rules выживают, logcat показывает `Migration_4_5` без `IllegalStateException`.
 - [ ] git tag -a v0.0.2-1 после device smoke (versionName тянется из `gitVersionName`, версия не зашита в build.gradle).
 
+### v0.0.2-5 — device bugs fix wave (2026-05-02)
+
+Баги найдены при тестировании v0.0.2-4 на устройстве:
+
+- [x] **SEC-P1-01** IPv6 leak при `ipv6Enabled=false` — `::/0` null-route теперь добавляется всегда. IPv6-адрес туна — только если включено. Sentinel `OzeroVpnServiceIpv6Test`.
+- [x] **CODE-P1-01** onDestroy serviceScope race — `runBlocking(Dispatchers.IO) { performShutdown() }` ПЕРЕД `serviceScope.cancel()`. Engine teardown теперь гарантирован.
+- [x] **CODE-P1-02** fd leak в `routeTrafficForEngine` — `fd.detachFd()` → try/catch вокруг `engine.attachTun(rawFd)` с `Os.close(rawFd)` в catch и Failure-ветке.
+- [x] **CODE-P1-03** ChainOrchestrator race — `Mutex` + `withLock` вокруг `start()` и `stop()`. Sentinel `ChainOrchestratorConcurrencyTest` (3 теста).
+- [x] **CODE-P1-04** ServersViewModel два upsert без транзакции — `@Transaction fun upsertPair(entry, exit)` в `ServerDao`, заменён двойной upsert.
+- [x] URnetwork NetworkSpace null — `importNetworkSpaceFromJson` + `setActiveNetworkSpace` fallback.
+- [x] WARP зеркала timeout — per-mirror coroutine timeout 20s.
+- [x] Simple/Expert визуальное разграничение — "EXPERT" badge в `ExpertMainContent` + string resources.
+- [x] Split tunnel навигация — уже была wired через `Settings → ALLOWED_APPS_ROW → TopScreen.SplitTunnel → SplitTunnelScreen`. UX issue, не код.
+
 ---
 
 ## Порядок следующей сессии (когда юзер вернётся с device)

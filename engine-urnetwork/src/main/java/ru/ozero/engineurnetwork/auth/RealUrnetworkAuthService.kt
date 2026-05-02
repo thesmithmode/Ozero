@@ -65,11 +65,16 @@ class RealUrnetworkAuthService(
             }
             val space = manager.activeNetworkSpace ?: run {
                 val key = Sdk.newNetworkSpaceKey(DEFAULT_HOST, DEFAULT_ENV)
-                manager.getNetworkSpace(key)
-            }
-            if (space == null) {
-                PersistentLoggers.error(TAG, "NetworkSpace null")
-                return null
+                val existing = manager.getNetworkSpace(key)
+                if (existing != null) {
+                    existing
+                } else {
+                    val imported = manager.importNetworkSpaceFromJson(
+                        """{"host_name":"$DEFAULT_HOST","env_name":"$DEFAULT_ENV"}"""
+                    )
+                    manager.setActiveNetworkSpace(imported)
+                    imported
+                }
             }
             spaceRef.set(space)
             space.api

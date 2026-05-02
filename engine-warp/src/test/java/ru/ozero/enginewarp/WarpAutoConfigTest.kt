@@ -3,6 +3,7 @@ package ru.ozero.enginewarp
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import java.io.IOException
+import java.util.Base64
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -90,7 +91,7 @@ class WarpAutoConfigTest {
         assertTrue(call.body.contains("\"selectedServices\":[]"))
         assertTrue(call.body.contains("\"siteMode\":\"all\""))
         assertTrue(call.body.contains("\"deviceType\":\"computer\""))
-        assertTrue(call.body.contains("\"allowScreenshotsAndRecording\":true"))
+        assertTrue(call.body.contains("\"endpoint\":\"162.159.195.1:500\""))
         assertTrue(
             !call.body.contains("\"key\""),
             "Proxy-зеркала генерируют ключ серверной стороной — клиент не отправляет",
@@ -209,6 +210,22 @@ class WarpAutoConfigTest {
     }
 
     @Test
+    fun `parses configBase64 response from real mirror format`() = runTest {
+        val b64 = Base64.getEncoder().encodeToString(sampleConf.toByteArray())
+        val body = """{"success":true,"content":{"configBase64":"$b64","qrCodeBase64":"abc"}}"""
+        val http = FakeHttpClient(Result.success(body))
+        val auto = singleMirrorConfig(http)
+
+        val result = auto.register()
+
+        assertTrue(result.isSuccess, "configBase64 ответ обязан декодироваться")
+        val cfg = result.getOrThrow()
+        assertEquals("duLmWkD6Pz6fqd+5/Wsh+aDwyaT8w+5ofxDZ3Z3l1c0=", cfg.privateKey)
+        assertEquals("bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=", cfg.peerPublicKey)
+        assertEquals("engage.cloudflareclient.com:4500", cfg.peerEndpoint)
+    }
+
+    @Test
     fun `default mirrors список содержит CYBERPORTAL_X URLs (sentinel против регрессии endpoint)`() {
         val urls = ProxyWarpAutoConfig.DEFAULT_MIRRORS
         assertTrue(urls.size >= 70, "Список зеркал из CYBERPORTAL_X-1.0.2 содержит 78 URL")
@@ -240,7 +257,7 @@ class WarpAutoConfigTest {
         assertTrue(body.contains("\"selectedServices\":[]"))
         assertTrue(body.contains("\"siteMode\":\"all\""))
         assertTrue(body.contains("\"deviceType\":\"computer\""))
-        assertTrue(body.contains("\"allowScreenshotsAndRecording\":true"))
+        assertTrue(body.contains("\"endpoint\":\"162.159.195.1:500\""))
         assertTrue(
             !body.contains("\"key\""),
             "Поле \"key\" клиентского pubkey запрещено — proxy-зеркала генерируют ключ сервером",

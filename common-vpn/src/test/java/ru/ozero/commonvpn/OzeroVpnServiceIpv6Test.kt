@@ -23,13 +23,18 @@ class OzeroVpnServiceIpv6Test {
     }
 
     @Test
-    fun `buildTunBuilder добавляет IPv6 route только при ipv6Enabled true`() {
+    fun `buildTunBuilder добавляет IPv6 route ВСЕГДА - null-route при ipv6Enabled false`() {
         val body = source.substringAfter("internal fun buildTunBuilder")
             .substringBefore("private fun buildNotification")
-        assertTrue(body.contains("if (ipv6Enabled)"), "IPv6 route conditional обязателен")
         assertTrue(
             body.contains("addRoute(\"::\", 0)") || body.contains("addRoute(\"::\",0)"),
-            "buildTunBuilder при ipv6Enabled должен делать addRoute IPv6 default",
+            "buildTunBuilder обязан добавлять addRoute IPv6 default (::/0) ВСЕГДА — " +
+                "при ipv6Enabled=true для маршрутизации IPv6 трафика, при false для null-route " +
+                "чтобы закрыть IPv6-leak (трафик не проходит мимо VPN-туннеля).",
+        )
+        assertTrue(
+            body.contains("if (ipv6Enabled)"),
+            "IPv6 address conditional обязателен — addAddress(TUN_ADDRESS_V6) только если enabled",
         )
         assertTrue(
             body.contains("addAddress(TUN_ADDRESS_V6"),

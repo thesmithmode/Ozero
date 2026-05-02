@@ -42,7 +42,16 @@ class RealUrnetworkSdkBridge(
         val space: NetworkSpace = try {
             manager.activeNetworkSpace ?: run {
                 val key = Sdk.newNetworkSpaceKey(DEFAULT_HOST, DEFAULT_ENV)
-                manager.getNetworkSpace(key) ?: error("getNetworkSpace returned null for $DEFAULT_HOST/$DEFAULT_ENV")
+                val existing = manager.getNetworkSpace(key)
+                if (existing != null) {
+                    existing
+                } else {
+                    val imported = manager.importNetworkSpaceFromJson(
+                        """{"host_name":"$DEFAULT_HOST","env_name":"$DEFAULT_ENV"}"""
+                    )
+                    manager.setActiveNetworkSpace(imported)
+                    imported
+                }
             }
         } catch (t: Throwable) {
             PersistentLoggers.error(TAG, "NetworkSpace resolve failed: ${t.message}")

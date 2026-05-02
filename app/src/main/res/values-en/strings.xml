@@ -212,4 +212,6 @@
     <string name="stats_history_status_label">Status: %1$s</string>
     <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
     <string name="engine_chip_auto">Auto</string>
+
+    <string name="mode_expert_badge">EXPERT</string>
 </resources>

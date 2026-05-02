@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 import ru.ozero.corestorage.entity.ServerEntity
 
@@ -14,6 +15,12 @@ interface ServerDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(servers: List<ServerEntity>)
+
+    @Transaction
+    suspend fun upsertPair(entry: ServerEntity, exit: ServerEntity) {
+        upsert(entry)
+        upsert(exit)
+    }
 
     @Query("SELECT * FROM servers ORDER BY priority ASC, lastCheckedAt DESC")
     fun observeAll(): Flow<List<ServerEntity>>

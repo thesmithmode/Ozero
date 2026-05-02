@@ -1,13 +1,16 @@
 package ru.ozero.enginescore
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class ChainOrchestrator(
     private val engines: Set<EnginePlugin>,
 ) {
     private val started = mutableListOf<EnginePlugin>()
+    private val mutex = Mutex()
 
-    suspend fun start(steps: List<ChainStep>): ChainResult {
+    suspend fun start(steps: List<ChainStep>): ChainResult = mutex.withLock {
         require(steps.isNotEmpty()) { "ChainOrchestrator.start: steps empty — single-engine = chain of 1" }
 
         var upstream: Upstream = Upstream.None
@@ -15,10 +18,10 @@ class ChainOrchestrator(
 
         steps.forEachIndexed { idx, step ->
             val plugin = engines.firstOrNull { it.id == step.engineId }
-                ?: return rollback(idx, "engine ${step.engineId} not found in registry")
+                ?: return@withLock rollback(idx, "engine ${step.engineId} not found in registry")
             if (upstream !is Upstream.None && !plugin.capabilities.supportsUpstreamSocks) {
                 PersistentLoggers.warn(TAG, "step $idx ${step.engineId} cannot accept upstream — terminal-only engine")
-                return rollback(
+                return@withLock rollback(
                     idx,
                     "engine ${step.engineId} terminal-only (supportsUpstreamSocks=false), " +
                         "can only be head of chain or standalone",
@@ -29,16 +32,16 @@ class ChainOrchestrator(
                 plugin.start(step.config, upstream)
             } catch (ce: CancellationException) {
                 PersistentLoggers.warn(TAG, "step $idx ${step.engineId} cancelled, rollback")
-                stop()
+                stopInternal()
                 throw ce
             } catch (t: Throwable) {
                 PersistentLoggers.error(TAG, "step $idx ${step.engineId} threw: ${t.message}")
-                return rollback(idx, "step $idx ${step.engineId} threw: ${t.message}")
+                return@withLock rollback(idx, "step $idx ${step.engineId} threw: ${t.message}")
             }
             when (r) {
                 is StartResult.Failure -> {
                     PersistentLoggers.warn(TAG, "step $idx ${step.engineId} failed: ${r.reason}")
-                    return rollback(idx, r.reason)
+                    return@withLock rollback(idx, r.reason)
                 }
                 is StartResult.Success -> {
                     started.add(plugin)
@@ -48,10 +51,20 @@ class ChainOrchestrator(
                 }
             }
         }
-        return ChainResult.Success(finalSocksPort = lastSocksPort)
+        ChainResult.Success(finalSocksPort = lastSocksPort)
     }
 
-    suspend fun stop() {
+    suspend fun stop() = mutex.withLock {
+        stopInternal()
+    }
+
+    private suspend fun rollback(failedAt: Int, reason: String): ChainResult.Failure {
+        val rolledBack = started.size
+        stopInternal()
+        return ChainResult.Failure(failedAtIndex = failedAt, reason = reason, rolledBack = rolledBack)
+    }
+
+    private suspend fun stopInternal() {
         val snapshot = started.toList().asReversed()
         started.clear()
         snapshot.forEach { plugin ->
@@ -63,12 +76,6 @@ class ChainOrchestrator(
                 PersistentLoggers.warn(TAG, "stop ${plugin.id} threw: ${t.message}")
             }
         }
-    }
-
-    private suspend fun rollback(failedAt: Int, reason: String): ChainResult.Failure {
-        val rolledBack = started.size
-        stop()
-        return ChainResult.Failure(failedAtIndex = failedAt, reason = reason, rolledBack = rolledBack)
     }
 
     private companion object {

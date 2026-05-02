@@ -71,11 +71,12 @@ class RealUrnetworkAuthServiceContractTest {
     }
 
     @Test
-    fun `ensureApi обрабатывает null space и Throwable`() {
+    fun `ensureApi обрабатывает null space fallback через importNetworkSpaceFromJson`() {
         val ensureBlock = source.substringAfter("private fun ensureApi")
         assertTrue(
-            ensureBlock.contains("space == null"),
-            "ensureApi обязан проверять space == null — без проверки crash на NPE при space.api.",
+            ensureBlock.contains("importNetworkSpaceFromJson"),
+            "ensureApi обязан fallback к importNetworkSpaceFromJson если getNetworkSpace вернул null — " +
+                "первый запуск не имеет сохранённых пространств, необходимо создать.",
         )
         assertTrue(
             ensureBlock.contains("catch (t: Throwable)"),

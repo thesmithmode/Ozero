@@ -51,16 +51,22 @@ class ServersViewModel @Inject constructor(
         val entry = state.entry ?: return
         val exit = state.exit ?: return
         viewModelScope.launch {
-            dao.upsert(entry.copy(pairId = exit.id))
-            dao.upsert(exit.copy(pairId = entry.id))
+            dao.upsertPair(
+                entry = entry.copy(pairId = exit.id),
+                exit = exit.copy(pairId = entry.id),
+            )
         }
     }
 
     fun onClearPair() {
         val state = _uiState.value as? ServersUiState.Content ?: return
+        val entry = state.entry ?: return
+        val exit = state.exit ?: return
         viewModelScope.launch {
-            state.entry?.let { dao.upsert(it.copy(pairId = null)) }
-            state.exit?.let { dao.upsert(it.copy(pairId = null)) }
+            dao.upsertPair(
+                entry = entry.copy(pairId = null),
+                exit = exit.copy(pairId = null),
+            )
         }
     }
 }
