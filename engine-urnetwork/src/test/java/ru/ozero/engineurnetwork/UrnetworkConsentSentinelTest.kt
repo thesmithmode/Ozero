@@ -2,7 +2,6 @@ package ru.ozero.engineurnetwork
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import ru.ozero.engineurnetwork.auth.GuestJwtResult
@@ -12,34 +11,33 @@ import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertTrue
 
 class UrnetworkConsentSentinelTest {
 
     @Test
-    fun `EngineUrnetwork_start без consent auto-grants и продолжает (guest mode — нет явного юзер-данных)`() = runTest {
+    fun `EngineUrnetwork_start без JWT auto-acquire guest и стартует bridge`() = runTest {
         val bridge = SpyBridge()
         val auth = SpyAuthService()
-        val store = SpyConsentStore()
+        val store = SpyStore()
         val engine = EngineUrnetwork(store, bridge, auth)
 
         engine.start(EngineConfig.Urnetwork(jwtToken = ""), Upstream.None)
 
-        assertEquals(1, store.grantCalls, "Auto-grant должен сработать ровно один раз на первый connect")
-        assertEquals(1, auth.acquireCalls, "Auth вызывается после auto-grant")
-        assertEquals(1, bridge.startCalls, "Bridge стартует после получения guest JWT")
+        assertEquals(1, auth.acquireCalls, "Guest JWT должен быть запрошен при отсутствии в store")
+        assertEquals(1, bridge.startCalls, "Bridge должен стартовать после получения JWT")
     }
 
     @Test
-    fun `EngineUrnetwork_start с уже выданным consent не вызывает повторный grant`() = runTest {
+    fun `EngineUrnetwork_start с существующим JWT не вызывает повторный acquire`() = runTest {
         val bridge = SpyBridge()
         val auth = SpyAuthService()
-        val store = SpyConsentStore(initialConsent = true)
+        val store = SpyStore(existingJwt = "existing.jwt")
         val engine = EngineUrnetwork(store, bridge, auth)
 
-        engine.start(EngineConfig.Urnetwork(jwtToken = ""), Upstream.None)
+        val result = engine.start(EngineConfig.Urnetwork(jwtToken = ""), Upstream.None)
 
-        assertEquals(0, store.grantCalls, "Повторный grant не должен вызываться если consent уже есть")
+        assertIs<StartResult.Success>(result)
+        assertEquals(0, auth.acquireCalls, "Повторный acquire не нужен если JWT уже есть")
         assertEquals(1, bridge.startCalls)
     }
 
@@ -51,20 +49,13 @@ class UrnetworkConsentSentinelTest {
         }
     }
 
-    private class SpyConsentStore(initialConsent: Boolean = false) : UrnetworkConfigStore {
-        private val walletOverrideState = MutableStateFlow<String?>(null)
-        private val consentState = MutableStateFlow(initialConsent)
-        private val jwtState = MutableStateFlow<String?>(null)
-        var grantCalls: Int = 0
-
-        override fun walletAddress(): Flow<String> = walletOverrideState.map { UrnetworkDefaults.PRESET_WALLET }
-        override fun walletOverride(): Flow<String?> = walletOverrideState
-        override suspend fun setWalletOverride(value: String?) { walletOverrideState.value = value }
-        override fun consentGranted(): Flow<Boolean> = consentState
-        override suspend fun markConsentGranted() { grantCalls++; consentState.value = true }
-        override suspend fun revokeConsent() { consentState.value = false }
-        override fun byJwt(): Flow<String?> = jwtState
-        override suspend fun setByJwt(value: String?) { jwtState.value = value }
+    private class SpyStore(existingJwt: String? = null) : UrnetworkConfigStore {
+        private val jwtFlow = MutableStateFlow(existingJwt)
+        override fun walletAddress(): Flow<String> = MutableStateFlow(UrnetworkDefaults.PRESET_WALLET)
+        override fun walletOverride(): Flow<String?> = MutableStateFlow(null)
+        override suspend fun setWalletOverride(value: String?) = Unit
+        override fun byJwt(): Flow<String?> = jwtFlow
+        override suspend fun setByJwt(value: String?) { jwtFlow.value = value }
     }
 
     private class SpyBridge : UrnetworkSdkBridge {

@@ -43,11 +43,6 @@ class EngineUrnetwork(
             "EngineUrnetwork не принимает upstream — supportsUpstreamSocks=false"
         }
 
-        if (!configStore.consentGranted().first()) {
-            configStore.markConsentGranted()
-            PersistentLoggers.info(TAG, "guest mode — consent auto-granted on first connect")
-        }
-
         val byJwt = ensureGuestJwt() ?: return StartResult.Failure(
             reason = "URnetwork guest jwt acquire failed — нет интернета или сервер недоступен",
         )

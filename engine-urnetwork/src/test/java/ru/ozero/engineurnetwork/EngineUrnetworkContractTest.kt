@@ -22,13 +22,12 @@ class EngineUrnetworkContractTest {
     private val baseConfig = EngineConfig.Urnetwork(jwtToken = "")
 
     private fun engine(
-        consent: Boolean = true,
         override: String? = null,
         byJwt: String? = null,
         bridge: FakeUrnetworkSdkBridge = FakeUrnetworkSdkBridge(),
         authService: FakeAuthService = FakeAuthService(),
     ): Triple<EngineUrnetwork, FakeUrnetworkSdkBridge, FakeUrnetworkConfigStore> {
-        val store = FakeUrnetworkConfigStore(consent = consent, override = override, byJwt = byJwt)
+        val store = FakeUrnetworkConfigStore(override = override, byJwt = byJwt)
         return Triple(EngineUrnetwork(store, bridge, authService), bridge, store)
     }
 
@@ -39,17 +38,8 @@ class EngineUrnetworkContractTest {
     }
 
     @Test
-    fun `start без consent возвращает Failure с consent reason`() = runTest {
-        val (e, bridge, _) = engine(consent = false)
-        val result = e.start(baseConfig, Upstream.None)
-        val failure = assertIs<StartResult.Failure>(result)
-        assertTrue(failure.reason.contains("consent", ignoreCase = true))
-        assertEquals(0, bridge.startCalls)
-    }
-
-    @Test
-    fun `start с consent и без override вызывает bridge с PRESET_WALLET`() = runTest {
-        val (e, bridge, _) = engine(consent = true, override = null, byJwt = "fake.jwt")
+    fun `start без override вызывает bridge с PRESET_WALLET`() = runTest {
+        val (e, bridge, _) = engine(override = null, byJwt = "fake.jwt")
         val result = e.start(baseConfig, Upstream.None)
         assertIs<StartResult.Success>(result)
         assertEquals(UrnetworkDefaults.PRESET_WALLET, bridge.lastWallet)
@@ -57,9 +47,9 @@ class EngineUrnetworkContractTest {
     }
 
     @Test
-    fun `start с consent и override вызывает bridge с override адресом`() = runTest {
+    fun `start с override вызывает bridge с override адресом`() = runTest {
         val custom = "AAAAbbbbCCCCdddd1111222233334444555566667777"
-        val (e, bridge, _) = engine(consent = true, override = custom, byJwt = "fake.jwt")
+        val (e, bridge, _) = engine(override = custom, byJwt = "fake.jwt")
         val result = e.start(baseConfig, Upstream.None)
         assertIs<StartResult.Success>(result)
         assertEquals(custom, bridge.lastWallet)
@@ -67,7 +57,7 @@ class EngineUrnetworkContractTest {
 
     @Test
     fun `stop вызывает bridge_stop`() = runTest {
-        val (e, bridge, _) = engine(consent = true, byJwt = "fake.jwt")
+        val (e, bridge, _) = engine(byJwt = "fake.jwt")
         e.start(baseConfig, Upstream.None)
         e.stop()
         assertEquals(1, bridge.stopCalls)
@@ -78,7 +68,7 @@ class EngineUrnetworkContractTest {
         val bridge = FakeUrnetworkSdkBridge(
             startResult = UrnetworkSdkBridge.StartResult.Failed("AAR not built"),
         )
-        val (e, _, _) = engine(consent = true, byJwt = "fake.jwt", bridge = bridge)
+        val (e, _, _) = engine(byJwt = "fake.jwt", bridge = bridge)
         val result = e.start(baseConfig, Upstream.None)
         val failure = assertIs<StartResult.Failure>(result)
         assertTrue(failure.reason.contains("AAR not built"))
@@ -87,26 +77,16 @@ class EngineUrnetworkContractTest {
     @Test
     fun `start читает byJwt из store и пробрасывает в bridge`() = runTest {
         val token = "eyJabc.def.ghi"
-        val (e, bridge, _) = engine(consent = true, byJwt = token)
+        val (e, bridge, _) = engine(byJwt = token)
         e.start(baseConfig, Upstream.None)
         assertEquals(token, bridge.lastByJwt)
         assertEquals(1, bridge.startCalls)
     }
 
     @Test
-    fun `start без byJwt и без consent возвращает consent-error без auth call`() = runTest {
-        val auth = FakeAuthService()
-        val (e, _, _) = engine(consent = false, byJwt = null, authService = auth)
-        val r = e.start(baseConfig, Upstream.None)
-        val f = assertIs<StartResult.Failure>(r)
-        assertTrue(f.reason.contains("consent", ignoreCase = true))
-        assertEquals(0, auth.acquireCalls)
-    }
-
-    @Test
-    fun `start с consent но без byJwt — auto-acquire guest jwt + persist + bridge call`() = runTest {
+    fun `start без byJwt — auto-acquire guest jwt + persist + bridge call`() = runTest {
         val auth = FakeAuthService(jwt = "guest.tok.42")
-        val (e, bridge, store) = engine(consent = true, byJwt = null, authService = auth)
+        val (e, bridge, store) = engine(byJwt = null, authService = auth)
         val r = e.start(baseConfig, Upstream.None)
         assertIs<StartResult.Success>(r)
         assertEquals(1, auth.acquireCalls)
@@ -116,9 +96,9 @@ class EngineUrnetworkContractTest {
     }
 
     @Test
-    fun `start с consent + auth fail — Failure без вызова bridge`() = runTest {
+    fun `start auth fail — Failure без вызова bridge`() = runTest {
         val auth = FakeAuthService(error = "no internet")
-        val (e, bridge, store) = engine(consent = true, byJwt = null, authService = auth)
+        val (e, bridge, store) = engine(byJwt = null, authService = auth)
         val r = e.start(baseConfig, Upstream.None)
         val f = assertIs<StartResult.Failure>(r)
         assertTrue(f.reason.contains("guest", ignoreCase = true))
@@ -129,7 +109,7 @@ class EngineUrnetworkContractTest {
     @Test
     fun `start с уже сохранённым byJwt не вызывает auth повторно`() = runTest {
         val auth = FakeAuthService(jwt = "should-not-use")
-        val (e, bridge, _) = engine(consent = true, byJwt = "existing.jwt", authService = auth)
+        val (e, bridge, _) = engine(byJwt = "existing.jwt", authService = auth)
         e.start(baseConfig, Upstream.None)
         assertEquals(0, auth.acquireCalls)
         assertEquals("existing.jwt", bridge.lastByJwt)
@@ -143,7 +123,7 @@ class EngineUrnetworkContractTest {
 
     @Test
     fun `attachTun проксирует в bridge с тем же fd`() = runTest {
-        val (e, bridge, _) = engine(consent = true, byJwt = "fake.jwt")
+        val (e, bridge, _) = engine(byJwt = "fake.jwt")
         e.start(baseConfig, Upstream.None)
         val acceptor = e as ru.ozero.enginescore.TunFdAcceptor
         val r = acceptor.attachTun(42)
@@ -154,7 +134,7 @@ class EngineUrnetworkContractTest {
 
     @Test
     fun `start требует Upstream_None как и ByeDpi`() = runTest {
-        val (e, _, _) = engine(consent = true)
+        val (e, _, _) = engine()
         runCatching {
             e.start(baseConfig, Upstream.Socks5("127.0.0.1", 1080))
         }.fold(
@@ -170,7 +150,7 @@ class EngineUrnetworkContractTest {
 
     @Test
     fun `start требует EngineConfig_Urnetwork — другие типы throw IllegalArgumentException`() = runTest {
-        val (e, _, _) = engine(consent = true)
+        val (e, _, _) = engine()
         val wrongConfig = EngineConfig.ByeDpi(args = "", socksPort = 1080)
         val ex = runCatching { e.start(wrongConfig, Upstream.None) }.exceptionOrNull()
         assertTrue(
@@ -211,7 +191,7 @@ class EngineUrnetworkContractTest {
     @Test
     fun `start success возвращает StartResult_Success с socksPort из config`() = runTest {
         val cfg = EngineConfig.Urnetwork(jwtToken = "", socksPort = 4242)
-        val (e, _, _) = engine(consent = true, byJwt = "tok")
+        val (e, _, _) = engine(byJwt = "tok")
         val r = e.start(cfg, Upstream.None)
         val s = assertIs<StartResult.Success>(r)
         assertEquals(
@@ -223,11 +203,9 @@ class EngineUrnetworkContractTest {
     }
 
     private class FakeUrnetworkConfigStore(
-        consent: Boolean,
         override: String?,
         byJwt: String? = null,
     ) : UrnetworkConfigStore {
-        private val consentFlow = MutableStateFlow(consent)
         private val overrideFlow = MutableStateFlow(override)
         val byJwtFlow = MutableStateFlow(byJwt)
         override fun walletAddress(): Flow<String> =
@@ -235,13 +213,6 @@ class EngineUrnetworkContractTest {
         override fun walletOverride(): Flow<String?> = overrideFlow
         override suspend fun setWalletOverride(value: String?) {
             overrideFlow.value = value
-        }
-        override fun consentGranted(): Flow<Boolean> = consentFlow
-        override suspend fun markConsentGranted() {
-            consentFlow.value = true
-        }
-        override suspend fun revokeConsent() {
-            consentFlow.value = false
         }
         override fun byJwt(): Flow<String?> = byJwtFlow
         override suspend fun setByJwt(value: String?) {

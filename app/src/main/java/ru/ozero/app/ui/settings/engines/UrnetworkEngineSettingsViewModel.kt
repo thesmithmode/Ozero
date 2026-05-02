@@ -6,7 +6,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import javax.inject.Inject
@@ -26,9 +25,6 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            if (!store.consentGranted().first()) {
-                store.markConsentGranted()
-            }
             _uiState.value = UrnetworkSettingsUiState.Ready
         }
     }

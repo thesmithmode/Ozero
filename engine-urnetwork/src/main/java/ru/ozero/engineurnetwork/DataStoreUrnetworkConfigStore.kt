@@ -2,7 +2,6 @@ package ru.ozero.engineurnetwork
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
@@ -30,18 +29,6 @@ class DataStoreUrnetworkConfigStore(
         }
     }
 
-    override fun consentGranted(): Flow<Boolean> = dataStore.data.map { prefs ->
-        prefs[KEY_CONSENT] == true
-    }
-
-    override suspend fun markConsentGranted() {
-        dataStore.edit { prefs -> prefs[KEY_CONSENT] = true }
-    }
-
-    override suspend fun revokeConsent() {
-        dataStore.edit { prefs -> prefs.remove(KEY_CONSENT) }
-    }
-
     override fun byJwt(): Flow<String?> = dataStore.data.map { prefs ->
         prefs[KEY_BY_JWT]?.takeIf { it.isNotBlank() }
     }
@@ -58,7 +45,6 @@ class DataStoreUrnetworkConfigStore(
 
     private companion object {
         val KEY_WALLET_OVERRIDE = stringPreferencesKey("urnetwork_wallet_override")
-        val KEY_CONSENT = booleanPreferencesKey("urnetwork_consent")
         val KEY_BY_JWT = stringPreferencesKey("urnetwork_by_jwt")
     }
 }

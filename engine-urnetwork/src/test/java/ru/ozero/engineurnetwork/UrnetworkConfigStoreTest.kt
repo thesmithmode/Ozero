@@ -9,9 +9,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 class UrnetworkConfigStoreTest {
 
@@ -43,27 +41,6 @@ class UrnetworkConfigStoreTest {
         store.setWalletOverride(null)
         assertEquals(UrnetworkDefaults.PRESET_WALLET, store.walletAddress().first())
         assertNull(store.walletOverride().first())
-    }
-
-    @Test
-    fun `consentGranted по умолчанию false`() = runTest {
-        val (store, _) = newStore()
-        assertFalse(store.consentGranted().first())
-    }
-
-    @Test
-    fun `markConsentGranted ставит флаг в true`() = runTest {
-        val (store, _) = newStore()
-        store.markConsentGranted()
-        assertTrue(store.consentGranted().first())
-    }
-
-    @Test
-    fun `revokeConsent очищает флаг`() = runTest {
-        val (store, _) = newStore()
-        store.markConsentGranted()
-        store.revokeConsent()
-        assertFalse(store.consentGranted().first())
     }
 
     @Test

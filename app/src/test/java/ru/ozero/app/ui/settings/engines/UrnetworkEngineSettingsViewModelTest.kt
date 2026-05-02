@@ -15,7 +15,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkDefaults
-import kotlin.test.assertEquals
 import kotlin.test.assertSame
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -36,56 +35,6 @@ class UrnetworkEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `init авто-грантит consent когда он не дан`() = runTest {
-        store.setConsentRaw(false)
-        val vm = UrnetworkEngineSettingsViewModel(store)
-        advanceUntilIdle()
-        assertEquals(1, store.markConsentCalls)
-        assertSame(UrnetworkSettingsUiState.Ready, vm.uiState.value)
-    }
-
-    @Test
-    fun `init НЕ зовёт markConsentGranted если consent уже дан`() = runTest {
-        store.setConsentRaw(true)
-        val vm = UrnetworkEngineSettingsViewModel(store)
-        advanceUntilIdle()
-        assertEquals(0, store.markConsentCalls)
-        assertSame(UrnetworkSettingsUiState.Ready, vm.uiState.value)
-    }
-
-    @Test
-    fun `init никогда не зовёт setWalletOverride — кошелёк юзеру невидим`() = runTest {
-        store.setConsentRaw(false)
-        UrnetworkEngineSettingsViewModel(store)
-        advanceUntilIdle()
-        assertEquals(0, store.setOverrideCalls.size)
-    }
-
-    @Test
-    fun `init никогда не зовёт revokeConsent — кнопка отзыва удалена из UI`() = runTest {
-        store.setConsentRaw(true)
-        UrnetworkEngineSettingsViewModel(store)
-        advanceUntilIdle()
-        assertEquals(0, store.revokeConsentCalls)
-    }
-
-    @Test
-    fun `PRESET_WALLET никогда не утекает в store через VM — sentinel против регрессии`() = runTest {
-        UrnetworkEngineSettingsViewModel(store)
-        advanceUntilIdle()
-        assertEquals(
-            emptyList<String?>(),
-            store.setOverrideCalls,
-            "VM не должен трогать walletOverride — preset зашит в store, юзер не видит и не редактирует.",
-        )
-        store.setOverrideCalls.forEach { value ->
-            assert(value != UrnetworkDefaults.PRESET_WALLET) {
-                "PRESET_WALLET записан через VM — утечка реферального кошелька в writable layer."
-            }
-        }
-    }
-
-    @Test
     fun `uiState стартует как Loading и переходит в Ready`() = runTest {
         val vm = UrnetworkEngineSettingsViewModel(store)
         assertSame(UrnetworkSettingsUiState.Loading, vm.uiState.value)
@@ -93,38 +42,36 @@ class UrnetworkEngineSettingsViewModelTest {
         assertSame(UrnetworkSettingsUiState.Ready, vm.uiState.value)
     }
 
-    private class FakeUrnetworkConfigStore : UrnetworkConfigStore {
-        private val override = MutableStateFlow<String?>(null)
-        private val consent = MutableStateFlow(false)
+    @Test
+    fun `init никогда не зовёт setWalletOverride — кошелёк юзеру невидим`() = runTest {
+        UrnetworkEngineSettingsViewModel(store)
+        advanceUntilIdle()
+        assertSame(emptyList<String?>(), store.setOverrideCalls)
+    }
 
-        val setOverrideCalls = mutableListOf<String?>()
-        var markConsentCalls: Int = 0
-        var revokeConsentCalls: Int = 0
-
-        fun setConsentRaw(value: Boolean) {
-            consent.value = value
+    @Test
+    fun `PRESET_WALLET никогда не утекает в store через VM — sentinel против регрессии`() = runTest {
+        UrnetworkEngineSettingsViewModel(store)
+        advanceUntilIdle()
+        store.setOverrideCalls.forEach { value ->
+            assert(value != UrnetworkDefaults.PRESET_WALLET) {
+                "PRESET_WALLET записан через VM — утечка реферального кошелька в writable layer."
+            }
         }
+    }
+
+    private class FakeUrnetworkConfigStore : UrnetworkConfigStore {
+        private val overrideFlow = MutableStateFlow<String?>(null)
+        val setOverrideCalls = mutableListOf<String?>()
 
         override fun walletAddress(): Flow<String> =
-            override.map { it ?: UrnetworkDefaults.PRESET_WALLET }
-        override fun walletOverride(): Flow<String?> = override
+            overrideFlow.map { it ?: UrnetworkDefaults.PRESET_WALLET }
+        override fun walletOverride(): Flow<String?> = overrideFlow
         override suspend fun setWalletOverride(value: String?) {
             setOverrideCalls += value
-            override.value = value
+            overrideFlow.value = value
         }
-        override fun consentGranted(): Flow<Boolean> = consent
-        override suspend fun markConsentGranted() {
-            markConsentCalls++
-            consent.value = true
-        }
-        override suspend fun revokeConsent() {
-            revokeConsentCalls++
-            consent.value = false
-        }
-        private val byJwtFlow = MutableStateFlow<String?>(null)
-        override fun byJwt(): Flow<String?> = byJwtFlow
-        override suspend fun setByJwt(value: String?) {
-            byJwtFlow.value = value
-        }
+        override fun byJwt(): Flow<String?> = MutableStateFlow(null)
+        override suspend fun setByJwt(value: String?) = Unit
     }
 }
