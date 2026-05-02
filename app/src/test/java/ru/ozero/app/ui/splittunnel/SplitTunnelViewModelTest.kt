@@ -167,5 +167,6 @@ class SplitTunnelViewModelTest {
         override suspend fun setHostsMode(mode: ru.ozero.enginescore.settings.HostsMode) = Unit
         override suspend fun setHosts(hosts: List<String>) = Unit
         override suspend fun setUiLocaleTag(tag: String?) = Unit
+        override suspend fun setAppMode(mode: ru.ozero.enginescore.settings.AppMode) = Unit
     }
 }

@@ -8,7 +8,6 @@ import com.bringyour.sdk.NetworkSpace
 import com.bringyour.sdk.NetworkSpaceManager
 import com.bringyour.sdk.Sdk
 import ru.ozero.enginescore.PersistentLoggers
-import ru.ozero.userwireguard.userwgbind.Userwgbind
 import java.util.concurrent.atomic.AtomicReference
 
 class RealUrnetworkSdkBridge(
@@ -88,8 +87,6 @@ class RealUrnetworkSdkBridge(
             runCatching { loop.close() }
                 .onFailure { PersistentLoggers.warn(TAG, "ioLoop.close threw: ${it.message}") }
         }
-        runCatching { Userwgbind.stopUserWg() }
-            .onFailure { PersistentLoggers.warn(TAG, "Userwgbind.stopUserWg threw: ${it.message}") }
         deviceRef.getAndSet(null)?.also { device ->
             runCatching { device.setTunnelStarted(false) }
                 .onFailure { PersistentLoggers.warn(TAG, "setTunnelStarted(false) threw: ${it.message}") }

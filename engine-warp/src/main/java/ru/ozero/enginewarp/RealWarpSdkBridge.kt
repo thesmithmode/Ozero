@@ -6,7 +6,6 @@ import com.wireguard.android.backend.Tunnel
 import com.wireguard.config.Config
 import com.wireguard.config.Interface
 import com.wireguard.config.Peer
-import com.wireguard.crypto.Key
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import ru.ozero.enginescore.PersistentLoggers
@@ -77,10 +76,6 @@ class RealWarpSdkBridge(
         // TODO link via DI: persistent keepalive interval (WARP recommends 25s
         // на CGNAT/мобильных сетях; нужно поднять из WarpConfig когда добавится
         // поле keepaliveSeconds).
-
-        // Touch Key just to ensure crypto module loads on path before backend
-        // setState (early failure surfaces в start() catch вместо JNI later).
-        Key.fromBase64(config.publicKey)
 
         return Config.Builder()
             .setInterface(ifaceBuilder.build())

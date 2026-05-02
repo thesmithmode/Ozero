@@ -15,7 +15,6 @@ dependencies {
     implementation(libs.datastore.preferences)
 
     implementation(libs.wireguard.android.tunnel)
-    implementation(libs.bundles.bouncycastle)
 
     testImplementation(libs.bundles.junit5)
     testRuntimeOnly(libs.junit.jupiter.engine)

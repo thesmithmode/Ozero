@@ -8,10 +8,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.app.ui.theme.OzeroTheme
 import ru.ozero.enginescore.settings.SplitTunnelMode
-import ru.ozero.enginescore.EngineId
 
 @RunWith(AndroidJUnit4::class)
 class SettingsScreenTest {
@@ -141,6 +142,39 @@ class SettingsScreenTest {
             .performClick()
 
         assert(clicked) { "BYEDPI radio click did not invoke callback" }
+    }
+
+    @Test
+    fun appModeSectionIsDisplayedWithSimpleSelected() {
+        renderContent(SettingsModel.DEFAULT)
+
+        composeRule.onNodeWithTag(SettingsTestTags.APP_MODE_SECTION).assertIsDisplayed()
+        composeRule.onNodeWithTag(SettingsTestTags.APP_MODE_SIMPLE).assertIsDisplayed()
+        composeRule.onNodeWithTag(SettingsTestTags.APP_MODE_EXPERT).assertIsDisplayed()
+    }
+
+    @Test
+    fun appModeSelectExpertInvokesCallback() {
+        val captured = mutableListOf<AppMode>()
+        composeRule.setContent {
+            OzeroTheme {
+                SettingsScreenContent(
+                    state = SettingsUiState.Content(SettingsModel.DEFAULT),
+                    onBack = {},
+                    onSplitModeChange = {},
+                    onIpv6Toggle = {},
+                    onAutoStartToggle = {},
+                    onManualEngineSelect = {},
+                    onAppModeSelect = { captured += it },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(SettingsTestTags.APP_MODE_EXPERT).performClick()
+
+        assert(captured == listOf(AppMode.EXPERT)) {
+            "expected EXPERT callback, got $captured"
+        }
     }
 
     private fun renderContent(model: SettingsModel) {

@@ -107,6 +107,9 @@
     <string name="split_tunnel_short_bypass_lan">Bypass LAN</string>
     <string name="split_tunnel_short_allowlist">Allowlist</string>
     <string name="split_tunnel_short_blocklist">Blocklist</string>
+    <string name="split_tunnel_selected_count">Selected: %1$d</string>
+    <string name="split_tunnel_clear_all">Clear</string>
+    <string name="split_tunnel_mode_hint">The app list applies only in Allowlist and Blocklist modes.</string>
 
     <!-- Servers (double-hop) -->
     <string name="servers_title">Servers — Double-hop</string>
@@ -173,14 +176,6 @@
     <string name="urnetwork_settings_title">URnetwork</string>
     <string name="urnetwork_consent_warning_title">Warning</string>
     <string name="urnetwork_consent_warning_body">URnetwork is a P2P network where every participant can act as an exit node. If you enable URnetwork, your device will relay other users\' traffic to the open internet from your own IP address. This may attract attention from your ISP and carries legal risks in some jurisdictions. Enable only if you understand the consequences. URx tokens on Solana are credited for exit-node traffic.</string>
-    <string name="urnetwork_consent_accept">I understand, enable</string>
-    <string name="urnetwork_consent_revoke">Revoke consent</string>
-    <string name="urnetwork_wallet_label">Solana wallet</string>
-    <string name="urnetwork_wallet_hint">Enter your Solana address to receive tokens for your exit-node traffic. Leave empty to skip earning.</string>
-    <string name="urnetwork_wallet_placeholder">Solana base58 address (32-44 chars)</string>
-    <string name="urnetwork_wallet_save">Save</string>
-    <string name="urnetwork_wallet_reset">Clear</string>
-    <string name="urnetwork_wallet_invalid">Invalid Solana address (32-44 base58 chars)</string>
     <string name="settings_urnetwork_title">URnetwork</string>
     <string name="settings_urnetwork_summary">P2P mesh — exit-node + Solana wallet</string>
 
@@ -192,9 +187,20 @@
     <string name="warp_generate">Generate</string>
     <string name="warp_regenerate">Regenerate</string>
     <string name="warp_clear">Clear</string>
-    <string name="warp_registering">Registering…</string>
+    <string name="warp_registering">Fetching WARP config from mirrors… (up to 4 min)</string>
     <string name="warp_endpoint_label">Endpoint:</string>
     <string name="warp_license_label">License:</string>
+
+    <!-- App mode -->
+    <string name="settings_app_mode_title">Interface mode</string>
+    <string name="settings_app_mode_simple">Simple</string>
+    <string name="settings_app_mode_simple_hint">One button and a country. Ozero picks the engine automatically.</string>
+    <string name="settings_app_mode_expert">Expert</string>
+    <string name="settings_app_mode_expert_hint">Manual engine selection, traffic stats, advanced settings.</string>
+
+    <!-- Onboarding mode pick -->
+    <string name="onboarding_mode_title">Choose a mode</string>
+    <string name="onboarding_mode_body">You can change this any time in Settings.</string>
 
     <!-- Stats history -->
     <string name="stats_history_title">Session history</string>
@@ -205,4 +211,5 @@
     <string name="stats_history_status_failed">Failed</string>
     <string name="stats_history_status_label">Status: %1$s</string>
     <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
+    <string name="engine_chip_auto">Auto</string>
 </resources>

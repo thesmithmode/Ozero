@@ -28,4 +28,6 @@ object SettingsKeys {
     val HOSTS_LIST = stringPreferencesKey("hosts_list")
 
     val UI_LOCALE_TAG = stringPreferencesKey("ui_locale_tag")
+
+    val APP_MODE = stringPreferencesKey("app_mode")
 }

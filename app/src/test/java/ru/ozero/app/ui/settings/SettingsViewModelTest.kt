@@ -14,10 +14,11 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginescore.settings.SplitTunnelMode
-import ru.ozero.enginescore.EngineId
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
@@ -113,6 +114,15 @@ class SettingsViewModelTest {
         assertEquals(listOf(EngineId.BYEDPI, null), repository.manualEngineUpdates)
     }
 
+    @Test
+    fun `onAppModeSelect persists EXPERT then round-trips back to SIMPLE`() = runTest(dispatcher) {
+        viewModel.onAppModeSelect(AppMode.EXPERT)
+        advanceUntilIdle()
+        viewModel.onAppModeSelect(AppMode.SIMPLE)
+        advanceUntilIdle()
+        assertEquals(listOf(AppMode.EXPERT, AppMode.SIMPLE), repository.appModeUpdates)
+    }
+
     private class FakeSettingsRepository : SettingsRepository {
         private val state = MutableStateFlow<SettingsModel?>(null)
 
@@ -120,6 +130,7 @@ class SettingsViewModelTest {
         val ipv6Updates = mutableListOf<Boolean>()
         val autoStartUpdates = mutableListOf<Boolean>()
         val manualEngineUpdates = mutableListOf<EngineId?>()
+        val appModeUpdates = mutableListOf<AppMode>()
 
         fun emit(model: SettingsModel) {
             state.value = model
@@ -151,5 +162,8 @@ class SettingsViewModelTest {
         override suspend fun setHostsMode(mode: ru.ozero.enginescore.settings.HostsMode) = Unit
         override suspend fun setHosts(hosts: List<String>) = Unit
         override suspend fun setUiLocaleTag(tag: String?) = Unit
+        override suspend fun setAppMode(mode: AppMode) {
+            appModeUpdates += mode
+        }
     }
 }

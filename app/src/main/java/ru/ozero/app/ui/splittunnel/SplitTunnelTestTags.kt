@@ -9,4 +9,7 @@ object SplitTunnelTestTags {
     const val APP_ROW_PREFIX = "split_tunnel_app_"
     const val EMPTY = "split_tunnel_empty"
     const val LOADING = "split_tunnel_loading"
+    const val SELECTED_COUNT = "split_tunnel_selected_count"
+    const val CLEAR_ALL = "split_tunnel_clear_all"
+    const val MODE_HINT = "split_tunnel_mode_hint"
 }

@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ru.ozero.app.settings.UserFlagsRepository
 import ru.ozero.app.ui.settings.LocaleApplier
+import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.SettingsRepository
 import javax.inject.Inject
 
@@ -33,11 +34,23 @@ class OnboardingViewModel @Inject constructor(
             initialValue = null,
         )
 
+    val currentAppMode: StateFlow<AppMode> = settingsRepository.settings
+        .map { it.appMode }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+            initialValue = AppMode.SIMPLE,
+        )
+
     fun onLocaleSelect(tag: String?) {
         viewModelScope.launch {
             settingsRepository.setUiLocaleTag(tag)
             LocaleApplier.apply(tag)
         }
+    }
+
+    fun onAppModeSelect(mode: AppMode) {
+        viewModelScope.launch { settingsRepository.setAppMode(mode) }
     }
 
     fun onNext() {
@@ -63,7 +76,7 @@ class OnboardingViewModel @Inject constructor(
     }
 
     companion object {
-        const val TOTAL_PAGES: Int = 4
+        const val TOTAL_PAGES: Int = 5
         private const val STOP_TIMEOUT_MS = 5_000L
     }
 }

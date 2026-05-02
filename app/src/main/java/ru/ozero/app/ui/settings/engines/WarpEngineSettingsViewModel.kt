@@ -29,10 +29,19 @@ class WarpEngineSettingsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(WarpSettingsUiState())
     val uiState: StateFlow<WarpSettingsUiState> = _uiState.asStateFlow()
 
+    private var autoTriggered: Boolean = false
+
     init {
         store.current()
             .onEach { cfg ->
                 _uiState.value = _uiState.value.copy(currentConfig = cfg)
+                if (cfg == null && !autoTriggered &&
+                    !_uiState.value.isRegistering &&
+                    _uiState.value.errorMessage == null
+                ) {
+                    autoTriggered = true
+                    onGenerate()
+                }
             }
             .launchIn(viewModelScope)
     }

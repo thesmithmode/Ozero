@@ -116,6 +116,9 @@
     <string name="split_tunnel_short_bypass_lan">Без LAN</string>
     <string name="split_tunnel_short_allowlist">Allowlist</string>
     <string name="split_tunnel_short_blocklist">Blocklist</string>
+    <string name="split_tunnel_selected_count">Выбрано: %1$d</string>
+    <string name="split_tunnel_clear_all">Очистить</string>
+    <string name="split_tunnel_mode_hint">Список приложений активен только в режимах Allowlist и Blocklist.</string>
 
     <!-- Servers (double-hop) -->
     <string name="servers_title">Серверы — Double-hop</string>
@@ -182,14 +185,6 @@
     <string name="urnetwork_settings_title">URnetwork</string>
     <string name="urnetwork_consent_warning_title">Внимание</string>
     <string name="urnetwork_consent_warning_body">URnetwork — P2P-сеть, в которой каждый участник может работать как exit-node. Если вы включите URnetwork, ваше устройство будет передавать чужой трафик в открытый интернет от своего IP-адреса. Это может приводить к подозрениям со стороны провайдера и юридическим рискам в некоторых юрисдикциях. Включайте только если понимаете последствия. За exit-node трафик начисляются токены URx на Solana-кошелёк.</string>
-    <string name="urnetwork_consent_accept">Я понимаю, включить</string>
-    <string name="urnetwork_consent_revoke">Отозвать согласие</string>
-    <string name="urnetwork_wallet_label">Solana-кошелёк</string>
-    <string name="urnetwork_wallet_hint">Введите ваш Solana-адрес, чтобы получать токены за свой exit-node трафик. Если оставить поле пустым — токены не начисляются.</string>
-    <string name="urnetwork_wallet_placeholder">Solana base58 адрес (32-44 символа)</string>
-    <string name="urnetwork_wallet_save">Сохранить</string>
-    <string name="urnetwork_wallet_reset">Очистить</string>
-    <string name="urnetwork_wallet_invalid">Невалидный Solana-адрес (32-44 символа base58)</string>
     <string name="settings_urnetwork_title">URnetwork</string>
     <string name="settings_urnetwork_summary">P2P mesh — exit-node + Solana-кошелёк</string>
 
@@ -201,9 +196,20 @@
     <string name="warp_generate">Сгенерировать</string>
     <string name="warp_regenerate">Перегенерировать</string>
     <string name="warp_clear">Удалить</string>
-    <string name="warp_registering">Регистрация…</string>
+    <string name="warp_registering">Получаем конфиг WARP с зеркал… (до 4 минут)</string>
     <string name="warp_endpoint_label">Endpoint:</string>
     <string name="warp_license_label">Лицензия:</string>
+
+    <!-- App mode -->
+    <string name="settings_app_mode_title">Режим интерфейса</string>
+    <string name="settings_app_mode_simple">Простой</string>
+    <string name="settings_app_mode_simple_hint">Одна кнопка и страна. Ozero выберет протокол сам.</string>
+    <string name="settings_app_mode_expert">Экспертный</string>
+    <string name="settings_app_mode_expert_hint">Ручной выбор движка, статистика трафика, расширенные настройки.</string>
+
+    <!-- Onboarding mode pick -->
+    <string name="onboarding_mode_title">Выберите режим</string>
+    <string name="onboarding_mode_body">Можно изменить в любой момент в Настройках.</string>
 
     <!-- Stats history -->
     <string name="stats_history_title">История сессий</string>
@@ -214,4 +220,5 @@
     <string name="stats_history_status_failed">Сбой</string>
     <string name="stats_history_status_label">Статус: %1$s</string>
     <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
+    <string name="engine_chip_auto">Авто</string>
 </resources>

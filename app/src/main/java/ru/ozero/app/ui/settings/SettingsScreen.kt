@@ -38,9 +38,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
+import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SplitTunnelMode
-import ru.ozero.enginescore.EngineId
 
 @Composable
 fun SettingsScreen(
@@ -79,6 +80,7 @@ fun SettingsScreen(
         onAutoStartToggle = viewModel::onAutoStartToggle,
         onManualEngineSelect = viewModel::onManualEngineSelect,
         onUiLocaleSelect = viewModel::onUiLocaleSelect,
+        onAppModeSelect = viewModel::onAppModeSelect,
     )
 }
 
@@ -94,6 +96,7 @@ fun SettingsScreenContent(
     onAutoStartToggle: (Boolean) -> Unit,
     onManualEngineSelect: (EngineId?) -> Unit,
     onUiLocaleSelect: (String?) -> Unit = {},
+    onAppModeSelect: (AppMode) -> Unit = {},
 ) {
     Scaffold(
         modifier = Modifier.testTag(SettingsTestTags.SCREEN),
@@ -126,6 +129,7 @@ fun SettingsScreenContent(
                     onAutoStartToggle = onAutoStartToggle,
                     onManualEngineSelect = onManualEngineSelect,
                     onUiLocaleSelect = onUiLocaleSelect,
+                    onAppModeSelect = onAppModeSelect,
                 )
         }
     }
@@ -154,11 +158,19 @@ private fun ContentBody(
     onAutoStartToggle: (Boolean) -> Unit,
     onManualEngineSelect: (EngineId?) -> Unit,
     onUiLocaleSelect: (String?) -> Unit = {},
+    onAppModeSelect: (AppMode) -> Unit = {},
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
         contentPadding = PaddingValues(vertical = 8.dp),
     ) {
+        item {
+            AppModeSection(
+                currentMode = model.appMode,
+                onSelect = onAppModeSelect,
+            )
+        }
+        item { SectionDivider() }
         item {
             ConnectionSection(
                 splitMode = model.splitMode,
@@ -207,6 +219,75 @@ private fun ContentBody(
         item { LogsSection(onOpenLogs = nav.onOpenLogs) }
         item { SectionDivider() }
         item { AboutSection(onOpenAbout = nav.onOpenAbout) }
+    }
+}
+
+@Composable
+private fun AppModeSection(
+    currentMode: AppMode,
+    onSelect: (AppMode) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(SettingsTestTags.APP_MODE_SECTION),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_app_mode_title),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .selectable(
+                    selected = currentMode == AppMode.SIMPLE,
+                    onClick = { onSelect(AppMode.SIMPLE) },
+                    role = Role.RadioButton,
+                )
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .testTag(SettingsTestTags.APP_MODE_SIMPLE),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RadioButton(selected = currentMode == AppMode.SIMPLE, onClick = null)
+            Column(modifier = Modifier.padding(start = 12.dp)) {
+                Text(
+                    text = stringResource(R.string.settings_app_mode_simple),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    text = stringResource(R.string.settings_app_mode_simple_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                )
+            }
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .selectable(
+                    selected = currentMode == AppMode.EXPERT,
+                    onClick = { onSelect(AppMode.EXPERT) },
+                    role = Role.RadioButton,
+                )
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .testTag(SettingsTestTags.APP_MODE_EXPERT),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RadioButton(selected = currentMode == AppMode.EXPERT, onClick = null)
+            Column(modifier = Modifier.padding(start = 12.dp)) {
+                Text(
+                    text = stringResource(R.string.settings_app_mode_expert),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    text = stringResource(R.string.settings_app_mode_expert_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                )
+            }
+        }
     }
 }
 

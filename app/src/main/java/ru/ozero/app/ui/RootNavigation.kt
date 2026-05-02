@@ -18,7 +18,6 @@ import ru.ozero.app.ui.settings.engines.WarpEngineSettingsScreen
 import ru.ozero.app.ui.splittunnel.SplitTunnelScreen
 import ru.ozero.app.ui.stats.StatsHistoryScreen
 import ru.ozero.app.ui.strategy.StrategyTestScreen
-import ru.ozero.app.ui.subs.SubscriptionsScreen
 
 @Composable
 fun RootNavigation(
@@ -64,15 +63,12 @@ fun RootNavigation(
         TopScreen.StrategyTest -> StrategyTestScreen(onBack = { back() })
         TopScreen.ManualServer -> ManualServerScreen(onBack = { back() })
         TopScreen.StatsHistory -> StatsHistoryScreen(onBack = { back() })
-        TopScreen.Subscriptions -> SubscriptionsScreen(onBack = { back() })
         TopScreen.Main ->
             MainScreen(
                 viewModel = viewModel,
                 onConnectClick = onConnectClick,
                 onOpenSettings = { navigate(TopScreen.Settings) },
                 onOpenServers = { navigate(TopScreen.Servers) },
-                onOpenStats = { navigate(TopScreen.StatsHistory) },
-                onOpenSubs = { navigate(TopScreen.Subscriptions) },
             )
     }
 }

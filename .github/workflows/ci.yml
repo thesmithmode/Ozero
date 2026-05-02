@@ -115,24 +115,21 @@ jobs:
       - name: Download native binaries
         run: ./gradlew :engine-byedpi:downloadBinaries --stacktrace
 
-      - name: Download URnetwork AARs (urnetwork-sdk + userwireguard)
+      - name: Download URnetwork AAR (urnetwork-sdk only — Portal Tor parity)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           mkdir -p engine-urnetwork/libs
-          for ENGINE in urnetwork-sdk userwireguard; do
-            TAG=$(gh release list --limit 100 --json tagName \
-              | grep -oE "\"${ENGINE}-[a-f0-9]{8}\"" \
-              | head -n1 | tr -d '"')
-            if [ -z "$TAG" ]; then
-              echo "::error::no $ENGINE release found"
-              exit 1
-            fi
-            echo "Download $TAG"
-            gh release download "$TAG" -p "*" -D engine-urnetwork/libs --clobber
-          done
-          bash tools/strip-urnetwork-go-runtime.sh engine-urnetwork/libs
+          TAG=$(gh release list --limit 100 --json tagName \
+            | grep -oE '"urnetwork-sdk-[a-f0-9]{8}"' \
+            | head -n1 | tr -d '"')
+          if [ -z "$TAG" ]; then
+            echo "::error::no urnetwork-sdk release found"
+            exit 1
+          fi
+          echo "Download $TAG"
+          gh release download "$TAG" -p "*" -D engine-urnetwork/libs --clobber
           ls -la engine-urnetwork/libs/
 
       - name: assembleDebug
@@ -178,24 +175,21 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' }}
 
-      - name: Download URnetwork AARs (urnetwork-sdk + userwireguard)
+      - name: Download URnetwork AAR (urnetwork-sdk only — Portal Tor parity)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           mkdir -p engine-urnetwork/libs
-          for ENGINE in urnetwork-sdk userwireguard; do
-            TAG=$(gh release list --limit 100 --json tagName \
-              | grep -oE "\"${ENGINE}-[a-f0-9]{8}\"" \
-              | head -n1 | tr -d '"')
-            if [ -z "$TAG" ]; then
-              echo "::error::no $ENGINE release found"
-              exit 1
-            fi
-            echo "Download $TAG"
-            gh release download "$TAG" -p "*" -D engine-urnetwork/libs --clobber
-          done
-          bash tools/strip-urnetwork-go-runtime.sh engine-urnetwork/libs
+          TAG=$(gh release list --limit 100 --json tagName \
+            | grep -oE '"urnetwork-sdk-[a-f0-9]{8}"' \
+            | head -n1 | tr -d '"')
+          if [ -z "$TAG" ]; then
+            echo "::error::no urnetwork-sdk release found"
+            exit 1
+          fi
+          echo "Download $TAG"
+          gh release download "$TAG" -p "*" -D engine-urnetwork/libs --clobber
           ls -la engine-urnetwork/libs/
 
       - name: testDebugUnitTest + coverage report and gate

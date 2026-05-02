@@ -36,6 +36,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import ru.ozero.app.R
 import ru.ozero.app.ui.settings.LocaleApplier
+import ru.ozero.enginescore.settings.AppMode
 
 @Composable
 fun OnboardingScreen(
@@ -44,13 +45,16 @@ fun OnboardingScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val currentLocale by viewModel.currentLocale.collectAsStateWithLifecycle()
+    val currentAppMode by viewModel.currentAppMode.collectAsStateWithLifecycle()
     LaunchedEffect(state.completed) {
         if (state.completed) onCompleted()
     }
     OnboardingContent(
         pageIndex = state.pageIndex,
         currentLocaleTag = currentLocale,
+        currentAppMode = currentAppMode,
         onLocaleSelect = viewModel::onLocaleSelect,
+        onAppModeSelect = viewModel::onAppModeSelect,
         onNext = viewModel::onNext,
         onSkip = viewModel::onSkip,
         onFinish = viewModel::onFinish,
@@ -61,7 +65,9 @@ fun OnboardingScreen(
 fun OnboardingContent(
     pageIndex: Int,
     currentLocaleTag: String?,
+    currentAppMode: AppMode,
     onLocaleSelect: (String?) -> Unit,
+    onAppModeSelect: (AppMode) -> Unit,
     onNext: () -> Unit,
     onSkip: () -> Unit,
     onFinish: () -> Unit,
@@ -97,6 +103,10 @@ fun OnboardingContent(
                     1 -> StaticPage(R.string.onboarding_title_1, R.string.onboarding_body_1)
                     2 -> StaticPage(R.string.onboarding_title_2, R.string.onboarding_body_2)
                     3 -> StaticPage(R.string.onboarding_title_3, R.string.onboarding_body_3)
+                    4 -> ModePickStep(
+                        currentMode = currentAppMode,
+                        onSelect = onAppModeSelect,
+                    )
                 }
             }
             Row(
@@ -123,6 +133,87 @@ fun OnboardingContent(
                         modifier = Modifier.testTag("onboarding_finish"),
                     ) { Text(stringResource(R.string.onboarding_finish)) }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModePickStep(
+    currentMode: AppMode,
+    onSelect: (AppMode) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.Start,
+    ) {
+        Text(
+            text = stringResource(R.string.onboarding_mode_title),
+            style = MaterialTheme.typography.headlineMedium,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.onboarding_mode_body),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .selectable(
+                    selected = currentMode == AppMode.SIMPLE,
+                    onClick = { onSelect(AppMode.SIMPLE) },
+                    role = Role.RadioButton,
+                )
+                .padding(vertical = 8.dp)
+                .testTag("onboarding_mode_simple"),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RadioButton(
+                selected = currentMode == AppMode.SIMPLE,
+                onClick = { onSelect(AppMode.SIMPLE) },
+            )
+            Column(modifier = Modifier.padding(start = 12.dp)) {
+                Text(
+                    text = stringResource(R.string.settings_app_mode_simple),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    text = stringResource(R.string.settings_app_mode_simple_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .selectable(
+                    selected = currentMode == AppMode.EXPERT,
+                    onClick = { onSelect(AppMode.EXPERT) },
+                    role = Role.RadioButton,
+                )
+                .padding(vertical = 8.dp)
+                .testTag("onboarding_mode_expert"),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RadioButton(
+                selected = currentMode == AppMode.EXPERT,
+                onClick = { onSelect(AppMode.EXPERT) },
+            )
+            Column(modifier = Modifier.padding(start = 12.dp)) {
+                Text(
+                    text = stringResource(R.string.settings_app_mode_expert),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    text = stringResource(R.string.settings_app_mode_expert_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

@@ -43,19 +43,41 @@ class WarpEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `init состояние без конфига`() = runTest {
+    fun `init без конфига auto-triggers register (user feedback — 'надо чтобы сразу регистрировалось всё')`() = runTest {
+        auto.result = Result.success(SAMPLE)
         advanceUntilIdle()
-        val s = vm.uiState.value
-        assertNull(s.currentConfig)
-        assertFalse(s.isRegistering)
-        assertNull(s.errorMessage)
+        assertEquals(
+            1,
+            auto.callCount,
+            "Открытие screen с пустым cache → автоматический register",
+        )
+        assertEquals(SAMPLE, store.savedRaw, "Auto-register обязан сохранить config в store")
     }
 
     @Test
-    fun `init подхватывает saved config из store`() = runTest {
+    fun `init подхватывает saved config из store без auto-trigger`() = runTest {
         store.setRaw(SAMPLE)
         advanceUntilIdle()
         assertEquals(SAMPLE, vm.uiState.value.currentConfig)
+        assertEquals(
+            0,
+            auto.callCount,
+            "Если config уже в store — auto-trigger НЕ срабатывает",
+        )
+    }
+
+    @Test
+    fun `auto-trigger запускается ровно один раз даже если store пушит null повторно`() = runTest {
+        auto.result = Result.success(SAMPLE)
+        advanceUntilIdle()
+        assertEquals(1, auto.callCount)
+        store.setRaw(null)
+        advanceUntilIdle()
+        assertEquals(
+            1,
+            auto.callCount,
+            "Повторный null из store не должен повторно auto-trigger (avoid loop)",
+        )
     }
 
     @Test

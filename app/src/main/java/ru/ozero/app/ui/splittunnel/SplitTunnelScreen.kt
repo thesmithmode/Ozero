@@ -1,18 +1,25 @@
 package ru.ozero.app.ui.splittunnel
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -26,17 +33,21 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
+import ru.ozero.app.ui.theme.OzeroPalette
 import ru.ozero.enginescore.settings.SplitTunnelMode
 
 @Composable
@@ -52,6 +63,7 @@ fun SplitTunnelScreen(
         onModeChange = viewModel::onModeChange,
         onToggleApp = viewModel::onToggleApp,
         onQuery = viewModel::onQuery,
+        onClearAll = viewModel::onClearAll,
     )
 }
 
@@ -63,12 +75,28 @@ fun SplitTunnelScreenContent(
     onModeChange: (SplitTunnelMode) -> Unit,
     onToggleApp: (String, Boolean) -> Unit,
     onQuery: (String) -> Unit,
+    onClearAll: () -> Unit = {},
 ) {
     Scaffold(
         modifier = Modifier.testTag(SplitTunnelTestTags.SCREEN),
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.split_tunnel_title)) },
+                title = {
+                    Column {
+                        Text(stringResource(R.string.split_tunnel_title))
+                        if (state is SplitTunnelUiState.Content && state.selectedCount > 0) {
+                            Text(
+                                text = stringResource(
+                                    R.string.split_tunnel_selected_count,
+                                    state.selectedCount,
+                                ),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                modifier = Modifier.testTag(SplitTunnelTestTags.SELECTED_COUNT),
+                            )
+                        }
+                    }
+                },
                 navigationIcon = {
                     IconButton(
                         onClick = onBack,
@@ -78,6 +106,16 @@ fun SplitTunnelScreenContent(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.split_tunnel_back),
                         )
+                    }
+                },
+                actions = {
+                    if (state is SplitTunnelUiState.Content && state.selectedCount > 0) {
+                        TextButton(
+                            onClick = onClearAll,
+                            modifier = Modifier.testTag(SplitTunnelTestTags.CLEAR_ALL),
+                        ) {
+                            Text(stringResource(R.string.split_tunnel_clear_all))
+                        }
                     }
                 },
             )
@@ -109,7 +147,6 @@ private fun LoadingBody(padding: PaddingValues) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ContentBody(
     padding: PaddingValues,
@@ -118,6 +155,7 @@ private fun ContentBody(
     onToggleApp: (String, Boolean) -> Unit,
     onQuery: (String) -> Unit,
 ) {
+    val listEnabled = state.mode == SplitTunnelMode.ALLOWLIST || state.mode == SplitTunnelMode.BLOCKLIST
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -137,31 +175,64 @@ private fun ContentBody(
                 .padding(horizontal = 16.dp, vertical = 8.dp)
                 .testTag(SplitTunnelTestTags.SEARCH),
         )
+        if (!listEnabled) {
+            ListDisabledHint()
+        }
         if (state.apps.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(24.dp)
-                    .testTag(SplitTunnelTestTags.EMPTY),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = stringResource(R.string.split_tunnel_no_apps),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
+            EmptyBody()
         } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(SplitTunnelTestTags.APPS_LIST),
-                contentPadding = PaddingValues(vertical = 8.dp),
-            ) {
-                items(state.apps, key = { it.packageName }) { app ->
-                    AppRowView(app = app, onToggleApp = onToggleApp)
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                }
-            }
+            AppsList(state = state, listEnabled = listEnabled, onToggleApp = onToggleApp)
+        }
+    }
+}
+
+@Composable
+private fun ListDisabledHint() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .testTag(SplitTunnelTestTags.MODE_HINT),
+    ) {
+        Text(
+            text = stringResource(R.string.split_tunnel_mode_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+        )
+    }
+}
+
+@Composable
+private fun EmptyBody() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp)
+            .testTag(SplitTunnelTestTags.EMPTY),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = stringResource(R.string.split_tunnel_no_apps),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+    }
+}
+
+@Composable
+private fun AppsList(
+    state: SplitTunnelUiState.Content,
+    listEnabled: Boolean,
+    onToggleApp: (String, Boolean) -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(SplitTunnelTestTags.APPS_LIST),
+        contentPadding = PaddingValues(vertical = 8.dp),
+    ) {
+        items(state.apps, key = { it.packageName }) { app ->
+            AppRowView(app = app, enabled = listEnabled, onToggleApp = onToggleApp)
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
         }
     }
 }
@@ -196,6 +267,7 @@ private fun ModeSegment(
 @Composable
 private fun AppRowView(
     app: AppRow,
+    enabled: Boolean,
     onToggleApp: (String, Boolean) -> Unit,
 ) {
     Row(
@@ -206,25 +278,61 @@ private fun AppRowView(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Column(modifier = Modifier.fillMaxWidth(0.85f)) {
-            Text(text = app.label, style = MaterialTheme.typography.bodyLarge)
-            Text(
-                text = app.packageName,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-            )
-            if (app.isSystem) {
+        Row(
+            modifier = Modifier.fillMaxWidth(0.85f),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AppIcon(icon = app.icon)
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(text = app.label, style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    text = stringResource(R.string.split_tunnel_system_app),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.tertiary,
+                    text = app.packageName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                 )
+                if (app.isSystem) {
+                    Text(
+                        text = stringResource(R.string.split_tunnel_system_app),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
+                }
             }
         }
         Checkbox(
             checked = app.included,
+            enabled = enabled,
             onCheckedChange = { value -> onToggleApp(app.packageName, value) },
         )
+    }
+}
+
+@Composable
+private fun AppIcon(icon: ImageBitmap?) {
+    if (icon != null) {
+        androidx.compose.foundation.Image(
+            bitmap = icon,
+            contentDescription = null,
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(8.dp)),
+        )
+    } else {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(OzeroPalette.GlassFill),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Apps,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                modifier = Modifier.size(24.dp),
+            )
+        }
     }
 }
 

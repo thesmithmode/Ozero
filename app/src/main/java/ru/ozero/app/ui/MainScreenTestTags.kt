@@ -6,4 +6,6 @@ object MainScreenTestTags {
     const val FAILED_REASON = "main_failed_reason"
     const val STAGNATION_BADGE = "main_stagnation_badge"
     const val HEALTH_DEGRADED_BADGE = "main_health_degraded_badge"
+    const val ENGINE_CHIPS_ROW = "main_engine_chips_row"
+    const val ENGINE_CHIP_PREFIX = "main_engine_chip_"
 }

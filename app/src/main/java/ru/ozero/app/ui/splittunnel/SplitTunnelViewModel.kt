@@ -7,14 +7,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import ru.ozero.enginescore.settings.SettingsRepository
-import ru.ozero.enginescore.settings.SplitTunnelMode
 import ru.ozero.corestorage.dao.AppSplitRuleDao
 import ru.ozero.corestorage.entity.AppSplitRule
+import ru.ozero.enginescore.settings.SettingsRepository
+import ru.ozero.enginescore.settings.SplitTunnelMode
 import javax.inject.Inject
 
 @HiltViewModel
@@ -49,8 +50,10 @@ class SplitTunnelViewModel @Inject constructor(
                         label = app.label,
                         isSystem = app.isSystem,
                         included = app.packageName in included,
+                        icon = app.icon,
                     )
                 },
+                selectedCount = included.size,
             )
         }.onEach { _uiState.value = it }.launchIn(viewModelScope)
     }
@@ -71,6 +74,13 @@ class SplitTunnelViewModel @Inject constructor(
 
     fun onQuery(value: String) {
         query.value = value
+    }
+
+    fun onClearAll() {
+        viewModelScope.launch {
+            val snapshot = runCatching { dao.observeAll().first() }.getOrNull() ?: return@launch
+            snapshot.forEach { dao.delete(it.packageName) }
+        }
     }
 
     private fun InstalledApp.matches(q: String): Boolean {

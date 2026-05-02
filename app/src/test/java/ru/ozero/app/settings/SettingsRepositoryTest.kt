@@ -14,12 +14,13 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.AutoStartGateway
 import ru.ozero.enginescore.settings.SettingsKeys
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginescore.settings.SplitTunnelMode
-import ru.ozero.enginescore.EngineId
 import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -234,6 +235,28 @@ class SettingsRepositoryTest {
         repository.setUiLocaleTag("en")
         repository.setUiLocaleTag("   ")
         assertNull(repository.settings.first().uiLocaleTag)
+    }
+
+    @Test
+    fun `appMode default is SIMPLE`() = runTest {
+        assertEquals(AppMode.SIMPLE, repository.settings.first().appMode)
+    }
+
+    @Test
+    fun `setAppMode persists EXPERT and round-trips back to SIMPLE`() = runTest {
+        repository.setAppMode(AppMode.EXPERT)
+        assertEquals(AppMode.EXPERT, repository.settings.first().appMode)
+
+        repository.setAppMode(AppMode.SIMPLE)
+        assertEquals(AppMode.SIMPLE, repository.settings.first().appMode)
+    }
+
+    @Test
+    fun `unknown app mode in DataStore falls back to SIMPLE`() = runTest {
+        dataStore.edit { prefs ->
+            prefs[SettingsKeys.APP_MODE] = "UNKNOWN_MODE"
+        }
+        assertEquals(AppMode.SIMPLE, repository.settings.first().appMode)
     }
 
     private class FakeAutoStartGateway : AutoStartGateway {

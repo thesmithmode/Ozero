@@ -14,6 +14,7 @@ data class SettingsModel(
     val hostsMode: HostsMode = DEFAULT_HOSTS_MODE,
     val hosts: List<String> = DEFAULT_HOSTS,
     val uiLocaleTag: String? = DEFAULT_UI_LOCALE_TAG,
+    val appMode: AppMode = DEFAULT_APP_MODE,
 ) {
     companion object {
         val DEFAULT_SPLIT_MODE: SplitTunnelMode = SplitTunnelMode.ALL
@@ -27,6 +28,7 @@ data class SettingsModel(
         val DEFAULT_HOSTS_MODE: HostsMode = HostsMode.DISABLED
         val DEFAULT_HOSTS: List<String> = emptyList()
         val DEFAULT_UI_LOCALE_TAG: String? = null
+        val DEFAULT_APP_MODE: AppMode = AppMode.SIMPLE
 
         const val LOCALE_RU: String = "ru"
         const val LOCALE_EN: String = "en"

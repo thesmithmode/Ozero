@@ -15,17 +15,15 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import ru.ozero.enginescore.EnginePlugin
-import ru.ozero.enginewarp.CloudflareWarpAutoConfig
 import ru.ozero.enginewarp.DataStoreWarpConfigStore
 import ru.ozero.enginewarp.EngineWarp
 import ru.ozero.enginewarp.HttpClient
 import ru.ozero.enginewarp.HttpUrlConnectionClient
-import ru.ozero.enginewarp.RealCurve25519KeyPairGenerator
+import ru.ozero.enginewarp.ProxyWarpAutoConfig
 import ru.ozero.enginewarp.StubWarpSdkBridge
 import ru.ozero.enginewarp.WarpAutoConfig
 import ru.ozero.enginewarp.WarpConfigStore
 import ru.ozero.enginewarp.WarpSdkBridge
-import ru.ozero.enginewarp.WireguardKeyPairGenerator
 import javax.inject.Qualifier
 import javax.inject.Singleton
 
@@ -60,15 +58,9 @@ object WarpModule {
 
     @Provides
     @Singleton
-    fun provideWireguardKeyPairGenerator(): WireguardKeyPairGenerator =
-        RealCurve25519KeyPairGenerator()
-
-    @Provides
-    @Singleton
     fun provideWarpAutoConfig(
         httpClient: HttpClient,
-        keypairGen: WireguardKeyPairGenerator,
-    ): WarpAutoConfig = CloudflareWarpAutoConfig(httpClient, keypairGen)
+    ): WarpAutoConfig = ProxyWarpAutoConfig(httpClient)
 
     @Provides
     @Singleton

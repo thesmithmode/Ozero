@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.edit
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.AutoStartGateway
 import ru.ozero.enginescore.settings.HostsMode
 import ru.ozero.enginescore.settings.SettingsKeys
@@ -110,6 +111,10 @@ class SettingsRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun setAppMode(mode: AppMode) {
+        dataStore.edit { it[SettingsKeys.APP_MODE] = mode.name }
+    }
+
     private fun Preferences.toSettingsModel(): SettingsModel = SettingsModel(
         splitMode = readSplitMode(),
         ipv6Enabled = this[SettingsKeys.IPV6_ENABLED] ?: SettingsModel.DEFAULT_IPV6_ENABLED,
@@ -122,6 +127,7 @@ class SettingsRepositoryImpl @Inject constructor(
         hostsMode = readHostsMode(),
         hosts = readHosts(),
         uiLocaleTag = this[SettingsKeys.UI_LOCALE_TAG],
+        appMode = readAppMode(),
     )
 
     private fun Preferences.readCustomDnsServers(): List<String> {
@@ -148,6 +154,11 @@ class SettingsRepositoryImpl @Inject constructor(
     private fun Preferences.readManualEngine(): EngineId? {
         val raw = this[SettingsKeys.MANUAL_ENGINE] ?: return null
         return runCatching { EngineId.valueOf(raw) }.getOrNull()
+    }
+
+    private fun Preferences.readAppMode(): AppMode {
+        val raw = this[SettingsKeys.APP_MODE] ?: return SettingsModel.DEFAULT_APP_MODE
+        return runCatching { AppMode.valueOf(raw) }.getOrDefault(SettingsModel.DEFAULT_APP_MODE)
     }
 
     private companion object {

@@ -14,12 +14,12 @@ class DataStoreWarpConfigStore(
 
     override fun current(): Flow<WarpConfig?> = dataStore.data.map { prefs ->
         val priv = prefs[KEY_PRIV] ?: return@map null
-        val pub = prefs[KEY_PUB] ?: return@map null
         val peerPub = prefs[KEY_PEER_PUB] ?: return@map null
         val peerEndpoint = prefs[KEY_PEER_ENDPOINT] ?: return@map null
         val v4 = prefs[KEY_IFACE_V4] ?: return@map null
         val v6 = prefs[KEY_IFACE_V6] ?: return@map null
-        val license = prefs[KEY_LICENSE] ?: return@map null
+        val pub = prefs[KEY_PUB].orEmpty()
+        val license = prefs[KEY_LICENSE].orEmpty()
         val mtu = prefs[KEY_MTU] ?: DEFAULT_MTU
         WarpConfig(
             privateKey = priv,

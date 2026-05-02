@@ -8,9 +8,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginescore.settings.SplitTunnelMode
-import ru.ozero.enginescore.EngineId
 import javax.inject.Inject
 
 @HiltViewModel
@@ -48,6 +49,10 @@ class SettingsViewModel @Inject constructor(
             repository.setUiLocaleTag(tag)
             LocaleApplier.apply(tag)
         }
+    }
+
+    fun onAppModeSelect(mode: AppMode) {
+        viewModelScope.launch { repository.setAppMode(mode) }
     }
 
     private companion object {

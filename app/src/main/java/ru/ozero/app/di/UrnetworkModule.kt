@@ -16,7 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import ru.ozero.engineurnetwork.DataStoreUrnetworkConfigStore
 import ru.ozero.engineurnetwork.EngineUrnetwork
-import ru.ozero.engineurnetwork.StubUrnetworkSdkBridge
+import ru.ozero.engineurnetwork.RealUrnetworkSdkBridge
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.auth.RealUrnetworkAuthService
@@ -50,15 +50,11 @@ object UrnetworkModule {
         @UrnetworkPrefs dataStore: DataStore<Preferences>,
     ): UrnetworkConfigStore = DataStoreUrnetworkConfigStore(dataStore)
 
-    // TODO(v0.0.2-5): вернуть RealUrnetworkSdkBridge(context) после rebuild AAR.
-    // URnetworkSdk.aar и userwireguard.aar — два независимых gomobile bind проекта,
-    // каждый содержит свою lib/*/libgojni.so + go.Seq.class. AGP merge перезаписывает
-    // одну .so → JNI registration теряется → "No implementation found for Sdk._init()".
-    // Fix: rebuild gomobile bind с обоими go-модулями в одном `gomobile bind ./sdk ./userwireguard`
-    // → одна совместная libgojni.so. Out of scope для v0.0.2-4 — Go toolchain работа.
     @Provides
     @Singleton
-    fun provideUrnetworkSdkBridge(): UrnetworkSdkBridge = StubUrnetworkSdkBridge()
+    fun provideUrnetworkSdkBridge(
+        @ApplicationContext context: Context,
+    ): UrnetworkSdkBridge = RealUrnetworkSdkBridge(context)
 
     @Provides
     @Singleton

@@ -2,96 +2,273 @@ package ru.ozero.enginewarp
 
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
+import java.io.IOException
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class WarpAutoConfigTest {
 
-    private val sampleResponse = """
-        {
-          "id": "abc123",
-          "account": {
-            "license": "TEST-LICENSE-KEY"
-          },
-          "config": {
-            "interface": {
-              "addresses": {
-                "v4": "172.16.0.2",
-                "v6": "2606:4700:110:8a36:1234:5678:9abc:def0"
-              }
-            },
-            "peers": [
-              {
-                "public_key": "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
-                "endpoint": {
-                  "host": "engage.cloudflareclient.com:2408",
-                  "v4": "162.159.193.10:2408",
-                  "v6": "[2606:4700:d0::a29f:c101]:2408"
-                }
-              }
-            ]
-          }
-        }
+    private val sampleConf = """
+        [Interface]
+        PrivateKey = duLmWkD6Pz6fqd+5/Wsh+aDwyaT8w+5ofxDZ3Z3l1c0=
+        Address = 172.16.0.2, 2606:4700:110:8af5:7421:75f0:3c0f:f366
+        DNS = 1.1.1.1, 2606:4700:4700::1111
+        MTU = 1280
+
+        [Peer]
+        PublicKey = bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=
+        AllowedIPs = 0.0.0.0/0, ::/0
+        Endpoint = engage.cloudflareclient.com:4500
+        PersistentKeepalive = 25
     """.trimIndent()
 
-    private val keypairGen = StubWireguardKeyPairGenerator()
-
     @Test
-    fun `register parses well-formed Cloudflare JSON to WarpConfig`() = runTest {
-        val http = FakeHttpClient(Result.success(sampleResponse))
-        val auto = CloudflareWarpAutoConfig(http, keypairGen)
+    fun `register parses raw WireGuard conf body to WarpConfig`() = runTest {
+        val http = FakeHttpClient(Result.success(sampleConf))
+        val auto = singleMirrorConfig(http)
 
         val result = auto.register()
 
         assertTrue(result.isSuccess, "expected success, got ${result.exceptionOrNull()?.message}")
         val cfg = result.getOrThrow()
-        assertEquals("stub-priv-base64", cfg.privateKey)
-        assertEquals("stub-pub-base64", cfg.publicKey)
-        assertEquals("bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=", cfg.peerPublicKey)
-        assertEquals("engage.cloudflareclient.com:2408", cfg.peerEndpoint)
-        assertEquals("172.16.0.2/32", cfg.interfaceAddressV4)
-        assertTrue(cfg.interfaceAddressV6.startsWith("2606:4700:110:8a36"))
-        assertEquals("TEST-LICENSE-KEY", cfg.accountLicense)
+        assertEquals("duLmWkD6Pz6fqd+5/Wsh+aDwyaT8w+5ofxDZ3Z3l1c0=", cfg.privateKey)
+        assertEquals(
+            "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
+            cfg.peerPublicKey,
+        )
+        assertEquals("engage.cloudflareclient.com:4500", cfg.peerEndpoint)
+        assertTrue(cfg.interfaceAddressV4.startsWith("172.16.0.2"))
+        assertTrue(cfg.interfaceAddressV6.startsWith("2606:4700:110"))
+        assertEquals(1280, cfg.mtu)
+        assertEquals("", cfg.accountLicense, "proxy mirrors не возвращают Cloudflare license")
+        assertEquals("", cfg.publicKey, "proxy mirrors не возвращают public key (priv достаточен)")
     }
 
     @Test
-    fun `register sends User-Agent okhttp and JSON body with pub key`() = runTest {
-        val http = FakeHttpClient(Result.success(sampleResponse))
-        val auto = CloudflareWarpAutoConfig(http, keypairGen)
+    fun `register accepts JSON wrapper success_data with conf string`() = runTest {
+        val wrapped = """{"success":true,"data":${escape(sampleConf)}}"""
+        val http = FakeHttpClient(Result.success(wrapped))
+        val auto = singleMirrorConfig(http)
+
+        val result = auto.register()
+
+        assertTrue(result.isSuccess, "JSON-wrapped success ответ должен парситься")
+    }
+
+    @Test
+    fun `register accepts JSON wrapper configs map first value`() = runTest {
+        val wrapped = """{"configs":{"Текущая страна":${escape(sampleConf)}}}"""
+        val http = FakeHttpClient(Result.success(wrapped))
+        val auto = singleMirrorConfig(http)
+
+        val result = auto.register()
+
+        assertTrue(result.isSuccess, "Map<country, conf> JSON ответ должен парситься")
+    }
+
+    @Test
+    fun `register treats success_false as mirror failure (proxy перегружен)`() = runTest {
+        val overloaded =
+            """{"success":false,"message":"Слишком много желающих — попробуй через 10 секунд"}"""
+        val http = FakeHttpClient(Result.success(overloaded))
+        val auto = singleMirrorConfig(http)
+
+        val result = auto.register()
+
+        assertTrue(result.isFailure, "success=false из mirror — это failure, не успех")
+    }
+
+    @Test
+    fun `register sends fixed JSON body without client public key`() = runTest {
+        val http = FakeHttpClient(Result.success(sampleConf))
+        val auto = singleMirrorConfig(http)
 
         auto.register()
 
         val call = assertNotNull(http.lastCall)
-        assertEquals("okhttp/3.12.1", call.userAgent)
-        assertTrue(call.url.contains("/v0a2158/reg"))
-        assertTrue(call.body.contains("\"key\":\"stub-pub-base64\""))
-        assertTrue(call.body.contains("\"locale\":\"en_US\""))
-        assertTrue(call.body.contains("\"model\":\"PC\""))
+        assertTrue(call.body.contains("\"selectedServices\":[]"))
+        assertTrue(call.body.contains("\"siteMode\":\"all\""))
+        assertTrue(call.body.contains("\"deviceType\":\"computer\""))
+        assertTrue(call.body.contains("\"allowScreenshotsAndRecording\":true"))
+        assertTrue(
+            !call.body.contains("\"key\""),
+            "Proxy-зеркала генерируют ключ серверной стороной — клиент не отправляет",
+        )
+    }
+
+    @Test
+    fun `register hits one of provided mirrors`() = runTest {
+        val http = FakeHttpClient(Result.success(sampleConf))
+        val auto = ProxyWarpAutoConfig(
+            httpClient = http,
+            mirrors = listOf("https://only-mirror.example/api/warp"),
+            concurrency = 1,
+            shuffler = { it },
+        )
+
+        auto.register()
+
+        assertEquals("https://only-mirror.example/api/warp", http.lastCall?.url)
     }
 
     @Test
     fun `register network failure returns Result_failure`() = runTest {
-        val http = FakeHttpClient(Result.failure(java.io.IOException("boom")))
-        val auto = CloudflareWarpAutoConfig(http, keypairGen)
+        val http = FakeHttpClient(Result.failure(IOException("boom")))
+        val auto = singleMirrorConfig(http)
 
         val result = auto.register()
 
         assertTrue(result.isFailure)
-        assertTrue(result.exceptionOrNull() is java.io.IOException)
     }
 
     @Test
-    fun `register malformed JSON missing peer public_key returns failure`() = runTest {
-        val malformed = """{"id":"x","account":{"license":"L"},""" +
-            """"config":{"interface":{"addresses":{"v4":"1.2.3.4","v6":"::1"}},""" +
-            """"peers":[{"endpoint":{"host":"h:1"}}]}}"""
-        val http = FakeHttpClient(Result.success(malformed))
-        val auto = CloudflareWarpAutoConfig(http, keypairGen)
+    fun `register garbage body without Interface section fails`() = runTest {
+        val http = FakeHttpClient(Result.success("Payment required\nDEPLOYMENT_DISABLED"))
+        val auto = singleMirrorConfig(http)
 
         val result = auto.register()
 
         assertTrue(result.isFailure)
+        assertTrue(
+            result.exceptionOrNull()?.message?.contains("Interface", ignoreCase = true) == true,
+        )
+    }
+
+    @Test
+    fun `register conf без PrivateKey возвращает failure`() = runTest {
+        val malformed = """
+            [Interface]
+            Address = 1.2.3.4
+            [Peer]
+            PublicKey = abc
+            Endpoint = h:1
+        """.trimIndent()
+        val http = FakeHttpClient(Result.success(malformed))
+        val auto = singleMirrorConfig(http)
+
+        val result = auto.register()
+
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()?.message?.contains("PrivateKey") == true)
+    }
+
+    @Test
+    fun `register conf без Peer endpoint возвращает failure`() = runTest {
+        val malformed = """
+            [Interface]
+            PrivateKey = priv
+            Address = 1.2.3.4
+            [Peer]
+            PublicKey = pub
+        """.trimIndent()
+        val http = FakeHttpClient(Result.success(malformed))
+        val auto = singleMirrorConfig(http)
+
+        val result = auto.register()
+
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()?.message?.contains("Endpoint") == true)
+    }
+
+    @Test
+    fun `register пустой список зеркал возвращает failure`() = runTest {
+        val http = FakeHttpClient(Result.success(sampleConf))
+        val auto = ProxyWarpAutoConfig(
+            httpClient = http,
+            mirrors = emptyList(),
+            concurrency = 1,
+        )
+
+        val result = auto.register()
+
+        assertTrue(result.isFailure)
+    }
+
+    @Test
+    fun `register пробует все зеркала когда первые fail`() = runTest {
+        val responses = ArrayDeque(
+            listOf(
+                Result.failure<String>(IOException("503")),
+                Result.failure<String>(IOException("read timeout")),
+                Result.success(sampleConf),
+            ),
+        )
+        val http = QueueHttpClient(responses)
+        val auto = ProxyWarpAutoConfig(
+            httpClient = http,
+            mirrors = listOf("https://m1/api", "https://m2/api", "https://m3/api"),
+            concurrency = 1,
+            shuffler = { it },
+        )
+
+        val result = auto.register()
+
+        assertTrue(result.isSuccess, "Должен fallthrough на третье зеркало после 2 fail")
+        assertEquals(3, http.callCount)
+    }
+
+    @Test
+    fun `default mirrors список содержит CYBERPORTAL_X URLs (sentinel против регрессии endpoint)`() {
+        val urls = ProxyWarpAutoConfig.DEFAULT_MIRRORS
+        assertTrue(urls.size >= 70, "Список зеркал из CYBERPORTAL_X-1.0.2 содержит 78 URL")
+        assertTrue(
+            urls.none { it.contains("api.cloudflareclient.com") },
+            "api.cloudflareclient.com блокируется ТСПУ в РФ — НЕ должен быть в списке зеркал",
+        )
+        assertTrue(
+            urls.all { it.endsWith("/api/warp") },
+            "Все зеркала используют /api/warp endpoint",
+        )
+        assertTrue(
+            urls.any { it.contains("netlify.app") },
+            "Часть зеркал hosted на Netlify",
+        )
+        assertTrue(
+            urls.any { it.contains("vercel.app") },
+            "Часть зеркал hosted на Vercel",
+        )
+        assertTrue(
+            urls.any { it.contains("cyberportal.workers.dev") },
+            "Часть зеркал на Cloudflare Workers",
+        )
+    }
+
+    @Test
+    fun `request body schema sentinel — поля совпадают с CYBERPORTAL_X`() {
+        val body = ProxyWarpAutoConfig.REQUEST_BODY
+        assertTrue(body.contains("\"selectedServices\":[]"))
+        assertTrue(body.contains("\"siteMode\":\"all\""))
+        assertTrue(body.contains("\"deviceType\":\"computer\""))
+        assertTrue(body.contains("\"allowScreenshotsAndRecording\":true"))
+        assertTrue(
+            !body.contains("\"key\""),
+            "Поле \"key\" клиентского pubkey запрещено — proxy-зеркала генерируют ключ сервером",
+        )
+    }
+
+    private fun singleMirrorConfig(http: HttpClient): ProxyWarpAutoConfig =
+        ProxyWarpAutoConfig(
+            httpClient = http,
+            mirrors = listOf("https://test-mirror/api/warp"),
+            concurrency = 1,
+            shuffler = { it },
+        )
+
+    private fun escape(s: String): String {
+        val sb = StringBuilder("\"")
+        s.forEach { c ->
+            when (c) {
+                '\\' -> sb.append("\\\\")
+                '"' -> sb.append("\\\"")
+                '\n' -> sb.append("\\n")
+                '\r' -> sb.append("\\r")
+                '\t' -> sb.append("\\t")
+                else -> sb.append(c)
+            }
+        }
+        sb.append('"')
+        return sb.toString()
     }
 
     private class FakeHttpClient(
@@ -109,6 +286,26 @@ class WarpAutoConfigTest {
         ): Result<String> {
             lastCall = Call(url, body, userAgent)
             return response
+        }
+    }
+
+    private class QueueHttpClient(
+        private val queue: ArrayDeque<Result<String>>,
+    ) : HttpClient {
+        var callCount: Int = 0
+            private set
+
+        override suspend fun postJson(
+            url: String,
+            body: String,
+            userAgent: String,
+        ): Result<String> {
+            callCount++
+            return if (queue.isEmpty()) {
+                Result.failure(IOException("queue exhausted"))
+            } else {
+                queue.removeFirst()
+            }
         }
     }
 }

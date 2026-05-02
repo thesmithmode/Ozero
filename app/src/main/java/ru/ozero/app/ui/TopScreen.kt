@@ -14,5 +14,4 @@ enum class TopScreen {
     StrategyTest,
     ManualServer,
     StatsHistory,
-    Subscriptions,
 }

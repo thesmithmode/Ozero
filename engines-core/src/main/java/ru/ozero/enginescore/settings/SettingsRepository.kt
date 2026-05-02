@@ -28,4 +28,6 @@ interface SettingsRepository {
     suspend fun setHosts(hosts: List<String>)
 
     suspend fun setUiLocaleTag(tag: String?)
+
+    suspend fun setAppMode(mode: AppMode)
 }

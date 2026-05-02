@@ -1,5 +1,6 @@
 package ru.ozero.app.ui.splittunnel
 
+import androidx.compose.ui.graphics.ImageBitmap
 import ru.ozero.enginescore.settings.SplitTunnelMode
 
 sealed interface SplitTunnelUiState {
@@ -9,6 +10,7 @@ sealed interface SplitTunnelUiState {
         val mode: SplitTunnelMode,
         val query: String,
         val apps: List<AppRow>,
+        val selectedCount: Int = 0,
     ) : SplitTunnelUiState
 }
 
@@ -17,4 +19,5 @@ data class AppRow(
     val label: String,
     val isSystem: Boolean,
     val included: Boolean,
+    val icon: ImageBitmap? = null,
 )

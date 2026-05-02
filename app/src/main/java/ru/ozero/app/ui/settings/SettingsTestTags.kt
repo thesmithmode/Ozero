@@ -19,4 +19,8 @@ object SettingsTestTags {
 
     const val ALLOWED_APPS_ROW = "allowed_apps_row"
     const val SERVERS_ROW = "servers_row"
+
+    const val APP_MODE_SECTION = "settings_app_mode_section"
+    const val APP_MODE_SIMPLE = "settings_app_mode_simple"
+    const val APP_MODE_EXPERT = "settings_app_mode_expert"
 }

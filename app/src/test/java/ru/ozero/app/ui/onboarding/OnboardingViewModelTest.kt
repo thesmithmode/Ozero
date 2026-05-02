@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test
 import ru.ozero.app.settings.UserFlags
 import ru.ozero.app.settings.UserFlagsRepository
 import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.HostsMode
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
@@ -63,12 +64,14 @@ class OnboardingViewModelTest {
         vm.onNext()
         assertEquals(3, vm.state.value.pageIndex)
         vm.onNext()
-        assertEquals(3, vm.state.value.pageIndex, "last page index = TOTAL_PAGES - 1")
+        assertEquals(4, vm.state.value.pageIndex)
+        vm.onNext()
+        assertEquals(4, vm.state.value.pageIndex, "last page index = TOTAL_PAGES - 1")
     }
 
     @Test
-    fun `TOTAL_PAGES is 4 — language step + 3 info pages`() {
-        assertEquals(4, OnboardingViewModel.TOTAL_PAGES)
+    fun `TOTAL_PAGES is 5 — language step + 3 info pages + mode pick`() {
+        assertEquals(5, OnboardingViewModel.TOTAL_PAGES)
     }
 
     @Test
@@ -103,6 +106,27 @@ class OnboardingViewModelTest {
         assertEquals(listOf<String?>(null), settings.localeWrites)
     }
 
+    @Test
+    fun `onAppModeSelect persists EXPERT`() = runTest {
+        vm.onAppModeSelect(AppMode.EXPERT)
+        advanceUntilIdle()
+        assertEquals(listOf(AppMode.EXPERT), settings.appModeWrites)
+    }
+
+    @Test
+    fun `onAppModeSelect round-trip EXPERT then SIMPLE`() = runTest {
+        vm.onAppModeSelect(AppMode.EXPERT)
+        advanceUntilIdle()
+        vm.onAppModeSelect(AppMode.SIMPLE)
+        advanceUntilIdle()
+        assertEquals(listOf(AppMode.EXPERT, AppMode.SIMPLE), settings.appModeWrites)
+    }
+
+    @Test
+    fun `currentAppMode default is SIMPLE`() = runTest {
+        assertEquals(AppMode.SIMPLE, vm.currentAppMode.value)
+    }
+
     private class FakeUserFlags : UserFlagsRepository {
         var markedCompleted = false
         var markedBattery = false
@@ -128,6 +152,7 @@ class OnboardingViewModelTest {
         private val state = MutableStateFlow(SettingsModel.DEFAULT)
         override val settings: Flow<SettingsModel> = state.asStateFlow()
         val localeWrites = mutableListOf<String?>()
+        val appModeWrites = mutableListOf<AppMode>()
 
         override suspend fun setSplitMode(mode: SplitTunnelMode) = Unit
         override suspend fun setIpv6Enabled(enabled: Boolean) = Unit
@@ -142,6 +167,10 @@ class OnboardingViewModelTest {
         override suspend fun setUiLocaleTag(tag: String?) {
             localeWrites += tag
             state.value = state.value.copy(uiLocaleTag = tag)
+        }
+        override suspend fun setAppMode(mode: AppMode) {
+            appModeWrites += mode
+            state.value = state.value.copy(appMode = mode)
         }
     }
 }

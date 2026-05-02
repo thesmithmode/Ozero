@@ -12,10 +12,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -39,6 +37,7 @@ import kotlinx.coroutines.delay
 import ru.ozero.app.R
 import ru.ozero.app.ui.components.BottomDock
 import ru.ozero.app.ui.components.DockTab
+import ru.ozero.app.ui.components.EngineChipsRow
 import ru.ozero.app.ui.components.OzeroBackground
 import ru.ozero.app.ui.components.OzeroBackgroundState
 import ru.ozero.app.ui.components.PowerDisc
@@ -48,6 +47,8 @@ import ru.ozero.commonvpn.BytesFormatter
 import ru.ozero.commonvpn.HealthMonitor
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.commonvpn.TunnelStats
+import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.settings.AppMode
 
 @Composable
 fun MainScreen(
@@ -55,93 +56,192 @@ fun MainScreen(
     onConnectClick: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenServers: () -> Unit = {},
-    onOpenStats: () -> Unit = {},
-    onOpenSubs: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val stats by viewModel.stats.collectAsStateWithLifecycle()
     val stagnant by viewModel.stagnant.collectAsStateWithLifecycle()
     val healthStatus by viewModel.healthStatus.collectAsStateWithLifecycle()
+    val appMode by viewModel.appMode.collectAsStateWithLifecycle()
+    val manualEngine by viewModel.manualEngine.collectAsStateWithLifecycle()
 
     val powerState = state.toPowerDiscState()
     val backgroundState = state.toBackgroundState()
     val isConnected = state is TunnelState.Connected
-    val statsValue = stats
 
     OzeroBackground(state = backgroundState) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Spacer(modifier = Modifier.height(20.dp))
-
-            AnimatedContent(targetState = state, label = "status") { s -> StatusLabel(s) }
-
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center,
-            ) {
-                PowerDisc(
-                    state = powerState,
-                    onClick = onConnectClick,
-                    modifier = Modifier.semantics {
-                        contentDescription = if (isConnected) "disconnect" else "connect"
-                    },
-                )
-            }
-
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                if (isConnected && statsValue != null) {
-                    TrafficStatsCard(statsValue)
-                    if (stagnant) {
-                        Text(
-                            text = stringResource(R.string.main_stagnation_warning),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.testTag(MainScreenTestTags.STAGNATION_BADGE),
-                        )
-                    }
-                    if (healthStatus == HealthMonitor.Status.DEGRADED) {
-                        Text(
-                            text = stringResource(R.string.main_health_degraded),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.testTag(MainScreenTestTags.HEALTH_DEGRADED_BADGE),
-                        )
-                    }
-                }
-                BottomDock(
-                    tabs = simpleDockTabs(),
-                    activeTabId = DOCK_TAB_HOME,
-                    onTabSelected = { id ->
-                        when (id) {
-                            DOCK_TAB_SERVERS -> onOpenServers()
-                            DOCK_TAB_STATS -> onOpenStats()
-                            DOCK_TAB_SUBS -> onOpenSubs()
-                            DOCK_TAB_SETTINGS -> onOpenSettings()
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-            }
+        when (appMode) {
+            AppMode.SIMPLE -> SimpleMainContent(
+                tunnelState = state,
+                powerState = powerState,
+                isConnected = isConnected,
+                onConnectClick = onConnectClick,
+                onOpenServers = onOpenServers,
+                onOpenSettings = onOpenSettings,
+            )
+            AppMode.EXPERT -> ExpertMainContent(
+                tunnelState = state,
+                stats = stats,
+                stagnant = stagnant,
+                healthStatus = healthStatus,
+                powerState = powerState,
+                isConnected = isConnected,
+                manualEngine = manualEngine,
+                onConnectClick = onConnectClick,
+                onManualEngineSelect = viewModel::onManualEngineSelect,
+                onOpenServers = onOpenServers,
+                onOpenSettings = onOpenSettings,
+            )
         }
     }
 }
 
 @Composable
-private fun simpleDockTabs(): List<DockTab> = listOf(
+private fun SimpleMainContent(
+    tunnelState: TunnelState,
+    powerState: PowerDiscState,
+    isConnected: Boolean,
+    onConnectClick: () -> Unit,
+    onOpenServers: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Spacer(modifier = Modifier.height(20.dp))
+
+        AnimatedContent(targetState = tunnelState, label = "status") { s -> StatusLabel(s) }
+
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center,
+        ) {
+            PowerDisc(
+                state = powerState,
+                onClick = onConnectClick,
+                modifier = Modifier.semantics {
+                    contentDescription = if (isConnected) "disconnect" else "connect"
+                },
+            )
+        }
+
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            BottomDock(
+                tabs = commonDockTabs(),
+                activeTabId = DOCK_TAB_HOME,
+                onTabSelected = { id ->
+                    when (id) {
+                        DOCK_TAB_SERVERS -> onOpenServers()
+                        DOCK_TAB_SETTINGS -> onOpenSettings()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+    }
+}
+
+@Suppress("LongParameterList")
+@Composable
+private fun ExpertMainContent(
+    tunnelState: TunnelState,
+    stats: TunnelStats?,
+    stagnant: Boolean,
+    healthStatus: HealthMonitor.Status,
+    powerState: PowerDiscState,
+    isConnected: Boolean,
+    manualEngine: EngineId?,
+    onConnectClick: () -> Unit,
+    onManualEngineSelect: (EngineId?) -> Unit,
+    onOpenServers: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Spacer(modifier = Modifier.height(16.dp))
+
+        AnimatedContent(targetState = tunnelState, label = "status") { s -> StatusLabel(s) }
+
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center,
+        ) {
+            PowerDisc(
+                state = powerState,
+                onClick = onConnectClick,
+                diameterDp = POWER_DISC_EXPERT_DP,
+                modifier = Modifier.semantics {
+                    contentDescription = if (isConnected) "disconnect" else "connect"
+                },
+            )
+        }
+
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (isConnected && stats != null) {
+                TrafficStatsCard(
+                    stats = stats,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+                if (stagnant) {
+                    Text(
+                        text = stringResource(R.string.main_stagnation_warning),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.testTag(MainScreenTestTags.STAGNATION_BADGE),
+                    )
+                }
+                if (healthStatus == HealthMonitor.Status.DEGRADED) {
+                    Text(
+                        text = stringResource(R.string.main_health_degraded),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.testTag(MainScreenTestTags.HEALTH_DEGRADED_BADGE),
+                    )
+                }
+            }
+
+            EngineChipsRow(
+                selectedEngine = manualEngine,
+                onSelect = onManualEngineSelect,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            BottomDock(
+                tabs = commonDockTabs(),
+                activeTabId = DOCK_TAB_HOME,
+                onTabSelected = { id ->
+                    when (id) {
+                        DOCK_TAB_SERVERS -> onOpenServers()
+                        DOCK_TAB_SETTINGS -> onOpenSettings()
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+    }
+}
+
+@Composable
+private fun commonDockTabs(): List<DockTab> = listOf(
     DockTab(DOCK_TAB_HOME, Icons.Filled.Home, stringResource(R.string.tab_main)),
     DockTab(DOCK_TAB_SERVERS, Icons.Filled.LocationOn, stringResource(R.string.tab_servers)),
-    DockTab(DOCK_TAB_STATS, Icons.Filled.Info, stringResource(R.string.tab_stats)),
-    DockTab(DOCK_TAB_SUBS, Icons.Filled.Star, stringResource(R.string.tab_subs)),
     DockTab(DOCK_TAB_SETTINGS, Icons.Filled.Settings, stringResource(R.string.tab_settings)),
 )
 
@@ -164,7 +264,7 @@ private fun TunnelState.toBackgroundState(): OzeroBackgroundState = when (this) 
 }
 
 @Composable
-private fun TrafficStatsCard(stats: TunnelStats) {
+private fun TrafficStatsCard(stats: TunnelStats, modifier: Modifier = Modifier) {
     var nowMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(stats.sessionStartMs) {
         while (true) {
@@ -179,12 +279,10 @@ private fun TrafficStatsCard(stats: TunnelStats) {
     val txTotal = BytesFormatter.humanReadable(stats.txBytes)
     val uptime = BytesFormatter.durationHms(sessionMs)
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .testTag(MainScreenTestTags.TRAFFIC_STATS),
-        colors = CardDefaults.cardColors(
-            containerColor = OzeroPalette.GlassFill,
-        ),
+        colors = CardDefaults.cardColors(containerColor = OzeroPalette.GlassFill),
         shape = RoundedCornerShape(20.dp),
     ) {
         Column(
@@ -252,6 +350,5 @@ private fun StatusLabel(state: TunnelState) {
 
 private const val DOCK_TAB_HOME = "home"
 private const val DOCK_TAB_SERVERS = "servers"
-private const val DOCK_TAB_STATS = "stats"
-private const val DOCK_TAB_SUBS = "subs"
 private const val DOCK_TAB_SETTINGS = "settings"
+private const val POWER_DISC_EXPERT_DP = 184
