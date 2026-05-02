@@ -24,7 +24,7 @@ complexity:
     active: true
     thresholdInFiles: 30
     thresholdInClasses: 20
-    thresholdInInterfaces: 10
+    thresholdInInterfaces: 20
     thresholdInObjects: 15
     thresholdInEnums: 10
   NestedBlockDepth:

@@ -260,7 +260,7 @@ class OzeroVpnService : android.net.VpnService() {
             val result = try {
                 engine.attachTun(rawFd)
             } catch (t: Throwable) {
-                runCatching { android.system.Os.close(rawFd) }
+                runCatching { ParcelFileDescriptor.adoptFd(rawFd).close() }
                 PersistentLoggers.error(TAG, "attachTun threw, fd closed: ${t.message}")
                 runCatching { chainOrchestrator.stop() }
                 tunnelController.onEngineDied(engineId, "attachTun threw: ${t.message}")
@@ -270,7 +270,7 @@ class OzeroVpnService : android.net.VpnService() {
             return when (result) {
                 ru.ozero.enginescore.TunAttachResult.Success -> true
                 is ru.ozero.enginescore.TunAttachResult.Failure -> {
-                    runCatching { android.system.Os.close(rawFd) }
+                    runCatching { ParcelFileDescriptor.adoptFd(rawFd).close() }
                     PersistentLoggers.error(TAG, "attachTun failed: ${result.reason}")
                     runCatching { chainOrchestrator.stop() }
                     tunnelController.onEngineDied(engineId, "attachTun: ${result.reason}")
