@@ -11,12 +11,7 @@ import org.json.JSONObject
 import ru.ozero.enginescore.PersistentLoggers
 import java.io.IOException
 
-// CYBERPORTAL_X-v1.0.2 (a9.h.java:57) использует ~78 публичных serverless-зеркал
-// (Netlify/Vercel/Cloudflare Workers) вместо api.cloudflareclient.com — последний
-// блокируется ТСПУ в РФ (Read timed out). Зеркала генерируют WireGuard ключи
-// серверной стороной и возвращают готовый .conf text. Запрос — фиксированный JSON
-// без публичного ключа клиента (см. body ниже). Schema подтверждена через bundled
-// sample КИБЕРЩИТ-X/assets/bundled/str_warp_2.conf.
+// 78 serverless-зеркал вместо api.cloudflareclient.com (блокируется ТСПУ); ключи генерирует сервер.
 class ProxyWarpAutoConfig(
     private val httpClient: HttpClient,
     private val mirrors: List<String> = DEFAULT_MIRRORS,
@@ -223,9 +218,6 @@ class ProxyWarpAutoConfig(
             "{\"selectedServices\":[],\"siteMode\":\"all\"," +
                 "\"deviceType\":\"computer\",\"allowScreenshotsAndRecording\":true}"
 
-        // Список зеркал из CYBERPORTAL_X-v1.0.2/sources/a9/h.java:57. Сохранять
-        // порядок не нужно (на каждом register() shuffle), но дубликатов не должно
-        // быть.
         val DEFAULT_MIRRORS: List<String> = listOf(
             "https://vless-portal.netlify.app/api/warp",
             "https://portal-warp.netlify.app/api/warp",

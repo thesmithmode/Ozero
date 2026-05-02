@@ -1,9 +1,5 @@
 package ru.ozero.enginewarp
 
-// publicKey и accountLicense опциональны — proxy-зеркала генерируют priv/pub
-// серверной стороной и не возвращают public key или Cloudflare-license.
-// Для совместимости с потенциальным native API fallback они оставлены полями
-// данных, но default = "" разрешён.
 data class WarpConfig(
     val privateKey: String,
     val publicKey: String = "",

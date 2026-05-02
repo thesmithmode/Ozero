@@ -1,8 +1,16 @@
 # engine-warp
 
-Cloudflare WARP engine (F2). WireGuard-based, ключи получает через автозапись
-(`CloudflareWarpAutoConfig`), peer endpoint статический (`engage.cloudflareclient.com`),
-JWT account license — anonymous free tier.
+Cloudflare WARP engine (F2). WireGuard-based, конфиг получает через `ProxyWarpAutoConfig`
+— список из ~78 публичных serverless-зеркал (Netlify/Vercel/Cloudflare Workers),
+которые проксируют запрос к Cloudflare и возвращают готовый `[Interface]/[Peer]`
+.conf text. Прямой `api.cloudflareclient.com` блокируется ТСПУ в РФ — список
+зеркал и schema запроса/ответа извлечены из CYBERPORTAL_X-v1.0.2 и подтверждены
+bundled sample КИБЕРЩИТ-X/assets/bundled/str_warp_2.conf.
+
+Проксирующие зеркала генерируют пару ключей серверной стороной → клиент НЕ
+посылает свой public key, и `WarpConfig.publicKey` / `accountLicense` опциональны.
+Регистрация: shuffle списка → race по 8 параллельных POST, общий бюджет 240s,
+первый успех отменяет остальные.
 
 ## Bridge layer
 
