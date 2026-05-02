@@ -60,6 +60,18 @@ class WarpConfigStoreTest {
     }
 
     @Test
+    fun `proxy-конфиг без pub и license сохраняется и возвращается с пустыми строками`() = runTest {
+        val proxyConfig = sample.copy(publicKey = "", accountLicense = "")
+        val store = newStore()
+        store.save(proxyConfig)
+        val read = assertNotNull(store.current().first())
+        assertEquals("", read.publicKey)
+        assertEquals("", read.accountLicense)
+        assertEquals(proxyConfig.privateKey, read.privateKey)
+        assertEquals(proxyConfig.peerEndpoint, read.peerEndpoint)
+    }
+
+    @Test
     fun `current возвращает null если записан только priv без остальных ключей`() = runTest {
         val ds = FakePreferencesDataStore()
         val partial = mutablePreferencesOf(stringPreferencesKey("warp_priv") to "priv-only")
