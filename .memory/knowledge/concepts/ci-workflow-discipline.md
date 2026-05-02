@@ -4,8 +4,9 @@ aliases: [ci-discipline, ci-on-dev, side-branch-workflow]
 tags: [ci, workflow, process]
 sources:
   - "daily/2026-04-29.md"
+  - "daily/2026-05-01.md"
 created: 2026-04-29
-updated: 2026-04-29
+updated: 2026-05-01
 ---
 
 # CI Workflow Discipline
@@ -28,11 +29,24 @@ The v1.0.5 development cycle validated this approach. The D1-D6 features were co
 
 A key lesson reinforced during v1.0.5: lint errors (ktlint, detekt) should be caught before push. While the workflow tolerates CI failures on `dev`, avoidable failures from formatting issues waste CI minutes and delay the pipeline.
 
+### CI Truthfulness Rules (2026-05-01)
+
+Two additional CI discipline rules were established after the `useJUnitPlatform()` incident revealed that CI had been reporting false greens for months:
+
+1. **`--continue` is mandatory** for both test and style steps in `ci.yml`. Gradle's default fail-fast behavior hides failures in modules that run after the first failure. With `--continue`, a single CI run exposes all broken surfaces.
+
+2. **Verify N > 0 tests per module**. A `BUILD SUCCESSFUL` with 0 tests executed is not green CI — it means the test runner failed to discover tests (e.g., missing `useJUnitPlatform()`). Coverage gates on 0 tests pass trivially, producing fictional coverage reports.
+
+Both rules were codified in the global `CLAUDE.md` as permanent CI practices after the v0.0.2 latent test discovery.
+
 ## Related Concepts
 
 - [[concepts/release-process]] - Release tagging happens only after CI is green on `dev`
 - [[concepts/per-engine-ui]] - The UI screens whose lint issues caused the first CI failure
+- [[concepts/junit-platform-silent-skip]] - The incident that prompted the N > 0 tests rule
+- [[concepts/gradle-continue-full-failures]] - The --continue discipline established alongside
 
 ## Sources
 
 - [[daily/2026-04-29.md]] - CI failed twice on v1.0.5 batch (ktlint+detekt, then tests), third run green; confirmed rule about not waiting for CI on side branches
+- [[daily/2026-05-01.md]] - `--continue` added to ci.yml; N > 0 test verification rule established after useJUnitPlatform() revealed 3 months of silent test skipping

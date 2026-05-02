@@ -5,8 +5,9 @@ tags: [tooling, knowledge-management, wiki]
 sources:
   - "daily/2026-04-29.md"
   - "daily/2026-04-30.md"
+  - "daily/2026-05-01.md"
 created: 2026-04-29
-updated: 2026-04-30
+updated: 2026-05-01
 ---
 
 # Wiki Knowledge Base Setup
@@ -38,6 +39,10 @@ The correct operational sequence for wiki maintenance is: compact first (creates
 
 Broken links in compile output are expected when a daily log references concepts that will become articles during that same compile pass. The compiler creates articles sequentially, so early articles may reference later ones before they exist. A post-compile lint resolves these.
 
+### Continued Flush Failures (2026-05-01)
+
+The flush hook unreliability continued on 2026-05-01. Three flush attempts across two productive sessions (pre-release fix wave + URnetwork SDK integration) all failed: one with "Control request timeout: initialize" and two with "Command failed with exit code 1." The pattern is now confirmed across three consecutive days of use — auto-flush hooks are structurally unreliable and daily logs must be maintained manually or via explicit `/wiki-compact` invocations. The error types vary (timeout, exit code 1, "nothing worth saving") suggesting multiple independent failure modes in the flush pipeline.
+
 ## Related Concepts
 
 - [[concepts/ci-workflow-discipline]] - The CI workflow that the wiki documents and tracks
@@ -47,3 +52,4 @@ Broken links in compile output are expected when a daily log references concepts
 
 - [[daily/2026-04-29.md]] - `/wiki-init` executed, .memory/ + hooks + .gitignore configured
 - [[daily/2026-04-30.md]] - Auto-flush hook unreliability discovered; compact-before-clear ordering established; 14 failed flushes in productive session
+- [[daily/2026-05-01.md]] - Continued flush failures (3/3 failed: timeout + exit code 1); pattern confirmed across 3 consecutive days
