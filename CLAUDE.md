@@ -76,6 +76,12 @@ Ozero — **обёртка-аггрегатор над набором рабоч
 - Boot log tab отдельный (Settings → Boot log), очистка только вручную.
 - `PersistentLoggers.error/warn` — для критичных событий, обязанных попасть в boot.log на диск (errors, warnings, JNI pre-blocking checkpoints для hang-диагностики). На success-events запрещено: `Log.i/d` достаточно — UnifiedLogger пишет и в logcat, и в файл через один канал. Дубль `Log.i + PersistentLoggers.info` на success → шум, удалять.
 
+## Тесты — типовые ловушки
+
+- **Интерфейс изменился** (добавлен/удалён метод) → сразу `grep -r "FakeXxx\|StubXxx\|FakeRepo"` по тестам и обновить все fake-реализации. Compile fail в CI = не обновил.
+- **ViewModel/объект с начальным StateFlow-состоянием в `@BeforeEach`**: если тест требует конкретного начального состояния store/repo — создавать VM **внутри теста** ПОСЛЕ `store.setRaw(...)`, не переиспользовать экземпляр из setUp. Иначе coroutine видит null раньше, чем тест успевает установить значение → race → ложный auto-trigger.
+- **Material Icons**: использовать только символы из `material-icons-core`. `Icons.Filled.Android`, `Icons.Filled.Apps`, `Icons.Filled.PhoneAndroid` — не существуют в core → compile fail. Placeholder без icon из расширенного набора → `Text("?")`.
+
 ## Per-engine UI
 
 - Каждый engine (Xray, Hy2, Awg, Naive, Tor, ByeDpi) обязан иметь settings screen в `app/src/main/java/.../ui/settings/engines/` для пользовательского override config (subscription URL, server picker, args, bridges, и т.д.).
