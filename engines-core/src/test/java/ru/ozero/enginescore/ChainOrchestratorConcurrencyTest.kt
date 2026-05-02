@@ -31,14 +31,14 @@ class ChainOrchestratorConcurrencyTest {
 
         jobs.forEach { it.join() }
         assertEquals(
-            plugin.startCount,
             5,
-            "5 parallel starts must execute sequentially"
+            plugin.startCount,
+            "5 parallel starts must execute sequentially",
         )
         assertEquals(
+            4,
             plugin.stopCount,
-            5,
-            "5 parallel stops must execute sequentially"
+            "first stop hits empty chain — no-op; 4 remaining stops each halt running engine",
         )
     }
 
