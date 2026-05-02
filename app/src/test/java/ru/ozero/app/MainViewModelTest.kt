@@ -149,7 +149,7 @@ class MainViewModelTest {
     fun onManualEngineSelectForwardsToRepository() = runTest {
         viewModel.onManualEngineSelect(EngineId.BYEDPI)
         advanceUntilIdle()
-        assertEquals(listOf(EngineId.BYEDPI), settingsRepository.manualEngineUpdates)
+        assertEquals(listOf<EngineId?>(EngineId.BYEDPI), settingsRepository.manualEngineUpdates)
     }
 
     private class FakeSettingsRepository : SettingsRepository {

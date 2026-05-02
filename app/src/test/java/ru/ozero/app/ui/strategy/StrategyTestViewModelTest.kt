@@ -26,6 +26,7 @@ import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.EngineStats
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
+import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.HostsMode
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
@@ -276,6 +277,7 @@ class StrategyTestViewModelTest {
         override suspend fun setHostsMode(mode: HostsMode) = Unit
         override suspend fun setHosts(hosts: List<String>) = Unit
         override suspend fun setUiLocaleTag(tag: String?) = Unit
+        override suspend fun setAppMode(mode: AppMode) = Unit
 
         override suspend fun setByedpiWinningArgs(args: String?) {
             byedpiUpdates += args
