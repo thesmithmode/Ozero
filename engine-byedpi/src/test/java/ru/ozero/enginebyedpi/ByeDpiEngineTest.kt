@@ -145,14 +145,17 @@ class ByeDpiEngineTest {
     }
 
     private fun ServerSocket.acceptSocks5InBackground(repeat: Int = 1) {
+        soTimeout = 200
         thread(isDaemon = true) {
-            runCatching {
-                repeat(repeat) {
+            var count = 0
+            while (count < repeat && !isClosed) {
+                runCatching {
                     accept().use { c ->
                         c.getInputStream().read(ByteArray(8))
                         c.getOutputStream().write(byteArrayOf(0x05, 0x00))
                         c.getOutputStream().flush()
                     }
+                    count++
                 }
             }
         }
