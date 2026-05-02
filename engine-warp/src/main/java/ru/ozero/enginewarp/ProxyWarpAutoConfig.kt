@@ -127,20 +127,30 @@ class ProxyWarpAutoConfig(
                 candidates.forEach { candidate ->
                     findInterfaceBlock(candidate)?.let { return it }
                 }
-                sequenceOf("data", "configs", "config").forEach { key ->
-                    val nested = json.optJSONObject(key) ?: return@forEach
-                    val names = nested.names() ?: return@forEach
-                    for (i in 0 until names.length()) {
-                        val childKey = names.optString(i)
-                        if (childKey.isNullOrEmpty()) continue
-                        val v = nested.optString(childKey)
-                        findInterfaceBlock(v)?.let { return it }
-                    }
-                }
+                findConfInNestedObject(json)?.let { return it }
                 return null
             }
         }
         return findInterfaceBlock(body)
+    }
+
+    private fun parseKeyValue(line: String): Pair<String, String>? {
+        val eq = line.indexOf('=')
+        if (eq <= 0) { return null }
+        return line.substring(0, eq).trim().lowercase() to line.substring(eq + 1).trim()
+    }
+
+    private fun findConfInNestedObject(json: JSONObject): String? {
+        sequenceOf("data", "configs", "config").forEach { key ->
+            val nested = json.optJSONObject(key) ?: return@forEach
+            val names = nested.names() ?: return@forEach
+            for (i in 0 until names.length()) {
+                val childKey = names.optString(i)
+                if (childKey.isNullOrEmpty()) { continue }
+                findInterfaceBlock(nested.optString(childKey))?.let { return it }
+            }
+        }
+        return null
     }
 
     private fun findInterfaceBlock(text: String?): String? {
@@ -156,18 +166,15 @@ class ProxyWarpAutoConfig(
         var section: String? = null
         conf.lineSequence().forEach { rawLine ->
             val line = rawLine.substringBefore('#').trim()
-            if (line.isEmpty()) return@forEach
+            if (line.isEmpty()) { return@forEach }
             when {
                 line.equals("[Interface]", ignoreCase = true) -> section = "iface"
                 line.equals("[Peer]", ignoreCase = true) -> section = "peer"
                 else -> {
-                    val eq = line.indexOf('=')
-                    if (eq <= 0) return@forEach
-                    val key = line.substring(0, eq).trim().lowercase()
-                    val value = line.substring(eq + 1).trim()
+                    val kv = parseKeyValue(line) ?: return@forEach
                     when (section) {
-                        "iface" -> iface[key] = value
-                        "peer" -> peer[key] = value
+                        "iface" -> iface[kv.first] = kv.second
+                        "peer" -> peer[kv.first] = kv.second
                         else -> Unit
                     }
                 }
@@ -203,9 +210,13 @@ class ProxyWarpAutoConfig(
         val parts = addresses.split(",").map { it.trim() }.filter { it.isNotEmpty() }
         val v4 = parts.firstOrNull { ":" !in it } ?: ""
         val v6 = parts.firstOrNull { ":" in it } ?: ""
-        val v4Cidr = if (v4.contains("/")) v4 else if (v4.isNotBlank()) "$v4/32" else v4
-        val v6Cidr = if (v6.contains("/")) v6 else if (v6.isNotBlank()) "$v6/128" else v6
-        return v4Cidr to v6Cidr
+        return toCidr(v4, "/32") to toCidr(v6, "/128")
+    }
+
+    private fun toCidr(addr: String, suffix: String): String = when {
+        addr.contains("/") -> addr
+        addr.isNotBlank() -> "$addr$suffix"
+        else -> addr
     }
 
     companion object {

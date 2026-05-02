@@ -43,7 +43,7 @@ class WarpEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `init без конфига auto-triggers register (user feedback — 'надо чтобы сразу регистрировалось всё')`() = runTest {
+    fun `init без конфига auto-triggers register — сразу регистрируется при первом открытии`() = runTest {
         auto.result = Result.success(SAMPLE)
         advanceUntilIdle()
         assertEquals(
