@@ -110,34 +110,40 @@ class ProxyWarpAutoConfig(
 
     private fun extractWireguardConf(body: String): String? {
         val trimmed = body.trim()
-        if (trimmed.startsWith("{")) {
-            val json = runCatching { JSONObject(trimmed) }.getOrNull()
-            if (json != null) {
-                if (json.optBoolean("success", true).not()) {
-                    val message = json.optString("message", "")
-                    PersistentLoggers.warn(TAG, "mirror reported failure: $message")
-                    return null
-                }
-                val candidates = sequenceOf(
-                    json.optString("data"),
-                    json.optString("config"),
-                    json.optString("wireguard"),
-                    json.optString("conf"),
-                )
-                candidates.forEach { candidate ->
-                    findInterfaceBlock(candidate)?.let { return it }
-                }
-                findConfInNestedObject(json)?.let { return it }
-                return null
-            }
+        if (!trimmed.startsWith("{")) { return findInterfaceBlock(body) }
+        val json = runCatching { JSONObject(trimmed) }.getOrNull() ?: return findInterfaceBlock(body)
+        return extractFromJson(json)
+    }
+
+    private fun extractFromJson(json: JSONObject): String? {
+        if (!json.optBoolean("success", true)) {
+            PersistentLoggers.warn(TAG, "mirror reported failure: ${json.optString("message", "")}")
+            return null
         }
-        return findInterfaceBlock(body)
+        sequenceOf("data", "config", "wireguard", "conf").forEach { key ->
+            findInterfaceBlock(json.optString(key))?.let { return it }
+        }
+        return findConfInNestedObject(json)
     }
 
     private fun parseKeyValue(line: String): Pair<String, String>? {
         val eq = line.indexOf('=')
         if (eq <= 0) { return null }
         return line.substring(0, eq).trim().lowercase() to line.substring(eq + 1).trim()
+    }
+
+    private fun applyKeyValue(
+        line: String,
+        section: String?,
+        iface: MutableMap<String, String>,
+        peer: MutableMap<String, String>,
+    ) {
+        val kv = parseKeyValue(line) ?: return
+        when (section) {
+            "iface" -> iface[kv.first] = kv.second
+            "peer" -> peer[kv.first] = kv.second
+            else -> Unit
+        }
     }
 
     private fun findConfInNestedObject(json: JSONObject): String? {
@@ -170,14 +176,7 @@ class ProxyWarpAutoConfig(
             when {
                 line.equals("[Interface]", ignoreCase = true) -> section = "iface"
                 line.equals("[Peer]", ignoreCase = true) -> section = "peer"
-                else -> {
-                    val kv = parseKeyValue(line) ?: return@forEach
-                    when (section) {
-                        "iface" -> iface[kv.first] = kv.second
-                        "peer" -> peer[kv.first] = kv.second
-                        else -> Unit
-                    }
-                }
+                else -> applyKeyValue(line, section, iface, peer)
             }
         }
         val priv = iface["privatekey"]
