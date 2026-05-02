@@ -35,10 +35,10 @@ class WarpEngineSettingsViewModel @Inject constructor(
         store.current()
             .onEach { cfg ->
                 _uiState.value = _uiState.value.copy(currentConfig = cfg)
-                val shouldAutoRegister = cfg == null
-                    && !autoTriggered
-                    && !_uiState.value.isRegistering
-                    && _uiState.value.errorMessage == null
+                val shouldAutoRegister = cfg == null &&
+                    !autoTriggered &&
+                    !_uiState.value.isRegistering &&
+                    _uiState.value.errorMessage == null
                 if (shouldAutoRegister) {
                     autoTriggered = true
                     onGenerate()

@@ -110,7 +110,9 @@ class ProxyWarpAutoConfig(
 
     private fun extractWireguardConf(body: String): String? {
         val trimmed = body.trim()
-        if (!trimmed.startsWith("{")) { return findInterfaceBlock(body) }
+        if (!trimmed.startsWith("{")) {
+            return findInterfaceBlock(body)
+        }
         val json = runCatching { JSONObject(trimmed) }.getOrNull() ?: return findInterfaceBlock(body)
         return extractFromJson(json)
     }
@@ -128,7 +130,9 @@ class ProxyWarpAutoConfig(
 
     private fun parseKeyValue(line: String): Pair<String, String>? {
         val eq = line.indexOf('=')
-        if (eq <= 0) { return null }
+        if (eq <= 0) {
+            return null
+        }
         return line.substring(0, eq).trim().lowercase() to line.substring(eq + 1).trim()
     }
 
@@ -152,7 +156,9 @@ class ProxyWarpAutoConfig(
             val names = nested.names() ?: return@forEach
             for (i in 0 until names.length()) {
                 val childKey = names.optString(i)
-                if (childKey.isNullOrEmpty()) { continue }
+                if (childKey.isNullOrEmpty()) {
+                    continue
+                }
                 findInterfaceBlock(nested.optString(childKey))?.let { return it }
             }
         }
@@ -172,7 +178,9 @@ class ProxyWarpAutoConfig(
         var section: String? = null
         conf.lineSequence().forEach { rawLine ->
             val line = rawLine.substringBefore('#').trim()
-            if (line.isEmpty()) { return@forEach }
+            if (line.isEmpty()) {
+                return@forEach
+            }
             when {
                 line.equals("[Interface]", ignoreCase = true) -> section = "iface"
                 line.equals("[Peer]", ignoreCase = true) -> section = "peer"
