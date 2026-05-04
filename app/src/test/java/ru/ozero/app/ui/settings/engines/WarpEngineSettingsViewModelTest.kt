@@ -64,7 +64,7 @@ class WarpEngineSettingsViewModelTest {
     fun `init подхватывает saved config из store без auto-trigger`() = runTest {
         val freshAuto = FakeAutoConfig()
         store.setRaw(SAMPLE)
-        val freshVm = WarpEngineSettingsViewModel(store, freshAuto)
+        val freshVm = WarpEngineSettingsViewModel(store, freshAuto, FakeFileImporter())
         advanceUntilIdle()
         assertEquals(SAMPLE, freshVm.uiState.value.currentConfig)
         assertEquals(

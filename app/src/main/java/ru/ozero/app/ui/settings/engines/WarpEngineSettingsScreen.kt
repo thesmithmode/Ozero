@@ -176,7 +176,11 @@ private fun ConfigCard(
                 style = MaterialTheme.typography.titleSmall,
             )
             Text(
-                text = config.accountLicense.take(LICENSE_PREVIEW_LEN) + "…",
+                text = if (config.accountLicense.isBlank()) {
+                    stringResource(R.string.warp_no_license)
+                } else {
+                    config.accountLicense.take(LICENSE_PREVIEW_LEN) + "…"
+                },
                 style = MaterialTheme.typography.bodyMedium,
             )
             if (errorMessage != null) {

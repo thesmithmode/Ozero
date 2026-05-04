@@ -200,6 +200,7 @@
     <string name="warp_endpoint_label">Endpoint:</string>
     <string name="warp_license_label">Лицензия:</string>
     <string name="warp_import_file">Импорт из файла .conf</string>
+    <string name="warp_no_license">—</string>
     <string name="warp_import_error">Ошибка импорта</string>
     <string name="warp_imported">Конфиг импортирован</string>
     <string name="warp_address_label">Адрес:</string>

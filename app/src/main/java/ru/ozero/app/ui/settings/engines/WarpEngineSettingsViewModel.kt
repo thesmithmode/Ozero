@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -32,22 +33,15 @@ class WarpEngineSettingsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(WarpSettingsUiState())
     val uiState: StateFlow<WarpSettingsUiState> = _uiState.asStateFlow()
 
-    private var autoTriggered: Boolean = false
-
     init {
         store.current()
-            .onEach { cfg ->
-                _uiState.value = _uiState.value.copy(currentConfig = cfg)
-                val shouldAutoRegister = cfg == null &&
-                    !autoTriggered &&
-                    !_uiState.value.isRegistering &&
-                    _uiState.value.errorMessage == null
-                if (shouldAutoRegister) {
-                    autoTriggered = true
-                    onGenerate()
-                }
-            }
+            .onEach { cfg -> _uiState.value = _uiState.value.copy(currentConfig = cfg) }
             .launchIn(viewModelScope)
+        viewModelScope.launch {
+            if (store.current().first() == null) {
+                onGenerate()
+            }
+        }
     }
 
     fun onGenerate() {

@@ -1,6 +1,6 @@
 package ru.ozero.enginewarp
 
-import com.wireguard.crypto.KeyPair
+import org.amnezia.awg.crypto.KeyPair
 
 interface WireguardKeyPairGenerator {
     fun generate(): Pair<String, String>
