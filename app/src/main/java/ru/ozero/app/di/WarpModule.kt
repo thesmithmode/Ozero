@@ -22,6 +22,7 @@ import ru.ozero.enginewarp.HttpUrlConnectionClient
 import ru.ozero.enginewarp.ProxyWarpAutoConfig
 import ru.ozero.enginewarp.RealWarpSdkBridge
 import ru.ozero.enginewarp.WarpAutoConfig
+import ru.ozero.enginewarp.WarpConfFileImporter
 import ru.ozero.enginewarp.WarpConfigStore
 import ru.ozero.enginewarp.WarpSdkBridge
 import javax.inject.Qualifier
@@ -61,6 +62,10 @@ object WarpModule {
     fun provideWarpAutoConfig(
         httpClient: HttpClient,
     ): WarpAutoConfig = ProxyWarpAutoConfig(httpClient)
+
+    @Provides
+    @Singleton
+    fun provideWarpConfFileImporter(): WarpConfFileImporter = WarpConfFileImporter()
 
     @Provides
     @Singleton

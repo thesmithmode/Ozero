@@ -1,6 +1,8 @@
 package ru.ozero.app.ui.settings.engines
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -42,6 +45,15 @@ fun WarpEngineSettingsScreen(
 ) {
     BackHandler(onBack = onBack)
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent(),
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        context.contentResolver.openInputStream(uri)?.use { stream ->
+            viewModel.onImportFile(stream)
+        }
+    }
     Scaffold(
         modifier = Modifier.testTag("warp_settings"),
         topBar = {
@@ -69,6 +81,7 @@ fun WarpEngineSettingsScreen(
                     isRegistering = state.isRegistering,
                     errorMessage = state.errorMessage,
                     onGenerate = viewModel::onGenerate,
+                    onImportFile = { filePickerLauncher.launch("*/*") },
                 )
             } else {
                 ConfigCard(
@@ -77,6 +90,7 @@ fun WarpEngineSettingsScreen(
                     errorMessage = state.errorMessage,
                     onRegenerate = viewModel::onGenerate,
                     onClear = viewModel::onClear,
+                    onImportFile = { filePickerLauncher.launch("*/*") },
                 )
             }
         }
@@ -88,6 +102,7 @@ private fun EmptyConfigCard(
     isRegistering: Boolean,
     errorMessage: String?,
     onGenerate: () -> Unit,
+    onImportFile: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -124,6 +139,15 @@ private fun EmptyConfigCard(
                     Text(stringResource(R.string.warp_generate))
                 }
             }
+            OutlinedButton(
+                onClick = onImportFile,
+                enabled = !isRegistering,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("warp_import_button"),
+            ) {
+                Text(stringResource(R.string.warp_import_file))
+            }
         }
     }
 }
@@ -135,6 +159,7 @@ private fun ConfigCard(
     errorMessage: String?,
     onRegenerate: () -> Unit,
     onClear: () -> Unit,
+    onImportFile: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -191,6 +216,15 @@ private fun ConfigCard(
         ) {
             Text(stringResource(R.string.warp_clear))
         }
+    }
+    OutlinedButton(
+        onClick = onImportFile,
+        enabled = !isRegistering,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("warp_import_button"),
+    ) {
+        Text(stringResource(R.string.warp_import_file))
     }
 }
 

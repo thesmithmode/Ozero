@@ -13,8 +13,12 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.enginewarp.WarpAutoConfig
+import ru.ozero.enginewarp.WarpConfFileImporter
 import ru.ozero.enginewarp.WarpConfig
 import ru.ozero.enginewarp.WarpConfigStore
+import java.io.ByteArrayInputStream
+import java.io.IOException
+import java.io.InputStream
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -27,6 +31,7 @@ class WarpEngineSettingsViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private lateinit var store: FakeWarpStore
     private lateinit var auto: FakeAutoConfig
+    private lateinit var importer: FakeFileImporter
     private lateinit var vm: WarpEngineSettingsViewModel
 
     @BeforeEach
@@ -34,7 +39,8 @@ class WarpEngineSettingsViewModelTest {
         Dispatchers.setMain(dispatcher)
         store = FakeWarpStore()
         auto = FakeAutoConfig()
-        vm = WarpEngineSettingsViewModel(store, auto)
+        importer = FakeFileImporter()
+        vm = WarpEngineSettingsViewModel(store, auto, importer)
     }
 
     @AfterEach
@@ -171,6 +177,45 @@ class WarpEngineSettingsViewModelTest {
             clearCalls++
             flow.value = null
         }
+    }
+
+    @Test
+    fun `onImportFile success сохраняет config и сбрасывает ошибку`() = runTest {
+        importer.result = Result.success(SAMPLE)
+        vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
+        advanceUntilIdle()
+        assertEquals(SAMPLE, store.savedRaw)
+        assertNull(vm.uiState.value.errorMessage)
+    }
+
+    @Test
+    fun `onImportFile failure ставит errorMessage`() = runTest {
+        importer.result = Result.failure(IOException("bad file"))
+        vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
+        advanceUntilIdle()
+        assertEquals("bad file", vm.uiState.value.errorMessage)
+        assertNull(store.savedRaw)
+    }
+
+    @Test
+    fun `onImportFile failure без message — fallback import failed`() = runTest {
+        importer.result = Result.failure(RuntimeException())
+        vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
+        advanceUntilIdle()
+        assertEquals("import failed", vm.uiState.value.errorMessage)
+    }
+
+    @Test
+    fun `onImportFile success обновляет currentConfig через store`() = runTest {
+        importer.result = Result.success(SAMPLE)
+        vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
+        advanceUntilIdle()
+        assertEquals(SAMPLE, vm.uiState.value.currentConfig)
+    }
+
+    private class FakeFileImporter : WarpConfFileImporter() {
+        var result: Result<WarpConfig> = Result.failure(IllegalStateException("not-stubbed"))
+        override fun import(stream: InputStream): Result<WarpConfig> = result
     }
 
     private class FakeAutoConfig : WarpAutoConfig {

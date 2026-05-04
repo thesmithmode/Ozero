@@ -10,8 +10,10 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import ru.ozero.enginewarp.WarpAutoConfig
+import ru.ozero.enginewarp.WarpConfFileImporter
 import ru.ozero.enginewarp.WarpConfig
 import ru.ozero.enginewarp.WarpConfigStore
+import java.io.InputStream
 import javax.inject.Inject
 
 data class WarpSettingsUiState(
@@ -24,6 +26,7 @@ data class WarpSettingsUiState(
 class WarpEngineSettingsViewModel @Inject constructor(
     private val store: WarpConfigStore,
     private val autoConfig: WarpAutoConfig,
+    private val fileImporter: WarpConfFileImporter,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(WarpSettingsUiState())
@@ -61,6 +64,23 @@ class WarpEngineSettingsViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(
                         isRegistering = false,
                         errorMessage = t.message ?: "register failed",
+                    )
+                },
+            )
+        }
+    }
+
+    fun onImportFile(stream: InputStream) {
+        viewModelScope.launch {
+            val result = fileImporter.import(stream)
+            result.fold(
+                onSuccess = { cfg ->
+                    store.save(cfg)
+                    _uiState.value = _uiState.value.copy(errorMessage = null)
+                },
+                onFailure = { t ->
+                    _uiState.value = _uiState.value.copy(
+                        errorMessage = t.message ?: "import failed",
                     )
                 },
             )
