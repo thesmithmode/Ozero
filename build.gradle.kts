@@ -29,7 +29,7 @@ allprojects {
     configurations.all {
         resolutionStrategy {
             force("com.squareup:javapoet:1.13.0")
-            force("androidx.core:core-ktx:1.13.1")
+            force("androidx.core:core-ktx:1.18.0")
             force("org.jetbrains.kotlin:kotlin-stdlib:2.0.20")
             force("org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.0.20")
             force("org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.0.20")
