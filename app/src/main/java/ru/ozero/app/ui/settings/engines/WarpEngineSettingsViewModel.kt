@@ -11,9 +11,9 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import ru.ozero.enginewarp.WarpAutoConfig
-import ru.ozero.enginewarp.WarpConfFileImporter
 import ru.ozero.enginewarp.WarpConfig
 import ru.ozero.enginewarp.WarpConfigStore
+import ru.ozero.enginewarp.WarpFileImporter
 import java.io.InputStream
 import javax.inject.Inject
 
@@ -27,7 +27,7 @@ data class WarpSettingsUiState(
 class WarpEngineSettingsViewModel @Inject constructor(
     private val store: WarpConfigStore,
     private val autoConfig: WarpAutoConfig,
-    private val fileImporter: WarpConfFileImporter,
+    private val fileImporter: WarpFileImporter,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(WarpSettingsUiState())

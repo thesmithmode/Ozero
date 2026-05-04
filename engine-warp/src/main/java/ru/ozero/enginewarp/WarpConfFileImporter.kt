@@ -3,8 +3,8 @@ package ru.ozero.enginewarp
 import java.io.IOException
 import java.io.InputStream
 
-open class WarpConfFileImporter {
-    open fun import(stream: InputStream): Result<WarpConfig> = try {
+class WarpConfFileImporter : WarpFileImporter {
+    override fun import(stream: InputStream): Result<WarpConfig> = try {
         val text = stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
         if (text.isBlank()) {
             Result.failure(IOException("Файл пустой"))

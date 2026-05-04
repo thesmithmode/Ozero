@@ -13,9 +13,9 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.enginewarp.WarpAutoConfig
-import ru.ozero.enginewarp.WarpConfFileImporter
 import ru.ozero.enginewarp.WarpConfig
 import ru.ozero.enginewarp.WarpConfigStore
+import ru.ozero.enginewarp.WarpFileImporter
 import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.io.InputStream
@@ -213,7 +213,7 @@ class WarpEngineSettingsViewModelTest {
         assertEquals(SAMPLE, vm.uiState.value.currentConfig)
     }
 
-    private class FakeFileImporter : WarpConfFileImporter() {
+    private class FakeFileImporter : WarpFileImporter {
         var result: Result<WarpConfig> = Result.failure(IllegalStateException("not-stubbed"))
         override fun import(stream: InputStream): Result<WarpConfig> = result
     }

@@ -120,7 +120,7 @@ class ProxyWarpAutoConfig(
     }
 
     private fun extractFromJson(json: JSONObject): String? {
-        if (!json.optBoolean("success", true)) {
+        if (json.has("success") && !json.getBoolean("success")) {
             PersistentLoggers.warn(TAG, "mirror reported failure: ${json.optString("message", "")}")
             return null
         }
@@ -159,11 +159,10 @@ class ProxyWarpAutoConfig(
     }
 
     companion object {
-        const val TAG = "ProxyWarpAutoConfig"
+        private const val TAG = "ProxyWarpAutoConfig"
         const val DEFAULT_USER_AGENT = "okhttp/3.12.1"
         const val DEFAULT_CONCURRENCY = 8
         const val DEFAULT_TOTAL_BUDGET_MS = 240_000L
-        const val DEFAULT_MTU = 1280
         const val PER_MIRROR_TIMEOUT_MS = 45_000L
         const val REQUEST_BODY =
             "{\"selectedServices\":[],\"siteMode\":\"all\"," +

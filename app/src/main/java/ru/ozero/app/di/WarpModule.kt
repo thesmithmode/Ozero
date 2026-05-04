@@ -23,6 +23,7 @@ import ru.ozero.enginewarp.ProxyWarpAutoConfig
 import ru.ozero.enginewarp.RealWarpSdkBridge
 import ru.ozero.enginewarp.WarpAutoConfig
 import ru.ozero.enginewarp.WarpConfFileImporter
+import ru.ozero.enginewarp.WarpFileImporter
 import ru.ozero.enginewarp.WarpConfigStore
 import ru.ozero.enginewarp.WarpSdkBridge
 import javax.inject.Qualifier
@@ -65,7 +66,7 @@ object WarpModule {
 
     @Provides
     @Singleton
-    fun provideWarpConfFileImporter(): WarpConfFileImporter = WarpConfFileImporter()
+    fun provideWarpConfFileImporter(): WarpFileImporter = WarpConfFileImporter()
 
     @Provides
     @Singleton

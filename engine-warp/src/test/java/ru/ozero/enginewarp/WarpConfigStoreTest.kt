@@ -135,6 +135,29 @@ class WarpConfigStoreTest {
     }
 
     @Test
+    fun `H-значения corrupted в DataStore — fallback к defaults без краша`() = runTest {
+        val ds = FakePreferencesDataStore()
+        ds.updateData {
+            mutablePreferencesOf(
+                stringPreferencesKey("warp_priv") to "p",
+                stringPreferencesKey("warp_peer_pub") to "pp",
+                stringPreferencesKey("warp_peer_endpoint") to "h:1",
+                stringPreferencesKey("warp_iface_v4") to "1.2.3.4/32",
+                stringPreferencesKey("warp_iface_v6") to "::1/128",
+                stringPreferencesKey("awg_h1") to "not-a-long",
+                stringPreferencesKey("awg_h2") to "",
+                stringPreferencesKey("awg_h3") to "9999999999999999999999",
+            )
+        }
+        val store = DataStoreWarpConfigStore(ds)
+        val read = assertNotNull(store.current().first())
+        assertEquals(AwgParams.DEFAULT_H1, read.awgParams.initPacketMagicHeader)
+        assertEquals(AwgParams.DEFAULT_H2, read.awgParams.responsePacketMagicHeader)
+        assertEquals(AwgParams.DEFAULT_H3, read.awgParams.cookieReplyMagicHeader)
+        assertEquals(AwgParams.DEFAULT_H4, read.awgParams.transportMagicHeader)
+    }
+
+    @Test
     fun `current возвращает null если записан только priv без остальных ключей`() = runTest {
         val ds = FakePreferencesDataStore()
         val partial = mutablePreferencesOf(stringPreferencesKey("warp_priv") to "priv-only")

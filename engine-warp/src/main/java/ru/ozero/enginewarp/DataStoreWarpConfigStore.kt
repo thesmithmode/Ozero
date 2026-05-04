@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import ru.ozero.enginescore.PersistentLoggers
 
 class DataStoreWarpConfigStore(
     private val dataStore: DataStore<Preferences>,
@@ -34,10 +35,10 @@ class DataStoreWarpConfigStore(
             junkPacketMaxSize = prefs[KEY_AWG_JMAX] ?: AwgParams.DEFAULT_JMAX,
             initPacketJunkSize = prefs[KEY_AWG_S1] ?: AwgParams.DEFAULT_S1,
             responsePacketJunkSize = prefs[KEY_AWG_S2] ?: AwgParams.DEFAULT_S2,
-            initPacketMagicHeader = prefs[KEY_AWG_H1]?.toLongOrNull() ?: AwgParams.DEFAULT_H1,
-            responsePacketMagicHeader = prefs[KEY_AWG_H2]?.toLongOrNull() ?: AwgParams.DEFAULT_H2,
-            cookieReplyMagicHeader = prefs[KEY_AWG_H3]?.toLongOrNull() ?: AwgParams.DEFAULT_H3,
-            transportMagicHeader = prefs[KEY_AWG_H4]?.toLongOrNull() ?: AwgParams.DEFAULT_H4,
+            initPacketMagicHeader = parseLongPref(prefs[KEY_AWG_H1], "H1", AwgParams.DEFAULT_H1),
+            responsePacketMagicHeader = parseLongPref(prefs[KEY_AWG_H2], "H2", AwgParams.DEFAULT_H2),
+            cookieReplyMagicHeader = parseLongPref(prefs[KEY_AWG_H3], "H3", AwgParams.DEFAULT_H3),
+            transportMagicHeader = parseLongPref(prefs[KEY_AWG_H4], "H4", AwgParams.DEFAULT_H4),
         )
         WarpConfig(
             privateKey = priv,
@@ -102,7 +103,16 @@ class DataStoreWarpConfigStore(
         }
     }
 
+    private fun parseLongPref(raw: String?, key: String, default: Long): Long {
+        if (raw == null) return default
+        return raw.toLongOrNull() ?: run {
+            PersistentLoggers.warn(TAG, "AWG $key parse failed ($raw), using default $default")
+            default
+        }
+    }
+
     private companion object {
+        const val TAG = "DataStoreWarpConfigStore"
         val KEY_PRIV = stringPreferencesKey("warp_priv")
         val KEY_PUB = stringPreferencesKey("warp_pub")
         val KEY_PEER_PUB = stringPreferencesKey("warp_peer_pub")

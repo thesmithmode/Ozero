@@ -11,6 +11,12 @@ data class AwgParams(
     val cookieReplyMagicHeader: Long = DEFAULT_H3,
     val transportMagicHeader: Long = DEFAULT_H4,
 ) {
+    init {
+        require(junkPacketMinSize <= junkPacketMaxSize) {
+            "Jmin ($junkPacketMinSize) must be <= Jmax ($junkPacketMaxSize)"
+        }
+    }
+
     companion object {
         const val DEFAULT_JC = 5
         const val DEFAULT_JMIN = 100
