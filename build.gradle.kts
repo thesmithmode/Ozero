@@ -29,6 +29,7 @@ allprojects {
     configurations.all {
         resolutionStrategy {
             force("com.squareup:javapoet:1.13.0")
+            force("androidx.core:core-ktx:1.13.1")
         }
     }
 }

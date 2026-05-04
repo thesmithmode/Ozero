@@ -199,6 +199,10 @@
     <string name="warp_registering">Получаем конфиг WARP с зеркал… (до 4 минут)</string>
     <string name="warp_endpoint_label">Endpoint:</string>
     <string name="warp_license_label">Лицензия:</string>
+    <string name="warp_import_file">Импорт из файла .conf</string>
+    <string name="warp_import_error">Ошибка импорта</string>
+    <string name="warp_imported">Конфиг импортирован</string>
+    <string name="warp_address_label">Адрес:</string>
 
     <!-- App mode -->
     <string name="settings_app_mode_title">Режим интерфейса</string>
