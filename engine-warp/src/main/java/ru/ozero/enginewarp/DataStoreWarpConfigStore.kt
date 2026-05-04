@@ -29,15 +29,15 @@ class DataStoreWarpConfigStore(
             ?: WarpConfig.DEFAULT_DNS
         val keepalive = prefs[KEY_KEEPALIVE] ?: WarpConfig.DEFAULT_KEEPALIVE
         val awgParams = AwgParams(
-            junkPacketCount           = prefs[KEY_AWG_JC]   ?: AwgParams.DEFAULT_JC,
-            junkPacketMinSize         = prefs[KEY_AWG_JMIN] ?: AwgParams.DEFAULT_JMIN,
-            junkPacketMaxSize         = prefs[KEY_AWG_JMAX] ?: AwgParams.DEFAULT_JMAX,
-            initPacketJunkSize        = prefs[KEY_AWG_S1]   ?: AwgParams.DEFAULT_S1,
-            responsePacketJunkSize    = prefs[KEY_AWG_S2]   ?: AwgParams.DEFAULT_S2,
-            initPacketMagicHeader     = prefs[KEY_AWG_H1]?.toLongOrNull() ?: AwgParams.DEFAULT_H1,
+            junkPacketCount = prefs[KEY_AWG_JC] ?: AwgParams.DEFAULT_JC,
+            junkPacketMinSize = prefs[KEY_AWG_JMIN] ?: AwgParams.DEFAULT_JMIN,
+            junkPacketMaxSize = prefs[KEY_AWG_JMAX] ?: AwgParams.DEFAULT_JMAX,
+            initPacketJunkSize = prefs[KEY_AWG_S1] ?: AwgParams.DEFAULT_S1,
+            responsePacketJunkSize = prefs[KEY_AWG_S2] ?: AwgParams.DEFAULT_S2,
+            initPacketMagicHeader = prefs[KEY_AWG_H1]?.toLongOrNull() ?: AwgParams.DEFAULT_H1,
             responsePacketMagicHeader = prefs[KEY_AWG_H2]?.toLongOrNull() ?: AwgParams.DEFAULT_H2,
-            cookieReplyMagicHeader    = prefs[KEY_AWG_H3]?.toLongOrNull() ?: AwgParams.DEFAULT_H3,
-            transportMagicHeader      = prefs[KEY_AWG_H4]?.toLongOrNull() ?: AwgParams.DEFAULT_H4,
+            cookieReplyMagicHeader = prefs[KEY_AWG_H3]?.toLongOrNull() ?: AwgParams.DEFAULT_H3,
+            transportMagicHeader = prefs[KEY_AWG_H4]?.toLongOrNull() ?: AwgParams.DEFAULT_H4,
         )
         WarpConfig(
             privateKey = priv,
@@ -66,15 +66,15 @@ class DataStoreWarpConfigStore(
             prefs[KEY_MTU] = config.mtu
             prefs[KEY_DNS] = config.dnsServers.joinToString(",")
             prefs[KEY_KEEPALIVE] = config.keepaliveSeconds
-            prefs[KEY_AWG_JC]   = config.awgParams.junkPacketCount
+            prefs[KEY_AWG_JC] = config.awgParams.junkPacketCount
             prefs[KEY_AWG_JMIN] = config.awgParams.junkPacketMinSize
             prefs[KEY_AWG_JMAX] = config.awgParams.junkPacketMaxSize
-            prefs[KEY_AWG_S1]   = config.awgParams.initPacketJunkSize
-            prefs[KEY_AWG_S2]   = config.awgParams.responsePacketJunkSize
-            prefs[KEY_AWG_H1]   = config.awgParams.initPacketMagicHeader.toString()
-            prefs[KEY_AWG_H2]   = config.awgParams.responsePacketMagicHeader.toString()
-            prefs[KEY_AWG_H3]   = config.awgParams.cookieReplyMagicHeader.toString()
-            prefs[KEY_AWG_H4]   = config.awgParams.transportMagicHeader.toString()
+            prefs[KEY_AWG_S1] = config.awgParams.initPacketJunkSize
+            prefs[KEY_AWG_S2] = config.awgParams.responsePacketJunkSize
+            prefs[KEY_AWG_H1] = config.awgParams.initPacketMagicHeader.toString()
+            prefs[KEY_AWG_H2] = config.awgParams.responsePacketMagicHeader.toString()
+            prefs[KEY_AWG_H3] = config.awgParams.cookieReplyMagicHeader.toString()
+            prefs[KEY_AWG_H4] = config.awgParams.transportMagicHeader.toString()
         }
     }
 
@@ -103,24 +103,24 @@ class DataStoreWarpConfigStore(
     }
 
     private companion object {
-        val KEY_PRIV          = stringPreferencesKey("warp_priv")
-        val KEY_PUB           = stringPreferencesKey("warp_pub")
-        val KEY_PEER_PUB      = stringPreferencesKey("warp_peer_pub")
+        val KEY_PRIV = stringPreferencesKey("warp_priv")
+        val KEY_PUB = stringPreferencesKey("warp_pub")
+        val KEY_PEER_PUB = stringPreferencesKey("warp_peer_pub")
         val KEY_PEER_ENDPOINT = stringPreferencesKey("warp_peer_endpoint")
-        val KEY_IFACE_V4      = stringPreferencesKey("warp_iface_v4")
-        val KEY_IFACE_V6      = stringPreferencesKey("warp_iface_v6")
-        val KEY_LICENSE       = stringPreferencesKey("warp_license")
-        val KEY_MTU           = intPreferencesKey("warp_mtu")
-        val KEY_DNS           = stringPreferencesKey("warp_dns")
-        val KEY_KEEPALIVE     = intPreferencesKey("warp_keepalive")
-        val KEY_AWG_JC        = intPreferencesKey("awg_jc")
-        val KEY_AWG_JMIN      = intPreferencesKey("awg_jmin")
-        val KEY_AWG_JMAX      = intPreferencesKey("awg_jmax")
-        val KEY_AWG_S1        = intPreferencesKey("awg_s1")
-        val KEY_AWG_S2        = intPreferencesKey("awg_s2")
-        val KEY_AWG_H1        = stringPreferencesKey("awg_h1")
-        val KEY_AWG_H2        = stringPreferencesKey("awg_h2")
-        val KEY_AWG_H3        = stringPreferencesKey("awg_h3")
-        val KEY_AWG_H4        = stringPreferencesKey("awg_h4")
+        val KEY_IFACE_V4 = stringPreferencesKey("warp_iface_v4")
+        val KEY_IFACE_V6 = stringPreferencesKey("warp_iface_v6")
+        val KEY_LICENSE = stringPreferencesKey("warp_license")
+        val KEY_MTU = intPreferencesKey("warp_mtu")
+        val KEY_DNS = stringPreferencesKey("warp_dns")
+        val KEY_KEEPALIVE = intPreferencesKey("warp_keepalive")
+        val KEY_AWG_JC = intPreferencesKey("awg_jc")
+        val KEY_AWG_JMIN = intPreferencesKey("awg_jmin")
+        val KEY_AWG_JMAX = intPreferencesKey("awg_jmax")
+        val KEY_AWG_S1 = intPreferencesKey("awg_s1")
+        val KEY_AWG_S2 = intPreferencesKey("awg_s2")
+        val KEY_AWG_H1 = stringPreferencesKey("awg_h1")
+        val KEY_AWG_H2 = stringPreferencesKey("awg_h2")
+        val KEY_AWG_H3 = stringPreferencesKey("awg_h3")
+        val KEY_AWG_H4 = stringPreferencesKey("awg_h4")
     }
 }

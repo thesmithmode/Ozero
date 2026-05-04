@@ -12,7 +12,6 @@ import ru.ozero.enginescore.PersistentLoggers
 import java.io.IOException
 import java.util.Base64
 
-// 78 serverless-зеркал вместо api.cloudflareclient.com (блокируется ТСПУ); ключи генерирует сервер.
 class ProxyWarpAutoConfig(
     private val httpClient: HttpClient,
     private val mirrors: List<String> = DEFAULT_MIRRORS,
@@ -238,15 +237,15 @@ class ProxyWarpAutoConfig(
     }
 
     private fun parseAwgParams(iface: Map<String, String>): AwgParams = AwgParams(
-        junkPacketCount           = iface["jc"]?.toIntOrNull()    ?: AwgParams.DEFAULT_JC,
-        junkPacketMinSize         = iface["jmin"]?.toIntOrNull()  ?: AwgParams.DEFAULT_JMIN,
-        junkPacketMaxSize         = iface["jmax"]?.toIntOrNull()  ?: AwgParams.DEFAULT_JMAX,
-        initPacketJunkSize        = iface["s1"]?.toIntOrNull()    ?: AwgParams.DEFAULT_S1,
-        responsePacketJunkSize    = iface["s2"]?.toIntOrNull()    ?: AwgParams.DEFAULT_S2,
-        initPacketMagicHeader     = iface["h1"]?.toLongOrNull()   ?: AwgParams.DEFAULT_H1,
-        responsePacketMagicHeader = iface["h2"]?.toLongOrNull()   ?: AwgParams.DEFAULT_H2,
-        cookieReplyMagicHeader    = iface["h3"]?.toLongOrNull()   ?: AwgParams.DEFAULT_H3,
-        transportMagicHeader      = iface["h4"]?.toLongOrNull()   ?: AwgParams.DEFAULT_H4,
+        junkPacketCount = iface["jc"]?.toIntOrNull() ?: AwgParams.DEFAULT_JC,
+        junkPacketMinSize = iface["jmin"]?.toIntOrNull() ?: AwgParams.DEFAULT_JMIN,
+        junkPacketMaxSize = iface["jmax"]?.toIntOrNull() ?: AwgParams.DEFAULT_JMAX,
+        initPacketJunkSize = iface["s1"]?.toIntOrNull() ?: AwgParams.DEFAULT_S1,
+        responsePacketJunkSize = iface["s2"]?.toIntOrNull() ?: AwgParams.DEFAULT_S2,
+        initPacketMagicHeader = iface["h1"]?.toLongOrNull() ?: AwgParams.DEFAULT_H1,
+        responsePacketMagicHeader = iface["h2"]?.toLongOrNull() ?: AwgParams.DEFAULT_H2,
+        cookieReplyMagicHeader = iface["h3"]?.toLongOrNull() ?: AwgParams.DEFAULT_H3,
+        transportMagicHeader = iface["h4"]?.toLongOrNull() ?: AwgParams.DEFAULT_H4,
     )
 
     private fun toCidr(addr: String, suffix: String): String = when {
