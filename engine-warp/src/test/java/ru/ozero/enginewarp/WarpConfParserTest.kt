@@ -44,7 +44,7 @@ class WarpConfParserTest {
     }
 
     @Test
-    fun `parse парсит все AWG параметры из .conf файла`() {
+    fun `parse парсит все AWG параметры из conf файла`() {
         val result = WarpConfParser.parse(validConf)
         val p = result.getOrThrow().awgParams
         assertEquals(5, p.junkPacketCount)
