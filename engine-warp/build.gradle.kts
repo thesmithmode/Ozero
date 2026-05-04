@@ -21,4 +21,5 @@ dependencies {
     testImplementation(libs.bundles.testing.unit)
     testImplementation(libs.datastore.preferences.core)
     testImplementation(libs.json)
+    testImplementation(libs.okhttp.mockwebserver)
 }

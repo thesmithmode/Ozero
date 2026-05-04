@@ -10,10 +10,9 @@ import org.amnezia.awg.config.Config
 import ru.ozero.enginescore.PersistentLoggers
 
 class RealWarpSdkBridge(
-    private val context: Context,
+    context: Context,
+    private val backend: AwgBackend = GoBackendWrapper(context),
 ) : WarpSdkBridge {
-
-    private val backend: GoBackend by lazy { GoBackend(context, NoOpTunnelActionHandler) }
 
     private val tunnel = object : Tunnel {
         override fun getName(): String = TUNNEL_NAME
@@ -60,15 +59,22 @@ class RealWarpSdkBridge(
     private fun buildConfig(config: WarpConfig): Config =
         Config.parse(WarpIniBuilder.build(config).byteInputStream())
 
-    private object NoOpTunnelActionHandler : TunnelActionHandler {
+    private companion object {
+        const val TAG = "RealWarpSdkBridge"
+        const val TUNNEL_NAME = "ozero-warp"
+    }
+}
+
+private class GoBackendWrapper(context: Context) : AwgBackend {
+    private val goBackend: GoBackend by lazy { GoBackend(context, NoOpHandler) }
+
+    override fun setState(tunnel: Tunnel, state: Tunnel.State, config: Config?): Tunnel.State =
+        goBackend.setState(tunnel, state, config)
+
+    private object NoOpHandler : TunnelActionHandler {
         override fun runPreUp(scripts: Collection<String>) = Unit
         override fun runPostUp(scripts: Collection<String>) = Unit
         override fun runPreDown(scripts: Collection<String>) = Unit
         override fun runPostDown(scripts: Collection<String>) = Unit
-    }
-
-    private companion object {
-        const val TAG = "RealWarpSdkBridge"
-        const val TUNNEL_NAME = "ozero-warp"
     }
 }
