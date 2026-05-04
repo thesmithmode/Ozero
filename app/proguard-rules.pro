@@ -65,6 +65,14 @@
 -keep class ru.ozero.corestorage.** { *; }
 
 -keep class ru.ozero.enginebyedpi.** { *; }
+-keep class ru.ozero.enginewarp.** { *; }
+-keep class ru.ozero.engineurnetwork.** { *; }
+
+-keep class org.amnezia.awg.** { *; }
+-dontwarn org.amnezia.awg.**
+
+-keep class com.bringyour.sdk.** { *; }
+-dontwarn com.bringyour.sdk.**
 
 -keep class **_MapFactory { *; }
 -keep class **_InjectedMapFactory { *; }

@@ -122,6 +122,37 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
+    fun `resolveNetworkSpace fallback active stored imported с диагностикой`() {
+        val helperBlock = source.substringAfter("private fun resolveNetworkSpace")
+            .substringBefore("private fun cleanupOnFailure")
+        assertTrue(
+            helperBlock.contains("activeNetworkSpace?.let") &&
+                helperBlock.contains("getNetworkSpace(key)?.let") &&
+                helperBlock.contains("importNetworkSpaceFromJson"),
+            "resolveNetworkSpace обязан fallback chain active -> stored -> imported — " +
+                "без diagnostic logging нельзя отделить null от throw в logs",
+        )
+        listOf("using active", "using stored", "imported default").forEach { phrase ->
+            assertTrue(
+                helperBlock.contains(phrase),
+                "resolveNetworkSpace обязан логировать выбранный путь '$phrase' — " +
+                    "иначе диагностика 'NetworkSpace null' impossible",
+            )
+        }
+        val startBlock = source
+            .substringAfter("override suspend fun start")
+            .substringBefore("override suspend fun stop")
+        assertTrue(
+            startBlock.contains("NetworkSpace null after active/get/import fallback"),
+            "start() обязан логировать NetworkSpace=null после import fallback — корневой кейс v0.0.2 краша",
+        )
+        assertTrue(
+            startBlock.contains("stackTraceToString()"),
+            "start() обязан включать stackTraceToString() в catch — без stack trace .message теряет нативный SDK fail context",
+        )
+    }
+
+    @Test
     fun `start() использует guest JWT empty placeholder если null`() {
         val startBlock = source
             .substringAfter("override suspend fun start")

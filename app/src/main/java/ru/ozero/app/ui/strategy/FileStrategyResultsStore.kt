@@ -25,6 +25,9 @@ class FileStrategyResultsStore(
                     totalRequests = o.optInt("totalRequests"),
                     currentProgress = o.optInt("currentProgress"),
                     isCompleted = o.optBoolean("isCompleted"),
+                    avgDurationMs = o.optLong("avgDurationMs"),
+                    lastSite = o.optString("lastSite").takeIf { it.isNotBlank() },
+                    lastError = o.optString("lastError").takeIf { it.isNotBlank() },
                 )
             }
         }.getOrDefault(emptyList())
@@ -39,6 +42,9 @@ class FileStrategyResultsStore(
             obj.put("totalRequests", r.totalRequests)
             obj.put("currentProgress", r.currentProgress)
             obj.put("isCompleted", r.isCompleted)
+            obj.put("avgDurationMs", r.avgDurationMs)
+            obj.put("lastSite", r.lastSite)
+            obj.put("lastError", r.lastError)
             array.put(obj)
         }
         runCatching { file.writeText(array.toString()) }

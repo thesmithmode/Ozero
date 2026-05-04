@@ -2,10 +2,13 @@ package ru.ozero.app.ui.settings.engines
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -150,6 +153,21 @@ class WarpEngineSettingsViewModelTest {
     }
 
     @Test
+    fun `onCancelGenerate отменяет register и сбрасывает isRegistering`() = runTest {
+        auto.delayMs = 60_000L
+        auto.result = Result.success(SAMPLE)
+        vm.onGenerate()
+        runCurrent()
+        assertTrue(vm.uiState.value.isRegistering, "после onGenerate isRegistering=true")
+        vm.onCancelGenerate()
+        runCurrent()
+        assertFalse(vm.uiState.value.isRegistering, "после onCancelGenerate isRegistering=false")
+        advanceTimeBy(120_000L)
+        advanceUntilIdle()
+        assertNull(store.savedRaw, "cancel прерывает суспендинг register — store.save не должен вызываться")
+    }
+
+    @Test
     fun `init продолжает реагировать на новые value из store_current()`() = runTest {
         advanceUntilIdle()
         assertNull(vm.uiState.value.currentConfig)
@@ -222,9 +240,11 @@ class WarpEngineSettingsViewModelTest {
         var result: Result<WarpConfig> = Result.failure(IllegalStateException("not-stubbed"))
         var callCount: Int = 0
         var beforeReturn: () -> Unit = {}
+        var delayMs: Long = 0L
         override suspend fun register(): Result<WarpConfig> {
             callCount++
             beforeReturn()
+            if (delayMs > 0) delay(delayMs)
             return result
         }
     }

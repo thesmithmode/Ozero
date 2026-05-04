@@ -3,6 +3,8 @@ package ru.ozero.app.ui.settings.engines
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,6 +34,7 @@ class WarpEngineSettingsViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(WarpSettingsUiState())
     val uiState: StateFlow<WarpSettingsUiState> = _uiState.asStateFlow()
+    private var registerJob: Job? = null
 
     init {
         val flow = store.current()
@@ -47,21 +50,34 @@ class WarpEngineSettingsViewModel @Inject constructor(
     fun onGenerate() {
         if (_uiState.value.isRegistering) return
         _uiState.value = _uiState.value.copy(isRegistering = true, errorMessage = null)
-        viewModelScope.launch {
-            val result = autoConfig.register()
-            result.fold(
-                onSuccess = { cfg ->
-                    store.save(cfg)
-                    _uiState.value = _uiState.value.copy(isRegistering = false, errorMessage = null)
-                },
-                onFailure = { t ->
-                    _uiState.value = _uiState.value.copy(
-                        isRegistering = false,
-                        errorMessage = t.message ?: "register failed",
-                    )
-                },
-            )
+        registerJob = viewModelScope.launch {
+            try {
+                val result = autoConfig.register()
+                result.fold(
+                    onSuccess = { cfg ->
+                        store.save(cfg)
+                        _uiState.value = _uiState.value.copy(isRegistering = false, errorMessage = null)
+                    },
+                    onFailure = { t ->
+                        _uiState.value = _uiState.value.copy(
+                            isRegistering = false,
+                            errorMessage = t.message ?: "register failed",
+                        )
+                    },
+                )
+            } catch (ce: CancellationException) {
+                _uiState.value = _uiState.value.copy(isRegistering = false)
+                throw ce
+            } finally {
+                registerJob = null
+            }
         }
+    }
+
+    fun onCancelGenerate() {
+        registerJob?.cancel()
+        registerJob = null
+        _uiState.value = _uiState.value.copy(isRegistering = false)
     }
 
     fun onImportFile(stream: InputStream) {

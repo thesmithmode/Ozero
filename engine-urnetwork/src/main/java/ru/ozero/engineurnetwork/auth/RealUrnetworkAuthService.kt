@@ -63,25 +63,36 @@ class RealUrnetworkAuthService(
             val manager = managerRef.get() ?: Sdk.newNetworkSpaceManager(storageDir).also {
                 managerRef.set(it)
             }
-            val space = manager.activeNetworkSpace ?: run {
-                val key = Sdk.newNetworkSpaceKey(DEFAULT_HOST, DEFAULT_ENV)
-                val existing = manager.getNetworkSpace(key)
-                if (existing != null) {
-                    existing
-                } else {
-                    val imported = manager.importNetworkSpaceFromJson(
-                        """{"host_name":"$DEFAULT_HOST","env_name":"$DEFAULT_ENV"}"""
-                    )
-                    manager.setActiveNetworkSpace(imported)
-                    imported
-                }
+            val space = resolveNetworkSpace(manager) ?: run {
+                PersistentLoggers.error(TAG, "NetworkSpace null after active/get/import fallback")
+                return null
             }
             spaceRef.set(space)
             space.api
         } catch (t: Throwable) {
-            PersistentLoggers.error(TAG, "ensureApi threw: ${t.message}")
+            PersistentLoggers.error(TAG, "ensureApi threw: ${t.message}\n${t.stackTraceToString()}")
             null
         }
+    }
+
+    private fun resolveNetworkSpace(manager: NetworkSpaceManager): NetworkSpace? {
+        manager.activeNetworkSpace?.let {
+            PersistentLoggers.info(TAG, "using active NetworkSpace")
+            return it
+        }
+        val key = Sdk.newNetworkSpaceKey(DEFAULT_HOST, DEFAULT_ENV)
+        manager.getNetworkSpace(key)?.let {
+            PersistentLoggers.info(TAG, "using stored NetworkSpace")
+            runCatching { manager.setActiveNetworkSpace(it) }
+                .onFailure { e -> PersistentLoggers.warn(TAG, "setActiveNetworkSpace(stored) failed: ${e.message}") }
+            return it
+        }
+        val imported = manager.importNetworkSpaceFromJson(
+            """{"host_name":"$DEFAULT_HOST","env_name":"$DEFAULT_ENV"}""",
+        ) ?: return null
+        manager.setActiveNetworkSpace(imported)
+        PersistentLoggers.info(TAG, "imported default NetworkSpace")
+        return imported
     }
 
     private companion object {

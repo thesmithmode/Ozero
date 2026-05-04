@@ -6,6 +6,9 @@ data class StrategyResult(
     val totalRequests: Int = 0,
     val currentProgress: Int = 0,
     val isCompleted: Boolean = false,
+    val avgDurationMs: Long = 0L,
+    val lastSite: String? = null,
+    val lastError: String? = null,
 ) {
     val successPercentage: Int
         get() = if (totalRequests > 0) (successCount * 100) / totalRequests else 0

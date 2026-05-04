@@ -23,6 +23,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -49,6 +50,8 @@ fun StrategyTestScreen(
 ) {
     val isRunning by viewModel.isRunning.collectAsStateWithLifecycle()
     val strategies by viewModel.strategies.collectAsStateWithLifecycle()
+    val sitesText by viewModel.sitesText.collectAsStateWithLifecycle()
+    val runSummary by viewModel.runSummary.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
     val context = LocalContext.current
     BackHandler {
@@ -110,6 +113,28 @@ fun StrategyTestScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(8.dp),
         ) {
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OutlinedTextField(
+                        value = sitesText,
+                        onValueChange = viewModel::onSitesTextChange,
+                        enabled = !isRunning,
+                        minLines = 3,
+                        maxLines = 6,
+                        label = { Text(stringResource(R.string.strategy_test_sites_label)) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("strategy_sites_input"),
+                    )
+                    if (runSummary.isNotBlank()) {
+                        Text(
+                            text = runSummary,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
             itemsIndexed(
                 items = strategies,
                 key = { index, item -> item.command + "_" + index },
@@ -163,6 +188,16 @@ private fun StrategyRow(
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
+            Text(
+                text = buildString {
+                    append("${item.currentProgress}/${item.totalRequests}")
+                    if (item.avgDurationMs > 0) append(" · avg ${item.avgDurationMs} ms")
+                    item.lastSite?.let { append(" · $it") }
+                    item.lastError?.let { append(" · $it") }
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             HorizontalDivider()
             Row(
                 modifier = Modifier.fillMaxWidth(),

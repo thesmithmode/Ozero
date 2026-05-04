@@ -86,6 +86,28 @@ class RealUrnetworkAuthServiceContractTest {
     }
 
     @Test
+    fun `resolveNetworkSpace fallback chain с stackTrace логированием`() {
+        val helperBlock = source.substringAfter("private fun resolveNetworkSpace")
+            .substringBefore("private companion object")
+        listOf("activeNetworkSpace?.let", "getNetworkSpace(key)?.let", "importNetworkSpaceFromJson").forEach { needle ->
+            assertTrue(
+                helperBlock.contains(needle),
+                "resolveNetworkSpace обязан содержать '$needle' — fallback chain active -> stored -> imported",
+            )
+        }
+        val ensureBlock = source.substringAfter("private fun ensureApi")
+            .substringBefore("private fun resolveNetworkSpace")
+        assertTrue(
+            ensureBlock.contains("NetworkSpace null after active/get/import fallback"),
+            "ensureApi обязан логировать NetworkSpace=null после import fallback — корневой v0.0.2 краш",
+        )
+        assertTrue(
+            ensureBlock.contains("stackTraceToString()"),
+            "ensureApi catch обязан включать stackTraceToString() — без stack trace нативный SDK fail невидим",
+        )
+    }
+
+    @Test
     fun `используется suspendCancellableCoroutine не suspendCoroutine`() {
         assertTrue(
             source.contains("suspendCancellableCoroutine"),

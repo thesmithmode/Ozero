@@ -82,6 +82,7 @@ fun WarpEngineSettingsScreen(
                     isRegistering = state.isRegistering,
                     errorMessage = state.errorMessage,
                     onGenerate = viewModel::onGenerate,
+                    onCancelGenerate = viewModel::onCancelGenerate,
                     onImportFile = { filePickerLauncher.launch("*/*") },
                 )
             } else {
@@ -90,6 +91,7 @@ fun WarpEngineSettingsScreen(
                     isRegistering = state.isRegistering,
                     errorMessage = state.errorMessage,
                     onRegenerate = viewModel::onGenerate,
+                    onCancelGenerate = viewModel::onCancelGenerate,
                     onClear = viewModel::onClear,
                     onImportFile = { filePickerLauncher.launch("*/*") },
                 )
@@ -103,6 +105,7 @@ private fun EmptyConfigCard(
     isRegistering: Boolean,
     errorMessage: String?,
     onGenerate: () -> Unit,
+    onCancelGenerate: () -> Unit,
     onImportFile: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -122,8 +125,7 @@ private fun EmptyConfigCard(
                 )
             }
             Button(
-                onClick = onGenerate,
-                enabled = !isRegistering,
+                onClick = if (isRegistering) onCancelGenerate else onGenerate,
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("warp_generate_button"),
@@ -134,7 +136,7 @@ private fun EmptyConfigCard(
                             modifier = Modifier.padding(end = 8.dp),
                             strokeWidth = 2.dp,
                         )
-                        Text(stringResource(R.string.warp_registering))
+                        Text(stringResource(R.string.warp_cancel_generation))
                     }
                 } else {
                     Text(stringResource(R.string.warp_generate))
@@ -159,6 +161,7 @@ private fun ConfigCard(
     isRegistering: Boolean,
     errorMessage: String?,
     onRegenerate: () -> Unit,
+    onCancelGenerate: () -> Unit,
     onClear: () -> Unit,
     onImportFile: () -> Unit,
 ) {
@@ -198,15 +201,14 @@ private fun ConfigCard(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Button(
-            onClick = onRegenerate,
-            enabled = !isRegistering,
+            onClick = if (isRegistering) onCancelGenerate else onRegenerate,
             modifier = Modifier
                 .weight(1f)
                 .testTag("warp_regenerate_button"),
         ) {
             Text(
                 text = if (isRegistering) {
-                    stringResource(R.string.warp_registering)
+                    stringResource(R.string.warp_cancel_generation)
                 } else {
                     stringResource(R.string.warp_regenerate)
                 },

@@ -180,6 +180,7 @@
     <string name="strategy_test_vpn_running_error">VPN активен. Остановите соединение перед запуском теста стратегий.</string>
     <string name="strategy_test_no_sites">Список тестовых сайтов пуст.</string>
     <string name="strategy_test_error_close">Закрыть</string>
+    <string name="strategy_test_sites_label">Сайты для проверки (по одному в строке)</string>
 
     <!-- URnetwork -->
     <string name="urnetwork_settings_title">URnetwork</string>
@@ -196,7 +197,8 @@
     <string name="warp_generate">Сгенерировать</string>
     <string name="warp_regenerate">Перегенерировать</string>
     <string name="warp_clear">Удалить</string>
-    <string name="warp_registering">Получаем конфиг WARP с зеркал… (до 4 минут)</string>
+    <string name="warp_registering">Получаем конфиг WARP с зеркал… (до 90 секунд)</string>
+    <string name="warp_cancel_generation">Отменить генерацию</string>
     <string name="warp_endpoint_label">Endpoint:</string>
     <string name="warp_license_label">Лицензия:</string>
     <string name="warp_import_file">Импорт из файла .conf</string>

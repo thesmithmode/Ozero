@@ -48,6 +48,12 @@ class StrategyTestViewModel @Inject constructor(
     private val _isRunning = MutableStateFlow(false)
     val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
 
+    private val _sitesText = MutableStateFlow("")
+    val sitesText: StateFlow<String> = _sitesText.asStateFlow()
+
+    private val _runSummary = MutableStateFlow("")
+    val runSummary: StateFlow<String> = _runSummary.asStateFlow()
+
     private val _errorMessage = MutableStateFlow<StrategyTestError?>(null)
     val errorMessage: StateFlow<StrategyTestError?> = _errorMessage.asStateFlow()
 
@@ -64,9 +70,30 @@ class StrategyTestViewModel @Inject constructor(
             val byCmd = previous.associateBy { it.command }
             _strategies.value = commands.map { cmd ->
                 byCmd[cmd] ?: StrategyResult(command = cmd)
+            }.sortedForUi()
+            _sitesText.value = withContext(ioDispatcher) {
+                runCatching { assetSource.loadSites().joinToString("\n") }.getOrDefault("")
             }
         }
     }
+
+    fun onSitesTextChange(text: String) {
+        _sitesText.value = text
+    }
+
+    private fun parseSites(text: String): List<String> =
+        text.lines()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() && !it.startsWith("#") }
+            .distinct()
+
+    private fun List<StrategyResult>.sortedForUi(): List<StrategyResult> =
+        sortedWith(
+            compareByDescending<StrategyResult> { it.successPercentage }
+                .thenByDescending { it.successCount }
+                .thenBy { if (it.avgDurationMs > 0) it.avgDurationMs else Long.MAX_VALUE }
+                .thenBy { it.command },
+        )
 
     fun onErrorDismiss() {
         _errorMessage.value = null
@@ -80,9 +107,7 @@ class StrategyTestViewModel @Inject constructor(
         }
         _isRunning.value = true
         testJob = viewModelScope.launch {
-            val sites = withContext(ioDispatcher) {
-                runCatching { assetSource.loadSites() }.getOrDefault(emptyList())
-            }
+            val sites = parseSites(_sitesText.value)
             if (sites.isEmpty()) {
                 _errorMessage.value = StrategyTestError.NoSites
                 _isRunning.value = false
@@ -94,15 +119,20 @@ class StrategyTestViewModel @Inject constructor(
                     totalRequests = sites.size,
                     currentProgress = 0,
                     isCompleted = false,
+                    avgDurationMs = 0L,
+                    lastSite = null,
+                    lastError = null,
                 )
             }
+            _runSummary.value = "0/${_strategies.value.size} strategies, ${sites.size} sites"
             try {
                 runLoop(sites)
             } finally {
-                _strategies.value = _strategies.value.sortedByDescending { it.successPercentage }
+                _strategies.value = _strategies.value.sortedForUi()
                 withContext(ioDispatcher) {
                     runCatching { resultsStore.save(_strategies.value) }
                 }
+                _runSummary.value = ""
                 _isRunning.value = false
             }
         }
@@ -126,6 +156,7 @@ class StrategyTestViewModel @Inject constructor(
         for (index in current.indices) {
             if (!currentCoroutineContext().isActive) return@coroutineScope
             val strategy = _strategies.value[index]
+            _runSummary.value = "Testing ${index + 1}/${_strategies.value.size}: ${strategy.command}"
             val started = withTimeoutOrNull(START_TIMEOUT_MS) {
                 byeDpiEngine.start(
                     config = EngineConfig.ByeDpi(args = strategy.command, socksPort = SOCKS_PORT),
@@ -139,12 +170,14 @@ class StrategyTestViewModel @Inject constructor(
                         currentProgress = sites.size,
                         successCount = 0,
                         isCompleted = true,
+                        lastError = started?.toString() ?: "start timeout",
                     )
                 }
                 continue
             }
             val probe: SocksProbeClient = probeFactory.create(SOCKS_PORT)
             var successCount = 0
+            var totalDuration = 0L
             for (site in sites) {
                 if (!currentCoroutineContext().isActive) {
                     runCatching { byeDpiEngine.stop() }
@@ -152,11 +185,16 @@ class StrategyTestViewModel @Inject constructor(
                 }
                 val result = probe.probe(site)
                 if (result.success) successCount++
+                totalDuration += result.durationMs
                 _strategies.value = _strategies.value.toMutableList().also { list ->
                     val cur = list[index]
+                    val processed = cur.currentProgress + 1
                     list[index] = cur.copy(
-                        currentProgress = cur.currentProgress + 1,
+                        currentProgress = processed,
                         successCount = successCount,
+                        avgDurationMs = totalDuration / processed.coerceAtLeast(1),
+                        lastSite = site,
+                        lastError = if (result.success) null else "probe failed",
                     )
                 }
             }

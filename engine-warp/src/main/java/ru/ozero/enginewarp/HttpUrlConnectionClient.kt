@@ -1,6 +1,8 @@
 package ru.ozero.enginewarp
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.job
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -18,6 +20,9 @@ class HttpUrlConnectionClient(
     ): Result<String> = withContext(Dispatchers.IO) {
         runCatching {
             val conn = URL(url).openConnection() as HttpURLConnection
+            val cancelHook = currentCoroutineContext().job.invokeOnCompletion {
+                runCatching { conn.disconnect() }
+            }
             try {
                 conn.requestMethod = "POST"
                 conn.connectTimeout = connectTimeoutMs
@@ -35,6 +40,7 @@ class HttpUrlConnectionClient(
                 }
                 text
             } finally {
+                cancelHook.dispose()
                 conn.disconnect()
             }
         }

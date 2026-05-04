@@ -171,6 +171,7 @@
     <string name="strategy_test_vpn_running_error">VPN is active. Stop it before running the strategy test.</string>
     <string name="strategy_test_no_sites">Test sites list is empty.</string>
     <string name="strategy_test_error_close">Close</string>
+    <string name="strategy_test_sites_label">Probe sites (one per line)</string>
 
     <!-- URnetwork -->
     <string name="urnetwork_settings_title">URnetwork</string>
@@ -187,7 +188,8 @@
     <string name="warp_generate">Generate</string>
     <string name="warp_regenerate">Regenerate</string>
     <string name="warp_clear">Clear</string>
-    <string name="warp_registering">Fetching WARP config from mirrors… (up to 4 min)</string>
+    <string name="warp_registering">Fetching WARP config from mirrors… (up to 90 s)</string>
+    <string name="warp_cancel_generation">Cancel generation</string>
     <string name="warp_endpoint_label">Endpoint:</string>
     <string name="warp_license_label">License:</string>
 

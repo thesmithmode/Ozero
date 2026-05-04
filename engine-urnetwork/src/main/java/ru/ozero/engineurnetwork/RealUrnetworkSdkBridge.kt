@@ -40,21 +40,13 @@ class RealUrnetworkSdkBridge(
         managerRef.set(manager)
 
         val space: NetworkSpace = try {
-            manager.activeNetworkSpace ?: run {
-                val key = Sdk.newNetworkSpaceKey(DEFAULT_HOST, DEFAULT_ENV)
-                val existing = manager.getNetworkSpace(key)
-                if (existing != null) {
-                    existing
-                } else {
-                    val imported = manager.importNetworkSpaceFromJson(
-                        """{"host_name":"$DEFAULT_HOST","env_name":"$DEFAULT_ENV"}"""
-                    )
-                    manager.setActiveNetworkSpace(imported)
-                    imported
-                }
+            resolveNetworkSpace(manager) ?: run {
+                PersistentLoggers.error(TAG, "NetworkSpace null after active/get/import fallback")
+                cleanupOnFailure()
+                return UrnetworkSdkBridge.StartResult.Failed("NetworkSpace resolve failed: SDK returned null")
             }
         } catch (t: Throwable) {
-            PersistentLoggers.error(TAG, "NetworkSpace resolve failed: ${t.message}")
+            PersistentLoggers.error(TAG, "NetworkSpace resolve failed: ${t.message}\n${t.stackTraceToString()}")
             cleanupOnFailure()
             return UrnetworkSdkBridge.StartResult.Failed("NetworkSpace resolve failed: ${t.message}")
         }
@@ -135,6 +127,26 @@ class RealUrnetworkSdkBridge(
             PersistentLoggers.error(TAG, "newIoLoop threw: ${t.message}")
             UrnetworkSdkBridge.AttachResult.Failed("newIoLoop failed: ${t.message}")
         }
+    }
+
+    private fun resolveNetworkSpace(manager: NetworkSpaceManager): NetworkSpace? {
+        manager.activeNetworkSpace?.let {
+            PersistentLoggers.info(TAG, "using active NetworkSpace")
+            return it
+        }
+        val key = Sdk.newNetworkSpaceKey(DEFAULT_HOST, DEFAULT_ENV)
+        manager.getNetworkSpace(key)?.let {
+            PersistentLoggers.info(TAG, "using stored NetworkSpace")
+            runCatching { manager.setActiveNetworkSpace(it) }
+                .onFailure { e -> PersistentLoggers.warn(TAG, "setActiveNetworkSpace(stored) failed: ${e.message}") }
+            return it
+        }
+        val imported = manager.importNetworkSpaceFromJson(
+            """{"host_name":"$DEFAULT_HOST","env_name":"$DEFAULT_ENV"}""",
+        ) ?: return null
+        manager.setActiveNetworkSpace(imported)
+        PersistentLoggers.info(TAG, "imported default NetworkSpace")
+        return imported
     }
 
     private fun cleanupOnFailure() {
