@@ -42,6 +42,8 @@ class WarpAutoConfigTest {
         assertTrue(cfg.interfaceAddressV4.startsWith("172.16.0.2"))
         assertTrue(cfg.interfaceAddressV6.startsWith("2606:4700:110"))
         assertEquals(1280, cfg.mtu)
+        assertEquals(listOf("1.1.1.1", "2606:4700:4700::1111"), cfg.dnsServers)
+        assertEquals(25, cfg.keepaliveSeconds)
         assertEquals("", cfg.accountLicense, "proxy mirrors не возвращают Cloudflare license")
         assertEquals("", cfg.publicKey, "proxy mirrors не возвращают public key (priv достаточен)")
     }
@@ -223,6 +225,141 @@ class WarpAutoConfigTest {
         assertEquals("duLmWkD6Pz6fqd+5/Wsh+aDwyaT8w+5ofxDZ3Z3l1c0=", cfg.privateKey)
         assertEquals("bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=", cfg.peerPublicKey)
         assertEquals("engage.cloudflareclient.com:4500", cfg.peerEndpoint)
+    }
+
+    @Test
+    fun `register парсит AWG параметры когда присутствуют в conf`() = runTest {
+        val awgConf = """
+            [Interface]
+            PrivateKey = duLmWkD6Pz6fqd+5/Wsh+aDwyaT8w+5ofxDZ3Z3l1c0=
+            Address = 172.16.0.2, 2606:4700:110:8af5:7421:75f0:3c0f:f366
+            DNS = 1.1.1.1, 2606:4700:4700::1111
+            MTU = 1280
+            Jc = 7
+            Jmin = 50
+            Jmax = 150
+            S1 = 10
+            S2 = 20
+            H1 = 100
+            H2 = 200
+            H3 = 300
+            H4 = 400
+
+            [Peer]
+            PublicKey = bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=
+            AllowedIPs = 0.0.0.0/0, ::/0
+            Endpoint = engage.cloudflareclient.com:4500
+            PersistentKeepalive = 25
+        """.trimIndent()
+        val http = FakeHttpClient(Result.success(awgConf))
+        val auto = singleMirrorConfig(http)
+
+        val result = auto.register()
+
+        val cfg = result.getOrThrow()
+        val p = cfg.awgParams
+        assertEquals(7, p.junkPacketCount)
+        assertEquals(50, p.junkPacketMinSize)
+        assertEquals(150, p.junkPacketMaxSize)
+        assertEquals(10, p.initPacketJunkSize)
+        assertEquals(20, p.responsePacketJunkSize)
+        assertEquals(100L, p.initPacketMagicHeader)
+        assertEquals(200L, p.responsePacketMagicHeader)
+        assertEquals(300L, p.cookieReplyMagicHeader)
+        assertEquals(400L, p.transportMagicHeader)
+    }
+
+    @Test
+    fun `register использует AwgParams defaults когда AWG строки отсутствуют`() = runTest {
+        val http = FakeHttpClient(Result.success(sampleConf))
+        val auto = singleMirrorConfig(http)
+
+        val result = auto.register()
+
+        assertEquals(AwgParams(), result.getOrThrow().awgParams)
+    }
+
+    @Test
+    fun `register fallback на default если AWG значение невалидно`() = runTest {
+        val badJcConf = sampleConf.replace("[Interface]", "[Interface]\nJc = notanumber")
+        val http = FakeHttpClient(Result.success(badJcConf))
+        val auto = singleMirrorConfig(http)
+
+        val result = auto.register()
+
+        assertEquals(AwgParams.DEFAULT_JC, result.getOrThrow().awgParams.junkPacketCount)
+    }
+
+    @Test
+    fun `AWG параметры выживают configBase64 roundtrip`() = runTest {
+        val awgConf = """
+            [Interface]
+            PrivateKey = duLmWkD6Pz6fqd+5/Wsh+aDwyaT8w+5ofxDZ3Z3l1c0=
+            Address = 172.16.0.2, 2606:4700:110:8af5:7421:75f0:3c0f:f366
+            Jc = 9
+            H1 = 999
+
+            [Peer]
+            PublicKey = bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=
+            Endpoint = engage.cloudflareclient.com:4500
+        """.trimIndent()
+        val b64 = Base64.getEncoder().encodeToString(awgConf.toByteArray())
+        val body = """{"success":true,"content":{"configBase64":"$b64"}}"""
+        val http = FakeHttpClient(Result.success(body))
+        val auto = singleMirrorConfig(http)
+
+        val result = auto.register()
+
+        val p = result.getOrThrow().awgParams
+        assertEquals(9, p.junkPacketCount)
+        assertEquals(999L, p.initPacketMagicHeader)
+    }
+
+    @Test
+    fun `register парсит DNS из conf строки`() = runTest {
+        val confWithDns = sampleConf
+        val http = FakeHttpClient(Result.success(confWithDns))
+        val auto = singleMirrorConfig(http)
+
+        val result = auto.register()
+
+        val cfg = result.getOrThrow()
+        assertEquals(listOf("1.1.1.1", "2606:4700:4700::1111"), cfg.dnsServers)
+    }
+
+    @Test
+    fun `register использует DEFAULT_DNS если DNS отсутствует в conf`() = runTest {
+        val confWithoutDns = sampleConf.lines().filterNot { it.trim().startsWith("DNS") }.joinToString("\n")
+        val http = FakeHttpClient(Result.success(confWithoutDns))
+        val auto = singleMirrorConfig(http)
+
+        val result = auto.register()
+
+        val cfg = result.getOrThrow()
+        assertEquals(WarpConfig.DEFAULT_DNS, cfg.dnsServers)
+    }
+
+    @Test
+    fun `register парсит PersistentKeepalive из conf`() = runTest {
+        val http = FakeHttpClient(Result.success(sampleConf))
+        val auto = singleMirrorConfig(http)
+
+        val result = auto.register()
+
+        assertEquals(25, result.getOrThrow().keepaliveSeconds)
+    }
+
+    @Test
+    fun `register использует DEFAULT_KEEPALIVE если PersistentKeepalive отсутствует`() = runTest {
+        val confWithoutKeepalive = sampleConf.lines()
+            .filterNot { it.trim().startsWith("PersistentKeepalive") }
+            .joinToString("\n")
+        val http = FakeHttpClient(Result.success(confWithoutKeepalive))
+        val auto = singleMirrorConfig(http)
+
+        val result = auto.register()
+
+        assertEquals(WarpConfig.DEFAULT_KEEPALIVE, result.getOrThrow().keepaliveSeconds)
     }
 
     @Test

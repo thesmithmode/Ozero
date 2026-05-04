@@ -1,20 +1,19 @@
 package ru.ozero.enginewarp
 
 import android.content.Context
-import com.wireguard.android.backend.GoBackend
-import com.wireguard.android.backend.Tunnel
-import com.wireguard.config.Config
-import com.wireguard.config.Interface
-import com.wireguard.config.Peer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.amnezia.awg.backend.GoBackend
+import org.amnezia.awg.backend.Tunnel
+import org.amnezia.awg.backend.TunnelActionHandler
+import org.amnezia.awg.config.Config
 import ru.ozero.enginescore.PersistentLoggers
 
 class RealWarpSdkBridge(
     private val context: Context,
 ) : WarpSdkBridge {
 
-    private val backend: GoBackend by lazy { GoBackend(context) }
+    private val backend: GoBackend by lazy { GoBackend(context, NoOpTunnelActionHandler) }
 
     private val tunnel = object : Tunnel {
         override fun getName(): String = TUNNEL_NAME
@@ -22,6 +21,8 @@ class RealWarpSdkBridge(
             PersistentLoggers.info(TAG, "tunnel state -> $newState")
             running = newState == Tunnel.State.UP
         }
+        override fun isIpv4ResolutionPreferred(): Boolean = false
+        override fun isMetered(): Boolean = false
     }
 
     @Volatile
@@ -31,9 +32,6 @@ class RealWarpSdkBridge(
         withContext(Dispatchers.IO) {
             try {
                 val wgConfig = buildConfig(config)
-                // TODO link via DI: backend lifecycle (single instance per process,
-                // currently lazily owned here; should move to module-scope @Provides
-                // когда RealWarpSdkBridge станет default).
                 backend.setState(tunnel, Tunnel.State.UP, wgConfig)
                 PersistentLoggers.info(TAG, "GoBackend.setState UP OK")
                 WarpSdkBridge.StartResult.Success
@@ -59,35 +57,14 @@ class RealWarpSdkBridge(
 
     override fun isRunning(): Boolean = running
 
-    private fun buildConfig(config: WarpConfig): Config {
-        val ifaceBuilder = Interface.Builder()
-            .parsePrivateKey(config.privateKey)
-            .parseAddresses("${config.interfaceAddressV4},${config.interfaceAddressV6}")
-            .setMtu(config.mtu)
-        // TODO link via DI: DNS provider (currently relies on system resolver via
-        // VpnService; WARP advertises 1.1.1.1/2606:4700:4700::1111 — should plumb
-        // через WarpAutoConfig если автоконфиг начнёт их возвращать).
+    private fun buildConfig(config: WarpConfig): Config =
+        Config.parse(WarpIniBuilder.build(config).byteInputStream())
 
-        val peerEndpoint = parseEndpoint(config.peerEndpoint)
-        val peerBuilder = Peer.Builder()
-            .parsePublicKey(config.peerPublicKey)
-            .setEndpoint(peerEndpoint)
-            .parseAllowedIPs(config.allowedIps.joinToString(","))
-        // TODO link via DI: persistent keepalive interval (WARP recommends 25s
-        // на CGNAT/мобильных сетях; нужно поднять из WarpConfig когда добавится
-        // поле keepaliveSeconds).
-
-        return Config.Builder()
-            .setInterface(ifaceBuilder.build())
-            .addPeer(peerBuilder.build())
-            .build()
-    }
-
-    private fun parseEndpoint(endpoint: String): com.wireguard.config.InetEndpoint {
-        // peerEndpoint from WarpConfig имеет формат "host:port" (либо "[v6]:port").
-        // com.wireguard.config.InetEndpoint.parse кидает ParseException на bad input —
-        // верхний catch в start() конвертирует в Failed.
-        return com.wireguard.config.InetEndpoint.parse(endpoint)
+    private object NoOpTunnelActionHandler : TunnelActionHandler {
+        override fun runPreUp(scripts: Collection<String>) = Unit
+        override fun runPostUp(scripts: Collection<String>) = Unit
+        override fun runPreDown(scripts: Collection<String>) = Unit
+        override fun runPostDown(scripts: Collection<String>) = Unit
     }
 
     private companion object {

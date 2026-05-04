@@ -20,7 +20,7 @@ import ru.ozero.enginewarp.EngineWarp
 import ru.ozero.enginewarp.HttpClient
 import ru.ozero.enginewarp.HttpUrlConnectionClient
 import ru.ozero.enginewarp.ProxyWarpAutoConfig
-import ru.ozero.enginewarp.StubWarpSdkBridge
+import ru.ozero.enginewarp.RealWarpSdkBridge
 import ru.ozero.enginewarp.WarpAutoConfig
 import ru.ozero.enginewarp.WarpConfigStore
 import ru.ozero.enginewarp.WarpSdkBridge
@@ -64,20 +64,9 @@ object WarpModule {
 
     @Provides
     @Singleton
-    fun provideWarpSdkBridge(): WarpSdkBridge = StubWarpSdkBridge()
-
-    // Switch to real wireguard-android tunnel binding (com.wireguard.android:tunnel
-    // через Maven Central, добавлен в engine-warp/build.gradle.kts). Активировать
-    // удалив provideWarpSdkBridge() выше и раскомментив ниже:
-    //
-    // @Provides
-    // @Singleton
-    // fun provideWarpSdkBridge(
-    //     @ApplicationContext context: Context,
-    // ): WarpSdkBridge = RealWarpSdkBridge(context)
-    //
-    // RealWarpSdkBridge владеет GoBackend(context) — один процесс = один backend.
-    // Hilt-scope @Singleton гарантирует это автоматически. См. README engine-warp.
+    fun provideWarpSdkBridge(
+        @ApplicationContext context: Context,
+    ): WarpSdkBridge = RealWarpSdkBridge(context)
 
     @Provides
     @Singleton

@@ -25,6 +25,9 @@ class WarpConfigStoreTest {
         interfaceAddressV6 = "2606:4700::1/128",
         accountLicense = "lic",
         mtu = 1280,
+        dnsServers = listOf("1.1.1.1", "2606:4700:4700::1111"),
+        keepaliveSeconds = 25,
+        awgParams = AwgParams(),
     )
 
     private fun newStore(): DataStoreWarpConfigStore =
@@ -49,6 +52,66 @@ class WarpConfigStoreTest {
         assertEquals(sample.interfaceAddressV6, read.interfaceAddressV6)
         assertEquals(sample.accountLicense, read.accountLicense)
         assertEquals(sample.mtu, read.mtu)
+        assertEquals(sample.dnsServers, read.dnsServers)
+        assertEquals(sample.keepaliveSeconds, read.keepaliveSeconds)
+        assertEquals(sample.awgParams, read.awgParams)
+    }
+
+    @Test
+    fun `save и load roundtrip сохраняет non-default AwgParams — все 9 полей`() = runTest {
+        val customAwg = AwgParams(
+            junkPacketCount = 10,
+            junkPacketMinSize = 77,
+            junkPacketMaxSize = 888,
+            initPacketJunkSize = 1,
+            responsePacketJunkSize = 2,
+            initPacketMagicHeader = 999L,
+            responsePacketMagicHeader = 1000L,
+            cookieReplyMagicHeader = 1001L,
+            transportMagicHeader = 1002L,
+        )
+        val config = sample.copy(awgParams = customAwg)
+        val store = newStore()
+        store.save(config)
+        val read = assertNotNull(store.current().first())
+        val p = read.awgParams
+        assertEquals(10, p.junkPacketCount)
+        assertEquals(77, p.junkPacketMinSize)
+        assertEquals(888, p.junkPacketMaxSize)
+        assertEquals(1, p.initPacketJunkSize)
+        assertEquals(2, p.responsePacketJunkSize)
+        assertEquals(999L, p.initPacketMagicHeader)
+        assertEquals(1000L, p.responsePacketMagicHeader)
+        assertEquals(1001L, p.cookieReplyMagicHeader)
+        assertEquals(1002L, p.transportMagicHeader)
+    }
+
+    @Test
+    fun `загрузка без AWG ключей возвращает default AwgParams`() = runTest {
+        val ds = FakePreferencesDataStore()
+        ds.updateData {
+            mutablePreferencesOf(
+                stringPreferencesKey("warp_priv") to "p",
+                stringPreferencesKey("warp_peer_pub") to "pp",
+                stringPreferencesKey("warp_peer_endpoint") to "h:1",
+                stringPreferencesKey("warp_iface_v4") to "1.2.3.4/32",
+                stringPreferencesKey("warp_iface_v6") to "::1/128",
+            )
+        }
+        val store = DataStoreWarpConfigStore(ds)
+        val read = assertNotNull(store.current().first())
+        assertEquals(AwgParams(), read.awgParams)
+    }
+
+    @Test
+    fun `clear удаляет AWG ключи — нет стейла после re-save с defaults`() = runTest {
+        val customAwg = AwgParams(junkPacketCount = 99)
+        val store = newStore()
+        store.save(sample.copy(awgParams = customAwg))
+        store.clear()
+        store.save(sample.copy(awgParams = AwgParams()))
+        val read = assertNotNull(store.current().first())
+        assertEquals(AwgParams.DEFAULT_JC, read.awgParams.junkPacketCount)
     }
 
     @Test

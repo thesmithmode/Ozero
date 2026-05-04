@@ -208,6 +208,9 @@ class ProxyWarpAutoConfig(
         val endpoint = peer["endpoint"]
             ?: throw IOException("WireGuard conf: Endpoint peer отсутствует")
         val mtu = iface["mtu"]?.toIntOrNull() ?: DEFAULT_MTU
+        val dnsServers = parseDnsServers(iface["dns"])
+        val keepalive = peer["persistentkeepalive"]?.toIntOrNull() ?: WarpConfig.DEFAULT_KEEPALIVE
+        val awgParams = parseAwgParams(iface)
         Result.success(
             WarpConfig(
                 privateKey = priv,
@@ -218,6 +221,9 @@ class ProxyWarpAutoConfig(
                 interfaceAddressV6 = v6,
                 accountLicense = "",
                 mtu = mtu,
+                dnsServers = dnsServers,
+                keepaliveSeconds = keepalive,
+                awgParams = awgParams,
             ),
         )
     } catch (t: Throwable) {
@@ -231,10 +237,28 @@ class ProxyWarpAutoConfig(
         return toCidr(v4, "/32") to toCidr(v6, "/128")
     }
 
+    private fun parseAwgParams(iface: Map<String, String>): AwgParams = AwgParams(
+        junkPacketCount           = iface["jc"]?.toIntOrNull()    ?: AwgParams.DEFAULT_JC,
+        junkPacketMinSize         = iface["jmin"]?.toIntOrNull()  ?: AwgParams.DEFAULT_JMIN,
+        junkPacketMaxSize         = iface["jmax"]?.toIntOrNull()  ?: AwgParams.DEFAULT_JMAX,
+        initPacketJunkSize        = iface["s1"]?.toIntOrNull()    ?: AwgParams.DEFAULT_S1,
+        responsePacketJunkSize    = iface["s2"]?.toIntOrNull()    ?: AwgParams.DEFAULT_S2,
+        initPacketMagicHeader     = iface["h1"]?.toLongOrNull()   ?: AwgParams.DEFAULT_H1,
+        responsePacketMagicHeader = iface["h2"]?.toLongOrNull()   ?: AwgParams.DEFAULT_H2,
+        cookieReplyMagicHeader    = iface["h3"]?.toLongOrNull()   ?: AwgParams.DEFAULT_H3,
+        transportMagicHeader      = iface["h4"]?.toLongOrNull()   ?: AwgParams.DEFAULT_H4,
+    )
+
     private fun toCidr(addr: String, suffix: String): String = when {
         addr.contains("/") -> addr
         addr.isNotBlank() -> "$addr$suffix"
         else -> addr
+    }
+
+    private fun parseDnsServers(raw: String?): List<String> {
+        if (raw.isNullOrBlank()) return WarpConfig.DEFAULT_DNS
+        val servers = raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        return servers.ifEmpty { WarpConfig.DEFAULT_DNS }
     }
 
     companion object {
