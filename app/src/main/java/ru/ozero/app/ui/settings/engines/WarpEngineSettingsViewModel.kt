@@ -34,11 +34,11 @@ class WarpEngineSettingsViewModel @Inject constructor(
     val uiState: StateFlow<WarpSettingsUiState> = _uiState.asStateFlow()
 
     init {
-        store.current()
-            .onEach { cfg -> _uiState.value = _uiState.value.copy(currentConfig = cfg) }
+        val flow = store.current()
+        flow.onEach { cfg -> _uiState.value = _uiState.value.copy(currentConfig = cfg) }
             .launchIn(viewModelScope)
         viewModelScope.launch {
-            if (store.current().first() == null) {
+            if (flow.first() == null) {
                 onGenerate()
             }
         }

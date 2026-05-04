@@ -32,6 +32,7 @@ class RealWarpSdkBridge(
             try {
                 val wgConfig = buildConfig(config)
                 backend.setState(tunnel, Tunnel.State.UP, wgConfig)
+                running = true
                 PersistentLoggers.info(TAG, "GoBackend.setState UP OK")
                 WarpSdkBridge.StartResult.Success
             } catch (t: Throwable) {

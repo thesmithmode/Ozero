@@ -1,5 +1,6 @@
 package ru.ozero.app.ui.settings.engines
 
+import java.io.ByteArrayInputStream
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -50,9 +51,9 @@ fun WarpEngineSettingsScreen(
         contract = ActivityResultContracts.GetContent(),
     ) { uri ->
         uri ?: return@rememberLauncherForActivityResult
-        context.contentResolver.openInputStream(uri)?.use { stream ->
-            viewModel.onImportFile(stream)
-        }
+        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            ?: return@rememberLauncherForActivityResult
+        viewModel.onImportFile(ByteArrayInputStream(bytes))
     }
     Scaffold(
         modifier = Modifier.testTag("warp_settings"),
