@@ -41,7 +41,7 @@ class NativeHevTunnelGateway(
         if (!loader.libraryLoaded) {
             PersistentLoggers.instance?.error(
                 TAG,
-                "libhev-socks5-tunnel не загружена: ${loader.loadError}",
+                "libhev-ozero-socks5-tunnel не загружена: ${loader.loadError}",
             )
             return -1
         }

@@ -65,8 +65,8 @@ class JniContractTest {
     fun `loadLibrary имя совпадает с именем so-файла из release pipeline`() {
         val source = File(moduleRoot, "src/main/java/hev/TProxyService.kt").readText()
         assertTrue(
-            source.contains("System.loadLibrary(\"hev-socks5-tunnel\")"),
-            "loadLibrary должен принимать ровно \"hev-socks5-tunnel\" — release.yml собирает upstream под этим именем.",
+            source.contains("System.loadLibrary(\"hev-ozero-socks5-tunnel\")"),
+            "loadLibrary должен принимать ровно \"hev-ozero-socks5-tunnel\" — release.yml копирует upstream под этим именем.",
         )
     }
 

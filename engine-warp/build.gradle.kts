@@ -14,9 +14,7 @@ dependencies {
     implementation(libs.hilt.android)
     implementation(libs.datastore.preferences)
 
-    implementation(libs.amneziawg.android) {
-        exclude(module = "hevtunnel")
-    }
+    implementation(libs.amneziawg.android)
 
     testImplementation(libs.bundles.junit5)
     testRuntimeOnly(libs.junit.jupiter.engine)

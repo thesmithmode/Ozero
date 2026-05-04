@@ -36,17 +36,17 @@ object TProxyService {
                 "sdk=${Build.VERSION.SDK_INT}"
             PersistentLoggers.instance?.info(TAG, "loadLibrary begin $ctx")
             try {
-                System.loadLibrary("hev-socks5-tunnel")
+                System.loadLibrary("hev-ozero-socks5-tunnel")
                 libraryLoaded = true
                 val dtMs = (System.nanoTime() - t0) / 1_000_000
-                PersistentLoggers.instance?.info(TAG, "libhev-socks5-tunnel loaded OK dt=${dtMs}ms")
+                PersistentLoggers.instance?.info(TAG, "libhev-ozero-socks5-tunnel loaded OK dt=${dtMs}ms")
             } catch (e: UnsatisfiedLinkError) {
                 loadError = e.message ?: e.javaClass.simpleName
                 libraryLoaded = false
                 val dtMs = (System.nanoTime() - t0) / 1_000_000
                 PersistentLoggers.instance?.error(
                     TAG,
-                    "libhev-socks5-tunnel load FAILED dt=${dtMs}ms: $loadError",
+                    "libhev-ozero-socks5-tunnel load FAILED dt=${dtMs}ms: $loadError",
                     e,
                 )
                 runCatching { dumpVendorMaps() }
@@ -56,7 +56,7 @@ object TProxyService {
                 val dtMs = (System.nanoTime() - t0) / 1_000_000
                 PersistentLoggers.instance?.error(
                     TAG,
-                    "libhev-socks5-tunnel load denied dt=${dtMs}ms: $loadError",
+                    "libhev-ozero-socks5-tunnel load denied dt=${dtMs}ms: $loadError",
                     e,
                 )
                 runCatching { dumpVendorMaps() }
@@ -66,7 +66,7 @@ object TProxyService {
                 val dtMs = (System.nanoTime() - t0) / 1_000_000
                 PersistentLoggers.instance?.error(
                     TAG,
-                    "libhev-socks5-tunnel load THROWN dt=${dtMs}ms: $loadError",
+                    "libhev-ozero-socks5-tunnel load THROWN dt=${dtMs}ms: $loadError",
                     e,
                 )
                 runCatching { dumpVendorMaps() }

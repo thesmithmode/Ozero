@@ -34,15 +34,15 @@ jobs:
         with:
           cache-read-only: true
 
-      - name: Cache libhev-socks5-tunnel.so jniLibs
+      - name: Cache libhev-ozero-socks5-tunnel.so jniLibs
         id: libhev-cache
         uses: actions/cache@v4
         with:
           path: |
-            common-vpn/src/main/jniLibs/arm64-v8a/libhev-socks5-tunnel.so
-            common-vpn/src/main/jniLibs/armeabi-v7a/libhev-socks5-tunnel.so
-            common-vpn/src/main/jniLibs/x86_64/libhev-socks5-tunnel.so
-          key: libhev-2.7.0-ndk-r27c-platform-android-24-pkgname-hev-16kb-v4
+            common-vpn/src/main/jniLibs/arm64-v8a/libhev-ozero-socks5-tunnel.so
+            common-vpn/src/main/jniLibs/armeabi-v7a/libhev-ozero-socks5-tunnel.so
+            common-vpn/src/main/jniLibs/x86_64/libhev-ozero-socks5-tunnel.so
+          key: libhev-ozero-2.7.0-ndk-r27c-platform-android-24-pkgname-hev-16kb-v1
 
       - name: Setup Android NDK
         id: ndk
@@ -61,7 +61,7 @@ jobs:
             https://github.com/heiher/hev-socks5-tunnel.git \
             "$RUNNER_TEMP/hev-socks5-tunnel"
 
-      - name: Build libhev-socks5-tunnel.so (3 ABI via ndk-build)
+      - name: Build libhev-ozero-socks5-tunnel.so (3 ABI via ndk-build)
         if: steps.libhev-cache.outputs.cache-hit != 'true'
         env:
           NDK_PATH: ${{ steps.ndk.outputs.ndk-path }}
@@ -90,14 +90,14 @@ jobs:
               find "$SRC/libs" -name '*.so' || true
               exit 1
             fi
-            cp "$SO_SRC" "$GITHUB_WORKSPACE/$OUT/$ABI/libhev-socks5-tunnel.so"
-            "$STRIP" "$GITHUB_WORKSPACE/$OUT/$ABI/libhev-socks5-tunnel.so" || true
+            cp "$SO_SRC" "$GITHUB_WORKSPACE/$OUT/$ABI/libhev-ozero-socks5-tunnel.so"
+            "$STRIP" "$GITHUB_WORKSPACE/$OUT/$ABI/libhev-ozero-socks5-tunnel.so" || true
           done
           cd "$GITHUB_WORKSPACE"
           echo "Built jniLibs:"
-          ls -la "$OUT"/*/libhev-socks5-tunnel.so
+          ls -la "$OUT"/*/libhev-ozero-socks5-tunnel.so
 
-      - name: Assert JNI symbols в libhev-socks5-tunnel.so
+      - name: Assert JNI symbols в libhev-ozero-socks5-tunnel.so
         if: steps.libhev-cache.outputs.cache-hit != 'true'
         env:
           NDK_PATH: ${{ steps.ndk.outputs.ndk-path }}
@@ -106,7 +106,7 @@ jobs:
           NM="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
           REQUIRED='JNI_OnLoad'
           for ABI in arm64-v8a armeabi-v7a x86_64; do
-            SO="common-vpn/src/main/jniLibs/$ABI/libhev-socks5-tunnel.so"
+            SO="common-vpn/src/main/jniLibs/$ABI/libhev-ozero-socks5-tunnel.so"
             if [ ! -f "$SO" ]; then continue; fi
             SYMS=$("$NM" -D --defined-only "$SO" || true)
             for sym in $REQUIRED; do
@@ -118,12 +118,12 @@ jobs:
           done
           echo "JNI symbols OK на всех ABI"
 
-      - name: Assert PKGNAME=hev зашит в libhev-socks5-tunnel.so
+      - name: Assert PKGNAME=hev зашит в libhev-ozero-socks5-tunnel.so
         if: steps.libhev-cache.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
           for ABI in arm64-v8a armeabi-v7a x86_64; do
-            SO="common-vpn/src/main/jniLibs/$ABI/libhev-socks5-tunnel.so"
+            SO="common-vpn/src/main/jniLibs/$ABI/libhev-ozero-socks5-tunnel.so"
             if [ ! -f "$SO" ]; then continue; fi
             if ! strings "$SO" | grep -qx 'hev/TProxyService'; then
               echo "::error::В $SO нет literal 'hev/TProxyService' — PKGNAME не передан в ndk-build, JNI_OnLoad упадёт с ART JniAbort"
@@ -143,7 +143,7 @@ jobs:
           READELF="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
           REQUIRED_ALIGN=16384
           for ABI in arm64-v8a x86_64; do
-            SO="common-vpn/src/main/jniLibs/$ABI/libhev-socks5-tunnel.so"
+            SO="common-vpn/src/main/jniLibs/$ABI/libhev-ozero-socks5-tunnel.so"
             if [ ! -f "$SO" ]; then continue; fi
             ALIGN_HEX=$("$READELF" -lW "$SO" | awk '/^\s*LOAD/ {print $NF; exit}')
             ALIGN_DEC=$(printf '%d' "$ALIGN_HEX")
@@ -188,7 +188,7 @@ jobs:
           UPDATE_PUBLIC_KEY_HEX: ${{ secrets.UPDATE_PUBLIC_KEY_HEX }}
         run: ./gradlew :app:assembleRelease --stacktrace
 
-      - name: Assert APK содержит libhev-socks5-tunnel.so для всех ABI
+      - name: Assert APK содержит libhev-ozero-socks5-tunnel.so для всех ABI
         run: |
           set -euo pipefail
           APK=$(find app/build/outputs/apk/release -name '*.apk' | head -n1)
@@ -198,14 +198,14 @@ jobs:
           fi
           echo "Проверяю $APK"
           for ABI in arm64-v8a armeabi-v7a x86_64; do
-            if ! unzip -l "$APK" | grep -q "lib/$ABI/libhev-socks5-tunnel.so"; then
-              echo "::error::В APK отсутствует lib/$ABI/libhev-socks5-tunnel.so — VPN краш гарантирован"
+            if ! unzip -l "$APK" | grep -q "lib/$ABI/libhev-ozero-socks5-tunnel.so"; then
+              echo "::error::В APK отсутствует lib/$ABI/libhev-ozero-socks5-tunnel.so — VPN краш гарантирован"
               unzip -l "$APK" | grep -E "lib/[^/]+/" | head -30
               exit 1
             fi
-            SIZE=$(unzip -l "$APK" "lib/$ABI/libhev-socks5-tunnel.so" | awk 'NR==4{print $1}')
+            SIZE=$(unzip -l "$APK" "lib/$ABI/libhev-ozero-socks5-tunnel.so" | awk 'NR==4{print $1}')
             if [ "$SIZE" -lt 50000 ]; then
-              echo "::error::libhev-socks5-tunnel.so для $ABI подозрительно мал ($SIZE байт)"
+              echo "::error::libhev-ozero-socks5-tunnel.so для $ABI подозрительно мал ($SIZE байт)"
               exit 1
             fi
           done
