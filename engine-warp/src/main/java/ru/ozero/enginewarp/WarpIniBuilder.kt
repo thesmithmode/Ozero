@@ -7,7 +7,11 @@ object WarpIniBuilder {
         return buildString {
             appendLine("[Interface]")
             appendLine("PrivateKey = ${config.privateKey}")
-            appendLine("Address = ${config.interfaceAddressV4},${config.interfaceAddressV6}")
+            val addresses = listOfNotNull(
+                config.interfaceAddressV4.takeIf { it.isNotBlank() },
+                config.interfaceAddressV6.takeIf { it.isNotBlank() },
+            ).joinToString(", ")
+            appendLine("Address = $addresses")
             appendLine("DNS = ${config.dnsServers.joinToString(", ")}")
             appendLine("MTU = ${config.mtu}")
             appendLine("Jc = ${p.junkPacketCount}")

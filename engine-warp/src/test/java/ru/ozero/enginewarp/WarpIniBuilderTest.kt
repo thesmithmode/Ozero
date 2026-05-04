@@ -151,4 +151,12 @@ class WarpIniBuilderTest {
         assertTrue(ini.contains("MTU = 1420"))
         assertFalse(ini.contains("MTU = 1280"))
     }
+
+    @Test
+    fun `IPv4-only config без IPv6 не добавляет trailing запятую`() {
+        val config = baseConfig.copy(interfaceAddressV6 = "")
+        val ini = WarpIniBuilder.build(config)
+        assertTrue(ini.contains("Address = 172.16.0.2/32"))
+        assertFalse(ini.contains("Address = 172.16.0.2/32,"), "Trailing запятая при пустом IPv6")
+    }
 }
