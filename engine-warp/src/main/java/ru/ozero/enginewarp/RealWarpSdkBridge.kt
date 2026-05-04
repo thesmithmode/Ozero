@@ -12,6 +12,7 @@ import ru.ozero.enginescore.PersistentLoggers
 class RealWarpSdkBridge(
     context: Context,
     private val backend: AwgBackend = GoBackendWrapper(context),
+    private val configBuilder: (WarpConfig) -> Config = { Config.parse(WarpIniBuilder.build(it).byteInputStream()) },
 ) : WarpSdkBridge {
 
     private val tunnel = object : Tunnel {
@@ -57,8 +58,7 @@ class RealWarpSdkBridge(
 
     override fun isRunning(): Boolean = running
 
-    private fun buildConfig(config: WarpConfig): Config =
-        Config.parse(WarpIniBuilder.build(config).byteInputStream())
+    private fun buildConfig(config: WarpConfig): Config = configBuilder(config)
 
     private companion object {
         const val TAG = "RealWarpSdkBridge"

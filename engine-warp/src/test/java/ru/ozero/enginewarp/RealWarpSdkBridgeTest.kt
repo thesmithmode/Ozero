@@ -20,7 +20,11 @@ class RealWarpSdkBridgeTest {
     @BeforeEach
     fun setUp() {
         fakeBackend = FakeAwgBackend()
-        bridge = RealWarpSdkBridge(context = context, backend = fakeBackend)
+        bridge = RealWarpSdkBridge(
+            context = context,
+            backend = fakeBackend,
+            configBuilder = { mockk(relaxed = true) },
+        )
     }
 
     @Test
@@ -90,8 +94,8 @@ class RealWarpSdkBridgeTest {
     }
 
     private fun minimalConfig() = WarpConfig(
-        privateKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-        peerPublicKey = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=",
+        privateKey = "test-priv",
+        peerPublicKey = "test-pub",
         peerEndpoint = "engage.cloudflareclient.com:4500",
         interfaceAddressV4 = "172.16.0.2/32",
         interfaceAddressV6 = "2606:4700::1/128",
