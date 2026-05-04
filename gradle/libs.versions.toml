@@ -21,7 +21,7 @@ datastore = "1.1.1"
 hilt = "2.56.2"
 
 # Persistence
-room = "2.6.1"
+room = "2.8.4"
 
 # Async
 coroutines = "1.9.0"
