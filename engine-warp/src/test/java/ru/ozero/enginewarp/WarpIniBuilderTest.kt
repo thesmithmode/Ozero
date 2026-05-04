@@ -119,7 +119,7 @@ class WarpIniBuilderTest {
         val ini = WarpIniBuilder.build(baseConfig)
         val ifacePart = ini.substringBefore("[Peer]")
         assertTrue(ifacePart.contains("PrivateKey = ${baseConfig.privateKey}"))
-        assertTrue(ifacePart.contains("Address = ${baseConfig.interfaceAddressV4},${baseConfig.interfaceAddressV6}"))
+        assertTrue(ifacePart.contains("Address = ${baseConfig.interfaceAddressV4}, ${baseConfig.interfaceAddressV6}"))
         assertTrue(ifacePart.contains("MTU = 1280"))
     }
 

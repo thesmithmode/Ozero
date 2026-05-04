@@ -90,8 +90,8 @@ class RealWarpSdkBridgeTest {
     }
 
     private fun minimalConfig() = WarpConfig(
-        privateKey = "dGVzdC1wcml2YXRlLWtleS1iYXNlNjQ=",
-        peerPublicKey = "dGVzdC1wZWVyLXB1YmxpYy1rZXk=",
+        privateKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        peerPublicKey = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=",
         peerEndpoint = "engage.cloudflareclient.com:4500",
         interfaceAddressV4 = "172.16.0.2/32",
         interfaceAddressV6 = "2606:4700::1/128",
