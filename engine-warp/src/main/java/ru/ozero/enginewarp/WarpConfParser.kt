@@ -14,13 +14,7 @@ internal object WarpConfParser {
             when {
                 line.equals("[Interface]", ignoreCase = true) -> section = "iface"
                 line.equals("[Peer]", ignoreCase = true) -> section = "peer"
-                else -> {
-                    val kv = parseKeyValue(line) ?: return@forEach
-                    when (section) {
-                        "iface" -> iface[kv.first] = kv.second
-                        "peer" -> peer[kv.first] = kv.second
-                    }
-                }
+                else -> applyKeyValue(line, section, iface, peer)
             }
         }
         val priv = iface["privatekey"]
@@ -53,6 +47,19 @@ internal object WarpConfParser {
         )
     } catch (t: Throwable) {
         Result.failure(IOException("WireGuard conf parse: ${t.message}", t))
+    }
+
+    private fun applyKeyValue(
+        line: String,
+        section: String?,
+        iface: MutableMap<String, String>,
+        peer: MutableMap<String, String>,
+    ) {
+        val kv = parseKeyValue(line) ?: return
+        when (section) {
+            "iface" -> iface[kv.first] = kv.second
+            "peer" -> peer[kv.first] = kv.second
+        }
     }
 
     private fun parseKeyValue(line: String): Pair<String, String>? {
