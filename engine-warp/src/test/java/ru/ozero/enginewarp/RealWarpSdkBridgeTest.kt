@@ -18,7 +18,7 @@ class RealWarpSdkBridgeTest {
 
     @Test
     fun `attachTun валидный fd → Success и сохраняет handle`() = runTest {
-        val rt = FakeAwgRuntime(returnHandle = 7)
+        val rt = FakeAwgRuntime(returnHandle = 7, socketV4 = 100)
         val (b, _) = bridgeWith(rt)
         val r = b.attachTun(
             tunnelName = "ozero-warp",
@@ -96,6 +96,27 @@ class RealWarpSdkBridgeTest {
     }
 
     @Test
+    fun `attachTun — оба сокета невалидны → Failed и turnOff вызван (anti-loop guard)`() = runTest {
+        val rt = FakeAwgRuntime(returnHandle = 1, socketV4 = 0, socketV6 = 0)
+        val (b, _) = bridgeWith(rt)
+        val r = b.attachTun("n", 5, "ini", "/x", noopProtector)
+        val f = assertIs<WarpSdkBridge.AttachResult.Failed>(r)
+        assertTrue(f.reason.contains("protect"))
+        assertEquals(1, rt.turnOffCalls)
+        assertFalse(b.isRunning())
+    }
+
+    @Test
+    fun `attachTun — protect v4 false → Failed и turnOff (rollback)`() = runTest {
+        val rt = FakeAwgRuntime(returnHandle = 1, socketV4 = 100, socketV6 = 0)
+        val (b, _) = bridgeWith(rt)
+        val protector = VpnSocketProtector { false }
+        val r = b.attachTun("n", 5, "ini", "/x", protector)
+        assertIs<WarpSdkBridge.AttachResult.Failed>(r)
+        assertEquals(1, rt.turnOffCalls)
+    }
+
+    @Test
     fun `detachTun без attach — no-op`() = runTest {
         val rt = FakeAwgRuntime()
         val (b, _) = bridgeWith(rt)
@@ -105,7 +126,7 @@ class RealWarpSdkBridgeTest {
 
     @Test
     fun `detachTun после attach зовёт turnOff с handle`() = runTest {
-        val rt = FakeAwgRuntime(returnHandle = 11)
+        val rt = FakeAwgRuntime(returnHandle = 11, socketV4 = 100)
         val (b, _) = bridgeWith(rt)
         b.attachTun("n", 5, "ini", "/x", noopProtector)
         b.detachTun()
@@ -116,7 +137,7 @@ class RealWarpSdkBridgeTest {
 
     @Test
     fun `detachTun runtime throws — не пробрасывает наружу`() = runTest {
-        val rt = FakeAwgRuntime(returnHandle = 1, throwOnTurnOff = RuntimeException("boom"))
+        val rt = FakeAwgRuntime(returnHandle = 1, socketV4 = 100, throwOnTurnOff = RuntimeException("boom"))
         val (b, _) = bridgeWith(rt)
         b.attachTun("n", 5, "ini", "/x", noopProtector)
         b.detachTun()

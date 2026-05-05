@@ -4,8 +4,10 @@ aliases: [urnetwork-engine, urnetwork-aar, bringyour-sdk]
 tags: [engine, urnetwork, integration, native, go]
 sources:
   - "daily/2026-05-01.md"
+  - "daily/2026-05-02.md"
+  - "daily/2026-05-05.md"
 created: 2026-05-01
-updated: 2026-05-01
+updated: 2026-05-05
 ---
 
 # URnetwork SDK Integration
@@ -18,8 +20,8 @@ URnetwork is a P2P VPN engine integrated into Ozero via two AAR artifacts: `user
 - AARs are placed in `engine-urnetwork/libs/` for local consumption
 - SDK AAR must be built by binding `gomobile bind` directly against the `sdk` package — a thin wrapper approach failed (exported only `Version`)
 - `build-tools/Dockerfile` requires explicit `ANDROID_CMDLINE_TOOLS_SHA256` env variable — undocumented, breaks all AAR CI jobs when missing
-- As of 2026-05-01: AAR built and inspected with real classes, but `RealUrnetworkSdkBridge` not yet written — engine remains stub in DI graph
-- Task decomposition: 1-SP micro-steps for remaining integration (RealBridge → DI switch → smoke test)
+- As of 2026-05-02: `RealUrnetworkSdkBridge` written, consent system removed entirely, `EngineUrnetwork.stop()` leak fixed
+- `getNetworkSpace(key)` returns null on first run — must call `importNetworkSpaceFromJson` to create (see [[concepts/urnetwork-networkspace-init]])
 
 ## Details
 
@@ -38,26 +40,39 @@ The `userwireguard.aar` built successfully on the first attempt using the existi
 
 The `build-tools/Dockerfile` used for all AAR builds (ByeDPI, AmneziaWG, Hysteria2, URnetwork) requires an `ANDROID_CMDLINE_TOOLS_SHA256` environment variable that is not documented anywhere. When omitted, the Docker build fails at the SDK tools download step. This was discovered during the URnetwork build session and affects all AAR CI jobs.
 
-### Remaining Integration Work
+### Integration Progress (2026-05-02)
 
-The AAR is built, but the engine is still a stub in the Hilt DI graph:
+The engine progressed from stub to partially functional:
 
-1. **RealUrnetworkSdkBridge** — Implement using real `com.bringyour.sdk.*` classes from the AAR (start/stop client, auth flow, network selection)
-2. **DI switch** — `UrnetworkModule`: swap `StubUrnetworkSdkBridge` → `RealUrnetworkSdkBridge`
-3. **Smoke test** — Device test with real URnetwork credentials
+1. **RealUrnetworkSdkBridge** — Implemented with `start()`/`stop()`/`isRunning` using real `com.bringyour.sdk.*` classes
+2. **Consent system removed** — The consent permission gate (`UrnetworkConsentStore`, `UrnetworkModule` consent params) was deleted entirely rather than fixed. The auto-grant workaround was rejected as symptom-patching (see [[connections/symptom-fix-vs-system-removal]])
+3. **stop() leak fixed** — `EngineUrnetwork.stop()` was not calling `sdkBridge.stop()`, leaving Go goroutines alive. Fixed: `stop()` now calls `sdkBridge.stop()` which calls `networkSpaceManager?.close()`
+4. **NetworkSpace init** — First-run null from `getNetworkSpace` handled via `importNetworkSpaceFromJson` (see [[concepts/urnetwork-networkspace-init]])
 
-Each step is decomposed as a 1-SP micro-task per project workflow discipline.
+### Runtime Failures (2026-05-05)
 
-### WARP Engine Note
+Two SIGABRT causes identified during device testing:
 
-During the same session, WARP engine timeout was increased from 15s to 30s as a quick fix. The `warp-gen1.vercel.app` fallback integration was deferred to a future session.
+1. **env="prod" vs env="main"** — production URnetwork environment identifier is `"main"`, not `"prod"`. Using wrong env causes Go SDK abort on guest network creation. See [[concepts/urnetwork-networkspace-bundle-fields]].
+
+2. **Missing bundle fields** — `linkHostName`, `migrationHostName`, `wallet` must be set via `updateNetworkSpace()` after `importNetworkSpaceFromJson` but before `networkCreate`. Omitting them causes SIGABRT. Reference values sourced from `.claude/Контекст/android`.
+
+The SIGABRT appeared after Nubia-guard removal (commit `47d0156`) — the guard was masking the underlying misconfiguration.
+
+## Remaining Work
+
+- CI verification of full fix chain (env + bundle fields)
+- `libgojni.so` ~28MB in APK — size impact assessment pending
 
 ## Related Concepts
 
 - [[concepts/gomobile-bind-gotchas]] - All four build iteration failures relate to gomobile bind traps documented here
-- [[concepts/vpn-engine-pipeline]] - URnetwork will plug into the engine pipeline as another selectable engine
+- [[concepts/vpn-engine-pipeline]] - URnetwork plugs into the engine pipeline as another selectable engine
 - [[concepts/xray-aar-build-research]] - Same Dockerfile infrastructure and gomobile pattern used for Xray AAR
+- [[concepts/urnetwork-networkspace-init]] - First-run initialization flow for NetworkSpace creation
+- [[connections/symptom-fix-vs-system-removal]] - Consent removal decision pattern
 
 ## Sources
 
 - [[daily/2026-05-01.md]] - URnetwork SDK 4-iteration build, userwireguard.aar success, Dockerfile SHA env trap, remaining integration tasks identified
+- [[daily/2026-05-02.md]] - Consent system removed, stop() leak fixed, NetworkSpace init flow discovered via bytecode introspection, RealBridge implemented

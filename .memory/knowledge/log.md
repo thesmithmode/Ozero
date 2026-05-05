@@ -1,5 +1,10 @@
 # Build Log
 
+## [2026-05-05T22:17:00+03:00] compile | 2026-05-05.md
+- Source: daily/2026-05-05.md
+- Articles created: [[concepts/amneziawg-relinker-loading-trap]], [[concepts/urnetwork-networkspace-bundle-fields]], [[concepts/core-backup-module]], [[concepts/warp-slot-corrupt-json-resilience]]
+- Articles updated: [[concepts/urnetwork-sdk-integration]] (env=main + bundle fields, SIGABRT diagnosis added)
+
 ## [2026-04-29T19:34:07+03:00] compile | 2026-04-29.md (session 1)
 - Source: daily/2026-04-29.md
 - Articles created: [[concepts/vpn-engine-pipeline]], [[concepts/per-engine-ui]], [[concepts/ci-workflow-discipline]], [[concepts/release-process]], [[concepts/wiki-knowledge-base]]
@@ -56,3 +61,17 @@
 - Articles updated: (none)
 - Index fix: [[concepts/wiki-knowledge-base]] date corrected 2026-04-30 → 2026-05-01, added daily/2026-05-01.md source
 - Excluded as too granular for standalone articles: HealthMonitor DEGRADED badge (W7.1 UI commit), LanguageSection RU/EN restriction (W9.1), WARP timeout 15→30s, v0.0.2-2 CI+Release green confirmation
+
+## [2026-05-05T22:10:00+03:00] compile | 2026-05-02.md
+- Source: daily/2026-05-02.md
+- Articles created: [[concepts/warp-config-generator-api]], [[concepts/urnetwork-networkspace-init]], [[concepts/ci-job-dependency-masking]], [[concepts/viewmodel-stateflow-test-race]]
+- Connections created: [[connections/symptom-fix-vs-system-removal]]
+- Articles updated: [[concepts/urnetwork-sdk-integration]] (consent removed, stop() leak fixed, NetworkSpace init), [[concepts/ci-workflow-discipline]] (job dependency masking), [[concepts/vpnservice-builder-traps]] (fd close pattern)
+- Excluded as too granular: individual P2/P3 security findings (tracked in AUDIT.md), code review non-critical findings, PortalConnect ≠ WARP (included in warp-config-generator-api context)
+
+## [2026-05-05T23:45:00+03:00] compile | 2026-05-04.md
+- Source: daily/2026-05-04.md
+- Articles created: [[concepts/amnezia-wg-warp-migration]], [[concepts/gradle-force-vs-catalog]], [[concepts/release-stub-gate]], [[concepts/okhttp5-kotlin-version-constraint]]
+- Connections created: [[connections/dependency-override-masking]], [[connections/release-checks-beyond-ci]]
+- Articles updated: (none)
+- Excluded as not actionable knowledge: specific AWG test counts, ktlint alignment-whitespace specifics, release run number 25310434846, multiple memory flush failures ("Nothing worth saving" or exit code 1)

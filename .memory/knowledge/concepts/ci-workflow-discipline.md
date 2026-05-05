@@ -5,8 +5,9 @@ tags: [ci, workflow, process]
 sources:
   - "daily/2026-04-29.md"
   - "daily/2026-05-01.md"
+  - "daily/2026-05-02.md"
 created: 2026-04-29
-updated: 2026-05-01
+updated: 2026-05-02
 ---
 
 # CI Workflow Discipline
@@ -39,14 +40,20 @@ Two additional CI discipline rules were established after the `useJUnitPlatform(
 
 Both rules were codified in the global `CLAUDE.md` as permanent CI practices after the v0.0.2 latent test discovery.
 
+### GitHub Actions Job Dependency Masking (2026-05-02)
+
+A third CI truthfulness issue was discovered: GitHub Actions `needs:` dependencies create hard gates where a failing predecessor silently skips all successors. During v0.0.2-5, a detekt threshold failure in the `kotlin-style` job caused `assemble-debug` to be skipped entirely, hiding a compile error (`Os.close(Int)` — nonexistent API) that was only caught later in `release.yml`. This is a job-level analog of Gradle's task-level fail-fast. See [[concepts/ci-job-dependency-masking]] for the full incident analysis.
+
 ## Related Concepts
 
 - [[concepts/release-process]] - Release tagging happens only after CI is green on `dev`
 - [[concepts/per-engine-ui]] - The UI screens whose lint issues caused the first CI failure
 - [[concepts/junit-platform-silent-skip]] - The incident that prompted the N > 0 tests rule
 - [[concepts/gradle-continue-full-failures]] - The --continue discipline established alongside
+- [[concepts/ci-job-dependency-masking]] - Job-level dependency masking discovered in v0.0.2-5
 
 ## Sources
 
 - [[daily/2026-04-29.md]] - CI failed twice on v1.0.5 batch (ktlint+detekt, then tests), third run green; confirmed rule about not waiting for CI on side branches
 - [[daily/2026-05-01.md]] - `--continue` added to ci.yml; N > 0 test verification rule established after useJUnitPlatform() revealed 3 months of silent test skipping
+- [[daily/2026-05-02.md]] - detekt failure in `kotlin-style` job masked compile error in `assemble-debug` via `needs:` dependency chain

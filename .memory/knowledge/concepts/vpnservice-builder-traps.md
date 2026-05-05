@@ -4,8 +4,9 @@ aliases: [builder-traps, vpn-builder-pitfalls, tun-configuration-traps]
 tags: [android, vpn, networking, gotcha]
 sources:
   - "daily/2026-04-30.md"
+  - "daily/2026-05-02.md"
 created: 2026-04-30
-updated: 2026-04-30
+updated: 2026-05-02
 ---
 
 # VpnService.Builder Configuration Traps
@@ -40,6 +41,10 @@ On API level Q (29) and above, `VpnService.Builder.setMetered(boolean)` controls
 
 ByeByeDPI calls `setMetered(false)` on Q+. This is particularly important for Nubia devices but may affect other OEM ROMs with aggressive battery/data management.
 
+### TUN fd Close: Os.close vs ParcelFileDescriptor
+
+`android.system.Os.close(Int)` does not exist in Android's POSIX API. Attempting to close a raw file descriptor integer via `Os.close(rawFd)` produces a compile error. The correct pattern for closing a raw fd obtained from `VpnService.Builder.establish()` is `ParcelFileDescriptor.adoptFd(rawFd).close()`, which wraps the integer fd in a `ParcelFileDescriptor` and closes it through the proper Android lifecycle. This was discovered during v0.0.2-5 when a P1 fix for fd leak introduced the incorrect call, and the compile error was masked by CI job dependency issues (see [[concepts/ci-job-dependency-masking]]).
+
 ## Related Concepts
 
 - [[concepts/v001-dpi-bypass-fix-chain]] - Builder traps were fixes #1, #7, and #8 in the 9-fix chain
@@ -49,3 +54,4 @@ ByeByeDPI calls `setMetered(false)` on Q+. This is particularly important for Nu
 ## Sources
 
 - [[daily/2026-04-30.md]] - setBlocking (fix #1), IPv6 routes (fix #7), and setMetered (fix #8) identified as Builder configuration traps during v0.0.1 retag cycle
+- [[daily/2026-05-02.md]] - Os.close(Int) nonexistent API discovered during v0.0.2-5 fd leak fix; correct pattern: ParcelFileDescriptor.adoptFd(rawFd).close()

@@ -34,7 +34,13 @@ class RealWarpSdkBridge internal constructor(
                 return@withContext WarpSdkBridge.AttachResult.Failed("awgTurnOn handle=$handle")
             }
             tunnelHandle = handle
-            protectUnderlyingSockets(handle, protector)
+            val protectOk = protectUnderlyingSockets(handle, protector)
+            if (!protectOk) {
+                PersistentLoggers.error(TAG, "protect failed — rolling back to avoid routing loop")
+                runCatching { awgRuntime.turnOff(handle) }
+                tunnelHandle = INVALID_HANDLE
+                return@withContext WarpSdkBridge.AttachResult.Failed("protect underlying sockets failed")
+            }
             PersistentLoggers.info(TAG, "awgTurnOn OK handle=$handle name=$tunnelName")
             WarpSdkBridge.AttachResult.Success
         } catch (t: Throwable) {
@@ -44,23 +50,39 @@ class RealWarpSdkBridge internal constructor(
         }
     }
 
-    private fun protectUnderlyingSockets(handle: Int, protector: VpnSocketProtector) {
-        runCatching { awgRuntime.getSocketV4(handle) }
-            .onSuccess { sock ->
-                if (sock > 0) {
-                    val ok = protector.protect(sock)
-                    PersistentLoggers.info(TAG, "protect v4 sock=$sock ok=$ok")
-                }
+    private fun protectUnderlyingSockets(handle: Int, protector: VpnSocketProtector): Boolean {
+        val v4 = runCatching { awgRuntime.getSocketV4(handle) }.getOrElse {
+            PersistentLoggers.warn(TAG, "awgGetSocketV4 threw: ${it.message}")
+            -1
+        }
+        val v6 = runCatching { awgRuntime.getSocketV6(handle) }.getOrElse {
+            PersistentLoggers.warn(TAG, "awgGetSocketV6 threw: ${it.message}")
+            -1
+        }
+        if (v4 <= 0 && v6 <= 0) {
+            PersistentLoggers.error(TAG, "no underlying sockets available v4=$v4 v6=$v6")
+            return false
+        }
+        var anyProtected = false
+        if (v4 > 0) {
+            val ok = protector.protect(v4)
+            PersistentLoggers.info(TAG, "protect v4 sock=$v4 ok=$ok")
+            if (!ok) {
+                PersistentLoggers.error(TAG, "protect v4 returned false — VpnService binding lost")
+                return false
             }
-            .onFailure { PersistentLoggers.warn(TAG, "awgGetSocketV4 threw: ${it.message}") }
-        runCatching { awgRuntime.getSocketV6(handle) }
-            .onSuccess { sock ->
-                if (sock > 0) {
-                    val ok = protector.protect(sock)
-                    PersistentLoggers.info(TAG, "protect v6 sock=$sock ok=$ok")
-                }
+            anyProtected = true
+        }
+        if (v6 > 0) {
+            val ok = protector.protect(v6)
+            PersistentLoggers.info(TAG, "protect v6 sock=$v6 ok=$ok")
+            if (!ok) {
+                PersistentLoggers.warn(TAG, "protect v6 returned false — continuing v4-only")
+            } else {
+                anyProtected = true
             }
-            .onFailure { PersistentLoggers.warn(TAG, "awgGetSocketV6 threw: ${it.message}") }
+        }
+        return anyProtected
     }
 
     override suspend fun detachTun() {

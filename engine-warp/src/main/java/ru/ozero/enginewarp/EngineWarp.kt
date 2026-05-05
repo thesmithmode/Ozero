@@ -17,13 +17,14 @@ import ru.ozero.enginescore.TunFdAcceptor
 import ru.ozero.enginescore.TunSpec
 import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.VpnSocketProtector
+import ru.ozero.enginescore.VpnSocketProtectorHolder
 
 class EngineWarp(
     private val autoConfig: WarpAutoConfig,
     private val configStore: WarpConfigSlotStore,
     private val sdkBridge: WarpSdkBridge,
     private val uapiPathProvider: () -> String,
-    private val socketProtector: VpnSocketProtector,
+    private val socketProtector: VpnSocketProtector = VpnSocketProtectorHolder,
 ) : EnginePlugin, TunFdAcceptor {
 
     override val id = EngineId.WARP

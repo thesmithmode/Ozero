@@ -52,9 +52,14 @@ class RealUrnetworkSdkBridge(
             return UrnetworkSdkBridge.StartResult.Failed("runtime ensure failed: ${t.message}")
         }
 
-        runCatching { space.asyncLocalState?.localState?.byClientJwt = byClientJwt }
+        val localState = space.asyncLocalState?.localState
+        if (localState == null) {
+            PersistentLoggers.error(TAG, "asyncLocalState.localState is null — runtime not ready")
+            return UrnetworkSdkBridge.StartResult.Failed("URnetwork localState not ready")
+        }
+        runCatching { localState.byClientJwt = byClientJwt }
             .onFailure { PersistentLoggers.warn(TAG, "set localState.byClientJwt threw: ${it.message}") }
-        val instanceId = runCatching { space.asyncLocalState?.localState?.instanceId }.getOrNull()
+        val instanceId = runCatching { localState.instanceId }.getOrNull()
 
         val device: DeviceLocal = try {
             Sdk.newDeviceLocalWithDefaults(
@@ -72,7 +77,7 @@ class RealUrnetworkSdkBridge(
             return UrnetworkSdkBridge.StartResult.Failed("DeviceLocal init failed: ${t.message}")
         }
         runCatching {
-            val keys = space.asyncLocalState?.localState?.provideSecretKeys
+            val keys = localState.provideSecretKeys
             if (keys != null) device.loadProvideSecretKeys(keys) else device.initProvideSecretKeys()
         }.onFailure { PersistentLoggers.warn(TAG, "provideSecretKeys init threw: ${it.message}") }
         runCatching { device.providePaused = true }

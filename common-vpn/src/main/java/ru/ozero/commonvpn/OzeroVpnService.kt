@@ -89,9 +89,12 @@ class OzeroVpnService : android.net.VpnService() {
             PersistentLoggers.error(TAG, "super.onCreate threw — Hilt graph failure: ${t.message}", t)
             throw t
         }
-        ru.ozero.enginescore.VpnSocketProtectorHolder.bind { fd -> protect(fd) }
+        socketProtector = ru.ozero.enginescore.VpnSocketProtector { fd -> protect(fd) }
+        ru.ozero.enginescore.VpnSocketProtectorHolder.bind(socketProtector!!)
         PersistentLoggers.info(TAG, "onCreate after super (Hilt inject done)")
     }
+
+    private var socketProtector: ru.ozero.enginescore.VpnSocketProtector? = null
 
     private val tunFdRef = AtomicReference<ParcelFileDescriptor?>(null)
     private val startJobRef = AtomicReference<Job?>(null)
@@ -605,7 +608,7 @@ class OzeroVpnService : android.net.VpnService() {
 
     override fun onDestroy() {
         PersistentLoggers.info(TAG, "onDestroy entry")
-        ru.ozero.enginescore.VpnSocketProtectorHolder.unbind()
+        socketProtector?.let { ru.ozero.enginescore.VpnSocketProtectorHolder.unbind(it) }
         if (stopping.compareAndSet(false, true)) {
             runBlocking(Dispatchers.IO) { performShutdown() }
         }
