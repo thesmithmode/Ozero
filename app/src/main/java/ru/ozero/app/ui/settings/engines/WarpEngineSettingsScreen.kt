@@ -1,6 +1,5 @@
 package ru.ozero.app.ui.settings.engines
 
-import java.io.ByteArrayInputStream
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -46,6 +45,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import java.io.ByteArrayInputStream
 import ru.ozero.app.R
 import ru.ozero.enginewarp.WarpConfigSlot
 
@@ -310,7 +310,7 @@ private fun EmptyConfigCard(
             OutlinedButton(
                 onClick = onImportFile,
                 enabled = !isRegistering,
-                modifier = Modifier.fillMaxWidth().testTag("warp_import_button"),
+                modifier = Modifier.fillMaxWidth().testTag("warp_import_button_empty"),
             ) {
                 Text(stringResource(R.string.warp_import_file))
             }

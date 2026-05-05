@@ -248,6 +248,16 @@ class WarpEngineSettingsViewModelTest {
     }
 
     @Test
+    fun `init — ошибка миграции — errorMessage установлен`() = runTest {
+        val throwingStore = object : FakeWarpStore() {
+            override suspend fun migrateIfNeeded() = error("migration boom")
+        }
+        val vm = WarpEngineSettingsViewModel(throwingStore, FakeAutoConfig(), FakeFileImporter())
+        advanceUntilIdle()
+        assertEquals("migration boom", vm.uiState.value.errorMessage)
+    }
+
+    @Test
     fun `onGenerate передаёт прогресс через progressText`() = runTest {
         auto.result = Result.success(SAMPLE)
         auto.progressToEmit = "3/78"
