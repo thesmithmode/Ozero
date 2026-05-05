@@ -16,12 +16,14 @@ import ru.ozero.enginescore.TunAttachResult
 import ru.ozero.enginescore.TunFdAcceptor
 import ru.ozero.enginescore.TunSpec
 import ru.ozero.enginescore.Upstream
+import ru.ozero.enginescore.VpnSocketProtector
 
 class EngineWarp(
     private val autoConfig: WarpAutoConfig,
     private val configStore: WarpConfigSlotStore,
     private val sdkBridge: WarpSdkBridge,
     private val uapiPathProvider: () -> String,
+    private val socketProtector: VpnSocketProtector,
 ) : EnginePlugin, TunFdAcceptor {
 
     override val id = EngineId.WARP
@@ -83,7 +85,7 @@ class EngineWarp(
         return TunSpec(
             sessionName = "WARP",
             mtu = cfg.mtu,
-            blocking = false,
+            blocking = true,
             ipv4Address = v4Addr,
             ipv4PrefixLength = v4Prefix,
             dnsServers = cfg.dnsServers,
@@ -103,7 +105,7 @@ class EngineWarp(
         )
         val uapiPath = uapiPathProvider()
         PersistentLoggers.info(TAG, "attachTun fd=$tunFd uapi=$uapiPath")
-        return when (val r = sdkBridge.attachTun(TUNNEL_NAME, tunFd, ini, uapiPath)) {
+        return when (val r = sdkBridge.attachTun(TUNNEL_NAME, tunFd, ini, uapiPath, socketProtector)) {
             WarpSdkBridge.AttachResult.Success -> TunAttachResult.Success
             is WarpSdkBridge.AttachResult.Failed -> TunAttachResult.Failure(r.reason)
         }

@@ -14,48 +14,44 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
-    fun `start() обрабатывает 3 SDK init throw paths`() {
-        val throwPoints = listOf(
-            "newNetworkSpaceManager threw",
-            "NetworkSpace resolve failed",
-            "newDeviceLocalWithDefaults threw",
-        )
-        throwPoints.forEach { msg ->
-            assertTrue(source.contains(msg), "должен быть catch: '$msg'")
-        }
-        assertTrue(
-            source.split("cleanupOnFailure()").size - 1 >= 3,
-            "cleanupOnFailure обязан вызываться на каждом из 3 throw paths",
-        )
-    }
-
-    @Test
     fun `start() guard already running`() {
         assertTrue(source.contains("running.get()") && source.contains("already running"))
     }
 
     @Test
     fun `start() требует non-blank byClientJwt`() {
+        assertTrue(source.contains("byClientJwt.isBlank()") && source.contains("byClientJwt is blank"))
+    }
+
+    @Test
+    fun `start() и attachTun выполняются на Main thread`() {
         assertTrue(
-            source.contains("byClientJwt.isBlank()") && source.contains("byClientJwt is blank"),
-            "byClientJwt blank → Failed без вызова newDeviceLocalWithDefaults — " +
-                "иначе SDK создаёт unauthenticated device, hits Go-GC SIGABRT path",
+            source.contains("Dispatchers.Main.immediate"),
+            "Go runtime + non-locked OSThread = SIGABRT на Nubia/RedMagic",
         )
     }
 
     @Test
-    fun `start() и attachTun выполняются на main thread`() {
+    fun `bridge использует UrnetworkRuntime ensure (один manager на процесс)`() {
         assertTrue(
-            source.contains("Dispatchers.Main.immediate"),
-            "SDK calls (newDeviceLocalWithDefaults, newIoLoop) обязаны на main thread — " +
-                "Go runtime + non-locked OSThread = SIGABRT на Nubia/RedMagic",
+            source.contains("UrnetworkRuntime.ensure(app)"),
+            "Bridge обязан использовать singleton Runtime — два NetworkSpaceManager = SIGABRT",
         )
+        assertTrue(
+            !source.contains("Sdk.newNetworkSpaceManager"),
+            "Bridge НЕ должен создавать свой manager",
+        )
+    }
+
+    @Test
+    fun `Application context not Activity`() {
+        assertTrue(source.contains("private val app: Application"))
     }
 
     @Test
     fun `attachTun валидирует fd и device state и double-attach`() {
         val attachBlock = source.substringAfter("override suspend fun attachTun")
-            .substringBefore("private fun resolveNetworkSpace")
+            .substringBefore("private fun cleanupOnFailure")
         assertTrue(attachBlock.contains("tunFd < 0") && attachBlock.contains("invalid fd"))
         assertTrue(attachBlock.contains("DeviceLocal not initialised"))
         assertTrue(attachBlock.contains("IoLoop already attached"))
@@ -63,89 +59,45 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
-    fun `attachTun вызывает setTunnelStarted true ПОСЛЕ newIoLoop`() {
+    fun `attachTun setTunnelStarted true ПОСЛЕ newIoLoop`() {
         val attachBlock = source.substringAfter("override suspend fun attachTun")
-            .substringBefore("private fun resolveNetworkSpace")
+            .substringBefore("private fun cleanupOnFailure")
         val ioLoopIdx = attachBlock.indexOf("Sdk.newIoLoop")
         val tunnelStartedIdx = attachBlock.indexOf("setTunnelStarted(true)")
-        assertTrue(ioLoopIdx >= 0, "newIoLoop должен быть в attachTun")
-        assertTrue(tunnelStartedIdx >= 0, "setTunnelStarted(true) должен быть в attachTun")
-        assertTrue(
-            tunnelStartedIdx > ioLoopIdx,
-            "setTunnelStarted(true) обязан вызываться ПОСЛЕ newIoLoop — иначе SDK forwarders " +
-                "стартуют без транспорта, hits nil packet flow path",
-        )
+        assertTrue(ioLoopIdx >= 0 && tunnelStartedIdx >= 0)
+        assertTrue(tunnelStartedIdx > ioLoopIdx)
     }
 
     @Test
-    fun `start() НЕ вызывает setTunnelStarted true (только attachTun)`() {
-        val startBlock = source
-            .substringAfter("private fun runStartOnMain")
+    fun `start() не вызывает setTunnelStarted true`() {
+        val startBlock = source.substringAfter("private suspend fun runStartOnMain")
             .substringBefore("override suspend fun stop")
-        assertTrue(
-            !startBlock.contains("setTunnelStarted(true)"),
-            "start() НЕ должен ставить tunnelStarted=true — это работа attachTun после newIoLoop",
-        )
+        assertTrue(!startBlock.contains("setTunnelStarted(true)"))
     }
 
     @Test
     fun `attachTun регистрирует IoLoopDoneCallback который сбрасывает running`() {
         val attachBlock = source.substringAfter("override suspend fun attachTun")
-            .substringBefore("private fun resolveNetworkSpace")
-        assertTrue(
-            attachBlock.contains("IoLoopDoneCallback") &&
-                attachBlock.contains("running.set(false)"),
-        )
+            .substringBefore("private fun cleanupOnFailure")
+        assertTrue(attachBlock.contains("IoLoopDoneCallback"))
+        assertTrue(attachBlock.contains("running.set(false)"))
     }
 
     @Test
-    fun `stop() очищает 3 ref-а через runCatching idempotent`() {
+    fun `stop() очищает ioLoop и device через runCatching idempotent`() {
         val stopBlock = source.substringAfter("override suspend fun stop").substringBefore("override fun isRunning")
         assertTrue(stopBlock.contains("running.set(false)"))
-        listOf("ioLoopRef", "deviceRef", "managerRef").forEach { ref ->
-            assertTrue(stopBlock.contains("$ref.getAndSet(null)"), "stop() getAndSet(null) на $ref")
-        }
+        assertTrue(stopBlock.contains("ioLoopRef.getAndSet(null)"))
+        assertTrue(stopBlock.contains("deviceRef.getAndSet(null)"))
         val runCatchingCount = stopBlock.split("runCatching").size - 1
-        assertTrue(runCatchingCount >= 4, "Каждый close()/setTunnelStarted в runCatching, found=$runCatchingCount")
+        assertTrue(runCatchingCount >= 3, "Каждый close()/setTunnelStarted в runCatching, found=$runCatchingCount")
     }
 
     @Test
-    fun `cleanupOnFailure закрывает device и manager без throw`() {
+    fun `cleanupOnFailure закрывает device без throw`() {
         val cleanupBlock = source.substringAfter("private fun cleanupOnFailure")
             .substringBefore("private companion object")
-        assertTrue(
-            cleanupBlock.contains("deviceRef.getAndSet(null)") &&
-                cleanupBlock.contains("managerRef.getAndSet(null)"),
-        )
+        assertTrue(cleanupBlock.contains("deviceRef.getAndSet(null)"))
         assertTrue(cleanupBlock.contains("runCatching"))
-    }
-
-    @Test
-    fun `resolveNetworkSpace fallback active stored imported`() {
-        val helperBlock = source.substringAfter("private fun resolveNetworkSpace")
-            .substringBefore("private fun cleanupOnFailure")
-        assertTrue(
-            helperBlock.contains("activeNetworkSpace?.let") &&
-                helperBlock.contains("getNetworkSpace(key)?.let") &&
-                helperBlock.contains("updateNetworkSpace(key)") &&
-                helperBlock.contains("values.linkHostName") &&
-                helperBlock.contains("values.migrationHostName") &&
-                helperBlock.contains("values.bundled = true"),
-            "resolveNetworkSpace обязан использовать updateNetworkSpace(key) с bundled полями " +
-                "(linkHostName, migrationHostName, wallet, bundled=true) — без них Go SDK падает " +
-                "SIGABRT на networkCreate.",
-        )
-        listOf("using active", "using stored", "updated bundled").forEach { phrase ->
-            assertTrue(helperBlock.contains(phrase))
-        }
-    }
-
-    @Test
-    fun `storage dir — filesDir root (parity с официальным URnetwork)`() {
-        assertTrue(
-            source.contains("context.filesDir.absolutePath"),
-            "Официальное URnetwork приложение использует filesDir.absolutePath (root), не subdir — " +
-                "обеспечивает консистентность NetworkSpace storage между сессиями",
-        )
     }
 }

@@ -1,11 +1,9 @@
 package ru.ozero.engineurnetwork
 
-import android.content.Context
+import android.app.Application
 import com.bringyour.sdk.DeviceLocal
 import com.bringyour.sdk.IoLoop
 import com.bringyour.sdk.IoLoopDoneCallback
-import com.bringyour.sdk.NetworkSpace
-import com.bringyour.sdk.NetworkSpaceManager
 import com.bringyour.sdk.Sdk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -14,10 +12,9 @@ import ru.ozero.enginescore.PersistentLoggers
 import java.util.concurrent.atomic.AtomicReference
 
 class RealUrnetworkSdkBridge(
-    private val context: Context,
+    private val app: Application,
 ) : UrnetworkSdkBridge {
 
-    private val managerRef = AtomicReference<NetworkSpaceManager?>(null)
     private val deviceRef = AtomicReference<DeviceLocal?>(null)
     private val ioLoopRef = AtomicReference<IoLoop?>(null)
     private val running = AtomicReference(false)
@@ -47,33 +44,17 @@ class RealUrnetworkSdkBridge(
         }
     }
 
-    private fun runStartOnMain(byClientJwt: String): UrnetworkSdkBridge.StartResult {
-        val storageDir = context.filesDir.absolutePath
-        val manager = try {
-            Sdk.newNetworkSpaceManager(storageDir)
+    private suspend fun runStartOnMain(byClientJwt: String): UrnetworkSdkBridge.StartResult {
+        val space = try {
+            UrnetworkRuntime.ensure(app)
         } catch (t: Throwable) {
-            PersistentLoggers.error(TAG, "newNetworkSpaceManager threw: ${t.message}")
-            return UrnetworkSdkBridge.StartResult.Failed(
-                "NetworkSpaceManager init failed: ${t.message}",
-            )
+            PersistentLoggers.error(TAG, "runtime ensure failed: ${t.message}")
+            return UrnetworkSdkBridge.StartResult.Failed("runtime ensure failed: ${t.message}")
         }
-        managerRef.set(manager)
 
-        val space: NetworkSpace = try {
-            resolveNetworkSpace(manager) ?: run {
-                PersistentLoggers.error(TAG, "NetworkSpace null after active/get/import fallback")
-                cleanupOnFailure()
-                return UrnetworkSdkBridge.StartResult.Failed(
-                    "NetworkSpace resolve failed: SDK returned null",
-                )
-            }
-        } catch (t: Throwable) {
-            PersistentLoggers.error(TAG, "NetworkSpace resolve failed: ${t.message}\n${t.stackTraceToString()}")
-            cleanupOnFailure()
-            return UrnetworkSdkBridge.StartResult.Failed(
-                "NetworkSpace resolve failed: ${t.message}",
-            )
-        }
+        runCatching { space.asyncLocalState?.localState?.byClientJwt = byClientJwt }
+            .onFailure { PersistentLoggers.warn(TAG, "set localState.byClientJwt threw: ${it.message}") }
+        val instanceId = runCatching { space.asyncLocalState?.localState?.instanceId }.getOrNull()
 
         val device: DeviceLocal = try {
             Sdk.newDeviceLocalWithDefaults(
@@ -82,16 +63,21 @@ class RealUrnetworkSdkBridge(
                 DEVICE_DESCRIPTION,
                 DEVICE_SPEC,
                 APP_VERSION,
-                null,
+                instanceId,
                 false,
             )
         } catch (t: Throwable) {
             PersistentLoggers.error(TAG, "newDeviceLocalWithDefaults threw: ${t.message}")
             cleanupOnFailure()
-            return UrnetworkSdkBridge.StartResult.Failed(
-                "DeviceLocal init failed: ${t.message}",
-            )
+            return UrnetworkSdkBridge.StartResult.Failed("DeviceLocal init failed: ${t.message}")
         }
+        runCatching {
+            val keys = space.asyncLocalState?.localState?.provideSecretKeys
+            if (keys != null) device.loadProvideSecretKeys(keys) else device.initProvideSecretKeys()
+        }.onFailure { PersistentLoggers.warn(TAG, "provideSecretKeys init threw: ${it.message}") }
+        runCatching { device.providePaused = true }
+            .onFailure { PersistentLoggers.warn(TAG, "providePaused threw: ${it.message}") }
+
         deviceRef.set(device)
         running.set(true)
         PersistentLoggers.info(TAG, "device created — awaiting attachTun(fd) before tunnelStarted")
@@ -111,10 +97,6 @@ class RealUrnetworkSdkBridge(
                 runCatching { device.close() }
                     .onFailure { PersistentLoggers.warn(TAG, "device.close threw: ${it.message}") }
             }
-            managerRef.getAndSet(null)?.also { manager ->
-                runCatching { manager.close() }
-                    .onFailure { PersistentLoggers.warn(TAG, "manager.close threw: ${it.message}") }
-            }
         }
         PersistentLoggers.info(TAG, "stop complete")
     }
@@ -126,9 +108,7 @@ class RealUrnetworkSdkBridge(
             return UrnetworkSdkBridge.AttachResult.Failed("invalid fd=$tunFd")
         }
         val device = deviceRef.get()
-            ?: return UrnetworkSdkBridge.AttachResult.Failed(
-                "DeviceLocal not initialised — call start() first",
-            )
+            ?: return UrnetworkSdkBridge.AttachResult.Failed("DeviceLocal not initialised — call start() first")
         if (ioLoopRef.get() != null) {
             return UrnetworkSdkBridge.AttachResult.Failed("IoLoop already attached")
         }
@@ -151,47 +131,13 @@ class RealUrnetworkSdkBridge(
         }
     }
 
-    private fun resolveNetworkSpace(manager: NetworkSpaceManager): NetworkSpace? {
-        manager.activeNetworkSpace?.let {
-            PersistentLoggers.info(TAG, "using active NetworkSpace")
-            return it
-        }
-        val key = Sdk.newNetworkSpaceKey(DEFAULT_HOST, DEFAULT_ENV)
-        manager.getNetworkSpace(key)?.let {
-            PersistentLoggers.info(TAG, "using stored NetworkSpace")
-            runCatching { manager.setActiveNetworkSpace(it) }
-                .onFailure { e -> PersistentLoggers.warn(TAG, "setActiveNetworkSpace(stored) failed: ${e.message}") }
-            return it
-        }
-        val updated = manager.updateNetworkSpace(key) { values ->
-            values.envSecret = ""
-            values.bundled = true
-            values.netExposeServerIps = true
-            values.netExposeServerHostNames = true
-            values.linkHostName = LINK_HOST_NAME
-            values.migrationHostName = MIGRATION_HOST_NAME
-            values.store = ""
-            values.wallet = WALLET
-            values.ssoGoogle = false
-        } ?: return null
-        manager.setActiveNetworkSpace(updated)
-        PersistentLoggers.info(TAG, "updated bundled NetworkSpace host=$DEFAULT_HOST env=$DEFAULT_ENV")
-        return updated
-    }
-
     private fun cleanupOnFailure() {
         deviceRef.getAndSet(null)?.also { runCatching { it.close() } }
-        managerRef.getAndSet(null)?.also { runCatching { it.close() } }
     }
 
     private companion object {
         const val TAG = "RealUrnetworkSdkBridge"
         const val SDK_INIT_TIMEOUT_MS = 30_000L
-        const val DEFAULT_HOST = "ur.network"
-        const val DEFAULT_ENV = "main"
-        const val LINK_HOST_NAME = "ur.io"
-        const val MIGRATION_HOST_NAME = "bringyour.com"
-        const val WALLET = "solana"
         const val DEVICE_DESCRIPTION = "Ozero VPN Android"
         const val DEVICE_SPEC = "android"
         const val APP_VERSION = "0.0.2"

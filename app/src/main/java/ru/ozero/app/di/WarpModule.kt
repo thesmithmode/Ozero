@@ -78,7 +78,9 @@ object WarpModule {
 
     @Provides
     @Singleton
-    fun provideWarpSdkBridge(): WarpSdkBridge = RealWarpSdkBridge()
+    fun provideWarpSdkBridge(
+        @ApplicationContext context: Context,
+    ): WarpSdkBridge = RealWarpSdkBridge(context)
 
     @Provides
     @Singleton
@@ -93,5 +95,6 @@ object WarpModule {
         configStore = store,
         sdkBridge = bridge,
         uapiPathProvider = { context.dataDir.absolutePath },
+        socketProtector = ru.ozero.enginescore.VpnSocketProtectorHolder,
     )
 }

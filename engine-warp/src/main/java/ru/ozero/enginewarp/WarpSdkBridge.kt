@@ -1,11 +1,14 @@
 package ru.ozero.enginewarp
 
+import ru.ozero.enginescore.VpnSocketProtector
+
 interface WarpSdkBridge {
     suspend fun attachTun(
         tunnelName: String,
         tunFd: Int,
         iniConfig: String,
         uapiPath: String,
+        protector: VpnSocketProtector,
     ): AttachResult
 
     suspend fun detachTun()

@@ -2,12 +2,15 @@ package ru.ozero.enginewarp
 
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
+import ru.ozero.enginescore.VpnSocketProtector
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class RealWarpSdkBridgeTest {
+
+    private val noopProtector = VpnSocketProtector { true }
 
     private fun bridgeWith(
         runtime: AwgRuntime = FakeAwgRuntime(),
@@ -17,7 +20,7 @@ class RealWarpSdkBridgeTest {
     fun `attachTun валидный fd → Success и сохраняет handle`() = runTest {
         val rt = FakeAwgRuntime(returnHandle = 7)
         val (b, _) = bridgeWith(rt)
-        val r = b.attachTun("ozero-warp", tunFd = 5, iniConfig = "[Interface]\nPrivateKey=k", uapiPath = "/x")
+        val r = b.attachTun("ozero-warp", tunFd = 5, iniConfig = "[Interface]\nPrivateKey=k", uapiPath = "/x", protector = noopProtector)
         assertEquals(WarpSdkBridge.AttachResult.Success, r)
         assertTrue(b.isRunning())
         assertEquals(5, rt.lastFd)
@@ -30,7 +33,7 @@ class RealWarpSdkBridgeTest {
     fun `attachTun negative fd → Failed без вызова runtime`() = runTest {
         val rt = FakeAwgRuntime()
         val (b, _) = bridgeWith(rt)
-        val r = b.attachTun("n", tunFd = -1, iniConfig = "ini", uapiPath = "/x")
+        val r = b.attachTun("n", tunFd = -1, iniConfig = "ini", uapiPath = "/x", protector = noopProtector)
         assertIs<WarpSdkBridge.AttachResult.Failed>(r)
         assertEquals(0, rt.turnOnCalls)
     }
@@ -39,7 +42,7 @@ class RealWarpSdkBridgeTest {
     fun `attachTun blank ini → Failed без вызова runtime`() = runTest {
         val rt = FakeAwgRuntime()
         val (b, _) = bridgeWith(rt)
-        val r = b.attachTun("n", tunFd = 1, iniConfig = "", uapiPath = "/x")
+        val r = b.attachTun("n", tunFd = 1, iniConfig = "", uapiPath = "/x", protector = noopProtector)
         assertIs<WarpSdkBridge.AttachResult.Failed>(r)
         assertEquals(0, rt.turnOnCalls)
     }
@@ -48,7 +51,7 @@ class RealWarpSdkBridgeTest {
     fun `attachTun blank uapi → Failed без вызова runtime`() = runTest {
         val rt = FakeAwgRuntime()
         val (b, _) = bridgeWith(rt)
-        val r = b.attachTun("n", tunFd = 1, iniConfig = "ini", uapiPath = "")
+        val r = b.attachTun("n", tunFd = 1, iniConfig = "ini", uapiPath = "", protector = noopProtector)
         assertIs<WarpSdkBridge.AttachResult.Failed>(r)
         assertEquals(0, rt.turnOnCalls)
     }
@@ -57,7 +60,7 @@ class RealWarpSdkBridgeTest {
     fun `attachTun negative handle от runtime → Failed`() = runTest {
         val rt = FakeAwgRuntime(returnHandle = -2)
         val (b, _) = bridgeWith(rt)
-        val r = b.attachTun("n", tunFd = 5, iniConfig = "ini", uapiPath = "/x")
+        val r = b.attachTun("n", tunFd = 5, iniConfig = "ini", uapiPath = "/x", protector = noopProtector)
         val f = assertIs<WarpSdkBridge.AttachResult.Failed>(r)
         assertTrue(f.reason.contains("handle=-2"))
         assertFalse(b.isRunning())
@@ -67,9 +70,20 @@ class RealWarpSdkBridgeTest {
     fun `attachTun runtime бросает → Failed с текстом ошибки`() = runTest {
         val rt = FakeAwgRuntime(throwOnTurnOn = RuntimeException("native crash"))
         val (b, _) = bridgeWith(rt)
-        val r = b.attachTun("n", tunFd = 5, iniConfig = "ini", uapiPath = "/x")
+        val r = b.attachTun("n", tunFd = 5, iniConfig = "ini", uapiPath = "/x", protector = noopProtector)
         val f = assertIs<WarpSdkBridge.AttachResult.Failed>(r)
         assertTrue(f.reason.contains("native crash"))
+    }
+
+    @Test
+    fun `attachTun success — protect зовётся для v4 и v6 sockets`() = runTest {
+        val rt = FakeAwgRuntime(returnHandle = 1, socketV4 = 100, socketV6 = 200)
+        val (b, _) = bridgeWith(rt)
+        val protectedFds = mutableListOf<Int>()
+        val protector = VpnSocketProtector { fd -> protectedFds.add(fd); true }
+        b.attachTun("n", 5, "ini", "/x", protector)
+        assertTrue(protectedFds.contains(100))
+        assertTrue(protectedFds.contains(200))
     }
 
     @Test
@@ -84,7 +98,7 @@ class RealWarpSdkBridgeTest {
     fun `detachTun после attach зовёт turnOff с handle`() = runTest {
         val rt = FakeAwgRuntime(returnHandle = 11)
         val (b, _) = bridgeWith(rt)
-        b.attachTun("n", 5, "ini", "/x")
+        b.attachTun("n", 5, "ini", "/x", noopProtector)
         b.detachTun()
         assertEquals(1, rt.turnOffCalls)
         assertEquals(11, rt.lastTurnOffHandle)
@@ -95,7 +109,7 @@ class RealWarpSdkBridgeTest {
     fun `detachTun runtime throws — не пробрасывает наружу`() = runTest {
         val rt = FakeAwgRuntime(returnHandle = 1, throwOnTurnOff = RuntimeException("boom"))
         val (b, _) = bridgeWith(rt)
-        b.attachTun("n", 5, "ini", "/x")
+        b.attachTun("n", 5, "ini", "/x", noopProtector)
         b.detachTun()
         assertFalse(b.isRunning())
     }
@@ -110,6 +124,8 @@ class RealWarpSdkBridgeTest {
         var returnHandle: Int = 1,
         var throwOnTurnOn: Throwable? = null,
         var throwOnTurnOff: Throwable? = null,
+        var socketV4: Int = 0,
+        var socketV6: Int = 0,
     ) : AwgRuntime {
         var turnOnCalls: Int = 0
         var turnOffCalls: Int = 0
@@ -134,5 +150,8 @@ class RealWarpSdkBridgeTest {
             lastTurnOffHandle = handle
             throwOnTurnOff?.let { throw it }
         }
+
+        override fun getSocketV4(handle: Int): Int = socketV4
+        override fun getSocketV6(handle: Int): Int = socketV6
     }
 }

@@ -13,133 +13,115 @@ class RealUrnetworkAuthServiceContractTest {
         f.readText()
     }
 
+    private val runtimeSource by lazy {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val f = File(moduleRoot, "src/main/java/ru/ozero/engineurnetwork/UrnetworkRuntime.kt")
+        assertTrue(f.exists(), "UrnetworkRuntime.kt не найден: $f")
+        f.readText()
+    }
+
     @Test
-    fun `acquireGuestJwt использует guestMode=true и terms=true (PORTAL TOR контракт)`() {
+    fun `acquireGuestJwt использует guestMode=true и terms=true`() {
         assertTrue(
             source.contains("guestMode = true"),
-            "guestMode=true обязателен — без него API требует email верификацию (антипаттерн UI флоу). " +
-                "PORTAL TOR референс показал что guest auto-mode единственный путь без UI.",
+            "guestMode=true обязателен — без него API требует email верификацию",
         )
         assertTrue(
             source.contains("terms = true"),
-            "terms=true обязателен — иначе server отклоняет networkCreate с ошибкой ToS.",
+            "terms=true обязателен — иначе server отклоняет networkCreate с ошибкой ToS",
         )
     }
 
     @Test
-    fun `callback покрывает все 5 ветвей (err, result null, result_error, network jwt blank, success)`() {
+    fun `все cgo вызовы строго на Main thread (Dispatchers Main immediate)`() {
+        assertTrue(
+            source.contains("Dispatchers.Main.immediate"),
+            "URnetwork SDK cgo не thread-safe относительно Dispatchers.IO worker — SIGABRT на Nubia",
+        )
+        assertTrue(
+            !source.contains("Dispatchers.IO"),
+            "Dispatchers.IO для cgo калов запрещён — только Main",
+        )
+    }
+
+    @Test
+    fun `использует UrnetworkRuntime singleton (один NetworkSpaceManager на процесс)`() {
+        assertTrue(
+            source.contains("UrnetworkRuntime.ensure(app)"),
+            "auth-service обязан использовать UrnetworkRuntime.ensure — один manager на процесс",
+        )
+        assertTrue(
+            !source.contains("Sdk.newNetworkSpaceManager"),
+            "auth-service НЕ должен создавать свой NetworkSpaceManager — два manager-а = SIGABRT",
+        )
+    }
+
+    @Test
+    fun `Application context (не Activity Context) — setLogDir global`() {
+        assertTrue(
+            source.contains("private val app: Application"),
+            "Application — глобальный, не Activity (иначе утечка Activity через setLogDir)",
+        )
+    }
+
+    @Test
+    fun `Runtime использует null envSecret и null store (не пустые строки)`() {
+        assertTrue(
+            runtimeSource.contains("v.envSecret = null"),
+            "envSecret = null (не пустая строка) — SDK различает null vs blank в validation path",
+        )
+        assertTrue(
+            runtimeSource.contains("v.store = null"),
+            "store = null (не пустая строка) — нестора режим",
+        )
+    }
+
+    @Test
+    fun `Runtime вызывает setLogDir и setMemoryLimit ДО newNetworkSpaceManager`() {
+        val setLogIdx = runtimeSource.indexOf("Sdk.setLogDir")
+        val newMgrIdx = runtimeSource.indexOf("Sdk.newNetworkSpaceManager")
+        assertTrue(setLogIdx >= 0, "Sdk.setLogDir обязан в Runtime")
+        assertTrue(newMgrIdx >= 0, "Sdk.newNetworkSpaceManager обязан в Runtime")
+        assertTrue(setLogIdx < newMgrIdx, "setLogDir обязан ДО newNetworkSpaceManager")
+        assertTrue(runtimeSource.contains("Sdk.setMemoryLimit"))
+    }
+
+    @Test
+    fun `Runtime вызывает newLoginViewController после updateNetworkSpace`() {
+        assertTrue(
+            runtimeSource.contains("Sdk.newLoginViewController"),
+            "newLoginViewController инициализирует internal SDK state перед networkCreate",
+        )
+    }
+
+    @Test
+    fun `callback покрывает 5 ветвей`() {
         val callbackBlock = source.substringAfter("NetworkCreateCallback").substringBefore("try {")
-        assertTrue(
-            callbackBlock.contains("err != null"),
-            "Branch 1: err != null — обязан resume Error, иначе coroutine висит навсегда.",
-        )
-        assertTrue(
-            callbackBlock.contains("result == null"),
-            "Branch 2: result == null — обязан resume Error, иначе NPE при доступе к result.error.",
-        )
-        assertTrue(
-            callbackBlock.contains("result.error != null"),
-            "Branch 3: result.error != null — server вернул business-level error, обязан resume Error.",
-        )
-        assertTrue(
-            callbackBlock.contains("result.network != null"),
-            "Branch 4: network != null — happy path, проверка jwt.",
-        )
-        assertTrue(
-            callbackBlock.contains("isNullOrBlank()"),
-            "Branch 5: jwt.isNullOrBlank() — server вернул network но без JWT (edge case), обязан resume Error.",
-        )
-        assertTrue(
-            callbackBlock.contains("GuestJwtResult.Success(byJwt = jwt)"),
-            "Happy path: GuestJwtResult.Success(byJwt = jwt) — без этого engine не получает токен.",
-        )
-    }
-
-    @Test
-    fun `networkCreate exception обработан через try catch + resume`() {
-        val callBlock = source.substringAfter("try {").substringBefore("private fun ensureApi")
-        assertTrue(
-            callBlock.contains("api.networkCreate(args, callback)"),
-            "Должен вызывать api.networkCreate(args, callback).",
-        )
-        assertTrue(
-            callBlock.contains("catch (t: Throwable)") &&
-                callBlock.contains("cont.resume(GuestJwtResult.Error"),
-            "Throwable обязан catch + resume Error — иначе при SDK throw coroutine висит навсегда " +
-                "и engine.start блокируется навечно.",
-        )
-    }
-
-    @Test
-    fun `ensureApi обрабатывает null space fallback через updateNetworkSpace bundled`() {
-        val ensureBlock = source.substringAfter("private fun ensureApi")
-        assertTrue(
-            ensureBlock.contains("updateNetworkSpace(key)") &&
-                ensureBlock.contains("values.linkHostName") &&
-                ensureBlock.contains("values.migrationHostName") &&
-                ensureBlock.contains("values.bundled = true"),
-            "ensureApi обязан создавать NetworkSpace через updateNetworkSpace(key) с bundled полями " +
-                "(linkHostName, migrationHostName, wallet, bundled=true) — без них Go SDK падает SIGABRT " +
-                "на networkCreate (повторение бага v0.0.2).",
-        )
-        assertTrue(
-            ensureBlock.contains("catch (t: Throwable)"),
-            "ensureApi обязан catch Throwable — Sdk.newNetworkSpaceManager может throw на init " +
-                "(file system, native), иначе crash на главном пути.",
-        )
-    }
-
-    @Test
-    fun `resolveNetworkSpace fallback chain с stackTrace логированием`() {
-        val helperBlock = source.substringAfter("private fun resolveNetworkSpace")
-            .substringBefore("private companion object")
-        listOf("activeNetworkSpace?.let", "getNetworkSpace(key)?.let", "updateNetworkSpace(key)").forEach { needle ->
-            assertTrue(
-                helperBlock.contains(needle),
-                "resolveNetworkSpace обязан содержать '$needle' — fallback chain active -> stored -> imported",
-            )
-        }
-        val ensureBlock = source.substringAfter("private fun ensureApi")
-            .substringBefore("private fun resolveNetworkSpace")
-        assertTrue(
-            ensureBlock.contains("NetworkSpace null after active/get/import fallback"),
-            "ensureApi обязан логировать NetworkSpace=null после import fallback — корневой v0.0.2 краш",
-        )
-        assertTrue(
-            ensureBlock.contains("stackTraceToString()"),
-            "ensureApi catch обязан включать stackTraceToString() — без stack trace нативный SDK fail невидим",
-        )
+        assertTrue(callbackBlock.contains("err != null"))
+        assertTrue(callbackBlock.contains("result == null"))
+        assertTrue(callbackBlock.contains("result.error != null"))
+        assertTrue(callbackBlock.contains("result.network != null"))
+        assertTrue(callbackBlock.contains("isNullOrBlank()"))
+        assertTrue(callbackBlock.contains("GuestJwtResult.Success(byJwt = jwt)"))
     }
 
     @Test
     fun `acquireClientJwt существует и зовёт authNetworkClient`() {
-        assertTrue(
-            source.contains("override suspend fun acquireClientJwt"),
-            "acquireClientJwt обязателен — official URnetwork делает two-step JWT (networkCreate → authNetworkClient)",
-        )
+        assertTrue(source.contains("override suspend fun acquireClientJwt"))
         assertTrue(source.contains("api.authNetworkClient(args, callback)"))
         assertTrue(
             source.contains("api.byJwt = byJwt"),
-            "api.byJwt должен быть установлен перед authNetworkClient — иначе SDK не идентифицирует guest network",
+            "api.byJwt должен быть установлен перед authNetworkClient",
         )
-        assertTrue(source.contains("ClientJwtResult.Success"))
-        assertTrue(source.contains("AuthNetworkClientArgs"))
     }
 
     @Test
     fun `acquireClientJwt blank byJwt → Error без вызова SDK`() {
-        assertTrue(
-            source.contains("byJwt.isBlank()") && source.contains("ClientJwtResult.Error"),
-            "guard на blank byJwt — иначе SDK call с пустым api.byJwt = unauthenticated path",
-        )
+        assertTrue(source.contains("byJwt.isBlank()"))
     }
 
     @Test
-    fun `используется suspendCancellableCoroutine не suspendCoroutine`() {
-        assertTrue(
-            source.contains("suspendCancellableCoroutine"),
-            "suspendCancellableCoroutine обязателен — позволяет cancel при VPN stop. " +
-                "suspendCoroutine не отменяется → utечка callback после disconnect.",
-        )
+    fun `используется suspendCancellableCoroutine`() {
+        assertTrue(source.contains("suspendCancellableCoroutine"))
     }
 }

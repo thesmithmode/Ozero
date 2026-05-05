@@ -1,5 +1,6 @@
 package ru.ozero.app.di
 
+import android.app.Application
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
@@ -54,7 +55,7 @@ object UrnetworkModule {
     @Singleton
     fun provideUrnetworkSdkBridge(
         @ApplicationContext context: Context,
-    ): UrnetworkSdkBridge = RealUrnetworkSdkBridge(context)
+    ): UrnetworkSdkBridge = RealUrnetworkSdkBridge(context.applicationContext as Application)
 
     @Provides
     @Singleton
@@ -69,5 +70,5 @@ object UrnetworkModule {
     @Singleton
     fun provideUrnetworkAuthService(
         @ApplicationContext context: Context,
-    ): UrnetworkAuthService = RealUrnetworkAuthService(context)
+    ): UrnetworkAuthService = RealUrnetworkAuthService(context.applicationContext as Application)
 }

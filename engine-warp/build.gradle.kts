@@ -15,6 +15,7 @@ dependencies {
     implementation(libs.datastore.preferences)
 
     implementation(libs.amneziawg.android)
+    implementation(libs.relinker)
 
     testImplementation(libs.bundles.junit5)
     testRuntimeOnly(libs.junit.jupiter.engine)

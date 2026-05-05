@@ -17,7 +17,7 @@ import ru.ozero.app.logging.BootDiagnostics
 import ru.ozero.app.logging.BootFileLogger
 import ru.ozero.app.logging.LogBuffer
 import ru.ozero.app.ui.onboarding.FirstRunBootstrap
-import ru.ozero.engineurnetwork.UrnetworkSdkBootstrap
+import ru.ozero.engineurnetwork.UrnetworkRuntime
 import javax.inject.Inject
 
 @HiltAndroidApp
@@ -60,8 +60,10 @@ class OzeroApp : Application(), Configuration.Provider {
         runCatching {
             AppLogger.attach(logBuffer)
         }.onFailure { BootFileLogger.error(TAG, "AppLogger.attach failed", it) }
-        runCatching { UrnetworkSdkBootstrap.initOnce(this) }
-            .onFailure { BootFileLogger.error(TAG, "UrnetworkSdkBootstrap.initOnce failed", it) }
+        appScope.launch {
+            runCatching { UrnetworkRuntime.ensure(this@OzeroApp) }
+                .onFailure { BootFileLogger.error(TAG, "UrnetworkRuntime.ensure failed", it) }
+        }
         appScope.launch {
             runCatching { firstRunBootstrap.runIfFirstStart() }
                 .onFailure { BootFileLogger.warn(TAG, "firstRunBootstrap.runIfFirstStart failed", it) }

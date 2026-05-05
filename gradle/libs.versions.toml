@@ -31,6 +31,7 @@ okhttp = "4.12.0"
 
 # AmneziaWG Android tunnel (AWG fork — обфускация для обхода ТСПУ)
 amneziawgAndroid = "2.3.7"
+relinker = "1.4.5"
 
 # Crypto
 bouncycastle = "1.80"
@@ -106,6 +107,7 @@ bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = 
 
 # AmneziaWG Android tunnel (AWG fork — обфускация Jc/Jmin/Jmax/S1/S2/H1-H4 против ТСПУ)
 amneziawg-android = { module = "com.zaneschepke:amneziawg-android", version.ref = "amneziawgAndroid" }
+relinker = { module = "com.getkeepsafe.relinker:relinker", version.ref = "relinker" }
 
 # Testing — JUnit 5
 junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junitJupiter" }
