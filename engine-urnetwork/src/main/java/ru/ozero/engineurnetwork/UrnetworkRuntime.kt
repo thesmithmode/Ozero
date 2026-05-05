@@ -23,8 +23,12 @@ object UrnetworkRuntime {
     private const val DEFAULT_MEM_MIB = 32L
     private const val MIB = 1024L * 1024L
 
-    @Volatile private var manager: NetworkSpaceManager? = null
-    @Volatile private var space: NetworkSpace? = null
+    @Volatile
+    private var manager: NetworkSpaceManager? = null
+
+    @Volatile
+    private var space: NetworkSpace? = null
+
     private val mutex = Mutex()
 
     suspend fun ensure(app: Application): NetworkSpace = withContext(Dispatchers.Main.immediate) {

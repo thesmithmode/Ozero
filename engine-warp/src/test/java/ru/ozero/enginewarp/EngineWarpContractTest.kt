@@ -41,6 +41,7 @@ class EngineWarpContractTest {
             configStore = store,
             sdkBridge = bridge,
             uapiPathProvider = { uapiPath },
+            socketProtector = ru.ozero.enginescore.VpnSocketProtector { true },
         )
         return Triple(e, auto, store)
     }
@@ -268,6 +269,7 @@ class EngineWarpContractTest {
             tunFd: Int,
             iniConfig: String,
             uapiPath: String,
+            protector: ru.ozero.enginescore.VpnSocketProtector,
         ): WarpSdkBridge.AttachResult {
             attachCalls++
             lastFd = tunFd

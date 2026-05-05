@@ -20,7 +20,13 @@ class RealWarpSdkBridgeTest {
     fun `attachTun валидный fd → Success и сохраняет handle`() = runTest {
         val rt = FakeAwgRuntime(returnHandle = 7)
         val (b, _) = bridgeWith(rt)
-        val r = b.attachTun("ozero-warp", tunFd = 5, iniConfig = "[Interface]\nPrivateKey=k", uapiPath = "/x", protector = noopProtector)
+        val r = b.attachTun(
+            tunnelName = "ozero-warp",
+            tunFd = 5,
+            iniConfig = "[Interface]\nPrivateKey=k",
+            uapiPath = "/x",
+            protector = noopProtector,
+        )
         assertEquals(WarpSdkBridge.AttachResult.Success, r)
         assertTrue(b.isRunning())
         assertEquals(5, rt.lastFd)
@@ -80,7 +86,10 @@ class RealWarpSdkBridgeTest {
         val rt = FakeAwgRuntime(returnHandle = 1, socketV4 = 100, socketV6 = 200)
         val (b, _) = bridgeWith(rt)
         val protectedFds = mutableListOf<Int>()
-        val protector = VpnSocketProtector { fd -> protectedFds.add(fd); true }
+        val protector = VpnSocketProtector { fd ->
+            protectedFds.add(fd)
+            true
+        }
         b.attachTun("n", 5, "ini", "/x", protector)
         assertTrue(protectedFds.contains(100))
         assertTrue(protectedFds.contains(200))
