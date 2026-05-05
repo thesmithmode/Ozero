@@ -7,6 +7,7 @@ import com.bringyour.sdk.IoLoopDoneCallback
 import com.bringyour.sdk.NetworkSpace
 import com.bringyour.sdk.NetworkSpaceManager
 import com.bringyour.sdk.Sdk
+import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.enginescore.PersistentLoggers
 import java.util.concurrent.atomic.AtomicReference
 
@@ -30,55 +31,61 @@ class RealUrnetworkSdkBridge(
             return UrnetworkSdkBridge.StartResult.Failed("already running")
         }
 
-        val storageDir = context.filesDir.resolve(URN_STORAGE_DIR).apply { mkdirs() }.absolutePath
-        val manager = try {
-            Sdk.newNetworkSpaceManager(storageDir)
-        } catch (t: Throwable) {
-            PersistentLoggers.error(TAG, "newNetworkSpaceManager threw: ${t.message}")
-            return UrnetworkSdkBridge.StartResult.Failed("NetworkSpaceManager init failed: ${t.message}")
-        }
-        managerRef.set(manager)
-
-        val space: NetworkSpace = try {
-            resolveNetworkSpace(manager) ?: run {
-                PersistentLoggers.error(TAG, "NetworkSpace null after active/get/import fallback")
-                cleanupOnFailure()
-                return UrnetworkSdkBridge.StartResult.Failed("NetworkSpace resolve failed: SDK returned null")
+        return withTimeoutOrNull(SDK_INIT_TIMEOUT_MS) {
+            val storageDir = context.filesDir.resolve(URN_STORAGE_DIR).apply { mkdirs() }.absolutePath
+            val manager = try {
+                Sdk.newNetworkSpaceManager(storageDir)
+            } catch (t: Throwable) {
+                PersistentLoggers.error(TAG, "newNetworkSpaceManager threw: ${t.message}")
+                return@withTimeoutOrNull UrnetworkSdkBridge.StartResult.Failed("NetworkSpaceManager init failed: ${t.message}")
             }
-        } catch (t: Throwable) {
-            PersistentLoggers.error(TAG, "NetworkSpace resolve failed: ${t.message}\n${t.stackTraceToString()}")
-            cleanupOnFailure()
-            return UrnetworkSdkBridge.StartResult.Failed("NetworkSpace resolve failed: ${t.message}")
-        }
+            managerRef.set(manager)
 
-        val device: DeviceLocal = try {
-            Sdk.newDeviceLocalWithDefaults(
-                space,
-                byJwt.orEmpty(),
-                DEVICE_DESCRIPTION,
-                DEVICE_SPEC,
-                APP_VERSION,
-                null,
-                false,
-            )
-        } catch (t: Throwable) {
-            PersistentLoggers.error(TAG, "newDeviceLocalWithDefaults threw: ${t.message}")
-            cleanupOnFailure()
-            return UrnetworkSdkBridge.StartResult.Failed(
-                "DeviceLocal init failed (likely needs JWT auth): ${t.message}",
-            )
-        }
-        deviceRef.set(device)
+            val space: NetworkSpace = try {
+                resolveNetworkSpace(manager) ?: run {
+                    PersistentLoggers.error(TAG, "NetworkSpace null after active/get/import fallback")
+                    cleanupOnFailure()
+                    return@withTimeoutOrNull UrnetworkSdkBridge.StartResult.Failed("NetworkSpace resolve failed: SDK returned null")
+                }
+            } catch (t: Throwable) {
+                PersistentLoggers.error(TAG, "NetworkSpace resolve failed: ${t.message}\n${t.stackTraceToString()}")
+                cleanupOnFailure()
+                return@withTimeoutOrNull UrnetworkSdkBridge.StartResult.Failed("NetworkSpace resolve failed: ${t.message}")
+            }
 
-        return try {
-            device.setTunnelStarted(true)
-            running.set(true)
-            PersistentLoggers.info(TAG, "tunnel signal sent — awaiting attachTun(fd)")
-            UrnetworkSdkBridge.StartResult.Success
-        } catch (t: Throwable) {
-            PersistentLoggers.error(TAG, "setTunnelStarted threw: ${t.message}")
+            val device: DeviceLocal = try {
+                Sdk.newDeviceLocalWithDefaults(
+                    space,
+                    byJwt.orEmpty(),
+                    DEVICE_DESCRIPTION,
+                    DEVICE_SPEC,
+                    APP_VERSION,
+                    null,
+                    false,
+                )
+            } catch (t: Throwable) {
+                PersistentLoggers.error(TAG, "newDeviceLocalWithDefaults threw: ${t.message}")
+                cleanupOnFailure()
+                return@withTimeoutOrNull UrnetworkSdkBridge.StartResult.Failed(
+                    "DeviceLocal init failed (likely needs JWT auth): ${t.message}",
+                )
+            }
+            deviceRef.set(device)
+
+            try {
+                device.setTunnelStarted(true)
+                running.set(true)
+                PersistentLoggers.info(TAG, "tunnel signal sent — awaiting attachTun(fd)")
+                UrnetworkSdkBridge.StartResult.Success
+            } catch (t: Throwable) {
+                PersistentLoggers.error(TAG, "setTunnelStarted threw: ${t.message}")
+                cleanupOnFailure()
+                UrnetworkSdkBridge.StartResult.Failed("setTunnelStarted failed: ${t.message}")
+            }
+        } ?: run {
+            PersistentLoggers.error(TAG, "SDK init timed out after ${SDK_INIT_TIMEOUT_MS}ms")
             cleanupOnFailure()
-            UrnetworkSdkBridge.StartResult.Failed("setTunnelStarted failed: ${t.message}")
+            UrnetworkSdkBridge.StartResult.Failed("URnetwork SDK init timeout (30s)")
         }
     }
 
@@ -157,6 +164,7 @@ class RealUrnetworkSdkBridge(
     private companion object {
         const val TAG = "RealUrnetworkSdkBridge"
         const val URN_STORAGE_DIR = "urnetwork"
+        const val SDK_INIT_TIMEOUT_MS = 30_000L
         const val DEFAULT_HOST = "ur.network"
         const val DEFAULT_ENV = "prod"
         const val DEVICE_DESCRIPTION = "Ozero VPN Android"

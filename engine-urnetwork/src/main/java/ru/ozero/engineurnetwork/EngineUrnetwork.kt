@@ -13,6 +13,7 @@ import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.EngineStats
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.ProbeResult
+import ru.ozero.enginescore.RomCompat
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.TunAttachResult
 import ru.ozero.enginescore.TunFdAcceptor
@@ -41,6 +42,11 @@ class EngineUrnetwork(
         require(config is EngineConfig.Urnetwork) { "EngineUrnetwork требует EngineConfig.Urnetwork" }
         require(upstream is Upstream.None) {
             "EngineUrnetwork не принимает upstream — supportsUpstreamSocks=false"
+        }
+
+        if (RomCompat.isNubiaRedMagic()) {
+            PersistentLoggers.warn(TAG, "Nubia/RedMagic ROM — URnetwork отключён (риск Go GC SIGABRT)")
+            return StartResult.Failure(reason = "URnetwork нестабилен на Nubia/RedMagic ROM. Используйте ByeDPI или WARP.")
         }
 
         val byJwt = ensureGuestJwt() ?: return StartResult.Failure(
