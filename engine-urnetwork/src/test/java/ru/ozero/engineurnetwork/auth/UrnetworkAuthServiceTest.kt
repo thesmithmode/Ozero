@@ -45,14 +45,42 @@ class UrnetworkAuthServiceTest {
         assertTrue(err.message.isNotBlank())
     }
 
+    @Test
+    fun `ClientJwtResult Success carries client jwt`() {
+        val r = ClientJwtResult.Success(byClientJwt = "client.jwt")
+        assertEquals("client.jwt", r.byClientJwt)
+    }
+
+    @Test
+    fun `Fake acquireClientJwt без error возвращает Success`() = runTest {
+        val service = FakeUrnetworkAuthService(clientJwt = "client.tok.x")
+        val r = service.acquireClientJwt("g")
+        val ok = assertIs<ClientJwtResult.Success>(r)
+        assertEquals("client.tok.x", ok.byClientJwt)
+    }
+
+    @Test
+    fun `Fake acquireClientJwt с пустым byJwt возвращает Error`() = runTest {
+        val service = FakeUrnetworkAuthService()
+        val r = service.acquireClientJwt("")
+        assertIs<ClientJwtResult.Error>(r)
+    }
+
     private class FakeUrnetworkAuthService(
         private val jwt: String = "fake.jwt",
+        private val clientJwt: String = "fake.cjwt",
         private val error: String? = null,
     ) : UrnetworkAuthService {
         override suspend fun acquireGuestJwt(): GuestJwtResult = when {
             error != null -> GuestJwtResult.Error(error)
             jwt.isBlank() -> GuestJwtResult.Error("empty jwt from server")
             else -> GuestJwtResult.Success(byJwt = jwt)
+        }
+        override suspend fun acquireClientJwt(byJwt: String): ClientJwtResult = when {
+            byJwt.isBlank() -> ClientJwtResult.Error("byJwt blank")
+            error != null -> ClientJwtResult.Error(error)
+            clientJwt.isBlank() -> ClientJwtResult.Error("empty client jwt")
+            else -> ClientJwtResult.Success(byClientJwt = clientJwt)
         }
     }
 }

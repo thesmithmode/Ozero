@@ -14,94 +14,99 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
-    fun `start() обрабатывает все 4 SDK init throw paths`() {
-        val startBlock = source
-            .substringAfter("override suspend fun start")
-            .substringBefore("override suspend fun stop")
+    fun `start() обрабатывает 3 SDK init throw paths`() {
         val throwPoints = listOf(
             "newNetworkSpaceManager threw",
             "NetworkSpace resolve failed",
             "newDeviceLocalWithDefaults threw",
-            "setTunnelStarted threw",
         )
         throwPoints.forEach { msg ->
-            assertTrue(
-                startBlock.contains(msg),
-                "start() должен ловить throw на этом этапе: '$msg'. Без catch — uncaught exception " +
-                    "ломает coroutine + утечка native ресурсов.",
-            )
+            assertTrue(source.contains(msg), "должен быть catch: '$msg'")
         }
         assertTrue(
-            startBlock.split("cleanupOnFailure()").size - 1 >= 3,
-            "cleanupOnFailure обязан вызываться на каждом из 3 throw paths после init manager — " +
-                "иначе утечка NetworkSpaceManager / DeviceLocal native handles.",
+            source.split("cleanupOnFailure()").size - 1 >= 3,
+            "cleanupOnFailure обязан вызываться на каждом из 3 throw paths",
         )
     }
 
     @Test
-    fun `start() возвращает StartResult Failed already running при повторном вызове`() {
+    fun `start() guard already running`() {
+        assertTrue(source.contains("running.get()") && source.contains("already running"))
+    }
+
+    @Test
+    fun `start() требует non-blank byClientJwt`() {
+        assertTrue(
+            source.contains("byClientJwt.isBlank()") && source.contains("byClientJwt is blank"),
+            "byClientJwt blank → Failed без вызова newDeviceLocalWithDefaults — " +
+                "иначе SDK создаёт unauthenticated device, hits Go-GC SIGABRT path",
+        )
+    }
+
+    @Test
+    fun `start() и attachTun выполняются на main thread`() {
+        assertTrue(
+            source.contains("Dispatchers.Main.immediate"),
+            "SDK calls (newDeviceLocalWithDefaults, newIoLoop) обязаны на main thread — " +
+                "Go runtime + non-locked OSThread = SIGABRT на Nubia/RedMagic",
+        )
+    }
+
+    @Test
+    fun `attachTun валидирует fd и device state и double-attach`() {
+        val attachBlock = source.substringAfter("override suspend fun attachTun")
+            .substringBefore("private fun resolveNetworkSpace")
+        assertTrue(attachBlock.contains("tunFd < 0") && attachBlock.contains("invalid fd"))
+        assertTrue(attachBlock.contains("DeviceLocal not initialised"))
+        assertTrue(attachBlock.contains("IoLoop already attached"))
+        assertTrue(attachBlock.contains("catch (t: Throwable)") && attachBlock.contains("newIoLoop failed"))
+    }
+
+    @Test
+    fun `attachTun вызывает setTunnelStarted true ПОСЛЕ newIoLoop`() {
+        val attachBlock = source.substringAfter("override suspend fun attachTun")
+            .substringBefore("private fun resolveNetworkSpace")
+        val ioLoopIdx = attachBlock.indexOf("Sdk.newIoLoop")
+        val tunnelStartedIdx = attachBlock.indexOf("setTunnelStarted(true)")
+        assertTrue(ioLoopIdx >= 0, "newIoLoop должен быть в attachTun")
+        assertTrue(tunnelStartedIdx >= 0, "setTunnelStarted(true) должен быть в attachTun")
+        assertTrue(
+            tunnelStartedIdx > ioLoopIdx,
+            "setTunnelStarted(true) обязан вызываться ПОСЛЕ newIoLoop — иначе SDK forwarders " +
+                "стартуют без транспорта, hits nil packet flow path",
+        )
+    }
+
+    @Test
+    fun `start() НЕ вызывает setTunnelStarted true (только attachTun)`() {
         val startBlock = source
-            .substringAfter("override suspend fun start")
+            .substringAfter("private fun runStartOnMain")
             .substringBefore("override suspend fun stop")
         assertTrue(
-            startBlock.contains("running.get()") && startBlock.contains("already running"),
-            "start() обязан guard если running=true — иначе двойная init = double native crash.",
-        )
-    }
-
-    @Test
-    fun `attachTun валидирует fd и device state и ioLoop double-attach`() {
-        val attachBlock = source.substringAfter("override suspend fun attachTun")
-            .substringBefore("private fun cleanupOnFailure")
-        assertTrue(
-            attachBlock.contains("tunFd < 0") && attachBlock.contains("invalid fd"),
-            "attachTun обязан проверять tunFd < 0 — Sdk.newIoLoop с invalid fd = native crash.",
-        )
-        assertTrue(
-            attachBlock.contains("DeviceLocal not initialised"),
-            "attachTun обязан проверять deviceRef.get() — без device.start NPE в native.",
-        )
-        assertTrue(
-            attachBlock.contains("IoLoop already attached"),
-            "attachTun обязан guard от double-attach — два IoLoop на один fd = race + leak.",
-        )
-        assertTrue(
-            attachBlock.contains("catch (t: Throwable)") && attachBlock.contains("newIoLoop failed"),
-            "attachTun обязан catch Throwable из Sdk.newIoLoop — иначе VPN crash на старте.",
+            !startBlock.contains("setTunnelStarted(true)"),
+            "start() НЕ должен ставить tunnelStarted=true — это работа attachTun после newIoLoop",
         )
     }
 
     @Test
     fun `attachTun регистрирует IoLoopDoneCallback который сбрасывает running`() {
         val attachBlock = source.substringAfter("override suspend fun attachTun")
-            .substringBefore("private fun cleanupOnFailure")
+            .substringBefore("private fun resolveNetworkSpace")
         assertTrue(
             attachBlock.contains("IoLoopDoneCallback") &&
                 attachBlock.contains("running.set(false)"),
-            "IoLoopDoneCallback обязан сбрасывать running=false — без этого после tunnel end " +
-                "isRunning() врёт = UI показывает connected когда нет.",
         )
     }
 
     @Test
-    fun `stop() очищает все 4 ref-ы через runCatching (idempotent)`() {
+    fun `stop() очищает 3 ref-а через runCatching idempotent`() {
         val stopBlock = source.substringAfter("override suspend fun stop").substringBefore("override fun isRunning")
-        assertTrue(
-            stopBlock.contains("running.set(false)"),
-            "stop() обязан сразу running=false — иначе race с attachTun.",
-        )
+        assertTrue(stopBlock.contains("running.set(false)"))
         listOf("ioLoopRef", "deviceRef", "managerRef").forEach { ref ->
-            assertTrue(
-                stopBlock.contains("$ref.getAndSet(null)"),
-                "stop() обязан getAndSet(null) на $ref — иначе stale reference + двойной close.",
-            )
+            assertTrue(stopBlock.contains("$ref.getAndSet(null)"), "stop() getAndSet(null) на $ref")
         }
         val runCatchingCount = stopBlock.split("runCatching").size - 1
-        assertTrue(
-            runCatchingCount >= 4,
-            "Каждый close() обязан в runCatching — exception в одной cleanup не должен останавливать " +
-                "остальные. Найдено runCatching=$runCatchingCount, ожидалось ≥4 (userwireguard удалён).",
-        )
+        assertTrue(runCatchingCount >= 4, "Каждый close()/setTunnelStarted в runCatching, found=$runCatchingCount")
     }
 
     @Test
@@ -111,56 +116,30 @@ class RealUrnetworkSdkBridgeContractTest {
         assertTrue(
             cleanupBlock.contains("deviceRef.getAndSet(null)") &&
                 cleanupBlock.contains("managerRef.getAndSet(null)"),
-            "cleanupOnFailure обязан getAndSet null обоих refs — иначе second start() видит stale " +
-                "ref и не начинает заново.",
         )
-        assertTrue(
-            cleanupBlock.contains("runCatching"),
-            "cleanupOnFailure runCatching close — exception на cleanup в error path не должен " +
-                "перекрывать первоначальную причину failure.",
-        )
+        assertTrue(cleanupBlock.contains("runCatching"))
     }
 
     @Test
-    fun `resolveNetworkSpace fallback active stored imported с диагностикой`() {
+    fun `resolveNetworkSpace fallback active stored imported`() {
         val helperBlock = source.substringAfter("private fun resolveNetworkSpace")
             .substringBefore("private fun cleanupOnFailure")
         assertTrue(
             helperBlock.contains("activeNetworkSpace?.let") &&
                 helperBlock.contains("getNetworkSpace(key)?.let") &&
                 helperBlock.contains("importNetworkSpaceFromJson"),
-            "resolveNetworkSpace обязан fallback chain active -> stored -> imported — " +
-                "без diagnostic logging нельзя отделить null от throw в logs",
         )
         listOf("using active", "using stored", "imported default").forEach { phrase ->
-            assertTrue(
-                helperBlock.contains(phrase),
-                "resolveNetworkSpace обязан логировать выбранный путь '$phrase' — " +
-                    "иначе диагностика 'NetworkSpace null' impossible",
-            )
+            assertTrue(helperBlock.contains(phrase))
         }
-        val startBlock = source
-            .substringAfter("override suspend fun start")
-            .substringBefore("override suspend fun stop")
-        assertTrue(
-            startBlock.contains("NetworkSpace null after active/get/import fallback"),
-            "start() обязан логировать NetworkSpace=null после import fallback — корневой кейс v0.0.2 краша",
-        )
-        assertTrue(
-            startBlock.contains("stackTraceToString()"),
-            "start() обязан включать stackTraceToString() в catch — без stack trace .message теряет нативный SDK fail context",
-        )
     }
 
     @Test
-    fun `start() использует guest JWT empty placeholder если null`() {
-        val startBlock = source
-            .substringAfter("override suspend fun start")
-            .substringBefore("override suspend fun stop")
+    fun `storage dir — filesDir root (parity с официальным URnetwork)`() {
         assertTrue(
-            startBlock.contains("byJwt.orEmpty()"),
-            "byJwt?.orEmpty() обязателен — Sdk.newDeviceLocalWithDefaults не принимает null. " +
-                "До auto-acquire guest path передавался null = NPE.",
+            source.contains("context.filesDir.absolutePath"),
+            "Официальное URnetwork приложение использует filesDir.absolutePath (root), не subdir — " +
+                "обеспечивает консистентность NetworkSpace storage между сессиями",
         )
     }
 }

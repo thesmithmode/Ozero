@@ -43,8 +43,23 @@ class DataStoreUrnetworkConfigStore(
         }
     }
 
+    override fun byClientJwt(): Flow<String?> = dataStore.data.map { prefs ->
+        prefs[KEY_BY_CLIENT_JWT]?.takeIf { it.isNotBlank() }
+    }
+
+    override suspend fun setByClientJwt(value: String?) {
+        dataStore.edit { prefs ->
+            if (value.isNullOrBlank()) {
+                prefs.remove(KEY_BY_CLIENT_JWT)
+            } else {
+                prefs[KEY_BY_CLIENT_JWT] = value
+            }
+        }
+    }
+
     private companion object {
         val KEY_WALLET_OVERRIDE = stringPreferencesKey("urnetwork_wallet_override")
         val KEY_BY_JWT = stringPreferencesKey("urnetwork_by_jwt")
+        val KEY_BY_CLIENT_JWT = stringPreferencesKey("urnetwork_by_client_jwt")
     }
 }

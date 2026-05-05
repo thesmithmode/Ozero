@@ -7,6 +7,8 @@ import com.bringyour.sdk.IoLoopDoneCallback
 import com.bringyour.sdk.NetworkSpace
 import com.bringyour.sdk.NetworkSpaceManager
 import com.bringyour.sdk.Sdk
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.enginescore.PersistentLoggers
 import java.util.concurrent.atomic.AtomicReference
@@ -24,69 +26,19 @@ class RealUrnetworkSdkBridge(
         walletAddress: String,
         apiUrl: String,
         connectUrl: String,
-        byJwt: String?,
+        byClientJwt: String,
     ): UrnetworkSdkBridge.StartResult {
         if (running.get()) {
             PersistentLoggers.warn(TAG, "start called while already running")
             return UrnetworkSdkBridge.StartResult.Failed("already running")
         }
+        if (byClientJwt.isBlank()) {
+            return UrnetworkSdkBridge.StartResult.Failed("byClientJwt is blank")
+        }
 
         return withTimeoutOrNull(SDK_INIT_TIMEOUT_MS) {
-            val storageDir = context.filesDir.resolve(URN_STORAGE_DIR).apply { mkdirs() }.absolutePath
-            val manager = try {
-                Sdk.newNetworkSpaceManager(storageDir)
-            } catch (t: Throwable) {
-                PersistentLoggers.error(TAG, "newNetworkSpaceManager threw: ${t.message}")
-                return@withTimeoutOrNull UrnetworkSdkBridge.StartResult.Failed(
-                    "NetworkSpaceManager init failed: ${t.message}",
-                )
-            }
-            managerRef.set(manager)
-
-            val space: NetworkSpace = try {
-                resolveNetworkSpace(manager) ?: run {
-                    PersistentLoggers.error(TAG, "NetworkSpace null after active/get/import fallback")
-                    cleanupOnFailure()
-                    return@withTimeoutOrNull UrnetworkSdkBridge.StartResult.Failed(
-                        "NetworkSpace resolve failed: SDK returned null",
-                    )
-                }
-            } catch (t: Throwable) {
-                PersistentLoggers.error(TAG, "NetworkSpace resolve failed: ${t.message}\n${t.stackTraceToString()}")
-                cleanupOnFailure()
-                return@withTimeoutOrNull UrnetworkSdkBridge.StartResult.Failed(
-                    "NetworkSpace resolve failed: ${t.message}",
-                )
-            }
-
-            val device: DeviceLocal = try {
-                Sdk.newDeviceLocalWithDefaults(
-                    space,
-                    byJwt.orEmpty(),
-                    DEVICE_DESCRIPTION,
-                    DEVICE_SPEC,
-                    APP_VERSION,
-                    null,
-                    false,
-                )
-            } catch (t: Throwable) {
-                PersistentLoggers.error(TAG, "newDeviceLocalWithDefaults threw: ${t.message}")
-                cleanupOnFailure()
-                return@withTimeoutOrNull UrnetworkSdkBridge.StartResult.Failed(
-                    "DeviceLocal init failed (likely needs JWT auth): ${t.message}",
-                )
-            }
-            deviceRef.set(device)
-
-            try {
-                device.setTunnelStarted(true)
-                running.set(true)
-                PersistentLoggers.info(TAG, "tunnel signal sent — awaiting attachTun(fd)")
-                UrnetworkSdkBridge.StartResult.Success
-            } catch (t: Throwable) {
-                PersistentLoggers.error(TAG, "setTunnelStarted threw: ${t.message}")
-                cleanupOnFailure()
-                UrnetworkSdkBridge.StartResult.Failed("setTunnelStarted failed: ${t.message}")
+            withContext(Dispatchers.Main.immediate) {
+                runStartOnMain(byClientJwt)
             }
         } ?: run {
             PersistentLoggers.error(TAG, "SDK init timed out after ${SDK_INIT_TIMEOUT_MS}ms")
@@ -95,21 +47,74 @@ class RealUrnetworkSdkBridge(
         }
     }
 
+    private fun runStartOnMain(byClientJwt: String): UrnetworkSdkBridge.StartResult {
+        val storageDir = context.filesDir.absolutePath
+        val manager = try {
+            Sdk.newNetworkSpaceManager(storageDir)
+        } catch (t: Throwable) {
+            PersistentLoggers.error(TAG, "newNetworkSpaceManager threw: ${t.message}")
+            return UrnetworkSdkBridge.StartResult.Failed(
+                "NetworkSpaceManager init failed: ${t.message}",
+            )
+        }
+        managerRef.set(manager)
+
+        val space: NetworkSpace = try {
+            resolveNetworkSpace(manager) ?: run {
+                PersistentLoggers.error(TAG, "NetworkSpace null after active/get/import fallback")
+                cleanupOnFailure()
+                return UrnetworkSdkBridge.StartResult.Failed(
+                    "NetworkSpace resolve failed: SDK returned null",
+                )
+            }
+        } catch (t: Throwable) {
+            PersistentLoggers.error(TAG, "NetworkSpace resolve failed: ${t.message}\n${t.stackTraceToString()}")
+            cleanupOnFailure()
+            return UrnetworkSdkBridge.StartResult.Failed(
+                "NetworkSpace resolve failed: ${t.message}",
+            )
+        }
+
+        val device: DeviceLocal = try {
+            Sdk.newDeviceLocalWithDefaults(
+                space,
+                byClientJwt,
+                DEVICE_DESCRIPTION,
+                DEVICE_SPEC,
+                APP_VERSION,
+                null,
+                false,
+            )
+        } catch (t: Throwable) {
+            PersistentLoggers.error(TAG, "newDeviceLocalWithDefaults threw: ${t.message}")
+            cleanupOnFailure()
+            return UrnetworkSdkBridge.StartResult.Failed(
+                "DeviceLocal init failed: ${t.message}",
+            )
+        }
+        deviceRef.set(device)
+        running.set(true)
+        PersistentLoggers.info(TAG, "device created — awaiting attachTun(fd) before tunnelStarted")
+        return UrnetworkSdkBridge.StartResult.Success
+    }
+
     override suspend fun stop() {
         running.set(false)
-        ioLoopRef.getAndSet(null)?.also { loop ->
-            runCatching { loop.close() }
-                .onFailure { PersistentLoggers.warn(TAG, "ioLoop.close threw: ${it.message}") }
-        }
-        deviceRef.getAndSet(null)?.also { device ->
-            runCatching { device.setTunnelStarted(false) }
-                .onFailure { PersistentLoggers.warn(TAG, "setTunnelStarted(false) threw: ${it.message}") }
-            runCatching { device.close() }
-                .onFailure { PersistentLoggers.warn(TAG, "device.close threw: ${it.message}") }
-        }
-        managerRef.getAndSet(null)?.also { manager ->
-            runCatching { manager.close() }
-                .onFailure { PersistentLoggers.warn(TAG, "manager.close threw: ${it.message}") }
+        withContext(Dispatchers.Main.immediate) {
+            ioLoopRef.getAndSet(null)?.also { loop ->
+                runCatching { loop.close() }
+                    .onFailure { PersistentLoggers.warn(TAG, "ioLoop.close threw: ${it.message}") }
+            }
+            deviceRef.getAndSet(null)?.also { device ->
+                runCatching { device.setTunnelStarted(false) }
+                    .onFailure { PersistentLoggers.warn(TAG, "setTunnelStarted(false) threw: ${it.message}") }
+                runCatching { device.close() }
+                    .onFailure { PersistentLoggers.warn(TAG, "device.close threw: ${it.message}") }
+            }
+            managerRef.getAndSet(null)?.also { manager ->
+                runCatching { manager.close() }
+                    .onFailure { PersistentLoggers.warn(TAG, "manager.close threw: ${it.message}") }
+            }
         }
         PersistentLoggers.info(TAG, "stop complete")
     }
@@ -127,18 +132,22 @@ class RealUrnetworkSdkBridge(
         if (ioLoopRef.get() != null) {
             return UrnetworkSdkBridge.AttachResult.Failed("IoLoop already attached")
         }
-        return try {
-            val callback = IoLoopDoneCallback {
-                PersistentLoggers.info(TAG, "IoLoop done — tunnel ended")
-                running.set(false)
+        return withContext(Dispatchers.Main.immediate) {
+            try {
+                val callback = IoLoopDoneCallback {
+                    PersistentLoggers.info(TAG, "IoLoop done — tunnel ended")
+                    running.set(false)
+                }
+                val loop = Sdk.newIoLoop(device, tunFd, callback)
+                ioLoopRef.set(loop)
+                runCatching { device.setTunnelStarted(true) }
+                    .onFailure { PersistentLoggers.warn(TAG, "setTunnelStarted(true) threw: ${it.message}") }
+                PersistentLoggers.info(TAG, "IoLoop attached on fd=$tunFd, tunnelStarted=true")
+                UrnetworkSdkBridge.AttachResult.Success
+            } catch (t: Throwable) {
+                PersistentLoggers.error(TAG, "newIoLoop threw: ${t.message}")
+                UrnetworkSdkBridge.AttachResult.Failed("newIoLoop failed: ${t.message}")
             }
-            val loop = Sdk.newIoLoop(device, tunFd, callback)
-            ioLoopRef.set(loop)
-            PersistentLoggers.info(TAG, "IoLoop attached on fd=$tunFd")
-            UrnetworkSdkBridge.AttachResult.Success
-        } catch (t: Throwable) {
-            PersistentLoggers.error(TAG, "newIoLoop threw: ${t.message}")
-            UrnetworkSdkBridge.AttachResult.Failed("newIoLoop failed: ${t.message}")
         }
     }
 
@@ -169,7 +178,6 @@ class RealUrnetworkSdkBridge(
 
     private companion object {
         const val TAG = "RealUrnetworkSdkBridge"
-        const val URN_STORAGE_DIR = "urnetwork"
         const val SDK_INIT_TIMEOUT_MS = 30_000L
         const val DEFAULT_HOST = "ur.network"
         const val DEFAULT_ENV = "prod"

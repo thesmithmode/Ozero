@@ -108,6 +108,29 @@ class RealUrnetworkAuthServiceContractTest {
     }
 
     @Test
+    fun `acquireClientJwt существует и зовёт authNetworkClient`() {
+        assertTrue(
+            source.contains("override suspend fun acquireClientJwt"),
+            "acquireClientJwt обязателен — official URnetwork делает two-step JWT (networkCreate → authNetworkClient)",
+        )
+        assertTrue(source.contains("api.authNetworkClient(args, callback)"))
+        assertTrue(
+            source.contains("api.byJwt = byJwt"),
+            "api.byJwt должен быть установлен перед authNetworkClient — иначе SDK не идентифицирует guest network",
+        )
+        assertTrue(source.contains("ClientJwtResult.Success"))
+        assertTrue(source.contains("AuthNetworkClientArgs"))
+    }
+
+    @Test
+    fun `acquireClientJwt blank byJwt → Error без вызова SDK`() {
+        assertTrue(
+            source.contains("byJwt.isBlank()") && source.contains("ClientJwtResult.Error"),
+            "guard на blank byJwt — иначе SDK call с пустым api.byJwt = unauthenticated path",
+        )
+    }
+
+    @Test
     fun `используется suspendCancellableCoroutine не suspendCoroutine`() {
         assertTrue(
             source.contains("suspendCancellableCoroutine"),

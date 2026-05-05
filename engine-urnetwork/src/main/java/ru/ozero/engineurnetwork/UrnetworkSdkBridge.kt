@@ -5,7 +5,7 @@ interface UrnetworkSdkBridge {
         walletAddress: String,
         apiUrl: String,
         connectUrl: String,
-        byJwt: String?,
+        byClientJwt: String,
     ): StartResult
     suspend fun stop()
     fun isRunning(): Boolean

@@ -4,6 +4,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import ru.ozero.engineurnetwork.auth.ClientJwtResult
 import ru.ozero.engineurnetwork.auth.GuestJwtResult
 import ru.ozero.engineurnetwork.auth.UrnetworkAuthService
 import ru.ozero.enginescore.EngineCapabilities
@@ -13,10 +14,10 @@ import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.EngineStats
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.ProbeResult
-import ru.ozero.enginescore.RomCompat
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.TunAttachResult
 import ru.ozero.enginescore.TunFdAcceptor
+import ru.ozero.enginescore.TunSpec
 import ru.ozero.enginescore.Upstream
 
 class EngineUrnetwork(
@@ -44,29 +45,26 @@ class EngineUrnetwork(
             "EngineUrnetwork не принимает upstream — supportsUpstreamSocks=false"
         }
 
-        if (RomCompat.isNubiaRedMagic()) {
-            PersistentLoggers.warn(TAG, "Nubia/RedMagic ROM — URnetwork отключён (риск Go GC SIGABRT)")
-            return StartResult.Failure(
-                reason = "URnetwork нестабилен на Nubia/RedMagic ROM. Используйте ByeDPI или WARP.",
-            )
-        }
-
         val byJwt = ensureGuestJwt() ?: return StartResult.Failure(
             reason = "URnetwork guest jwt acquire failed — нет интернета или сервер недоступен",
+        )
+
+        val byClientJwt = ensureClientJwt(byJwt) ?: return StartResult.Failure(
+            reason = "URnetwork client jwt acquire failed — нет интернета или сервер недоступен",
         )
 
         val wallet = configStore.walletAddress().first()
         val isPreset = wallet == UrnetworkDefaults.PRESET_WALLET
         PersistentLoggers.info(
             TAG,
-            "start wallet=${wallet.take(WALLET_LOG_PREFIX_LEN)}… isPreset=$isPreset hasJwt=true",
+            "start wallet=${wallet.take(WALLET_LOG_PREFIX_LEN)}… isPreset=$isPreset hasClientJwt=true",
         )
 
         val bridgeResult = sdkBridge.start(
             walletAddress = wallet,
             apiUrl = UrnetworkDefaults.DEFAULT_API_URL,
             connectUrl = UrnetworkDefaults.DEFAULT_CONNECT_URL,
-            byJwt = byJwt,
+            byClientJwt = byClientJwt,
         )
         return when (bridgeResult) {
             UrnetworkSdkBridge.StartResult.Success -> {
@@ -89,6 +87,20 @@ class EngineUrnetwork(
         ProbeResult.Failure(reason = "URnetwork не предоставляет SOCKS-интерфейс")
 
     override fun stats(): Flow<EngineStats> = _stats.asStateFlow()
+
+    override fun tunSpec(): TunSpec = TunSpec(
+        sessionName = "URnetwork",
+        mtu = TUN_MTU,
+        blocking = false,
+        ipv4Address = "169.254.2.1",
+        ipv4PrefixLength = TUN_PREFIX,
+        dnsServers = listOf("1.1.1.1", "8.8.8.8"),
+        allowFamilyV4 = true,
+        allowFamilyV6 = false,
+        excludeRfc1918 = true,
+        routeAllV4 = true,
+        routeAllV6 = false,
+    )
 
     override suspend fun attachTun(tunFd: Int): TunAttachResult {
         PersistentLoggers.info(TAG, "attachTun fd=$tunFd")
@@ -115,8 +127,27 @@ class EngineUrnetwork(
         }
     }
 
+    private suspend fun ensureClientJwt(byJwt: String): String? {
+        val existing = configStore.byClientJwt().first()
+        if (existing != null) return existing
+        PersistentLoggers.info(TAG, "no byClientJwt in store — calling authNetworkClient")
+        return when (val r = authService.acquireClientJwt(byJwt)) {
+            is ClientJwtResult.Success -> {
+                configStore.setByClientJwt(r.byClientJwt)
+                PersistentLoggers.info(TAG, "client jwt acquired and persisted")
+                r.byClientJwt
+            }
+            is ClientJwtResult.Error -> {
+                PersistentLoggers.error(TAG, "acquireClientJwt failed: ${r.message}")
+                null
+            }
+        }
+    }
+
     private companion object {
         const val TAG = "EngineUrnetwork"
         const val WALLET_LOG_PREFIX_LEN = 6
+        const val TUN_MTU = 1440
+        const val TUN_PREFIX = 32
     }
 }

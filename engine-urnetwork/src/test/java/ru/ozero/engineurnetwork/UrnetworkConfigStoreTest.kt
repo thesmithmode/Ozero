@@ -73,6 +73,37 @@ class UrnetworkConfigStoreTest {
         assertNull(store.byJwt().first())
     }
 
+    @Test
+    fun `byClientJwt по умолчанию null`() = runTest {
+        val (store, _) = newStore()
+        assertNull(store.byClientJwt().first())
+    }
+
+    @Test
+    fun `setByClientJwt сохраняет токен`() = runTest {
+        val (store, _) = newStore()
+        val cjwt = "client.eyJ.x.y"
+        store.setByClientJwt(cjwt)
+        assertEquals(cjwt, store.byClientJwt().first())
+    }
+
+    @Test
+    fun `setByClientJwt(null) очищает токен`() = runTest {
+        val (store, _) = newStore()
+        store.setByClientJwt("c.j.w.t")
+        store.setByClientJwt(null)
+        assertNull(store.byClientJwt().first())
+    }
+
+    @Test
+    fun `byJwt и byClientJwt хранятся независимо`() = runTest {
+        val (store, _) = newStore()
+        store.setByJwt("guest.tok")
+        store.setByClientJwt("client.tok")
+        assertEquals("guest.tok", store.byJwt().first())
+        assertEquals("client.tok", store.byClientJwt().first())
+    }
+
     private class FakePreferencesDataStore : DataStore<Preferences> {
         private val state = MutableStateFlow<Preferences>(emptyPreferences())
         override val data: Flow<Preferences> get() = state

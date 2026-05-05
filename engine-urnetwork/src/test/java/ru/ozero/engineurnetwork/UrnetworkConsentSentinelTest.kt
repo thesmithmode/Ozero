@@ -4,6 +4,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
+import ru.ozero.engineurnetwork.auth.ClientJwtResult
 import ru.ozero.engineurnetwork.auth.GuestJwtResult
 import ru.ozero.engineurnetwork.auth.UrnetworkAuthService
 import ru.ozero.enginescore.EngineConfig
@@ -15,7 +16,7 @@ import kotlin.test.assertIs
 class UrnetworkConsentSentinelTest {
 
     @Test
-    fun `EngineUrnetwork_start без JWT auto-acquire guest и стартует bridge`() = runTest {
+    fun `EngineUrnetwork_start без JWT auto-acquire guest+client и стартует bridge`() = runTest {
         val bridge = SpyBridge()
         val auth = SpyAuthService()
         val store = SpyStore()
@@ -23,40 +24,55 @@ class UrnetworkConsentSentinelTest {
 
         engine.start(EngineConfig.Urnetwork(jwtToken = ""), Upstream.None)
 
-        assertEquals(1, auth.acquireCalls, "Guest JWT должен быть запрошен при отсутствии в store")
-        assertEquals(1, bridge.startCalls, "Bridge должен стартовать после получения JWT")
+        assertEquals(1, auth.acquireGuestCalls)
+        assertEquals(1, auth.acquireClientCalls)
+        assertEquals(1, bridge.startCalls)
     }
 
     @Test
-    fun `EngineUrnetwork_start с существующим JWT не вызывает повторный acquire`() = runTest {
+    fun `EngineUrnetwork_start с существующими jwt не повторяет acquire`() = runTest {
         val bridge = SpyBridge()
         val auth = SpyAuthService()
-        val store = SpyStore(existingJwt = "existing.jwt")
+        val store = SpyStore(existingJwt = "existing.jwt", existingClientJwt = "existing.cjwt")
         val engine = EngineUrnetwork(store, bridge, auth)
 
         val result = engine.start(EngineConfig.Urnetwork(jwtToken = ""), Upstream.None)
 
         assertIs<StartResult.Success>(result)
-        assertEquals(0, auth.acquireCalls, "Повторный acquire не нужен если JWT уже есть")
+        assertEquals(0, auth.acquireGuestCalls)
+        assertEquals(0, auth.acquireClientCalls)
         assertEquals(1, bridge.startCalls)
     }
 
     private class SpyAuthService : UrnetworkAuthService {
-        var acquireCalls: Int = 0
+        var acquireGuestCalls: Int = 0
+        var acquireClientCalls: Int = 0
         override suspend fun acquireGuestJwt(): GuestJwtResult {
-            acquireCalls++
+            acquireGuestCalls++
             return GuestJwtResult.Success("spy.jwt")
+        }
+        override suspend fun acquireClientJwt(byJwt: String): ClientJwtResult {
+            acquireClientCalls++
+            return ClientJwtResult.Success("spy.cjwt")
         }
     }
 
-    private class SpyStore(existingJwt: String? = null) : UrnetworkConfigStore {
+    private class SpyStore(
+        existingJwt: String? = null,
+        existingClientJwt: String? = null,
+    ) : UrnetworkConfigStore {
         private val jwtFlow = MutableStateFlow(existingJwt)
+        private val cJwtFlow = MutableStateFlow(existingClientJwt)
         override fun walletAddress(): Flow<String> = MutableStateFlow(UrnetworkDefaults.PRESET_WALLET)
         override fun walletOverride(): Flow<String?> = MutableStateFlow(null)
         override suspend fun setWalletOverride(value: String?) = Unit
         override fun byJwt(): Flow<String?> = jwtFlow
         override suspend fun setByJwt(value: String?) {
             jwtFlow.value = value
+        }
+        override fun byClientJwt(): Flow<String?> = cJwtFlow
+        override suspend fun setByClientJwt(value: String?) {
+            cJwtFlow.value = value
         }
     }
 
@@ -66,7 +82,7 @@ class UrnetworkConsentSentinelTest {
             walletAddress: String,
             apiUrl: String,
             connectUrl: String,
-            byJwt: String?,
+            byClientJwt: String,
         ): UrnetworkSdkBridge.StartResult {
             startCalls++
             return UrnetworkSdkBridge.StartResult.Success

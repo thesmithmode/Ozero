@@ -9,4 +9,5 @@ interface EnginePlugin {
     suspend fun stop()
     suspend fun probe(): ProbeResult
     fun stats(): Flow<EngineStats>
+    fun tunSpec(): TunSpec? = null
 }

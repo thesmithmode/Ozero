@@ -163,17 +163,6 @@ class OzeroVpnService : android.net.VpnService() {
             packages = splitPackages,
         )
 
-        val fd = establishTun(
-            splitConfig,
-            ipv6 = settings?.ipv6Enabled ?: false,
-            customDns = settings?.customDnsServers.orEmpty(),
-        ) ?: return
-        if (stopping.get()) {
-            runCatching { fd.close() }
-            tunFdRef.compareAndSet(fd, null)
-            return
-        }
-
         tunnelController.onProbing()
         val activeEngineId = settings?.manualEngine ?: EngineId.BYEDPI
         val activeConfig = buildEngineConfig(activeEngineId, settings)
@@ -184,6 +173,20 @@ class OzeroVpnService : android.net.VpnService() {
             )
             tunnelController.onEngineDied(activeEngineId, "no config for manual engine")
             stopVpn()
+            return
+        }
+        val fd = if (engineNeedsCustomTun(activeEngineId)) {
+            establishTunForEngine(activeEngineId) ?: return
+        } else {
+            establishTun(
+                splitConfig,
+                ipv6 = settings?.ipv6Enabled ?: false,
+                customDns = settings?.customDnsServers.orEmpty(),
+            ) ?: return
+        }
+        if (stopping.get()) {
+            runCatching { fd.close() }
+            tunFdRef.compareAndSet(fd, null)
             return
         }
         val chainResult = startChain(activeEngineId, activeConfig) ?: return
@@ -197,6 +200,40 @@ class OzeroVpnService : android.net.VpnService() {
         )
         runCatching { healthMonitor.start(chainResult.finalSocksPort) }
         startStatsLogger()
+    }
+
+    private fun engineNeedsCustomTun(engineId: EngineId): Boolean {
+        val plugin = enginePlugins.firstOrNull { it.id == engineId } ?: return false
+        return plugin.tunSpec() != null
+    }
+
+    private suspend fun establishTunForEngine(engineId: EngineId): ParcelFileDescriptor? {
+        val plugin = enginePlugins.firstOrNull { it.id == engineId } ?: return null
+        val spec = plugin.tunSpec() ?: return null
+        val splitPackages = withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
+            runCatching { splitTunnelRulesProvider.activePackages() }.getOrNull()
+        } ?: emptySet()
+        val splitMode = withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
+            runCatching { settingsRepository.settings.first() }.getOrNull()
+        }?.splitMode ?: ru.ozero.enginescore.settings.SplitTunnelMode.ALL
+        val splitCfg = ru.ozero.commonvpn.split.SplitTunnelConfig(mode = splitMode, packages = splitPackages)
+        val builder = buildTunBuilderFromSpec(spec)
+        ru.ozero.commonvpn.split.TunBuilderConfigurator(packageName).apply(builder, splitCfg)
+        val pfd = try {
+            builder.establish()
+        } catch (t: Throwable) {
+            PersistentLoggers.error(TAG, "engine TUN establish threw: ${t.message}")
+            stopVpn()
+            return null
+        }
+        if (pfd == null) {
+            PersistentLoggers.error(TAG, "engine TUN establish returned null — permission revoked?")
+            stopVpn()
+            return null
+        }
+        tunFdRef.set(pfd)
+        PersistentLoggers.info(TAG, "engine TUN established fd=${pfd.fd} engineId=$engineId mtu=${spec.mtu}")
+        return pfd
     }
 
     private fun buildEngineConfig(
@@ -456,6 +493,46 @@ class OzeroVpnService : android.net.VpnService() {
             stopping.set(false)
             PersistentLoggers.info(TAG, "performShutdown end")
         }
+    }
+
+    internal fun buildTunBuilderFromSpec(spec: ru.ozero.enginescore.TunSpec): Builder {
+        val builder = Builder()
+            .setSession(spec.sessionName)
+            .setMtu(spec.mtu)
+            .setBlocking(spec.blocking)
+            .addAddress(spec.ipv4Address, spec.ipv4PrefixLength)
+        spec.dnsServers.forEach { dns ->
+            runCatching { builder.addDnsServer(dns) }
+                .onFailure { PersistentLoggers.warn(TAG, "spec addDnsServer rejected '$dns': ${it.message}") }
+        }
+        if (spec.allowFamilyV4) builder.allowFamily(android.system.OsConstants.AF_INET)
+        if (spec.allowFamilyV6) builder.allowFamily(android.system.OsConstants.AF_INET6)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            runCatching { builder.setMetered(false) }
+        }
+        if (spec.routeAllV4) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && spec.excludeRfc1918) {
+                builder.addRoute("0.0.0.0", 0)
+                runCatching {
+                    builder.excludeRoute(
+                        android.net.IpPrefix(java.net.InetAddress.getByName("10.0.0.0"), 8),
+                    )
+                    builder.excludeRoute(
+                        android.net.IpPrefix(java.net.InetAddress.getByName("172.16.0.0"), 12),
+                    )
+                    builder.excludeRoute(
+                        android.net.IpPrefix(java.net.InetAddress.getByName("192.168.0.0"), 16),
+                    )
+                }.onFailure { PersistentLoggers.warn(TAG, "excludeRoute RFC1918 failed: ${it.message}") }
+            } else {
+                builder.addRoute("0.0.0.0", 0)
+            }
+        }
+        if (spec.allowFamilyV6 && spec.ipv6Address != null) {
+            builder.addAddress(spec.ipv6Address, spec.ipv6PrefixLength)
+            if (spec.routeAllV6) builder.addRoute("::", 0)
+        }
+        return builder
     }
 
     internal fun buildTunBuilder(

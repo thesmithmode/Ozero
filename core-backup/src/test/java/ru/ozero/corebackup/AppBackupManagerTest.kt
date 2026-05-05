@@ -293,6 +293,11 @@ class AppBackupManagerTest {
         override suspend fun setByJwt(value: String?) {
             byJwt = value
         }
+        var byClientJwt: String? = null
+        override fun byClientJwt(): Flow<String?> = MutableStateFlow(byClientJwt)
+        override suspend fun setByClientJwt(value: String?) {
+            byClientJwt = value
+        }
     }
 
     private class FakeSplitRuleDao : AppSplitRuleDao {

@@ -8,4 +8,6 @@ interface UrnetworkConfigStore {
     suspend fun setWalletOverride(value: String?)
     fun byJwt(): Flow<String?>
     suspend fun setByJwt(value: String?)
+    fun byClientJwt(): Flow<String?>
+    suspend fun setByClientJwt(value: String?)
 }
