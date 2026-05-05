@@ -44,6 +44,7 @@ class DataStoreWarpConfigSlotStore(
     override suspend fun setActive(id: String): Unit = mutex.withLock {
         dataStore.edit { prefs ->
             val current = parseSlots(prefs[KEY_SLOTS] ?: "[]")
+            if (current.none { it.id == id }) return@edit
             val updated = current.map { slot -> slot.copy(isActive = slot.id == id) }
             prefs[KEY_SLOTS] = serializeSlots(updated)
         }
@@ -96,13 +97,21 @@ class DataStoreWarpConfigSlotStore(
     }
 
     private fun parseSlots(json: String): List<WarpConfigSlot> {
-        return try {
-            val arr = JSONArray(json)
-            (0 until arr.length()).map { i -> slotFromJson(arr.getJSONObject(i)) }
+        val arr = try {
+            JSONArray(json)
         } catch (e: Exception) {
-            PersistentLoggers.warn(TAG, "slot list parse failed: ${e.message}")
-            emptyList()
+            PersistentLoggers.warn(TAG, "slot list JSON invalid: ${e.message}")
+            return emptyList()
         }
+        val result = mutableListOf<WarpConfigSlot>()
+        for (i in 0 until arr.length()) {
+            try {
+                result += slotFromJson(arr.getJSONObject(i))
+            } catch (e: Exception) {
+                PersistentLoggers.warn(TAG, "slot[$i] parse failed, skipping: ${e.message}")
+            }
+        }
+        return result
     }
 
     private fun slotFromJson(obj: JSONObject): WarpConfigSlot {

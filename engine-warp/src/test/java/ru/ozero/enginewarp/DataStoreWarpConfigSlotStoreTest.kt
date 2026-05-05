@@ -245,6 +245,36 @@ class DataStoreWarpConfigSlotStoreTest {
         assertTrue(store.slots().first().isEmpty())
     }
 
+    @Test
+    fun `один сломанный слот в массиве — валидные слоты не теряются`() = runTest {
+        val ds = FakePreferencesDataStore()
+        val goodSlot = buildValidSlotJson("id-good", "Good")
+        val badSlot = """{"id":"id-bad","name":"Bad"}"""
+        ds.edit { it[stringPreferencesKey("warp_slots_json")] = """[$goodSlot,$badSlot]""" }
+        val store = DataStoreWarpConfigSlotStore(ds, DataStoreWarpConfigStore(FakePreferencesDataStore()))
+        val slots = store.slots().first()
+        assertEquals(1, slots.size)
+        assertEquals("id-good", slots[0].id)
+        assertEquals("Good", slots[0].name)
+    }
+
+    @Test
+    fun `setActive несуществующего id — активный слот не меняется`() = runTest {
+        val store = newStore()
+        val id1 = store.addSlot("First", sample)
+        store.addSlot("Second", sample.copy(privateKey = "p2"))
+        store.setActive(id1)
+        store.setActive("nonexistent-id")
+        val slots = store.slots().first()
+        assertTrue(slots[0].isActive)
+        assertFalse(slots[1].isActive)
+    }
+
+    private fun buildValidSlotJson(id: String, name: String): String {
+        val config = sample
+        return """{"id":"$id","name":"$name","isActive":false,"config":{"priv":"${config.privateKey}","pub":"${config.publicKey}","peerPub":"${config.peerPublicKey}","peerEndpoint":"${config.peerEndpoint}","ifaceV4":"${config.interfaceAddressV4}","ifaceV6":"${config.interfaceAddressV6}","license":"${config.accountLicense}","mtu":${config.mtu},"dnsServers":["1.1.1.1"],"keepalive":${config.keepaliveSeconds},"awgParams":{"jc":0,"jmin":0,"jmax":0,"s1":0,"s2":0,"h1":0,"h2":0,"h3":0,"h4":0}}}"""
+    }
+
     private class FakePreferencesDataStore : DataStore<Preferences> {
         private val state = MutableStateFlow<Preferences>(emptyPreferences())
         override val data: Flow<Preferences> get() = state
