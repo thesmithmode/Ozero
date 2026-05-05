@@ -22,7 +22,7 @@ class RealUrnetworkAuthService(
         val space = runCatching { UrnetworkRuntime.ensure(app) }
             .getOrElse { return@withContext GuestJwtResult.Error("runtime init failed: ${it.message}") }
         val api = space.api ?: return@withContext GuestJwtResult.Error("api null after runtime init")
-        suspendCancellableCoroutine { cont ->
+        suspendCancellableCoroutine<GuestJwtResult> { cont ->
             val args = NetworkCreateArgs().apply {
                 terms = true
                 guestMode = true
@@ -63,7 +63,7 @@ class RealUrnetworkAuthService(
             .onFailure { return@withContext ClientJwtResult.Error("set api.byJwt failed: ${it.message}") }
         runCatching { space.asyncLocalState?.localState?.byJwt = byJwt }
             .onFailure { PersistentLoggers.warn(TAG, "set localState.byJwt threw: ${it.message}") }
-        suspendCancellableCoroutine { cont ->
+        suspendCancellableCoroutine<ClientJwtResult> { cont ->
             val args = AuthNetworkClientArgs().apply {
                 description = DEVICE_DESCRIPTION
                 deviceSpec = DEVICE_SPEC
