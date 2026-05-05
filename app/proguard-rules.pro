@@ -71,6 +71,17 @@
 -keep class org.amnezia.awg.** { *; }
 -dontwarn org.amnezia.awg.**
 
+-keep class okhttp3.** { *; }
+-keep interface okhttp3.** { *; }
+-keep class okhttp3.internal.platform.** { *; }
+-keep class okhttp3.internal.platform.android.** { *; }
+-keep class okio.** { *; }
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-dontwarn org.conscrypt.**
+-dontwarn org.bouncycastle.jsse.**
+-dontwarn org.openjsse.**
+
 -keep class com.bringyour.sdk.** { *; }
 -dontwarn com.bringyour.sdk.**
 
