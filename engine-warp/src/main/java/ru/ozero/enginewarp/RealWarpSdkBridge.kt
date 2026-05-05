@@ -71,10 +71,32 @@ interface AwgRuntime {
 }
 
 private object DefaultAwgRuntime : AwgRuntime {
-    override fun turnOn(name: String, tunFd: Int, ini: String, uapiPath: String): Int =
-        org.amnezia.awg.GoBackend.awgTurnOn(name, tunFd, ini, uapiPath)
+    @Volatile private var loaded = false
+    private val lock = Any()
+    private var loadError: Throwable? = null
+
+    private fun loadOnce() {
+        if (loaded) return
+        synchronized(lock) {
+            if (loaded) return
+            try {
+                System.loadLibrary("am-go")
+                loaded = true
+            } catch (e: Throwable) {
+                loadError = e
+                PersistentLoggers.error("DefaultAwgRuntime", "loadLibrary am-go failed: ${e.message}")
+                throw e
+            }
+        }
+    }
+
+    override fun turnOn(name: String, tunFd: Int, ini: String, uapiPath: String): Int {
+        loadOnce()
+        return org.amnezia.awg.GoBackend.awgTurnOn(name, tunFd, ini, uapiPath)
+    }
 
     override fun turnOff(handle: Int) {
+        loadOnce()
         org.amnezia.awg.GoBackend.awgTurnOff(handle)
     }
 }
