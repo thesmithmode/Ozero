@@ -206,6 +206,9 @@
     <string name="warp_import_error">Ошибка импорта</string>
     <string name="warp_imported">Конфиг импортирован</string>
     <string name="warp_address_label">Адрес:</string>
+    <string name="warp_rename_title">Переименовать</string>
+    <string name="warp_rename_ok">OK</string>
+    <string name="warp_rename_cancel">Отмена</string>
 
     <!-- App mode -->
     <string name="settings_app_mode_title">Режим интерфейса</string>

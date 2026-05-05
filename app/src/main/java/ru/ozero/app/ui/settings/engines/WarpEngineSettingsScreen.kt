@@ -5,15 +5,19 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -22,11 +26,18 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -36,7 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
-import ru.ozero.enginewarp.WarpConfig
+import ru.ozero.enginewarp.WarpConfigSlot
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,6 +58,14 @@ fun WarpEngineSettingsScreen(
     BackHandler(onBack = onBack)
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val importedMessage = stringResource(R.string.warp_imported)
+    LaunchedEffect(state.importSuccess) {
+        if (state.importSuccess) {
+            snackbarHostState.showSnackbar(importedMessage)
+            viewModel.onImportSuccessConsumed()
+        }
+    }
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
     ) { uri ->
@@ -57,6 +76,7 @@ fun WarpEngineSettingsScreen(
     }
     Scaffold(
         modifier = Modifier.testTag("warp_settings"),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.warp_settings_title)) },
@@ -68,34 +88,108 @@ fun WarpEngineSettingsScreen(
             )
         },
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            val cfg = state.currentConfig
-            if (cfg == null) {
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            if (state.slots.isEmpty()) {
                 EmptyConfigCard(
                     isRegistering = state.isRegistering,
+                    progressText = state.progressText,
                     errorMessage = state.errorMessage,
                     onGenerate = viewModel::onGenerate,
                     onCancelGenerate = viewModel::onCancelGenerate,
                     onImportFile = { filePickerLauncher.launch("*/*") },
+                    modifier = Modifier.padding(16.dp),
                 )
             } else {
-                ConfigCard(
-                    config = cfg,
-                    isRegistering = state.isRegistering,
-                    errorMessage = state.errorMessage,
-                    onRegenerate = viewModel::onGenerate,
-                    onCancelGenerate = viewModel::onCancelGenerate,
-                    onClear = viewModel::onClear,
-                    onImportFile = { filePickerLauncher.launch("*/*") },
-                )
+                LazyColumn(
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        start = 16.dp, end = 16.dp, top = 8.dp, bottom = 80.dp,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (state.errorMessage != null) {
+                        item {
+                            Text(
+                                text = state.errorMessage,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.padding(horizontal = 4.dp),
+                            )
+                        }
+                    }
+                    if (state.isRegistering && state.progressText != null) {
+                        item {
+                            Text(
+                                text = state.progressText,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 4.dp),
+                            )
+                        }
+                    }
+                    items(state.slots, key = { it.id }) { slot ->
+                        WarpConfigSlotCard(
+                            slot = slot,
+                            onSetActive = { viewModel.onSetActive(slot.id) },
+                            onStartRename = { viewModel.onStartRename(slot.id) },
+                            onDelete = { viewModel.onDeleteSlot(slot.id) },
+                        )
+                    }
+                }
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Button(
+                        onClick = if (state.isRegistering) viewModel::onCancelGenerate else viewModel::onGenerate,
+                        modifier = Modifier.weight(1f).testTag("warp_generate_button"),
+                    ) {
+                        if (state.isRegistering) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.padding(end = 8.dp),
+                                    strokeWidth = 2.dp,
+                                )
+                                Text(stringResource(R.string.warp_cancel_generation))
+                            }
+                        } else {
+                            Text(stringResource(R.string.warp_generate))
+                        }
+                    }
+                    OutlinedButton(
+                        onClick = { filePickerLauncher.launch("*/*") },
+                        enabled = !state.isRegistering,
+                        modifier = Modifier.weight(1f).testTag("warp_import_button"),
+                    ) {
+                        Text(stringResource(R.string.warp_import_file))
+                    }
+                }
             }
+        }
+        if (state.showRenameDialog) {
+            AlertDialog(
+                onDismissRequest = viewModel::onRenameCancel,
+                title = { Text(stringResource(R.string.warp_rename_title)) },
+                text = {
+                    OutlinedTextField(
+                        value = state.renameText,
+                        onValueChange = viewModel::onRenameTextChange,
+                        singleLine = true,
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = viewModel::onRenameConfirm) {
+                        Text(stringResource(R.string.warp_rename_ok))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = viewModel::onRenameCancel) {
+                        Text(stringResource(R.string.warp_rename_cancel))
+                    }
+                },
+            )
         }
     }
 }
@@ -103,12 +197,14 @@ fun WarpEngineSettingsScreen(
 @Composable
 private fun EmptyConfigCard(
     isRegistering: Boolean,
+    progressText: String?,
     errorMessage: String?,
     onGenerate: () -> Unit,
     onCancelGenerate: () -> Unit,
     onImportFile: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(modifier = modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -126,9 +222,7 @@ private fun EmptyConfigCard(
             }
             Button(
                 onClick = if (isRegistering) onCancelGenerate else onGenerate,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("warp_generate_button"),
+                modifier = Modifier.fillMaxWidth().testTag("warp_generate_button"),
             ) {
                 if (isRegistering) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -142,12 +236,17 @@ private fun EmptyConfigCard(
                     Text(stringResource(R.string.warp_generate))
                 }
             }
+            if (isRegistering && progressText != null) {
+                Text(
+                    text = progressText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             OutlinedButton(
                 onClick = onImportFile,
                 enabled = !isRegistering,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("warp_import_button"),
+                modifier = Modifier.fillMaxWidth().testTag("warp_import_button"),
             ) {
                 Text(stringResource(R.string.warp_import_file))
             }
@@ -156,83 +255,35 @@ private fun EmptyConfigCard(
 }
 
 @Composable
-private fun ConfigCard(
-    config: WarpConfig,
-    isRegistering: Boolean,
-    errorMessage: String?,
-    onRegenerate: () -> Unit,
-    onCancelGenerate: () -> Unit,
-    onClear: () -> Unit,
-    onImportFile: () -> Unit,
+private fun WarpConfigSlotCard(
+    slot: WarpConfigSlot,
+    onSetActive: () -> Unit,
+    onStartRename: () -> Unit,
+    onDelete: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+        Row(
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = stringResource(R.string.warp_endpoint_label),
-                style = MaterialTheme.typography.titleSmall,
+            RadioButton(
+                selected = slot.isActive,
+                onClick = onSetActive,
             )
-            Text(text = config.peerEndpoint, style = MaterialTheme.typography.bodyMedium)
-            Text(
-                text = stringResource(R.string.warp_license_label),
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Text(
-                text = if (config.accountLicense.isBlank()) {
-                    stringResource(R.string.warp_no_license)
-                } else {
-                    config.accountLicense.take(LICENSE_PREVIEW_LEN) + "…"
-                },
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            if (errorMessage != null) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = slot.name, style = MaterialTheme.typography.titleSmall)
                 Text(
-                    text = errorMessage,
+                    text = slot.config.peerEndpoint,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+            IconButton(onClick = onStartRename) {
+                Icon(Icons.Filled.Edit, contentDescription = null)
+            }
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Filled.Delete, contentDescription = null)
             }
         }
     }
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Button(
-            onClick = if (isRegistering) onCancelGenerate else onRegenerate,
-            modifier = Modifier
-                .weight(1f)
-                .testTag("warp_regenerate_button"),
-        ) {
-            Text(
-                text = if (isRegistering) {
-                    stringResource(R.string.warp_cancel_generation)
-                } else {
-                    stringResource(R.string.warp_regenerate)
-                },
-            )
-        }
-        OutlinedButton(
-            onClick = onClear,
-            enabled = !isRegistering,
-            modifier = Modifier
-                .weight(1f)
-                .testTag("warp_clear_button"),
-        ) {
-            Text(stringResource(R.string.warp_clear))
-        }
-    }
-    OutlinedButton(
-        onClick = onImportFile,
-        enabled = !isRegistering,
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag("warp_import_button"),
-    ) {
-        Text(stringResource(R.string.warp_import_file))
-    }
 }
-
-private const val LICENSE_PREVIEW_LEN = 8

@@ -5,6 +5,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -17,7 +18,8 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.enginewarp.WarpAutoConfig
 import ru.ozero.enginewarp.WarpConfig
-import ru.ozero.enginewarp.WarpConfigStore
+import ru.ozero.enginewarp.WarpConfigSlot
+import ru.ozero.enginewarp.WarpConfigSlotStore
 import ru.ozero.enginewarp.WarpFileImporter
 import java.io.ByteArrayInputStream
 import java.io.IOException
@@ -52,65 +54,45 @@ class WarpEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `init без конфига auto-triggers register — сразу регистрируется при первом открытии`() = runTest {
-        auto.result = Result.success(SAMPLE)
+    fun `init подхватывает слоты из store`() = runTest {
+        store.addSlot("Test", SAMPLE)
+        val freshVm = WarpEngineSettingsViewModel(store, FakeAutoConfig(), FakeFileImporter())
         advanceUntilIdle()
-        assertEquals(
-            1,
-            auto.callCount,
-            "Открытие screen с пустым cache → автоматический register",
-        )
-        assertEquals(SAMPLE, store.savedRaw, "Auto-register обязан сохранить config в store")
+        assertEquals(1, freshVm.uiState.value.slots.size)
+        assertEquals("Test", freshVm.uiState.value.slots[0].name)
     }
 
     @Test
-    fun `init подхватывает saved config из store без auto-trigger`() = runTest {
-        val freshAuto = FakeAutoConfig()
-        store.setRaw(SAMPLE)
-        val freshVm = WarpEngineSettingsViewModel(store, freshAuto, FakeFileImporter())
+    fun `init с пустым store — нет auto-trigger`() = runTest {
         advanceUntilIdle()
-        assertEquals(SAMPLE, freshVm.uiState.value.currentConfig)
-        assertEquals(
-            0,
-            freshAuto.callCount,
-            "Если config уже в store — auto-trigger НЕ срабатывает",
-        )
+        assertEquals(0, auto.callCount, "При пустом store auto-register НЕ срабатывает")
+        assertTrue(vm.uiState.value.slots.isEmpty())
     }
 
     @Test
-    fun `auto-trigger запускается ровно один раз даже если store пушит null повторно`() = runTest {
-        auto.result = Result.success(SAMPLE)
+    fun `activeSlotId обновляется когда слот становится активным`() = runTest {
+        val id = store.addSlot("Slot1", SAMPLE)
         advanceUntilIdle()
-        assertEquals(1, auto.callCount)
-        store.setRaw(null)
-        advanceUntilIdle()
-        assertEquals(
-            1,
-            auto.callCount,
-            "Повторный null из store не должен повторно auto-trigger (avoid loop)",
-        )
+        assertEquals(id, vm.uiState.value.activeSlotId)
     }
 
     @Test
-    fun `onGenerate success persist config + clears error`() = runTest {
+    fun `onGenerate success добавляет ровно один слот`() = runTest {
         auto.result = Result.success(SAMPLE)
         vm.onGenerate()
         advanceUntilIdle()
-        val s = vm.uiState.value
-        assertFalse(s.isRegistering)
-        assertNull(s.errorMessage)
-        assertEquals(SAMPLE, store.savedRaw)
+        assertEquals(1, store.slotCount())
     }
 
     @Test
-    fun `onGenerate failure ставит errorMessage и не persist`() = runTest {
+    fun `onGenerate failure ставит errorMessage и не добавляет слот`() = runTest {
         auto.result = Result.failure(IllegalStateException("network down"))
         vm.onGenerate()
         advanceUntilIdle()
         val s = vm.uiState.value
         assertFalse(s.isRegistering)
         assertEquals("network down", s.errorMessage)
-        assertNull(store.savedRaw)
+        assertEquals(0, store.slotCount())
     }
 
     @Test
@@ -122,7 +104,7 @@ class WarpEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `onGenerate во время isRegistering=true игнорируется (no-op)`() = runTest {
+    fun `onGenerate во время isRegistering=true игнорируется`() = runTest {
         auto.result = Result.success(SAMPLE)
         auto.callCount = 0
         vm.onGenerate()
@@ -130,14 +112,6 @@ class WarpEngineSettingsViewModelTest {
         vm.onGenerate()
         advanceUntilIdle()
         assertEquals(1, auto.callCount, "Параллельный onGenerate обязан игнорировать дубли")
-    }
-
-    @Test
-    fun `onClear вызывает store_clear`() = runTest {
-        store.setRaw(SAMPLE)
-        vm.onClear()
-        advanceUntilIdle()
-        assertEquals(1, store.clearCalls)
     }
 
     @Test
@@ -158,61 +132,41 @@ class WarpEngineSettingsViewModelTest {
         auto.result = Result.success(SAMPLE)
         vm.onGenerate()
         runCurrent()
-        assertTrue(vm.uiState.value.isRegistering, "после onGenerate isRegistering=true")
+        assertTrue(vm.uiState.value.isRegistering)
         vm.onCancelGenerate()
         runCurrent()
-        assertFalse(vm.uiState.value.isRegistering, "после onCancelGenerate isRegistering=false")
+        assertFalse(vm.uiState.value.isRegistering)
         advanceTimeBy(120_000L)
         advanceUntilIdle()
-        assertNull(store.savedRaw, "cancel прерывает суспендинг register — store.save не должен вызываться")
+        assertEquals(0, store.slotCount(), "cancel прерывает register — слот не добавляется")
     }
 
     @Test
-    fun `init продолжает реагировать на новые value из store_current()`() = runTest {
+    fun `slots обновляется в реальном времени через store`() = runTest {
         advanceUntilIdle()
-        assertNull(vm.uiState.value.currentConfig)
-        store.setRaw(SAMPLE)
+        assertEquals(0, vm.uiState.value.slots.size)
+        store.addSlot("A", SAMPLE)
         advanceUntilIdle()
-        assertNotNull(vm.uiState.value.currentConfig)
-        store.setRaw(null)
-        advanceUntilIdle()
-        assertNull(vm.uiState.value.currentConfig)
-    }
-
-    private class FakeWarpStore : WarpConfigStore {
-        private val flow = MutableStateFlow<WarpConfig?>(null)
-        var savedRaw: WarpConfig? = null
-        var clearCalls: Int = 0
-        fun setRaw(v: WarpConfig?) {
-            flow.value = v
-        }
-        override fun current(): Flow<WarpConfig?> = flow
-        override suspend fun save(config: WarpConfig) {
-            savedRaw = config
-            flow.value = config
-        }
-        override suspend fun clear() {
-            clearCalls++
-            flow.value = null
-        }
+        assertEquals(1, vm.uiState.value.slots.size)
     }
 
     @Test
-    fun `onImportFile success сохраняет config и сбрасывает ошибку`() = runTest {
+    fun `onImportFile success добавляет слот и ставит importSuccess`() = runTest {
         importer.result = Result.success(SAMPLE)
         vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
         advanceUntilIdle()
-        assertEquals(SAMPLE, store.savedRaw)
+        assertEquals(1, store.slotCount())
         assertNull(vm.uiState.value.errorMessage)
+        assertTrue(vm.uiState.value.importSuccess)
     }
 
     @Test
-    fun `onImportFile failure ставит errorMessage`() = runTest {
+    fun `onImportFile failure ставит errorMessage и не добавляет слот`() = runTest {
         importer.result = Result.failure(IOException("bad file"))
         vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
         advanceUntilIdle()
         assertEquals("bad file", vm.uiState.value.errorMessage)
-        assertNull(store.savedRaw)
+        assertEquals(0, store.slotCount())
     }
 
     @Test
@@ -224,11 +178,125 @@ class WarpEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `onImportFile success обновляет currentConfig через store`() = runTest {
+    fun `onImportSuccessConsumed сбрасывает importSuccess`() = runTest {
         importer.result = Result.success(SAMPLE)
         vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
         advanceUntilIdle()
-        assertEquals(SAMPLE, vm.uiState.value.currentConfig)
+        vm.onImportSuccessConsumed()
+        assertFalse(vm.uiState.value.importSuccess)
+    }
+
+    @Test
+    fun `onSetActive делегирует в store`() = runTest {
+        val id1 = store.addSlot("A", SAMPLE)
+        val id2 = store.addSlot("B", SAMPLE.copy(privateKey = "p2"))
+        advanceUntilIdle()
+        assertEquals(id1, vm.uiState.value.activeSlotId)
+        vm.onSetActive(id2)
+        advanceUntilIdle()
+        assertEquals(id2, vm.uiState.value.activeSlotId)
+        assertEquals(id2, store.setActiveCalls.lastOrNull())
+    }
+
+    @Test
+    fun `onDeleteSlot делегирует в store`() = runTest {
+        val id = store.addSlot("A", SAMPLE)
+        advanceUntilIdle()
+        vm.onDeleteSlot(id)
+        advanceUntilIdle()
+        assertEquals(0, store.slotCount())
+    }
+
+    @Test
+    fun `onStartRename открывает диалог с именем слота`() = runTest {
+        val id = store.addSlot("MySlot", SAMPLE)
+        advanceUntilIdle()
+        vm.onStartRename(id)
+        val s = vm.uiState.value
+        assertTrue(s.showRenameDialog)
+        assertEquals(id, s.renamingSlotId)
+        assertEquals("MySlot", s.renameText)
+    }
+
+    @Test
+    fun `onRenameCancel закрывает диалог`() = runTest {
+        val id = store.addSlot("X", SAMPLE)
+        advanceUntilIdle()
+        vm.onStartRename(id)
+        vm.onRenameCancel()
+        val s = vm.uiState.value
+        assertFalse(s.showRenameDialog)
+        assertNull(s.renamingSlotId)
+        assertEquals("", s.renameText)
+    }
+
+    @Test
+    fun `onRenameConfirm вызывает store_rename и закрывает диалог`() = runTest {
+        val id = store.addSlot("Old", SAMPLE)
+        advanceUntilIdle()
+        vm.onStartRename(id)
+        vm.onRenameTextChange("New Name")
+        vm.onRenameConfirm()
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.showRenameDialog)
+        assertEquals("New Name", store.lastRenameCall?.second)
+    }
+
+    @Test
+    fun `onRenameTextChange обновляет renameText`() = runTest {
+        vm.onRenameTextChange("hello")
+        assertEquals("hello", vm.uiState.value.renameText)
+    }
+
+    @Test
+    fun `onGenerate передаёт прогресс через progressText`() = runTest {
+        auto.result = Result.success(SAMPLE)
+        auto.progressToEmit = "3/78"
+        vm.onGenerate()
+        advanceUntilIdle()
+        assertNull(vm.uiState.value.progressText, "progressText сбрасывается после успеха")
+    }
+
+    private class FakeWarpStore : WarpConfigSlotStore {
+        private val slotsFlow = MutableStateFlow<List<WarpConfigSlot>>(emptyList())
+        val setActiveCalls = mutableListOf<String>()
+        var lastRenameCall: Pair<String, String>? = null
+        private var idCounter = 0
+
+        fun slotCount() = slotsFlow.value.size
+
+        override fun slots(): Flow<List<WarpConfigSlot>> = slotsFlow
+
+        override fun activeConfig() = slotsFlow.map { list ->
+            list.firstOrNull { it.isActive }?.config
+        }
+
+        override suspend fun addSlot(name: String, config: WarpConfig): String {
+            val id = "fake-${idCounter++}"
+            val makeActive = slotsFlow.value.isEmpty()
+            slotsFlow.value = slotsFlow.value + WarpConfigSlot(
+                id = id, name = name, config = config, isActive = makeActive,
+            )
+            return id
+        }
+
+        override suspend fun setActive(id: String) {
+            setActiveCalls.add(id)
+            slotsFlow.value = slotsFlow.value.map { it.copy(isActive = it.id == id) }
+        }
+
+        override suspend fun rename(id: String, name: String) {
+            lastRenameCall = id to name
+            slotsFlow.value = slotsFlow.value.map { if (it.id == id) it.copy(name = name) else it }
+        }
+
+        override suspend fun delete(id: String) {
+            slotsFlow.value = slotsFlow.value.filter { it.id != id }
+        }
+
+        override suspend fun clear() {
+            slotsFlow.value = emptyList()
+        }
     }
 
     private class FakeFileImporter : WarpFileImporter {
@@ -241,9 +309,11 @@ class WarpEngineSettingsViewModelTest {
         var callCount: Int = 0
         var beforeReturn: () -> Unit = {}
         var delayMs: Long = 0L
-        override suspend fun register(): Result<WarpConfig> {
+        var progressToEmit: String? = null
+        override suspend fun register(onProgress: ((String) -> Unit)?): Result<WarpConfig> {
             callCount++
             beforeReturn()
+            progressToEmit?.let { onProgress?.invoke(it) }
             if (delayMs > 0) delay(delayMs)
             return result
         }

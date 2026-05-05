@@ -16,7 +16,7 @@ import ru.ozero.enginescore.Upstream
 
 class EngineWarp(
     private val autoConfig: WarpAutoConfig,
-    private val configStore: WarpConfigStore,
+    private val configStore: WarpConfigSlotStore,
     private val sdkBridge: WarpSdkBridge,
 ) : EnginePlugin {
 
@@ -39,19 +39,19 @@ class EngineWarp(
             "EngineWarp не принимает upstream — supportsUpstreamSocks=false"
         }
 
-        val cached = configStore.current().first()
+        val cached = configStore.activeConfig().first()
         val effective = if (cached != null) {
-            PersistentLoggers.info(TAG, "start using cached config")
+            PersistentLoggers.info(TAG, "start using active config")
             cached
         } else {
-            PersistentLoggers.info(TAG, "no cached config — calling autoConfig.register")
+            PersistentLoggers.info(TAG, "no active config — calling autoConfig.register")
             val regResult = autoConfig.register()
             val fresh = regResult.getOrElse { t ->
                 val msg = t.message ?: "register failed"
                 PersistentLoggers.error(TAG, "register failure: $msg")
                 return StartResult.Failure(reason = "WARP register failed: $msg", cause = t)
             }
-            configStore.save(fresh)
+            configStore.addSlot("WARP Auto", fresh)
             fresh
         }
 

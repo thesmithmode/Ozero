@@ -1,0 +1,195 @@
+package ru.ozero.enginewarp
+
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import org.json.JSONArray
+import org.json.JSONObject
+import ru.ozero.enginescore.PersistentLoggers
+import java.util.UUID
+
+class DataStoreWarpConfigSlotStore(
+    private val dataStore: DataStore<Preferences>,
+    private val legacyStore: DataStoreWarpConfigStore,
+) : WarpConfigSlotStore {
+
+    private val mutex = Mutex()
+
+    override fun slots(): Flow<List<WarpConfigSlot>> = dataStore.data.map { prefs ->
+        parseSlots(prefs[KEY_SLOTS] ?: "[]")
+    }
+
+    override fun activeConfig(): Flow<WarpConfig?> = slots().map { list ->
+        list.firstOrNull { it.isActive }?.config
+    }
+
+    override suspend fun addSlot(name: String, config: WarpConfig): String = mutex.withLock {
+        val id = UUID.randomUUID().toString()
+        dataStore.edit { prefs ->
+            val current = parseSlots(prefs[KEY_SLOTS] ?: "[]")
+            val makeActive = current.isEmpty()
+            val updated = current + WarpConfigSlot(id = id, name = name, config = config, isActive = makeActive)
+            prefs[KEY_SLOTS] = serializeSlots(updated)
+        }
+        id
+    }
+
+    override suspend fun setActive(id: String): Unit = mutex.withLock {
+        dataStore.edit { prefs ->
+            val current = parseSlots(prefs[KEY_SLOTS] ?: "[]")
+            val updated = current.map { slot -> slot.copy(isActive = slot.id == id) }
+            prefs[KEY_SLOTS] = serializeSlots(updated)
+        }
+    }
+
+    override suspend fun rename(id: String, name: String): Unit = mutex.withLock {
+        dataStore.edit { prefs ->
+            val current = parseSlots(prefs[KEY_SLOTS] ?: "[]")
+            val updated = current.map { slot -> if (slot.id == id) slot.copy(name = name) else slot }
+            prefs[KEY_SLOTS] = serializeSlots(updated)
+        }
+    }
+
+    override suspend fun delete(id: String): Unit = mutex.withLock {
+        dataStore.edit { prefs ->
+            val current = parseSlots(prefs[KEY_SLOTS] ?: "[]")
+            val filtered = current.filter { it.id != id }
+            val needsNewActive = filtered.isNotEmpty() && filtered.none { it.isActive }
+            val updated = if (needsNewActive) {
+                filtered.mapIndexed { i, slot -> if (i == 0) slot.copy(isActive = true) else slot }
+            } else {
+                filtered
+            }
+            prefs[KEY_SLOTS] = serializeSlots(updated)
+        }
+    }
+
+    override suspend fun clear(): Unit = mutex.withLock {
+        dataStore.edit { prefs ->
+            prefs.remove(KEY_SLOTS)
+            prefs.remove(KEY_MIGRATION_DONE)
+        }
+    }
+
+    suspend fun migrateIfNeeded() {
+        val alreadyDone = dataStore.data.map { it[KEY_MIGRATION_DONE] ?: false }.first()
+        if (alreadyDone) return
+        val legacyConfig = legacyStore.current().first()
+        mutex.withLock {
+            dataStore.edit { prefs ->
+                if (prefs[KEY_MIGRATION_DONE] == true) return@edit
+                prefs[KEY_MIGRATION_DONE] = true
+                if (legacyConfig == null) return@edit
+                val existing = parseSlots(prefs[KEY_SLOTS] ?: "[]")
+                if (existing.isNotEmpty()) return@edit
+                val id = UUID.randomUUID().toString()
+                val slot = WarpConfigSlot(id = id, name = "Migrated", config = legacyConfig, isActive = true)
+                prefs[KEY_SLOTS] = serializeSlots(listOf(slot))
+                PersistentLoggers.info(TAG, "migrated legacy WARP config to slot $id")
+            }
+        }
+    }
+
+    private fun parseSlots(json: String): List<WarpConfigSlot> {
+        return try {
+            val arr = JSONArray(json)
+            (0 until arr.length()).map { i -> slotFromJson(arr.getJSONObject(i)) }
+        } catch (e: Exception) {
+            PersistentLoggers.warn(TAG, "slot list parse failed: ${e.message}")
+            emptyList()
+        }
+    }
+
+    private fun slotFromJson(obj: JSONObject): WarpConfigSlot {
+        val configObj = obj.getJSONObject("config")
+        val awgObj = configObj.optJSONObject("awgParams") ?: JSONObject()
+        val dnsArr = configObj.optJSONArray("dnsServers")
+        val dns = if (dnsArr != null) {
+            (0 until dnsArr.length()).map { dnsArr.getString(it) }
+        } else {
+            WarpConfig.DEFAULT_DNS
+        }
+        val awg = AwgParams(
+            junkPacketCount = awgObj.optInt("jc", AwgParams.DEFAULT_JC),
+            junkPacketMinSize = awgObj.optInt("jmin", AwgParams.DEFAULT_JMIN),
+            junkPacketMaxSize = awgObj.optInt("jmax", AwgParams.DEFAULT_JMAX),
+            initPacketJunkSize = awgObj.optInt("s1", AwgParams.DEFAULT_S1),
+            responsePacketJunkSize = awgObj.optInt("s2", AwgParams.DEFAULT_S2),
+            initPacketMagicHeader = awgObj.optLong("h1", AwgParams.DEFAULT_H1),
+            responsePacketMagicHeader = awgObj.optLong("h2", AwgParams.DEFAULT_H2),
+            cookieReplyMagicHeader = awgObj.optLong("h3", AwgParams.DEFAULT_H3),
+            transportMagicHeader = awgObj.optLong("h4", AwgParams.DEFAULT_H4),
+        )
+        val config = WarpConfig(
+            privateKey = configObj.getString("priv"),
+            publicKey = configObj.optString("pub", ""),
+            peerPublicKey = configObj.getString("peerPub"),
+            peerEndpoint = configObj.getString("peerEndpoint"),
+            interfaceAddressV4 = configObj.getString("ifaceV4"),
+            interfaceAddressV6 = configObj.getString("ifaceV6"),
+            accountLicense = configObj.optString("license", ""),
+            mtu = configObj.optInt("mtu", WarpConfig.DEFAULT_MTU),
+            dnsServers = dns,
+            keepaliveSeconds = configObj.optInt("keepalive", WarpConfig.DEFAULT_KEEPALIVE),
+            awgParams = awg,
+        )
+        return WarpConfigSlot(
+            id = obj.getString("id"),
+            name = obj.getString("name"),
+            config = config,
+            isActive = obj.optBoolean("isActive", false),
+        )
+    }
+
+    private fun serializeSlots(slots: List<WarpConfigSlot>): String {
+        val arr = JSONArray()
+        for (slot in slots) {
+            val obj = JSONObject()
+            obj.put("id", slot.id)
+            obj.put("name", slot.name)
+            obj.put("isActive", slot.isActive)
+            val cfg = slot.config
+            val configObj = JSONObject()
+            configObj.put("priv", cfg.privateKey)
+            configObj.put("pub", cfg.publicKey)
+            configObj.put("peerPub", cfg.peerPublicKey)
+            configObj.put("peerEndpoint", cfg.peerEndpoint)
+            configObj.put("ifaceV4", cfg.interfaceAddressV4)
+            configObj.put("ifaceV6", cfg.interfaceAddressV6)
+            configObj.put("license", cfg.accountLicense)
+            configObj.put("mtu", cfg.mtu)
+            val dnsArr = JSONArray()
+            cfg.dnsServers.forEach { dnsArr.put(it) }
+            configObj.put("dnsServers", dnsArr)
+            configObj.put("keepalive", cfg.keepaliveSeconds)
+            val awg = cfg.awgParams
+            val awgObj = JSONObject()
+            awgObj.put("jc", awg.junkPacketCount)
+            awgObj.put("jmin", awg.junkPacketMinSize)
+            awgObj.put("jmax", awg.junkPacketMaxSize)
+            awgObj.put("s1", awg.initPacketJunkSize)
+            awgObj.put("s2", awg.responsePacketJunkSize)
+            awgObj.put("h1", awg.initPacketMagicHeader)
+            awgObj.put("h2", awg.responsePacketMagicHeader)
+            awgObj.put("h3", awg.cookieReplyMagicHeader)
+            awgObj.put("h4", awg.transportMagicHeader)
+            configObj.put("awgParams", awgObj)
+            obj.put("config", configObj)
+            arr.put(obj)
+        }
+        return arr.toString()
+    }
+
+    private companion object {
+        const val TAG = "DataStoreWarpConfigSlotStore"
+        val KEY_SLOTS = stringPreferencesKey("warp_slots_json")
+        val KEY_MIGRATION_DONE = booleanPreferencesKey("warp_slots_migration_done")
+    }
+}

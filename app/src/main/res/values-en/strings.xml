@@ -192,6 +192,14 @@
     <string name="warp_cancel_generation">Cancel generation</string>
     <string name="warp_endpoint_label">Endpoint:</string>
     <string name="warp_license_label">License:</string>
+    <string name="warp_import_file">Import from .conf file</string>
+    <string name="warp_no_license">—</string>
+    <string name="warp_import_error">Import error</string>
+    <string name="warp_imported">Config imported</string>
+    <string name="warp_address_label">Address:</string>
+    <string name="warp_rename_title">Rename</string>
+    <string name="warp_rename_ok">OK</string>
+    <string name="warp_rename_cancel">Cancel</string>
 
     <!-- App mode -->
     <string name="settings_app_mode_title">Interface mode</string>

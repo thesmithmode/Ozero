@@ -15,6 +15,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import ru.ozero.enginescore.EnginePlugin
+import ru.ozero.enginewarp.DataStoreWarpConfigSlotStore
 import ru.ozero.enginewarp.DataStoreWarpConfigStore
 import ru.ozero.enginewarp.EngineWarp
 import ru.ozero.enginewarp.HttpClient
@@ -24,7 +25,7 @@ import ru.ozero.enginewarp.RealWarpSdkBridge
 import ru.ozero.enginewarp.WarpAutoConfig
 import ru.ozero.enginewarp.WarpConfFileImporter
 import ru.ozero.enginewarp.WarpFileImporter
-import ru.ozero.enginewarp.WarpConfigStore
+import ru.ozero.enginewarp.WarpConfigSlotStore
 import ru.ozero.enginewarp.WarpSdkBridge
 import javax.inject.Qualifier
 import javax.inject.Singleton
@@ -50,9 +51,16 @@ object WarpModule {
 
     @Provides
     @Singleton
-    fun provideWarpConfigStore(
+    fun provideWarpConfigLegacyStore(
         @WarpPrefs dataStore: DataStore<Preferences>,
-    ): WarpConfigStore = DataStoreWarpConfigStore(dataStore)
+    ): DataStoreWarpConfigStore = DataStoreWarpConfigStore(dataStore)
+
+    @Provides
+    @Singleton
+    fun provideWarpConfigSlotStore(
+        @WarpPrefs dataStore: DataStore<Preferences>,
+        legacyStore: DataStoreWarpConfigStore,
+    ): WarpConfigSlotStore = DataStoreWarpConfigSlotStore(dataStore, legacyStore)
 
     @Provides
     @Singleton
@@ -79,7 +87,7 @@ object WarpModule {
     @IntoSet
     fun provideEngineWarp(
         autoConfig: WarpAutoConfig,
-        store: WarpConfigStore,
+        store: WarpConfigSlotStore,
         bridge: WarpSdkBridge,
     ): EnginePlugin = EngineWarp(autoConfig, store, bridge)
 }
