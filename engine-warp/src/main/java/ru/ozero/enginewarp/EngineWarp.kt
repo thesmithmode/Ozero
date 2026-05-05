@@ -70,8 +70,9 @@ class EngineWarp(
     override fun stats(): Flow<EngineStats> = _stats.asStateFlow()
 
     override suspend fun tunSpec(): TunSpec? {
-        val cfg = resolvedConfig ?: resolveConfig()?.also { resolvedConfig = it }
-        ?: return null
+        val cfg = resolvedConfig
+            ?: resolveConfig()?.also { resolvedConfig = it }
+            ?: return null
         val v4Addr = cfg.interfaceAddressV4.substringBefore('/').takeIf { it.isNotBlank() }
             ?: return null
         val v4Prefix = cfg.interfaceAddressV4.substringAfter('/', missingDelimiterValue = "32")
