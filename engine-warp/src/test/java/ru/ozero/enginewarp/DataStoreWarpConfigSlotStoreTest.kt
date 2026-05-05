@@ -271,8 +271,13 @@ class DataStoreWarpConfigSlotStoreTest {
     }
 
     private fun buildValidSlotJson(id: String, name: String): String {
-        val config = sample
-        return """{"id":"$id","name":"$name","isActive":false,"config":{"priv":"${config.privateKey}","pub":"${config.publicKey}","peerPub":"${config.peerPublicKey}","peerEndpoint":"${config.peerEndpoint}","ifaceV4":"${config.interfaceAddressV4}","ifaceV6":"${config.interfaceAddressV6}","license":"${config.accountLicense}","mtu":${config.mtu},"dnsServers":["1.1.1.1"],"keepalive":${config.keepaliveSeconds},"awgParams":{"jc":0,"jmin":0,"jmax":0,"s1":0,"s2":0,"h1":0,"h2":0,"h3":0,"h4":0}}}"""
+        val c = sample
+        val cfg = """{"priv":"${c.privateKey}","pub":"${c.publicKey}","peerPub":"${c.peerPublicKey}",""" +
+            """"peerEndpoint":"${c.peerEndpoint}","ifaceV4":"${c.interfaceAddressV4}",""" +
+            """"ifaceV6":"${c.interfaceAddressV6}","license":"${c.accountLicense}","mtu":${c.mtu},""" +
+            """"dnsServers":["1.1.1.1"],"keepalive":${c.keepaliveSeconds},""" +
+            """"awgParams":{"jc":0,"jmin":0,"jmax":0,"s1":0,"s2":0,"h1":0,"h2":0,"h3":0,"h4":0}}"""
+        return """{"id":"$id","name":"$name","isActive":false,"config":$cfg}"""
     }
 
     private class FakePreferencesDataStore : DataStore<Preferences> {
