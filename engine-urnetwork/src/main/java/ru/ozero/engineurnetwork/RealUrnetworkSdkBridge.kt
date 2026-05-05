@@ -37,7 +37,9 @@ class RealUrnetworkSdkBridge(
                 Sdk.newNetworkSpaceManager(storageDir)
             } catch (t: Throwable) {
                 PersistentLoggers.error(TAG, "newNetworkSpaceManager threw: ${t.message}")
-                return@withTimeoutOrNull UrnetworkSdkBridge.StartResult.Failed("NetworkSpaceManager init failed: ${t.message}")
+                return@withTimeoutOrNull UrnetworkSdkBridge.StartResult.Failed(
+                    "NetworkSpaceManager init failed: ${t.message}",
+                )
             }
             managerRef.set(manager)
 
@@ -45,12 +47,16 @@ class RealUrnetworkSdkBridge(
                 resolveNetworkSpace(manager) ?: run {
                     PersistentLoggers.error(TAG, "NetworkSpace null after active/get/import fallback")
                     cleanupOnFailure()
-                    return@withTimeoutOrNull UrnetworkSdkBridge.StartResult.Failed("NetworkSpace resolve failed: SDK returned null")
+                    return@withTimeoutOrNull UrnetworkSdkBridge.StartResult.Failed(
+                        "NetworkSpace resolve failed: SDK returned null",
+                    )
                 }
             } catch (t: Throwable) {
                 PersistentLoggers.error(TAG, "NetworkSpace resolve failed: ${t.message}\n${t.stackTraceToString()}")
                 cleanupOnFailure()
-                return@withTimeoutOrNull UrnetworkSdkBridge.StartResult.Failed("NetworkSpace resolve failed: ${t.message}")
+                return@withTimeoutOrNull UrnetworkSdkBridge.StartResult.Failed(
+                    "NetworkSpace resolve failed: ${t.message}",
+                )
             }
 
             val device: DeviceLocal = try {

@@ -46,7 +46,9 @@ class EngineUrnetwork(
 
         if (RomCompat.isNubiaRedMagic()) {
             PersistentLoggers.warn(TAG, "Nubia/RedMagic ROM — URnetwork отключён (риск Go GC SIGABRT)")
-            return StartResult.Failure(reason = "URnetwork нестабилен на Nubia/RedMagic ROM. Используйте ByeDPI или WARP.")
+            return StartResult.Failure(
+                reason = "URnetwork нестабилен на Nubia/RedMagic ROM. Используйте ByeDPI или WARP.",
+            )
         }
 
         val byJwt = ensureGuestJwt() ?: return StartResult.Failure(
