@@ -78,16 +78,20 @@ object WarpModule {
 
     @Provides
     @Singleton
-    fun provideWarpSdkBridge(
-        @ApplicationContext context: Context,
-    ): WarpSdkBridge = RealWarpSdkBridge(context)
+    fun provideWarpSdkBridge(): WarpSdkBridge = RealWarpSdkBridge()
 
     @Provides
     @Singleton
     @IntoSet
     fun provideEngineWarp(
+        @ApplicationContext context: Context,
         autoConfig: WarpAutoConfig,
         store: WarpConfigSlotStore,
         bridge: WarpSdkBridge,
-    ): EnginePlugin = EngineWarp(autoConfig, store, bridge)
+    ): EnginePlugin = EngineWarp(
+        autoConfig = autoConfig,
+        configStore = store,
+        sdkBridge = bridge,
+        uapiPathProvider = { context.dataDir.absolutePath },
+    )
 }

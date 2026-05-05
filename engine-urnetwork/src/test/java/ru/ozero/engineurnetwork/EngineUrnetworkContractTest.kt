@@ -215,7 +215,7 @@ class EngineUrnetworkContractTest {
     }
 
     @Test
-    fun `tunSpec не null — URnetwork требует custom TUN params`() {
+    fun `tunSpec не null — URnetwork требует custom TUN params`() = runTest {
         val (e, _, _) = engine()
         val spec = e.tunSpec()
         assertNotNull(spec)

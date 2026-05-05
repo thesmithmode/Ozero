@@ -88,7 +88,7 @@ class EngineUrnetwork(
 
     override fun stats(): Flow<EngineStats> = _stats.asStateFlow()
 
-    override fun tunSpec(): TunSpec = TunSpec(
+    override suspend fun tunSpec(): TunSpec = TunSpec(
         sessionName = "URnetwork",
         mtu = TUN_MTU,
         blocking = false,

@@ -1,12 +1,19 @@
 package ru.ozero.enginewarp
 
 interface WarpSdkBridge {
-    suspend fun start(config: WarpConfig): StartResult
-    suspend fun stop()
+    suspend fun attachTun(
+        tunnelName: String,
+        tunFd: Int,
+        iniConfig: String,
+        uapiPath: String,
+    ): AttachResult
+
+    suspend fun detachTun()
+
     fun isRunning(): Boolean
 
-    sealed interface StartResult {
-        data object Success : StartResult
-        data class Failed(val reason: String) : StartResult
+    sealed interface AttachResult {
+        data object Success : AttachResult
+        data class Failed(val reason: String) : AttachResult
     }
 }

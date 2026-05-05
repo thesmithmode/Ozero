@@ -1,81 +1,80 @@
 package ru.ozero.enginewarp
 
-import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.amnezia.awg.backend.GoBackend
-import org.amnezia.awg.backend.Tunnel
-import org.amnezia.awg.backend.TunnelActionHandler
-import org.amnezia.awg.config.Config
 import ru.ozero.enginescore.PersistentLoggers
 
 class RealWarpSdkBridge(
-    context: Context,
-    private val backend: AwgBackend = GoBackendWrapper(context),
-    private val configBuilder: (WarpConfig) -> Config = { Config.parse(WarpIniBuilder.build(it).byteInputStream()) },
+    private val awgRuntime: AwgRuntime = DefaultAwgRuntime,
 ) : WarpSdkBridge {
 
-    private val tunnel = object : Tunnel {
-        override fun getName(): String = TUNNEL_NAME
-        override fun onStateChange(newState: Tunnel.State) {
-            PersistentLoggers.info(TAG, "tunnel state -> $newState")
-            running = newState == Tunnel.State.UP
-        }
-        override fun isIpv4ResolutionPreferred(): Boolean = false
-        override fun isMetered(): Boolean = false
-    }
-
     @Volatile
-    private var running: Boolean = false
+    private var tunnelHandle: Int = INVALID_HANDLE
 
-    override suspend fun start(config: WarpConfig): WarpSdkBridge.StartResult =
-        withContext(Dispatchers.IO) {
-            try {
-                val wgConfig = buildConfig(config)
-                backend.setState(tunnel, Tunnel.State.UP, wgConfig)
-                running = true
-                PersistentLoggers.info(TAG, "GoBackend.setState UP OK")
-                WarpSdkBridge.StartResult.Success
-            } catch (t: Throwable) {
-                val msg = t.message ?: t.javaClass.simpleName
-                PersistentLoggers.error(TAG, "GoBackend.setState UP failed: $msg")
-                WarpSdkBridge.StartResult.Failed("WireGuard backend start failed: $msg")
-            }
+    override suspend fun attachTun(
+        tunnelName: String,
+        tunFd: Int,
+        iniConfig: String,
+        uapiPath: String,
+    ): WarpSdkBridge.AttachResult = withContext(Dispatchers.IO) {
+        if (tunFd < 0) {
+            return@withContext WarpSdkBridge.AttachResult.Failed("invalid tunFd=$tunFd")
         }
+        if (iniConfig.isBlank()) {
+            return@withContext WarpSdkBridge.AttachResult.Failed("empty iniConfig")
+        }
+        if (uapiPath.isBlank()) {
+            return@withContext WarpSdkBridge.AttachResult.Failed("empty uapiPath")
+        }
+        try {
+            val handle = awgRuntime.turnOn(tunnelName, tunFd, iniConfig, uapiPath)
+            if (handle < 0) {
+                PersistentLoggers.error(TAG, "awgTurnOn returned negative handle=$handle")
+                return@withContext WarpSdkBridge.AttachResult.Failed("awgTurnOn handle=$handle")
+            }
+            tunnelHandle = handle
+            PersistentLoggers.info(TAG, "awgTurnOn OK handle=$handle name=$tunnelName")
+            WarpSdkBridge.AttachResult.Success
+        } catch (t: Throwable) {
+            val msg = t.message ?: t.javaClass.simpleName
+            PersistentLoggers.error(TAG, "awgTurnOn threw: $msg")
+            WarpSdkBridge.AttachResult.Failed("awgTurnOn failed: $msg")
+        }
+    }
 
-    override suspend fun stop() {
+    override suspend fun detachTun() {
         withContext(Dispatchers.IO) {
+            val h = tunnelHandle
+            if (h == INVALID_HANDLE) return@withContext
             try {
-                backend.setState(tunnel, Tunnel.State.DOWN, null)
-                PersistentLoggers.info(TAG, "GoBackend.setState DOWN OK")
+                awgRuntime.turnOff(h)
+                PersistentLoggers.info(TAG, "awgTurnOff OK handle=$h")
             } catch (t: Throwable) {
-                PersistentLoggers.error(TAG, "stop failed: ${t.message}")
+                PersistentLoggers.error(TAG, "awgTurnOff failed: ${t.message}")
             } finally {
-                running = false
+                tunnelHandle = INVALID_HANDLE
             }
         }
     }
 
-    override fun isRunning(): Boolean = running
-
-    private fun buildConfig(config: WarpConfig): Config = configBuilder(config)
+    override fun isRunning(): Boolean = tunnelHandle != INVALID_HANDLE
 
     private companion object {
         const val TAG = "RealWarpSdkBridge"
-        const val TUNNEL_NAME = "ozero-warp"
+        const val INVALID_HANDLE = -1
     }
 }
 
-private class GoBackendWrapper(context: Context) : AwgBackend {
-    private val goBackend: GoBackend by lazy { GoBackend(context, NoOpHandler) }
+interface AwgRuntime {
+    fun turnOn(name: String, tunFd: Int, ini: String, uapiPath: String): Int
+    fun turnOff(handle: Int)
+}
 
-    override fun setState(tunnel: Tunnel, state: Tunnel.State, config: Config?): Tunnel.State =
-        goBackend.setState(tunnel, state, config)
+private object DefaultAwgRuntime : AwgRuntime {
+    override fun turnOn(name: String, tunFd: Int, ini: String, uapiPath: String): Int =
+        org.amnezia.awg.GoBackend.awgTurnOn(name, tunFd, ini, uapiPath)
 
-    private object NoOpHandler : TunnelActionHandler {
-        override fun runPreUp(scripts: Collection<String>) = Unit
-        override fun runPostUp(scripts: Collection<String>) = Unit
-        override fun runPreDown(scripts: Collection<String>) = Unit
-        override fun runPostDown(scripts: Collection<String>) = Unit
+    override fun turnOff(handle: Int) {
+        org.amnezia.awg.GoBackend.awgTurnOff(handle)
     }
 }

@@ -202,9 +202,9 @@ class OzeroVpnService : android.net.VpnService() {
         startStatsLogger()
     }
 
-    private fun engineNeedsCustomTun(engineId: EngineId): Boolean {
+    private suspend fun engineNeedsCustomTun(engineId: EngineId): Boolean {
         val plugin = enginePlugins.firstOrNull { it.id == engineId } ?: return false
-        return plugin.tunSpec() != null
+        return plugin is ru.ozero.enginescore.TunFdAcceptor
     }
 
     private suspend fun establishTunForEngine(engineId: EngineId): ParcelFileDescriptor? {

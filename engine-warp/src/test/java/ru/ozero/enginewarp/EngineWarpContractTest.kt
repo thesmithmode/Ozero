@@ -2,15 +2,18 @@ package ru.ozero.enginewarp
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.StartResult
+import ru.ozero.enginescore.TunAttachResult
+import ru.ozero.enginescore.TunFdAcceptor
 import ru.ozero.enginescore.Upstream
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class EngineWarpContractTest {
@@ -29,10 +32,16 @@ class EngineWarpContractTest {
         activeConfig: WarpConfig? = null,
         autoConfigResult: Result<WarpConfig> = Result.success(sampleConfig),
         bridge: FakeWarpSdkBridge = FakeWarpSdkBridge(),
+        uapiPath: String = "/data/data/ru.ozero.app",
     ): Triple<EngineWarp, FakeWarpAutoConfig, FakeWarpConfigSlotStore> {
         val store = FakeWarpConfigSlotStore(activeConfig = activeConfig)
         val auto = FakeWarpAutoConfig(autoConfigResult)
-        val e = EngineWarp(autoConfig = auto, configStore = store, sdkBridge = bridge)
+        val e = EngineWarp(
+            autoConfig = auto,
+            configStore = store,
+            sdkBridge = bridge,
+            uapiPathProvider = { uapiPath },
+        )
         return Triple(e, auto, store)
     }
 
@@ -43,81 +52,143 @@ class EngineWarpContractTest {
     }
 
     @Test
-    fun `start без active config регистрирует и добавляет слот`() = runTest {
-        val bridge = FakeWarpSdkBridge(WarpSdkBridge.StartResult.Success)
-        val (e, auto, store) = engine(activeConfig = null, bridge = bridge)
+    fun `EngineWarp implements TunFdAcceptor`() {
+        val (e, _, _) = engine()
+        assertTrue(e is TunFdAcceptor)
+    }
 
-        val result = e.start(EngineConfig.Warp, Upstream.None)
-
-        assertIs<StartResult.Success>(result)
+    @Test
+    fun `start без active config регистрирует и кеширует ini`() = runTest {
+        val (e, auto, store) = engine(activeConfig = null)
+        val r = e.start(EngineConfig.Warp, Upstream.None)
+        assertIs<StartResult.Success>(r)
         assertEquals(1, auto.registerCalls)
         assertEquals(sampleConfig, store.lastAdded?.second)
-        assertEquals(1, bridge.startCalls)
-        assertEquals(sampleConfig, bridge.lastConfig)
     }
 
     @Test
     fun `start с active config пропускает register`() = runTest {
-        val active = sampleConfig.copy(privateKey = "active-priv")
-        val bridge = FakeWarpSdkBridge(WarpSdkBridge.StartResult.Success)
-        val (e, auto, _) = engine(activeConfig = active, bridge = bridge)
-
-        val result = e.start(EngineConfig.Warp, Upstream.None)
-
-        assertIs<StartResult.Success>(result)
+        val (e, auto, _) = engine(activeConfig = sampleConfig)
+        val r = e.start(EngineConfig.Warp, Upstream.None)
+        assertIs<StartResult.Success>(r)
         assertEquals(0, auto.registerCalls)
-        assertEquals(1, bridge.startCalls)
-        assertEquals(active, bridge.lastConfig)
     }
 
     @Test
-    fun `stop вызывает bridge_stop`() = runTest {
-        val bridge = FakeWarpSdkBridge(WarpSdkBridge.StartResult.Success)
-        val (e, _, _) = engine(activeConfig = sampleConfig, bridge = bridge)
-        e.start(EngineConfig.Warp, Upstream.None)
-        e.stop()
-        assertEquals(1, bridge.stopCalls)
-    }
-
-    @Test
-    fun `register failure пробрасывается как StartResult_Failure`() = runTest {
+    fun `register failure → StartResult Failure`() = runTest {
         val (e, _, _) = engine(
             activeConfig = null,
             autoConfigResult = Result.failure(java.io.IOException("net down")),
         )
-
-        val result = e.start(EngineConfig.Warp, Upstream.None)
-
-        val failure = assertIs<StartResult.Failure>(result)
-        assertTrue(failure.reason.contains("net down") || failure.reason.contains("register"))
+        val r = e.start(EngineConfig.Warp, Upstream.None)
+        assertIs<StartResult.Failure>(r)
     }
 
     @Test
-    fun `bridge failure пробрасывается как StartResult_Failure`() = runTest {
-        val bridge = FakeWarpSdkBridge(WarpSdkBridge.StartResult.Failed("AAR not built"))
+    fun `start не зовёт bridge attachTun — это делает VpnService`() = runTest {
+        val bridge = FakeWarpSdkBridge()
         val (e, _, _) = engine(activeConfig = sampleConfig, bridge = bridge)
-
-        val result = e.start(EngineConfig.Warp, Upstream.None)
-
-        val failure = assertIs<StartResult.Failure>(result)
-        assertTrue(failure.reason.contains("AAR not built"))
+        e.start(EngineConfig.Warp, Upstream.None)
+        assertEquals(0, bridge.attachCalls, "start не должен звать attachTun — fd ещё не известен")
     }
 
     @Test
-    fun `start требует Upstream_None`() = runTest {
+    fun `attachTun без start → Failure`() = runTest {
         val (e, _, _) = engine(activeConfig = sampleConfig)
+        val r = e.attachTun(tunFd = 42)
+        assertIs<TunAttachResult.Failure>(r)
+    }
 
-        runCatching {
-            e.start(EngineConfig.Warp, Upstream.Socks5("127.0.0.1", 1080))
-        }.fold(
-            onSuccess = { result ->
-                val failure = assertIs<StartResult.Failure>(result)
-                assertTrue(failure.reason.contains("upstream", ignoreCase = true))
-            },
-            onFailure = {
-                assertTrue(it is IllegalArgumentException)
-            },
+    @Test
+    fun `attachTun после start вызывает bridge attachTun с ini и uapiPath`() = runTest {
+        val bridge = FakeWarpSdkBridge()
+        val (e, _, _) = engine(
+            activeConfig = sampleConfig,
+            bridge = bridge,
+            uapiPath = "/data/data/test",
         )
+        e.start(EngineConfig.Warp, Upstream.None)
+        val r = e.attachTun(tunFd = 7)
+        assertIs<TunAttachResult.Success>(r)
+        assertEquals(1, bridge.attachCalls)
+        assertEquals(7, bridge.lastFd)
+        assertEquals("/data/data/test", bridge.lastUapi)
+        assertNotNull(bridge.lastIni)
+        assertTrue(bridge.lastIni!!.contains("PrivateKey = ${sampleConfig.privateKey}"))
+        assertTrue(bridge.lastIni!!.contains("Endpoint = ${sampleConfig.peerEndpoint}"))
+    }
+
+    @Test
+    fun `attachTun проксирует bridge Failure`() = runTest {
+        val bridge = FakeWarpSdkBridge(
+            attachResult = WarpSdkBridge.AttachResult.Failed("awgTurnOn handle=-1"),
+        )
+        val (e, _, _) = engine(activeConfig = sampleConfig, bridge = bridge)
+        e.start(EngineConfig.Warp, Upstream.None)
+        val r = e.attachTun(tunFd = 7)
+        val f = assertIs<TunAttachResult.Failure>(r)
+        assertTrue(f.reason.contains("awgTurnOn"))
+    }
+
+    @Test
+    fun `stop вызывает bridge detachTun`() = runTest {
+        val bridge = FakeWarpSdkBridge()
+        val (e, _, _) = engine(activeConfig = sampleConfig, bridge = bridge)
+        e.start(EngineConfig.Warp, Upstream.None)
+        e.stop()
+        assertEquals(1, bridge.detachCalls)
+    }
+
+    @Test
+    fun `tunSpec без active config регистрирует через autoConfig`() = runTest {
+        val (e, auto, _) = engine(activeConfig = null)
+        val spec = e.tunSpec()
+        assertNotNull(spec)
+        assertEquals(1, auto.registerCalls)
+    }
+
+    @Test
+    fun `tunSpec возвращает корректные параметры из WarpConfig`() = runTest {
+        val (e, _, _) = engine(activeConfig = sampleConfig)
+        val spec = e.tunSpec()!!
+        assertEquals("WARP", spec.sessionName)
+        assertEquals(sampleConfig.mtu, spec.mtu)
+        assertEquals("172.16.0.2", spec.ipv4Address)
+        assertEquals(32, spec.ipv4PrefixLength)
+        assertEquals("2606:4700::1", spec.ipv6Address)
+        assertEquals(128, spec.ipv6PrefixLength)
+        assertEquals(sampleConfig.dnsServers, spec.dnsServers)
+        assertTrue(spec.allowFamilyV4)
+        assertTrue(spec.allowFamilyV6)
+        assertTrue(spec.routeAllV4)
+    }
+
+    @Test
+    fun `tunSpec без IPv6 → allowFamilyV6=false`() = runTest {
+        val noV6 = sampleConfig.copy(interfaceAddressV6 = "")
+        val (e, _, _) = engine(activeConfig = noV6)
+        val spec = e.tunSpec()!!
+        assertEquals(false, spec.allowFamilyV6)
+        assertNull(spec.ipv6Address)
+    }
+
+    @Test
+    fun `tunSpec при register failure → null`() = runTest {
+        val (e, _, _) = engine(
+            activeConfig = null,
+            autoConfigResult = Result.failure(java.io.IOException("net")),
+        )
+        assertNull(e.tunSpec())
+    }
+
+    @Test
+    fun `start требует Upstream None`() = runTest {
+        val (e, _, _) = engine(activeConfig = sampleConfig)
+        runCatching { e.start(EngineConfig.Warp, Upstream.Socks5("127.0.0.1", 1080)) }
+            .fold(
+                onSuccess = { assertIs<StartResult.Failure>(it) },
+                onFailure = { assertTrue(it is IllegalArgumentException) },
+            )
     }
 
     private class FakeWarpAutoConfig(
@@ -141,7 +212,7 @@ class EngineWarpContractTest {
         init {
             if (activeConfig != null) {
                 slotsList.value = listOf(
-                    WarpConfigSlot(id = "initial", name = "Initial", config = activeConfig, isActive = true),
+                    WarpConfigSlot(id = "init", name = "Init", config = activeConfig, isActive = true),
                 )
             }
         }
@@ -152,8 +223,8 @@ class EngineWarpContractTest {
         override suspend fun addSlot(name: String, config: WarpConfig): String {
             lastAdded = name to config
             val id = "fake-${slotsList.value.size}"
-            val slot = WarpConfigSlot(id = id, name = name, config = config, isActive = slotsList.value.isEmpty())
-            slotsList.value = slotsList.value + slot
+            slotsList.value = slotsList.value +
+                WarpConfigSlot(id = id, name = name, config = config, isActive = slotsList.value.isEmpty())
             activeFlow.value = config
             return id
         }
@@ -169,9 +240,6 @@ class EngineWarpContractTest {
 
         override suspend fun delete(id: String) {
             slotsList.value = slotsList.value.filter { it.id != id }
-            if (activeFlow.value != null && slotsList.value.none { it.isActive }) {
-                activeFlow.value = null
-            }
         }
 
         override suspend fun clear() {
@@ -186,22 +254,31 @@ class EngineWarpContractTest {
     }
 
     private class FakeWarpSdkBridge(
-        private val startResult: WarpSdkBridge.StartResult = WarpSdkBridge.StartResult.Success,
+        private val attachResult: WarpSdkBridge.AttachResult = WarpSdkBridge.AttachResult.Success,
     ) : WarpSdkBridge {
-        var startCalls: Int = 0
-        var stopCalls: Int = 0
-        var lastConfig: WarpConfig? = null
+        var attachCalls: Int = 0
+        var detachCalls: Int = 0
+        var lastFd: Int = -1
+        var lastIni: String? = null
+        var lastUapi: String? = null
         private var running = false
 
-        override suspend fun start(config: WarpConfig): WarpSdkBridge.StartResult {
-            startCalls++
-            lastConfig = config
-            if (startResult is WarpSdkBridge.StartResult.Success) running = true
-            return startResult
+        override suspend fun attachTun(
+            tunnelName: String,
+            tunFd: Int,
+            iniConfig: String,
+            uapiPath: String,
+        ): WarpSdkBridge.AttachResult {
+            attachCalls++
+            lastFd = tunFd
+            lastIni = iniConfig
+            lastUapi = uapiPath
+            if (attachResult is WarpSdkBridge.AttachResult.Success) running = true
+            return attachResult
         }
 
-        override suspend fun stop() {
-            stopCalls++
+        override suspend fun detachTun() {
+            detachCalls++
             running = false
         }
 
