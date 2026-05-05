@@ -178,6 +178,11 @@ class EngineWarpContractTest {
             slotsList.value = emptyList()
             activeFlow.value = null
         }
+
+        override suspend fun replaceAll(slots: List<WarpConfigSlot>) {
+            slotsList.value = slots
+            activeFlow.value = slots.firstOrNull { it.isActive }?.config
+        }
     }
 
     private class FakeWarpSdkBridge(

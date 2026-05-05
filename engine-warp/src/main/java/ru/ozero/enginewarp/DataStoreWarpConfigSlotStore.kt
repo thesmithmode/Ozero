@@ -72,6 +72,12 @@ class DataStoreWarpConfigSlotStore(
         }
     }
 
+    override suspend fun replaceAll(slots: List<WarpConfigSlot>): Unit = mutex.withLock {
+        dataStore.edit { prefs ->
+            prefs[KEY_SLOTS] = serializeSlots(slots)
+        }
+    }
+
     override suspend fun clear(): Unit = mutex.withLock {
         dataStore.edit { prefs ->
             prefs.remove(KEY_SLOTS)

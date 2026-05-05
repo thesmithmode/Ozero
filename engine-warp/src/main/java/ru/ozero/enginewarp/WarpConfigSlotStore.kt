@@ -10,5 +10,6 @@ interface WarpConfigSlotStore {
     suspend fun rename(id: String, name: String)
     suspend fun delete(id: String)
     suspend fun clear()
+    suspend fun replaceAll(slots: List<WarpConfigSlot>)
     suspend fun migrateIfNeeded() {}
 }
