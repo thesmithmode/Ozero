@@ -3,12 +3,15 @@ package ru.ozero.enginescore
 import android.os.Build
 
 object RomCompat {
-    fun isNubiaRedMagic(): Boolean {
-        val manufacturer = Build.MANUFACTURER.lowercase()
-        val model = Build.MODEL.lowercase()
-        return manufacturer.contains("nubia") ||
-            manufacturer.contains("zte") ||
-            model.contains("redmagic") ||
-            model.contains("nx7")
+    fun isNubiaRedMagic(
+        manufacturer: String = Build.MANUFACTURER ?: "",
+        model: String = Build.MODEL ?: "",
+    ): Boolean {
+        val mfr = manufacturer.lowercase()
+        val mdl = model.lowercase()
+        return mfr.contains("nubia") ||
+            mfr.contains("zte") ||
+            mdl.contains("redmagic") ||
+            mdl.contains("nx7")
     }
 }

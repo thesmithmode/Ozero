@@ -78,7 +78,7 @@ class DataStoreWarpConfigSlotStore(
         }
     }
 
-    suspend fun migrateIfNeeded() {
+    override suspend fun migrateIfNeeded() {
         val alreadyDone = dataStore.data.map { it[KEY_MIGRATION_DONE] ?: false }.first()
         if (alreadyDone) return
         val legacyConfig = legacyStore.current().first()
