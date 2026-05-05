@@ -233,4 +233,15 @@
     <string name="engine_chip_auto">Авто</string>
 
     <string name="mode_expert_badge">EXPERT</string>
+
+    <string name="backup_title">Экспорт / Импорт</string>
+    <string name="backup_summary">Сохранить или восстановить все настройки</string>
+    <string name="backup_export_button">Экспортировать настройки</string>
+    <string name="backup_import_button">Импортировать настройки</string>
+    <string name="backup_warning">Файл резервной копии содержит чувствительные данные (ключи WireGuard, токены). Храните его в надёжном месте.</string>
+    <string name="backup_export_success">Настройки успешно экспортированы</string>
+    <string name="backup_import_success">Настройки успешно импортированы. Перезапустите приложение для применения.</string>
+    <string name="backup_error">Ошибка: %1$s</string>
+    <string name="backup_in_progress">Выполняется…</string>
+    <string name="backup_filename">ozero_backup.json</string>
 </resources>

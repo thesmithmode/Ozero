@@ -56,6 +56,7 @@ fun SettingsScreen(
     onOpenManualServer: () -> Unit = {},
     onOpenStatsHistory: () -> Unit = {},
     onOpenDiagnostics: () -> Unit = {},
+    onOpenBackup: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -74,6 +75,7 @@ fun SettingsScreen(
             onOpenManualServer = onOpenManualServer,
             onOpenStatsHistory = onOpenStatsHistory,
             onOpenDiagnostics = onOpenDiagnostics,
+            onOpenBackup = onOpenBackup,
         ),
         onSplitModeChange = viewModel::onSplitModeChange,
         onIpv6Toggle = viewModel::onIpv6Toggle,
@@ -208,6 +210,8 @@ private fun ContentBody(
         item { StatsHistorySection(onOpenStats = nav.onOpenStatsHistory) }
         item { SectionDivider() }
         item { DiagnosticsSection(onOpenDiagnostics = nav.onOpenDiagnostics) }
+        item { SectionDivider() }
+        item { BackupSection(onOpenBackup = nav.onOpenBackup) }
         item { SectionDivider() }
         item {
             LanguageSection(
@@ -347,6 +351,17 @@ private fun StatsHistorySection(onOpenStats: () -> Unit) {
         summary = stringResource(R.string.stats_history_summary),
         tag = "settings_stats_history_row",
         onClick = onOpenStats,
+        enabled = true,
+    )
+}
+
+@Composable
+private fun BackupSection(onOpenBackup: () -> Unit) {
+    NavRow(
+        title = stringResource(R.string.backup_title),
+        summary = stringResource(R.string.backup_summary),
+        tag = "settings_backup_row",
+        onClick = onOpenBackup,
         enabled = true,
     )
 }

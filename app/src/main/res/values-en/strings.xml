@@ -224,4 +224,15 @@
     <string name="engine_chip_auto">Auto</string>
 
     <string name="mode_expert_badge">EXPERT</string>
+
+    <string name="backup_title">Export / Import</string>
+    <string name="backup_summary">Save or restore all settings</string>
+    <string name="backup_export_button">Export settings</string>
+    <string name="backup_import_button">Import settings</string>
+    <string name="backup_warning">The backup file contains sensitive data (WireGuard keys, tokens). Store it in a safe place.</string>
+    <string name="backup_export_success">Settings exported successfully</string>
+    <string name="backup_import_success">Settings imported successfully. Restart the app to apply changes.</string>
+    <string name="backup_error">Error: %1$s</string>
+    <string name="backup_in_progress">Processing…</string>
+    <string name="backup_filename">ozero_backup.json</string>
 </resources>

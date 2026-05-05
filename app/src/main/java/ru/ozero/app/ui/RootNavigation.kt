@@ -7,6 +7,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import ru.ozero.app.ui.about.AboutScreen
+import ru.ozero.app.ui.backup.BackupScreen
 import ru.ozero.app.ui.diag.DiagnosticsScreen
 import ru.ozero.app.ui.logs.LogsScreen
 import ru.ozero.app.ui.servers.ManualServerScreen
@@ -47,7 +48,9 @@ fun RootNavigation(
                 onOpenManualServer = { navigate(TopScreen.ManualServer) },
                 onOpenStatsHistory = { navigate(TopScreen.StatsHistory) },
                 onOpenDiagnostics = { navigate(TopScreen.Diagnostics) },
+                onOpenBackup = { navigate(TopScreen.Backup) },
             )
+        TopScreen.Backup -> BackupScreen(onBack = { back() })
         TopScreen.Logs -> LogsScreen(onBack = { back() })
         TopScreen.Diagnostics -> DiagnosticsScreen(onBack = { back() })
         TopScreen.SplitTunnel -> SplitTunnelScreen(onBack = { back() })

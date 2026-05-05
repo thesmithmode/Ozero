@@ -11,4 +11,5 @@ data class SettingsNavActions(
     val onOpenManualServer: () -> Unit = {},
     val onOpenStatsHistory: () -> Unit = {},
     val onOpenDiagnostics: () -> Unit = {},
+    val onOpenBackup: () -> Unit = {},
 )
