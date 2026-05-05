@@ -127,9 +127,15 @@ class RealUrnetworkSdkBridgeContractTest {
         assertTrue(
             helperBlock.contains("activeNetworkSpace?.let") &&
                 helperBlock.contains("getNetworkSpace(key)?.let") &&
-                helperBlock.contains("importNetworkSpaceFromJson"),
+                helperBlock.contains("updateNetworkSpace(key)") &&
+                helperBlock.contains("values.linkHostName") &&
+                helperBlock.contains("values.migrationHostName") &&
+                helperBlock.contains("values.bundled = true"),
+            "resolveNetworkSpace обязан использовать updateNetworkSpace(key) с bundled полями " +
+                "(linkHostName, migrationHostName, wallet, bundled=true) — без них Go SDK падает " +
+                "SIGABRT на networkCreate.",
         )
-        listOf("using active", "using stored", "imported default").forEach { phrase ->
+        listOf("using active", "using stored", "updated bundled").forEach { phrase ->
             assertTrue(helperBlock.contains(phrase))
         }
     }

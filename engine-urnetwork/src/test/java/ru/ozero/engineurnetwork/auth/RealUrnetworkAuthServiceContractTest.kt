@@ -71,12 +71,16 @@ class RealUrnetworkAuthServiceContractTest {
     }
 
     @Test
-    fun `ensureApi обрабатывает null space fallback через importNetworkSpaceFromJson`() {
+    fun `ensureApi обрабатывает null space fallback через updateNetworkSpace bundled`() {
         val ensureBlock = source.substringAfter("private fun ensureApi")
         assertTrue(
-            ensureBlock.contains("importNetworkSpaceFromJson"),
-            "ensureApi обязан fallback к importNetworkSpaceFromJson если getNetworkSpace вернул null — " +
-                "первый запуск не имеет сохранённых пространств, необходимо создать.",
+            ensureBlock.contains("updateNetworkSpace(key)") &&
+                ensureBlock.contains("values.linkHostName") &&
+                ensureBlock.contains("values.migrationHostName") &&
+                ensureBlock.contains("values.bundled = true"),
+            "ensureApi обязан создавать NetworkSpace через updateNetworkSpace(key) с bundled полями " +
+                "(linkHostName, migrationHostName, wallet, bundled=true) — без них Go SDK падает SIGABRT " +
+                "на networkCreate (повторение бага v0.0.2).",
         )
         assertTrue(
             ensureBlock.contains("catch (t: Throwable)"),
@@ -89,7 +93,7 @@ class RealUrnetworkAuthServiceContractTest {
     fun `resolveNetworkSpace fallback chain с stackTrace логированием`() {
         val helperBlock = source.substringAfter("private fun resolveNetworkSpace")
             .substringBefore("private companion object")
-        listOf("activeNetworkSpace?.let", "getNetworkSpace(key)?.let", "importNetworkSpaceFromJson").forEach { needle ->
+        listOf("activeNetworkSpace?.let", "getNetworkSpace(key)?.let", "updateNetworkSpace(key)").forEach { needle ->
             assertTrue(
                 helperBlock.contains(needle),
                 "resolveNetworkSpace обязан содержать '$needle' — fallback chain active -> stored -> imported",

@@ -127,19 +127,30 @@ class RealUrnetworkAuthService(
                 .onFailure { e -> PersistentLoggers.warn(TAG, "setActiveNetworkSpace(stored) failed: ${e.message}") }
             return it
         }
-        val imported = manager.importNetworkSpaceFromJson(
-            """{"host_name":"$DEFAULT_HOST","env_name":"$DEFAULT_ENV"}""",
-        ) ?: return null
-        manager.setActiveNetworkSpace(imported)
-        PersistentLoggers.info(TAG, "imported default NetworkSpace")
-        return imported
+        val updated = manager.updateNetworkSpace(key) { values ->
+            values.envSecret = ""
+            values.bundled = true
+            values.netExposeServerIps = true
+            values.netExposeServerHostNames = true
+            values.linkHostName = LINK_HOST_NAME
+            values.migrationHostName = MIGRATION_HOST_NAME
+            values.store = ""
+            values.wallet = WALLET
+            values.ssoGoogle = false
+        } ?: return null
+        manager.setActiveNetworkSpace(updated)
+        PersistentLoggers.info(TAG, "updated bundled NetworkSpace host=$DEFAULT_HOST env=$DEFAULT_ENV")
+        return updated
     }
 
     private companion object {
         const val TAG = "RealUrnetworkAuthService"
         const val URN_AUTH_STORAGE_DIR = "urnetwork_auth"
         const val DEFAULT_HOST = "ur.network"
-        const val DEFAULT_ENV = "prod"
+        const val DEFAULT_ENV = "main"
+        const val LINK_HOST_NAME = "ur.io"
+        const val MIGRATION_HOST_NAME = "bringyour.com"
+        const val WALLET = "solana"
         const val DEVICE_DESCRIPTION = "Ozero VPN Android"
         const val DEVICE_SPEC = "android"
     }
