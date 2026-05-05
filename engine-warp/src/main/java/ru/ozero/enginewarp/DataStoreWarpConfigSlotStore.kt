@@ -82,18 +82,16 @@ class DataStoreWarpConfigSlotStore(
         val alreadyDone = dataStore.data.map { it[KEY_MIGRATION_DONE] ?: false }.first()
         if (alreadyDone) return
         val legacyConfig = legacyStore.current().first()
-        mutex.withLock {
-            dataStore.edit { prefs ->
-                if (prefs[KEY_MIGRATION_DONE] == true) return@edit
-                prefs[KEY_MIGRATION_DONE] = true
-                if (legacyConfig == null) return@edit
-                val existing = parseSlots(prefs[KEY_SLOTS] ?: "[]")
-                if (existing.isNotEmpty()) return@edit
-                val id = UUID.randomUUID().toString()
-                val slot = WarpConfigSlot(id = id, name = "Migrated", config = legacyConfig, isActive = true)
-                prefs[KEY_SLOTS] = serializeSlots(listOf(slot))
-                PersistentLoggers.info(TAG, "migrated legacy WARP config to slot $id")
-            }
+        dataStore.edit { prefs ->
+            if (prefs[KEY_MIGRATION_DONE] == true) return@edit
+            prefs[KEY_MIGRATION_DONE] = true
+            if (legacyConfig == null) return@edit
+            val existing = parseSlots(prefs[KEY_SLOTS] ?: "[]")
+            if (existing.isNotEmpty()) return@edit
+            val id = UUID.randomUUID().toString()
+            val slot = WarpConfigSlot(id = id, name = "Migrated", config = legacyConfig, isActive = true)
+            prefs[KEY_SLOTS] = serializeSlots(listOf(slot))
+            PersistentLoggers.info(TAG, "migrated legacy WARP config to slot $id")
         }
     }
 

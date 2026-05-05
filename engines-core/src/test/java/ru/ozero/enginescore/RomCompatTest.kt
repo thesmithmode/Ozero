@@ -32,4 +32,7 @@ class RomCompatTest {
 
     @Test
     fun xiaomi_device_returns_false() = assertFalse(check("Xiaomi", "Redmi Note 12"))
+
+    @Test
+    fun empty_strings_return_false() = assertFalse(check("", ""))
 }

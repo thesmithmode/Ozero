@@ -45,7 +45,11 @@ class WarpEngineSettingsViewModel @Inject constructor(
     private var registerJob: Job? = null
 
     init {
-        viewModelScope.launch { store.migrateIfNeeded() }
+        viewModelScope.launch {
+            runCatching { store.migrateIfNeeded() }.onFailure { t ->
+                _uiState.value = _uiState.value.copy(errorMessage = t.message ?: "migration failed")
+            }
+        }
         store.slots().onEach { slots ->
             _uiState.value = _uiState.value.copy(
                 slots = slots,
