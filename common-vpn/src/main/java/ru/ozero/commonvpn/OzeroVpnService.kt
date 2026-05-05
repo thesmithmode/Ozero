@@ -217,7 +217,7 @@ class OzeroVpnService : android.net.VpnService() {
             runCatching { settingsRepository.settings.first() }.getOrNull()
         }?.splitMode ?: ru.ozero.enginescore.settings.SplitTunnelMode.ALL
         val splitCfg = ru.ozero.commonvpn.split.SplitTunnelConfig(mode = splitMode, packages = splitPackages)
-        val builder = buildTunBuilderFromSpec(spec)
+        val builder = applyEngineTunSpec(spec)
         ru.ozero.commonvpn.split.TunBuilderConfigurator(packageName).apply(builder, splitCfg)
         val pfd = try {
             builder.establish()
@@ -495,7 +495,7 @@ class OzeroVpnService : android.net.VpnService() {
         }
     }
 
-    internal fun buildTunBuilderFromSpec(spec: ru.ozero.enginescore.TunSpec): Builder {
+    internal fun applyEngineTunSpec(spec: ru.ozero.enginescore.TunSpec): Builder {
         val builder = Builder()
             .setSession(spec.sessionName)
             .setMtu(spec.mtu)
