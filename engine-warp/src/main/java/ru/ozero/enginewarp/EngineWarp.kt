@@ -51,7 +51,8 @@ class EngineWarp(
                 PersistentLoggers.error(TAG, "register failure: $msg")
                 return StartResult.Failure(reason = "WARP register failed: $msg", cause = t)
             }
-            configStore.addSlot("WARP Auto", fresh)
+            val slotId = configStore.addSlot("WARP Auto", fresh)
+            PersistentLoggers.info(TAG, "auto-registered config saved as slot $slotId")
             fresh
         }
 

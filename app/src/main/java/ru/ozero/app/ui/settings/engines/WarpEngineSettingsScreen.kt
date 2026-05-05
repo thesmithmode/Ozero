@@ -194,6 +194,31 @@ private fun SlotListContent(
 }
 
 @Composable
+private fun WarpGenerateButton(
+    isRegistering: Boolean,
+    onGenerate: () -> Unit,
+    onCancelGenerate: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Button(
+        onClick = if (isRegistering) onCancelGenerate else onGenerate,
+        modifier = modifier.testTag("warp_generate_button"),
+    ) {
+        if (isRegistering) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(
+                    modifier = Modifier.padding(end = 8.dp),
+                    strokeWidth = 2.dp,
+                )
+                Text(stringResource(R.string.warp_cancel_generation))
+            }
+        } else {
+            Text(stringResource(R.string.warp_generate))
+        }
+    }
+}
+
+@Composable
 private fun WarpActionRow(
     isRegistering: Boolean,
     onGenerate: () -> Unit,
@@ -205,22 +230,12 @@ private fun WarpActionRow(
         modifier = modifier.fillMaxWidth().padding(16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Button(
-            onClick = if (isRegistering) onCancelGenerate else onGenerate,
-            modifier = Modifier.weight(1f).testTag("warp_generate_button"),
-        ) {
-            if (isRegistering) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.padding(end = 8.dp),
-                        strokeWidth = 2.dp,
-                    )
-                    Text(stringResource(R.string.warp_cancel_generation))
-                }
-            } else {
-                Text(stringResource(R.string.warp_generate))
-            }
-        }
+        WarpGenerateButton(
+            isRegistering = isRegistering,
+            onGenerate = onGenerate,
+            onCancelGenerate = onCancelGenerate,
+            modifier = Modifier.weight(1f),
+        )
         OutlinedButton(
             onClick = onImportFile,
             enabled = !isRegistering,
@@ -279,22 +294,12 @@ private fun EmptyConfigCard(
                     color = MaterialTheme.colorScheme.error,
                 )
             }
-            Button(
-                onClick = if (isRegistering) onCancelGenerate else onGenerate,
-                modifier = Modifier.fillMaxWidth().testTag("warp_generate_button"),
-            ) {
-                if (isRegistering) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.padding(end = 8.dp),
-                            strokeWidth = 2.dp,
-                        )
-                        Text(stringResource(R.string.warp_cancel_generation))
-                    }
-                } else {
-                    Text(stringResource(R.string.warp_generate))
-                }
-            }
+            WarpGenerateButton(
+                isRegistering = isRegistering,
+                onGenerate = onGenerate,
+                onCancelGenerate = onCancelGenerate,
+                modifier = Modifier.fillMaxWidth(),
+            )
             if (isRegistering && progressText != null) {
                 Text(
                     text = progressText,
