@@ -266,7 +266,7 @@ class WarpEngineSettingsViewModelTest {
         assertNull(vm.uiState.value.progressText, "progressText сбрасывается после успеха")
     }
 
-    private class FakeWarpStore : WarpConfigSlotStore {
+    private open class FakeWarpStore : WarpConfigSlotStore {
         private val slotsFlow = MutableStateFlow<List<WarpConfigSlot>>(emptyList())
         val setActiveCalls = mutableListOf<String>()
         var lastRenameCall: Pair<String, String>? = null
@@ -305,6 +305,10 @@ class WarpEngineSettingsViewModelTest {
 
         override suspend fun clear() {
             slotsFlow.value = emptyList()
+        }
+
+        override suspend fun replaceAll(slots: List<WarpConfigSlot>) {
+            slotsFlow.value = slots
         }
     }
 
