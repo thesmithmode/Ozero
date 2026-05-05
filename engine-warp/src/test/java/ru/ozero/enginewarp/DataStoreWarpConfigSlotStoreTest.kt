@@ -2,9 +2,9 @@ package ru.ozero.enginewarp
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.core.toMutablePreferences
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -45,18 +45,7 @@ class DataStoreWarpConfigSlotStoreTest {
     private fun buildLegacyDataStore(config: WarpConfig?): FakePreferencesDataStore {
         val ds = FakePreferencesDataStore()
         if (config == null) return ds
-        kotlinx.coroutines.runBlocking {
-            ds.updateData { prefs ->
-                val m = prefs.toMutablePreferences()
-                m[stringPreferencesKey("warp_priv")] = config.privateKey
-                m[stringPreferencesKey("warp_pub")] = config.publicKey
-                m[stringPreferencesKey("warp_peer_pub")] = config.peerPublicKey
-                m[stringPreferencesKey("warp_peer_endpoint")] = config.peerEndpoint
-                m[stringPreferencesKey("warp_iface_v4")] = config.interfaceAddressV4
-                m[stringPreferencesKey("warp_iface_v6")] = config.interfaceAddressV6
-                m
-            }
-        }
+        runBlocking { DataStoreWarpConfigStore(ds).save(config) }
         return ds
     }
 
@@ -251,12 +240,7 @@ class DataStoreWarpConfigSlotStoreTest {
     @Test
     fun `corrupted JSON в DataStore — slots возвращает пустой список без краша`() = runTest {
         val ds = FakePreferencesDataStore()
-        ds.updateData { prefs ->
-            val mutable = prefs.toMutablePreferences()
-            mutable[stringPreferencesKey("warp_slots_json")] =
-                "not-valid-json{"
-            mutable
-        }
+        ds.edit { it[stringPreferencesKey("warp_slots_json")] = "not-valid-json{" }
         val store = DataStoreWarpConfigSlotStore(ds, DataStoreWarpConfigStore(FakePreferencesDataStore()))
         assertTrue(store.slots().first().isEmpty())
     }
