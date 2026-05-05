@@ -528,8 +528,9 @@ class OzeroVpnService : android.net.VpnService() {
                 builder.addRoute("0.0.0.0", 0)
             }
         }
-        if (spec.allowFamilyV6 && spec.ipv6Address != null) {
-            builder.addAddress(spec.ipv6Address, spec.ipv6PrefixLength)
+        val v6 = spec.ipv6Address
+        if (spec.allowFamilyV6 && v6 != null) {
+            builder.addAddress(v6, spec.ipv6PrefixLength)
             if (spec.routeAllV6) builder.addRoute("::", 0)
         }
         return builder
