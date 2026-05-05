@@ -21,16 +21,17 @@ class ProxyWarpAutoConfig(
     private val shuffler: (List<String>) -> List<String> = { it.shuffled() },
 ) : WarpAutoConfig {
 
-    override suspend fun register(): Result<WarpConfig> {
+    override suspend fun register(onProgress: ((String) -> Unit)?): Result<WarpConfig> {
         val ordered = shuffler(mirrors)
         if (ordered.isEmpty()) {
             return Result.failure(IOException("WARP register: список зеркал пуст"))
         }
+        val total = ordered.size
         PersistentLoggers.info(
             TAG,
-            "register: ${ordered.size} mirrors, concurrency=$concurrency, budget=${totalBudgetMs}ms",
+            "register: $total mirrors, concurrency=$concurrency, budget=${totalBudgetMs}ms",
         )
-        val winner = withTimeoutOrNull(totalBudgetMs) { raceMirrors(ordered) }
+        val winner = withTimeoutOrNull(totalBudgetMs) { raceMirrors(ordered, total, onProgress) }
         return when {
             winner == null -> {
                 PersistentLoggers.error(TAG, "register: total budget exceeded (${totalBudgetMs}ms)")
@@ -48,10 +49,15 @@ class ProxyWarpAutoConfig(
         }
     }
 
-    private suspend fun raceMirrors(ordered: List<String>): Result<WarpConfig> = coroutineScope {
+    private suspend fun raceMirrors(
+        ordered: List<String>,
+        total: Int,
+        onProgress: ((String) -> Unit)?,
+    ): Result<WarpConfig> = coroutineScope {
         val iterator = ordered.iterator()
         val inFlight = ArrayDeque<Deferred<Result<WarpConfig>>>()
         var lastError: Throwable? = null
+        var tried = 0
         while (iterator.hasNext() && inFlight.size < concurrency) {
             inFlight.add(spawnMirror(iterator.next()))
         }
@@ -62,11 +68,14 @@ class ProxyWarpAutoConfig(
                 }
             }
             inFlight.remove(finished)
+            tried++
             val r = finished.getCompleted()
             if (r.isSuccess) {
+                onProgress?.invoke("$tried/$total")
                 inFlight.forEach { it.cancel() }
                 return@coroutineScope r
             } else {
+                onProgress?.invoke("$tried/$total")
                 lastError = r.exceptionOrNull() ?: lastError
                 if (iterator.hasNext()) {
                     inFlight.add(spawnMirror(iterator.next()))
