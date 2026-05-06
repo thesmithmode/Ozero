@@ -88,9 +88,27 @@ class RealUrnetworkSdkBridgeContractTest {
         val stopBlock = source.substringAfter("override suspend fun stop").substringBefore("override fun isRunning")
         assertTrue(stopBlock.contains("running.set(false)"))
         assertTrue(stopBlock.contains("ioLoopRef.getAndSet(null)"))
-        assertTrue(stopBlock.contains("deviceRef.getAndSet(null)"))
         val runCatchingCount = stopBlock.split("runCatching").size - 1
-        assertTrue(runCatchingCount >= 3, "Каждый close()/setTunnelStarted в runCatching, found=$runCatchingCount")
+        assertTrue(runCatchingCount >= 2, "Каждый close() в runCatching, found=$runCatchingCount")
+    }
+
+    @Test
+    fun `stop() не закрывает device пока IoLoop активен — SIGABRT guard`() {
+        val stopBlock = source.substringAfter("override suspend fun stop").substringBefore("override fun isRunning")
+        assertTrue(
+            stopBlock.contains("hadLoop") || stopBlock.contains("IoLoop still running"),
+            "device.close() в stop() при активном IoLoop = use-after-free → SIGABRT на Nubia/RedMagic",
+        )
+    }
+
+    @Test
+    fun `IoLoopDoneCallback закрывает device после завершения IoLoop`() {
+        val attachBlock = source.substringAfter("override suspend fun attachTun")
+            .substringBefore("private fun cleanupOnFailure")
+        assertTrue(
+            attachBlock.contains("closeDevice") || attachBlock.contains("device.close"),
+            "device должен закрываться в IoLoopDoneCallback, не в stop()",
+        )
     }
 
     @Test

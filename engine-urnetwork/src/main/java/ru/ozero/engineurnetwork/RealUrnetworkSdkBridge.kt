@@ -100,18 +100,26 @@ class RealUrnetworkSdkBridge(
                 runCatching { vc.close() }
                     .onFailure { PersistentLoggers.warn(TAG, "connectVc.close threw: ${it.message}") }
             }
-            ioLoopRef.getAndSet(null)?.also { loop ->
+            val hadLoop = ioLoopRef.getAndSet(null)?.also { loop ->
                 runCatching { loop.close() }
                     .onFailure { PersistentLoggers.warn(TAG, "ioLoop.close threw: ${it.message}") }
-            }
-            deviceRef.getAndSet(null)?.also { device ->
-                runCatching { device.setTunnelStarted(false) }
-                    .onFailure { PersistentLoggers.warn(TAG, "setTunnelStarted(false) threw: ${it.message}") }
-                runCatching { device.close() }
-                    .onFailure { PersistentLoggers.warn(TAG, "device.close threw: ${it.message}") }
+            } != null
+            if (!hadLoop) {
+                deviceRef.getAndSet(null)?.also { device -> closeDevice(device) }
+            } else {
+                // IoLoop still running its goroutines — IoLoopDoneCallback will close device
+                // after Go runtime finishes; closing device here = use-after-free → SIGABRT
+                deviceRef.set(null)
             }
         }
         PersistentLoggers.info(TAG, "stop complete")
+    }
+
+    private fun closeDevice(device: DeviceLocal) {
+        runCatching { device.setTunnelStarted(false) }
+            .onFailure { PersistentLoggers.warn(TAG, "setTunnelStarted(false) threw: ${it.message}") }
+        runCatching { device.close() }
+            .onFailure { PersistentLoggers.warn(TAG, "device.close threw: ${it.message}") }
     }
 
     override fun isRunning(): Boolean = running.get()
@@ -127,11 +135,13 @@ class RealUrnetworkSdkBridge(
         }
         return withContext(Dispatchers.Main.immediate) {
             try {
+                val capturedDevice = device
                 val callback = IoLoopDoneCallback {
                     PersistentLoggers.info(TAG, "IoLoop done — tunnel ended")
                     running.set(false)
+                    closeDevice(capturedDevice)
                 }
-                val loop = Sdk.newIoLoop(device, tunFd, callback)
+                val loop = Sdk.newIoLoop(capturedDevice, tunFd, callback)
                 ioLoopRef.set(loop)
                 runCatching { device.setTunnelStarted(true) }
                     .onFailure { PersistentLoggers.warn(TAG, "setTunnelStarted(true) threw: ${it.message}") }
