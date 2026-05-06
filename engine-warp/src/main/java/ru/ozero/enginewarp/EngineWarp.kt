@@ -106,6 +106,8 @@ class EngineWarp(
         )
         val uapiPath = uapiPathProvider()
         PersistentLoggers.info(TAG, "attachTun fd=$tunFd uapi=$uapiPath")
+        val maskedIni = ini.replace(Regex("(?m)^(PrivateKey\\s*=\\s*)(.+)$"), "$1<masked>")
+        PersistentLoggers.info(TAG, "ini:\n$maskedIni")
         return when (val r = sdkBridge.attachTun(TUNNEL_NAME, tunFd, ini, uapiPath, socketProtector)) {
             WarpSdkBridge.AttachResult.Success -> TunAttachResult.Success
             is WarpSdkBridge.AttachResult.Failed -> TunAttachResult.Failure(r.reason)

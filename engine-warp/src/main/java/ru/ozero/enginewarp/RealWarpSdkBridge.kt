@@ -138,6 +138,7 @@ class ReLinkerAwgRuntime(context: Context) : AwgRuntime {
 
     override fun turnOn(name: String, tunFd: Int, ini: String, uapiPath: String): Int {
         loadOnce()
+        PersistentLoggers.info(TAG, "awg version=${GoBackend.awgVersion()}")
         return GoBackend.awgTurnOn(name, tunFd, ini, uapiPath)
     }
 
