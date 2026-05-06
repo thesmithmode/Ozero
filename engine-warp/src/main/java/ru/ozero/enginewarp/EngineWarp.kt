@@ -57,12 +57,10 @@ class EngineWarp(
         resolvedConfig = effective
         resolvedIni = WarpIniBuilder.build(effective)
         PersistentLoggers.info(TAG, "resolved config: $effective")
-        PersistentLoggers.info(TAG, "start ready — ini cached, ждём attachTun")
         return StartResult.Success(socksPort = WARP_NO_SOCKS_PORT)
     }
 
     override suspend fun stop() {
-        PersistentLoggers.info(TAG, "stop — detachTun")
         sdkBridge.detachTun()
         resolvedConfig = null
         resolvedIni = null
@@ -106,12 +104,14 @@ class EngineWarp(
             reason = "attachTun до start — нет ini config",
         )
         val uapiPath = uapiPathProvider()
-        PersistentLoggers.info(TAG, "attachTun fd=$tunFd uapi=$uapiPath")
-        val maskedIni = ini.replace(Regex("(?m)^(PrivateKey\\s*=\\s*)(.+)$"), "$1<masked>")
-        PersistentLoggers.info(TAG, "ini:\n$maskedIni")
+        PersistentLoggers.info(TAG, "attachTun fd=$tunFd uapi=$uapiPath/$TUNNEL_NAME.sock")
         return when (val r = sdkBridge.attachTun(TUNNEL_NAME, tunFd, ini, uapiPath, socketProtector)) {
             WarpSdkBridge.AttachResult.Success -> TunAttachResult.Success
-            is WarpSdkBridge.AttachResult.Failed -> TunAttachResult.Failure(r.reason)
+            is WarpSdkBridge.AttachResult.Failed -> {
+                val maskedIni = ini.replace(Regex("(?m)^(PrivateKey\\s*=\\s*)(.+)$"), "$1<masked>")
+                PersistentLoggers.error(TAG, "attachTun failed: ${r.reason}\nini:\n$maskedIni")
+                TunAttachResult.Failure(r.reason)
+            }
         }
     }
 

@@ -30,7 +30,6 @@ class RealWarpSdkBridge internal constructor(
         try {
             val handle = awgRuntime.turnOn(tunnelName, tunFd, iniConfig, uapiPath)
             if (handle < 0) {
-                PersistentLoggers.error(TAG, "awgTurnOn returned negative handle=$handle")
                 return@withContext WarpSdkBridge.AttachResult.Failed("awgTurnOn handle=$handle")
             }
             tunnelHandle = handle
@@ -138,8 +137,9 @@ class ReLinkerAwgRuntime(context: Context) : AwgRuntime {
 
     override fun turnOn(name: String, tunFd: Int, ini: String, uapiPath: String): Int {
         loadOnce()
-        PersistentLoggers.info(TAG, "awg version=${GoBackend.awgVersion()}")
-        return GoBackend.awgTurnOn(name, tunFd, ini, uapiPath)
+        val result = GoBackend.awgTurnOn(name, tunFd, ini, uapiPath)
+        PersistentLoggers.info(TAG, "awgTurnOn name=$name fd=$tunFd version=${GoBackend.awgVersion()} → handle=$result")
+        return result
     }
 
     override fun turnOff(handle: Int) {
