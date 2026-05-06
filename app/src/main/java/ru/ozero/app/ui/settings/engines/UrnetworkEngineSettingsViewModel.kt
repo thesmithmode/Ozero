@@ -62,7 +62,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
             }
             locationsVc = vc
             withContext(Dispatchers.Main.immediate) {
-                vc.addFilteredLocationsListener { filtered ->
+                vc.addFilteredLocationsListener { filtered, _ ->
                     viewModelScope.launch {
                         updateLocations(filtered)
                     }

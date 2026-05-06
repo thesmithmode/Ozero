@@ -22,6 +22,7 @@ dependencies {
     // Если папка пуста (Stub-режим до CI download) — fileTree резолвится в
     // пустой набор, конфигурация не падает, StubUrnetworkSdkBridge активен.
     compileOnly(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar", "*.jar"))))
+    testImplementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar", "*.jar"))))
 
     testImplementation(libs.bundles.junit5)
     testRuntimeOnly(libs.junit.jupiter.engine)
