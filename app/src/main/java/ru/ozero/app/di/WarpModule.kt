@@ -94,7 +94,7 @@ object WarpModule {
         autoConfig = autoConfig,
         configStore = store,
         sdkBridge = bridge,
-        uapiPathProvider = { context.dataDir.absolutePath },
+        uapiPathProvider = { context.filesDir.absolutePath },
         socketProtector = ru.ozero.enginescore.VpnSocketProtectorHolder,
     )
 }
