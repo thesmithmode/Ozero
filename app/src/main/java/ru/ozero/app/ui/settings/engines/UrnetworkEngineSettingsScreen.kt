@@ -10,8 +10,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -19,6 +22,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -30,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -87,11 +92,14 @@ fun UrnetworkEngineSettingsScreen(
             }
             is UrnetworkSettingsUiState.Ready -> {
                 val ready = state as UrnetworkSettingsUiState.Ready
+                val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
                 LocationListContent(
                     modifier = Modifier.padding(padding),
                     countries = ready.countries,
                     selectedLocation = ready.selectedLocation,
                     providePaused = ready.providePaused,
+                    searchQuery = searchQuery,
+                    onSearchQueryChange = viewModel::setSearchQuery,
                     onSelect = viewModel::selectLocation,
                     onSetProvidePaused = viewModel::setProvidePaused,
                 )
@@ -106,6 +114,8 @@ private fun LocationListContent(
     countries: List<UrnetworkLocationItem>,
     selectedLocation: ConnectLocation?,
     providePaused: Boolean,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
     onSelect: (ConnectLocation?) -> Unit,
     onSetProvidePaused: (Boolean) -> Unit,
 ) {
@@ -145,17 +155,34 @@ private fun LocationListContent(
                     style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
                 )
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = onSearchQueryChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text(stringResource(R.string.urnetwork_search_hint)) },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { onSearchQueryChange("") }) {
+                                Icon(Icons.Filled.Clear, contentDescription = null)
+                            }
+                        }
+                    },
+                    singleLine = true,
+                )
             }
         }
-        item {
-            LocationRow(
-                name = stringResource(R.string.urnetwork_location_best_available),
-                countryCode = "",
-                providerCount = 0,
-                selected = isBestAvailable,
-                onClick = { onSelect(null) },
-            )
-            HorizontalDivider()
+        if (searchQuery.isEmpty()) {
+            item {
+                LocationRow(
+                    name = stringResource(R.string.urnetwork_location_best_available),
+                    flag = "",
+                    providerCount = 0,
+                    selected = isBestAvailable,
+                    onClick = { onSelect(null) },
+                )
+                HorizontalDivider()
+            }
         }
         items(countries, key = { it.countryCode.ifEmpty { it.name } }) { item ->
             val selected = !isBestAvailable &&
@@ -163,7 +190,7 @@ private fun LocationListContent(
                 selectedLocation.country == item.location.country
             LocationRow(
                 name = item.name,
-                countryCode = item.countryCode,
+                flag = item.flag,
                 providerCount = item.providerCount,
                 selected = selected,
                 onClick = { onSelect(item.location) },
@@ -176,7 +203,7 @@ private fun LocationListContent(
 @Composable
 private fun LocationRow(
     name: String,
-    countryCode: String,
+    flag: String,
     providerCount: Int,
     selected: Boolean,
     onClick: () -> Unit,
@@ -184,15 +211,23 @@ private fun LocationRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .selectable(selected = selected, onClick = onClick, role = Role.RadioButton)
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        RadioButton(selected = selected, onClick = onClick)
-        Column(modifier = Modifier.weight(1f)) {
-            val label = if (countryCode.isNotEmpty()) "$countryCode  $name" else name
-            Text(text = label, style = MaterialTheme.typography.bodyLarge)
+        RadioButton(selected = selected, onClick = null)
+        if (flag.isNotEmpty()) {
+            Text(
+                text = flag,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(end = 8.dp),
+            )
         }
+        Text(
+            text = name,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f),
+        )
         if (providerCount > 0) {
             Text(
                 text = "$providerCount",

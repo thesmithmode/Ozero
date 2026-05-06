@@ -13,12 +13,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
+import java.util.Locale
 import javax.inject.Inject
 
 data class UrnetworkLocationItem(
     val location: ConnectLocation,
     val name: String,
+    val nameRu: String,
     val countryCode: String,
+    val flag: String,
     val providerCount: Int,
 )
 
@@ -40,7 +43,10 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<UrnetworkSettingsUiState>(UrnetworkSettingsUiState.Loading)
     val uiState: StateFlow<UrnetworkSettingsUiState> = _uiState.asStateFlow()
 
+    val searchQuery = MutableStateFlow("")
+
     private var locationsVc: LocationsViewController? = null
+    private var allCountries: List<UrnetworkLocationItem> = emptyList()
 
     init {
         viewModelScope.launch {
@@ -86,6 +92,11 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         }
     }
 
+    fun setSearchQuery(query: String) {
+        searchQuery.value = query
+        applyFilter(query)
+    }
+
     fun setProvidePaused(paused: Boolean) {
         bridge.setProvidePaused(paused)
         val current = _uiState.value
@@ -96,25 +107,54 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
 
     private fun updateLocations(filtered: FilteredLocations?) {
         if (filtered == null) return
-        val countries = buildList {
+        allCountries = buildList {
             val list = filtered.countries ?: return@buildList
             for (i in 0 until list.len()) {
                 val loc = list.get(i) ?: continue
+                val code = loc.countryCode ?: ""
                 add(
                     UrnetworkLocationItem(
                         location = loc,
                         name = loc.name ?: loc.country ?: "Unknown",
-                        countryCode = loc.countryCode ?: "",
+                        nameRu = if (code.length == 2)
+                            Locale("", code).getDisplayCountry(Locale("ru")) else "",
+                        countryCode = code,
+                        flag = countryCodeToFlag(code),
                         providerCount = loc.providerCount,
                     ),
                 )
             }
         }
+        applyFilter(searchQuery.value)
+    }
+
+    private fun applyFilter(query: String) {
+        val q = query.trim().lowercase()
+        val filtered = if (q.isEmpty()) allCountries
+        else allCountries.filter { item ->
+            item.name.lowercase().contains(q) ||
+                item.nameRu.lowercase().contains(q) ||
+                item.countryCode.lowercase().contains(q)
+        }
+        val current = _uiState.value
+        val selectedLocation = if (current is UrnetworkSettingsUiState.Ready)
+            current.selectedLocation else bridge.selectedLocation()
+        val providePaused = if (current is UrnetworkSettingsUiState.Ready)
+            current.providePaused else bridge.isProvidePaused()
         _uiState.value = UrnetworkSettingsUiState.Ready(
-            countries = countries,
-            selectedLocation = bridge.selectedLocation(),
-            providePaused = bridge.isProvidePaused(),
+            countries = filtered,
+            selectedLocation = selectedLocation,
+            providePaused = providePaused,
         )
+    }
+
+    companion object {
+        fun countryCodeToFlag(code: String): String {
+            if (code.length != 2) return ""
+            val first = code[0].uppercaseChar().code - 'A'.code + 0x1F1E6
+            val second = code[1].uppercaseChar().code - 'A'.code + 0x1F1E6
+            return String(intArrayOf(first, second), 0, 2)
+        }
     }
 
     override fun onCleared() {

@@ -22,6 +22,7 @@
     <!-- Tabs -->
     <string name="tab_main">Home</string>
     <string name="tab_settings">Settings</string>
+    <string name="tab_servers">Params</string>
     <string name="tab_diagnostics">Diagnostics</string>
 
     <!-- Settings -->
@@ -177,6 +178,7 @@
     <string name="urnetwork_settings_title">URnetwork</string>
     <string name="urnetwork_consent_warning_title">Warning</string>
     <string name="urnetwork_consent_warning_body">URnetwork is a P2P network where every participant can act as an exit node. If you enable URnetwork, your device will relay other users\' traffic to the open internet from your own IP address. This may attract attention from your ISP and carries legal risks in some jurisdictions. Enable only if you understand the consequences. URx tokens on Solana are credited for exit-node traffic.</string>
+    <string name="urnetwork_search_hint">Search country…</string>
     <string name="urnetwork_location_title">Exit region</string>
     <string name="urnetwork_location_best_available">Best available</string>
     <string name="urnetwork_location_connect_first">Connect to URnetwork to view available regions</string>

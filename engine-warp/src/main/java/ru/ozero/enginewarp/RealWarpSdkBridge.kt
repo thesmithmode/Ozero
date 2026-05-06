@@ -7,6 +7,7 @@ import kotlinx.coroutines.withContext
 import org.amnezia.awg.GoBackend
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.VpnSocketProtector
+import java.io.File
 
 class RealWarpSdkBridge internal constructor(
     private val awgRuntime: AwgRuntime,
@@ -27,6 +28,11 @@ class RealWarpSdkBridge internal constructor(
         if (tunFd < 0) return@withContext WarpSdkBridge.AttachResult.Failed("invalid tunFd=$tunFd")
         if (iniConfig.isBlank()) return@withContext WarpSdkBridge.AttachResult.Failed("empty iniConfig")
         if (uapiPath.isBlank()) return@withContext WarpSdkBridge.AttachResult.Failed("empty uapiPath")
+        val socketFile = File(uapiPath, "$tunnelName.sock")
+        if (socketFile.exists()) {
+            val deleted = socketFile.delete()
+            PersistentLoggers.info(TAG, "stale socket $socketFile deleted=$deleted")
+        }
         try {
             val handle = awgRuntime.turnOn(tunnelName, tunFd, iniConfig, uapiPath)
             if (handle < 0) {

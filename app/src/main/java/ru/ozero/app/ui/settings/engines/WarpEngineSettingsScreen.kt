@@ -97,7 +97,7 @@ fun WarpEngineSettingsScreen(
     }
     Scaffold(
         modifier = Modifier.testTag("warp_settings"),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { SnackbarHost(snackbarHostState, modifier = Modifier.padding(bottom = 80.dp)) },
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.warp_settings_title)) },

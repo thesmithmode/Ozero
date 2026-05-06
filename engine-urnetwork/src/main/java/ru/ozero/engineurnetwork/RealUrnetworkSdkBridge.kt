@@ -157,8 +157,10 @@ class RealUrnetworkSdkBridge(
         }
 
     override fun setProvidePaused(paused: Boolean) {
-        runCatching { deviceRef.get()?.providePaused = paused }
-            .onFailure { PersistentLoggers.warn(TAG, "setProvidePaused($paused) threw: ${it.message}") }
+        runCatching {
+            deviceRef.get()?.providePaused = paused
+            PersistentLoggers.info(TAG, "setProvidePaused paused=$paused OK")
+        }.onFailure { PersistentLoggers.warn(TAG, "setProvidePaused($paused) threw: ${it.message}") }
     }
 
     override fun isProvidePaused(): Boolean =

@@ -85,7 +85,7 @@ class EngineWarp(
         return TunSpec(
             sessionName = "WARP",
             mtu = cfg.mtu,
-            blocking = true,
+            blocking = false,
             ipv4Address = v4Addr,
             ipv4PrefixLength = v4Prefix,
             dnsServers = cfg.dnsServers,

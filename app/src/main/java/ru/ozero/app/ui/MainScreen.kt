@@ -171,15 +171,6 @@ private fun ExpertMainContent(
     ) {
         Spacer(modifier = Modifier.height(16.dp))
 
-        Text(
-            text = stringResource(R.string.mode_expert_badge),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier
-                .padding(horizontal = 16.dp)
-                .align(Alignment.Start),
-        )
-
         AnimatedContent(targetState = tunnelState, label = "status") { s -> StatusLabel(s) }
 
         Box(

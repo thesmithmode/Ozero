@@ -96,7 +96,7 @@ fun BackupScreen(
                 },
             )
         },
-        snackbarHost = { SnackbarHost(snackbar) },
+        snackbarHost = { SnackbarHost(snackbar, modifier = Modifier.padding(bottom = 80.dp)) },
     ) { padding ->
         Column(
             modifier = Modifier
