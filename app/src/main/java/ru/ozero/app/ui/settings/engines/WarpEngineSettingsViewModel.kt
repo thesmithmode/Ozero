@@ -188,9 +188,8 @@ class WarpEngineSettingsViewModel @Inject constructor(
 
     fun onSaveEdit() {
         val draft = _uiState.value.editDraft ?: return
-        if (draft.privateKey.isBlank() || draft.peerPublicKey.isBlank() ||
-            draft.endpoint.isBlank() || draft.addressV4.isBlank()
-        ) {
+        val requiredFields = listOf(draft.privateKey, draft.peerPublicKey, draft.endpoint, draft.addressV4)
+        if (requiredFields.any { it.isBlank() }) {
             _uiState.value = _uiState.value.copy(errorMessage = VALIDATION_REQUIRED_FIELDS)
             return
         }
