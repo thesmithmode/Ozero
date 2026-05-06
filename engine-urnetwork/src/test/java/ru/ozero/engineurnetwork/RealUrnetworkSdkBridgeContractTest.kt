@@ -94,6 +94,28 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
+    fun `attachTun вызывает openConnectViewController и connectBestAvailable`() {
+        val attachBlock = source.substringAfter("override suspend fun attachTun")
+            .substringBefore("private fun cleanupOnFailure")
+        assertTrue(
+            attachBlock.contains("openConnectViewController"),
+            "P2P соединение не установится без openConnectViewController",
+        )
+        assertTrue(
+            attachBlock.contains("connectBestAvailable"),
+            "P2P соединение не установится без connectBestAvailable",
+        )
+    }
+
+    @Test
+    fun `stop() освобождает connectVcRef с disconnect и close`() {
+        val stopBlock = source.substringAfter("override suspend fun stop").substringBefore("override fun isRunning")
+        assertTrue(stopBlock.contains("connectVcRef.getAndSet(null)"))
+        assertTrue(stopBlock.contains("vc.disconnect()"))
+        assertTrue(stopBlock.contains("vc.close()"))
+    }
+
+    @Test
     fun `cleanupOnFailure закрывает device без throw`() {
         val cleanupBlock = source.substringAfter("private fun cleanupOnFailure")
             .substringBefore("private companion object")

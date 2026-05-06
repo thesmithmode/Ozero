@@ -1,6 +1,7 @@
 package ru.ozero.engineurnetwork
 
 import android.app.Application
+import com.bringyour.sdk.ConnectViewController
 import com.bringyour.sdk.DeviceLocal
 import com.bringyour.sdk.IoLoop
 import com.bringyour.sdk.IoLoopDoneCallback
@@ -17,6 +18,7 @@ class RealUrnetworkSdkBridge(
 
     private val deviceRef = AtomicReference<DeviceLocal?>(null)
     private val ioLoopRef = AtomicReference<IoLoop?>(null)
+    private val connectVcRef = AtomicReference<ConnectViewController?>(null)
     private val running = AtomicReference(false)
 
     override suspend fun start(
@@ -92,6 +94,12 @@ class RealUrnetworkSdkBridge(
     override suspend fun stop() {
         running.set(false)
         withContext(Dispatchers.Main.immediate) {
+            connectVcRef.getAndSet(null)?.also { vc ->
+                runCatching { vc.disconnect() }
+                    .onFailure { PersistentLoggers.warn(TAG, "connectVc.disconnect threw: ${it.message}") }
+                runCatching { vc.close() }
+                    .onFailure { PersistentLoggers.warn(TAG, "connectVc.close threw: ${it.message}") }
+            }
             ioLoopRef.getAndSet(null)?.also { loop ->
                 runCatching { loop.close() }
                     .onFailure { PersistentLoggers.warn(TAG, "ioLoop.close threw: ${it.message}") }
@@ -127,7 +135,18 @@ class RealUrnetworkSdkBridge(
                 ioLoopRef.set(loop)
                 runCatching { device.setTunnelStarted(true) }
                     .onFailure { PersistentLoggers.warn(TAG, "setTunnelStarted(true) threw: ${it.message}") }
-                PersistentLoggers.info(TAG, "IoLoop attached on fd=$tunFd, tunnelStarted=true")
+                val cv = runCatching { device.openConnectViewController() }.getOrElse {
+                    PersistentLoggers.warn(TAG, "openConnectViewController threw: ${it.message}")
+                    null
+                }
+                if (cv != null) {
+                    connectVcRef.set(cv)
+                    runCatching { cv.connectBestAvailable() }
+                        .onFailure { PersistentLoggers.warn(TAG, "connectBestAvailable threw: ${it.message}") }
+                    PersistentLoggers.info(TAG, "IoLoop fd=$tunFd tunnelStarted=true connectBestAvailable called")
+                } else {
+                    PersistentLoggers.error(TAG, "ConnectViewController is null — P2P connection will not be established")
+                }
                 UrnetworkSdkBridge.AttachResult.Success
             } catch (t: Throwable) {
                 PersistentLoggers.error(TAG, "newIoLoop threw: ${t.message}")
