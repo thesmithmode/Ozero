@@ -61,6 +61,7 @@ class EngineWarp(
     }
 
     override suspend fun stop() {
+        PersistentLoggers.info(TAG, "stop — detaching tun")
         sdkBridge.detachTun()
         resolvedConfig = null
         resolvedIni = null

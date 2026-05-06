@@ -203,7 +203,9 @@ class OzeroVpnService : android.net.VpnService() {
             runCatching { sessionStatsRecorder.startSession(activeEngineId.name, nowMs) }.getOrDefault(-1L),
         )
         runCatching { healthMonitor.start(chainResult.finalSocksPort) }
-        startStatsLogger()
+        if (!engineNeedsCustomTun(activeEngineId)) {
+            startStatsLogger()
+        }
     }
 
     private suspend fun engineNeedsCustomTun(engineId: EngineId): Boolean {

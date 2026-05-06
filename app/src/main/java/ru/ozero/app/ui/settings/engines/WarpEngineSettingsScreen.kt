@@ -27,6 +27,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -327,6 +328,8 @@ private fun WarpScreenContent(
             EmptyConfigCard(
                 isRegistering = state.isRegistering,
                 progressText = state.progressText,
+                progressCurrent = state.progressCurrent,
+                progressTotal = state.progressTotal,
                 errorMessage = state.errorMessage,
                 onGenerate = onGenerate,
                 onCancelGenerate = onCancelGenerate,
@@ -340,13 +343,55 @@ private fun WarpScreenContent(
                 onStartEdit = onStartEdit,
                 onDeleteSlot = onDeleteSlot,
             )
-            WarpActionRow(
-                isRegistering = state.isRegistering,
-                onGenerate = onGenerate,
-                onCancelGenerate = onCancelGenerate,
-                onImportFile = onImportFile,
-                modifier = Modifier.align(Alignment.BottomCenter),
-            )
+            if (state.isRegistering) {
+                WarpProgressCard(
+                    progressText = state.progressText ?: stringResource(R.string.warp_registering),
+                    progressCurrent = state.progressCurrent,
+                    progressTotal = state.progressTotal,
+                    onCancel = onCancelGenerate,
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+                )
+            } else {
+                WarpActionRow(
+                    isRegistering = false,
+                    onGenerate = onGenerate,
+                    onCancelGenerate = onCancelGenerate,
+                    onImportFile = onImportFile,
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WarpProgressCard(
+    progressText: String,
+    progressCurrent: Int,
+    progressTotal: Int,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(modifier = modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(progressText, style = MaterialTheme.typography.bodyMedium)
+            if (progressTotal > 0) {
+                LinearProgressIndicator(
+                    progress = { progressCurrent.toFloat() / progressTotal },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+            OutlinedButton(
+                onClick = onCancel,
+                modifier = Modifier.fillMaxWidth().testTag("warp_cancel_button"),
+            ) {
+                Text(stringResource(R.string.warp_cancel_generation))
+            }
         }
     }
 }
@@ -370,16 +415,6 @@ private fun SlotListContent(
                     text = state.errorMessage,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(horizontal = 4.dp),
-                )
-            }
-        }
-        if (state.isRegistering && state.progressText != null) {
-            item {
-                Text(
-                    text = state.progressText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 4.dp),
                 )
             }
@@ -452,6 +487,8 @@ private fun WarpActionRow(
 private fun EmptyConfigCard(
     isRegistering: Boolean,
     progressText: String?,
+    progressCurrent: Int,
+    progressTotal: Int,
     errorMessage: String?,
     onGenerate: () -> Unit,
     onCancelGenerate: () -> Unit,
@@ -474,25 +511,26 @@ private fun EmptyConfigCard(
                     color = MaterialTheme.colorScheme.error,
                 )
             }
-            WarpGenerateButton(
-                isRegistering = isRegistering,
-                onGenerate = onGenerate,
-                onCancelGenerate = onCancelGenerate,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (isRegistering && progressText != null) {
-                Text(
-                    text = progressText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+            if (isRegistering) {
+                WarpProgressCard(
+                    progressText = progressText ?: stringResource(R.string.warp_registering),
+                    progressCurrent = progressCurrent,
+                    progressTotal = progressTotal,
+                    onCancel = onCancelGenerate,
                 )
-            }
-            OutlinedButton(
-                onClick = onImportFile,
-                enabled = !isRegistering,
-                modifier = Modifier.fillMaxWidth().testTag("warp_import_button_empty"),
-            ) {
-                Text(stringResource(R.string.warp_import_file))
+            } else {
+                Button(
+                    onClick = onGenerate,
+                    modifier = Modifier.fillMaxWidth().testTag("warp_generate_button"),
+                ) {
+                    Text(stringResource(R.string.warp_generate))
+                }
+                OutlinedButton(
+                    onClick = onImportFile,
+                    modifier = Modifier.fillMaxWidth().testTag("warp_import_button_empty"),
+                ) {
+                    Text(stringResource(R.string.warp_import_file))
+                }
             }
         }
     }

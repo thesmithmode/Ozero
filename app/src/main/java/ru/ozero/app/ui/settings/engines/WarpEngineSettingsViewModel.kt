@@ -52,6 +52,8 @@ data class WarpSettingsUiState(
     val isRegistering: Boolean = false,
     val errorMessage: String? = null,
     val progressText: String? = null,
+    val progressCurrent: Int = 0,
+    val progressTotal: Int = 0,
     val importSuccess: Boolean = false,
     val editDraft: WarpEditDraft? = null,
 )
@@ -87,7 +89,14 @@ class WarpEngineSettingsViewModel @Inject constructor(
         registerJob = viewModelScope.launch {
             try {
                 val result = autoConfig.register(onProgress = { progress ->
-                    _uiState.value = _uiState.value.copy(progressText = "Зеркало $progress")
+                    val parts = progress.split("/")
+                    val current = parts.getOrNull(0)?.toIntOrNull() ?: 0
+                    val total = parts.getOrNull(1)?.toIntOrNull() ?: 0
+                    _uiState.value = _uiState.value.copy(
+                        progressText = "Зеркало $progress",
+                        progressCurrent = current,
+                        progressTotal = total,
+                    )
                 })
                 result.fold(
                     onSuccess = { cfg ->
