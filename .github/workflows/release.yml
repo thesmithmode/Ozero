@@ -38,11 +38,8 @@ jobs:
         id: libhev-cache
         uses: actions/cache@v4
         with:
-          path: |
-            common-vpn/src/main/jniLibs/arm64-v8a/libhev-ozero-socks5-tunnel.so
-            common-vpn/src/main/jniLibs/armeabi-v7a/libhev-ozero-socks5-tunnel.so
-            common-vpn/src/main/jniLibs/x86_64/libhev-ozero-socks5-tunnel.so
-          key: libhev-ozero-2.7.0-ndk-r27c-platform-android-24-pkgname-hev-16kb-v1
+          path: common-vpn/src/main/jniLibs/arm64-v8a/libhev-ozero-socks5-tunnel.so
+          key: libhev-ozero-2.7.0-ndk-r27c-platform-android-24-pkgname-hev-16kb-arm64-v1
 
       - name: Setup Android NDK
         id: ndk
@@ -61,7 +58,7 @@ jobs:
             https://github.com/heiher/hev-socks5-tunnel.git \
             "$RUNNER_TEMP/hev-socks5-tunnel"
 
-      - name: Build libhev-ozero-socks5-tunnel.so (3 ABI via ndk-build)
+      - name: Build libhev-ozero-socks5-tunnel.so (arm64-v8a via ndk-build)
         if: steps.libhev-cache.outputs.cache-hit != 'true'
         env:
           NDK_PATH: ${{ steps.ndk.outputs.ndk-path }}
@@ -69,33 +66,31 @@ jobs:
           set -euo pipefail
           SRC="$RUNNER_TEMP/hev-socks5-tunnel"
           OUT="common-vpn/src/main/jniLibs"
-          mkdir -p "$OUT/arm64-v8a" "$OUT/armeabi-v7a" "$OUT/x86_64"
+          mkdir -p "$OUT/arm64-v8a"
 
           cd "$SRC"
           "$NDK_PATH/ndk-build" \
             NDK_PROJECT_PATH="$SRC" \
             APP_BUILD_SCRIPT="$SRC/Android.mk" \
             NDK_APPLICATION_MK="$SRC/Application.mk" \
-            APP_ABI="arm64-v8a armeabi-v7a x86_64" \
+            APP_ABI="arm64-v8a" \
             APP_PLATFORM=android-24 \
             APP_CFLAGS="-DPKGNAME=hev" \
             APP_LDFLAGS="-Wl,-z,max-page-size=16384,-z,common-page-size=16384" \
             -j"$(nproc)"
 
           STRIP="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
-          for ABI in arm64-v8a armeabi-v7a x86_64; do
-            SO_SRC="$SRC/libs/$ABI/libhev-socks5-tunnel.so"
-            if [ ! -f "$SO_SRC" ]; then
-              echo "::error::libhev-socks5-tunnel.so не найден для $ABI"
-              find "$SRC/libs" -name '*.so' || true
-              exit 1
-            fi
-            cp "$SO_SRC" "$GITHUB_WORKSPACE/$OUT/$ABI/libhev-ozero-socks5-tunnel.so"
-            "$STRIP" "$GITHUB_WORKSPACE/$OUT/$ABI/libhev-ozero-socks5-tunnel.so" || true
-          done
+          SO_SRC="$SRC/libs/arm64-v8a/libhev-socks5-tunnel.so"
+          if [ ! -f "$SO_SRC" ]; then
+            echo "::error::libhev-socks5-tunnel.so не найден для arm64-v8a"
+            find "$SRC/libs" -name '*.so' || true
+            exit 1
+          fi
+          cp "$SO_SRC" "$GITHUB_WORKSPACE/$OUT/arm64-v8a/libhev-ozero-socks5-tunnel.so"
+          "$STRIP" "$GITHUB_WORKSPACE/$OUT/arm64-v8a/libhev-ozero-socks5-tunnel.so" || true
           cd "$GITHUB_WORKSPACE"
           echo "Built jniLibs:"
-          ls -la "$OUT"/*/libhev-ozero-socks5-tunnel.so
+          ls -la "$OUT/arm64-v8a/libhev-ozero-socks5-tunnel.so"
 
       - name: Assert JNI symbols в libhev-ozero-socks5-tunnel.so
         if: steps.libhev-cache.outputs.cache-hit != 'true'
@@ -104,55 +99,41 @@ jobs:
         run: |
           set -euo pipefail
           NM="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
-          REQUIRED='JNI_OnLoad'
-          for ABI in arm64-v8a armeabi-v7a x86_64; do
-            SO="common-vpn/src/main/jniLibs/$ABI/libhev-ozero-socks5-tunnel.so"
-            if [ ! -f "$SO" ]; then continue; fi
-            SYMS=$("$NM" -D --defined-only "$SO" || true)
-            for sym in $REQUIRED; do
-              if ! echo "$SYMS" | grep -q "$sym"; then
-                echo "::error::В $SO отсутствует JNI-symbol $sym"
-                exit 1
-              fi
-            done
-          done
-          echo "JNI symbols OK на всех ABI"
+          SO="common-vpn/src/main/jniLibs/arm64-v8a/libhev-ozero-socks5-tunnel.so"
+          SYMS=$("$NM" -D --defined-only "$SO" || true)
+          if ! echo "$SYMS" | grep -q 'JNI_OnLoad'; then
+            echo "::error::В $SO отсутствует JNI_OnLoad"
+            exit 1
+          fi
+          echo "JNI symbols OK (arm64-v8a)"
 
       - name: Assert PKGNAME=hev зашит в libhev-ozero-socks5-tunnel.so
         if: steps.libhev-cache.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
-          for ABI in arm64-v8a armeabi-v7a x86_64; do
-            SO="common-vpn/src/main/jniLibs/$ABI/libhev-ozero-socks5-tunnel.so"
-            if [ ! -f "$SO" ]; then continue; fi
-            if ! strings "$SO" | grep -qx 'hev/TProxyService'; then
-              echo "::error::В $SO нет literal 'hev/TProxyService' — PKGNAME не передан в ndk-build, JNI_OnLoad упадёт с ART JniAbort"
-              echo "Найденные TProxyService-related strings:"
-              strings "$SO" | grep -i 'tproxy\|hev/' || true
-              exit 1
-            fi
-          done
-          echo "PKGNAME=hev зашит корректно — FindClass найдёт hev/TProxyService"
+          SO="common-vpn/src/main/jniLibs/arm64-v8a/libhev-ozero-socks5-tunnel.so"
+          if ! strings "$SO" | grep -qx 'hev/TProxyService'; then
+            echo "::error::В $SO нет literal 'hev/TProxyService' — PKGNAME не передан в ndk-build, JNI_OnLoad упадёт с ART JniAbort"
+            strings "$SO" | grep -i 'tproxy\|hev/' || true
+            exit 1
+          fi
+          echo "PKGNAME=hev зашит корректно"
 
-      - name: Assert 16KB page-size alignment в arm64/x86_64 libhev
+      - name: Assert 16KB page-size alignment в arm64-v8a libhev
         if: steps.libhev-cache.outputs.cache-hit != 'true'
         env:
           NDK_PATH: ${{ steps.ndk.outputs.ndk-path }}
         run: |
           set -euo pipefail
           READELF="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
-          REQUIRED_ALIGN=16384
-          for ABI in arm64-v8a x86_64; do
-            SO="common-vpn/src/main/jniLibs/$ABI/libhev-ozero-socks5-tunnel.so"
-            if [ ! -f "$SO" ]; then continue; fi
-            ALIGN_HEX=$("$READELF" -lW "$SO" | awk '/^\s*LOAD/ {print $NF; exit}')
-            ALIGN_DEC=$(printf '%d' "$ALIGN_HEX")
-            if [ "$ALIGN_DEC" -lt "$REQUIRED_ALIGN" ]; then
-              echo "::error::$SO имеет LOAD-segment alignment=$ALIGN_HEX (<$REQUIRED_ALIGN) — Android 15+ Pixel 9 (16KB pages) откажется грузить, dlopen UnsatisfiedLinkError"
-              exit 1
-            fi
-            echo "$ABI: LOAD alignment=$ALIGN_HEX (>=0x4000) — Android 15 16KB compatible"
-          done
+          SO="common-vpn/src/main/jniLibs/arm64-v8a/libhev-ozero-socks5-tunnel.so"
+          ALIGN_HEX=$("$READELF" -lW "$SO" | awk '/^\s*LOAD/ {print $NF; exit}')
+          ALIGN_DEC=$(printf '%d' "$ALIGN_HEX")
+          if [ "$ALIGN_DEC" -lt 16384 ]; then
+            echo "::error::$SO LOAD alignment=$ALIGN_HEX (<0x4000) — Android 15 16KB pages откажется грузить"
+            exit 1
+          fi
+          echo "arm64-v8a: LOAD alignment=$ALIGN_HEX — Android 15 16KB compatible"
 
       - name: Decode keystore
         env:
@@ -188,7 +169,7 @@ jobs:
           UPDATE_PUBLIC_KEY_HEX: ${{ secrets.UPDATE_PUBLIC_KEY_HEX }}
         run: ./gradlew :app:assembleRelease --stacktrace
 
-      - name: Assert APK содержит libhev-ozero-socks5-tunnel.so для всех ABI
+      - name: Assert APK содержит libhev-ozero-socks5-tunnel.so (arm64-v8a)
         run: |
           set -euo pipefail
           APK=$(find app/build/outputs/apk/release -name '*.apk' | head -n1)
@@ -196,38 +177,33 @@ jobs:
             echo "::error::Release APK не собран"
             exit 1
           fi
-          echo "Проверяю $APK"
-          for ABI in arm64-v8a armeabi-v7a x86_64; do
-            if ! unzip -l "$APK" | grep -q "lib/$ABI/libhev-ozero-socks5-tunnel.so"; then
-              echo "::error::В APK отсутствует lib/$ABI/libhev-ozero-socks5-tunnel.so — VPN краш гарантирован"
-              unzip -l "$APK" | grep -E "lib/[^/]+/" | head -30
-              exit 1
-            fi
-            SIZE=$(unzip -l "$APK" "lib/$ABI/libhev-ozero-socks5-tunnel.so" | awk 'NR==4{print $1}')
-            if [ "$SIZE" -lt 50000 ]; then
-              echo "::error::libhev-ozero-socks5-tunnel.so для $ABI подозрительно мал ($SIZE байт)"
-              exit 1
-            fi
-          done
-          echo "APK содержит libhev на всех нужных ABI"
+          if ! unzip -l "$APK" | grep -q "lib/arm64-v8a/libhev-ozero-socks5-tunnel.so"; then
+            echo "::error::В APK отсутствует lib/arm64-v8a/libhev-ozero-socks5-tunnel.so"
+            unzip -l "$APK" | grep -E "lib/[^/]+/" | head -30
+            exit 1
+          fi
+          SIZE=$(unzip -l "$APK" "lib/arm64-v8a/libhev-ozero-socks5-tunnel.so" | awk 'NR==4{print $1}')
+          if [ "$SIZE" -lt 50000 ]; then
+            echo "::error::libhev-ozero-socks5-tunnel.so подозрительно мал ($SIZE байт)"
+            exit 1
+          fi
+          echo "APK содержит libhev (arm64-v8a)"
 
-      - name: Assert APK содержит libbyedpi.so без abi-суффикса для всех ABI
+      - name: Assert APK содержит libbyedpi.so (arm64-v8a)
         run: |
           set -euo pipefail
           APK=$(find app/build/outputs/apk/release -name '*.apk' | head -n1)
-          for ABI in arm64-v8a armeabi-v7a x86_64; do
-            if ! unzip -l "$APK" | grep -q "lib/$ABI/libbyedpi.so"; then
-              echo "::error::В APK отсутствует lib/$ABI/libbyedpi.so"
-              unzip -l "$APK" | grep -E "lib/$ABI/" || true
-              exit 1
-            fi
-            SIZE=$(unzip -l "$APK" "lib/$ABI/libbyedpi.so" | awk 'NR==4{print $1}')
-            if [ "$SIZE" -lt 50000 ]; then
-              echo "::error::libbyedpi.so для $ABI подозрительно мал ($SIZE байт)"
-              exit 1
-            fi
-          done
-          echo "APK содержит libbyedpi.so на всех нужных ABI"
+          if ! unzip -l "$APK" | grep -q "lib/arm64-v8a/libbyedpi.so"; then
+            echo "::error::В APK отсутствует lib/arm64-v8a/libbyedpi.so"
+            unzip -l "$APK" | grep -E "lib/arm64-v8a/" || true
+            exit 1
+          fi
+          SIZE=$(unzip -l "$APK" "lib/arm64-v8a/libbyedpi.so" | awk 'NR==4{print $1}')
+          if [ "$SIZE" -lt 50000 ]; then
+            echo "::error::libbyedpi.so подозрительно мал ($SIZE байт)"
+            exit 1
+          fi
+          echo "APK содержит libbyedpi.so (arm64-v8a)"
 
       - name: Assert dex содержит hev/TProxyService и native bridge классы
         run: |
@@ -271,11 +247,11 @@ jobs:
           )
           for cls in "${FORBIDDEN_CLASSES[@]}"; do
             if grep -aor "$cls" "$WORK"/classes*.dex | head -n1 | grep -q "$cls"; then
-              echo "::error::В classes.dex обнаружен $cls — engine-* модули должны быть удалены в Phase 0"
+              echo "::error::В classes.dex обнаружен $cls — stub классы запрещены в релизе"
               exit 1
             fi
           done
-          echo "Native bridge классы сохранены R8, удалённые engine-* отсутствуют"
+          echo "Native bridge классы сохранены R8, stub-классы отсутствуют"
 
       - name: Collect artifacts
         env:
