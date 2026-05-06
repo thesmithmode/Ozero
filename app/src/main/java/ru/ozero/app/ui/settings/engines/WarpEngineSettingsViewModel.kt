@@ -104,7 +104,8 @@ class WarpEngineSettingsViewModel @Inject constructor(
             val result = fileImporter.import(stream)
             result.fold(
                 onSuccess = { cfg ->
-                    store.addSlot(suggestedName, cfg)
+                    val id = store.addSlot(suggestedName, cfg)
+                    store.setActive(id)
                     _uiState.value = _uiState.value.copy(errorMessage = null, importSuccess = true)
                 },
                 onFailure = { t ->
