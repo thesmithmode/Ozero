@@ -95,7 +95,7 @@ class DataStoreWarpConfigSlotStore(
         }
     }
 
-    override suspend fun migrateIfNeeded() {
+    override suspend fun migrateIfNeeded(): Unit = mutex.withLock {
         val alreadyDone = dataStore.data.map { it[KEY_MIGRATION_DONE] ?: false }.first()
         if (alreadyDone) return
         val legacyConfig = legacyStore.current().first()

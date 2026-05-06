@@ -226,9 +226,12 @@ class WarpEngineSettingsViewModel @Inject constructor(
         val slotId = draft.slotId
         val name = draft.name.trim().ifBlank { "WARP" }
         viewModelScope.launch {
-            store.updateSlot(slotId, name, config)
+            runCatching { store.updateSlot(slotId, name, config) }
+                .onSuccess { _uiState.value = _uiState.value.copy(editDraft = null) }
+                .onFailure { t ->
+                    _uiState.value = _uiState.value.copy(errorMessage = t.message ?: "save failed")
+                }
         }
-        _uiState.value = _uiState.value.copy(editDraft = null)
     }
 
     fun onEditCancel() {

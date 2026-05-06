@@ -71,7 +71,6 @@ fun WarpEngineSettingsScreen(
         return
     }
 
-    BackHandler(onBack = onBack)
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val importedMessage = stringResource(R.string.warp_imported)
@@ -159,130 +158,127 @@ private fun WarpEditScreen(
                 onValueChange = { onDraftChange(draft.copy(name = it)) },
                 tag = "warp_edit_name",
             )
-            SectionLabel(stringResource(R.string.warp_section_interface))
-            WarpTextField(
-                label = stringResource(R.string.warp_field_private_key),
-                value = draft.privateKey,
-                onValueChange = { onDraftChange(draft.copy(privateKey = it)) },
-                tag = "warp_edit_priv",
-            )
-            WarpTextField(
-                label = stringResource(R.string.warp_field_public_key),
-                value = draft.publicKey,
-                onValueChange = { onDraftChange(draft.copy(publicKey = it)) },
-                tag = "warp_edit_pub",
-            )
-            WarpTextField(
-                label = stringResource(R.string.warp_field_address_v4),
-                value = draft.addressV4,
-                onValueChange = { onDraftChange(draft.copy(addressV4 = it)) },
-                tag = "warp_edit_addr4",
-            )
-            WarpTextField(
-                label = stringResource(R.string.warp_field_address_v6),
-                value = draft.addressV6,
-                onValueChange = { onDraftChange(draft.copy(addressV6 = it)) },
-                tag = "warp_edit_addr6",
-            )
-            WarpTextField(
-                label = stringResource(R.string.warp_field_dns),
-                value = draft.dns,
-                onValueChange = { onDraftChange(draft.copy(dns = it)) },
-                tag = "warp_edit_dns",
-            )
-            WarpTextField(
-                label = stringResource(R.string.warp_field_mtu),
-                value = draft.mtu,
-                onValueChange = { onDraftChange(draft.copy(mtu = it)) },
-                keyboardType = KeyboardType.Number,
-                tag = "warp_edit_mtu",
-            )
-            SectionLabel(stringResource(R.string.warp_section_peer))
-            WarpTextField(
-                label = stringResource(R.string.warp_field_endpoint),
-                value = draft.endpoint,
-                onValueChange = { onDraftChange(draft.copy(endpoint = it)) },
-                tag = "warp_edit_endpoint",
-            )
-            WarpTextField(
-                label = stringResource(R.string.warp_field_peer_public_key),
-                value = draft.peerPublicKey,
-                onValueChange = { onDraftChange(draft.copy(peerPublicKey = it)) },
-                tag = "warp_edit_peer_pub",
-            )
-            WarpTextField(
-                label = stringResource(R.string.warp_field_keepalive),
-                value = draft.keepalive,
-                onValueChange = { onDraftChange(draft.copy(keepalive = it)) },
-                keyboardType = KeyboardType.Number,
-                tag = "warp_edit_keepalive",
-            )
-            SectionLabel(stringResource(R.string.warp_section_awg))
-            WarpTextField(
-                label = "Jc",
-                value = draft.jc,
-                onValueChange = { onDraftChange(draft.copy(jc = it)) },
-                keyboardType = KeyboardType.Number,
-                tag = "warp_edit_jc",
-            )
-            WarpTextField(
-                label = "Jmin",
-                value = draft.jmin,
-                onValueChange = { onDraftChange(draft.copy(jmin = it)) },
-                keyboardType = KeyboardType.Number,
-                tag = "warp_edit_jmin",
-            )
-            WarpTextField(
-                label = "Jmax",
-                value = draft.jmax,
-                onValueChange = { onDraftChange(draft.copy(jmax = it)) },
-                keyboardType = KeyboardType.Number,
-                tag = "warp_edit_jmax",
-            )
-            WarpTextField(
-                label = "S1",
-                value = draft.s1,
-                onValueChange = { onDraftChange(draft.copy(s1 = it)) },
-                keyboardType = KeyboardType.Number,
-                tag = "warp_edit_s1",
-            )
-            WarpTextField(
-                label = "S2",
-                value = draft.s2,
-                onValueChange = { onDraftChange(draft.copy(s2 = it)) },
-                keyboardType = KeyboardType.Number,
-                tag = "warp_edit_s2",
-            )
-            WarpTextField(
-                label = "H1",
-                value = draft.h1,
-                onValueChange = { onDraftChange(draft.copy(h1 = it)) },
-                keyboardType = KeyboardType.Number,
-                tag = "warp_edit_h1",
-            )
-            WarpTextField(
-                label = "H2",
-                value = draft.h2,
-                onValueChange = { onDraftChange(draft.copy(h2 = it)) },
-                keyboardType = KeyboardType.Number,
-                tag = "warp_edit_h2",
-            )
-            WarpTextField(
-                label = "H3",
-                value = draft.h3,
-                onValueChange = { onDraftChange(draft.copy(h3 = it)) },
-                keyboardType = KeyboardType.Number,
-                tag = "warp_edit_h3",
-            )
-            WarpTextField(
-                label = "H4",
-                value = draft.h4,
-                onValueChange = { onDraftChange(draft.copy(h4 = it)) },
-                keyboardType = KeyboardType.Number,
-                tag = "warp_edit_h4",
-            )
+            WarpInterfaceSection(draft, onDraftChange)
+            WarpPeerSection(draft, onDraftChange)
+            WarpAwgSection(draft, onDraftChange)
         }
     }
+}
+
+@Composable
+private fun WarpInterfaceSection(draft: WarpEditDraft, onDraftChange: (WarpEditDraft) -> Unit) {
+    SectionLabel(stringResource(R.string.warp_section_interface))
+    WarpTextField(
+        label = stringResource(R.string.warp_field_private_key),
+        value = draft.privateKey,
+        onValueChange = { onDraftChange(draft.copy(privateKey = it)) },
+        tag = "warp_edit_priv",
+    )
+    WarpTextField(
+        label = stringResource(R.string.warp_field_public_key),
+        value = draft.publicKey,
+        onValueChange = { onDraftChange(draft.copy(publicKey = it)) },
+        tag = "warp_edit_pub",
+    )
+    WarpTextField(
+        label = stringResource(R.string.warp_field_address_v4),
+        value = draft.addressV4,
+        onValueChange = { onDraftChange(draft.copy(addressV4 = it)) },
+        tag = "warp_edit_addr4",
+    )
+    WarpTextField(
+        label = stringResource(R.string.warp_field_address_v6),
+        value = draft.addressV6,
+        onValueChange = { onDraftChange(draft.copy(addressV6 = it)) },
+        tag = "warp_edit_addr6",
+    )
+    WarpTextField(
+        label = stringResource(R.string.warp_field_dns),
+        value = draft.dns,
+        onValueChange = { onDraftChange(draft.copy(dns = it)) },
+        tag = "warp_edit_dns",
+    )
+    WarpTextField(
+        label = stringResource(R.string.warp_field_mtu),
+        value = draft.mtu,
+        onValueChange = { onDraftChange(draft.copy(mtu = it)) },
+        keyboardType = KeyboardType.Number,
+        tag = "warp_edit_mtu",
+    )
+}
+
+@Composable
+private fun WarpPeerSection(draft: WarpEditDraft, onDraftChange: (WarpEditDraft) -> Unit) {
+    SectionLabel(stringResource(R.string.warp_section_peer))
+    WarpTextField(
+        label = stringResource(R.string.warp_field_endpoint),
+        value = draft.endpoint,
+        onValueChange = { onDraftChange(draft.copy(endpoint = it)) },
+        tag = "warp_edit_endpoint",
+    )
+    WarpTextField(
+        label = stringResource(R.string.warp_field_peer_public_key),
+        value = draft.peerPublicKey,
+        onValueChange = { onDraftChange(draft.copy(peerPublicKey = it)) },
+        tag = "warp_edit_peer_pub",
+    )
+    WarpTextField(
+        label = stringResource(R.string.warp_field_keepalive),
+        value = draft.keepalive,
+        onValueChange = { onDraftChange(draft.copy(keepalive = it)) },
+        keyboardType = KeyboardType.Number,
+        tag = "warp_edit_keepalive",
+    )
+}
+
+@Composable
+private fun WarpAwgSection(draft: WarpEditDraft, onDraftChange: (WarpEditDraft) -> Unit) {
+    SectionLabel(stringResource(R.string.warp_section_awg))
+    WarpTextField(
+        label = "Jc", value = draft.jc,
+        onValueChange = { onDraftChange(draft.copy(jc = it)) },
+        keyboardType = KeyboardType.Number, tag = "warp_edit_jc",
+    )
+    WarpTextField(
+        label = "Jmin", value = draft.jmin,
+        onValueChange = { onDraftChange(draft.copy(jmin = it)) },
+        keyboardType = KeyboardType.Number, tag = "warp_edit_jmin",
+    )
+    WarpTextField(
+        label = "Jmax", value = draft.jmax,
+        onValueChange = { onDraftChange(draft.copy(jmax = it)) },
+        keyboardType = KeyboardType.Number, tag = "warp_edit_jmax",
+    )
+    WarpTextField(
+        label = "S1", value = draft.s1,
+        onValueChange = { onDraftChange(draft.copy(s1 = it)) },
+        keyboardType = KeyboardType.Number, tag = "warp_edit_s1",
+    )
+    WarpTextField(
+        label = "S2", value = draft.s2,
+        onValueChange = { onDraftChange(draft.copy(s2 = it)) },
+        keyboardType = KeyboardType.Number, tag = "warp_edit_s2",
+    )
+    WarpTextField(
+        label = "H1", value = draft.h1,
+        onValueChange = { onDraftChange(draft.copy(h1 = it)) },
+        keyboardType = KeyboardType.Number, tag = "warp_edit_h1",
+    )
+    WarpTextField(
+        label = "H2", value = draft.h2,
+        onValueChange = { onDraftChange(draft.copy(h2 = it)) },
+        keyboardType = KeyboardType.Number, tag = "warp_edit_h2",
+    )
+    WarpTextField(
+        label = "H3", value = draft.h3,
+        onValueChange = { onDraftChange(draft.copy(h3 = it)) },
+        keyboardType = KeyboardType.Number, tag = "warp_edit_h3",
+    )
+    WarpTextField(
+        label = "H4", value = draft.h4,
+        onValueChange = { onDraftChange(draft.copy(h4 = it)) },
+        keyboardType = KeyboardType.Number, tag = "warp_edit_h4",
+    )
 }
 
 @Composable
@@ -411,7 +407,7 @@ private fun WarpGenerateButton(
         if (isRegistering) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(
-                    modifier = Modifier.padding(end = 8.dp),
+                    modifier = Modifier.size(18.dp).padding(end = 8.dp),
                     strokeWidth = 2.dp,
                 )
                 Text(stringResource(R.string.warp_cancel_generation))
