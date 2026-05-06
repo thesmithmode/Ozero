@@ -60,7 +60,6 @@ fun MainScreen(
     viewModel: MainViewModel,
     onConnectClick: () -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenServers: () -> Unit = {},
     onOpenEngineParams: (EngineId?) -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()

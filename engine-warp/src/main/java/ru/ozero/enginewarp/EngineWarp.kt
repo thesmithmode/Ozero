@@ -142,7 +142,9 @@ class EngineWarp(
         if (host.isBlank() || isLikelyIpAddress(host)) return cfg
         return runCatching {
             val resolved = java.net.InetAddress.getByName(host).hostAddress
-            if (resolved.isNullOrBlank()) cfg else {
+            if (resolved.isNullOrBlank()) {
+                cfg
+            } else {
                 PersistentLoggers.info(TAG, "endpoint resolved $host → $resolved")
                 cfg.copy(peerEndpoint = "$resolved:$port")
             }

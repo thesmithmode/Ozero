@@ -74,7 +74,6 @@ fun RootNavigation(
                 viewModel = viewModel,
                 onConnectClick = onConnectClick,
                 onOpenSettings = { navigate(TopScreen.Settings) },
-                onOpenServers = { navigate(TopScreen.Servers) },
                 onOpenEngineParams = { engineId ->
                     when (engineId) {
                         EngineId.WARP -> navigate(TopScreen.WarpEngineSettings)
