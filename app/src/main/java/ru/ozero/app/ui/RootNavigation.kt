@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import ru.ozero.enginescore.EngineId
 import ru.ozero.app.ui.about.AboutScreen
 import ru.ozero.app.ui.backup.BackupScreen
 import ru.ozero.app.ui.diag.DiagnosticsScreen
@@ -74,6 +75,14 @@ fun RootNavigation(
                 onConnectClick = onConnectClick,
                 onOpenSettings = { navigate(TopScreen.Settings) },
                 onOpenServers = { navigate(TopScreen.Servers) },
+                onOpenEngineParams = { engineId ->
+                    when (engineId) {
+                        EngineId.WARP -> navigate(TopScreen.WarpEngineSettings)
+                        EngineId.URNETWORK -> navigate(TopScreen.UrnetworkEngineSettings)
+                        EngineId.BYEDPI -> navigate(TopScreen.ByeDpiEngineSettings)
+                        else -> navigate(TopScreen.Servers)
+                    }
+                },
             )
     }
 }

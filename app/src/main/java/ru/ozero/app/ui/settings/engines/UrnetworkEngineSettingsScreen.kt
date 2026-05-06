@@ -21,6 +21,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -90,7 +91,9 @@ fun UrnetworkEngineSettingsScreen(
                     modifier = Modifier.padding(padding),
                     countries = ready.countries,
                     selectedLocation = ready.selectedLocation,
+                    providePaused = ready.providePaused,
                     onSelect = viewModel::selectLocation,
+                    onSetProvidePaused = viewModel::setProvidePaused,
                 )
             }
         }
@@ -102,7 +105,9 @@ private fun LocationListContent(
     modifier: Modifier,
     countries: List<UrnetworkLocationItem>,
     selectedLocation: ConnectLocation?,
+    providePaused: Boolean,
     onSelect: (ConnectLocation?) -> Unit,
+    onSetProvidePaused: (Boolean) -> Unit,
 ) {
     val isBestAvailable = selectedLocation == null || selectedLocation.connectLocationId?.bestAvailable == true
     LazyColumn(
@@ -112,6 +117,29 @@ private fun LocationListContent(
         item {
             Column(modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)) {
                 InfoBlock()
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.urnetwork_provide_title),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        Text(
+                            text = stringResource(R.string.urnetwork_provide_subtitle),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = !providePaused,
+                        onCheckedChange = { checked -> onSetProvidePaused(!checked) },
+                    )
+                }
                 Text(
                     text = stringResource(R.string.urnetwork_location_title),
                     style = MaterialTheme.typography.titleSmall,

@@ -189,6 +189,8 @@
     <string name="urnetwork_location_title">Регион выхода</string>
     <string name="urnetwork_location_best_available">Лучший доступный</string>
     <string name="urnetwork_location_connect_first">Подключитесь к URnetwork чтобы увидеть доступные регионы</string>
+    <string name="urnetwork_provide_title">Предоставлять трафик</string>
+    <string name="urnetwork_provide_subtitle">Делиться пропускной способностью с сетью URnetwork</string>
     <string name="settings_urnetwork_title">URnetwork</string>
     <string name="settings_urnetwork_summary">P2P mesh — exit-node + Solana-кошелёк</string>
 

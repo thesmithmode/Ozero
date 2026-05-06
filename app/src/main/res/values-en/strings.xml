@@ -180,6 +180,8 @@
     <string name="urnetwork_location_title">Exit region</string>
     <string name="urnetwork_location_best_available">Best available</string>
     <string name="urnetwork_location_connect_first">Connect to URnetwork to view available regions</string>
+    <string name="urnetwork_provide_title">Provide bandwidth</string>
+    <string name="urnetwork_provide_subtitle">Share bandwidth with the URnetwork mesh</string>
     <string name="settings_urnetwork_title">URnetwork</string>
     <string name="settings_urnetwork_summary">P2P mesh — exit-node + Solana wallet</string>
 

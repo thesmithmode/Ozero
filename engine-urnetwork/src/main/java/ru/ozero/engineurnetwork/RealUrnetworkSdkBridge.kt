@@ -156,6 +156,14 @@ class RealUrnetworkSdkBridge(
             null
         }
 
+    override fun setProvidePaused(paused: Boolean) {
+        runCatching { deviceRef.get()?.providePaused = paused }
+            .onFailure { PersistentLoggers.warn(TAG, "setProvidePaused($paused) threw: ${it.message}") }
+    }
+
+    override fun isProvidePaused(): Boolean =
+        runCatching { deviceRef.get()?.providePaused ?: true }.getOrDefault(true)
+
     override suspend fun attachTun(tunFd: Int): UrnetworkSdkBridge.AttachResult {
         if (tunFd < 0) {
             return UrnetworkSdkBridge.AttachResult.Failed("invalid fd=$tunFd")

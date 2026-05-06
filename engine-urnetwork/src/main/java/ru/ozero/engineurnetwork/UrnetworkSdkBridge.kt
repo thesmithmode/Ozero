@@ -19,6 +19,9 @@ interface UrnetworkSdkBridge {
     fun selectedLocation(): ConnectLocation?
     fun openLocationsViewController(): LocationsViewController?
 
+    fun setProvidePaused(paused: Boolean)
+    fun isProvidePaused(): Boolean
+
     sealed class StartResult {
         data object Success : StartResult()
         data class Failed(val reason: String) : StartResult()

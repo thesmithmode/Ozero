@@ -28,6 +28,7 @@ sealed interface UrnetworkSettingsUiState {
     data class Ready(
         val countries: List<UrnetworkLocationItem>,
         val selectedLocation: ConnectLocation?,
+        val providePaused: Boolean,
     ) : UrnetworkSettingsUiState
 }
 
@@ -85,6 +86,14 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         }
     }
 
+    fun setProvidePaused(paused: Boolean) {
+        bridge.setProvidePaused(paused)
+        val current = _uiState.value
+        if (current is UrnetworkSettingsUiState.Ready) {
+            _uiState.value = current.copy(providePaused = paused)
+        }
+    }
+
     private fun updateLocations(filtered: FilteredLocations?) {
         if (filtered == null) return
         val countries = buildList {
@@ -104,6 +113,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         _uiState.value = UrnetworkSettingsUiState.Ready(
             countries = countries,
             selectedLocation = bridge.selectedLocation(),
+            providePaused = bridge.isProvidePaused(),
         )
     }
 

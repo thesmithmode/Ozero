@@ -56,6 +56,7 @@ fun MainScreen(
     onConnectClick: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenServers: () -> Unit = {},
+    onOpenEngineParams: (EngineId?) -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val stats by viewModel.stats.collectAsStateWithLifecycle()
@@ -88,7 +89,7 @@ fun MainScreen(
                 manualEngine = manualEngine,
                 onConnectClick = onConnectClick,
                 onManualEngineSelect = viewModel::onManualEngineSelect,
-                onOpenServers = onOpenServers,
+                onOpenEngineParams = onOpenEngineParams,
                 onOpenSettings = onOpenSettings,
             )
         }
@@ -160,7 +161,7 @@ private fun ExpertMainContent(
     manualEngine: EngineId?,
     onConnectClick: () -> Unit,
     onManualEngineSelect: (EngineId?) -> Unit,
-    onOpenServers: () -> Unit,
+    onOpenEngineParams: (EngineId?) -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     Column(
@@ -234,7 +235,7 @@ private fun ExpertMainContent(
                 activeTabId = DOCK_TAB_HOME,
                 onTabSelected = { id ->
                     when (id) {
-                        DOCK_TAB_SERVERS -> onOpenServers()
+                        DOCK_TAB_SERVERS -> onOpenEngineParams(manualEngine)
                         DOCK_TAB_SETTINGS -> onOpenSettings()
                     }
                 },
