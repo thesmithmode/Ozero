@@ -1,5 +1,7 @@
 package ru.ozero.app.ui.settings.engines
 
+import com.bringyour.sdk.ConnectLocation
+import com.bringyour.sdk.LocationsViewController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -10,6 +12,8 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import ru.ozero.engineurnetwork.UrnetworkSdkBridge
+import kotlin.test.assertIs
 import kotlin.test.assertSame
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -28,10 +32,33 @@ class UrnetworkEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `uiState стартует как Loading и переходит в Ready`() = runTest {
-        val vm = UrnetworkEngineSettingsViewModel()
+    fun `uiState стартует как Loading`() = runTest {
+        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge())
         assertSame(UrnetworkSettingsUiState.Loading, vm.uiState.value)
-        advanceUntilIdle()
-        assertSame(UrnetworkSettingsUiState.Ready, vm.uiState.value)
     }
+
+    @Test
+    fun `uiState переходит в NotConnected когда bridge не подключён`() = runTest {
+        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(connected = false))
+        advanceUntilIdle()
+        assertIs<UrnetworkSettingsUiState.NotConnected>(vm.uiState.value)
+    }
+}
+
+private class FakeUrnetworkBridge(private val connected: Boolean = false) : UrnetworkSdkBridge {
+    override suspend fun start(
+        walletAddress: String,
+        apiUrl: String,
+        connectUrl: String,
+        byClientJwt: String,
+    ): UrnetworkSdkBridge.StartResult = UrnetworkSdkBridge.StartResult.Success
+
+    override suspend fun stop() = Unit
+    override fun isRunning(): Boolean = connected
+    override suspend fun attachTun(tunFd: Int): UrnetworkSdkBridge.AttachResult =
+        UrnetworkSdkBridge.AttachResult.Success
+    override fun connectTo(location: ConnectLocation) = Unit
+    override fun connectBestAvailable() = Unit
+    override fun selectedLocation(): ConnectLocation? = null
+    override fun openLocationsViewController(): LocationsViewController? = null
 }
