@@ -296,12 +296,13 @@ class OzeroVpnService : android.net.VpnService() {
     ): Boolean {
         val engine = enginePlugins.firstOrNull { it.id == engineId }
         if (engine is ru.ozero.enginescore.TunFdAcceptor) {
-            val rawFd = fd.detachFd()
+            val pfdForNative = fd.dup()
+            val rawDupFd = pfdForNative.detachFd()
             tunFdRef.compareAndSet(fd, null)
             val result = try {
-                engine.attachTun(rawFd)
+                engine.attachTun(rawDupFd)
             } catch (t: Throwable) {
-                runCatching { ParcelFileDescriptor.adoptFd(rawFd).close() }
+                runCatching { fd.close() }
                 PersistentLoggers.error(TAG, "attachTun threw, fd closed: ${t.message}")
                 runCatching { chainOrchestrator.stop() }
                 tunnelController.onEngineDied(engineId, "attachTun threw: ${t.message}")
@@ -309,9 +310,12 @@ class OzeroVpnService : android.net.VpnService() {
                 return false
             }
             return when (result) {
-                ru.ozero.enginescore.TunAttachResult.Success -> true
+                ru.ozero.enginescore.TunAttachResult.Success -> {
+                    runCatching { fd.close() }
+                    true
+                }
                 is ru.ozero.enginescore.TunAttachResult.Failure -> {
-                    runCatching { ParcelFileDescriptor.adoptFd(rawFd).close() }
+                    runCatching { fd.close() }
                     PersistentLoggers.error(TAG, "attachTun failed: ${result.reason}")
                     runCatching { chainOrchestrator.stop() }
                     tunnelController.onEngineDied(engineId, "attachTun: ${result.reason}")

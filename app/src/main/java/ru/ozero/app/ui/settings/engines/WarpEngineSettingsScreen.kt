@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -506,12 +507,15 @@ private fun WarpConfigSlotCard(
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .selectable(selected = slot.isActive, onClick = onSetActive)
+                .padding(horizontal = 4.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             RadioButton(
                 selected = slot.isActive,
-                onClick = onSetActive,
+                onClick = null,
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = slot.name, style = MaterialTheme.typography.titleSmall)

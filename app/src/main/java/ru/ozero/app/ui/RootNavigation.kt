@@ -1,5 +1,6 @@
 package ru.ozero.app.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,6 +35,7 @@ fun RootNavigation(
     fun back() {
         screen = if (backStack.isNotEmpty()) backStack.removeAt(backStack.size - 1) else TopScreen.Main
     }
+    BackHandler(enabled = backStack.isNotEmpty()) { back() }
     when (screen) {
         TopScreen.Settings ->
             SettingsScreen(
