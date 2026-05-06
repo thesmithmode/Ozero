@@ -56,6 +56,7 @@ class EngineWarp(
         )
         resolvedConfig = effective
         resolvedIni = WarpIniBuilder.build(effective)
+        PersistentLoggers.info(TAG, "resolved config: $effective")
         PersistentLoggers.info(TAG, "start ready — ini cached, ждём attachTun")
         return StartResult.Success(socksPort = WARP_NO_SOCKS_PORT)
     }
