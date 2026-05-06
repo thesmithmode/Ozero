@@ -116,8 +116,11 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
                     UrnetworkLocationItem(
                         location = loc,
                         name = loc.name ?: loc.country ?: "Unknown",
-                        nameRu = if (code.length == 2)
-                            Locale("", code).getDisplayCountry(Locale("ru")) else "",
+                        nameRu = if (code.length == 2) {
+                            Locale("", code).getDisplayCountry(Locale("ru"))
+                        } else {
+                            ""
+                        },
                         countryCode = code,
                         flag = countryCodeToFlag(code),
                         providerCount = loc.providerCount,
@@ -130,17 +133,26 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
 
     private fun applyFilter(query: String) {
         val q = query.trim().lowercase()
-        val filtered = if (q.isEmpty()) allCountries
-        else allCountries.filter { item ->
-            item.name.lowercase().contains(q) ||
-                item.nameRu.lowercase().contains(q) ||
-                item.countryCode.lowercase().contains(q)
+        val filtered = if (q.isEmpty()) {
+            allCountries
+        } else {
+            allCountries.filter { item ->
+                item.name.lowercase().contains(q) ||
+                    item.nameRu.lowercase().contains(q) ||
+                    item.countryCode.lowercase().contains(q)
+            }
         }
         val current = _uiState.value
-        val selectedLocation = if (current is UrnetworkSettingsUiState.Ready)
-            current.selectedLocation else bridge.selectedLocation()
-        val providePaused = if (current is UrnetworkSettingsUiState.Ready)
-            current.providePaused else bridge.isProvidePaused()
+        val selectedLocation = if (current is UrnetworkSettingsUiState.Ready) {
+            current.selectedLocation
+        } else {
+            bridge.selectedLocation()
+        }
+        val providePaused = if (current is UrnetworkSettingsUiState.Ready) {
+            current.providePaused
+        } else {
+            bridge.isProvidePaused()
+        }
         _uiState.value = UrnetworkSettingsUiState.Ready(
             countries = filtered,
             selectedLocation = selectedLocation,
