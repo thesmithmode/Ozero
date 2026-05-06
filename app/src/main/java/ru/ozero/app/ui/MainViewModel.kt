@@ -3,8 +3,11 @@ package ru.ozero.app.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -70,6 +73,25 @@ class MainViewModel @Inject constructor(
                 initialValue = null,
             )
 
+    private val _speedHistory = MutableStateFlow<List<Pair<Float, Float>>>(emptyList())
+    val speedHistory: StateFlow<List<Pair<Float, Float>>> = _speedHistory.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            while (true) {
+                delay(SPEED_SAMPLE_INTERVAL_MS)
+                val s = stats.value
+                if (s != null) {
+                    val prev = _speedHistory.value
+                    _speedHistory.value = (prev + Pair(s.bpsIn.toFloat(), s.bpsOut.toFloat()))
+                        .takeLast(SPEED_HISTORY_SIZE)
+                } else {
+                    if (_speedHistory.value.isNotEmpty()) _speedHistory.value = emptyList()
+                }
+            }
+        }
+    }
+
     fun onConnectClick() = Unit
 
     fun onVpnPermissionGranted() = Unit
@@ -83,5 +105,10 @@ class MainViewModel @Inject constructor(
 
     fun onManualEngineSelect(engine: EngineId?) {
         viewModelScope.launch { settingsRepository.setManualEngine(engine) }
+    }
+
+    private companion object {
+        const val SPEED_SAMPLE_INTERVAL_MS = 100L
+        const val SPEED_HISTORY_SIZE = 60
     }
 }

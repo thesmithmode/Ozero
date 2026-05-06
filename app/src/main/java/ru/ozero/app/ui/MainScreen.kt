@@ -1,6 +1,7 @@
 package ru.ozero.app.ui
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +27,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -64,6 +69,7 @@ fun MainScreen(
     val healthStatus by viewModel.healthStatus.collectAsStateWithLifecycle()
     val appMode by viewModel.appMode.collectAsStateWithLifecycle()
     val manualEngine by viewModel.manualEngine.collectAsStateWithLifecycle()
+    val speedHistory by viewModel.speedHistory.collectAsStateWithLifecycle()
 
     val powerState = state.toPowerDiscState()
     val backgroundState = state.toBackgroundState()
@@ -82,6 +88,7 @@ fun MainScreen(
             AppMode.EXPERT -> ExpertMainContent(
                 tunnelState = state,
                 stats = stats,
+                speedHistory = speedHistory,
                 stagnant = stagnant,
                 healthStatus = healthStatus,
                 powerState = powerState,
@@ -154,6 +161,7 @@ private fun SimpleMainContent(
 private fun ExpertMainContent(
     tunnelState: TunnelState,
     stats: TunnelStats?,
+    speedHistory: List<Pair<Float, Float>>,
     stagnant: Boolean,
     healthStatus: HealthMonitor.Status,
     powerState: PowerDiscState,
@@ -180,7 +188,6 @@ private fun ExpertMainContent(
             PowerDisc(
                 state = powerState,
                 onClick = onConnectClick,
-                diameterDp = POWER_DISC_EXPERT_DP,
                 modifier = Modifier.semantics {
                     contentDescription = if (isConnected) "disconnect" else "connect"
                 },
@@ -195,6 +202,7 @@ private fun ExpertMainContent(
             if (isConnected && stats != null) {
                 TrafficStatsCard(
                     stats = stats,
+                    speedHistory = speedHistory,
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
                 if (stagnant) {
@@ -265,7 +273,11 @@ private fun TunnelState.toBackgroundState(): OzeroBackgroundState = when (this) 
 }
 
 @Composable
-private fun TrafficStatsCard(stats: TunnelStats, modifier: Modifier = Modifier) {
+private fun TrafficStatsCard(
+    stats: TunnelStats,
+    speedHistory: List<Pair<Float, Float>> = emptyList(),
+    modifier: Modifier = Modifier,
+) {
     var nowMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(stats.sessionStartMs) {
         while (true) {
@@ -287,8 +299,9 @@ private fun TrafficStatsCard(stats: TunnelStats, modifier: Modifier = Modifier) 
         shape = RoundedCornerShape(20.dp),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
                 text = "↓ $rxSpeed   ↑ $txSpeed",
@@ -304,7 +317,50 @@ private fun TrafficStatsCard(stats: TunnelStats, modifier: Modifier = Modifier) 
                 style = MaterialTheme.typography.bodySmall,
                 color = OzeroPalette.Text3,
             )
+            if (speedHistory.size >= 2) {
+                LiveTrafficChart(
+                    history = speedHistory,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .padding(top = 4.dp),
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun LiveTrafficChart(
+    history: List<Pair<Float, Float>>,
+    modifier: Modifier = Modifier,
+) {
+    val colorRx = OzeroPalette.Aqua
+    val colorTx = OzeroPalette.Amber
+    Canvas(modifier = modifier) {
+        if (history.size < 2) return@Canvas
+        val maxVal = history.maxOf { maxOf(it.first, it.second) }.coerceAtLeast(1f)
+        val w = size.width
+        val h = size.height
+        val step = w / (history.size - 1)
+        val strokePx = 2.dp.toPx()
+        val stroke = Stroke(width = strokePx, cap = StrokeCap.Round, join = StrokeJoin.Round)
+
+        val pathRx = Path()
+        history.forEachIndexed { i, (rx, _) ->
+            val x = i * step
+            val y = h - (rx / maxVal) * h
+            if (i == 0) pathRx.moveTo(x, y) else pathRx.lineTo(x, y)
+        }
+        drawPath(pathRx, color = colorRx, style = stroke)
+
+        val pathTx = Path()
+        history.forEachIndexed { i, (_, tx) ->
+            val x = i * step
+            val y = h - (tx / maxVal) * h
+            if (i == 0) pathTx.moveTo(x, y) else pathTx.lineTo(x, y)
+        }
+        drawPath(pathTx, color = colorTx, style = stroke)
     }
 }
 
@@ -352,4 +408,3 @@ private fun StatusLabel(state: TunnelState) {
 private const val DOCK_TAB_HOME = "home"
 private const val DOCK_TAB_SERVERS = "servers"
 private const val DOCK_TAB_SETTINGS = "settings"
-private const val POWER_DISC_EXPERT_DP = 184
