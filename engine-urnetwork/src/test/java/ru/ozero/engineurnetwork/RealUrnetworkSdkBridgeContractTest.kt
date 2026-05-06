@@ -84,12 +84,33 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
-    fun `stop() очищает ioLoop и device через runCatching idempotent`() {
-        val stopBlock = source.substringAfter("override suspend fun stop").substringBefore("override fun isRunning")
-        assertTrue(stopBlock.contains("running.set(false)"))
-        assertTrue(stopBlock.contains("ioLoopRef.getAndSet(null)"))
-        val runCatchingCount = stopBlock.split("runCatching").size - 1
-        assertTrue(runCatchingCount >= 2, "Каждый close() в runCatching, found=$runCatchingCount")
+    fun `openConnectViewController вызывается в start а не в attachTun`() {
+        val startBlock = source.substringAfter("private suspend fun runStartOnMain")
+            .substringBefore("override suspend fun stop")
+        val attachBlock = source.substringAfter("override suspend fun attachTun")
+            .substringBefore("private fun cleanupOnFailure")
+        assertTrue(
+            startBlock.contains("openConnectViewController"),
+            "ConnectViewController открывается в start() — нужен для location picker до подключения",
+        )
+        assertTrue(
+            !attachBlock.contains("openConnectViewController"),
+            "attachTun не должен открывать ConnectViewController — он уже открыт в start()",
+        )
+    }
+
+    @Test
+    fun `attachTun вызывает connectBestAvailable через существующий connectVcRef`() {
+        val attachBlock = source.substringAfter("override suspend fun attachTun")
+            .substringBefore("private fun cleanupOnFailure")
+        assertTrue(
+            attachBlock.contains("connectBestAvailable"),
+            "P2P соединение не установится без connectBestAvailable в attachTun",
+        )
+        assertTrue(
+            attachBlock.contains("connectVcRef.get()"),
+            "connectBestAvailable должен вызываться через connectVcRef, не через новый объект",
+        )
     }
 
     @Test
@@ -106,22 +127,8 @@ class RealUrnetworkSdkBridgeContractTest {
         val attachBlock = source.substringAfter("override suspend fun attachTun")
             .substringBefore("private fun cleanupOnFailure")
         assertTrue(
-            attachBlock.contains("closeDevice") || attachBlock.contains("device.close"),
+            attachBlock.contains("closeDevice"),
             "device должен закрываться в IoLoopDoneCallback, не в stop()",
-        )
-    }
-
-    @Test
-    fun `attachTun вызывает openConnectViewController и connectBestAvailable`() {
-        val attachBlock = source.substringAfter("override suspend fun attachTun")
-            .substringBefore("private fun cleanupOnFailure")
-        assertTrue(
-            attachBlock.contains("openConnectViewController"),
-            "P2P соединение не установится без openConnectViewController",
-        )
-        assertTrue(
-            attachBlock.contains("connectBestAvailable"),
-            "P2P соединение не установится без connectBestAvailable",
         )
     }
 
@@ -131,6 +138,15 @@ class RealUrnetworkSdkBridgeContractTest {
         assertTrue(stopBlock.contains("connectVcRef.getAndSet(null)"))
         assertTrue(stopBlock.contains("vc.disconnect()"))
         assertTrue(stopBlock.contains("vc.close()"))
+    }
+
+    @Test
+    fun `stop() очищает ioLoop через runCatching`() {
+        val stopBlock = source.substringAfter("override suspend fun stop").substringBefore("override fun isRunning")
+        assertTrue(stopBlock.contains("running.set(false)"))
+        assertTrue(stopBlock.contains("ioLoopRef.getAndSet(null)"))
+        val runCatchingCount = stopBlock.split("runCatching").size - 1
+        assertTrue(runCatchingCount >= 2, "Каждый close() в runCatching, found=$runCatchingCount")
     }
 
     @Test

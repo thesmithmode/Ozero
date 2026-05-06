@@ -1,10 +1,12 @@
 package ru.ozero.engineurnetwork
 
 import android.app.Application
+import com.bringyour.sdk.ConnectLocation
 import com.bringyour.sdk.ConnectViewController
 import com.bringyour.sdk.DeviceLocal
 import com.bringyour.sdk.IoLoop
 import com.bringyour.sdk.IoLoopDoneCallback
+import com.bringyour.sdk.LocationsViewController
 import com.bringyour.sdk.Sdk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -85,6 +87,17 @@ class RealUrnetworkSdkBridge(
         runCatching { device.providePaused = true }
             .onFailure { PersistentLoggers.warn(TAG, "providePaused threw: ${it.message}") }
 
+        val cv = runCatching { device.openConnectViewController() }.getOrElse {
+            PersistentLoggers.warn(TAG, "openConnectViewController threw: ${it.message}")
+            null
+        }
+        if (cv != null) {
+            connectVcRef.set(cv)
+            PersistentLoggers.info(TAG, "ConnectViewController opened — locations available")
+        } else {
+            PersistentLoggers.error(TAG, "ConnectViewController is null — P2P connection unavailable")
+        }
+
         deviceRef.set(device)
         running.set(true)
         PersistentLoggers.info(TAG, "device created — awaiting attachTun(fd) before tunnelStarted")
@@ -124,6 +137,25 @@ class RealUrnetworkSdkBridge(
 
     override fun isRunning(): Boolean = running.get()
 
+    override fun connectTo(location: ConnectLocation) {
+        runCatching { connectVcRef.get()?.connect(location) }
+            .onFailure { PersistentLoggers.warn(TAG, "connect threw: ${it.message}") }
+    }
+
+    override fun connectBestAvailable() {
+        runCatching { connectVcRef.get()?.connectBestAvailable() }
+            .onFailure { PersistentLoggers.warn(TAG, "connectBestAvailable threw: ${it.message}") }
+    }
+
+    override fun selectedLocation(): ConnectLocation? =
+        runCatching { connectVcRef.get()?.selectedLocation }.getOrNull()
+
+    override fun openLocationsViewController(): LocationsViewController? =
+        runCatching { deviceRef.get()?.openLocationsViewController() }.getOrElse {
+            PersistentLoggers.warn(TAG, "openLocationsViewController threw: ${it.message}")
+            null
+        }
+
     override suspend fun attachTun(tunFd: Int): UrnetworkSdkBridge.AttachResult {
         if (tunFd < 0) {
             return UrnetworkSdkBridge.AttachResult.Failed("invalid fd=$tunFd")
@@ -145,17 +177,13 @@ class RealUrnetworkSdkBridge(
                 ioLoopRef.set(loop)
                 runCatching { device.setTunnelStarted(true) }
                     .onFailure { PersistentLoggers.warn(TAG, "setTunnelStarted(true) threw: ${it.message}") }
-                val cv = runCatching { device.openConnectViewController() }.getOrElse {
-                    PersistentLoggers.warn(TAG, "openConnectViewController threw: ${it.message}")
-                    null
-                }
+                val cv = connectVcRef.get()
                 if (cv != null) {
-                    connectVcRef.set(cv)
                     runCatching { cv.connectBestAvailable() }
                         .onFailure { PersistentLoggers.warn(TAG, "connectBestAvailable threw: ${it.message}") }
                     PersistentLoggers.info(TAG, "IoLoop fd=$tunFd tunnelStarted=true connectBestAvailable called")
                 } else {
-                    PersistentLoggers.error(TAG, "ConnectViewController is null — P2P connection will not be established")
+                    PersistentLoggers.error(TAG, "No ConnectViewController — P2P connection will not be established")
                 }
                 UrnetworkSdkBridge.AttachResult.Success
             } catch (t: Throwable) {

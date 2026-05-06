@@ -186,6 +186,9 @@
     <string name="urnetwork_settings_title">URnetwork</string>
     <string name="urnetwork_consent_warning_title">Внимание</string>
     <string name="urnetwork_consent_warning_body">URnetwork — P2P-сеть, в которой каждый участник может работать как exit-node. Если вы включите URnetwork, ваше устройство будет передавать чужой трафик в открытый интернет от своего IP-адреса. Это может приводить к подозрениям со стороны провайдера и юридическим рискам в некоторых юрисдикциях. Включайте только если понимаете последствия. За exit-node трафик начисляются токены URx на Solana-кошелёк.</string>
+    <string name="urnetwork_location_title">Регион выхода</string>
+    <string name="urnetwork_location_best_available">Лучший доступный</string>
+    <string name="urnetwork_location_connect_first">Подключитесь к URnetwork чтобы увидеть доступные регионы</string>
     <string name="settings_urnetwork_title">URnetwork</string>
     <string name="settings_urnetwork_summary">P2P mesh — exit-node + Solana-кошелёк</string>
 

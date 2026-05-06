@@ -91,5 +91,9 @@ class UrnetworkConsentSentinelTest {
         override fun isRunning(): Boolean = false
         override suspend fun attachTun(tunFd: Int): UrnetworkSdkBridge.AttachResult =
             UrnetworkSdkBridge.AttachResult.Success
+        override fun connectTo(location: com.bringyour.sdk.ConnectLocation) = Unit
+        override fun connectBestAvailable() = Unit
+        override fun selectedLocation(): com.bringyour.sdk.ConnectLocation? = null
+        override fun openLocationsViewController(): com.bringyour.sdk.LocationsViewController? = null
     }
 }

@@ -310,5 +310,10 @@ class EngineUrnetworkContractTest {
             lastAttachFd = tunFd
             return UrnetworkSdkBridge.AttachResult.Success
         }
+
+        override fun connectTo(location: com.bringyour.sdk.ConnectLocation) = Unit
+        override fun connectBestAvailable() = Unit
+        override fun selectedLocation(): com.bringyour.sdk.ConnectLocation? = null
+        override fun openLocationsViewController(): com.bringyour.sdk.LocationsViewController? = null
     }
 }
