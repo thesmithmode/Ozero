@@ -20,6 +20,8 @@ import ru.ozero.enginewarp.DataStoreWarpConfigStore
 import ru.ozero.enginewarp.EngineWarp
 import ru.ozero.enginewarp.HttpClient
 import ru.ozero.enginewarp.HttpUrlConnectionClient
+import ru.ozero.enginewarp.MirrorRanker
+import ru.ozero.enginewarp.PrefsMirrorRanker
 import ru.ozero.enginewarp.ProxyWarpAutoConfig
 import ru.ozero.enginewarp.RealWarpSdkBridge
 import ru.ozero.enginewarp.WarpAutoConfig
@@ -68,9 +70,17 @@ object WarpModule {
 
     @Provides
     @Singleton
+    fun provideMirrorRanker(@ApplicationContext context: Context): MirrorRanker =
+        PrefsMirrorRanker(
+            context.getSharedPreferences("warp_mirror_ranks", Context.MODE_PRIVATE),
+        )
+
+    @Provides
+    @Singleton
     fun provideWarpAutoConfig(
         httpClient: HttpClient,
-    ): WarpAutoConfig = ProxyWarpAutoConfig(httpClient)
+        ranker: MirrorRanker,
+    ): WarpAutoConfig = ProxyWarpAutoConfig(httpClient, ranker = ranker)
 
     @Provides
     @Singleton

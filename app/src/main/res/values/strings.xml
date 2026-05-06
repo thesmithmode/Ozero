@@ -162,8 +162,7 @@
     <!-- about -->
     <string name="about_title">О приложении</string>
     <string name="about_version">Версия %1$s</string>
-    <string name="about_repo">Исходники на GitHub</string>
-    <string name="about_legal">Лицензии</string>
+    <string name="about_description">Ozero — агрегатор VPN и anti-DPI движков в одном приложении. Внутри несколько проверенных решений для обхода блокировок: ByeDPI, AmneziaWG (WARP), URnetwork P2P и другие. Можно выбрать конкретный движок вручную или собрать каскад из нескольких — каждое звено решает свою задачу.</string>
 
     <!-- crash log export -->
     <string name="diag_export_crashes">Экспорт crash log</string>

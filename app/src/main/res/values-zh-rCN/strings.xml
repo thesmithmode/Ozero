@@ -137,8 +137,7 @@
 
     <string name="about_title">关于</string>
     <string name="about_version">版本 %1$s</string>
-    <string name="about_repo">GitHub 源代码</string>
-    <string name="about_legal">许可证</string>
+    <string name="about_description">Ozero 是一款集合 VPN 与 anti-DPI 引擎的应用：ByeDPI、AmneziaWG (WARP)、URnetwork P2P 等。</string>
 
     <string name="diag_export_crashes">导出崩溃日志</string>
     <string name="diag_export_no_crashes">崩溃日志为空</string>

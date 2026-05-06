@@ -81,8 +81,9 @@ fun MainScreen(
                 tunnelState = state,
                 powerState = powerState,
                 isConnected = isConnected,
+                manualEngine = manualEngine,
                 onConnectClick = onConnectClick,
-                onOpenServers = onOpenServers,
+                onOpenEngineParams = onOpenEngineParams,
                 onOpenSettings = onOpenSettings,
             )
             AppMode.EXPERT -> ExpertMainContent(
@@ -108,8 +109,9 @@ private fun SimpleMainContent(
     tunnelState: TunnelState,
     powerState: PowerDiscState,
     isConnected: Boolean,
+    manualEngine: EngineId?,
     onConnectClick: () -> Unit,
-    onOpenServers: () -> Unit,
+    onOpenEngineParams: (EngineId?) -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     Column(
@@ -145,7 +147,7 @@ private fun SimpleMainContent(
                 activeTabId = DOCK_TAB_HOME,
                 onTabSelected = { id ->
                     when (id) {
-                        DOCK_TAB_SERVERS -> onOpenServers()
+                        DOCK_TAB_SERVERS -> onOpenEngineParams(manualEngine)
                         DOCK_TAB_SETTINGS -> onOpenSettings()
                     }
                 },

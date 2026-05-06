@@ -86,7 +86,7 @@ class EngineWarp(
         return TunSpec(
             sessionName = "WARP",
             mtu = cfg.mtu,
-            blocking = false,
+            blocking = true,
             ipv4Address = v4Addr,
             ipv4PrefixLength = v4Prefix,
             dnsServers = cfg.dnsServers,
@@ -117,17 +117,45 @@ class EngineWarp(
     }
 
     private suspend fun resolveConfig(): WarpConfig? {
-        configStore.activeConfig().first()?.let { return it }
-        PersistentLoggers.info(TAG, "no active config — autoConfig.register")
-        val regResult = autoConfig.register()
-        val fresh = regResult.getOrElse { t ->
-            PersistentLoggers.error(TAG, "register failed: ${t.message}")
-            return null
+        val raw = configStore.activeConfig().first()
+            ?: run {
+                PersistentLoggers.info(TAG, "no active config — autoConfig.register")
+                val regResult = autoConfig.register()
+                val fresh = regResult.getOrElse { t ->
+                    PersistentLoggers.error(TAG, "register failed: ${t.message}")
+                    return null
+                }
+                runCatching { configStore.addSlot("WARP Auto", fresh) }
+                    .onSuccess { PersistentLoggers.info(TAG, "auto-registered config saved as slot $it") }
+                    .onFailure { PersistentLoggers.warn(TAG, "addSlot failed: ${it.message}") }
+                fresh
+            }
+        return resolveEndpointHost(raw)
+    }
+
+    private fun resolveEndpointHost(cfg: WarpConfig): WarpConfig {
+        val ep = cfg.peerEndpoint
+        val sep = ep.lastIndexOf(':')
+        if (sep < 0) return cfg
+        val host = ep.substring(0, sep)
+        val port = ep.substring(sep + 1)
+        if (host.isBlank() || isLikelyIpAddress(host)) return cfg
+        return runCatching {
+            val resolved = java.net.InetAddress.getByName(host).hostAddress
+            if (resolved.isNullOrBlank()) cfg else {
+                PersistentLoggers.info(TAG, "endpoint resolved $host → $resolved")
+                cfg.copy(peerEndpoint = "$resolved:$port")
+            }
+        }.getOrElse { t ->
+            PersistentLoggers.warn(TAG, "endpoint resolve failed for $host: ${t.message}")
+            cfg
         }
-        runCatching { configStore.addSlot("WARP Auto", fresh) }
-            .onSuccess { PersistentLoggers.info(TAG, "auto-registered config saved as slot $it") }
-            .onFailure { PersistentLoggers.warn(TAG, "addSlot failed: ${it.message}") }
-        return fresh
+    }
+
+    private fun isLikelyIpAddress(host: String): Boolean {
+        if (host.isEmpty()) return false
+        if (host.contains(':')) return true
+        return host.all { it.isDigit() || it == '.' }
     }
 
     private companion object {

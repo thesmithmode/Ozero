@@ -18,11 +18,12 @@ class ProxyWarpAutoConfig(
     private val concurrency: Int = DEFAULT_CONCURRENCY,
     private val totalBudgetMs: Long = DEFAULT_TOTAL_BUDGET_MS,
     private val userAgent: String = DEFAULT_USER_AGENT,
-    private val shuffler: (List<String>) -> List<String> = { it.shuffled() },
+    private val ranker: MirrorRanker = NoopMirrorRanker,
+    private val shuffler: ((List<String>) -> List<String>)? = null,
 ) : WarpAutoConfig {
 
     override suspend fun register(onProgress: ((String) -> Unit)?): Result<WarpConfig> {
-        val ordered = shuffler(mirrors)
+        val ordered = shuffler?.invoke(mirrors) ?: ranker.order(mirrors)
         if (ordered.isEmpty()) {
             return Result.failure(IOException("WARP register: список зеркал пуст"))
         }
@@ -90,8 +91,12 @@ class ProxyWarpAutoConfig(
             try {
                 val httpResult = withTimeoutOrNull(PER_MIRROR_TIMEOUT_MS) {
                     httpClient.postJson(url, REQUEST_BODY, userAgent)
-                } ?: return@async Result.failure(IOException("mirror timeout: $url"))
+                } ?: run {
+                    ranker.recordFailure(url)
+                    return@async Result.failure(IOException("mirror timeout: $url"))
+                }
                 if (httpResult.isFailure) {
+                    ranker.recordFailure(url)
                     return@async Result.failure(
                         httpResult.exceptionOrNull()
                             ?: IOException("HTTP failure on $url"),
@@ -99,7 +104,10 @@ class ProxyWarpAutoConfig(
                 }
                 val body = httpResult.getOrThrow()
                 val parsed = parseProxyResponse(body)
-                if (parsed.isFailure) {
+                if (parsed.isSuccess) {
+                    ranker.recordSuccess(url)
+                } else {
+                    ranker.recordFailure(url)
                     PersistentLoggers.warn(
                         TAG,
                         "mirror parse failed on $url: ${parsed.exceptionOrNull()?.message}",
@@ -109,6 +117,7 @@ class ProxyWarpAutoConfig(
             } catch (ce: CancellationException) {
                 throw ce
             } catch (t: Throwable) {
+                ranker.recordFailure(url)
                 Result.failure(t)
             }
         }

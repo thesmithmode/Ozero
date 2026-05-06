@@ -137,8 +137,7 @@
 
     <string name="about_title">Sobre</string>
     <string name="about_version">Versão %1$s</string>
-    <string name="about_repo">Código no GitHub</string>
-    <string name="about_legal">Licenças</string>
+    <string name="about_description">Ozero é um agregador de motores VPN e anti-DPI em um único app: ByeDPI, AmneziaWG (WARP), URnetwork P2P e outros.</string>
 
     <string name="diag_export_crashes">Exportar log de falhas</string>
     <string name="diag_export_no_crashes">Log de falhas vazio</string>

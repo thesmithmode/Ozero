@@ -53,6 +53,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.io.ByteArrayInputStream
 import ru.ozero.app.R
+import ru.ozero.enginewarp.AwgPreset
+import ru.ozero.enginewarp.AwgPresets
+import ru.ozero.enginewarp.DnsPreset
+import ru.ozero.enginewarp.DnsPresets
+import ru.ozero.enginewarp.EndpointPreset
+import ru.ozero.enginewarp.EndpointPresets
 import ru.ozero.enginewarp.WarpConfigSlot
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -195,6 +201,9 @@ private fun WarpInterfaceSection(draft: WarpEditDraft, onDraftChange: (WarpEditD
         onValueChange = { onDraftChange(draft.copy(addressV6 = it)) },
         tag = "warp_edit_addr6",
     )
+    WarpDnsPresetsRow(onPresetClick = { preset ->
+        onDraftChange(draft.copy(dns = preset.servers.joinToString(", ")))
+    })
     WarpTextField(
         label = stringResource(R.string.warp_field_dns),
         value = draft.dns,
@@ -213,6 +222,9 @@ private fun WarpInterfaceSection(draft: WarpEditDraft, onDraftChange: (WarpEditD
 @Composable
 private fun WarpPeerSection(draft: WarpEditDraft, onDraftChange: (WarpEditDraft) -> Unit) {
     SectionLabel(stringResource(R.string.warp_section_peer))
+    WarpEndpointPresetsRow(onPresetClick = { preset ->
+        onDraftChange(draft.copy(endpoint = preset.endpoint))
+    })
     WarpTextField(
         label = stringResource(R.string.warp_field_endpoint),
         value = draft.endpoint,
@@ -237,6 +249,9 @@ private fun WarpPeerSection(draft: WarpEditDraft, onDraftChange: (WarpEditDraft)
 @Composable
 private fun WarpAwgSection(draft: WarpEditDraft, onDraftChange: (WarpEditDraft) -> Unit) {
     SectionLabel(stringResource(R.string.warp_section_awg))
+    WarpAwgPresetsRow(onPresetClick = { preset ->
+        onDraftChange(applyPreset(draft, preset))
+    })
     WarpTextField(
         label = "Jc", value = draft.jc,
         onValueChange = { onDraftChange(draft.copy(jc = it)) },
@@ -281,6 +296,69 @@ private fun WarpAwgSection(draft: WarpEditDraft, onDraftChange: (WarpEditDraft) 
         label = "H4", value = draft.h4,
         onValueChange = { onDraftChange(draft.copy(h4 = it)) },
         keyboardType = KeyboardType.Number, tag = "warp_edit_h4",
+    )
+}
+
+@Composable
+private fun WarpAwgPresetsRow(onPresetClick: (AwgPreset) -> Unit) {
+    androidx.compose.foundation.lazy.LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth().testTag("warp_awg_presets"),
+    ) {
+        items(AwgPresets.ALL) { preset ->
+            androidx.compose.material3.AssistChip(
+                onClick = { onPresetClick(preset) },
+                label = { Text(preset.name) },
+                modifier = Modifier.testTag("warp_awg_preset_${preset.id}"),
+            )
+        }
+    }
+}
+
+@Composable
+private fun WarpEndpointPresetsRow(onPresetClick: (EndpointPreset) -> Unit) {
+    androidx.compose.foundation.lazy.LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth().testTag("warp_endpoint_presets"),
+    ) {
+        items(EndpointPresets.ALL) { preset ->
+            androidx.compose.material3.AssistChip(
+                onClick = { onPresetClick(preset) },
+                label = { Text(preset.name) },
+                modifier = Modifier.testTag("warp_endpoint_preset_${preset.id}"),
+            )
+        }
+    }
+}
+
+@Composable
+private fun WarpDnsPresetsRow(onPresetClick: (DnsPreset) -> Unit) {
+    androidx.compose.foundation.lazy.LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth().testTag("warp_dns_presets"),
+    ) {
+        items(DnsPresets.ALL) { preset ->
+            androidx.compose.material3.AssistChip(
+                onClick = { onPresetClick(preset) },
+                label = { Text(preset.name) },
+                modifier = Modifier.testTag("warp_dns_preset_${preset.id}"),
+            )
+        }
+    }
+}
+
+private fun applyPreset(draft: WarpEditDraft, preset: AwgPreset): WarpEditDraft {
+    val p = preset.params
+    return draft.copy(
+        jc = p.junkPacketCount.toString(),
+        jmin = p.junkPacketMinSize.toString(),
+        jmax = p.junkPacketMaxSize.toString(),
+        s1 = p.initPacketJunkSize.toString(),
+        s2 = p.responsePacketJunkSize.toString(),
+        h1 = p.initPacketMagicHeader.toString(),
+        h2 = p.responsePacketMagicHeader.toString(),
+        h3 = p.cookieReplyMagicHeader.toString(),
+        h4 = p.transportMagicHeader.toString(),
     )
 }
 
