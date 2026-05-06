@@ -188,6 +188,12 @@ class WarpEngineSettingsViewModel @Inject constructor(
 
     fun onSaveEdit() {
         val draft = _uiState.value.editDraft ?: return
+        if (draft.privateKey.isBlank() || draft.peerPublicKey.isBlank() ||
+            draft.endpoint.isBlank() || draft.addressV4.isBlank()
+        ) {
+            _uiState.value = _uiState.value.copy(errorMessage = VALIDATION_REQUIRED_FIELDS)
+            return
+        }
         val mtu = draft.mtu.toIntOrNull() ?: WarpConfig.DEFAULT_MTU
         val keepalive = draft.keepalive.toIntOrNull() ?: WarpConfig.DEFAULT_KEEPALIVE
         val dns = draft.dns.split(",").map { it.trim() }.filter { it.isNotBlank() }
@@ -240,5 +246,9 @@ class WarpEngineSettingsViewModel @Inject constructor(
 
     fun onImportSuccessConsumed() {
         _uiState.value = _uiState.value.copy(importSuccess = false)
+    }
+
+    private companion object {
+        const val VALIDATION_REQUIRED_FIELDS = "PrivateKey, Endpoint, PublicKey (Peer), Address обязательны"
     }
 }

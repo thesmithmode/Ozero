@@ -203,6 +203,7 @@
     <string name="warp_rename_title">Rename</string>
     <string name="warp_rename_ok">OK</string>
     <string name="warp_rename_cancel">Cancel</string>
+    <string name="warp_edit_required_fields">PrivateKey, Endpoint, PublicKey (Peer), Address are required</string>
     <string name="warp_edit_title">Edit config</string>
     <string name="warp_edit_save">Save</string>
     <string name="warp_field_name">Name</string>

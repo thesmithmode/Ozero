@@ -303,6 +303,31 @@ class WarpEngineSettingsViewModelTest {
     }
 
     @Test
+    fun `onSaveEdit с пустым privateKey — не сохраняет и ставит errorMessage`() = runTest {
+        val id = store.addSlot("S", SAMPLE)
+        advanceUntilIdle()
+        vm.onStartEdit(id)
+        vm.onEditDraftChange(vm.uiState.value.editDraft!!.copy(privateKey = ""))
+        vm.onSaveEdit()
+        advanceUntilIdle()
+        assertNotNull(vm.uiState.value.editDraft, "draft должен оставаться открытым при ошибке валидации")
+        assertNotNull(vm.uiState.value.errorMessage)
+        assertNull(store.lastUpdateCall, "updateSlot не должен вызываться при невалидных данных")
+    }
+
+    @Test
+    fun `onSaveEdit с пустым endpoint — не сохраняет`() = runTest {
+        val id = store.addSlot("S", SAMPLE)
+        advanceUntilIdle()
+        vm.onStartEdit(id)
+        vm.onEditDraftChange(vm.uiState.value.editDraft!!.copy(endpoint = "   "))
+        vm.onSaveEdit()
+        advanceUntilIdle()
+        assertNotNull(vm.uiState.value.editDraft)
+        assertNull(store.lastUpdateCall)
+    }
+
+    @Test
     fun `onSaveEdit с пустым DNS — использует DEFAULT_DNS`() = runTest {
         val id = store.addSlot("S", SAMPLE)
         advanceUntilIdle()

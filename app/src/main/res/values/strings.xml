@@ -212,6 +212,7 @@
     <string name="warp_rename_title">Переименовать</string>
     <string name="warp_rename_ok">OK</string>
     <string name="warp_rename_cancel">Отмена</string>
+    <string name="warp_edit_required_fields">PrivateKey, Endpoint, PublicKey (Peer), Address обязательны</string>
     <string name="warp_edit_title">Редактировать конфиг</string>
     <string name="warp_edit_save">Сохранить</string>
     <string name="warp_field_name">Название</string>
