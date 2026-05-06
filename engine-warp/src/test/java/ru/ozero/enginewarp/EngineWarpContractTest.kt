@@ -239,6 +239,12 @@ class EngineWarpContractTest {
             slotsList.value = slotsList.value.map { if (it.id == id) it.copy(name = name) else it }
         }
 
+        override suspend fun updateSlot(id: String, name: String, config: WarpConfig) {
+            slotsList.value = slotsList.value.map {
+                if (it.id == id) it.copy(name = name, config = config) else it
+            }
+        }
+
         override suspend fun delete(id: String) {
             slotsList.value = slotsList.value.filter { it.id != id }
         }

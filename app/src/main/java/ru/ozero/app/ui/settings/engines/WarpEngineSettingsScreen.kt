@@ -12,11 +12,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -42,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -55,8 +58,20 @@ fun WarpEngineSettingsScreen(
     onBack: () -> Unit,
     viewModel: WarpEngineSettingsViewModel = hiltViewModel(),
 ) {
-    BackHandler(onBack = onBack)
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    if (state.editDraft != null) {
+        BackHandler { viewModel.onEditCancel() }
+        WarpEditScreen(
+            draft = state.editDraft!!,
+            onDraftChange = viewModel::onEditDraftChange,
+            onSave = viewModel::onSaveEdit,
+            onCancel = viewModel::onEditCancel,
+        )
+        return
+    }
+
+    BackHandler(onBack = onBack)
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val importedMessage = stringResource(R.string.warp_imported)
@@ -100,18 +115,202 @@ fun WarpEngineSettingsScreen(
             onCancelGenerate = viewModel::onCancelGenerate,
             onImportFile = { filePickerLauncher.launch("*/*") },
             onSetActive = viewModel::onSetActive,
-            onStartRename = viewModel::onStartRename,
+            onStartEdit = viewModel::onStartEdit,
             onDeleteSlot = viewModel::onDeleteSlot,
         )
-        if (state.showRenameDialog) {
-            WarpRenameDialog(
-                text = state.renameText,
-                onTextChange = viewModel::onRenameTextChange,
-                onConfirm = viewModel::onRenameConfirm,
-                onDismiss = viewModel::onRenameCancel,
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WarpEditScreen(
+    draft: WarpEditDraft,
+    onDraftChange: (WarpEditDraft) -> Unit,
+    onSave: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.warp_edit_title)) },
+                navigationIcon = {
+                    IconButton(onClick = onCancel) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                    }
+                },
+                actions = {
+                    TextButton(onClick = onSave) {
+                        Text(stringResource(R.string.warp_edit_save))
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            WarpTextField(
+                label = stringResource(R.string.warp_field_name),
+                value = draft.name,
+                onValueChange = { onDraftChange(draft.copy(name = it)) },
+                tag = "warp_edit_name",
+            )
+            SectionLabel(stringResource(R.string.warp_section_interface))
+            WarpTextField(
+                label = stringResource(R.string.warp_field_private_key),
+                value = draft.privateKey,
+                onValueChange = { onDraftChange(draft.copy(privateKey = it)) },
+                tag = "warp_edit_priv",
+            )
+            WarpTextField(
+                label = stringResource(R.string.warp_field_public_key),
+                value = draft.publicKey,
+                onValueChange = { onDraftChange(draft.copy(publicKey = it)) },
+                tag = "warp_edit_pub",
+            )
+            WarpTextField(
+                label = stringResource(R.string.warp_field_address_v4),
+                value = draft.addressV4,
+                onValueChange = { onDraftChange(draft.copy(addressV4 = it)) },
+                tag = "warp_edit_addr4",
+            )
+            WarpTextField(
+                label = stringResource(R.string.warp_field_address_v6),
+                value = draft.addressV6,
+                onValueChange = { onDraftChange(draft.copy(addressV6 = it)) },
+                tag = "warp_edit_addr6",
+            )
+            WarpTextField(
+                label = stringResource(R.string.warp_field_dns),
+                value = draft.dns,
+                onValueChange = { onDraftChange(draft.copy(dns = it)) },
+                tag = "warp_edit_dns",
+            )
+            WarpTextField(
+                label = stringResource(R.string.warp_field_mtu),
+                value = draft.mtu,
+                onValueChange = { onDraftChange(draft.copy(mtu = it)) },
+                keyboardType = KeyboardType.Number,
+                tag = "warp_edit_mtu",
+            )
+            SectionLabel(stringResource(R.string.warp_section_peer))
+            WarpTextField(
+                label = stringResource(R.string.warp_field_endpoint),
+                value = draft.endpoint,
+                onValueChange = { onDraftChange(draft.copy(endpoint = it)) },
+                tag = "warp_edit_endpoint",
+            )
+            WarpTextField(
+                label = stringResource(R.string.warp_field_peer_public_key),
+                value = draft.peerPublicKey,
+                onValueChange = { onDraftChange(draft.copy(peerPublicKey = it)) },
+                tag = "warp_edit_peer_pub",
+            )
+            WarpTextField(
+                label = stringResource(R.string.warp_field_keepalive),
+                value = draft.keepalive,
+                onValueChange = { onDraftChange(draft.copy(keepalive = it)) },
+                keyboardType = KeyboardType.Number,
+                tag = "warp_edit_keepalive",
+            )
+            SectionLabel(stringResource(R.string.warp_section_awg))
+            WarpTextField(
+                label = "Jc",
+                value = draft.jc,
+                onValueChange = { onDraftChange(draft.copy(jc = it)) },
+                keyboardType = KeyboardType.Number,
+                tag = "warp_edit_jc",
+            )
+            WarpTextField(
+                label = "Jmin",
+                value = draft.jmin,
+                onValueChange = { onDraftChange(draft.copy(jmin = it)) },
+                keyboardType = KeyboardType.Number,
+                tag = "warp_edit_jmin",
+            )
+            WarpTextField(
+                label = "Jmax",
+                value = draft.jmax,
+                onValueChange = { onDraftChange(draft.copy(jmax = it)) },
+                keyboardType = KeyboardType.Number,
+                tag = "warp_edit_jmax",
+            )
+            WarpTextField(
+                label = "S1",
+                value = draft.s1,
+                onValueChange = { onDraftChange(draft.copy(s1 = it)) },
+                keyboardType = KeyboardType.Number,
+                tag = "warp_edit_s1",
+            )
+            WarpTextField(
+                label = "S2",
+                value = draft.s2,
+                onValueChange = { onDraftChange(draft.copy(s2 = it)) },
+                keyboardType = KeyboardType.Number,
+                tag = "warp_edit_s2",
+            )
+            WarpTextField(
+                label = "H1",
+                value = draft.h1,
+                onValueChange = { onDraftChange(draft.copy(h1 = it)) },
+                keyboardType = KeyboardType.Number,
+                tag = "warp_edit_h1",
+            )
+            WarpTextField(
+                label = "H2",
+                value = draft.h2,
+                onValueChange = { onDraftChange(draft.copy(h2 = it)) },
+                keyboardType = KeyboardType.Number,
+                tag = "warp_edit_h2",
+            )
+            WarpTextField(
+                label = "H3",
+                value = draft.h3,
+                onValueChange = { onDraftChange(draft.copy(h3 = it)) },
+                keyboardType = KeyboardType.Number,
+                tag = "warp_edit_h3",
+            )
+            WarpTextField(
+                label = "H4",
+                value = draft.h4,
+                onValueChange = { onDraftChange(draft.copy(h4 = it)) },
+                keyboardType = KeyboardType.Number,
+                tag = "warp_edit_h4",
             )
         }
     }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(top = 8.dp),
+    )
+}
+
+@Composable
+private fun WarpTextField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    tag: String = "",
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        modifier = Modifier.fillMaxWidth().testTag(tag),
+    )
 }
 
 @Composable
@@ -122,7 +321,7 @@ private fun WarpScreenContent(
     onCancelGenerate: () -> Unit,
     onImportFile: () -> Unit,
     onSetActive: (String) -> Unit,
-    onStartRename: (String) -> Unit,
+    onStartEdit: (String) -> Unit,
     onDeleteSlot: (String) -> Unit,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -140,7 +339,7 @@ private fun WarpScreenContent(
             SlotListContent(
                 state = state,
                 onSetActive = onSetActive,
-                onStartRename = onStartRename,
+                onStartEdit = onStartEdit,
                 onDeleteSlot = onDeleteSlot,
             )
             WarpActionRow(
@@ -158,7 +357,7 @@ private fun WarpScreenContent(
 private fun SlotListContent(
     state: WarpSettingsUiState,
     onSetActive: (String) -> Unit,
-    onStartRename: (String) -> Unit,
+    onStartEdit: (String) -> Unit,
     onDeleteSlot: (String) -> Unit,
 ) {
     LazyColumn(
@@ -191,7 +390,7 @@ private fun SlotListContent(
             WarpConfigSlotCard(
                 slot = slot,
                 onSetActive = { onSetActive(slot.id) },
-                onStartRename = { onStartRename(slot.id) },
+                onStartEdit = { onStartEdit(slot.id) },
                 onDelete = { onDeleteSlot(slot.id) },
             )
         }
@@ -252,28 +451,6 @@ private fun WarpActionRow(
 }
 
 @Composable
-private fun WarpRenameDialog(
-    text: String,
-    onTextChange: (String) -> Unit,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.warp_rename_title)) },
-        text = {
-            OutlinedTextField(
-                value = text,
-                onValueChange = onTextChange,
-                singleLine = true,
-            )
-        },
-        confirmButton = { TextButton(onClick = onConfirm) { Text(stringResource(R.string.warp_rename_ok)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.warp_rename_cancel)) } },
-    )
-}
-
-@Composable
 private fun EmptyConfigCard(
     isRegistering: Boolean,
     progressText: String?,
@@ -327,7 +504,7 @@ private fun EmptyConfigCard(
 private fun WarpConfigSlotCard(
     slot: WarpConfigSlot,
     onSetActive: () -> Unit,
-    onStartRename: () -> Unit,
+    onStartEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -347,7 +524,7 @@ private fun WarpConfigSlotCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            IconButton(onClick = onStartRename) {
+            IconButton(onClick = onStartEdit) {
                 Icon(Icons.Filled.Edit, contentDescription = null)
             }
             IconButton(onClick = onDelete) {

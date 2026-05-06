@@ -58,6 +58,16 @@ class DataStoreWarpConfigSlotStore(
         }
     }
 
+    override suspend fun updateSlot(id: String, name: String, config: WarpConfig): Unit = mutex.withLock {
+        dataStore.edit { prefs ->
+            val current = parseSlots(prefs[KEY_SLOTS] ?: "[]")
+            val updated = current.map { slot ->
+                if (slot.id == id) slot.copy(name = name, config = config) else slot
+            }
+            prefs[KEY_SLOTS] = serializeSlots(updated)
+        }
+    }
+
     override suspend fun delete(id: String): Unit = mutex.withLock {
         dataStore.edit { prefs ->
             val current = parseSlots(prefs[KEY_SLOTS] ?: "[]")

@@ -203,6 +203,21 @@
     <string name="warp_rename_title">Rename</string>
     <string name="warp_rename_ok">OK</string>
     <string name="warp_rename_cancel">Cancel</string>
+    <string name="warp_edit_title">Edit config</string>
+    <string name="warp_edit_save">Save</string>
+    <string name="warp_field_name">Name</string>
+    <string name="warp_field_private_key">PrivateKey</string>
+    <string name="warp_field_public_key">PublicKey</string>
+    <string name="warp_field_address_v4">Address (IPv4)</string>
+    <string name="warp_field_address_v6">Address (IPv6)</string>
+    <string name="warp_field_dns">DNS (comma-separated)</string>
+    <string name="warp_field_mtu">MTU</string>
+    <string name="warp_field_endpoint">Endpoint</string>
+    <string name="warp_field_peer_public_key">PublicKey (Peer)</string>
+    <string name="warp_field_keepalive">PersistentKeepalive</string>
+    <string name="warp_section_interface">Interface</string>
+    <string name="warp_section_peer">Peer</string>
+    <string name="warp_section_awg">AmneziaWG</string>
 
     <!-- App mode -->
     <string name="settings_app_mode_title">Interface mode</string>

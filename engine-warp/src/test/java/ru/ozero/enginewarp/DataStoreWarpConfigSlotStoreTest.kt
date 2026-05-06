@@ -259,6 +259,37 @@ class DataStoreWarpConfigSlotStoreTest {
     }
 
     @Test
+    fun `updateSlot обновляет имя и конфиг слота`() = runTest {
+        val store = newStore()
+        val id = store.addSlot("OldName", sample)
+        val newConfig = sample.copy(peerEndpoint = "new.endpoint:2408", privateKey = "newpriv")
+        store.updateSlot(id, "NewName", newConfig)
+        val slots = store.slots().first()
+        assertEquals(1, slots.size)
+        assertEquals("NewName", slots[0].name)
+        assertEquals("new.endpoint:2408", slots[0].config.peerEndpoint)
+        assertEquals("newpriv", slots[0].config.privateKey)
+    }
+
+    @Test
+    fun `updateSlot не меняет isActive`() = runTest {
+        val store = newStore()
+        val id = store.addSlot("S", sample)
+        store.updateSlot(id, "S2", sample.copy(peerEndpoint = "x:1"))
+        assertTrue(store.slots().first()[0].isActive, "isActive не должен сбрасываться при updateSlot")
+    }
+
+    @Test
+    fun `updateSlot несуществующего id — ничего не меняет`() = runTest {
+        val store = newStore()
+        store.addSlot("A", sample)
+        store.updateSlot("nonexistent", "X", sample.copy(peerEndpoint = "x:1"))
+        val slots = store.slots().first()
+        assertEquals("A", slots[0].name)
+        assertEquals(sample.peerEndpoint, slots[0].config.peerEndpoint)
+    }
+
+    @Test
     fun `setActive несуществующего id — активный слот не меняется`() = runTest {
         val store = newStore()
         val id1 = store.addSlot("First", sample)

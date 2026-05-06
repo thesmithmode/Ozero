@@ -271,6 +271,7 @@ class AppBackupManagerTest {
         override suspend fun addSlot(name: String, config: WarpConfig): String = error("not used")
         override suspend fun setActive(id: String) = Unit
         override suspend fun rename(id: String, name: String) = Unit
+        override suspend fun updateSlot(id: String, name: String, config: WarpConfig) = Unit
         override suspend fun delete(id: String) = Unit
         override suspend fun clear() {
             slots.value = emptyList()

@@ -16,6 +16,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import ru.ozero.enginewarp.AwgParams
 import ru.ozero.enginewarp.WarpAutoConfig
 import ru.ozero.enginewarp.WarpConfig
 import ru.ozero.enginewarp.WarpConfigSlot
@@ -26,6 +27,7 @@ import java.io.IOException
 import java.io.InputStream
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -207,44 +209,109 @@ class WarpEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `onStartRename открывает диалог с именем слота`() = runTest {
+    fun `onStartEdit открывает draft с полями слота`() = runTest {
         val id = store.addSlot("MySlot", SAMPLE)
         advanceUntilIdle()
-        vm.onStartRename(id)
-        val s = vm.uiState.value
-        assertTrue(s.showRenameDialog)
-        assertEquals(id, s.renamingSlotId)
-        assertEquals("MySlot", s.renameText)
+        vm.onStartEdit(id)
+        val draft = vm.uiState.value.editDraft
+        assertNotNull(draft)
+        assertEquals(id, draft.slotId)
+        assertEquals("MySlot", draft.name)
+        assertEquals(SAMPLE.peerEndpoint, draft.endpoint)
+        assertEquals(SAMPLE.privateKey, draft.privateKey)
+        assertEquals(SAMPLE.interfaceAddressV4, draft.addressV4)
     }
 
     @Test
-    fun `onRenameCancel закрывает диалог`() = runTest {
+    fun `onStartEdit с неизвестным id — draft не открывается`() = runTest {
+        advanceUntilIdle()
+        vm.onStartEdit("unknown-id")
+        assertNull(vm.uiState.value.editDraft)
+    }
+
+    @Test
+    fun `onEditCancel закрывает draft`() = runTest {
         val id = store.addSlot("X", SAMPLE)
         advanceUntilIdle()
-        vm.onStartRename(id)
-        vm.onRenameCancel()
-        val s = vm.uiState.value
-        assertFalse(s.showRenameDialog)
-        assertNull(s.renamingSlotId)
-        assertEquals("", s.renameText)
+        vm.onStartEdit(id)
+        assertNotNull(vm.uiState.value.editDraft)
+        vm.onEditCancel()
+        assertNull(vm.uiState.value.editDraft)
     }
 
     @Test
-    fun `onRenameConfirm вызывает store_rename и закрывает диалог`() = runTest {
+    fun `onEditDraftChange обновляет draft`() = runTest {
+        val id = store.addSlot("X", SAMPLE)
+        advanceUntilIdle()
+        vm.onStartEdit(id)
+        val draft = vm.uiState.value.editDraft!!
+        vm.onEditDraftChange(draft.copy(name = "NewName", endpoint = "1.2.3.4:51820"))
+        val updated = vm.uiState.value.editDraft!!
+        assertEquals("NewName", updated.name)
+        assertEquals("1.2.3.4:51820", updated.endpoint)
+    }
+
+    @Test
+    fun `onSaveEdit вызывает store_updateSlot и закрывает draft`() = runTest {
         val id = store.addSlot("Old", SAMPLE)
         advanceUntilIdle()
-        vm.onStartRename(id)
-        vm.onRenameTextChange("New Name")
-        vm.onRenameConfirm()
+        vm.onStartEdit(id)
+        vm.onEditDraftChange(vm.uiState.value.editDraft!!.copy(name = "New", endpoint = "9.9.9.9:2408"))
+        vm.onSaveEdit()
         advanceUntilIdle()
-        assertFalse(vm.uiState.value.showRenameDialog)
-        assertEquals("New Name", store.lastRenameCall?.second)
+        assertNull(vm.uiState.value.editDraft)
+        val call = store.lastUpdateCall
+        assertNotNull(call)
+        assertEquals(id, call.first)
+        assertEquals("New", call.second)
+        assertEquals("9.9.9.9:2408", call.third.peerEndpoint)
     }
 
     @Test
-    fun `onRenameTextChange обновляет renameText`() = runTest {
-        vm.onRenameTextChange("hello")
-        assertEquals("hello", vm.uiState.value.renameText)
+    fun `onSaveEdit с невалидным MTU — использует DEFAULT_MTU`() = runTest {
+        val id = store.addSlot("S", SAMPLE)
+        advanceUntilIdle()
+        vm.onStartEdit(id)
+        vm.onEditDraftChange(vm.uiState.value.editDraft!!.copy(mtu = "not-a-number"))
+        vm.onSaveEdit()
+        advanceUntilIdle()
+        assertEquals(WarpConfig.DEFAULT_MTU, store.lastUpdateCall?.third?.mtu)
+    }
+
+    @Test
+    fun `onSaveEdit нормализует jmin_jmax — min всегда не больше max`() = runTest {
+        val id = store.addSlot("S", SAMPLE)
+        advanceUntilIdle()
+        vm.onStartEdit(id)
+        vm.onEditDraftChange(vm.uiState.value.editDraft!!.copy(jmin = "300", jmax = "100"))
+        vm.onSaveEdit()
+        advanceUntilIdle()
+        val awg = store.lastUpdateCall?.third?.awgParams!!
+        assertTrue(awg.junkPacketMinSize <= awg.junkPacketMaxSize)
+        assertEquals(100, awg.junkPacketMinSize)
+        assertEquals(300, awg.junkPacketMaxSize)
+    }
+
+    @Test
+    fun `onSaveEdit с пустым именем — fallback WARP`() = runTest {
+        val id = store.addSlot("S", SAMPLE)
+        advanceUntilIdle()
+        vm.onStartEdit(id)
+        vm.onEditDraftChange(vm.uiState.value.editDraft!!.copy(name = "   "))
+        vm.onSaveEdit()
+        advanceUntilIdle()
+        assertEquals("WARP", store.lastUpdateCall?.second)
+    }
+
+    @Test
+    fun `onSaveEdit с пустым DNS — использует DEFAULT_DNS`() = runTest {
+        val id = store.addSlot("S", SAMPLE)
+        advanceUntilIdle()
+        vm.onStartEdit(id)
+        vm.onEditDraftChange(vm.uiState.value.editDraft!!.copy(dns = "   "))
+        vm.onSaveEdit()
+        advanceUntilIdle()
+        assertEquals(WarpConfig.DEFAULT_DNS, store.lastUpdateCall?.third?.dnsServers)
     }
 
     @Test
@@ -269,7 +336,7 @@ class WarpEngineSettingsViewModelTest {
     private open class FakeWarpStore : WarpConfigSlotStore {
         private val slotsFlow = MutableStateFlow<List<WarpConfigSlot>>(emptyList())
         val setActiveCalls = mutableListOf<String>()
-        var lastRenameCall: Pair<String, String>? = null
+        var lastUpdateCall: Triple<String, String, WarpConfig>? = null
         private var idCounter = 0
 
         fun slotCount() = slotsFlow.value.size
@@ -295,8 +362,14 @@ class WarpEngineSettingsViewModelTest {
         }
 
         override suspend fun rename(id: String, name: String) {
-            lastRenameCall = id to name
             slotsFlow.value = slotsFlow.value.map { if (it.id == id) it.copy(name = name) else it }
+        }
+
+        override suspend fun updateSlot(id: String, name: String, config: WarpConfig) {
+            lastUpdateCall = Triple(id, name, config)
+            slotsFlow.value = slotsFlow.value.map {
+                if (it.id == id) it.copy(name = name, config = config) else it
+            }
         }
 
         override suspend fun delete(id: String) {

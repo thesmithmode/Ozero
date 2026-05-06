@@ -11,7 +11,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import ru.ozero.enginewarp.AwgParams
 import ru.ozero.enginewarp.WarpAutoConfig
+import ru.ozero.enginewarp.WarpConfig
 import ru.ozero.enginewarp.WarpConfigSlot
 import ru.ozero.enginewarp.WarpConfigSlotStore
 import ru.ozero.enginewarp.WarpFileImporter
@@ -21,6 +23,29 @@ import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
 
+data class WarpEditDraft(
+    val slotId: String,
+    val name: String,
+    val endpoint: String,
+    val privateKey: String,
+    val publicKey: String,
+    val peerPublicKey: String,
+    val addressV4: String,
+    val addressV6: String,
+    val dns: String,
+    val mtu: String,
+    val keepalive: String,
+    val jc: String,
+    val jmin: String,
+    val jmax: String,
+    val s1: String,
+    val s2: String,
+    val h1: String,
+    val h2: String,
+    val h3: String,
+    val h4: String,
+)
+
 data class WarpSettingsUiState(
     val slots: List<WarpConfigSlot> = emptyList(),
     val activeSlotId: String? = null,
@@ -28,9 +53,7 @@ data class WarpSettingsUiState(
     val errorMessage: String? = null,
     val progressText: String? = null,
     val importSuccess: Boolean = false,
-    val showRenameDialog: Boolean = false,
-    val renamingSlotId: String? = null,
-    val renameText: String = "",
+    val editDraft: WarpEditDraft? = null,
 )
 
 @HiltViewModel
@@ -129,38 +152,87 @@ class WarpEngineSettingsViewModel @Inject constructor(
         }
     }
 
-    fun onStartRename(id: String) {
-        val currentName = _uiState.value.slots.firstOrNull { it.id == id }?.name ?: ""
+    fun onStartEdit(id: String) {
+        val slot = _uiState.value.slots.firstOrNull { it.id == id } ?: return
+        val cfg = slot.config
+        val awg = cfg.awgParams
         _uiState.value = _uiState.value.copy(
-            showRenameDialog = true,
-            renamingSlotId = id,
-            renameText = currentName,
+            editDraft = WarpEditDraft(
+                slotId = id,
+                name = slot.name,
+                endpoint = cfg.peerEndpoint,
+                privateKey = cfg.privateKey,
+                publicKey = cfg.publicKey,
+                peerPublicKey = cfg.peerPublicKey,
+                addressV4 = cfg.interfaceAddressV4,
+                addressV6 = cfg.interfaceAddressV6,
+                dns = cfg.dnsServers.joinToString(", "),
+                mtu = cfg.mtu.toString(),
+                keepalive = cfg.keepaliveSeconds.toString(),
+                jc = awg.junkPacketCount.toString(),
+                jmin = awg.junkPacketMinSize.toString(),
+                jmax = awg.junkPacketMaxSize.toString(),
+                s1 = awg.initPacketJunkSize.toString(),
+                s2 = awg.responsePacketJunkSize.toString(),
+                h1 = awg.initPacketMagicHeader.toString(),
+                h2 = awg.responsePacketMagicHeader.toString(),
+                h3 = awg.cookieReplyMagicHeader.toString(),
+                h4 = awg.transportMagicHeader.toString(),
+            ),
         )
     }
 
-    fun onRenameConfirm() {
-        val id = _uiState.value.renamingSlotId ?: return
-        val name = _uiState.value.renameText
+    fun onEditDraftChange(draft: WarpEditDraft) {
+        _uiState.value = _uiState.value.copy(editDraft = draft)
+    }
+
+    fun onSaveEdit() {
+        val draft = _uiState.value.editDraft ?: return
+        val mtu = draft.mtu.toIntOrNull() ?: WarpConfig.DEFAULT_MTU
+        val keepalive = draft.keepalive.toIntOrNull() ?: WarpConfig.DEFAULT_KEEPALIVE
+        val dns = draft.dns.split(",").map { it.trim() }.filter { it.isNotBlank() }
+            .ifEmpty { WarpConfig.DEFAULT_DNS }
+        val jc = draft.jc.toIntOrNull() ?: AwgParams.DEFAULT_JC
+        val jmin = draft.jmin.toIntOrNull() ?: AwgParams.DEFAULT_JMIN
+        val jmax = draft.jmax.toIntOrNull() ?: AwgParams.DEFAULT_JMAX
+        val s1 = draft.s1.toIntOrNull() ?: AwgParams.DEFAULT_S1
+        val s2 = draft.s2.toIntOrNull() ?: AwgParams.DEFAULT_S2
+        val h1 = draft.h1.toLongOrNull() ?: AwgParams.DEFAULT_H1
+        val h2 = draft.h2.toLongOrNull() ?: AwgParams.DEFAULT_H2
+        val h3 = draft.h3.toLongOrNull() ?: AwgParams.DEFAULT_H3
+        val h4 = draft.h4.toLongOrNull() ?: AwgParams.DEFAULT_H4
+        val config = WarpConfig(
+            privateKey = draft.privateKey.trim(),
+            publicKey = draft.publicKey.trim(),
+            peerPublicKey = draft.peerPublicKey.trim(),
+            peerEndpoint = draft.endpoint.trim(),
+            interfaceAddressV4 = draft.addressV4.trim(),
+            interfaceAddressV6 = draft.addressV6.trim(),
+            mtu = mtu,
+            dnsServers = dns,
+            keepaliveSeconds = keepalive,
+            awgParams = AwgParams(
+                junkPacketCount = jc,
+                junkPacketMinSize = minOf(jmin, jmax),
+                junkPacketMaxSize = maxOf(jmin, jmax),
+                initPacketJunkSize = s1,
+                responsePacketJunkSize = s2,
+                initPacketMagicHeader = h1,
+                responsePacketMagicHeader = h2,
+                cookieReplyMagicHeader = h3,
+                transportMagicHeader = h4,
+            ),
+        )
+        val slotId = draft.slotId
+        val name = draft.name.trim().ifBlank { "WARP" }
         viewModelScope.launch {
-            store.rename(id, name)
+            store.updateSlot(slotId, name, config)
         }
-        _uiState.value = _uiState.value.copy(
-            showRenameDialog = false,
-            renamingSlotId = null,
-            renameText = "",
-        )
+        _uiState.value = _uiState.value.copy(editDraft = null)
     }
 
-    fun onRenameCancel() {
-        _uiState.value = _uiState.value.copy(
-            showRenameDialog = false,
-            renamingSlotId = null,
-            renameText = "",
-        )
-    }
-
-    fun onRenameTextChange(text: String) {
-        _uiState.value = _uiState.value.copy(renameText = text)
+    fun onEditCancel() {
+        _uiState.value = _uiState.value.copy(editDraft = null)
     }
 
     fun onImportSuccessConsumed() {
