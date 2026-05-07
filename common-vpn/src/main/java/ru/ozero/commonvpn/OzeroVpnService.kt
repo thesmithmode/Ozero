@@ -37,7 +37,7 @@ fun interface ProcessKiller {
 }
 
 @AndroidEntryPoint
-@Suppress("TooManyFunctions")
+@Suppress("TooManyFunctions", "LargeClass")
 class OzeroVpnService : android.net.VpnService() {
 
     @Inject lateinit var chainOrchestrator: ChainOrchestrator
