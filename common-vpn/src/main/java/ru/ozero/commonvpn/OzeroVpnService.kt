@@ -579,6 +579,14 @@ class OzeroVpnService : android.net.VpnService() {
                 android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT,
             )
         }
+        val stopIntent = Intent(this, OzeroVpnService::class.java).setAction(ACTION_STOP)
+        val stopPending = android.app.PendingIntent.getService(
+            this, 1, stopIntent,
+            android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val stopAction = Notification.Action.Builder(
+            android.R.drawable.ic_menu_close_clear_cancel, "Stop", stopPending,
+        ).build()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             getSystemService(NotificationManager::class.java)?.createNotificationChannel(
                 NotificationChannel(CHANNEL_ID, "Ozero VPN", NotificationManager.IMPORTANCE_LOW),
@@ -588,6 +596,7 @@ class OzeroVpnService : android.net.VpnService() {
                 .setSmallIcon(android.R.drawable.ic_lock_lock)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
+                .addAction(stopAction)
                 .apply {
                     if (contentText != null) setContentText(contentText)
                     if (contentIntent != null) setContentIntent(contentIntent)
@@ -600,6 +609,7 @@ class OzeroVpnService : android.net.VpnService() {
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
+            .addAction(stopAction)
             .apply {
                 if (contentText != null) setContentText(contentText)
                 if (contentIntent != null) setContentIntent(contentIntent)

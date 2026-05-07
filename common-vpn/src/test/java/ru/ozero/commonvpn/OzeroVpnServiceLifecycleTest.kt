@@ -123,6 +123,25 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
+    fun `buildNotification содержит Stop action с ACTION_STOP intent`() {
+        val body = source.substringAfter("private fun buildNotification").substringBefore("override fun onRevoke")
+        assertTrue(
+            body.contains("ACTION_STOP"),
+            "notification обязан содержать ACTION_STOP intent — иначе юзер не может остановить VPN " +
+                "из notification shade без открытия app",
+        )
+        assertTrue(body.contains("addAction"), "notification обязан содержать addAction для Stop кнопки")
+        assertTrue(
+            body.contains("PendingIntent.getService") || body.contains("getService"),
+            "Stop action должен использовать PendingIntent.getService — direct call в OzeroVpnService.onStartCommand",
+        )
+        assertTrue(
+            body.contains("FLAG_IMMUTABLE"),
+            "PendingIntent с Android 12+ обязан FLAG_IMMUTABLE",
+        )
+    }
+
+    @Test
     fun `onRevoke переопределён и вызывает stopVpn`() {
         val body = source.substringAfter("override fun onRevoke()").substringBefore("override fun onDestroy()")
         assertTrue(body.contains("stopVpn()"))
