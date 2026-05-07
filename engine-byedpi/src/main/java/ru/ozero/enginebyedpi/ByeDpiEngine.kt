@@ -139,6 +139,8 @@ class ByeDpiEngine(
 
     override fun stats(): Flow<EngineStats> = _stats.asStateFlow()
 
+    override fun preflight(): ru.ozero.enginescore.EnginePreflight = ByeDpiPreflight()
+
     internal fun buildArgs(config: EngineConfig.ByeDpi): Array<String> {
         val extra =
             config.args.trim()
