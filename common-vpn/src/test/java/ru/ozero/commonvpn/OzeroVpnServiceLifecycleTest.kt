@@ -160,6 +160,37 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
+    fun `onDestroy ограничивает runBlocking shutdown через withTimeoutOrNull`() {
+        val body = source.substringAfter("override fun onDestroy()").substringBefore("private fun enterForegroundOrLog")
+        assertTrue(
+            body.contains("runBlocking"),
+            "onDestroy обязан runBlocking shutdown — иначе coroutines умрут до завершения performShutdown",
+        )
+        assertTrue(
+            body.contains("withTimeoutOrNull"),
+            "runBlocking в onDestroy обязан withTimeoutOrNull — performShutdown имеет 2 внутренних " +
+                "таймаута по 3s (chain + native). Без внешнего лимита onDestroy может занять до 6s+, " +
+                "ANR threshold = 5s → краш системой как ANR. " +
+                "Лимит должен быть < 5000ms.",
+        )
+        val rbBody = body.substringAfter("runBlocking").take(200)
+        assertTrue(
+            rbBody.contains("withTimeoutOrNull"),
+            "withTimeoutOrNull должен быть ВНУТРИ runBlocking, не снаружи",
+        )
+    }
+
+    @Test
+    fun `onDestroy логирует если runBlocking shutdown не уложился в таймаут`() {
+        val body = source.substringAfter("override fun onDestroy()").substringBefore("private fun enterForegroundOrLog")
+        assertTrue(
+            body.contains("onDestroy shutdown timeout"),
+            "Если withTimeoutOrNull вернул null — обязан появиться лог 'onDestroy shutdown timeout' " +
+                "для post-mortem диагностики ANR-near-miss",
+        )
+    }
+
+    @Test
     fun `onDestroy не shutdown-ит singleton HealthMonitor`() {
         val body = source.substringAfter("override fun onDestroy()").substringBefore("private fun enterForegroundOrLog")
         assertFalse(

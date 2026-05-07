@@ -79,6 +79,7 @@ class OzeroVpnService : android.net.VpnService() {
         private const val STATS_SAMPLE_INTERVAL_MS = 1_000L
         private const val STATS_NOTIFY_LOG_EVERY = 5
         private const val SETTINGS_READ_TIMEOUT_MS = 1_500L
+        private const val ON_DESTROY_SHUTDOWN_TIMEOUT_MS = 4_000L
     }
 
     override fun onCreate() {
@@ -616,7 +617,15 @@ class OzeroVpnService : android.net.VpnService() {
         PersistentLoggers.info(TAG, "onDestroy entry")
         socketProtector?.let { ru.ozero.enginescore.VpnSocketProtectorHolder.unbind(it) }
         if (stopping.compareAndSet(false, true)) {
-            runBlocking(Dispatchers.IO) { performShutdown() }
+            runBlocking(Dispatchers.IO) {
+                val ok = withTimeoutOrNull(ON_DESTROY_SHUTDOWN_TIMEOUT_MS) { performShutdown() }
+                if (ok == null) {
+                    PersistentLoggers.warn(
+                        TAG,
+                        "onDestroy shutdown timeout > ${ON_DESTROY_SHUTDOWN_TIMEOUT_MS}ms — abandon",
+                    )
+                }
+            }
         }
         runCatching { healthMonitor.stop() }
         serviceScope.cancel()
