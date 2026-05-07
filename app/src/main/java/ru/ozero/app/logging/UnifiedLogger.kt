@@ -15,6 +15,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicReference
 
+@Suppress("TooManyFunctions")
 object UnifiedLogger : PersistentLogger {
 
     private const val TAG = "UnifiedLogger"
