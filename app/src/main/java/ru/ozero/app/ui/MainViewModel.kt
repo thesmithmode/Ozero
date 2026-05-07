@@ -3,11 +3,11 @@ package ru.ozero.app.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -78,9 +78,7 @@ class MainViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            while (true) {
-                delay(SPEED_SAMPLE_INTERVAL_MS)
-                val s = stats.value
+            tunnelController.stats.collect { s ->
                 if (s != null) {
                     val prev = _speedHistory.value
                     _speedHistory.value = (prev + Pair(s.bpsIn.toFloat(), s.bpsOut.toFloat()))
@@ -108,7 +106,6 @@ class MainViewModel @Inject constructor(
     }
 
     private companion object {
-        const val SPEED_SAMPLE_INTERVAL_MS = 100L
         const val SPEED_HISTORY_SIZE = 60
     }
 }
