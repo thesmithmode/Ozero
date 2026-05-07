@@ -47,7 +47,10 @@ class RealWarpSdkBridgeTest {
         val piIdx = passed.indexOf("PrivateKey")
         val peerIdx = passed.indexOf("[Peer]")
         assertTrue(piIdx in 0 until peerIdx, "PrivateKey должен идти ПЕРЕД [Peer] (canonical Interface)")
-        assertTrue(piIdx > passed.indexOf("Address"), "canonical: PrivateKey ПОСЛЕ Address — am-go parser ожидает этот порядок")
+        assertTrue(
+            piIdx > passed.indexOf("Address"),
+            "canonical: PrivateKey ПОСЛЕ Address — am-go parser ожидает этот порядок",
+        )
     }
 
     @Test
