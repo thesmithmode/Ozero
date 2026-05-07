@@ -149,7 +149,10 @@ class WarpEngineSettingsViewModel @Inject constructor(
                 onSuccess = { cfg ->
                     val id = store.addSlot(suggestedName, cfg)
                     store.setActive(id)
-                    _uiState.value = _uiState.value.copy(errorMessage = null, importSuccessCount = _uiState.value.importSuccessCount + 1)
+                    _uiState.value = _uiState.value.copy(
+                        errorMessage = null,
+                        importSuccessCount = _uiState.value.importSuccessCount + 1,
+                    )
                 },
                 onFailure = { t ->
                     _uiState.value = _uiState.value.copy(

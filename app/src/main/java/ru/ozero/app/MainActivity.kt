@@ -37,6 +37,7 @@ class MainActivity : AppCompatActivity() {
     @Inject lateinit var userFlags: UserFlagsRepository
 
     @Inject lateinit var settingsRepository: ru.ozero.enginescore.settings.SettingsRepository
+
     @Inject lateinit var warpConfigSlotStore: WarpConfigSlotStore
 
     @Inject lateinit var logcatReader: LogcatReader
