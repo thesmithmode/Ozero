@@ -24,6 +24,7 @@ class RealWarpSdkBridge internal constructor(
     private var tunnelHandle: Int = INVALID_HANDLE
 
     private val watchdogScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     @Volatile
     private var handshakeWatchdogJob: Job? = null
 
