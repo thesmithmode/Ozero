@@ -168,7 +168,7 @@ class ProxyWarpAutoConfig(
         }
         json.optJSONObject("content")?.let { content ->
             content.optString("wgQuick", "").takeIf { it.isNotBlank() }?.let { wg ->
-                findInterfaceBlock(wg)?.let { return ExtractedIni(it, "wgQuick", forceVanilla = false) }
+                findInterfaceBlock(wg)?.let { return ExtractedIni(it, "wgQuick", forceVanilla = true) }
             }
             content.optString("amQuick", "").takeIf { it.isNotBlank() }?.let { am ->
                 findInterfaceBlock(am)?.let { return ExtractedIni(it, "amQuick", forceVanilla = true) }
