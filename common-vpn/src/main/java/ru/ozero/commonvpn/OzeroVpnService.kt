@@ -181,7 +181,7 @@ class OzeroVpnService : android.net.VpnService() {
         val pick = pickActiveEngine(manualEngine, settings)
         if (pick == null) {
             val mode = if (manualEngine == null) "auto" else "manual"
-            val targetForUi = manualEngine ?: EngineId.BYEDPI
+            val targetForUi = if (manualEngine != null) manualEngine else EngineId.BYEDPI
             PersistentLoggers.error(
                 TAG,
                 "no engine config available ($mode mode) — отказ старта",
