@@ -198,7 +198,7 @@ class ReLinkerAwgRuntime(context: Context) : AwgRuntime {
         return result
     }
 
-    fun getConfig(handle: Int): String? {
+    override fun getConfig(handle: Int): String? {
         loadOnce()
         return runCatching { GoBackend.awgGetConfig(handle) }.getOrNull()
     }
