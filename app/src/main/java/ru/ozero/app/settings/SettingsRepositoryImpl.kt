@@ -47,6 +47,17 @@ class SettingsRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun setEngineAutoPriority(priority: List<EngineId>) {
+        dataStore.edit { prefs ->
+            val cleaned = priority.distinct().filter { !it.isStub }
+            if (cleaned.isEmpty()) {
+                prefs.remove(SettingsKeys.ENGINE_AUTO_PRIORITY)
+            } else {
+                prefs[SettingsKeys.ENGINE_AUTO_PRIORITY] = cleaned.joinToString(",") { it.name }
+            }
+        }
+    }
+
     override suspend fun setUrnetworkEnabled(enabled: Boolean) {
         dataStore.edit { it[SettingsKeys.URNETWORK_ENABLED] = enabled }
     }
@@ -120,6 +131,7 @@ class SettingsRepositoryImpl @Inject constructor(
         ipv6Enabled = this[SettingsKeys.IPV6_ENABLED] ?: SettingsModel.DEFAULT_IPV6_ENABLED,
         autoStart = this[SettingsKeys.AUTO_START] ?: SettingsModel.DEFAULT_AUTO_START,
         manualEngine = readManualEngine(),
+        engineAutoPriority = readEngineAutoPriority(),
         urnetworkEnabled = this[SettingsKeys.URNETWORK_ENABLED] ?: SettingsModel.DEFAULT_URNETWORK_ENABLED,
         urnetworkJwt = this[SettingsKeys.URNETWORK_JWT],
         byedpiWinningArgs = this[SettingsKeys.BYDPI_WINNING_ARGS],
@@ -154,6 +166,16 @@ class SettingsRepositoryImpl @Inject constructor(
     private fun Preferences.readManualEngine(): EngineId? {
         val raw = this[SettingsKeys.MANUAL_ENGINE] ?: return null
         return runCatching { EngineId.valueOf(raw) }.getOrNull()
+    }
+
+    private fun Preferences.readEngineAutoPriority(): List<EngineId> {
+        val raw = this[SettingsKeys.ENGINE_AUTO_PRIORITY]
+            ?: return SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY
+        val parsed = raw.split(",")
+            .mapNotNull { name -> runCatching { EngineId.valueOf(name.trim()) }.getOrNull() }
+            .filter { !it.isStub }
+            .distinct()
+        return parsed.ifEmpty { SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY }
     }
 
     private fun Preferences.readAppMode(): AppMode {

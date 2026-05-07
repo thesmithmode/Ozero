@@ -177,18 +177,22 @@ class OzeroVpnService : android.net.VpnService() {
             packages = splitPackages,
         )
 
-        val activeEngineId = settings?.manualEngine ?: EngineId.BYEDPI
-        tunnelController.onProbing(activeEngineId)
-        val activeConfig = buildEngineConfig(activeEngineId, settings)
-        if (activeConfig == null) {
+        val manualEngine = settings?.manualEngine
+        val pick = pickActiveEngine(manualEngine, settings)
+        if (pick == null) {
+            val mode = if (manualEngine == null) "auto" else "manual"
+            val targetForUi = manualEngine ?: EngineId.BYEDPI
             PersistentLoggers.error(
                 TAG,
-                "manual engine $activeEngineId не имеет конфига — отказ без fallback (manual selection)",
+                "no engine config available ($mode mode) — отказ старта",
             )
-            tunnelController.onEngineDied(activeEngineId, "no config for manual engine")
+            tunnelController.onEngineDied(targetForUi, "no config available ($mode mode)")
             stopVpn()
             return
         }
+        val activeEngineId = pick.first
+        val activeConfig = pick.second
+        tunnelController.onProbing(activeEngineId)
         val fd = if (engineNeedsCustomTun(activeEngineId)) {
             establishTunForEngine(activeEngineId) ?: return
         } else {
@@ -269,6 +273,24 @@ class OzeroVpnService : android.net.VpnService() {
         engineId: EngineId,
         settings: ru.ozero.enginescore.settings.SettingsModel?,
     ): EngineConfig? = ManualEngineConfigBuilder.build(engineId, settings)
+
+    private fun pickActiveEngine(
+        manualEngine: EngineId?,
+        settings: ru.ozero.enginescore.settings.SettingsModel?,
+    ): Pair<EngineId, EngineConfig>? {
+        if (manualEngine != null) {
+            val cfg = buildEngineConfig(manualEngine, settings) ?: return null
+            return manualEngine to cfg
+        }
+        val priority = settings?.engineAutoPriority
+            ?: ru.ozero.enginescore.settings.SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY
+        for (id in priority) {
+            val cfg = buildEngineConfig(id, settings) ?: continue
+            PersistentLoggers.info(TAG, "auto-mode picked engine=$id from priority=$priority")
+            return id to cfg
+        }
+        return null
+    }
 
     private fun establishTun(
         splitConfig: ru.ozero.commonvpn.split.SplitTunnelConfig,

@@ -55,6 +55,18 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { repository.setAppMode(mode) }
     }
 
+    fun onMoveAutoPriority(current: List<EngineId>, engine: EngineId, delta: Int) {
+        val idx = current.indexOf(engine)
+        if (idx < 0) return
+        val target = idx + delta
+        if (target < 0 || target >= current.size) return
+        val next = current.toMutableList().apply {
+            removeAt(idx)
+            add(target, engine)
+        }
+        viewModelScope.launch { repository.setEngineAutoPriority(next) }
+    }
+
     private companion object {
         const val STOP_TIMEOUT_MS = 5_000L
     }

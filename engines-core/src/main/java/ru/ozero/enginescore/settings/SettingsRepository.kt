@@ -15,6 +15,8 @@ interface SettingsRepository {
 
     suspend fun setManualEngine(engine: EngineId?)
 
+    suspend fun setEngineAutoPriority(priority: List<EngineId>) = Unit
+
     suspend fun setUrnetworkEnabled(enabled: Boolean)
 
     suspend fun setUrnetworkJwt(jwt: String?)

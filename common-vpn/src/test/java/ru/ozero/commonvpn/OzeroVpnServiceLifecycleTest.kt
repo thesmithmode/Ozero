@@ -321,6 +321,40 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
+    fun `runStartSequence использует pickActiveEngine не hardcoded BYEDPI fallback`() {
+        val body = source.substringAfter("private suspend fun runStartSequence()")
+            .substringBefore("private suspend fun engineNeedsCustomTun")
+        assertTrue(
+            body.contains("pickActiveEngine("),
+            "runStartSequence обязан звать pickActiveEngine для авто/ручного выбора — " +
+                "не hardcoded ?: EngineId.BYEDPI",
+        )
+        assertFalse(
+            body.contains("?: EngineId.BYEDPI"),
+            "hardcoded fallback на BYEDPI запрещён — выбор движка должен идти через " +
+                "engineAutoPriority в pickActiveEngine",
+        )
+    }
+
+    @Test
+    fun `pickActiveEngine итерирует engineAutoPriority при manualEngine null`() {
+        val body = source.substringAfter("private fun pickActiveEngine(")
+            .substringBefore("private fun establishTun(")
+        assertTrue(
+            body.contains("engineAutoPriority"),
+            "pickActiveEngine обязан читать settings.engineAutoPriority для авто-режима",
+        )
+        assertTrue(
+            body.contains("DEFAULT_ENGINE_AUTO_PRIORITY"),
+            "fallback на DEFAULT_ENGINE_AUTO_PRIORITY когда settings null обязателен",
+        )
+        assertTrue(
+            body.contains("buildEngineConfig("),
+            "pickActiveEngine обязан проверять buildEngineConfig — первый non-null = выбор",
+        )
+    }
+
+    @Test
     fun `onDestroy не shutdown-ит singleton HealthMonitor`() {
         val body = source.substringAfter("override fun onDestroy()").substringBefore("private fun enterForegroundOrLog")
         assertFalse(

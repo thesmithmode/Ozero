@@ -23,4 +23,9 @@ object SettingsTestTags {
     const val APP_MODE_SECTION = "settings_app_mode_section"
     const val APP_MODE_SIMPLE = "settings_app_mode_simple"
     const val APP_MODE_EXPERT = "settings_app_mode_expert"
+
+    const val AUTO_PRIORITY_SECTION = "settings_auto_priority_section"
+    const val AUTO_PRIORITY_ITEM_PREFIX = "auto_priority_item_"
+    const val AUTO_PRIORITY_UP_PREFIX = "auto_priority_up_"
+    const val AUTO_PRIORITY_DOWN_PREFIX = "auto_priority_down_"
 }

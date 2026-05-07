@@ -71,6 +71,10 @@
     <string name="settings_manual_engine_title">Выбор движка</string>
     <string name="settings_manual_engine_summary">Авто — Ozero сам выберет лучший</string>
     <string name="settings_manual_engine_auto">Авто</string>
+    <string name="settings_auto_priority_title">Порядок Auto-режима</string>
+    <string name="settings_auto_priority_summary">Ozero пробует движки в этом порядке. Первый рабочий — активен.</string>
+    <string name="settings_auto_priority_move_up">Выше</string>
+    <string name="settings_auto_priority_move_down">Ниже</string>
     <string name="engine_wip_badge">в разработке</string>
     <string name="settings_ipv6_title">IPv6</string>
     <string name="settings_ipv6_summary">Маршрутизировать IPv6 через VPN</string>

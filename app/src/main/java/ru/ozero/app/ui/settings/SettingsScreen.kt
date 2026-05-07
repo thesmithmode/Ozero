@@ -16,6 +16,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -83,6 +85,7 @@ fun SettingsScreen(
         onManualEngineSelect = viewModel::onManualEngineSelect,
         onUiLocaleSelect = viewModel::onUiLocaleSelect,
         onAppModeSelect = viewModel::onAppModeSelect,
+        onMoveAutoPriority = viewModel::onMoveAutoPriority,
     )
 }
 
@@ -99,6 +102,7 @@ fun SettingsScreenContent(
     onManualEngineSelect: (EngineId?) -> Unit,
     onUiLocaleSelect: (String?) -> Unit = {},
     onAppModeSelect: (AppMode) -> Unit = {},
+    onMoveAutoPriority: (List<EngineId>, EngineId, Int) -> Unit = { _, _, _ -> },
 ) {
     Scaffold(
         modifier = Modifier.testTag(SettingsTestTags.SCREEN),
@@ -132,6 +136,7 @@ fun SettingsScreenContent(
                     onManualEngineSelect = onManualEngineSelect,
                     onUiLocaleSelect = onUiLocaleSelect,
                     onAppModeSelect = onAppModeSelect,
+                    onMoveAutoPriority = onMoveAutoPriority,
                 )
         }
     }
@@ -161,6 +166,7 @@ private fun ContentBody(
     onManualEngineSelect: (EngineId?) -> Unit,
     onUiLocaleSelect: (String?) -> Unit = {},
     onAppModeSelect: (AppMode) -> Unit = {},
+    onMoveAutoPriority: (List<EngineId>, EngineId, Int) -> Unit = { _, _, _ -> },
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
@@ -181,6 +187,14 @@ private fun ContentBody(
                 onManualEngineSelect = onManualEngineSelect,
                 onOpenServers = nav.onOpenServers,
             )
+        }
+        if (model.appMode == AppMode.EXPERT && model.manualEngine == null) {
+            item {
+                AutoPrioritySection(
+                    priority = model.engineAutoPriority,
+                    onMove = { engine, delta -> onMoveAutoPriority(model.engineAutoPriority, engine, delta) },
+                )
+            }
         }
         item { SectionDivider() }
         item {
@@ -223,6 +237,67 @@ private fun ContentBody(
         item { LogsSection(onOpenLogs = nav.onOpenLogs) }
         item { SectionDivider() }
         item { AboutSection(onOpenAbout = nav.onOpenAbout) }
+    }
+}
+
+@Composable
+private fun AutoPrioritySection(
+    priority: List<EngineId>,
+    onMove: (EngineId, Int) -> Unit,
+) {
+    val items = priority.filter { !it.isStub }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(SettingsTestTags.AUTO_PRIORITY_SECTION)
+            .padding(top = 8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_auto_priority_title),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+        Text(
+            text = stringResource(R.string.settings_auto_priority_summary),
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+        items.forEachIndexed { index, engine ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .testTag(SettingsTestTags.AUTO_PRIORITY_ITEM_PREFIX + engine.name),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "${index + 1}. ${engine.displayName}",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(
+                    onClick = { onMove(engine, -1) },
+                    enabled = index > 0,
+                    modifier = Modifier.testTag(SettingsTestTags.AUTO_PRIORITY_UP_PREFIX + engine.name),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.KeyboardArrowUp,
+                        contentDescription = stringResource(R.string.settings_auto_priority_move_up),
+                    )
+                }
+                IconButton(
+                    onClick = { onMove(engine, 1) },
+                    enabled = index < items.lastIndex,
+                    modifier = Modifier.testTag(SettingsTestTags.AUTO_PRIORITY_DOWN_PREFIX + engine.name),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.KeyboardArrowDown,
+                        contentDescription = stringResource(R.string.settings_auto_priority_move_down),
+                    )
+                }
+            }
+        }
     }
 }
 

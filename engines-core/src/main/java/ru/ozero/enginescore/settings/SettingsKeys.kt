@@ -11,6 +11,7 @@ object SettingsKeys {
     val IPV6_ENABLED = booleanPreferencesKey("ipv6_enabled")
     val AUTO_START = booleanPreferencesKey("auto_start")
     val MANUAL_ENGINE = stringPreferencesKey("manual_engine")
+    val ENGINE_AUTO_PRIORITY = stringPreferencesKey("engine_auto_priority")
 
     val BATTERY_PROMPT_SHOWN = booleanPreferencesKey("battery_prompt_shown")
 

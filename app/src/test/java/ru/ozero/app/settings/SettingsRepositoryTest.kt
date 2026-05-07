@@ -139,6 +139,69 @@ class SettingsRepositoryTest {
     }
 
     @Test
+    fun `engineAutoPriority default содержит ByeDPI WARP URnetwork в этом порядке`() = runTest {
+        val current = repository.settings.first()
+        assertEquals(
+            listOf(EngineId.BYEDPI, EngineId.WARP, EngineId.URNETWORK),
+            current.engineAutoPriority,
+        )
+    }
+
+    @Test
+    fun `setEngineAutoPriority сохраняет CSV и читается обратно`() = runTest {
+        repository.setEngineAutoPriority(listOf(EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI))
+        assertEquals(
+            listOf(EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI),
+            repository.settings.first().engineAutoPriority,
+        )
+    }
+
+    @Test
+    fun `setEngineAutoPriority дедуплицирует и фильтрует stub движки`() = runTest {
+        repository.setEngineAutoPriority(
+            listOf(
+                EngineId.BYEDPI, EngineId.XRAY, EngineId.BYEDPI,
+                EngineId.WARP, EngineId.TOR,
+            ),
+        )
+        assertEquals(
+            listOf(EngineId.BYEDPI, EngineId.WARP),
+            repository.settings.first().engineAutoPriority,
+        )
+    }
+
+    @Test
+    fun `setEngineAutoPriority с пустым списком возвращает default`() = runTest {
+        repository.setEngineAutoPriority(emptyList())
+        assertEquals(
+            SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY,
+            repository.settings.first().engineAutoPriority,
+        )
+    }
+
+    @Test
+    fun `engineAutoPriority с unknown id в CSV падает на default`() = runTest {
+        dataStore.edit { prefs ->
+            prefs[SettingsKeys.ENGINE_AUTO_PRIORITY] = "ROGUE,NOPE"
+        }
+        assertEquals(
+            SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY,
+            repository.settings.first().engineAutoPriority,
+        )
+    }
+
+    @Test
+    fun `engineAutoPriority CSV с trim spaces`() = runTest {
+        dataStore.edit { prefs ->
+            prefs[SettingsKeys.ENGINE_AUTO_PRIORITY] = " WARP , BYEDPI "
+        }
+        assertEquals(
+            listOf(EngineId.WARP, EngineId.BYEDPI),
+            repository.settings.first().engineAutoPriority,
+        )
+    }
+
+    @Test
     fun `urnetwork disabled by default`() = runTest {
         assertFalse(repository.settings.first().urnetworkEnabled)
         assertNull(repository.settings.first().urnetworkJwt)

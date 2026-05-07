@@ -63,6 +63,10 @@
     <string name="settings_manual_engine_title">Engine selection</string>
     <string name="settings_manual_engine_summary">Auto — Ozero picks the best</string>
     <string name="settings_manual_engine_auto">Auto</string>
+    <string name="settings_auto_priority_title">Auto-mode priority</string>
+    <string name="settings_auto_priority_summary">Ozero tries engines in this order. First working — active.</string>
+    <string name="settings_auto_priority_move_up">Move up</string>
+    <string name="settings_auto_priority_move_down">Move down</string>
     <string name="engine_wip_badge">WIP</string>
     <string name="settings_ipv6_title">IPv6</string>
     <string name="settings_ipv6_summary">Route IPv6 through VPN</string>
