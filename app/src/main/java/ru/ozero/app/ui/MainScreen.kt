@@ -369,7 +369,11 @@ private fun LiveTrafficChart(
 private fun StatusLabel(state: TunnelState) {
     val labelRes = when (state) {
         is TunnelState.Idle -> R.string.main_status_disconnected
-        is TunnelState.Probing -> R.string.main_status_probing
+        is TunnelState.Probing -> if (state.engineId == ru.ozero.enginescore.EngineId.WARP) {
+            R.string.main_status_probing_warp
+        } else {
+            R.string.main_status_probing
+        }
         is TunnelState.Connecting -> R.string.main_status_connecting
         is TunnelState.Connected -> R.string.main_status_connected
         is TunnelState.Failed -> R.string.main_status_failed

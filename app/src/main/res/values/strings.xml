@@ -8,6 +8,7 @@
     <string name="main_disconnect">Отключиться</string>
     <string name="main_status_disconnected">Отключено</string>
     <string name="main_status_probing">Поиск маршрута…</string>
+    <string name="main_status_probing_warp">Получение конфига WARP…</string>
     <string name="main_status_connecting">Подключение…</string>
     <string name="main_status_connected">Подключено</string>
     <string name="main_status_switching">Переключение…</string>

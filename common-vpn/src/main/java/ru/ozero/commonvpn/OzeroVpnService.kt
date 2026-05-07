@@ -176,8 +176,8 @@ class OzeroVpnService : android.net.VpnService() {
             packages = splitPackages,
         )
 
-        tunnelController.onProbing()
         val activeEngineId = settings?.manualEngine ?: EngineId.BYEDPI
+        tunnelController.onProbing(activeEngineId)
         val activeConfig = buildEngineConfig(activeEngineId, settings)
         if (activeConfig == null) {
             PersistentLoggers.error(

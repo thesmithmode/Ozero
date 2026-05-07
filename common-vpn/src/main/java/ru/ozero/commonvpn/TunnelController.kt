@@ -24,7 +24,7 @@ class TunnelController(
     private var smoothedBpsIn: Double = 0.0
     private var smoothedBpsOut: Double = 0.0
 
-    fun onProbing() = transition(TunnelState.Probing)
+    fun onProbing(engineId: EngineId? = null) = transition(TunnelState.Probing(engineId))
 
     fun onConnecting(engineId: EngineId) = transition(TunnelState.Connecting(engineId))
 
