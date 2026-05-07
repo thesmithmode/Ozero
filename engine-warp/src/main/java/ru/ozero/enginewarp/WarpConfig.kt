@@ -14,10 +14,17 @@ data class WarpConfig(
     val allowedIps: List<String> = listOf("0.0.0.0/0", "::/0"),
     val awgParams: AwgParams = AwgParams(),
 ) {
-    override fun toString(): String =
-        "WarpConfig(privateKey=***, publicKey=$publicKey, peerEndpoint=$peerEndpoint, " +
-            "interfaceAddressV4=$interfaceAddressV4, interfaceAddressV6=***, " +
-            "accountLicense=***, mtu=$mtu, keepalive=${keepaliveSeconds}s, awg=$awgParams)"
+    override fun toString(): String {
+        val peerFingerprint = if (peerPublicKey.length >= 8) {
+            "***${peerPublicKey.takeLast(8)}"
+        } else {
+            "***"
+        }
+        return "WarpConfig(privateKey=***, publicKey=$publicKey, peerPublicKey=$peerFingerprint, " +
+            "peerEndpoint=$peerEndpoint, interfaceAddressV4=$interfaceAddressV4, " +
+            "interfaceAddressV6=***, accountLicense=***, mtu=$mtu, " +
+            "keepalive=${keepaliveSeconds}s, awg=$awgParams)"
+    }
 
     companion object {
         const val DEFAULT_MTU = 1280

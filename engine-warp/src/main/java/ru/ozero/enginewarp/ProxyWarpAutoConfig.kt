@@ -132,48 +132,75 @@ class ProxyWarpAutoConfig(
             }
         }
 
+    private data class ExtractedIni(val text: String, val source: String, val forceVanilla: Boolean)
+
     private fun parseProxyResponse(body: String): Result<WarpConfig> {
-        val confText = extractWireguardConf(body)
+        val extracted = extractIniFromBody(body)
             ?: return Result.failure(IOException("WARP response: [Interface] не найден"))
-        return WarpConfParser.parse(confText)
+        PersistentLoggers.info(
+            TAG,
+            "selected ${extracted.source}${if (extracted.forceVanilla) " (AWG dropped → vanilla)" else " (vanilla)"}",
+        )
+        val parsed = WarpConfParser.parse(extracted.text)
+        if (parsed.isFailure || !extracted.forceVanilla) return parsed
+        val cfg = parsed.getOrThrow()
+        return if (cfg.awgParams != AwgParams.VANILLA) {
+            Result.success(cfg.copy(awgParams = AwgParams.VANILLA))
+        } else {
+            parsed
+        }
     }
 
-    private fun extractWireguardConf(body: String): String? {
+    private fun extractIniFromBody(body: String): ExtractedIni? {
         val trimmed = body.trim()
         if (!trimmed.startsWith("{")) {
-            return findInterfaceBlock(body)
+            return findInterfaceBlock(body)?.let { ExtractedIni(it, "raw INI", forceVanilla = false) }
         }
-        val json = runCatching { JSONObject(trimmed) }.getOrNull() ?: return findInterfaceBlock(body)
+        val json = runCatching { JSONObject(trimmed) }.getOrNull()
+            ?: return findInterfaceBlock(body)?.let { ExtractedIni(it, "raw INI", forceVanilla = false) }
         return extractFromJson(json)
     }
 
-    private fun extractFromJson(json: JSONObject): String? {
+    private fun extractFromJson(json: JSONObject): ExtractedIni? {
         if (json.has("success") && !json.getBoolean("success")) {
             PersistentLoggers.warn(TAG, "mirror reported failure: ${json.optString("message", "")}")
             return null
         }
         json.optJSONObject("content")?.let { content ->
+            content.optString("wgQuick", "").takeIf { it.isNotBlank() }?.let { wg ->
+                findInterfaceBlock(wg)?.let { return ExtractedIni(it, "wgQuick", forceVanilla = false) }
+            }
+            content.optString("amQuick", "").takeIf { it.isNotBlank() }?.let { am ->
+                findInterfaceBlock(am)?.let { return ExtractedIni(it, "amQuick", forceVanilla = true) }
+            }
             val b64 = content.optString("configBase64", "")
             if (b64.isNotBlank()) {
                 return runCatching {
                     String(Base64.getDecoder().decode(b64), Charsets.UTF_8)
-                }.getOrNull()?.let { findInterfaceBlock(it) ?: it }
+                }.getOrNull()?.let { decoded ->
+                    val ini = findInterfaceBlock(decoded) ?: decoded
+                    ExtractedIni(ini, "configBase64", forceVanilla = true)
+                }
             }
         }
         sequenceOf("data", "config", "wireguard", "conf").forEach { key ->
-            findInterfaceBlock(json.optString(key))?.let { return it }
+            findInterfaceBlock(json.optString(key))?.let {
+                return ExtractedIni(it, "json.$key", forceVanilla = false)
+            }
         }
         return findConfInNestedObject(json)
     }
 
-    private fun findConfInNestedObject(json: JSONObject): String? {
+    private fun findConfInNestedObject(json: JSONObject): ExtractedIni? {
         sequenceOf("data", "configs", "config").forEach { key ->
             val nested = json.optJSONObject(key) ?: return@forEach
             val names = nested.names() ?: return@forEach
             for (i in 0 until names.length()) {
                 val childKey = names.optString(i)
                 if (childKey.isNullOrEmpty()) continue
-                findInterfaceBlock(nested.optString(childKey))?.let { return it }
+                findInterfaceBlock(nested.optString(childKey))?.let {
+                    return ExtractedIni(it, "json.$key[$childKey]", forceVanilla = false)
+                }
             }
         }
         return null

@@ -33,6 +33,7 @@ class RealWarpSdkBridge internal constructor(
             val deleted = socketFile.delete()
             PersistentLoggers.info(TAG, "stale socket $socketFile deleted=$deleted")
         }
+        PersistentLoggers.info(TAG, "INI ($tunnelName):\n${sanitizeIni(iniConfig)}")
         try {
             val handle = awgRuntime.turnOn(tunnelName, tunFd, iniConfig, uapiPath)
             if (handle < 0) {
@@ -110,6 +111,14 @@ class RealWarpSdkBridge internal constructor(
     private companion object {
         const val TAG = "RealWarpSdkBridge"
         const val INVALID_HANDLE = -1
+
+        fun sanitizeIni(ini: String): String = ini.lineSequence().joinToString("\n") { line ->
+            if (line.trimStart().startsWith("PrivateKey", ignoreCase = true)) {
+                "PrivateKey = ***"
+            } else {
+                line
+            }
+        }
     }
 }
 

@@ -43,4 +43,23 @@ class AwgParamsTest {
         assertEquals(Int.MAX_VALUE.toLong() + 1, p.initPacketMagicHeader)
         assertEquals(Long.MAX_VALUE, p.responsePacketMagicHeader)
     }
+
+    @Test
+    fun `VANILLA constant равна vanilla WG baseline (Jc-Jmin-Jmax-S1-S2 = 0, H1-H4 = 1-2-3-4)`() {
+        val v = AwgParams.VANILLA
+        assertEquals(0, v.junkPacketCount)
+        assertEquals(0, v.junkPacketMinSize)
+        assertEquals(0, v.junkPacketMaxSize)
+        assertEquals(0, v.initPacketJunkSize)
+        assertEquals(0, v.responsePacketJunkSize)
+        assertEquals(1L, v.initPacketMagicHeader)
+        assertEquals(2L, v.responsePacketMagicHeader)
+        assertEquals(3L, v.cookieReplyMagicHeader)
+        assertEquals(4L, v.transportMagicHeader)
+    }
+
+    @Test
+    fun `default AwgParams не равно VANILLA (default включает AWG-обфускацию)`() {
+        assertEquals(false, AwgParams() == AwgParams.VANILLA)
+    }
 }

@@ -291,7 +291,7 @@ class WarpAutoConfigTest {
     }
 
     @Test
-    fun `AWG параметры выживают configBase64 roundtrip`() = runTest {
+    fun `AWG параметры из configBase64 force-сбрасываются в VANILLA для Cloudflare WARP handshake`() = runTest {
         val awgConf = """
             [Interface]
             PrivateKey = duLmWkD6Pz6fqd+5/Wsh+aDwyaT8w+5ofxDZ3Z3l1c0=
@@ -310,9 +310,100 @@ class WarpAutoConfigTest {
 
         val result = auto.register()
 
-        val p = result.getOrThrow().awgParams
-        assertEquals(9, p.junkPacketCount)
-        assertEquals(999L, p.initPacketMagicHeader)
+        assertEquals(
+            AwgParams.VANILLA,
+            result.getOrThrow().awgParams,
+            "configBase64 → mirror возвращает amQuick с обфускацией; для Cloudflare WARP мы должны force vanilla",
+        )
+    }
+
+    @Test
+    fun `register предпочитает wgQuick над amQuick когда оба присутствуют`() = runTest {
+        val wgVanilla = sampleConf
+        val amWithJunk = """
+            [Interface]
+            PrivateKey = duLmWkD6Pz6fqd+5/Wsh+aDwyaT8w+5ofxDZ3Z3l1c0=
+            Address = 172.16.0.2
+            Jc = 5
+            H1 = 100
+
+            [Peer]
+            PublicKey = OTHER_PEER_KEY=
+            Endpoint = some-other-endpoint:443
+        """.trimIndent()
+        val body =
+            """{"success":true,"content":{"wgQuick":${escape(wgVanilla)},"amQuick":${escape(amWithJunk)}}}"""
+        val http = FakeHttpClient(Result.success(body))
+        val auto = singleMirrorConfig(http)
+
+        val result = auto.register()
+
+        val cfg = result.getOrThrow()
+        assertEquals(AwgParams.VANILLA, cfg.awgParams, "wgQuick естественно vanilla")
+        assertEquals(
+            "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
+            cfg.peerPublicKey,
+            "peerPublicKey должен быть из wgQuick (sampleConf), не из amQuick",
+        )
+        assertEquals("engage.cloudflareclient.com:4500", cfg.peerEndpoint)
+    }
+
+    @Test
+    fun `register парсит amQuick и force-сбрасывает AWG-параметры когда wgQuick отсутствует`() = runTest {
+        val amWithJunk = """
+            [Interface]
+            PrivateKey = duLmWkD6Pz6fqd+5/Wsh+aDwyaT8w+5ofxDZ3Z3l1c0=
+            Address = 172.16.0.2
+            Jc = 9
+            H1 = 999
+
+            [Peer]
+            PublicKey = bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=
+            Endpoint = engage.cloudflareclient.com:4500
+        """.trimIndent()
+        val body = """{"success":true,"content":{"amQuick":${escape(amWithJunk)}}}"""
+        val http = FakeHttpClient(Result.success(body))
+        val auto = singleMirrorConfig(http)
+
+        val result = auto.register()
+
+        val cfg = result.getOrThrow()
+        assertEquals(AwgParams.VANILLA, cfg.awgParams, "amQuick force vanilla для Cloudflare WARP")
+        assertEquals(
+            "duLmWkD6Pz6fqd+5/Wsh+aDwyaT8w+5ofxDZ3Z3l1c0=",
+            cfg.privateKey,
+            "privateKey корректно парсится из amQuick",
+        )
+    }
+
+    @Test
+    fun `register предпочитает wgQuick над configBase64 когда оба присутствуют`() = runTest {
+        val wgVanilla = sampleConf
+        val amWithJunk = """
+            [Interface]
+            PrivateKey = duLmWkD6Pz6fqd+5/Wsh+aDwyaT8w+5ofxDZ3Z3l1c0=
+            Address = 172.16.0.2
+            Jc = 5
+
+            [Peer]
+            PublicKey = OTHER_KEY=
+            Endpoint = other:443
+        """.trimIndent()
+        val b64 = Base64.getEncoder().encodeToString(amWithJunk.toByteArray())
+        val body =
+            """{"success":true,"content":{"wgQuick":${escape(wgVanilla)},"configBase64":"$b64"}}"""
+        val http = FakeHttpClient(Result.success(body))
+        val auto = singleMirrorConfig(http)
+
+        val result = auto.register()
+
+        val cfg = result.getOrThrow()
+        assertEquals(AwgParams.VANILLA, cfg.awgParams)
+        assertEquals(
+            "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
+            cfg.peerPublicKey,
+            "wgQuick > configBase64 — peerPublicKey из wgQuick (sampleConf)",
+        )
     }
 
     @Test

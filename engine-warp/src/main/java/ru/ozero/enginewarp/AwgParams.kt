@@ -27,5 +27,17 @@ data class AwgParams(
         const val DEFAULT_H2 = 2L
         const val DEFAULT_H3 = 3L
         const val DEFAULT_H4 = 4L
+
+        val VANILLA = AwgParams(
+            junkPacketCount = 0,
+            junkPacketMinSize = 0,
+            junkPacketMaxSize = 0,
+            initPacketJunkSize = 0,
+            responsePacketJunkSize = 0,
+            initPacketMagicHeader = 1L,
+            responsePacketMagicHeader = 2L,
+            cookieReplyMagicHeader = 3L,
+            transportMagicHeader = 4L,
+        )
     }
 }

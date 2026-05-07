@@ -159,4 +159,61 @@ class WarpIniBuilderTest {
         assertTrue(ini.contains("Address = 172.16.0.2/32"))
         assertFalse(ini.contains("Address = 172.16.0.2/32,"), "Trailing запятая при пустом IPv6")
     }
+
+    @Test
+    fun `VANILLA AwgParams не пишет AWG-строк (Cloudflare WARP vanilla handshake)`() {
+        val config = baseConfig.copy(awgParams = AwgParams.VANILLA)
+        val ini = WarpIniBuilder.build(config)
+        assertFalse(ini.contains("Jc ="), "Jc не должна писаться в vanilla INI")
+        assertFalse(ini.contains("Jmin ="), "Jmin не должна писаться в vanilla INI")
+        assertFalse(ini.contains("Jmax ="), "Jmax не должна писаться в vanilla INI")
+        assertFalse(ini.contains("S1 ="), "S1 не должна писаться в vanilla INI")
+        assertFalse(ini.contains("S2 ="), "S2 не должна писаться в vanilla INI")
+        assertFalse(ini.contains("H1 ="), "H1 не должна писаться в vanilla INI")
+        assertFalse(ini.contains("H2 ="), "H2 не должна писаться в vanilla INI")
+        assertFalse(ini.contains("H3 ="), "H3 не должна писаться в vanilla INI")
+        assertFalse(ini.contains("H4 ="), "H4 не должна писаться в vanilla INI")
+        assertTrue(ini.contains("[Interface]"))
+        assertTrue(ini.contains("[Peer]"))
+        assertTrue(ini.contains("PrivateKey = ${baseConfig.privateKey}"))
+        assertTrue(ini.contains("PublicKey = ${baseConfig.peerPublicKey}"))
+    }
+
+    @Test
+    fun `non-VANILLA AwgParams пишет все 9 AWG-строк (AmneziaWG обфускация)`() {
+        val config = baseConfig.copy(
+            awgParams = AwgParams(
+                junkPacketCount = 7,
+                junkPacketMinSize = 50,
+                junkPacketMaxSize = 150,
+                initPacketJunkSize = 10,
+                responsePacketJunkSize = 20,
+                initPacketMagicHeader = 100L,
+                responsePacketMagicHeader = 200L,
+                cookieReplyMagicHeader = 300L,
+                transportMagicHeader = 400L,
+            ),
+        )
+        val ini = WarpIniBuilder.build(config)
+        assertTrue(ini.contains("Jc = 7"))
+        assertTrue(ini.contains("Jmin = 50"))
+        assertTrue(ini.contains("Jmax = 150"))
+        assertTrue(ini.contains("S1 = 10"))
+        assertTrue(ini.contains("S2 = 20"))
+        assertTrue(ini.contains("H1 = 100"))
+        assertTrue(ini.contains("H2 = 200"))
+        assertTrue(ini.contains("H3 = 300"))
+        assertTrue(ini.contains("H4 = 400"))
+    }
+
+    @Test
+    fun `partial override отличающийся от VANILLA пишет все 9 строк (atomicity)`() {
+        val config = baseConfig.copy(
+            awgParams = AwgParams.VANILLA.copy(junkPacketCount = 1),
+        )
+        val ini = WarpIniBuilder.build(config)
+        assertTrue(ini.contains("Jc = 1"))
+        assertTrue(ini.contains("Jmin = 0"), "Jmin=0 пишется когда awgParams != VANILLA")
+        assertTrue(ini.contains("H1 = 1"), "H1=1 пишется когда awgParams != VANILLA")
+    }
 }
