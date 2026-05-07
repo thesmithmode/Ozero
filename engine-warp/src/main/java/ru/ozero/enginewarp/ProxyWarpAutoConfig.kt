@@ -22,7 +22,16 @@ class ProxyWarpAutoConfig(
     private val shuffler: ((List<String>) -> List<String>)? = null,
 ) : WarpAutoConfig {
 
+    @Volatile private var lastSuccessMs: Long = 0L
+
+    override fun remainingCooldownMs(): Long = maxOf(0L, COOLDOWN_MS - (System.currentTimeMillis() - lastSuccessMs))
+
     override suspend fun register(onProgress: ((String) -> Unit)?): Result<WarpConfig> {
+        val cooldown = remainingCooldownMs()
+        if (cooldown > 0) {
+            PersistentLoggers.info(TAG, "register: кулдаун ${cooldown / 1000}с, пропуск")
+            return Result.failure(IOException("WARP auto-register: кулдаун ${cooldown / 1000}с"))
+        }
         val ordered = shuffler?.invoke(mirrors) ?: ranker.order(mirrors)
         if (ordered.isEmpty()) {
             return Result.failure(IOException("WARP register: список зеркал пуст"))
@@ -44,6 +53,7 @@ class ProxyWarpAutoConfig(
                 Result.failure(cause ?: IOException("WARP register: все зеркала отказали"))
             }
             else -> {
+                lastSuccessMs = System.currentTimeMillis()
                 PersistentLoggers.info(TAG, "register: success on mirror")
                 winner
             }
@@ -178,6 +188,7 @@ class ProxyWarpAutoConfig(
 
     companion object {
         private const val TAG = "ProxyWarpAutoConfig"
+        const val COOLDOWN_MS = 5 * 60 * 1000L
         const val DEFAULT_USER_AGENT = "okhttp/3.12.1"
         const val DEFAULT_CONCURRENCY = 8
         const val DEFAULT_TOTAL_BUDGET_MS = 90_000L

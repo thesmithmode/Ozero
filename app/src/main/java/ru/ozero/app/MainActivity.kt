@@ -10,7 +10,10 @@ import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.app.logging.AppLogger
@@ -24,6 +27,7 @@ import ru.ozero.app.ui.launcher.VpnIntentLauncher
 import ru.ozero.app.ui.theme.OzeroTheme
 import ru.ozero.app.vpn.EngineSettingsRestartObserver
 import ru.ozero.commonvpn.TunnelState
+import ru.ozero.enginewarp.WarpConfigSlotStore
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -33,6 +37,7 @@ class MainActivity : AppCompatActivity() {
     @Inject lateinit var userFlags: UserFlagsRepository
 
     @Inject lateinit var settingsRepository: ru.ozero.enginescore.settings.SettingsRepository
+    @Inject lateinit var warpConfigSlotStore: WarpConfigSlotStore
 
     @Inject lateinit var logcatReader: LogcatReader
 
@@ -69,6 +74,7 @@ class MainActivity : AppCompatActivity() {
         )
 
         observeLiveEngineSettingsChanges()
+        observeWarpActiveSlotChanges()
         setContent {
             OzeroTheme {
                 OnboardingGate(userFlags = userFlags) {
@@ -97,6 +103,26 @@ class MainActivity : AppCompatActivity() {
             observer.triggers
                 .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
                 .collect { observer.handle(it) }
+        }
+    }
+
+    private fun observeWarpActiveSlotChanges() {
+        lifecycleScope.launch(safeUiCoroutineHandler) {
+            warpConfigSlotStore.activeConfig()
+                .map { it?.peerEndpoint + it?.privateKey?.take(8) }
+                .distinctUntilChanged()
+                .drop(1)
+                .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
+                .collect {
+                    if (viewModel.state.value is TunnelState.Connected) {
+                        AppLogger.i(TAG, "WARP active slot changed while connected → restart")
+                        vpnIntentLauncher.stop()
+                        withTimeoutOrNull(5_000L) {
+                            viewModel.state.first { s -> s is TunnelState.Idle || s is TunnelState.Failed }
+                        }
+                        vpnIntentLauncher.start()
+                    }
+                }
         }
     }
 

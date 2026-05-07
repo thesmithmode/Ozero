@@ -88,9 +88,9 @@ internal object WarpConfParser {
     }
 
     private fun parseAwgParams(iface: Map<String, String>): AwgParams = AwgParams(
-        junkPacketCount = iface["jc"]?.toIntOrNull() ?: AwgParams.DEFAULT_JC,
-        junkPacketMinSize = iface["jmin"]?.toIntOrNull() ?: AwgParams.DEFAULT_JMIN,
-        junkPacketMaxSize = iface["jmax"]?.toIntOrNull() ?: AwgParams.DEFAULT_JMAX,
+        junkPacketCount = iface["jc"]?.toIntOrNull() ?: 0,
+        junkPacketMinSize = iface["jmin"]?.toIntOrNull() ?: 0,
+        junkPacketMaxSize = iface["jmax"]?.toIntOrNull() ?: 0,
         initPacketJunkSize = iface["s1"]?.toIntOrNull() ?: AwgParams.DEFAULT_S1,
         responsePacketJunkSize = iface["s2"]?.toIntOrNull() ?: AwgParams.DEFAULT_S2,
         initPacketMagicHeader = iface["h1"]?.toLongOrNull() ?: AwgParams.DEFAULT_H1,

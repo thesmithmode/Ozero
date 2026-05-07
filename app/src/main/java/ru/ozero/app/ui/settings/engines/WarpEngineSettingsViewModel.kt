@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -54,7 +55,8 @@ data class WarpSettingsUiState(
     val progressText: String? = null,
     val progressCurrent: Int = 0,
     val progressTotal: Int = 0,
-    val importSuccess: Boolean = false,
+    val importSuccessCount: Int = 0,
+    val cooldownRemainingMs: Long = 0L,
     val editDraft: WarpEditDraft? = null,
 )
 
@@ -81,6 +83,15 @@ class WarpEngineSettingsViewModel @Inject constructor(
                 activeSlotId = slots.firstOrNull { it.isActive }?.id,
             )
         }.launchIn(viewModelScope)
+        viewModelScope.launch {
+            while (true) {
+                val remaining = autoConfig.remainingCooldownMs()
+                if (_uiState.value.cooldownRemainingMs != remaining) {
+                    _uiState.value = _uiState.value.copy(cooldownRemainingMs = remaining)
+                }
+                delay(1_000L)
+            }
+        }
     }
 
     fun onGenerate() {
@@ -138,7 +149,7 @@ class WarpEngineSettingsViewModel @Inject constructor(
                 onSuccess = { cfg ->
                     val id = store.addSlot(suggestedName, cfg)
                     store.setActive(id)
-                    _uiState.value = _uiState.value.copy(errorMessage = null, importSuccess = true)
+                    _uiState.value = _uiState.value.copy(errorMessage = null, importSuccessCount = _uiState.value.importSuccessCount + 1)
                 },
                 onFailure = { t ->
                     _uiState.value = _uiState.value.copy(
@@ -250,10 +261,6 @@ class WarpEngineSettingsViewModel @Inject constructor(
 
     fun onEditCancel() {
         _uiState.value = _uiState.value.copy(editDraft = null)
-    }
-
-    fun onImportSuccessConsumed() {
-        _uiState.value = _uiState.value.copy(importSuccess = false)
     }
 
     private companion object {

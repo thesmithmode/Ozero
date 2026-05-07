@@ -83,10 +83,9 @@ fun WarpEngineSettingsScreen(
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val importedMessage = stringResource(R.string.warp_imported)
-    LaunchedEffect(state.importSuccess) {
-        if (state.importSuccess) {
+    LaunchedEffect(state.importSuccessCount) {
+        if (state.importSuccessCount > 0) {
             snackbarHostState.showSnackbar(importedMessage)
-            viewModel.onImportSuccessConsumed()
         }
     }
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -409,6 +408,7 @@ private fun WarpScreenContent(
                 progressCurrent = state.progressCurrent,
                 progressTotal = state.progressTotal,
                 errorMessage = state.errorMessage,
+                cooldownRemainingMs = state.cooldownRemainingMs,
                 onGenerate = onGenerate,
                 onCancelGenerate = onCancelGenerate,
                 onImportFile = onImportFile,
@@ -432,6 +432,7 @@ private fun WarpScreenContent(
             } else {
                 WarpActionRow(
                     isRegistering = false,
+                    cooldownRemainingMs = state.cooldownRemainingMs,
                     onGenerate = onGenerate,
                     onCancelGenerate = onCancelGenerate,
                     onImportFile = onImportFile,
@@ -536,27 +537,38 @@ private fun WarpGenerateButton(
 @Composable
 private fun WarpActionRow(
     isRegistering: Boolean,
+    cooldownRemainingMs: Long = 0L,
     onGenerate: () -> Unit,
     onCancelGenerate: () -> Unit,
     onImportFile: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = modifier.fillMaxWidth().padding(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        WarpGenerateButton(
-            isRegistering = isRegistering,
-            onGenerate = onGenerate,
-            onCancelGenerate = onCancelGenerate,
-            modifier = Modifier.weight(1f),
-        )
-        OutlinedButton(
-            onClick = onImportFile,
-            enabled = !isRegistering,
-            modifier = Modifier.weight(1f).testTag("warp_import_button"),
+    Column(modifier = modifier.fillMaxWidth()) {
+        if (cooldownRemainingMs > 0) {
+            Text(
+                text = "Следующая генерация через ${formatCooldown(cooldownRemainingMs)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(stringResource(R.string.warp_import_file))
+            WarpGenerateButton(
+                isRegistering = isRegistering,
+                onGenerate = onGenerate,
+                onCancelGenerate = onCancelGenerate,
+                modifier = Modifier.weight(1f),
+            )
+            OutlinedButton(
+                onClick = onImportFile,
+                enabled = !isRegistering,
+                modifier = Modifier.weight(1f).testTag("warp_import_button"),
+            ) {
+                Text(stringResource(R.string.warp_import_file))
+            }
         }
     }
 }
@@ -568,6 +580,7 @@ private fun EmptyConfigCard(
     progressCurrent: Int,
     progressTotal: Int,
     errorMessage: String?,
+    cooldownRemainingMs: Long = 0L,
     onGenerate: () -> Unit,
     onCancelGenerate: () -> Unit,
     onImportFile: () -> Unit,
@@ -587,6 +600,13 @@ private fun EmptyConfigCard(
                     text = errorMessage,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
+                )
+            }
+            if (cooldownRemainingMs > 0) {
+                Text(
+                    text = "Следующая генерация через ${formatCooldown(cooldownRemainingMs)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             if (isRegistering) {
@@ -612,6 +632,11 @@ private fun EmptyConfigCard(
             }
         }
     }
+}
+
+private fun formatCooldown(ms: Long): String {
+    val s = ms / 1000
+    return "${s / 60}:${(s % 60).toString().padStart(2, '0')}"
 }
 
 @Composable

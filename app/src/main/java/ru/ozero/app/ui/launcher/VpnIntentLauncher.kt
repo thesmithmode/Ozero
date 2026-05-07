@@ -28,6 +28,7 @@ class VpnIntentLauncher(
                 stop()
             }
             is TunnelState.Idle, is TunnelState.Failed -> requestVpnAndStart()
+            is TunnelState.Probing, is TunnelState.Connecting, is TunnelState.Disconnecting -> stop()
             else -> Unit
         }
     }
