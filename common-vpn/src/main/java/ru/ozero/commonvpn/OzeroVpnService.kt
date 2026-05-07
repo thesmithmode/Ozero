@@ -81,6 +81,7 @@ class OzeroVpnService : android.net.VpnService() {
         private const val STATS_NOTIFY_LOG_EVERY = 5
         private const val SETTINGS_READ_TIMEOUT_MS = 1_500L
         private const val ON_DESTROY_SHUTDOWN_TIMEOUT_MS = 4_000L
+        private const val PREFLIGHT_HARD_TIMEOUT_MS = 7_000L
     }
 
     override fun onCreate() {
@@ -178,15 +179,20 @@ class OzeroVpnService : android.net.VpnService() {
         )
 
         val manualEngine = settings?.manualEngine
-        val pick = pickActiveEngine(manualEngine, settings)
+        val pick = if (manualEngine != null) {
+            val cfg = buildEngineConfig(manualEngine, settings)
+            if (cfg == null) null else manualEngine to cfg
+        } else {
+            pickAutoCandidateWithPreflight(settings)
+        }
         if (pick == null) {
             val mode = if (manualEngine == null) "auto" else "manual"
             val targetForUi = if (manualEngine != null) manualEngine else EngineId.BYEDPI
             PersistentLoggers.error(
                 TAG,
-                "no engine config available ($mode mode) — отказ старта",
+                "no engine reachable ($mode mode) — отказ старта",
             )
-            tunnelController.onEngineDied(targetForUi, "no config available ($mode mode)")
+            tunnelController.onEngineDied(targetForUi, "no engine reachable ($mode mode)")
             stopVpn()
             return
         }
@@ -288,6 +294,51 @@ class OzeroVpnService : android.net.VpnService() {
             val cfg = buildEngineConfig(id, settings) ?: continue
             PersistentLoggers.info(TAG, "auto-mode picked engine=$id from priority=$priority")
             return id to cfg
+        }
+        return null
+    }
+
+    private fun autoCandidates(
+        settings: ru.ozero.enginescore.settings.SettingsModel?,
+    ): List<Pair<EngineId, EngineConfig>> {
+        val priority = settings?.engineAutoPriority
+            ?: ru.ozero.enginescore.settings.SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY
+        return priority.mapNotNull { id ->
+            val cfg = buildEngineConfig(id, settings) ?: return@mapNotNull null
+            id to cfg
+        }
+    }
+
+    private suspend fun pickAutoCandidateWithPreflight(
+        settings: ru.ozero.enginescore.settings.SettingsModel?,
+    ): Pair<EngineId, EngineConfig>? {
+        val candidates = autoCandidates(settings)
+        if (candidates.isEmpty()) {
+            PersistentLoggers.warn(TAG, "auto-mode: нет валидных кандидатов")
+            return null
+        }
+        val protector = ru.ozero.enginescore.SocketProtector { socket -> protect(socket) }
+        for ((id, cfg) in candidates) {
+            val plugin = enginePlugins.firstOrNull { it.id == id }
+            val preflight = plugin?.preflight()
+            if (preflight == null) {
+                PersistentLoggers.info(TAG, "auto-mode preflight skip (null) engine=$id — берём как кандидата")
+                return id to cfg
+            }
+            tunnelController.onProbing(id)
+            val result = withTimeoutOrNull(PREFLIGHT_HARD_TIMEOUT_MS) {
+                runCatching { preflight.probe(protector) }
+                    .getOrElse { ru.ozero.enginescore.EnginePreflight.Result.Fail("preflight threw: ${it.message}") }
+            } ?: ru.ozero.enginescore.EnginePreflight.Result.Fail("preflight hard-timeout ${PREFLIGHT_HARD_TIMEOUT_MS}ms")
+            when (result) {
+                is ru.ozero.enginescore.EnginePreflight.Result.Ok -> {
+                    PersistentLoggers.info(TAG, "auto-mode preflight OK engine=$id")
+                    return id to cfg
+                }
+                is ru.ozero.enginescore.EnginePreflight.Result.Fail -> {
+                    PersistentLoggers.warn(TAG, "auto-mode preflight FAIL engine=$id reason=${result.reason}")
+                }
+            }
         }
         return null
     }

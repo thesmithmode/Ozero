@@ -321,18 +321,44 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `runStartSequence использует pickActiveEngine не hardcoded BYEDPI fallback`() {
+    fun `runStartSequence в auto-mode идёт через pickAutoCandidateWithPreflight`() {
         val body = source.substringAfter("private suspend fun runStartSequence()")
             .substringBefore("private suspend fun engineNeedsCustomTun")
         assertTrue(
-            body.contains("pickActiveEngine("),
-            "runStartSequence обязан звать pickActiveEngine для авто/ручного выбора — " +
-                "не hardcoded ?: EngineId.BYEDPI",
+            body.contains("pickAutoCandidateWithPreflight("),
+            "runStartSequence обязан звать pickAutoCandidateWithPreflight в auto-mode — " +
+                "fallback по priority + TCP-probe",
         )
         assertFalse(
-            body.contains("?: EngineId.BYEDPI"),
-            "hardcoded fallback на BYEDPI запрещён — выбор движка должен идти через " +
-                "engineAutoPriority в pickActiveEngine",
+            body.contains("?: EngineId.BYEDPI") && !body.contains("if (manualEngine != null) manualEngine else EngineId.BYEDPI"),
+            "hardcoded fallback ?: EngineId.BYEDPI запрещён — только в diagnostic-пути 'no engine reachable'",
+        )
+    }
+
+    @Test
+    fun `pickAutoCandidateWithPreflight вызывает plugin preflight и protect для каждого кандидата`() {
+        assertTrue(
+            source.contains("plugin?.preflight()"),
+            "pickAutoCandidateWithPreflight обязан брать EnginePreflight через plugin.preflight()",
+        )
+        assertTrue(
+            source.contains("SocketProtector { socket -> protect(socket) }"),
+            "SocketProtector обязан делегировать VpnService.protect(socket) — " +
+                "иначе TCP-probe пойдёт через VPN tunnel и зацикливается",
+        )
+    }
+
+    @Test
+    fun `manual-mode не зовёт pickAutoCandidateWithPreflight`() {
+        val body = source.substringAfter("private suspend fun runStartSequence()")
+            .substringBefore("private suspend fun engineNeedsCustomTun")
+        assertTrue(
+            body.contains("if (manualEngine != null)"),
+            "manual-mode идёт прямым путём через buildEngineConfig — без preflight",
+        )
+        assertTrue(
+            body.contains("pickAutoCandidateWithPreflight(settings)"),
+            "auto-mode (manualEngine == null) идёт через pickAutoCandidateWithPreflight",
         )
     }
 
