@@ -9,8 +9,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import ru.ozero.enginewarp.AwgParams
 import ru.ozero.enginewarp.WarpAutoConfig
@@ -22,6 +20,7 @@ import java.io.InputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
 data class WarpEditDraft(
@@ -70,19 +69,31 @@ class WarpEngineSettingsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(WarpSettingsUiState())
     val uiState: StateFlow<WarpSettingsUiState> = _uiState.asStateFlow()
     private var registerJob: Job? = null
+    private val autoTriggered = AtomicBoolean(false)
 
     init {
         viewModelScope.launch {
-            runCatching { store.migrateIfNeeded() }.onFailure { t ->
-                _uiState.value = _uiState.value.copy(errorMessage = t.message ?: "migration failed")
+            val migrationOk = runCatching { store.migrateIfNeeded() }
+                .onFailure { t ->
+                    _uiState.value = _uiState.value.copy(errorMessage = t.message ?: "migration failed")
+                }
+                .isSuccess
+            store.slots().collect { slots ->
+                _uiState.value = _uiState.value.copy(
+                    slots = slots,
+                    activeSlotId = slots.firstOrNull { it.isActive }?.id,
+                )
+                if (
+                    migrationOk &&
+                    slots.isEmpty() &&
+                    !_uiState.value.isRegistering &&
+                    autoConfig.remainingCooldownMs() == 0L &&
+                    autoTriggered.compareAndSet(false, true)
+                ) {
+                    onGenerate()
+                }
             }
         }
-        store.slots().onEach { slots ->
-            _uiState.value = _uiState.value.copy(
-                slots = slots,
-                activeSlotId = slots.firstOrNull { it.isActive }?.id,
-            )
-        }.launchIn(viewModelScope)
         viewModelScope.launch {
             while (true) {
                 val remaining = autoConfig.remainingCooldownMs()
