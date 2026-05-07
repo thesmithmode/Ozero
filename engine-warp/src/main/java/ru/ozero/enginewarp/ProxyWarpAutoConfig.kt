@@ -215,12 +215,6 @@ class ProxyWarpAutoConfig(
                 "\"deviceType\":\"computer\",\"endpoint\":\"162.159.195.1:500\"}"
 
         val DEFAULT_MIRRORS: List<String> = listOf(
-            "https://vless-portal.netlify.app/api/warp",
-            "https://portal-warp.netlify.app/api/warp",
-            "https://warp-vless.netlify.app/api/warp",
-            "https://portal-vless.netlify.app/api/warp",
-            "https://warp-porta.netlify.app/api/warp",
-            "https://warpgen.netlify.app/api/warp",
             "https://portawg11.netlify.app/api/warp",
             "https://warp-vless1.netlify.app/api/warp",
             "https://strugov.netlify.app/api/warp",
@@ -295,6 +289,12 @@ class ProxyWarpAutoConfig(
             "https://str.cyberportal.workers.dev/api/warp",
             "https://warp-vless.cyberportal.workers.dev/api/warp",
             "https://git.cyberportal.workers.dev/api/warp",
+            "https://vless-portal.netlify.app/api/warp",
+            "https://portal-warp.netlify.app/api/warp",
+            "https://warp-vless.netlify.app/api/warp",
+            "https://portal-vless.netlify.app/api/warp",
+            "https://warp-porta.netlify.app/api/warp",
+            "https://warpgen.netlify.app/api/warp",
         )
     }
 }

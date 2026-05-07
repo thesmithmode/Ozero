@@ -150,6 +150,6 @@
     <string name="stats_history_status_failed">Fallida</string>
     <string name="stats_history_status_label">Estado: %1$s</string>
     <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
-    <string name="urnetwork_peer_count_label">Pares en línea: %1$d</string>
+    <string name="urnetwork_peer_count_label">Pares: %1$d</string>
     <string name="urnetwork_provider_unpaid">Tráfico no pagado: %1$.2f MB</string>
 </resources>

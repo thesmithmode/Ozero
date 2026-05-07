@@ -10,9 +10,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.amnezia.awg.GoBackend
+import org.amnezia.awg.config.BadConfigException
+import org.amnezia.awg.config.Config
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.VpnSocketProtector
+import java.io.BufferedReader
 import java.io.File
+import java.io.StringReader
 
 class RealWarpSdkBridge internal constructor(
     private val awgRuntime: AwgRuntime,
@@ -43,9 +47,20 @@ class RealWarpSdkBridge internal constructor(
             val deleted = socketFile.delete()
             PersistentLoggers.info(TAG, "stale socket $socketFile deleted=$deleted")
         }
-        PersistentLoggers.info(TAG, "INI ($tunnelName):\n${sanitizeIni(iniConfig)}")
+        PersistentLoggers.info(TAG, "INI raw ($tunnelName):\n${sanitizeIni(iniConfig)}")
+        val canonicalIni = try {
+            Config.parse(BufferedReader(StringReader(iniConfig)))
+                .toAwgQuickString(false, false)
+        } catch (e: BadConfigException) {
+            PersistentLoggers.error(TAG, "Config.parse BadConfigException: ${e.message}")
+            return@withContext WarpSdkBridge.AttachResult.Failed("INI parse error: ${e.message}")
+        } catch (e: Throwable) {
+            PersistentLoggers.error(TAG, "Config.parse threw: ${e.message}")
+            return@withContext WarpSdkBridge.AttachResult.Failed("INI parse threw: ${e.message}")
+        }
+        PersistentLoggers.info(TAG, "INI canonical ($tunnelName):\n${sanitizeIni(canonicalIni)}")
         try {
-            val handle = awgRuntime.turnOn(tunnelName, tunFd, iniConfig, uapiPath)
+            val handle = awgRuntime.turnOn(tunnelName, tunFd, canonicalIni, uapiPath)
             if (handle < 0) {
                 return@withContext WarpSdkBridge.AttachResult.Failed("awgTurnOn handle=$handle")
             }

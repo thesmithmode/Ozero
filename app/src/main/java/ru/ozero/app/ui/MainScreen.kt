@@ -5,6 +5,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,8 +32,11 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -332,22 +336,32 @@ private fun TrafficStatsCard(
                 color = OzeroPalette.Text,
             )
             Text(
-                text = stringResource(R.string.stats_session, rxTotal, txTotal),
-                style = MaterialTheme.typography.bodySmall,
-                color = OzeroPalette.Text2,
-            )
-            Text(
                 text = stringResource(R.string.stats_uptime, uptime),
                 style = MaterialTheme.typography.bodySmall,
                 color = OzeroPalette.Text3,
             )
-            if (speedHistory.size >= 2) {
-                LiveTrafficChart(
-                    history = speedHistory,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .padding(top = 4.dp),
+            Spacer(modifier = Modifier.height(4.dp))
+            LiveTrafficChart(
+                history = speedHistory,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(72.dp),
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "↓ $rxTotal",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OzeroPalette.Aqua,
+                )
+                Text(
+                    text = "↑ $txTotal",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OzeroPalette.Amber,
                 )
             }
         }
@@ -361,19 +375,48 @@ private fun LiveTrafficChart(
 ) {
     val colorRx = OzeroPalette.Aqua
     val colorTx = OzeroPalette.Amber
+    val gridColor = OzeroPalette.Text3.copy(alpha = 0.25f)
+    val labelColor = OzeroPalette.Text3
+    val labelStyle = MaterialTheme.typography.labelSmall.copy(color = labelColor)
+    val textMeasurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val maxVal = remember(history) {
+        if (history.isEmpty()) 0f else history.maxOf { maxOf(it.first, it.second) }
+    }
+    val maxLabel = if (maxVal > 0f) BytesFormatter.humanReadablePerSec(maxVal.toDouble()) else ""
     Canvas(modifier = modifier) {
-        if (history.size < 2) return@Canvas
-        val maxVal = history.maxOf { maxOf(it.first, it.second) }.coerceAtLeast(1f)
         val w = size.width
         val h = size.height
+        val gridStrokePx = with(density) { 1.dp.toPx() }
+        val gridLines = 4
+        for (i in 0..gridLines) {
+            val y = h * i / gridLines
+            drawLine(
+                color = gridColor,
+                start = androidx.compose.ui.geometry.Offset(0f, y),
+                end = androidx.compose.ui.geometry.Offset(w, y),
+                strokeWidth = gridStrokePx,
+            )
+        }
+        if (maxLabel.isNotEmpty()) {
+            val measured = textMeasurer.measure(maxLabel, style = labelStyle)
+            val labelPad = with(density) { 4.dp.toPx() }
+            val tx = w - measured.size.width - labelPad
+            drawText(
+                textLayoutResult = measured,
+                topLeft = androidx.compose.ui.geometry.Offset(tx.coerceAtLeast(0f), labelPad),
+            )
+        }
+        if (history.size < 2 || maxVal <= 0f) return@Canvas
+        val safeMax = maxVal.coerceAtLeast(1f)
         val step = w / (history.size - 1)
-        val strokePx = 2.dp.toPx()
+        val strokePx = with(density) { 2.dp.toPx() }
         val stroke = Stroke(width = strokePx, cap = StrokeCap.Round, join = StrokeJoin.Round)
 
         val pathRx = Path()
         history.forEachIndexed { i, (rx, _) ->
             val x = i * step
-            val y = h - (rx / maxVal) * h
+            val y = h - (rx / safeMax) * h
             if (i == 0) pathRx.moveTo(x, y) else pathRx.lineTo(x, y)
         }
         drawPath(pathRx, color = colorRx, style = stroke)
@@ -381,7 +424,7 @@ private fun LiveTrafficChart(
         val pathTx = Path()
         history.forEachIndexed { i, (_, tx) ->
             val x = i * step
-            val y = h - (tx / maxVal) * h
+            val y = h - (tx / safeMax) * h
             if (i == 0) pathTx.moveTo(x, y) else pathTx.lineTo(x, y)
         }
         drawPath(pathTx, color = colorTx, style = stroke)

@@ -150,6 +150,6 @@
     <string name="stats_history_status_failed">विफल</string>
     <string name="stats_history_status_label">स्थिति: %1$s</string>
     <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
-    <string name="urnetwork_peer_count_label">ऑनलाइन पीयर: %1$d</string>
+    <string name="urnetwork_peer_count_label">पीयर: %1$d</string>
     <string name="urnetwork_provider_unpaid">अनभुगतान ट्रैफ़िक: %1$.2f MB</string>
 </resources>
