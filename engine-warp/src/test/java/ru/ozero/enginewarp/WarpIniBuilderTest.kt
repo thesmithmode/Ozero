@@ -18,7 +18,7 @@ class WarpIniBuilderTest {
     @Test
     fun `default AwgParams не пишет AWG-строк — WARP всегда vanilla WireGuard`() {
         val ini = WarpIniBuilder.build(baseConfig)
-        assertFalse(ini.contains("Jc ="), "WARP INI не должен содержать Jc — am-go активирует AWG при наличии этого поля")
+        assertFalse(ini.contains("Jc ="), "WARP INI не должен содержать Jc — am-go активирует AWG при наличии поля")
         assertFalse(ini.contains("Jmin ="))
         assertFalse(ini.contains("Jmax ="))
         assertFalse(ini.contains("H1 ="))
@@ -153,7 +153,7 @@ class WarpIniBuilderTest {
             ),
         )
         val ini = WarpIniBuilder.build(config)
-        assertFalse(ini.contains("Jc ="), "Jc не должна попасть в INI: Cloudflare WARP = vanilla WireGuard, am-go при наличии Jc активирует AWG-обфускацию → Cloudflare дропает handshake")
+        assertFalse(ini.contains("Jc ="), "Jc в INI → am-go AWG mode → Cloudflare дропает handshake")
         assertFalse(ini.contains("Jmin ="), "Jmin в INI → AWG обфускация → нет трафика")
         assertFalse(ini.contains("Jmax ="), "Jmax в INI → AWG обфускация → нет трафика")
         assertFalse(ini.contains("H1 ="), "H1 в INI → AWG обфускация → нет трафика")
