@@ -123,6 +123,52 @@ class SettingsViewModelTest {
         assertEquals(listOf(AppMode.EXPERT, AppMode.SIMPLE), repository.appModeUpdates)
     }
 
+    @Test
+    fun `onMoveAutoPriority moves engine up by one position`() = runTest(dispatcher) {
+        val current = listOf(EngineId.BYEDPI, EngineId.WARP, EngineId.URNETWORK)
+        viewModel.onMoveAutoPriority(current, EngineId.WARP, -1)
+        advanceUntilIdle()
+        assertEquals(
+            listOf(listOf(EngineId.WARP, EngineId.BYEDPI, EngineId.URNETWORK)),
+            repository.autoPriorityUpdates,
+        )
+    }
+
+    @Test
+    fun `onMoveAutoPriority moves engine down by one position`() = runTest(dispatcher) {
+        val current = listOf(EngineId.BYEDPI, EngineId.WARP, EngineId.URNETWORK)
+        viewModel.onMoveAutoPriority(current, EngineId.BYEDPI, 1)
+        advanceUntilIdle()
+        assertEquals(
+            listOf(listOf(EngineId.WARP, EngineId.BYEDPI, EngineId.URNETWORK)),
+            repository.autoPriorityUpdates,
+        )
+    }
+
+    @Test
+    fun `onMoveAutoPriority no-op when moving first engine up`() = runTest(dispatcher) {
+        val current = listOf(EngineId.BYEDPI, EngineId.WARP)
+        viewModel.onMoveAutoPriority(current, EngineId.BYEDPI, -1)
+        advanceUntilIdle()
+        assertEquals(emptyList(), repository.autoPriorityUpdates)
+    }
+
+    @Test
+    fun `onMoveAutoPriority no-op when moving last engine down`() = runTest(dispatcher) {
+        val current = listOf(EngineId.BYEDPI, EngineId.WARP)
+        viewModel.onMoveAutoPriority(current, EngineId.WARP, 1)
+        advanceUntilIdle()
+        assertEquals(emptyList(), repository.autoPriorityUpdates)
+    }
+
+    @Test
+    fun `onMoveAutoPriority no-op when engine not in list`() = runTest(dispatcher) {
+        val current = listOf(EngineId.BYEDPI, EngineId.WARP)
+        viewModel.onMoveAutoPriority(current, EngineId.URNETWORK, -1)
+        advanceUntilIdle()
+        assertEquals(emptyList(), repository.autoPriorityUpdates)
+    }
+
     private class FakeSettingsRepository : SettingsRepository {
         private val state = MutableStateFlow<SettingsModel?>(null)
 
@@ -131,6 +177,7 @@ class SettingsViewModelTest {
         val autoStartUpdates = mutableListOf<Boolean>()
         val manualEngineUpdates = mutableListOf<EngineId?>()
         val appModeUpdates = mutableListOf<AppMode>()
+        val autoPriorityUpdates = mutableListOf<List<EngineId>>()
 
         fun emit(model: SettingsModel) {
             state.value = model
@@ -164,6 +211,9 @@ class SettingsViewModelTest {
         override suspend fun setUiLocaleTag(tag: String?) = Unit
         override suspend fun setAppMode(mode: AppMode) {
             appModeUpdates += mode
+        }
+        override suspend fun setEngineAutoPriority(priority: List<EngineId>) {
+            autoPriorityUpdates += priority
         }
     }
 }
