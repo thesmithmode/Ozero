@@ -84,7 +84,7 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `performShutdown stop order — chainOrchestrator ПЕРЕД tunnelGateway`() {
-        val body = source.substringAfter("private suspend fun performShutdown()")
+        val body = source.substringAfter("private suspend fun performShutdown(")
             .substringBefore("internal fun buildTunBuilder")
         val chainIdx = body.indexOf("chainOrchestrator.stop()")
         val nativeIdx = body.indexOf("tunnelGateway.stop()")
@@ -99,7 +99,7 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `performShutdown закрывает TUN fd ПОСЛЕ tunnelGateway_stop в finally`() {
-        val body = source.substringAfter("private suspend fun performShutdown()")
+        val body = source.substringAfter("private suspend fun performShutdown(")
             .substringBefore("internal fun buildTunBuilder")
         val nativeIdx = body.indexOf("tunnelGateway.stop()")
         val closeIdx = body.indexOf("tunFdRef.getAndSet(null)?.close()")
@@ -146,6 +146,54 @@ class OzeroVpnServiceLifecycleTest {
         val body = source.substringAfter("override fun onRevoke()").substringBefore("override fun onDestroy()")
         assertTrue(body.contains("stopVpn()"))
         assertTrue(body.contains("super.onRevoke()"))
+    }
+
+    @Test
+    fun `performShutdown использует stopSelf с lastStopStartId — не голый stopSelf`() {
+        val body = source.substringAfter("private suspend fun performShutdown(")
+            .substringBefore("internal fun buildTunBuilder")
+        assertTrue(
+            body.contains("stopSelf(lastStopStartId.get())"),
+            "performShutdown обязан вызывать stopSelf(lastStopStartId.get()), а не безаргументный stopSelf(). " +
+                "stopSelf(startId) — no-op если пришёл новый intents, что исключает onDestroy при engine switch. " +
+                "Голый stopSelf() безусловно планирует onDestroy → ForegroundServiceDidNotStartInTimeException.",
+        )
+        assertFalse(
+            body.contains(Regex("(?<!lastStopStartId\\.get\\(\\))\\bstopSelf\\(\\)")),
+            "performShutdown не должен содержать голый stopSelf() без аргумента",
+        )
+    }
+
+    @Test
+    fun `onDestroy вызывает performShutdown с callStopSelf=false`() {
+        val body = source.substringAfter("override fun onDestroy()").substringBefore("private fun enterForegroundOrLog")
+        assertTrue(
+            body.contains("performShutdown(callStopSelf = false)"),
+            "onDestroy должен передавать callStopSelf=false — сервис уже умирает, " +
+                "второй stopSelf() из onDestroy-пути не нужен и вреден.",
+        )
+    }
+
+    @Test
+    fun `ACTION_STOP сохраняет startId в lastStopStartId перед stopVpn`() {
+        val body = source.substringAfter("override fun onStartCommand").substringBefore("private fun startVpn()")
+        val stopBlock = body.substringAfter("ACTION_STOP").substringBefore("ACTION_START")
+        assertTrue(
+            stopBlock.contains("lastStopStartId.set(startId)"),
+            "При ACTION_STOP обязан сохранить startId в lastStopStartId до вызова stopVpn(), " +
+                "иначе performShutdown не знает какой startId передать в stopSelf(startId).",
+        )
+    }
+
+    @Test
+    fun `ACTION_START сбрасывает stopping до вызова startVpn`() {
+        val body = source.substringAfter("override fun onStartCommand").substringBefore("private fun startVpn()")
+        val startBlock = body.substringAfter("ACTION_START, null ->").substringBefore("}")
+        assertTrue(
+            startBlock.contains("stopping.set(false)"),
+            "При ACTION_START обязан сбросить stopping=false до startVpn(), иначе если новый START " +
+                "пришёл во время shutdown, startVpn() видит stopping=true и вызывает stopVpn() повторно.",
+        )
     }
 
     @Test

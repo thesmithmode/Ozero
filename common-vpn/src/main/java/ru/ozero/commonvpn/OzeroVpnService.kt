@@ -28,6 +28,7 @@ import ru.ozero.enginescore.ChainStep
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 
@@ -103,6 +104,7 @@ class OzeroVpnService : android.net.VpnService() {
     private val starting = AtomicBoolean(false)
     private val stopping = AtomicBoolean(false)
     private val stopSignal = AtomicBoolean(false)
+    private val lastStopStartId = AtomicInteger(-1)
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         PersistentLoggers.info(TAG, "onStartCommand action=${intent?.action} startId=$startId")
@@ -118,8 +120,14 @@ class OzeroVpnService : android.net.VpnService() {
                 return START_NOT_STICKY
             }
             when (intent?.action) {
-                ACTION_STOP -> stopVpn()
-                ACTION_START, null -> startVpn()
+                ACTION_STOP -> {
+                    lastStopStartId.set(startId)
+                    stopVpn()
+                }
+                ACTION_START, null -> {
+                    stopping.set(false)
+                    startVpn()
+                }
             }
             START_STICKY
         } catch (t: Throwable) {
@@ -457,7 +465,7 @@ class OzeroVpnService : android.net.VpnService() {
         }
     }
 
-    private suspend fun performShutdown() {
+    private suspend fun performShutdown(callStopSelf: Boolean = true) {
         PersistentLoggers.info(TAG, "performShutdown begin")
         try {
             statsJobRef.getAndSet(null)?.cancel()
@@ -500,8 +508,7 @@ class OzeroVpnService : android.net.VpnService() {
                 @Suppress("DEPRECATION")
                 stopForeground(true)
             }
-            stopSelf()
-            stopping.set(false)
+            if (callStopSelf) stopSelf(lastStopStartId.get())
             PersistentLoggers.info(TAG, "performShutdown end")
         }
     }
@@ -628,7 +635,7 @@ class OzeroVpnService : android.net.VpnService() {
         socketProtector?.let { ru.ozero.enginescore.VpnSocketProtectorHolder.unbind(it) }
         if (stopping.compareAndSet(false, true)) {
             runBlocking(Dispatchers.IO) {
-                val ok = withTimeoutOrNull(ON_DESTROY_SHUTDOWN_TIMEOUT_MS) { performShutdown() }
+                val ok = withTimeoutOrNull(ON_DESTROY_SHUTDOWN_TIMEOUT_MS) { performShutdown(callStopSelf = false) }
                 if (ok == null) {
                     PersistentLoggers.warn(
                         TAG,
