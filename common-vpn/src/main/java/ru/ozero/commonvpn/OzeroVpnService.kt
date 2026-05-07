@@ -248,7 +248,11 @@ class OzeroVpnService : android.net.VpnService() {
         }
         tunFdRef.set(pfd)
         captureTunIfaceName(before)
-        PersistentLoggers.info(TAG, "engine TUN established fd=${pfd.fd} engineId=$engineId mtu=${spec.mtu} iface=${tunIfaceNameRef.get()}")
+        val iface = tunIfaceNameRef.get()
+        PersistentLoggers.info(
+            TAG,
+            "engine TUN established fd=${pfd.fd} engineId=$engineId mtu=${spec.mtu} iface=$iface",
+        )
         return pfd
     }
 

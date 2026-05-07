@@ -187,27 +187,31 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `startStatsLogger вызывается безусловно независимо от engine`() {
-        val body = source.substringAfter("runCatching { healthMonitor.start").substringBefore("private suspend fun engineNeedsCustomTun")
+        val body = source
+            .substringAfter("runCatching { healthMonitor.start")
+            .substringBefore("private suspend fun engineNeedsCustomTun")
         assertTrue(
             body.contains("startStatsLogger()"),
-            "startStatsLogger должен вызываться без условия engineNeedsCustomTun — единый stats путь для всех движков",
+            "startStatsLogger должен вызываться без условия engineNeedsCustomTun",
         )
         assertFalse(
             body.contains("if (!engineNeedsCustomTun") || body.contains("if (engineNeedsCustomTun"),
-            "Не должно быть гейтa engineNeedsCustomTun перед startStatsLogger — статистика общая для всех",
+            "Не должно быть гейтa engineNeedsCustomTun перед startStatsLogger",
         )
     }
 
     @Test
-    fun `startStatsLogger не вызывает TProxyGetStats — единый источник через TunInterfaceStats`() {
-        val body = source.substringAfter("private fun startStatsLogger()").substringBefore("private fun updateNotificationWithStats")
+    fun `startStatsLogger не вызывает TProxyGetStats — единый источник TunInterfaceStats`() {
+        val body = source
+            .substringAfter("private fun startStatsLogger()")
+            .substringBefore("private fun updateNotificationWithStats")
         assertFalse(
             body.contains("TProxyGetStats"),
-            "TProxyGetStats — libhev-only API, работает только при ByeDPI. Использовать TunInterfaceStats для всех движков",
+            "TProxyGetStats — libhev-only API. Использовать TunInterfaceStats для всех движков",
         )
         assertTrue(
             body.contains("TunInterfaceStats.readTunStats"),
-            "stats logger обязан читать через TunInterfaceStats.readTunStats — единый /proc/net/dev путь",
+            "stats logger обязан читать через TunInterfaceStats.readTunStats",
         )
     }
 
@@ -221,7 +225,9 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `tunIfaceNameRef сбрасывается в null в performShutdown finally`() {
-        val body = source.substringAfter("private suspend fun performShutdown(").substringBefore("internal fun buildTunBuilder")
+        val body = source
+            .substringAfter("private suspend fun performShutdown(")
+            .substringBefore("internal fun buildTunBuilder")
         val finallyBlock = body.substringAfter("} finally {").substringBefore("if (callStopSelf)")
         assertTrue(
             finallyBlock.contains("tunIfaceNameRef.set(null)"),
