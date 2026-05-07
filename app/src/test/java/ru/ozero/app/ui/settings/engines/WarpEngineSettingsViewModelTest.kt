@@ -151,13 +151,13 @@ class WarpEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `onImportFile success добавляет слот и ставит importSuccess`() = runTest {
+    fun `onImportFile success добавляет слот и увеличивает importSuccessCount`() = runTest {
         importer.result = Result.success(SAMPLE)
         vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
         advanceUntilIdle()
         assertEquals(1, store.slotCount())
         assertNull(vm.uiState.value.errorMessage)
-        assertTrue(vm.uiState.value.importSuccess)
+        assertEquals(1, vm.uiState.value.importSuccessCount)
     }
 
     @Test
@@ -178,12 +178,13 @@ class WarpEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `onImportSuccessConsumed сбрасывает importSuccess`() = runTest {
+    fun `onImportFile успешный дважды — importSuccessCount равен двум`() = runTest {
         importer.result = Result.success(SAMPLE)
         vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
         advanceUntilIdle()
-        vm.onImportSuccessConsumed()
-        assertFalse(vm.uiState.value.importSuccess)
+        vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
+        advanceUntilIdle()
+        assertEquals(2, vm.uiState.value.importSuccessCount)
     }
 
     @Test

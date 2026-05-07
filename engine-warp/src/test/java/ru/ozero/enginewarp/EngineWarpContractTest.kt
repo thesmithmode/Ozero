@@ -22,7 +22,7 @@ class EngineWarpContractTest {
         privateKey = "p",
         publicKey = "P",
         peerPublicKey = "PP",
-        peerEndpoint = "engage.cloudflareclient.com:2408",
+        peerEndpoint = "162.159.192.1:2408",
         interfaceAddressV4 = "172.16.0.2/32",
         interfaceAddressV6 = "2606:4700::1/128",
         accountLicense = "L",
