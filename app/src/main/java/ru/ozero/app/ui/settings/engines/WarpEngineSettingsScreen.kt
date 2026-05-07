@@ -17,8 +17,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
@@ -33,17 +36,21 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -81,13 +88,19 @@ fun WarpEngineSettingsScreen(
     }
 
     val context = LocalContext.current
-    val snackbarHostState = remember { SnackbarHostState() }
-    val importedMessage = stringResource(R.string.warp_imported)
+    var importOverlayVisible by remember { mutableStateOf(false) }
     LaunchedEffect(state.importSuccessCount) {
         if (state.importSuccessCount > 0) {
-            snackbarHostState.showSnackbar(importedMessage)
+            importOverlayVisible = true
+            kotlinx.coroutines.delay(IMPORT_OVERLAY_HOLD_MS)
+            importOverlayVisible = false
         }
     }
+    val overlayAlpha by animateFloatAsState(
+        targetValue = if (importOverlayVisible) 1f else 0f,
+        animationSpec = tween(durationMillis = IMPORT_OVERLAY_FADE_MS),
+        label = "importOverlay",
+    )
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
     ) { uri ->
@@ -103,7 +116,6 @@ fun WarpEngineSettingsScreen(
     }
     Scaffold(
         modifier = Modifier.testTag("warp_settings"),
-        snackbarHost = { SnackbarHost(snackbarHostState, modifier = Modifier.padding(bottom = 80.dp)) },
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.warp_settings_title)) },
@@ -115,18 +127,48 @@ fun WarpEngineSettingsScreen(
             )
         },
     ) { padding ->
-        WarpScreenContent(
-            state = state,
-            modifier = Modifier.padding(padding),
-            onGenerate = viewModel::onGenerate,
-            onCancelGenerate = viewModel::onCancelGenerate,
-            onImportFile = { filePickerLauncher.launch("*/*") },
-            onSetActive = viewModel::onSetActive,
-            onStartEdit = viewModel::onStartEdit,
-            onDeleteSlot = viewModel::onDeleteSlot,
-        )
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            WarpScreenContent(
+                state = state,
+                modifier = Modifier.fillMaxSize(),
+                onGenerate = viewModel::onGenerate,
+                onCancelGenerate = viewModel::onCancelGenerate,
+                onImportFile = { filePickerLauncher.launch("*/*") },
+                onSetActive = viewModel::onSetActive,
+                onStartEdit = viewModel::onStartEdit,
+                onDeleteSlot = viewModel::onDeleteSlot,
+            )
+            if (overlayAlpha > 0f) {
+                ImportSuccessOverlay(
+                    modifier = Modifier.align(Alignment.Center).alpha(overlayAlpha),
+                )
+            }
+        }
     }
 }
+
+@Composable
+private fun ImportSuccessOverlay(modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.size(IMPORT_OVERLAY_SIZE_DP.dp),
+        shape = RectangleShape,
+        color = Color.Transparent,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = Icons.Filled.Check,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(IMPORT_OVERLAY_ICON_DP.dp),
+            )
+        }
+    }
+}
+
+private const val IMPORT_OVERLAY_HOLD_MS = 900L
+private const val IMPORT_OVERLAY_FADE_MS = 600
+private const val IMPORT_OVERLAY_SIZE_DP = 120
+private const val IMPORT_OVERLAY_ICON_DP = 96
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
