@@ -10,4 +10,5 @@ interface EnginePlugin {
     suspend fun probe(): ProbeResult
     fun stats(): Flow<EngineStats>
     suspend fun tunSpec(): TunSpec? = null
+    fun preflight(): EnginePreflight? = null
 }
