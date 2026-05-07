@@ -329,9 +329,13 @@ class OzeroVpnServiceLifecycleTest {
             "runStartSequence обязан звать pickAutoCandidateWithPreflight в auto-mode — " +
                 "fallback по priority + TCP-probe",
         )
+        val hasShortFallback = body.contains("?: EngineId.BYEDPI")
+        val hasDiagnosticIfElse = body.contains(
+            "if (manualEngine != null) manualEngine else EngineId.BYEDPI",
+        )
         assertFalse(
-            body.contains("?: EngineId.BYEDPI") && !body.contains("if (manualEngine != null) manualEngine else EngineId.BYEDPI"),
-            "hardcoded fallback ?: EngineId.BYEDPI запрещён — только в diagnostic-пути 'no engine reachable'",
+            hasShortFallback && !hasDiagnosticIfElse,
+            "hardcoded fallback ?: EngineId.BYEDPI запрещён — только в diagnostic-пути",
         )
     }
 

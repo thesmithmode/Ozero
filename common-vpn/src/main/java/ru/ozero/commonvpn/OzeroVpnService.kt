@@ -280,24 +280,6 @@ class OzeroVpnService : android.net.VpnService() {
         settings: ru.ozero.enginescore.settings.SettingsModel?,
     ): EngineConfig? = ManualEngineConfigBuilder.build(engineId, settings)
 
-    private fun pickActiveEngine(
-        manualEngine: EngineId?,
-        settings: ru.ozero.enginescore.settings.SettingsModel?,
-    ): Pair<EngineId, EngineConfig>? {
-        if (manualEngine != null) {
-            val cfg = buildEngineConfig(manualEngine, settings) ?: return null
-            return manualEngine to cfg
-        }
-        val priority = settings?.engineAutoPriority
-            ?: ru.ozero.enginescore.settings.SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY
-        for (id in priority) {
-            val cfg = buildEngineConfig(id, settings) ?: continue
-            PersistentLoggers.info(TAG, "auto-mode picked engine=$id from priority=$priority")
-            return id to cfg
-        }
-        return null
-    }
-
     private fun autoCandidates(
         settings: ru.ozero.enginescore.settings.SettingsModel?,
     ): List<Pair<EngineId, EngineConfig>> {
@@ -328,8 +310,14 @@ class OzeroVpnService : android.net.VpnService() {
             tunnelController.onProbing(id)
             val result = withTimeoutOrNull(PREFLIGHT_HARD_TIMEOUT_MS) {
                 runCatching { preflight.probe(protector) }
-                    .getOrElse { ru.ozero.enginescore.EnginePreflight.Result.Fail("preflight threw: ${it.message}") }
-            } ?: ru.ozero.enginescore.EnginePreflight.Result.Fail("preflight hard-timeout ${PREFLIGHT_HARD_TIMEOUT_MS}ms")
+                    .getOrElse {
+                        ru.ozero.enginescore.EnginePreflight.Result.Fail(
+                            "preflight threw: ${it.message}",
+                        )
+                    }
+            } ?: ru.ozero.enginescore.EnginePreflight.Result.Fail(
+                "preflight hard-timeout ${PREFLIGHT_HARD_TIMEOUT_MS}ms",
+            )
             when (result) {
                 is ru.ozero.enginescore.EnginePreflight.Result.Ok -> {
                     PersistentLoggers.info(TAG, "auto-mode preflight OK engine=$id")
