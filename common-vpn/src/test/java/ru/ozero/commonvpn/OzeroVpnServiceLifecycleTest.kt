@@ -186,6 +186,63 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
+    fun `startStatsLogger вызывается безусловно независимо от engine`() {
+        val body = source.substringAfter("runCatching { healthMonitor.start").substringBefore("private suspend fun engineNeedsCustomTun")
+        assertTrue(
+            body.contains("startStatsLogger()"),
+            "startStatsLogger должен вызываться без условия engineNeedsCustomTun — единый stats путь для всех движков",
+        )
+        assertFalse(
+            body.contains("if (!engineNeedsCustomTun") || body.contains("if (engineNeedsCustomTun"),
+            "Не должно быть гейтa engineNeedsCustomTun перед startStatsLogger — статистика общая для всех",
+        )
+    }
+
+    @Test
+    fun `startStatsLogger не вызывает TProxyGetStats — единый источник через TunInterfaceStats`() {
+        val body = source.substringAfter("private fun startStatsLogger()").substringBefore("private fun updateNotificationWithStats")
+        assertFalse(
+            body.contains("TProxyGetStats"),
+            "TProxyGetStats — libhev-only API, работает только при ByeDPI. Использовать TunInterfaceStats для всех движков",
+        )
+        assertTrue(
+            body.contains("TunInterfaceStats.readTunStats"),
+            "stats logger обязан читать через TunInterfaceStats.readTunStats — единый /proc/net/dev путь",
+        )
+    }
+
+    @Test
+    fun `tunIfaceNameRef объявлен AtomicReference String`() {
+        assertTrue(
+            source.contains("private val tunIfaceNameRef = AtomicReference<String?>(null)"),
+            "Имя tun-интерфейса хранится в AtomicReference для thread-safe доступа из stats coroutine",
+        )
+    }
+
+    @Test
+    fun `tunIfaceNameRef сбрасывается в null в performShutdown finally`() {
+        val body = source.substringAfter("private suspend fun performShutdown(").substringBefore("internal fun buildTunBuilder")
+        val finallyBlock = body.substringAfter("} finally {").substringBefore("if (callStopSelf)")
+        assertTrue(
+            finallyBlock.contains("tunIfaceNameRef.set(null)"),
+            "performShutdown finally обязан сбрасывать tunIfaceNameRef — иначе stale имя в новой сессии вернёт чужие байты",
+        )
+    }
+
+    @Test
+    fun `establishTun сохраняет tunIfaceNameRef после establish — оба пути`() {
+        assertTrue(
+            source.contains("captureTunIfaceName(before)"),
+            "После establish() обоих путей (engineTun и обычный) должен вызываться captureTunIfaceName",
+        )
+        val callCount = source.split("captureTunIfaceName(before)").size - 1
+        assertTrue(
+            callCount >= 2,
+            "captureTunIfaceName должен вызываться в обоих establish — establishTun и establishTunForEngine. Найдено: $callCount",
+        )
+    }
+
+    @Test
     fun `ACTION_START сбрасывает stopping до вызова startVpn`() {
         val body = source.substringAfter("override fun onStartCommand").substringBefore("private fun startVpn()")
         val startBlock = body.substringAfter("ACTION_START, null ->").substringBefore("}")

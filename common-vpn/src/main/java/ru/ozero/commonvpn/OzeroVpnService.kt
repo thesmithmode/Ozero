@@ -99,6 +99,7 @@ class OzeroVpnService : android.net.VpnService() {
     private var socketProtector: ru.ozero.enginescore.VpnSocketProtector? = null
 
     private val tunFdRef = AtomicReference<ParcelFileDescriptor?>(null)
+    private val tunIfaceNameRef = AtomicReference<String?>(null)
     private val startJobRef = AtomicReference<Job?>(null)
     private val statsJobRef = AtomicReference<Job?>(null)
     private val starting = AtomicBoolean(false)
@@ -212,9 +213,7 @@ class OzeroVpnService : android.net.VpnService() {
             runCatching { sessionStatsRecorder.startSession(activeEngineId.name, nowMs) }.getOrDefault(-1L),
         )
         runCatching { healthMonitor.start(chainResult.finalSocksPort) }
-        if (!engineNeedsCustomTun(activeEngineId)) {
-            startStatsLogger()
-        }
+        startStatsLogger()
     }
 
     private suspend fun engineNeedsCustomTun(engineId: EngineId): Boolean {
@@ -234,6 +233,7 @@ class OzeroVpnService : android.net.VpnService() {
         val splitCfg = ru.ozero.commonvpn.split.SplitTunnelConfig(mode = splitMode, packages = splitPackages)
         val builder = applyEngineTunSpec(spec)
         ru.ozero.commonvpn.split.TunBuilderConfigurator(packageName).apply(builder, splitCfg)
+        val before = TunInterfaceStats.snapshotTunInterfaces()
         val pfd = try {
             builder.establish()
         } catch (t: Throwable) {
@@ -247,8 +247,18 @@ class OzeroVpnService : android.net.VpnService() {
             return null
         }
         tunFdRef.set(pfd)
-        PersistentLoggers.info(TAG, "engine TUN established fd=${pfd.fd} engineId=$engineId mtu=${spec.mtu}")
+        captureTunIfaceName(before)
+        PersistentLoggers.info(TAG, "engine TUN established fd=${pfd.fd} engineId=$engineId mtu=${spec.mtu} iface=${tunIfaceNameRef.get()}")
         return pfd
+    }
+
+    private fun captureTunIfaceName(before: Set<String>) {
+        val after = TunInterfaceStats.snapshotTunInterfaces()
+        val picked = TunInterfaceStats.pickNewTunInterface(before, after)
+        tunIfaceNameRef.set(picked)
+        if (picked == null) {
+            PersistentLoggers.warn(TAG, "tun interface discovery failed — stats logger будет получать null")
+        }
     }
 
     private fun buildEngineConfig(
@@ -261,6 +271,7 @@ class OzeroVpnService : android.net.VpnService() {
         ipv6: Boolean,
         customDns: List<String>,
     ): ParcelFileDescriptor? {
+        val before = TunInterfaceStats.snapshotTunInterfaces()
         val fd = try {
             buildTunBuilder(splitConfig = splitConfig, ipv6Enabled = ipv6, customDnsServers = customDns)
                 .establish()
@@ -275,7 +286,8 @@ class OzeroVpnService : android.net.VpnService() {
             return null
         }
         tunFdRef.set(fd)
-        PersistentLoggers.info(TAG, "TUN established fd=${fd.fd}")
+        captureTunIfaceName(before)
+        PersistentLoggers.info(TAG, "TUN established fd=${fd.fd} iface=${tunIfaceNameRef.get()}")
         return fd
     }
 
@@ -373,19 +385,26 @@ class OzeroVpnService : android.net.VpnService() {
                 while (true) {
                     delay(STATS_SAMPLE_INTERVAL_MS)
                     if (stopSignal.get()) return@launch
-                    val raw = runCatching { hev.TProxyService.TProxyGetStats() }.getOrNull()
-                    if (raw == null || raw.size < 4) {
-                        PersistentLoggers.warn(TAG, "TunnelStats: TProxyGetStats unavailable")
+                    val iface = tunIfaceNameRef.get()
+                    if (iface == null) {
+                        if (tickCount % STATS_NOTIFY_LOG_EVERY == 0) {
+                            PersistentLoggers.warn(TAG, "TunnelStats: tunIfaceName not set yet")
+                        }
+                        tickCount++
                         continue
                     }
-                    val txPackets = raw[0]
-                    val txBytes = raw[1]
-                    val rxPackets = raw[2]
-                    val rxBytes = raw[3]
+                    val read = TunInterfaceStats.readTunStats(iface)
+                    if (read == null) {
+                        PersistentLoggers.warn(TAG, "TunnelStats: readTunStats($iface) failed")
+                        tickCount++
+                        continue
+                    }
+                    val rxBytes = read.rxBytes
+                    val txBytes = read.txBytes
                     val snapshot = TunnelStats(
-                        txPackets = txPackets,
+                        txPackets = 0L,
                         txBytes = txBytes,
-                        rxPackets = rxPackets,
+                        rxPackets = 0L,
                         rxBytes = rxBytes,
                         timestampMs = System.currentTimeMillis(),
                     )
@@ -396,8 +415,8 @@ class OzeroVpnService : android.net.VpnService() {
                         val dRx = rxBytes - prevRx
                         PersistentLoggers.info(
                             TAG,
-                            "TunnelStats tx=${BytesFormatter.humanReadable(txBytes)}/$txPackets pkts " +
-                                "rx=${BytesFormatter.humanReadable(rxBytes)}/$rxPackets pkts " +
+                            "TunnelStats iface=$iface tx=${BytesFormatter.humanReadable(txBytes)} " +
+                                "rx=${BytesFormatter.humanReadable(rxBytes)} " +
                                 "Δtx=${BytesFormatter.humanReadable(dTx)} Δrx=${BytesFormatter.humanReadable(dRx)}",
                         )
                         updateNotificationWithStats(txBytes, rxBytes)
@@ -502,6 +521,7 @@ class OzeroVpnService : android.net.VpnService() {
         } finally {
             tunnelController.reset()
             starting.set(false)
+            tunIfaceNameRef.set(null)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 stopForeground(STOP_FOREGROUND_REMOVE)
             } else {
