@@ -92,11 +92,13 @@ fun UrnetworkEngineSettingsScreen(
             is UrnetworkSettingsUiState.Ready -> {
                 val ready = state as UrnetworkSettingsUiState.Ready
                 val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+                val peerCount by viewModel.peerCount.collectAsStateWithLifecycle()
                 LocationListContent(
                     modifier = Modifier.padding(padding),
                     countries = ready.countries,
                     selectedLocation = ready.selectedLocation,
                     providePaused = ready.providePaused,
+                    peerCount = peerCount,
                     searchQuery = searchQuery,
                     onSearchQueryChange = viewModel::setSearchQuery,
                     onSelect = viewModel::selectLocation,
@@ -107,12 +109,14 @@ fun UrnetworkEngineSettingsScreen(
     }
 }
 
+@Suppress("LongParameterList")
 @Composable
 private fun LocationListContent(
     modifier: Modifier,
     countries: List<UrnetworkLocationItem>,
     selectedLocation: ConnectLocation?,
     providePaused: Boolean,
+    peerCount: Int,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     onSelect: (ConnectLocation?) -> Unit,
@@ -125,7 +129,9 @@ private fun LocationListContent(
     ) {
         item {
             Column(modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)) {
+                PeerCounterRow(peerCount = peerCount)
                 InfoBlock()
+                AboutBlock()
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -232,6 +238,41 @@ private fun LocationRow(
                 text = "$providerCount",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PeerCounterRow(peerCount: Int) {
+    val text = if (peerCount > 0) {
+        stringResource(R.string.urnetwork_peers_connected, peerCount)
+    } else {
+        stringResource(R.string.urnetwork_peers_searching)
+    }
+    Card(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(16.dp),
+        )
+    }
+}
+
+@Composable
+private fun AboutBlock() {
+    Card(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.urnetwork_about_title),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = stringResource(R.string.urnetwork_about_body),
+                style = MaterialTheme.typography.bodyMedium,
             )
         }
     }

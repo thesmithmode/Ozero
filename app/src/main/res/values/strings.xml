@@ -196,6 +196,10 @@
     <string name="urnetwork_location_connect_first">Подключитесь к URnetwork чтобы увидеть доступные регионы</string>
     <string name="urnetwork_provide_title">Предоставлять трафик</string>
     <string name="urnetwork_provide_subtitle">Делиться пропускной способностью с сетью URnetwork</string>
+    <string name="urnetwork_peers_connected">Подключено к %1$d peer-ам</string>
+    <string name="urnetwork_peers_searching">Поиск peer-ов…</string>
+    <string name="urnetwork_about_title">Что такое URnetwork</string>
+    <string name="urnetwork_about_body">URnetwork — самая локальная и приватная сеть в мире. Запатентованный протокол держит участников в безопасности. Сейчас в сети больше 30 000 провайдеров, известных инцидентов — ноль.</string>
     <string name="settings_urnetwork_title">URnetwork</string>
     <string name="settings_urnetwork_summary">P2P mesh — exit-node + Solana-кошелёк</string>
 

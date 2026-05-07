@@ -317,5 +317,6 @@ class EngineUrnetworkContractTest {
         override fun openLocationsViewController(): com.bringyour.sdk.LocationsViewController? = null
         override fun setProvidePaused(paused: Boolean) = Unit
         override fun isProvidePaused(): Boolean = true
+        override fun peerCount(): Int = 0
     }
 }

@@ -22,6 +22,8 @@ interface UrnetworkSdkBridge {
     fun setProvidePaused(paused: Boolean)
     fun isProvidePaused(): Boolean
 
+    fun peerCount(): Int
+
     sealed class StartResult {
         data object Success : StartResult()
         data class Failed(val reason: String) : StartResult()

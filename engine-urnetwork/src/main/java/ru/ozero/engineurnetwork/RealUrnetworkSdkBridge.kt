@@ -166,6 +166,9 @@ class RealUrnetworkSdkBridge(
     override fun isProvidePaused(): Boolean =
         runCatching { deviceRef.get()?.providePaused ?: true }.getOrDefault(true)
 
+    override fun peerCount(): Int =
+        runCatching { connectVcRef.get()?.grid?.windowCurrentSize ?: 0 }.getOrDefault(0)
+
     override suspend fun attachTun(tunFd: Int): UrnetworkSdkBridge.AttachResult {
         if (tunFd < 0) {
             return UrnetworkSdkBridge.AttachResult.Failed("invalid fd=$tunFd")

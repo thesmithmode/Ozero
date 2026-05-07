@@ -7,9 +7,13 @@ import com.bringyour.sdk.FilteredLocations
 import com.bringyour.sdk.LocationsViewController
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
@@ -44,6 +48,13 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     val uiState: StateFlow<UrnetworkSettingsUiState> = _uiState.asStateFlow()
 
     val searchQuery = MutableStateFlow("")
+
+    val peerCount: StateFlow<Int> = flow {
+        while (true) {
+            emit(bridge.peerCount())
+            delay(PEER_COUNT_POLL_MS)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(PEER_COUNT_KEEP_ALIVE_MS), 0)
 
     private var locationsVc: LocationsViewController? = null
     private var allCountries: List<UrnetworkLocationItem> = emptyList()
@@ -161,6 +172,9 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     }
 
     companion object {
+        private const val PEER_COUNT_POLL_MS = 2_000L
+        private const val PEER_COUNT_KEEP_ALIVE_MS = 5_000L
+
         fun countryCodeToFlag(code: String): String {
             if (code.length != 2) return ""
             val first = code[0].uppercaseChar().code - 'A'.code + 0x1F1E6

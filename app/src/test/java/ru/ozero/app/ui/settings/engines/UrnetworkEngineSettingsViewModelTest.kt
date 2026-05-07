@@ -63,4 +63,5 @@ private class FakeUrnetworkBridge(private val connected: Boolean = false) : Urne
     override fun openLocationsViewController(): LocationsViewController? = null
     override fun setProvidePaused(paused: Boolean) = Unit
     override fun isProvidePaused(): Boolean = true
+    override fun peerCount(): Int = 0
 }

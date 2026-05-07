@@ -188,6 +188,10 @@
     <string name="urnetwork_location_connect_first">Connect to URnetwork to view available regions</string>
     <string name="urnetwork_provide_title">Provide bandwidth</string>
     <string name="urnetwork_provide_subtitle">Share bandwidth with the URnetwork mesh</string>
+    <string name="urnetwork_peers_connected">Connected to %1$d peers</string>
+    <string name="urnetwork_peers_searching">Searching peers…</string>
+    <string name="urnetwork_about_title">About URnetwork</string>
+    <string name="urnetwork_about_body">URnetwork is the most local and most private network on the planet. A patented protocol keeps participants safe. The mesh has more than 30,000 providers today and zero known incidents.</string>
     <string name="settings_urnetwork_title">URnetwork</string>
     <string name="settings_urnetwork_summary">P2P mesh — exit-node + Solana wallet</string>
 
