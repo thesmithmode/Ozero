@@ -83,13 +83,11 @@ class WarpEngineSettingsViewModel @Inject constructor(
                     slots = slots,
                     activeSlotId = slots.firstOrNull { it.isActive }?.id,
                 )
-                if (
-                    migrationOk &&
+                val canAutoTrigger = migrationOk &&
                     slots.isEmpty() &&
                     !_uiState.value.isRegistering &&
-                    autoConfig.remainingCooldownMs() == 0L &&
-                    autoTriggered.compareAndSet(false, true)
-                ) {
+                    autoConfig.remainingCooldownMs() == 0L
+                if (canAutoTrigger && autoTriggered.compareAndSet(false, true)) {
                     onGenerate()
                 }
             }
