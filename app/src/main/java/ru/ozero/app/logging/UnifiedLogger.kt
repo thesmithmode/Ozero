@@ -64,18 +64,37 @@ object UnifiedLogger : PersistentLogger {
     @Synchronized
     fun clear() {
         targetRef.get()?.let { runCatching { it.writeText("") } }
+        prevFile()?.let { runCatching { if (it.exists()) it.delete() } }
     }
 
-    fun read(): String =
-        targetRef.get()?.takeIf { it.exists() }?.readText().orEmpty()
+    private fun prevFile(): File? {
+        val parent = targetRef.get()?.parentFile ?: return null
+        return File(parent, PREV)
+    }
+
+    fun read(): String {
+        val current = targetRef.get()?.takeIf { it.exists() }?.readText().orEmpty()
+        val prev = prevFile()?.takeIf { it.exists() }?.readText().orEmpty()
+        return prev + current
+    }
 
     fun readTail(maxBytes: Long = 256_000L): String {
         val f = targetRef.get() ?: return ""
         if (!f.exists()) return ""
-        val len = f.length()
-        if (len <= maxBytes) return f.readText()
+        val curLen = f.length()
+        val prev = prevFile()?.takeIf { it.exists() }
+        if (prev == null) return tailOf(f, curLen, maxBytes)
+        if (curLen >= maxBytes) return tailOf(f, curLen, maxBytes)
+        val needFromPrev = maxBytes - curLen
+        val prevPart = tailOf(prev, prev.length(), needFromPrev)
+        val currentPart = f.readText()
+        return prevPart + currentPart
+    }
+
+    private fun tailOf(file: File, len: Long, maxBytes: Long): String {
+        if (len <= maxBytes) return runCatching { file.readText() }.getOrDefault("")
         return runCatching {
-            RandomAccessFile(f, "r").use { raf ->
+            RandomAccessFile(file, "r").use { raf ->
                 raf.seek(len - maxBytes)
                 val buf = ByteArray(maxBytes.toInt())
                 val read = raf.read(buf)
@@ -84,7 +103,11 @@ object UnifiedLogger : PersistentLogger {
         }.getOrDefault("")
     }
 
-    fun fileSize(): Long = targetRef.get()?.takeIf { it.exists() }?.length() ?: 0L
+    fun fileSize(): Long {
+        val current = targetRef.get()?.takeIf { it.exists() }?.length() ?: 0L
+        val prev = prevFile()?.takeIf { it.exists() }?.length() ?: 0L
+        return current + prev
+    }
 
     @Synchronized
     fun log(level: String, tag: String, msg: String, t: Throwable? = null) {
