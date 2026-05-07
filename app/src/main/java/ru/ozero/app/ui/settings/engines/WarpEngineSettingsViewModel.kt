@@ -7,8 +7,11 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ru.ozero.enginewarp.AwgParams
 import ru.ozero.enginewarp.WarpAutoConfig
@@ -55,7 +58,6 @@ data class WarpSettingsUiState(
     val progressCurrent: Int = 0,
     val progressTotal: Int = 0,
     val importSuccessCount: Int = 0,
-    val cooldownRemainingMs: Long = 0L,
     val editDraft: WarpEditDraft? = null,
 )
 
@@ -92,16 +94,18 @@ class WarpEngineSettingsViewModel @Inject constructor(
                 }
             }
         }
-        viewModelScope.launch {
-            while (true) {
-                val remaining = autoConfig.remainingCooldownMs()
-                if (_uiState.value.cooldownRemainingMs != remaining) {
-                    _uiState.value = _uiState.value.copy(cooldownRemainingMs = remaining)
-                }
-                delay(1_000L)
-            }
-        }
     }
+
+    val cooldownRemainingMs: StateFlow<Long> = flow {
+        while (true) {
+            emit(autoConfig.remainingCooldownMs())
+            delay(COOLDOWN_POLL_INTERVAL_MS)
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(0),
+        initialValue = 0L,
+    )
 
     fun onGenerate() {
         if (_uiState.value.isRegistering) return
@@ -277,5 +281,6 @@ class WarpEngineSettingsViewModel @Inject constructor(
 
     private companion object {
         const val VALIDATION_REQUIRED_FIELDS = "PrivateKey, Endpoint, PublicKey (Peer), Address обязательны"
+        const val COOLDOWN_POLL_INTERVAL_MS = 1_000L
     }
 }

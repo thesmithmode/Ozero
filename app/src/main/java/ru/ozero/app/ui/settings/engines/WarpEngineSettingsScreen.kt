@@ -75,6 +75,7 @@ fun WarpEngineSettingsScreen(
     viewModel: WarpEngineSettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val cooldownRemainingMs by viewModel.cooldownRemainingMs.collectAsStateWithLifecycle()
 
     if (state.editDraft != null) {
         BackHandler { viewModel.onEditCancel() }
@@ -130,6 +131,7 @@ fun WarpEngineSettingsScreen(
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             WarpScreenContent(
                 state = state,
+                cooldownRemainingMs = cooldownRemainingMs,
                 modifier = Modifier.fillMaxSize(),
                 onGenerate = viewModel::onGenerate,
                 onCancelGenerate = viewModel::onCancelGenerate,
@@ -434,6 +436,7 @@ private fun WarpTextField(
 @Composable
 private fun WarpScreenContent(
     state: WarpSettingsUiState,
+    cooldownRemainingMs: Long,
     modifier: Modifier = Modifier,
     onGenerate: () -> Unit,
     onCancelGenerate: () -> Unit,
@@ -450,7 +453,7 @@ private fun WarpScreenContent(
                 progressCurrent = state.progressCurrent,
                 progressTotal = state.progressTotal,
                 errorMessage = state.errorMessage,
-                cooldownRemainingMs = state.cooldownRemainingMs,
+                cooldownRemainingMs = cooldownRemainingMs,
                 onGenerate = onGenerate,
                 onCancelGenerate = onCancelGenerate,
                 onImportFile = onImportFile,
@@ -474,7 +477,7 @@ private fun WarpScreenContent(
             } else {
                 WarpActionRow(
                     isRegistering = false,
-                    cooldownRemainingMs = state.cooldownRemainingMs,
+                    cooldownRemainingMs = cooldownRemainingMs,
                     onGenerate = onGenerate,
                     onCancelGenerate = onCancelGenerate,
                     onImportFile = onImportFile,
