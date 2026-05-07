@@ -307,6 +307,7 @@ private fun TrafficStatsCard(
             Text(
                 text = "↓ $rxSpeed   ↑ $txSpeed",
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = OzeroPalette.Text,
             )
             Text(
                 text = stringResource(R.string.stats_session, rxTotal, txTotal),
