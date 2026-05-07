@@ -131,6 +131,7 @@ class OzeroVpnService : android.net.VpnService() {
                     stopVpn()
                 }
                 ACTION_START, null -> {
+                    stopping.set(false)
                     startVpn()
                 }
             }
