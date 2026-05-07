@@ -19,6 +19,8 @@
     <string name="stats_uptime">Время: %1$s</string>
     <string name="main_stagnation_warning">Трафик не идёт уже 30 секунд</string>
     <string name="main_health_degraded">Соединение нестабильно</string>
+    <string name="urnetwork_peer_count_label">Пиров онлайн: %1$d</string>
+    <string name="urnetwork_provider_unpaid">Невыплаченный трафик: %1$.2f MB</string>
 
     <!-- Tabs -->
     <string name="tab_main">Главная</string>

@@ -291,7 +291,7 @@ class WarpAutoConfigTest {
     }
 
     @Test
-    fun `AWG параметры из configBase64 force-сбрасываются в VANILLA для Cloudflare WARP handshake`() = runTest {
+    fun `AWG параметры из configBase64 сохраняются (ТСПУ режет vanilla WARP, AWG обвес обязателен)`() = runTest {
         val awgConf = """
             [Interface]
             PrivateKey = duLmWkD6Pz6fqd+5/Wsh+aDwyaT8w+5ofxDZ3Z3l1c0=
@@ -309,16 +309,13 @@ class WarpAutoConfigTest {
         val auto = singleMirrorConfig(http)
 
         val result = auto.register()
-
-        assertEquals(
-            AwgParams.VANILLA,
-            result.getOrThrow().awgParams,
-            "configBase64 → mirror возвращает amQuick с обфускацией; для Cloudflare WARP мы должны force vanilla",
-        )
+        val cfg = result.getOrThrow()
+        assertEquals(9, cfg.awgParams.junkPacketCount, "Jc должен сохраниться из configBase64")
+        assertEquals(999L, cfg.awgParams.initPacketMagicHeader, "H1 должен сохраниться из configBase64")
     }
 
     @Test
-    fun `register предпочитает wgQuick над amQuick когда оба присутствуют`() = runTest {
+    fun `register предпочитает amQuick над wgQuick когда оба присутствуют (AWG нужен против ТСПУ)`() = runTest {
         val wgVanilla = sampleConf
         val amWithJunk = """
             [Interface]
@@ -328,8 +325,8 @@ class WarpAutoConfigTest {
             H1 = 100
 
             [Peer]
-            PublicKey = OTHER_PEER_KEY=
-            Endpoint = some-other-endpoint:443
+            PublicKey = AM_PEER_KEY=
+            Endpoint = engage.cloudflareclient.com:4500
         """.trimIndent()
         val body =
             """{"success":true,"content":{"wgQuick":${escape(wgVanilla)},"amQuick":${escape(amWithJunk)}}}"""
@@ -339,17 +336,13 @@ class WarpAutoConfigTest {
         val result = auto.register()
 
         val cfg = result.getOrThrow()
-        assertEquals(AwgParams.VANILLA, cfg.awgParams, "wgQuick естественно vanilla")
-        assertEquals(
-            "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
-            cfg.peerPublicKey,
-            "peerPublicKey должен быть из wgQuick (sampleConf), не из amQuick",
-        )
-        assertEquals("engage.cloudflareclient.com:4500", cfg.peerEndpoint)
+        assertEquals(5, cfg.awgParams.junkPacketCount, "amQuick содержит AWG → должен быть выбран")
+        assertEquals(100L, cfg.awgParams.initPacketMagicHeader)
+        assertEquals("AM_PEER_KEY=", cfg.peerPublicKey, "peerPublicKey из amQuick (приоритет)")
     }
 
     @Test
-    fun `register парсит amQuick и force-сбрасывает AWG-параметры когда wgQuick отсутствует`() = runTest {
+    fun `register парсит amQuick и сохраняет AWG-параметры из конфига`() = runTest {
         val amWithJunk = """
             [Interface]
             PrivateKey = duLmWkD6Pz6fqd+5/Wsh+aDwyaT8w+5ofxDZ3Z3l1c0=
@@ -368,41 +361,28 @@ class WarpAutoConfigTest {
         val result = auto.register()
 
         val cfg = result.getOrThrow()
-        assertEquals(AwgParams.VANILLA, cfg.awgParams, "amQuick force vanilla для Cloudflare WARP")
+        assertEquals(9, cfg.awgParams.junkPacketCount, "amQuick сохраняет AWG для bypass ТСПУ")
+        assertEquals(999L, cfg.awgParams.initPacketMagicHeader)
         assertEquals(
             "duLmWkD6Pz6fqd+5/Wsh+aDwyaT8w+5ofxDZ3Z3l1c0=",
             cfg.privateKey,
-            "privateKey корректно парсится из amQuick",
         )
     }
 
     @Test
-    fun `register предпочитает wgQuick над configBase64 когда оба присутствуют`() = runTest {
+    fun `register fallback на wgQuick когда amQuick отсутствует`() = runTest {
         val wgVanilla = sampleConf
-        val amWithJunk = """
-            [Interface]
-            PrivateKey = duLmWkD6Pz6fqd+5/Wsh+aDwyaT8w+5ofxDZ3Z3l1c0=
-            Address = 172.16.0.2
-            Jc = 5
-
-            [Peer]
-            PublicKey = OTHER_KEY=
-            Endpoint = other:443
-        """.trimIndent()
-        val b64 = Base64.getEncoder().encodeToString(amWithJunk.toByteArray())
-        val body =
-            """{"success":true,"content":{"wgQuick":${escape(wgVanilla)},"configBase64":"$b64"}}"""
+        val body = """{"success":true,"content":{"wgQuick":${escape(wgVanilla)}}}"""
         val http = FakeHttpClient(Result.success(body))
         val auto = singleMirrorConfig(http)
 
         val result = auto.register()
 
         val cfg = result.getOrThrow()
-        assertEquals(AwgParams.VANILLA, cfg.awgParams)
         assertEquals(
             "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
             cfg.peerPublicKey,
-            "wgQuick > configBase64 — peerPublicKey из wgQuick (sampleConf)",
+            "wgQuick fallback когда amQuick отсутствует",
         )
     }
 

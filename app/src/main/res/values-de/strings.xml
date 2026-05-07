@@ -150,4 +150,6 @@
     <string name="stats_history_status_failed">Fehlgeschlagen</string>
     <string name="stats_history_status_label">Status: %1$s</string>
     <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
+    <string name="urnetwork_peer_count_label">Peers online: %1$d</string>
+    <string name="urnetwork_provider_unpaid">Nicht ausgezahlter Traffic: %1$.2f MB</string>
 </resources>

@@ -69,6 +69,7 @@ fun MainScreen(
     val appMode by viewModel.appMode.collectAsStateWithLifecycle()
     val manualEngine by viewModel.manualEngine.collectAsStateWithLifecycle()
     val speedHistory by viewModel.speedHistory.collectAsStateWithLifecycle()
+    val urnetworkPeerCount by viewModel.urnetworkPeerCount.collectAsStateWithLifecycle()
 
     val powerState = state.toPowerDiscState()
     val backgroundState = state.toBackgroundState()
@@ -81,6 +82,7 @@ fun MainScreen(
                 powerState = powerState,
                 isConnected = isConnected,
                 manualEngine = manualEngine,
+                urnetworkPeerCount = urnetworkPeerCount,
                 onConnectClick = onConnectClick,
                 onOpenEngineParams = onOpenEngineParams,
                 onOpenSettings = onOpenSettings,
@@ -94,6 +96,7 @@ fun MainScreen(
                 powerState = powerState,
                 isConnected = isConnected,
                 manualEngine = manualEngine,
+                urnetworkPeerCount = urnetworkPeerCount,
                 onConnectClick = onConnectClick,
                 onManualEngineSelect = viewModel::onManualEngineSelect,
                 onOpenEngineParams = onOpenEngineParams,
@@ -109,6 +112,7 @@ private fun SimpleMainContent(
     powerState: PowerDiscState,
     isConnected: Boolean,
     manualEngine: EngineId?,
+    urnetworkPeerCount: Int,
     onConnectClick: () -> Unit,
     onOpenEngineParams: (EngineId?) -> Unit,
     onOpenSettings: () -> Unit,
@@ -137,6 +141,10 @@ private fun SimpleMainContent(
             )
         }
 
+        if (isConnected && manualEngine == EngineId.URNETWORK) {
+            UrnetworkPeerBadge(count = urnetworkPeerCount)
+        }
+
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -157,6 +165,16 @@ private fun SimpleMainContent(
     }
 }
 
+@Composable
+private fun UrnetworkPeerBadge(count: Int) {
+    Text(
+        text = stringResource(R.string.urnetwork_peer_count_label, count),
+        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.testTag(MainScreenTestTags.URNETWORK_PEER_COUNT),
+    )
+}
+
 @Suppress("LongParameterList")
 @Composable
 private fun ExpertMainContent(
@@ -168,6 +186,7 @@ private fun ExpertMainContent(
     powerState: PowerDiscState,
     isConnected: Boolean,
     manualEngine: EngineId?,
+    urnetworkPeerCount: Int,
     onConnectClick: () -> Unit,
     onManualEngineSelect: (EngineId?) -> Unit,
     onOpenEngineParams: (EngineId?) -> Unit,
@@ -200,6 +219,9 @@ private fun ExpertMainContent(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            if (isConnected && manualEngine == EngineId.URNETWORK) {
+                UrnetworkPeerBadge(count = urnetworkPeerCount)
+            }
             if (isConnected && stats != null) {
                 TrafficStatsCard(
                     stats = stats,

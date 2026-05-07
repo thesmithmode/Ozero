@@ -8,6 +8,7 @@ import com.bringyour.sdk.IoLoop
 import com.bringyour.sdk.IoLoopDoneCallback
 import com.bringyour.sdk.LocationsViewController
 import com.bringyour.sdk.Sdk
+import com.bringyour.sdk.WalletViewController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -21,6 +22,8 @@ class RealUrnetworkSdkBridge(
     private val deviceRef = AtomicReference<DeviceLocal?>(null)
     private val ioLoopRef = AtomicReference<IoLoop?>(null)
     private val connectVcRef = AtomicReference<ConnectViewController?>(null)
+    private val walletVcRef = AtomicReference<WalletViewController?>(null)
+    private val unpaidBytesRef = AtomicReference(0L)
     private val running = AtomicReference(false)
 
     override suspend fun start(
@@ -99,6 +102,16 @@ class RealUrnetworkSdkBridge(
         }
 
         deviceRef.set(device)
+        runCatching {
+            val walletVc = device.openWalletViewController()
+            walletVcRef.set(walletVc)
+            walletVc?.addUnpaidByteCountListener { ubc -> unpaidBytesRef.set(ubc) }
+            walletVc?.start()
+            walletVc?.fetchTransferStats()
+            PersistentLoggers.info(TAG, "WalletViewController opened — provider stats listener attached")
+        }.onFailure {
+            PersistentLoggers.warn(TAG, "WalletViewController init threw: ${it.message}")
+        }
         running.set(true)
         PersistentLoggers.info(TAG, "device created — awaiting attachTun(fd) before tunnelStarted")
         return UrnetworkSdkBridge.StartResult.Success
@@ -107,6 +120,10 @@ class RealUrnetworkSdkBridge(
     override suspend fun stop() {
         running.set(false)
         withContext(Dispatchers.Main.immediate) {
+            walletVcRef.getAndSet(null)?.also { vc ->
+                runCatching { vc.close() }
+                    .onFailure { PersistentLoggers.warn(TAG, "walletVc.close threw: ${it.message}") }
+            }
             connectVcRef.getAndSet(null)?.also { vc ->
                 runCatching { vc.disconnect() }
                     .onFailure { PersistentLoggers.warn(TAG, "connectVc.disconnect threw: ${it.message}") }
@@ -168,6 +185,13 @@ class RealUrnetworkSdkBridge(
 
     override fun peerCount(): Int =
         runCatching { connectVcRef.get()?.grid?.windowCurrentSize ?: 0 }.getOrDefault(0)
+
+    override fun unpaidByteCount(): Long = unpaidBytesRef.get()
+
+    override fun fetchTransferStats() {
+        runCatching { walletVcRef.get()?.fetchTransferStats() }
+            .onFailure { PersistentLoggers.warn(TAG, "fetchTransferStats threw: ${it.message}") }
+    }
 
     override suspend fun attachTun(tunFd: Int): UrnetworkSdkBridge.AttachResult {
         if (tunFd < 0) {

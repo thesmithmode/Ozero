@@ -8,4 +8,5 @@ object MainScreenTestTags {
     const val HEALTH_DEGRADED_BADGE = "main_health_degraded_badge"
     const val ENGINE_CHIPS_ROW = "main_engine_chips_row"
     const val ENGINE_CHIP_PREFIX = "main_engine_chip_"
+    const val URNETWORK_PEER_COUNT = "main_urnetwork_peer_count"
 }

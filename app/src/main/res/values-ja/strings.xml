@@ -150,4 +150,6 @@
     <string name="stats_history_status_failed">失敗</string>
     <string name="stats_history_status_label">状態: %1$s</string>
     <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
+    <string name="urnetwork_peer_count_label">オンラインピア: %1$d</string>
+    <string name="urnetwork_provider_unpaid">未払いトラフィック: %1$.2f MB</string>
 </resources>

@@ -150,4 +150,6 @@
     <string name="stats_history_status_failed">失败</string>
     <string name="stats_history_status_label">状态: %1$s</string>
     <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
+    <string name="urnetwork_peer_count_label">在线对等点: %1$d</string>
+    <string name="urnetwork_provider_unpaid">未付款流量: %1$.2f MB</string>
 </resources>

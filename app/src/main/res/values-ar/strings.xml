@@ -150,4 +150,6 @@
     <string name="stats_history_status_failed">فشلت</string>
     <string name="stats_history_status_label">الحالة: %1$s</string>
     <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
+    <string name="urnetwork_peer_count_label">الأقران المتصلون: %1$d</string>
+    <string name="urnetwork_provider_unpaid">الحركة غير المدفوعة: %1$.2f MB</string>
 </resources>

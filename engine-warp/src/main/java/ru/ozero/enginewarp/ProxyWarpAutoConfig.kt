@@ -132,32 +132,22 @@ class ProxyWarpAutoConfig(
             }
         }
 
-    private data class ExtractedIni(val text: String, val source: String, val forceVanilla: Boolean)
+    private data class ExtractedIni(val text: String, val source: String)
 
     private fun parseProxyResponse(body: String): Result<WarpConfig> {
         val extracted = extractIniFromBody(body)
             ?: return Result.failure(IOException("WARP response: [Interface] не найден"))
-        PersistentLoggers.info(
-            TAG,
-            "selected ${extracted.source}${if (extracted.forceVanilla) " (AWG dropped → vanilla)" else " (vanilla)"}",
-        )
-        val parsed = WarpConfParser.parse(extracted.text)
-        if (parsed.isFailure || !extracted.forceVanilla) return parsed
-        val cfg = parsed.getOrThrow()
-        return if (cfg.awgParams != AwgParams.VANILLA) {
-            Result.success(cfg.copy(awgParams = AwgParams.VANILLA))
-        } else {
-            parsed
-        }
+        PersistentLoggers.info(TAG, "selected ${extracted.source}")
+        return WarpConfParser.parse(extracted.text)
     }
 
     private fun extractIniFromBody(body: String): ExtractedIni? {
         val trimmed = body.trim()
         if (!trimmed.startsWith("{")) {
-            return findInterfaceBlock(body)?.let { ExtractedIni(it, "raw INI", forceVanilla = false) }
+            return findInterfaceBlock(body)?.let { ExtractedIni(it, "raw INI") }
         }
         val json = runCatching { JSONObject(trimmed) }.getOrNull()
-            ?: return findInterfaceBlock(body)?.let { ExtractedIni(it, "raw INI", forceVanilla = false) }
+            ?: return findInterfaceBlock(body)?.let { ExtractedIni(it, "raw INI") }
         return extractFromJson(json)
     }
 
@@ -167,11 +157,11 @@ class ProxyWarpAutoConfig(
             return null
         }
         json.optJSONObject("content")?.let { content ->
-            content.optString("wgQuick", "").takeIf { it.isNotBlank() }?.let { wg ->
-                findInterfaceBlock(wg)?.let { return ExtractedIni(it, "wgQuick", forceVanilla = true) }
-            }
             content.optString("amQuick", "").takeIf { it.isNotBlank() }?.let { am ->
-                findInterfaceBlock(am)?.let { return ExtractedIni(it, "amQuick", forceVanilla = true) }
+                findInterfaceBlock(am)?.let { return ExtractedIni(it, "amQuick") }
+            }
+            content.optString("wgQuick", "").takeIf { it.isNotBlank() }?.let { wg ->
+                findInterfaceBlock(wg)?.let { return ExtractedIni(it, "wgQuick") }
             }
             val b64 = content.optString("configBase64", "")
             if (b64.isNotBlank()) {
@@ -179,13 +169,13 @@ class ProxyWarpAutoConfig(
                     String(Base64.getDecoder().decode(b64), Charsets.UTF_8)
                 }.getOrNull()?.let { decoded ->
                     val ini = findInterfaceBlock(decoded) ?: decoded
-                    ExtractedIni(ini, "configBase64", forceVanilla = true)
+                    ExtractedIni(ini, "configBase64")
                 }
             }
         }
         sequenceOf("data", "config", "wireguard", "conf").forEach { key ->
             findInterfaceBlock(json.optString(key))?.let {
-                return ExtractedIni(it, "json.$key", forceVanilla = false)
+                return ExtractedIni(it, "json.$key")
             }
         }
         return findConfInNestedObject(json)
@@ -199,7 +189,7 @@ class ProxyWarpAutoConfig(
                 val childKey = names.optString(i)
                 if (childKey.isNullOrEmpty()) continue
                 findInterfaceBlock(nested.optString(childKey))?.let {
-                    return ExtractedIni(it, "json.$key[$childKey]", forceVanilla = false)
+                    return ExtractedIni(it, "json.$key[$childKey]")
                 }
             }
         }

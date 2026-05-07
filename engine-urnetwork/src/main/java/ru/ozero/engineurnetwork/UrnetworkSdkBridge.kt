@@ -24,6 +24,9 @@ interface UrnetworkSdkBridge {
 
     fun peerCount(): Int
 
+    fun unpaidByteCount(): Long
+    fun fetchTransferStats()
+
     sealed class StartResult {
         data object Success : StartResult()
         data class Failed(val reason: String) : StartResult()

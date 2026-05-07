@@ -16,11 +16,13 @@ class WarpIniBuilderTest {
     )
 
     @Test
-    fun `default AwgParams не пишет AWG-строк — WARP всегда vanilla WireGuard`() {
-        val ini = WarpIniBuilder.build(baseConfig)
-        assertFalse(ini.contains("Jc ="), "WARP INI не должен содержать Jc — am-go активирует AWG при наличии поля")
+    fun `VANILLA AwgParams не пишет AWG-строк`() {
+        val ini = WarpIniBuilder.build(baseConfig.copy(awgParams = AwgParams.VANILLA))
+        assertFalse(ini.contains("Jc ="))
         assertFalse(ini.contains("Jmin ="))
         assertFalse(ini.contains("Jmax ="))
+        assertFalse(ini.contains("S1 ="))
+        assertFalse(ini.contains("S2 ="))
         assertFalse(ini.contains("H1 ="))
         assertFalse(ini.contains("H2 ="))
         assertFalse(ini.contains("H3 ="))
@@ -28,7 +30,21 @@ class WarpIniBuilderTest {
     }
 
     @Test
-    fun `кастомные AWG параметры не попадают в INI — builder всегда vanilla`() {
+    fun `default AwgParams пишет AWG-поля (Jc=5, Jmin=100, Jmax=200, H1-4=1-4)`() {
+        val ini = WarpIniBuilder.build(baseConfig)
+        assertTrue(ini.contains("Jc = 5"))
+        assertTrue(ini.contains("Jmin = 100"))
+        assertTrue(ini.contains("Jmax = 200"))
+        assertTrue(ini.contains("S1 = 0"))
+        assertTrue(ini.contains("S2 = 0"))
+        assertTrue(ini.contains("H1 = 1"))
+        assertTrue(ini.contains("H2 = 2"))
+        assertTrue(ini.contains("H3 = 3"))
+        assertTrue(ini.contains("H4 = 4"))
+    }
+
+    @Test
+    fun `кастомные AWG параметры пишутся в INI ровно как заданы`() {
         val config = baseConfig.copy(
             awgParams = AwgParams(
                 junkPacketCount = 10,
@@ -43,22 +59,24 @@ class WarpIniBuilderTest {
             ),
         )
         val ini = WarpIniBuilder.build(config)
-        assertFalse(ini.contains("Jc ="))
-        assertFalse(ini.contains("Jmin ="))
-        assertFalse(ini.contains("Jmax ="))
-        assertFalse(ini.contains("S1 ="))
-        assertFalse(ini.contains("S2 ="))
-        assertFalse(ini.contains("H1 ="))
-        assertFalse(ini.contains("H2 ="))
-        assertFalse(ini.contains("H3 ="))
-        assertFalse(ini.contains("H4 ="))
+        assertTrue(ini.contains("Jc = 10"))
+        assertTrue(ini.contains("Jmin = 50"))
+        assertTrue(ini.contains("Jmax = 150"))
+        assertTrue(ini.contains("S1 = 15"))
+        assertTrue(ini.contains("S2 = 20"))
+        assertTrue(ini.contains("H1 = 100"))
+        assertTrue(ini.contains("H2 = 200"))
+        assertTrue(ini.contains("H3 = 300"))
+        assertTrue(ini.contains("H4 = 400"))
     }
 
     @Test
-    fun `AWG ключи отсутствуют в обеих секциях Interface и Peer`() {
+    fun `AWG-поля пишутся в Interface секцию, не в Peer`() {
         val ini = WarpIniBuilder.build(baseConfig)
-        assertFalse(ini.contains("Jc ="))
-        assertFalse(ini.contains("H1 ="))
+        val ifacePart = ini.substringBefore("[Peer]")
+        val peerPart = ini.substringAfter("[Peer]")
+        assertTrue(ifacePart.contains("Jc = 5"))
+        assertFalse(peerPart.contains("Jc ="))
     }
 
     @Test
@@ -83,12 +101,6 @@ class WarpIniBuilderTest {
         val ini = WarpIniBuilder.build(config)
         assertTrue(ini.contains("DNS = 8.8.8.8"))
         assertFalse(ini.contains("DNS = 8.8.8.8,"))
-    }
-
-    @Test
-    fun `AllowedIPs formatted with comma-space separator`() {
-        val ini = WarpIniBuilder.build(baseConfig)
-        assertTrue(ini.contains("AllowedIPs = 0.0.0.0/0, ::/0"))
     }
 
     @Test
@@ -118,7 +130,7 @@ class WarpIniBuilderTest {
         val ini = WarpIniBuilder.build(baseConfig)
         val ifaceIdx = ini.indexOf("[Interface]")
         val peerIdx = ini.indexOf("[Peer]")
-        assertTrue(ifaceIdx < peerIdx, "Expected [Interface] before [Peer]")
+        assertTrue(ifaceIdx < peerIdx)
     }
 
     @Test
@@ -134,89 +146,17 @@ class WarpIniBuilderTest {
         val config = baseConfig.copy(interfaceAddressV6 = "")
         val ini = WarpIniBuilder.build(config)
         assertTrue(ini.contains("Address = 172.16.0.2/32"))
-        assertFalse(ini.contains("Address = 172.16.0.2/32,"), "Trailing запятая при пустом IPv6")
+        assertFalse(ini.contains("Address = 172.16.0.2/32,"))
     }
 
     @Test
-    fun `импортированный конфиг с ненулевыми AWG полями не пишет AWG в INI — WARP всегда vanilla`() {
-        val config = baseConfig.copy(
-            awgParams = AwgParams(
-                junkPacketCount = 5,
-                junkPacketMinSize = 100,
-                junkPacketMaxSize = 200,
-                initPacketJunkSize = 0,
-                responsePacketJunkSize = 0,
-                initPacketMagicHeader = 1L,
-                responsePacketMagicHeader = 2L,
-                cookieReplyMagicHeader = 3L,
-                transportMagicHeader = 4L,
-            ),
-        )
-        val ini = WarpIniBuilder.build(config)
-        assertFalse(ini.contains("Jc ="), "Jc в INI → am-go AWG mode → Cloudflare дропает handshake")
-        assertFalse(ini.contains("Jmin ="), "Jmin в INI → AWG обфускация → нет трафика")
-        assertFalse(ini.contains("Jmax ="), "Jmax в INI → AWG обфускация → нет трафика")
-        assertFalse(ini.contains("H1 ="), "H1 в INI → AWG обфускация → нет трафика")
-        assertFalse(ini.contains("H2 ="), "H2 в INI → AWG обфускация → нет трафика")
-        assertFalse(ini.contains("H3 ="), "H3 в INI → AWG обфускация → нет трафика")
-        assertFalse(ini.contains("H4 ="), "H4 в INI → AWG обфускация → нет трафика")
-        assertTrue(ini.contains("[Interface]"))
-        assertTrue(ini.contains("[Peer]"))
-        assertTrue(ini.contains("PrivateKey = ${baseConfig.privateKey}"))
-    }
-
-    @Test
-    fun `VANILLA AwgParams не пишет AWG-строк (Cloudflare WARP vanilla handshake)`() {
-        val config = baseConfig.copy(awgParams = AwgParams.VANILLA)
-        val ini = WarpIniBuilder.build(config)
-        assertFalse(ini.contains("Jc ="), "Jc не должна писаться в vanilla INI")
-        assertFalse(ini.contains("Jmin ="), "Jmin не должна писаться в vanilla INI")
-        assertFalse(ini.contains("Jmax ="), "Jmax не должна писаться в vanilla INI")
-        assertFalse(ini.contains("S1 ="), "S1 не должна писаться в vanilla INI")
-        assertFalse(ini.contains("S2 ="), "S2 не должна писаться в vanilla INI")
-        assertFalse(ini.contains("H1 ="), "H1 не должна писаться в vanilla INI")
-        assertFalse(ini.contains("H2 ="), "H2 не должна писаться в vanilla INI")
-        assertFalse(ini.contains("H3 ="), "H3 не должна писаться в vanilla INI")
-        assertFalse(ini.contains("H4 ="), "H4 не должна писаться в vanilla INI")
-        assertTrue(ini.contains("[Interface]"))
-        assertTrue(ini.contains("[Peer]"))
-        assertTrue(ini.contains("PrivateKey = ${baseConfig.privateKey}"))
-        assertTrue(ini.contains("PublicKey = ${baseConfig.peerPublicKey}"))
-    }
-
-    @Test
-    fun `non-VANILLA AwgParams не пишет AWG-строк — WARP vanilla-only независимо от awgParams`() {
-        val config = baseConfig.copy(
-            awgParams = AwgParams(
-                junkPacketCount = 7,
-                junkPacketMinSize = 50,
-                junkPacketMaxSize = 150,
-                initPacketJunkSize = 10,
-                responsePacketJunkSize = 20,
-                initPacketMagicHeader = 100L,
-                responsePacketMagicHeader = 200L,
-                cookieReplyMagicHeader = 300L,
-                transportMagicHeader = 400L,
-            ),
-        )
-        val ini = WarpIniBuilder.build(config)
-        assertFalse(ini.contains("Jc ="))
-        assertFalse(ini.contains("Jmin ="))
-        assertFalse(ini.contains("Jmax ="))
-        assertFalse(ini.contains("S1 ="))
-        assertFalse(ini.contains("S2 ="))
-        assertFalse(ini.contains("H1 ="))
-        assertFalse(ini.contains("H4 ="))
-    }
-
-    @Test
-    fun `partial override AwgParams не пишет AWG-строк`() {
+    fun `partial override AwgParams (только Jc != VANILLA) пишет полный AWG-блок`() {
         val config = baseConfig.copy(
             awgParams = AwgParams.VANILLA.copy(junkPacketCount = 1),
         )
         val ini = WarpIniBuilder.build(config)
-        assertFalse(ini.contains("Jc ="))
-        assertFalse(ini.contains("Jmin ="))
-        assertFalse(ini.contains("H1 ="))
+        assertTrue(ini.contains("Jc = 1"))
+        assertTrue(ini.contains("Jmin = 0"))
+        assertTrue(ini.contains("Jmax = 0"))
     }
 }

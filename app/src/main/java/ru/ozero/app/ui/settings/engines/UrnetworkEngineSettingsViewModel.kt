@@ -56,6 +56,14 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(PEER_COUNT_KEEP_ALIVE_MS), 0)
 
+    val unpaidBytes: StateFlow<Long> = flow {
+        while (true) {
+            bridge.fetchTransferStats()
+            emit(bridge.unpaidByteCount())
+            delay(PROVIDER_STATS_POLL_MS)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(PEER_COUNT_KEEP_ALIVE_MS), 0L)
+
     private var locationsVc: LocationsViewController? = null
     private var allCountries: List<UrnetworkLocationItem> = emptyList()
 
@@ -174,6 +182,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     companion object {
         private const val PEER_COUNT_POLL_MS = 2_000L
         private const val PEER_COUNT_KEEP_ALIVE_MS = 5_000L
+        private const val PROVIDER_STATS_POLL_MS = 30_000L
 
         fun countryCodeToFlag(code: String): String {
             if (code.length != 2) return ""

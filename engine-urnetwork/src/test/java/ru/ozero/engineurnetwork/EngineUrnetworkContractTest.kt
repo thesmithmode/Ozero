@@ -318,5 +318,7 @@ class EngineUrnetworkContractTest {
         override fun setProvidePaused(paused: Boolean) = Unit
         override fun isProvidePaused(): Boolean = true
         override fun peerCount(): Int = 0
+        override fun unpaidByteCount(): Long = 0L
+        override fun fetchTransferStats() = Unit
     }
 }

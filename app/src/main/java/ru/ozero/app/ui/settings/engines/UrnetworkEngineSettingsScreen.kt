@@ -93,12 +93,14 @@ fun UrnetworkEngineSettingsScreen(
                 val ready = state as UrnetworkSettingsUiState.Ready
                 val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
                 val peerCount by viewModel.peerCount.collectAsStateWithLifecycle()
+                val unpaidBytes by viewModel.unpaidBytes.collectAsStateWithLifecycle()
                 LocationListContent(
                     modifier = Modifier.padding(padding),
                     countries = ready.countries,
                     selectedLocation = ready.selectedLocation,
                     providePaused = ready.providePaused,
                     peerCount = peerCount,
+                    unpaidBytes = unpaidBytes,
                     searchQuery = searchQuery,
                     onSearchQueryChange = viewModel::setSearchQuery,
                     onSelect = viewModel::selectLocation,
@@ -117,6 +119,7 @@ private fun LocationListContent(
     selectedLocation: ConnectLocation?,
     providePaused: Boolean,
     peerCount: Int,
+    unpaidBytes: Long,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     onSelect: (ConnectLocation?) -> Unit,
@@ -154,6 +157,9 @@ private fun LocationListContent(
                         checked = !providePaused,
                         onCheckedChange = { checked -> onSetProvidePaused(!checked) },
                     )
+                }
+                if (!providePaused) {
+                    ProviderStatsRow(unpaidBytes = unpaidBytes)
                 }
                 Text(
                     text = stringResource(R.string.urnetwork_location_title),
@@ -241,6 +247,17 @@ private fun LocationRow(
             )
         }
     }
+}
+
+@Composable
+private fun ProviderStatsRow(unpaidBytes: Long) {
+    val mb = unpaidBytes / 1_000_000.0
+    Text(
+        text = stringResource(R.string.urnetwork_provider_unpaid, mb),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 4.dp),
+    )
 }
 
 @Composable

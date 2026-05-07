@@ -3,11 +3,13 @@ package ru.ozero.app.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -18,6 +20,7 @@ import ru.ozero.commonvpn.TunnelStats
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.SettingsRepository
+import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import javax.inject.Inject
 
 @HiltViewModel
@@ -25,6 +28,7 @@ class MainViewModel @Inject constructor(
     private val tunnelController: TunnelController,
     private val healthMonitor: HealthMonitor,
     private val settingsRepository: SettingsRepository,
+    private val urnetworkBridge: UrnetworkSdkBridge,
 ) : ViewModel() {
 
     val state: StateFlow<TunnelState> =
@@ -76,6 +80,19 @@ class MainViewModel @Inject constructor(
     private val _speedHistory = MutableStateFlow<List<Pair<Float, Float>>>(emptyList())
     val speedHistory: StateFlow<List<Pair<Float, Float>>> = _speedHistory.asStateFlow()
 
+    val urnetworkPeerCount: StateFlow<Int> = flow {
+        while (true) {
+            val s = tunnelController.state.value
+            val active = s is TunnelState.Connected && s.engineId == EngineId.URNETWORK
+            emit(if (active) urnetworkBridge.peerCount() else 0)
+            delay(URNETWORK_PEER_POLL_MS)
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(URNETWORK_PEER_POLL_KEEP_MS),
+        initialValue = 0,
+    )
+
     init {
         viewModelScope.launch {
             tunnelController.stats.collect { s ->
@@ -107,5 +124,7 @@ class MainViewModel @Inject constructor(
 
     private companion object {
         const val SPEED_HISTORY_SIZE = 60
+        const val URNETWORK_PEER_POLL_MS = 2_000L
+        const val URNETWORK_PEER_POLL_KEEP_MS = 5_000L
     }
 }

@@ -2,7 +2,12 @@ package ru.ozero.enginewarp
 
 import android.content.Context
 import com.getkeepsafe.relinker.ReLinker
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.amnezia.awg.GoBackend
 import ru.ozero.enginescore.PersistentLoggers
@@ -17,6 +22,10 @@ class RealWarpSdkBridge internal constructor(
 
     @Volatile
     private var tunnelHandle: Int = INVALID_HANDLE
+
+    private val watchdogScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    @Volatile
+    private var handshakeWatchdogJob: Job? = null
 
     override suspend fun attachTun(
         tunnelName: String,
@@ -48,6 +57,7 @@ class RealWarpSdkBridge internal constructor(
                 return@withContext WarpSdkBridge.AttachResult.Failed("protect underlying sockets failed")
             }
             PersistentLoggers.info(TAG, "awgTurnOn OK handle=$handle name=$tunnelName")
+            startHandshakeWatchdog(handle)
             WarpSdkBridge.AttachResult.Success
         } catch (t: Throwable) {
             val msg = t.message ?: t.javaClass.simpleName
@@ -92,6 +102,8 @@ class RealWarpSdkBridge internal constructor(
     }
 
     override suspend fun detachTun() {
+        handshakeWatchdogJob?.cancel()
+        handshakeWatchdogJob = null
         withContext(Dispatchers.IO) {
             val h = tunnelHandle
             if (h == INVALID_HANDLE) return@withContext
@@ -106,11 +118,38 @@ class RealWarpSdkBridge internal constructor(
         }
     }
 
+    private fun startHandshakeWatchdog(handle: Int) {
+        handshakeWatchdogJob?.cancel()
+        handshakeWatchdogJob = watchdogScope.launch {
+            var elapsed = 0L
+            while (elapsed < HANDSHAKE_TIMEOUT_MS && tunnelHandle == handle) {
+                delay(HANDSHAKE_POLL_MS)
+                elapsed += HANDSHAKE_POLL_MS
+                val cfg = awgRuntime.getConfig(handle) ?: continue
+                val hsLine = cfg.lineSequence().firstOrNull { it.startsWith("last_handshake_time_sec=") }
+                val sec = hsLine?.substringAfter("=")?.toLongOrNull() ?: 0L
+                if (sec > 0L) {
+                    PersistentLoggers.info(TAG, "handshake OK after ${elapsed}ms (last_handshake_time_sec=$sec)")
+                    return@launch
+                }
+            }
+            if (tunnelHandle == handle) {
+                PersistentLoggers.error(
+                    TAG,
+                    "handshake НЕ установлен за ${HANDSHAKE_TIMEOUT_MS}ms — Cloudflare не отвечает " +
+                        "(возможны: неверный конфиг/AWG-параметры/блокировка endpoint)",
+                )
+            }
+        }
+    }
+
     override fun isRunning(): Boolean = tunnelHandle != INVALID_HANDLE
 
     private companion object {
         const val TAG = "RealWarpSdkBridge"
         const val INVALID_HANDLE = -1
+        const val HANDSHAKE_POLL_MS = 1_000L
+        const val HANDSHAKE_TIMEOUT_MS = 12_000L
 
         fun sanitizeIni(ini: String): String = ini.lineSequence().joinToString("\n") { line ->
             if (line.trimStart().startsWith("PrivateKey", ignoreCase = true)) {
@@ -127,6 +166,7 @@ interface AwgRuntime {
     fun turnOff(handle: Int)
     fun getSocketV4(handle: Int): Int
     fun getSocketV6(handle: Int): Int
+    fun getConfig(handle: Int): String? = null
 }
 
 class ReLinkerAwgRuntime(context: Context) : AwgRuntime {
@@ -157,6 +197,11 @@ class ReLinkerAwgRuntime(context: Context) : AwgRuntime {
         return result
     }
 
+    fun getConfig(handle: Int): String? {
+        loadOnce()
+        return runCatching { GoBackend.awgGetConfig(handle) }.getOrNull()
+    }
+
     override fun turnOff(handle: Int) {
         loadOnce()
         GoBackend.awgTurnOff(handle)
@@ -172,8 +217,16 @@ class ReLinkerAwgRuntime(context: Context) : AwgRuntime {
         return GoBackend.awgGetSocketV6(handle)
     }
 
+    fun preload() = loadOnce()
+
     private companion object {
         const val TAG = "ReLinkerAwgRuntime"
         const val LIB_NAME = "am-go"
+    }
+}
+
+object AwgRuntimePreloader {
+    fun preload(context: Context) {
+        runCatching { ReLinkerAwgRuntime(context).preload() }
     }
 }

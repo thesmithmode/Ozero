@@ -24,6 +24,9 @@ import ru.ozero.enginescore.settings.HostsMode
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginescore.settings.SplitTunnelMode
+import ru.ozero.engineurnetwork.UrnetworkSdkBridge
+import com.bringyour.sdk.ConnectLocation
+import com.bringyour.sdk.LocationsViewController
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
@@ -42,7 +45,29 @@ class MainViewModelTest {
         tunnelController = TunnelController()
         healthMonitor = HealthMonitor()
         settingsRepository = FakeSettingsRepository()
-        viewModel = MainViewModel(tunnelController, healthMonitor, settingsRepository)
+        viewModel = MainViewModel(tunnelController, healthMonitor, settingsRepository, FakeUrnetworkBridge())
+    }
+
+    private class FakeUrnetworkBridge : UrnetworkSdkBridge {
+        override suspend fun start(
+            walletAddress: String,
+            apiUrl: String,
+            connectUrl: String,
+            byClientJwt: String,
+        ): UrnetworkSdkBridge.StartResult = UrnetworkSdkBridge.StartResult.Success
+        override suspend fun stop() = Unit
+        override fun isRunning(): Boolean = false
+        override suspend fun attachTun(tunFd: Int): UrnetworkSdkBridge.AttachResult =
+            UrnetworkSdkBridge.AttachResult.Success
+        override fun connectTo(location: ConnectLocation) = Unit
+        override fun connectBestAvailable() = Unit
+        override fun selectedLocation(): ConnectLocation? = null
+        override fun openLocationsViewController(): LocationsViewController? = null
+        override fun setProvidePaused(paused: Boolean) = Unit
+        override fun isProvidePaused(): Boolean = true
+        override fun peerCount(): Int = 0
+        override fun unpaidByteCount(): Long = 0L
+        override fun fetchTransferStats() = Unit
     }
 
     @AfterEach

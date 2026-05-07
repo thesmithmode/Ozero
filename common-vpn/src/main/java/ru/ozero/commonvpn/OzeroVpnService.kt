@@ -36,6 +36,8 @@ fun interface ProcessKiller {
     fun kill(pid: Int)
 }
 
+private data class TunnelStatsReadResult(val rxBytes: Long, val txBytes: Long, val source: String)
+
 @AndroidEntryPoint
 @Suppress("TooManyFunctions", "LargeClass")
 class OzeroVpnService : android.net.VpnService() {
@@ -77,6 +79,7 @@ class OzeroVpnService : android.net.VpnService() {
         private const val CHAIN_START_TIMEOUT_MS = 30_000L
         private const val CHAIN_STOP_TIMEOUT_MS = 3_000L
         private const val NATIVE_STOP_TIMEOUT_MS = 3_000L
+        private const val SHUTDOWN_JOIN_TIMEOUT_MS = 7_000L
         private const val STATS_SAMPLE_INTERVAL_MS = 1_000L
         private const val STATS_NOTIFY_LOG_EVERY = 5
         private const val SETTINGS_READ_TIMEOUT_MS = 1_500L
@@ -103,6 +106,7 @@ class OzeroVpnService : android.net.VpnService() {
     private val tunIfaceNameRef = AtomicReference<String?>(null)
     private val startJobRef = AtomicReference<Job?>(null)
     private val statsJobRef = AtomicReference<Job?>(null)
+    private val shutdownJobRef = AtomicReference<Job?>(null)
     private val starting = AtomicBoolean(false)
     private val stopping = AtomicBoolean(false)
     private val stopSignal = AtomicBoolean(false)
@@ -127,7 +131,6 @@ class OzeroVpnService : android.net.VpnService() {
                     stopVpn()
                 }
                 ACTION_START, null -> {
-                    stopping.set(false)
                     startVpn()
                 }
             }
@@ -140,10 +143,6 @@ class OzeroVpnService : android.net.VpnService() {
     }
 
     private fun startVpn() {
-        if (stopping.get()) {
-            stopVpn()
-            return
-        }
         if (!starting.compareAndSet(false, true)) return
         stopSignal.set(false)
         PersistentLoggers.info(TAG, "startVpn entry")
@@ -157,6 +156,17 @@ class OzeroVpnService : android.net.VpnService() {
 
         val job = serviceScope.launch {
             try {
+                shutdownJobRef.getAndSet(null)?.let { prev ->
+                    PersistentLoggers.info(TAG, "startVpn: ожидание завершения предыдущего shutdown")
+                    runCatching {
+                        withTimeoutOrNull(SHUTDOWN_JOIN_TIMEOUT_MS) { prev.join() }
+                    }
+                    PersistentLoggers.info(TAG, "startVpn: предыдущий shutdown завершён → продолжаем старт")
+                }
+                if (stopping.get()) {
+                    PersistentLoggers.warn(TAG, "startVpn: stopping всё ещё активен после join — отказ старта")
+                    return@launch
+                }
                 runStartSequence()
             } finally {
                 starting.set(false)
@@ -451,21 +461,25 @@ class OzeroVpnService : android.net.VpnService() {
                     delay(STATS_SAMPLE_INTERVAL_MS)
                     if (stopSignal.get()) return@launch
                     val iface = tunIfaceNameRef.get()
-                    if (iface == null) {
-                        if (tickCount % STATS_NOTIFY_LOG_EVERY == 0) {
-                            PersistentLoggers.warn(TAG, "TunnelStats: tunIfaceName not set yet")
+                    val read = if (iface != null) {
+                        TunInterfaceStats.readTunStats(iface)?.let {
+                            TunnelStatsReadResult(it.rxBytes, it.txBytes, "iface=$iface")
                         }
-                        tickCount++
-                        continue
+                    } else {
+                        null
+                    } ?: UidTrafficStats.read()?.let {
+                        TunnelStatsReadResult(it.rxBytes, it.txBytes, "uid")
                     }
-                    val read = TunInterfaceStats.readTunStats(iface)
                     if (read == null) {
-                        PersistentLoggers.warn(TAG, "TunnelStats: readTunStats($iface) failed")
+                        if (tickCount % STATS_NOTIFY_LOG_EVERY == 0) {
+                            PersistentLoggers.warn(TAG, "TunnelStats: ни iface, ни uid stats недоступны")
+                        }
                         tickCount++
                         continue
                     }
                     val rxBytes = read.rxBytes
                     val txBytes = read.txBytes
+                    val source = read.source
                     val snapshot = TunnelStats(
                         txPackets = 0L,
                         txBytes = txBytes,
@@ -480,7 +494,7 @@ class OzeroVpnService : android.net.VpnService() {
                         val dRx = rxBytes - prevRx
                         PersistentLoggers.info(
                             TAG,
-                            "TunnelStats iface=$iface tx=${BytesFormatter.humanReadable(txBytes)} " +
+                            "TunnelStats[$source] tx=${BytesFormatter.humanReadable(txBytes)} " +
                                 "rx=${BytesFormatter.humanReadable(rxBytes)} " +
                                 "Δtx=${BytesFormatter.humanReadable(dTx)} Δrx=${BytesFormatter.humanReadable(dRx)}",
                         )
@@ -523,7 +537,8 @@ class OzeroVpnService : android.net.VpnService() {
             SessionStatsRecorder.Status.DISCONNECTED
         }
         recordSessionEnd(endStatus)
-        serviceScope.launch { performShutdown() }
+        val job = serviceScope.launch { performShutdown() }
+        shutdownJobRef.set(job)
     }
 
     private fun recordSessionEnd(status: SessionStatsRecorder.Status) {
@@ -586,6 +601,8 @@ class OzeroVpnService : android.net.VpnService() {
         } finally {
             tunnelController.reset()
             starting.set(false)
+            stopping.set(false)
+            stopSignal.set(false)
             tunIfaceNameRef.set(null)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 stopForeground(STOP_FOREGROUND_REMOVE)
