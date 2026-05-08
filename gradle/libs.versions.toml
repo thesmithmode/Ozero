@@ -48,7 +48,7 @@ testExtJunit = "1.2.1"
 
 # Quality
 detekt = "1.23.7"
-ktlint = "12.1.1"
+ktlint = "14.2.0"
 jacoco = "0.8.12"
 
 # Robolectric (для runtime Room migration tests — JVM SQLite)
