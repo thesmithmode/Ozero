@@ -195,7 +195,10 @@ class MainViewModel @Inject constructor(
             val result = ipInfoProvider.fetchVia(host, port)
             result.fold(
                 onSuccess = { return IpInfoState.Loaded(it) },
-                onFailure = { lastError = it },
+                onFailure = {
+                    if (it is kotlinx.coroutines.CancellationException) throw it
+                    lastError = it
+                },
             )
             if (attempt < IP_INFO_RETRY_ATTEMPTS - 1) {
                 delay(IP_INFO_RETRY_DELAY_MS)

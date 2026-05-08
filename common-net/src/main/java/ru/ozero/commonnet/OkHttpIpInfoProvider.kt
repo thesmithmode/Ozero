@@ -29,14 +29,14 @@ class OkHttpIpInfoProvider(
     }
 
     private suspend fun doFetch(httpClient: OkHttpClient): Result<IpInfo> = withContext(Dispatchers.IO) {
-        runCatching {
+        try {
             val request = Request.Builder()
                 .url(endpoint)
                 .header("User-Agent", USER_AGENT)
                 .header("Accept", "application/json")
                 .get()
                 .build()
-            httpClient.newCall(request).execute().use { response ->
+            val info = httpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     throw IOException("HTTP ${response.code}")
                 }
@@ -44,6 +44,11 @@ class OkHttpIpInfoProvider(
                 if (body.isBlank()) throw IOException("empty body")
                 parse(body, clock())
             }
+            Result.success(info)
+        } catch (ce: kotlinx.coroutines.CancellationException) {
+            throw ce
+        } catch (t: Throwable) {
+            Result.failure(t)
         }
     }
 
