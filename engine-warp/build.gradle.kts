@@ -4,6 +4,12 @@ plugins {
 
 android {
     namespace = "ru.ozero.enginewarp"
+
+    defaultConfig {
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
+    }
 }
 
 dependencies {
@@ -14,7 +20,6 @@ dependencies {
     implementation(libs.hilt.android)
     implementation(libs.datastore.preferences)
 
-    implementation(libs.amneziawg.android)
     implementation(libs.relinker)
 
     testImplementation(libs.bundles.junit5)

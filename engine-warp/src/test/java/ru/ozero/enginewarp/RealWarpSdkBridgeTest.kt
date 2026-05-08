@@ -251,16 +251,67 @@ class RealWarpSdkBridgeTest {
         assertFalse(b.isRunning())
     }
 
+    @Test
+    fun `attachTun — version() читается до turnOn для логирования checkpoint`() = runTest {
+        val rt = FakeAwgRuntime(returnHandle = 1, socketV4 = 100, version = "amneziawg-go-v0.0.20240124")
+        val (b, _) = bridgeWith(rt)
+        b.attachTun("n", 5, validIni, "/x", noopProtector)
+        assertTrue(rt.versionCalls >= 1, "version() должен запрашиваться для pre-JNI checkpoint лога")
+    }
+
+    @Test
+    fun `attachTun — version() throws не должен ломать turnOn`() = runTest {
+        val rt = FakeAwgRuntime(returnHandle = 1, socketV4 = 100, throwOnVersion = RuntimeException("ver-fail"))
+        val (b, _) = bridgeWith(rt)
+        val r = b.attachTun("n", 5, validIni, "/x", noopProtector)
+        assertEquals(WarpSdkBridge.AttachResult.Success, r)
+        assertEquals(1, rt.turnOnCalls)
+    }
+
+    @Test
+    fun `attachTun — реалистичный INI с длинным I1 hex blob идёт passthrough без потерь`() = runTest {
+        val rt = FakeAwgRuntime(returnHandle = 42, socketV4 = 100)
+        val (b, _) = bridgeWith(rt)
+        val i1Blob = "<b 0xc70000000108ce1bf31eec7d93360000449e227e" +
+            "de8c39f4f93b6a0d8c2f1e6b".repeat(50) + ">"
+        val realisticIni = buildString {
+            append("[Interface]\n")
+            append("PrivateKey = yAnz5TF+lXXJte14tji3zlMNq+hd2rYUIgJBgB3fBmk=\n")
+            append("Address = 172.16.0.2/32\n")
+            append("Address = 2606:4700:110:8a36:df92:102a:9602:fa18/128\n")
+            append("DNS = 1.1.1.1, 8.8.8.8\n")
+            append("MTU = 1280\n")
+            append("Jc = 5\nJmin = 100\nJmax = 200\nS1 = 0\nS2 = 0\n")
+            append("H1 = 1\nH2 = 2\nH3 = 3\nH4 = 4\n")
+            append("I1 = ").append(i1Blob).append('\n')
+            append('\n')
+            append("[Peer]\n")
+            append("PublicKey = bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=\n")
+            append("AllowedIPs = 0.0.0.0/0, ::/0\n")
+            append("Endpoint = 162.159.195.1:500\n")
+            append("PersistentKeepalive = 25\n")
+        }
+        val r = b.attachTun("ozero-warp", 7, realisticIni, "/data/uapi", noopProtector)
+        assertEquals(WarpSdkBridge.AttachResult.Success, r)
+        assertEquals(realisticIni, rt.lastIni, "реалистичный INI с длинным I1 blob — passthrough байт-в-байт")
+        assertTrue(rt.lastIni!!.contains("I1 = <b 0x"), "I1 blob present")
+        assertTrue(rt.lastIni!!.contains("Jc = 5"), "AWG поля present")
+        assertTrue(rt.lastIni!!.length > 1000, "длинный I1 содержит >1000 байт")
+    }
+
     private class FakeAwgRuntime(
         var returnHandle: Int = 1,
         var throwOnTurnOn: Throwable? = null,
         var throwOnTurnOff: Throwable? = null,
+        var throwOnVersion: Throwable? = null,
         var socketV4: Int = 0,
         var socketV6: Int = 0,
+        var version: String = "fake-runtime",
     ) : AwgRuntime {
         var turnOnCalls: Int = 0
         var turnOffCalls: Int = 0
         var getConfigCalls: Int = 0
+        var versionCalls: Int = 0
         var lastName: String? = null
         var lastFd: Int = -1
         var lastIni: String? = null
@@ -285,6 +336,11 @@ class RealWarpSdkBridgeTest {
 
         override fun getSocketV4(handle: Int): Int = socketV4
         override fun getSocketV6(handle: Int): Int = socketV6
+        override fun version(): String {
+            versionCalls++
+            throwOnVersion?.let { throw it }
+            return version
+        }
         override fun getConfig(handle: Int): String? {
             getConfigCalls++
             return null

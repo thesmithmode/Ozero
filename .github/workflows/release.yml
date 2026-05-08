@@ -205,6 +205,40 @@ jobs:
           fi
           echo "APK содержит libbyedpi.so (arm64-v8a)"
 
+      - name: Assert WARP libam-go.so SHA256 == PORTAL_WG_v1.4.3 reference
+        run: |
+          set -euo pipefail
+          SO_SRC="engine-warp/src/main/jniLibs/arm64-v8a/libam-go.so"
+          EXPECTED="2ebc0ee96c0a0f0edbdf4687f2981888184b63d417417343b2774f5355daa603"
+          if [ ! -f "$SO_SRC" ]; then
+            echo "::error::checked-in $SO_SRC не найден"
+            exit 1
+          fi
+          ACTUAL=$(sha256sum "$SO_SRC" | awk '{print $1}')
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::libam-go.so SHA256 mismatch: $ACTUAL ≠ $EXPECTED — НЕ возвращайте maven com.zaneschepke (крашит на raw INI с I1 blob)"
+            exit 1
+          fi
+          echo "libam-go.so SHA256 OK: $ACTUAL"
+
+      - name: Assert APK содержит AmneziaWG so (arm64-v8a)
+        run: |
+          set -euo pipefail
+          APK=$(find app/build/outputs/apk/release -name '*.apk' | head -n1)
+          for SO in libam.so libam-go.so libam-quick.so; do
+            if ! unzip -l "$APK" | grep -q "lib/arm64-v8a/$SO"; then
+              echo "::error::В APK отсутствует lib/arm64-v8a/$SO"
+              unzip -l "$APK" | grep -E "lib/arm64-v8a/" || true
+              exit 1
+            fi
+          done
+          GO_SIZE=$(unzip -l "$APK" "lib/arm64-v8a/libam-go.so" | awk 'NR==4{print $1}')
+          if [ "$GO_SIZE" -lt 8000000 ]; then
+            echo "::error::libam-go.so подозрительно мал ($GO_SIZE байт), ожидается ≥8MB"
+            exit 1
+          fi
+          echo "APK содержит AmneziaWG SO (arm64-v8a)"
+
       - name: Assert dex содержит hev/TProxyService и native bridge классы
         run: |
           set -euo pipefail

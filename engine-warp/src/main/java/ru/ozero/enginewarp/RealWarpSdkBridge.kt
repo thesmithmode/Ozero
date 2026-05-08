@@ -40,8 +40,17 @@ class RealWarpSdkBridge internal constructor(
             PersistentLoggers.info(TAG, "stale socket $socketFile deleted=$deleted")
         }
         logIniDigest(tunnelName, iniConfig)
+        val started = System.currentTimeMillis()
+        val threadName = Thread.currentThread().name
+        val runtimeVersion = runCatching { awgRuntime.version() }.getOrElse { "version-threw:${it.javaClass.simpleName}" }
+        PersistentLoggers.warn(
+            TAG,
+            "awgTurnOn JNI entry name=$tunnelName fd=$tunFd iniLen=${iniConfig.length} thread=$threadName version=$runtimeVersion",
+        )
         try {
             val handle = awgRuntime.turnOn(tunnelName, tunFd, iniConfig, uapiPath)
+            val dt = System.currentTimeMillis() - started
+            PersistentLoggers.warn(TAG, "awgTurnOn JNI exit handle=$handle dt=${dt}ms thread=$threadName")
             if (handle < 0) {
                 return@withContext WarpSdkBridge.AttachResult.Failed("awgTurnOn handle=$handle")
             }
@@ -58,8 +67,12 @@ class RealWarpSdkBridge internal constructor(
         } catch (ce: CancellationException) {
             throw ce
         } catch (t: Throwable) {
+            val dt = System.currentTimeMillis() - started
             val msg = t.message ?: t.javaClass.simpleName
-            PersistentLoggers.error(TAG, "awgTurnOn threw: $msg (${t.javaClass.name})")
+            PersistentLoggers.error(
+                TAG,
+                "awgTurnOn threw dt=${dt}ms thread=$threadName: $msg (${t.javaClass.name})",
+            )
             WarpSdkBridge.AttachResult.Failed("awgTurnOn failed: $msg")
         }
     }
@@ -103,11 +116,16 @@ class RealWarpSdkBridge internal constructor(
         withContext(Dispatchers.IO) {
             val h = tunnelHandle
             if (h == INVALID_HANDLE) return@withContext
+            val started = System.currentTimeMillis()
+            val thread = Thread.currentThread().name
+            PersistentLoggers.warn(TAG, "awgTurnOff JNI entry handle=$h thread=$thread")
             try {
                 awgRuntime.turnOff(h)
-                PersistentLoggers.info(TAG, "awgTurnOff OK handle=$h")
+                val dt = System.currentTimeMillis() - started
+                PersistentLoggers.warn(TAG, "awgTurnOff JNI exit handle=$h dt=${dt}ms thread=$thread")
             } catch (t: Throwable) {
-                PersistentLoggers.error(TAG, "awgTurnOff failed: ${t.message}")
+                val dt = System.currentTimeMillis() - started
+                PersistentLoggers.error(TAG, "awgTurnOff failed dt=${dt}ms: ${t.message} (${t.javaClass.name})")
             } finally {
                 tunnelHandle = INVALID_HANDLE
             }
@@ -186,6 +204,8 @@ interface AwgRuntime {
     fun getSocketV4(handle: Int): Int
     fun getSocketV6(handle: Int): Int
 
+    fun version(): String = "unknown"
+
     @Deprecated("awgGetConfig causes SIGSEGV on partial-handshake handle, use only post-disconnect")
     fun getConfig(handle: Int): String? = null
 }
@@ -200,12 +220,20 @@ class ReLinkerAwgRuntime(context: Context) : AwgRuntime {
         if (loaded) return
         synchronized(lock) {
             if (loaded) return
+            val started = System.currentTimeMillis()
+            val thread = Thread.currentThread().name
+            PersistentLoggers.warn(TAG, "ReLinker.loadLibrary $LIB_NAME entry thread=$thread")
             try {
                 ReLinker.loadLibrary(appContext, LIB_NAME)
                 loaded = true
-                PersistentLoggers.info(TAG, "ReLinker loaded $LIB_NAME")
+                val dt = System.currentTimeMillis() - started
+                PersistentLoggers.warn(TAG, "ReLinker.loadLibrary $LIB_NAME exit ok dt=${dt}ms thread=$thread")
             } catch (e: Throwable) {
-                PersistentLoggers.error(TAG, "ReLinker.loadLibrary $LIB_NAME failed: ${e.message}")
+                val dt = System.currentTimeMillis() - started
+                PersistentLoggers.error(
+                    TAG,
+                    "ReLinker.loadLibrary $LIB_NAME failed dt=${dt}ms thread=$thread err=${e.message} (${e.javaClass.name})",
+                )
                 throw e
             }
         }
@@ -214,9 +242,14 @@ class ReLinkerAwgRuntime(context: Context) : AwgRuntime {
     override fun turnOn(name: String, tunFd: Int, ini: String, uapiPath: String): Int {
         loadOnce()
         val result = GoBackend.awgTurnOn(name, tunFd, ini, uapiPath)
-        PersistentLoggers.info(TAG, "awgTurnOn name=$name fd=$tunFd version=${GoBackend.awgVersion()} → handle=$result")
+        PersistentLoggers.info(TAG, "awgTurnOn name=$name fd=$tunFd → handle=$result")
         return result
     }
+
+    override fun version(): String = runCatching {
+        loadOnce()
+        GoBackend.awgVersion() ?: "null"
+    }.getOrElse { it.javaClass.simpleName }
 
     override fun getConfig(handle: Int): String? {
         loadOnce()

@@ -79,6 +79,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
+!engine-warp/src/main/jniLibs/**/*.so
 .Python
 develop-eggs/
 dist/
