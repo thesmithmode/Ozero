@@ -42,7 +42,8 @@ class RealWarpSdkBridge internal constructor(
         logIniDigest(tunnelName, iniConfig)
         val started = System.currentTimeMillis()
         val threadName = Thread.currentThread().name
-        val runtimeVersion = runCatching { awgRuntime.version() }.getOrElse { "version-threw:${it.javaClass.simpleName}" }
+        val runtimeVersion = runCatching { awgRuntime.version() }
+            .getOrElse { "version-threw:${it.javaClass.simpleName}" }
         PersistentLoggers.warn(
             TAG,
             "awgTurnOn JNI entry name=$tunnelName fd=$tunFd iniLen=${iniConfig.length} thread=$threadName version=$runtimeVersion",

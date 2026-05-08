@@ -14,8 +14,8 @@ class NoMavenAmneziawgTest {
         val text = file.readText()
         assertFalse(
             text.contains("amneziawg-android") || text.contains("zaneschepke"),
-            "engine-warp/build.gradle.kts must not reference maven amneziawg-android (crashes on raw INI with I1 blob); " +
-                "use checked-in libam-go.so from PORTAL_WG_v1.4.3 instead. Found in:\n$text",
+            "engine-warp/build.gradle.kts must not reference maven amneziawg-android " +
+                "(I1-blob SIGSEGV); use checked-in libam-go.so from PORTAL_WG_v1.4.3. Found in:\n$text",
         )
     }
 
