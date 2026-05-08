@@ -439,13 +439,11 @@ class OzeroVpnService : android.net.VpnService() {
     ): Boolean {
         val engine = enginePlugins.firstOrNull { it.id == engineId }
         if (engine is ru.ozero.enginescore.TunFdAcceptor) {
-            val pfdForNative = fd.dup()
-            val rawDupFd = pfdForNative.detachFd()
-            tunFdRef.compareAndSet(fd, null)
+            val rawDupFd = fd.dup().detachFd()
             val result = try {
                 engine.attachTun(rawDupFd)
             } catch (t: Throwable) {
-                runCatching { fd.close() }
+                runCatching { tunFdRef.getAndSet(null)?.close() }
                 PersistentLoggers.error(TAG, "attachTun threw, fd closed: ${t.message}")
                 runCatching { chainOrchestrator.stop() }
                 handleEngineFailure(engineId, "attachTun threw: ${t.message}")
@@ -453,11 +451,10 @@ class OzeroVpnService : android.net.VpnService() {
             }
             return when (result) {
                 ru.ozero.enginescore.TunAttachResult.Success -> {
-                    runCatching { fd.close() }
                     true
                 }
                 is ru.ozero.enginescore.TunAttachResult.Failure -> {
-                    runCatching { fd.close() }
+                    runCatching { tunFdRef.getAndSet(null)?.close() }
                     PersistentLoggers.error(TAG, "attachTun failed: ${result.reason}")
                     runCatching { chainOrchestrator.stop() }
                     handleEngineFailure(engineId, "attachTun: ${result.reason}")
@@ -601,17 +598,9 @@ class OzeroVpnService : android.net.VpnService() {
         healthWatchJobRef.getAndSet(null)?.cancel()
         serviceScope.launch {
             runCatching { chainOrchestrator.stop() }
-                .onFailure { PersistentLoggers.warn(TAG, "killswitch: chainOrchestrator.stop threw: ${it.message}") }
-        }
-        Thread(
-            {
-                runCatching { tunnelGateway.stop() }
-                    .onFailure { PersistentLoggers.warn(TAG, "killswitch: tunnelGateway.stop threw: ${it.message}") }
-            },
-            "ozero-killswitch-native-stop",
-        ).apply {
-            isDaemon = true
-            start()
+                .onFailure { t ->
+                    PersistentLoggers.warn(TAG, "killswitch: chainOrchestrator.stop threw: ${t.message}")
+                }
         }
         runCatching { healthMonitor.stop() }
         runCatching {
@@ -763,7 +752,12 @@ class OzeroVpnService : android.net.VpnService() {
     private fun applyLockdown(builder: Builder, callerTag: String) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
             runCatching { builder.setUnderlyingNetworks(null) }
-                .onFailure { PersistentLoggers.warn(TAG, "$callerTag: setUnderlyingNetworks(null) failed: ${it.message}") }
+                .onFailure { t ->
+                    PersistentLoggers.warn(
+                        TAG,
+                        "$callerTag: setUnderlyingNetworks(null) failed: ${t.message}",
+                    )
+                }
         }
     }
 

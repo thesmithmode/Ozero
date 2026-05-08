@@ -72,7 +72,9 @@ class OzeroVpnServiceIpv6BlackholeTest {
 
     @Test
     fun `establishTunForEngine принимает ipv6Enabled и пропускает в applyEngineTunSpec`() {
-        val sig = source.substringAfter("private suspend fun establishTunForEngine").substringBefore("): ParcelFileDescriptor?")
+        val sig = source
+            .substringAfter("private suspend fun establishTunForEngine")
+            .substringBefore("): ParcelFileDescriptor?")
         assertTrue(
             sig.contains("ipv6Enabled"),
             "establishTunForEngine обязан принимать ipv6Enabled чтобы WARP/URnetwork TUN " +

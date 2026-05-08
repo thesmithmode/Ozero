@@ -15,6 +15,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -134,6 +135,7 @@ class RealUrnetworkSdkBridge(
 
     override suspend fun stop() {
         running.set(false)
+        runCatching { bridgeScope.coroutineContext.cancelChildren() }
         val completed = withTimeoutOrNull(STOP_TIMEOUT_MS) {
             withContext(Dispatchers.Main.immediate) {
                 walletVcRef.getAndSet(null)?.also { vc ->
@@ -297,7 +299,10 @@ class RealUrnetworkSdkBridge(
                 if (cv != null) {
                     val preferredCountry = preferredCountryRef.get()
                     if (preferredCountry != null) {
-                        Log.i(TAG, "IoLoop fd=$tunFd tunnelStarted=true — connecting via preferredCountry=$preferredCountry")
+                        Log.i(
+                            TAG,
+                            "IoLoop fd=$tunFd tunnelStarted=true — preferredCountry=$preferredCountry",
+                        )
                         connectByPreferredCountry(preferredCountry, cv)
                     } else {
                         runCatching { cv.connectBestAvailable() }

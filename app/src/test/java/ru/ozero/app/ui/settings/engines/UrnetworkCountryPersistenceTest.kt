@@ -16,15 +16,6 @@ class UrnetworkCountryPersistenceTest {
         f.readText()
     }
 
-    private val bridgeSource by lazy {
-        val repoRoot = File(System.getProperty("user.dir") ?: ".").resolve("../engine-urnetwork")
-        val f = File(
-            repoRoot,
-            "src/main/java/ru/ozero/engineurnetwork/RealUrnetworkSdkBridge.kt",
-        )
-        if (f.exists()) f.readText() else ""
-    }
-
     @Test
     fun `UrnetworkEngineSettingsViewModel инжектит SettingsRepository`() {
         assertTrue(

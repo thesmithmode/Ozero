@@ -165,7 +165,12 @@ class OkHttpIpInfoProviderTest {
 
     @Test
     fun fetchViaWithSocksProxyToDeadPortFails() = runTest {
-        val deadSocksPort = okhttp3.mockwebserver.MockWebServer().also { it.start(); it.shutdown() }.port
+        val deadSocksPort = MockWebServer().run {
+            start()
+            val p = port
+            shutdown()
+            p
+        }
         val result = provider.fetchVia(socksHost = "127.0.0.1", socksPort = deadSocksPort)
         assertTrue(
             result.isFailure,
