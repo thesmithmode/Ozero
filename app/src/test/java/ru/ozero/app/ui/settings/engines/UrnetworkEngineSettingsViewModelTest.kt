@@ -5,6 +5,7 @@ import com.bringyour.sdk.LocationsViewController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -81,12 +82,14 @@ class UrnetworkEngineSettingsViewModelTest {
             balanceCallCounter = callCount,
         )
         val vm = UrnetworkEngineSettingsViewModel(bridge)
+        val collector = backgroundScope.launch { vm.subscriptionBalance.collect {} }
         vm.subscriptionBalance.first { it != null }
         runCurrent()
         val before = callCount.get()
         advanceTimeBy(60_001L)
         runCurrent()
         val after = callCount.get()
+        collector.cancel()
         assertEquals(
             true,
             after > before,
