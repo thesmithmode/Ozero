@@ -37,6 +37,7 @@ class EngineWarpContractTest {
         ),
         bridge: FakeWarpSdkBridge = FakeWarpSdkBridge(),
         uapiPath: String = "/data/data/ru.ozero.app",
+        ipv6Enabled: Boolean = true,
     ): Triple<EngineWarp, FakeWarpAutoConfig, FakeWarpConfigSlotStore> {
         val store = FakeWarpConfigSlotStore(activeConfig = activeConfig, activeRawIni = activeRawIni)
         val auto = FakeWarpAutoConfig(autoConfigResult)
@@ -46,6 +47,7 @@ class EngineWarpContractTest {
             sdkBridge = bridge,
             uapiPathProvider = { uapiPath },
             socketProtector = ru.ozero.enginescore.VpnSocketProtector { true },
+            ipv6EnabledProvider = { ipv6Enabled },
         )
         return Triple(e, auto, store)
     }
