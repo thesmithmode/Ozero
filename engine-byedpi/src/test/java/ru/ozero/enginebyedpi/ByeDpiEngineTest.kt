@@ -1,4 +1,4 @@
-﻿package ru.ozero.enginebyedpi
+package ru.ozero.enginebyedpi
 
 import io.mockk.every
 import io.mockk.just
@@ -17,6 +17,7 @@ import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
 import java.net.ServerSocket
+import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -26,6 +27,7 @@ import kotlin.test.assertTrue
 class ByeDpiEngineTest {
     private lateinit var proxy: ByeDpiProxy
     private lateinit var engine: ByeDpiEngine
+    private lateinit var proxyRunning: CountDownLatch
 
     @BeforeEach
     fun setUp() {
@@ -35,10 +37,12 @@ class ByeDpiEngineTest {
         every { ByeDpiProxy.libraryLoaded } returns true
         every { ByeDpiProxy.loadError } returns null
         engine = ByeDpiEngine(proxy)
+        proxyRunning = CountDownLatch(1)
     }
 
     @AfterEach
     fun tearDown() {
+        proxyRunning.countDown()
         unmockkObject(ByeDpiProxy.Companion)
     }
 
@@ -63,7 +67,7 @@ class ByeDpiEngineTest {
         server.acceptSocks5InBackground()
         try {
             every { proxy.startProxy(any()) } answers {
-                Thread.sleep(60_000)
+                proxyRunning.await()
                 0
             }
             val result = engine.start(EngineConfig.ByeDpi(socksPort = port))
@@ -88,7 +92,7 @@ class ByeDpiEngineTest {
         server.acceptSocks5InBackground()
         try {
             every { proxy.startProxy(any()) } answers {
-                Thread.sleep(60_000)
+                proxyRunning.await()
                 0
             }
             engine.start(EngineConfig.ByeDpi(socksPort = port))
@@ -109,7 +113,7 @@ class ByeDpiEngineTest {
         server.acceptSocks5InBackground()
         try {
             every { proxy.startProxy(any()) } answers {
-                Thread.sleep(60_000)
+                proxyRunning.await()
                 0
             }
             engine.start(EngineConfig.ByeDpi(socksPort = port))
@@ -133,7 +137,7 @@ class ByeDpiEngineTest {
         server.acceptSocks5InBackground(repeat = 2)
         try {
             every { proxy.startProxy(any()) } answers {
-                Thread.sleep(60_000)
+                proxyRunning.await()
                 0
             }
             engine.start(EngineConfig.ByeDpi(socksPort = port))
@@ -277,7 +281,7 @@ class ByeDpiEngineTest {
         server.acceptSocks5InBackground()
         try {
             every { proxy.startProxy(any()) } answers {
-                Thread.sleep(60_000)
+                proxyRunning.await()
                 0
             }
             engine.start(EngineConfig.ByeDpi(args = "", socksPort = port))
