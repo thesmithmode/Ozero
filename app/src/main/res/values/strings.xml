@@ -291,4 +291,8 @@
     <string name="ip_card_error">Не удалось получить IP: %1$s</string>
     <string name="ip_card_refresh">Обновить</string>
     <string name="ip_card_country_unknown">Страна неизвестна</string>
+    <!-- Killswitch -->
+    <string name="settings_killswitch_title">Killswitch</string>
+    <string name="settings_killswitch_summary">Блокировать весь трафик при падении тоннеля до восстановления</string>
+    <string name="killswitch_active_badge">Killswitch активен — трафик заблокирован</string>
 </resources>

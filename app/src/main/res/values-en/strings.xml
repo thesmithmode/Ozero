@@ -282,4 +282,7 @@
     <string name="ip_card_error">Failed to fetch IP: %1$s</string>
     <string name="ip_card_refresh">Refresh</string>
     <string name="ip_card_country_unknown">Unknown country</string>
+    <string name="settings_killswitch_title">Kill switch</string>
+    <string name="settings_killswitch_summary">Block all traffic when tunnel drops, until reconnect</string>
+    <string name="killswitch_active_badge">Kill switch active — traffic blocked</string>
 </resources>

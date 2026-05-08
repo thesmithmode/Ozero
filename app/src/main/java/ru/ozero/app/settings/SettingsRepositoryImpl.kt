@@ -126,6 +126,10 @@ class SettingsRepositoryImpl @Inject constructor(
         dataStore.edit { it[SettingsKeys.APP_MODE] = mode.name }
     }
 
+    override suspend fun setKillswitchEnabled(enabled: Boolean) {
+        dataStore.edit { it[SettingsKeys.KILLSWITCH_ENABLED] = enabled }
+    }
+
     private fun Preferences.toSettingsModel(): SettingsModel = SettingsModel(
         splitMode = readSplitMode(),
         ipv6Enabled = this[SettingsKeys.IPV6_ENABLED] ?: SettingsModel.DEFAULT_IPV6_ENABLED,
@@ -140,6 +144,8 @@ class SettingsRepositoryImpl @Inject constructor(
         hosts = readHosts(),
         uiLocaleTag = this[SettingsKeys.UI_LOCALE_TAG],
         appMode = readAppMode(),
+        killswitchEnabled = this[SettingsKeys.KILLSWITCH_ENABLED]
+            ?: SettingsModel.DEFAULT_KILLSWITCH_ENABLED,
     )
 
     private fun Preferences.readCustomDnsServers(): List<String> {

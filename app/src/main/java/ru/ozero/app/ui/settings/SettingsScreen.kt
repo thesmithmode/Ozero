@@ -82,6 +82,7 @@ fun SettingsScreen(
         onSplitModeChange = viewModel::onSplitModeChange,
         onIpv6Toggle = viewModel::onIpv6Toggle,
         onAutoStartToggle = viewModel::onAutoStartToggle,
+        onKillswitchToggle = viewModel::onKillswitchToggle,
         onManualEngineSelect = viewModel::onManualEngineSelect,
         onUiLocaleSelect = viewModel::onUiLocaleSelect,
         onAppModeSelect = viewModel::onAppModeSelect,
@@ -98,6 +99,7 @@ fun SettingsScreenContent(
     onSplitModeChange: (SplitTunnelMode) -> Unit,
     onIpv6Toggle: (Boolean) -> Unit,
     onAutoStartToggle: (Boolean) -> Unit,
+    onKillswitchToggle: (Boolean) -> Unit = {},
     onManualEngineSelect: (EngineId?) -> Unit,
     onUiLocaleSelect: (String?) -> Unit = {},
     onAppModeSelect: (AppMode) -> Unit = {},
@@ -131,6 +133,7 @@ fun SettingsScreenContent(
                     onSplitModeChange = onSplitModeChange,
                     onIpv6Toggle = onIpv6Toggle,
                     onAutoStartToggle = onAutoStartToggle,
+                    onKillswitchToggle = onKillswitchToggle,
                     onManualEngineSelect = onManualEngineSelect,
                     onUiLocaleSelect = onUiLocaleSelect,
                     onAppModeSelect = onAppModeSelect,
@@ -160,6 +163,7 @@ private fun ContentBody(
     onSplitModeChange: (SplitTunnelMode) -> Unit,
     onIpv6Toggle: (Boolean) -> Unit,
     onAutoStartToggle: (Boolean) -> Unit,
+    onKillswitchToggle: (Boolean) -> Unit = {},
     onManualEngineSelect: (EngineId?) -> Unit,
     onUiLocaleSelect: (String?) -> Unit = {},
     onAppModeSelect: (AppMode) -> Unit = {},
@@ -210,7 +214,9 @@ private fun ContentBody(
         item {
             SecuritySection(
                 autoStart = model.autoStart,
+                killswitch = model.killswitchEnabled,
                 onAutoStartToggle = onAutoStartToggle,
+                onKillswitchToggle = onKillswitchToggle,
             )
         }
         item { SectionDivider() }
@@ -536,7 +542,9 @@ private fun NetworkSection(
 @Composable
 private fun SecuritySection(
     autoStart: Boolean,
+    killswitch: Boolean,
     onAutoStartToggle: (Boolean) -> Unit,
+    onKillswitchToggle: (Boolean) -> Unit,
 ) {
     SectionHeader(R.string.settings_section_security, SettingsTestTags.SECTION_SECURITY)
     SwitchRow(
@@ -545,6 +553,13 @@ private fun SecuritySection(
         checked = autoStart,
         tag = SettingsTestTags.AUTO_START_SWITCH,
         onCheckedChange = onAutoStartToggle,
+    )
+    SwitchRow(
+        title = stringResource(R.string.settings_killswitch_title),
+        summary = stringResource(R.string.settings_killswitch_summary),
+        checked = killswitch,
+        tag = SettingsTestTags.KILLSWITCH_SWITCH,
+        onCheckedChange = onKillswitchToggle,
     )
 }
 

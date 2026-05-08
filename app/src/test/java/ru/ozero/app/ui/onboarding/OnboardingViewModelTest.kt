@@ -172,5 +172,6 @@ class OnboardingViewModelTest {
             appModeWrites += mode
             state.value = state.value.copy(appMode = mode)
         }
+        override suspend fun setKillswitchEnabled(enabled: Boolean) = Unit
     }
 }

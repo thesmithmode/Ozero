@@ -40,6 +40,10 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { repository.setAutoStart(enabled) }
     }
 
+    fun onKillswitchToggle(enabled: Boolean) {
+        viewModelScope.launch { repository.setKillswitchEnabled(enabled) }
+    }
+
     fun onManualEngineSelect(engine: EngineId?) {
         viewModelScope.launch { repository.setManualEngine(engine) }
     }

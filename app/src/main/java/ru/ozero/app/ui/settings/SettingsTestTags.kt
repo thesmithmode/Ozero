@@ -16,6 +16,7 @@ object SettingsTestTags {
 
     const val IPV6_SWITCH = "ipv6_switch"
     const val AUTO_START_SWITCH = "auto_start_switch"
+    const val KILLSWITCH_SWITCH = "killswitch_switch"
 
     const val ALLOWED_APPS_ROW = "allowed_apps_row"
     const val SERVERS_ROW = "servers_row"

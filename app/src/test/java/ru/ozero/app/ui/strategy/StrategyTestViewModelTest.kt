@@ -278,6 +278,7 @@ class StrategyTestViewModelTest {
         override suspend fun setHosts(hosts: List<String>) = Unit
         override suspend fun setUiLocaleTag(tag: String?) = Unit
         override suspend fun setAppMode(mode: AppMode) = Unit
+        override suspend fun setKillswitchEnabled(enabled: Boolean) = Unit
 
         override suspend fun setByedpiWinningArgs(args: String?) {
             byedpiUpdates += args

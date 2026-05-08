@@ -106,6 +106,15 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun `onKillswitchToggle forwards true then false`() = runTest(dispatcher) {
+        viewModel.onKillswitchToggle(true)
+        advanceUntilIdle()
+        viewModel.onKillswitchToggle(false)
+        advanceUntilIdle()
+        assertEquals(listOf(true, false), repository.killswitchUpdates)
+    }
+
+    @Test
     fun `onManualEngineSelect forwards engine and null clears`() = runTest(dispatcher) {
         viewModel.onManualEngineSelect(EngineId.BYEDPI)
         advanceUntilIdle()
@@ -177,6 +186,7 @@ class SettingsViewModelTest {
         val autoStartUpdates = mutableListOf<Boolean>()
         val manualEngineUpdates = mutableListOf<EngineId?>()
         val appModeUpdates = mutableListOf<AppMode>()
+        val killswitchUpdates = mutableListOf<Boolean>()
         val autoPriorityUpdates = mutableListOf<List<EngineId>>()
 
         fun emit(model: SettingsModel) {
@@ -211,6 +221,9 @@ class SettingsViewModelTest {
         override suspend fun setUiLocaleTag(tag: String?) = Unit
         override suspend fun setAppMode(mode: AppMode) {
             appModeUpdates += mode
+        }
+        override suspend fun setKillswitchEnabled(enabled: Boolean) {
+            killswitchUpdates += enabled
         }
         override suspend fun setEngineAutoPriority(priority: List<EngineId>) {
             autoPriorityUpdates += priority

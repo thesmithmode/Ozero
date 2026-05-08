@@ -32,4 +32,6 @@ interface SettingsRepository {
     suspend fun setUiLocaleTag(tag: String?)
 
     suspend fun setAppMode(mode: AppMode)
+
+    suspend fun setKillswitchEnabled(enabled: Boolean)
 }

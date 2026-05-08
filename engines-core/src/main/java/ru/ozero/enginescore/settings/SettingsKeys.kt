@@ -31,4 +31,6 @@ object SettingsKeys {
     val UI_LOCALE_TAG = stringPreferencesKey("ui_locale_tag")
 
     val APP_MODE = stringPreferencesKey("app_mode")
+
+    val KILLSWITCH_ENABLED = booleanPreferencesKey("killswitch_enabled")
 }
