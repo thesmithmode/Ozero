@@ -115,14 +115,24 @@ class MainViewModel @Inject constructor(
 
     val urnetworkPeerSearchSeconds: StateFlow<Int> = flow {
         var seconds = 0
+        var graceTicks = 0
         while (true) {
             val s = tunnelController.state.value
             val active = s is TunnelState.Connected && s.engineId == EngineId.URNETWORK
             val peers = if (active) runCatching { urnetworkBridge.peerCount() }.getOrDefault(0) else 0
-            seconds = when {
-                !active -> 0
-                peers > 0 -> 0
-                else -> seconds + 1
+            when {
+                !active -> {
+                    seconds = 0
+                    graceTicks = 0
+                }
+                peers > 0 -> {
+                    seconds = 0
+                    graceTicks = 0
+                }
+                else -> {
+                    graceTicks++
+                    if (graceTicks > URNETWORK_STARTUP_GRACE_TICKS) seconds++ else seconds = 0
+                }
             }
             emit(seconds)
             delay(URNETWORK_SEARCH_TICK_MS)
@@ -197,6 +207,7 @@ class MainViewModel @Inject constructor(
         const val URNETWORK_PEER_POLL_MS = 2_000L
         const val URNETWORK_PEER_POLL_KEEP_MS = 5_000L
         const val URNETWORK_SEARCH_TICK_MS = 1_000L
+        const val URNETWORK_STARTUP_GRACE_TICKS = 10
         const val IP_INFO_WARMUP_MS = 3_000L
     }
 }

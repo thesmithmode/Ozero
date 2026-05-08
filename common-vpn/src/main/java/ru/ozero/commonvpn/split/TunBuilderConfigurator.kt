@@ -9,21 +9,25 @@ class TunBuilderConfigurator(
     private val packageName: String,
 ) {
 
-    fun apply(builder: VpnService.Builder, config: SplitTunnelConfig): VpnService.Builder {
+    fun apply(
+        builder: VpnService.Builder,
+        config: SplitTunnelConfig,
+        excludeSelf: Boolean = true,
+    ): VpnService.Builder {
         when (config.mode) {
             SplitTunnelMode.ALL -> {
                 builder.addRoute("0.0.0.0", 0)
-                excludeSelfFromTun(builder)
-                Log.i(TAG, "split-tunnel ALL — добавлен default route v4, self исключён")
+                if (excludeSelf) excludeSelfFromTun(builder)
+                Log.i(TAG, "split-tunnel ALL — default route v4, excludeSelf=$excludeSelf")
             }
             SplitTunnelMode.BYPASS_LAN -> {
                 for (cidr in LanRoutes.BYPASS_LAN_IPV4) {
                     builder.addRoute(cidr.address, cidr.prefix)
                 }
-                excludeSelfFromTun(builder)
+                if (excludeSelf) excludeSelfFromTun(builder)
                 Log.i(
                     TAG,
-                    "split-tunnel BYPASS_LAN — ${LanRoutes.BYPASS_LAN_IPV4.size} v4 routes, self исключён",
+                    "split-tunnel BYPASS_LAN — ${LanRoutes.BYPASS_LAN_IPV4.size} v4 routes, excludeSelf=$excludeSelf",
                 )
             }
             SplitTunnelMode.ALLOWLIST -> {
@@ -32,7 +36,7 @@ class TunBuilderConfigurator(
             }
             SplitTunnelMode.BLOCKLIST -> {
                 builder.addRoute("0.0.0.0", 0)
-                excludeSelfFromTun(builder)
+                if (excludeSelf) excludeSelfFromTun(builder)
                 applyDisallowed(builder, config.packages)
             }
         }

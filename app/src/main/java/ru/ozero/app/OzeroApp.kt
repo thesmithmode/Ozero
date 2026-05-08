@@ -58,6 +58,10 @@ class OzeroApp : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        runCatching { System.loadLibrary("am-go") }
+            .onFailure { BootFileLogger.error(TAG, "am-go eager load failed", it) }
+        runCatching { System.loadLibrary("gojni") }
+            .onFailure { BootFileLogger.error(TAG, "gojni eager load failed", it) }
         runCatching {
             AppLogger.attach(logBuffer)
         }.onFailure { BootFileLogger.error(TAG, "AppLogger.attach failed", it) }

@@ -232,7 +232,7 @@ class MainViewModelTest {
     }
 
     @Test
-    fun urnetworkPeerSearchSecondsIncrementsWhileNoPeers() = runTest {
+    fun urnetworkPeerSearchSecondsZeroDuringGracePeriod() = runTest {
         val bridge = FakeUrnetworkBridge(peers = 0)
         val vm = MainViewModel(tunnelController, healthMonitor, settingsRepository, bridge, ipInfoProvider)
         backgroundScope.launch { vm.urnetworkPeerSearchSeconds.collect {} }
@@ -240,10 +240,24 @@ class MainViewModelTest {
         tunnelController.onConnecting(EngineId.URNETWORK)
         tunnelController.onEngineStarted(EngineId.URNETWORK, 1080)
         runCurrent()
-        advanceTimeBy(3_500)
+        advanceTimeBy(9_500)
+        runCurrent()
+        assertEquals(0, vm.urnetworkPeerSearchSeconds.value)
+    }
+
+    @Test
+    fun urnetworkPeerSearchSecondsIncrementsAfterGracePeriod() = runTest {
+        val bridge = FakeUrnetworkBridge(peers = 0)
+        val vm = MainViewModel(tunnelController, healthMonitor, settingsRepository, bridge, ipInfoProvider)
+        backgroundScope.launch { vm.urnetworkPeerSearchSeconds.collect {} }
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.URNETWORK)
+        tunnelController.onEngineStarted(EngineId.URNETWORK, 1080)
+        runCurrent()
+        advanceTimeBy(14_500)
         runCurrent()
         assert(vm.urnetworkPeerSearchSeconds.value >= 2) {
-            "expected >=2 after 3.5s of no peers, got ${vm.urnetworkPeerSearchSeconds.value}"
+            "expected >=2 after grace+2s, got ${vm.urnetworkPeerSearchSeconds.value}"
         }
     }
 

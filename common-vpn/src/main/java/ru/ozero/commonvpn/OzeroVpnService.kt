@@ -242,11 +242,13 @@ class OzeroVpnService : android.net.VpnService() {
         sessionIdRef.set(
             runCatching { sessionStatsRecorder.startSession(activeEngineId.name, nowMs) }.getOrDefault(-1L),
         )
-        runCatching { healthMonitor.start(chainResult.finalSocksPort) }
-            .onFailure { t ->
-                if (t is kotlinx.coroutines.CancellationException) throw t
-                PersistentLoggers.warn(TAG, "healthMonitor.start threw: ${t.message}")
-            }
+        if (activeEngineId != EngineId.URNETWORK) {
+            runCatching { healthMonitor.start(chainResult.finalSocksPort) }
+                .onFailure { t ->
+                    if (t is kotlinx.coroutines.CancellationException) throw t
+                    PersistentLoggers.warn(TAG, "healthMonitor.start threw: ${t.message}")
+                }
+        }
         startStatsLogger()
     }
 
@@ -262,7 +264,7 @@ class OzeroVpnService : android.net.VpnService() {
         val plugin = enginePlugins.firstOrNull { it.id == engineId } ?: return null
         val spec = plugin.tunSpec() ?: return null
         val builder = applyEngineTunSpec(spec)
-        ru.ozero.commonvpn.split.TunBuilderConfigurator(packageName).apply(builder, splitConfig)
+        ru.ozero.commonvpn.split.TunBuilderConfigurator(packageName).apply(builder, splitConfig, excludeSelf = false)
         val before = TunInterfaceStats.snapshotTunInterfaces()
         val pfd = try {
             builder.establish()
