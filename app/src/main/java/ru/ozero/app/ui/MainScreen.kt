@@ -275,11 +275,18 @@ private fun ExpertMainContent(
 }
 
 @Composable
-private fun commonDockTabs(): List<DockTab> = listOf(
-    DockTab(DOCK_TAB_HOME, Icons.Filled.Home, stringResource(R.string.tab_main)),
-    DockTab(DOCK_TAB_SERVERS, Icons.Filled.LocationOn, stringResource(R.string.tab_servers)),
-    DockTab(DOCK_TAB_SETTINGS, Icons.Filled.Settings, stringResource(R.string.tab_settings)),
-)
+private fun commonDockTabs(): List<DockTab> {
+    val labelHome = stringResource(R.string.tab_main)
+    val labelServers = stringResource(R.string.tab_servers)
+    val labelSettings = stringResource(R.string.tab_settings)
+    return remember(labelHome, labelServers, labelSettings) {
+        listOf(
+            DockTab(DOCK_TAB_HOME, Icons.Filled.Home, labelHome),
+            DockTab(DOCK_TAB_SERVERS, Icons.Filled.LocationOn, labelServers),
+            DockTab(DOCK_TAB_SETTINGS, Icons.Filled.Settings, labelSettings),
+        )
+    }
+}
 
 private fun TunnelState.toPowerDiscState(): PowerDiscState = when (this) {
     is TunnelState.Connected -> PowerDiscState.Connected

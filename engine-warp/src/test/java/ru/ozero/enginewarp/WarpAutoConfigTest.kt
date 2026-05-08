@@ -325,7 +325,7 @@ class WarpAutoConfigTest {
             H1 = 100
 
             [Peer]
-            PublicKey = AM_PEER_KEY=
+            PublicKey = bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=
             Endpoint = engage.cloudflareclient.com:4500
         """.trimIndent()
         val body =
@@ -338,7 +338,54 @@ class WarpAutoConfigTest {
         val cfg = result.getOrThrow().config
         assertEquals(5, cfg.awgParams.junkPacketCount, "amQuick содержит AWG → должен быть выбран")
         assertEquals(100L, cfg.awgParams.initPacketMagicHeader)
-        assertEquals("AM_PEER_KEY=", cfg.peerPublicKey, "peerPublicKey из amQuick (приоритет)")
+    }
+
+    @Test
+    fun `register отклоняет mirror response с подменённым peerPublicKey (supply chain attack)`() = runTest {
+        val malicious = sampleConf.replace(
+            "PublicKey = bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
+            "PublicKey = ATTACKER_PUBKEY_XXXXXXXXXXXXXXXXXXXXXXXX=",
+        )
+        val http = FakeHttpClient(Result.success(malicious))
+        val auto = singleMirrorConfig(http)
+
+        val result = auto.register()
+
+        assertTrue(result.isFailure, "вредоносный peerPublicKey обязан отклоняться")
+        assertTrue(
+            result.exceptionOrNull()?.message?.contains("peerPublicKey") == true,
+            "сообщение об ошибке должно явно указывать на peerPublicKey mismatch",
+        )
+    }
+
+    @Test
+    fun `register отклоняет mirror response с подменённым peer endpoint host (supply chain attack)`() = runTest {
+        val malicious = sampleConf.replace(
+            "Endpoint = engage.cloudflareclient.com:4500",
+            "Endpoint = attacker.example.com:4500",
+        )
+        val http = FakeHttpClient(Result.success(malicious))
+        val auto = singleMirrorConfig(http)
+
+        val result = auto.register()
+
+        assertTrue(result.isFailure, "не-Cloudflare peer host обязан отклоняться")
+        assertTrue(
+            result.exceptionOrNull()?.message?.contains("peer host") == true,
+            "сообщение об ошибке должно явно указывать на peer host mismatch",
+        )
+    }
+
+    @Test
+    fun `register принимает любой Cloudflare WARP UDP port (2408 4500 500 1701)`() = runTest {
+        val ports = listOf(2408, 4500, 500, 1701)
+        for (port in ports) {
+            val conf = sampleConf.replace("4500", port.toString())
+            val http = FakeHttpClient(Result.success(conf))
+            val auto = singleMirrorConfig(http)
+            val result = auto.register()
+            assertTrue(result.isSuccess, "port $port обязан приниматься: ${result.exceptionOrNull()?.message}")
+        }
     }
 
     @Test

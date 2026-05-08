@@ -19,12 +19,7 @@ sealed class DohResult {
 class DohResolver(
     private val endpoint: String = CLOUDFLARE_ENDPOINT,
     private val timeoutMs: Long = 5_000L,
-    private val client: OkHttpClient =
-        OkHttpClient.Builder()
-            .connectTimeout(timeoutMs, TimeUnit.MILLISECONDS)
-            .callTimeout(timeoutMs, TimeUnit.MILLISECONDS)
-            .certificatePinner(defaultPinner())
-            .build(),
+    private val client: OkHttpClient = defaultClient(timeoutMs),
 ) {
 
     suspend fun resolve(hostname: String): DohResult =
@@ -65,6 +60,12 @@ class DohResolver(
         fun defaultPinner(): CertificatePinner = CertificatePinner.Builder()
             .add("cloudflare-dns.com", "sha256/v3zZBT4LfPWyUJGyl0NCMCsKnaVj2UZfKUwRk4G3DuA=")
             .add("dns.quad9.net", "sha256/i7WTqTvh0OioIruIfFR4kMPnBqrS2rdiVPl/s2uC/CY=")
+            .build()
+
+        fun defaultClient(timeoutMs: Long = 5_000L): OkHttpClient = OkHttpClient.Builder()
+            .connectTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+            .callTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+            .certificatePinner(defaultPinner())
             .build()
     }
 }

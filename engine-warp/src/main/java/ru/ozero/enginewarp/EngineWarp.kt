@@ -178,8 +178,8 @@ class EngineWarp(
 
     private fun applyEndpointToRawIni(rawIni: String, resolvedEndpoint: String): String =
         rawIni.lineSequence().joinToString("\n") { line ->
-            val trimmed = line.trim()
-            if (trimmed.startsWith("Endpoint", ignoreCase = true) && trimmed.contains('=')) {
+            val eqIdx = line.indexOf('=')
+            if (eqIdx > 0 && line.substring(0, eqIdx).trim().equals("Endpoint", ignoreCase = true)) {
                 val indent = line.takeWhile { it.isWhitespace() }
                 "${indent}Endpoint = $resolvedEndpoint"
             } else {
@@ -189,7 +189,7 @@ class EngineWarp(
 
     private fun isLikelyIpAddress(host: String): Boolean {
         if (host.isEmpty()) return false
-        if (host.contains(':')) return true
+        if (host.startsWith('[') || host.contains(':')) return true
         return host.all { it.isDigit() || it == '.' }
     }
 

@@ -35,13 +35,75 @@ class AwgParamsTest {
     }
 
     @Test
-    fun `H-значения типа Long не переполняются при Int max`() {
+    fun `H-значения принимают полный диапазон uint32`() {
         val p = AwgParams(
-            initPacketMagicHeader = Int.MAX_VALUE.toLong() + 1,
-            responsePacketMagicHeader = Long.MAX_VALUE,
+            initPacketMagicHeader = 0xFFFFFFFFL,
+            responsePacketMagicHeader = 0xFFFFFFFEL,
+            cookieReplyMagicHeader = 0xFFFFFFFDL,
+            transportMagicHeader = 0xFFFFFFFCL,
         )
-        assertEquals(Int.MAX_VALUE.toLong() + 1, p.initPacketMagicHeader)
-        assertEquals(Long.MAX_VALUE, p.responsePacketMagicHeader)
+        assertEquals(0xFFFFFFFFL, p.initPacketMagicHeader)
+        assertEquals(0xFFFFFFFEL, p.responsePacketMagicHeader)
+    }
+
+    @Test
+    fun `H-значения вне диапазона uint32 бросают IllegalArgumentException`() {
+        assertFailsWith<IllegalArgumentException> {
+            AwgParams(
+                initPacketMagicHeader = 0x1_0000_0000L,
+                responsePacketMagicHeader = 2L,
+                cookieReplyMagicHeader = 3L,
+                transportMagicHeader = 4L,
+            )
+        }
+    }
+
+    @Test
+    fun `H-значение ноль запрещено (валидные Magic headers неотрицательны и ненулевые)`() {
+        assertFailsWith<IllegalArgumentException> {
+            AwgParams(
+                initPacketMagicHeader = 0L,
+                responsePacketMagicHeader = 2L,
+                cookieReplyMagicHeader = 3L,
+                transportMagicHeader = 4L,
+            )
+        }
+    }
+
+    @Test
+    fun `дублирующиеся Magic headers запрещены (collision = AWG protocol violation)`() {
+        assertFailsWith<IllegalArgumentException> {
+            AwgParams(
+                initPacketMagicHeader = 1L,
+                responsePacketMagicHeader = 1L,
+                cookieReplyMagicHeader = 3L,
+                transportMagicHeader = 4L,
+            )
+        }
+    }
+
+    @Test
+    fun `Jc вне диапазона 0_128 бросает IllegalArgumentException`() {
+        assertFailsWith<IllegalArgumentException> {
+            AwgParams(junkPacketCount = 200)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            AwgParams(junkPacketCount = -1)
+        }
+    }
+
+    @Test
+    fun `Jmax вне диапазона 0_1500 бросает IllegalArgumentException`() {
+        assertFailsWith<IllegalArgumentException> {
+            AwgParams(junkPacketMinSize = 0, junkPacketMaxSize = 2000)
+        }
+    }
+
+    @Test
+    fun `S1 вне диапазона 0_1500 бросает IllegalArgumentException`() {
+        assertFailsWith<IllegalArgumentException> {
+            AwgParams(initPacketJunkSize = 9999)
+        }
     }
 
     @Test

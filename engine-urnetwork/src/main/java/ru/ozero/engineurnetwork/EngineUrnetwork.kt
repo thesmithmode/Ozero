@@ -1,9 +1,16 @@
 package ru.ozero.engineurnetwork
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import ru.ozero.engineurnetwork.auth.ClientJwtResult
 import ru.ozero.engineurnetwork.auth.GuestJwtResult
 import ru.ozero.engineurnetwork.auth.UrnetworkAuthService
@@ -19,12 +26,17 @@ import ru.ozero.enginescore.TunAttachResult
 import ru.ozero.enginescore.TunFdAcceptor
 import ru.ozero.enginescore.TunSpec
 import ru.ozero.enginescore.Upstream
+import java.util.concurrent.atomic.AtomicReference
 
 class EngineUrnetwork(
     private val configStore: UrnetworkConfigStore,
     private val sdkBridge: UrnetworkSdkBridge,
     private val authService: UrnetworkAuthService,
+    private val pluginScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    private val statsPollIntervalMs: Long = STATS_POLL_INTERVAL_MS,
 ) : EnginePlugin, TunFdAcceptor {
+
+    private val statsJobRef = AtomicReference<Job?>(null)
 
     override val id = EngineId.URNETWORK
 
@@ -69,6 +81,7 @@ class EngineUrnetwork(
         return when (bridgeResult) {
             UrnetworkSdkBridge.StartResult.Success -> {
                 PersistentLoggers.info(TAG, "started OK")
+                startStatsPolling()
                 StartResult.Success(socksPort = config.socksPort)
             }
             is UrnetworkSdkBridge.StartResult.Failed -> {
@@ -80,7 +93,25 @@ class EngineUrnetwork(
 
     override suspend fun stop() {
         PersistentLoggers.info(TAG, "stop")
+        statsJobRef.getAndSet(null)?.cancel()
+        _stats.value = EngineStats()
         sdkBridge.stop()
+    }
+
+    private fun startStatsPolling() {
+        statsJobRef.getAndSet(null)?.cancel()
+        val sessionStart = System.currentTimeMillis()
+        val job = pluginScope.launch {
+            while (true) {
+                val peers = runCatching { sdkBridge.peerCount() }.getOrDefault(0)
+                _stats.value = EngineStats(
+                    activeConnections = peers,
+                    connectedSince = sessionStart,
+                )
+                delay(statsPollIntervalMs)
+            }
+        }
+        statsJobRef.set(job)
     }
 
     override suspend fun probe(): ProbeResult =
@@ -146,10 +177,16 @@ class EngineUrnetwork(
         }
     }
 
+    fun shutdown() {
+        statsJobRef.getAndSet(null)?.cancel()
+        pluginScope.cancel()
+    }
+
     private companion object {
         const val TAG = "EngineUrnetwork"
         const val WALLET_LOG_PREFIX_LEN = 6
         const val TUN_MTU = 1440
         const val TUN_PREFIX = 32
+        const val STATS_POLL_INTERVAL_MS = 2_000L
     }
 }

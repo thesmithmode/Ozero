@@ -21,7 +21,6 @@ object PublicDnsServers {
     val ALL: List<String> = IPV4 + IPV6
 
     val DOH_ENDPOINTS: List<String> = listOf(
-        "https://dns.google/dns-query",
         "https://cloudflare-dns.com/dns-query",
         "https://dns.quad9.net/dns-query",
     )

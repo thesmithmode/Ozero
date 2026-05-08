@@ -80,7 +80,7 @@ class AutoStrategyPicker(
             runCatching { byeDpiEngine.stop() }
             return StrategyScore(
                 strategy = strategy,
-                totalProbes = sites.size,
+                totalProbes = 0,
                 successCount = 0,
                 avgDurationMs = 0L,
             )

@@ -85,19 +85,22 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private suspend fun restartVpnIfConnected(reason: String) {
+        if (viewModel.state.value !is TunnelState.Connected) return
+        AppLogger.i(TAG, reason)
+        vpnIntentLauncher.stop()
+        withTimeoutOrNull(5_000L) {
+            viewModel.state.first { it is TunnelState.Idle || it is TunnelState.Failed }
+        }
+        vpnIntentLauncher.start()
+    }
+
     private fun observeLiveEngineSettingsChanges() {
         val observer = EngineSettingsRestartObserver(
             settingsFlow = settingsRepository.settings,
             vpnStateProvider = { viewModel.state.value },
             onRestartConnected = { snapshot ->
-                AppLogger.i(TAG, "engine settings changed while connected → restart $snapshot")
-                vpnIntentLauncher.stop()
-                withTimeoutOrNull(5_000L) {
-                    viewModel.state.first {
-                        it is TunnelState.Idle || it is TunnelState.Failed
-                    }
-                }
-                vpnIntentLauncher.start()
+                restartVpnIfConnected("engine settings changed while connected → restart $snapshot")
             },
         )
         lifecycleScope.launch(safeUiCoroutineHandler) {
@@ -115,14 +118,7 @@ class MainActivity : AppCompatActivity() {
                 .drop(1)
                 .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
                 .collect {
-                    if (viewModel.state.value is TunnelState.Connected) {
-                        AppLogger.i(TAG, "WARP active slot changed while connected → restart")
-                        vpnIntentLauncher.stop()
-                        withTimeoutOrNull(5_000L) {
-                            viewModel.state.first { s -> s is TunnelState.Idle || s is TunnelState.Failed }
-                        }
-                        vpnIntentLauncher.start()
-                    }
+                    restartVpnIfConnected("WARP active slot changed while connected → restart")
                 }
         }
     }

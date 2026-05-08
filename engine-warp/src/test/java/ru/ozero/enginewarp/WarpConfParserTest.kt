@@ -165,4 +165,34 @@ class WarpConfParserTest {
         assertEquals("", cfg.publicKey)
         assertEquals("", cfg.accountLicense)
     }
+
+    @Test
+    fun `parse отклоняет conf с дублирующимися Magic headers (AWG protocol violation)`() {
+        val malicious = validConf
+            .replace("H1 = 1", "H1 = 7")
+            .replace("H2 = 2", "H2 = 7")
+        val result = WarpConfParser.parse(malicious)
+        assertTrue(result.isFailure, "дублирующиеся H1=H2 должны давать failure (AwgParams.init)")
+    }
+
+    @Test
+    fun `parse отклоняет conf с Jc вне диапазона (DoS prevention)`() {
+        val malicious = validConf.replace("Jc = 5", "Jc = 999999")
+        val result = WarpConfParser.parse(malicious)
+        assertTrue(result.isFailure, "Jc вне 0..128 должен давать failure")
+    }
+
+    @Test
+    fun `parse отклоняет conf с Jmax вне диапазона`() {
+        val malicious = validConf.replace("Jmax = 200", "Jmax = 999999")
+        val result = WarpConfParser.parse(malicious)
+        assertTrue(result.isFailure, "Jmax вне 0..1500 должен давать failure")
+    }
+
+    @Test
+    fun `parse отклоняет conf с H1=0 (out of HEADER_RANGE)`() {
+        val malicious = validConf.replace("H1 = 1", "H1 = 0")
+        val result = WarpConfParser.parse(malicious)
+        assertTrue(result.isFailure, "H1=0 не в HEADER_RANGE 1..uint32_max")
+    }
 }

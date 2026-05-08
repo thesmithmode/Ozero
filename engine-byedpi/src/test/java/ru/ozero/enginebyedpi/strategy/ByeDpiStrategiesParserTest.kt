@@ -80,6 +80,20 @@ class ByeDpiStrategiesParserTest {
     }
 
     @Test
+    fun `parse skips comment lines starting with hash`() {
+        val result = ByeDpiStrategiesParser.parse("# comment\n-d1 -a1\n# another comment\n-o2 -a1")
+        assertEquals(2, result.size)
+        assertEquals("-d1 -a1", result[0].command)
+        assertEquals("-o2 -a1", result[1].command)
+    }
+
+    @Test
+    fun `parse skips hash-only line`() {
+        val result = ByeDpiStrategiesParser.parse("#\n-d1 -a1")
+        assertEquals(1, result.size)
+    }
+
+    @Test
     fun `default constants`() {
         assertEquals("google.com", ByeDpiStrategiesParser.DEFAULT_SNI)
         assertEquals(75, ByeDpiStrategiesParser.EXPECTED_COUNT)

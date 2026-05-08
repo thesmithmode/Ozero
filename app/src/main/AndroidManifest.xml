@@ -53,6 +53,14 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".selfupdate.UpdateInstallResultReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="ru.ozero.app.UPDATE_INSTALL_RESULT" />
+            </intent-filter>
+        </receiver>
+
         <!-- отключаем default WorkManager auto-init, используем custom Configuration.Provider в OzeroApp -->
         <provider
             android:name="androidx.startup.InitializationProvider"

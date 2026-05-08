@@ -12,19 +12,21 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.enginescore.EngineCapabilities
-import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.EngineConfig
+import ru.ozero.enginescore.EnginePreflight
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.EngineStats
+import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.probe.Socks5HandshakeProbe
+import ru.ozero.enginescore.settings.HostsMode
 import java.util.concurrent.atomic.AtomicReference
 
 class ByeDpiEngine(
-    private val proxy: ByeDpiProxy = ByeDpiProxy(),
+    private val proxy: ByeDpiProxyContract = ByeDpiProxy(),
 ) : EnginePlugin {
 
     override val id = EngineId.BYEDPI
@@ -69,9 +71,7 @@ class ByeDpiEngine(
         }
         proxyJobRef.getAndSet(proxyJob)?.cancel()
 
-        val readyAt = withContext(Dispatchers.IO) {
-            waitSocksReady(config.socksPort)
-        }
+        val readyAt = waitSocksReady(config.socksPort)
         return if (readyAt > 0) {
             activeSocksPort = config.socksPort
             PersistentLoggers.info(TAG, "started OK socksPort=${config.socksPort} readyMs=$readyAt")
@@ -139,7 +139,7 @@ class ByeDpiEngine(
 
     override fun stats(): Flow<EngineStats> = _stats.asStateFlow()
 
-    override fun preflight(): ru.ozero.enginescore.EnginePreflight = ByeDpiPreflight()
+    override fun preflight(): EnginePreflight = ByeDpiPreflight()
 
     internal fun buildArgs(config: EngineConfig.ByeDpi): Array<String> {
         val extra =
@@ -154,14 +154,14 @@ class ByeDpiEngine(
     }
 
     internal fun buildHostsArgs(config: EngineConfig.ByeDpi): List<String> {
-        if (config.hostsMode == ru.ozero.enginescore.settings.HostsMode.DISABLED) return emptyList()
+        if (config.hostsMode == HostsMode.DISABLED) return emptyList()
         val cleaned = config.hosts.map { it.trim() }.filter { it.isNotEmpty() }
         if (cleaned.isEmpty()) return emptyList()
         val hostStr = ":" + cleaned.joinToString(" ")
         return when (config.hostsMode) {
-            ru.ozero.enginescore.settings.HostsMode.BLACKLIST -> listOf("-H$hostStr", "-An")
-            ru.ozero.enginescore.settings.HostsMode.WHITELIST -> listOf("-H$hostStr")
-            ru.ozero.enginescore.settings.HostsMode.DISABLED -> emptyList()
+            HostsMode.BLACKLIST -> listOf("-H$hostStr", "-An")
+            HostsMode.WHITELIST -> listOf("-H$hostStr")
+            HostsMode.DISABLED -> emptyList()
         }
     }
 

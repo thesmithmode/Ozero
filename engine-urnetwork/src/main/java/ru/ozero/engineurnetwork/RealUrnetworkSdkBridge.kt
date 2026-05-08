@@ -8,15 +8,20 @@ import com.bringyour.sdk.IoLoop
 import com.bringyour.sdk.IoLoopDoneCallback
 import com.bringyour.sdk.LocationsViewController
 import com.bringyour.sdk.Sdk
+import com.bringyour.sdk.SubscriptionBalanceCallback
 import com.bringyour.sdk.WalletViewController
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.enginescore.PersistentLoggers
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.coroutines.resume
 
 class RealUrnetworkSdkBridge(
     private val app: Application,
+    private val appVersion: String = DEFAULT_APP_VERSION,
 ) : UrnetworkSdkBridge {
 
     private val deviceRef = AtomicReference<DeviceLocal?>(null)
@@ -24,7 +29,9 @@ class RealUrnetworkSdkBridge(
     private val connectVcRef = AtomicReference<ConnectViewController?>(null)
     private val walletVcRef = AtomicReference<WalletViewController?>(null)
     private val unpaidBytesRef = AtomicReference(0L)
-    private val running = AtomicReference(false)
+    private val subscriptionBalanceRef =
+        AtomicReference<UrnetworkSdkBridge.SubscriptionBalanceSnapshot?>(null)
+    private val running = AtomicBoolean(false)
 
     override suspend fun start(
         walletAddress: String,
@@ -72,9 +79,9 @@ class RealUrnetworkSdkBridge(
             Sdk.newDeviceLocalWithDefaults(
                 space,
                 byClientJwt,
-                DEVICE_DESCRIPTION,
-                DEVICE_SPEC,
-                APP_VERSION,
+                UrnetworkDefaults.DEVICE_DESCRIPTION,
+                UrnetworkDefaults.DEVICE_SPEC,
+                appVersion,
                 instanceId,
                 false,
             )
@@ -119,28 +126,31 @@ class RealUrnetworkSdkBridge(
 
     override suspend fun stop() {
         running.set(false)
-        withContext(Dispatchers.Main.immediate) {
-            walletVcRef.getAndSet(null)?.also { vc ->
-                runCatching { vc.close() }
-                    .onFailure { PersistentLoggers.warn(TAG, "walletVc.close threw: ${it.message}") }
+        val completed = withTimeoutOrNull(STOP_TIMEOUT_MS) {
+            withContext(Dispatchers.Main.immediate) {
+                walletVcRef.getAndSet(null)?.also { vc ->
+                    runCatching { vc.close() }
+                        .onFailure { PersistentLoggers.warn(TAG, "walletVc.close threw: ${it.message}") }
+                }
+                connectVcRef.getAndSet(null)?.also { vc ->
+                    runCatching { vc.disconnect() }
+                        .onFailure { PersistentLoggers.warn(TAG, "connectVc.disconnect threw: ${it.message}") }
+                    runCatching { vc.close() }
+                        .onFailure { PersistentLoggers.warn(TAG, "connectVc.close threw: ${it.message}") }
+                }
+                val hadLoop = ioLoopRef.getAndSet(null)?.also { loop ->
+                    runCatching { loop.close() }
+                        .onFailure { PersistentLoggers.warn(TAG, "ioLoop.close threw: ${it.message}") }
+                } != null
+                if (!hadLoop) {
+                    deviceRef.getAndSet(null)?.also { device -> closeDevice(device) }
+                } else {
+                    deviceRef.set(null)
+                }
             }
-            connectVcRef.getAndSet(null)?.also { vc ->
-                runCatching { vc.disconnect() }
-                    .onFailure { PersistentLoggers.warn(TAG, "connectVc.disconnect threw: ${it.message}") }
-                runCatching { vc.close() }
-                    .onFailure { PersistentLoggers.warn(TAG, "connectVc.close threw: ${it.message}") }
-            }
-            val hadLoop = ioLoopRef.getAndSet(null)?.also { loop ->
-                runCatching { loop.close() }
-                    .onFailure { PersistentLoggers.warn(TAG, "ioLoop.close threw: ${it.message}") }
-            } != null
-            if (!hadLoop) {
-                deviceRef.getAndSet(null)?.also { device -> closeDevice(device) }
-            } else {
-                // IoLoop still running its goroutines — IoLoopDoneCallback will close device
-                // after Go runtime finishes; closing device here = use-after-free → SIGABRT
-                deviceRef.set(null)
-            }
+        }
+        if (completed == null) {
+            PersistentLoggers.warn(TAG, "stop timed out after ${STOP_TIMEOUT_MS}ms — refs cleared")
         }
         PersistentLoggers.info(TAG, "stop complete")
     }
@@ -193,6 +203,61 @@ class RealUrnetworkSdkBridge(
             .onFailure { PersistentLoggers.warn(TAG, "fetchTransferStats threw: ${it.message}") }
     }
 
+    override suspend fun fetchSubscriptionBalance(): UrnetworkSdkBridge.SubscriptionBalanceSnapshot? {
+        val device = deviceRef.get() ?: return null
+        val api = runCatching { device.api }.getOrNull() ?: run {
+            PersistentLoggers.warn(TAG, "device.api is null — cannot fetch subscription balance")
+            return null
+        }
+        val cached = subscriptionBalanceRef.get()
+        val snapshot = withTimeoutOrNull(SUBSCRIPTION_BALANCE_TIMEOUT_MS) {
+            suspendCancellableCoroutine<UrnetworkSdkBridge.SubscriptionBalanceSnapshot?> { cont ->
+                val resumed = AtomicBoolean(false)
+                val callback = SubscriptionBalanceCallback { result, err ->
+                    if (!resumed.compareAndSet(false, true)) return@SubscriptionBalanceCallback
+                    if (err != null || result == null) {
+                        PersistentLoggers.warn(TAG, "subscriptionBalance err=${err?.message}")
+                        cont.resume(null)
+                        return@SubscriptionBalanceCallback
+                    }
+                    val balance = runCatching { result.balanceByteCount }.getOrDefault(0L)
+                    val pending = runCatching { result.openTransferByteCount }.getOrDefault(0L)
+                    val startBalance = runCatching { result.startBalanceByteCount }.getOrDefault(0L)
+                    val sub = runCatching { result.currentSubscription }.getOrNull()
+                    val plan = runCatching { sub?.plan }.getOrNull()
+                    val store = runCatching { sub?.store }.getOrNull()
+                    val used = startBalance - balance - pending
+                    cont.resume(
+                        UrnetworkSdkBridge.SubscriptionBalanceSnapshot(
+                            balanceBytes = balance,
+                            pendingBytes = pending,
+                            startBalanceBytes = startBalance,
+                            usedBytes = used,
+                            plan = plan,
+                            store = store,
+                        ),
+                    )
+                }
+                runCatching { api.subscriptionBalance(callback) }.onFailure { t ->
+                    if (resumed.compareAndSet(false, true)) {
+                        PersistentLoggers.warn(TAG, "subscriptionBalance threw: ${t.message}")
+                        cont.resume(null)
+                    }
+                }
+            }
+        }
+        return when {
+            snapshot != null -> {
+                subscriptionBalanceRef.set(snapshot)
+                snapshot
+            }
+            else -> {
+                PersistentLoggers.warn(TAG, "subscriptionBalance timeout/null — using cached=${cached != null}")
+                cached
+            }
+        }
+    }
+
     override suspend fun attachTun(tunFd: Int): UrnetworkSdkBridge.AttachResult {
         if (tunFd < 0) {
             return UrnetworkSdkBridge.AttachResult.Failed("invalid fd=$tunFd")
@@ -237,8 +302,8 @@ class RealUrnetworkSdkBridge(
     private companion object {
         const val TAG = "RealUrnetworkSdkBridge"
         const val SDK_INIT_TIMEOUT_MS = 30_000L
-        const val DEVICE_DESCRIPTION = "Ozero VPN Android"
-        const val DEVICE_SPEC = "android"
-        const val APP_VERSION = "0.0.2"
+        const val SUBSCRIPTION_BALANCE_TIMEOUT_MS = 10_000L
+        const val STOP_TIMEOUT_MS = 3_000L
+        const val DEFAULT_APP_VERSION = "0.0.2"
     }
 }

@@ -21,6 +21,9 @@
     <string name="main_health_degraded">Соединение нестабильно</string>
     <string name="urnetwork_peer_count_label">Пиры: %1$d</string>
     <string name="urnetwork_provider_unpaid">Невыплаченный трафик: %1$.2f MB</string>
+    <string name="urnetwork_consumed_label">Потреблено</string>
+    <string name="urnetwork_consumed_format">%1$s из %2$s MB</string>
+    <string name="urnetwork_pending_label">В пути: %1$s MB</string>
 
     <!-- Tabs -->
     <string name="tab_main">Главная</string>

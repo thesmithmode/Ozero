@@ -44,7 +44,7 @@ class ChainOrchestrator(
                     return@withLock rollback(idx, r.reason)
                 }
                 is StartResult.Success -> {
-                    started.add(plugin)
+                    synchronized(started) { started.add(plugin) }
                     lastSocksPort = r.socksPort
                     upstream = Upstream.Socks5(host = LOOPBACK, port = r.socksPort)
                     PersistentLoggers.info(TAG, "step[$idx] ${step.engineId} success socksPort=${r.socksPort}")
@@ -58,15 +58,18 @@ class ChainOrchestrator(
         stopInternal()
     }
 
+    fun activeEngines(): List<EnginePlugin> = synchronized(started) { started.toList() }
+
     private suspend fun rollback(failedAt: Int, reason: String): ChainResult.Failure {
-        val rolledBack = started.size
+        val rolledBack = synchronized(started) { started.size }
         stopInternal()
         return ChainResult.Failure(failedAtIndex = failedAt, reason = reason, rolledBack = rolledBack)
     }
 
     private suspend fun stopInternal() {
-        val snapshot = started.toList().asReversed()
-        started.clear()
+        val snapshot = synchronized(started) {
+            started.toList().asReversed().also { started.clear() }
+        }
         snapshot.forEach { plugin ->
             try {
                 plugin.stop()

@@ -188,6 +188,23 @@ class AppBackupManagerTest {
     }
 
     @Test
+    fun `import — пустые split rules — существующие не стираются`() = runTest {
+        splitDao.rules.value = listOf(AppSplitRule("com.existing", true))
+        manager.import(makeMinimalBackup().copy(splitRules = emptyList()))
+        assertEquals(1, splitDao.rules.value.size)
+        assertEquals("com.existing", splitDao.rules.value[0].packageName)
+    }
+
+    @Test
+    fun `import — null URnetwork поля — существующие не перезаписываются`() = runTest {
+        urnStore.walletOverride = "existing-wallet"
+        urnStore.byJwt = "existing-jwt"
+        manager.import(makeMinimalBackup().copy(urnetwork = BackupUrnetwork(walletOverride = null, byJwt = null)))
+        assertEquals("existing-wallet", urnStore.walletOverride)
+        assertEquals("existing-jwt", urnStore.byJwt)
+    }
+
+    @Test
     fun `import — split rules — удаляет отсутствующие, добавляет новые`() = runTest {
         splitDao.rules.value = listOf(
             AppSplitRule("com.old", true),

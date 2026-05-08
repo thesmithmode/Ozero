@@ -7,6 +7,7 @@ import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import ru.ozero.enginebyedpi.ByeDpiEngine
 import ru.ozero.enginebyedpi.ByeDpiProxy
+import ru.ozero.enginebyedpi.ByeDpiProxyContract
 import ru.ozero.enginescore.EnginePlugin
 import javax.inject.Singleton
 
@@ -16,11 +17,11 @@ object EnginesModule {
 
     @Provides
     @Singleton
-    fun provideByeDpiProxy(): ByeDpiProxy = ByeDpiProxy()
+    fun provideByeDpiProxy(): ByeDpiProxyContract = ByeDpiProxy()
 
     @Provides
     @Singleton
-    fun provideByeDpiEngineDirect(proxy: ByeDpiProxy): ByeDpiEngine = ByeDpiEngine(proxy)
+    fun provideByeDpiEngineDirect(proxy: ByeDpiProxyContract): ByeDpiEngine = ByeDpiEngine(proxy)
 
     @Provides
     @Singleton

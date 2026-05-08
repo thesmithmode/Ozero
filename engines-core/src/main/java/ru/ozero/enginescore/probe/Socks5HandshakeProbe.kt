@@ -1,8 +1,8 @@
 package ru.ozero.enginescore.probe
 
-import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import ru.ozero.enginescore.PersistentLoggers
 import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Socket
@@ -24,7 +24,7 @@ object Socks5HandshakeProbe {
                 try {
                     socket.connect(InetSocketAddress(host, port), timeoutMs)
                 } catch (e: IOException) {
-                    Log.w(TAG, "connect failed $host:$port: ${e.message}")
+                    PersistentLoggers.warn(TAG, "connect failed $host:$port: ${e.message}")
                     throw e
                 }
 
@@ -38,9 +38,7 @@ object Socks5HandshakeProbe {
                 if (ver != 0x05) throw IOException("bad SOCKS version in response: $ver")
                 if (method == 0xFF) throw IOException("server rejected all auth methods")
                 if (method != 0x00) throw IOException("unsupported method=$method (expected 0x00)")
-                val latency = System.currentTimeMillis() - started
-                Log.d(TAG, "ok $host:$port latency=${latency}ms")
-                latency
+                System.currentTimeMillis() - started
             }
         }
 }

@@ -100,5 +100,6 @@ class UrnetworkConsentSentinelTest {
         override fun peerCount(): Int = 0
         override fun unpaidByteCount(): Long = 0L
         override fun fetchTransferStats() = Unit
+        override suspend fun fetchSubscriptionBalance(): UrnetworkSdkBridge.SubscriptionBalanceSnapshot? = null
     }
 }

@@ -62,8 +62,8 @@ class CrashLogStore(
 
     companion object {
         const val DIR_NAME: String = "crashes"
-        const val TAG: String = "CrashLogStore"
         const val MAX_FILES: Int = 10
+        private const val TAG: String = "CrashLogStore"
 
         private val USERINFO_URI = Regex(
             "(?i)(\\w+)://([^:/@\\s]+(?::[^@\\s]*)?)@([^\\s/]+)",

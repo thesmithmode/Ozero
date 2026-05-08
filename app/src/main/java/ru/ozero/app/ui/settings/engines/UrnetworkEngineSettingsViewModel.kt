@@ -54,7 +54,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
             emit(bridge.peerCount())
             delay(PEER_COUNT_POLL_MS)
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(PEER_COUNT_KEEP_ALIVE_MS), 0)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(POLLER_KEEP_ALIVE_MS), 0)
 
     val unpaidBytes: StateFlow<Long> = flow {
         while (true) {
@@ -62,9 +62,16 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
             emit(bridge.unpaidByteCount())
             delay(PROVIDER_STATS_POLL_MS)
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(PEER_COUNT_KEEP_ALIVE_MS), 0L)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(POLLER_KEEP_ALIVE_MS), 0L)
 
-    private var locationsVc: LocationsViewController? = null
+    val subscriptionBalance: StateFlow<UrnetworkSdkBridge.SubscriptionBalanceSnapshot?> = flow {
+        while (true) {
+            emit(bridge.fetchSubscriptionBalance())
+            delay(SUBSCRIPTION_BALANCE_POLL_MS)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(POLLER_KEEP_ALIVE_MS), null)
+
+    @Volatile private var locationsVc: LocationsViewController? = null
     private var allCountries: List<UrnetworkLocationItem> = emptyList()
 
     init {
@@ -181,8 +188,9 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
 
     companion object {
         private const val PEER_COUNT_POLL_MS = 2_000L
-        private const val PEER_COUNT_KEEP_ALIVE_MS = 5_000L
         private const val PROVIDER_STATS_POLL_MS = 30_000L
+        private const val SUBSCRIPTION_BALANCE_POLL_MS = 60_000L
+        private const val POLLER_KEEP_ALIVE_MS = 5_000L
 
         fun countryCodeToFlag(code: String): String {
             if (code.length != 2) return ""

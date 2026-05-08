@@ -89,4 +89,27 @@ class HttpUrlConnectionClientTest {
         assertTrue(result.isSuccess)
         assertEquals("""{"created":true}""", result.getOrThrow())
     }
+
+    @Test
+    fun `postJson отклоняет ответ больше 512KB чтобы предотвратить OOM`() = runTest {
+        val tooLarge = "x".repeat(600_000)
+        server.enqueue(MockResponse().setResponseCode(200).setBody(tooLarge))
+        val url = server.url("/api/warp").toString()
+        val result = client.postJson(url, "{}", "ua")
+        assertTrue(result.isFailure, "ответ >512KB обязан давать failure (DoS prevention)")
+        val message = result.exceptionOrNull()?.message.orEmpty()
+        assertTrue(
+            message.contains("too large") || message.contains("524288"),
+            "сообщение об ошибке должно указывать на превышение лимита: $message",
+        )
+    }
+
+    @Test
+    fun `postJson принимает ответ 512KB ровно (пограничное значение)`() = runTest {
+        val maxBody = "y".repeat(524_288)
+        server.enqueue(MockResponse().setResponseCode(200).setBody(maxBody))
+        val url = server.url("/api/warp").toString()
+        val result = client.postJson(url, "{}", "ua")
+        assertTrue(result.isSuccess, "ответ ровно 512KB должен проходить (граница включительно)")
+    }
 }

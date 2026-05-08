@@ -6,7 +6,7 @@ class StatsStagnationMonitor(
 ) {
     private var lastTxBytes: Long = 0L
     private var lastRxBytes: Long = 0L
-    private var lastChangeMs: Long = 0L
+    private var lastChangeMs: Long = nowMs()
 
     fun reset() {
         lastTxBytes = 0L
@@ -19,10 +19,6 @@ class StatsStagnationMonitor(
         if (txBytes != lastTxBytes || rxBytes != lastRxBytes) {
             lastTxBytes = txBytes
             lastRxBytes = rxBytes
-            lastChangeMs = now
-            return false
-        }
-        if (lastChangeMs == 0L) {
             lastChangeMs = now
             return false
         }

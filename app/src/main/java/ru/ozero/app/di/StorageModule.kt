@@ -25,12 +25,15 @@ object StorageModule {
     ): OzeroDatabase = OzeroDatabase.create(context)
 
     @Provides
+    @Singleton
     fun provideServerDao(database: OzeroDatabase): ServerDao = database.serverDao()
 
     @Provides
+    @Singleton
     fun provideAppSplitRuleDao(database: OzeroDatabase): AppSplitRuleDao = database.appSplitRuleDao()
 
     @Provides
+    @Singleton
     fun provideSessionStatsDao(database: OzeroDatabase): SessionStatsDao = database.sessionStatsDao()
 }
 

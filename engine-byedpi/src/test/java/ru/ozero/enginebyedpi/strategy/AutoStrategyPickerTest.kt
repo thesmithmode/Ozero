@@ -143,6 +143,7 @@ class AutoStrategyPickerTest {
         assertEquals("-ok", success.winner.strategy.command)
         val failedScore = success.ranked.find { it.strategy.command == "-fail" }
         assertEquals(0, failedScore?.successCount, "fail strategy → 0 success")
+        assertEquals(0, failedScore?.totalProbes, "fail strategy start → totalProbes=0, не sites.size")
     }
 
     @Test

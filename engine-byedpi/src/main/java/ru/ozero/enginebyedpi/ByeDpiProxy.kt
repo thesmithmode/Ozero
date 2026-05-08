@@ -2,19 +2,25 @@ package ru.ozero.enginebyedpi
 
 import ru.ozero.enginescore.PersistentLoggers
 
-open class ByeDpiProxy {
+interface ByeDpiProxyContract {
+    fun startProxy(args: Array<String>): Int
+    fun stopProxy(): Int
+    fun forceClose(): Int
+}
 
-    external fun jniStartProxy(args: Array<String>): Int
+class ByeDpiProxy : ByeDpiProxyContract {
 
-    external fun jniStopProxy(): Int
+    private external fun jniStartProxy(args: Array<String>): Int
 
-    external fun jniForceClose(): Int
+    private external fun jniStopProxy(): Int
 
-    open fun startProxy(args: Array<String>): Int = jniStartProxy(args)
+    private external fun jniForceClose(): Int
 
-    open fun stopProxy(): Int = jniStopProxy()
+    override fun startProxy(args: Array<String>): Int = jniStartProxy(args)
 
-    open fun forceClose(): Int = jniForceClose()
+    override fun stopProxy(): Int = jniStopProxy()
+
+    override fun forceClose(): Int = jniForceClose()
 
     companion object {
         private const val TAG = "ByeDpiProxy"

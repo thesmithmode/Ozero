@@ -10,6 +10,7 @@ import com.bringyour.sdk.NetworkCreateResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import ru.ozero.engineurnetwork.UrnetworkDefaults
 import ru.ozero.engineurnetwork.UrnetworkRuntime
 import ru.ozero.enginescore.PersistentLoggers
 import kotlin.coroutines.resume
@@ -65,8 +66,8 @@ class RealUrnetworkAuthService(
             .onFailure { PersistentLoggers.warn(TAG, "set localState.byJwt threw: ${it.message}") }
         suspendCancellableCoroutine<ClientJwtResult> { cont ->
             val args = AuthNetworkClientArgs().apply {
-                description = DEVICE_DESCRIPTION
-                deviceSpec = DEVICE_SPEC
+                description = UrnetworkDefaults.DEVICE_DESCRIPTION
+                deviceSpec = UrnetworkDefaults.DEVICE_SPEC
             }
             val callback = AuthNetworkClientCallback { result: AuthNetworkClientResult?, err: Exception? ->
                 when {
@@ -96,7 +97,5 @@ class RealUrnetworkAuthService(
 
     private companion object {
         const val TAG = "RealUrnetworkAuthService"
-        const val DEVICE_DESCRIPTION = "Ozero VPN Android"
-        const val DEVICE_SPEC = "android"
     }
 }

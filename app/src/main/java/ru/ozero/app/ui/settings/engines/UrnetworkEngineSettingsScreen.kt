@@ -61,7 +61,8 @@ fun UrnetworkEngineSettingsScreen(
             )
         },
     ) { padding ->
-        when (state) {
+        val current = state
+        when (current) {
             UrnetworkSettingsUiState.Loading -> {
                 Column(
                     modifier = Modifier.fillMaxSize().padding(padding),
@@ -90,17 +91,18 @@ fun UrnetworkEngineSettingsScreen(
                 }
             }
             is UrnetworkSettingsUiState.Ready -> {
-                val ready = state as UrnetworkSettingsUiState.Ready
                 val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
                 val peerCount by viewModel.peerCount.collectAsStateWithLifecycle()
                 val unpaidBytes by viewModel.unpaidBytes.collectAsStateWithLifecycle()
+                val balance by viewModel.subscriptionBalance.collectAsStateWithLifecycle()
                 LocationListContent(
                     modifier = Modifier.padding(padding),
-                    countries = ready.countries,
-                    selectedLocation = ready.selectedLocation,
-                    providePaused = ready.providePaused,
+                    countries = current.countries,
+                    selectedLocation = current.selectedLocation,
+                    providePaused = current.providePaused,
                     peerCount = peerCount,
                     unpaidBytes = unpaidBytes,
+                    balance = balance,
                     searchQuery = searchQuery,
                     onSearchQueryChange = viewModel::setSearchQuery,
                     onSelect = viewModel::selectLocation,
@@ -120,6 +122,7 @@ private fun LocationListContent(
     providePaused: Boolean,
     peerCount: Int,
     unpaidBytes: Long,
+    balance: ru.ozero.engineurnetwork.UrnetworkSdkBridge.SubscriptionBalanceSnapshot?,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     onSelect: (ConnectLocation?) -> Unit,
@@ -161,6 +164,7 @@ private fun LocationListContent(
                 if (!providePaused) {
                     ProviderStatsRow(unpaidBytes = unpaidBytes)
                 }
+                ConsumerStatsBlock(balance = balance)
                 Text(
                     text = stringResource(R.string.urnetwork_location_title),
                     style = MaterialTheme.typography.titleSmall,
@@ -258,6 +262,41 @@ private fun ProviderStatsRow(unpaidBytes: Long) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(top = 4.dp),
     )
+}
+
+@Composable
+private fun ConsumerStatsBlock(
+    balance: ru.ozero.engineurnetwork.UrnetworkSdkBridge.SubscriptionBalanceSnapshot?,
+) {
+    if (balance == null || balance.startBalanceBytes <= 0L) return
+    val usedMb = balance.usedBytes.coerceAtLeast(0L) / 1_000_000.0
+    val totalMb = balance.startBalanceBytes / 1_000_000.0
+    val pendingMb = balance.pendingBytes / 1_000_000.0
+    Column(modifier = Modifier.padding(top = 8.dp)) {
+        Text(
+            text = stringResource(R.string.urnetwork_consumed_label),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = stringResource(
+                R.string.urnetwork_consumed_format,
+                String.format(java.util.Locale.US, "%.2f", usedMb),
+                String.format(java.util.Locale.US, "%.2f", totalMb),
+            ),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        if (balance.pendingBytes > 0L) {
+            Text(
+                text = stringResource(
+                    R.string.urnetwork_pending_label,
+                    String.format(java.util.Locale.US, "%.2f", pendingMb),
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
 }
 
 @Composable

@@ -55,7 +55,10 @@ object UrnetworkModule {
     @Singleton
     fun provideUrnetworkSdkBridge(
         @ApplicationContext context: Context,
-    ): UrnetworkSdkBridge = RealUrnetworkSdkBridge(context.applicationContext as Application)
+    ): UrnetworkSdkBridge = RealUrnetworkSdkBridge(
+        app = context.applicationContext as Application,
+        appVersion = ru.ozero.app.BuildConfig.VERSION_NAME,
+    )
 
     @Provides
     @Singleton

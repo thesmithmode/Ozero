@@ -27,6 +27,17 @@ interface UrnetworkSdkBridge {
     fun unpaidByteCount(): Long
     fun fetchTransferStats()
 
+    suspend fun fetchSubscriptionBalance(): SubscriptionBalanceSnapshot?
+
+    data class SubscriptionBalanceSnapshot(
+        val balanceBytes: Long,
+        val pendingBytes: Long,
+        val startBalanceBytes: Long,
+        val usedBytes: Long,
+        val plan: String?,
+        val store: String?,
+    )
+
     sealed class StartResult {
         data object Success : StartResult()
         data class Failed(val reason: String) : StartResult()

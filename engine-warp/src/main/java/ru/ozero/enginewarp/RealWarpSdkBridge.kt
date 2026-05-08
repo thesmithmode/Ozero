@@ -2,6 +2,7 @@ package ru.ozero.enginewarp
 
 import android.content.Context
 import com.getkeepsafe.relinker.ReLinker
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.amnezia.awg.GoBackend
@@ -54,6 +55,8 @@ class RealWarpSdkBridge internal constructor(
             }
             PersistentLoggers.info(TAG, "awgTurnOn OK handle=$handle name=$tunnelName")
             WarpSdkBridge.AttachResult.Success
+        } catch (ce: CancellationException) {
+            throw ce
         } catch (t: Throwable) {
             val msg = t.message ?: t.javaClass.simpleName
             PersistentLoggers.error(TAG, "awgTurnOn threw: $msg (${t.javaClass.name})")
@@ -143,16 +146,36 @@ class RealWarpSdkBridge internal constructor(
                 TAG,
                 "INI digest ($tunnelName): bytes=$totalBytes lines=${lines.size} nonEmpty=$nonEmpty keys=$keys",
             )
-            PersistentLoggers.info(TAG, "INI passthrough ($tunnelName):\n${sanitizeIni(ini)}")
+            PersistentLoggers.info(TAG, "INI passthrough ($tunnelName):\n${IniSanitizer.sanitize(ini)}")
         }
+    }
+}
 
-        fun sanitizeIni(ini: String): String = ini.lineSequence().joinToString("\n") { line ->
-            val trimmed = line.trimStart()
-            when {
-                trimmed.startsWith("PrivateKey", ignoreCase = true) -> "PrivateKey = ***"
-                trimmed.startsWith("PresharedKey", ignoreCase = true) -> "PresharedKey = ***"
-                else -> line
-            }
+internal object IniSanitizer {
+    fun sanitize(ini: String): String = ini.lineSequence().joinToString("\n") { line ->
+        val trimmed = line.trimStart()
+        when {
+            trimmed.startsWith("PrivateKey", ignoreCase = true) -> "PrivateKey = ***"
+            trimmed.startsWith("PresharedKey", ignoreCase = true) -> "PresharedKey = ***"
+            trimmed.startsWith("PublicKey", ignoreCase = true) -> redactKey(line, "PublicKey")
+            trimmed.startsWith("Endpoint", ignoreCase = true) -> redactEndpoint(line)
+            else -> line
+        }
+    }
+
+    private fun redactKey(line: String, name: String): String {
+        val value = line.substringAfter('=').trim()
+        val tail = value.takeLast(8).ifEmpty { "***" }
+        return "$name = ***$tail"
+    }
+
+    private fun redactEndpoint(line: String): String {
+        val value = line.substringAfter('=').trim()
+        val port = value.substringAfterLast(':', "")
+        return if (port.isNotEmpty() && port.all { it.isDigit() }) {
+            "Endpoint = ***:$port"
+        } else {
+            "Endpoint = ***"
         }
     }
 }
@@ -162,6 +185,8 @@ interface AwgRuntime {
     fun turnOff(handle: Int)
     fun getSocketV4(handle: Int): Int
     fun getSocketV6(handle: Int): Int
+
+    @Deprecated("awgGetConfig causes SIGSEGV on partial-handshake handle, use only post-disconnect")
     fun getConfig(handle: Int): String? = null
 }
 

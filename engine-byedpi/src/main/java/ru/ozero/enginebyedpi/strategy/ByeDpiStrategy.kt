@@ -11,7 +11,7 @@ object ByeDpiStrategiesParser {
             .replace("{sni}", "\"$sniValue\"")
             .lines()
             .map { it.trim() }
-            .filter { it.isNotEmpty() }
+            .filter { it.isNotEmpty() && !it.startsWith("#") }
             .map { ByeDpiStrategy(command = it) }
 
     const val DEFAULT_SNI: String = "google.com"

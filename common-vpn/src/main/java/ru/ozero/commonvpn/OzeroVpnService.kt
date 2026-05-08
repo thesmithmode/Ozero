@@ -81,7 +81,8 @@ class OzeroVpnService : android.net.VpnService() {
         private const val NATIVE_STOP_TIMEOUT_MS = 3_000L
         private const val SHUTDOWN_JOIN_TIMEOUT_MS = 7_000L
         private const val STATS_SAMPLE_INTERVAL_MS = 1_000L
-        private const val STATS_NOTIFY_LOG_EVERY = 5
+        private const val STATS_LOG_EVERY = 5
+        private const val STATS_NOTIFY_EVERY = 1
         private const val SETTINGS_READ_TIMEOUT_MS = 1_500L
         private const val ON_DESTROY_SHUTDOWN_TIMEOUT_MS = 4_000L
         private const val PREFLIGHT_HARD_TIMEOUT_MS = 7_000L
@@ -211,7 +212,7 @@ class OzeroVpnService : android.net.VpnService() {
         val activeConfig = pick.second
         tunnelController.onProbing(activeEngineId)
         val fd = if (engineNeedsCustomTun(activeEngineId)) {
-            establishTunForEngine(activeEngineId) ?: return
+            establishTunForEngine(activeEngineId, splitConfig) ?: return
         } else {
             establishTun(
                 splitConfig,
@@ -233,7 +234,13 @@ class OzeroVpnService : android.net.VpnService() {
         sessionIdRef.set(
             runCatching { sessionStatsRecorder.startSession(activeEngineId.name, nowMs) }.getOrDefault(-1L),
         )
-        runCatching { healthMonitor.start(chainResult.finalSocksPort) }
+        try {
+            healthMonitor.start(chainResult.finalSocksPort)
+        } catch (ce: kotlinx.coroutines.CancellationException) {
+            throw ce
+        } catch (t: Throwable) {
+            PersistentLoggers.warn(TAG, "healthMonitor.start threw: ${t.message}")
+        }
         startStatsLogger()
     }
 
@@ -242,18 +249,14 @@ class OzeroVpnService : android.net.VpnService() {
         return plugin is ru.ozero.enginescore.TunFdAcceptor
     }
 
-    private suspend fun establishTunForEngine(engineId: EngineId): ParcelFileDescriptor? {
+    private suspend fun establishTunForEngine(
+        engineId: EngineId,
+        splitConfig: ru.ozero.commonvpn.split.SplitTunnelConfig,
+    ): ParcelFileDescriptor? {
         val plugin = enginePlugins.firstOrNull { it.id == engineId } ?: return null
         val spec = plugin.tunSpec() ?: return null
-        val splitPackages = withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
-            runCatching { splitTunnelRulesProvider.activePackages() }.getOrNull()
-        } ?: emptySet()
-        val splitMode = withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
-            runCatching { settingsRepository.settings.first() }.getOrNull()
-        }?.splitMode ?: ru.ozero.enginescore.settings.SplitTunnelMode.ALL
-        val splitCfg = ru.ozero.commonvpn.split.SplitTunnelConfig(mode = splitMode, packages = splitPackages)
         val builder = applyEngineTunSpec(spec)
-        ru.ozero.commonvpn.split.TunBuilderConfigurator(packageName).apply(builder, splitCfg)
+        ru.ozero.commonvpn.split.TunBuilderConfigurator(packageName).apply(builder, splitConfig)
         val before = TunInterfaceStats.snapshotTunInterfaces()
         val pfd = try {
             builder.establish()
@@ -472,7 +475,7 @@ class OzeroVpnService : android.net.VpnService() {
                         TunnelStatsReadResult(it.rxBytes, it.txBytes, "uid")
                     }
                     if (read == null) {
-                        if (tickCount % STATS_NOTIFY_LOG_EVERY == 0) {
+                        if (tickCount % STATS_LOG_EVERY == 0) {
                             PersistentLoggers.warn(TAG, "TunnelStats: ни iface, ни uid stats недоступны")
                         }
                         tickCount++
@@ -490,7 +493,10 @@ class OzeroVpnService : android.net.VpnService() {
                     )
                     tunnelController.updateStats(snapshot)
                     tickCount++
-                    if (tickCount % STATS_NOTIFY_LOG_EVERY == 0) {
+                    if (tickCount % STATS_NOTIFY_EVERY == 0) {
+                        updateNotificationWithStats(tunnelController.stats.value)
+                    }
+                    if (tickCount % STATS_LOG_EVERY == 0) {
                         val dTx = txBytes - prevTx
                         val dRx = rxBytes - prevRx
                         PersistentLoggers.info(
@@ -499,7 +505,6 @@ class OzeroVpnService : android.net.VpnService() {
                                 "rx=${BytesFormatter.humanReadable(rxBytes)} " +
                                 "Δtx=${BytesFormatter.humanReadable(dTx)} Δrx=${BytesFormatter.humanReadable(dRx)}",
                         )
-                        updateNotificationWithStats(txBytes, rxBytes)
                         prevTx = txBytes
                         prevRx = rxBytes
                     }
@@ -513,14 +518,32 @@ class OzeroVpnService : android.net.VpnService() {
         statsJobRef.set(job)
     }
 
-    private fun updateNotificationWithStats(txBytes: Long, rxBytes: Long) {
-        if (stopSignal.get()) return
+    private fun updateNotificationWithStats(snapshot: TunnelStats?) {
+        if (stopSignal.get() || snapshot == null) return
         runCatching {
             val nm = getSystemService(NotificationManager::class.java) ?: return
-            val text = "↓ ${BytesFormatter.humanReadable(rxBytes)}  ↑ ${BytesFormatter.humanReadable(txBytes)}"
+            val text = NotificationStatsFormatter.format(snapshot, engineExtras())
             val n = buildNotification(text)
             nm.notify(NOTIFICATION_ID, n)
         }.onFailure { PersistentLoggers.warn(TAG, "updateNotificationWithStats: ${it.message}") }
+    }
+
+    private fun engineExtras(): String {
+        if (!::chainOrchestrator.isInitialized) return ""
+        return runCatching {
+            chainOrchestrator.activeEngines()
+                .mapNotNull { plugin ->
+                    val flow = plugin.stats() as? kotlinx.coroutines.flow.StateFlow<*>
+                    val stats = flow?.value as? ru.ozero.enginescore.EngineStats
+                    val peers = stats?.activeConnections ?: 0
+                    when {
+                        plugin.id == EngineId.URNETWORK && peers > 0 -> "$peers peers"
+                        peers > 0 -> "$peers conns"
+                        else -> null
+                    }
+                }
+                .joinToString(" · ")
+        }.getOrDefault("")
     }
 
     private fun stopVpn() {
@@ -653,8 +676,19 @@ class OzeroVpnService : android.net.VpnService() {
         if (spec.allowFamilyV6 && v6 != null) {
             builder.addAddress(v6, spec.ipv6PrefixLength)
             if (spec.routeAllV6) builder.addRoute("::", 0)
+        } else {
+            blackholeIpv6(builder, "applyEngineTunSpec")
         }
         return builder
+    }
+
+    private fun blackholeIpv6(builder: Builder, callerTag: String) {
+        runCatching {
+            builder.addAddress(TUN_ADDRESS_V6, TUN_PREFIX_LENGTH_V6)
+            builder.addRoute("::", 0)
+        }.onFailure {
+            PersistentLoggers.warn(TAG, "$callerTag: blackhole IPv6 failed: ${it.message}")
+        }
     }
 
     internal fun buildTunBuilder(
@@ -669,6 +703,8 @@ class OzeroVpnService : android.net.VpnService() {
         if (ipv6Enabled) {
             builder.addAddress(TUN_ADDRESS_V6, TUN_PREFIX_LENGTH_V6)
             builder.addRoute("::", 0)
+        } else {
+            blackholeIpv6(builder, "buildTunBuilder")
         }
         val dnsServers = if (customDnsServers.isNotEmpty()) customDnsServers else TUN_DNS_SERVERS
         dnsServers.forEach { dns ->
@@ -708,7 +744,11 @@ class OzeroVpnService : android.net.VpnService() {
                 .setOnlyAlertOnce(true)
                 .addAction(stopAction)
                 .apply {
-                    if (contentText != null) setContentText(contentText)
+                    if (contentText != null) {
+                        val firstLine = contentText.substringBefore('\n')
+                        setContentText(firstLine)
+                        setStyle(Notification.BigTextStyle().bigText(contentText))
+                    }
                     if (contentIntent != null) setContentIntent(contentIntent)
                 }
                 .build()
@@ -721,7 +761,12 @@ class OzeroVpnService : android.net.VpnService() {
             .setOnlyAlertOnce(true)
             .addAction(stopAction)
             .apply {
-                if (contentText != null) setContentText(contentText)
+                if (contentText != null) {
+                    val firstLine = contentText.substringBefore('\n')
+                    setContentText(firstLine)
+                    @Suppress("DEPRECATION")
+                    setStyle(Notification.BigTextStyle().bigText(contentText))
+                }
                 if (contentIntent != null) setContentIntent(contentIntent)
             }
             .build()

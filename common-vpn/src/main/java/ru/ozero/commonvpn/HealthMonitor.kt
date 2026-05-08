@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -34,8 +35,8 @@ class HealthMonitor(
     private var job: Job? = null
     private var consecutiveFailures: Int = 0
 
-    fun start(socksPort: Int) {
-        stop()
+    suspend fun start(socksPort: Int) {
+        job?.cancelAndJoin()
         consecutiveFailures = 0
         _status.value = Status.UNKNOWN
         job = scope.launch {

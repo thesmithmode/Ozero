@@ -90,4 +90,17 @@ class WarpConfFileImporterTest {
         val stream = ByteArrayInputStream(validConf.toByteArray(Charsets.UTF_8))
         assertTrue(importer.import(stream).isSuccess)
     }
+
+    @Test
+    fun `import отклоняет файл больше 64KB чтобы предотвратить OOM`() {
+        val padding = "# " + "x".repeat(70_000) + "\n"
+        val tooLarge = padding + validConf
+        val result = importer.import(ByteArrayInputStream(tooLarge.toByteArray()))
+        assertTrue(result.isFailure, "файл >64KB обязан давать failure (OOM prevention)")
+        val message = result.exceptionOrNull()?.message.orEmpty()
+        assertTrue(
+            message.contains("слишком большой") || message.contains("65536"),
+            "сообщение об ошибке должно указывать на превышение лимита: $message",
+        )
+    }
 }

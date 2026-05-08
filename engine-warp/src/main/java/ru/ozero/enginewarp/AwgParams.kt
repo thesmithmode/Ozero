@@ -15,6 +15,23 @@ data class AwgParams(
         require(junkPacketMinSize <= junkPacketMaxSize) {
             "Jmin ($junkPacketMinSize) must be <= Jmax ($junkPacketMaxSize)"
         }
+        require(junkPacketCount in JC_RANGE) { "Jc out of range: $junkPacketCount" }
+        require(junkPacketMinSize in SIZE_RANGE) { "Jmin out of range: $junkPacketMinSize" }
+        require(junkPacketMaxSize in SIZE_RANGE) { "Jmax out of range: $junkPacketMaxSize" }
+        require(initPacketJunkSize in SIZE_RANGE) { "S1 out of range: $initPacketJunkSize" }
+        require(responsePacketJunkSize in SIZE_RANGE) { "S2 out of range: $responsePacketJunkSize" }
+        val headers = listOf(
+            initPacketMagicHeader,
+            responsePacketMagicHeader,
+            cookieReplyMagicHeader,
+            transportMagicHeader,
+        )
+        require(headers.all { it in HEADER_RANGE }) {
+            "Magic headers must be in $HEADER_RANGE: $headers"
+        }
+        require(headers.toSet().size == headers.size) {
+            "Magic headers must be unique: $headers"
+        }
     }
 
     companion object {
@@ -27,6 +44,10 @@ data class AwgParams(
         const val DEFAULT_H2 = 2L
         const val DEFAULT_H3 = 3L
         const val DEFAULT_H4 = 4L
+
+        val JC_RANGE = 0..128
+        val SIZE_RANGE = 0..1500
+        val HEADER_RANGE = 1L..0xFFFFFFFFL
 
         val VANILLA = AwgParams(
             junkPacketCount = 0,

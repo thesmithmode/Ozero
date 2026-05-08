@@ -78,22 +78,24 @@ class AppBackupManager(
             s.appMode?.let { prefs[SettingsKeys.APP_MODE] = it }
         }
 
-        urnetworkStore.setWalletOverride(data.urnetwork.walletOverride)
-        urnetworkStore.setByJwt(data.urnetwork.byJwt)
+        data.urnetwork.walletOverride?.let { urnetworkStore.setWalletOverride(it) }
+        data.urnetwork.byJwt?.let { urnetworkStore.setByJwt(it) }
 
         if (data.warpSlots.isNotEmpty()) {
             warpSlotStore.replaceAll(data.warpSlots.map { it.toSlot() })
         }
 
-        val existingRules = splitRuleDao.observeAll().first()
-        val backupPackages = data.splitRules.map { it.packageName }.toSet()
-        for (existing in existingRules) {
-            if (existing.packageName !in backupPackages) {
-                splitRuleDao.delete(existing.packageName)
+        if (data.splitRules.isNotEmpty()) {
+            val existingRules = splitRuleDao.observeAll().first()
+            val backupPackages = data.splitRules.map { it.packageName }.toSet()
+            for (existing in existingRules) {
+                if (existing.packageName !in backupPackages) {
+                    splitRuleDao.delete(existing.packageName)
+                }
             }
-        }
-        for (rule in data.splitRules) {
-            splitRuleDao.upsert(AppSplitRule(packageName = rule.packageName, isExcluded = rule.isExcluded))
+            for (rule in data.splitRules) {
+                splitRuleDao.upsert(AppSplitRule(packageName = rule.packageName, isExcluded = rule.isExcluded))
+            }
         }
     }
 

@@ -138,8 +138,24 @@ class ProxyWarpAutoConfig(
         val extracted = extractIniFromBody(body)
             ?: return Result.failure(IOException("WARP response: [Interface] не найден"))
         PersistentLoggers.info(TAG, "selected ${extracted.source}")
-        return WarpConfParser.parse(extracted.text).map { config ->
+        return WarpConfParser.parse(extracted.text).mapCatching { config ->
+            validateCloudflarePeer(config)
             RegisteredWarpConfig(config = config, rawIni = extracted.text)
+        }
+    }
+
+    private fun validateCloudflarePeer(config: WarpConfig) {
+        if (config.peerPublicKey != CLOUDFLARE_WARP_PEER_PUBKEY) {
+            throw IOException(
+                "mirror peerPublicKey mismatch: ${config.peerPublicKey.take(12)}… " +
+                    "expected Cloudflare WARP key — supply chain risk",
+            )
+        }
+        val host = config.peerEndpoint.substringBeforeLast(":").trim().lowercase()
+        if (host != CLOUDFLARE_WARP_PEER_HOST) {
+            throw IOException(
+                "mirror peer host mismatch: '$host' expected '$CLOUDFLARE_WARP_PEER_HOST' — supply chain risk",
+            )
         }
     }
 
@@ -207,6 +223,8 @@ class ProxyWarpAutoConfig(
 
     companion object {
         private const val TAG = "ProxyWarpAutoConfig"
+        const val CLOUDFLARE_WARP_PEER_PUBKEY = "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo="
+        const val CLOUDFLARE_WARP_PEER_HOST = "engage.cloudflareclient.com"
         const val COOLDOWN_MS = 5 * 60 * 1000L
         const val DEFAULT_USER_AGENT = "okhttp/3.12.1"
         const val DEFAULT_CONCURRENCY = 8

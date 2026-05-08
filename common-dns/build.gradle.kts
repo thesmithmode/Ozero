@@ -7,6 +7,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":engines-core"))
     implementation(libs.bundles.coroutines)
     implementation(libs.okhttp.core)
 
