@@ -62,6 +62,13 @@ class MainViewModel @Inject constructor(
             initialValue = false,
         )
 
+    val killswitchActive: StateFlow<Boolean> =
+        tunnelController.killswitchActive.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = false,
+        )
+
     val healthStatus: StateFlow<HealthMonitor.Status> =
         healthMonitor.status.stateIn(
             scope = viewModelScope,

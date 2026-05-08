@@ -77,6 +77,7 @@ fun MainScreen(
     val urnetworkPeerCount by viewModel.urnetworkPeerCount.collectAsStateWithLifecycle()
     val urnetworkPeerSearchSeconds by viewModel.urnetworkPeerSearchSeconds.collectAsStateWithLifecycle()
     val ipInfo by viewModel.ipInfo.collectAsStateWithLifecycle()
+    val killswitchActive by viewModel.killswitchActive.collectAsStateWithLifecycle()
 
     val powerState = state.toPowerDiscState()
     val backgroundState = state.toBackgroundState()
@@ -107,6 +108,7 @@ fun MainScreen(
                 urnetworkPeerCount = urnetworkPeerCount,
                 urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
                 ipInfo = ipInfo,
+                killswitchActive = killswitchActive,
                 onConnectClick = onConnectClick,
                 onManualEngineSelect = viewModel::onManualEngineSelect,
                 onRefreshIpInfo = viewModel::refreshIpInfo,
@@ -214,6 +216,7 @@ private fun ExpertMainContent(
     urnetworkPeerCount: Int,
     urnetworkPeerSearchSeconds: Int,
     ipInfo: IpInfoState,
+    killswitchActive: Boolean,
     onConnectClick: () -> Unit,
     onManualEngineSelect: (EngineId?) -> Unit,
     onRefreshIpInfo: () -> Unit,
@@ -247,6 +250,14 @@ private fun ExpertMainContent(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            if (killswitchActive) {
+                Text(
+                    text = stringResource(R.string.killswitch_active_badge),
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.testTag(MainScreenTestTags.KILLSWITCH_BADGE),
+                )
+            }
             if (isConnected && manualEngine == EngineId.URNETWORK) {
                 UrnetworkPeerBadge(
                     count = urnetworkPeerCount,

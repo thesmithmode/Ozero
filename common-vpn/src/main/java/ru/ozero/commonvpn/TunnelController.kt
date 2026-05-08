@@ -16,6 +16,8 @@ class TunnelController(
     val stats: StateFlow<TunnelStats?> = _stats.asStateFlow()
     private val _stagnant = MutableStateFlow(false)
     val stagnant: StateFlow<Boolean> = _stagnant.asStateFlow()
+    private val _killswitchActive = MutableStateFlow(false)
+    val killswitchActive: StateFlow<Boolean> = _killswitchActive.asStateFlow()
     private val lock = Any()
     private var sessionStartMs: Long = 0L
     private var prevTxBytes: Long = 0L
@@ -43,11 +45,24 @@ class TunnelController(
     fun onEngineDied(engineId: EngineId, reason: String) =
         transition(TunnelState.Failed(engineId, reason), markError = true)
 
+    fun onKillswitchEngaged(engineId: EngineId, reason: String) {
+        transition(TunnelState.Failed(engineId, reason), markError = true)
+        _killswitchActive.value = true
+        PersistentLoggers.warn(TAG, "killswitch engaged: engine=$engineId reason=$reason")
+    }
+
+    fun onKillswitchReleased() {
+        if (_killswitchActive.compareAndSet(true, false)) {
+            PersistentLoggers.info(TAG, "killswitch released")
+        }
+    }
+
     fun onDisconnecting() = transition(TunnelState.Disconnecting)
 
     fun reset() {
         _stats.value = null
         _stagnant.value = false
+        _killswitchActive.value = false
         sessionStartMs = 0L
         prevTxBytes = 0L
         prevRxBytes = 0L

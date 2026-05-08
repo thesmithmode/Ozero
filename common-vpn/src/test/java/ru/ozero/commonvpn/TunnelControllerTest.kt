@@ -324,6 +324,56 @@ class TunnelControllerTest {
     }
 
     @Test
+    fun killswitchActiveInitiallyFalse() {
+        assertEquals(false, controller.killswitchActive.value)
+    }
+
+    @Test
+    fun killswitchEngagedSetsFlagAndTransitionsToFailed() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        controller.onKillswitchEngaged(EngineId.BYEDPI, "engine died, killswitch on")
+        assertIs<TunnelState.Failed>(controller.state.value)
+        assertEquals(true, controller.killswitchActive.value)
+    }
+
+    @Test
+    fun killswitchReleasedClearsFlagOnly() {
+        controller.onProbing()
+        controller.onKillswitchEngaged(EngineId.BYEDPI, "x")
+        assertEquals(true, controller.killswitchActive.value)
+        controller.onKillswitchReleased()
+        assertEquals(false, controller.killswitchActive.value)
+        assertIs<TunnelState.Failed>(controller.state.value)
+    }
+
+    @Test
+    fun resetClearsKillswitchFlag() {
+        controller.onProbing()
+        controller.onKillswitchEngaged(EngineId.BYEDPI, "x")
+        controller.reset()
+        assertEquals(false, controller.killswitchActive.value)
+        assertIs<TunnelState.Idle>(controller.state.value)
+    }
+
+    @Test
+    fun killswitchReleasedNoOpWhenInactive() {
+        controller.onKillswitchReleased()
+        assertEquals(false, controller.killswitchActive.value)
+    }
+
+    @Test
+    fun killswitchEngagedFromProbingSurvives() {
+        controller.onProbing()
+        controller.onKillswitchEngaged(EngineId.WARP, "preflight failed")
+        assertEquals(true, controller.killswitchActive.value)
+        val s = controller.state.value
+        assertIs<TunnelState.Failed>(s)
+        assertEquals(EngineId.WARP, s.engineId)
+    }
+
+    @Test
     fun resetClearsStats() {
         controller.onProbing()
         controller.onConnecting(EngineId.BYEDPI)
