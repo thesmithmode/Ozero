@@ -16,6 +16,8 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import ru.ozero.enginewarp.ImportedWarpConfig
+import ru.ozero.enginewarp.RegisteredWarpConfig
 import ru.ozero.enginewarp.WarpAutoConfig
 import ru.ozero.enginewarp.WarpConfig
 import ru.ozero.enginewarp.WarpConfigSlot
@@ -90,7 +92,7 @@ class WarpEngineSettingsViewModelTest {
 
     @Test
     fun `auto-trigger один раз — после fail повторное empty НЕ регистрит снова`() = runTest {
-        auto.result = Result.failure(IllegalStateException("network down"))
+        auto.result = Result.failure<RegisteredWarpConfig>(IllegalStateException("network down"))
         advanceUntilIdle()
         assertEquals(1, auto.callCount, "Первый auto-trigger сработал и упал")
         val id = store.addSlot("Manual", SAMPLE)
@@ -141,7 +143,7 @@ class WarpEngineSettingsViewModelTest {
 
     @Test
     fun `onGenerate failure ставит errorMessage и не добавляет слот`() = runTest {
-        auto.result = Result.failure(IllegalStateException("network down"))
+        auto.result = Result.failure<RegisteredWarpConfig>(IllegalStateException("network down"))
         vm.onGenerate()
         advanceUntilIdle()
         val s = vm.uiState.value
@@ -152,7 +154,7 @@ class WarpEngineSettingsViewModelTest {
 
     @Test
     fun `onGenerate failure без message — fallback register failed`() = runTest {
-        auto.result = Result.failure(RuntimeException())
+        auto.result = Result.failure<RegisteredWarpConfig>(RuntimeException())
         vm.onGenerate()
         advanceUntilIdle()
         assertEquals("register failed", vm.uiState.value.errorMessage)
@@ -217,7 +219,7 @@ class WarpEngineSettingsViewModelTest {
 
     @Test
     fun `onImportFile failure ставит errorMessage и не добавляет слот`() = runTest {
-        importer.result = Result.failure(IOException("bad file"))
+        importer.result = Result.failure<ImportedWarpConfig>(IOException("bad file"))
         vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
         advanceUntilIdle()
         assertEquals("bad file", vm.uiState.value.errorMessage)
@@ -226,7 +228,7 @@ class WarpEngineSettingsViewModelTest {
 
     @Test
     fun `onImportFile failure без message — fallback import failed`() = runTest {
-        importer.result = Result.failure(RuntimeException())
+        importer.result = Result.failure<ImportedWarpConfig>(RuntimeException())
         vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
         advanceUntilIdle()
         assertEquals("import failed", vm.uiState.value.errorMessage)
