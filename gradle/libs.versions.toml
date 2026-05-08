@@ -42,7 +42,7 @@ hiltWork = "1.2.0"
 # Testing
 junitJupiter = "5.11.0"
 mockk = "1.13.12"
-espresso = "3.6.1"
+espresso = "3.7.0"
 composeTest = "1.7.2"
 testExtJunit = "1.2.1"
 
