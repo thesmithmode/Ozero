@@ -43,18 +43,11 @@ class RealWarpSdkBridgeTest {
         assertEquals(5, rt.lastFd)
         assertEquals("ozero-warp", rt.lastName)
         assertEquals("/x", rt.lastUapi)
-        val passed = rt.lastIni!!
-        val piIdx = passed.indexOf("PrivateKey")
-        val peerIdx = passed.indexOf("[Peer]")
-        assertTrue(piIdx in 0 until peerIdx, "PrivateKey должен идти ПЕРЕД [Peer] (canonical Interface)")
-        assertTrue(
-            piIdx > passed.indexOf("Address"),
-            "canonical: PrivateKey ПОСЛЕ Address — am-go parser ожидает этот порядок",
-        )
+        assertEquals(validIni, rt.lastIni, "INI должен передаваться runtime БЕЗ модификаций (passthrough)")
     }
 
     @Test
-    fun `attachTun raw INI с PrivateKey впереди → канонизирован через Config_toAwgQuickString`() = runTest {
+    fun `attachTun raw INI с PrivateKey впереди — passthrough как есть`() = runTest {
         val rt = FakeAwgRuntime(returnHandle = 7, socketV4 = 100)
         val (b, _) = bridgeWith(rt)
         val rawIniWithPrivateKeyFirst = """
@@ -73,21 +66,62 @@ class RealWarpSdkBridgeTest {
         """.trimIndent()
         val r = b.attachTun("ozero-warp", 5, rawIniWithPrivateKeyFirst, "/x", noopProtector)
         assertEquals(WarpSdkBridge.AttachResult.Success, r)
-        val canonical = rt.lastIni!!
-        val pkIdx = canonical.indexOf("PrivateKey")
-        val jcIdx = canonical.indexOf("Jc =")
-        assertTrue(jcIdx in 0 until pkIdx, "canonical INI: AWG-поля (Jc) должны идти ПЕРЕД PrivateKey")
+        assertEquals(rawIniWithPrivateKeyFirst, rt.lastIni, "passthrough — никакой канонизации, никаких потерь полей")
     }
 
     @Test
-    fun `attachTun INI с битым ключом → BadConfigException → Failed без вызова runtime`() = runTest {
+    fun `attachTun INI с I1 — passthrough сохраняет I1 ровно как в исходнике`() = runTest {
+        val rt = FakeAwgRuntime(returnHandle = 7, socketV4 = 100)
+        val (b, _) = bridgeWith(rt)
+        val iniWithI1 = """
+            [Interface]
+            PrivateKey = yAnz5TF+lXXJte14tji3zlMNq+hd2rYUIgJBgB3fBmk=
+            Address = 10.0.0.2/32
+            Jc = 5
+            Jmin = 100
+            Jmax = 200
+            S1 = 0
+            S2 = 0
+            H1 = 1
+            H2 = 2
+            H3 = 3
+            H4 = 4
+            I1 = <b 0xc70000000108ce1bf31eec7d93360000449e227e>
+
+            [Peer]
+            PublicKey = xTIBA9rboUyYM73OZE9hQNwY9DYBJ7cT/AKO1S6jPBI=
+            AllowedIPs = 0.0.0.0/0
+            Endpoint = 1.2.3.4:51820
+        """.trimIndent()
+        b.attachTun("ozero-warp", 5, iniWithI1, "/x", noopProtector)
+        val passed = rt.lastIni!!
+        assertTrue(
+            passed.contains("I1 = <b 0xc70000000108ce1bf31eec7d93360000449e227e>"),
+            "I1 должен присутствовать в передаваемом am-go INI как есть — без потерь полей",
+        )
+        assertEquals(iniWithI1, passed, "INI passthrough — ноль модификаций")
+    }
+
+    @Test
+    fun `attachTun INI без секции Interface → Failed без вызова runtime`() = runTest {
         val rt = FakeAwgRuntime()
         val (b, _) = bridgeWith(rt)
-        val brokenIni = "[Interface]\nPrivateKey = NOT_A_VALID_BASE64_KEY!!!\n\n[Peer]\nPublicKey = also_broken\n"
+        val brokenIni = "[Peer]\nPublicKey = abc\nEndpoint = 1.2.3.4:5\n"
         val r = b.attachTun("n", 5, brokenIni, "/x", noopProtector)
         val f = assertIs<WarpSdkBridge.AttachResult.Failed>(r)
-        assertTrue(f.reason.contains("INI parse"), "reason='${f.reason}' — должно содержать 'INI parse'")
-        assertEquals(0, rt.turnOnCalls, "runtime НЕ вызывается при невалидном INI — иначе SIGSEGV в am-go native")
+        assertTrue(f.reason.contains("Interface"), "reason='${f.reason}' должно содержать 'Interface'")
+        assertEquals(0, rt.turnOnCalls, "runtime НЕ вызывается без [Interface]")
+    }
+
+    @Test
+    fun `attachTun INI без секции Peer → Failed без вызова runtime`() = runTest {
+        val rt = FakeAwgRuntime()
+        val (b, _) = bridgeWith(rt)
+        val brokenIni = "[Interface]\nPrivateKey = abc\n"
+        val r = b.attachTun("n", 5, brokenIni, "/x", noopProtector)
+        val f = assertIs<WarpSdkBridge.AttachResult.Failed>(r)
+        assertTrue(f.reason.contains("Peer"))
+        assertEquals(0, rt.turnOnCalls)
     }
 
     @Test
@@ -200,6 +234,18 @@ class RealWarpSdkBridgeTest {
     }
 
     @Test
+    fun `attachTun success — getConfig НЕ вызывается (нет watchdog poll)`() = runTest {
+        val rt = FakeAwgRuntime(returnHandle = 7, socketV4 = 100)
+        val (b, _) = bridgeWith(rt)
+        b.attachTun("n", 5, validIni, "/x", noopProtector)
+        assertEquals(
+            0,
+            rt.getConfigCalls,
+            "PORTAL_WG не делает poll awgGetConfig — наш bridge тоже не должен (потенциальный SIGSEGV)",
+        )
+    }
+
+    @Test
     fun `isRunning false до attachTun`() {
         val (b, _) = bridgeWith()
         assertFalse(b.isRunning())
@@ -214,6 +260,7 @@ class RealWarpSdkBridgeTest {
     ) : AwgRuntime {
         var turnOnCalls: Int = 0
         var turnOffCalls: Int = 0
+        var getConfigCalls: Int = 0
         var lastName: String? = null
         var lastFd: Int = -1
         var lastIni: String? = null
@@ -238,5 +285,9 @@ class RealWarpSdkBridgeTest {
 
         override fun getSocketV4(handle: Int): Int = socketV4
         override fun getSocketV6(handle: Int): Int = socketV6
+        override fun getConfig(handle: Int): String? {
+            getConfigCalls++
+            return null
+        }
     }
 }

@@ -26,16 +26,26 @@ class DataStoreWarpConfigSlotStore(
         parseSlots(prefs[KEY_SLOTS] ?: "[]")
     }
 
+    override fun activeSlot(): Flow<WarpConfigSlot?> = slots().map { list ->
+        list.firstOrNull { it.isActive }
+    }
+
     override fun activeConfig(): Flow<WarpConfig?> = slots().map { list ->
         list.firstOrNull { it.isActive }?.config
     }
 
-    override suspend fun addSlot(name: String, config: WarpConfig): String = mutex.withLock {
+    override suspend fun addSlot(name: String, config: WarpConfig, rawIni: String?): String = mutex.withLock {
         val id = UUID.randomUUID().toString()
         dataStore.edit { prefs ->
             val current = parseSlots(prefs[KEY_SLOTS] ?: "[]")
             val makeActive = current.isEmpty()
-            val updated = current + WarpConfigSlot(id = id, name = name, config = config, isActive = makeActive)
+            val updated = current + WarpConfigSlot(
+                id = id,
+                name = name,
+                config = config,
+                isActive = makeActive,
+                rawIniOverride = rawIni,
+            )
             prefs[KEY_SLOTS] = serializeSlots(updated)
         }
         id
@@ -58,15 +68,20 @@ class DataStoreWarpConfigSlotStore(
         }
     }
 
-    override suspend fun updateSlot(id: String, name: String, config: WarpConfig): Unit = mutex.withLock {
-        dataStore.edit { prefs ->
-            val current = parseSlots(prefs[KEY_SLOTS] ?: "[]")
-            val updated = current.map { slot ->
-                if (slot.id == id) slot.copy(name = name, config = config) else slot
+    override suspend fun updateSlot(id: String, name: String, config: WarpConfig, rawIni: String?): Unit =
+        mutex.withLock {
+            dataStore.edit { prefs ->
+                val current = parseSlots(prefs[KEY_SLOTS] ?: "[]")
+                val updated = current.map { slot ->
+                    if (slot.id == id) {
+                        slot.copy(name = name, config = config, rawIniOverride = rawIni)
+                    } else {
+                        slot
+                    }
+                }
+                prefs[KEY_SLOTS] = serializeSlots(updated)
             }
-            prefs[KEY_SLOTS] = serializeSlots(updated)
         }
-    }
 
     override suspend fun delete(id: String): Unit = mutex.withLock {
         dataStore.edit { prefs ->
@@ -163,11 +178,13 @@ class DataStoreWarpConfigSlotStore(
             keepaliveSeconds = configObj.optInt("keepalive", WarpConfig.DEFAULT_KEEPALIVE),
             awgParams = awg,
         )
+        val rawIni = obj.optString("rawIni", "").takeIf { it.isNotEmpty() }
         return WarpConfigSlot(
             id = obj.getString("id"),
             name = obj.getString("name"),
             config = config,
             isActive = obj.optBoolean("isActive", false),
+            rawIniOverride = rawIni,
         )
     }
 
@@ -178,6 +195,7 @@ class DataStoreWarpConfigSlotStore(
             obj.put("id", slot.id)
             obj.put("name", slot.name)
             obj.put("isActive", slot.isActive)
+            slot.rawIniOverride?.takeIf { it.isNotEmpty() }?.let { obj.put("rawIni", it) }
             val cfg = slot.config
             val configObj = JSONObject()
             configObj.put("priv", cfg.privateKey)

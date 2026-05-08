@@ -33,13 +33,14 @@ class WarpConfFileImporterTest {
     """.trimIndent()
 
     @Test
-    fun `import валидного conf файла возвращает WarpConfig`() {
+    fun `import валидного conf файла возвращает ImportedWarpConfig`() {
         val stream = ByteArrayInputStream(validConf.toByteArray())
         val result = importer.import(stream)
         assertTrue(result.isSuccess)
-        val cfg = result.getOrThrow()
-        assertEquals("xmPeOeSIU2UTjYFCSzw5Gc+Ks1uxZhanU6iQZKAyFpQ=", cfg.privateKey)
-        assertEquals("engage.cloudflareclient.com:4500", cfg.peerEndpoint)
+        val imported = result.getOrThrow()
+        assertEquals("xmPeOeSIU2UTjYFCSzw5Gc+Ks1uxZhanU6iQZKAyFpQ=", imported.config.privateKey)
+        assertEquals("engage.cloudflareclient.com:4500", imported.config.peerEndpoint)
+        assertEquals(validConf, imported.rawIni, "rawIni сохраняет оригинальный текст файла без потерь")
     }
 
     @Test
@@ -67,16 +68,21 @@ class WarpConfFileImporterTest {
     @Test
     fun `import парсит AWG параметры из файла`() {
         val stream = ByteArrayInputStream(validConf.toByteArray())
-        val cfg = importer.import(stream).getOrThrow()
-        assertEquals(5, cfg.awgParams.junkPacketCount)
-        assertEquals(1L, cfg.awgParams.initPacketMagicHeader)
+        val imported = importer.import(stream).getOrThrow()
+        assertEquals(5, imported.config.awgParams.junkPacketCount)
+        assertEquals(1L, imported.config.awgParams.initPacketMagicHeader)
     }
 
     @Test
-    fun `import игнорирует поле I1 из реального WARP conf`() {
+    fun `import сохраняет I1 в rawIni — будет передан am-go без потерь`() {
         val confWithI1 = validConf + "\nI1 = <b 0xdeadbeef1234>"
         val result = importer.import(ByteArrayInputStream(confWithI1.toByteArray()))
         assertTrue(result.isSuccess)
+        val imported = result.getOrThrow()
+        assertTrue(
+            imported.rawIni.contains("I1 = <b 0xdeadbeef1234>"),
+            "rawIni должен содержать I1 целиком — иначе AmneziaWG init packet override потерян",
+        )
     }
 
     @Test

@@ -56,6 +56,35 @@ class DataStoreWarpConfigSlotStoreTest {
     }
 
     @Test
+    fun `addSlot с rawIni — сохраняется в storage и читается обратно (passthrough roundtrip)`() = runTest {
+        val store = newStore()
+        val raw = "[Interface]\nPrivateKey = abc\nI1 = <b 0xdeadbeef>\n[Peer]\nPublicKey = def\nEndpoint = h:1\n"
+        val id = store.addSlot("Imported", sample, rawIni = raw)
+        val slots = store.slots().first()
+        val saved = slots.first { it.id == id }
+        assertEquals(raw, saved.rawIniOverride, "rawIni roundtrip — full text preserved через JSON storage")
+    }
+
+    @Test
+    fun `addSlot без rawIni — rawIniOverride остаётся null (auto-config legacy path)`() = runTest {
+        val store = newStore()
+        val id = store.addSlot("Auto", sample)
+        val saved = store.slots().first().first { it.id == id }
+        assertNull(saved.rawIniOverride, "default null — backward compat для слотов без raw text")
+    }
+
+    @Test
+    fun `activeSlot возвращает full WarpConfigSlot — нужен для rawIni доступа в EngineWarp`() = runTest {
+        val store = newStore()
+        val raw = "[Interface]\nfoo=bar\n[Peer]\n"
+        val id = store.addSlot("R", sample, rawIni = raw)
+        val active = store.activeSlot().first()
+        assertNotNull(active)
+        assertEquals(id, active.id)
+        assertEquals(raw, active.rawIniOverride)
+    }
+
+    @Test
     fun `activeConfig null на старте`() = runTest {
         val store = newStore()
         assertNull(store.activeConfig().first())

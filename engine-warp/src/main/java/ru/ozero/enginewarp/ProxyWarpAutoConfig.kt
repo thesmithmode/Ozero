@@ -26,7 +26,7 @@ class ProxyWarpAutoConfig(
 
     override fun remainingCooldownMs(): Long = maxOf(0L, COOLDOWN_MS - (System.currentTimeMillis() - lastSuccessMs))
 
-    override suspend fun register(onProgress: ((String) -> Unit)?): Result<WarpConfig> {
+    override suspend fun register(onProgress: ((String) -> Unit)?): Result<RegisteredWarpConfig> {
         val cooldown = remainingCooldownMs()
         if (cooldown > 0) {
             PersistentLoggers.info(TAG, "register: кулдаун ${cooldown / 1000}с, пропуск")
@@ -64,16 +64,16 @@ class ProxyWarpAutoConfig(
         ordered: List<String>,
         total: Int,
         onProgress: ((String) -> Unit)?,
-    ): Result<WarpConfig> = coroutineScope {
+    ): Result<RegisteredWarpConfig> = coroutineScope {
         val iterator = ordered.iterator()
-        val inFlight = ArrayDeque<Deferred<Result<WarpConfig>>>()
+        val inFlight = ArrayDeque<Deferred<Result<RegisteredWarpConfig>>>()
         var lastError: Throwable? = null
         var tried = 0
         while (iterator.hasNext() && inFlight.size < concurrency) {
             inFlight.add(spawnMirror(iterator.next()))
         }
         while (inFlight.isNotEmpty()) {
-            val finished = select<Deferred<Result<WarpConfig>>> {
+            val finished = select<Deferred<Result<RegisteredWarpConfig>>> {
                 inFlight.forEach { d ->
                     d.onAwait { d }
                 }
@@ -96,7 +96,7 @@ class ProxyWarpAutoConfig(
         Result.failure(lastError ?: IOException("WARP register: все зеркала отказали"))
     }
 
-    private fun CoroutineScope.spawnMirror(url: String): Deferred<Result<WarpConfig>> =
+    private fun CoroutineScope.spawnMirror(url: String): Deferred<Result<RegisteredWarpConfig>> =
         async {
             try {
                 val httpResult = withTimeoutOrNull(PER_MIRROR_TIMEOUT_MS) {
@@ -134,11 +134,13 @@ class ProxyWarpAutoConfig(
 
     private data class ExtractedIni(val text: String, val source: String)
 
-    private fun parseProxyResponse(body: String): Result<WarpConfig> {
+    private fun parseProxyResponse(body: String): Result<RegisteredWarpConfig> {
         val extracted = extractIniFromBody(body)
             ?: return Result.failure(IOException("WARP response: [Interface] не найден"))
         PersistentLoggers.info(TAG, "selected ${extracted.source}")
-        return WarpConfParser.parse(extracted.text)
+        return WarpConfParser.parse(extracted.text).map { config ->
+            RegisteredWarpConfig(config = config, rawIni = extracted.text)
+        }
     }
 
     private fun extractIniFromBody(body: String): ExtractedIni? {

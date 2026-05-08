@@ -32,7 +32,7 @@ class WarpAutoConfigTest {
         val result = auto.register()
 
         assertTrue(result.isSuccess, "expected success, got ${result.exceptionOrNull()?.message}")
-        val cfg = result.getOrThrow()
+        val cfg = result.getOrThrow().config
         assertEquals("duLmWkD6Pz6fqd+5/Wsh+aDwyaT8w+5ofxDZ3Z3l1c0=", cfg.privateKey)
         assertEquals(
             "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
@@ -221,7 +221,7 @@ class WarpAutoConfigTest {
         val result = auto.register()
 
         assertTrue(result.isSuccess, "configBase64 ответ обязан декодироваться")
-        val cfg = result.getOrThrow()
+        val cfg = result.getOrThrow().config
         assertEquals("duLmWkD6Pz6fqd+5/Wsh+aDwyaT8w+5ofxDZ3Z3l1c0=", cfg.privateKey)
         assertEquals("bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=", cfg.peerPublicKey)
         assertEquals("engage.cloudflareclient.com:4500", cfg.peerEndpoint)
@@ -256,7 +256,7 @@ class WarpAutoConfigTest {
 
         val result = auto.register()
 
-        val cfg = result.getOrThrow()
+        val cfg = result.getOrThrow().config
         val p = cfg.awgParams
         assertEquals(7, p.junkPacketCount)
         assertEquals(50, p.junkPacketMinSize)
@@ -276,7 +276,7 @@ class WarpAutoConfigTest {
 
         val result = auto.register()
 
-        assertEquals(AwgParams(), result.getOrThrow().awgParams)
+        assertEquals(AwgParams(), result.getOrThrow().config.awgParams)
     }
 
     @Test
@@ -287,7 +287,7 @@ class WarpAutoConfigTest {
 
         val result = auto.register()
 
-        assertEquals(AwgParams.DEFAULT_JC, result.getOrThrow().awgParams.junkPacketCount)
+        assertEquals(AwgParams.DEFAULT_JC, result.getOrThrow().config.awgParams.junkPacketCount)
     }
 
     @Test
@@ -309,7 +309,7 @@ class WarpAutoConfigTest {
         val auto = singleMirrorConfig(http)
 
         val result = auto.register()
-        val cfg = result.getOrThrow()
+        val cfg = result.getOrThrow().config
         assertEquals(9, cfg.awgParams.junkPacketCount, "Jc должен сохраниться из configBase64")
         assertEquals(999L, cfg.awgParams.initPacketMagicHeader, "H1 должен сохраниться из configBase64")
     }
@@ -335,7 +335,7 @@ class WarpAutoConfigTest {
 
         val result = auto.register()
 
-        val cfg = result.getOrThrow()
+        val cfg = result.getOrThrow().config
         assertEquals(5, cfg.awgParams.junkPacketCount, "amQuick содержит AWG → должен быть выбран")
         assertEquals(100L, cfg.awgParams.initPacketMagicHeader)
         assertEquals("AM_PEER_KEY=", cfg.peerPublicKey, "peerPublicKey из amQuick (приоритет)")
@@ -360,7 +360,7 @@ class WarpAutoConfigTest {
 
         val result = auto.register()
 
-        val cfg = result.getOrThrow()
+        val cfg = result.getOrThrow().config
         assertEquals(9, cfg.awgParams.junkPacketCount, "amQuick сохраняет AWG для bypass ТСПУ")
         assertEquals(999L, cfg.awgParams.initPacketMagicHeader)
         assertEquals(
@@ -378,7 +378,7 @@ class WarpAutoConfigTest {
 
         val result = auto.register()
 
-        val cfg = result.getOrThrow()
+        val cfg = result.getOrThrow().config
         assertEquals(
             "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
             cfg.peerPublicKey,
@@ -394,7 +394,7 @@ class WarpAutoConfigTest {
 
         val result = auto.register()
 
-        val cfg = result.getOrThrow()
+        val cfg = result.getOrThrow().config
         assertEquals(listOf("1.1.1.1", "2606:4700:4700::1111"), cfg.dnsServers)
     }
 
@@ -406,7 +406,7 @@ class WarpAutoConfigTest {
 
         val result = auto.register()
 
-        val cfg = result.getOrThrow()
+        val cfg = result.getOrThrow().config
         assertEquals(WarpConfig.DEFAULT_DNS, cfg.dnsServers)
     }
 
@@ -417,7 +417,7 @@ class WarpAutoConfigTest {
 
         val result = auto.register()
 
-        assertEquals(25, result.getOrThrow().keepaliveSeconds)
+        assertEquals(25, result.getOrThrow().config.keepaliveSeconds)
     }
 
     @Test
@@ -430,7 +430,35 @@ class WarpAutoConfigTest {
 
         val result = auto.register()
 
-        assertEquals(WarpConfig.DEFAULT_KEEPALIVE, result.getOrThrow().keepaliveSeconds)
+        assertEquals(WarpConfig.DEFAULT_KEEPALIVE, result.getOrThrow().config.keepaliveSeconds)
+    }
+
+    @Test
+    fun `register сохраняет rawIni — I1 если присутствует в configBase64 не теряется`() = runTest {
+        val confWithI1 = """
+            [Interface]
+            PrivateKey = duLmWkD6Pz6fqd+5/Wsh+aDwyaT8w+5ofxDZ3Z3l1c0=
+            Address = 172.16.0.2
+            Jc = 5
+            Jmin = 100
+            Jmax = 200
+            I1 = <b 0xc70000000108ce1bf31eec7d>
+
+            [Peer]
+            PublicKey = bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=
+            Endpoint = engage.cloudflareclient.com:4500
+        """.trimIndent()
+        val b64 = Base64.getEncoder().encodeToString(confWithI1.toByteArray())
+        val body = """{"success":true,"content":{"configBase64":"$b64"}}"""
+        val http = FakeHttpClient(Result.success(body))
+        val auto = singleMirrorConfig(http)
+
+        val result = auto.register()
+        val registered = result.getOrThrow()
+        assertTrue(
+            registered.rawIni.contains("I1 = <b 0xc70000000108ce1bf31eec7d>"),
+            "rawIni из auto-config должен сохранять I1 — иначе AmneziaWG обфускация теряется",
+        )
     }
 
     @Test

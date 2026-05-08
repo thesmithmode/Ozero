@@ -7,4 +7,5 @@ data class WarpConfigSlot(
     val name: String,
     val config: WarpConfig,
     val isActive: Boolean = false,
+    val rawIniOverride: String? = null,
 )

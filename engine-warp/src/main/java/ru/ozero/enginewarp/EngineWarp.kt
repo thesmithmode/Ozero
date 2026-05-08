@@ -51,12 +51,12 @@ class EngineWarp(
         require(upstream is Upstream.None) {
             "EngineWarp не принимает upstream — supportsUpstreamSocks=false"
         }
-        val effective = resolveConfig() ?: return StartResult.Failure(
+        val resolved = resolveActive() ?: return StartResult.Failure(
             reason = "WARP config resolve failed (auto-register не сработал)",
         )
-        resolvedConfig = effective
-        resolvedIni = WarpIniBuilder.build(effective)
-        PersistentLoggers.info(TAG, "resolved config: $effective")
+        resolvedConfig = resolved.config
+        resolvedIni = resolved.ini
+        PersistentLoggers.info(TAG, "resolved config: ${resolved.config} (iniSource=${resolved.iniSource})")
         return StartResult.Success(socksPort = WARP_NO_SOCKS_PORT)
     }
 
@@ -76,7 +76,10 @@ class EngineWarp(
 
     override suspend fun tunSpec(): TunSpec? {
         val cfg = resolvedConfig
-            ?: resolveConfig()?.also { resolvedConfig = it }
+            ?: resolveActive()?.also {
+                resolvedConfig = it.config
+                resolvedIni = it.ini
+            }?.config
             ?: return null
         val v4Addr = cfg.interfaceAddressV4.substringBefore('/').takeIf { it.isNotBlank() }
             ?: return null
@@ -118,21 +121,38 @@ class EngineWarp(
         }
     }
 
-    private suspend fun resolveConfig(): WarpConfig? {
-        val raw = configStore.activeConfig().first()
-            ?: run {
-                PersistentLoggers.info(TAG, "no active config — autoConfig.register")
-                val regResult = autoConfig.register()
-                val fresh = regResult.getOrElse { t ->
-                    PersistentLoggers.error(TAG, "register failed: ${t.message}")
-                    return null
-                }
-                runCatching { configStore.addSlot("WARP Auto", fresh) }
-                    .onSuccess { PersistentLoggers.info(TAG, "auto-registered config saved as slot $it") }
-                    .onFailure { PersistentLoggers.warn(TAG, "addSlot failed: ${it.message}") }
-                fresh
+    private data class ResolvedWarp(val config: WarpConfig, val ini: String, val iniSource: String)
+
+    private suspend fun resolveActive(): ResolvedWarp? {
+        val slot = configStore.activeSlot().first()
+        return if (slot != null) {
+            buildResolved(slot.config, slot.rawIniOverride, source = "slot")
+        } else {
+            PersistentLoggers.info(TAG, "no active config — autoConfig.register")
+            val regResult = autoConfig.register()
+            val fresh = regResult.getOrElse { t ->
+                PersistentLoggers.error(TAG, "register failed: ${t.message}")
+                return null
             }
-        return resolveEndpointHost(raw)
+            runCatching { configStore.addSlot("WARP Auto", fresh.config, fresh.rawIni) }
+                .onSuccess { PersistentLoggers.info(TAG, "auto-registered config saved as slot $it") }
+                .onFailure { PersistentLoggers.warn(TAG, "addSlot failed: ${it.message}") }
+            buildResolved(fresh.config, fresh.rawIni, source = "auto")
+        }
+    }
+
+    private fun buildResolved(config: WarpConfig, rawIni: String?, source: String): ResolvedWarp {
+        val resolvedConfig = resolveEndpointHost(config)
+        val ini = if (!rawIni.isNullOrBlank()) {
+            applyEndpointToRawIni(rawIni, resolvedConfig.peerEndpoint)
+        } else {
+            WarpIniBuilder.build(resolvedConfig)
+        }
+        val iniSource = when {
+            !rawIni.isNullOrBlank() -> "raw($source)"
+            else -> "builder($source)"
+        }
+        return ResolvedWarp(config = resolvedConfig, ini = ini, iniSource = iniSource)
     }
 
     private fun resolveEndpointHost(cfg: WarpConfig): WarpConfig {
@@ -155,6 +175,17 @@ class EngineWarp(
             cfg
         }
     }
+
+    private fun applyEndpointToRawIni(rawIni: String, resolvedEndpoint: String): String =
+        rawIni.lineSequence().joinToString("\n") { line ->
+            val trimmed = line.trim()
+            if (trimmed.startsWith("Endpoint", ignoreCase = true) && trimmed.contains('=')) {
+                val indent = line.takeWhile { it.isWhitespace() }
+                "${indent}Endpoint = $resolvedEndpoint"
+            } else {
+                line
+            }
+        }
 
     private fun isLikelyIpAddress(host: String): Boolean {
         if (host.isEmpty()) return false

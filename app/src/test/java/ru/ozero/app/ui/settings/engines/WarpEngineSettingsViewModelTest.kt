@@ -64,7 +64,7 @@ class WarpEngineSettingsViewModelTest {
 
     @Test
     fun `init с пустым store — auto-trigger register ровно один раз`() = runTest {
-        auto.result = Result.success(SAMPLE)
+        auto.setConfig(SAMPLE)
         advanceUntilIdle()
         assertEquals(1, auto.callCount, "При пустом store auto-register срабатывает (Bug #3)")
     }
@@ -116,7 +116,7 @@ class WarpEngineSettingsViewModelTest {
     @Test
     fun `auto-trigger при isRegistering=true (manual onGenerate уже идёт) — НЕ дублирует`() = runTest {
         auto.delayMs = 60_000L
-        auto.result = Result.success(SAMPLE)
+        auto.setConfig(SAMPLE)
         vm.onGenerate()
         runCurrent()
         assertTrue(vm.uiState.value.isRegistering)
@@ -133,7 +133,7 @@ class WarpEngineSettingsViewModelTest {
 
     @Test
     fun `onGenerate success добавляет ровно один слот`() = runTest {
-        auto.result = Result.success(SAMPLE)
+        auto.setConfig(SAMPLE)
         vm.onGenerate()
         advanceUntilIdle()
         assertEquals(1, store.slotCount())
@@ -160,7 +160,7 @@ class WarpEngineSettingsViewModelTest {
 
     @Test
     fun `onGenerate во время isRegistering=true игнорируется`() = runTest {
-        auto.result = Result.success(SAMPLE)
+        auto.setConfig(SAMPLE)
         auto.callCount = 0
         vm.onGenerate()
         vm.onGenerate()
@@ -175,7 +175,7 @@ class WarpEngineSettingsViewModelTest {
         auto.beforeReturn = {
             observed = vm.uiState.value.isRegistering
         }
-        auto.result = Result.success(SAMPLE)
+        auto.setConfig(SAMPLE)
         vm.onGenerate()
         advanceUntilIdle()
         assertTrue(observed, "isRegistering обязан быть true пока auto.register выполняется")
@@ -184,7 +184,7 @@ class WarpEngineSettingsViewModelTest {
     @Test
     fun `onCancelGenerate отменяет register и сбрасывает isRegistering`() = runTest {
         auto.delayMs = 60_000L
-        auto.result = Result.success(SAMPLE)
+        auto.setConfig(SAMPLE)
         vm.onGenerate()
         runCurrent()
         assertTrue(vm.uiState.value.isRegistering)
@@ -207,7 +207,7 @@ class WarpEngineSettingsViewModelTest {
 
     @Test
     fun `onImportFile success добавляет слот и увеличивает importSuccessCount`() = runTest {
-        importer.result = Result.success(SAMPLE)
+        importer.setConfig(SAMPLE)
         vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
         advanceUntilIdle()
         assertEquals(1, store.slotCount())
@@ -234,7 +234,7 @@ class WarpEngineSettingsViewModelTest {
 
     @Test
     fun `onImportFile успешный дважды — importSuccessCount равен двум`() = runTest {
-        importer.result = Result.success(SAMPLE)
+        importer.setConfig(SAMPLE)
         vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
         advanceUntilIdle()
         vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
@@ -406,7 +406,7 @@ class WarpEngineSettingsViewModelTest {
 
     @Test
     fun `onGenerate передаёт прогресс через progressText`() = runTest {
-        auto.result = Result.success(SAMPLE)
+        auto.setConfig(SAMPLE)
         auto.progressToEmit = "3/78"
         vm.onGenerate()
         advanceUntilIdle()
@@ -423,15 +423,24 @@ class WarpEngineSettingsViewModelTest {
 
         override fun slots(): Flow<List<WarpConfigSlot>> = slotsFlow
 
+        override fun activeSlot() = slotsFlow.map { list -> list.firstOrNull { it.isActive } }
+
         override fun activeConfig() = slotsFlow.map { list ->
             list.firstOrNull { it.isActive }?.config
         }
 
-        override suspend fun addSlot(name: String, config: WarpConfig): String {
+        var lastAddedRawIni: String? = null
+
+        override suspend fun addSlot(name: String, config: WarpConfig, rawIni: String?): String {
             val id = "fake-${idCounter++}"
             val makeActive = slotsFlow.value.isEmpty()
+            lastAddedRawIni = rawIni
             slotsFlow.value = slotsFlow.value + WarpConfigSlot(
-                id = id, name = name, config = config, isActive = makeActive,
+                id = id,
+                name = name,
+                config = config,
+                isActive = makeActive,
+                rawIniOverride = rawIni,
             )
             return id
         }
@@ -445,10 +454,10 @@ class WarpEngineSettingsViewModelTest {
             slotsFlow.value = slotsFlow.value.map { if (it.id == id) it.copy(name = name) else it }
         }
 
-        override suspend fun updateSlot(id: String, name: String, config: WarpConfig) {
+        override suspend fun updateSlot(id: String, name: String, config: WarpConfig, rawIni: String?) {
             lastUpdateCall = Triple(id, name, config)
             slotsFlow.value = slotsFlow.value.map {
-                if (it.id == id) it.copy(name = name, config = config) else it
+                if (it.id == id) it.copy(name = name, config = config, rawIniOverride = rawIni) else it
             }
         }
 
@@ -466,18 +475,24 @@ class WarpEngineSettingsViewModelTest {
     }
 
     private class FakeFileImporter : WarpFileImporter {
-        var result: Result<WarpConfig> = Result.failure(IllegalStateException("not-stubbed"))
-        override fun import(stream: InputStream): Result<WarpConfig> = result
+        var result: Result<ImportedWarpConfig> = Result.failure(IllegalStateException("not-stubbed"))
+        fun setConfig(cfg: WarpConfig, rawIni: String = "[Interface]\n[Peer]\n") {
+            result = Result.success(ImportedWarpConfig(cfg, rawIni))
+        }
+        override fun import(stream: InputStream): Result<ImportedWarpConfig> = result
     }
 
     private class FakeAutoConfig : WarpAutoConfig {
-        var result: Result<WarpConfig> = Result.failure(IllegalStateException("not-stubbed"))
+        var result: Result<RegisteredWarpConfig> = Result.failure(IllegalStateException("not-stubbed"))
         var callCount: Int = 0
         var beforeReturn: () -> Unit = {}
         var delayMs: Long = 0L
         var progressToEmit: String? = null
         var cooldownMs: Long = 0L
-        override suspend fun register(onProgress: ((String) -> Unit)?): Result<WarpConfig> {
+        fun setConfig(cfg: WarpConfig, rawIni: String = "[Interface]\n[Peer]\n") {
+            result = Result.success(RegisteredWarpConfig(cfg, rawIni))
+        }
+        override suspend fun register(onProgress: ((String) -> Unit)?): Result<RegisteredWarpConfig> {
             callCount++
             beforeReturn()
             progressToEmit?.let { onProgress?.invoke(it) }

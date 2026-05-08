@@ -30,11 +30,14 @@ class EngineWarpContractTest {
 
     private fun engine(
         activeConfig: WarpConfig? = null,
-        autoConfigResult: Result<WarpConfig> = Result.success(sampleConfig),
+        activeRawIni: String? = null,
+        autoConfigResult: Result<RegisteredWarpConfig> = Result.success(
+            RegisteredWarpConfig(sampleConfig, "[Interface]\n[Peer]\n"),
+        ),
         bridge: FakeWarpSdkBridge = FakeWarpSdkBridge(),
         uapiPath: String = "/data/data/ru.ozero.app",
     ): Triple<EngineWarp, FakeWarpAutoConfig, FakeWarpConfigSlotStore> {
-        val store = FakeWarpConfigSlotStore(activeConfig = activeConfig)
+        val store = FakeWarpConfigSlotStore(activeConfig = activeConfig, activeRawIni = activeRawIni)
         val auto = FakeWarpAutoConfig(autoConfigResult)
         val e = EngineWarp(
             autoConfig = auto,
@@ -64,7 +67,7 @@ class EngineWarpContractTest {
         val r = e.start(EngineConfig.Warp, Upstream.None)
         assertIs<StartResult.Success>(r)
         assertEquals(1, auto.registerCalls)
-        assertEquals(sampleConfig, store.lastAdded?.second)
+        assertEquals(sampleConfig, store.lastAdded?.config)
     }
 
     @Test
@@ -79,7 +82,7 @@ class EngineWarpContractTest {
     fun `register failure → StartResult Failure`() = runTest {
         val (e, _, _) = engine(
             activeConfig = null,
-            autoConfigResult = Result.failure(java.io.IOException("net down")),
+            autoConfigResult = Result.failure<RegisteredWarpConfig>(java.io.IOException("net down")),
         )
         val r = e.start(EngineConfig.Warp, Upstream.None)
         assertIs<StartResult.Failure>(r)
@@ -177,9 +180,43 @@ class EngineWarpContractTest {
     fun `tunSpec при register failure → null`() = runTest {
         val (e, _, _) = engine(
             activeConfig = null,
-            autoConfigResult = Result.failure(java.io.IOException("net")),
+            autoConfigResult = Result.failure<RegisteredWarpConfig>(java.io.IOException("net")),
         )
         assertNull(e.tunSpec())
+    }
+
+    @Test
+    fun `attachTun с rawIniOverride в slot — bridge получает raw INI без модификаций (passthrough)`() = runTest {
+        val rawIni = """
+            [Interface]
+            PrivateKey = ${sampleConfig.privateKey}
+            Address = 172.16.0.2/32
+            Jc = 5
+            I1 = <b 0xdeadbeef>
+
+            [Peer]
+            PublicKey = ${sampleConfig.peerPublicKey}
+            Endpoint = ${sampleConfig.peerEndpoint}
+        """.trimIndent()
+        val bridge = FakeWarpSdkBridge()
+        val (e, _, _) = engine(activeConfig = sampleConfig, activeRawIni = rawIni, bridge = bridge)
+        e.start(EngineConfig.Warp, Upstream.None)
+        e.attachTun(tunFd = 7)
+        assertTrue(
+            bridge.lastIni!!.contains("I1 = <b 0xdeadbeef>"),
+            "rawIni passthrough — I1 должен передаться в bridge",
+        )
+    }
+
+    @Test
+    fun `auto-register сохраняет rawIni в slot (для passthrough при следующем start)`() = runTest {
+        val raw = "[Interface]\nPrivateKey = abc\n[Peer]\nPublicKey = def\nEndpoint = h:1\n"
+        val (e, _, store) = engine(
+            activeConfig = null,
+            autoConfigResult = Result.success(RegisteredWarpConfig(sampleConfig, raw)),
+        )
+        e.start(EngineConfig.Warp, Upstream.None)
+        assertEquals(raw, store.lastAdded?.rawIni, "auto-config rawIni сохраняется в slot")
     }
 
     @Test
@@ -193,39 +230,55 @@ class EngineWarpContractTest {
     }
 
     private class FakeWarpAutoConfig(
-        private val result: Result<WarpConfig>,
+        private val result: Result<RegisteredWarpConfig>,
     ) : WarpAutoConfig {
         var registerCalls: Int = 0
-        override suspend fun register(onProgress: ((String) -> Unit)?): Result<WarpConfig> {
+        override suspend fun register(onProgress: ((String) -> Unit)?): Result<RegisteredWarpConfig> {
             registerCalls++
             return result
         }
     }
 
+    data class AddedSlot(val name: String, val config: WarpConfig, val rawIni: String?)
+
     private class FakeWarpConfigSlotStore(
         activeConfig: WarpConfig?,
+        activeRawIni: String? = null,
     ) : WarpConfigSlotStore {
         private val activeFlow = MutableStateFlow(activeConfig)
         private val slotsList = MutableStateFlow<List<WarpConfigSlot>>(emptyList())
-        var lastAdded: Pair<String, WarpConfig>? = null
+        var lastAdded: AddedSlot? = null
             private set
 
         init {
             if (activeConfig != null) {
                 slotsList.value = listOf(
-                    WarpConfigSlot(id = "init", name = "Init", config = activeConfig, isActive = true),
+                    WarpConfigSlot(
+                        id = "init",
+                        name = "Init",
+                        config = activeConfig,
+                        isActive = true,
+                        rawIniOverride = activeRawIni,
+                    ),
                 )
             }
         }
 
         override fun slots(): Flow<List<WarpConfigSlot>> = slotsList
+        override fun activeSlot(): Flow<WarpConfigSlot?> = MutableStateFlow(slotsList.value.firstOrNull { it.isActive })
         override fun activeConfig(): Flow<WarpConfig?> = activeFlow
 
-        override suspend fun addSlot(name: String, config: WarpConfig): String {
-            lastAdded = name to config
+        override suspend fun addSlot(name: String, config: WarpConfig, rawIni: String?): String {
+            lastAdded = AddedSlot(name, config, rawIni)
             val id = "fake-${slotsList.value.size}"
             slotsList.value = slotsList.value +
-                WarpConfigSlot(id = id, name = name, config = config, isActive = slotsList.value.isEmpty())
+                WarpConfigSlot(
+                    id = id,
+                    name = name,
+                    config = config,
+                    isActive = slotsList.value.isEmpty(),
+                    rawIniOverride = rawIni,
+                )
             activeFlow.value = config
             return id
         }
@@ -239,9 +292,9 @@ class EngineWarpContractTest {
             slotsList.value = slotsList.value.map { if (it.id == id) it.copy(name = name) else it }
         }
 
-        override suspend fun updateSlot(id: String, name: String, config: WarpConfig) {
+        override suspend fun updateSlot(id: String, name: String, config: WarpConfig, rawIni: String?) {
             slotsList.value = slotsList.value.map {
-                if (it.id == id) it.copy(name = name, config = config) else it
+                if (it.id == id) it.copy(name = name, config = config, rawIniOverride = rawIni) else it
             }
         }
 

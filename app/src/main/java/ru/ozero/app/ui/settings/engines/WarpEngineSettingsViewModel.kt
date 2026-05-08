@@ -123,9 +123,9 @@ class WarpEngineSettingsViewModel @Inject constructor(
                     )
                 })
                 result.fold(
-                    onSuccess = { cfg ->
+                    onSuccess = { registered ->
                         val timestamp = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
-                        store.addSlot("WARP Auto $timestamp", cfg)
+                        store.addSlot("WARP Auto $timestamp", registered.config, registered.rawIni)
                         _uiState.value = _uiState.value.copy(
                             isRegistering = false,
                             errorMessage = null,
@@ -159,8 +159,8 @@ class WarpEngineSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             val result = fileImporter.import(stream)
             result.fold(
-                onSuccess = { cfg ->
-                    val id = store.addSlot(suggestedName, cfg)
+                onSuccess = { imported ->
+                    val id = store.addSlot(suggestedName, imported.config, imported.rawIni)
                     store.setActive(id)
                     _uiState.value = _uiState.value.copy(
                         errorMessage = null,

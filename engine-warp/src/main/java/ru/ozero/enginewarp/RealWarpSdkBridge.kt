@@ -2,21 +2,12 @@ package ru.ozero.enginewarp
 
 import android.content.Context
 import com.getkeepsafe.relinker.ReLinker
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.amnezia.awg.GoBackend
-import org.amnezia.awg.config.BadConfigException
-import org.amnezia.awg.config.Config
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.VpnSocketProtector
-import java.io.BufferedReader
 import java.io.File
-import java.io.StringReader
 
 class RealWarpSdkBridge internal constructor(
     private val awgRuntime: AwgRuntime,
@@ -26,11 +17,6 @@ class RealWarpSdkBridge internal constructor(
 
     @Volatile
     private var tunnelHandle: Int = INVALID_HANDLE
-
-    private val watchdogScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
-    @Volatile
-    private var handshakeWatchdogJob: Job? = null
 
     override suspend fun attachTun(
         tunnelName: String,
@@ -42,25 +28,19 @@ class RealWarpSdkBridge internal constructor(
         if (tunFd < 0) return@withContext WarpSdkBridge.AttachResult.Failed("invalid tunFd=$tunFd")
         if (iniConfig.isBlank()) return@withContext WarpSdkBridge.AttachResult.Failed("empty iniConfig")
         if (uapiPath.isBlank()) return@withContext WarpSdkBridge.AttachResult.Failed("empty uapiPath")
+        val structuralError = validateIniStructure(iniConfig)
+        if (structuralError != null) {
+            PersistentLoggers.error(TAG, "INI rejected: $structuralError")
+            return@withContext WarpSdkBridge.AttachResult.Failed("INI invalid: $structuralError")
+        }
         val socketFile = File(uapiPath, "$tunnelName.sock")
         if (socketFile.exists()) {
             val deleted = socketFile.delete()
             PersistentLoggers.info(TAG, "stale socket $socketFile deleted=$deleted")
         }
-        PersistentLoggers.info(TAG, "INI raw ($tunnelName):\n${sanitizeIni(iniConfig)}")
-        val canonicalIni = try {
-            Config.parse(BufferedReader(StringReader(iniConfig)))
-                .toAwgQuickString(false, false)
-        } catch (e: BadConfigException) {
-            PersistentLoggers.error(TAG, "Config.parse BadConfigException: ${e.message}")
-            return@withContext WarpSdkBridge.AttachResult.Failed("INI parse error: ${e.message}")
-        } catch (e: Throwable) {
-            PersistentLoggers.error(TAG, "Config.parse threw: ${e.message}")
-            return@withContext WarpSdkBridge.AttachResult.Failed("INI parse threw: ${e.message}")
-        }
-        PersistentLoggers.info(TAG, "INI canonical ($tunnelName):\n${sanitizeIni(canonicalIni)}")
+        logIniDigest(tunnelName, iniConfig)
         try {
-            val handle = awgRuntime.turnOn(tunnelName, tunFd, canonicalIni, uapiPath)
+            val handle = awgRuntime.turnOn(tunnelName, tunFd, iniConfig, uapiPath)
             if (handle < 0) {
                 return@withContext WarpSdkBridge.AttachResult.Failed("awgTurnOn handle=$handle")
             }
@@ -73,11 +53,10 @@ class RealWarpSdkBridge internal constructor(
                 return@withContext WarpSdkBridge.AttachResult.Failed("protect underlying sockets failed")
             }
             PersistentLoggers.info(TAG, "awgTurnOn OK handle=$handle name=$tunnelName")
-            startHandshakeWatchdog(handle)
             WarpSdkBridge.AttachResult.Success
         } catch (t: Throwable) {
             val msg = t.message ?: t.javaClass.simpleName
-            PersistentLoggers.error(TAG, "awgTurnOn threw: $msg")
+            PersistentLoggers.error(TAG, "awgTurnOn threw: $msg (${t.javaClass.name})")
             WarpSdkBridge.AttachResult.Failed("awgTurnOn failed: $msg")
         }
     }
@@ -118,8 +97,6 @@ class RealWarpSdkBridge internal constructor(
     }
 
     override suspend fun detachTun() {
-        handshakeWatchdogJob?.cancel()
-        handshakeWatchdogJob = null
         withContext(Dispatchers.IO) {
             val h = tunnelHandle
             if (h == INVALID_HANDLE) return@withContext
@@ -134,44 +111,47 @@ class RealWarpSdkBridge internal constructor(
         }
     }
 
-    private fun startHandshakeWatchdog(handle: Int) {
-        handshakeWatchdogJob?.cancel()
-        handshakeWatchdogJob = watchdogScope.launch {
-            var elapsed = 0L
-            while (elapsed < HANDSHAKE_TIMEOUT_MS && tunnelHandle == handle) {
-                delay(HANDSHAKE_POLL_MS)
-                elapsed += HANDSHAKE_POLL_MS
-                val cfg = awgRuntime.getConfig(handle) ?: continue
-                val hsLine = cfg.lineSequence().firstOrNull { it.startsWith("last_handshake_time_sec=") }
-                val sec = hsLine?.substringAfter("=")?.toLongOrNull() ?: 0L
-                if (sec > 0L) {
-                    PersistentLoggers.info(TAG, "handshake OK after ${elapsed}ms (last_handshake_time_sec=$sec)")
-                    return@launch
-                }
-            }
-            if (tunnelHandle == handle) {
-                PersistentLoggers.error(
-                    TAG,
-                    "handshake НЕ установлен за ${HANDSHAKE_TIMEOUT_MS}ms — Cloudflare не отвечает " +
-                        "(возможны: неверный конфиг/AWG-параметры/блокировка endpoint)",
-                )
-            }
-        }
-    }
-
     override fun isRunning(): Boolean = tunnelHandle != INVALID_HANDLE
 
     private companion object {
         const val TAG = "RealWarpSdkBridge"
         const val INVALID_HANDLE = -1
-        const val HANDSHAKE_POLL_MS = 1_000L
-        const val HANDSHAKE_TIMEOUT_MS = 12_000L
+
+        fun validateIniStructure(ini: String): String? {
+            val hasInterface = ini.lineSequence().any { it.trim().equals("[Interface]", ignoreCase = true) }
+            val hasPeer = ini.lineSequence().any { it.trim().equals("[Peer]", ignoreCase = true) }
+            return when {
+                !hasInterface -> "[Interface] section отсутствует"
+                !hasPeer -> "[Peer] section отсутствует"
+                else -> null
+            }
+        }
+
+        fun logIniDigest(tunnelName: String, ini: String) {
+            val totalBytes = ini.toByteArray(Charsets.UTF_8).size
+            val lines = ini.lines()
+            val nonEmpty = lines.count { it.isNotBlank() }
+            val keys = lines.mapNotNull { line ->
+                val trimmed = line.trim()
+                if (trimmed.isEmpty() || trimmed.startsWith("#") || trimmed.startsWith("[")) {
+                    null
+                } else {
+                    trimmed.substringBefore('=').trim().lowercase()
+                }
+            }.distinct()
+            PersistentLoggers.info(
+                TAG,
+                "INI digest ($tunnelName): bytes=$totalBytes lines=${lines.size} nonEmpty=$nonEmpty keys=$keys",
+            )
+            PersistentLoggers.info(TAG, "INI passthrough ($tunnelName):\n${sanitizeIni(ini)}")
+        }
 
         fun sanitizeIni(ini: String): String = ini.lineSequence().joinToString("\n") { line ->
-            if (line.trimStart().startsWith("PrivateKey", ignoreCase = true)) {
-                "PrivateKey = ***"
-            } else {
-                line
+            val trimmed = line.trimStart()
+            when {
+                trimmed.startsWith("PrivateKey", ignoreCase = true) -> "PrivateKey = ***"
+                trimmed.startsWith("PresharedKey", ignoreCase = true) -> "PresharedKey = ***"
+                else -> line
             }
         }
     }
