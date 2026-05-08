@@ -2,6 +2,7 @@ package ru.ozero.app.ui
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -75,6 +76,7 @@ fun MainScreen(
     val speedHistory by viewModel.speedHistory.collectAsStateWithLifecycle()
     val urnetworkPeerCount by viewModel.urnetworkPeerCount.collectAsStateWithLifecycle()
     val urnetworkPeerSearchSeconds by viewModel.urnetworkPeerSearchSeconds.collectAsStateWithLifecycle()
+    val ipInfo by viewModel.ipInfo.collectAsStateWithLifecycle()
 
     val powerState = state.toPowerDiscState()
     val backgroundState = state.toBackgroundState()
@@ -104,8 +106,10 @@ fun MainScreen(
                 manualEngine = manualEngine,
                 urnetworkPeerCount = urnetworkPeerCount,
                 urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
+                ipInfo = ipInfo,
                 onConnectClick = onConnectClick,
                 onManualEngineSelect = viewModel::onManualEngineSelect,
+                onRefreshIpInfo = viewModel::refreshIpInfo,
                 onOpenEngineParams = onOpenEngineParams,
                 onOpenSettings = onOpenSettings,
             )
@@ -209,8 +213,10 @@ private fun ExpertMainContent(
     manualEngine: EngineId?,
     urnetworkPeerCount: Int,
     urnetworkPeerSearchSeconds: Int,
+    ipInfo: IpInfoState,
     onConnectClick: () -> Unit,
     onManualEngineSelect: (EngineId?) -> Unit,
+    onRefreshIpInfo: () -> Unit,
     onOpenEngineParams: (EngineId?) -> Unit,
     onOpenSettings: () -> Unit,
 ) {
@@ -245,6 +251,13 @@ private fun ExpertMainContent(
                 UrnetworkPeerBadge(
                     count = urnetworkPeerCount,
                     searchSeconds = urnetworkPeerSearchSeconds,
+                )
+            }
+            if (isConnected) {
+                IpInfoCard(
+                    state = ipInfo,
+                    onRefresh = onRefreshIpInfo,
+                    modifier = Modifier.padding(horizontal = 16.dp),
                 )
             }
             if (isConnected && stats != null) {
@@ -333,6 +346,68 @@ private fun TunnelState.toBackgroundState(): OzeroBackgroundState = when (this) 
     is TunnelState.Disconnecting,
     -> OzeroBackgroundState.Connecting
     is TunnelState.Idle, is TunnelState.Failed -> OzeroBackgroundState.Off
+}
+
+@Composable
+private fun IpInfoCard(
+    state: IpInfoState,
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable { onRefresh() }
+            .testTag(MainScreenTestTags.IP_CARD),
+        colors = CardDefaults.cardColors(containerColor = OzeroPalette.GlassFill),
+        shape = RoundedCornerShape(20.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.ip_card_title),
+                style = MaterialTheme.typography.bodySmall,
+                color = OzeroPalette.Text3,
+            )
+            when (state) {
+                is IpInfoState.Idle, is IpInfoState.Loading -> Text(
+                    text = stringResource(R.string.ip_card_loading),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = OzeroPalette.Text,
+                )
+                is IpInfoState.Loaded -> {
+                    Text(
+                        text = state.info.ip,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = OzeroPalette.Text,
+                    )
+                    val country = state.info.country
+                        ?: stringResource(R.string.ip_card_country_unknown)
+                    val location = listOfNotNull(state.info.city, country).joinToString(", ")
+                    Text(
+                        text = location,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = OzeroPalette.Text3,
+                    )
+                }
+                is IpInfoState.Error -> {
+                    Text(
+                        text = stringResource(R.string.ip_card_error, state.message),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    Text(
+                        text = stringResource(R.string.ip_card_refresh),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = OzeroPalette.Aqua,
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable

@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import ru.ozero.commonnet.IpInfo
+import ru.ozero.commonnet.IpInfoProvider
 import ru.ozero.commonvpn.HealthMonitor
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
@@ -23,12 +25,20 @@ import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import javax.inject.Inject
 
+sealed class IpInfoState {
+    data object Idle : IpInfoState()
+    data object Loading : IpInfoState()
+    data class Loaded(val info: IpInfo) : IpInfoState()
+    data class Error(val message: String) : IpInfoState()
+}
+
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val tunnelController: TunnelController,
     private val healthMonitor: HealthMonitor,
     private val settingsRepository: SettingsRepository,
     private val urnetworkBridge: UrnetworkSdkBridge,
+    private val ipInfoProvider: IpInfoProvider,
 ) : ViewModel() {
 
     val state: StateFlow<TunnelState> =
@@ -80,6 +90,9 @@ class MainViewModel @Inject constructor(
     private val _speedHistory = MutableStateFlow<List<Pair<Float, Float>>>(emptyList())
     val speedHistory: StateFlow<List<Pair<Float, Float>>> = _speedHistory.asStateFlow()
 
+    private val _ipInfo = MutableStateFlow<IpInfoState>(IpInfoState.Idle)
+    val ipInfo: StateFlow<IpInfoState> = _ipInfo.asStateFlow()
+
     val urnetworkPeerCount: StateFlow<Int> = flow {
         while (true) {
             val s = tunnelController.state.value
@@ -125,6 +138,36 @@ class MainViewModel @Inject constructor(
                 }
             }
         }
+        viewModelScope.launch {
+            var lastSessionKey: String? = null
+            tunnelController.state.collect { s ->
+                if (s is TunnelState.Connected) {
+                    val key = "${s.engineId}:${s.socksPort}"
+                    if (key != lastSessionKey) {
+                        lastSessionKey = key
+                        _ipInfo.value = IpInfoState.Loading
+                        delay(IP_INFO_WARMUP_MS)
+                        _ipInfo.value = ipInfoProvider.fetch().fold(
+                            onSuccess = { IpInfoState.Loaded(it) },
+                            onFailure = { IpInfoState.Error(it.message ?: it.javaClass.simpleName) },
+                        )
+                    }
+                } else {
+                    lastSessionKey = null
+                    if (_ipInfo.value !is IpInfoState.Idle) _ipInfo.value = IpInfoState.Idle
+                }
+            }
+        }
+    }
+
+    fun refreshIpInfo() {
+        viewModelScope.launch {
+            _ipInfo.value = IpInfoState.Loading
+            _ipInfo.value = ipInfoProvider.fetch().fold(
+                onSuccess = { IpInfoState.Loaded(it) },
+                onFailure = { IpInfoState.Error(it.message ?: it.javaClass.simpleName) },
+            )
+        }
     }
 
     fun onConnectClick() = Unit
@@ -147,5 +190,6 @@ class MainViewModel @Inject constructor(
         const val URNETWORK_PEER_POLL_MS = 2_000L
         const val URNETWORK_PEER_POLL_KEEP_MS = 5_000L
         const val URNETWORK_SEARCH_TICK_MS = 1_000L
+        const val IP_INFO_WARMUP_MS = 3_000L
     }
 }

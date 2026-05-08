@@ -14,7 +14,10 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import ru.ozero.app.ui.IpInfoState
 import ru.ozero.app.ui.MainViewModel
+import ru.ozero.commonnet.IpInfo
+import ru.ozero.commonnet.IpInfoProvider
 import ru.ozero.commonvpn.HealthMonitor
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
@@ -38,6 +41,7 @@ class MainViewModelTest {
     private lateinit var tunnelController: TunnelController
     private lateinit var healthMonitor: HealthMonitor
     private lateinit var settingsRepository: FakeSettingsRepository
+    private lateinit var ipInfoProvider: FakeIpInfoProvider
     private lateinit var viewModel: MainViewModel
 
     @BeforeEach
@@ -46,7 +50,32 @@ class MainViewModelTest {
         tunnelController = TunnelController()
         healthMonitor = HealthMonitor()
         settingsRepository = FakeSettingsRepository()
-        viewModel = MainViewModel(tunnelController, healthMonitor, settingsRepository, FakeUrnetworkBridge())
+        ipInfoProvider = FakeIpInfoProvider()
+        viewModel = MainViewModel(
+            tunnelController,
+            healthMonitor,
+            settingsRepository,
+            FakeUrnetworkBridge(),
+            ipInfoProvider,
+        )
+    }
+
+    private class FakeIpInfoProvider(
+        @Volatile var result: Result<IpInfo> = Result.success(
+            IpInfo(
+                ip = "203.0.113.1",
+                country = "Germany",
+                countryCode = "DE",
+                city = "Berlin",
+                fetchedAtMs = 1_700_000_000_000L,
+            ),
+        ),
+    ) : IpInfoProvider {
+        @Volatile var calls: Int = 0
+        override suspend fun fetch(): Result<IpInfo> {
+            calls += 1
+            return result
+        }
     }
 
     private class FakeUrnetworkBridge(var peers: Int = 0) : UrnetworkSdkBridge {
@@ -203,7 +232,7 @@ class MainViewModelTest {
     @Test
     fun urnetworkPeerSearchSecondsIncrementsWhileNoPeers() = runTest {
         val bridge = FakeUrnetworkBridge(peers = 0)
-        val vm = MainViewModel(tunnelController, healthMonitor, settingsRepository, bridge)
+        val vm = MainViewModel(tunnelController, healthMonitor, settingsRepository, bridge, ipInfoProvider)
         backgroundScope.launch { vm.urnetworkPeerSearchSeconds.collect {} }
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.URNETWORK)
@@ -219,7 +248,7 @@ class MainViewModelTest {
     @Test
     fun urnetworkPeerSearchSecondsResetsWhenPeersAppear() = runTest {
         val bridge = FakeUrnetworkBridge(peers = 0)
-        val vm = MainViewModel(tunnelController, healthMonitor, settingsRepository, bridge)
+        val vm = MainViewModel(tunnelController, healthMonitor, settingsRepository, bridge, ipInfoProvider)
         backgroundScope.launch { vm.urnetworkPeerSearchSeconds.collect {} }
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.URNETWORK)
@@ -231,6 +260,72 @@ class MainViewModelTest {
         kotlinx.coroutines.delay(2_000)
         advanceUntilIdle()
         assertEquals(0, vm.urnetworkPeerSearchSeconds.value)
+    }
+
+    @Test
+    fun ipInfoInitiallyIdle() {
+        assertIs<IpInfoState.Idle>(viewModel.ipInfo.value)
+    }
+
+    @Test
+    fun ipInfoFetchesOnConnected() = runTest {
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
+        advanceUntilIdle()
+        kotlinx.coroutines.delay(3_500)
+        advanceUntilIdle()
+        val s = viewModel.ipInfo.value
+        assertIs<IpInfoState.Loaded>(s)
+        assertEquals("203.0.113.1", s.info.ip)
+        assertEquals(1, ipInfoProvider.calls)
+    }
+
+    @Test
+    fun ipInfoBackToIdleOnDisconnect() = runTest {
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
+        advanceUntilIdle()
+        kotlinx.coroutines.delay(3_500)
+        advanceUntilIdle()
+        tunnelController.onEngineDied(EngineId.BYEDPI, "test disconnect")
+        advanceUntilIdle()
+        assertIs<IpInfoState.Idle>(viewModel.ipInfo.value)
+    }
+
+    @Test
+    fun ipInfoErrorOnProviderFailure() = runTest {
+        ipInfoProvider.result = Result.failure(java.io.IOException("network down"))
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
+        advanceUntilIdle()
+        kotlinx.coroutines.delay(3_500)
+        advanceUntilIdle()
+        val s = viewModel.ipInfo.value
+        assertIs<IpInfoState.Error>(s)
+        assertEquals("network down", s.message)
+    }
+
+    @Test
+    fun ipInfoNotRefetchedOnSameSession() = runTest {
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
+        advanceUntilIdle()
+        kotlinx.coroutines.delay(3_500)
+        advanceUntilIdle()
+        assertEquals(1, ipInfoProvider.calls)
+    }
+
+    @Test
+    fun refreshIpInfoForcesRefetch() = runTest {
+        viewModel.refreshIpInfo()
+        advanceUntilIdle()
+        val s = viewModel.ipInfo.value
+        assertIs<IpInfoState.Loaded>(s)
+        assertEquals(1, ipInfoProvider.calls)
     }
 
     private class FakeSettingsRepository : SettingsRepository {

@@ -103,6 +103,7 @@ dependencies {
     implementation(project(":engines-core"))
     implementation(project(":core-storage"))
     implementation(project(":common-vpn"))
+    implementation(project(":common-net"))
     implementation(project(":common-crypto"))
     implementation(project(":engine-byedpi"))
     implementation(project(":engine-urnetwork"))
