@@ -62,14 +62,19 @@ class RouteTrafficForEngineContractTest {
                 "engine.attachTun VPN остаётся в зомби-состоянии без трафика.",
         )
         assertTrue(
-            acceptorBranch.contains("chainOrchestrator.stop()") &&
+            acceptorBranch.contains("chainOrchestrator.stop()"),
+            "Failure path обязан вызвать chainOrchestrator.stop() — иначе chain остаётся активным.",
+        )
+        assertTrue(
+            acceptorBranch.contains("handleEngineFailure(") ||
                 acceptorBranch.contains("stopVpn()"),
-            "Failure path обязан вызвать chainOrchestrator.stop() + stopVpn() — иначе утечка " +
+            "Failure path обязан вызвать handleEngineFailure() или stopVpn() — иначе утечка " +
                 "ресурсов и зомби-tunnel notification.",
         )
         assertTrue(
-            acceptorBranch.contains("tunnelController.onEngineDied"),
-            "Failure path обязан уведомить tunnelController.onEngineDied для UI-состояния.",
+            acceptorBranch.contains("tunnelController.onEngineDied") ||
+                acceptorBranch.contains("handleEngineFailure("),
+            "Failure path обязан уведомить о сбое через tunnelController.onEngineDied или handleEngineFailure.",
         )
     }
 

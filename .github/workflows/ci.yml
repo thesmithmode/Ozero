@@ -400,6 +400,21 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' }}
 
+      - name: Download URnetwork AAR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p engine-urnetwork/libs
+          TAG=$(gh release list --limit 100 --json tagName \
+            | grep -oE '"urnetwork-sdk-[a-f0-9]{8}"' \
+            | head -n1 | tr -d '"')
+          if [ -z "$TAG" ]; then
+            echo "::error::no urnetwork-sdk release found"
+            exit 1
+          fi
+          gh release download "$TAG" -p "*" -D engine-urnetwork/libs --clobber
+
       - name: testDebugUnitTest + coverage
         run: >
           ./gradlew

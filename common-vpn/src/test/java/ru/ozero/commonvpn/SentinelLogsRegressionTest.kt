@@ -49,7 +49,7 @@ class SentinelLogsRegressionTest {
 
     @Test
     fun `service performShutdown закрывает tunFd ПОСЛЕ tunnelGateway_stop`() {
-        val body = serviceSrc.substringAfter("private suspend fun performShutdown()")
+        val body = serviceSrc.substringAfter("private suspend fun performShutdown(")
             .substringBefore("internal fun buildTunBuilder")
         val nativeIdx = body.indexOf("tunnelGateway.stop()")
         val closeIdx = body.indexOf("tunFdRef.getAndSet(null)?.close()")
