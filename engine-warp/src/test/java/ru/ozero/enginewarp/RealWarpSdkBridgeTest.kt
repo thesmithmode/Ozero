@@ -278,7 +278,11 @@ class RealWarpSdkBridgeTest {
         rt.returnHandle = 22
         b.attachTun("n", 7, validIni, "/x", noopProtector)
         assertEquals(2, rt.turnOnCalls, "второй turnOn должен пройти")
-        assertEquals(1, rt.turnOffCalls, "перед вторым turnOn ОБЯЗАН быть turnOff старого handle (Go runtime leak guard)")
+        assertEquals(
+            1,
+            rt.turnOffCalls,
+            "перед вторым turnOn ОБЯЗАН быть turnOff старого handle (Go runtime leak guard)",
+        )
         assertEquals(11, rt.lastTurnOffHandle, "именно старый handle=11 должен быть закрыт")
         assertTrue(b.isRunning())
     }
@@ -304,7 +308,11 @@ class RealWarpSdkBridgeTest {
             b.attachTun("n", 5, validIni, "/x", noopProtector)
         }
         assertEquals(10, rt.turnOnCalls)
-        assertEquals(9, rt.turnOffCalls, "каждый повторный attach закрывает предыдущий handle — нет накопления в Go runtime")
+        assertEquals(
+            9,
+            rt.turnOffCalls,
+            "каждый повторный attach закрывает предыдущий handle — нет накопления handles в Go runtime",
+        )
         assertTrue(b.isRunning())
     }
 
