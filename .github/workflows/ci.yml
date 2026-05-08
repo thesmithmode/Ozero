@@ -146,15 +146,14 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 7
 
-  test-and-coverage:
-    name: Tests + coverage
+  test-app:
+    name: Tests — app
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
     needs: kotlin-style
     if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' }}
     permissions:
       contents: read
-      checks: write
 
     steps:
       - name: Checkout code
@@ -175,7 +174,7 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' }}
 
-      - name: Download URnetwork AAR (urnetwork-sdk only — Portal Tor parity)
+      - name: Download URnetwork AAR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -188,25 +187,254 @@ jobs:
             echo "::error::no urnetwork-sdk release found"
             exit 1
           fi
-          echo "Download $TAG"
           gh release download "$TAG" -p "*" -D engine-urnetwork/libs --clobber
-          ls -la engine-urnetwork/libs/
 
-      - name: testDebugUnitTest + coverage report and gate
-        run: ./gradlew testDebugUnitTest jacocoTestReport jacocoTestCoverageVerification --stacktrace --continue
+      - name: testDebugUnitTest + coverage
+        run: ./gradlew :app:testDebugUnitTest :app:jacocoTestReport :app:jacocoTestCoverageVerification --stacktrace --continue
 
-      - name: Upload Jacoco coverage report
+      - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: jacoco-coverage
-          path: '**/build/reports/jacoco/**'
-          retention-days: 30
+          name: jacoco-app
+          path: app/build/reports/jacoco/**
+          retention-days: 14
 
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-reports
-          path: '**/build/reports/tests/**'
-          retention-days: 30
+          name: test-reports-app
+          path: app/build/reports/tests/**
+          retention-days: 14
+
+  test-common-vpn:
+    name: Tests — common-vpn
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: kotlin-style
+    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Setup Gradle with caching
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' }}
+
+      - name: testDebugUnitTest + coverage
+        run: ./gradlew :common-vpn:testDebugUnitTest :common-vpn:jacocoTestReport :common-vpn:jacocoTestCoverageVerification --stacktrace --continue
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-common-vpn
+          path: common-vpn/build/reports/jacoco/**
+          retention-days: 14
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-common-vpn
+          path: common-vpn/build/reports/tests/**
+          retention-days: 14
+
+  test-engine-warp:
+    name: Tests — engine-warp
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: kotlin-style
+    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Setup Gradle with caching
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' }}
+
+      - name: testDebugUnitTest + coverage
+        run: ./gradlew :engine-warp:testDebugUnitTest :engine-warp:jacocoTestReport :engine-warp:jacocoTestCoverageVerification --stacktrace --continue
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-engine-warp
+          path: engine-warp/build/reports/jacoco/**
+          retention-days: 14
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-engine-warp
+          path: engine-warp/build/reports/tests/**
+          retention-days: 14
+
+  test-engines-urnetwork-byedpi:
+    name: Tests — engine-urnetwork + engine-byedpi
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: kotlin-style
+    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Setup Gradle with caching
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' }}
+
+      - name: Download URnetwork AAR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p engine-urnetwork/libs
+          TAG=$(gh release list --limit 100 --json tagName \
+            | grep -oE '"urnetwork-sdk-[a-f0-9]{8}"' \
+            | head -n1 | tr -d '"')
+          if [ -z "$TAG" ]; then
+            echo "::error::no urnetwork-sdk release found"
+            exit 1
+          fi
+          gh release download "$TAG" -p "*" -D engine-urnetwork/libs --clobber
+
+      - name: testDebugUnitTest + coverage
+        run: >
+          ./gradlew
+          :engine-urnetwork:testDebugUnitTest :engine-urnetwork:jacocoTestReport :engine-urnetwork:jacocoTestCoverageVerification
+          :engine-byedpi:testDebugUnitTest :engine-byedpi:jacocoTestReport :engine-byedpi:jacocoTestCoverageVerification
+          --stacktrace --continue
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-engines-urnetwork-byedpi
+          path: |
+            engine-urnetwork/build/reports/jacoco/**
+            engine-byedpi/build/reports/jacoco/**
+          retention-days: 14
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-engines-urnetwork-byedpi
+          path: |
+            engine-urnetwork/build/reports/tests/**
+            engine-byedpi/build/reports/tests/**
+          retention-days: 14
+
+  test-core-modules:
+    name: Tests — core + common modules
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: kotlin-style
+    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Setup Gradle with caching
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' }}
+
+      - name: testDebugUnitTest + coverage
+        run: >
+          ./gradlew
+          :core-storage:testDebugUnitTest :core-storage:jacocoTestReport :core-storage:jacocoTestCoverageVerification
+          :core-backup:testDebugUnitTest :core-backup:jacocoTestReport :core-backup:jacocoTestCoverageVerification
+          :engines-core:testDebugUnitTest :engines-core:jacocoTestReport :engines-core:jacocoTestCoverageVerification
+          :common-dns:testDebugUnitTest :common-dns:jacocoTestReport :common-dns:jacocoTestCoverageVerification
+          :common-crypto:testDebugUnitTest :common-crypto:jacocoTestReport :common-crypto:jacocoTestCoverageVerification
+          :common-net:testDebugUnitTest :common-net:jacocoTestReport :common-net:jacocoTestCoverageVerification
+          --stacktrace --continue
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-core-modules
+          path: |
+            core-storage/build/reports/jacoco/**
+            core-backup/build/reports/jacoco/**
+            engines-core/build/reports/jacoco/**
+            common-dns/build/reports/jacoco/**
+            common-crypto/build/reports/jacoco/**
+            common-net/build/reports/jacoco/**
+          retention-days: 14
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-core-modules
+          path: |
+            core-storage/build/reports/tests/**
+            core-backup/build/reports/tests/**
+            engines-core/build/reports/tests/**
+            common-dns/build/reports/tests/**
+            common-crypto/build/reports/tests/**
+            common-net/build/reports/tests/**
+          retention-days: 14
