@@ -32,7 +32,7 @@ class TunBuilderConfigurator(
             }
             SplitTunnelMode.ALLOWLIST -> {
                 builder.addRoute("0.0.0.0", 0)
-                applyAllowed(builder, config.packages)
+                applyAllowed(builder, config.packages, includeSelf = !excludeSelf)
             }
             SplitTunnelMode.BLOCKLIST -> {
                 builder.addRoute("0.0.0.0", 0)
@@ -48,7 +48,7 @@ class TunBuilderConfigurator(
             .onFailure { PersistentLoggers.error(TAG, "addDisallowedApplication self failed: ${it.message}") }
     }
 
-    private fun applyAllowed(builder: VpnService.Builder, packages: Set<String>) {
+    private fun applyAllowed(builder: VpnService.Builder, packages: Set<String>, includeSelf: Boolean = false) {
         var added = 0
         var failed = 0
         for (pkg in packages) {
@@ -58,12 +58,16 @@ class TunBuilderConfigurator(
                 .onFailure { failed++ }
         }
         if (failed > 0) PersistentLoggers.warn(TAG, "addAllowedApplication failed для $failed пакетов")
-        if (added == 0) {
+        if (added == 0 && !includeSelf) {
             runCatching { builder.addAllowedApplication(packageName) }
                 .onFailure { PersistentLoggers.error(TAG, "не удалось добавить self в allowlist: ${it.message}") }
             PersistentLoggers.warn(TAG, "ALLOWLIST пуст → kill-all (только self в фильтре)")
         } else {
             Log.i(TAG, "ALLOWLIST применён: $added пакетов")
+        }
+        if (includeSelf) {
+            runCatching { builder.addAllowedApplication(packageName) }
+                .onFailure { PersistentLoggers.warn(TAG, "addAllowedApplication self failed: ${it.message}") }
         }
     }
 

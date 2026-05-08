@@ -127,7 +127,6 @@ class MainViewModel @Inject constructor(
                 }
                 peers > 0 -> {
                     seconds = 0
-                    graceTicks = 0
                 }
                 else -> {
                     graceTicks++

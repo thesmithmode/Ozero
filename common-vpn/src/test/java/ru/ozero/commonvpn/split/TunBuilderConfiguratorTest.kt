@@ -115,6 +115,34 @@ class TunBuilderConfiguratorTest {
     }
 
     @Test
+    fun allowlistExcludeSelfFalseAddsSelfToAllowedList() {
+        val b = mockBuilder()
+        every { b.addAllowedApplication(any()) } returns b
+        configurator.apply(
+            b,
+            SplitTunnelConfig(
+                mode = SplitTunnelMode.ALLOWLIST,
+                packages = setOf("com.example.browser"),
+            ),
+            excludeSelf = false,
+        )
+        verify { b.addAllowedApplication("com.example.browser") }
+        verify { b.addAllowedApplication("ru.ozero.app") }
+    }
+
+    @Test
+    fun allowlistExcludeSelfFalseEmptyPackagesStillAddsSelf() {
+        val b = mockBuilder()
+        every { b.addAllowedApplication(any()) } returns b
+        configurator.apply(
+            b,
+            SplitTunnelConfig(mode = SplitTunnelMode.ALLOWLIST, packages = emptySet()),
+            excludeSelf = false,
+        )
+        verify { b.addAllowedApplication("ru.ozero.app") }
+    }
+
+    @Test
     fun allModeExcludeSelfFalseDoesNotAddDisallowed() {
         val b = mockBuilder()
         configurator.apply(b, SplitTunnelConfig(mode = SplitTunnelMode.ALL), excludeSelf = false)

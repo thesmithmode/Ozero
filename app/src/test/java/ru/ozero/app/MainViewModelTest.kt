@@ -256,9 +256,7 @@ class MainViewModelTest {
         runCurrent()
         advanceTimeBy(14_500)
         runCurrent()
-        assert(vm.urnetworkPeerSearchSeconds.value >= 2) {
-            "expected >=2 after grace+2s, got ${vm.urnetworkPeerSearchSeconds.value}"
-        }
+        assertEquals(5, vm.urnetworkPeerSearchSeconds.value)
     }
 
     @Test

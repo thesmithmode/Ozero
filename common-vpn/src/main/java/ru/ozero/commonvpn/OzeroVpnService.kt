@@ -219,7 +219,8 @@ class OzeroVpnService : android.net.VpnService() {
         val activeEngineId = pick.first
         val activeConfig = pick.second
         tunnelController.onProbing(activeEngineId)
-        val fd = if (engineNeedsCustomTun(activeEngineId)) {
+        val usesCustomTun = engineNeedsCustomTun(activeEngineId)
+        val fd = if (usesCustomTun) {
             establishTunForEngine(activeEngineId, splitConfig) ?: return
         } else {
             establishTun(
@@ -242,7 +243,7 @@ class OzeroVpnService : android.net.VpnService() {
         sessionIdRef.set(
             runCatching { sessionStatsRecorder.startSession(activeEngineId.name, nowMs) }.getOrDefault(-1L),
         )
-        if (activeEngineId != EngineId.URNETWORK) {
+        if (!usesCustomTun) {
             runCatching { healthMonitor.start(chainResult.finalSocksPort) }
                 .onFailure { t ->
                     if (t is kotlinx.coroutines.CancellationException) throw t
