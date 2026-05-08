@@ -113,6 +113,7 @@ class OzeroVpnService : android.net.VpnService() {
     private val stopping = AtomicBoolean(false)
     private val stopSignal = AtomicBoolean(false)
     private val lastStopStartId = AtomicInteger(-1)
+    @Volatile private var killswitchCached: Boolean = false
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         PersistentLoggers.info(TAG, "onStartCommand action=${intent?.action} startId=$startId")
@@ -190,6 +191,7 @@ class OzeroVpnService : android.net.VpnService() {
             mode = settings?.splitMode ?: ru.ozero.enginescore.settings.SplitTunnelMode.ALL,
             packages = splitPackages,
         )
+        killswitchCached = settings?.killswitchEnabled ?: false
 
         val manualEngine = settings?.manualEngine
         val pick = if (manualEngine != null) {
@@ -382,8 +384,7 @@ class OzeroVpnService : android.net.VpnService() {
         }
         Log.i(TAG, "chain result=$chainResult engineId=$engineId")
         if (chainResult !is ChainResult.Success) {
-            tunnelController.onEngineDied(engineId, chainResult?.toString() ?: "timeout")
-            stopVpn()
+            handleEngineFailure(engineId, chainResult?.toString() ?: "timeout")
             return null
         }
         tunnelController.onConnecting(engineId)
@@ -406,8 +407,7 @@ class OzeroVpnService : android.net.VpnService() {
                 runCatching { fd.close() }
                 PersistentLoggers.error(TAG, "attachTun threw, fd closed: ${t.message}")
                 runCatching { chainOrchestrator.stop() }
-                tunnelController.onEngineDied(engineId, "attachTun threw: ${t.message}")
-                stopVpn()
+                handleEngineFailure(engineId, "attachTun threw: ${t.message}")
                 return false
             }
             return when (result) {
@@ -419,8 +419,7 @@ class OzeroVpnService : android.net.VpnService() {
                     runCatching { fd.close() }
                     PersistentLoggers.error(TAG, "attachTun failed: ${result.reason}")
                     runCatching { chainOrchestrator.stop() }
-                    tunnelController.onEngineDied(engineId, "attachTun: ${result.reason}")
-                    stopVpn()
+                    handleEngineFailure(engineId, "attachTun: ${result.reason}")
                     false
                 }
             }
@@ -446,8 +445,7 @@ class OzeroVpnService : android.net.VpnService() {
         if (code != 0) {
             PersistentLoggers.error(TAG, "tunnel start failed code=$code")
             runCatching { chainOrchestrator.stop() }
-            tunnelController.onEngineDied(engineId, "tunnel code=$code")
-            stopVpn()
+            handleEngineFailure(engineId, "tunnel code=$code")
             return false
         }
         return true
@@ -545,10 +543,47 @@ class OzeroVpnService : android.net.VpnService() {
         }.getOrDefault("")
     }
 
+    private fun handleEngineFailure(engineId: EngineId, reason: String) {
+        val fdAlive = tunFdRef.get() != null
+        if (killswitchCached && fdAlive) {
+            enterKillswitchMode(engineId, reason)
+        } else {
+            tunnelController.onEngineDied(engineId, reason)
+            stopVpn()
+        }
+    }
+
+    private fun enterKillswitchMode(engineId: EngineId, reason: String) {
+        PersistentLoggers.warn(TAG, "killswitch engaging: engine=$engineId reason=$reason")
+        tunnelController.onKillswitchEngaged(engineId, reason)
+        statsJobRef.getAndSet(null)?.cancel()
+        serviceScope.launch {
+            runCatching { chainOrchestrator.stop() }
+                .onFailure { PersistentLoggers.warn(TAG, "killswitch: chainOrchestrator.stop threw: ${it.message}") }
+        }
+        Thread(
+            {
+                runCatching { tunnelGateway.stop() }
+                    .onFailure { PersistentLoggers.warn(TAG, "killswitch: tunnelGateway.stop threw: ${it.message}") }
+            },
+            "ozero-killswitch-native-stop",
+        ).apply {
+            isDaemon = true
+            start()
+        }
+        runCatching { healthMonitor.stop() }
+        runCatching {
+            val nm = getSystemService(NotificationManager::class.java) ?: return@runCatching
+            nm.notify(NOTIFICATION_ID, buildNotification("Killswitch активен — трафик заблокирован"))
+        }.onFailure { PersistentLoggers.warn(TAG, "killswitch: notification update threw: ${it.message}") }
+        starting.set(false)
+    }
+
     private fun stopVpn() {
         if (!stopping.compareAndSet(false, true)) return
         stopSignal.set(true)
         PersistentLoggers.info(TAG, "stopVpn entry")
+        runCatching { tunnelController.onKillswitchReleased() }
         val priorState = tunnelController.state.value
         tunnelController.onDisconnecting()
         startJobRef.getAndSet(null)?.cancel()
