@@ -1,8 +1,20 @@
 # Engines Ozero
 
-6 встроенных транспортных движков + 1 запланирован (URnetwork P2P mesh, фаза E15).
+Каждый engine реализует `ru.ozero.coreapi.Engine` — единый интерфейс. Native-сторона за интерфейсом `Lib<X>Delegate`.
 
-Каждый engine реализует `ru.ozero.coreapi.Engine` — единый интерфейс. Native-сторона за интерфейсом `Lib<X>Delegate` (тестируемая абстракция, реальная JNI-реализация в RT.6).
+## Текущий статус
+
+| Engine | Статус | Модуль |
+|--------|--------|--------|
+| ByeDPI | ✅ работает | `engine-byedpi` |
+| WARP (AmneziaWG) | ✅ работает | `engine-warp` |
+| URnetwork | ✅ работает | `engine-urnetwork` |
+| Xray-core | ⏳ stub | — |
+| Hysteria2 | ⏳ stub | — |
+| NaiveProxy | ⏳ stub | — |
+| Tor + IPtProxy | ⏳ stub | — |
+
+Описания ниже включают как реализованные, так и запланированные движки.
 
 ---
 
