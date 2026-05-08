@@ -269,6 +269,46 @@ class RealWarpSdkBridgeTest {
     }
 
     @Test
+    fun `attachTun дважды без detach — старый handle закрывается перед новым awgTurnOn (anti-leak)`() = runTest {
+        val rt = FakeAwgRuntime(returnHandle = 11, socketV4 = 100)
+        val (b, _) = bridgeWith(rt)
+        b.attachTun("n", 5, validIni, "/x", noopProtector)
+        assertEquals(1, rt.turnOnCalls)
+        assertEquals(0, rt.turnOffCalls, "первый attach — turnOff не нужен")
+        rt.returnHandle = 22
+        b.attachTun("n", 7, validIni, "/x", noopProtector)
+        assertEquals(2, rt.turnOnCalls, "второй turnOn должен пройти")
+        assertEquals(1, rt.turnOffCalls, "перед вторым turnOn ОБЯЗАН быть turnOff старого handle (Go runtime leak guard)")
+        assertEquals(11, rt.lastTurnOffHandle, "именно старый handle=11 должен быть закрыт")
+        assertTrue(b.isRunning())
+    }
+
+    @Test
+    fun `attachTun дважды — старый turnOff бросает не должен ломать новый turnOn`() = runTest {
+        val rt = FakeAwgRuntime(returnHandle = 11, socketV4 = 100)
+        val (b, _) = bridgeWith(rt)
+        b.attachTun("n", 5, validIni, "/x", noopProtector)
+        rt.throwOnTurnOff = RuntimeException("stale turnOff blew up")
+        rt.returnHandle = 22
+        val r = b.attachTun("n", 7, validIni, "/x", noopProtector)
+        assertEquals(WarpSdkBridge.AttachResult.Success, r)
+        assertEquals(2, rt.turnOnCalls)
+    }
+
+    @Test
+    fun `attachTun cycle ×10 без detach — turnOff = turnOn-1 (Nubia SIGABRT regression)`() = runTest {
+        val rt = FakeAwgRuntime(returnHandle = 1, socketV4 = 100)
+        val (b, _) = bridgeWith(rt)
+        repeat(10) { i ->
+            rt.returnHandle = 100 + i
+            b.attachTun("n", 5, validIni, "/x", noopProtector)
+        }
+        assertEquals(10, rt.turnOnCalls)
+        assertEquals(9, rt.turnOffCalls, "каждый повторный attach закрывает предыдущий handle — нет накопления в Go runtime")
+        assertTrue(b.isRunning())
+    }
+
+    @Test
     fun `attachTun — реалистичный INI с длинным I1 hex blob идёт passthrough без потерь`() = runTest {
         val rt = FakeAwgRuntime(returnHandle = 42, socketV4 = 100)
         val (b, _) = bridgeWith(rt)

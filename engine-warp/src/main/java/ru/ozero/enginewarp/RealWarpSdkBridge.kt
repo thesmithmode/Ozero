@@ -35,6 +35,16 @@ class RealWarpSdkBridge internal constructor(
             PersistentLoggers.error(TAG, "INI rejected: $structuralError")
             return@withContext WarpSdkBridge.AttachResult.Failed("INI invalid: $structuralError")
         }
+        val staleHandle = tunnelHandle
+        if (staleHandle != INVALID_HANDLE) {
+            PersistentLoggers.warn(
+                TAG,
+                "attachTun: stale handle=$staleHandle обнаружен — закрываю до нового awgTurnOn",
+            )
+            runCatching { awgRuntime.turnOff(staleHandle) }
+                .onFailure { PersistentLoggers.error(TAG, "stale awgTurnOff failed: ${it.message}") }
+            tunnelHandle = INVALID_HANDLE
+        }
         val socketFile = File(uapiPath, "$tunnelName.sock")
         if (socketFile.exists()) {
             val deleted = socketFile.delete()
