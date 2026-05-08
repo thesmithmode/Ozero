@@ -7,8 +7,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
@@ -211,9 +213,9 @@ class MainViewModelTest {
     @Test
     fun urnetworkPeerSearchSecondsZeroWhenIdle() = runTest {
         backgroundScope.launch { viewModel.urnetworkPeerSearchSeconds.collect {} }
-        advanceUntilIdle()
-        kotlinx.coroutines.delay(2_500)
-        advanceUntilIdle()
+        runCurrent()
+        advanceTimeBy(2_500)
+        runCurrent()
         assertEquals(0, viewModel.urnetworkPeerSearchSeconds.value)
     }
 
@@ -223,9 +225,9 @@ class MainViewModelTest {
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.BYEDPI)
         tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
-        advanceUntilIdle()
-        kotlinx.coroutines.delay(3_500)
-        advanceUntilIdle()
+        runCurrent()
+        advanceTimeBy(3_500)
+        runCurrent()
         assertEquals(0, viewModel.urnetworkPeerSearchSeconds.value)
     }
 
@@ -237,9 +239,9 @@ class MainViewModelTest {
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.URNETWORK)
         tunnelController.onEngineStarted(EngineId.URNETWORK, 1080)
-        advanceUntilIdle()
-        kotlinx.coroutines.delay(3_500)
-        advanceUntilIdle()
+        runCurrent()
+        advanceTimeBy(3_500)
+        runCurrent()
         assert(vm.urnetworkPeerSearchSeconds.value >= 2) {
             "expected >=2 after 3.5s of no peers, got ${vm.urnetworkPeerSearchSeconds.value}"
         }
@@ -253,12 +255,12 @@ class MainViewModelTest {
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.URNETWORK)
         tunnelController.onEngineStarted(EngineId.URNETWORK, 1080)
-        advanceUntilIdle()
-        kotlinx.coroutines.delay(3_500)
-        advanceUntilIdle()
+        runCurrent()
+        advanceTimeBy(3_500)
+        runCurrent()
         bridge.peers = 5
-        kotlinx.coroutines.delay(2_000)
-        advanceUntilIdle()
+        advanceTimeBy(2_000)
+        runCurrent()
         assertEquals(0, vm.urnetworkPeerSearchSeconds.value)
     }
 
