@@ -11,7 +11,12 @@ import com.bringyour.sdk.LocationsViewController
 import com.bringyour.sdk.Sdk
 import com.bringyour.sdk.SubscriptionBalanceCallback
 import com.bringyour.sdk.WalletViewController
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -33,6 +38,8 @@ class RealUrnetworkSdkBridge(
     private val subscriptionBalanceRef =
         AtomicReference<UrnetworkSdkBridge.SubscriptionBalanceSnapshot?>(null)
     private val running = AtomicBoolean(false)
+    private val preferredCountryRef = AtomicReference<String?>(null)
+    private val bridgeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override suspend fun start(
         walletAddress: String,
@@ -178,6 +185,12 @@ class RealUrnetworkSdkBridge(
     override fun selectedLocation(): ConnectLocation? =
         runCatching { connectVcRef.get()?.selectedLocation }.getOrNull()
 
+    override fun setPreferredCountry(code: String?) {
+        val cleaned = code?.trim()?.uppercase()?.takeIf { it.length == 2 && it.all { it.isLetter() } }
+        preferredCountryRef.set(cleaned)
+        Log.i(TAG, "preferredCountry set to ${cleaned ?: "<auto>"}")
+    }
+
     override fun openLocationsViewController(): LocationsViewController? =
         runCatching { deviceRef.get()?.openLocationsViewController() }.getOrElse {
             PersistentLoggers.warn(TAG, "openLocationsViewController threw: ${it.message}")
@@ -282,9 +295,15 @@ class RealUrnetworkSdkBridge(
                     .onFailure { PersistentLoggers.warn(TAG, "setTunnelStarted(true) threw: ${it.message}") }
                 val cv = connectVcRef.get()
                 if (cv != null) {
-                    runCatching { cv.connectBestAvailable() }
-                        .onFailure { PersistentLoggers.warn(TAG, "connectBestAvailable threw: ${it.message}") }
-                    Log.i(TAG, "IoLoop fd=$tunFd tunnelStarted=true connectBestAvailable called")
+                    val preferredCountry = preferredCountryRef.get()
+                    if (preferredCountry != null) {
+                        Log.i(TAG, "IoLoop fd=$tunFd tunnelStarted=true — connecting via preferredCountry=$preferredCountry")
+                        connectByPreferredCountry(preferredCountry, cv)
+                    } else {
+                        runCatching { cv.connectBestAvailable() }
+                            .onFailure { PersistentLoggers.warn(TAG, "connectBestAvailable threw: ${it.message}") }
+                        Log.i(TAG, "IoLoop fd=$tunFd tunnelStarted=true connectBestAvailable called")
+                    }
                 } else {
                     PersistentLoggers.error(TAG, "No ConnectViewController — P2P connection will not be established")
                 }
@@ -292,6 +311,72 @@ class RealUrnetworkSdkBridge(
             } catch (t: Throwable) {
                 PersistentLoggers.error(TAG, "newIoLoop threw: ${t.message}")
                 UrnetworkSdkBridge.AttachResult.Failed("newIoLoop failed: ${t.message}")
+            }
+        }
+    }
+
+    private fun connectByPreferredCountry(countryCode: String, cv: ConnectViewController) {
+        val device = deviceRef.get() ?: run {
+            runCatching { cv.connectBestAvailable() }
+            return
+        }
+        val locVc = runCatching { device.openLocationsViewController() }.getOrNull()
+        if (locVc == null) {
+            PersistentLoggers.warn(TAG, "openLocationsViewController null — fallback connectBestAvailable")
+            runCatching { cv.connectBestAvailable() }
+            return
+        }
+        val attached = AtomicBoolean(false)
+        val timeoutJob = bridgeScope.launch {
+            delay(PREFERRED_COUNTRY_TIMEOUT_MS)
+            if (attached.compareAndSet(false, true)) {
+                runCatching { cv.connectBestAvailable() }
+                runCatching { locVc.stop() }
+                runCatching { locVc.close() }
+                PersistentLoggers.warn(
+                    TAG,
+                    "preferred country $countryCode timeout (${PREFERRED_COUNTRY_TIMEOUT_MS}ms) → fallback connectBestAvailable",
+                )
+            }
+        }
+        runCatching {
+            locVc.addFilteredLocationsListener { filtered, _ ->
+                val list = filtered?.countries ?: return@addFilteredLocationsListener
+                if (list.len() == 0L) return@addFilteredLocationsListener
+                var match: ConnectLocation? = null
+                for (i in 0 until list.len()) {
+                    val loc = list.get(i) ?: continue
+                    if (loc.countryCode?.uppercase() == countryCode) {
+                        match = loc
+                        break
+                    }
+                }
+                if (attached.compareAndSet(false, true)) {
+                    timeoutJob.cancel()
+                    if (match != null) {
+                        runCatching { cv.connect(match) }
+                            .onFailure { PersistentLoggers.warn(TAG, "connect(match) threw: ${it.message}") }
+                        Log.i(TAG, "preferred country $countryCode matched → connected")
+                    } else {
+                        runCatching { cv.connectBestAvailable() }
+                        PersistentLoggers.warn(
+                            TAG,
+                            "preferred country $countryCode not in locations → fallback connectBestAvailable",
+                        )
+                    }
+                    runCatching { locVc.stop() }
+                    runCatching { locVc.close() }
+                }
+            }
+            locVc.start()
+            locVc.filterLocations("")
+        }.onFailure { t ->
+            if (attached.compareAndSet(false, true)) {
+                timeoutJob.cancel()
+                PersistentLoggers.warn(TAG, "locVc setup failed: ${t.message} → fallback connectBestAvailable")
+                runCatching { cv.connectBestAvailable() }
+                runCatching { locVc.stop() }
+                runCatching { locVc.close() }
             }
         }
     }
@@ -306,5 +391,6 @@ class RealUrnetworkSdkBridge(
         const val SUBSCRIPTION_BALANCE_TIMEOUT_MS = 10_000L
         const val STOP_TIMEOUT_MS = 3_000L
         const val DEFAULT_APP_VERSION = "0.0.2"
+        const val PREFERRED_COUNTRY_TIMEOUT_MS = 8_000L
     }
 }

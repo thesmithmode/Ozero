@@ -19,6 +19,8 @@ interface UrnetworkSdkBridge {
     fun selectedLocation(): ConnectLocation?
     fun openLocationsViewController(): LocationsViewController?
 
+    fun setPreferredCountry(code: String?) {}
+
     fun setProvidePaused(paused: Boolean)
     fun isProvidePaused(): Boolean
 

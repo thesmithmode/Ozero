@@ -287,7 +287,7 @@ class MainViewModelTest {
         tunnelController.onConnecting(EngineId.BYEDPI)
         tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
         advanceUntilIdle()
-        kotlinx.coroutines.delay(3_500)
+        kotlinx.coroutines.delay(8_500)
         advanceUntilIdle()
         val s = viewModel.ipInfo.value
         assertIs<IpInfoState.Loaded>(s)
@@ -301,7 +301,7 @@ class MainViewModelTest {
         tunnelController.onConnecting(EngineId.BYEDPI)
         tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
         advanceUntilIdle()
-        kotlinx.coroutines.delay(3_500)
+        kotlinx.coroutines.delay(8_500)
         advanceUntilIdle()
         tunnelController.onEngineDied(EngineId.BYEDPI, "test disconnect")
         advanceUntilIdle()
@@ -315,7 +315,8 @@ class MainViewModelTest {
         tunnelController.onConnecting(EngineId.BYEDPI)
         tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
         advanceUntilIdle()
-        kotlinx.coroutines.delay(3_500)
+        // 8000 warmup + 2 attempts × 5000 retry delay = ~14s
+        kotlinx.coroutines.delay(15_000)
         advanceUntilIdle()
         val s = viewModel.ipInfo.value
         assertIs<IpInfoState.Error>(s)
@@ -328,8 +329,9 @@ class MainViewModelTest {
         tunnelController.onConnecting(EngineId.BYEDPI)
         tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
         advanceUntilIdle()
-        kotlinx.coroutines.delay(3_500)
+        kotlinx.coroutines.delay(8_500)
         advanceUntilIdle()
+        // первая попытка успешна → calls=1, retry skipped
         assertEquals(1, ipInfoProvider.calls)
     }
 
@@ -337,6 +339,7 @@ class MainViewModelTest {
     fun refreshIpInfoForcesRefetch() = runTest {
         viewModel.refreshIpInfo()
         advanceUntilIdle()
+        // Idle state → refresh использует fetch() напрямую, не через fetchVia
         val s = viewModel.ipInfo.value
         assertIs<IpInfoState.Loaded>(s)
         assertEquals(1, ipInfoProvider.calls)
@@ -360,6 +363,7 @@ class MainViewModelTest {
         }
         override suspend fun setUrnetworkEnabled(enabled: Boolean) = Unit
         override suspend fun setUrnetworkJwt(jwt: String?) = Unit
+        override suspend fun setUrnetworkCountryCode(code: String?) = Unit
         override suspend fun setByedpiWinningArgs(args: String?) = Unit
         override suspend fun setCustomDnsServers(servers: List<String>) = Unit
         override suspend fun setHostsMode(mode: HostsMode) = Unit

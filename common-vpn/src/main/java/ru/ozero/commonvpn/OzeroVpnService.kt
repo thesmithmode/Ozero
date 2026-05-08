@@ -15,6 +15,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -109,6 +110,7 @@ class OzeroVpnService : android.net.VpnService() {
     private val startJobRef = AtomicReference<Job?>(null)
     private val statsJobRef = AtomicReference<Job?>(null)
     private val shutdownJobRef = AtomicReference<Job?>(null)
+    private val healthWatchJobRef = AtomicReference<Job?>(null)
     private val starting = AtomicBoolean(false)
     private val stopping = AtomicBoolean(false)
     private val stopSignal = AtomicBoolean(false)
@@ -220,12 +222,13 @@ class OzeroVpnService : android.net.VpnService() {
         val activeConfig = pick.second
         tunnelController.onProbing(activeEngineId)
         val usesCustomTun = engineNeedsCustomTun(activeEngineId)
+        val ipv6Enabled = settings?.ipv6Enabled ?: false
         val fd = if (usesCustomTun) {
-            establishTunForEngine(activeEngineId, splitConfig) ?: return
+            establishTunForEngine(activeEngineId, splitConfig, ipv6Enabled) ?: return
         } else {
             establishTun(
                 splitConfig,
-                ipv6 = settings?.ipv6Enabled ?: false,
+                ipv6 = ipv6Enabled,
                 customDns = settings?.customDnsServers.orEmpty(),
             ) ?: return
         }
@@ -250,7 +253,36 @@ class OzeroVpnService : android.net.VpnService() {
                     PersistentLoggers.warn(TAG, "healthMonitor.start threw: ${t.message}")
                 }
         }
+        startHealthKillswitchWatcher(activeEngineId)
         startStatsLogger()
+    }
+
+    private fun startHealthKillswitchWatcher(engineId: EngineId) {
+        healthWatchJobRef.getAndSet(null)?.cancel()
+        val job = serviceScope.launch {
+            try {
+                healthMonitor.status
+                    .filter { it == HealthMonitor.Status.DEGRADED }
+                    .first()
+                if (killswitchCached && tunFdRef.get() != null && !stopping.get()) {
+                    PersistentLoggers.warn(
+                        TAG,
+                        "health degraded → killswitch fire engine=$engineId",
+                    )
+                    enterKillswitchMode(engineId, "health degraded")
+                } else {
+                    PersistentLoggers.warn(
+                        TAG,
+                        "health degraded но killswitch off (cached=$killswitchCached) — без partial-shutdown",
+                    )
+                }
+            } catch (ce: kotlinx.coroutines.CancellationException) {
+                throw ce
+            } catch (t: Throwable) {
+                PersistentLoggers.warn(TAG, "health killswitch watcher threw: ${t.message}")
+            }
+        }
+        healthWatchJobRef.set(job)
     }
 
     private suspend fun engineNeedsCustomTun(engineId: EngineId): Boolean {
@@ -261,10 +293,11 @@ class OzeroVpnService : android.net.VpnService() {
     private suspend fun establishTunForEngine(
         engineId: EngineId,
         splitConfig: ru.ozero.commonvpn.split.SplitTunnelConfig,
+        ipv6Enabled: Boolean,
     ): ParcelFileDescriptor? {
         val plugin = enginePlugins.firstOrNull { it.id == engineId } ?: return null
         val spec = plugin.tunSpec() ?: return null
-        val builder = applyEngineTunSpec(spec)
+        val builder = applyEngineTunSpec(spec, ipv6Enabled)
         ru.ozero.commonvpn.split.TunBuilderConfigurator(packageName).apply(builder, splitConfig, excludeSelf = false)
         val before = TunInterfaceStats.snapshotTunInterfaces()
         val pfd = try {
@@ -565,6 +598,7 @@ class OzeroVpnService : android.net.VpnService() {
         PersistentLoggers.warn(TAG, "killswitch engaging: engine=$engineId reason=$reason")
         tunnelController.onKillswitchEngaged(engineId, reason)
         statsJobRef.getAndSet(null)?.cancel()
+        healthWatchJobRef.getAndSet(null)?.cancel()
         serviceScope.launch {
             runCatching { chainOrchestrator.stop() }
                 .onFailure { PersistentLoggers.warn(TAG, "killswitch: chainOrchestrator.stop threw: ${it.message}") }
@@ -596,6 +630,7 @@ class OzeroVpnService : android.net.VpnService() {
         tunnelController.onDisconnecting()
         startJobRef.getAndSet(null)?.cancel()
         statsJobRef.getAndSet(null)?.cancel()
+        healthWatchJobRef.getAndSet(null)?.cancel()
         runCatching { healthMonitor.stop() }
         val endStatus = if (priorState is TunnelState.Failed) {
             SessionStatsRecorder.Status.FAILED
@@ -681,12 +716,13 @@ class OzeroVpnService : android.net.VpnService() {
         }
     }
 
-    internal fun applyEngineTunSpec(spec: ru.ozero.enginescore.TunSpec): Builder {
+    internal fun applyEngineTunSpec(spec: ru.ozero.enginescore.TunSpec, ipv6Enabled: Boolean): Builder {
         val builder = Builder()
             .setSession(spec.sessionName)
             .setMtu(spec.mtu)
             .setBlocking(spec.blocking)
             .addAddress(spec.ipv4Address, spec.ipv4PrefixLength)
+        applyLockdown(builder, "applyEngineTunSpec")
         spec.dnsServers.forEach { dns ->
             runCatching { builder.addDnsServer(dns) }
                 .onFailure { PersistentLoggers.warn(TAG, "spec addDnsServer rejected '$dns': ${it.message}") }
@@ -715,13 +751,20 @@ class OzeroVpnService : android.net.VpnService() {
             }
         }
         val v6 = spec.ipv6Address
-        if (spec.allowFamilyV6 && v6 != null) {
+        if (ipv6Enabled && spec.allowFamilyV6 && v6 != null) {
             builder.addAddress(v6, spec.ipv6PrefixLength)
             if (spec.routeAllV6) builder.addRoute("::", 0)
         } else {
             blackholeIpv6(builder, "applyEngineTunSpec")
         }
         return builder
+    }
+
+    private fun applyLockdown(builder: Builder, callerTag: String) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
+            runCatching { builder.setUnderlyingNetworks(null) }
+                .onFailure { PersistentLoggers.warn(TAG, "$callerTag: setUnderlyingNetworks(null) failed: ${it.message}") }
+        }
     }
 
     private fun blackholeIpv6(builder: Builder, callerTag: String) {
@@ -742,6 +785,7 @@ class OzeroVpnService : android.net.VpnService() {
         val builder = Builder()
             .addAddress(TUN_ADDRESS, TUN_PREFIX_LENGTH)
             .setSession(SESSION_NAME)
+        applyLockdown(builder, "buildTunBuilder")
         if (ipv6Enabled) {
             builder.addAddress(TUN_ADDRESS_V6, TUN_PREFIX_LENGTH_V6)
             builder.addRoute("::", 0)

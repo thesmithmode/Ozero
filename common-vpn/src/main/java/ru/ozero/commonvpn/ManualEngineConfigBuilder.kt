@@ -16,6 +16,7 @@ object ManualEngineConfigBuilder {
         EngineId.WARP -> EngineConfig.Warp
         EngineId.URNETWORK -> EngineConfig.Urnetwork(
             jwtToken = settings?.urnetworkJwt.orEmpty(),
+            region = settings?.urnetworkCountryCode,
         )
         EngineId.XRAY, EngineId.HYSTERIA2, EngineId.AMNEZIA,
         EngineId.TOR, EngineId.NAIVE, EngineId.FPTN -> null

@@ -11,6 +11,7 @@ import ru.ozero.enginescore.TunAttachResult
 import ru.ozero.enginescore.TunFdAcceptor
 import ru.ozero.enginescore.Upstream
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -227,6 +228,94 @@ class EngineWarpContractTest {
                 onSuccess = { assertIs<StartResult.Failure>(it) },
                 onFailure = { assertTrue(it is IllegalArgumentException) },
             )
+    }
+
+    @Test
+    fun `tunSpec при ipv6Enabled=false выставляет allowFamilyV6=false и ipv6Address=null`() = runTest {
+        val (e, _, _) = engineIpv6(ipv6Enabled = false)
+        e.start(EngineConfig.Warp, Upstream.None)
+        val spec = e.tunSpec() ?: error("tunSpec null")
+        assertFalse(spec.allowFamilyV6, "allowFamilyV6 must be false when ipv6Enabled=false")
+        assertNull(spec.ipv6Address, "ipv6Address must be null when ipv6Enabled=false")
+    }
+
+    @Test
+    fun `tunSpec при ipv6Enabled=true сохраняет IPv6 из config`() = runTest {
+        val (e, _, _) = engineIpv6(ipv6Enabled = true)
+        e.start(EngineConfig.Warp, Upstream.None)
+        val spec = e.tunSpec() ?: error("tunSpec null")
+        assertTrue(spec.allowFamilyV6)
+        assertEquals("2606:4700::1", spec.ipv6Address)
+    }
+
+    @Test
+    fun `attachTun ini БЕЗ IPv6 строк при ipv6Enabled=false`() = runTest {
+        val raw = """
+            [Interface]
+            PrivateKey = abc
+            Address = 172.16.0.2/32, 2606:4700::1/128
+            DNS = 1.1.1.1, 2606:4700::1
+            MTU = 1280
+
+            [Peer]
+            PublicKey = X
+            AllowedIPs = 0.0.0.0/0, ::/0
+            Endpoint = 162.159.192.1:2408
+        """.trimIndent()
+        val bridge = FakeWarpSdkBridge()
+        val (e, _, _) = engineIpv6(ipv6Enabled = false, activeRawIni = raw, bridge = bridge)
+        e.start(EngineConfig.Warp, Upstream.None)
+        e.attachTun(tunFd = 42)
+        val ini = bridge.lastIni ?: error("ini missing")
+        assertFalse(ini.contains("::/0"), "::/0 must be removed. INI:\n$ini")
+        assertFalse(
+            ini.contains("2606:4700::1"),
+            "IPv6 address must be removed when ipv6Enabled=false. INI:\n$ini",
+        )
+        assertTrue(ini.contains("0.0.0.0/0"), "IPv4 routing preserved. INI:\n$ini")
+        assertTrue(ini.contains("172.16.0.2"), "IPv4 address preserved. INI:\n$ini")
+    }
+
+    @Test
+    fun `attachTun ini С IPv6 при ipv6Enabled=true`() = runTest {
+        val raw = """
+            [Interface]
+            PrivateKey = abc
+            Address = 172.16.0.2/32, 2606:4700::1/128
+
+            [Peer]
+            PublicKey = X
+            AllowedIPs = 0.0.0.0/0, ::/0
+            Endpoint = 162.159.192.1:2408
+        """.trimIndent()
+        val bridge = FakeWarpSdkBridge()
+        val (e, _, _) = engineIpv6(ipv6Enabled = true, activeRawIni = raw, bridge = bridge)
+        e.start(EngineConfig.Warp, Upstream.None)
+        e.attachTun(tunFd = 42)
+        val ini = bridge.lastIni ?: error("ini missing")
+        assertTrue(ini.contains("::/0"), "::/0 preserved when ipv6Enabled=true")
+        assertTrue(ini.contains("2606:4700::1"), "IPv6 address preserved when ipv6Enabled=true")
+    }
+
+    private fun engineIpv6(
+        ipv6Enabled: Boolean,
+        activeConfig: WarpConfig = sampleConfig,
+        activeRawIni: String? = null,
+        bridge: FakeWarpSdkBridge = FakeWarpSdkBridge(),
+    ): Triple<EngineWarp, FakeWarpAutoConfig, FakeWarpConfigSlotStore> {
+        val store = FakeWarpConfigSlotStore(activeConfig = activeConfig, activeRawIni = activeRawIni)
+        val auto = FakeWarpAutoConfig(
+            Result.success(RegisteredWarpConfig(activeConfig, activeRawIni ?: "")),
+        )
+        val e = EngineWarp(
+            autoConfig = auto,
+            configStore = store,
+            sdkBridge = bridge,
+            uapiPathProvider = { "/tmp" },
+            socketProtector = ru.ozero.enginescore.VpnSocketProtector { true },
+            ipv6EnabledProvider = { ipv6Enabled },
+        )
+        return Triple(e, auto, store)
     }
 
     private class FakeWarpAutoConfig(

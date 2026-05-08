@@ -148,4 +148,29 @@ class OkHttpIpInfoProviderTest {
         assertEquals("application/json", recorded.getHeader("Accept"))
         assertEquals("GET", recorded.method)
     }
+
+    @Test
+    fun fetchViaNullDelegatesToDefaultClient() = runTest {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"ip":"1.1.1.1"}"""))
+        val info = provider.fetchVia(socksHost = null, socksPort = null).getOrThrow()
+        assertEquals("1.1.1.1", info.ip)
+    }
+
+    @Test
+    fun fetchViaInvalidPortDelegatesToDefaultClient() = runTest {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"ip":"2.2.2.2"}"""))
+        val info = provider.fetchVia(socksHost = "127.0.0.1", socksPort = 0).getOrThrow()
+        assertEquals("2.2.2.2", info.ip)
+    }
+
+    @Test
+    fun fetchViaWithSocksProxyToDeadPortFails() = runTest {
+        val deadSocksPort = okhttp3.mockwebserver.MockWebServer().also { it.start(); it.shutdown() }.port
+        val result = provider.fetchVia(socksHost = "127.0.0.1", socksPort = deadSocksPort)
+        assertTrue(
+            result.isFailure,
+            "SOCKS proxy на закрытый порт обязан fail — fetchVia с proxy не должен фоллбечиться " +
+                "на direct connect (это IP-leak). result=$result",
+        )
+    }
 }

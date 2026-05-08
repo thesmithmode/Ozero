@@ -16,7 +16,10 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import android.util.Log
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
+import ru.ozero.enginescore.PersistentLoggers
+import ru.ozero.enginescore.settings.SettingsRepository
 import java.util.Locale
 import javax.inject.Inject
 
@@ -42,6 +45,7 @@ sealed interface UrnetworkSettingsUiState {
 @HiltViewModel
 class UrnetworkEngineSettingsViewModel @Inject constructor(
     private val bridge: UrnetworkSdkBridge,
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<UrnetworkSettingsUiState>(UrnetworkSettingsUiState.Loading)
@@ -82,10 +86,19 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
 
     fun refresh() {
         viewModelScope.launch {
+            Log.i(TAG, "refresh: openLocationsViewController")
             val vc = withContext(Dispatchers.Main.immediate) {
-                bridge.openLocationsViewController()
+                runCatching { bridge.openLocationsViewController() }
+                    .getOrElse { t ->
+                        PersistentLoggers.warn(TAG, "openLocationsViewController threw: ${t.message}")
+                        null
+                    }
             }
             if (vc == null) {
+                PersistentLoggers.warn(
+                    TAG,
+                    "refresh: openLocationsViewController вернул null — bridge не подключён или SDK не готов → NotConnected",
+                )
                 _uiState.value = UrnetworkSettingsUiState.NotConnected
                 return@launch
             }
@@ -95,13 +108,19 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
             }
             locationsVc = vc
             withContext(Dispatchers.Main.immediate) {
-                vc.addFilteredLocationsListener { filtered, _ ->
-                    viewModelScope.launch {
-                        updateLocations(filtered)
+                runCatching {
+                    vc.addFilteredLocationsListener { filtered, _ ->
+                        viewModelScope.launch {
+                            updateLocations(filtered)
+                        }
                     }
+                    vc.start()
+                    vc.filterLocations("")
+                    Log.i(TAG, "refresh: locationsVc started, listener attached")
+                }.onFailure {
+                    PersistentLoggers.warn(TAG, "refresh: locationsVc setup threw: ${it.message}")
+                    _uiState.value = UrnetworkSettingsUiState.NotConnected
                 }
-                vc.start()
-                vc.filterLocations("")
             }
         }
     }
@@ -112,6 +131,11 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         } else {
             bridge.connectTo(location)
         }
+        val countryCode = location?.countryCode
+        viewModelScope.launch {
+            runCatching { settingsRepository.setUrnetworkCountryCode(countryCode) }
+        }
+        runCatching { bridge.setPreferredCountry(countryCode) }
         val current = _uiState.value
         if (current is UrnetworkSettingsUiState.Ready) {
             _uiState.value = current.copy(selectedLocation = location)
@@ -187,6 +211,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     }
 
     companion object {
+        private const val TAG = "UrnetworkSettingsVM"
         private const val PEER_COUNT_POLL_MS = 2_000L
         private const val PROVIDER_STATS_POLL_MS = 30_000L
         private const val SUBSCRIPTION_BALANCE_POLL_MS = 60_000L

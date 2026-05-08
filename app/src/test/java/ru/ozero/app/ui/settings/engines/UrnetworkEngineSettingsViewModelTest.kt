@@ -40,20 +40,20 @@ class UrnetworkEngineSettingsViewModelTest {
 
     @Test
     fun `uiState стартует как Loading`() = runTest {
-        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge())
+        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(), FakeSettingsRepo())
         assertSame(UrnetworkSettingsUiState.Loading, vm.uiState.value)
     }
 
     @Test
     fun `uiState переходит в NotConnected когда bridge не подключён`() = runTest {
-        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(connected = false))
+        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(connected = false), FakeSettingsRepo())
         advanceUntilIdle()
         assertIs<UrnetworkSettingsUiState.NotConnected>(vm.uiState.value)
     }
 
     @Test
     fun `subscriptionBalance стартует с null когда никто не подписан`() = runTest {
-        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge())
+        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(), FakeSettingsRepo())
         assertNull(vm.subscriptionBalance.value)
     }
 
@@ -68,7 +68,7 @@ class UrnetworkEngineSettingsViewModelTest {
             store = "google",
         )
         val bridge = FakeUrnetworkBridge(subscriptionBalance = snap)
-        val vm = UrnetworkEngineSettingsViewModel(bridge)
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo())
         val first = vm.subscriptionBalance.first { it != null }
         assertEquals(snap, first)
     }
@@ -81,7 +81,7 @@ class UrnetworkEngineSettingsViewModelTest {
             subscriptionBalance = snap,
             balanceCallCounter = callCount,
         )
-        val vm = UrnetworkEngineSettingsViewModel(bridge)
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo())
         val collector = backgroundScope.launch { vm.subscriptionBalance.collect {} }
         vm.subscriptionBalance.first { it != null }
         runCurrent()
@@ -100,11 +100,35 @@ class UrnetworkEngineSettingsViewModelTest {
     @Test
     fun `subscriptionBalance остаётся null когда bridge возвращает null (free user)`() = runTest {
         val bridge = FakeUrnetworkBridge(subscriptionBalance = null)
-        val vm = UrnetworkEngineSettingsViewModel(bridge)
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo())
         vm.subscriptionBalance.first()
         runCurrent()
         assertNull(vm.subscriptionBalance.value)
     }
+}
+
+private class FakeSettingsRepo : ru.ozero.enginescore.settings.SettingsRepository {
+    private val state = kotlinx.coroutines.flow.MutableStateFlow(
+        ru.ozero.enginescore.settings.SettingsModel.DEFAULT,
+    )
+    override val settings: kotlinx.coroutines.flow.Flow<ru.ozero.enginescore.settings.SettingsModel> = state
+    val countryCodeUpdates = mutableListOf<String?>()
+    override suspend fun setSplitMode(mode: ru.ozero.enginescore.settings.SplitTunnelMode) = Unit
+    override suspend fun setIpv6Enabled(enabled: Boolean) = Unit
+    override suspend fun setAutoStart(enabled: Boolean) = Unit
+    override suspend fun setManualEngine(engine: ru.ozero.enginescore.EngineId?) = Unit
+    override suspend fun setUrnetworkEnabled(enabled: Boolean) = Unit
+    override suspend fun setUrnetworkJwt(jwt: String?) = Unit
+    override suspend fun setUrnetworkCountryCode(code: String?) {
+        countryCodeUpdates += code
+    }
+    override suspend fun setByedpiWinningArgs(args: String?) = Unit
+    override suspend fun setCustomDnsServers(servers: List<String>) = Unit
+    override suspend fun setHostsMode(mode: ru.ozero.enginescore.settings.HostsMode) = Unit
+    override suspend fun setHosts(hosts: List<String>) = Unit
+    override suspend fun setUiLocaleTag(tag: String?) = Unit
+    override suspend fun setAppMode(mode: ru.ozero.enginescore.settings.AppMode) = Unit
+    override suspend fun setKillswitchEnabled(enabled: Boolean) = Unit
 }
 
 private class FakeUrnetworkBridge(

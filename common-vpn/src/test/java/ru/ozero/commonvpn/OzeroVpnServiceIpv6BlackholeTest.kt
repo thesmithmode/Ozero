@@ -51,4 +51,39 @@ class OzeroVpnServiceIpv6BlackholeTest {
             "applyEngineTunSpec обязан вызывать blackholeIpv6 в else-ветке для engines с allowFamilyV6=false",
         )
     }
+
+    @Test
+    fun `applyEngineTunSpec принимает ipv6Enabled параметр и форсит blackhole при false`() {
+        val sig = source.substringAfter("internal fun applyEngineTunSpec").substringBefore("): Builder")
+        assertTrue(
+            sig.contains("ipv6Enabled"),
+            "applyEngineTunSpec обязан иметь параметр ipv6Enabled — без него WARP/URnetwork с " +
+                "allowFamilyV6=true в spec проигнорируют пользовательский switch и leak IPv6 наружу",
+        )
+        val body = source
+            .substringAfter("internal fun applyEngineTunSpec")
+            .substringBefore("internal fun buildTunBuilder")
+        assertTrue(
+            body.contains("if (ipv6Enabled && spec.allowFamilyV6"),
+            "IF-ветка обязана начинаться с ipv6Enabled — иначе spec.allowFamilyV6=true (WARP) " +
+                "обходит пользовательский запрет IPv6 и пускает CF v6 наружу. Body:\n$body",
+        )
+    }
+
+    @Test
+    fun `establishTunForEngine принимает ipv6Enabled и пропускает в applyEngineTunSpec`() {
+        val sig = source.substringAfter("private suspend fun establishTunForEngine").substringBefore("): ParcelFileDescriptor?")
+        assertTrue(
+            sig.contains("ipv6Enabled"),
+            "establishTunForEngine обязан принимать ipv6Enabled чтобы WARP/URnetwork TUN " +
+                "уважал пользовательский switch IPv6.",
+        )
+        val body = source
+            .substringAfter("private suspend fun establishTunForEngine")
+            .substringBefore("private fun captureTunIfaceName")
+        assertTrue(
+            body.contains("applyEngineTunSpec(spec, ipv6Enabled)"),
+            "applyEngineTunSpec обязан получать ipv6Enabled из establishTunForEngine. Body:\n$body",
+        )
+    }
 }

@@ -26,6 +26,7 @@ class EngineWarp(
     private val sdkBridge: WarpSdkBridge,
     private val uapiPathProvider: () -> String,
     private val socketProtector: VpnSocketProtector = VpnSocketProtectorHolder,
+    private val ipv6EnabledProvider: () -> Boolean = { false },
 ) : EnginePlugin, TunFdAcceptor {
 
     override val id = EngineId.WARP
@@ -86,7 +87,8 @@ class EngineWarp(
             ?: return null
         val v4Prefix = cfg.interfaceAddressV4.substringAfter('/', missingDelimiterValue = "32")
             .toIntOrNull() ?: 32
-        val v6Addr = cfg.interfaceAddressV6.substringBefore('/').takeIf { it.isNotBlank() }
+        val ipv6Allowed = ipv6EnabledProvider()
+        val v6Addr = cfg.interfaceAddressV6.substringBefore('/').takeIf { it.isNotBlank() && ipv6Allowed }
         val v6Prefix = cfg.interfaceAddressV6.substringAfter('/', missingDelimiterValue = "128")
             .toIntOrNull() ?: 128
         return TunSpec(
@@ -95,7 +97,7 @@ class EngineWarp(
             blocking = true,
             ipv4Address = v4Addr,
             ipv4PrefixLength = v4Prefix,
-            dnsServers = cfg.dnsServers,
+            dnsServers = cfg.dnsServers.filter { ipv6Allowed || !it.contains(':') },
             allowFamilyV4 = true,
             allowFamilyV6 = v6Addr != null,
             ipv6Address = v6Addr,
@@ -144,16 +146,46 @@ class EngineWarp(
 
     private fun buildResolved(config: WarpConfig, rawIni: String?, source: String): ResolvedWarp {
         val resolvedConfig = resolveEndpointHost(config)
-        val ini = if (!rawIni.isNullOrBlank()) {
+        val ipv6Allowed = ipv6EnabledProvider()
+        val baseIni = if (!rawIni.isNullOrBlank()) {
             applyEndpointToRawIni(rawIni, resolvedConfig.peerEndpoint)
         } else {
             WarpIniBuilder.build(resolvedConfig)
         }
+        val ini = if (ipv6Allowed) baseIni else stripIpv6FromIni(baseIni)
         val iniSource = when {
             !rawIni.isNullOrBlank() -> "raw($source)"
             else -> "builder($source)"
         }
         return ResolvedWarp(config = resolvedConfig, ini = ini, iniSource = iniSource)
+    }
+
+    private fun stripIpv6FromIni(ini: String): String {
+        val out = StringBuilder()
+        ini.lineSequence().forEachIndexed { idx, line ->
+            if (idx > 0) out.append('\n')
+            val eq = line.indexOf('=')
+            if (eq <= 0) {
+                out.append(line)
+                return@forEachIndexed
+            }
+            val key = line.substring(0, eq).trim().lowercase()
+            if (key != "address" && key != "allowedips" && key != "dns") {
+                out.append(line)
+                return@forEachIndexed
+            }
+            val value = line.substring(eq + 1)
+            val ipv4Items = value.split(',')
+                .map { it.trim() }
+                .filter { it.isNotEmpty() && !it.contains(':') }
+            if (ipv4Items.isEmpty()) {
+                return@forEachIndexed
+            }
+            val indent = line.takeWhile { it.isWhitespace() }
+            val keyText = line.substring(indent.length, eq).trimEnd()
+            out.append(indent).append(keyText).append(" = ").append(ipv4Items.joinToString(", "))
+        }
+        return out.toString()
     }
 
     private fun resolveEndpointHost(cfg: WarpConfig): WarpConfig {

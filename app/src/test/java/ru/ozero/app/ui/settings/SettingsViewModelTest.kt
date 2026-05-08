@@ -214,6 +214,7 @@ class SettingsViewModelTest {
         }
         override suspend fun setUrnetworkEnabled(enabled: Boolean) = Unit
         override suspend fun setUrnetworkJwt(jwt: String?) = Unit
+        override suspend fun setUrnetworkCountryCode(code: String?) = Unit
         override suspend fun setByedpiWinningArgs(args: String?) = Unit
         override suspend fun setCustomDnsServers(servers: List<String>) = Unit
         override suspend fun setHostsMode(mode: ru.ozero.enginescore.settings.HostsMode) = Unit

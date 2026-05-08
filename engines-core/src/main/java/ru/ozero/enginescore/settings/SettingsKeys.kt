@@ -22,6 +22,7 @@ object SettingsKeys {
 
     val URNETWORK_ENABLED = booleanPreferencesKey("urnetwork_enabled")
     val URNETWORK_JWT = stringPreferencesKey("urnetwork_jwt")
+    val URNETWORK_COUNTRY_CODE = stringPreferencesKey("urnetwork_country_code")
 
     val CUSTOM_DNS_SERVERS = stringPreferencesKey("custom_dns_servers")
 

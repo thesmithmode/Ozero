@@ -72,6 +72,17 @@ class SettingsRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun setUrnetworkCountryCode(code: String?) {
+        dataStore.edit { prefs ->
+            val cleaned = code?.trim()?.uppercase()?.takeIf { it.length == 2 && it.all { ch -> ch.isLetter() } }
+            if (cleaned == null) {
+                prefs.remove(SettingsKeys.URNETWORK_COUNTRY_CODE)
+            } else {
+                prefs[SettingsKeys.URNETWORK_COUNTRY_CODE] = cleaned
+            }
+        }
+    }
+
     override suspend fun setByedpiWinningArgs(args: String?) {
         dataStore.edit { prefs ->
             if (args.isNullOrBlank()) {
@@ -138,6 +149,8 @@ class SettingsRepositoryImpl @Inject constructor(
         engineAutoPriority = readEngineAutoPriority(),
         urnetworkEnabled = this[SettingsKeys.URNETWORK_ENABLED] ?: SettingsModel.DEFAULT_URNETWORK_ENABLED,
         urnetworkJwt = this[SettingsKeys.URNETWORK_JWT],
+        urnetworkCountryCode = this[SettingsKeys.URNETWORK_COUNTRY_CODE]
+            ?: SettingsModel.DEFAULT_URNETWORK_COUNTRY_CODE,
         byedpiWinningArgs = this[SettingsKeys.BYDPI_WINNING_ARGS],
         customDnsServers = readCustomDnsServers(),
         hostsMode = readHostsMode(),

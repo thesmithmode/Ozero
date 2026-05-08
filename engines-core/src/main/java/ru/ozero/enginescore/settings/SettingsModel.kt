@@ -10,6 +10,7 @@ data class SettingsModel(
     val engineAutoPriority: List<EngineId> = DEFAULT_ENGINE_AUTO_PRIORITY,
     val urnetworkEnabled: Boolean = DEFAULT_URNETWORK_ENABLED,
     val urnetworkJwt: String? = DEFAULT_URNETWORK_JWT,
+    val urnetworkCountryCode: String? = DEFAULT_URNETWORK_COUNTRY_CODE,
     val byedpiWinningArgs: String? = DEFAULT_BYEDPI_WINNING_ARGS,
     val customDnsServers: List<String> = DEFAULT_CUSTOM_DNS_SERVERS,
     val hostsMode: HostsMode = DEFAULT_HOSTS_MODE,
@@ -28,6 +29,7 @@ data class SettingsModel(
         )
         const val DEFAULT_URNETWORK_ENABLED: Boolean = false
         val DEFAULT_URNETWORK_JWT: String? = null
+        val DEFAULT_URNETWORK_COUNTRY_CODE: String? = null
         val DEFAULT_BYEDPI_WINNING_ARGS: String? = null
         val DEFAULT_CUSTOM_DNS_SERVERS: List<String> = emptyList()
         val DEFAULT_HOSTS_MODE: HostsMode = HostsMode.DISABLED

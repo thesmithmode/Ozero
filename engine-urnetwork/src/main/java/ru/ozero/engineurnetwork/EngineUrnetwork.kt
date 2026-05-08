@@ -81,7 +81,9 @@ class EngineUrnetwork(
         )
         return when (bridgeResult) {
             UrnetworkSdkBridge.StartResult.Success -> {
-                Log.i(TAG, "started OK")
+                runCatching { sdkBridge.setPreferredCountry(config.region) }
+                    .onFailure { PersistentLoggers.warn(TAG, "setPreferredCountry threw: ${it.message}") }
+                Log.i(TAG, "started OK preferredCountry=${config.region ?: "<auto>"}")
                 startStatsPolling()
                 StartResult.Success(socksPort = config.socksPort)
             }

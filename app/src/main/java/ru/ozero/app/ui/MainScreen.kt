@@ -185,15 +185,14 @@ private fun SimpleMainContent(
 
 @Composable
 private fun UrnetworkPeerBadge(count: Int, searchSeconds: Int) {
-    if (count > 0) {
-        Text(
+    when {
+        count > 0 -> Text(
             text = stringResource(R.string.urnetwork_peer_count_label, count),
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.testTag(MainScreenTestTags.URNETWORK_PEER_COUNT),
         )
-    } else {
-        Text(
+        searchSeconds >= URNETWORK_PEER_SEARCH_VISIBLE_THRESHOLD_S -> Text(
             text = stringResource(R.string.urnetwork_peer_searching, searchSeconds),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.tertiary,
@@ -201,6 +200,8 @@ private fun UrnetworkPeerBadge(count: Int, searchSeconds: Int) {
         )
     }
 }
+
+private const val URNETWORK_PEER_SEARCH_VISIBLE_THRESHOLD_S: Int = 20
 
 @Suppress("LongParameterList")
 @Composable

@@ -5,6 +5,8 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.IOException
+import java.net.InetSocketAddress
+import java.net.Proxy
 import java.util.concurrent.TimeUnit
 
 class OkHttpIpInfoProvider(
@@ -13,7 +15,20 @@ class OkHttpIpInfoProvider(
     private val clock: () -> Long = { System.currentTimeMillis() },
 ) : IpInfoProvider {
 
-    override suspend fun fetch(): Result<IpInfo> = withContext(Dispatchers.IO) {
+    override suspend fun fetch(): Result<IpInfo> = doFetch(client)
+
+    override suspend fun fetchVia(socksHost: String?, socksPort: Int?): Result<IpInfo> {
+        val effective = if (socksHost != null && socksPort != null && socksPort > 0) {
+            client.newBuilder()
+                .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(socksHost, socksPort)))
+                .build()
+        } else {
+            client
+        }
+        return doFetch(effective)
+    }
+
+    private suspend fun doFetch(httpClient: OkHttpClient): Result<IpInfo> = withContext(Dispatchers.IO) {
         runCatching {
             val request = Request.Builder()
                 .url(endpoint)
@@ -21,7 +36,7 @@ class OkHttpIpInfoProvider(
                 .header("Accept", "application/json")
                 .get()
                 .build()
-            client.newCall(request).execute().use { response ->
+            httpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     throw IOException("HTTP ${response.code}")
                 }

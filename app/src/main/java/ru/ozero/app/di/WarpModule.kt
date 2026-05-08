@@ -14,7 +14,12 @@ import dagger.multibindings.IntoSet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.enginescore.EnginePlugin
+import ru.ozero.enginescore.settings.SettingsModel
+import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginewarp.DataStoreWarpConfigSlotStore
 import ru.ozero.enginewarp.DataStoreWarpConfigStore
 import ru.ozero.enginewarp.EngineWarp
@@ -100,11 +105,21 @@ object WarpModule {
         autoConfig: WarpAutoConfig,
         store: WarpConfigSlotStore,
         bridge: WarpSdkBridge,
+        settingsRepository: SettingsRepository,
     ): EnginePlugin = EngineWarp(
         autoConfig = autoConfig,
         configStore = store,
         sdkBridge = bridge,
         uapiPathProvider = { context.dataDir.absolutePath },
         socketProtector = ru.ozero.enginescore.VpnSocketProtectorHolder,
+        ipv6EnabledProvider = {
+            runBlocking {
+                withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
+                    runCatching { settingsRepository.settings.first() }.getOrNull()
+                }?.ipv6Enabled ?: SettingsModel.DEFAULT_IPV6_ENABLED
+            }
+        },
     )
+
+    private const val SETTINGS_READ_TIMEOUT_MS = 1_500L
 }

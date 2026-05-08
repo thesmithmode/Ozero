@@ -163,10 +163,7 @@ class MainViewModel @Inject constructor(
                         lastSessionKey = key
                         _ipInfo.value = IpInfoState.Loading
                         delay(IP_INFO_WARMUP_MS)
-                        _ipInfo.value = ipInfoProvider.fetch().fold(
-                            onSuccess = { IpInfoState.Loaded(it) },
-                            onFailure = { IpInfoState.Error(it.message ?: it.javaClass.simpleName) },
-                        )
+                        _ipInfo.value = fetchIpInfoViaEngine(s.engineId, s.socksPort)
                     }
                 } else {
                     lastSessionKey = null
@@ -179,11 +176,38 @@ class MainViewModel @Inject constructor(
     fun refreshIpInfo() {
         viewModelScope.launch {
             _ipInfo.value = IpInfoState.Loading
-            _ipInfo.value = ipInfoProvider.fetch().fold(
-                onSuccess = { IpInfoState.Loaded(it) },
-                onFailure = { IpInfoState.Error(it.message ?: it.javaClass.simpleName) },
-            )
+            val s = tunnelController.state.value
+            _ipInfo.value = if (s is TunnelState.Connected) {
+                fetchIpInfoViaEngine(s.engineId, s.socksPort)
+            } else {
+                ipInfoProvider.fetch().fold(
+                    onSuccess = { IpInfoState.Loaded(it) },
+                    onFailure = { IpInfoState.Error(it.message ?: it.javaClass.simpleName) },
+                )
+            }
         }
+    }
+
+    private suspend fun fetchIpInfoViaEngine(engineId: EngineId, socksPort: Int): IpInfoState {
+        val (host, port) = engineSocksProxy(engineId, socksPort)
+        var lastError: Throwable? = null
+        repeat(IP_INFO_RETRY_ATTEMPTS) { attempt ->
+            val result = ipInfoProvider.fetchVia(host, port)
+            result.fold(
+                onSuccess = { return IpInfoState.Loaded(it) },
+                onFailure = { lastError = it },
+            )
+            if (attempt < IP_INFO_RETRY_ATTEMPTS - 1) {
+                delay(IP_INFO_RETRY_DELAY_MS)
+            }
+        }
+        val msg = lastError?.message ?: lastError?.javaClass?.simpleName ?: "unknown"
+        return IpInfoState.Error(msg)
+    }
+
+    private fun engineSocksProxy(engineId: EngineId, socksPort: Int): Pair<String?, Int?> = when (engineId) {
+        EngineId.BYEDPI -> if (socksPort > 0) "127.0.0.1" to socksPort else null to null
+        else -> null to null
     }
 
     fun onConnectClick() = Unit
@@ -207,6 +231,8 @@ class MainViewModel @Inject constructor(
         const val URNETWORK_PEER_POLL_KEEP_MS = 5_000L
         const val URNETWORK_SEARCH_TICK_MS = 1_000L
         const val URNETWORK_STARTUP_GRACE_TICKS = 10
-        const val IP_INFO_WARMUP_MS = 3_000L
+        const val IP_INFO_WARMUP_MS = 8_000L
+        const val IP_INFO_RETRY_ATTEMPTS = 2
+        const val IP_INFO_RETRY_DELAY_MS = 5_000L
     }
 }

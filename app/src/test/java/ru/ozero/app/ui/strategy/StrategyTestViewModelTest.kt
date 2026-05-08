@@ -273,6 +273,7 @@ class StrategyTestViewModelTest {
         override suspend fun setManualEngine(engine: EngineId?) = Unit
         override suspend fun setUrnetworkEnabled(enabled: Boolean) = Unit
         override suspend fun setUrnetworkJwt(jwt: String?) = Unit
+        override suspend fun setUrnetworkCountryCode(code: String?) = Unit
         override suspend fun setCustomDnsServers(servers: List<String>) = Unit
         override suspend fun setHostsMode(mode: HostsMode) = Unit
         override suspend fun setHosts(hosts: List<String>) = Unit
