@@ -16,6 +16,7 @@
     <string name="stats_uptime">समय: %1$s</string>
     <string name="main_stagnation_warning">30 सेकंड से कोई ट्रैफ़िक नहीं</string>
     <string name="main_health_degraded">कनेक्शन अस्थिर</string>
+    <string name="main_health_degraded_hint">रूट जांच लगातार 3 बार विफल हुई। इंजन बदलकर देखें।</string>
 
     <string name="tab_main">मुख्य</string>
     <string name="tab_settings">सेटिंग्स</string>
@@ -152,4 +153,12 @@
     <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
     <string name="urnetwork_peer_count_label">पीयर: %1$d</string>
     <string name="urnetwork_provider_unpaid">अनभुगतान ट्रैफ़िक: %1$.2f MB</string>
+    <string name="settings_auto_priority_title">Auto-मोड प्राथमिकता</string>
+    <string name="settings_auto_priority_summary">Ozero इस क्रम में एंजन आज़माता है। पहला काम करने वाला — सक्रिय।</string>
+    <string name="settings_auto_priority_move_up">ऊपर</string>
+    <string name="settings_auto_priority_move_down">नीचे</string>
+    <string name="settings_auto_mode_open_title">Auto-मोड</string>
+    <string name="settings_auto_mode_open_summary">एंजन कनेक्शन प्राथमिकता क्रम</string>
+    <string name="auto_mode_screen_title">Auto-मोड</string>
+    <string name="auto_mode_inactive_warning">वर्तमान में एक एंजन मैन्युअली चुना गया है। Auto-मोड निष्क्रिय है — परिवर्तन सहेजे जाएँगे और Auto पर वापस आने पर लागू होंगे।</string>
 </resources>

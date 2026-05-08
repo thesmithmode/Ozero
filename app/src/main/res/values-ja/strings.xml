@@ -16,6 +16,7 @@
     <string name="stats_uptime">経過時間: %1$s</string>
     <string name="main_stagnation_warning">30秒間トラフィックなし</string>
     <string name="main_health_degraded">接続が不安定</string>
+    <string name="main_health_degraded_hint">ルートプローブが3回連続で失敗しました。エンジンを切り替えてみてください。</string>
 
     <string name="tab_main">ホーム</string>
     <string name="tab_settings">設定</string>
@@ -152,4 +153,12 @@
     <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
     <string name="urnetwork_peer_count_label">ピア: %1$d</string>
     <string name="urnetwork_provider_unpaid">未払いトラフィック: %1$.2f MB</string>
+    <string name="settings_auto_priority_title">Auto モードの優先順位</string>
+    <string name="settings_auto_priority_summary">Ozero はこの順序でエンジンを試します。最初に動作するものがアクティブ。</string>
+    <string name="settings_auto_priority_move_up">上へ</string>
+    <string name="settings_auto_priority_move_down">下へ</string>
+    <string name="settings_auto_mode_open_title">Auto モード</string>
+    <string name="settings_auto_mode_open_summary">エンジン接続優先順位</string>
+    <string name="auto_mode_screen_title">Auto モード</string>
+    <string name="auto_mode_inactive_warning">現在エンジンが手動で選択されています。Auto モードは非アクティブ — 変更は保存され、Auto に戻したとき適用されます。</string>
 </resources>

@@ -15,6 +15,7 @@ import ru.ozero.app.ui.diag.DiagnosticsScreen
 import ru.ozero.app.ui.logs.LogsScreen
 import ru.ozero.app.ui.servers.ManualServerScreen
 import ru.ozero.app.ui.servers.ServersScreen
+import ru.ozero.app.ui.settings.AutoModeSettingsScreen
 import ru.ozero.app.ui.settings.SettingsScreen
 import ru.ozero.app.ui.settings.engines.ByeDpiEngineSettingsScreen
 import ru.ozero.app.ui.settings.engines.UrnetworkEngineSettingsScreen
@@ -55,7 +56,9 @@ fun RootNavigation(
                     onOpenStatsHistory = { navigate(TopScreen.StatsHistory) },
                     onOpenDiagnostics = { navigate(TopScreen.Diagnostics) },
                     onOpenBackup = { navigate(TopScreen.Backup) },
+                    onOpenAutoModeSettings = { navigate(TopScreen.AutoModeSettings) },
                 )
+            TopScreen.AutoModeSettings -> AutoModeSettingsScreen(onBack = { back() })
             TopScreen.Backup -> BackupScreen(onBack = { back() })
             TopScreen.Logs -> LogsScreen(onBack = { back() })
             TopScreen.Diagnostics -> DiagnosticsScreen(onBack = { back() })

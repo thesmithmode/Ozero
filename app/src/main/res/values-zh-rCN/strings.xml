@@ -16,6 +16,7 @@
     <string name="stats_uptime">运行时间: %1$s</string>
     <string name="main_stagnation_warning">已 30 秒无流量</string>
     <string name="main_health_degraded">连接不稳定</string>
+    <string name="main_health_degraded_hint">路由探测连续失败 3 次。请尝试切换引擎。</string>
 
     <string name="tab_main">主页</string>
     <string name="tab_settings">设置</string>
@@ -152,4 +153,12 @@
     <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
     <string name="urnetwork_peer_count_label">对等点: %1$d</string>
     <string name="urnetwork_provider_unpaid">未付款流量: %1$.2f MB</string>
+    <string name="settings_auto_priority_title">Auto 模式优先级</string>
+    <string name="settings_auto_priority_summary">Ozero 按此顺序尝试引擎。首个可用的为活动引擎。</string>
+    <string name="settings_auto_priority_move_up">上移</string>
+    <string name="settings_auto_priority_move_down">下移</string>
+    <string name="settings_auto_mode_open_title">Auto 模式</string>
+    <string name="settings_auto_mode_open_summary">引擎连接优先级顺序</string>
+    <string name="auto_mode_screen_title">Auto 模式</string>
+    <string name="auto_mode_inactive_warning">当前已手动选择引擎。Auto 模式未激活 — 更改将保存，切换回 Auto 时应用。</string>
 </resources>

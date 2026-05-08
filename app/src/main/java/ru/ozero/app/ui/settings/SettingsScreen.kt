@@ -16,8 +16,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -59,6 +57,7 @@ fun SettingsScreen(
     onOpenStatsHistory: () -> Unit = {},
     onOpenDiagnostics: () -> Unit = {},
     onOpenBackup: () -> Unit = {},
+    onOpenAutoModeSettings: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -78,6 +77,7 @@ fun SettingsScreen(
             onOpenStatsHistory = onOpenStatsHistory,
             onOpenDiagnostics = onOpenDiagnostics,
             onOpenBackup = onOpenBackup,
+            onOpenAutoModeSettings = onOpenAutoModeSettings,
         ),
         onSplitModeChange = viewModel::onSplitModeChange,
         onIpv6Toggle = viewModel::onIpv6Toggle,
@@ -85,7 +85,6 @@ fun SettingsScreen(
         onManualEngineSelect = viewModel::onManualEngineSelect,
         onUiLocaleSelect = viewModel::onUiLocaleSelect,
         onAppModeSelect = viewModel::onAppModeSelect,
-        onMoveAutoPriority = viewModel::onMoveAutoPriority,
     )
 }
 
@@ -102,7 +101,6 @@ fun SettingsScreenContent(
     onManualEngineSelect: (EngineId?) -> Unit,
     onUiLocaleSelect: (String?) -> Unit = {},
     onAppModeSelect: (AppMode) -> Unit = {},
-    onMoveAutoPriority: (List<EngineId>, EngineId, Int) -> Unit = { _, _, _ -> },
 ) {
     Scaffold(
         modifier = Modifier.testTag(SettingsTestTags.SCREEN),
@@ -136,7 +134,6 @@ fun SettingsScreenContent(
                     onManualEngineSelect = onManualEngineSelect,
                     onUiLocaleSelect = onUiLocaleSelect,
                     onAppModeSelect = onAppModeSelect,
-                    onMoveAutoPriority = onMoveAutoPriority,
                 )
         }
     }
@@ -166,7 +163,6 @@ private fun ContentBody(
     onManualEngineSelect: (EngineId?) -> Unit,
     onUiLocaleSelect: (String?) -> Unit = {},
     onAppModeSelect: (AppMode) -> Unit = {},
-    onMoveAutoPriority: (List<EngineId>, EngineId, Int) -> Unit = { _, _, _ -> },
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
@@ -188,12 +184,9 @@ private fun ContentBody(
                 onOpenServers = nav.onOpenServers,
             )
         }
-        if (model.appMode == AppMode.EXPERT && model.manualEngine == null) {
+        if (model.appMode == AppMode.EXPERT) {
             item {
-                AutoPrioritySection(
-                    priority = model.engineAutoPriority,
-                    onMove = { engine, delta -> onMoveAutoPriority(model.engineAutoPriority, engine, delta) },
-                )
+                AutoModeRow(onOpen = nav.onOpenAutoModeSettings)
             }
         }
         item { SectionDivider() }
@@ -241,63 +234,23 @@ private fun ContentBody(
 }
 
 @Composable
-private fun AutoPrioritySection(
-    priority: List<EngineId>,
-    onMove: (EngineId, Int) -> Unit,
-) {
-    val items = priority.filter { !it.isStub }
+private fun AutoModeRow(onOpen: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .testTag(SettingsTestTags.AUTO_PRIORITY_SECTION)
-            .padding(top = 8.dp),
+            .clickable(onClick = onOpen)
+            .testTag(SettingsTestTags.AUTO_MODE_OPEN_ROW)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         Text(
-            text = stringResource(R.string.settings_auto_priority_title),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            text = stringResource(R.string.settings_auto_mode_open_title),
+            style = MaterialTheme.typography.bodyLarge,
         )
         Text(
-            text = stringResource(R.string.settings_auto_priority_summary),
+            text = stringResource(R.string.settings_auto_mode_open_summary),
             style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
         )
-        items.forEachIndexed { index, engine ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
-                    .testTag(SettingsTestTags.AUTO_PRIORITY_ITEM_PREFIX + engine.name),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "${index + 1}. ${engine.displayName}",
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.weight(1f),
-                )
-                IconButton(
-                    onClick = { onMove(engine, -1) },
-                    enabled = index > 0,
-                    modifier = Modifier.testTag(SettingsTestTags.AUTO_PRIORITY_UP_PREFIX + engine.name),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.KeyboardArrowUp,
-                        contentDescription = stringResource(R.string.settings_auto_priority_move_up),
-                    )
-                }
-                IconButton(
-                    onClick = { onMove(engine, 1) },
-                    enabled = index < items.lastIndex,
-                    modifier = Modifier.testTag(SettingsTestTags.AUTO_PRIORITY_DOWN_PREFIX + engine.name),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.KeyboardArrowDown,
-                        contentDescription = stringResource(R.string.settings_auto_priority_move_down),
-                    )
-                }
-            }
-        }
     }
 }
 

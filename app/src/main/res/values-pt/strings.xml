@@ -16,6 +16,7 @@
     <string name="stats_uptime">Tempo: %1$s</string>
     <string name="main_stagnation_warning">Sem tráfego há 30 segundos</string>
     <string name="main_health_degraded">Conexão instável</string>
+    <string name="main_health_degraded_hint">A sonda de rota falhou 3 vezes seguidas. Tente trocar de motor.</string>
 
     <string name="tab_main">Início</string>
     <string name="tab_settings">Ajustes</string>
@@ -152,4 +153,12 @@
     <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
     <string name="urnetwork_peer_count_label">Pares: %1$d</string>
     <string name="urnetwork_provider_unpaid">Tráfego não pago: %1$.2f MB</string>
+    <string name="settings_auto_priority_title">Prioridade do Auto-modo</string>
+    <string name="settings_auto_priority_summary">Ozero tenta motores nesta ordem. O primeiro funcional — ativo.</string>
+    <string name="settings_auto_priority_move_up">Subir</string>
+    <string name="settings_auto_priority_move_down">Descer</string>
+    <string name="settings_auto_mode_open_title">Auto-modo</string>
+    <string name="settings_auto_mode_open_summary">Ordem de prioridade de conexão dos motores</string>
+    <string name="auto_mode_screen_title">Auto-modo</string>
+    <string name="auto_mode_inactive_warning">Atualmente um motor está selecionado manualmente. O Auto-modo está inativo — as alterações serão salvas e aplicadas ao voltar para Auto.</string>
 </resources>

@@ -19,6 +19,11 @@
     <string name="stats_uptime">Uptime: %1$s</string>
     <string name="main_stagnation_warning">No traffic for 30 seconds</string>
     <string name="main_health_degraded">Connection unstable</string>
+    <string name="main_health_degraded_hint">Route probe failed 3 times in a row. Try switching engine.</string>
+    <string name="settings_auto_mode_open_title">Auto-mode</string>
+    <string name="settings_auto_mode_open_summary">Engine connection priority order</string>
+    <string name="auto_mode_screen_title">Auto-mode</string>
+    <string name="auto_mode_inactive_warning">An engine is currently chosen manually. Auto-mode is inactive — changes will be saved and applied when you switch back to Auto.</string>
 
     <!-- Tabs -->
     <string name="tab_main">Home</string>

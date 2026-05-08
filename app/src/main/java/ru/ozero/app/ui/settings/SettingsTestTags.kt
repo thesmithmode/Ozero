@@ -28,4 +28,7 @@ object SettingsTestTags {
     const val AUTO_PRIORITY_ITEM_PREFIX = "auto_priority_item_"
     const val AUTO_PRIORITY_UP_PREFIX = "auto_priority_up_"
     const val AUTO_PRIORITY_DOWN_PREFIX = "auto_priority_down_"
+    const val AUTO_MODE_OPEN_ROW = "auto_mode_open_row"
+    const val AUTO_MODE_SCREEN = "auto_mode_screen"
+    const val AUTO_MODE_INACTIVE_WARNING = "auto_mode_inactive_warning"
 }

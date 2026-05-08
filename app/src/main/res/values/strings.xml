@@ -18,7 +18,8 @@
     <string name="stats_session">Сессия: ↓ %1$s ↑ %2$s</string>
     <string name="stats_uptime">Время: %1$s</string>
     <string name="main_stagnation_warning">Трафик не идёт уже 30 секунд</string>
-    <string name="main_health_degraded">Соединение нестабильно</string>
+    <string name="main_health_degraded">Связь нестабильна</string>
+    <string name="main_health_degraded_hint">Проба маршрута не отвечает 3 раза подряд. Попробуйте сменить движок.</string>
     <string name="urnetwork_peer_count_label">Пиры: %1$d</string>
     <string name="urnetwork_provider_unpaid">Невыплаченный трафик: %1$.2f MB</string>
     <string name="urnetwork_consumed_label">Потреблено</string>
@@ -80,6 +81,10 @@
     <string name="settings_auto_priority_summary">Ozero пробует движки в этом порядке. Первый рабочий — активен.</string>
     <string name="settings_auto_priority_move_up">Выше</string>
     <string name="settings_auto_priority_move_down">Ниже</string>
+    <string name="settings_auto_mode_open_title">Auto-режим</string>
+    <string name="settings_auto_mode_open_summary">Порядок попыток подключения движков</string>
+    <string name="auto_mode_screen_title">Auto-режим</string>
+    <string name="auto_mode_inactive_warning">Сейчас выбран движок вручную. Auto-режим неактивен — изменения сохранятся, но применятся при возврате в Авто.</string>
     <string name="engine_wip_badge">в разработке</string>
     <string name="settings_ipv6_title">IPv6</string>
     <string name="settings_ipv6_summary">Маршрутизировать IPv6 через VPN</string>

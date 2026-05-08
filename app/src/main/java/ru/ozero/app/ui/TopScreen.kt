@@ -15,4 +15,5 @@ enum class TopScreen {
     ManualServer,
     StatsHistory,
     Backup,
+    AutoModeSettings,
 }

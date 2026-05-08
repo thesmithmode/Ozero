@@ -241,12 +241,20 @@ private fun ExpertMainContent(
                     )
                 }
                 if (healthStatus == HealthMonitor.Status.DEGRADED) {
-                    Text(
-                        text = stringResource(R.string.main_health_degraded),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
+                    Column(
                         modifier = Modifier.testTag(MainScreenTestTags.HEALTH_DEGRADED_BADGE),
-                    )
+                    ) {
+                        Text(
+                            text = stringResource(R.string.main_health_degraded),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                        Text(
+                            text = stringResource(R.string.main_health_degraded_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
 

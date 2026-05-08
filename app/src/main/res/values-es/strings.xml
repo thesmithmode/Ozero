@@ -16,6 +16,7 @@
     <string name="stats_uptime">Tiempo activo: %1$s</string>
     <string name="main_stagnation_warning">Sin tráfico durante 30 segundos</string>
     <string name="main_health_degraded">Conexión inestable</string>
+    <string name="main_health_degraded_hint">La sonda de ruta falló 3 veces seguidas. Pruebe a cambiar de motor.</string>
 
     <string name="tab_main">Inicio</string>
     <string name="tab_settings">Ajustes</string>
@@ -152,4 +153,12 @@
     <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
     <string name="urnetwork_peer_count_label">Pares: %1$d</string>
     <string name="urnetwork_provider_unpaid">Tráfico no pagado: %1$.2f MB</string>
+    <string name="settings_auto_priority_title">Prioridad de Auto-modo</string>
+    <string name="settings_auto_priority_summary">Ozero prueba motores en este orden. El primero que funcione — activo.</string>
+    <string name="settings_auto_priority_move_up">Subir</string>
+    <string name="settings_auto_priority_move_down">Bajar</string>
+    <string name="settings_auto_mode_open_title">Auto-modo</string>
+    <string name="settings_auto_mode_open_summary">Orden de prioridad de conexión de motores</string>
+    <string name="auto_mode_screen_title">Auto-modo</string>
+    <string name="auto_mode_inactive_warning">Actualmente hay un motor seleccionado manualmente. El Auto-modo está inactivo — los cambios se guardarán y aplicarán al volver a Auto.</string>
 </resources>
