@@ -6,7 +6,7 @@ ksp = "2.0.20-1.0.25"
 
 # AndroidX
 coreKtx = "1.13.1"
-appcompat = "1.7.0"
+appcompat = "1.7.1"
 
 # Compose
 composeBom = "2024.09.01"
