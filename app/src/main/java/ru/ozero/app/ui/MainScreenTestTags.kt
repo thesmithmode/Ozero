@@ -9,4 +9,5 @@ object MainScreenTestTags {
     const val ENGINE_CHIPS_ROW = "main_engine_chips_row"
     const val ENGINE_CHIP_PREFIX = "main_engine_chip_"
     const val URNETWORK_PEER_COUNT = "main_urnetwork_peer_count"
+    const val URNETWORK_PEER_SEARCHING = "main_urnetwork_peer_searching"
 }

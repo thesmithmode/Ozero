@@ -74,6 +74,7 @@ fun MainScreen(
     val manualEngine by viewModel.manualEngine.collectAsStateWithLifecycle()
     val speedHistory by viewModel.speedHistory.collectAsStateWithLifecycle()
     val urnetworkPeerCount by viewModel.urnetworkPeerCount.collectAsStateWithLifecycle()
+    val urnetworkPeerSearchSeconds by viewModel.urnetworkPeerSearchSeconds.collectAsStateWithLifecycle()
 
     val powerState = state.toPowerDiscState()
     val backgroundState = state.toBackgroundState()
@@ -87,6 +88,7 @@ fun MainScreen(
                 isConnected = isConnected,
                 manualEngine = manualEngine,
                 urnetworkPeerCount = urnetworkPeerCount,
+                urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
                 onConnectClick = onConnectClick,
                 onOpenEngineParams = onOpenEngineParams,
                 onOpenSettings = onOpenSettings,
@@ -101,6 +103,7 @@ fun MainScreen(
                 isConnected = isConnected,
                 manualEngine = manualEngine,
                 urnetworkPeerCount = urnetworkPeerCount,
+                urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
                 onConnectClick = onConnectClick,
                 onManualEngineSelect = viewModel::onManualEngineSelect,
                 onOpenEngineParams = onOpenEngineParams,
@@ -110,6 +113,7 @@ fun MainScreen(
     }
 }
 
+@Suppress("LongParameterList")
 @Composable
 private fun SimpleMainContent(
     tunnelState: TunnelState,
@@ -117,6 +121,7 @@ private fun SimpleMainContent(
     isConnected: Boolean,
     manualEngine: EngineId?,
     urnetworkPeerCount: Int,
+    urnetworkPeerSearchSeconds: Int,
     onConnectClick: () -> Unit,
     onOpenEngineParams: (EngineId?) -> Unit,
     onOpenSettings: () -> Unit,
@@ -146,7 +151,10 @@ private fun SimpleMainContent(
         }
 
         if (isConnected && manualEngine == EngineId.URNETWORK) {
-            UrnetworkPeerBadge(count = urnetworkPeerCount)
+            UrnetworkPeerBadge(
+                count = urnetworkPeerCount,
+                searchSeconds = urnetworkPeerSearchSeconds,
+            )
         }
 
         Column(
@@ -170,13 +178,22 @@ private fun SimpleMainContent(
 }
 
 @Composable
-private fun UrnetworkPeerBadge(count: Int) {
-    Text(
-        text = stringResource(R.string.urnetwork_peer_count_label, count),
-        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.testTag(MainScreenTestTags.URNETWORK_PEER_COUNT),
-    )
+private fun UrnetworkPeerBadge(count: Int, searchSeconds: Int) {
+    if (count > 0) {
+        Text(
+            text = stringResource(R.string.urnetwork_peer_count_label, count),
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.testTag(MainScreenTestTags.URNETWORK_PEER_COUNT),
+        )
+    } else {
+        Text(
+            text = stringResource(R.string.urnetwork_peer_searching, searchSeconds),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.tertiary,
+            modifier = Modifier.testTag(MainScreenTestTags.URNETWORK_PEER_SEARCHING),
+        )
+    }
 }
 
 @Suppress("LongParameterList")
@@ -191,6 +208,7 @@ private fun ExpertMainContent(
     isConnected: Boolean,
     manualEngine: EngineId?,
     urnetworkPeerCount: Int,
+    urnetworkPeerSearchSeconds: Int,
     onConnectClick: () -> Unit,
     onManualEngineSelect: (EngineId?) -> Unit,
     onOpenEngineParams: (EngineId?) -> Unit,
@@ -224,7 +242,10 @@ private fun ExpertMainContent(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (isConnected && manualEngine == EngineId.URNETWORK) {
-                UrnetworkPeerBadge(count = urnetworkPeerCount)
+                UrnetworkPeerBadge(
+                    count = urnetworkPeerCount,
+                    searchSeconds = urnetworkPeerSearchSeconds,
+                )
             }
             if (isConnected && stats != null) {
                 TrafficStatsCard(

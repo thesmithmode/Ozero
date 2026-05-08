@@ -152,6 +152,7 @@
     <string name="stats_history_status_label">الحالة: %1$s</string>
     <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
     <string name="urnetwork_peer_count_label">الأقران: %1$d</string>
+    <string name="urnetwork_peer_searching">الأقران غير متاحين، إعادة محاولة الاتصال %1$d ث</string>
     <string name="urnetwork_provider_unpaid">الحركة غير المدفوعة: %1$.2f MB</string>
     <string name="settings_auto_priority_title">أولوية الوضع التلقائي</string>
     <string name="settings_auto_priority_summary">يجرب Ozero المحركات بهذا الترتيب. الأول الذي يعمل — نشط.</string>

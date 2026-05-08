@@ -152,6 +152,7 @@
     <string name="stats_history_status_label">Estado: %1$s</string>
     <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
     <string name="urnetwork_peer_count_label">Pares: %1$d</string>
+    <string name="urnetwork_peer_searching">Pares indisponíveis, repetindo conexão %1$d s</string>
     <string name="urnetwork_provider_unpaid">Tráfego não pago: %1$.2f MB</string>
     <string name="settings_auto_priority_title">Prioridade do Auto-modo</string>
     <string name="settings_auto_priority_summary">Ozero tenta motores nesta ordem. O primeiro funcional — ativo.</string>

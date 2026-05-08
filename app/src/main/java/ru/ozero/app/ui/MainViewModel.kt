@@ -93,6 +93,26 @@ class MainViewModel @Inject constructor(
         initialValue = 0,
     )
 
+    val urnetworkPeerSearchSeconds: StateFlow<Int> = flow {
+        var seconds = 0
+        while (true) {
+            val s = tunnelController.state.value
+            val active = s is TunnelState.Connected && s.engineId == EngineId.URNETWORK
+            val peers = if (active) runCatching { urnetworkBridge.peerCount() }.getOrDefault(0) else 0
+            seconds = when {
+                !active -> 0
+                peers > 0 -> 0
+                else -> seconds + 1
+            }
+            emit(seconds)
+            delay(URNETWORK_SEARCH_TICK_MS)
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(URNETWORK_PEER_POLL_KEEP_MS),
+        initialValue = 0,
+    )
+
     init {
         viewModelScope.launch {
             tunnelController.stats.collect { s ->
@@ -126,5 +146,6 @@ class MainViewModel @Inject constructor(
         const val SPEED_HISTORY_SIZE = 60
         const val URNETWORK_PEER_POLL_MS = 2_000L
         const val URNETWORK_PEER_POLL_KEEP_MS = 5_000L
+        const val URNETWORK_SEARCH_TICK_MS = 1_000L
     }
 }

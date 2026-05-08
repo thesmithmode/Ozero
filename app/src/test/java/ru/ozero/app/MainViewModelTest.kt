@@ -5,6 +5,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -48,7 +49,7 @@ class MainViewModelTest {
         viewModel = MainViewModel(tunnelController, healthMonitor, settingsRepository, FakeUrnetworkBridge())
     }
 
-    private class FakeUrnetworkBridge : UrnetworkSdkBridge {
+    private class FakeUrnetworkBridge(var peers: Int = 0) : UrnetworkSdkBridge {
         override suspend fun start(
             walletAddress: String,
             apiUrl: String,
@@ -65,7 +66,7 @@ class MainViewModelTest {
         override fun openLocationsViewController(): LocationsViewController? = null
         override fun setProvidePaused(paused: Boolean) = Unit
         override fun isProvidePaused(): Boolean = true
-        override fun peerCount(): Int = 0
+        override fun peerCount(): Int = peers
         override fun unpaidByteCount(): Long = 0L
         override fun fetchTransferStats() = Unit
         override suspend fun fetchSubscriptionBalance(): UrnetworkSdkBridge.SubscriptionBalanceSnapshot? = null
@@ -176,6 +177,60 @@ class MainViewModelTest {
         viewModel.onManualEngineSelect(EngineId.BYEDPI)
         advanceUntilIdle()
         assertEquals(listOf<EngineId?>(EngineId.BYEDPI), settingsRepository.manualEngineUpdates)
+    }
+
+    @Test
+    fun urnetworkPeerSearchSecondsZeroWhenIdle() = runTest {
+        backgroundScope.launch { viewModel.urnetworkPeerSearchSeconds.collect {} }
+        advanceUntilIdle()
+        kotlinx.coroutines.delay(2_500)
+        advanceUntilIdle()
+        assertEquals(0, viewModel.urnetworkPeerSearchSeconds.value)
+    }
+
+    @Test
+    fun urnetworkPeerSearchSecondsZeroWhenDifferentEngineConnected() = runTest {
+        backgroundScope.launch { viewModel.urnetworkPeerSearchSeconds.collect {} }
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
+        advanceUntilIdle()
+        kotlinx.coroutines.delay(3_500)
+        advanceUntilIdle()
+        assertEquals(0, viewModel.urnetworkPeerSearchSeconds.value)
+    }
+
+    @Test
+    fun urnetworkPeerSearchSecondsIncrementsWhileNoPeers() = runTest {
+        val bridge = FakeUrnetworkBridge(peers = 0)
+        val vm = MainViewModel(tunnelController, healthMonitor, settingsRepository, bridge)
+        backgroundScope.launch { vm.urnetworkPeerSearchSeconds.collect {} }
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.URNETWORK)
+        tunnelController.onEngineStarted(EngineId.URNETWORK, 1080)
+        advanceUntilIdle()
+        kotlinx.coroutines.delay(3_500)
+        advanceUntilIdle()
+        assert(vm.urnetworkPeerSearchSeconds.value >= 2) {
+            "expected >=2 after 3.5s of no peers, got ${vm.urnetworkPeerSearchSeconds.value}"
+        }
+    }
+
+    @Test
+    fun urnetworkPeerSearchSecondsResetsWhenPeersAppear() = runTest {
+        val bridge = FakeUrnetworkBridge(peers = 0)
+        val vm = MainViewModel(tunnelController, healthMonitor, settingsRepository, bridge)
+        backgroundScope.launch { vm.urnetworkPeerSearchSeconds.collect {} }
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.URNETWORK)
+        tunnelController.onEngineStarted(EngineId.URNETWORK, 1080)
+        advanceUntilIdle()
+        kotlinx.coroutines.delay(3_500)
+        advanceUntilIdle()
+        bridge.peers = 5
+        kotlinx.coroutines.delay(2_000)
+        advanceUntilIdle()
+        assertEquals(0, vm.urnetworkPeerSearchSeconds.value)
     }
 
     private class FakeSettingsRepository : SettingsRepository {
