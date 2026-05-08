@@ -364,6 +364,15 @@ class TunnelControllerTest {
     }
 
     @Test
+    fun failedToProbingDoesNotAutoClearKillswitch() {
+        controller.onProbing()
+        controller.onKillswitchEngaged(EngineId.BYEDPI, "x")
+        controller.onProbing()
+        assertEquals(true, controller.killswitchActive.value)
+        assertIs<TunnelState.Probing>(controller.state.value)
+    }
+
+    @Test
     fun killswitchEngagedFromProbingSurvives() {
         controller.onProbing()
         controller.onKillswitchEngaged(EngineId.WARP, "preflight failed")
