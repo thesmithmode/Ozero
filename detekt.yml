@@ -12,7 +12,7 @@ complexity:
     threshold: 25
   CognitiveComplexMethod:
     active: true
-    threshold: 30
+    threshold: 35
   LongMethod:
     active: true
     threshold: 120

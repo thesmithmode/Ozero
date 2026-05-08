@@ -113,7 +113,9 @@ class OzeroVpnService : android.net.VpnService() {
     private val stopping = AtomicBoolean(false)
     private val stopSignal = AtomicBoolean(false)
     private val lastStopStartId = AtomicInteger(-1)
-    @Volatile private var killswitchCached: Boolean = false
+
+    @Volatile
+    private var killswitchCached: Boolean = false
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         PersistentLoggers.info(TAG, "onStartCommand action=${intent?.action} startId=$startId")
