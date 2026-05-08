@@ -1,5 +1,6 @@
 package ru.ozero.engineurnetwork
 
+import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -67,7 +68,7 @@ class EngineUrnetwork(
 
         val wallet = configStore.walletAddress().first()
         val isPreset = wallet == UrnetworkDefaults.PRESET_WALLET
-        PersistentLoggers.info(
+        Log.i(
             TAG,
             "start wallet=${wallet.take(WALLET_LOG_PREFIX_LEN)}… isPreset=$isPreset hasClientJwt=true",
         )
@@ -80,7 +81,7 @@ class EngineUrnetwork(
         )
         return when (bridgeResult) {
             UrnetworkSdkBridge.StartResult.Success -> {
-                PersistentLoggers.info(TAG, "started OK")
+                Log.i(TAG, "started OK")
                 startStatsPolling()
                 StartResult.Success(socksPort = config.socksPort)
             }
@@ -92,7 +93,7 @@ class EngineUrnetwork(
     }
 
     override suspend fun stop() {
-        PersistentLoggers.info(TAG, "stop")
+        Log.i(TAG, "stop")
         statsJobRef.getAndSet(null)?.cancel()
         _stats.value = EngineStats()
         sdkBridge.stop()
@@ -136,7 +137,7 @@ class EngineUrnetwork(
     )
 
     override suspend fun attachTun(tunFd: Int): TunAttachResult {
-        PersistentLoggers.info(TAG, "attachTun fd=$tunFd")
+        Log.i(TAG, "attachTun fd=$tunFd")
         return when (val r = sdkBridge.attachTun(tunFd)) {
             UrnetworkSdkBridge.AttachResult.Success -> TunAttachResult.Success
             is UrnetworkSdkBridge.AttachResult.Failed -> TunAttachResult.Failure(r.reason)

@@ -1,5 +1,6 @@
 package ru.ozero.commonvpn
 
+import android.util.Log
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -66,7 +67,7 @@ class HealthMonitor(
             consecutiveFailures = 0
             if (_status.value != Status.HEALTHY) {
                 _status.value = Status.HEALTHY
-                PersistentLoggers.info(TAG, "engine healthy on port=$socksPort")
+                Log.i(TAG, "engine healthy on port=$socksPort")
             }
         } else {
             consecutiveFailures++

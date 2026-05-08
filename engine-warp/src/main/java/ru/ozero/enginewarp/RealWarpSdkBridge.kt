@@ -1,6 +1,7 @@
 package ru.ozero.enginewarp
 
 import android.content.Context
+import android.util.Log
 import com.getkeepsafe.relinker.ReLinker
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -37,7 +38,7 @@ class RealWarpSdkBridge internal constructor(
         val socketFile = File(uapiPath, "$tunnelName.sock")
         if (socketFile.exists()) {
             val deleted = socketFile.delete()
-            PersistentLoggers.info(TAG, "stale socket $socketFile deleted=$deleted")
+            Log.i(TAG, "stale socket $socketFile deleted=$deleted")
         }
         logIniDigest(tunnelName, iniConfig)
         val started = System.currentTimeMillis()
@@ -63,7 +64,7 @@ class RealWarpSdkBridge internal constructor(
                 tunnelHandle = INVALID_HANDLE
                 return@withContext WarpSdkBridge.AttachResult.Failed("protect underlying sockets failed")
             }
-            PersistentLoggers.info(TAG, "awgTurnOn OK handle=$handle name=$tunnelName")
+            Log.i(TAG, "awgTurnOn OK handle=$handle name=$tunnelName")
             WarpSdkBridge.AttachResult.Success
         } catch (ce: CancellationException) {
             throw ce
@@ -94,7 +95,7 @@ class RealWarpSdkBridge internal constructor(
         var anyProtected = false
         if (v4 > 0) {
             val ok = protector.protect(v4)
-            PersistentLoggers.info(TAG, "protect v4 sock=$v4 ok=$ok")
+            Log.i(TAG, "protect v4 sock=$v4 ok=$ok")
             if (!ok) {
                 PersistentLoggers.error(TAG, "protect v4 returned false — VpnService binding lost")
                 return false
@@ -103,7 +104,7 @@ class RealWarpSdkBridge internal constructor(
         }
         if (v6 > 0) {
             val ok = protector.protect(v6)
-            PersistentLoggers.info(TAG, "protect v6 sock=$v6 ok=$ok")
+            Log.i(TAG, "protect v6 sock=$v6 ok=$ok")
             if (!ok) {
                 PersistentLoggers.warn(TAG, "protect v6 returned false — continuing v4-only")
             } else {
@@ -161,7 +162,7 @@ class RealWarpSdkBridge internal constructor(
                     trimmed.substringBefore('=').trim().lowercase()
                 }
             }.distinct()
-            PersistentLoggers.info(
+            Log.i(
                 TAG,
                 "INI digest ($tunnelName): bytes=$totalBytes lines=${lines.size} nonEmpty=$nonEmpty keys=$keys",
             )
@@ -243,7 +244,7 @@ class ReLinkerAwgRuntime(context: Context) : AwgRuntime {
     override fun turnOn(name: String, tunFd: Int, ini: String, uapiPath: String): Int {
         loadOnce()
         val result = GoBackend.awgTurnOn(name, tunFd, ini, uapiPath)
-        PersistentLoggers.info(TAG, "awgTurnOn name=$name fd=$tunFd → handle=$result")
+        Log.i(TAG, "awgTurnOn name=$name fd=$tunFd → handle=$result")
         return result
     }
 

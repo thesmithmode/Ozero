@@ -1,5 +1,6 @@
 package ru.ozero.enginewarp
 
+import android.util.Log
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -56,12 +57,12 @@ class EngineWarp(
         )
         resolvedConfig = resolved.config
         resolvedIni = resolved.ini
-        PersistentLoggers.info(TAG, "resolved config: ${resolved.config} (iniSource=${resolved.iniSource})")
+        Log.i(TAG, "resolved config: ${resolved.config} (iniSource=${resolved.iniSource})")
         return StartResult.Success(socksPort = WARP_NO_SOCKS_PORT)
     }
 
     override suspend fun stop() {
-        PersistentLoggers.info(TAG, "stop — detaching tun")
+        Log.i(TAG, "stop — detaching tun")
         sdkBridge.detachTun()
         resolvedConfig = null
         resolvedIni = null
@@ -110,7 +111,7 @@ class EngineWarp(
             reason = "attachTun до start — нет ini config",
         )
         val uapiPath = uapiPathProvider()
-        PersistentLoggers.info(TAG, "attachTun fd=$tunFd uapi=$uapiPath/$TUNNEL_NAME.sock")
+        Log.i(TAG, "attachTun fd=$tunFd uapi=$uapiPath/$TUNNEL_NAME.sock")
         return when (val r = sdkBridge.attachTun(TUNNEL_NAME, tunFd, ini, uapiPath, socketProtector)) {
             WarpSdkBridge.AttachResult.Success -> TunAttachResult.Success
             is WarpSdkBridge.AttachResult.Failed -> {
@@ -167,7 +168,7 @@ class EngineWarp(
             if (resolved.isNullOrBlank()) {
                 cfg
             } else {
-                PersistentLoggers.info(TAG, "endpoint resolved $host → $resolved")
+                Log.i(TAG, "endpoint resolved $host → $resolved")
                 cfg.copy(peerEndpoint = "$resolved:$port")
             }
         }.getOrElse { t ->

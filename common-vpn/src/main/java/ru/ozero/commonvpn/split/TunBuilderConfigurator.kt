@@ -1,6 +1,7 @@
 package ru.ozero.commonvpn.split
 
 import android.net.VpnService
+import android.util.Log
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.settings.SplitTunnelMode
 
@@ -13,14 +14,14 @@ class TunBuilderConfigurator(
             SplitTunnelMode.ALL -> {
                 builder.addRoute("0.0.0.0", 0)
                 excludeSelfFromTun(builder)
-                PersistentLoggers.info(TAG, "split-tunnel ALL — добавлен default route v4, self исключён")
+                Log.i(TAG, "split-tunnel ALL — добавлен default route v4, self исключён")
             }
             SplitTunnelMode.BYPASS_LAN -> {
                 for (cidr in LanRoutes.BYPASS_LAN_IPV4) {
                     builder.addRoute(cidr.address, cidr.prefix)
                 }
                 excludeSelfFromTun(builder)
-                PersistentLoggers.info(
+                Log.i(
                     TAG,
                     "split-tunnel BYPASS_LAN — ${LanRoutes.BYPASS_LAN_IPV4.size} v4 routes, self исключён",
                 )
@@ -58,7 +59,7 @@ class TunBuilderConfigurator(
                 .onFailure { PersistentLoggers.error(TAG, "не удалось добавить self в allowlist: ${it.message}") }
             PersistentLoggers.warn(TAG, "ALLOWLIST пуст → kill-all (только self в фильтре)")
         } else {
-            PersistentLoggers.info(TAG, "ALLOWLIST применён: $added пакетов")
+            Log.i(TAG, "ALLOWLIST применён: $added пакетов")
         }
     }
 
@@ -72,7 +73,7 @@ class TunBuilderConfigurator(
                 .onFailure { failed++ }
         }
         if (failed > 0) PersistentLoggers.warn(TAG, "addDisallowedApplication failed для $failed пакетов")
-        PersistentLoggers.info(TAG, "BLOCKLIST применён: $added пакетов")
+        Log.i(TAG, "BLOCKLIST применён: $added пакетов")
     }
 
     private companion object {

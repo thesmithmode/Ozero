@@ -7,6 +7,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.os.Process
+import android.util.Log
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -271,7 +272,7 @@ class OzeroVpnService : android.net.VpnService() {
         tunFdRef.set(pfd)
         captureTunIfaceName(before)
         val iface = tunIfaceNameRef.get()
-        PersistentLoggers.info(
+        Log.i(
             TAG,
             "engine TUN established fd=${pfd.fd} engineId=$engineId mtu=${spec.mtu} iface=$iface",
         )
@@ -316,7 +317,7 @@ class OzeroVpnService : android.net.VpnService() {
             val plugin = enginePlugins.firstOrNull { it.id == id }
             val preflight = plugin?.preflight()
             if (preflight == null) {
-                PersistentLoggers.info(TAG, "auto-mode preflight skip (null) engine=$id — берём как кандидата")
+                Log.i(TAG, "auto-mode preflight skip (null) engine=$id — берём как кандидата")
                 return id to cfg
             }
             tunnelController.onProbing(id)
@@ -332,7 +333,7 @@ class OzeroVpnService : android.net.VpnService() {
             )
             when (result) {
                 is ru.ozero.enginescore.EnginePreflight.Result.Ok -> {
-                    PersistentLoggers.info(TAG, "auto-mode preflight OK engine=$id")
+                    Log.i(TAG, "auto-mode preflight OK engine=$id")
                     return id to cfg
                 }
                 is ru.ozero.enginescore.EnginePreflight.Result.Fail -> {
@@ -364,7 +365,7 @@ class OzeroVpnService : android.net.VpnService() {
         }
         tunFdRef.set(fd)
         captureTunIfaceName(before)
-        PersistentLoggers.info(TAG, "TUN established fd=${fd.fd} iface=${tunIfaceNameRef.get()}")
+        Log.i(TAG, "TUN established fd=${fd.fd} iface=${tunIfaceNameRef.get()}")
         return fd
     }
 
@@ -379,7 +380,7 @@ class OzeroVpnService : android.net.VpnService() {
                 null
             }
         }
-        PersistentLoggers.info(TAG, "chain result=$chainResult engineId=$engineId")
+        Log.i(TAG, "chain result=$chainResult engineId=$engineId")
         if (chainResult !is ChainResult.Success) {
             tunnelController.onEngineDied(engineId, chainResult?.toString() ?: "timeout")
             stopVpn()
@@ -497,7 +498,7 @@ class OzeroVpnService : android.net.VpnService() {
                     if (tickCount % STATS_LOG_EVERY == 0) {
                         val dTx = txBytes - prevTx
                         val dRx = rxBytes - prevRx
-                        PersistentLoggers.info(
+                        Log.i(
                             TAG,
                             "TunnelStats[$source] tx=${BytesFormatter.humanReadable(txBytes)} " +
                                 "rx=${BytesFormatter.humanReadable(rxBytes)} " +
@@ -599,7 +600,7 @@ class OzeroVpnService : android.net.VpnService() {
             if (chainOk == null) {
                 PersistentLoggers.warn(TAG, "chainOrchestrator.stop hung > ${CHAIN_STOP_TIMEOUT_MS}ms")
             } else {
-                PersistentLoggers.info(TAG, "chainOrchestrator.stop completed")
+                Log.i(TAG, "chainOrchestrator.stop completed")
             }
 
             val nativeStopThread = Thread({
@@ -615,7 +616,7 @@ class OzeroVpnService : android.net.VpnService() {
                     "native tunnel stop hung > ${NATIVE_STOP_TIMEOUT_MS}ms — abandon thread",
                 )
             } else {
-                PersistentLoggers.info(TAG, "native tunnel stop completed")
+                Log.i(TAG, "native tunnel stop completed")
             }
 
             runCatching { tunFdRef.getAndSet(null)?.close() }
@@ -811,7 +812,7 @@ class OzeroVpnService : android.net.VpnService() {
             } else {
                 startForeground(NOTIFICATION_ID, buildNotification())
             }
-            PersistentLoggers.info(TAG, "startForeground OK")
+            Log.i(TAG, "startForeground OK")
             true
         } catch (t: Throwable) {
             PersistentLoggers.error(TAG, "startForeground threw: ${t.message}", t)

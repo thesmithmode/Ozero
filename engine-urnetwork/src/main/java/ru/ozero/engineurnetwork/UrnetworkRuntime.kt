@@ -3,6 +3,7 @@ package ru.ozero.engineurnetwork
 import android.app.ActivityManager
 import android.app.Application
 import android.content.Context
+import android.util.Log
 import com.bringyour.sdk.NetworkSpace
 import com.bringyour.sdk.NetworkSpaceManager
 import com.bringyour.sdk.Sdk
@@ -65,7 +66,7 @@ object UrnetworkRuntime {
             runCatching { Sdk.newLoginViewController(ns.api) }
                 .onFailure { PersistentLoggers.warn(TAG, "newLoginViewController threw: ${it.message}") }
             space = ns
-            PersistentLoggers.info(TAG, "runtime ready host=$HOST env=$ENV mem=${app.filesDir.absolutePath}")
+            Log.i(TAG, "runtime ready host=$HOST env=$ENV mem=${app.filesDir.absolutePath}")
             ns
         }
     }

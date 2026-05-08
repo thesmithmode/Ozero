@@ -1,5 +1,6 @@
 package ru.ozero.enginewarp
 
+import android.util.Log
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -29,7 +30,7 @@ class ProxyWarpAutoConfig(
     override suspend fun register(onProgress: ((String) -> Unit)?): Result<RegisteredWarpConfig> {
         val cooldown = remainingCooldownMs()
         if (cooldown > 0) {
-            PersistentLoggers.info(TAG, "register: кулдаун ${cooldown / 1000}с, пропуск")
+            Log.i(TAG, "register: кулдаун ${cooldown / 1000}с, пропуск")
             return Result.failure(IOException("WARP auto-register: кулдаун ${cooldown / 1000}с"))
         }
         val ordered = shuffler?.invoke(mirrors) ?: ranker.order(mirrors)
@@ -37,7 +38,7 @@ class ProxyWarpAutoConfig(
             return Result.failure(IOException("WARP register: список зеркал пуст"))
         }
         val total = ordered.size
-        PersistentLoggers.info(
+        Log.i(
             TAG,
             "register: $total mirrors, concurrency=$concurrency, budget=${totalBudgetMs}ms",
         )
@@ -137,7 +138,7 @@ class ProxyWarpAutoConfig(
     private fun parseProxyResponse(body: String): Result<RegisteredWarpConfig> {
         val extracted = extractIniFromBody(body)
             ?: return Result.failure(IOException("WARP response: [Interface] не найден"))
-        PersistentLoggers.info(TAG, "selected ${extracted.source}")
+        Log.i(TAG, "selected ${extracted.source}")
         return WarpConfParser.parse(extracted.text).mapCatching { config ->
             validateCloudflarePeer(config)
             RegisteredWarpConfig(config = config, rawIni = extracted.text)

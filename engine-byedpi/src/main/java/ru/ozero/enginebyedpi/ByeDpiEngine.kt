@@ -1,5 +1,6 @@
 package ru.ozero.enginebyedpi
 
+import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -56,7 +57,7 @@ class ByeDpiEngine(
             PersistentLoggers.error(TAG, "native lib не загружена — устройство не поддерживает или stripped APK")
             return StartResult.Failure(reason = "byedpi native library не загружена: ${ByeDpiProxy.loadError}")
         }
-        PersistentLoggers.info(TAG, "start socksPort=${config.socksPort} args=${config.args}")
+        Log.i(TAG, "start socksPort=${config.socksPort} args=${config.args}")
         val args = buildArgs(config)
         val proxyJob = proxyScope.launch {
             val code = runCatching { proxy.startProxy(args) }
@@ -64,8 +65,6 @@ class ByeDpiEngine(
                 .getOrElse { -1 }
             if (code != 0) {
                 PersistentLoggers.error(TAG, "jniStartProxy завершился с кодом $code")
-            } else {
-                PersistentLoggers.info(TAG, "jniStartProxy event-loop завершён нормально")
             }
             activeSocksPort = 0
         }
@@ -74,7 +73,7 @@ class ByeDpiEngine(
         val readyAt = waitSocksReady(config.socksPort)
         return if (readyAt > 0) {
             activeSocksPort = config.socksPort
-            PersistentLoggers.info(TAG, "started OK socksPort=${config.socksPort} readyMs=$readyAt")
+            Log.i(TAG, "started socksPort=${config.socksPort} readyMs=$readyAt")
             StartResult.Success(socksPort = config.socksPort)
         } else {
             PersistentLoggers.error(TAG, "byedpi не вышел на порт ${config.socksPort} за ${READY_TIMEOUT_MS}ms")
@@ -100,7 +99,7 @@ class ByeDpiEngine(
     }
 
     override suspend fun stop() {
-        PersistentLoggers.info(TAG, "stop")
+        Log.i(TAG, "stop")
         withContext(Dispatchers.IO) {
             runCatching { proxy.stopProxy() }
                 .onFailure { PersistentLoggers.warn(TAG, "jniStopProxy исключение: ${it.message}") }
@@ -129,7 +128,6 @@ class ByeDpiEngine(
         }
         return try {
             val latency = Socks5HandshakeProbe.probe("127.0.0.1", port, timeoutMs = 3_000)
-            PersistentLoggers.info(TAG, "probe OK latency=${latency}ms")
             ProbeResult.Success(latencyMs = latency)
         } catch (e: Exception) {
             PersistentLoggers.warn(TAG, "probe failed: ${e.message}")

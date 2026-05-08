@@ -1,6 +1,7 @@
 package ru.ozero.engineurnetwork
 
 import android.app.Application
+import android.util.Log
 import com.bringyour.sdk.ConnectLocation
 import com.bringyour.sdk.ConnectViewController
 import com.bringyour.sdk.DeviceLocal
@@ -103,7 +104,7 @@ class RealUrnetworkSdkBridge(
         }
         if (cv != null) {
             connectVcRef.set(cv)
-            PersistentLoggers.info(TAG, "ConnectViewController opened — locations available")
+            Log.i(TAG, "ConnectViewController opened — locations available")
         } else {
             PersistentLoggers.error(TAG, "ConnectViewController is null — P2P connection unavailable")
         }
@@ -115,12 +116,12 @@ class RealUrnetworkSdkBridge(
             walletVc?.addUnpaidByteCountListener { ubc -> unpaidBytesRef.set(ubc) }
             walletVc?.start()
             walletVc?.fetchTransferStats()
-            PersistentLoggers.info(TAG, "WalletViewController opened — provider stats listener attached")
+            Log.i(TAG, "WalletViewController opened — provider stats listener attached")
         }.onFailure {
             PersistentLoggers.warn(TAG, "WalletViewController init threw: ${it.message}")
         }
         running.set(true)
-        PersistentLoggers.info(TAG, "device created — awaiting attachTun(fd) before tunnelStarted")
+        Log.i(TAG, "device created — awaiting attachTun(fd) before tunnelStarted")
         return UrnetworkSdkBridge.StartResult.Success
     }
 
@@ -152,7 +153,7 @@ class RealUrnetworkSdkBridge(
         if (completed == null) {
             PersistentLoggers.warn(TAG, "stop timed out after ${STOP_TIMEOUT_MS}ms — refs cleared")
         }
-        PersistentLoggers.info(TAG, "stop complete")
+        Log.i(TAG, "stop complete")
     }
 
     private fun closeDevice(device: DeviceLocal) {
@@ -186,7 +187,7 @@ class RealUrnetworkSdkBridge(
     override fun setProvidePaused(paused: Boolean) {
         runCatching {
             deviceRef.get()?.providePaused = paused
-            PersistentLoggers.info(TAG, "setProvidePaused paused=$paused OK")
+            Log.i(TAG, "setProvidePaused paused=$paused OK")
         }.onFailure { PersistentLoggers.warn(TAG, "setProvidePaused($paused) threw: ${it.message}") }
     }
 
@@ -271,7 +272,7 @@ class RealUrnetworkSdkBridge(
             try {
                 val capturedDevice = device
                 val callback = IoLoopDoneCallback {
-                    PersistentLoggers.info(TAG, "IoLoop done — tunnel ended")
+                    Log.i(TAG, "IoLoop done — tunnel ended")
                     running.set(false)
                     closeDevice(capturedDevice)
                 }
@@ -283,7 +284,7 @@ class RealUrnetworkSdkBridge(
                 if (cv != null) {
                     runCatching { cv.connectBestAvailable() }
                         .onFailure { PersistentLoggers.warn(TAG, "connectBestAvailable threw: ${it.message}") }
-                    PersistentLoggers.info(TAG, "IoLoop fd=$tunFd tunnelStarted=true connectBestAvailable called")
+                    Log.i(TAG, "IoLoop fd=$tunFd tunnelStarted=true connectBestAvailable called")
                 } else {
                     PersistentLoggers.error(TAG, "No ConnectViewController — P2P connection will not be established")
                 }
