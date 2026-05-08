@@ -64,12 +64,10 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(POLLER_KEEP_ALIVE_MS), 0L)
 
-    val subscriptionBalance: StateFlow<UrnetworkSdkBridge.SubscriptionBalanceSnapshot?> = flow {
-        while (true) {
-            emit(bridge.fetchSubscriptionBalance())
-            delay(SUBSCRIPTION_BALANCE_POLL_MS)
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(POLLER_KEEP_ALIVE_MS), null)
+    private val _subscriptionBalance =
+        MutableStateFlow<UrnetworkSdkBridge.SubscriptionBalanceSnapshot?>(null)
+    val subscriptionBalance: StateFlow<UrnetworkSdkBridge.SubscriptionBalanceSnapshot?> =
+        _subscriptionBalance.asStateFlow()
 
     @Volatile private var locationsVc: LocationsViewController? = null
     private var allCountries: List<UrnetworkLocationItem> = emptyList()
@@ -77,6 +75,12 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             refresh()
+        }
+        viewModelScope.launch {
+            while (true) {
+                _subscriptionBalance.value = bridge.fetchSubscriptionBalance()
+                delay(SUBSCRIPTION_BALANCE_POLL_MS)
+            }
         }
     }
 

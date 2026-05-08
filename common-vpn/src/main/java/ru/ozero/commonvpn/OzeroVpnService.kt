@@ -234,13 +234,11 @@ class OzeroVpnService : android.net.VpnService() {
         sessionIdRef.set(
             runCatching { sessionStatsRecorder.startSession(activeEngineId.name, nowMs) }.getOrDefault(-1L),
         )
-        try {
-            healthMonitor.start(chainResult.finalSocksPort)
-        } catch (ce: kotlinx.coroutines.CancellationException) {
-            throw ce
-        } catch (t: Throwable) {
-            PersistentLoggers.warn(TAG, "healthMonitor.start threw: ${t.message}")
-        }
+        runCatching { healthMonitor.start(chainResult.finalSocksPort) }
+            .onFailure { t ->
+                if (t is kotlinx.coroutines.CancellationException) throw t
+                PersistentLoggers.warn(TAG, "healthMonitor.start threw: ${t.message}")
+            }
         startStatsLogger()
     }
 
