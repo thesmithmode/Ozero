@@ -18,6 +18,7 @@ data class SettingsModel(
     val uiLocaleTag: String? = DEFAULT_UI_LOCALE_TAG,
     val appMode: AppMode = DEFAULT_APP_MODE,
     val killswitchEnabled: Boolean = DEFAULT_KILLSWITCH_ENABLED,
+    val alwaysOnBannerDismissed: Boolean = DEFAULT_ALWAYS_ON_BANNER_DISMISSED,
 ) {
     companion object {
         val DEFAULT_SPLIT_MODE: SplitTunnelMode = SplitTunnelMode.ALL
@@ -37,6 +38,7 @@ data class SettingsModel(
         val DEFAULT_UI_LOCALE_TAG: String? = null
         val DEFAULT_APP_MODE: AppMode = AppMode.SIMPLE
         const val DEFAULT_KILLSWITCH_ENABLED: Boolean = false
+        const val DEFAULT_ALWAYS_ON_BANNER_DISMISSED: Boolean = false
 
         const val LOCALE_RU: String = "ru"
         const val LOCALE_EN: String = "en"

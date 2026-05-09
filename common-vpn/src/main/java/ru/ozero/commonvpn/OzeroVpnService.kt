@@ -17,6 +17,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
@@ -88,6 +89,8 @@ class OzeroVpnService : android.net.VpnService() {
         private const val SETTINGS_READ_TIMEOUT_MS = 1_500L
         private const val ON_DESTROY_SHUTDOWN_TIMEOUT_MS = 4_000L
         private const val PREFLIGHT_HARD_TIMEOUT_MS = 7_000L
+        private const val PEER_WATCHDOG_POLL_MS = 5_000L
+        private const val PEER_WATCHDOG_TIMEOUT_MS = 30_000L
     }
 
     override fun onCreate() {
@@ -111,6 +114,8 @@ class OzeroVpnService : android.net.VpnService() {
     private val statsJobRef = AtomicReference<Job?>(null)
     private val shutdownJobRef = AtomicReference<Job?>(null)
     private val healthWatchJobRef = AtomicReference<Job?>(null)
+    private val lockdownStartupFdRef = AtomicReference<ParcelFileDescriptor?>(null)
+    private val peerWatchJobRef = AtomicReference<Job?>(null)
     private val starting = AtomicBoolean(false)
     private val stopping = AtomicBoolean(false)
     private val stopSignal = AtomicBoolean(false)
@@ -199,6 +204,18 @@ class OzeroVpnService : android.net.VpnService() {
             packages = splitPackages,
         )
         killswitchCached = settings?.killswitchEnabled ?: false
+        if (killswitchCached) {
+            val startupIpv6 = settings?.ipv6Enabled ?: false
+            val startupDns = settings?.customDnsServers.orEmpty()
+            runCatching { buildTunBuilder(splitConfig, startupIpv6, startupDns).establish() }
+                .onSuccess { fd ->
+                    if (fd != null) {
+                        lockdownStartupFdRef.set(fd)
+                        PersistentLoggers.info(TAG, "instant lockdown TUN — engine pick pending")
+                    }
+                }
+                .onFailure { PersistentLoggers.error(TAG, "lockdown startup TUN failed: ${it.message}") }
+        }
 
         val manualEngine = settings?.manualEngine
         val pick = if (manualEngine != null) {
@@ -232,6 +249,7 @@ class OzeroVpnService : android.net.VpnService() {
                 customDns = settings?.customDnsServers.orEmpty(),
             ) ?: return
         }
+        lockdownStartupFdRef.getAndSet(null)?.runCatching { close() }
         if (stopping.get()) {
             runCatching { fd.close() }
             tunFdRef.compareAndSet(fd, null)
@@ -253,7 +271,8 @@ class OzeroVpnService : android.net.VpnService() {
                     PersistentLoggers.warn(TAG, "healthMonitor.start threw: ${t.message}")
                 }
         }
-        startHealthKillswitchWatcher(activeEngineId)
+        if (!usesCustomTun) startHealthKillswitchWatcher(activeEngineId)
+        if (usesCustomTun) startPeerWatchdog(activeEngineId)
         startStatsLogger()
     }
 
@@ -283,6 +302,37 @@ class OzeroVpnService : android.net.VpnService() {
             }
         }
         healthWatchJobRef.set(job)
+    }
+
+    private fun startPeerWatchdog(engineId: EngineId) {
+        peerWatchJobRef.getAndSet(null)?.cancel()
+        val plugin = enginePlugins.firstOrNull { it.id == engineId } ?: return
+        val job = serviceScope.launch {
+            try {
+                var zeroPeersSince = 0L
+                var hadPeers = false
+                while (isActive) {
+                    delay(PEER_WATCHDOG_POLL_MS)
+                    val peers = plugin.stats().first().activeConnections
+                    if (peers > 0) {
+                        hadPeers = true
+                        zeroPeersSince = 0L
+                    } else if (hadPeers) {
+                        val now = System.currentTimeMillis()
+                        if (zeroPeersSince == 0L) zeroPeersSince = now
+                        else if (now - zeroPeersSince > PEER_WATCHDOG_TIMEOUT_MS) {
+                            handleEngineFailure(engineId, "no URnetwork peers for ${PEER_WATCHDOG_TIMEOUT_MS / 1000}s")
+                            return@launch
+                        }
+                    }
+                }
+            } catch (ce: kotlinx.coroutines.CancellationException) {
+                throw ce
+            } catch (t: Throwable) {
+                PersistentLoggers.warn(TAG, "peer watchdog threw: ${t.message}")
+            }
+        }
+        peerWatchJobRef.set(job)
     }
 
     private suspend fun engineNeedsCustomTun(engineId: EngineId): Boolean {
@@ -596,6 +646,7 @@ class OzeroVpnService : android.net.VpnService() {
         tunnelController.onKillswitchEngaged(engineId, reason)
         statsJobRef.getAndSet(null)?.cancel()
         healthWatchJobRef.getAndSet(null)?.cancel()
+        peerWatchJobRef.getAndSet(null)?.cancel()
         serviceScope.launch {
             runCatching { chainOrchestrator.stop() }
                 .onFailure { t ->
@@ -620,6 +671,8 @@ class OzeroVpnService : android.net.VpnService() {
         startJobRef.getAndSet(null)?.cancel()
         statsJobRef.getAndSet(null)?.cancel()
         healthWatchJobRef.getAndSet(null)?.cancel()
+        peerWatchJobRef.getAndSet(null)?.cancel()
+        lockdownStartupFdRef.getAndSet(null)?.runCatching { close() }
         runCatching { healthMonitor.stop() }
         val endStatus = if (priorState is TunnelState.Failed) {
             SessionStatsRecorder.Status.FAILED

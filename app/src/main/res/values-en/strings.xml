@@ -285,4 +285,7 @@
     <string name="settings_killswitch_title">Kill switch</string>
     <string name="settings_killswitch_summary">Block all traffic when tunnel drops, until reconnect</string>
     <string name="killswitch_active_badge">Kill switch active — traffic blocked</string>
+    <string name="settings_always_on_banner_title">Strengthen protection</string>
+    <string name="settings_always_on_banner_body">Enable Always-on VPN in Android settings to prevent leaks on reboot</string>
+    <string name="settings_always_on_banner_configure">Configure</string>
 </resources>

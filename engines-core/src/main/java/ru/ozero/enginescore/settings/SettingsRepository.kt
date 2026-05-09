@@ -36,4 +36,6 @@ interface SettingsRepository {
     suspend fun setAppMode(mode: AppMode)
 
     suspend fun setKillswitchEnabled(enabled: Boolean)
+
+    suspend fun setAlwaysOnBannerDismissed(dismissed: Boolean)
 }

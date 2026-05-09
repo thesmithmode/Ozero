@@ -174,5 +174,6 @@ class OnboardingViewModelTest {
             state.value = state.value.copy(appMode = mode)
         }
         override suspend fun setKillswitchEnabled(enabled: Boolean) = Unit
+        override suspend fun setAlwaysOnBannerDismissed(dismissed: Boolean) = Unit
     }
 }

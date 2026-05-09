@@ -44,6 +44,10 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { repository.setKillswitchEnabled(enabled) }
     }
 
+    fun onAlwaysOnBannerDismissed() {
+        viewModelScope.launch { repository.setAlwaysOnBannerDismissed(true) }
+    }
+
     fun onManualEngineSelect(engine: EngineId?) {
         viewModelScope.launch { repository.setManualEngine(engine) }
     }

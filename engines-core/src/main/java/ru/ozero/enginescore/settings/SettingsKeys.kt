@@ -34,4 +34,5 @@ object SettingsKeys {
     val APP_MODE = stringPreferencesKey("app_mode")
 
     val KILLSWITCH_ENABLED = booleanPreferencesKey("killswitch_enabled")
+    val ALWAYS_ON_BANNER_DISMISSED = booleanPreferencesKey("always_on_banner_dismissed")
 }

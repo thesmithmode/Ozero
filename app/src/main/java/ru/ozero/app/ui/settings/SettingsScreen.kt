@@ -14,8 +14,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.selectable
+import android.content.Intent
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -26,11 +29,13 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -83,6 +88,7 @@ fun SettingsScreen(
         onIpv6Toggle = viewModel::onIpv6Toggle,
         onAutoStartToggle = viewModel::onAutoStartToggle,
         onKillswitchToggle = viewModel::onKillswitchToggle,
+        onAlwaysOnBannerDismissed = viewModel::onAlwaysOnBannerDismissed,
         onManualEngineSelect = viewModel::onManualEngineSelect,
         onUiLocaleSelect = viewModel::onUiLocaleSelect,
         onAppModeSelect = viewModel::onAppModeSelect,
@@ -100,6 +106,7 @@ fun SettingsScreenContent(
     onIpv6Toggle: (Boolean) -> Unit,
     onAutoStartToggle: (Boolean) -> Unit,
     onKillswitchToggle: (Boolean) -> Unit = {},
+    onAlwaysOnBannerDismissed: () -> Unit = {},
     onManualEngineSelect: (EngineId?) -> Unit,
     onUiLocaleSelect: (String?) -> Unit = {},
     onAppModeSelect: (AppMode) -> Unit = {},
@@ -134,6 +141,7 @@ fun SettingsScreenContent(
                     onIpv6Toggle = onIpv6Toggle,
                     onAutoStartToggle = onAutoStartToggle,
                     onKillswitchToggle = onKillswitchToggle,
+                    onAlwaysOnBannerDismissed = onAlwaysOnBannerDismissed,
                     onManualEngineSelect = onManualEngineSelect,
                     onUiLocaleSelect = onUiLocaleSelect,
                     onAppModeSelect = onAppModeSelect,
@@ -164,6 +172,7 @@ private fun ContentBody(
     onIpv6Toggle: (Boolean) -> Unit,
     onAutoStartToggle: (Boolean) -> Unit,
     onKillswitchToggle: (Boolean) -> Unit = {},
+    onAlwaysOnBannerDismissed: () -> Unit = {},
     onManualEngineSelect: (EngineId?) -> Unit,
     onUiLocaleSelect: (String?) -> Unit = {},
     onAppModeSelect: (AppMode) -> Unit = {},
@@ -215,8 +224,10 @@ private fun ContentBody(
             SecuritySection(
                 autoStart = model.autoStart,
                 killswitch = model.killswitchEnabled,
+                alwaysOnBannerDismissed = model.alwaysOnBannerDismissed,
                 onAutoStartToggle = onAutoStartToggle,
                 onKillswitchToggle = onKillswitchToggle,
+                onAlwaysOnBannerDismiss = onAlwaysOnBannerDismissed,
             )
         }
         item { SectionDivider() }
@@ -543,8 +554,10 @@ private fun NetworkSection(
 private fun SecuritySection(
     autoStart: Boolean,
     killswitch: Boolean,
+    alwaysOnBannerDismissed: Boolean,
     onAutoStartToggle: (Boolean) -> Unit,
     onKillswitchToggle: (Boolean) -> Unit,
+    onAlwaysOnBannerDismiss: () -> Unit,
 ) {
     SectionHeader(R.string.settings_section_security, SettingsTestTags.SECTION_SECURITY)
     SwitchRow(
@@ -561,6 +574,61 @@ private fun SecuritySection(
         tag = SettingsTestTags.KILLSWITCH_SWITCH,
         onCheckedChange = onKillswitchToggle,
     )
+    if (killswitch && !alwaysOnBannerDismissed) {
+        AlwaysOnVpnBanner(onDismiss = onAlwaysOnBannerDismiss)
+    }
+}
+
+@Composable
+private fun AlwaysOnVpnBanner(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 4.dp, bottom = 0.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.settings_always_on_banner_title),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    text = stringResource(R.string.settings_always_on_banner_body),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+            IconButton(onClick = onDismiss) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = null,
+                )
+            }
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(end = 8.dp, bottom = 4.dp),
+            horizontalArrangement = Arrangement.End,
+        ) {
+            TextButton(
+                onClick = {
+                    runCatching {
+                        context.startActivity(
+                            Intent("android.net.vpn.SETTINGS")
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    }
+                },
+            ) {
+                Text(stringResource(R.string.settings_always_on_banner_configure))
+            }
+        }
+    }
 }
 
 @Composable

@@ -178,6 +178,13 @@ class SettingsViewModelTest {
         assertEquals(emptyList(), repository.autoPriorityUpdates)
     }
 
+    @Test
+    fun `onAlwaysOnBannerDismissed forwards true to repository`() = runTest(dispatcher) {
+        viewModel.onAlwaysOnBannerDismissed()
+        advanceUntilIdle()
+        assertEquals(listOf(true), repository.alwaysOnBannerDismissedUpdates)
+    }
+
     private class FakeSettingsRepository : SettingsRepository {
         private val state = MutableStateFlow<SettingsModel?>(null)
 
@@ -187,6 +194,7 @@ class SettingsViewModelTest {
         val manualEngineUpdates = mutableListOf<EngineId?>()
         val appModeUpdates = mutableListOf<AppMode>()
         val killswitchUpdates = mutableListOf<Boolean>()
+        val alwaysOnBannerDismissedUpdates = mutableListOf<Boolean>()
         val autoPriorityUpdates = mutableListOf<List<EngineId>>()
 
         fun emit(model: SettingsModel) {
@@ -225,6 +233,9 @@ class SettingsViewModelTest {
         }
         override suspend fun setKillswitchEnabled(enabled: Boolean) {
             killswitchUpdates += enabled
+        }
+        override suspend fun setAlwaysOnBannerDismissed(dismissed: Boolean) {
+            alwaysOnBannerDismissedUpdates += dismissed
         }
         override suspend fun setEngineAutoPriority(priority: List<EngineId>) {
             autoPriorityUpdates += priority

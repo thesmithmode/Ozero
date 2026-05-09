@@ -141,6 +141,10 @@ class SettingsRepositoryImpl @Inject constructor(
         dataStore.edit { it[SettingsKeys.KILLSWITCH_ENABLED] = enabled }
     }
 
+    override suspend fun setAlwaysOnBannerDismissed(dismissed: Boolean) {
+        dataStore.edit { it[SettingsKeys.ALWAYS_ON_BANNER_DISMISSED] = dismissed }
+    }
+
     private fun Preferences.toSettingsModel(): SettingsModel = SettingsModel(
         splitMode = readSplitMode(),
         ipv6Enabled = this[SettingsKeys.IPV6_ENABLED] ?: SettingsModel.DEFAULT_IPV6_ENABLED,
@@ -159,6 +163,8 @@ class SettingsRepositoryImpl @Inject constructor(
         appMode = readAppMode(),
         killswitchEnabled = this[SettingsKeys.KILLSWITCH_ENABLED]
             ?: SettingsModel.DEFAULT_KILLSWITCH_ENABLED,
+        alwaysOnBannerDismissed = this[SettingsKeys.ALWAYS_ON_BANNER_DISMISSED]
+            ?: SettingsModel.DEFAULT_ALWAYS_ON_BANNER_DISMISSED,
     )
 
     private fun Preferences.readCustomDnsServers(): List<String> {

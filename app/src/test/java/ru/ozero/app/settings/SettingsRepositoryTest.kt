@@ -322,6 +322,28 @@ class SettingsRepositoryTest {
         assertEquals(AppMode.SIMPLE, repository.settings.first().appMode)
     }
 
+    @Test
+    fun `alwaysOnBannerDismissed false by default`() = runTest {
+        assertFalse(repository.settings.first().alwaysOnBannerDismissed)
+    }
+
+    @Test
+    fun `setAlwaysOnBannerDismissed persists toggle`() = runTest {
+        repository.setAlwaysOnBannerDismissed(true)
+        assertTrue(repository.settings.first().alwaysOnBannerDismissed)
+
+        repository.setAlwaysOnBannerDismissed(false)
+        assertFalse(repository.settings.first().alwaysOnBannerDismissed)
+    }
+
+    @Test
+    fun `alwaysOnBannerDismissed reads from DataStore key directly`() = runTest {
+        dataStore.edit { prefs ->
+            prefs[SettingsKeys.ALWAYS_ON_BANNER_DISMISSED] = true
+        }
+        assertTrue(repository.settings.first().alwaysOnBannerDismissed)
+    }
+
     private class FakeAutoStartGateway : AutoStartGateway {
         val invocations = mutableListOf<Boolean>()
 

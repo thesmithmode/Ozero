@@ -83,4 +83,56 @@ class OzeroVpnServiceLockdownKillswitchTest {
             "watcher обязан проверять killswitchCached перед fire. Body:\n$body",
         )
     }
+
+    @Test
+    fun `lockdownStartupFdRef объявлен в сервисе`() {
+        assertTrue(
+            source.contains("lockdownStartupFdRef"),
+            "OzeroVpnService обязан иметь lockdownStartupFdRef — instant lockdown TUN fd " +
+                "для закрытия startup race gap при killswitch=ON.",
+        )
+    }
+
+    @Test
+    fun `lockdownStartupTun устанавливается до выбора движка в runStartSequence`() {
+        val body = source
+            .substringAfter("private suspend fun runStartSequence")
+            .substringBefore("private fun startHealthKillswitchWatcher")
+        val lockdownIdx = body.indexOf("lockdownStartupFdRef.set")
+        val pickIdx = body.indexOf("pickAutoCandidateWithPreflight")
+        assertTrue(lockdownIdx >= 0, "lockdownStartupFdRef.set не найден в runStartSequence. Body:\n$body")
+        assertTrue(pickIdx >= 0, "pickAutoCandidateWithPreflight не найден в runStartSequence. Body:\n$body")
+        assertTrue(
+            lockdownIdx < pickIdx,
+            "lockdownStartupFdRef.set обязан быть РАНЬШЕ pickAutoCandidateWithPreflight — " +
+                "иначе startup gap не закрыт. lockdownIdx=$lockdownIdx pickIdx=$pickIdx",
+        )
+    }
+
+    @Test
+    fun `lockdownStartupFdRef закрывается после установки реального TUN в runStartSequence`() {
+        val body = source
+            .substringAfter("private suspend fun runStartSequence")
+            .substringBefore("private fun startHealthKillswitchWatcher")
+        val establishIdx = body.indexOf("establishTun")
+        val clearIdx = body.indexOf("lockdownStartupFdRef.getAndSet(null)")
+        assertTrue(establishIdx >= 0, "establishTun не найден в runStartSequence. Body:\n$body")
+        assertTrue(clearIdx >= 0, "lockdownStartupFdRef.getAndSet(null) не найден в runStartSequence.")
+        assertTrue(
+            clearIdx > establishIdx,
+            "lockdownStartupFdRef должен очищаться ПОСЛЕ establish реального TUN. " +
+                "establishIdx=$establishIdx clearIdx=$clearIdx",
+        )
+    }
+
+    @Test
+    fun `lockdownStartupFdRef очищается в stopVpn`() {
+        val body = source
+            .substringAfter("private fun stopVpn")
+            .substringBefore("private fun recordSessionEnd")
+        assertTrue(
+            body.contains("lockdownStartupFdRef.getAndSet(null)"),
+            "stopVpn обязан закрывать lockdownStartupFdRef — иначе fd утечёт при остановке VPN до старта движка.",
+        )
+    }
 }
