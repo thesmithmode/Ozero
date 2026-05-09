@@ -48,20 +48,37 @@ class MainViewModelIpInfoChannelTest {
     }
 
     @Test
-    fun `fetchOnce выделяет BYEDPI через SOCKS-proxy на 127_0_0_1`() {
+    fun `fetchOnce роутит SOCKS-engine через 127_0_0_1 + fetchVia`() {
         val body = source.substringAfter("private suspend fun fetchOnce")
-            .substringBefore("fun onConnectClick")
+            .substringBefore("private fun supportsIpProbe")
         assertTrue(
-            body.contains("EngineId.BYEDPI"),
-            "fetchOnce обязан выделять BYEDPI как socks-engine. Body:\n$body",
+            body.contains("socksPort > 0"),
+            "fetchOnce обязан различать SOCKS-engine по socksPort > 0. Body:\n$body",
         )
         assertTrue(
             body.contains("BYEDPI_LOOPBACK") || body.contains("\"127.0.0.1\""),
-            "ByeDPI socks proxy host должен быть 127.0.0.1 (константа или литерал). Body:\n$body",
+            "SOCKS proxy host должен быть 127.0.0.1 (константа или литерал). Body:\n$body",
         )
         assertTrue(
             body.contains("ipInfoProvider.fetchVia("),
-            "BYEDPI обязан использовать fetchVia с SOCKS host/port — иначе IP-fetch идёт мимо ByeDPI прокси.",
+            "SOCKS-engine обязан использовать fetchVia(host, port) — иначе IP-fetch " +
+                "идёт мимо SOCKS прокси.",
+        )
+    }
+
+    @Test
+    fun `supportsIpProbe — BYEDPI всегда поддерживается, остальные только при socksPort больше 0`() {
+        val body = source.substringAfter("private fun supportsIpProbe")
+            .substringBefore("fun onConnectClick")
+        assertTrue(
+            body.contains("EngineId.BYEDPI"),
+            "supportsIpProbe обязан явно whitelist'ить BYEDPI " +
+                "(работает через SOCKS даже если порт=0 на промежуточных state). Body:\n$body",
+        )
+        assertTrue(
+            body.contains("socksPort > 0"),
+            "supportsIpProbe обязан считать любой engine с активным SOCKS-портом " +
+                "пробируемым. Body:\n$body",
         )
     }
 

@@ -53,6 +53,7 @@ import ru.ozero.app.ui.components.OzeroBackgroundState
 import ru.ozero.app.ui.components.PowerDisc
 import ru.ozero.app.ui.components.PowerDiscState
 import ru.ozero.app.ui.theme.OzeroPalette
+import ru.ozero.commonnet.CountryFlag
 import ru.ozero.commonvpn.BytesFormatter
 import ru.ozero.commonvpn.HealthMonitor
 import ru.ozero.commonvpn.TunnelState
@@ -391,11 +392,20 @@ private fun IpInfoCard(
                     color = OzeroPalette.Text,
                 )
                 is IpInfoState.Loaded -> {
-                    Text(
-                        text = state.info.ip,
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                        color = OzeroPalette.Text,
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(
+                            text = CountryFlag.emoji(state.info.countryCode),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            text = state.info.ip,
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = OzeroPalette.Text,
+                        )
+                    }
                     val country = state.info.country
                         ?: stringResource(R.string.ip_card_country_unknown)
                     val location = listOfNotNull(state.info.city, country).joinToString(", ")
@@ -413,6 +423,18 @@ private fun IpInfoCard(
                     )
                     Text(
                         text = stringResource(R.string.ip_card_refresh),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = OzeroPalette.Aqua,
+                    )
+                }
+                is IpInfoState.Unsupported -> {
+                    Text(
+                        text = stringResource(R.string.ip_card_unsupported),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = OzeroPalette.Text3,
+                    )
+                    Text(
+                        text = stringResource(R.string.ip_card_open_browser),
                         style = MaterialTheme.typography.bodySmall,
                         color = OzeroPalette.Aqua,
                     )

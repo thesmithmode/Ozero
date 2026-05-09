@@ -324,7 +324,7 @@ class MainViewModelTest {
     }
 
     @Test
-    fun ipInfoReturnsErrorForWarpWithoutSocks() = runTest {
+    fun ipInfoUnsupportedForWarpWithoutSocks() = runTest {
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.WARP)
         tunnelController.onEngineStarted(EngineId.WARP, 0)
@@ -332,11 +332,16 @@ class MainViewModelTest {
         kotlinx.coroutines.delay(2_500)
         advanceUntilIdle()
         val s = viewModel.ipInfo.value
-        assertIs<IpInfoState.Error>(
+        assertIs<IpInfoState.Unsupported>(
             s,
-            "WARP — full-tun без SOCKS, plain fetch() показал бы реальный (невыпускной) IP " +
-                "из-за excludeSelf=true. Sentinel: вернуть Error с инструкцией проверить в браузере, " +
-                "не показывать неверный IP пользователю.",
+            "WARP — full-tun без SOCKS, app excluded из TUN. Sentinel: state=Unsupported(WARP), " +
+                "UI показывает 'проверьте в браузере', никаких HTTP-проб.",
+        )
+        assertEquals(EngineId.WARP, s.engineId)
+        assertEquals(
+            0,
+            ipInfoProvider.calls,
+            "Unsupported state не должен делать ни одного HTTP запроса — WARP excluded из TUN.",
         )
         assertEquals(
             false,
@@ -344,6 +349,23 @@ class MainViewModelTest {
             "WARP не должен пытаться bind на VPN network через socketFactory — EPERM в production.",
         )
         assertNull(ipInfoProvider.lastSocksHost)
+    }
+
+    @Test
+    fun ipInfoUnsupportedForUrnetworkWithoutSocks() = runTest {
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.URNETWORK)
+        tunnelController.onEngineStarted(EngineId.URNETWORK, 0)
+        advanceUntilIdle()
+        kotlinx.coroutines.delay(2_500)
+        advanceUntilIdle()
+        val s = viewModel.ipInfo.value
+        assertIs<IpInfoState.Unsupported>(
+            s,
+            "URnetwork — TUN-only без SOCKS, app excluded. Должен быть Unsupported(URNETWORK).",
+        )
+        assertEquals(EngineId.URNETWORK, s.engineId)
+        assertEquals(0, ipInfoProvider.calls)
     }
 
     @Test

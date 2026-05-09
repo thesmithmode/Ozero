@@ -32,6 +32,7 @@ sealed class IpInfoState {
     data object Loading : IpInfoState()
     data class Loaded(val info: IpInfo) : IpInfoState()
     data class Error(val message: String) : IpInfoState()
+    data class Unsupported(val engineId: EngineId) : IpInfoState()
 }
 
 @HiltViewModel
@@ -163,6 +164,14 @@ class MainViewModel @Inject constructor(
                     val key = "${s.engineId}:${s.socksPort}"
                     if (key != lastSessionKey) {
                         lastSessionKey = key
+                        if (!supportsIpProbe(s.engineId, s.socksPort)) {
+                            PersistentLoggers.info(
+                                IP_TAG,
+                                "engine=${s.engineId} excluded из TUN — IP-проба недоступна",
+                            )
+                            _ipInfo.value = IpInfoState.Unsupported(s.engineId)
+                            return@collect
+                        }
                         _ipInfo.value = IpInfoState.Loading
                         PersistentLoggers.info(
                             IP_TAG,
@@ -190,8 +199,12 @@ class MainViewModel @Inject constructor(
 
     fun refreshIpInfo() {
         viewModelScope.launch {
-            _ipInfo.value = IpInfoState.Loading
             val s = tunnelController.state.value
+            if (s is TunnelState.Connected && !supportsIpProbe(s.engineId, s.socksPort)) {
+                _ipInfo.value = IpInfoState.Unsupported(s.engineId)
+                return@launch
+            }
+            _ipInfo.value = IpInfoState.Loading
             _ipInfo.value = if (s is TunnelState.Connected) {
                 fetchIpInfoViaEngine(s.engineId, s.socksPort)
             } else {
@@ -222,29 +235,15 @@ class MainViewModel @Inject constructor(
         return IpInfoState.Error(msg)
     }
 
-    private suspend fun fetchOnce(engineId: EngineId, socksPort: Int): Result<IpInfo> = when {
-        engineId == EngineId.BYEDPI && socksPort > 0 ->
+    private suspend fun fetchOnce(engineId: EngineId, socksPort: Int): Result<IpInfo> =
+        if (socksPort > 0) {
             ipInfoProvider.fetchVia(BYEDPI_LOOPBACK, socksPort)
-        socksPort > 0 ->
-            ipInfoProvider.fetchVia(BYEDPI_LOOPBACK, socksPort)
-        engineId == EngineId.URNETWORK ->
-            Result.failure(
-                java.io.IOException(
-                    "URnetwork исключает self из TUN (Go SDK не имеет protect callback) — " +
-                        "проверьте IP в браузере",
-                ),
-            )
-        engineId == EngineId.WARP ->
-            Result.failure(
-                java.io.IOException(
-                    "WARP — full-tun без SOCKS-прокси, IP-проба от VpnService уходит вне " +
-                        "VPN из-за excludeSelf=true (требуется для Go SDK). " +
-                        "Проверьте IP в браузере.",
-                ),
-            )
-        else ->
+        } else {
             ipInfoProvider.fetch()
-    }
+        }
+
+    private fun supportsIpProbe(engineId: EngineId, socksPort: Int): Boolean =
+        socksPort > 0 || engineId == EngineId.BYEDPI
 
     fun onConnectClick() = Unit
 
