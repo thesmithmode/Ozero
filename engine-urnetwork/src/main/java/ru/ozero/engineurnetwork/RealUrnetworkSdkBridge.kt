@@ -86,12 +86,14 @@ class RealUrnetworkSdkBridge(
             UrnetworkRuntime.ensure(app)
         } catch (t: Throwable) {
             PersistentLoggers.error(TAG, "runtime ensure failed: ${t.message}")
+            cleanupOnFailure()
             return UrnetworkSdkBridge.StartResult.Failed("runtime ensure failed: ${t.message}")
         }
 
         val localState = space.asyncLocalState?.localState
         if (localState == null) {
             PersistentLoggers.error(TAG, "asyncLocalState.localState is null — runtime not ready")
+            cleanupOnFailure()
             return UrnetworkSdkBridge.StartResult.Failed("URnetwork localState not ready")
         }
         runCatching { localState.byClientJwt = byClientJwt }
