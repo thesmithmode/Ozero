@@ -8,12 +8,12 @@ class CountryFlagTest {
     private val whiteFlag = "🏳"
 
     @Test
-    fun `US -> US emoji`() {
+    fun `US returns US emoji`() {
         assertEquals("🇺🇸", CountryFlag.emoji("US"))
     }
 
     @Test
-    fun `RU -> RU emoji`() {
+    fun `RU returns RU emoji`() {
         assertEquals("🇷🇺", CountryFlag.emoji("RU"))
     }
 
@@ -23,32 +23,32 @@ class CountryFlagTest {
     }
 
     @Test
-    fun `null -> white flag`() {
+    fun `null input returns white flag`() {
         assertEquals(whiteFlag, CountryFlag.emoji(null))
     }
 
     @Test
-    fun `empty -> white flag`() {
+    fun `empty input returns white flag`() {
         assertEquals(whiteFlag, CountryFlag.emoji(""))
     }
 
     @Test
-    fun `single char -> white flag`() {
+    fun `single char input returns white flag`() {
         assertEquals(whiteFlag, CountryFlag.emoji("U"))
     }
 
     @Test
-    fun `three chars -> white flag`() {
+    fun `three chars input returns white flag`() {
         assertEquals(whiteFlag, CountryFlag.emoji("USA"))
     }
 
     @Test
-    fun `digits -> white flag`() {
+    fun `digits input returns white flag`() {
         assertEquals(whiteFlag, CountryFlag.emoji("12"))
     }
 
     @Test
-    fun `mixed alnum -> white flag`() {
+    fun `mixed alphanumeric input returns white flag`() {
         assertEquals(whiteFlag, CountryFlag.emoji("U1"))
     }
 
@@ -58,7 +58,7 @@ class CountryFlagTest {
     }
 
     @Test
-    fun `unassigned ZZ — still produces 2-char regional indicator pair`() {
+    fun `unassigned ZZ still produces 2-char regional indicator pair`() {
         val zz = CountryFlag.emoji("ZZ")
         assertEquals(2, zz.codePointCount(0, zz.length))
     }
