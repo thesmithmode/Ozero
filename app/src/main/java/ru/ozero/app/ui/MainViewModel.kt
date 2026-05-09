@@ -1,5 +1,6 @@
 package ru.ozero.app.ui
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -174,7 +175,7 @@ class MainViewModel @Inject constructor(
                         val result = fetchIpInfoViaEngine(s.engineId, s.socksPort)
                         when (result) {
                             is IpInfoState.Loaded ->
-                                PersistentLoggers.info(IP_TAG, "fetch success ip=${result.info.ip}")
+                                Log.i(IP_TAG, "fetch success ip=${result.info.ip}")
                             is IpInfoState.Error ->
                                 PersistentLoggers.warn(IP_TAG, "fetch error: ${result.message}")
                             else -> Unit
