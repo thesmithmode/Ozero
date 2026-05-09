@@ -176,7 +176,7 @@ private fun ContentBody(
             if (state.apps.isEmpty()) {
                 EmptyBody()
             } else {
-                AppsList(state = state, listEnabled = true, onToggleApp = onToggleApp)
+                AppsList(state = state, onToggleApp = onToggleApp)
             }
         } else {
             ModeDescription(mode = state.mode)
@@ -225,7 +225,6 @@ private fun EmptyBody() {
 @Composable
 private fun AppsList(
     state: SplitTunnelUiState.Content,
-    listEnabled: Boolean,
     onToggleApp: (String, Boolean) -> Unit,
 ) {
     LazyColumn(
@@ -235,7 +234,7 @@ private fun AppsList(
         contentPadding = PaddingValues(vertical = 8.dp),
     ) {
         items(state.apps, key = { it.packageName }) { app ->
-            AppRowView(app = app, enabled = listEnabled, onToggleApp = onToggleApp)
+            AppRowView(app = app, onToggleApp = onToggleApp)
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
         }
     }
@@ -271,7 +270,6 @@ private fun ModeSegment(
 @Composable
 private fun AppRowView(
     app: AppRow,
-    enabled: Boolean,
     onToggleApp: (String, Boolean) -> Unit,
 ) {
     Row(
@@ -306,7 +304,6 @@ private fun AppRowView(
         }
         Checkbox(
             checked = app.included,
-            enabled = enabled,
             onCheckedChange = { value -> onToggleApp(app.packageName, value) },
         )
     }
