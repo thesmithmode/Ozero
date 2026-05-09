@@ -179,7 +179,7 @@ class MainViewModel @Inject constructor(
                         )
                         delay(IP_INFO_WARMUP_MS)
                         PersistentLoggers.info(IP_TAG, "warmup done — fetch IP")
-                        val result = fetchIpInfoViaEngine(s.engineId, s.socksPort)
+                        val result = fetchIpInfoViaEngine(s.socksPort)
                         when (result) {
                             is IpInfoState.Loaded ->
                                 Log.i(IP_TAG, "fetch success ip=${result.info.ip}")
@@ -206,7 +206,7 @@ class MainViewModel @Inject constructor(
             }
             _ipInfo.value = IpInfoState.Loading
             _ipInfo.value = if (s is TunnelState.Connected) {
-                fetchIpInfoViaEngine(s.engineId, s.socksPort)
+                fetchIpInfoViaEngine(s.socksPort)
             } else {
                 ipInfoProvider.fetch().fold(
                     onSuccess = { IpInfoState.Loaded(it) },
@@ -216,10 +216,10 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private suspend fun fetchIpInfoViaEngine(engineId: EngineId, socksPort: Int): IpInfoState {
+    private suspend fun fetchIpInfoViaEngine(socksPort: Int): IpInfoState {
         var lastError: Throwable? = null
         repeat(IP_INFO_RETRY_ATTEMPTS) { attempt ->
-            val result = fetchOnce(engineId, socksPort)
+            val result = fetchOnce(socksPort)
             result.fold(
                 onSuccess = { return IpInfoState.Loaded(it) },
                 onFailure = {
@@ -235,7 +235,7 @@ class MainViewModel @Inject constructor(
         return IpInfoState.Error(msg)
     }
 
-    private suspend fun fetchOnce(engineId: EngineId, socksPort: Int): Result<IpInfo> =
+    private suspend fun fetchOnce(socksPort: Int): Result<IpInfo> =
         if (socksPort > 0) {
             ipInfoProvider.fetchVia(BYEDPI_LOOPBACK, socksPort)
         } else {
