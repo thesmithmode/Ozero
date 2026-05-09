@@ -156,8 +156,10 @@ class SplitTunnelViewModelTest {
         advanceUntilIdle()
 
         val state = vm.uiState.value as SplitTunnelUiState.Content
-        assertTrue(state.apps.first { it.packageName == "com.user.bar" }.included, "blocklist entry должен быть included в BLOCKLIST mode")
-        assertTrue(!state.apps.first { it.packageName == "com.user.foo" }.included, "allowlist entry НЕ должен быть included в BLOCKLIST mode")
+        val barRow = state.apps.first { it.packageName == "com.user.bar" }
+        val fooRow = state.apps.first { it.packageName == "com.user.foo" }
+        assertTrue(barRow.included, "blocklist entry должен быть included в BLOCKLIST mode")
+        assertTrue(!fooRow.included, "allowlist entry НЕ должен быть included в BLOCKLIST mode")
     }
 
     @Test
@@ -173,8 +175,10 @@ class SplitTunnelViewModelTest {
         advanceUntilIdle()
 
         val state = vm.uiState.value as SplitTunnelUiState.Content
-        assertTrue(state.apps.first { it.packageName == "com.user.foo" }.included, "allowlist entry included в ALLOWLIST mode")
-        assertTrue(!state.apps.first { it.packageName == "com.user.bar" }.included, "blocklist entry НЕ included в ALLOWLIST mode")
+        val fooRow = state.apps.first { it.packageName == "com.user.foo" }
+        val barRow = state.apps.first { it.packageName == "com.user.bar" }
+        assertTrue(fooRow.included, "allowlist entry included в ALLOWLIST mode")
+        assertTrue(!barRow.included, "blocklist entry НЕ included в ALLOWLIST mode")
     }
 
     @Test

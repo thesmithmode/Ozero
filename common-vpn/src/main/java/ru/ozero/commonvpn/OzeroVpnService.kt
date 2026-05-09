@@ -196,16 +196,8 @@ class OzeroVpnService : android.net.VpnService() {
         val settings = withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
             runCatching { settingsRepository.settings.first() }.getOrNull()
         }
-        val splitAllowlist = withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
-            runCatching { splitTunnelRulesProvider.allowlistPackages() }.getOrNull()
-        } ?: emptySet()
-        val splitBlocklist = withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
-            runCatching { splitTunnelRulesProvider.blocklistPackages() }.getOrNull()
-        } ?: emptySet()
-        val splitConfig = ru.ozero.commonvpn.split.SplitTunnelConfig(
-            mode = settings?.splitMode ?: ru.ozero.enginescore.settings.SplitTunnelMode.ALL,
-            allowlist = splitAllowlist,
-            blocklist = splitBlocklist,
+        val splitConfig = readSplitConfig(
+            settings?.splitMode ?: ru.ozero.enginescore.settings.SplitTunnelMode.ALL,
         )
         killswitchCached = settings?.killswitchEnabled ?: false
         if (killswitchCached) {
@@ -278,6 +270,18 @@ class OzeroVpnService : android.net.VpnService() {
         if (!usesCustomTun) startHealthKillswitchWatcher(activeEngineId)
         if (usesCustomTun) startPeerWatchdog(activeEngineId)
         startStatsLogger()
+    }
+
+    private suspend fun readSplitConfig(
+        mode: ru.ozero.enginescore.settings.SplitTunnelMode,
+    ): ru.ozero.commonvpn.split.SplitTunnelConfig {
+        val allowlist = withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
+            runCatching { splitTunnelRulesProvider.allowlistPackages() }.getOrNull()
+        } ?: emptySet()
+        val blocklist = withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
+            runCatching { splitTunnelRulesProvider.blocklistPackages() }.getOrNull()
+        } ?: emptySet()
+        return ru.ozero.commonvpn.split.SplitTunnelConfig(mode = mode, allowlist = allowlist, blocklist = blocklist)
     }
 
     private fun startHealthKillswitchWatcher(engineId: EngineId) {

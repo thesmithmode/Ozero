@@ -181,7 +181,10 @@ class TunBuilderConfiguratorTest {
             val b = mockBuilder()
             every { b.addAllowedApplication(any()) } returns b
             every { b.addDisallowedApplication(any()) } returns b
-            configurator.apply(b, SplitTunnelConfig(mode = mode, allowlist = setOf("com.bank.app"), blocklist = setOf("com.bank.app")))
+            configurator.apply(
+                b,
+                SplitTunnelConfig(mode = mode, allowlist = setOf("com.bank.app"), blocklist = setOf("com.bank.app")),
+            )
             verify(exactly = 0) {
                 b.addDisallowedApplication("ru.ozero.app")
             }
