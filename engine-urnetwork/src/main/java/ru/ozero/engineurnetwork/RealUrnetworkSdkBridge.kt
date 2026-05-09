@@ -8,7 +8,9 @@ import com.bringyour.sdk.DeviceLocal
 import com.bringyour.sdk.IoLoop
 import com.bringyour.sdk.IoLoopDoneCallback
 import com.bringyour.sdk.LocationsViewController
+import com.bringyour.sdk.PerformanceProfile
 import com.bringyour.sdk.Sdk
+import com.bringyour.sdk.WindowSizeSettings
 import com.bringyour.sdk.SubscriptionBalanceCallback
 import com.bringyour.sdk.WalletViewController
 import kotlinx.coroutines.CoroutineScope
@@ -225,6 +227,30 @@ class RealUrnetworkSdkBridge(
 
     override fun isProvidePaused(): Boolean =
         runCatching { deviceRef.get()?.providePaused ?: true }.getOrDefault(true)
+
+    override fun applyPerformanceProfile(windowType: UrnetworkWindowType, fixedIpSize: Boolean) {
+        if (windowType == UrnetworkWindowType.AUTO) {
+            Log.i(TAG, "applyPerformanceProfile skip — AUTO uses SDK defaults")
+            return
+        }
+        val device = deviceRef.get() ?: return
+        runCatching {
+            val profile = PerformanceProfile()
+            profile.windowType = when (windowType) {
+                UrnetworkWindowType.QUALITY -> Sdk.WindowTypeQuality
+                UrnetworkWindowType.SPEED -> Sdk.WindowTypeSpeed
+                UrnetworkWindowType.AUTO -> Sdk.WindowTypeQuality
+            }
+            val sizes = WindowSizeSettings()
+            sizes.windowSizeMin = if (fixedIpSize) 1 else 2
+            sizes.windowSizeMax = if (fixedIpSize) 1 else 4
+            profile.windowSize = sizes
+            device.performanceProfile = profile
+            Log.i(TAG, "applyPerformanceProfile windowType=${windowType.rawValue} fixedIp=$fixedIpSize OK")
+        }.onFailure {
+            PersistentLoggers.warn(TAG, "applyPerformanceProfile threw: ${it.message}")
+        }
+    }
 
     override fun peerCount(): Int =
         runCatching { connectVcRef.get()?.grid?.windowCurrentSize ?: 0 }.getOrDefault(0)

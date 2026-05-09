@@ -24,6 +24,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -39,6 +42,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bringyour.sdk.ConnectLocation
 import ru.ozero.app.R
+import ru.ozero.engineurnetwork.UrnetworkWindowType
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,6 +99,8 @@ fun UrnetworkEngineSettingsScreen(
                 val peerCount by viewModel.peerCount.collectAsStateWithLifecycle()
                 val unpaidBytes by viewModel.unpaidBytes.collectAsStateWithLifecycle()
                 val balance by viewModel.subscriptionBalance.collectAsStateWithLifecycle()
+                val windowType by viewModel.windowType.collectAsStateWithLifecycle()
+                val fixedIp by viewModel.fixedIpSize.collectAsStateWithLifecycle()
                 LocationListContent(
                     modifier = Modifier.padding(padding),
                     countries = current.countries,
@@ -104,9 +110,13 @@ fun UrnetworkEngineSettingsScreen(
                     unpaidBytes = unpaidBytes,
                     balance = balance,
                     searchQuery = searchQuery,
+                    windowType = windowType,
+                    fixedIp = fixedIp,
                     onSearchQueryChange = viewModel::setSearchQuery,
                     onSelect = viewModel::selectLocation,
                     onSetProvidePaused = viewModel::setProvidePaused,
+                    onSelectWindowType = viewModel::selectWindowType,
+                    onToggleFixedIp = viewModel::toggleFixedIpSize,
                 )
             }
         }
@@ -124,9 +134,13 @@ private fun LocationListContent(
     unpaidBytes: Long,
     balance: ru.ozero.engineurnetwork.UrnetworkSdkBridge.SubscriptionBalanceSnapshot?,
     searchQuery: String,
+    windowType: UrnetworkWindowType,
+    fixedIp: Boolean,
     onSearchQueryChange: (String) -> Unit,
     onSelect: (ConnectLocation?) -> Unit,
     onSetProvidePaused: (Boolean) -> Unit,
+    onSelectWindowType: (UrnetworkWindowType) -> Unit,
+    onToggleFixedIp: (Boolean) -> Unit,
 ) {
     val isBestAvailable = selectedLocation == null || selectedLocation.connectLocationId?.bestAvailable == true
     LazyColumn(
@@ -165,6 +179,12 @@ private fun LocationListContent(
                     ProviderStatsRow(unpaidBytes = unpaidBytes)
                 }
                 ConsumerStatsBlock(balance = balance)
+                WindowTypeSection(
+                    selected = windowType,
+                    fixedIp = fixedIp,
+                    onSelect = onSelectWindowType,
+                    onToggleFixedIp = onToggleFixedIp,
+                )
                 Text(
                     text = stringResource(R.string.urnetwork_location_title),
                     style = MaterialTheme.typography.titleSmall,
@@ -249,6 +269,67 @@ private fun LocationRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WindowTypeSection(
+    selected: UrnetworkWindowType,
+    fixedIp: Boolean,
+    onSelect: (UrnetworkWindowType) -> Unit,
+    onToggleFixedIp: (Boolean) -> Unit,
+) {
+    val modes = listOf(
+        UrnetworkWindowType.AUTO to R.string.urnetwork_mode_auto,
+        UrnetworkWindowType.QUALITY to R.string.urnetwork_mode_quality,
+        UrnetworkWindowType.SPEED to R.string.urnetwork_mode_speed,
+    )
+    Column(modifier = Modifier.padding(top = 16.dp)) {
+        Text(
+            text = stringResource(R.string.urnetwork_mode_title),
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(bottom = 4.dp),
+        )
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            modes.forEachIndexed { index, (mode, labelRes) ->
+                SegmentedButton(
+                    selected = mode == selected,
+                    onClick = { onSelect(mode) },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size),
+                ) {
+                    Text(stringResource(labelRes))
+                }
+            }
+        }
+        Text(
+            text = stringResource(R.string.urnetwork_mode_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        if (selected != UrnetworkWindowType.AUTO) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.urnetwork_fixed_ip_size),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Text(
+                        text = stringResource(R.string.urnetwork_fixed_ip_size_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = fixedIp, onCheckedChange = onToggleFixedIp)
+            }
         }
     }
 }

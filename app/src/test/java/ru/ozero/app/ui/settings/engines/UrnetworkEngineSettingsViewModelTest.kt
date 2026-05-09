@@ -16,7 +16,9 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
+import ru.ozero.engineurnetwork.UrnetworkWindowType
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -40,20 +42,20 @@ class UrnetworkEngineSettingsViewModelTest {
 
     @Test
     fun `uiState стартует как Loading`() = runTest {
-        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(), FakeSettingsRepo())
+        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(), FakeSettingsRepo(), FakeUrnetworkConfigStore())
         assertSame(UrnetworkSettingsUiState.Loading, vm.uiState.value)
     }
 
     @Test
     fun `uiState переходит в NotConnected когда bridge не подключён`() = runTest {
-        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(connected = false), FakeSettingsRepo())
+        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(connected = false), FakeSettingsRepo(), FakeUrnetworkConfigStore())
         advanceUntilIdle()
         assertIs<UrnetworkSettingsUiState.NotConnected>(vm.uiState.value)
     }
 
     @Test
     fun `subscriptionBalance стартует с null когда никто не подписан`() = runTest {
-        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(), FakeSettingsRepo())
+        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(), FakeSettingsRepo(), FakeUrnetworkConfigStore())
         assertNull(vm.subscriptionBalance.value)
     }
 
@@ -68,7 +70,7 @@ class UrnetworkEngineSettingsViewModelTest {
             store = "google",
         )
         val bridge = FakeUrnetworkBridge(subscriptionBalance = snap)
-        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo())
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), FakeUrnetworkConfigStore())
         val first = vm.subscriptionBalance.first { it != null }
         assertEquals(snap, first)
     }
@@ -81,7 +83,7 @@ class UrnetworkEngineSettingsViewModelTest {
             subscriptionBalance = snap,
             balanceCallCounter = callCount,
         )
-        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo())
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), FakeUrnetworkConfigStore())
         val collector = backgroundScope.launch { vm.subscriptionBalance.collect {} }
         vm.subscriptionBalance.first { it != null }
         runCurrent()
@@ -119,7 +121,7 @@ class UrnetworkEngineSettingsViewModelTest {
     @Test
     fun `subscriptionBalance остаётся null когда bridge возвращает null (free user)`() = runTest {
         val bridge = FakeUrnetworkBridge(subscriptionBalance = null)
-        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo())
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), FakeUrnetworkConfigStore())
         vm.subscriptionBalance.first()
         runCurrent()
         assertNull(vm.subscriptionBalance.value)
@@ -149,6 +151,25 @@ private class FakeSettingsRepo : ru.ozero.enginescore.settings.SettingsRepositor
     override suspend fun setAppMode(mode: ru.ozero.enginescore.settings.AppMode) = Unit
     override suspend fun setKillswitchEnabled(enabled: Boolean) = Unit
     override suspend fun setAlwaysOnBannerDismissed(dismissed: Boolean) = Unit
+}
+
+private class FakeUrnetworkConfigStore : UrnetworkConfigStore {
+    private val wallet = kotlinx.coroutines.flow.MutableStateFlow("0xWALLET")
+    private val byJwt = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+    private val byClientJwt = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+    private val winType = kotlinx.coroutines.flow.MutableStateFlow(UrnetworkWindowType.AUTO)
+    private val fixedIp = kotlinx.coroutines.flow.MutableStateFlow(false)
+    override fun walletAddress(): kotlinx.coroutines.flow.Flow<String> = wallet
+    override fun walletOverride(): kotlinx.coroutines.flow.Flow<String?> = kotlinx.coroutines.flow.flowOf(null)
+    override suspend fun setWalletOverride(value: String?) = Unit
+    override fun byJwt(): kotlinx.coroutines.flow.Flow<String?> = byJwt
+    override suspend fun setByJwt(value: String?) { byJwt.value = value }
+    override fun byClientJwt(): kotlinx.coroutines.flow.Flow<String?> = byClientJwt
+    override suspend fun setByClientJwt(value: String?) { byClientJwt.value = value }
+    override fun windowType(): kotlinx.coroutines.flow.Flow<UrnetworkWindowType> = winType
+    override suspend fun setWindowType(value: UrnetworkWindowType) { winType.value = value }
+    override fun fixedIpSize(): kotlinx.coroutines.flow.Flow<Boolean> = fixedIp
+    override suspend fun setFixedIpSize(value: Boolean) { fixedIp.value = value }
 }
 
 private class FakeUrnetworkBridge(

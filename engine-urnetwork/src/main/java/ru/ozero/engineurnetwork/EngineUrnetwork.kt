@@ -83,7 +83,11 @@ class EngineUrnetwork(
             UrnetworkSdkBridge.StartResult.Success -> {
                 runCatching { sdkBridge.setPreferredCountry(config.region) }
                     .onFailure { PersistentLoggers.warn(TAG, "setPreferredCountry threw: ${it.message}") }
-                Log.i(TAG, "started OK preferredCountry=${config.region ?: "<auto>"}")
+                val windowType = configStore.windowType().first()
+                val fixedIp = configStore.fixedIpSize().first()
+                runCatching { sdkBridge.applyPerformanceProfile(windowType, fixedIp) }
+                    .onFailure { PersistentLoggers.warn(TAG, "applyPerformanceProfile threw: ${it.message}") }
+                Log.i(TAG, "started OK preferredCountry=${config.region ?: "<auto>"} windowType=${windowType.rawValue} fixedIp=$fixedIp")
                 startStatsPolling()
                 StartResult.Success(socksPort = config.socksPort)
             }

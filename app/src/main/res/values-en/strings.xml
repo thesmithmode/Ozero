@@ -197,6 +197,13 @@
     <string name="urnetwork_provide_subtitle">Share bandwidth with the URnetwork mesh</string>
     <string name="urnetwork_peers_connected">Connected to %1$d peers</string>
     <string name="urnetwork_peers_searching">Searching peers…</string>
+    <string name="urnetwork_mode_title">Mode</string>
+    <string name="urnetwork_mode_auto">Auto</string>
+    <string name="urnetwork_mode_quality">Web</string>
+    <string name="urnetwork_mode_speed">Streaming</string>
+    <string name="urnetwork_mode_hint">Web — low latency for browsing. Streaming — high bandwidth for video.</string>
+    <string name="urnetwork_fixed_ip_size">Fixed exit IP</string>
+    <string name="urnetwork_fixed_ip_size_hint">Single peer instead of pool — stable session IP</string>
     <string name="urnetwork_about_title">About URnetwork</string>
     <string name="urnetwork_about_body">URnetwork is the most local and most private network on the planet. A patented protocol keeps participants safe. The mesh has more than 30,000 providers today and zero known incidents.</string>
     <string name="settings_urnetwork_title">URnetwork</string>

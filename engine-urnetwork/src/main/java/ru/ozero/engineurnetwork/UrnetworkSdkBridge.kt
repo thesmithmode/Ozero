@@ -24,6 +24,8 @@ interface UrnetworkSdkBridge {
     fun setProvidePaused(paused: Boolean)
     fun isProvidePaused(): Boolean
 
+    fun applyPerformanceProfile(windowType: UrnetworkWindowType, fixedIpSize: Boolean) {}
+
     fun peerCount(): Int
 
     fun unpaidByteCount(): Long

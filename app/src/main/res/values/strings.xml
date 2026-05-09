@@ -211,6 +211,13 @@
     <string name="urnetwork_provide_subtitle">Делиться пропускной способностью с сетью URnetwork</string>
     <string name="urnetwork_peers_connected">Подключено к %1$d peer-ам</string>
     <string name="urnetwork_peers_searching">Поиск peer-ов…</string>
+    <string name="urnetwork_mode_title">Режим</string>
+    <string name="urnetwork_mode_auto">Авто</string>
+    <string name="urnetwork_mode_quality">Веб</string>
+    <string name="urnetwork_mode_speed">Стриминг</string>
+    <string name="urnetwork_mode_hint">Веб — низкая задержка для браузинга. Стриминг — большая ширина для видео.</string>
+    <string name="urnetwork_fixed_ip_size">Фиксированный exit-IP</string>
+    <string name="urnetwork_fixed_ip_size_hint">Один peer вместо пула — стабильный IP сессии</string>
     <string name="urnetwork_about_title">Что такое URnetwork</string>
     <string name="urnetwork_about_body">URnetwork — самая локальная и приватная сеть в мире. Запатентованный протокол держит участников в безопасности. Сейчас в сети больше 30 000 провайдеров, известных инцидентов — ноль.</string>
     <string name="settings_urnetwork_title">URnetwork</string>

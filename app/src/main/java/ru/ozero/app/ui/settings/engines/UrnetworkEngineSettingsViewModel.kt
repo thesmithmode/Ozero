@@ -17,7 +17,9 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import android.util.Log
+import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
+import ru.ozero.engineurnetwork.UrnetworkWindowType
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.settings.SettingsRepository
 import java.util.Locale
@@ -46,7 +48,31 @@ sealed interface UrnetworkSettingsUiState {
 class UrnetworkEngineSettingsViewModel @Inject constructor(
     private val bridge: UrnetworkSdkBridge,
     private val settingsRepository: SettingsRepository,
+    private val configStore: UrnetworkConfigStore,
 ) : ViewModel() {
+
+    val windowType: StateFlow<UrnetworkWindowType> = configStore.windowType()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, UrnetworkWindowType.AUTO)
+
+    val fixedIpSize: StateFlow<Boolean> = configStore.fixedIpSize()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun selectWindowType(value: UrnetworkWindowType) {
+        viewModelScope.launch {
+            configStore.setWindowType(value)
+            if (value == UrnetworkWindowType.AUTO) {
+                configStore.setFixedIpSize(false)
+            }
+            runCatching { bridge.applyPerformanceProfile(value, fixedIpSize.value) }
+        }
+    }
+
+    fun toggleFixedIpSize(value: Boolean) {
+        viewModelScope.launch {
+            configStore.setFixedIpSize(value)
+            runCatching { bridge.applyPerformanceProfile(windowType.value, value) }
+        }
+    }
 
     private val _uiState = MutableStateFlow<UrnetworkSettingsUiState>(UrnetworkSettingsUiState.Loading)
     val uiState: StateFlow<UrnetworkSettingsUiState> = _uiState.asStateFlow()
