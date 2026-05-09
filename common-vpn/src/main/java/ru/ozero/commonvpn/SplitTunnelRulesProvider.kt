@@ -1,9 +1,11 @@
 package ru.ozero.commonvpn
 
 interface SplitTunnelRulesProvider {
-    suspend fun activePackages(): Set<String>
+    suspend fun allowlistPackages(): Set<String>
+    suspend fun blocklistPackages(): Set<String>
 
     object NoOp : SplitTunnelRulesProvider {
-        override suspend fun activePackages(): Set<String> = emptySet()
+        override suspend fun allowlistPackages() = emptySet<String>()
+        override suspend fun blocklistPackages() = emptySet<String>()
     }
 }

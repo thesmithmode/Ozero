@@ -47,7 +47,8 @@ class SplitTunnelViewModel @Inject constructor(
             query,
         ) { appsList, rules, persistedMode, q ->
             val mode = if (persistedMode == SplitTunnelMode.BYPASS_LAN) SplitTunnelMode.ALL else persistedMode
-            val included = rules.map { it.packageName }.toSet()
+            val isBlocklist = mode == SplitTunnelMode.BLOCKLIST
+            val included = rules.filter { it.isExcluded == isBlocklist }.map { it.packageName }.toSet()
             val filtered = if (q.isBlank()) appsList else appsList.filter { it.matches(q) }
             val rows = filtered.map { app ->
                 AppRow(
@@ -78,7 +79,8 @@ class SplitTunnelViewModel @Inject constructor(
     fun onToggleApp(packageName: String, checked: Boolean) {
         viewModelScope.launch {
             if (checked) {
-                dao.upsert(AppSplitRule(packageName = packageName, isExcluded = false))
+                val mode = settingsRepository.settings.map { it.splitMode }.first()
+                dao.upsert(AppSplitRule(packageName = packageName, isExcluded = mode == SplitTunnelMode.BLOCKLIST))
             } else {
                 dao.delete(packageName)
             }

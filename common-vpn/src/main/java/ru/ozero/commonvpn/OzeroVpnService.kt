@@ -196,12 +196,16 @@ class OzeroVpnService : android.net.VpnService() {
         val settings = withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
             runCatching { settingsRepository.settings.first() }.getOrNull()
         }
-        val splitPackages = withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
-            runCatching { splitTunnelRulesProvider.activePackages() }.getOrNull()
+        val splitAllowlist = withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
+            runCatching { splitTunnelRulesProvider.allowlistPackages() }.getOrNull()
+        } ?: emptySet()
+        val splitBlocklist = withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
+            runCatching { splitTunnelRulesProvider.blocklistPackages() }.getOrNull()
         } ?: emptySet()
         val splitConfig = ru.ozero.commonvpn.split.SplitTunnelConfig(
             mode = settings?.splitMode ?: ru.ozero.enginescore.settings.SplitTunnelMode.ALL,
-            packages = splitPackages,
+            allowlist = splitAllowlist,
+            blocklist = splitBlocklist,
         )
         killswitchCached = settings?.killswitchEnabled ?: false
         if (killswitchCached) {

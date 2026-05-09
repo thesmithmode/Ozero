@@ -32,12 +32,12 @@ class TunBuilderConfigurator(
             }
             SplitTunnelMode.ALLOWLIST -> {
                 builder.addRoute("0.0.0.0", 0)
-                applyAllowed(builder, config.packages, includeSelf = !excludeSelf)
+                applyAllowed(builder, config.allowlist, includeSelf = !excludeSelf)
             }
             SplitTunnelMode.BLOCKLIST -> {
                 builder.addRoute("0.0.0.0", 0)
                 if (excludeSelf) excludeSelfFromTun(builder)
-                applyDisallowed(builder, config.packages)
+                applyDisallowed(builder, config.blocklist)
             }
         }
         return builder

@@ -115,7 +115,88 @@ class SplitTunnelViewModelTest {
         viewModel.onToggleApp("com.user.foo", checked = true)
         advanceUntilIdle()
 
-        assertTrue(dao.upserts.any { it.packageName == "com.user.foo" })
+        val rule = dao.upserts.first { it.packageName == "com.user.foo" }
+        assertEquals(false, rule.isExcluded, "ALL mode toggle → isExcluded=false (allowlist)")
+    }
+
+    @Test
+    fun `onToggleApp в BLOCKLIST режиме вставляет isExcluded=true`() = runTest {
+        settings.setSplitMode(SplitTunnelMode.BLOCKLIST)
+        advanceUntilIdle()
+
+        viewModel.onToggleApp("com.user.bar", checked = true)
+        advanceUntilIdle()
+
+        val rule = dao.upserts.first { it.packageName == "com.user.bar" }
+        assertEquals(true, rule.isExcluded, "BLOCKLIST mode toggle → isExcluded=true")
+    }
+
+    @Test
+    fun `onToggleApp в ALLOWLIST режиме вставляет isExcluded=false`() = runTest {
+        settings.setSplitMode(SplitTunnelMode.ALLOWLIST)
+        advanceUntilIdle()
+
+        viewModel.onToggleApp("com.user.foo", checked = true)
+        advanceUntilIdle()
+
+        val rule = dao.upserts.first { it.packageName == "com.user.foo" }
+        assertEquals(false, rule.isExcluded, "ALLOWLIST mode toggle → isExcluded=false")
+    }
+
+    @Test
+    fun `BLOCKLIST mode показывает isExcluded=true как included, isExcluded=false — нет`() = runTest {
+        settings.setSplitMode(SplitTunnelMode.BLOCKLIST)
+        dao.emit(
+            listOf(
+                AppSplitRule("com.user.foo", isExcluded = false),
+                AppSplitRule("com.user.bar", isExcluded = true),
+            ),
+        )
+        val vm = SplitTunnelViewModel(apps, dao, settings)
+        advanceUntilIdle()
+
+        val state = vm.uiState.value as SplitTunnelUiState.Content
+        assertTrue(state.apps.first { it.packageName == "com.user.bar" }.included, "blocklist entry должен быть included в BLOCKLIST mode")
+        assertTrue(!state.apps.first { it.packageName == "com.user.foo" }.included, "allowlist entry НЕ должен быть included в BLOCKLIST mode")
+    }
+
+    @Test
+    fun `ALLOWLIST mode не показывает isExcluded=true как included`() = runTest {
+        settings.setSplitMode(SplitTunnelMode.ALLOWLIST)
+        dao.emit(
+            listOf(
+                AppSplitRule("com.user.foo", isExcluded = false),
+                AppSplitRule("com.user.bar", isExcluded = true),
+            ),
+        )
+        val vm = SplitTunnelViewModel(apps, dao, settings)
+        advanceUntilIdle()
+
+        val state = vm.uiState.value as SplitTunnelUiState.Content
+        assertTrue(state.apps.first { it.packageName == "com.user.foo" }.included, "allowlist entry included в ALLOWLIST mode")
+        assertTrue(!state.apps.first { it.packageName == "com.user.bar" }.included, "blocklist entry НЕ included в ALLOWLIST mode")
+    }
+
+    @Test
+    fun `переключение режимов сохраняет оба списка независимо`() = runTest {
+        settings.setSplitMode(SplitTunnelMode.ALLOWLIST)
+        dao.emit(
+            listOf(
+                AppSplitRule("com.user.foo", isExcluded = false),
+                AppSplitRule("com.user.bar", isExcluded = true),
+            ),
+        )
+        val vm = SplitTunnelViewModel(apps, dao, settings)
+        advanceUntilIdle()
+
+        val allowlistState = vm.uiState.value as SplitTunnelUiState.Content
+        assertEquals(1, allowlistState.selectedCount, "ALLOWLIST: только foo (isExcluded=false)")
+
+        settings.setSplitMode(SplitTunnelMode.BLOCKLIST)
+        advanceUntilIdle()
+
+        val blocklistState = vm.uiState.value as SplitTunnelUiState.Content
+        assertEquals(1, blocklistState.selectedCount, "BLOCKLIST: только bar (isExcluded=true)")
     }
 
     @Test

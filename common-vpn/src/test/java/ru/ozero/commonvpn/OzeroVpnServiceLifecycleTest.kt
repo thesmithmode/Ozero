@@ -265,7 +265,7 @@ class OzeroVpnServiceLifecycleTest {
         assertFalse(
             body.contains("runBlocking"),
             "startVpn не должен использовать runBlocking. settings и split-packages читаются " +
-                "из serviceScope.launch (IO) через withTimeoutOrNull + first()/activePackages().",
+                "из serviceScope.launch (IO) через withTimeoutOrNull + first()/allowlistPackages().",
         )
     }
 
@@ -278,9 +278,13 @@ class OzeroVpnServiceLifecycleTest {
                 "custom DNS / split / hosts / winning-args.",
         )
         assertTrue(
-            body.contains("splitTunnelRulesProvider.activePackages()"),
-            "startVpn обязан читать activePackages() свежими на каждый connect — иначе изменение " +
+            body.contains("splitTunnelRulesProvider.allowlistPackages()"),
+            "startVpn обязан читать allowlistPackages() свежими на каждый connect — иначе изменение " +
                 "split-rules видно только со второго reconnect.",
+        )
+        assertTrue(
+            body.contains("splitTunnelRulesProvider.blocklistPackages()"),
+            "startVpn обязан читать blocklistPackages() свежими на каждый connect.",
         )
         assertTrue(
             body.contains("withTimeoutOrNull"),
