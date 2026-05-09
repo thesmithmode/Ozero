@@ -319,8 +319,9 @@ class OzeroVpnService : android.net.VpnService() {
                         zeroPeersSince = 0L
                     } else if (hadPeers) {
                         val now = System.currentTimeMillis()
-                        if (zeroPeersSince == 0L) zeroPeersSince = now
-                        else if (now - zeroPeersSince > PEER_WATCHDOG_TIMEOUT_MS) {
+                        if (zeroPeersSince == 0L) {
+                            zeroPeersSince = now
+                        } else if (now - zeroPeersSince > PEER_WATCHDOG_TIMEOUT_MS) {
                             handleEngineFailure(engineId, "no URnetwork peers for ${PEER_WATCHDOG_TIMEOUT_MS / 1000}s")
                             return@launch
                         }
