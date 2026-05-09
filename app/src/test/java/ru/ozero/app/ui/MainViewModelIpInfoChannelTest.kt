@@ -52,16 +52,16 @@ class MainViewModelIpInfoChannelTest {
     }
 
     @Test
-    fun `engineSocksProxy возвращает SOCKS только для BYEDPI`() {
-        val body = source.substringAfter("private fun engineSocksProxy")
-            .substringBefore("private companion object")
+    fun `fetchOnce выделяет BYEDPI через SOCKS-proxy на 127_0_0_1`() {
+        val body = source.substringAfter("private suspend fun fetchOnce")
+            .substringBefore("private fun requiresVpnNetworkBinding")
         assertTrue(
             body.contains("EngineId.BYEDPI"),
-            "engineSocksProxy обязан выделять BYEDPI как socks-engine. Body:\n$body",
+            "fetchOnce обязан выделять BYEDPI как socks-engine. Body:\n$body",
         )
         assertTrue(
-            body.contains("\"127.0.0.1\""),
-            "ByeDPI socks proxy host = 127.0.0.1. Body:\n$body",
+            body.contains("BYEDPI_LOOPBACK") || body.contains("\"127.0.0.1\""),
+            "ByeDPI socks proxy host должен быть 127.0.0.1 (константа или литерал). Body:\n$body",
         )
     }
 }

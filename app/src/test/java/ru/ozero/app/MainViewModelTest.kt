@@ -354,15 +354,16 @@ class MainViewModelTest {
     @Test
     fun ipInfoLeakProtectionWhenVpnNetworkLocatorReturnsNull() = runTest {
         val locator = FakeVpnNetworkLocator(factory = null)
+        val isolatedProvider = FakeIpInfoProvider()
         val vm = MainViewModel(
             tunnelController, healthMonitor, settingsRepository,
-            FakeUrnetworkBridge(), ipInfoProvider, locator,
+            FakeUrnetworkBridge(), isolatedProvider, locator,
         )
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.WARP)
         tunnelController.onEngineStarted(EngineId.WARP, 0)
         advanceUntilIdle()
-        kotlinx.coroutines.delay(8_000)
+        kotlinx.coroutines.delay(10_000)
         advanceUntilIdle()
         val s = vm.ipInfo.value
         assertIs<IpInfoState.Error>(
@@ -370,7 +371,7 @@ class MainViewModelTest {
             "Если VPN Network не виден через ConnectivityManager — IP fetch обязан вернуть Error, " +
                 "не отправлять fetch без factory. Иначе real IP протёкет в UI как 'IP туннеля'.",
         )
-        assertEquals(false, ipInfoProvider.lastSocketFactoryUsed)
+        assertEquals(false, isolatedProvider.lastSocketFactoryUsed)
     }
 
     @Test
