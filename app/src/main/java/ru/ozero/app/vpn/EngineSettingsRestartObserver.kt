@@ -46,6 +46,6 @@ class EngineSettingsRestartObserver(
     }
 
     private companion object {
-        const val RESTART_DEBOUNCE_MS = 1500L
+        const val RESTART_DEBOUNCE_MS = 4000L
     }
 }

@@ -153,6 +153,23 @@ class EngineSettingsRestartObserverTest {
         assertEquals(listOf(snapshot), restarts, "restart fires when Connected")
     }
 
+    @Test
+    fun `RESTART_DEBOUNCE_MS не меньше 3000 — защита от engine-restart storm при split-tunnel toggle`() {
+        val source = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/vpn/EngineSettingsRestartObserver.kt",
+        ).readText()
+        val regex = Regex("RESTART_DEBOUNCE_MS\\s*=\\s*(\\d[\\d_]*)L")
+        val m = regex.find(source) ?: error("RESTART_DEBOUNCE_MS не найден")
+        val ms = m.groupValues[1].replace("_", "").toLong()
+        assertTrue(
+            ms >= 3_000L,
+            "RESTART_DEBOUNCE_MS обязан быть >= 3000ms — каждый restart engine во время " +
+                "split-tunnel toggling рискует SIGABRT в libgojni gcWriteBarrier (dual Go runtime conflict, " +
+                "warp-handle-leak-sigabrt). Меньшее окно → restart-storm → нативный краш. Fact=$ms",
+        )
+    }
+
     private fun newObserver(
         flow: MutableSharedFlow<SettingsModel>,
         stateProvider: () -> TunnelState,
