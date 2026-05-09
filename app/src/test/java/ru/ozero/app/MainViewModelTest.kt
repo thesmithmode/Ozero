@@ -76,9 +76,13 @@ class MainViewModelTest {
         ),
     ) : IpInfoProvider {
         @Volatile var calls: Int = 0
+
         @Volatile var lastSocksHost: String? = null
+
         @Volatile var lastSocksPort: Int? = null
+
         @Volatile var lastSocketFactoryUsed: Boolean = false
+
         override suspend fun fetch(): Result<IpInfo> {
             calls += 1
             return result
