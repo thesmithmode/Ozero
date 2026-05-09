@@ -324,7 +324,7 @@ class MainViewModelTest {
     }
 
     @Test
-    fun ipInfoUsesPlainFetchForCustomTunEngines() = runTest {
+    fun ipInfoReturnsErrorForWarpWithoutSocks() = runTest {
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.WARP)
         tunnelController.onEngineStarted(EngineId.WARP, 0)
@@ -332,14 +332,16 @@ class MainViewModelTest {
         kotlinx.coroutines.delay(2_500)
         advanceUntilIdle()
         val s = viewModel.ipInfo.value
-        assertIs<IpInfoState.Loaded>(s)
+        assertIs<IpInfoState.Error>(
+            s,
+            "WARP — full-tun без SOCKS, plain fetch() показал бы реальный (невыпускной) IP " +
+                "из-за excludeSelf=true. Sentinel: вернуть Error с инструкцией проверить в браузере, " +
+                "не показывать неверный IP пользователю.",
+        )
         assertEquals(
             false,
             ipInfoProvider.lastSocketFactoryUsed,
-            "WARP/URnetwork обязаны идти через plain fetch() — TUN routes self-traffic, " +
-                "поскольку TunBuilderConfigurator больше не addDisallowedApplication(self). " +
-                "Попытка bind на VPN network через socketFactory приводит к EPERM: " +
-                "Network.bindSocketToNetwork требует system-привилегий.",
+            "WARP не должен пытаться bind на VPN network через socketFactory — EPERM в production.",
         )
         assertNull(ipInfoProvider.lastSocksHost)
     }
