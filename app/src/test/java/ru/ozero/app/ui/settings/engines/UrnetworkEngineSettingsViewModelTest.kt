@@ -130,7 +130,7 @@ class UrnetworkEngineSettingsViewModelTest {
         vm.selectWindowType(UrnetworkWindowType.SPEED)
         advanceUntilIdle()
         assertEquals(UrnetworkWindowType.SPEED, store.windowType().first())
-        assertEquals(UrnetworkWindowType.SPEED, bridge.lastWindowType)
+        assertEquals(UrnetworkWindowType.SPEED, bridge.lastAppliedWindowType)
     }
 
     @Test
@@ -152,7 +152,7 @@ class UrnetworkEngineSettingsViewModelTest {
         vm.toggleFixedIpSize(true)
         advanceUntilIdle()
         assertEquals(true, store.fixedIpSize().first())
-        assertEquals(true, bridge.lastFixedIp)
+        assertEquals(true, bridge.lastAppliedFixedIp)
     }
 
     @Test
@@ -162,44 +162,6 @@ class UrnetworkEngineSettingsViewModelTest {
         vm.subscriptionBalance.first()
         runCurrent()
         assertNull(vm.subscriptionBalance.value)
-    }
-
-    @Test
-    fun `selectWindowType сохраняет выбранный тип в configStore`() = runTest {
-        val store = FakeUrnetworkConfigStore()
-        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(), FakeSettingsRepo(), store)
-        vm.selectWindowType(UrnetworkWindowType.SPEED)
-        advanceUntilIdle()
-        assertEquals(UrnetworkWindowType.SPEED, store.windowType().first())
-    }
-
-    @Test
-    fun `selectWindowType вызывает applyPerformanceProfile на bridge`() = runTest {
-        val bridge = FakeUrnetworkBridge()
-        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), FakeUrnetworkConfigStore())
-        vm.selectWindowType(UrnetworkWindowType.QUALITY)
-        advanceUntilIdle()
-        assertEquals(UrnetworkWindowType.QUALITY, bridge.lastAppliedWindowType)
-    }
-
-    @Test
-    fun `selectWindowType AUTO сбрасывает fixedIpSize в false в configStore`() = runTest {
-        val store = FakeUrnetworkConfigStore()
-        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(), FakeSettingsRepo(), store)
-        vm.toggleFixedIpSize(true)
-        advanceUntilIdle()
-        vm.selectWindowType(UrnetworkWindowType.AUTO)
-        advanceUntilIdle()
-        assertEquals(false, store.fixedIpSize().first())
-    }
-
-    @Test
-    fun `toggleFixedIpSize сохраняет значение в configStore`() = runTest {
-        val store = FakeUrnetworkConfigStore()
-        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(), FakeSettingsRepo(), store)
-        vm.toggleFixedIpSize(true)
-        advanceUntilIdle()
-        assertEquals(true, store.fixedIpSize().first())
     }
 
     @Test
@@ -268,12 +230,6 @@ private class FakeUrnetworkBridge(
     private val subscriptionBalance: UrnetworkSdkBridge.SubscriptionBalanceSnapshot? = null,
     private val balanceCallCounter: AtomicInteger? = null,
 ) : UrnetworkSdkBridge {
-    @Volatile var lastWindowType: UrnetworkWindowType? = null
-    @Volatile var lastFixedIp: Boolean? = null
-    override fun applyPerformanceProfile(windowType: UrnetworkWindowType, fixedIpSize: Boolean) {
-        lastWindowType = windowType
-        lastFixedIp = fixedIpSize
-    }
     override suspend fun start(
         walletAddress: String,
         apiUrl: String,
