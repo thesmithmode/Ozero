@@ -98,6 +98,25 @@ class UrnetworkEngineSettingsViewModelTest {
     }
 
     @Test
+    fun `init обязан retry refresh пока bridge не готов — sentinel против stuck NotConnected`() {
+        val source = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/ui/settings/engines/UrnetworkEngineSettingsViewModel.kt",
+        ).readText()
+        val initBlock = source.substringAfter("init {").substringBefore("\n    }\n")
+        kotlin.test.assertTrue(
+            initBlock.contains("REFRESH_RETRY_ATTEMPTS") && initBlock.contains("refreshOnce()"),
+            "init обязан retry refreshOnce пока bridge не готов — иначе stuck в NotConnected " +
+                "когда экран открыт раньше чем URnetwork SDK завершил start. Init body:\n$initBlock",
+        )
+        kotlin.test.assertTrue(
+            source.contains("REFRESH_RETRY_ATTEMPTS = ") &&
+                Regex("REFRESH_RETRY_ATTEMPTS\\s*=\\s*(\\d+)").find(source)!!.groupValues[1].toInt() >= 5,
+            "REFRESH_RETRY_ATTEMPTS обязан быть >= 5 — bridge.start может занять секунды",
+        )
+    }
+
+    @Test
     fun `subscriptionBalance остаётся null когда bridge возвращает null (free user)`() = runTest {
         val bridge = FakeUrnetworkBridge(subscriptionBalance = null)
         val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo())

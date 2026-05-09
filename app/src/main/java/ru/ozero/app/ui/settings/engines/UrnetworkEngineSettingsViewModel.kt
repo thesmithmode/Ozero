@@ -80,47 +80,55 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            refresh()
+            var attempt = 0
+            while (attempt < REFRESH_RETRY_ATTEMPTS && _uiState.value !is UrnetworkSettingsUiState.Ready) {
+                refreshOnce()
+                if (_uiState.value is UrnetworkSettingsUiState.Ready) break
+                attempt++
+                if (attempt < REFRESH_RETRY_ATTEMPTS) delay(REFRESH_RETRY_DELAY_MS)
+            }
         }
     }
 
     fun refresh() {
-        viewModelScope.launch {
-            Log.i(TAG, "refresh: openLocationsViewController")
-            val vc = withContext(Dispatchers.Main.immediate) {
-                runCatching { bridge.openLocationsViewController() }
-                    .getOrElse { t ->
-                        PersistentLoggers.warn(TAG, "openLocationsViewController threw: ${t.message}")
-                        null
-                    }
-            }
-            if (vc == null) {
-                PersistentLoggers.warn(
-                    TAG,
-                    "refresh: openLocationsViewController вернул null — bridge не подключён или SDK не готов → NotConnected",
-                )
-                _uiState.value = UrnetworkSettingsUiState.NotConnected
-                return@launch
-            }
-            locationsVc?.also {
-                runCatching { it.stop() }
-                runCatching { it.close() }
-            }
-            locationsVc = vc
-            withContext(Dispatchers.Main.immediate) {
-                runCatching {
-                    vc.addFilteredLocationsListener { filtered, _ ->
-                        viewModelScope.launch {
-                            updateLocations(filtered)
-                        }
-                    }
-                    vc.start()
-                    vc.filterLocations("")
-                    Log.i(TAG, "refresh: locationsVc started, listener attached")
-                }.onFailure {
-                    PersistentLoggers.warn(TAG, "refresh: locationsVc setup threw: ${it.message}")
-                    _uiState.value = UrnetworkSettingsUiState.NotConnected
+        viewModelScope.launch { refreshOnce() }
+    }
+
+    private suspend fun refreshOnce() {
+        Log.i(TAG, "refresh: openLocationsViewController")
+        val vc = withContext(Dispatchers.Main.immediate) {
+            runCatching { bridge.openLocationsViewController() }
+                .getOrElse { t ->
+                    PersistentLoggers.warn(TAG, "openLocationsViewController threw: ${t.message}")
+                    null
                 }
+        }
+        if (vc == null) {
+            PersistentLoggers.warn(
+                TAG,
+                "refresh: openLocationsViewController вернул null — bridge не подключён или SDK не готов → NotConnected",
+            )
+            _uiState.value = UrnetworkSettingsUiState.NotConnected
+            return
+        }
+        locationsVc?.also {
+            runCatching { it.stop() }
+            runCatching { it.close() }
+        }
+        locationsVc = vc
+        withContext(Dispatchers.Main.immediate) {
+            runCatching {
+                vc.addFilteredLocationsListener { filtered, _ ->
+                    viewModelScope.launch {
+                        updateLocations(filtered)
+                    }
+                }
+                vc.start()
+                vc.filterLocations("")
+                Log.i(TAG, "refresh: locationsVc started, listener attached")
+            }.onFailure {
+                PersistentLoggers.warn(TAG, "refresh: locationsVc setup threw: ${it.message}")
+                _uiState.value = UrnetworkSettingsUiState.NotConnected
             }
         }
     }
@@ -216,6 +224,8 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         private const val PROVIDER_STATS_POLL_MS = 30_000L
         private const val SUBSCRIPTION_BALANCE_POLL_MS = 60_000L
         private const val POLLER_KEEP_ALIVE_MS = 5_000L
+        private const val REFRESH_RETRY_ATTEMPTS = 15
+        private const val REFRESH_RETRY_DELAY_MS = 2_000L
 
         fun countryCodeToFlag(code: String): String {
             if (code.length != 2) return ""
