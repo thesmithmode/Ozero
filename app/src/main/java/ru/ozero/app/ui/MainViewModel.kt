@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import ru.ozero.app.ip.VpnNetworkLocator
 import ru.ozero.commonnet.IpInfo
 import ru.ozero.commonnet.IpInfoProvider
 import ru.ozero.commonvpn.HealthMonitor
@@ -42,7 +41,6 @@ class MainViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val urnetworkBridge: UrnetworkSdkBridge,
     private val ipInfoProvider: IpInfoProvider,
-    private val vpnNetworkLocator: VpnNetworkLocator,
 ) : ViewModel() {
 
     val state: StateFlow<TunnelState> =
@@ -227,25 +225,15 @@ class MainViewModel @Inject constructor(
     private suspend fun fetchOnce(engineId: EngineId, socksPort: Int): Result<IpInfo> = when {
         engineId == EngineId.BYEDPI && socksPort > 0 ->
             ipInfoProvider.fetchVia(BYEDPI_LOOPBACK, socksPort)
-        requiresVpnNetworkBinding(engineId) -> {
-            val factory = vpnNetworkLocator.vpnSocketFactory()
-            if (factory == null) {
-                Result.failure(
-                    java.io.IOException(
-                        "VPN network not yet visible — IP fetch отказан, чтобы не утечь реальный IP",
-                    ),
-                )
-            } else {
-                ipInfoProvider.fetchViaSocketFactory(factory)
-            }
-        }
+        engineId == EngineId.URNETWORK ->
+            Result.failure(
+                java.io.IOException(
+                    "URnetwork исключает self из TUN (Go SDK не имеет protect callback) — " +
+                        "проверьте IP в браузере",
+                ),
+            )
         else ->
             ipInfoProvider.fetch()
-    }
-
-    private fun requiresVpnNetworkBinding(engineId: EngineId): Boolean = when (engineId) {
-        EngineId.WARP, EngineId.URNETWORK -> true
-        else -> false
     }
 
     fun onConnectClick() = Unit

@@ -349,7 +349,11 @@ class OzeroVpnService : android.net.VpnService() {
         val plugin = enginePlugins.firstOrNull { it.id == engineId } ?: return null
         val spec = plugin.tunSpec() ?: return null
         val builder = applyEngineTunSpec(spec, ipv6Enabled)
-        ru.ozero.commonvpn.split.TunBuilderConfigurator(packageName).apply(builder, splitConfig)
+        ru.ozero.commonvpn.split.TunBuilderConfigurator(packageName).apply(
+            builder,
+            splitConfig,
+            excludeSelf = true,
+        )
         val before = TunInterfaceStats.snapshotTunInterfaces()
         val pfd = try {
             builder.establish()

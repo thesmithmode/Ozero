@@ -60,7 +60,6 @@ class MainViewModelTest {
             settingsRepository,
             FakeUrnetworkBridge(),
             ipInfoProvider,
-            FakeVpnNetworkLocator(),
         )
     }
 
@@ -100,12 +99,6 @@ class MainViewModelTest {
             lastSocketFactoryUsed = socketFactory != null
             return result
         }
-    }
-
-    private class FakeVpnNetworkLocator(
-        var factory: javax.net.SocketFactory? = javax.net.SocketFactory.getDefault(),
-    ) : ru.ozero.app.ip.VpnNetworkLocator {
-        override fun vpnSocketFactory(): javax.net.SocketFactory? = factory
     }
 
     private class FakeUrnetworkBridge(var peers: Int = 0) : UrnetworkSdkBridge {
@@ -264,7 +257,6 @@ class MainViewModelTest {
         val bridge = FakeUrnetworkBridge(peers = 0)
         val vm = MainViewModel(
             tunnelController, healthMonitor, settingsRepository, bridge, ipInfoProvider,
-            FakeVpnNetworkLocator(),
         )
         backgroundScope.launch { vm.urnetworkPeerSearchSeconds.collect {} }
         tunnelController.onProbing()
@@ -281,7 +273,6 @@ class MainViewModelTest {
         val bridge = FakeUrnetworkBridge(peers = 0)
         val vm = MainViewModel(
             tunnelController, healthMonitor, settingsRepository, bridge, ipInfoProvider,
-            FakeVpnNetworkLocator(),
         )
         backgroundScope.launch { vm.urnetworkPeerSearchSeconds.collect {} }
         tunnelController.onProbing()
@@ -298,7 +289,6 @@ class MainViewModelTest {
         val bridge = FakeUrnetworkBridge(peers = 0)
         val vm = MainViewModel(
             tunnelController, healthMonitor, settingsRepository, bridge, ipInfoProvider,
-            FakeVpnNetworkLocator(),
         )
         backgroundScope.launch { vm.urnetworkPeerSearchSeconds.collect {} }
         tunnelController.onProbing()
@@ -335,7 +325,7 @@ class MainViewModelTest {
     }
 
     @Test
-    fun ipInfoUsesVpnSocketFactoryForCustomTunEngines() = runTest {
+    fun ipInfoUsesPlainFetchForCustomTunEngines() = runTest {
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.WARP)
         tunnelController.onEngineStarted(EngineId.WARP, 0)
@@ -344,34 +334,15 @@ class MainViewModelTest {
         advanceUntilIdle()
         val s = viewModel.ipInfo.value
         assertIs<IpInfoState.Loaded>(s)
-        assertTrue(
+        assertEquals(
+            false,
             ipInfoProvider.lastSocketFactoryUsed,
-            "WARP/URnetwork — customTun engines, IP fetch обязан идти через VPN socketFactory, " +
-                "иначе IP-leak: запрос пройдёт мимо туннеля и покажет реальный IP пользователя.",
+            "WARP/URnetwork обязаны идти через plain fetch() — TUN routes self-traffic, " +
+                "поскольку TunBuilderConfigurator больше не addDisallowedApplication(self). " +
+                "Попытка bind на VPN network через socketFactory приводит к EPERM: " +
+                "Network.bindSocketToNetwork требует system-привилегий.",
         )
-    }
-
-    @Test
-    fun ipInfoLeakProtectionWhenVpnNetworkLocatorReturnsNull() = runTest {
-        val locator = FakeVpnNetworkLocator(factory = null)
-        val isolatedProvider = FakeIpInfoProvider()
-        val vm = MainViewModel(
-            tunnelController, healthMonitor, settingsRepository,
-            FakeUrnetworkBridge(), isolatedProvider, locator,
-        )
-        tunnelController.onProbing()
-        tunnelController.onConnecting(EngineId.WARP)
-        tunnelController.onEngineStarted(EngineId.WARP, 0)
-        advanceUntilIdle()
-        kotlinx.coroutines.delay(10_000)
-        advanceUntilIdle()
-        val s = vm.ipInfo.value
-        assertIs<IpInfoState.Error>(
-            s,
-            "Если VPN Network не виден через ConnectivityManager — IP fetch обязан вернуть Error, " +
-                "не отправлять fetch без factory. Иначе real IP протёкет в UI как 'IP туннеля'.",
-        )
-        assertEquals(false, isolatedProvider.lastSocketFactoryUsed)
+        assertNull(ipInfoProvider.lastSocksHost)
     }
 
     @Test

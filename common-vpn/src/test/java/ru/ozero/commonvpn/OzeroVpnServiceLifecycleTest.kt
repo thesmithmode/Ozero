@@ -407,18 +407,22 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `establishTunForEngine не передаёт excludeSelf=false для TunFdAcceptor движков`() {
+    fun `establishTunForEngine ЯВНО передаёт excludeSelf=true для TunFdAcceptor движков`() {
         val body = source
             .substringAfter("private suspend fun establishTunForEngine(")
             .substringBefore("internal fun applyEngineTunSpec")
         assertFalse(
             body.contains("excludeSelf = false"),
-            "establishTunForEngine ЗАПРЕЩЕНО передавать excludeSelf=false. " +
-                "URnetwork Go SDK не имеет механизма вызова VpnService.protect() на своих сокетах — " +
+            "establishTunForEngine ЗАПРЕЩЕНО передавать excludeSelf=false (URnetwork Go SDK без protect → routing loop).",
+        )
+        assertTrue(
+            body.contains("excludeSelf = true"),
+            "establishTunForEngine ОБЯЗАН ЯВНО передавать excludeSelf=true. " +
+                "URnetwork Go SDK не имеет механизма VpnService.protect() — " +
                 "Sdk.newDeviceLocalWithDefaults не принимает SocketProtector callback. " +
-                "Без исключения self из TUN, SDK-соединения к bringyour.com идут в TUN → " +
-                "URnetwork читает их и пытается роутить → routing loop → SDK никогда не поднимается. " +
-                "Регрессия v0.0.7 (коммит 65e5b13). Фикс: убрать excludeSelf=false, использовать default (true).",
+                "Дефолт TunBuilderConfigurator теперь false (для WARP, чтобы fix EPERM на IP fetch), " +
+                "поэтому URnetwork обязан явно overriden'ить параметром. " +
+                "Регрессия v0.0.7 (65e5b13). Без явного true → routing loop → SDK не поднимется.",
         )
     }
 }

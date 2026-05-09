@@ -2,6 +2,7 @@ package ru.ozero.app.ui
 
 import org.junit.jupiter.api.Test
 import java.io.File
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class MainViewModelIpInfoChannelTest {
@@ -37,14 +38,9 @@ class MainViewModelIpInfoChannelTest {
     }
 
     @Test
-    fun `fetchIpInfoViaEngine использует fetchVia с engine-aware proxy`() {
+    fun `fetchIpInfoViaEngine задерживает между retries`() {
         val body = source.substringAfter("private suspend fun fetchIpInfoViaEngine")
-            .substringBefore("private fun engineSocksProxy")
-        assertTrue(
-            body.contains("ipInfoProvider.fetchVia("),
-            "fetchIpInfoViaEngine обязан использовать fetchVia (engine-aware), не fetch() — " +
-                "иначе для ByeDPI запрос идёт мимо SOCKS proxy и определяет IP до туннеля.",
-        )
+            .substringBefore("private suspend fun fetchOnce")
         assertTrue(
             body.contains("delay(IP_INFO_RETRY_DELAY_MS)"),
             "fetchIpInfoViaEngine обязан задерживать между retries.",
@@ -54,7 +50,7 @@ class MainViewModelIpInfoChannelTest {
     @Test
     fun `fetchOnce выделяет BYEDPI через SOCKS-proxy на 127_0_0_1`() {
         val body = source.substringAfter("private suspend fun fetchOnce")
-            .substringBefore("private fun requiresVpnNetworkBinding")
+            .substringBefore("fun onConnectClick")
         assertTrue(
             body.contains("EngineId.BYEDPI"),
             "fetchOnce обязан выделять BYEDPI как socks-engine. Body:\n$body",
@@ -62,6 +58,33 @@ class MainViewModelIpInfoChannelTest {
         assertTrue(
             body.contains("BYEDPI_LOOPBACK") || body.contains("\"127.0.0.1\""),
             "ByeDPI socks proxy host должен быть 127.0.0.1 (константа или литерал). Body:\n$body",
+        )
+        assertTrue(
+            body.contains("ipInfoProvider.fetchVia("),
+            "BYEDPI обязан использовать fetchVia с SOCKS host/port — иначе IP-fetch идёт мимо ByeDPI прокси.",
+        )
+    }
+
+    @Test
+    fun `fetchOnce не использует fetchViaSocketFactory — Network_bindSocketToNetwork даёт EPERM на VPN net`() {
+        val body = source.substringAfter("private suspend fun fetchOnce")
+            .substringBefore("fun onConnectClick")
+        assertFalse(
+            body.contains("fetchViaSocketFactory"),
+            "fetchOnce обязан НЕ использовать fetchViaSocketFactory: " +
+                "Network.socketFactory.createSocket() для VPN-network вызывает bindSocketToNetwork " +
+                "и получает EPERM (Operation not permitted) — system-only привилегия. " +
+                "Self-traffic роутится через TUN автоматически, " +
+                "т.к. TunBuilderConfigurator более не excludeSelf по умолчанию.",
+        )
+    }
+
+    @Test
+    fun `MainViewModel не зависит от VpnNetworkLocator`() {
+        assertFalse(
+            source.contains("VpnNetworkLocator"),
+            "MainViewModel обязан НЕ инъектить VpnNetworkLocator: bind на VPN network даёт EPERM, " +
+                "fix — не excludeSelf в TunBuilder, тогда self-traffic роутится через TUN автоматически.",
         )
     }
 }

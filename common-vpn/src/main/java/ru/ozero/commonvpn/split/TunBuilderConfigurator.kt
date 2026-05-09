@@ -12,7 +12,7 @@ class TunBuilderConfigurator(
     fun apply(
         builder: VpnService.Builder,
         config: SplitTunnelConfig,
-        excludeSelf: Boolean = true,
+        excludeSelf: Boolean = false,
     ): VpnService.Builder {
         when (config.mode) {
             SplitTunnelMode.ALL -> {
