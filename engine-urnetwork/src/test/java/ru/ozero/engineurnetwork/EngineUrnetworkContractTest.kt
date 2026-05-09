@@ -253,9 +253,13 @@ class EngineUrnetworkContractTest {
             byClientJwtFlow.value = value
         }
         override fun windowType(): Flow<UrnetworkWindowType> = windowTypeFlow
-        override suspend fun setWindowType(value: UrnetworkWindowType) { windowTypeFlow.value = value }
+        override suspend fun setWindowType(value: UrnetworkWindowType) {
+            windowTypeFlow.value = value
+        }
         override fun fixedIpSize(): Flow<Boolean> = fixedIpFlow
-        override suspend fun setFixedIpSize(value: Boolean) { fixedIpFlow.value = value }
+        override suspend fun setFixedIpSize(value: Boolean) {
+            fixedIpFlow.value = value
+        }
     }
 
     private class FakeAuthService(
@@ -363,7 +367,7 @@ class EngineUrnetworkPerformanceProfileTest {
     }
 
     @Test
-    fun `start применяет windowType AUTO из configStore к bridge (AUTO не skipped на уровне EngineUrnetwork)`() = runTest {
+    fun `start применяет AUTO windowType из configStore (AUTO не skipped на уровне engine)`() = runTest {
         val store = FakeProfileConfigStore(windowType = UrnetworkWindowType.AUTO, fixedIp = false)
         val bridge = FakeProfileBridge()
         val engine = EngineUrnetwork(store, bridge, FakeProfileAuthService())
