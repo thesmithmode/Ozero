@@ -30,7 +30,12 @@ class VpnSocketProtectorHolderTest {
     @Test
     fun `protect delegates to bound protector`() {
         val captured = mutableListOf<Int>()
-        bind(VpnSocketProtector { fd -> captured += fd; true })
+        bind(
+            VpnSocketProtector { fd ->
+                captured += fd
+                true
+            },
+        )
 
         val result = VpnSocketProtectorHolder.protect(7)
 

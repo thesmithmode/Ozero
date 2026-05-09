@@ -29,8 +29,6 @@ class AutoStrategyPickerTest {
         assertEquals(0.0, score.successRate, "totalProbes=0 → successRate=0.0, не деление на ноль")
     }
 
-
-
     private fun fakeEngine(
         startBehavior: (EngineConfig) -> StartResult = { StartResult.Success(socksPort = 1080) },
     ) = object : EnginePlugin {
