@@ -21,6 +21,14 @@
     -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
+    <!--
+        Android 11+ (API 30+): без QUERY_ALL_PACKAGES getInstalledApplications возвращает
+        обрезанный список, и пользователь не может добавить системные сервисы / background-only
+        приложения в split-tunnel allowlist/blocklist. VPN-юзкейс — Google Play разрешает
+        QUERY_ALL_PACKAGES для VPN чтобы дать пользователю полный контроль над per-app routing.
+    -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
+
     <application
         android:name=".OzeroApp"
         android:allowBackup="false"

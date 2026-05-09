@@ -37,9 +37,13 @@ class StatsHistoryViewModelTest {
     }
 
     @Test
-    fun `init подписывается на observeRecent с лимитом 30`() = runTest {
+    fun `init подписывается на observeRecent с лимитом 200`() = runTest {
         advanceUntilIdle()
-        assertEquals(30, dao.lastLimit, "HISTORY_LIMIT обязан быть 30 — UI scroll не справится с большим числом")
+        assertEquals(
+            200,
+            dao.lastLimit,
+            "HISTORY_LIMIT обязан быть 200 — фильтрация client-side требует достаточно данных",
+        )
     }
 
     @Test
@@ -49,42 +53,128 @@ class StatsHistoryViewModelTest {
     }
 
     @Test
-    fun `обновления dao пропагируются в sessions StateFlow`() = runTest {
+    fun `обновления dao пропагируются в sessions StateFlow с дефолтной сортировкой по времени desc`() = runTest {
         advanceUntilIdle()
-        val items = listOf(sample(1L), sample(2L))
+        val items = listOf(sample(1L, startedAt = 100L), sample(2L, startedAt = 300L), sample(3L, startedAt = 200L))
         dao.flow.value = items
         advanceUntilIdle()
-        assertEquals(items, vm.sessions.value)
+        assertEquals(listOf(2L, 3L, 1L), vm.sessions.value.map { it.id })
     }
 
     @Test
-    fun `последовательные обновления отражаются в sessions`() = runTest {
+    fun `setSort TIME_ASC меняет порядок на по возрастанию`() = runTest {
         advanceUntilIdle()
-        dao.flow.value = listOf(sample(1L))
+        dao.flow.value = listOf(sample(1L, startedAt = 100L), sample(2L, startedAt = 300L))
+        vm.setSort(SessionSort.TIME_ASC)
+        advanceUntilIdle()
+        assertEquals(listOf(1L, 2L), vm.sessions.value.map { it.id })
+    }
+
+    @Test
+    fun `setSort TRAFFIC_DESC сортирует по сумме rx плюс tx по убыванию`() = runTest {
+        advanceUntilIdle()
+        dao.flow.value = listOf(
+            sample(1L, rxBytes = 100L, txBytes = 100L),
+            sample(2L, rxBytes = 500L, txBytes = 0L),
+            sample(3L, rxBytes = 50L, txBytes = 50L),
+        )
+        vm.setSort(SessionSort.TRAFFIC_DESC)
+        advanceUntilIdle()
+        assertEquals(listOf(2L, 1L, 3L), vm.sessions.value.map { it.id })
+    }
+
+    @Test
+    fun `setSort DURATION_DESC сортирует по длительности по убыванию`() = runTest {
+        advanceUntilIdle()
+        dao.flow.value = listOf(
+            sample(1L, durationMs = 1000L),
+            sample(2L, durationMs = 5000L),
+            sample(3L, durationMs = 2000L),
+        )
+        vm.setSort(SessionSort.DURATION_DESC)
+        advanceUntilIdle()
+        assertEquals(listOf(2L, 3L, 1L), vm.sessions.value.map { it.id })
+    }
+
+    @Test
+    fun `toggleEngineFilter оставляет только сессии с выбранным движком`() = runTest {
+        advanceUntilIdle()
+        dao.flow.value = listOf(
+            sample(1L, engineId = "BYEDPI"),
+            sample(2L, engineId = "WARP"),
+            sample(3L, engineId = "BYEDPI"),
+        )
+        vm.toggleEngineFilter("BYEDPI")
+        advanceUntilIdle()
+        assertEquals(setOf("BYEDPI"), vm.filter.value.engines)
+        assertEquals(listOf(3L, 1L), vm.sessions.value.map { it.id })
+    }
+
+    @Test
+    fun `повторный toggleEngineFilter снимает фильтр`() = runTest {
+        advanceUntilIdle()
+        dao.flow.value = listOf(sample(1L, engineId = "BYEDPI"), sample(2L, engineId = "WARP"))
+        vm.toggleEngineFilter("WARP")
         advanceUntilIdle()
         assertEquals(1, vm.sessions.value.size)
-        dao.flow.value = listOf(sample(1L), sample(2L), sample(3L))
+        vm.toggleEngineFilter("WARP")
         advanceUntilIdle()
-        assertEquals(3, vm.sessions.value.size)
-        dao.flow.value = emptyList()
-        advanceUntilIdle()
-        assertTrue(vm.sessions.value.isEmpty())
+        assertEquals(2, vm.sessions.value.size)
+        assertTrue(vm.filter.value.engines.isEmpty())
     }
 
     @Test
-    fun `observeRecent вызывается ровно один раз (Eagerly)`() = runTest {
+    fun `setPeriod отсекает старые сессии за пределами окна`() = runTest {
         advanceUntilIdle()
-        assertEquals(1, dao.observeCalls, "observeRecent должен вызываться один раз — повторные подписки утечка")
+        val now = System.currentTimeMillis()
+        dao.flow.value = listOf(
+            sample(1L, startedAt = now - 60_000L),
+            sample(2L, startedAt = now - 8L * 24L * 60L * 60L * 1000L),
+        )
+        val dayMs = 24L * 60L * 60L * 1000L
+        vm.setPeriod(dayMs)
+        advanceUntilIdle()
+        assertEquals(listOf(1L), vm.sessions.value.map { it.id })
     }
 
-    private fun sample(id: Long) = SessionStatsEntity(
+    @Test
+    fun `clearFilters сбрасывает engines и periodMs`() = runTest {
+        advanceUntilIdle()
+        vm.toggleEngineFilter("BYEDPI")
+        vm.setPeriod(60_000L)
+        advanceUntilIdle()
+        vm.clearFilters()
+        advanceUntilIdle()
+        assertEquals(SessionFilter(), vm.filter.value)
+    }
+
+    @Test
+    fun `availableEngines собирает уникальные engineId из dao`() = runTest {
+        advanceUntilIdle()
+        dao.flow.value = listOf(
+            sample(1L, engineId = "BYEDPI"),
+            sample(2L, engineId = "WARP"),
+            sample(3L, engineId = "BYEDPI"),
+        )
+        advanceUntilIdle()
+        assertEquals(listOf("BYEDPI", "WARP"), vm.availableEngines.value)
+    }
+
+    private fun sample(
+        id: Long,
+        engineId: String = "BYE_DPI",
+        startedAt: Long = id * 1000L,
+        durationMs: Long = 5000L,
+        rxBytes: Long = 100L,
+        txBytes: Long = 200L,
+    ) = SessionStatsEntity(
         id = id,
-        engineId = "BYE_DPI",
-        startedAt = id * 1000L,
-        endedAt = id * 1000L + 5000L,
-        rxBytes = 100L,
-        txBytes = 200L,
-        durationMs = 5000L,
+        engineId = engineId,
+        startedAt = startedAt,
+        endedAt = startedAt + durationMs,
+        rxBytes = rxBytes,
+        txBytes = txBytes,
+        durationMs = durationMs,
         finalStatus = SessionStatsEntity.STATUS_DISCONNECTED,
     )
 

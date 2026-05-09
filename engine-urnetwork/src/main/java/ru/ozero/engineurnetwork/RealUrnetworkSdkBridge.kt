@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import ru.ozero.enginescore.GoRuntimeGuard
 import ru.ozero.enginescore.PersistentLoggers
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
@@ -54,6 +55,19 @@ class RealUrnetworkSdkBridge(
         }
         if (byClientJwt.isBlank()) {
             return UrnetworkSdkBridge.StartResult.Failed("byClientJwt is blank")
+        }
+        when (val r = GoRuntimeGuard.acquire(GoRuntimeGuard.Owner.URNETWORK)) {
+            is GoRuntimeGuard.Result.Conflict -> {
+                PersistentLoggers.error(
+                    TAG,
+                    "GoRuntime conflict — already active=${r.activeOwner}; second Go runtime в одном " +
+                        "процессе крашит libgojni в gcWriteBarrier. Откат, требуется process restart.",
+                )
+                return UrnetworkSdkBridge.StartResult.Failed(
+                    "Go runtime conflict — ${r.activeOwner} уже активен в этом процессе",
+                )
+            }
+            GoRuntimeGuard.Result.Granted -> Unit
         }
 
         return withTimeoutOrNull(SDK_INIT_TIMEOUT_MS) {
@@ -299,15 +313,12 @@ class RealUrnetworkSdkBridge(
                 if (cv != null) {
                     val preferredCountry = preferredCountryRef.get()
                     if (preferredCountry != null) {
-                        PersistentLoggers.info(
-                            TAG,
-                            "IoLoop fd=$tunFd tunnelStarted=true — preferredCountry=$preferredCountry",
-                        )
+                        Log.i(TAG, "IoLoop fd=$tunFd tunnelStarted preferredCountry=$preferredCountry")
                         connectByPreferredCountry(preferredCountry, cv)
                     } else {
                         runCatching { cv.connectBestAvailable() }
                             .onFailure { PersistentLoggers.warn(TAG, "connectBestAvailable threw: ${it.message}") }
-                        PersistentLoggers.info(TAG, "IoLoop fd=$tunFd tunnelStarted=true connectBestAvailable called")
+                        Log.i(TAG, "IoLoop fd=$tunFd tunnelStarted connectBestAvailable called")
                     }
                 } else {
                     PersistentLoggers.error(TAG, "No ConnectViewController — P2P connection will not be established")

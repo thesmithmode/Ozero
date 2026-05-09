@@ -49,8 +49,10 @@ class DefaultAppListProvider @Inject constructor(
 
 internal fun isUserVisibleApp(pm: PackageManager, info: ApplicationInfo, ownPackage: String): Boolean {
     if (info.packageName == ownPackage) return false
-    val launchable = runCatching { pm.getLaunchIntentForPackage(info.packageName) }.getOrNull() != null
-    return launchable
+    val isSystem = (info.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+    val isUpdatedSystem = (info.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+    if (!isSystem || isUpdatedSystem) return true
+    return runCatching { pm.getLaunchIntentForPackage(info.packageName) }.getOrNull() != null
 }
 
 private fun drawableToImageBitmap(drawable: Drawable): ImageBitmap? = runCatching {

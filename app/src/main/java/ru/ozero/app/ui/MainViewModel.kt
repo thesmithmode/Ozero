@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import ru.ozero.app.ip.VpnNetworkLocator
 import ru.ozero.commonnet.IpInfo
 import ru.ozero.commonnet.IpInfoProvider
 import ru.ozero.commonvpn.HealthMonitor
@@ -39,6 +40,7 @@ class MainViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val urnetworkBridge: UrnetworkSdkBridge,
     private val ipInfoProvider: IpInfoProvider,
+    private val vpnNetworkLocator: VpnNetworkLocator,
 ) : ViewModel() {
 
     val state: StateFlow<TunnelState> =
@@ -189,10 +191,9 @@ class MainViewModel @Inject constructor(
     }
 
     private suspend fun fetchIpInfoViaEngine(engineId: EngineId, socksPort: Int): IpInfoState {
-        val (host, port) = engineSocksProxy(engineId, socksPort)
         var lastError: Throwable? = null
         repeat(IP_INFO_RETRY_ATTEMPTS) { attempt ->
-            val result = ipInfoProvider.fetchVia(host, port)
+            val result = fetchOnce(engineId, socksPort)
             result.fold(
                 onSuccess = { return IpInfoState.Loaded(it) },
                 onFailure = {
@@ -208,9 +209,28 @@ class MainViewModel @Inject constructor(
         return IpInfoState.Error(msg)
     }
 
-    private fun engineSocksProxy(engineId: EngineId, socksPort: Int): Pair<String?, Int?> = when (engineId) {
-        EngineId.BYEDPI -> if (socksPort > 0) "127.0.0.1" to socksPort else null to null
-        else -> null to null
+    private suspend fun fetchOnce(engineId: EngineId, socksPort: Int): Result<IpInfo> = when {
+        engineId == EngineId.BYEDPI && socksPort > 0 ->
+            ipInfoProvider.fetchVia(BYEDPI_LOOPBACK, socksPort)
+        requiresVpnNetworkBinding(engineId) -> {
+            val factory = vpnNetworkLocator.vpnSocketFactory()
+            if (factory == null) {
+                Result.failure(
+                    java.io.IOException(
+                        "VPN network not yet visible — IP fetch отказан, чтобы не утечь реальный IP",
+                    ),
+                )
+            } else {
+                ipInfoProvider.fetchViaSocketFactory(factory)
+            }
+        }
+        else ->
+            ipInfoProvider.fetch()
+    }
+
+    private fun requiresVpnNetworkBinding(engineId: EngineId): Boolean = when (engineId) {
+        EngineId.WARP, EngineId.URNETWORK -> true
+        else -> false
     }
 
     fun onConnectClick() = Unit
@@ -234,8 +254,9 @@ class MainViewModel @Inject constructor(
         const val URNETWORK_PEER_POLL_KEEP_MS = 5_000L
         const val URNETWORK_SEARCH_TICK_MS = 1_000L
         const val URNETWORK_STARTUP_GRACE_TICKS = 10
-        const val IP_INFO_WARMUP_MS = 8_000L
-        const val IP_INFO_RETRY_ATTEMPTS = 2
-        const val IP_INFO_RETRY_DELAY_MS = 5_000L
+        const val IP_INFO_WARMUP_MS = 2_000L
+        const val IP_INFO_RETRY_ATTEMPTS = 4
+        const val IP_INFO_RETRY_DELAY_MS = 1_000L
+        const val BYEDPI_LOOPBACK = "127.0.0.1"
     }
 }

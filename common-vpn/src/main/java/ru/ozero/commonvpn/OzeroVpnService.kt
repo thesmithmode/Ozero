@@ -378,7 +378,7 @@ class OzeroVpnService : android.net.VpnService() {
         val picked = TunInterfaceStats.pickNewTunInterface(before, after)
         tunIfaceNameRef.set(picked)
         if (picked == null) {
-            PersistentLoggers.warn(TAG, "tun interface discovery failed — stats logger будет получать null")
+            Log.d(TAG, "tun interface discovery failed — stats logger будет получать null")
         }
     }
 

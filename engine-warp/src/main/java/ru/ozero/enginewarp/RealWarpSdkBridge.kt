@@ -7,6 +7,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.amnezia.awg.GoBackend
+import ru.ozero.enginescore.GoRuntimeGuard
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.VpnSocketProtector
 import java.io.File
@@ -34,6 +35,19 @@ class RealWarpSdkBridge internal constructor(
         if (structuralError != null) {
             PersistentLoggers.error(TAG, "INI rejected: $structuralError")
             return@withContext WarpSdkBridge.AttachResult.Failed("INI invalid: $structuralError")
+        }
+        when (val r = GoRuntimeGuard.acquire(GoRuntimeGuard.Owner.AMNEZIA_WG)) {
+            is GoRuntimeGuard.Result.Conflict -> {
+                PersistentLoggers.error(
+                    TAG,
+                    "GoRuntime conflict — already active=${r.activeOwner}; second Go runtime в одном " +
+                        "процессе крашит libam-go в gcWriteBarrier. Откат, требуется process restart.",
+                )
+                return@withContext WarpSdkBridge.AttachResult.Failed(
+                    "Go runtime conflict — ${r.activeOwner} уже активен в этом процессе",
+                )
+            }
+            GoRuntimeGuard.Result.Granted -> Unit
         }
         val staleHandle = tunnelHandle
         if (staleHandle != INVALID_HANDLE) {
@@ -74,7 +88,6 @@ class RealWarpSdkBridge internal constructor(
                 tunnelHandle = INVALID_HANDLE
                 return@withContext WarpSdkBridge.AttachResult.Failed("protect underlying sockets failed")
             }
-            Log.i(TAG, "awgTurnOn OK handle=$handle name=$tunnelName")
             WarpSdkBridge.AttachResult.Success
         } catch (ce: CancellationException) {
             throw ce
@@ -234,12 +247,11 @@ class ReLinkerAwgRuntime(context: Context) : AwgRuntime {
             if (loaded) return
             val started = System.currentTimeMillis()
             val thread = Thread.currentThread().name
-            PersistentLoggers.warn(TAG, "ReLinker.loadLibrary $LIB_NAME entry thread=$thread")
             try {
                 ReLinker.loadLibrary(appContext, LIB_NAME)
                 loaded = true
                 val dt = System.currentTimeMillis() - started
-                PersistentLoggers.warn(TAG, "ReLinker.loadLibrary $LIB_NAME exit ok dt=${dt}ms thread=$thread")
+                Log.d(TAG, "ReLinker.loadLibrary $LIB_NAME ok dt=${dt}ms thread=$thread")
             } catch (e: Throwable) {
                 val dt = System.currentTimeMillis() - started
                 PersistentLoggers.error(
@@ -253,9 +265,7 @@ class ReLinkerAwgRuntime(context: Context) : AwgRuntime {
 
     override fun turnOn(name: String, tunFd: Int, ini: String, uapiPath: String): Int {
         loadOnce()
-        val result = GoBackend.awgTurnOn(name, tunFd, ini, uapiPath)
-        Log.i(TAG, "awgTurnOn name=$name fd=$tunFd → handle=$result")
-        return result
+        return GoBackend.awgTurnOn(name, tunFd, ini, uapiPath)
     }
 
     override fun version(): String = runCatching {
@@ -288,11 +298,5 @@ class ReLinkerAwgRuntime(context: Context) : AwgRuntime {
     private companion object {
         const val TAG = "ReLinkerAwgRuntime"
         const val LIB_NAME = "am-go"
-    }
-}
-
-object AwgRuntimePreloader {
-    fun preload(context: Context) {
-        runCatching { ReLinkerAwgRuntime(context).preload() }
     }
 }

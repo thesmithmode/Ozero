@@ -17,7 +17,6 @@ import ru.ozero.app.logging.BootDiagnostics
 import ru.ozero.app.logging.BootFileLogger
 import ru.ozero.app.logging.LogBuffer
 import ru.ozero.app.ui.onboarding.FirstRunBootstrap
-import ru.ozero.enginewarp.AwgRuntimePreloader
 import ru.ozero.engineurnetwork.UrnetworkRuntime
 import javax.inject.Inject
 
@@ -68,10 +67,6 @@ class OzeroApp : Application(), Configuration.Provider {
         appScope.launch {
             runCatching { UrnetworkRuntime.ensure(this@OzeroApp) }
                 .onFailure { BootFileLogger.error(TAG, "UrnetworkRuntime.ensure failed", it) }
-        }
-        appScope.launch {
-            runCatching { AwgRuntimePreloader.preload(this@OzeroApp) }
-                .onFailure { BootFileLogger.error(TAG, "AwgRuntime preload failed", it) }
         }
         appScope.launch {
             runCatching { firstRunBootstrap.runIfFirstStart() }
