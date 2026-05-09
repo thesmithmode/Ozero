@@ -130,8 +130,8 @@
     <string name="split_tunnel_system_app">Системное</string>
     <string name="split_tunnel_short_all">Все</string>
     <string name="split_tunnel_short_bypass_lan">Без LAN</string>
-    <string name="split_tunnel_short_allowlist">Allowlist</string>
-    <string name="split_tunnel_short_blocklist">Blocklist</string>
+    <string name="split_tunnel_short_allowlist">Включить</string>
+    <string name="split_tunnel_short_blocklist">Исключить</string>
     <string name="split_tunnel_selected_count">Выбрано: %1$d</string>
     <string name="split_tunnel_clear_all">Очистить</string>
     <string name="split_tunnel_mode_hint">Список приложений активен только в режимах Allowlist и Blocklist.</string>

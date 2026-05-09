@@ -11,18 +11,35 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
+import javax.inject.Singleton
 
 interface AppListProvider {
     suspend fun loadApps(): List<InstalledApp>
 }
 
+@Singleton
 class DefaultAppListProvider @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : AppListProvider {
 
-    override suspend fun loadApps(): List<InstalledApp> = withContext(Dispatchers.IO) {
+    @Volatile private var cache: List<InstalledApp>? = null
+    private val mutex = Mutex()
+
+    override suspend fun loadApps(): List<InstalledApp> {
+        cache?.let { return it }
+        return mutex.withLock {
+            cache?.let { return@withLock it }
+            val loaded = doLoad()
+            cache = loaded
+            loaded
+        }
+    }
+
+    private suspend fun doLoad(): List<InstalledApp> = withContext(Dispatchers.IO) {
         val pm = context.packageManager
         val ownPackage = context.packageName
         val infos = pm.getInstalledApplications(PackageManager.GET_META_DATA)

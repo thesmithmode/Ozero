@@ -17,6 +17,7 @@ import ru.ozero.app.logging.BootDiagnostics
 import ru.ozero.app.logging.BootFileLogger
 import ru.ozero.app.logging.LogBuffer
 import ru.ozero.app.ui.onboarding.FirstRunBootstrap
+import ru.ozero.app.ui.splittunnel.AppListProvider
 import ru.ozero.engineurnetwork.UrnetworkRuntime
 import javax.inject.Inject
 
@@ -28,6 +29,8 @@ class OzeroApp : Application(), Configuration.Provider {
     @Inject lateinit var logBuffer: LogBuffer
 
     @Inject lateinit var firstRunBootstrap: FirstRunBootstrap
+
+    @Inject lateinit var appListProvider: AppListProvider
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -71,6 +74,10 @@ class OzeroApp : Application(), Configuration.Provider {
         appScope.launch {
             runCatching { firstRunBootstrap.runIfFirstStart() }
                 .onFailure { BootFileLogger.warn(TAG, "firstRunBootstrap.runIfFirstStart failed", it) }
+        }
+        appScope.launch {
+            runCatching { appListProvider.loadApps() }
+                .onFailure { BootFileLogger.warn(TAG, "appListProvider prewarm failed", it) }
         }
     }
 

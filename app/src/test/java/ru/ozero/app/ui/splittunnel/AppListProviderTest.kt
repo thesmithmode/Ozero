@@ -79,6 +79,25 @@ class AppListProviderTest {
     }
 
     @Test
+    fun `loadApps кэширует — повторный вызов не сканирует PackageManager заново`() {
+        val source = File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/ui/splittunnel/AppListProvider.kt",
+        ).readText()
+        assertTrue(
+            source.contains("@Volatile private var cache: List<InstalledApp>?") &&
+                source.contains("cache?.let { return"),
+            "DefaultAppListProvider обязан кэшировать loadApps() — повторный сканс PackageManager " +
+                "при каждом открытии split-tunnel экрана = bottleneck (200+ приложений * loadIcon). " +
+                "PORTAL_WG-style: загрузить один раз, переиспользовать. Source:\n${source.take(2000)}",
+        )
+        assertTrue(
+            source.contains("@Singleton"),
+            "DefaultAppListProvider обязан быть @Singleton — иначе кэш per-instance бесполезен.",
+        )
+    }
+
+    @Test
     fun `manifest содержит QUERY_ALL_PACKAGES permission`() {
         val moduleRoot = File(System.getProperty("user.dir") ?: ".")
         val manifest = File(moduleRoot, "src/main/AndroidManifest.xml")

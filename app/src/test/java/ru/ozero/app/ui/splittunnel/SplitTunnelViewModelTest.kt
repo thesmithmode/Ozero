@@ -178,6 +178,52 @@ class SplitTunnelViewModelTest {
     }
 
     @Test
+    fun `included apps всплывают наверх списка`() = runTest {
+        dao.emit(listOf(AppSplitRule("com.user.foo", isExcluded = false)))
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value as SplitTunnelUiState.Content
+        assertEquals(
+            "com.user.foo",
+            state.apps.first().packageName,
+            "Включённые приложения обязаны быть сверху — UX порт PORTAL_WG. Got: " +
+                state.apps.map { it.packageName },
+        )
+        assertTrue(state.apps.first().included)
+    }
+
+    @Test
+    fun `BYPASS_LAN persisted мигрирует в ALL — UI не показывает 4й таб`() = runTest {
+        settings.modeUpdates.clear()
+        settings.setSplitMode(SplitTunnelMode.BYPASS_LAN)
+        val vm = SplitTunnelViewModel(apps, dao, settings)
+        advanceUntilIdle()
+
+        val state = vm.uiState.value as SplitTunnelUiState.Content
+        assertEquals(SplitTunnelMode.ALL, state.mode, "BYPASS_LAN persisted → ALL в UI")
+        assertTrue(
+            settings.modeUpdates.contains(SplitTunnelMode.ALL),
+            "VM обязана записать ALL в settings когда обнаружила BYPASS_LAN — миграция " +
+                "(BYPASS_LAN скрыт из UI tabs). modeUpdates=${settings.modeUpdates}",
+        )
+    }
+
+    @Test
+    fun `onModeChange BYPASS_LAN игнорируется — UI больше не предлагает этот режим`() = runTest {
+        advanceUntilIdle()
+        settings.modeUpdates.clear()
+
+        viewModel.onModeChange(SplitTunnelMode.BYPASS_LAN)
+        advanceUntilIdle()
+
+        assertEquals(
+            emptyList<SplitTunnelMode>(),
+            settings.modeUpdates,
+            "onModeChange(BYPASS_LAN) обязан быть no-op — режим скрыт из UI tabs.",
+        )
+    }
+
+    @Test
     fun `onQuery filters apps case-insensitive`() = runTest {
         advanceUntilIdle()
 

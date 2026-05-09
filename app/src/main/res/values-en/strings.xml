@@ -116,8 +116,8 @@
     <string name="split_tunnel_system_app">System</string>
     <string name="split_tunnel_short_all">All</string>
     <string name="split_tunnel_short_bypass_lan">Bypass LAN</string>
-    <string name="split_tunnel_short_allowlist">Allowlist</string>
-    <string name="split_tunnel_short_blocklist">Blocklist</string>
+    <string name="split_tunnel_short_allowlist">Include</string>
+    <string name="split_tunnel_short_blocklist">Exclude</string>
     <string name="split_tunnel_selected_count">Selected: %1$d</string>
     <string name="split_tunnel_clear_all">Clear</string>
     <string name="split_tunnel_mode_hint">The app list applies only in Allowlist and Blocklist modes.</string>

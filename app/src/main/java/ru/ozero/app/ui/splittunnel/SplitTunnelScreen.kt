@@ -251,13 +251,13 @@ private fun ModeSegment(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
-        SplitTunnelMode.entries.forEachIndexed { index, value ->
+        VISIBLE_MODES.forEachIndexed { index, value ->
             SegmentedButton(
                 selected = value == mode,
                 onClick = { onModeChange(value) },
                 shape = SegmentedButtonDefaults.itemShape(
                     index = index,
-                    count = SplitTunnelMode.entries.size,
+                    count = VISIBLE_MODES.size,
                 ),
                 modifier = Modifier.testTag(SplitTunnelTestTags.MODE_SEGMENT_PREFIX + value.name),
             ) {
@@ -266,6 +266,12 @@ private fun ModeSegment(
         }
     }
 }
+
+private val VISIBLE_MODES = listOf(
+    SplitTunnelMode.ALLOWLIST,
+    SplitTunnelMode.ALL,
+    SplitTunnelMode.BLOCKLIST,
+)
 
 @Composable
 private fun AppRowView(

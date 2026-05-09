@@ -34,32 +34,44 @@ class SplitTunnelViewModel @Inject constructor(
 
     init {
         viewModelScope.launch { apps.value = appListProvider.loadApps() }
+        viewModelScope.launch {
+            val current = settingsRepository.settings.map { it.splitMode }.first()
+            if (current == SplitTunnelMode.BYPASS_LAN) {
+                settingsRepository.setSplitMode(SplitTunnelMode.ALL)
+            }
+        }
         combine(
             apps.filterNotNull(),
             dao.observeAll(),
             settingsRepository.settings.map { it.splitMode },
             query,
-        ) { appsList, rules, mode, q ->
+        ) { appsList, rules, persistedMode, q ->
+            val mode = if (persistedMode == SplitTunnelMode.BYPASS_LAN) SplitTunnelMode.ALL else persistedMode
             val included = rules.map { it.packageName }.toSet()
             val filtered = if (q.isBlank()) appsList else appsList.filter { it.matches(q) }
+            val rows = filtered.map { app ->
+                AppRow(
+                    packageName = app.packageName,
+                    label = app.label,
+                    isSystem = app.isSystem,
+                    included = app.packageName in included,
+                    icon = app.icon,
+                )
+            }.sortedWith(
+                compareByDescending<AppRow> { it.included }
+                    .thenBy { it.label.lowercase() },
+            )
             SplitTunnelUiState.Content(
                 mode = mode,
                 query = q,
-                apps = filtered.map { app ->
-                    AppRow(
-                        packageName = app.packageName,
-                        label = app.label,
-                        isSystem = app.isSystem,
-                        included = app.packageName in included,
-                        icon = app.icon,
-                    )
-                },
+                apps = rows,
                 selectedCount = included.size,
             )
         }.onEach { _uiState.value = it }.launchIn(viewModelScope)
     }
 
     fun onModeChange(mode: SplitTunnelMode) {
+        if (mode == SplitTunnelMode.BYPASS_LAN) return
         viewModelScope.launch { settingsRepository.setSplitMode(mode) }
     }
 
