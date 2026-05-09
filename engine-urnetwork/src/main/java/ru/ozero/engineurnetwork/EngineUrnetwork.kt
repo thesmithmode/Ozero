@@ -139,7 +139,7 @@ class EngineUrnetwork(
     )
 
     override suspend fun attachTun(tunFd: Int): TunAttachResult {
-        Log.i(TAG, "attachTun fd=$tunFd")
+        PersistentLoggers.info(TAG, "attachTun fd=$tunFd")
         return when (val r = sdkBridge.attachTun(tunFd)) {
             UrnetworkSdkBridge.AttachResult.Success -> TunAttachResult.Success
             is UrnetworkSdkBridge.AttachResult.Failed -> TunAttachResult.Failure(r.reason)

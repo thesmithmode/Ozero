@@ -83,7 +83,7 @@ class OzeroVpnService : android.net.VpnService() {
         private const val NATIVE_STOP_TIMEOUT_MS = 3_000L
         private const val SHUTDOWN_JOIN_TIMEOUT_MS = 7_000L
         private const val STATS_SAMPLE_INTERVAL_MS = 1_000L
-        private const val STATS_LOG_EVERY = 5
+        private const val STATS_LOG_EVERY = 30
         private const val STATS_NOTIFY_EVERY = 1
         private const val SETTINGS_READ_TIMEOUT_MS = 1_500L
         private const val ON_DESTROY_SHUTDOWN_TIMEOUT_MS = 4_000L
@@ -355,7 +355,7 @@ class OzeroVpnService : android.net.VpnService() {
             PersistentLoggers.warn(TAG, "auto-mode: нет валидных кандидатов")
             return null
         }
-        val protector = ru.ozero.enginescore.SocketProtector { socket -> protect(socket) }
+        val protector = ru.ozero.enginescore.SocketProtector { _ -> true }
         for ((id, cfg) in candidates) {
             val plugin = enginePlugins.firstOrNull { it.id == id }
             val preflight = plugin?.preflight()

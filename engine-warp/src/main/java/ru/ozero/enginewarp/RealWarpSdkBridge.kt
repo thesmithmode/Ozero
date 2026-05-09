@@ -176,7 +176,7 @@ class RealWarpSdkBridge internal constructor(
                 TAG,
                 "INI digest ($tunnelName): bytes=$totalBytes lines=${lines.size} nonEmpty=$nonEmpty keys=$keys",
             )
-            PersistentLoggers.info(TAG, "INI passthrough ($tunnelName):\n${IniSanitizer.sanitize(ini)}")
+            Log.i(TAG, "INI passthrough ($tunnelName):\n${IniSanitizer.sanitize(ini)}")
         }
     }
 }

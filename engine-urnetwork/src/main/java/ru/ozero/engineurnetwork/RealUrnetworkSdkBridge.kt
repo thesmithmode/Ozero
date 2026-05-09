@@ -129,7 +129,7 @@ class RealUrnetworkSdkBridge(
             PersistentLoggers.warn(TAG, "WalletViewController init threw: ${it.message}")
         }
         running.set(true)
-        Log.i(TAG, "device created — awaiting attachTun(fd) before tunnelStarted")
+        PersistentLoggers.info(TAG, "device created — awaiting attachTun(fd) before tunnelStarted")
         return UrnetworkSdkBridge.StartResult.Success
     }
 
@@ -287,7 +287,7 @@ class RealUrnetworkSdkBridge(
             try {
                 val capturedDevice = device
                 val callback = IoLoopDoneCallback {
-                    Log.i(TAG, "IoLoop done — tunnel ended")
+                    PersistentLoggers.info(TAG, "IoLoop done — tunnel ended")
                     running.set(false)
                     closeDevice(capturedDevice)
                 }
@@ -299,7 +299,7 @@ class RealUrnetworkSdkBridge(
                 if (cv != null) {
                     val preferredCountry = preferredCountryRef.get()
                     if (preferredCountry != null) {
-                        Log.i(
+                        PersistentLoggers.info(
                             TAG,
                             "IoLoop fd=$tunFd tunnelStarted=true — preferredCountry=$preferredCountry",
                         )
@@ -307,7 +307,7 @@ class RealUrnetworkSdkBridge(
                     } else {
                         runCatching { cv.connectBestAvailable() }
                             .onFailure { PersistentLoggers.warn(TAG, "connectBestAvailable threw: ${it.message}") }
-                        Log.i(TAG, "IoLoop fd=$tunFd tunnelStarted=true connectBestAvailable called")
+                        PersistentLoggers.info(TAG, "IoLoop fd=$tunFd tunnelStarted=true connectBestAvailable called")
                     }
                 } else {
                     PersistentLoggers.error(TAG, "No ConnectViewController — P2P connection will not be established")

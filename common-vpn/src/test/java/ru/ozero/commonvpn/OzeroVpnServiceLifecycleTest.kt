@@ -340,15 +340,21 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `pickAutoCandidateWithPreflight вызывает plugin preflight и protect для каждого кандидата`() {
+    fun `pickAutoCandidateWithPreflight вызывает plugin preflight с no-op protector`() {
         assertTrue(
             source.contains("plugin?.preflight()"),
             "pickAutoCandidateWithPreflight обязан брать EnginePreflight через plugin.preflight()",
         )
+        val preflightFn = source.substringAfter("private suspend fun pickAutoCandidateWithPreflight")
+            .substringBefore("private fun autoCandidates")
         assertTrue(
-            source.contains("SocketProtector { socket -> protect(socket) }"),
-            "SocketProtector обязан делегировать VpnService.protect(socket) — " +
-                "иначе TCP-probe пойдёт через VPN tunnel и зацикливается",
+            preflightFn.contains("SocketProtector { _ -> true }"),
+            "preflight использует no-op protector: TUN ещё не создан при preflight — " +
+                "VpnService.protect() вернёт false и заблокирует все движки",
+        )
+        assertFalse(
+            preflightFn.contains("protect(socket)"),
+            "protect(socket) запрещён в preflight — TUN не создан, protect() вернёт false",
         )
     }
 
