@@ -400,20 +400,31 @@ private fun IpInfoCard(
                             text = CountryFlag.emoji(state.info.countryCode),
                             style = MaterialTheme.typography.titleMedium,
                         )
+                        if (state.info.ip.isNotBlank()) {
+                            Text(
+                                text = state.info.ip,
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = OzeroPalette.Text,
+                            )
+                        } else {
+                            Text(
+                                text = state.info.country
+                                    ?: stringResource(R.string.ip_card_country_unknown),
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = OzeroPalette.Text,
+                            )
+                        }
+                    }
+                    if (state.info.ip.isNotBlank()) {
+                        val country = state.info.country
+                            ?: stringResource(R.string.ip_card_country_unknown)
+                        val location = listOfNotNull(state.info.city, country).joinToString(", ")
                         Text(
-                            text = state.info.ip,
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                            color = OzeroPalette.Text,
+                            text = location,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = OzeroPalette.Text3,
                         )
                     }
-                    val country = state.info.country
-                        ?: stringResource(R.string.ip_card_country_unknown)
-                    val location = listOfNotNull(state.info.city, country).joinToString(", ")
-                    Text(
-                        text = location,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = OzeroPalette.Text3,
-                    )
                 }
                 is IpInfoState.Error -> {
                     Text(
@@ -423,18 +434,6 @@ private fun IpInfoCard(
                     )
                     Text(
                         text = stringResource(R.string.ip_card_refresh),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = OzeroPalette.Aqua,
-                    )
-                }
-                is IpInfoState.Unsupported -> {
-                    Text(
-                        text = stringResource(R.string.ip_card_unsupported),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = OzeroPalette.Text3,
-                    )
-                    Text(
-                        text = stringResource(R.string.ip_card_open_browser),
                         style = MaterialTheme.typography.bodySmall,
                         color = OzeroPalette.Aqua,
                     )

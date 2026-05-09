@@ -132,6 +132,15 @@ class EngineUrnetwork(
 
     override fun preflight(): ru.ozero.enginescore.EnginePreflight = UrnetworkPreflight()
 
+    override suspend fun ipProbeRoute(socksPort: Int): ru.ozero.enginescore.IpProbeRoute {
+        val loc = runCatching { sdkBridge.selectedLocation() }.getOrNull()
+            ?: return ru.ozero.enginescore.IpProbeRoute.Unavailable("URnetwork location pending")
+        val country = runCatching { loc.country }.getOrNull()
+            ?: runCatching { loc.name }.getOrNull()
+        val code = runCatching { loc.countryCode?.uppercase() }.getOrNull()
+        return ru.ozero.enginescore.IpProbeRoute.StaticLocation(country, code)
+    }
+
     override suspend fun tunSpec(): TunSpec = TunSpec(
         sessionName = "URnetwork",
         mtu = TUN_MTU,

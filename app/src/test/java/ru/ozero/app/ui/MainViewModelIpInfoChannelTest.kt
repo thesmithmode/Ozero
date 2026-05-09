@@ -38,57 +38,66 @@ class MainViewModelIpInfoChannelTest {
     }
 
     @Test
-    fun `fetchIpInfoViaEngine задерживает между retries`() {
-        val body = source.substringAfter("private suspend fun fetchIpInfoViaEngine")
-            .substringBefore("private suspend fun fetchOnce")
+    fun `resolveIpInfoWithRetry задерживает между retries`() {
+        val body = source.substringAfter("private suspend fun resolveIpInfoWithRetry")
+            .substringBefore("private suspend fun resolveOnce")
         assertTrue(
             body.contains("delay(IP_INFO_RETRY_DELAY_MS)"),
-            "fetchIpInfoViaEngine обязан задерживать между retries.",
+            "resolveIpInfoWithRetry обязан задерживать между retries.",
         )
     }
 
     @Test
-    fun `fetchOnce роутит SOCKS-engine через 127_0_0_1 + fetchVia`() {
-        val body = source.substringAfter("private suspend fun fetchOnce")
-            .substringBefore("private fun supportsIpProbe")
+    fun `resolveOnce роутит SOCKS-engine через IpProbeRoute_Socks + fetchVia`() {
+        val body = source.substringAfter("private suspend fun resolveOnce")
+            .substringBefore("private fun Result<IpInfo>.toState")
         assertTrue(
-            body.contains("socksPort > 0"),
-            "fetchOnce обязан различать SOCKS-engine по socksPort > 0. Body:\n$body",
-        )
-        assertTrue(
-            body.contains("BYEDPI_LOOPBACK") || body.contains("\"127.0.0.1\""),
-            "SOCKS proxy host должен быть 127.0.0.1 (константа или литерал). Body:\n$body",
+            body.contains("IpProbeRoute.Socks"),
+            "resolveOnce обязан различать SOCKS-engine через IpProbeRoute.Socks. Body:\n$body",
         )
         assertTrue(
             body.contains("ipInfoProvider.fetchVia("),
-            "SOCKS-engine обязан использовать fetchVia(host, port) — иначе IP-fetch " +
-                "идёт мимо SOCKS прокси.",
+            "SOCKS-route обязан использовать fetchVia(host, port) — иначе IP-fetch " +
+                "идёт мимо SOCKS прокси. Body:\n$body",
+        )
+        assertTrue(
+            body.contains("ipInfoProvider.fetch().toState()") ||
+                body.contains("ipInfoProvider.fetch()"),
+            "Default-route обязан использовать fetch() напрямую (WARP full-tun). Body:\n$body",
         )
     }
 
     @Test
-    fun `supportsIpProbe — BYEDPI всегда поддерживается, остальные только при socksPort больше 0`() {
-        val body = source.substringAfter("private fun supportsIpProbe")
-            .substringBefore("fun onConnectClick")
+    fun `resolveOnce обрабатывает все четыре варианта IpProbeRoute`() {
+        val body = source.substringAfter("private suspend fun resolveOnce")
+            .substringBefore("private fun Result<IpInfo>.toState")
         assertTrue(
-            body.contains("EngineId.BYEDPI"),
-            "supportsIpProbe обязан явно whitelist'ить BYEDPI " +
-                "(работает через SOCKS даже если порт=0 на промежуточных state). Body:\n$body",
+            body.contains("IpProbeRoute.Default"),
+            "resolveOnce обязан явно обрабатывать IpProbeRoute.Default → fetch(). Body:\n$body",
         )
         assertTrue(
-            body.contains("socksPort > 0"),
-            "supportsIpProbe обязан считать любой engine с активным SOCKS-портом " +
-                "пробируемым. Body:\n$body",
+            body.contains("IpProbeRoute.Socks"),
+            "resolveOnce обязан явно обрабатывать IpProbeRoute.Socks → fetchVia(). Body:\n$body",
+        )
+        assertTrue(
+            body.contains("IpProbeRoute.StaticLocation"),
+            "resolveOnce обязан явно обрабатывать IpProbeRoute.StaticLocation — " +
+                "URnetwork даёт страну без HTTP probe. Body:\n$body",
+        )
+        assertTrue(
+            body.contains("IpProbeRoute.Unavailable"),
+            "resolveOnce обязан явно обрабатывать IpProbeRoute.Unavailable → IpInfoState.Error. " +
+                "Body:\n$body",
         )
     }
 
     @Test
-    fun `fetchOnce не использует fetchViaSocketFactory — Network_bindSocketToNetwork даёт EPERM на VPN net`() {
-        val body = source.substringAfter("private suspend fun fetchOnce")
-            .substringBefore("fun onConnectClick")
+    fun `resolveOnce не использует fetchViaSocketFactory — bindSocketToNetwork даёт EPERM на VPN net`() {
+        val body = source.substringAfter("private suspend fun resolveOnce")
+            .substringBefore("private fun Result<IpInfo>.toState")
         assertFalse(
             body.contains("fetchViaSocketFactory"),
-            "fetchOnce обязан НЕ использовать fetchViaSocketFactory: " +
+            "resolveOnce обязан НЕ использовать fetchViaSocketFactory: " +
                 "Network.socketFactory.createSocket() для VPN-network вызывает bindSocketToNetwork " +
                 "и получает EPERM (Operation not permitted) — system-only привилегия. " +
                 "Self-traffic роутится через TUN автоматически, " +
@@ -102,6 +111,23 @@ class MainViewModelIpInfoChannelTest {
             source.contains("VpnNetworkLocator"),
             "MainViewModel обязан НЕ инъектить VpnNetworkLocator: bind на VPN network даёт EPERM, " +
                 "fix — не excludeSelf в TunBuilder, тогда self-traffic роутится через TUN автоматически.",
+        )
+    }
+
+    @Test
+    fun `MainViewModel принимает Set EnginePlugin через DI`() {
+        assertTrue(
+            source.contains("Set<@JvmSuppressWildcards EnginePlugin>") ||
+                source.contains("Set<EnginePlugin>"),
+            "MainViewModel обязан получать Set<EnginePlugin> через @Inject — " +
+                "IP-routing делегируется в plugin.ipProbeRoute(). " +
+                "Без @JvmSuppressWildcards Hilt не свяжет multibinding с Kotlin Set.",
+        )
+        assertTrue(
+            source.contains("plugin.ipProbeRoute(") ||
+                source.contains(".ipProbeRoute("),
+            "MainViewModel обязан звать plugin.ipProbeRoute(socksPort) — " +
+                "engine сам решает Default/Socks/StaticLocation/Unavailable.",
         )
     }
 }

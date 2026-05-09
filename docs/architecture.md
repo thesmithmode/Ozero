@@ -110,3 +110,25 @@ interface Engine {
 5. `EngineModuleTest` рефлексией убедится что покрытие полное (тест упадёт без п.4)
 
 Никакого touching `OrchestratorModule` или `VpnPipelineModule`.
+
+## 6. IP-resolution контракт (engine-agnostic)
+
+`MainViewModel` показывает текущий exit-IP в UI. Способ узнать IP физически разный per-engine — но интерфейс ОДИН: `EnginePlugin.ipProbeRoute(socksPort): IpProbeRoute`.
+
+```kotlin
+sealed class IpProbeRoute {
+    data object Default : IpProbeRoute()
+    data class Socks(host: String, port: Int) : IpProbeRoute()
+    data class StaticLocation(country: String?, countryCode: String?) : IpProbeRoute()
+    data class Unavailable(reason: String) : IpProbeRoute()
+}
+```
+
+Per-engine реализация:
+- `ByeDpiEngine` → `Socks("127.0.0.1", port)`. SOCKS proxy, app-сокет надо явно роутить через прокси, иначе пинг идёт мимо.
+- `EngineUrnetwork` → `StaticLocation` через `sdkBridge.selectedLocation()` (country+countryCode). Go SDK требует excludeSelf из своего же TUN (иначе routing loop, нет коннекта, sentinel защищает) → self-fetch уходит мимо TUN → real IP, не VPN. SDK сам отдаёт страну peer'а.
+- `EngineWarp` → не overrides → `Default` → обычный `IpInfoProvider.fetch()` через TUN (WG socket protect-ается, self-traffic роутится через TUN).
+
+`MainViewModel.resolveOnce(engineId, socksPort)` находит plugin в `Set<EnginePlugin>`, вызывает `ipProbeRoute`, по типу route делает один из трёх действий: `fetch()` / `fetchVia(host,port)` / собирает IpInfo из StaticLocation. App не знает engine-specific деталей.
+
+Расширяемость: новый engine — override `ipProbeRoute` если нужно специфичное поведение, иначе Default. Никаких switch/if по EngineId в `app/`.

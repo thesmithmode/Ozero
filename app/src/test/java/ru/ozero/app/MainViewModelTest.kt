@@ -1,10 +1,13 @@
 package ru.ozero.app
 
+import com.bringyour.sdk.ConnectLocation
+import com.bringyour.sdk.LocationsViewController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -24,15 +27,21 @@ import ru.ozero.commonvpn.HealthMonitor
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.commonvpn.TunnelStats
+import ru.ozero.enginescore.EngineCapabilities
+import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.EnginePlugin
+import ru.ozero.enginescore.EngineStats
+import ru.ozero.enginescore.IpProbeRoute
+import ru.ozero.enginescore.ProbeResult
+import ru.ozero.enginescore.StartResult
+import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.HostsMode
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginescore.settings.SplitTunnelMode
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
-import com.bringyour.sdk.ConnectLocation
-import com.bringyour.sdk.LocationsViewController
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
@@ -44,6 +53,9 @@ class MainViewModelTest {
     private lateinit var healthMonitor: HealthMonitor
     private lateinit var settingsRepository: FakeSettingsRepository
     private lateinit var ipInfoProvider: FakeIpInfoProvider
+    private lateinit var byedpiPlugin: FakeEnginePlugin
+    private lateinit var warpPlugin: FakeEnginePlugin
+    private lateinit var urnetworkPlugin: FakeEnginePlugin
     private lateinit var viewModel: MainViewModel
 
     @BeforeEach
@@ -53,13 +65,52 @@ class MainViewModelTest {
         healthMonitor = HealthMonitor()
         settingsRepository = FakeSettingsRepository()
         ipInfoProvider = FakeIpInfoProvider()
+        byedpiPlugin = FakeEnginePlugin(EngineId.BYEDPI) { port ->
+            IpProbeRoute.Socks("127.0.0.1", if (port > 0) port else 1080)
+        }
+        warpPlugin = FakeEnginePlugin(EngineId.WARP) { IpProbeRoute.Default }
+        urnetworkPlugin = FakeEnginePlugin(EngineId.URNETWORK) {
+            IpProbeRoute.Unavailable("URnetwork location pending")
+        }
         viewModel = MainViewModel(
             tunnelController,
             healthMonitor,
             settingsRepository,
             FakeUrnetworkBridge(),
             ipInfoProvider,
+            setOf(byedpiPlugin, warpPlugin, urnetworkPlugin),
         )
+    }
+
+    private fun newViewModel(
+        bridge: UrnetworkSdkBridge = FakeUrnetworkBridge(),
+        plugins: Set<EnginePlugin> = setOf(byedpiPlugin, warpPlugin, urnetworkPlugin),
+    ): MainViewModel = MainViewModel(
+        tunnelController,
+        healthMonitor,
+        settingsRepository,
+        bridge,
+        ipInfoProvider,
+        plugins,
+    )
+
+    private class FakeEnginePlugin(
+        override val id: EngineId,
+        private val route: (Int) -> IpProbeRoute,
+    ) : EnginePlugin {
+        override val capabilities: EngineCapabilities = EngineCapabilities(
+            supportsTcp = true,
+            supportsUdp = false,
+            supportsDoH = false,
+            localOnly = true,
+            requiresServer = false,
+        )
+        override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult =
+            StartResult.Failure("test fake")
+        override suspend fun stop() = Unit
+        override suspend fun probe(): ProbeResult = ProbeResult.Failure("test fake")
+        override fun stats(): Flow<EngineStats> = emptyFlow()
+        override suspend fun ipProbeRoute(socksPort: Int): IpProbeRoute = route(socksPort)
     }
 
     private class FakeIpInfoProvider(
@@ -74,19 +125,20 @@ class MainViewModelTest {
         ),
     ) : IpInfoProvider {
         @Volatile var calls: Int = 0
-
+        @Volatile var fetchCalls: Int = 0
+        @Volatile var fetchViaCalls: Int = 0
         @Volatile var lastSocksHost: String? = null
-
         @Volatile var lastSocksPort: Int? = null
-
         @Volatile var lastSocketFactoryUsed: Boolean = false
 
         override suspend fun fetch(): Result<IpInfo> {
             calls += 1
+            fetchCalls += 1
             return result
         }
         override suspend fun fetchVia(socksHost: String?, socksPort: Int?): Result<IpInfo> {
             calls += 1
+            fetchViaCalls += 1
             lastSocksHost = socksHost
             lastSocksPort = socksPort
             return result
@@ -254,9 +306,7 @@ class MainViewModelTest {
     @Test
     fun urnetworkPeerSearchSecondsZeroDuringGracePeriod() = runTest {
         val bridge = FakeUrnetworkBridge(peers = 0)
-        val vm = MainViewModel(
-            tunnelController, healthMonitor, settingsRepository, bridge, ipInfoProvider,
-        )
+        val vm = newViewModel(bridge = bridge)
         backgroundScope.launch { vm.urnetworkPeerSearchSeconds.collect {} }
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.URNETWORK)
@@ -270,9 +320,7 @@ class MainViewModelTest {
     @Test
     fun urnetworkPeerSearchSecondsIncrementsAfterGracePeriod() = runTest {
         val bridge = FakeUrnetworkBridge(peers = 0)
-        val vm = MainViewModel(
-            tunnelController, healthMonitor, settingsRepository, bridge, ipInfoProvider,
-        )
+        val vm = newViewModel(bridge = bridge)
         backgroundScope.launch { vm.urnetworkPeerSearchSeconds.collect {} }
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.URNETWORK)
@@ -286,9 +334,7 @@ class MainViewModelTest {
     @Test
     fun urnetworkPeerSearchSecondsResetsWhenPeersAppear() = runTest {
         val bridge = FakeUrnetworkBridge(peers = 0)
-        val vm = MainViewModel(
-            tunnelController, healthMonitor, settingsRepository, bridge, ipInfoProvider,
-        )
+        val vm = newViewModel(bridge = bridge)
         backgroundScope.launch { vm.urnetworkPeerSearchSeconds.collect {} }
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.URNETWORK)
@@ -308,7 +354,7 @@ class MainViewModelTest {
     }
 
     @Test
-    fun ipInfoFetchesOnConnected() = runTest {
+    fun ipInfoFetchesViaSocksOnByedpiConnected() = runTest {
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.BYEDPI)
         tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
@@ -319,12 +365,13 @@ class MainViewModelTest {
         assertIs<IpInfoState.Loaded>(s)
         assertEquals("203.0.113.1", s.info.ip)
         assertEquals(1, ipInfoProvider.calls)
+        assertEquals(1, ipInfoProvider.fetchViaCalls)
         assertEquals("127.0.0.1", ipInfoProvider.lastSocksHost)
         assertEquals(1080, ipInfoProvider.lastSocksPort)
     }
 
     @Test
-    fun ipInfoUnsupportedForWarpWithoutSocks() = runTest {
+    fun ipInfoFetchesDirectForWarp() = runTest {
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.WARP)
         tunnelController.onEngineStarted(EngineId.WARP, 0)
@@ -332,17 +379,13 @@ class MainViewModelTest {
         kotlinx.coroutines.delay(2_500)
         advanceUntilIdle()
         val s = viewModel.ipInfo.value
-        assertIs<IpInfoState.Unsupported>(
+        assertIs<IpInfoState.Loaded>(
             s,
-            "WARP — full-tun без SOCKS, app excluded из TUN. Sentinel: state=Unsupported(WARP), " +
-                "UI показывает 'проверьте в браузере', никаких HTTP-проб.",
+            "WARP — full-tun, self-traffic роутится через TUN. ipProbeRoute=Default → " +
+                "ipInfoProvider.fetch() возвращает IP виден миру через WARP.",
         )
-        assertEquals(EngineId.WARP, s.engineId)
-        assertEquals(
-            0,
-            ipInfoProvider.calls,
-            "Unsupported state не должен делать ни одного HTTP запроса — WARP excluded из TUN.",
-        )
+        assertEquals(1, ipInfoProvider.fetchCalls)
+        assertEquals(0, ipInfoProvider.fetchViaCalls)
         assertEquals(
             false,
             ipInfoProvider.lastSocketFactoryUsed,
@@ -352,20 +395,40 @@ class MainViewModelTest {
     }
 
     @Test
-    fun ipInfoUnsupportedForUrnetworkWithoutSocks() = runTest {
+    fun ipInfoErrorForUrnetworkWhenLocationUnavailable() = runTest {
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.URNETWORK)
+        tunnelController.onEngineStarted(EngineId.URNETWORK, 0)
+        advanceUntilIdle()
+        kotlinx.coroutines.delay(6_000)
+        advanceUntilIdle()
+        val s = viewModel.ipInfo.value
+        assertIs<IpInfoState.Error>(
+            s,
+            "URnetwork без selectedLocation → ipProbeRoute.Unavailable → IpInfoState.Error. " +
+                "Sentinel: 0 HTTP вызовов, error.message содержит причину.",
+        )
+        assertEquals(0, ipInfoProvider.calls)
+    }
+
+    @Test
+    fun ipInfoStaticLocationForUrnetworkWhenLocationKnown() = runTest {
+        val staticUrnetwork = FakeEnginePlugin(EngineId.URNETWORK) {
+            IpProbeRoute.StaticLocation(country = "Germany", countryCode = "DE")
+        }
+        val vm = newViewModel(plugins = setOf(byedpiPlugin, warpPlugin, staticUrnetwork))
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.URNETWORK)
         tunnelController.onEngineStarted(EngineId.URNETWORK, 0)
         advanceUntilIdle()
         kotlinx.coroutines.delay(2_500)
         advanceUntilIdle()
-        val s = viewModel.ipInfo.value
-        assertIs<IpInfoState.Unsupported>(
-            s,
-            "URnetwork — TUN-only без SOCKS, app excluded. Должен быть Unsupported(URNETWORK).",
-        )
-        assertEquals(EngineId.URNETWORK, s.engineId)
-        assertEquals(0, ipInfoProvider.calls)
+        val s = vm.ipInfo.value
+        assertIs<IpInfoState.Loaded>(s)
+        assertEquals("", s.info.ip, "StaticLocation не несёт IP — только страну.")
+        assertEquals("Germany", s.info.country)
+        assertEquals("DE", s.info.countryCode)
+        assertEquals(0, ipInfoProvider.calls, "StaticLocation не должен делать HTTP запросов.")
     }
 
     @Test
@@ -410,7 +473,6 @@ class MainViewModelTest {
     fun refreshIpInfoForcesRefetch() = runTest {
         viewModel.refreshIpInfo()
         advanceUntilIdle()
-        // Idle state → refresh использует fetch() напрямую, не через fetchVia
         val s = viewModel.ipInfo.value
         assertIs<IpInfoState.Loaded>(s)
         assertEquals(1, ipInfoProvider.calls)

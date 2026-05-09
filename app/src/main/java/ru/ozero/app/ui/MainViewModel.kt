@@ -21,6 +21,8 @@ import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.commonvpn.TunnelStats
 import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.EnginePlugin
+import ru.ozero.enginescore.IpProbeRoute
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.SettingsRepository
@@ -32,7 +34,6 @@ sealed class IpInfoState {
     data object Loading : IpInfoState()
     data class Loaded(val info: IpInfo) : IpInfoState()
     data class Error(val message: String) : IpInfoState()
-    data class Unsupported(val engineId: EngineId) : IpInfoState()
 }
 
 @HiltViewModel
@@ -42,6 +43,7 @@ class MainViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val urnetworkBridge: UrnetworkSdkBridge,
     private val ipInfoProvider: IpInfoProvider,
+    private val enginePlugins: Set<@JvmSuppressWildcards EnginePlugin>,
 ) : ViewModel() {
 
     val state: StateFlow<TunnelState> =
@@ -164,27 +166,19 @@ class MainViewModel @Inject constructor(
                     val key = "${s.engineId}:${s.socksPort}"
                     if (key != lastSessionKey) {
                         lastSessionKey = key
-                        if (!supportsIpProbe(s.engineId, s.socksPort)) {
-                            PersistentLoggers.info(
-                                IP_TAG,
-                                "engine=${s.engineId} excluded из TUN — IP-проба недоступна",
-                            )
-                            _ipInfo.value = IpInfoState.Unsupported(s.engineId)
-                            return@collect
-                        }
                         _ipInfo.value = IpInfoState.Loading
                         PersistentLoggers.info(
                             IP_TAG,
                             "warmup begin engine=${s.engineId} port=${s.socksPort} delay=${IP_INFO_WARMUP_MS}ms",
                         )
                         delay(IP_INFO_WARMUP_MS)
-                        PersistentLoggers.info(IP_TAG, "warmup done — fetch IP")
-                        val result = fetchIpInfoViaEngine(s.socksPort)
+                        PersistentLoggers.info(IP_TAG, "warmup done — resolve IP")
+                        val result = resolveIpInfoWithRetry(s.engineId, s.socksPort)
                         when (result) {
                             is IpInfoState.Loaded ->
-                                Log.i(IP_TAG, "fetch success ip=${result.info.ip}")
+                                Log.i(IP_TAG, "resolve ok ip='${result.info.ip}' country=${result.info.country}")
                             is IpInfoState.Error ->
-                                PersistentLoggers.warn(IP_TAG, "fetch error: ${result.message}")
+                                PersistentLoggers.warn(IP_TAG, "resolve error: ${result.message}")
                             else -> Unit
                         }
                         _ipInfo.value = result
@@ -200,50 +194,57 @@ class MainViewModel @Inject constructor(
     fun refreshIpInfo() {
         viewModelScope.launch {
             val s = tunnelController.state.value
-            if (s is TunnelState.Connected && !supportsIpProbe(s.engineId, s.socksPort)) {
-                _ipInfo.value = IpInfoState.Unsupported(s.engineId)
-                return@launch
-            }
             _ipInfo.value = IpInfoState.Loading
             _ipInfo.value = if (s is TunnelState.Connected) {
-                fetchIpInfoViaEngine(s.socksPort)
+                resolveIpInfoWithRetry(s.engineId, s.socksPort)
             } else {
-                ipInfoProvider.fetch().fold(
-                    onSuccess = { IpInfoState.Loaded(it) },
-                    onFailure = { IpInfoState.Error(it.message ?: it.javaClass.simpleName) },
-                )
+                resolveOnce(engineId = null, socksPort = 0)
             }
         }
     }
 
-    private suspend fun fetchIpInfoViaEngine(socksPort: Int): IpInfoState {
-        var lastError: Throwable? = null
+    private suspend fun resolveIpInfoWithRetry(engineId: EngineId, socksPort: Int): IpInfoState {
+        var lastError: String? = null
         repeat(IP_INFO_RETRY_ATTEMPTS) { attempt ->
-            val result = fetchOnce(socksPort)
-            result.fold(
-                onSuccess = { return IpInfoState.Loaded(it) },
-                onFailure = {
-                    if (it is kotlinx.coroutines.CancellationException) throw it
-                    lastError = it
-                },
-            )
+            when (val s = resolveOnce(engineId, socksPort)) {
+                is IpInfoState.Loaded -> return s
+                is IpInfoState.Error -> lastError = s.message
+                else -> Unit
+            }
             if (attempt < IP_INFO_RETRY_ATTEMPTS - 1) {
                 delay(IP_INFO_RETRY_DELAY_MS)
             }
         }
-        val msg = lastError?.message ?: lastError?.javaClass?.simpleName ?: "unknown"
-        return IpInfoState.Error(msg)
+        return IpInfoState.Error(lastError ?: "unknown")
     }
 
-    private suspend fun fetchOnce(socksPort: Int): Result<IpInfo> =
-        if (socksPort > 0) {
-            ipInfoProvider.fetchVia(BYEDPI_LOOPBACK, socksPort)
-        } else {
-            ipInfoProvider.fetch()
+    private suspend fun resolveOnce(engineId: EngineId?, socksPort: Int): IpInfoState {
+        val plugin = engineId?.let { id -> enginePlugins.firstOrNull { it.id == id } }
+        val route = runCatching { plugin?.ipProbeRoute(socksPort) ?: IpProbeRoute.Default }
+            .getOrElse { return IpInfoState.Error(it.message ?: it.javaClass.simpleName) }
+        return when (route) {
+            IpProbeRoute.Default -> ipInfoProvider.fetch().toState()
+            is IpProbeRoute.Socks -> ipInfoProvider.fetchVia(route.host, route.port).toState()
+            is IpProbeRoute.StaticLocation -> IpInfoState.Loaded(
+                IpInfo(
+                    ip = "",
+                    country = route.country,
+                    countryCode = route.countryCode,
+                    city = null,
+                    fetchedAtMs = System.currentTimeMillis(),
+                ),
+            )
+            is IpProbeRoute.Unavailable -> IpInfoState.Error(route.reason)
         }
+    }
 
-    private fun supportsIpProbe(engineId: EngineId, socksPort: Int): Boolean =
-        socksPort > 0 || engineId == EngineId.BYEDPI
+    private fun Result<IpInfo>.toState(): IpInfoState = fold(
+        onSuccess = { IpInfoState.Loaded(it) },
+        onFailure = {
+            if (it is kotlinx.coroutines.CancellationException) throw it
+            IpInfoState.Error(it.message ?: it.javaClass.simpleName)
+        },
+    )
 
     fun onConnectClick() = Unit
 
@@ -270,6 +271,5 @@ class MainViewModel @Inject constructor(
         const val IP_INFO_WARMUP_MS = 8_000L
         const val IP_INFO_RETRY_ATTEMPTS = 4
         const val IP_INFO_RETRY_DELAY_MS = 1_000L
-        const val BYEDPI_LOOPBACK = "127.0.0.1"
     }
 }

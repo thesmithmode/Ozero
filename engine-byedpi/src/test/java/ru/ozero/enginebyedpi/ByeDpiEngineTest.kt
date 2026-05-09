@@ -292,4 +292,18 @@ class ByeDpiEngineTest {
             server.close()
         }
     }
+
+    @Test
+    fun ipProbeRouteReturnsSocksWhenPortGivenExplicitly() = runTest {
+        val route = engine.ipProbeRoute(socksPort = 1080)
+        assertIs<ru.ozero.enginescore.IpProbeRoute.Socks>(route)
+        assertEquals("127.0.0.1", route.host)
+        assertEquals(1080, route.port)
+    }
+
+    @Test
+    fun ipProbeRouteReturnsDefaultBeforeStartWhenPortZero() = runTest {
+        val route = engine.ipProbeRoute(socksPort = 0)
+        assertIs<ru.ozero.enginescore.IpProbeRoute.Default>(route)
+    }
 }

@@ -226,6 +226,22 @@ class EngineUrnetworkContractTest {
         assertTrue(spec.excludeRfc1918)
     }
 
+    @Test
+    fun `ipProbeRoute возвращает Unavailable когда selectedLocation null`() = runTest {
+        val (e, _, _) = engine()
+        val route = e.ipProbeRoute(0)
+        assertIs<ru.ozero.enginescore.IpProbeRoute.Unavailable>(
+            route,
+            "URnetwork без selectedLocation = страна неизвестна. " +
+                "ipProbeRoute обязан вернуть Unavailable, не Default — иначе MainViewModel " +
+                "пойдёт fetch() через TUN и получит провайдерский IP вместо exit-страны.",
+        )
+        assertTrue(
+            route.reason.isNotEmpty(),
+            "Unavailable.reason обязан содержать причину для UI/логов.",
+        )
+    }
+
     private class FakeUrnetworkConfigStore(
         override: String?,
         byJwt: String? = null,

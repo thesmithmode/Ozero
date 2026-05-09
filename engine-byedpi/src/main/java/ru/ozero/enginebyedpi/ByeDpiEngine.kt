@@ -139,6 +139,15 @@ class ByeDpiEngine(
 
     override fun preflight(): EnginePreflight = ByeDpiPreflight()
 
+    override suspend fun ipProbeRoute(socksPort: Int): ru.ozero.enginescore.IpProbeRoute {
+        val port = if (socksPort > 0) socksPort else activeSocksPort
+        return if (port > 0) {
+            ru.ozero.enginescore.IpProbeRoute.Socks("127.0.0.1", port)
+        } else {
+            ru.ozero.enginescore.IpProbeRoute.Default
+        }
+    }
+
     internal fun buildArgs(config: EngineConfig.ByeDpi): Array<String> {
         val extra =
             config.args.trim()
