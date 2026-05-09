@@ -3,6 +3,7 @@ package ru.ozero.commonvpn
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineId
+import kotlin.math.abs
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -380,6 +381,70 @@ class TunnelControllerTest {
         val s = controller.state.value
         assertIs<TunnelState.Failed>(s)
         assertEquals(EngineId.WARP, s.engineId)
+    }
+
+    @Test
+    fun updateStats_firstSampleBpsIsZero() {
+        controller.updateStats(
+            TunnelStats(txPackets = 10, txBytes = 9000, rxPackets = 5, rxBytes = 5000, timestampMs = 1000),
+        )
+        val snap = controller.stats.value
+        assertNotNull(snap)
+        assertEquals(
+            0.0, snap.bpsIn,
+            "первый вызов: prevTimestampMs=0 → rawBpsIn=0 → smoothedBpsIn=0",
+        )
+        assertEquals(
+            0.0, snap.bpsOut,
+            "первый вызов: prevTimestampMs=0 → rawBpsOut=0 → smoothedBpsOut=0",
+        )
+    }
+
+    @Test
+    fun updateStats_ewmaAlpha04_secondSampleExact() {
+        controller.updateStats(TunnelStats(0, 0, 0, 0, timestampMs = 1000))
+        controller.updateStats(TunnelStats(0, 0, 0, 1000, timestampMs = 2000))
+        val snap = controller.stats.value
+        assertNotNull(snap)
+        assertTrue(
+            abs(snap.bpsIn - 400.0) < 0.001,
+            "EWMA α=0.4: Δrx=1000B Δt=1s → rawBps=1000 → smoothed=0.4*1000+0.6*0=400.0, got ${snap.bpsIn}",
+        )
+    }
+
+    @Test
+    fun updateStats_ewmaAlpha04_thirdSampleAccumulates() {
+        controller.updateStats(TunnelStats(0, 0, 0, 0, timestampMs = 1000))
+        controller.updateStats(TunnelStats(0, 0, 0, 1000, timestampMs = 2000))
+        controller.updateStats(TunnelStats(0, 0, 0, 2000, timestampMs = 3000))
+        val snap = controller.stats.value
+        assertNotNull(snap)
+        assertTrue(
+            abs(snap.bpsIn - 640.0) < 0.001,
+            "EWMA α=0.4: 3rd sample: 0.4*1000+0.6*400=640.0, got ${snap.bpsIn}",
+        )
+    }
+
+    @Test
+    fun updateStats_counterResetCoercedToZero() {
+        controller.updateStats(TunnelStats(0, 0, 0, 5000, timestampMs = 1000))
+        controller.updateStats(TunnelStats(0, 0, 0, 0, timestampMs = 2000))
+        val snap = controller.stats.value
+        assertNotNull(snap)
+        assertTrue(snap.bpsIn >= 0.0, "счётчик сбросился → delta отрицательный → coerceAtLeast(0) → bpsIn≥0")
+    }
+
+    @Test
+    fun updateStats_txBpsOutMirrorsBpsIn() {
+        controller.updateStats(TunnelStats(0, 0, 0, 0, timestampMs = 1000))
+        controller.updateStats(TunnelStats(0, 2000, 0, 0, timestampMs = 2000))
+        val snap = controller.stats.value
+        assertNotNull(snap)
+        assertTrue(
+            abs(snap.bpsOut - 800.0) < 0.001,
+            "EWMA α=0.4: Δtx=2000B Δt=1s → rawBps=2000 → smoothed=0.4*2000=800.0, got ${snap.bpsOut}",
+        )
+        assertEquals(0.0, snap.bpsIn, "rx не менялся → bpsIn=0")
     }
 
     @Test

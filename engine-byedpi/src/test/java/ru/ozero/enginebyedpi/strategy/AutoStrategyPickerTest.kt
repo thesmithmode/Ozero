@@ -18,6 +18,19 @@ import kotlin.test.assertTrue
 
 class AutoStrategyPickerTest {
 
+    @Test
+    fun `StrategyScore successRate zero when totalProbes is zero`() {
+        val score = StrategyScore(
+            strategy = ByeDpiStrategy("-x"),
+            totalProbes = 0,
+            successCount = 0,
+            avgDurationMs = 0L,
+        )
+        assertEquals(0.0, score.successRate, "totalProbes=0 → successRate=0.0, не деление на ноль")
+    }
+
+
+
     private fun fakeEngine(
         startBehavior: (EngineConfig) -> StartResult = { StartResult.Success(socksPort = 1080) },
     ) = object : EnginePlugin {
