@@ -272,7 +272,7 @@ private fun ExpertMainContent(
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
             }
-            if (isConnected && stats != null) {
+            if (isConnected) {
                 TrafficStatsCard(
                     stats = stats,
                     speedHistory = speedHistory,
@@ -424,22 +424,23 @@ private fun IpInfoCard(
 
 @Composable
 private fun TrafficStatsCard(
-    stats: TunnelStats,
+    stats: TunnelStats?,
     speedHistory: List<Pair<Float, Float>> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
+    val sessionStartMs = stats?.sessionStartMs ?: 0L
     var nowMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(stats.sessionStartMs) {
+    LaunchedEffect(sessionStartMs) {
         while (true) {
             nowMs = System.currentTimeMillis()
             delay(1_000)
         }
     }
-    val sessionMs = if (stats.sessionStartMs > 0L) nowMs - stats.sessionStartMs else 0L
-    val rxSpeed = BytesFormatter.humanReadablePerSec(stats.bpsIn)
-    val txSpeed = BytesFormatter.humanReadablePerSec(stats.bpsOut)
-    val rxTotal = BytesFormatter.humanReadable(stats.rxBytes)
-    val txTotal = BytesFormatter.humanReadable(stats.txBytes)
+    val sessionMs = if (sessionStartMs > 0L) nowMs - sessionStartMs else 0L
+    val rxSpeed = BytesFormatter.humanReadablePerSec(stats?.bpsIn ?: 0.0)
+    val txSpeed = BytesFormatter.humanReadablePerSec(stats?.bpsOut ?: 0.0)
+    val rxTotal = BytesFormatter.humanReadable(stats?.rxBytes ?: 0L)
+    val txTotal = BytesFormatter.humanReadable(stats?.txBytes ?: 0L)
     val uptime = BytesFormatter.durationHms(sessionMs)
     Card(
         modifier = modifier
