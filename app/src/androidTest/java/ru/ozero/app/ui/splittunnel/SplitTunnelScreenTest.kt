@@ -1,5 +1,6 @@
 package ru.ozero.app.ui.splittunnel
 
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -79,7 +80,7 @@ class SplitTunnelScreenTest {
             OzeroTheme {
                 SplitTunnelScreenContent(
                     state = SplitTunnelUiState.Content(
-                        mode = SplitTunnelMode.ALL,
+                        mode = SplitTunnelMode.ALLOWLIST,
                         query = "",
                         apps = emptyList(),
                     ),
@@ -99,12 +100,52 @@ class SplitTunnelScreenTest {
     fun emptyAppsShowsEmptyMessage() {
         render(
             SplitTunnelUiState.Content(
-                mode = SplitTunnelMode.ALL,
+                mode = SplitTunnelMode.ALLOWLIST,
                 query = "abc",
                 apps = emptyList(),
             ),
         )
         composeRule.onNodeWithTag(SplitTunnelTestTags.EMPTY).assertIsDisplayed()
+    }
+
+    @Test
+    fun modeAllShowsDescriptionAndHidesAppList() {
+        render(
+            SplitTunnelUiState.Content(
+                mode = SplitTunnelMode.ALL,
+                query = "",
+                apps = listOf(AppRow("com.foo", "Foo", isSystem = false, included = false)),
+            ),
+        )
+        composeRule.onNodeWithTag(SplitTunnelTestTags.MODE_DESCRIPTION).assertIsDisplayed()
+        composeRule.onNodeWithTag(SplitTunnelTestTags.APPS_LIST).assertDoesNotExist()
+        composeRule.onNodeWithTag(SplitTunnelTestTags.SEARCH).assertDoesNotExist()
+    }
+
+    @Test
+    fun modeBypassLanShowsDescriptionAndHidesAppList() {
+        render(
+            SplitTunnelUiState.Content(
+                mode = SplitTunnelMode.BYPASS_LAN,
+                query = "",
+                apps = listOf(AppRow("com.foo", "Foo", isSystem = false, included = false)),
+            ),
+        )
+        composeRule.onNodeWithTag(SplitTunnelTestTags.MODE_DESCRIPTION).assertIsDisplayed()
+        composeRule.onNodeWithTag(SplitTunnelTestTags.APPS_LIST).assertDoesNotExist()
+    }
+
+    @Test
+    fun modeAllowlistHidesDescriptionShowsList() {
+        render(
+            SplitTunnelUiState.Content(
+                mode = SplitTunnelMode.ALLOWLIST,
+                query = "",
+                apps = listOf(AppRow("com.foo", "Foo", isSystem = false, included = false)),
+            ),
+        )
+        composeRule.onNodeWithTag(SplitTunnelTestTags.MODE_DESCRIPTION).assertDoesNotExist()
+        composeRule.onNodeWithTag(SplitTunnelTestTags.APP_ROW_PREFIX + "com.foo").assertIsDisplayed()
     }
 
     @Test

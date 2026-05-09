@@ -176,6 +176,7 @@ class RealUrnetworkSdkBridge(
         if (completed == null) {
             PersistentLoggers.warn(TAG, "stop timed out after ${STOP_TIMEOUT_MS}ms — refs cleared")
         }
+        GoRuntimeGuard.release(GoRuntimeGuard.Owner.URNETWORK)
         Log.i(TAG, "stop complete")
     }
 
@@ -399,6 +400,7 @@ class RealUrnetworkSdkBridge(
 
     private fun cleanupOnFailure() {
         deviceRef.getAndSet(null)?.also { runCatching { it.close() } }
+        GoRuntimeGuard.release(GoRuntimeGuard.Owner.URNETWORK)
     }
 
     private companion object {

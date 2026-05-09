@@ -1,5 +1,6 @@
 ﻿package ru.ozero.app.ui.splittunnel
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -55,6 +56,27 @@ class SplitTunnelViewModelTest {
     @Test
     fun `initial state Loading until apps loaded`() = runTest {
         assertIs<SplitTunnelUiState.Loading>(viewModel.uiState.value)
+    }
+
+    @Test
+    fun `state остаётся Loading пока loadApps не завершён даже после combine pass`() = runTest {
+        val gated = GatedAppListProvider()
+        val gatedVm = SplitTunnelViewModel(gated, dao, settings)
+
+        advanceUntilIdle()
+
+        assertIs<SplitTunnelUiState.Loading>(
+            gatedVm.uiState.value,
+            "uiState must remain Loading until loadApps completes — empty apps must NOT " +
+                "produce Content. Реальный device эмитит Content(empty) сразу из-за combine " +
+                "над MutableStateFlow(emptyList()) — sentinel против этого паттерна.",
+        )
+
+        gated.complete(sample)
+        advanceUntilIdle()
+
+        val state = assertIs<SplitTunnelUiState.Content>(gatedVm.uiState.value)
+        assertEquals(3, state.apps.size)
     }
 
     @Test
@@ -169,6 +191,14 @@ class SplitTunnelViewModelTest {
 
     private class FakeAppListProvider(val apps: List<InstalledApp>) : AppListProvider {
         override suspend fun loadApps(): List<InstalledApp> = apps
+    }
+
+    private class GatedAppListProvider : AppListProvider {
+        private val signal = CompletableDeferred<List<InstalledApp>>()
+        override suspend fun loadApps(): List<InstalledApp> = signal.await()
+        fun complete(apps: List<InstalledApp>) {
+            signal.complete(apps)
+        }
     }
 
     private class FakeAppSplitRuleDao : AppSplitRuleDao {

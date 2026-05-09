@@ -6,17 +6,14 @@ import java.util.concurrent.atomic.AtomicReference
  * Process-wide guard для Go-рантайма.
  *
  * Why: libam-go (WARP/AmneziaWG) и libgojni (URnetwork SDK) — два независимых Go-рантайма.
- * После запуска один из них оставляет process-wide state (signal handlers, TLS slots),
- * который ломает second JNI_OnLoad другого Go-рантайма → SIGABRT в gcWriteBarrier.
+ * Concurrent JNI_OnLoad обоих ломал libgojni в gcWriteBarrier. CLAUDE.md инвариант:
+ * оба .so грузятся eager-синхронно в OzeroApp.onCreate (main thread, до async-корутин),
+ * после этого они coexist resident в процессе. Guard сериализует **active runtime**:
+ * только один из движков использует свой Go в момент времени, второй ждёт release.
  *
- * Подтверждено: pid=16101 в логе 2026-05-09 — WARP первый запуск 7ms успех, после URnetwork
- * lifecycle (start+stop) повторный awgTurnOn → SIGABRT через 100ms. Гипотеза f7cdcdc
- * (handle leak) была недостаточна — краши продолжились после фикса.
- *
- * Решение: per-process один Go-рантайм. Если попытка second runtime — отказать.
- * ChainOrchestrator упадёт на fallback engine (ByeDPI) или stopVpn если auto pool пуст.
- *
- * Reset невозможен — флаг живёт до Process.killProcess или OS-kill.
+ * release(owner) — обязательный hook в EngineWarp.detachTun / EngineUrnetwork.stop после
+ * teardown SDK-state (awgTurnOff / Sdk.close + ioLoop.close + cv.disconnect). Без release
+ * следующий движок другого owner получит Conflict навсегда (sticky owner).
  */
 object GoRuntimeGuard {
     private val acquired = AtomicReference<Owner?>(null)
@@ -25,6 +22,10 @@ object GoRuntimeGuard {
         if (acquired.compareAndSet(null, owner)) return Result.Granted
         val current = acquired.get()
         return if (current == owner) Result.Granted else Result.Conflict(current ?: owner)
+    }
+
+    fun release(owner: Owner) {
+        acquired.compareAndSet(owner, null)
     }
 
     fun current(): Owner? = acquired.get()

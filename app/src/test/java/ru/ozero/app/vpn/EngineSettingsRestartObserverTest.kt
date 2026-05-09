@@ -100,6 +100,34 @@ class EngineSettingsRestartObserverTest {
     }
 
     @Test
+    fun `triggers debounce коалесцирует chain быстрых изменений`() = runTest(dispatcher) {
+        val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 16)
+        val observer = newObserver(flow, alwaysConnected())
+        val collected = mutableListOf<EngineSettingsRestartObserver.Snapshot>()
+        val job = launch { observer.triggers.toList(collected) }
+        advanceUntilIdle()
+
+        flow.emit(SettingsModel.DEFAULT)
+        advanceUntilIdle()
+        flow.emit(SettingsModel.DEFAULT.copy(manualEngine = EngineId.BYEDPI))
+        flow.emit(SettingsModel.DEFAULT.copy(manualEngine = EngineId.WARP))
+        flow.emit(SettingsModel.DEFAULT.copy(manualEngine = EngineId.URNETWORK))
+        flow.emit(SettingsModel.DEFAULT.copy(manualEngine = EngineId.BYEDPI))
+        flow.emit(SettingsModel.DEFAULT.copy(manualEngine = EngineId.WARP))
+        advanceUntilIdle()
+
+        assertEquals(
+            1,
+            collected.size,
+            "5 быстрых engine-toggle обязаны коалесцироваться в 1 emit после debounce — иначе " +
+                "MainActivity триггерит chain restart VPN, что роняет URnetwork (Go runtime " +
+                "conflict), сбивает IP fetch warmup и убивает стабильность.",
+        )
+        assertEquals(EngineId.WARP, collected.single().manualEngine)
+        job.cancel()
+    }
+
+    @Test
     fun `handle invokes restart only when state is Connected`() = runTest(dispatcher) {
         val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
         val state = MutableStateFlow<TunnelState>(TunnelState.Idle)

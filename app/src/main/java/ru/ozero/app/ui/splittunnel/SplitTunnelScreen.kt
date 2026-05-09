@@ -153,7 +153,6 @@ private fun ContentBody(
     onToggleApp: (String, Boolean) -> Unit,
     onQuery: (String) -> Unit,
 ) {
-    val listEnabled = state.mode == SplitTunnelMode.ALLOWLIST || state.mode == SplitTunnelMode.BLOCKLIST
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -163,39 +162,46 @@ private fun ContentBody(
             mode = state.mode,
             onModeChange = onModeChange,
         )
-        OutlinedTextField(
-            value = state.query,
-            onValueChange = onQuery,
-            label = { Text(stringResource(R.string.split_tunnel_search_hint)) },
-            singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-                .testTag(SplitTunnelTestTags.SEARCH),
-        )
-        if (!listEnabled) {
-            ListDisabledHint()
-        }
-        if (state.apps.isEmpty()) {
-            EmptyBody()
+        if (state.mode.requiresAppList()) {
+            OutlinedTextField(
+                value = state.query,
+                onValueChange = onQuery,
+                label = { Text(stringResource(R.string.split_tunnel_search_hint)) },
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .testTag(SplitTunnelTestTags.SEARCH),
+            )
+            if (state.apps.isEmpty()) {
+                EmptyBody()
+            } else {
+                AppsList(state = state, listEnabled = true, onToggleApp = onToggleApp)
+            }
         } else {
-            AppsList(state = state, listEnabled = listEnabled, onToggleApp = onToggleApp)
+            ModeDescription(mode = state.mode)
         }
     }
 }
 
 @Composable
-private fun ListDisabledHint() {
+private fun ModeDescription(mode: SplitTunnelMode) {
+    val text = when (mode) {
+        SplitTunnelMode.ALL -> stringResource(R.string.split_tunnel_mode_all_description)
+        SplitTunnelMode.BYPASS_LAN -> stringResource(R.string.split_tunnel_mode_bypass_lan_description)
+        SplitTunnelMode.ALLOWLIST, SplitTunnelMode.BLOCKLIST -> ""
+    }
     Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
-            .testTag(SplitTunnelTestTags.MODE_HINT),
+            .fillMaxSize()
+            .padding(horizontal = 24.dp, vertical = 32.dp)
+            .testTag(SplitTunnelTestTags.MODE_DESCRIPTION),
+        contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = stringResource(R.string.split_tunnel_mode_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            text = text,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
         )
     }
 }

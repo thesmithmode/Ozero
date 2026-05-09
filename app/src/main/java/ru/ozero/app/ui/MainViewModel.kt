@@ -21,6 +21,7 @@ import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.commonvpn.TunnelStats
 import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
@@ -164,8 +165,21 @@ class MainViewModel @Inject constructor(
                     if (key != lastSessionKey) {
                         lastSessionKey = key
                         _ipInfo.value = IpInfoState.Loading
+                        PersistentLoggers.info(
+                            IP_TAG,
+                            "warmup begin engine=${s.engineId} port=${s.socksPort} delay=${IP_INFO_WARMUP_MS}ms",
+                        )
                         delay(IP_INFO_WARMUP_MS)
-                        _ipInfo.value = fetchIpInfoViaEngine(s.engineId, s.socksPort)
+                        PersistentLoggers.info(IP_TAG, "warmup done — fetch IP")
+                        val result = fetchIpInfoViaEngine(s.engineId, s.socksPort)
+                        when (result) {
+                            is IpInfoState.Loaded ->
+                                PersistentLoggers.info(IP_TAG, "fetch success ip=${result.info.ip}")
+                            is IpInfoState.Error ->
+                                PersistentLoggers.warn(IP_TAG, "fetch error: ${result.message}")
+                            else -> Unit
+                        }
+                        _ipInfo.value = result
                     }
                 } else {
                     lastSessionKey = null
@@ -249,6 +263,7 @@ class MainViewModel @Inject constructor(
     }
 
     private companion object {
+        const val IP_TAG = "MainViewModel.ip"
         const val SPEED_HISTORY_SIZE = 60
         const val URNETWORK_PEER_POLL_MS = 2_000L
         const val URNETWORK_PEER_POLL_KEEP_MS = 5_000L

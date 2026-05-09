@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
@@ -29,12 +30,12 @@ class SplitTunnelViewModel @Inject constructor(
     val uiState: StateFlow<SplitTunnelUiState> = _uiState.asStateFlow()
 
     private val query = MutableStateFlow("")
-    private val apps = MutableStateFlow<List<InstalledApp>>(emptyList())
+    private val apps = MutableStateFlow<List<InstalledApp>?>(null)
 
     init {
         viewModelScope.launch { apps.value = appListProvider.loadApps() }
         combine(
-            apps,
+            apps.filterNotNull(),
             dao.observeAll(),
             settingsRepository.settings.map { it.splitMode },
             query,

@@ -1,6 +1,8 @@
 ﻿package ru.ozero.app.vpn
 
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
@@ -22,6 +24,7 @@ class EngineSettingsRestartObserver(
         val customDnsServers: List<String>,
     )
 
+    @OptIn(FlowPreview::class)
     val triggers: Flow<Snapshot> = settingsFlow
         .map {
             Snapshot(
@@ -34,10 +37,15 @@ class EngineSettingsRestartObserver(
         }
         .distinctUntilChanged()
         .drop(1)
+        .debounce(RESTART_DEBOUNCE_MS)
 
     suspend fun handle(snapshot: Snapshot) {
         if (vpnStateProvider() is TunnelState.Connected) {
             onRestartConnected(snapshot)
         }
+    }
+
+    private companion object {
+        const val RESTART_DEBOUNCE_MS = 1500L
     }
 }
