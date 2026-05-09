@@ -134,7 +134,7 @@ class ByeDpiEngineTest {
     fun probeSuccessWhenSocketListens() = runTest {
         val server = ServerSocket(0)
         val port = server.localPort
-        server.acceptSocks5InBackground(repeat = 2)
+        server.acceptSocks5InBackground()
         try {
             every { proxy.startProxy(any()) } answers {
                 proxyRunning.await()
@@ -148,18 +148,16 @@ class ByeDpiEngineTest {
         }
     }
 
-    private fun ServerSocket.acceptSocks5InBackground(repeat: Int = 1) {
+    private fun ServerSocket.acceptSocks5InBackground() {
         soTimeout = 200
         thread(isDaemon = true) {
-            var count = 0
-            while (count < repeat && !isClosed) {
+            while (!isClosed) {
                 runCatching {
                     accept().use { c ->
                         c.getInputStream().read(ByteArray(8))
                         c.getOutputStream().write(byteArrayOf(0x05, 0x00))
                         c.getOutputStream().flush()
                     }
-                    count++
                 }
             }
         }
