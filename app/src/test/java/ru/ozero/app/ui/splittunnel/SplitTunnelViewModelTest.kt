@@ -322,11 +322,13 @@ class SplitTunnelViewModelTest {
 
     private class FakeAppListProvider(val apps: List<InstalledApp>) : AppListProvider {
         override suspend fun loadApps(): List<InstalledApp> = apps
+        override suspend fun loadIcon(packageName: String): androidx.compose.ui.graphics.ImageBitmap? = null
     }
 
     private class GatedAppListProvider : AppListProvider {
         private val signal = CompletableDeferred<List<InstalledApp>>()
         override suspend fun loadApps(): List<InstalledApp> = signal.await()
+        override suspend fun loadIcon(packageName: String): androidx.compose.ui.graphics.ImageBitmap? = null
         fun complete(apps: List<InstalledApp>) {
             signal.complete(apps)
         }

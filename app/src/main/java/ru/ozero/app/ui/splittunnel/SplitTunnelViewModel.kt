@@ -98,6 +98,9 @@ class SplitTunnelViewModel @Inject constructor(
         }
     }
 
+    suspend fun loadIcon(packageName: String): androidx.compose.ui.graphics.ImageBitmap? =
+        appListProvider.loadIcon(packageName)
+
     private fun InstalledApp.matches(q: String): Boolean {
         val needle = q.lowercase()
         return label.lowercase().contains(needle) || packageName.lowercase().contains(needle)

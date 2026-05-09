@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SplitTunnelMode
 import ru.ozero.enginescore.EngineId
+import kotlinx.coroutines.delay
 import ru.ozero.commonvpn.TunnelState
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -66,7 +67,6 @@ class EngineSettingsRestartObserverTest {
             SettingsModel.DEFAULT.copy(
                 manualEngine = EngineId.BYEDPI,
                 ipv6Enabled = true,
-                splitMode = SplitTunnelMode.ALLOWLIST,
                 byedpiWinningArgs = "  --foo  ",
             ),
         )
@@ -76,8 +76,30 @@ class EngineSettingsRestartObserverTest {
         val snap = collected.single()
         assertEquals(EngineId.BYEDPI, snap.manualEngine)
         assertEquals("--foo", snap.byedpiWinningArgs)
-        assertEquals(SplitTunnelMode.ALLOWLIST, snap.splitMode)
         assertEquals(true, snap.ipv6Enabled)
+        job.cancel()
+    }
+
+    @Test
+    fun `splitMode change НЕ триггерит restart — VPN живёт независимо от mode toggle`() = runTest(dispatcher) {
+        val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
+        val observer = newObserver(flow, alwaysConnected())
+        val collected = mutableListOf<EngineSettingsRestartObserver.Snapshot>()
+        val job = launch { observer.triggers.toList(collected) }
+        advanceUntilIdle()
+
+        flow.emit(SettingsModel.DEFAULT)
+        flow.emit(SettingsModel.DEFAULT.copy(splitMode = SplitTunnelMode.ALLOWLIST))
+        flow.emit(SettingsModel.DEFAULT.copy(splitMode = SplitTunnelMode.BLOCKLIST))
+        flow.emit(SettingsModel.DEFAULT.copy(splitMode = SplitTunnelMode.ALL))
+        advanceUntilIdle()
+
+        assertTrue(
+            collected.isEmpty(),
+            "splitMode toggle не должен валить VPN restart — пользователь крутит вкладки " +
+                "Включено/Все/Исключено, каждый restart на Nubia ROM = SIGABRT в libam-go.so. " +
+                "splitMode применяется при следующем коннекте (engine читает значение из repo).",
+        )
         job.cancel()
     }
 
@@ -141,7 +163,6 @@ class EngineSettingsRestartObserverTest {
         val snapshot = EngineSettingsRestartObserver.Snapshot(
             manualEngine = EngineId.BYEDPI,
             byedpiWinningArgs = null,
-            splitMode = SplitTunnelMode.ALL,
             ipv6Enabled = false,
             customDnsServers = emptyList(),
         )

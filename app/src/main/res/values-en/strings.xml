@@ -33,7 +33,7 @@
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
-    <string name="settings_split_tunnel_title">Split tunnel</string>
+    <string name="settings_split_tunnel_title">Split Tunneling</string>
     <string name="settings_split_tunnel_summary">Which apps go through VPN</string>
     <string name="settings_split_mode_all">All apps</string>
     <string name="settings_split_mode_bypass_lan">All except local network</string>
@@ -77,7 +77,7 @@
     <string name="settings_ipv6_summary">Route IPv6 through VPN</string>
     <string name="settings_auto_start_title">Start on boot</string>
     <string name="settings_auto_start_summary">VPN turns on automatically after reboot</string>
-    <string name="settings_allowed_apps_title">App list</string>
+    <string name="settings_allowed_apps_title">Split Tunneling</string>
     <string name="settings_allowed_apps_summary">Coming in TBD</string>
     <string name="settings_allowed_apps_open_summary">Pick apps and Split-tunnel mode</string>
     <string name="settings_servers_title">Servers / Double-hop</string>
@@ -109,15 +109,15 @@
     <string name="diag_back">Back</string>
 
     <!-- Split-tunnel screen -->
-    <string name="split_tunnel_title">App list</string>
+    <string name="split_tunnel_title">Split Tunneling</string>
     <string name="split_tunnel_back">Back</string>
     <string name="split_tunnel_search_hint">Search apps…</string>
     <string name="split_tunnel_no_apps">No apps found</string>
     <string name="split_tunnel_system_app">System</string>
     <string name="split_tunnel_short_all">All</string>
     <string name="split_tunnel_short_bypass_lan">Bypass LAN</string>
-    <string name="split_tunnel_short_allowlist">Include</string>
-    <string name="split_tunnel_short_blocklist">Exclude</string>
+    <string name="split_tunnel_short_allowlist">Included</string>
+    <string name="split_tunnel_short_blocklist">Excluded</string>
     <string name="split_tunnel_selected_count">Selected: %1$d</string>
     <string name="split_tunnel_clear_all">Clear</string>
     <string name="split_tunnel_mode_hint">The app list applies only in Allowlist and Blocklist modes.</string>

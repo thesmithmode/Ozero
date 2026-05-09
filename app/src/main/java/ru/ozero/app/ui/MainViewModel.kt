@@ -225,11 +225,21 @@ class MainViewModel @Inject constructor(
     private suspend fun fetchOnce(engineId: EngineId, socksPort: Int): Result<IpInfo> = when {
         engineId == EngineId.BYEDPI && socksPort > 0 ->
             ipInfoProvider.fetchVia(BYEDPI_LOOPBACK, socksPort)
+        socksPort > 0 ->
+            ipInfoProvider.fetchVia(BYEDPI_LOOPBACK, socksPort)
         engineId == EngineId.URNETWORK ->
             Result.failure(
                 java.io.IOException(
                     "URnetwork исключает self из TUN (Go SDK не имеет protect callback) — " +
                         "проверьте IP в браузере",
+                ),
+            )
+        engineId == EngineId.WARP ->
+            Result.failure(
+                java.io.IOException(
+                    "WARP — full-tun без SOCKS-прокси, IP-проба от VpnService уходит вне " +
+                        "VPN из-за excludeSelf=true (требуется для Go SDK). " +
+                        "Проверьте IP в браузере.",
                 ),
             )
         else ->

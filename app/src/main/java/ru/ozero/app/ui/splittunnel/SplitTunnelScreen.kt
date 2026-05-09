@@ -62,6 +62,7 @@ fun SplitTunnelScreen(
         onToggleApp = viewModel::onToggleApp,
         onQuery = viewModel::onQuery,
         onClearAll = viewModel::onClearAll,
+        iconLoader = viewModel::loadIcon,
     )
 }
 
@@ -74,6 +75,7 @@ fun SplitTunnelScreenContent(
     onToggleApp: (String, Boolean) -> Unit,
     onQuery: (String) -> Unit,
     onClearAll: () -> Unit = {},
+    iconLoader: suspend (String) -> ImageBitmap? = { null },
 ) {
     Scaffold(
         modifier = Modifier.testTag(SplitTunnelTestTags.SCREEN),
@@ -128,6 +130,7 @@ fun SplitTunnelScreenContent(
                     onModeChange = onModeChange,
                     onToggleApp = onToggleApp,
                     onQuery = onQuery,
+                    iconLoader = iconLoader,
                 )
         }
     }
@@ -152,6 +155,7 @@ private fun ContentBody(
     onModeChange: (SplitTunnelMode) -> Unit,
     onToggleApp: (String, Boolean) -> Unit,
     onQuery: (String) -> Unit,
+    iconLoader: suspend (String) -> ImageBitmap?,
 ) {
     Column(
         modifier = Modifier
@@ -176,7 +180,7 @@ private fun ContentBody(
             if (state.apps.isEmpty()) {
                 EmptyBody()
             } else {
-                AppsList(state = state, onToggleApp = onToggleApp)
+                AppsList(state = state, onToggleApp = onToggleApp, iconLoader = iconLoader)
             }
         } else {
             ModeDescription(mode = state.mode)
@@ -226,6 +230,7 @@ private fun EmptyBody() {
 private fun AppsList(
     state: SplitTunnelUiState.Content,
     onToggleApp: (String, Boolean) -> Unit,
+    iconLoader: suspend (String) -> ImageBitmap?,
 ) {
     LazyColumn(
         modifier = Modifier
@@ -234,7 +239,7 @@ private fun AppsList(
         contentPadding = PaddingValues(vertical = 8.dp),
     ) {
         items(state.apps, key = { it.packageName }) { app ->
-            AppRowView(app = app, onToggleApp = onToggleApp)
+            AppRowView(app = app, onToggleApp = onToggleApp, iconLoader = iconLoader)
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
         }
     }
@@ -277,7 +282,19 @@ private val VISIBLE_MODES = listOf(
 private fun AppRowView(
     app: AppRow,
     onToggleApp: (String, Boolean) -> Unit,
+    iconLoader: suspend (String) -> ImageBitmap?,
 ) {
+    val icon: ImageBitmap? = if (app.icon != null) {
+        app.icon
+    } else {
+        val state = androidx.compose.runtime.remember(app.packageName) {
+            androidx.compose.runtime.mutableStateOf<ImageBitmap?>(null)
+        }
+        androidx.compose.runtime.LaunchedEffect(app.packageName) {
+            state.value = iconLoader(app.packageName)
+        }
+        state.value
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -290,7 +307,7 @@ private fun AppRowView(
             modifier = Modifier.fillMaxWidth(0.85f),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            AppIcon(icon = app.icon)
+            AppIcon(icon = icon)
             Spacer(modifier = Modifier.width(12.dp))
             Column {
                 Text(text = app.label, style = MaterialTheme.typography.bodyLarge)

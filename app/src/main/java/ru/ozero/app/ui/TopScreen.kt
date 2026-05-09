@@ -16,4 +16,5 @@ enum class TopScreen {
     StatsHistory,
     Backup,
     AutoModeSettings,
+    Language,
 }

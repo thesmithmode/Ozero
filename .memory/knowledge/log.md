@@ -75,3 +75,10 @@
 - Connections created: [[connections/dependency-override-masking]], [[connections/release-checks-beyond-ci]]
 - Articles updated: (none)
 - Excluded as not actionable knowledge: specific AWG test counts, ktlint alignment-whitespace specifics, release run number 25310434846, multiple memory flush failures ("Nothing worth saving" or exit code 1)
+
+## [2026-05-09T18:28:06+03:00] compile | 2026-05-07.md
+- Source: daily/2026-05-07.md
+- Articles created: [[concepts/warp-false-connected-no-handshake]]
+- Connections created: [[connections/false-positive-engine-status]]
+- Articles updated: (none — 3 main concepts already existed from prior 2026-05-08 compile: [[concepts/warp-awg-obfuscation-russian-isps]], [[concepts/android-vpn-traffic-stats]], [[concepts/dual-go-runtime-eager-loading]])
+- Excluded as already covered: AwgParams() vs VANILLA confusion (in warp-awg-obfuscation article), CI not triggered on intermediate commits (in same article), git stash unreliability (process trivia), auto-mode failover design mention (insufficient detail), 5 memory flush failures ("Nothing worth saving" or error)

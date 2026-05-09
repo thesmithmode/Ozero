@@ -46,7 +46,6 @@ import ru.ozero.app.R
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.SettingsModel
-import ru.ozero.enginescore.settings.SplitTunnelMode
 
 @Composable
 fun SettingsScreen(
@@ -63,6 +62,7 @@ fun SettingsScreen(
     onOpenDiagnostics: () -> Unit = {},
     onOpenBackup: () -> Unit = {},
     onOpenAutoModeSettings: () -> Unit = {},
+    onOpenLanguage: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -83,14 +83,13 @@ fun SettingsScreen(
             onOpenDiagnostics = onOpenDiagnostics,
             onOpenBackup = onOpenBackup,
             onOpenAutoModeSettings = onOpenAutoModeSettings,
+            onOpenLanguage = onOpenLanguage,
         ),
-        onSplitModeChange = viewModel::onSplitModeChange,
         onIpv6Toggle = viewModel::onIpv6Toggle,
         onAutoStartToggle = viewModel::onAutoStartToggle,
         onKillswitchToggle = viewModel::onKillswitchToggle,
         onAlwaysOnBannerDismissed = viewModel::onAlwaysOnBannerDismissed,
         onManualEngineSelect = viewModel::onManualEngineSelect,
-        onUiLocaleSelect = viewModel::onUiLocaleSelect,
         onAppModeSelect = viewModel::onAppModeSelect,
     )
 }
@@ -102,13 +101,11 @@ fun SettingsScreenContent(
     state: SettingsUiState,
     onBack: () -> Unit,
     nav: SettingsNavActions = SettingsNavActions(onOpenAllowedApps = {}, onOpenServers = {}),
-    onSplitModeChange: (SplitTunnelMode) -> Unit,
     onIpv6Toggle: (Boolean) -> Unit,
     onAutoStartToggle: (Boolean) -> Unit,
     onKillswitchToggle: (Boolean) -> Unit = {},
     onAlwaysOnBannerDismissed: () -> Unit = {},
     onManualEngineSelect: (EngineId?) -> Unit,
-    onUiLocaleSelect: (String?) -> Unit = {},
     onAppModeSelect: (AppMode) -> Unit = {},
 ) {
     Scaffold(
@@ -137,13 +134,11 @@ fun SettingsScreenContent(
                     padding = padding,
                     model = state.model,
                     nav = nav,
-                    onSplitModeChange = onSplitModeChange,
                     onIpv6Toggle = onIpv6Toggle,
                     onAutoStartToggle = onAutoStartToggle,
                     onKillswitchToggle = onKillswitchToggle,
                     onAlwaysOnBannerDismissed = onAlwaysOnBannerDismissed,
                     onManualEngineSelect = onManualEngineSelect,
-                    onUiLocaleSelect = onUiLocaleSelect,
                     onAppModeSelect = onAppModeSelect,
                 )
         }
@@ -168,13 +163,11 @@ private fun ContentBody(
     padding: PaddingValues,
     model: SettingsModel,
     nav: SettingsNavActions,
-    onSplitModeChange: (SplitTunnelMode) -> Unit,
     onIpv6Toggle: (Boolean) -> Unit,
     onAutoStartToggle: (Boolean) -> Unit,
     onKillswitchToggle: (Boolean) -> Unit = {},
     onAlwaysOnBannerDismissed: () -> Unit = {},
     onManualEngineSelect: (EngineId?) -> Unit,
-    onUiLocaleSelect: (String?) -> Unit = {},
     onAppModeSelect: (AppMode) -> Unit = {},
 ) {
     LazyColumn(
@@ -190,9 +183,7 @@ private fun ContentBody(
         item { SectionDivider() }
         item {
             ConnectionSection(
-                splitMode = model.splitMode,
                 manualEngine = model.manualEngine,
-                onSplitModeChange = onSplitModeChange,
                 onManualEngineSelect = onManualEngineSelect,
                 onOpenServers = nav.onOpenServers,
             )
@@ -238,9 +229,9 @@ private fun ContentBody(
         item { BackupSection(onOpenBackup = nav.onOpenBackup) }
         item { SectionDivider() }
         item {
-            LanguageSection(
+            LanguageNavRow(
                 currentTag = model.uiLocaleTag,
-                onSelect = onUiLocaleSelect,
+                onOpen = nav.onOpenLanguage,
             )
         }
         item { SectionDivider() }
@@ -341,52 +332,31 @@ private fun AppModeSection(
 }
 
 @Composable
-private fun LanguageSection(
+private fun LanguageNavRow(
     currentTag: String?,
-    onSelect: (String?) -> Unit,
+    onOpen: () -> Unit,
 ) {
-    val allLocales = listOf(
-        null to R.string.settings_language_system,
-        SettingsModel.LOCALE_RU to R.string.settings_language_ru,
-        SettingsModel.LOCALE_EN to R.string.settings_language_en,
-        SettingsModel.LOCALE_ZH_CN to R.string.settings_language_zh_cn,
-        SettingsModel.LOCALE_ES to R.string.settings_language_es,
-        SettingsModel.LOCALE_AR to R.string.settings_language_ar,
-        SettingsModel.LOCALE_FR to R.string.settings_language_fr,
-        SettingsModel.LOCALE_HI to R.string.settings_language_hi,
-        SettingsModel.LOCALE_PT to R.string.settings_language_pt,
-        SettingsModel.LOCALE_ID to R.string.settings_language_id,
-        SettingsModel.LOCALE_DE to R.string.settings_language_de,
-        SettingsModel.LOCALE_JA to R.string.settings_language_ja,
-    )
-    val supported = LocaleApplier.SUPPORTED_TAGS.toSet()
-    val locales = allLocales.filter { (tag, _) -> (tag ?: "") in supported }
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(R.string.settings_language_title),
-            style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-        )
-        locales.forEach { (tag, labelRes) ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .selectable(
-                        selected = currentTag == tag,
-                        onClick = { onSelect(tag) },
-                        role = Role.RadioButton,
-                    )
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                RadioButton(selected = currentTag == tag, onClick = null)
-                Text(
-                    text = stringResource(labelRes),
-                    modifier = Modifier.padding(start = 12.dp),
-                )
-            }
-        }
+    val labelRes = when (currentTag) {
+        SettingsModel.LOCALE_RU -> R.string.settings_language_ru
+        SettingsModel.LOCALE_EN -> R.string.settings_language_en
+        SettingsModel.LOCALE_ZH_CN -> R.string.settings_language_zh_cn
+        SettingsModel.LOCALE_ES -> R.string.settings_language_es
+        SettingsModel.LOCALE_AR -> R.string.settings_language_ar
+        SettingsModel.LOCALE_FR -> R.string.settings_language_fr
+        SettingsModel.LOCALE_HI -> R.string.settings_language_hi
+        SettingsModel.LOCALE_PT -> R.string.settings_language_pt
+        SettingsModel.LOCALE_ID -> R.string.settings_language_id
+        SettingsModel.LOCALE_DE -> R.string.settings_language_de
+        SettingsModel.LOCALE_JA -> R.string.settings_language_ja
+        else -> R.string.settings_language_system
     }
+    NavRow(
+        title = stringResource(R.string.settings_language_title),
+        summary = stringResource(labelRes),
+        tag = SettingsTestTags.LANGUAGE_ROW,
+        enabled = true,
+        onClick = onOpen,
+    )
 }
 
 @Composable
@@ -477,22 +447,11 @@ private fun LogsSection(onOpenLogs: () -> Unit) {
 
 @Composable
 private fun ConnectionSection(
-    splitMode: SplitTunnelMode,
     manualEngine: EngineId?,
-    onSplitModeChange: (SplitTunnelMode) -> Unit,
     onManualEngineSelect: (EngineId?) -> Unit,
     onOpenServers: () -> Unit,
 ) {
     SectionHeader(R.string.settings_section_connection, SettingsTestTags.SECTION_CONNECTION)
-    SubsectionLabel(stringResource(R.string.settings_split_mode_label))
-    SplitTunnelMode.entries.forEach { mode ->
-        RadioRow(
-            selected = mode == splitMode,
-            label = stringResource(mode.labelRes()),
-            tag = SettingsTestTags.SPLIT_MODE_PREFIX + mode.name,
-            onClick = { onSplitModeChange(mode) },
-        )
-    }
     SubsectionLabel(stringResource(R.string.settings_manual_engine_title))
     Text(
         text = stringResource(R.string.settings_manual_engine_summary),
@@ -749,11 +708,3 @@ private fun SectionDivider() {
     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 }
 
-@androidx.annotation.StringRes
-private fun SplitTunnelMode.labelRes(): Int =
-    when (this) {
-        SplitTunnelMode.ALL -> R.string.settings_split_mode_all
-        SplitTunnelMode.BYPASS_LAN -> R.string.settings_split_mode_bypass_lan
-        SplitTunnelMode.ALLOWLIST -> R.string.settings_split_mode_allowlist
-        SplitTunnelMode.BLOCKLIST -> R.string.settings_split_mode_blocklist
-    }

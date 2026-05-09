@@ -43,7 +43,7 @@
 
     <!-- Settings -->
     <string name="settings_title">Настройки</string>
-    <string name="settings_split_tunnel_title">Split-tunnel</string>
+    <string name="settings_split_tunnel_title">Раздельное туннелирование</string>
     <string name="settings_split_tunnel_summary">Какие приложения идут через VPN</string>
     <string name="settings_split_mode_all">Все приложения</string>
     <string name="settings_split_mode_bypass_lan">Все, кроме локальной сети</string>
@@ -91,7 +91,7 @@
     <string name="settings_ipv6_summary">Маршрутизировать IPv6 через VPN</string>
     <string name="settings_auto_start_title">Автозапуск при загрузке</string>
     <string name="settings_auto_start_summary">VPN включится автоматически после перезагрузки</string>
-    <string name="settings_allowed_apps_title">Список приложений</string>
+    <string name="settings_allowed_apps_title">Раздельное туннелирование</string>
     <string name="settings_allowed_apps_summary">Откроется в TBD</string>
     <string name="settings_allowed_apps_open_summary">Выбор приложений и режим Split-tunnel</string>
     <string name="settings_servers_title">Серверы / Double-hop</string>
@@ -123,15 +123,15 @@
     <string name="diag_back">Назад</string>
 
     <!-- Split-tunnel screen -->
-    <string name="split_tunnel_title">Список приложений</string>
+    <string name="split_tunnel_title">Раздельное туннелирование</string>
     <string name="split_tunnel_back">Назад</string>
     <string name="split_tunnel_search_hint">Поиск приложения…</string>
     <string name="split_tunnel_no_apps">Ничего не найдено</string>
     <string name="split_tunnel_system_app">Системное</string>
     <string name="split_tunnel_short_all">Все</string>
     <string name="split_tunnel_short_bypass_lan">Без LAN</string>
-    <string name="split_tunnel_short_allowlist">Включить</string>
-    <string name="split_tunnel_short_blocklist">Исключить</string>
+    <string name="split_tunnel_short_allowlist">Включено</string>
+    <string name="split_tunnel_short_blocklist">Исключено</string>
     <string name="split_tunnel_selected_count">Выбрано: %1$d</string>
     <string name="split_tunnel_clear_all">Очистить</string>
     <string name="split_tunnel_mode_hint">Список приложений активен только в режимах Allowlist и Blocklist.</string>

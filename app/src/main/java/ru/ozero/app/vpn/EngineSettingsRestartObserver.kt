@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.commonvpn.TunnelState
-import ru.ozero.enginescore.settings.SplitTunnelMode
 import ru.ozero.enginescore.EngineId
 
 class EngineSettingsRestartObserver(
@@ -19,7 +18,6 @@ class EngineSettingsRestartObserver(
     data class Snapshot(
         val manualEngine: EngineId?,
         val byedpiWinningArgs: String?,
-        val splitMode: SplitTunnelMode,
         val ipv6Enabled: Boolean,
         val customDnsServers: List<String>,
     )
@@ -30,7 +28,6 @@ class EngineSettingsRestartObserver(
             Snapshot(
                 manualEngine = it.manualEngine,
                 byedpiWinningArgs = it.byedpiWinningArgs?.trim(),
-                splitMode = it.splitMode,
                 ipv6Enabled = it.ipv6Enabled,
                 customDnsServers = it.customDnsServers,
             )
