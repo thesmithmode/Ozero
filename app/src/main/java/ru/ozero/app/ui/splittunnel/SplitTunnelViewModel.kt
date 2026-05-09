@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import ru.ozero.commonvpn.TunnelController
+import ru.ozero.commonvpn.TunnelState
 import ru.ozero.corestorage.dao.AppSplitRuleDao
 import ru.ozero.corestorage.entity.AppSplitRule
 import ru.ozero.enginescore.settings.SettingsRepository
@@ -24,6 +26,7 @@ class SplitTunnelViewModel @Inject constructor(
     private val appListProvider: AppListProvider,
     private val dao: AppSplitRuleDao,
     private val settingsRepository: SettingsRepository,
+    private val tunnelController: TunnelController,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<SplitTunnelUiState>(SplitTunnelUiState.Loading)
@@ -45,7 +48,8 @@ class SplitTunnelViewModel @Inject constructor(
             dao.observeAll(),
             settingsRepository.settings.map { it.splitMode },
             query,
-        ) { appsList, rules, persistedMode, q ->
+            tunnelController.state.map { it is TunnelState.Idle },
+        ) { appsList, rules, persistedMode, q, editable ->
             val mode = if (persistedMode == SplitTunnelMode.BYPASS_LAN) SplitTunnelMode.ALL else persistedMode
             val isBlocklist = mode == SplitTunnelMode.BLOCKLIST
             val included = rules.filter { it.isExcluded == isBlocklist }.map { it.packageName }.toSet()
@@ -67,16 +71,19 @@ class SplitTunnelViewModel @Inject constructor(
                 query = q,
                 apps = rows,
                 selectedCount = included.size,
+                editable = editable,
             )
         }.onEach { _uiState.value = it }.launchIn(viewModelScope)
     }
 
     fun onModeChange(mode: SplitTunnelMode) {
         if (mode == SplitTunnelMode.BYPASS_LAN) return
+        if (tunnelController.state.value !is TunnelState.Idle) return
         viewModelScope.launch { settingsRepository.setSplitMode(mode) }
     }
 
     fun onToggleApp(packageName: String, checked: Boolean) {
+        if (tunnelController.state.value !is TunnelState.Idle) return
         viewModelScope.launch {
             if (checked) {
                 val mode = settingsRepository.settings.map { it.splitMode }.first()

@@ -137,6 +137,7 @@
     <string name="split_tunnel_mode_hint">Список приложений активен только в режимах Allowlist и Blocklist.</string>
     <string name="split_tunnel_mode_all_description">Все приложения идут через VPN.</string>
     <string name="split_tunnel_mode_bypass_lan_description">Все приложения идут через VPN, кроме локальных адресов (LAN).</string>
+    <string name="split_tunnel_disabled_banner">Отключите VPN, чтобы изменить режим</string>
 
     <!-- Servers (double-hop) -->
     <string name="servers_title">Серверы — Double-hop</string>

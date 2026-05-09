@@ -12,4 +12,5 @@ object SplitTunnelTestTags {
     const val SELECTED_COUNT = "split_tunnel_selected_count"
     const val CLEAR_ALL = "split_tunnel_clear_all"
     const val MODE_DESCRIPTION = "split_tunnel_mode_description"
+    const val DISABLED_BANNER = "split_tunnel_disabled_banner"
 }

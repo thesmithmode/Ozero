@@ -93,7 +93,7 @@ class EngineUrnetwork(
                         "windowType=${windowType.rawValue} fixedIp=$fixedIp",
                 )
                 startStatsPolling()
-                StartResult.Success(socksPort = config.socksPort)
+                StartResult.Success(socksPort = 0)
             }
             is UrnetworkSdkBridge.StartResult.Failed -> {
                 PersistentLoggers.error(TAG, "start failed: ${bridgeResult.reason}")

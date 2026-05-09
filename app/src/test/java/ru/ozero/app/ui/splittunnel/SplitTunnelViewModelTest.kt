@@ -18,6 +18,7 @@ import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginescore.settings.SplitTunnelMode
 import ru.ozero.enginescore.EngineId
+import ru.ozero.commonvpn.TunnelController
 import ru.ozero.corestorage.dao.AppSplitRuleDao
 import ru.ozero.corestorage.entity.AppSplitRule
 import kotlin.test.assertEquals
@@ -31,6 +32,7 @@ class SplitTunnelViewModelTest {
     private lateinit var apps: FakeAppListProvider
     private lateinit var dao: FakeAppSplitRuleDao
     private lateinit var settings: FakeSettingsRepository
+    private lateinit var tunnelController: TunnelController
     private lateinit var viewModel: SplitTunnelViewModel
 
     private val sample = listOf(
@@ -45,7 +47,8 @@ class SplitTunnelViewModelTest {
         apps = FakeAppListProvider(sample)
         dao = FakeAppSplitRuleDao()
         settings = FakeSettingsRepository()
-        viewModel = SplitTunnelViewModel(apps, dao, settings)
+        tunnelController = TunnelController()
+        viewModel = SplitTunnelViewModel(apps, dao, settings, tunnelController)
     }
 
     @AfterEach
@@ -61,7 +64,7 @@ class SplitTunnelViewModelTest {
     @Test
     fun `state остаётся Loading пока loadApps не завершён даже после combine pass`() = runTest {
         val gated = GatedAppListProvider()
-        val gatedVm = SplitTunnelViewModel(gated, dao, settings)
+        val gatedVm = SplitTunnelViewModel(gated, dao, settings, tunnelController)
 
         advanceUntilIdle()
 
@@ -152,7 +155,7 @@ class SplitTunnelViewModelTest {
                 AppSplitRule("com.user.bar", isExcluded = true),
             ),
         )
-        val vm = SplitTunnelViewModel(apps, dao, settings)
+        val vm = SplitTunnelViewModel(apps, dao, settings, tunnelController)
         advanceUntilIdle()
 
         val state = vm.uiState.value as SplitTunnelUiState.Content
@@ -171,7 +174,7 @@ class SplitTunnelViewModelTest {
                 AppSplitRule("com.user.bar", isExcluded = true),
             ),
         )
-        val vm = SplitTunnelViewModel(apps, dao, settings)
+        val vm = SplitTunnelViewModel(apps, dao, settings, tunnelController)
         advanceUntilIdle()
 
         val state = vm.uiState.value as SplitTunnelUiState.Content
@@ -190,7 +193,7 @@ class SplitTunnelViewModelTest {
                 AppSplitRule("com.user.bar", isExcluded = true),
             ),
         )
-        val vm = SplitTunnelViewModel(apps, dao, settings)
+        val vm = SplitTunnelViewModel(apps, dao, settings, tunnelController)
         advanceUntilIdle()
 
         val allowlistState = vm.uiState.value as SplitTunnelUiState.Content
@@ -281,7 +284,7 @@ class SplitTunnelViewModelTest {
     fun `BYPASS_LAN persisted мигрирует в ALL — UI не показывает 4й таб`() = runTest {
         settings.modeUpdates.clear()
         settings.setSplitMode(SplitTunnelMode.BYPASS_LAN)
-        val vm = SplitTunnelViewModel(apps, dao, settings)
+        val vm = SplitTunnelViewModel(apps, dao, settings, tunnelController)
         advanceUntilIdle()
 
         val state = vm.uiState.value as SplitTunnelUiState.Content
@@ -306,6 +309,54 @@ class SplitTunnelViewModelTest {
             settings.modeUpdates,
             "onModeChange(BYPASS_LAN) обязан быть no-op — режим скрыт из UI tabs.",
         )
+    }
+
+    @Test
+    fun `editable=true когда tunnel Idle`() = runTest {
+        advanceUntilIdle()
+        val state = viewModel.uiState.value as SplitTunnelUiState.Content
+        assertTrue(state.editable, "Idle → editable=true")
+    }
+
+    @Test
+    fun `editable=false когда tunnel Connected`() = runTest {
+        tunnelController.onProbing(EngineId.BYEDPI)
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, socksPort = 1080)
+        advanceUntilIdle()
+        val state = viewModel.uiState.value as SplitTunnelUiState.Content
+        assertTrue(!state.editable, "Connected → editable=false (без редактирования при VPN ON)")
+    }
+
+    @Test
+    fun `onModeChange игнорируется когда tunnel не Idle`() = runTest {
+        tunnelController.onProbing(EngineId.BYEDPI)
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, socksPort = 1080)
+        advanceUntilIdle()
+        settings.modeUpdates.clear()
+
+        viewModel.onModeChange(SplitTunnelMode.ALLOWLIST)
+        advanceUntilIdle()
+
+        assertEquals(
+            emptyList<SplitTunnelMode>(),
+            settings.modeUpdates,
+            "onModeChange при Connected — no-op (sentinel против race с Snapshot)",
+        )
+    }
+
+    @Test
+    fun `onToggleApp игнорируется когда tunnel не Idle`() = runTest {
+        tunnelController.onProbing(EngineId.BYEDPI)
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, socksPort = 1080)
+        advanceUntilIdle()
+
+        viewModel.onToggleApp("com.user.foo", checked = true)
+        advanceUntilIdle()
+
+        assertEquals(emptyList<AppSplitRule>(), dao.upserts, "Connected → toggle игнор")
     }
 
     @Test

@@ -162,8 +162,12 @@ private fun ContentBody(
             .fillMaxSize()
             .padding(padding),
     ) {
+        if (!state.editable) {
+            DisabledBanner()
+        }
         ModeSegment(
             mode = state.mode,
+            enabled = state.editable,
             onModeChange = onModeChange,
         )
         if (state.mode.requiresAppList()) {
@@ -172,6 +176,7 @@ private fun ContentBody(
                 onValueChange = onQuery,
                 label = { Text(stringResource(R.string.split_tunnel_search_hint)) },
                 singleLine = true,
+                enabled = state.editable,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -180,11 +185,33 @@ private fun ContentBody(
             if (state.apps.isEmpty()) {
                 EmptyBody()
             } else {
-                AppsList(state = state, onToggleApp = onToggleApp, iconLoader = iconLoader)
+                AppsList(
+                    state = state,
+                    onToggleApp = onToggleApp,
+                    iconLoader = iconLoader,
+                    editable = state.editable,
+                )
             }
         } else {
             ModeDescription(mode = state.mode)
         }
+    }
+}
+
+@Composable
+private fun DisabledBanner() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f))
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .testTag(SplitTunnelTestTags.DISABLED_BANNER),
+    ) {
+        Text(
+            text = stringResource(R.string.split_tunnel_disabled_banner),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onErrorContainer,
+        )
     }
 }
 
@@ -231,6 +258,7 @@ private fun AppsList(
     state: SplitTunnelUiState.Content,
     onToggleApp: (String, Boolean) -> Unit,
     iconLoader: suspend (String) -> ImageBitmap?,
+    editable: Boolean,
 ) {
     LazyColumn(
         modifier = Modifier
@@ -239,7 +267,12 @@ private fun AppsList(
         contentPadding = PaddingValues(vertical = 8.dp),
     ) {
         items(state.apps, key = { it.packageName }) { app ->
-            AppRowView(app = app, onToggleApp = onToggleApp, iconLoader = iconLoader)
+            AppRowView(
+                app = app,
+                onToggleApp = onToggleApp,
+                iconLoader = iconLoader,
+                editable = editable,
+            )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
         }
     }
@@ -249,6 +282,7 @@ private fun AppsList(
 @Composable
 private fun ModeSegment(
     mode: SplitTunnelMode,
+    enabled: Boolean,
     onModeChange: (SplitTunnelMode) -> Unit,
 ) {
     SingleChoiceSegmentedButtonRow(
@@ -260,6 +294,7 @@ private fun ModeSegment(
             SegmentedButton(
                 selected = value == mode,
                 onClick = { onModeChange(value) },
+                enabled = enabled,
                 shape = SegmentedButtonDefaults.itemShape(
                     index = index,
                     count = VISIBLE_MODES.size,
@@ -283,6 +318,7 @@ private fun AppRowView(
     app: AppRow,
     onToggleApp: (String, Boolean) -> Unit,
     iconLoader: suspend (String) -> ImageBitmap?,
+    editable: Boolean,
 ) {
     val icon: ImageBitmap? = if (app.icon != null) {
         app.icon
@@ -328,6 +364,7 @@ private fun AppRowView(
         Checkbox(
             checked = app.included,
             onCheckedChange = { value -> onToggleApp(app.packageName, value) },
+            enabled = editable,
         )
     }
 }

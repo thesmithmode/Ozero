@@ -206,12 +206,12 @@ class EngineUrnetworkContractTest {
     }
 
     @Test
-    fun `start success возвращает StartResult_Success с socksPort из config`() = runTest {
+    fun `start success всегда возвращает socksPort=0 — URnetwork TUN-only без SOCKS`() = runTest {
         val cfg = EngineConfig.Urnetwork(jwtToken = "", socksPort = 4242)
         val (e, _, _) = engine(byJwt = "j", byClientJwt = "cj")
         val r = e.start(cfg, Upstream.None)
         val s = assertIs<StartResult.Success>(r)
-        assertEquals(4242, s.socksPort)
+        assertEquals(0, s.socksPort)
     }
 
     @Test

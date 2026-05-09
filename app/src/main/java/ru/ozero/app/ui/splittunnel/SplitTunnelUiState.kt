@@ -11,6 +11,7 @@ sealed interface SplitTunnelUiState {
         val query: String,
         val apps: List<AppRow>,
         val selectedCount: Int = 0,
+        val editable: Boolean = true,
     ) : SplitTunnelUiState
 }
 
