@@ -144,7 +144,7 @@ class OkHttpIpInfoProviderTest {
         server.enqueue(MockResponse().setResponseCode(200).setBody("""{"ip":"1.2.3.4"}"""))
         provider.fetch().getOrThrow()
         val recorded = server.takeRequest()
-        assertEquals("Ozero-IpInfo/1", recorded.getHeader("User-Agent"))
+        assertEquals("Ozero-IpInfo/2", recorded.getHeader("User-Agent"))
         assertEquals("application/json", recorded.getHeader("Accept"))
         assertEquals("GET", recorded.method)
     }

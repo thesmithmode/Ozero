@@ -13,7 +13,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -189,7 +188,7 @@ private fun PeriodChip(labelRes: Int, selected: Boolean, onClick: () -> Unit) {
 private fun SortMenu(current: SessionSort, onSelect: (SessionSort) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     IconButton(onClick = { expanded = true }, modifier = Modifier.testTag("sort_menu")) {
-        Icon(Icons.Filled.Sort, contentDescription = stringResource(R.string.stats_history_sort_cd))
+        Text("↕")
     }
     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
         SortOption(SessionSort.TIME_DESC, current, R.string.stats_history_sort_time_desc, onSelect) {
