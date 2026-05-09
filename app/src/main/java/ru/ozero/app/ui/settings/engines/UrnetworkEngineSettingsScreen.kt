@@ -77,6 +77,8 @@ fun UrnetworkEngineSettingsScreen(
                 }
             }
             UrnetworkSettingsUiState.NotConnected -> {
+                val windowType by viewModel.windowType.collectAsStateWithLifecycle()
+                val fixedIp by viewModel.fixedIpSize.collectAsStateWithLifecycle()
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -92,6 +94,12 @@ fun UrnetworkEngineSettingsScreen(
                             modifier = Modifier.padding(16.dp),
                         )
                     }
+                    WindowTypeSection(
+                        selected = windowType,
+                        fixedIp = fixedIp,
+                        onSelect = viewModel::selectWindowType,
+                        onToggleFixedIp = viewModel::toggleFixedIpSize,
+                    )
                 }
             }
             is UrnetworkSettingsUiState.Ready -> {

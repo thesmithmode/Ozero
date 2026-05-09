@@ -47,6 +47,7 @@ import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.SettingsModel
 
+@Suppress("LongParameterList")
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
@@ -707,4 +708,3 @@ private fun NavRow(
 private fun SectionDivider() {
     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 }
-

@@ -87,7 +87,11 @@ class EngineUrnetwork(
                 val fixedIp = configStore.fixedIpSize().first()
                 runCatching { sdkBridge.applyPerformanceProfile(windowType, fixedIp) }
                     .onFailure { PersistentLoggers.warn(TAG, "applyPerformanceProfile threw: ${it.message}") }
-                Log.i(TAG, "started OK preferredCountry=${config.region ?: "<auto>"} windowType=${windowType.rawValue} fixedIp=$fixedIp")
+                Log.i(
+                    TAG,
+                    "started OK preferredCountry=${config.region ?: "<auto>"} " +
+                        "windowType=${windowType.rawValue} fixedIp=$fixedIp",
+                )
                 startStatsPolling()
                 StartResult.Success(socksPort = config.socksPort)
             }

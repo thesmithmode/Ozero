@@ -230,10 +230,14 @@ class EngineUrnetworkContractTest {
         override: String?,
         byJwt: String? = null,
         byClientJwt: String? = null,
+        initialWindowType: UrnetworkWindowType = UrnetworkWindowType.AUTO,
+        initialFixedIp: Boolean = false,
     ) : UrnetworkConfigStore {
         private val overrideFlow = MutableStateFlow(override)
         val byJwtFlow = MutableStateFlow(byJwt)
         val byClientJwtFlow = MutableStateFlow(byClientJwt)
+        private val windowTypeFlow = MutableStateFlow(initialWindowType)
+        private val fixedIpFlow = MutableStateFlow(initialFixedIp)
         override fun walletAddress(): Flow<String> =
             overrideFlow.map { it ?: UrnetworkDefaults.PRESET_WALLET }
         override fun walletOverride(): Flow<String?> = overrideFlow
@@ -248,6 +252,10 @@ class EngineUrnetworkContractTest {
         override suspend fun setByClientJwt(value: String?) {
             byClientJwtFlow.value = value
         }
+        override fun windowType(): Flow<UrnetworkWindowType> = windowTypeFlow
+        override suspend fun setWindowType(value: UrnetworkWindowType) { windowTypeFlow.value = value }
+        override fun fixedIpSize(): Flow<Boolean> = fixedIpFlow
+        override suspend fun setFixedIpSize(value: Boolean) { fixedIpFlow.value = value }
     }
 
     private class FakeAuthService(
@@ -321,5 +329,98 @@ class EngineUrnetworkContractTest {
         override fun unpaidByteCount(): Long = 0L
         override fun fetchTransferStats() = Unit
         override suspend fun fetchSubscriptionBalance(): UrnetworkSdkBridge.SubscriptionBalanceSnapshot? = null
+        var lastAppliedWindowType: UrnetworkWindowType? = null
+        var lastAppliedFixedIp: Boolean? = null
+        override fun applyPerformanceProfile(windowType: UrnetworkWindowType, fixedIpSize: Boolean) {
+            lastAppliedWindowType = windowType
+            lastAppliedFixedIp = fixedIpSize
+        }
+    }
+}
+
+class EngineUrnetworkPerformanceProfileTest {
+
+    private val baseConfig = EngineConfig.Urnetwork(jwtToken = "")
+
+    @Test
+    fun `start применяет windowType QUALITY из configStore к bridge`() = runTest {
+        val store = FakeProfileConfigStore(windowType = UrnetworkWindowType.QUALITY, fixedIp = false)
+        val bridge = FakeProfileBridge()
+        val engine = EngineUrnetwork(store, bridge, FakeProfileAuthService())
+        engine.start(baseConfig, Upstream.None)
+        assertEquals(UrnetworkWindowType.QUALITY, bridge.lastAppliedWindowType)
+        assertEquals(false, bridge.lastAppliedFixedIp)
+    }
+
+    @Test
+    fun `start применяет windowType SPEED с fixedIp true из configStore к bridge`() = runTest {
+        val store = FakeProfileConfigStore(windowType = UrnetworkWindowType.SPEED, fixedIp = true)
+        val bridge = FakeProfileBridge()
+        val engine = EngineUrnetwork(store, bridge, FakeProfileAuthService())
+        engine.start(baseConfig, Upstream.None)
+        assertEquals(UrnetworkWindowType.SPEED, bridge.lastAppliedWindowType)
+        assertEquals(true, bridge.lastAppliedFixedIp)
+    }
+
+    @Test
+    fun `start применяет windowType AUTO из configStore к bridge (AUTO не skipped на уровне EngineUrnetwork)`() = runTest {
+        val store = FakeProfileConfigStore(windowType = UrnetworkWindowType.AUTO, fixedIp = false)
+        val bridge = FakeProfileBridge()
+        val engine = EngineUrnetwork(store, bridge, FakeProfileAuthService())
+        engine.start(baseConfig, Upstream.None)
+        assertEquals(UrnetworkWindowType.AUTO, bridge.lastAppliedWindowType)
+    }
+
+    private class FakeProfileConfigStore(
+        private val windowType: UrnetworkWindowType,
+        private val fixedIp: Boolean,
+    ) : UrnetworkConfigStore {
+        override fun walletAddress(): kotlinx.coroutines.flow.Flow<String> =
+            kotlinx.coroutines.flow.flowOf(UrnetworkDefaults.PRESET_WALLET)
+        override fun walletOverride(): kotlinx.coroutines.flow.Flow<String?> =
+            kotlinx.coroutines.flow.flowOf(null)
+        override suspend fun setWalletOverride(value: String?) = Unit
+        override fun byJwt(): kotlinx.coroutines.flow.Flow<String?> =
+            kotlinx.coroutines.flow.flowOf("j")
+        override suspend fun setByJwt(value: String?) = Unit
+        override fun byClientJwt(): kotlinx.coroutines.flow.Flow<String?> =
+            kotlinx.coroutines.flow.flowOf("cj")
+        override suspend fun setByClientJwt(value: String?) = Unit
+        override fun windowType(): kotlinx.coroutines.flow.Flow<UrnetworkWindowType> =
+            kotlinx.coroutines.flow.flowOf(windowType)
+        override suspend fun setWindowType(value: UrnetworkWindowType) = Unit
+        override fun fixedIpSize(): kotlinx.coroutines.flow.Flow<Boolean> =
+            kotlinx.coroutines.flow.flowOf(fixedIp)
+        override suspend fun setFixedIpSize(value: Boolean) = Unit
+    }
+
+    private class FakeProfileBridge : UrnetworkSdkBridge {
+        var lastAppliedWindowType: UrnetworkWindowType? = null
+        var lastAppliedFixedIp: Boolean? = null
+        override fun applyPerformanceProfile(windowType: UrnetworkWindowType, fixedIpSize: Boolean) {
+            lastAppliedWindowType = windowType
+            lastAppliedFixedIp = fixedIpSize
+        }
+        override suspend fun start(walletAddress: String, apiUrl: String, connectUrl: String, byClientJwt: String) =
+            UrnetworkSdkBridge.StartResult.Success
+        override suspend fun stop() = Unit
+        override fun isRunning() = false
+        override suspend fun attachTun(tunFd: Int) = UrnetworkSdkBridge.AttachResult.Success
+        override fun connectTo(location: com.bringyour.sdk.ConnectLocation) = Unit
+        override fun connectBestAvailable() = Unit
+        override fun selectedLocation(): com.bringyour.sdk.ConnectLocation? = null
+        override fun openLocationsViewController(): com.bringyour.sdk.LocationsViewController? = null
+        override fun setProvidePaused(paused: Boolean) = Unit
+        override fun isProvidePaused() = false
+        override fun peerCount() = 0
+        override fun unpaidByteCount() = 0L
+        override fun fetchTransferStats() = Unit
+        override suspend fun fetchSubscriptionBalance(): UrnetworkSdkBridge.SubscriptionBalanceSnapshot? = null
+    }
+
+    private class FakeProfileAuthService : ru.ozero.engineurnetwork.auth.UrnetworkAuthService {
+        override suspend fun acquireGuestJwt() = ru.ozero.engineurnetwork.auth.GuestJwtResult.Success("j")
+        override suspend fun acquireClientJwt(byJwt: String) =
+            ru.ozero.engineurnetwork.auth.ClientJwtResult.Success("cj")
     }
 }

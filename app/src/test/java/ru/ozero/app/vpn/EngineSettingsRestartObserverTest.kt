@@ -17,7 +17,6 @@ import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SplitTunnelMode
 import ru.ozero.enginescore.EngineId
-import kotlinx.coroutines.delay
 import ru.ozero.commonvpn.TunnelState
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
