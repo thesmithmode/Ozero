@@ -405,4 +405,20 @@ class OzeroVpnServiceLifecycleTest {
                 "текущий probe job, не убивая сам scope.",
         )
     }
+
+    @Test
+    fun `establishTunForEngine не передаёт excludeSelf=false для TunFdAcceptor движков`() {
+        val body = source
+            .substringAfter("private suspend fun establishTunForEngine(")
+            .substringBefore("internal fun applyEngineTunSpec")
+        assertFalse(
+            body.contains("excludeSelf = false"),
+            "establishTunForEngine ЗАПРЕЩЕНО передавать excludeSelf=false. " +
+                "URnetwork Go SDK не имеет механизма вызова VpnService.protect() на своих сокетах — " +
+                "Sdk.newDeviceLocalWithDefaults не принимает SocketProtector callback. " +
+                "Без исключения self из TUN, SDK-соединения к bringyour.com идут в TUN → " +
+                "URnetwork читает их и пытается роутить → routing loop → SDK никогда не поднимается. " +
+                "Регрессия v0.0.7 (коммит 65e5b13). Фикс: убрать excludeSelf=false, использовать default (true).",
+        )
+    }
 }
