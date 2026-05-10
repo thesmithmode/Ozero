@@ -14,6 +14,12 @@ class WarpConfFileImporter : WarpFileImporter {
                 ImportedWarpConfig(config = config, rawIni = text)
             }
         }
+    } catch (e: VirtualMachineError) {
+        throw e
+    } catch (e: ThreadDeath) {
+        throw e
+    } catch (e: LinkageError) {
+        throw e
     } catch (t: Throwable) {
         if (t is VirtualMachineError || t is ThreadDeath || t is LinkageError) throw t
         Result.failure(IOException("Ошибка чтения файла: ${t.message}", t))
