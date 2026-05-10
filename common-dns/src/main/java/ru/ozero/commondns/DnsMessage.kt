@@ -18,7 +18,7 @@ internal object DnsMessage {
         buf.write(id)
         buf.write(byteArrayOf(0x01, 0x00))
         buf.write(byteArrayOf(0, 1, 0, 0, 0, 0, 0, 0))
-        hostname.split(".").forEach { label ->
+        hostname.split(".").filter { it.isNotEmpty() }.forEach { label ->
             buf.write(label.length)
             buf.write(label.toByteArray())
         }
