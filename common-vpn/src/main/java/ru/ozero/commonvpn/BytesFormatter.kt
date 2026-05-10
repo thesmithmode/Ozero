@@ -24,16 +24,14 @@ object BytesFormatter {
 
     fun humanReadablePerSec(bytesPerSec: Double): String {
         if (bytesPerSec <= 0.0) return "0 B/s"
-        val abs = abs(bytesPerSec)
-        if (abs < UNIT_STEP) return String.format(Locale.US, "%.0f B/s", bytesPerSec)
-        var value = abs
+        if (bytesPerSec < UNIT_STEP) return String.format(Locale.US, "%.0f B/s", bytesPerSec)
+        var value = bytesPerSec
         var unit = 0
         while (value >= UNIT_STEP && unit < UNITS.size - 1) {
             value /= UNIT_STEP
             unit++
         }
-        val signed = if (bytesPerSec < 0) -value else value
-        return String.format(Locale.US, "%.1f %s/s", signed, UNITS[unit])
+        return String.format(Locale.US, "%.1f %s/s", value, UNITS[unit])
     }
 
     fun durationHms(ms: Long): String {
