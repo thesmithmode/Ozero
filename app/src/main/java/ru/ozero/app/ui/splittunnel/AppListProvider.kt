@@ -64,20 +64,21 @@ class DefaultAppListProvider @Inject constructor(
     private fun loadMetadata(): List<InstalledApp> {
         val pm = context.packageManager
         val ownPackage = context.packageName
-        val launchableSet = queryLaunchablePackages(pm)
+        val launchableSet = queryLaunchablePackages(pm).toMutableSet()
         val infos = mutableMapOf<String, ApplicationInfo>()
         for (info in pm.getInstalledApplications(0)) {
             infos[info.packageName] = info
         }
 
-        runCatching {
-            val launcherApps = context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as? LauncherApps
-            if (launcherApps != null) {
-                for (profile in launcherApps.profiles) {
+        val launcherApps = context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as? LauncherApps
+        if (launcherApps != null) {
+            for (profile in launcherApps.profiles) {
+                runCatching {
                     val activities = launcherApps.getActivityList(null, profile)
                     for (activity in activities) {
                         val appInfo = activity.applicationInfo
                         infos[appInfo.packageName] = appInfo
+                        launchableSet.add(appInfo.packageName)
                     }
                 }
             }

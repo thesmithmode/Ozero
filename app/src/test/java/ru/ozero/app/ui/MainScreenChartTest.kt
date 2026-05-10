@@ -94,7 +94,6 @@ class MainScreenChartTest {
     @Test
     fun `downsample список меньше maxPoints возвращает оригинал`() {
         val data = listOf(1f to 2f, 3f to 4f, 5f to 6f)
-        assertNotSame(Unit, data) // sanity
         assertEquals(data, downsample(data, 10))
     }
 

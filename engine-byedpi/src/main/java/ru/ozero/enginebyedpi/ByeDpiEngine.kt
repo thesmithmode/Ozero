@@ -75,7 +75,7 @@ class ByeDpiEngine(
         proxyJobRef.getAndSet(proxyJob)?.cancel()
 
         val readyAt = waitSocksReady(config.socksPort)
-        return if (readyAt > 0) {
+        return if (readyAt >= 0) {
             activeSocksPort = config.socksPort
             Log.i(TAG, "started socksPort=${config.socksPort} readyMs=$readyAt")
             StartResult.Success(socksPort = config.socksPort)

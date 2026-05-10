@@ -115,6 +115,56 @@ class AppListProviderTest {
         )
     }
 
+    @Test
+    fun `work profile system app отображается когда есть launcher`() {
+        val info = makeInfo("com.android.work.browser", flags = ApplicationInfo.FLAG_SYSTEM)
+        val workProfileLaunchable = setOf("com.android.work.browser")
+        assertTrue(
+            isUserVisibleApp(info, workProfileLaunchable, "ru.ozero.app"),
+            "Work profile system app с launcher activity обязан отображаться в split-tunnel. " +
+                "Фикс: launchableSet включает пакеты из LauncherApps всех профилей.",
+        )
+    }
+
+    @Test
+    fun `work profile system app без launcher не отображается`() {
+        val info = makeInfo("com.android.work.hidden", flags = ApplicationInfo.FLAG_SYSTEM)
+        assertFalse(
+            isUserVisibleApp(info, emptySet(), "ru.ozero.app"),
+            "Work profile system service без launcher — мусор в UI, не показывать.",
+        )
+    }
+
+    @Test
+    fun `loadMetadata runCatching per-profile — ошибка одного профиля не скрывает остальных`() {
+        val source = File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/ui/splittunnel/AppListProvider.kt",
+        ).readText()
+        val profilesBlock = source.substringAfter("for (profile in launcherApps.profiles)")
+        assertTrue(
+            profilesBlock.trimStart().startsWith("{") &&
+                profilesBlock.contains("runCatching"),
+            "runCatching обязан быть ВНУТРИ цикла per-profile. " +
+                "Иначе исключение одного профиля (locked work profile, SecurityException) " +
+                "молча дропает все work profile apps.",
+        )
+    }
+
+    @Test
+    fun `loadMetadata добавляет work profile packages в launchableSet`() {
+        val source = File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/ui/splittunnel/AppListProvider.kt",
+        ).readText()
+        val launcherBlock = source.substringAfter("for (profile in launcherApps.profiles)")
+        assertTrue(
+            launcherBlock.contains("launchableSet.add"),
+            "Пакеты из LauncherApps.getActivityList обязаны добавляться в launchableSet. " +
+                "Иначе work profile system apps с launcher отфильтровываются isUserVisibleApp.",
+        )
+    }
+
     private fun makeInfo(pkg: String, flags: Int): ApplicationInfo {
         val info = ApplicationInfo()
         info.packageName = pkg
