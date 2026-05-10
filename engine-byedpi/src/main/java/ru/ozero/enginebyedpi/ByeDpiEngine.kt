@@ -1,6 +1,7 @@
 package ru.ozero.enginebyedpi
 
 import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -29,6 +30,7 @@ import java.util.concurrent.atomic.AtomicReference
 class ByeDpiEngine(
     private val proxy: ByeDpiProxyContract = ByeDpiProxy(),
     private val readyProbeTimeoutMs: Int = READY_PROBE_TIMEOUT_MS,
+    private val readyTotalTimeoutMs: Long = READY_TIMEOUT_MS,
 ) : EnginePlugin {
 
     override val id = EngineId.BYEDPI
@@ -90,13 +92,21 @@ class ByeDpiEngine(
 
     private suspend fun waitSocksReady(port: Int): Long {
         val started = System.currentTimeMillis()
-        while (System.currentTimeMillis() - started < READY_TIMEOUT_MS) {
-            val ok = runCatching { Socks5HandshakeProbe.probe("127.0.0.1", port, readyProbeTimeoutMs) }
-                .isSuccess
-            if (ok) return System.currentTimeMillis() - started
-            delay(READY_RETRY_MS)
-        }
-        return -1
+        withTimeoutOrNull(readyTotalTimeoutMs) {
+            while (true) {
+                val ok = try {
+                    Socks5HandshakeProbe.probe("127.0.0.1", port, readyProbeTimeoutMs)
+                    true
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Throwable) {
+                    false
+                }
+                if (ok) return@withTimeoutOrNull
+                delay(READY_RETRY_MS)
+            }
+        } ?: return -1
+        return System.currentTimeMillis() - started
     }
 
     override suspend fun stop() {

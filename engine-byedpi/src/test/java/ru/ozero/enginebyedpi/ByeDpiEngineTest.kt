@@ -36,7 +36,7 @@ class ByeDpiEngineTest {
         every { ByeDpiProxy.loadOnce() } just runs
         every { ByeDpiProxy.libraryLoaded } returns true
         every { ByeDpiProxy.loadError } returns null
-        engine = ByeDpiEngine(proxy, readyProbeTimeoutMs = 5_000)
+        engine = ByeDpiEngine(proxy, readyProbeTimeoutMs = 200, readyTotalTimeoutMs = 30_000)
         proxyRunning = CountDownLatch(1)
     }
 
