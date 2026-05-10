@@ -17,6 +17,7 @@ interface UrnetworkSdkBridge {
     fun connectTo(location: ConnectLocation)
     fun connectBestAvailable()
     fun selectedLocation(): ConnectLocation?
+    fun selectedLocationInfo(): LocationInfo? = null
     fun openLocationsViewController(): LocationsViewController?
 
     fun setPreferredCountry(code: String?) {}
@@ -32,6 +33,12 @@ interface UrnetworkSdkBridge {
     fun fetchTransferStats()
 
     suspend fun fetchSubscriptionBalance(): SubscriptionBalanceSnapshot?
+
+    data class LocationInfo(
+        val country: String?,
+        val countryCode: String?,
+        val name: String?,
+    )
 
     data class SubscriptionBalanceSnapshot(
         val balanceBytes: Long,

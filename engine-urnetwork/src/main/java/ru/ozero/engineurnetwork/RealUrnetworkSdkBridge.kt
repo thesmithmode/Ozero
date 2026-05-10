@@ -207,6 +207,16 @@ class RealUrnetworkSdkBridge(
     override fun selectedLocation(): ConnectLocation? =
         runCatching { connectVcRef.get()?.selectedLocation }.getOrNull()
 
+    override fun selectedLocationInfo(): UrnetworkSdkBridge.LocationInfo? {
+        val loc = runCatching { selectedLocation() }.getOrNull() ?: return null
+        val country = runCatching { loc.country }.getOrNull()
+            ?: runCatching { loc.name }.getOrNull()
+        val code = runCatching { loc.countryCode?.trim()?.uppercase() }.getOrNull()
+            ?.takeIf { it.length == 2 }
+        val name = runCatching { loc.name }.getOrNull()
+        return UrnetworkSdkBridge.LocationInfo(country = country, countryCode = code, name = name)
+    }
+
     override fun setPreferredCountry(code: String?) {
         val cleaned = code?.trim()?.uppercase()?.takeIf { it.length == 2 && it.all { it.isLetter() } }
         preferredCountryRef.set(cleaned)
