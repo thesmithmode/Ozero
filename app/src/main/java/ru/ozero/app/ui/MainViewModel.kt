@@ -115,9 +115,9 @@ class MainViewModel @Inject constructor(
             .distinctUntilChanged()
             .flatMapLatest { isUrnetwork ->
                 if (!isUrnetwork) {
-                    flowOf(null)
+                    flowOf<IpInfoState.Loaded?>(null)
                 } else {
-                    flow {
+                    flow<IpInfoState.Loaded?> {
                         while (true) {
                             delay(URNETWORK_LOCATION_POLL_MS)
                             val r = resolveOnce(EngineId.URNETWORK, 0)
