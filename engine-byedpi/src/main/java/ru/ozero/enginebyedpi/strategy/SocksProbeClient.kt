@@ -73,7 +73,7 @@ class HttpSocksProbeClient(
                 site = site,
                 success = false,
                 durationMs = nowMs() - started,
-                error = e.javaClass.simpleName + ": " + (e.message ?: ""),
+                error = "${e.javaClass.simpleName}: ${e.message.orEmpty()}",
             )
         } finally {
             runCatching { connection?.disconnect() }
@@ -90,7 +90,7 @@ class HttpSocksProbeClient(
         try {
             while (actualLength < limit) {
                 val remaining = limit - actualLength
-                val toRead = if (remaining > buffer.size) buffer.size else remaining.toInt()
+                val toRead = minOf(remaining, buffer.size.toLong()).toInt()
                 val bytesRead = stream.read(buffer, 0, toRead)
                 if (bytesRead == -1) break
                 actualLength += bytesRead

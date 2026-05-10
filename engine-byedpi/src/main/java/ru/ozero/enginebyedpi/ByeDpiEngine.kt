@@ -23,6 +23,7 @@ import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
+import ru.ozero.enginescore.IpProbeRoute
 import ru.ozero.enginescore.probe.Socks5HandshakeProbe
 import ru.ozero.enginescore.settings.HostsMode
 import java.util.concurrent.atomic.AtomicReference
@@ -153,13 +154,9 @@ class ByeDpiEngine(
 
     override fun preflight(): EnginePreflight = ByeDpiPreflight()
 
-    override suspend fun ipProbeRoute(socksPort: Int): ru.ozero.enginescore.IpProbeRoute {
+    override suspend fun ipProbeRoute(socksPort: Int): IpProbeRoute {
         val port = if (socksPort > 0) socksPort else activeSocksPort
-        return if (port > 0) {
-            ru.ozero.enginescore.IpProbeRoute.Socks("127.0.0.1", port)
-        } else {
-            ru.ozero.enginescore.IpProbeRoute.Default
-        }
+        return if (port > 0) IpProbeRoute.Socks("127.0.0.1", port) else IpProbeRoute.Default
     }
 
     internal fun buildArgs(config: EngineConfig.ByeDpi): Array<String> {
@@ -169,9 +166,8 @@ class ByeDpiEngine(
                 ?.split("\\s+".toRegex())
                 .orEmpty()
         val hostsArgs = buildHostsArgs(config)
-        return (
-            listOf("ciadpi", "--ip", "127.0.0.1", "-p", config.socksPort.toString()) + extra + hostsArgs
-            ).toTypedArray()
+        return (listOf("ciadpi", "--ip", "127.0.0.1", "-p", config.socksPort.toString()) + extra + hostsArgs)
+            .toTypedArray()
     }
 
     internal fun buildHostsArgs(config: EngineConfig.ByeDpi): List<String> {
