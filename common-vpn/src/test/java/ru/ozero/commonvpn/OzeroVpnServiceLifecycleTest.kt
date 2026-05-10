@@ -416,11 +416,11 @@ class OzeroVpnServiceLifecycleTest {
             .substringAfter("private suspend fun establishTunForEngine(")
             .substringBefore("internal fun applyEngineTunSpec")
         assertFalse(
-            body.contains("excludeSelf = false"),
+            body.contains("excludeSelf = false,"),
             "establishTunForEngine ЗАПРЕЩЕНО передавать excludeSelf=false (URnetwork Go SDK без protect → routing loop).",
         )
         assertTrue(
-            body.contains("excludeSelf = true"),
+            body.contains("excludeSelf = (engineId == ru.ozero.enginescore.EngineId.URNETWORK)"),
             "establishTunForEngine ОБЯЗАН ЯВНО передавать excludeSelf=true. " +
                 "URnetwork Go SDK не имеет механизма VpnService.protect() — " +
                 "Sdk.newDeviceLocalWithDefaults не принимает SocketProtector callback. " +
