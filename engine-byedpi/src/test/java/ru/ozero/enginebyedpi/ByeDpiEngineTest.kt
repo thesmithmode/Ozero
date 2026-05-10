@@ -154,7 +154,12 @@ class ByeDpiEngineTest {
                 runCatching {
                     accept().use { c ->
                         c.soTimeout = 1_000
-                        c.getInputStream().read(ByteArray(8))
+                        val nmethods = run {
+                            val header = ByteArray(2)
+                            c.getInputStream().read(header)
+                            header[1].toInt() and 0xFF
+                        }
+                        c.getInputStream().read(ByteArray(nmethods.coerceAtLeast(1)))
                         c.getOutputStream().write(byteArrayOf(0x05, 0x00))
                         c.getOutputStream().flush()
                     }
