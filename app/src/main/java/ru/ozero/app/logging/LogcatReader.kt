@@ -87,8 +87,9 @@ class LogcatReader(private val buffer: LogBuffer) {
                     everReadLines = true
                     attempt = 0
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (t: Throwable) {
-                if (t is CancellationException) throw t
                 Log.w(TAG, "logcat read error", t)
                 if (!everReadLines) buffer.append(diagnostic(LogLevel.WARN, "logcat read error: ${t.message}"))
             } finally {
