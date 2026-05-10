@@ -55,6 +55,11 @@ fun SplitTunnelScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     BackHandler(onBack = onBack)
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        viewModel.onQuery("")
+    }
+
     SplitTunnelScreenContent(
         state = state,
         onBack = onBack,

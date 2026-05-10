@@ -149,11 +149,11 @@ class ByeDpiEngineTest {
     }
 
     private fun ServerSocket.acceptSocks5InBackground() {
-        soTimeout = 200
         thread(isDaemon = true) {
             while (!isClosed) {
                 runCatching {
                     accept().use { c ->
+                        c.soTimeout = 1_000
                         c.getInputStream().read(ByteArray(8))
                         c.getOutputStream().write(byteArrayOf(0x05, 0x00))
                         c.getOutputStream().flush()

@@ -3,6 +3,7 @@ package ru.ozero.app.ui.splittunnel
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
+import android.content.pm.LauncherApps
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -64,8 +65,25 @@ class DefaultAppListProvider @Inject constructor(
         val pm = context.packageManager
         val ownPackage = context.packageName
         val launchableSet = queryLaunchablePackages(pm)
-        val infos = pm.getInstalledApplications(0)
-        return infos.asSequence()
+        val infos = mutableMapOf<String, ApplicationInfo>()
+        for (info in pm.getInstalledApplications(0)) {
+            infos[info.packageName] = info
+        }
+
+        runCatching {
+            val launcherApps = context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as? LauncherApps
+            if (launcherApps != null) {
+                for (profile in launcherApps.profiles) {
+                    val activities = launcherApps.getActivityList(null, profile)
+                    for (activity in activities) {
+                        val appInfo = activity.applicationInfo
+                        infos[appInfo.packageName] = appInfo
+                    }
+                }
+            }
+        }
+
+        return infos.values.asSequence()
             .filter { isUserVisibleApp(it, launchableSet, ownPackage) }
             .map { info ->
                 val label = runCatching { info.loadLabel(pm).toString() }.getOrNull().orEmpty()
