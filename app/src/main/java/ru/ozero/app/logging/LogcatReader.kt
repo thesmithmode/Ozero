@@ -6,6 +6,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -87,6 +88,7 @@ class LogcatReader(private val buffer: LogBuffer) {
                     attempt = 0
                 }
             } catch (t: Throwable) {
+                if (t is CancellationException) throw t
                 Log.w(TAG, "logcat read error", t)
                 if (!everReadLines) buffer.append(diagnostic(LogLevel.WARN, "logcat read error: ${t.message}"))
             } finally {
