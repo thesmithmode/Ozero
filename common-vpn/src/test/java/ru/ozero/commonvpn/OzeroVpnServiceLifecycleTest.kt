@@ -411,22 +411,20 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `establishTunForEngine ЯВНО передаёт excludeSelf=true для TunFdAcceptor движков`() {
+    fun `establishTunForEngine excludeSelf true для всех кроме WARP`() {
         val body = source
             .substringAfter("private suspend fun establishTunForEngine(")
             .substringBefore("internal fun applyEngineTunSpec")
         assertFalse(
-            body.contains("excludeSelf = false,"),
-            "establishTunForEngine ЗАПРЕЩЕНО передавать excludeSelf=false (URnetwork Go SDK без protect → routing loop).",
+            body.contains("excludeSelf = (engineId == ru.ozero.enginescore.EngineId.URNETWORK)"),
+            "excludeSelf must cover ByeDPI too — ciadpi JNI не вызывает protect(), " +
+                "outbound сокеты идут через TUN → loop. Правильно: excludeSelf = (engineId != WARP).",
         )
         assertTrue(
-            body.contains("excludeSelf = (engineId == ru.ozero.enginescore.EngineId.URNETWORK)"),
-            "establishTunForEngine ОБЯЗАН ЯВНО передавать excludeSelf=true. " +
-                "URnetwork Go SDK не имеет механизма VpnService.protect() — " +
-                "Sdk.newDeviceLocalWithDefaults не принимает SocketProtector callback. " +
-                "Дефолт TunBuilderConfigurator теперь false (для WARP, чтобы fix EPERM на IP fetch), " +
-                "поэтому URnetwork обязан явно overriden'ить параметром. " +
-                "Регрессия v0.0.7 (65e5b13). Без явного true → routing loop → SDK не поднимется.",
+            body.contains("excludeSelf = (engineId != ru.ozero.enginescore.EngineId.WARP)"),
+            "WARP: AWG сокет защищён VpnSocketProtectorHolder → excludeSelf=false OK. " +
+                "ByeDPI + URnetwork: нет protect() → excludeSelf=true обязателен → нет routing loop. " +
+                "Регрессия 4624406: excludeSelf=false для ByeDPI → ciadpi outbound через TUN → SOCKS loop → нет сети.",
         )
     }
 }

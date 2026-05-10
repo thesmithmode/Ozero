@@ -1,5 +1,7 @@
 package ru.ozero.engineurnetwork
 
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -242,6 +244,33 @@ class EngineUrnetworkContractTest {
         )
     }
 
+    @Test
+    fun `ipProbeRoute возвращает StaticLocation с кодом когда selectedLocation валидный`() = runTest {
+        val loc = mockk<com.bringyour.sdk.ConnectLocation>(relaxed = true)
+        every { loc.countryCode } returns "in"
+        every { loc.country } returns "India"
+        val bridge = FakeUrnetworkSdkBridge(locationResult = loc)
+        val (e, _, _) = engine(bridge = bridge)
+        val route = e.ipProbeRoute(0)
+        assertIs<ru.ozero.enginescore.IpProbeRoute.StaticLocation>(route)
+        assertEquals("IN", route.countryCode)
+        assertEquals("India", route.country)
+    }
+
+    @Test
+    fun `ipProbeRoute возвращает StaticLocation с null кодом когда countryCode null (Best Available)`() = runTest {
+        val loc = mockk<com.bringyour.sdk.ConnectLocation>(relaxed = true)
+        every { loc.countryCode } returns null
+        every { loc.country } returns null
+        every { loc.name } returns "Best Available"
+        val bridge = FakeUrnetworkSdkBridge(locationResult = loc)
+        val (e, _, _) = engine(bridge = bridge)
+        val route = e.ipProbeRoute(0)
+        assertIs<ru.ozero.enginescore.IpProbeRoute.StaticLocation>(route)
+        assertNull(route.countryCode, "Best Available не имеет countryCode — null, флаг не отображается")
+        assertEquals("Best Available", route.country)
+    }
+
     private class FakeUrnetworkConfigStore(
         override: String?,
         byJwt: String? = null,
@@ -300,6 +329,7 @@ class EngineUrnetworkContractTest {
 
     private class FakeUrnetworkSdkBridge(
         private val startResult: UrnetworkSdkBridge.StartResult = UrnetworkSdkBridge.StartResult.Success,
+        private val locationResult: com.bringyour.sdk.ConnectLocation? = null,
     ) : UrnetworkSdkBridge {
         var startCalls: Int = 0
         var stopCalls: Int = 0
@@ -341,7 +371,7 @@ class EngineUrnetworkContractTest {
 
         override fun connectTo(location: com.bringyour.sdk.ConnectLocation) = Unit
         override fun connectBestAvailable() = Unit
-        override fun selectedLocation(): com.bringyour.sdk.ConnectLocation? = null
+        override fun selectedLocation(): com.bringyour.sdk.ConnectLocation? = locationResult
         override fun openLocationsViewController(): com.bringyour.sdk.LocationsViewController? = null
         override fun setProvidePaused(paused: Boolean) = Unit
         override fun isProvidePaused(): Boolean = true

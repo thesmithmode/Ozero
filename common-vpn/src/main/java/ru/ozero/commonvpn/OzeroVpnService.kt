@@ -360,7 +360,7 @@ class OzeroVpnService : android.net.VpnService() {
         ru.ozero.commonvpn.split.TunBuilderConfigurator(packageName).apply(
             builder,
             splitConfig,
-            excludeSelf = (engineId == ru.ozero.enginescore.EngineId.URNETWORK),
+            excludeSelf = (engineId != ru.ozero.enginescore.EngineId.WARP),
         )
         val before = TunInterfaceStats.snapshotTunInterfaces()
         val pfd = try {

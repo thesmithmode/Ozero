@@ -396,10 +396,13 @@ private fun IpInfoCard(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        Text(
-                            text = CountryFlag.emoji(state.info.countryCode),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
+                        val hasFlag = state.info.countryCode?.length == 2
+                        if (hasFlag) {
+                            Text(
+                                text = CountryFlag.emoji(state.info.countryCode),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                        }
                         if (state.info.ip.isNotBlank()) {
                             Text(
                                 text = state.info.ip,

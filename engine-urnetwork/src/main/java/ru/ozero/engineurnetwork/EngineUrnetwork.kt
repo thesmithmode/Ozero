@@ -137,7 +137,8 @@ class EngineUrnetwork(
             ?: return ru.ozero.enginescore.IpProbeRoute.Unavailable("URnetwork location pending")
         val country = runCatching { loc.country }.getOrNull()
             ?: runCatching { loc.name }.getOrNull()
-        val code = runCatching { loc.countryCode?.uppercase() }.getOrNull()
+        val code = runCatching { loc.countryCode?.trim()?.uppercase() }.getOrNull()
+            ?.takeIf { it.length == 2 }
         return ru.ozero.enginescore.IpProbeRoute.StaticLocation(country, code)
     }
 
