@@ -860,7 +860,7 @@ class OzeroVpnService : android.net.VpnService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             runCatching { builder.setMetered(false) }
         }
-        ru.ozero.commonvpn.split.TunBuilderConfigurator(packageName).apply(builder, splitConfig)
+        ru.ozero.commonvpn.split.TunBuilderConfigurator(packageName).apply(builder, splitConfig, excludeSelf = true)
         return builder
     }
 

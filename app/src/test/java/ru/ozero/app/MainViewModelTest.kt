@@ -404,9 +404,11 @@ class MainViewModelTest {
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.URNETWORK)
         tunnelController.onEngineStarted(EngineId.URNETWORK, 0)
-        advanceUntilIdle()
-        kotlinx.coroutines.delay(6_000)
-        advanceUntilIdle()
+        // runCurrent instead of advanceUntilIdle — B3 while(true) loop makes URNETWORK advance infinite
+        runCurrent()
+        // 3000ms warmup + 2×1500ms retry delays = 6000ms total
+        advanceTimeBy(7_000)
+        runCurrent()
         val s = viewModel.ipInfo.value
         assertIs<IpInfoState.Error>(
             s,
@@ -425,15 +427,38 @@ class MainViewModelTest {
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.URNETWORK)
         tunnelController.onEngineStarted(EngineId.URNETWORK, 0)
-        advanceUntilIdle()
-        kotlinx.coroutines.delay(2_500)
-        advanceUntilIdle()
+        runCurrent() // runCurrent, не advanceUntilIdle — B3 while(true) даёт infinite advance
+        advanceTimeBy(4_500) // past warmup(3s) and first B3 poll(4s)
+        runCurrent()
         val s = vm.ipInfo.value
         assertIs<IpInfoState.Loaded>(s)
         assertEquals("", s.info.ip, "StaticLocation не несёт IP — только страну.")
         assertEquals("Germany", s.info.country)
         assertEquals("DE", s.info.countryCode)
         assertEquals(0, ipInfoProvider.calls, "StaticLocation не должен делать HTTP запросов.")
+    }
+
+    @Test
+    fun ipInfoUpdatesWhenUrnetworkLocationChangesDuringSession() = runTest {
+        var countryCode = "US"
+        val dynamicUrnetwork = FakeEnginePlugin(EngineId.URNETWORK) {
+            IpProbeRoute.StaticLocation(country = "Country", countryCode = countryCode)
+        }
+        val vm = newViewModel(plugins = setOf(byedpiPlugin, warpPlugin, dynamicUrnetwork))
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.URNETWORK)
+        tunnelController.onEngineStarted(EngineId.URNETWORK, 0)
+        runCurrent() // runCurrent, не advanceUntilIdle — B3 while(true) даёт infinite advance
+        advanceTimeBy(4_500) // past warmup(3s) + B3 first poll(4s)
+        runCurrent()
+        assertEquals("US", (vm.ipInfo.value as IpInfoState.Loaded).info.countryCode)
+        countryCode = "DE"
+        advanceTimeBy(4_000) // next B3 poll at t=8s detects change
+        runCurrent()
+        val s = vm.ipInfo.value
+        assertIs<IpInfoState.Loaded>(s)
+        assertEquals("DE", s.info.countryCode)
+        assertEquals(0, ipInfoProvider.calls, "StaticLocation — нет HTTP запросов.")
     }
 
     @Test

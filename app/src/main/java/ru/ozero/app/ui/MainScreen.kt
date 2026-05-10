@@ -411,7 +411,7 @@ private fun IpInfoCard(
                             )
                         } else {
                             Text(
-                                text = state.info.country
+                                text = state.info.country?.takeIf { it.isNotBlank() }
                                     ?: stringResource(R.string.ip_card_country_unknown),
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                                 color = OzeroPalette.Text,

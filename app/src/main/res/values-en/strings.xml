@@ -294,7 +294,7 @@
     <string name="urnetwork_consumed_label">Consumed</string>
     <string name="urnetwork_consumed_format">%1$s of %2$s MB</string>
     <string name="urnetwork_pending_label">Pending: %1$s MB</string>
-    <string name="ip_card_title">Your exit</string>
+    <string name="ip_card_title">Exit node</string>
     <string name="ip_card_loading">Resolving IP…</string>
     <string name="ip_card_error">Failed to fetch IP: %1$s</string>
     <string name="ip_card_refresh">Refresh</string>

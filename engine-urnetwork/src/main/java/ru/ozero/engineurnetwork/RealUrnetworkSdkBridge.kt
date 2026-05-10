@@ -209,11 +209,11 @@ class RealUrnetworkSdkBridge(
 
     override fun selectedLocationInfo(): UrnetworkSdkBridge.LocationInfo? {
         val loc = runCatching { selectedLocation() }.getOrNull() ?: return null
-        val country = runCatching { loc.country }.getOrNull()
-            ?: runCatching { loc.name }.getOrNull()
+        val country = runCatching { loc.country }.getOrNull()?.takeIf { it.isNotBlank() }
+            ?: runCatching { loc.name }.getOrNull()?.takeIf { it.isNotBlank() }
         val code = runCatching { loc.countryCode?.trim()?.uppercase() }.getOrNull()
             ?.takeIf { it.length == 2 }
-        val name = runCatching { loc.name }.getOrNull()
+        val name = runCatching { loc.name }.getOrNull()?.takeIf { it.isNotBlank() }
         return UrnetworkSdkBridge.LocationInfo(country = country, countryCode = code, name = name)
     }
 

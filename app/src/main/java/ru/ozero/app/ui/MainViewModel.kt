@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -160,6 +162,23 @@ class MainViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            tunnelController.state
+                .map { (it as? TunnelState.Connected)?.engineId }
+                .distinctUntilChanged()
+                .collectLatest { engineId ->
+                    if (engineId != EngineId.URNETWORK) return@collectLatest
+                    var lastCountryCode: String? = null
+                    while (true) {
+                        delay(URNETWORK_LOCATION_POLL_MS)
+                        val result = resolveOnce(EngineId.URNETWORK, 0)
+                        if (result is IpInfoState.Loaded && result.info.countryCode != lastCountryCode) {
+                            lastCountryCode = result.info.countryCode
+                            _ipInfo.value = result
+                        }
+                    }
+                }
+        }
+        viewModelScope.launch {
             var lastSessionKey: String? = null
             tunnelController.state.collect { s ->
                 if (s is TunnelState.Connected) {
@@ -268,8 +287,9 @@ class MainViewModel @Inject constructor(
         const val URNETWORK_PEER_POLL_KEEP_MS = 5_000L
         const val URNETWORK_SEARCH_TICK_MS = 1_000L
         const val URNETWORK_STARTUP_GRACE_TICKS = 10
-        const val IP_INFO_WARMUP_MS = 8_000L
-        const val IP_INFO_RETRY_ATTEMPTS = 4
-        const val IP_INFO_RETRY_DELAY_MS = 1_000L
+        const val IP_INFO_WARMUP_MS = 3_000L
+        const val IP_INFO_RETRY_ATTEMPTS = 3
+        const val IP_INFO_RETRY_DELAY_MS = 1_500L
+        const val URNETWORK_LOCATION_POLL_MS = 4_000L
     }
 }
