@@ -40,10 +40,10 @@ class MainViewModelIpInfoChannelTest {
     }
 
     @Test
-    fun `MainViewModel содержит polling-loop для URnetwork location через collectLatest`() {
+    fun `MainViewModel содержит polling-flow для URnetwork location через flatMapLatest + WhileSubscribed`() {
         assertTrue(
-            source.contains("collectLatest"),
-            "MainViewModel обязан использовать collectLatest для URnetwork location polling — " +
+            source.contains("flatMapLatest"),
+            "MainViewModel обязан использовать flatMapLatest для URnetwork location polling — " +
                 "отменяет предыдущий цикл при смене движка.",
         )
         assertTrue(
@@ -51,8 +51,13 @@ class MainViewModelIpInfoChannelTest {
             "Polling-цикл обязан использовать URNETWORK_LOCATION_POLL_MS.",
         )
         assertTrue(
-            source.contains("return@collectLatest"),
-            "Polling работает только для EngineId.URNETWORK — иначе return@collectLatest.",
+            source.contains("WhileSubscribed"),
+            "Polling обязан запускаться только при наличии подписчика — SharingStarted.WhileSubscribed. " +
+                "Иначе while(true) в init блокирует runTest auto-advanceUntilIdle (CI hang).",
+        )
+        assertTrue(
+            source.contains("urnetworkLocationOverride"),
+            "Override-flow обязан называться urnetworkLocationOverride — комбинируется с _ipInfo.",
         )
     }
 

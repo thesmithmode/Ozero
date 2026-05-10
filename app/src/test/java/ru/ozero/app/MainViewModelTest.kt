@@ -360,6 +360,7 @@ class MainViewModelTest {
 
     @Test
     fun ipInfoFetchesViaSocksOnByedpiConnected() = runTest {
+        backgroundScope.launch { viewModel.ipInfo.collect {} }
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.BYEDPI)
         tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
@@ -377,6 +378,7 @@ class MainViewModelTest {
 
     @Test
     fun ipInfoFetchesDirectForWarp() = runTest {
+        backgroundScope.launch { viewModel.ipInfo.collect {} }
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.WARP)
         tunnelController.onEngineStarted(EngineId.WARP, 0)
@@ -401,10 +403,10 @@ class MainViewModelTest {
 
     @Test
     fun ipInfoErrorForUrnetworkWhenLocationUnavailable() = runTest {
+        backgroundScope.launch { viewModel.ipInfo.collect {} }
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.URNETWORK)
         tunnelController.onEngineStarted(EngineId.URNETWORK, 0)
-        // runCurrent instead of advanceUntilIdle — B3 while(true) loop makes URNETWORK advance infinite
         runCurrent()
         // 3000ms warmup + 2×1500ms retry delays = 6000ms total
         advanceTimeBy(7_000)
@@ -424,11 +426,12 @@ class MainViewModelTest {
             IpProbeRoute.StaticLocation(country = "Germany", countryCode = "DE")
         }
         val vm = newViewModel(plugins = setOf(byedpiPlugin, warpPlugin, staticUrnetwork))
+        backgroundScope.launch { vm.ipInfo.collect {} }
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.URNETWORK)
         tunnelController.onEngineStarted(EngineId.URNETWORK, 0)
-        runCurrent() // runCurrent, не advanceUntilIdle — B3 while(true) даёт infinite advance
-        advanceTimeBy(4_500) // past warmup(3s) and first B3 poll(4s)
+        runCurrent()
+        advanceTimeBy(4_500)
         runCurrent()
         val s = vm.ipInfo.value
         assertIs<IpInfoState.Loaded>(s)
@@ -445,15 +448,16 @@ class MainViewModelTest {
             IpProbeRoute.StaticLocation(country = "Country", countryCode = countryCode)
         }
         val vm = newViewModel(plugins = setOf(byedpiPlugin, warpPlugin, dynamicUrnetwork))
+        backgroundScope.launch { vm.ipInfo.collect {} }
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.URNETWORK)
         tunnelController.onEngineStarted(EngineId.URNETWORK, 0)
-        runCurrent() // runCurrent, не advanceUntilIdle — B3 while(true) даёт infinite advance
-        advanceTimeBy(4_500) // past warmup(3s) + B3 first poll(4s)
+        runCurrent()
+        advanceTimeBy(4_500)
         runCurrent()
         assertEquals("US", (vm.ipInfo.value as IpInfoState.Loaded).info.countryCode)
         countryCode = "DE"
-        advanceTimeBy(4_000) // next B3 poll at t=8s detects change
+        advanceTimeBy(4_000)
         runCurrent()
         val s = vm.ipInfo.value
         assertIs<IpInfoState.Loaded>(s)
@@ -463,6 +467,7 @@ class MainViewModelTest {
 
     @Test
     fun ipInfoBackToIdleOnDisconnect() = runTest {
+        backgroundScope.launch { viewModel.ipInfo.collect {} }
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.BYEDPI)
         tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
@@ -476,6 +481,7 @@ class MainViewModelTest {
 
     @Test
     fun ipInfoErrorOnProviderFailure() = runTest {
+        backgroundScope.launch { viewModel.ipInfo.collect {} }
         ipInfoProvider.result = Result.failure(java.io.IOException("network down"))
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.BYEDPI)
@@ -490,6 +496,7 @@ class MainViewModelTest {
 
     @Test
     fun ipInfoNotRefetchedOnSameSession() = runTest {
+        backgroundScope.launch { viewModel.ipInfo.collect {} }
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.BYEDPI)
         tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
@@ -501,6 +508,7 @@ class MainViewModelTest {
 
     @Test
     fun refreshIpInfoForcesRefetch() = runTest {
+        backgroundScope.launch { viewModel.ipInfo.collect {} }
         viewModel.refreshIpInfo()
         advanceUntilIdle()
         val s = viewModel.ipInfo.value

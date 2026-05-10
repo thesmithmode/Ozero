@@ -4,15 +4,17 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -105,7 +107,40 @@ class MainViewModel @Inject constructor(
     val speedHistory: StateFlow<List<Pair<Float, Float>>> = _speedHistory.asStateFlow()
 
     private val _ipInfo = MutableStateFlow<IpInfoState>(IpInfoState.Idle)
-    val ipInfo: StateFlow<IpInfoState> = _ipInfo.asStateFlow()
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val urnetworkLocationOverride: StateFlow<IpInfoState.Loaded?> =
+        tunnelController.state
+            .map { (it as? TunnelState.Connected)?.engineId == EngineId.URNETWORK }
+            .distinctUntilChanged()
+            .flatMapLatest { isUrnetwork ->
+                if (!isUrnetwork) {
+                    flowOf(null)
+                } else {
+                    flow {
+                        while (true) {
+                            delay(URNETWORK_LOCATION_POLL_MS)
+                            val r = resolveOnce(EngineId.URNETWORK, 0)
+                            if (r is IpInfoState.Loaded) emit(r)
+                        }
+                    }
+                }
+            }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(0),
+                initialValue = null,
+            )
+
+    val ipInfo: StateFlow<IpInfoState> = combine(
+        _ipInfo,
+        urnetworkLocationOverride,
+    ) { base, override -> override ?: base }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(0),
+            initialValue = IpInfoState.Idle,
+        )
 
     val urnetworkPeerCount: StateFlow<Int> = flow {
         while (true) {
@@ -160,23 +195,6 @@ class MainViewModel @Inject constructor(
                     if (_speedHistory.value.isNotEmpty()) _speedHistory.value = emptyList()
                 }
             }
-        }
-        viewModelScope.launch {
-            tunnelController.state
-                .map { (it as? TunnelState.Connected)?.engineId }
-                .distinctUntilChanged()
-                .collectLatest { engineId ->
-                    if (engineId != EngineId.URNETWORK) return@collectLatest
-                    var lastCountryCode: String? = null
-                    while (true) {
-                        delay(URNETWORK_LOCATION_POLL_MS)
-                        val result = resolveOnce(EngineId.URNETWORK, 0)
-                        if (result is IpInfoState.Loaded && result.info.countryCode != lastCountryCode) {
-                            lastCountryCode = result.info.countryCode
-                            _ipInfo.value = result
-                        }
-                    }
-                }
         }
         viewModelScope.launch {
             var lastSessionKey: String? = null
