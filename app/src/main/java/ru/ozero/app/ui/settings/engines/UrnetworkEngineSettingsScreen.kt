@@ -15,11 +15,13 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -42,6 +44,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bringyour.sdk.ConnectLocation
 import ru.ozero.app.R
+import ru.ozero.app.ui.theme.OzeroPalette
 import ru.ozero.engineurnetwork.UrnetworkWindowType
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -86,18 +89,25 @@ fun UrnetworkEngineSettingsScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    InfoBlock()
-                    Card(modifier = Modifier.fillMaxWidth()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = OzeroPalette.Bg1),
+                    ) {
                         Text(
                             text = stringResource(R.string.urnetwork_location_connect_first),
                             style = MaterialTheme.typography.bodyMedium,
+                            color = OzeroPalette.Text2,
                             modifier = Modifier.padding(16.dp),
                         )
                     }
-                    WindowTypeSection(
-                        selected = windowType,
+                    SettingsCard(
+                        providePaused = true,
+                        unpaidBytes = 0L,
+                        windowType = windowType,
                         fixedIp = fixedIp,
-                        onSelect = viewModel::selectWindowType,
+                        showProvide = false,
+                        onSetProvidePaused = {},
+                        onSelectWindowType = viewModel::selectWindowType,
                         onToggleFixedIp = viewModel::toggleFixedIpSize,
                     )
                 }
@@ -157,46 +167,24 @@ private fun LocationListContent(
     ) {
         item {
             Column(modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)) {
-                PeerCounterRow(peerCount = peerCount)
-                InfoBlock()
-                AboutBlock()
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.urnetwork_provide_title),
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                        Text(
-                            text = stringResource(R.string.urnetwork_provide_subtitle),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Switch(
-                        checked = !providePaused,
-                        onCheckedChange = { checked -> onSetProvidePaused(!checked) },
-                    )
-                }
-                if (!providePaused) {
-                    ProviderStatsRow(unpaidBytes = unpaidBytes)
-                }
-                ConsumerStatsBlock(balance = balance)
-                WindowTypeSection(
-                    selected = windowType,
+                StatusRow(peerCount = peerCount)
+                SettingsCard(
+                    providePaused = providePaused,
+                    unpaidBytes = unpaidBytes,
+                    windowType = windowType,
                     fixedIp = fixedIp,
-                    onSelect = onSelectWindowType,
+                    showProvide = true,
+                    onSetProvidePaused = onSetProvidePaused,
+                    onSelectWindowType = onSelectWindowType,
                     onToggleFixedIp = onToggleFixedIp,
                 )
+                ConsumerProgressCard(balance = balance)
+                ConsentRow()
                 Text(
                     text = stringResource(R.string.urnetwork_location_title),
                     style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
+                    color = OzeroPalette.Text2,
+                    modifier = Modifier.padding(top = 20.dp, bottom = 4.dp),
                 )
                 OutlinedTextField(
                     value = searchQuery,
@@ -224,7 +212,7 @@ private fun LocationListContent(
                     selected = isBestAvailable,
                     onClick = { onSelect(null) },
                 )
-                HorizontalDivider()
+                HorizontalDivider(color = OzeroPalette.Line)
             }
         }
         items(countries, key = { it.countryCode.ifEmpty { it.name } }) { item ->
@@ -238,9 +226,239 @@ private fun LocationListContent(
                 selected = selected,
                 onClick = { onSelect(item.location) },
             )
-            HorizontalDivider()
+            HorizontalDivider(color = OzeroPalette.Line)
         }
     }
+}
+
+@Suppress("LongParameterList")
+@Composable
+private fun SettingsCard(
+    providePaused: Boolean,
+    unpaidBytes: Long,
+    windowType: UrnetworkWindowType,
+    fixedIp: Boolean,
+    showProvide: Boolean,
+    onSetProvidePaused: (Boolean) -> Unit,
+    onSelectWindowType: (UrnetworkWindowType) -> Unit,
+    onToggleFixedIp: (Boolean) -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        colors = CardDefaults.cardColors(containerColor = OzeroPalette.Bg1),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            if (showProvide) {
+                SectionLabel(stringResource(R.string.urnetwork_provide_title))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(R.string.urnetwork_provide_subtitle),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = OzeroPalette.Text2,
+                        modifier = Modifier.weight(1f).padding(end = 12.dp),
+                    )
+                    Switch(
+                        checked = !providePaused,
+                        onCheckedChange = { checked -> onSetProvidePaused(!checked) },
+                    )
+                }
+                if (!providePaused) {
+                    val mb = unpaidBytes / 1_000_000.0
+                    Text(
+                        text = stringResource(R.string.urnetwork_provider_unpaid, mb),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = OzeroPalette.Teal,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 12.dp),
+                    color = OzeroPalette.Line,
+                )
+            }
+            ModeSection(
+                selected = windowType,
+                fixedIp = fixedIp,
+                onSelect = onSelectWindowType,
+                onToggleFixedIp = onToggleFixedIp,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ModeSection(
+    selected: UrnetworkWindowType,
+    fixedIp: Boolean,
+    onSelect: (UrnetworkWindowType) -> Unit,
+    onToggleFixedIp: (Boolean) -> Unit,
+) {
+    val modes = listOf(
+        UrnetworkWindowType.AUTO to R.string.urnetwork_mode_auto,
+        UrnetworkWindowType.QUALITY to R.string.urnetwork_mode_quality,
+        UrnetworkWindowType.SPEED to R.string.urnetwork_mode_speed,
+    )
+    SectionLabel(stringResource(R.string.urnetwork_mode_title))
+    SingleChoiceSegmentedButtonRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+    ) {
+        modes.forEachIndexed { index, (mode, labelRes) ->
+            SegmentedButton(
+                selected = mode == selected,
+                onClick = { onSelect(mode) },
+                shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size),
+            ) {
+                Text(stringResource(labelRes))
+            }
+        }
+    }
+    Text(
+        text = stringResource(R.string.urnetwork_mode_hint),
+        style = MaterialTheme.typography.bodySmall,
+        color = OzeroPalette.Text3,
+        modifier = Modifier.padding(top = 6.dp),
+    )
+    if (selected != UrnetworkWindowType.AUTO) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                Text(
+                    text = stringResource(R.string.urnetwork_fixed_ip_size),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = OzeroPalette.Text,
+                )
+                Text(
+                    text = stringResource(R.string.urnetwork_fixed_ip_size_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OzeroPalette.Text3,
+                )
+            }
+            Switch(checked = fixedIp, onCheckedChange = onToggleFixedIp)
+        }
+    }
+}
+
+@Composable
+private fun StatusRow(peerCount: Int) {
+    val (dot, label, dotColor) = if (peerCount > 0) {
+        Triple("●", stringResource(R.string.urnetwork_peers_connected, peerCount), OzeroPalette.StateConnected)
+    } else {
+        Triple("●", stringResource(R.string.urnetwork_peers_searching), OzeroPalette.StateConnecting)
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(text = dot, color = dotColor, style = MaterialTheme.typography.bodySmall)
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = OzeroPalette.Text2,
+        )
+    }
+}
+
+@Composable
+private fun ConsumerProgressCard(
+    balance: ru.ozero.engineurnetwork.UrnetworkSdkBridge.SubscriptionBalanceSnapshot?,
+) {
+    if (balance == null || balance.startBalanceBytes <= 0L) return
+    val usedBytes = balance.usedBytes.coerceAtLeast(0L)
+    val totalBytes = balance.startBalanceBytes
+    val usedMb = usedBytes / 1_000_000.0
+    val totalMb = totalBytes / 1_000_000.0
+    val pendingMb = balance.pendingBytes / 1_000_000.0
+    val progress = if (totalBytes > 0) (usedBytes.toFloat() / totalBytes).coerceIn(0f, 1f) else 0f
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        colors = CardDefaults.cardColors(containerColor = OzeroPalette.Bg1),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            SectionLabel(stringResource(R.string.urnetwork_consumed_label))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp, bottom = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = String.format(java.util.Locale.US, "%.2f MB", usedMb),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = OzeroPalette.Text,
+                )
+                Text(
+                    text = String.format(java.util.Locale.US, "/ %.2f MB", totalMb),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = OzeroPalette.Text3,
+                )
+            }
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.fillMaxWidth(),
+                color = OzeroPalette.Teal,
+                trackColor = OzeroPalette.Bg2,
+            )
+            if (balance.pendingBytes > 0L) {
+                Text(
+                    text = stringResource(
+                        R.string.urnetwork_pending_label,
+                        String.format(java.util.Locale.US, "%.2f", pendingMb),
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OzeroPalette.Text3,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConsentRow() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 10.dp, bottom = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Text(text = "⚠", style = MaterialTheme.typography.bodySmall, color = OzeroPalette.Amber)
+        Text(
+            text = stringResource(R.string.urnetwork_consent_short),
+            style = MaterialTheme.typography.bodySmall,
+            color = OzeroPalette.Text3,
+        )
+    }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text = text.uppercase(),
+        style = MaterialTheme.typography.labelSmall,
+        color = OzeroPalette.Text3,
+    )
 }
 
 @Composable
@@ -276,167 +494,6 @@ private fun LocationRow(
                 text = "$providerCount",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun WindowTypeSection(
-    selected: UrnetworkWindowType,
-    fixedIp: Boolean,
-    onSelect: (UrnetworkWindowType) -> Unit,
-    onToggleFixedIp: (Boolean) -> Unit,
-) {
-    val modes = listOf(
-        UrnetworkWindowType.AUTO to R.string.urnetwork_mode_auto,
-        UrnetworkWindowType.QUALITY to R.string.urnetwork_mode_quality,
-        UrnetworkWindowType.SPEED to R.string.urnetwork_mode_speed,
-    )
-    Column(modifier = Modifier.padding(top = 16.dp)) {
-        Text(
-            text = stringResource(R.string.urnetwork_mode_title),
-            style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(bottom = 4.dp),
-        )
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            modes.forEachIndexed { index, (mode, labelRes) ->
-                SegmentedButton(
-                    selected = mode == selected,
-                    onClick = { onSelect(mode) },
-                    shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size),
-                ) {
-                    Text(stringResource(labelRes))
-                }
-            }
-        }
-        Text(
-            text = stringResource(R.string.urnetwork_mode_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp),
-        )
-        if (selected != UrnetworkWindowType.AUTO) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.urnetwork_fixed_ip_size),
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                    Text(
-                        text = stringResource(R.string.urnetwork_fixed_ip_size_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(checked = fixedIp, onCheckedChange = onToggleFixedIp)
-            }
-        }
-    }
-}
-
-@Composable
-private fun ProviderStatsRow(unpaidBytes: Long) {
-    val mb = unpaidBytes / 1_000_000.0
-    Text(
-        text = stringResource(R.string.urnetwork_provider_unpaid, mb),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = 4.dp),
-    )
-}
-
-@Composable
-private fun ConsumerStatsBlock(
-    balance: ru.ozero.engineurnetwork.UrnetworkSdkBridge.SubscriptionBalanceSnapshot?,
-) {
-    if (balance == null || balance.startBalanceBytes <= 0L) return
-    val usedMb = balance.usedBytes.coerceAtLeast(0L) / 1_000_000.0
-    val totalMb = balance.startBalanceBytes / 1_000_000.0
-    val pendingMb = balance.pendingBytes / 1_000_000.0
-    Column(modifier = Modifier.padding(top = 8.dp)) {
-        Text(
-            text = stringResource(R.string.urnetwork_consumed_label),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = stringResource(
-                R.string.urnetwork_consumed_format,
-                String.format(java.util.Locale.US, "%.2f", usedMb),
-                String.format(java.util.Locale.US, "%.2f", totalMb),
-            ),
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        if (balance.pendingBytes > 0L) {
-            Text(
-                text = stringResource(
-                    R.string.urnetwork_pending_label,
-                    String.format(java.util.Locale.US, "%.2f", pendingMb),
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-private fun PeerCounterRow(peerCount: Int) {
-    val text = if (peerCount > 0) {
-        stringResource(R.string.urnetwork_peers_connected, peerCount)
-    } else {
-        stringResource(R.string.urnetwork_peers_searching)
-    }
-    Card(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(16.dp),
-        )
-    }
-}
-
-@Composable
-private fun AboutBlock() {
-    Card(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.urnetwork_about_title),
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Text(
-                text = stringResource(R.string.urnetwork_about_body),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-    }
-}
-
-@Composable
-private fun InfoBlock() {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.urnetwork_consent_warning_title),
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Text(
-                text = stringResource(R.string.urnetwork_consent_warning_body),
-                style = MaterialTheme.typography.bodyMedium,
             )
         }
     }
