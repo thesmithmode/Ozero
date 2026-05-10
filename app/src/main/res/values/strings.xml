@@ -315,4 +315,10 @@
     <string name="settings_always_on_banner_title">Усильте защиту</string>
     <string name="settings_always_on_banner_body">Включите «Всегда включён» в настройках VPN Android для защиты от утечек при перезагрузке</string>
     <string name="settings_always_on_banner_configure">Настроить</string>
+    <!-- Chart timeframe -->
+    <string name="chart_tf_5s">5с</string>
+    <string name="chart_tf_30s">30с</string>
+    <string name="chart_tf_1h">1ч</string>
+    <string name="chart_tf_6h">6ч</string>
+    <string name="chart_tf_24h">24ч</string>
 </resources>

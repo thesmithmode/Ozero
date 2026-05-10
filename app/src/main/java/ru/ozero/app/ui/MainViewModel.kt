@@ -155,7 +155,7 @@ class MainViewModel @Inject constructor(
                 if (s != null) {
                     val prev = _speedHistory.value
                     _speedHistory.value = (prev + Pair(s.bpsIn.toFloat(), s.bpsOut.toFloat()))
-                        .takeLast(SPEED_HISTORY_SIZE)
+                        .takeLast(MAX_SPEED_HISTORY_POINTS)
                 } else {
                     if (_speedHistory.value.isNotEmpty()) _speedHistory.value = emptyList()
                 }
@@ -282,7 +282,7 @@ class MainViewModel @Inject constructor(
 
     private companion object {
         const val IP_TAG = "MainViewModel.ip"
-        const val SPEED_HISTORY_SIZE = 60
+        const val MAX_SPEED_HISTORY_POINTS = 86_400
         const val URNETWORK_PEER_POLL_MS = 2_000L
         const val URNETWORK_PEER_POLL_KEEP_MS = 5_000L
         const val URNETWORK_SEARCH_TICK_MS = 1_000L

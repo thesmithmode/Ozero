@@ -1,6 +1,9 @@
 package ru.ozero.app.ui
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,12 +22,14 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -85,37 +90,43 @@ fun MainScreen(
     val isConnected = state is TunnelState.Connected
 
     OzeroBackground(state = backgroundState) {
-        when (appMode) {
-            AppMode.SIMPLE -> SimpleMainContent(
-                tunnelState = state,
-                powerState = powerState,
-                isConnected = isConnected,
-                manualEngine = manualEngine,
-                urnetworkPeerCount = urnetworkPeerCount,
-                urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
-                onConnectClick = onConnectClick,
-                onOpenEngineParams = onOpenEngineParams,
-                onOpenSettings = onOpenSettings,
-            )
-            AppMode.EXPERT -> ExpertMainContent(
-                tunnelState = state,
-                stats = stats,
-                speedHistory = speedHistory,
-                stagnant = stagnant,
-                healthStatus = healthStatus,
-                powerState = powerState,
-                isConnected = isConnected,
-                manualEngine = manualEngine,
-                urnetworkPeerCount = urnetworkPeerCount,
-                urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
-                ipInfo = ipInfo,
-                killswitchActive = killswitchActive,
-                onConnectClick = onConnectClick,
-                onManualEngineSelect = viewModel::onManualEngineSelect,
-                onRefreshIpInfo = viewModel::refreshIpInfo,
-                onOpenEngineParams = onOpenEngineParams,
-                onOpenSettings = onOpenSettings,
-            )
+        AnimatedContent(
+            targetState = appMode,
+            transitionSpec = { fadeIn() togetherWith fadeOut() },
+            label = "mode_switch",
+        ) { mode ->
+            when (mode) {
+                AppMode.SIMPLE -> SimpleMainContent(
+                    tunnelState = state,
+                    powerState = powerState,
+                    isConnected = isConnected,
+                    manualEngine = manualEngine,
+                    urnetworkPeerCount = urnetworkPeerCount,
+                    urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
+                    onConnectClick = onConnectClick,
+                    onOpenEngineParams = onOpenEngineParams,
+                    onOpenSettings = onOpenSettings,
+                )
+                AppMode.EXPERT -> ExpertMainContent(
+                    tunnelState = state,
+                    stats = stats,
+                    speedHistory = speedHistory,
+                    stagnant = stagnant,
+                    healthStatus = healthStatus,
+                    powerState = powerState,
+                    isConnected = isConnected,
+                    manualEngine = manualEngine,
+                    urnetworkPeerCount = urnetworkPeerCount,
+                    urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
+                    ipInfo = ipInfo,
+                    killswitchActive = killswitchActive,
+                    onConnectClick = onConnectClick,
+                    onManualEngineSelect = viewModel::onManualEngineSelect,
+                    onRefreshIpInfo = viewModel::refreshIpInfo,
+                    onOpenEngineParams = onOpenEngineParams,
+                    onOpenSettings = onOpenSettings,
+                )
+            }
         }
     }
 }
@@ -466,6 +477,13 @@ private fun TrafficStatsCard(
     val rxTotal = BytesFormatter.humanReadable(stats?.rxBytes ?: 0L)
     val txTotal = BytesFormatter.humanReadable(stats?.txBytes ?: 0L)
     val uptime = BytesFormatter.durationHms(sessionMs)
+
+    var selectedTf by remember { mutableStateOf(TimeframeOption.S30) }
+    val displayHistory = remember(speedHistory, selectedTf) {
+        val slice = speedHistory.takeLast(selectedTf.points)
+        downsample(slice, CHART_MAX_RENDER_POINTS)
+    }
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -475,32 +493,43 @@ private fun TrafficStatsCard(
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(
-                text = "↓ $rxSpeed   ↑ $txSpeed",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = OzeroPalette.Text,
-            )
-            Text(
-                text = stringResource(R.string.stats_uptime, uptime),
-                style = MaterialTheme.typography.bodySmall,
-                color = OzeroPalette.Text3,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            LiveTrafficChart(
-                history = speedHistory,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(72.dp),
-            )
-            Spacer(modifier = Modifier.height(6.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                Text(
+                    text = "↓ $rxSpeed  ↑ $txSpeed",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = OzeroPalette.Text,
+                )
+                Text(
+                    text = stringResource(R.string.stats_uptime, uptime),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OzeroPalette.Text3,
+                )
+            }
+            LiveTrafficChart(
+                history = displayHistory,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(72.dp),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TimeframeOption.entries.forEach { tf ->
+                    FilterChip(
+                        selected = selectedTf == tf,
+                        onClick = { selectedTf = tf },
+                        label = { Text(stringResource(tf.labelRes), style = MaterialTheme.typography.labelSmall) },
+                    )
+                }
+                Spacer(modifier = Modifier.weight(1f))
                 Text(
                     text = "↓ $rxTotal",
                     style = MaterialTheme.typography.bodySmall,
@@ -561,21 +590,16 @@ private fun LiveTrafficChart(
         val strokePx = with(density) { 2.dp.toPx() }
         val stroke = Stroke(width = strokePx, cap = StrokeCap.Round, join = StrokeJoin.Round)
 
-        val pathRx = Path()
-        history.forEachIndexed { i, (rx, _) ->
-            val x = i * step
-            val y = h - (rx / safeMax) * h
-            if (i == 0) pathRx.moveTo(x, y) else pathRx.lineTo(x, y)
-        }
-        drawPath(pathRx, color = colorRx, style = stroke)
-
-        val pathTx = Path()
-        history.forEachIndexed { i, (_, tx) ->
-            val x = i * step
-            val y = h - (tx / safeMax) * h
-            if (i == 0) pathTx.moveTo(x, y) else pathTx.lineTo(x, y)
-        }
-        drawPath(pathTx, color = colorTx, style = stroke)
+        drawPath(
+            Path().apply { addSmooth(history.map { it.first }, step, h, safeMax) },
+            color = colorRx,
+            style = stroke,
+        )
+        drawPath(
+            Path().apply { addSmooth(history.map { it.second }, step, h, safeMax) },
+            color = colorTx,
+            style = stroke,
+        )
     }
 }
 
@@ -627,3 +651,36 @@ private fun StatusLabel(state: TunnelState) {
 private const val DOCK_TAB_HOME = "home"
 private const val DOCK_TAB_SERVERS = "servers"
 private const val DOCK_TAB_SETTINGS = "settings"
+
+internal const val CHART_MAX_RENDER_POINTS = 300
+
+private enum class TimeframeOption(val labelRes: Int, val points: Int) {
+    S5(R.string.chart_tf_5s, 5),
+    S30(R.string.chart_tf_30s, 30),
+    H1(R.string.chart_tf_1h, 3_600),
+    H6(R.string.chart_tf_6h, 21_600),
+    H24(R.string.chart_tf_24h, 86_400),
+}
+
+internal fun downsample(history: List<Pair<Float, Float>>, maxPoints: Int): List<Pair<Float, Float>> {
+    if (history.size <= maxPoints) return history
+    val step = history.size.toDouble() / maxPoints
+    return List(maxPoints) { i -> history[(i * step).toInt()] }
+}
+
+private fun Path.addSmooth(values: List<Float>, step: Float, height: Float, safeMax: Float) {
+    if (values.size < 2) {
+        if (values.size == 1) moveTo(0f, height - (values[0] / safeMax) * height)
+        return
+    }
+    val xs = List(values.size) { i -> i * step }
+    val ys = values.map { height - (it / safeMax) * height }
+    moveTo(xs[0], ys[0])
+    val midXs = List(values.size - 1) { i -> (xs[i] + xs[i + 1]) / 2f }
+    val midYs = List(values.size - 1) { i -> (ys[i] + ys[i + 1]) / 2f }
+    lineTo(midXs[0], midYs[0])
+    for (i in 1 until values.size - 1) {
+        quadraticBezierTo(xs[i], ys[i], midXs[i], midYs[i])
+    }
+    lineTo(xs.last(), ys.last())
+}
