@@ -98,6 +98,10 @@ extensions.configure<BaseAppModuleExtension> {
                 it.useJUnitPlatform()
                 it.maxParallelForks =
                     (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
+                it.testLogging {
+                    events("started", "passed", "failed", "skipped")
+                    showStandardStreams = false
+                }
             }
         }
     }
