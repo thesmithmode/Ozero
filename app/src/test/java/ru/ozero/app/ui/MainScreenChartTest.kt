@@ -3,7 +3,6 @@ package ru.ozero.app.ui
 import org.junit.jupiter.api.Test
 import java.io.File
 import kotlin.test.assertEquals
-import kotlin.test.assertNotSame
 import kotlin.test.assertTrue
 
 class MainScreenChartTest {
