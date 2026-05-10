@@ -1,5 +1,21 @@
 # Build Log
 
+## [2026-05-10T21:00:00+03:00] compile | 2026-05-10.md (session 3 — full day verification)
+- Source: daily/2026-05-10.md
+- Articles created: (none — all already compiled in passes 18:17 and 19:30)
+- Articles updated: (none)
+- Note: All five concepts from today confirmed present in index and articles: [[concepts/mockk-aar-native-initializer-trap]], [[concepts/kotlin-empty-string-null-coalesce-trap]], [[concepts/viewmodel-polling-runtest-trap]], [[concepts/byedpi-mock-server-ci-fragility]] (Root Cause 3), [[concepts/tun-self-exclusion-sdk-engines]] (SOCKS loop). Session 17:46 GROUP A/B fixes mapped to existing articles. Session 13:00 billing/monetization planning — no technical knowledge to extract.
+
+## [2026-05-10T19:30:00+03:00] compile | 2026-05-10.md (session 2 — GROUP B polling trap)
+- Source: daily/2026-05-10.md
+- Articles created: [[concepts/viewmodel-polling-runtest-trap]]
+- Articles updated: (none)
+
+## [2026-05-10T18:17:00+03:00] compile | 2026-05-10.md
+- Source: daily/2026-05-10.md
+- Articles created: [[concepts/mockk-aar-native-initializer-trap]], [[concepts/kotlin-empty-string-null-coalesce-trap]]
+- Articles updated: [[concepts/byedpi-mock-server-ci-fragility]] (source added — Root Cause 3 injectable probe implemented), [[concepts/tun-self-exclusion-sdk-engines]] (expanded: SOCKS/hev loop mechanism added, renamed to "All VPN Engines")
+
 ## [2026-05-05T22:17:00+03:00] compile | 2026-05-05.md
 - Source: daily/2026-05-05.md
 - Articles created: [[concepts/amneziawg-relinker-loading-trap]], [[concepts/urnetwork-networkspace-bundle-fields]], [[concepts/core-backup-module]], [[concepts/warp-slot-corrupt-json-resilience]]
@@ -75,6 +91,20 @@
 - Connections created: [[connections/dependency-override-masking]], [[connections/release-checks-beyond-ci]]
 - Articles updated: (none)
 - Excluded as not actionable knowledge: specific AWG test counts, ktlint alignment-whitespace specifics, release run number 25310434846, multiple memory flush failures ("Nothing worth saving" or exit code 1)
+
+## [2026-05-10T18:00:00+03:00] compile | 2026-05-08.md
+- Source: daily/2026-05-08.md
+- Articles created: [[concepts/amneziawg-so-binary-integrity]], [[concepts/amneziawg-jni-classpath-completeness]], [[concepts/gitignore-jnilibs-conflict]], [[concepts/warp-handle-leak-sigabrt]], [[concepts/android-vpn-self-traffic-bypass]], [[concepts/health-monitor-p2p-mismatch]], [[concepts/test-io-thread-zombie-trap]], [[concepts/compose-remember-stale-collectasstate]]
+- Articles updated: [[concepts/amnezia-wg-warp-migration]] (Phase 2: Maven→PORTAL_WG SO migration, pre-JNI logging, SHA256 sentinel)
+- Connections created: (none new — [[connections/false-positive-engine-status]] extended via 2026-05-07 compile)
+- Note: All 8 new concept articles were already written to disk before this log entry was created; this entry retroactively documents the compile
+
+## [2026-05-10T18:30:00+03:00] compile | 2026-05-09.md
+- Source: daily/2026-05-09.md
+- Articles created: [[concepts/tun-self-exclusion-sdk-engines]], [[concepts/engine-switch-chain-cascading-failures]], [[concepts/codeql-aar-dependency-gap]], [[concepts/byedpi-mock-server-ci-fragility]], [[concepts/vendor-bindsocket-eperm]], [[concepts/dependabot-dev-workflow-mismatch]], [[concepts/vpn-ip-detection-contract]], [[concepts/ip-probe-route-architecture]], [[concepts/urnetwork-window-type-modes]]
+- Articles updated: [[concepts/urnetwork-sdk-integration]] (excludeSelf regression + engine-switch chain context), [[concepts/dual-go-runtime-eager-loading]] (GoRuntimeGuard contradiction added), [[concepts/ci-job-dependency-masking]] (2026-05-09 ktlint→test masking example), [[connections/false-positive-engine-status]] (IP warmup cancellation as 4th false-positive vector)
+- Connections created: (none new)
+- Excluded as too granular: SplitTunnelViewModelTest gap details (testing trivia), specific CI run numbers, memory flush failures
 
 ## [2026-05-09T18:28:06+03:00] compile | 2026-05-07.md
 - Source: daily/2026-05-07.md
