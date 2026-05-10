@@ -1,13 +1,14 @@
 package ru.ozero.enginescore
 
+import ru.ozero.enginescore.settings.HostsMode
+
 sealed class EngineConfig {
     abstract val engineId: EngineId
 
     data class ByeDpi(
         val args: String = "-s1 -q1 -a1 -Y -Ar -a1 -s5 -o2 -At -f-1 -r1+s -a1 -As -s1 -o1+s -s-1 -a1",
         val socksPort: Int = 1080,
-        val hostsMode: ru.ozero.enginescore.settings.HostsMode =
-            ru.ozero.enginescore.settings.HostsMode.DISABLED,
+        val hostsMode: HostsMode = HostsMode.DISABLED,
         val hosts: List<String> = emptyList(),
     ) : EngineConfig() {
         override val engineId = EngineId.BYEDPI

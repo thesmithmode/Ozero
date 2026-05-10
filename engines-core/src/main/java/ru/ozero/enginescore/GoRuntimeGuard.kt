@@ -6,7 +6,7 @@ import java.util.concurrent.atomic.AtomicReference
  * Process-wide guard для Go-рантайма.
  *
  * Why: libam-go (WARP/AmneziaWG) и libgojni (URnetwork SDK) — два независимых Go-рантайма.
- * Concurrent JNI_OnLoad обоих ломал libgojni в gcWriteBarrier. CLAUDE.md инвариант:
+ * Concurrent JNI_OnLoad обоих ломал libgojni в gcWriteBarrier.
  * оба .so грузятся eager-синхронно в OzeroApp.onCreate (main thread, до async-корутин),
  * после этого они coexist resident в процессе. Guard сериализует **active runtime**:
  * только один из движков использует свой Go в момент времени, второй ждёт release.
