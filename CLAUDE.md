@@ -69,6 +69,11 @@
 - Boot log tab отдельный (Settings → Boot log), очистка только вручную.
 - `PersistentLoggers.error/warn` — для критичных событий, обязанных попасть в boot.log на диск (errors, warnings, JNI pre-blocking checkpoints для hang-диагностики). На success-events запрещено: `Log.i/d` достаточно — UnifiedLogger пишет и в logcat, и в файл через один канал. Дубль `Log.i + PersistentLoggers.info` на success → шум, удалять.
 
+## Коммиты — типовые ловушки
+
+- Удалил вызов → удали импорт. ktlint/detekt режут unused imports как errors.
+- Перед commit: `git diff --staged` → проверить нет ли осиротевших import строк.
+
 ## Тесты — типовые ловушки
 
 - **Интерфейс изменился** (добавлен/удалён метод) → сразу `grep -r "FakeXxx\|StubXxx\|FakeRepo"` по тестам и обновить все fake-реализации. Compile fail в CI = не обновил.
