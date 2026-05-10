@@ -1,8 +1,8 @@
 # Engines Ozero
 
-Каждый engine реализует `ru.ozero.coreapi.Engine` — единый интерфейс. Native-сторона за интерфейсом `Lib<X>Delegate`.
+Каждый engine реализует `EnginePlugin` из `:engines-core`. Детали архитектуры — `architecture.md`.
 
-## Текущий статус
+## Статус
 
 | Engine | Статус | Модуль |
 |--------|--------|--------|
@@ -14,98 +14,71 @@
 | NaiveProxy | ⏳ stub | — |
 | Tor + IPtProxy | ⏳ stub | — |
 
-Описания ниже включают как реализованные, так и запланированные движки.
+---
+
+## ByeDPI
+
+| | |
+|---|---|
+| Назначение | Локальный TCP-прокси с фрагментацией SNI, без удалённого сервера |
+| Транспорт | TCP, локальный SOCKS5 |
+| Native | `libbyedpi-<abi>.so` (CMake + NDK) |
+| Source | `engine-byedpi/src/main/cpp/byedpi/` (submodule pinned v0.17.3) |
+| Capabilities | TCP=true UDP=false localOnly=true requiresServer=false supportsUpstreamSocks=false |
+
+Terminal proxy — upstream chain не поддерживает. Подходит как always-on baseline без внешнего сервера.
+
+`waitSocksReady`: после старта JNI движок опрашивает SOCKS5 порт через `withTimeoutOrNull(5 000)` с retry 100 мс, проверяя живость handshake.
+
+## WARP (AmneziaWG)
+
+| | |
+|---|---|
+| Назначение | Cloudflare WARP через AmneziaWG с защитой от DPI (junk packets / S1-S2 / H1-H4) |
+| Транспорт | UDP/WireGuard TUN-режим |
+| Native | AmneziaWG Go AAR (gomobile bind) |
+| Source | amnezia-vpn/amneziawg-go |
+| Capabilities | TCP=true UDP=true localOnly=false requiresServer=true supportsUpstreamSocks=false |
+
+Config: raw INI (WireGuard Quick Config format) с расширенными полями Jc/Jmin/Jmax/S1/S2/H1-H4. Параметры подбираются автоматически (`WarpAutoConfig`). Конфигурации хранятся в `WarpConfigSlotStore` (слоты).
+
+TUN-режим: не создаёт SOCKS-интерфейс, TUN fd передаётся напрямую через `TunFdAcceptor.attachTun`.
+
+## URnetwork
+
+| | |
+|---|---|
+| Назначение | Decentralized P2P provider mesh, анонимизация через peer-сеть |
+| Транспорт | P2P (Go SDK), TUN-режим |
+| Native | URnetwork Go AAR (gomobile) |
+| Source | urnetwork/sdk (MPL-2.0) |
+| Capabilities | TCP=true UDP=true localOnly=false requiresServer=true supportsUpstreamSocks=false |
+
+Аутентификация: guest JWT → client JWT (persisted в `UrnetworkConfigStore`). Регион выбирается через `setPreferredCountry`. Performance profile — через `applyPerformanceProfile(windowType, fixedIp)`.
+
+TUN fd передаётся через `attachTun`. SDK excludeSelf из своего TUN — self-трафик обходит туннель (нет routing loop). IP определяется через `selectedLocationInfo()` (country+countryCode из SDK без внешнего запроса).
+
+`GoRuntimeGuard` защищает от одновременного запуска двух Go-рантаймов (WARP + URnetwork): каждый `acquire(owner)` требует парного `release(owner)` при teardown.
 
 ---
 
-## 1. ByeDPI
+## Запланированные движки (stub, модуль отсутствует)
 
-| Что | Значение |
-|-----|----------|
-| Назначение | Локальный TCP-прокси с фрагментацией SNI, без удалённого сервера |
-| Source | `engine-byedpi/src/main/cpp/byedpi/` (submodule pinned `v0.17.3`) |
-| Native | `libbyedpi-<abi>.so`, CMake + NDK (4 ABI) |
-| Транспорт | TCP, локальный SOCKS5 |
-| Capabilities | TCP=true, UDP=false, localOnly=true, requiresServer=false |
-| Build | `build_byedpi.sh` через `Dockerfile.byedpi` |
-| Lock tag | `byedpi-<sha8>` |
+### Xray-core (VLESS+Reality+XHTTP)
+- Native: `libxray.aar` (gomobile bind, XTLS/Xray-core)
+- Capabilities: TCP=true UDP=true requiresServer=true **supportsUpstreamSocks=true** (proxySettings.tag)
+- Единственный движок пригодный для middle-звена в chain
 
-Работает без удалённого backend, подходит как always-on baseline.
+### Hysteria2
+- Native: `libhysteria2.aar` (gomobile, apernet/hysteria v2)
+- Транспорт: UDP/QUIC + port hopping + Salamander obfs
+- Не работает на CGNAT с UDP-фильтром
 
-## 2. Xray-core (VLESS+Reality+XHTTP)
+### NaiveProxy
+- Native: `libnaive-<abi>.so` (Chromium net stack, HTTP/2 CONNECT)
+- Запускается как subprocess через `Runtime.exec`
 
-| Что | Значение |
-|-----|----------|
-| Назначение | Прокси с VLESS+Reality fingerprint mimicry |
-| Source | XTLS/Xray-core upstream |
-| Native | `libxray.aar` (gomobile bind, multi-ABI) |
-| Транспорт | TCP/UDP, локальный SOCKS/HTTP |
-| Capabilities | TCP=true, UDP=true, DoH=true, requiresServer=true |
-| Build | `build_xray.sh` через `Dockerfile` (Go + gomobile + NDK) |
-| Lock tag | `xray-<sha8>` |
-
-Поддерживает множество транспортов: Reality, XHTTP, gRPC, WebSocket. Фаза E2.x добавит конфиг-builder из подписки.
-
-## 3. AmneziaWG 2.0
-
-| Что | Значение |
-|-----|----------|
-| Назначение | WireGuard с расширениями junk packets / S1-S2 / H1-H4 |
-| Source | amnezia-vpn/amneziawg-go |
-| Native | `libamneziawg.aar` (gomobile bind) |
-| Транспорт | UDP/WireGuard tun-режим (без локального SOCKS) |
-| Capabilities | TCP=true, UDP=true, DoH=true, requiresServer=true |
-| Build | `build_amneziawg.sh` через `Dockerfile` |
-| Lock tag | `amneziawg-<sha8>` |
-
-В отличие от классического WG, делает peer-трафик неотличимым от random UDP. Probe идёт через `delegate.isUp()` (нет socket'а).
-
-## 4. Hysteria2 (native)
-
-| Что | Значение |
-|-----|----------|
-| Назначение | QUIC/UDP + port hopping + Salamander obfuscation |
-| Source | apernet/hysteria v2 |
-| Native | `libhysteria2.aar` (gomobile bind) |
-| Транспорт | UDP/QUIC, локальный SOCKS5 |
-| Capabilities | TCP=true, UDP=true, DoH=true, requiresServer=true |
-| Build | `build_hysteria2.sh` через `Dockerfile` |
-| Lock tag | `hysteria2-<sha8>` |
-
-Не работает на CGNAT с UDP-фильтром (`StrategyEngine.udpReachable=false` отфильтрует).
-
-## 5. NaiveProxy
-
-| Что | Значение |
-|-----|----------|
-| Назначение | HTTP/2 (или QUIC) CONNECT через Chromium net stack |
-| Source | klzgrad/naiveproxy |
-| Native | `libnaive-<abi>.so` (4 ABI), извлечён из upstream APK plugin |
-| Транспорт | TCP (HTTP/2), локальный SOCKS5 |
-| Capabilities | TCP=true, UDP=false, localOnly=false, requiresServer=true |
-| Build | `build_naive.sh` (download APK plugin → unzip lib/) |
-| Lock tag | `naive-<sha8>` |
-
-NaiveProxy исполняется как subprocess (`Runtime.exec`), не Go-библиотека. TLS-стэк настоящий Chromium.
-
-## 6. Tor + IPtProxy
-
-| Что | Значение |
-|-----|----------|
-| Назначение | Анонимизирующий transport + pluggable transports |
-| Source | tor-android (Maven Central) + IPtProxy (Maven Central) |
-| Native | `libtor-<abi>.so` + `libiptproxy-<abi>.so` (4 ABI каждый) |
-| Pluggable transports | obfs4 / snowflake / webtunnel / meek_lite (через IPtProxy 5.4.1: lyrebird+snowflake+dnstt) |
-| Транспорт | TCP, локальный SOCKS5 (default 9050) |
-| Capabilities | TCP=true, UDP=false, localOnly=false, requiresServer=false |
-| Build | `build_tor.sh` (download+extract из Maven AAR, без gomobile) |
-| Lock tag | `tor-<sha8>` (несёт оба engine — `tor` + `iptproxy`, два manifest'а) |
-| Доставка | Встроено в основной APK/ABI-артефакты (без PlayCore SplitInstall) |
-
-Bridges подаются в `EngineConfig.Tor.bridges: List<String>`.
-
-Сборка из исходников требует NDK + Go + gomobile + 30+ мин CI; Maven Central — стабильный канал с подписанными AAR. Conjure отложен (gotapdance Android NOT MAINTAINED upstream).
-
-## 7. URnetwork (запланирован, фаза E15)
-
-P2P mesh-VPN от BringYour Inc. Подключение через JWT/GuestMode, MPL-2.0 (Go+gomobile).
+### Tor + IPtProxy
+- Native: `libtor.so` + `libiptproxy.so` (Maven Central AAR)
+- Pluggable transports: obfs4 / snowflake / webtunnel
+- Планировался как Dynamic Feature Module (PlayCore), будет обычной library

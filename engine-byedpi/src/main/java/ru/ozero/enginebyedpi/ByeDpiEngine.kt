@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 class ByeDpiEngine(
     private val proxy: ByeDpiProxyContract = ByeDpiProxy(),
+    private val socksProbe: suspend (String, Int, Int) -> Long = Socks5HandshakeProbe::probe,
     private val readyProbeTimeoutMs: Int = READY_PROBE_TIMEOUT_MS,
     private val readyTotalTimeoutMs: Long = READY_TIMEOUT_MS,
 ) : EnginePlugin {
@@ -95,7 +96,7 @@ class ByeDpiEngine(
         withTimeoutOrNull(readyTotalTimeoutMs) {
             while (true) {
                 val ok = try {
-                    Socks5HandshakeProbe.probe("127.0.0.1", port, readyProbeTimeoutMs)
+                    socksProbe("127.0.0.1", port, readyProbeTimeoutMs)
                     true
                 } catch (e: CancellationException) {
                     throw e
@@ -138,11 +139,13 @@ class ByeDpiEngine(
             return ProbeResult.Failure(reason = "движок не запущен")
         }
         return try {
-            val latency = Socks5HandshakeProbe.probe("127.0.0.1", port, timeoutMs = 3_000)
+            val latency = socksProbe("127.0.0.1", port, 3_000)
             ProbeResult.Success(latencyMs = latency)
-        } catch (e: Exception) {
-            PersistentLoggers.warn(TAG, "probe failed: ${e.message}")
-            ProbeResult.Failure(reason = e.message ?: "connection refused")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Throwable) {
+            PersistentLoggers.warn(TAG, "probe failed on port $port")
+            ProbeResult.Failure(reason = "connection refused")
         }
     }
 

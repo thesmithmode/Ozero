@@ -16,9 +16,8 @@ import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
-import java.net.ServerSocket
+import java.io.IOException
 import java.util.concurrent.CountDownLatch
-import kotlin.concurrent.thread
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
@@ -36,7 +35,7 @@ class ByeDpiEngineTest {
         every { ByeDpiProxy.loadOnce() } just runs
         every { ByeDpiProxy.libraryLoaded } returns true
         every { ByeDpiProxy.loadError } returns null
-        engine = ByeDpiEngine(proxy, readyProbeTimeoutMs = 200, readyTotalTimeoutMs = 30_000)
+        engine = ByeDpiEngine(proxy, socksProbe = { _, _, _ -> 1L })
         proxyRunning = CountDownLatch(1)
     }
 
@@ -62,66 +61,41 @@ class ByeDpiEngineTest {
 
     @Test
     fun startSuccessWhenSocksPortReady() = runTest {
-        val server = ServerSocket(0)
-        val port = server.localPort
-        server.acceptSocks5InBackground()
-        try {
-            every { proxy.startProxy(any()) } answers {
-                proxyRunning.await()
-                0
-            }
-            val result = engine.start(EngineConfig.ByeDpi(socksPort = port))
-            assertIs<StartResult.Success>(result)
-            assertEquals(port, result.socksPort)
-        } finally {
-            server.close()
-        }
+        every { proxy.startProxy(any()) } returns 0
+        val result = engine.start(EngineConfig.ByeDpi(socksPort = 1080))
+        assertIs<StartResult.Success>(result)
+        assertEquals(1080, result.socksPort)
     }
 
     @Test
     fun startFailureWhenSocksPortNeverOpens() = runTest {
+        val failEngine = ByeDpiEngine(
+            proxy,
+            socksProbe = { _, _, _ -> throw IOException("refused") },
+            readyTotalTimeoutMs = 500,
+        )
         every { proxy.startProxy(any()) } returns -1
-        val result = engine.start(EngineConfig.ByeDpi(socksPort = 19998))
+        val result = failEngine.start(EngineConfig.ByeDpi(socksPort = 19998))
         assertIs<StartResult.Failure>(result)
     }
 
     @Test
     fun startArgsIncludePortFlag() = runTest {
-        val server = ServerSocket(0)
-        val port = server.localPort
-        server.acceptSocks5InBackground()
-        try {
-            every { proxy.startProxy(any()) } answers {
-                proxyRunning.await()
-                0
-            }
-            engine.start(EngineConfig.ByeDpi(socksPort = port))
-            verify {
-                proxy.startProxy(
-                    match { args -> args.contains("-p") && args.contains(port.toString()) }
-                )
-            }
-        } finally {
-            server.close()
+        every { proxy.startProxy(any()) } returns 0
+        engine.start(EngineConfig.ByeDpi(socksPort = 1080))
+        verify {
+            proxy.startProxy(
+                match { args -> args.contains("-p") && args.contains("1080") }
+            )
         }
     }
 
     @Test
     fun stopCallsJniStopProxy() = runTest {
-        val server = ServerSocket(0)
-        val port = server.localPort
-        server.acceptSocks5InBackground()
-        try {
-            every { proxy.startProxy(any()) } answers {
-                proxyRunning.await()
-                0
-            }
-            engine.start(EngineConfig.ByeDpi(socksPort = port))
-            engine.stop()
-            verify { proxy.stopProxy() }
-        } finally {
-            server.close()
-        }
+        every { proxy.startProxy(any()) } returns 0
+        engine.start(EngineConfig.ByeDpi(socksPort = 1080))
+        engine.stop()
+        verify { proxy.stopProxy() }
     }
 
     @Test
@@ -132,55 +106,41 @@ class ByeDpiEngineTest {
 
     @Test
     fun probeSuccessWhenSocketListens() = runTest {
-        val server = ServerSocket(0)
-        val port = server.localPort
-        server.acceptSocks5InBackground()
-        try {
-            every { proxy.startProxy(any()) } answers {
-                proxyRunning.await()
-                0
-            }
-            engine.start(EngineConfig.ByeDpi(socksPort = port))
-            val result = engine.probe()
-            assertIs<ProbeResult.Success>(result)
-        } finally {
-            server.close()
+        every { proxy.startProxy(any()) } answers {
+            proxyRunning.await()
+            0
         }
-    }
-
-    private fun ServerSocket.acceptSocks5InBackground() {
-        thread(isDaemon = true) {
-            while (!isClosed) {
-                runCatching {
-                    accept().use { c ->
-                        c.soTimeout = 1_000
-                        val nmethods = run {
-                            val header = ByteArray(2)
-                            c.getInputStream().read(header)
-                            header[1].toInt() and 0xFF
-                        }
-                        c.getInputStream().read(ByteArray(nmethods.coerceAtLeast(1)))
-                        c.getOutputStream().write(byteArrayOf(0x05, 0x00))
-                        c.getOutputStream().flush()
-                    }
-                }
-            }
-        }
+        engine.start(EngineConfig.ByeDpi(socksPort = 1080))
+        val result = engine.probe()
+        assertIs<ProbeResult.Success>(result)
     }
 
     @Test
     fun probeFailsWhenNoSocketListening() = runTest {
-        every { proxy.startProxy(any()) } returns 0
-        engine.start(EngineConfig.ByeDpi(socksPort = 19999))
-        val result = engine.probe()
+        var callCount = 0
+        val localEngine = ByeDpiEngine(
+            proxy,
+            socksProbe = { _, _, _ -> if (++callCount == 1) 1L else throw IOException("refused") },
+        )
+        every { proxy.startProxy(any()) } answers {
+            proxyRunning.await()
+            0
+        }
+        localEngine.start(EngineConfig.ByeDpi(socksPort = 1080))
+        val result = localEngine.probe()
         assertIs<ProbeResult.Failure>(result)
     }
 
     @Test
     fun probeFailsAfterStartFailure() = runTest {
+        val failEngine = ByeDpiEngine(
+            proxy,
+            socksProbe = { _, _, _ -> throw IOException("refused") },
+            readyTotalTimeoutMs = 500,
+        )
         every { proxy.startProxy(any()) } returns -1
-        engine.start(EngineConfig.ByeDpi(socksPort = 12345))
-        val result = engine.probe()
+        failEngine.start(EngineConfig.ByeDpi(socksPort = 12345))
+        val result = failEngine.probe()
         assertIs<ProbeResult.Failure>(result)
         assertEquals("движок не запущен", result.reason)
     }
@@ -279,22 +239,12 @@ class ByeDpiEngineTest {
 
     @Test
     fun startWithBlankArgsDoesNotPassEmptyToken() = runTest {
-        val server = ServerSocket(0)
-        val port = server.localPort
-        server.acceptSocks5InBackground()
-        try {
-            every { proxy.startProxy(any()) } answers {
-                proxyRunning.await()
-                0
-            }
-            engine.start(EngineConfig.ByeDpi(args = "", socksPort = port))
-            verify {
-                proxy.startProxy(
-                    match { args -> args.none { it.isEmpty() } },
-                )
-            }
-        } finally {
-            server.close()
+        every { proxy.startProxy(any()) } returns 0
+        engine.start(EngineConfig.ByeDpi(args = "", socksPort = 1080))
+        verify {
+            proxy.startProxy(
+                match { args -> args.none { it.isEmpty() } },
+            )
         }
     }
 
