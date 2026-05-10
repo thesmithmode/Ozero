@@ -55,6 +55,11 @@ fun SplitTunnelScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     BackHandler(onBack = onBack)
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        viewModel.onQuery("")
+    }
+
     SplitTunnelScreenContent(
         state = state,
         onBack = onBack,
@@ -62,6 +67,7 @@ fun SplitTunnelScreen(
         onToggleApp = viewModel::onToggleApp,
         onQuery = viewModel::onQuery,
         onClearAll = viewModel::onClearAll,
+        iconLoader = viewModel::loadIcon,
     )
 }
 
@@ -74,6 +80,7 @@ fun SplitTunnelScreenContent(
     onToggleApp: (String, Boolean) -> Unit,
     onQuery: (String) -> Unit,
     onClearAll: () -> Unit = {},
+    iconLoader: suspend (String) -> ImageBitmap? = { null },
 ) {
     Scaffold(
         modifier = Modifier.testTag(SplitTunnelTestTags.SCREEN),
@@ -128,6 +135,7 @@ fun SplitTunnelScreenContent(
                     onModeChange = onModeChange,
                     onToggleApp = onToggleApp,
                     onQuery = onQuery,
+                    iconLoader = iconLoader,
                 )
         }
     }
@@ -152,50 +160,84 @@ private fun ContentBody(
     onModeChange: (SplitTunnelMode) -> Unit,
     onToggleApp: (String, Boolean) -> Unit,
     onQuery: (String) -> Unit,
+    iconLoader: suspend (String) -> ImageBitmap?,
 ) {
-    val listEnabled = state.mode == SplitTunnelMode.ALLOWLIST || state.mode == SplitTunnelMode.BLOCKLIST
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(padding),
     ) {
+        if (!state.editable) {
+            DisabledBanner()
+        }
         ModeSegment(
             mode = state.mode,
+            enabled = state.editable,
             onModeChange = onModeChange,
         )
-        OutlinedTextField(
-            value = state.query,
-            onValueChange = onQuery,
-            label = { Text(stringResource(R.string.split_tunnel_search_hint)) },
-            singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-                .testTag(SplitTunnelTestTags.SEARCH),
-        )
-        if (!listEnabled) {
-            ListDisabledHint()
-        }
-        if (state.apps.isEmpty()) {
-            EmptyBody()
+        if (state.mode.requiresAppList()) {
+            OutlinedTextField(
+                value = state.query,
+                onValueChange = onQuery,
+                label = { Text(stringResource(R.string.split_tunnel_search_hint)) },
+                singleLine = true,
+                enabled = state.editable,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .testTag(SplitTunnelTestTags.SEARCH),
+            )
+            if (state.apps.isEmpty()) {
+                EmptyBody()
+            } else {
+                AppsList(
+                    state = state,
+                    onToggleApp = onToggleApp,
+                    iconLoader = iconLoader,
+                    editable = state.editable,
+                )
+            }
         } else {
-            AppsList(state = state, listEnabled = listEnabled, onToggleApp = onToggleApp)
+            ModeDescription(mode = state.mode)
         }
     }
 }
 
 @Composable
-private fun ListDisabledHint() {
+private fun DisabledBanner() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
-            .testTag(SplitTunnelTestTags.MODE_HINT),
+            .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f))
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .testTag(SplitTunnelTestTags.DISABLED_BANNER),
     ) {
         Text(
-            text = stringResource(R.string.split_tunnel_mode_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            text = stringResource(R.string.split_tunnel_disabled_banner),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onErrorContainer,
+        )
+    }
+}
+
+@Composable
+private fun ModeDescription(mode: SplitTunnelMode) {
+    val text = when (mode) {
+        SplitTunnelMode.ALL -> stringResource(R.string.split_tunnel_mode_all_description)
+        SplitTunnelMode.BYPASS_LAN -> stringResource(R.string.split_tunnel_mode_bypass_lan_description)
+        SplitTunnelMode.ALLOWLIST, SplitTunnelMode.BLOCKLIST -> ""
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp, vertical = 32.dp)
+            .testTag(SplitTunnelTestTags.MODE_DESCRIPTION),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
         )
     }
 }
@@ -219,8 +261,9 @@ private fun EmptyBody() {
 @Composable
 private fun AppsList(
     state: SplitTunnelUiState.Content,
-    listEnabled: Boolean,
     onToggleApp: (String, Boolean) -> Unit,
+    iconLoader: suspend (String) -> ImageBitmap?,
+    editable: Boolean,
 ) {
     LazyColumn(
         modifier = Modifier
@@ -229,7 +272,12 @@ private fun AppsList(
         contentPadding = PaddingValues(vertical = 8.dp),
     ) {
         items(state.apps, key = { it.packageName }) { app ->
-            AppRowView(app = app, enabled = listEnabled, onToggleApp = onToggleApp)
+            AppRowView(
+                app = app,
+                onToggleApp = onToggleApp,
+                iconLoader = iconLoader,
+                editable = editable,
+            )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
         }
     }
@@ -239,6 +287,7 @@ private fun AppsList(
 @Composable
 private fun ModeSegment(
     mode: SplitTunnelMode,
+    enabled: Boolean,
     onModeChange: (SplitTunnelMode) -> Unit,
 ) {
     SingleChoiceSegmentedButtonRow(
@@ -246,13 +295,14 @@ private fun ModeSegment(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
-        SplitTunnelMode.entries.forEachIndexed { index, value ->
+        VISIBLE_MODES.forEachIndexed { index, value ->
             SegmentedButton(
                 selected = value == mode,
                 onClick = { onModeChange(value) },
+                enabled = enabled,
                 shape = SegmentedButtonDefaults.itemShape(
                     index = index,
-                    count = SplitTunnelMode.entries.size,
+                    count = VISIBLE_MODES.size,
                 ),
                 modifier = Modifier.testTag(SplitTunnelTestTags.MODE_SEGMENT_PREFIX + value.name),
             ) {
@@ -262,12 +312,30 @@ private fun ModeSegment(
     }
 }
 
+private val VISIBLE_MODES = listOf(
+    SplitTunnelMode.ALLOWLIST,
+    SplitTunnelMode.ALL,
+    SplitTunnelMode.BLOCKLIST,
+)
+
 @Composable
 private fun AppRowView(
     app: AppRow,
-    enabled: Boolean,
     onToggleApp: (String, Boolean) -> Unit,
+    iconLoader: suspend (String) -> ImageBitmap?,
+    editable: Boolean,
 ) {
+    val icon: ImageBitmap? = if (app.icon != null) {
+        app.icon
+    } else {
+        val state = androidx.compose.runtime.remember(app.packageName) {
+            androidx.compose.runtime.mutableStateOf<ImageBitmap?>(null)
+        }
+        androidx.compose.runtime.LaunchedEffect(app.packageName) {
+            state.value = iconLoader(app.packageName)
+        }
+        state.value
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -280,7 +348,7 @@ private fun AppRowView(
             modifier = Modifier.fillMaxWidth(0.85f),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            AppIcon(icon = app.icon)
+            AppIcon(icon = icon)
             Spacer(modifier = Modifier.width(12.dp))
             Column {
                 Text(text = app.label, style = MaterialTheme.typography.bodyLarge)
@@ -300,8 +368,8 @@ private fun AppRowView(
         }
         Checkbox(
             checked = app.included,
-            enabled = enabled,
             onCheckedChange = { value -> onToggleApp(app.packageName, value) },
+            enabled = editable,
         )
     }
 }

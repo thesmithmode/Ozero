@@ -30,9 +30,14 @@ object WarpIniBuilder {
         appendLine("Jmax = ${p.junkPacketMaxSize}")
         appendLine("S1 = ${p.initPacketJunkSize}")
         appendLine("S2 = ${p.responsePacketJunkSize}")
+        appendLine("S3 = ${p.underloadPacketJunkSize}")
+        appendLine("S4 = ${p.payloadPacketJunkSize}")
         appendLine("H1 = ${p.initPacketMagicHeader}")
         appendLine("H2 = ${p.responsePacketMagicHeader}")
         appendLine("H3 = ${p.cookieReplyMagicHeader}")
         appendLine("H4 = ${p.transportMagicHeader}")
+        appendLine("I1 = ${p.payloadPacketSizeCount1}")
+        appendLine("I2 = ${p.payloadPacketSizeCount2}")
+        appendLine("I5 = ${p.payloadPacketSizeCount3}")
     }
 }

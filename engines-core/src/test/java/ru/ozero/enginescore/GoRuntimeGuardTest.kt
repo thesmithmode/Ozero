@@ -55,6 +55,35 @@ class GoRuntimeGuardTest {
         assertEquals(setOf("AMNEZIA_WG", "URNETWORK"), names.toSet())
     }
 
+    @Test
+    fun `release освобождает acquired чтобы другой owner мог acquire`() {
+        resetGuard()
+        assertEquals(GoRuntimeGuard.Result.Granted, GoRuntimeGuard.acquire(GoRuntimeGuard.Owner.AMNEZIA_WG))
+        GoRuntimeGuard.release(GoRuntimeGuard.Owner.AMNEZIA_WG)
+        assertEquals(null, GoRuntimeGuard.current())
+        assertEquals(
+            GoRuntimeGuard.Result.Granted,
+            GoRuntimeGuard.acquire(GoRuntimeGuard.Owner.URNETWORK),
+            "После release(AMNEZIA_WG) URNETWORK обязан получить Granted — иначе WARP→URnetwork " +
+                "switch заблокирован навсегда (CLAUDE.md: requires resident coexistence + clean release).",
+        )
+    }
+
+    @Test
+    fun `release не очищает acquired если owner отличается`() {
+        resetGuard()
+        GoRuntimeGuard.acquire(GoRuntimeGuard.Owner.URNETWORK)
+        GoRuntimeGuard.release(GoRuntimeGuard.Owner.AMNEZIA_WG)
+        assertEquals(GoRuntimeGuard.Owner.URNETWORK, GoRuntimeGuard.current())
+    }
+
+    @Test
+    fun `release без acquire — noop`() {
+        resetGuard()
+        GoRuntimeGuard.release(GoRuntimeGuard.Owner.AMNEZIA_WG)
+        assertEquals(null, GoRuntimeGuard.current())
+    }
+
     private fun resetGuard() {
         val field = GoRuntimeGuard::class.java.getDeclaredField("acquired")
         field.isAccessible = true

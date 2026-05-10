@@ -56,6 +56,11 @@ data class BackupWarpSlot(
     val awgH2: Long,
     val awgH3: Long,
     val awgH4: Long,
+    val awgS3: Int? = null,
+    val awgS4: Int? = null,
+    val awgI1: Int? = null,
+    val awgI2: Int? = null,
+    val awgI5: Int? = null,
 )
 
 data class BackupSplitRule(

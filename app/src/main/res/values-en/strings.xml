@@ -33,7 +33,7 @@
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
-    <string name="settings_split_tunnel_title">Split tunnel</string>
+    <string name="settings_split_tunnel_title">Split Tunneling</string>
     <string name="settings_split_tunnel_summary">Which apps go through VPN</string>
     <string name="settings_split_mode_all">All apps</string>
     <string name="settings_split_mode_bypass_lan">All except local network</string>
@@ -77,7 +77,7 @@
     <string name="settings_ipv6_summary">Route IPv6 through VPN</string>
     <string name="settings_auto_start_title">Start on boot</string>
     <string name="settings_auto_start_summary">VPN turns on automatically after reboot</string>
-    <string name="settings_allowed_apps_title">App list</string>
+    <string name="settings_allowed_apps_title">Split Tunneling</string>
     <string name="settings_allowed_apps_summary">Coming in TBD</string>
     <string name="settings_allowed_apps_open_summary">Pick apps and Split-tunnel mode</string>
     <string name="settings_servers_title">Servers / Double-hop</string>
@@ -109,18 +109,21 @@
     <string name="diag_back">Back</string>
 
     <!-- Split-tunnel screen -->
-    <string name="split_tunnel_title">App list</string>
+    <string name="split_tunnel_title">Split Tunneling</string>
     <string name="split_tunnel_back">Back</string>
     <string name="split_tunnel_search_hint">Search apps…</string>
     <string name="split_tunnel_no_apps">No apps found</string>
     <string name="split_tunnel_system_app">System</string>
     <string name="split_tunnel_short_all">All</string>
     <string name="split_tunnel_short_bypass_lan">Bypass LAN</string>
-    <string name="split_tunnel_short_allowlist">Allowlist</string>
-    <string name="split_tunnel_short_blocklist">Blocklist</string>
+    <string name="split_tunnel_short_allowlist">Included</string>
+    <string name="split_tunnel_short_blocklist">Excluded</string>
     <string name="split_tunnel_selected_count">Selected: %1$d</string>
     <string name="split_tunnel_clear_all">Clear</string>
     <string name="split_tunnel_mode_hint">The app list applies only in Allowlist and Blocklist modes.</string>
+    <string name="split_tunnel_mode_all_description">All apps go through the VPN.</string>
+    <string name="split_tunnel_mode_bypass_lan_description">All apps go through the VPN, except local (LAN) addresses.</string>
+    <string name="split_tunnel_disabled_banner">Disconnect VPN to change mode</string>
 
     <!-- Servers (double-hop) -->
     <string name="servers_title">Servers — Double-hop</string>
@@ -187,6 +190,7 @@
     <string name="urnetwork_settings_title">URnetwork</string>
     <string name="urnetwork_consent_warning_title">Warning</string>
     <string name="urnetwork_consent_warning_body">URnetwork is a P2P network where every participant can act as an exit node. If you enable URnetwork, your device will relay other users\' traffic to the open internet from your own IP address. This may attract attention from your ISP and carries legal risks in some jurisdictions. Enable only if you understand the consequences. URx tokens on Solana are credited for exit-node traffic.</string>
+    <string name="urnetwork_consent_short">P2P network: your IP may relay others\' traffic. URx tokens are credited to your Solana wallet.</string>
     <string name="urnetwork_search_hint">Search country…</string>
     <string name="urnetwork_location_title">Exit region</string>
     <string name="urnetwork_location_best_available">Best available</string>
@@ -195,6 +199,13 @@
     <string name="urnetwork_provide_subtitle">Share bandwidth with the URnetwork mesh</string>
     <string name="urnetwork_peers_connected">Connected to %1$d peers</string>
     <string name="urnetwork_peers_searching">Searching peers…</string>
+    <string name="urnetwork_mode_title">Mode</string>
+    <string name="urnetwork_mode_auto">Auto</string>
+    <string name="urnetwork_mode_quality">Web</string>
+    <string name="urnetwork_mode_speed">Streaming</string>
+    <string name="urnetwork_mode_hint">Web — low latency for browsing. Streaming — high bandwidth for video.</string>
+    <string name="urnetwork_fixed_ip_size">Fixed exit IP</string>
+    <string name="urnetwork_fixed_ip_size_hint">Single peer instead of pool — stable session IP</string>
     <string name="urnetwork_about_title">About URnetwork</string>
     <string name="urnetwork_about_body">URnetwork is the most local and most private network on the planet. A patented protocol keeps participants safe. The mesh has more than 30,000 providers today and zero known incidents.</string>
     <string name="settings_urnetwork_title">URnetwork</string>

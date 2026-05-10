@@ -1,4 +1,4 @@
-﻿package ru.ozero.app.ui.settings
+package ru.ozero.app.ui.settings
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -12,7 +12,6 @@ import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.app.ui.theme.OzeroTheme
-import ru.ozero.enginescore.settings.SplitTunnelMode
 
 @RunWith(AndroidJUnit4::class)
 class SettingsScreenTest {
@@ -27,7 +26,6 @@ class SettingsScreenTest {
                 SettingsScreenContent(
                     state = SettingsUiState.Loading,
                     onBack = {},
-                    onSplitModeChange = {},
                     onIpv6Toggle = {},
                     onAutoStartToggle = {},
                     onManualEngineSelect = {},
@@ -56,7 +54,6 @@ class SettingsScreenTest {
                 SettingsScreenContent(
                     state = SettingsUiState.Content(SettingsModel.DEFAULT),
                     onBack = { clicked = true },
-                    onSplitModeChange = {},
                     onIpv6Toggle = {},
                     onAutoStartToggle = {},
                     onManualEngineSelect = {},
@@ -69,31 +66,6 @@ class SettingsScreenTest {
     }
 
     @Test
-    fun splitModeRadioInvokesCallbackWithEnum() {
-        val captured = mutableListOf<SplitTunnelMode>()
-        composeRule.setContent {
-            OzeroTheme {
-                SettingsScreenContent(
-                    state = SettingsUiState.Content(SettingsModel.DEFAULT),
-                    onBack = {},
-                    onSplitModeChange = { captured += it },
-                    onIpv6Toggle = {},
-                    onAutoStartToggle = {},
-                    onManualEngineSelect = {},
-                )
-            }
-        }
-
-        composeRule
-            .onNodeWithTag(SettingsTestTags.SPLIT_MODE_PREFIX + SplitTunnelMode.ALLOWLIST.name)
-            .performClick()
-
-        assert(captured == listOf(SplitTunnelMode.ALLOWLIST)) {
-            "expected ALLOWLIST callback, got $captured"
-        }
-    }
-
-    @Test
     fun ipv6SwitchReflectsModelAndInvokesCallback() {
         val captured = mutableListOf<Boolean>()
         composeRule.setContent {
@@ -103,7 +75,6 @@ class SettingsScreenTest {
                         SettingsModel.DEFAULT.copy(ipv6Enabled = true),
                     ),
                     onBack = {},
-                    onSplitModeChange = {},
                     onIpv6Toggle = { captured += it },
                     onAutoStartToggle = {},
                     onManualEngineSelect = {},
@@ -129,7 +100,6 @@ class SettingsScreenTest {
                 SettingsScreenContent(
                     state = SettingsUiState.Content(SettingsModel.DEFAULT),
                     onBack = {},
-                    onSplitModeChange = {},
                     onIpv6Toggle = {},
                     onAutoStartToggle = {},
                     onManualEngineSelect = { if (it == EngineId.BYEDPI) clicked = true },
@@ -161,7 +131,6 @@ class SettingsScreenTest {
                 SettingsScreenContent(
                     state = SettingsUiState.Content(SettingsModel.DEFAULT),
                     onBack = {},
-                    onSplitModeChange = {},
                     onIpv6Toggle = {},
                     onAutoStartToggle = {},
                     onManualEngineSelect = {},
@@ -183,7 +152,6 @@ class SettingsScreenTest {
                 SettingsScreenContent(
                     state = SettingsUiState.Content(model),
                     onBack = {},
-                    onSplitModeChange = {},
                     onIpv6Toggle = {},
                     onAutoStartToggle = {},
                     onManualEngineSelect = {},

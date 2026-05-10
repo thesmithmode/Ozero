@@ -9,8 +9,17 @@ class RoomSplitTunnelRulesProvider @Inject constructor(
     private val dao: AppSplitRuleDao,
 ) : SplitTunnelRulesProvider {
 
-    override suspend fun activePackages(): Set<String> {
-        val rules = runCatching { dao.observeAll().first() }.getOrDefault(emptyList())
-        return rules.map { it.packageName }.toSet()
-    }
+    override suspend fun allowlistPackages(): Set<String> =
+        runCatching { dao.observeAll().first() }
+            .getOrDefault(emptyList())
+            .filter { !it.isExcluded }
+            .map { it.packageName }
+            .toSet()
+
+    override suspend fun blocklistPackages(): Set<String> =
+        runCatching { dao.observeAll().first() }
+            .getOrDefault(emptyList())
+            .filter { it.isExcluded }
+            .map { it.packageName }
+            .toSet()
 }

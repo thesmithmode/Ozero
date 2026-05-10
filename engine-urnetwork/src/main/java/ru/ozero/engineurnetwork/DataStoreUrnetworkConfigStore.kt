@@ -2,6 +2,7 @@ package ru.ozero.engineurnetwork
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
@@ -57,9 +58,27 @@ class DataStoreUrnetworkConfigStore(
         }
     }
 
+    override fun windowType(): Flow<UrnetworkWindowType> = dataStore.data.map { prefs ->
+        UrnetworkWindowType.fromRaw(prefs[KEY_WINDOW_TYPE])
+    }
+
+    override suspend fun setWindowType(value: UrnetworkWindowType) {
+        dataStore.edit { prefs -> prefs[KEY_WINDOW_TYPE] = value.rawValue }
+    }
+
+    override fun fixedIpSize(): Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[KEY_FIXED_IP_SIZE] == true
+    }
+
+    override suspend fun setFixedIpSize(value: Boolean) {
+        dataStore.edit { prefs -> prefs[KEY_FIXED_IP_SIZE] = value }
+    }
+
     private companion object {
         val KEY_WALLET_OVERRIDE = stringPreferencesKey("urnetwork_wallet_override")
         val KEY_BY_JWT = stringPreferencesKey("urnetwork_by_jwt")
         val KEY_BY_CLIENT_JWT = stringPreferencesKey("urnetwork_by_client_jwt")
+        val KEY_WINDOW_TYPE = stringPreferencesKey("urnetwork_window_type")
+        val KEY_FIXED_IP_SIZE = booleanPreferencesKey("urnetwork_fixed_ip_size")
     }
 }

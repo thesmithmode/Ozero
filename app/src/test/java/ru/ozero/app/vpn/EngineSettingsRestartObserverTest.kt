@@ -66,7 +66,6 @@ class EngineSettingsRestartObserverTest {
             SettingsModel.DEFAULT.copy(
                 manualEngine = EngineId.BYEDPI,
                 ipv6Enabled = true,
-                splitMode = SplitTunnelMode.ALLOWLIST,
                 byedpiWinningArgs = "  --foo  ",
             ),
         )
@@ -76,8 +75,30 @@ class EngineSettingsRestartObserverTest {
         val snap = collected.single()
         assertEquals(EngineId.BYEDPI, snap.manualEngine)
         assertEquals("--foo", snap.byedpiWinningArgs)
-        assertEquals(SplitTunnelMode.ALLOWLIST, snap.splitMode)
         assertEquals(true, snap.ipv6Enabled)
+        job.cancel()
+    }
+
+    @Test
+    fun `splitMode change НЕ триггерит restart — VPN живёт независимо от mode toggle`() = runTest(dispatcher) {
+        val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
+        val observer = newObserver(flow, alwaysConnected())
+        val collected = mutableListOf<EngineSettingsRestartObserver.Snapshot>()
+        val job = launch { observer.triggers.toList(collected) }
+        advanceUntilIdle()
+
+        flow.emit(SettingsModel.DEFAULT)
+        flow.emit(SettingsModel.DEFAULT.copy(splitMode = SplitTunnelMode.ALLOWLIST))
+        flow.emit(SettingsModel.DEFAULT.copy(splitMode = SplitTunnelMode.BLOCKLIST))
+        flow.emit(SettingsModel.DEFAULT.copy(splitMode = SplitTunnelMode.ALL))
+        advanceUntilIdle()
+
+        assertTrue(
+            collected.isEmpty(),
+            "splitMode toggle не должен валить VPN restart — пользователь крутит вкладки " +
+                "Включено/Все/Исключено, каждый restart на Nubia ROM = SIGABRT в libam-go.so. " +
+                "splitMode применяется при следующем коннекте (engine читает значение из repo).",
+        )
         job.cancel()
     }
 
@@ -100,6 +121,34 @@ class EngineSettingsRestartObserverTest {
     }
 
     @Test
+    fun `triggers debounce коалесцирует chain быстрых изменений`() = runTest(dispatcher) {
+        val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 16)
+        val observer = newObserver(flow, alwaysConnected())
+        val collected = mutableListOf<EngineSettingsRestartObserver.Snapshot>()
+        val job = launch { observer.triggers.toList(collected) }
+        advanceUntilIdle()
+
+        flow.emit(SettingsModel.DEFAULT)
+        advanceUntilIdle()
+        flow.emit(SettingsModel.DEFAULT.copy(manualEngine = EngineId.BYEDPI))
+        flow.emit(SettingsModel.DEFAULT.copy(manualEngine = EngineId.WARP))
+        flow.emit(SettingsModel.DEFAULT.copy(manualEngine = EngineId.URNETWORK))
+        flow.emit(SettingsModel.DEFAULT.copy(manualEngine = EngineId.BYEDPI))
+        flow.emit(SettingsModel.DEFAULT.copy(manualEngine = EngineId.WARP))
+        advanceUntilIdle()
+
+        assertEquals(
+            1,
+            collected.size,
+            "5 быстрых engine-toggle обязаны коалесцироваться в 1 emit после debounce — иначе " +
+                "MainActivity триггерит chain restart VPN, что роняет URnetwork (Go runtime " +
+                "conflict), сбивает IP fetch warmup и убивает стабильность.",
+        )
+        assertEquals(EngineId.WARP, collected.single().manualEngine)
+        job.cancel()
+    }
+
+    @Test
     fun `handle invokes restart only when state is Connected`() = runTest(dispatcher) {
         val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
         val state = MutableStateFlow<TunnelState>(TunnelState.Idle)
@@ -113,7 +162,6 @@ class EngineSettingsRestartObserverTest {
         val snapshot = EngineSettingsRestartObserver.Snapshot(
             manualEngine = EngineId.BYEDPI,
             byedpiWinningArgs = null,
-            splitMode = SplitTunnelMode.ALL,
             ipv6Enabled = false,
             customDnsServers = emptyList(),
         )
@@ -123,6 +171,23 @@ class EngineSettingsRestartObserverTest {
         state.value = TunnelState.Connected(EngineId.BYEDPI, 1080)
         observer.handle(snapshot)
         assertEquals(listOf(snapshot), restarts, "restart fires when Connected")
+    }
+
+    @Test
+    fun `RESTART_DEBOUNCE_MS не меньше 3000 — защита от engine-restart storm при split-tunnel toggle`() {
+        val source = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/vpn/EngineSettingsRestartObserver.kt",
+        ).readText()
+        val regex = Regex("RESTART_DEBOUNCE_MS\\s*=\\s*(\\d[\\d_]*)L")
+        val m = regex.find(source) ?: error("RESTART_DEBOUNCE_MS не найден")
+        val ms = m.groupValues[1].replace("_", "").toLong()
+        assertTrue(
+            ms >= 3_000L,
+            "RESTART_DEBOUNCE_MS обязан быть >= 3000ms — каждый restart engine во время " +
+                "split-tunnel toggling рискует SIGABRT в libgojni gcWriteBarrier (dual Go runtime conflict, " +
+                "warp-handle-leak-sigabrt). Меньшее окно → restart-storm → нативный краш. Fact=$ms",
+        )
     }
 
     private fun newObserver(

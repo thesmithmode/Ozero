@@ -8,7 +8,9 @@ import com.bringyour.sdk.DeviceLocal
 import com.bringyour.sdk.IoLoop
 import com.bringyour.sdk.IoLoopDoneCallback
 import com.bringyour.sdk.LocationsViewController
+import com.bringyour.sdk.PerformanceProfile
 import com.bringyour.sdk.Sdk
+import com.bringyour.sdk.WindowSizeSettings
 import com.bringyour.sdk.SubscriptionBalanceCallback
 import com.bringyour.sdk.WalletViewController
 import kotlinx.coroutines.CoroutineScope
@@ -27,6 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.resume
 
+@Suppress("TooManyFunctions")
 class RealUrnetworkSdkBridge(
     private val app: Application,
     private val appVersion: String = DEFAULT_APP_VERSION,
@@ -86,12 +89,14 @@ class RealUrnetworkSdkBridge(
             UrnetworkRuntime.ensure(app)
         } catch (t: Throwable) {
             PersistentLoggers.error(TAG, "runtime ensure failed: ${t.message}")
+            cleanupOnFailure()
             return UrnetworkSdkBridge.StartResult.Failed("runtime ensure failed: ${t.message}")
         }
 
         val localState = space.asyncLocalState?.localState
         if (localState == null) {
             PersistentLoggers.error(TAG, "asyncLocalState.localState is null — runtime not ready")
+            cleanupOnFailure()
             return UrnetworkSdkBridge.StartResult.Failed("URnetwork localState not ready")
         }
         runCatching { localState.byClientJwt = byClientJwt }
@@ -176,6 +181,7 @@ class RealUrnetworkSdkBridge(
         if (completed == null) {
             PersistentLoggers.warn(TAG, "stop timed out after ${STOP_TIMEOUT_MS}ms — refs cleared")
         }
+        GoRuntimeGuard.release(GoRuntimeGuard.Owner.URNETWORK)
         Log.i(TAG, "stop complete")
     }
 
@@ -201,6 +207,16 @@ class RealUrnetworkSdkBridge(
     override fun selectedLocation(): ConnectLocation? =
         runCatching { connectVcRef.get()?.selectedLocation }.getOrNull()
 
+    override fun selectedLocationInfo(): UrnetworkSdkBridge.LocationInfo? {
+        val loc = runCatching { selectedLocation() }.getOrNull() ?: return null
+        val country = runCatching { loc.country }.getOrNull()
+            ?: runCatching { loc.name }.getOrNull()
+        val code = runCatching { loc.countryCode?.trim()?.uppercase() }.getOrNull()
+            ?.takeIf { it.length == 2 }
+        val name = runCatching { loc.name }.getOrNull()
+        return UrnetworkSdkBridge.LocationInfo(country = country, countryCode = code, name = name)
+    }
+
     override fun setPreferredCountry(code: String?) {
         val cleaned = code?.trim()?.uppercase()?.takeIf { it.length == 2 && it.all { it.isLetter() } }
         preferredCountryRef.set(cleaned)
@@ -222,6 +238,30 @@ class RealUrnetworkSdkBridge(
 
     override fun isProvidePaused(): Boolean =
         runCatching { deviceRef.get()?.providePaused ?: true }.getOrDefault(true)
+
+    override fun applyPerformanceProfile(windowType: UrnetworkWindowType, fixedIpSize: Boolean) {
+        if (windowType == UrnetworkWindowType.AUTO) {
+            Log.i(TAG, "applyPerformanceProfile skip — AUTO uses SDK defaults")
+            return
+        }
+        val device = deviceRef.get() ?: return
+        runCatching {
+            val profile = PerformanceProfile()
+            profile.windowType = when (windowType) {
+                UrnetworkWindowType.QUALITY -> Sdk.WindowTypeQuality
+                UrnetworkWindowType.SPEED -> Sdk.WindowTypeSpeed
+                UrnetworkWindowType.AUTO -> Sdk.WindowTypeQuality
+            }
+            val sizes = WindowSizeSettings()
+            sizes.windowSizeMin = if (fixedIpSize) 1 else 2
+            sizes.windowSizeMax = if (fixedIpSize) 1 else 4
+            profile.windowSize = sizes
+            device.performanceProfile = profile
+            Log.i(TAG, "applyPerformanceProfile windowType=${windowType.rawValue} fixedIp=$fixedIpSize OK")
+        }.onFailure {
+            PersistentLoggers.warn(TAG, "applyPerformanceProfile threw: ${it.message}")
+        }
+    }
 
     override fun peerCount(): Int =
         runCatching { connectVcRef.get()?.grid?.windowCurrentSize ?: 0 }.getOrDefault(0)
@@ -399,6 +439,7 @@ class RealUrnetworkSdkBridge(
 
     private fun cleanupOnFailure() {
         deviceRef.getAndSet(null)?.also { runCatching { it.close() } }
+        GoRuntimeGuard.release(GoRuntimeGuard.Owner.URNETWORK)
     }
 
     private companion object {

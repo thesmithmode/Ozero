@@ -15,6 +15,7 @@ class WarpConfFileImporter : WarpFileImporter {
             }
         }
     } catch (t: Throwable) {
+        if (t is VirtualMachineError || t is ThreadDeath || t is LinkageError) throw t
         Result.failure(IOException("Ошибка чтения файла: ${t.message}", t))
     }
 

@@ -124,6 +124,11 @@ class AppBackupManager(
             awgH2 = awg.responsePacketMagicHeader,
             awgH3 = awg.cookieReplyMagicHeader,
             awgH4 = awg.transportMagicHeader,
+            awgS3 = awg.underloadPacketJunkSize,
+            awgS4 = awg.payloadPacketJunkSize,
+            awgI1 = awg.payloadPacketSizeCount1,
+            awgI2 = awg.payloadPacketSizeCount2,
+            awgI5 = awg.payloadPacketSizeCount3,
         )
     }
 
@@ -153,6 +158,11 @@ class AppBackupManager(
                     responsePacketMagicHeader = awgH2,
                     cookieReplyMagicHeader = awgH3,
                     transportMagicHeader = awgH4,
+                    underloadPacketJunkSize = awgS3 ?: AwgParams.DEFAULT_S3,
+                    payloadPacketJunkSize = awgS4 ?: AwgParams.DEFAULT_S4,
+                    payloadPacketSizeCount1 = awgI1 ?: AwgParams.DEFAULT_I1,
+                    payloadPacketSizeCount2 = awgI2 ?: AwgParams.DEFAULT_I2,
+                    payloadPacketSizeCount3 = awgI5 ?: AwgParams.DEFAULT_I5,
                 ),
             ),
         )

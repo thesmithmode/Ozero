@@ -265,7 +265,7 @@ class OzeroVpnServiceLifecycleTest {
         assertFalse(
             body.contains("runBlocking"),
             "startVpn не должен использовать runBlocking. settings и split-packages читаются " +
-                "из serviceScope.launch (IO) через withTimeoutOrNull + first()/activePackages().",
+                "из serviceScope.launch (IO) через withTimeoutOrNull + first()/allowlistPackages().",
         )
     }
 
@@ -278,9 +278,13 @@ class OzeroVpnServiceLifecycleTest {
                 "custom DNS / split / hosts / winning-args.",
         )
         assertTrue(
-            body.contains("splitTunnelRulesProvider.activePackages()"),
-            "startVpn обязан читать activePackages() свежими на каждый connect — иначе изменение " +
+            body.contains("splitTunnelRulesProvider.allowlistPackages()"),
+            "startVpn обязан читать allowlistPackages() свежими на каждый connect — иначе изменение " +
                 "split-rules видно только со второго reconnect.",
+        )
+        assertTrue(
+            body.contains("splitTunnelRulesProvider.blocklistPackages()"),
+            "startVpn обязан читать blocklistPackages() свежими на каждый connect.",
         )
         assertTrue(
             body.contains("withTimeoutOrNull"),
@@ -407,18 +411,20 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `establishTunForEngine не передаёт excludeSelf=false для TunFdAcceptor движков`() {
+    fun `establishTunForEngine excludeSelf true для всех кроме WARP`() {
         val body = source
             .substringAfter("private suspend fun establishTunForEngine(")
             .substringBefore("internal fun applyEngineTunSpec")
         assertFalse(
-            body.contains("excludeSelf = false"),
-            "establishTunForEngine ЗАПРЕЩЕНО передавать excludeSelf=false. " +
-                "URnetwork Go SDK не имеет механизма вызова VpnService.protect() на своих сокетах — " +
-                "Sdk.newDeviceLocalWithDefaults не принимает SocketProtector callback. " +
-                "Без исключения self из TUN, SDK-соединения к bringyour.com идут в TUN → " +
-                "URnetwork читает их и пытается роутить → routing loop → SDK никогда не поднимается. " +
-                "Регрессия v0.0.7 (коммит 65e5b13). Фикс: убрать excludeSelf=false, использовать default (true).",
+            body.contains("excludeSelf = (engineId == ru.ozero.enginescore.EngineId.URNETWORK)"),
+            "excludeSelf must cover ByeDPI too — ciadpi JNI не вызывает protect(), " +
+                "outbound сокеты идут через TUN → loop. Правильно: excludeSelf = (engineId != WARP).",
+        )
+        assertTrue(
+            body.contains("excludeSelf = (engineId != ru.ozero.enginescore.EngineId.WARP)"),
+            "WARP: AWG сокет защищён VpnSocketProtectorHolder → excludeSelf=false OK. " +
+                "ByeDPI + URnetwork: нет protect() → excludeSelf=true обязателен → нет routing loop. " +
+                "Регрессия 4624406: excludeSelf=false для ByeDPI → ciadpi outbound через TUN → SOCKS loop → нет сети.",
         )
     }
 }

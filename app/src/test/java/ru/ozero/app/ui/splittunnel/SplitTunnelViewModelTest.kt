@@ -1,5 +1,6 @@
 ﻿package ru.ozero.app.ui.splittunnel
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -17,6 +18,7 @@ import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginescore.settings.SplitTunnelMode
 import ru.ozero.enginescore.EngineId
+import ru.ozero.commonvpn.TunnelController
 import ru.ozero.corestorage.dao.AppSplitRuleDao
 import ru.ozero.corestorage.entity.AppSplitRule
 import kotlin.test.assertEquals
@@ -30,6 +32,7 @@ class SplitTunnelViewModelTest {
     private lateinit var apps: FakeAppListProvider
     private lateinit var dao: FakeAppSplitRuleDao
     private lateinit var settings: FakeSettingsRepository
+    private lateinit var tunnelController: TunnelController
     private lateinit var viewModel: SplitTunnelViewModel
 
     private val sample = listOf(
@@ -44,7 +47,8 @@ class SplitTunnelViewModelTest {
         apps = FakeAppListProvider(sample)
         dao = FakeAppSplitRuleDao()
         settings = FakeSettingsRepository()
-        viewModel = SplitTunnelViewModel(apps, dao, settings)
+        tunnelController = TunnelController()
+        viewModel = SplitTunnelViewModel(apps, dao, settings, tunnelController)
     }
 
     @AfterEach
@@ -55,6 +59,27 @@ class SplitTunnelViewModelTest {
     @Test
     fun `initial state Loading until apps loaded`() = runTest {
         assertIs<SplitTunnelUiState.Loading>(viewModel.uiState.value)
+    }
+
+    @Test
+    fun `state остаётся Loading пока loadApps не завершён даже после combine pass`() = runTest {
+        val gated = GatedAppListProvider()
+        val gatedVm = SplitTunnelViewModel(gated, dao, settings, tunnelController)
+
+        advanceUntilIdle()
+
+        assertIs<SplitTunnelUiState.Loading>(
+            gatedVm.uiState.value,
+            "uiState must remain Loading until loadApps completes — empty apps must NOT " +
+                "produce Content. Реальный device эмитит Content(empty) сразу из-за combine " +
+                "над MutableStateFlow(emptyList()) — sentinel против этого паттерна.",
+        )
+
+        gated.complete(sample)
+        advanceUntilIdle()
+
+        val state = assertIs<SplitTunnelUiState.Content>(gatedVm.uiState.value)
+        assertEquals(3, state.apps.size)
     }
 
     @Test
@@ -93,7 +118,92 @@ class SplitTunnelViewModelTest {
         viewModel.onToggleApp("com.user.foo", checked = true)
         advanceUntilIdle()
 
-        assertTrue(dao.upserts.any { it.packageName == "com.user.foo" })
+        val rule = dao.upserts.first { it.packageName == "com.user.foo" }
+        assertEquals(false, rule.isExcluded, "ALL mode toggle → isExcluded=false (allowlist)")
+    }
+
+    @Test
+    fun `onToggleApp в BLOCKLIST режиме вставляет isExcluded=true`() = runTest {
+        settings.setSplitMode(SplitTunnelMode.BLOCKLIST)
+        advanceUntilIdle()
+
+        viewModel.onToggleApp("com.user.bar", checked = true)
+        advanceUntilIdle()
+
+        val rule = dao.upserts.first { it.packageName == "com.user.bar" }
+        assertEquals(true, rule.isExcluded, "BLOCKLIST mode toggle → isExcluded=true")
+    }
+
+    @Test
+    fun `onToggleApp в ALLOWLIST режиме вставляет isExcluded=false`() = runTest {
+        settings.setSplitMode(SplitTunnelMode.ALLOWLIST)
+        advanceUntilIdle()
+
+        viewModel.onToggleApp("com.user.foo", checked = true)
+        advanceUntilIdle()
+
+        val rule = dao.upserts.first { it.packageName == "com.user.foo" }
+        assertEquals(false, rule.isExcluded, "ALLOWLIST mode toggle → isExcluded=false")
+    }
+
+    @Test
+    fun `BLOCKLIST mode показывает isExcluded=true как included, isExcluded=false — нет`() = runTest {
+        settings.setSplitMode(SplitTunnelMode.BLOCKLIST)
+        dao.emit(
+            listOf(
+                AppSplitRule("com.user.foo", isExcluded = false),
+                AppSplitRule("com.user.bar", isExcluded = true),
+            ),
+        )
+        val vm = SplitTunnelViewModel(apps, dao, settings, tunnelController)
+        advanceUntilIdle()
+
+        val state = vm.uiState.value as SplitTunnelUiState.Content
+        val barRow = state.apps.first { it.packageName == "com.user.bar" }
+        val fooRow = state.apps.first { it.packageName == "com.user.foo" }
+        assertTrue(barRow.included, "blocklist entry должен быть included в BLOCKLIST mode")
+        assertTrue(!fooRow.included, "allowlist entry НЕ должен быть included в BLOCKLIST mode")
+    }
+
+    @Test
+    fun `ALLOWLIST mode не показывает isExcluded=true как included`() = runTest {
+        settings.setSplitMode(SplitTunnelMode.ALLOWLIST)
+        dao.emit(
+            listOf(
+                AppSplitRule("com.user.foo", isExcluded = false),
+                AppSplitRule("com.user.bar", isExcluded = true),
+            ),
+        )
+        val vm = SplitTunnelViewModel(apps, dao, settings, tunnelController)
+        advanceUntilIdle()
+
+        val state = vm.uiState.value as SplitTunnelUiState.Content
+        val fooRow = state.apps.first { it.packageName == "com.user.foo" }
+        val barRow = state.apps.first { it.packageName == "com.user.bar" }
+        assertTrue(fooRow.included, "allowlist entry included в ALLOWLIST mode")
+        assertTrue(!barRow.included, "blocklist entry НЕ included в ALLOWLIST mode")
+    }
+
+    @Test
+    fun `переключение режимов сохраняет оба списка независимо`() = runTest {
+        settings.setSplitMode(SplitTunnelMode.ALLOWLIST)
+        dao.emit(
+            listOf(
+                AppSplitRule("com.user.foo", isExcluded = false),
+                AppSplitRule("com.user.bar", isExcluded = true),
+            ),
+        )
+        val vm = SplitTunnelViewModel(apps, dao, settings, tunnelController)
+        advanceUntilIdle()
+
+        val allowlistState = vm.uiState.value as SplitTunnelUiState.Content
+        assertEquals(1, allowlistState.selectedCount, "ALLOWLIST: только foo (isExcluded=false)")
+
+        settings.setSplitMode(SplitTunnelMode.BLOCKLIST)
+        advanceUntilIdle()
+
+        val blocklistState = vm.uiState.value as SplitTunnelUiState.Content
+        assertEquals(1, blocklistState.selectedCount, "BLOCKLIST: только bar (isExcluded=true)")
     }
 
     @Test
@@ -156,6 +266,100 @@ class SplitTunnelViewModelTest {
     }
 
     @Test
+    fun `included apps всплывают наверх списка`() = runTest {
+        dao.emit(listOf(AppSplitRule("com.user.foo", isExcluded = false)))
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value as SplitTunnelUiState.Content
+        assertEquals(
+            "com.user.foo",
+            state.apps.first().packageName,
+            "Включённые приложения обязаны быть сверху — UX порт PORTAL_WG. Got: " +
+                state.apps.map { it.packageName },
+        )
+        assertTrue(state.apps.first().included)
+    }
+
+    @Test
+    fun `BYPASS_LAN persisted мигрирует в ALL — UI не показывает 4й таб`() = runTest {
+        settings.modeUpdates.clear()
+        settings.setSplitMode(SplitTunnelMode.BYPASS_LAN)
+        val vm = SplitTunnelViewModel(apps, dao, settings, tunnelController)
+        advanceUntilIdle()
+
+        val state = vm.uiState.value as SplitTunnelUiState.Content
+        assertEquals(SplitTunnelMode.ALL, state.mode, "BYPASS_LAN persisted → ALL в UI")
+        assertTrue(
+            settings.modeUpdates.contains(SplitTunnelMode.ALL),
+            "VM обязана записать ALL в settings когда обнаружила BYPASS_LAN — миграция " +
+                "(BYPASS_LAN скрыт из UI tabs). modeUpdates=${settings.modeUpdates}",
+        )
+    }
+
+    @Test
+    fun `onModeChange BYPASS_LAN игнорируется — UI больше не предлагает этот режим`() = runTest {
+        advanceUntilIdle()
+        settings.modeUpdates.clear()
+
+        viewModel.onModeChange(SplitTunnelMode.BYPASS_LAN)
+        advanceUntilIdle()
+
+        assertEquals(
+            emptyList<SplitTunnelMode>(),
+            settings.modeUpdates,
+            "onModeChange(BYPASS_LAN) обязан быть no-op — режим скрыт из UI tabs.",
+        )
+    }
+
+    @Test
+    fun `editable=true когда tunnel Idle`() = runTest {
+        advanceUntilIdle()
+        val state = viewModel.uiState.value as SplitTunnelUiState.Content
+        assertTrue(state.editable, "Idle → editable=true")
+    }
+
+    @Test
+    fun `editable=false когда tunnel Connected`() = runTest {
+        tunnelController.onProbing(EngineId.BYEDPI)
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, socksPort = 1080)
+        advanceUntilIdle()
+        val state = viewModel.uiState.value as SplitTunnelUiState.Content
+        assertTrue(!state.editable, "Connected → editable=false (без редактирования при VPN ON)")
+    }
+
+    @Test
+    fun `onModeChange игнорируется когда tunnel не Idle`() = runTest {
+        tunnelController.onProbing(EngineId.BYEDPI)
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, socksPort = 1080)
+        advanceUntilIdle()
+        settings.modeUpdates.clear()
+
+        viewModel.onModeChange(SplitTunnelMode.ALLOWLIST)
+        advanceUntilIdle()
+
+        assertEquals(
+            emptyList<SplitTunnelMode>(),
+            settings.modeUpdates,
+            "onModeChange при Connected — no-op (sentinel против race с Snapshot)",
+        )
+    }
+
+    @Test
+    fun `onToggleApp игнорируется когда tunnel не Idle`() = runTest {
+        tunnelController.onProbing(EngineId.BYEDPI)
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, socksPort = 1080)
+        advanceUntilIdle()
+
+        viewModel.onToggleApp("com.user.foo", checked = true)
+        advanceUntilIdle()
+
+        assertEquals(emptyList<AppSplitRule>(), dao.upserts, "Connected → toggle игнор")
+    }
+
+    @Test
     fun `onQuery filters apps case-insensitive`() = runTest {
         advanceUntilIdle()
 
@@ -169,6 +373,16 @@ class SplitTunnelViewModelTest {
 
     private class FakeAppListProvider(val apps: List<InstalledApp>) : AppListProvider {
         override suspend fun loadApps(): List<InstalledApp> = apps
+        override suspend fun loadIcon(packageName: String): androidx.compose.ui.graphics.ImageBitmap? = null
+    }
+
+    private class GatedAppListProvider : AppListProvider {
+        private val signal = CompletableDeferred<List<InstalledApp>>()
+        override suspend fun loadApps(): List<InstalledApp> = signal.await()
+        override suspend fun loadIcon(packageName: String): androidx.compose.ui.graphics.ImageBitmap? = null
+        fun complete(apps: List<InstalledApp>) {
+            signal.complete(apps)
+        }
     }
 
     private class FakeAppSplitRuleDao : AppSplitRuleDao {

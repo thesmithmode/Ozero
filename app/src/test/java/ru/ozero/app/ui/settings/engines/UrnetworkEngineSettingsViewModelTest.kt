@@ -16,7 +16,9 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
+import ru.ozero.engineurnetwork.UrnetworkWindowType
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -40,20 +42,24 @@ class UrnetworkEngineSettingsViewModelTest {
 
     @Test
     fun `uiState стартует как Loading`() = runTest {
-        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(), FakeSettingsRepo())
+        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(), FakeSettingsRepo(), FakeUrnetworkConfigStore())
         assertSame(UrnetworkSettingsUiState.Loading, vm.uiState.value)
     }
 
     @Test
     fun `uiState переходит в NotConnected когда bridge не подключён`() = runTest {
-        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(connected = false), FakeSettingsRepo())
+        val vm = UrnetworkEngineSettingsViewModel(
+            FakeUrnetworkBridge(connected = false),
+            FakeSettingsRepo(),
+            FakeUrnetworkConfigStore(),
+        )
         advanceUntilIdle()
         assertIs<UrnetworkSettingsUiState.NotConnected>(vm.uiState.value)
     }
 
     @Test
     fun `subscriptionBalance стартует с null когда никто не подписан`() = runTest {
-        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(), FakeSettingsRepo())
+        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(), FakeSettingsRepo(), FakeUrnetworkConfigStore())
         assertNull(vm.subscriptionBalance.value)
     }
 
@@ -68,7 +74,7 @@ class UrnetworkEngineSettingsViewModelTest {
             store = "google",
         )
         val bridge = FakeUrnetworkBridge(subscriptionBalance = snap)
-        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo())
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), FakeUrnetworkConfigStore())
         val first = vm.subscriptionBalance.first { it != null }
         assertEquals(snap, first)
     }
@@ -81,7 +87,7 @@ class UrnetworkEngineSettingsViewModelTest {
             subscriptionBalance = snap,
             balanceCallCounter = callCount,
         )
-        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo())
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), FakeUrnetworkConfigStore())
         val collector = backgroundScope.launch { vm.subscriptionBalance.collect {} }
         vm.subscriptionBalance.first { it != null }
         runCurrent()
@@ -98,12 +104,72 @@ class UrnetworkEngineSettingsViewModelTest {
     }
 
     @Test
+    fun `init обязан retry refresh пока bridge не готов — sentinel против stuck NotConnected`() {
+        val source = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/ui/settings/engines/UrnetworkEngineSettingsViewModel.kt",
+        ).readText()
+        val initBlock = source.substringAfter("init {").substringBefore("\n    }\n")
+        kotlin.test.assertTrue(
+            initBlock.contains("REFRESH_RETRY_ATTEMPTS") && initBlock.contains("refreshOnce()"),
+            "init обязан retry refreshOnce пока bridge не готов — иначе stuck в NotConnected " +
+                "когда экран открыт раньше чем URnetwork SDK завершил start. Init body:\n$initBlock",
+        )
+        kotlin.test.assertTrue(
+            source.contains("REFRESH_RETRY_ATTEMPTS = ") &&
+                Regex("REFRESH_RETRY_ATTEMPTS\\s*=\\s*(\\d+)").find(source)!!.groupValues[1].toInt() >= 5,
+            "REFRESH_RETRY_ATTEMPTS обязан быть >= 5 — bridge.start может занять секунды",
+        )
+    }
+
+    @Test
+    fun `selectWindowType сохраняет в configStore и применяет profile через bridge`() = runTest {
+        val bridge = FakeUrnetworkBridge()
+        val store = FakeUrnetworkConfigStore()
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store)
+        vm.selectWindowType(UrnetworkWindowType.SPEED)
+        advanceUntilIdle()
+        assertEquals(UrnetworkWindowType.SPEED, store.windowType().first())
+        assertEquals(UrnetworkWindowType.SPEED, bridge.lastAppliedWindowType)
+    }
+
+    @Test
+    fun `selectWindowType AUTO сбрасывает fixedIpSize`() = runTest {
+        val bridge = FakeUrnetworkBridge()
+        val store = FakeUrnetworkConfigStore()
+        store.setFixedIpSize(true)
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store)
+        vm.selectWindowType(UrnetworkWindowType.AUTO)
+        advanceUntilIdle()
+        assertEquals(false, store.fixedIpSize().first())
+    }
+
+    @Test
+    fun `toggleFixedIpSize сохраняет в configStore и применяет profile`() = runTest {
+        val bridge = FakeUrnetworkBridge()
+        val store = FakeUrnetworkConfigStore()
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store)
+        vm.toggleFixedIpSize(true)
+        advanceUntilIdle()
+        assertEquals(true, store.fixedIpSize().first())
+        assertEquals(true, bridge.lastAppliedFixedIp)
+    }
+
+    @Test
     fun `subscriptionBalance остаётся null когда bridge возвращает null (free user)`() = runTest {
         val bridge = FakeUrnetworkBridge(subscriptionBalance = null)
-        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo())
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), FakeUrnetworkConfigStore())
         vm.subscriptionBalance.first()
         runCurrent()
         assertNull(vm.subscriptionBalance.value)
+    }
+
+    @Test
+    fun `windowType StateFlow отражает начальное значение из configStore`() = runTest {
+        val store = FakeUrnetworkConfigStore()
+        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(), FakeSettingsRepo(), store)
+        advanceUntilIdle()
+        assertEquals(UrnetworkWindowType.AUTO, vm.windowType.value)
     }
 }
 
@@ -132,6 +198,33 @@ private class FakeSettingsRepo : ru.ozero.enginescore.settings.SettingsRepositor
     override suspend fun setAlwaysOnBannerDismissed(dismissed: Boolean) = Unit
 }
 
+private class FakeUrnetworkConfigStore : UrnetworkConfigStore {
+    private val wallet = kotlinx.coroutines.flow.MutableStateFlow("0xWALLET")
+    private val byJwt = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+    private val byClientJwt = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+    private val winType = kotlinx.coroutines.flow.MutableStateFlow(UrnetworkWindowType.AUTO)
+    private val fixedIp = kotlinx.coroutines.flow.MutableStateFlow(false)
+    override fun walletAddress(): kotlinx.coroutines.flow.Flow<String> = wallet
+    override fun walletOverride(): kotlinx.coroutines.flow.Flow<String?> = kotlinx.coroutines.flow.flowOf(null)
+    override suspend fun setWalletOverride(value: String?) = Unit
+    override fun byJwt(): kotlinx.coroutines.flow.Flow<String?> = byJwt
+    override suspend fun setByJwt(value: String?) {
+        byJwt.value = value
+    }
+    override fun byClientJwt(): kotlinx.coroutines.flow.Flow<String?> = byClientJwt
+    override suspend fun setByClientJwt(value: String?) {
+        byClientJwt.value = value
+    }
+    override fun windowType(): kotlinx.coroutines.flow.Flow<UrnetworkWindowType> = winType
+    override suspend fun setWindowType(value: UrnetworkWindowType) {
+        winType.value = value
+    }
+    override fun fixedIpSize(): kotlinx.coroutines.flow.Flow<Boolean> = fixedIp
+    override suspend fun setFixedIpSize(value: Boolean) {
+        fixedIp.value = value
+    }
+}
+
 private class FakeUrnetworkBridge(
     private val connected: Boolean = false,
     private val subscriptionBalance: UrnetworkSdkBridge.SubscriptionBalanceSnapshot? = null,
@@ -152,6 +245,12 @@ private class FakeUrnetworkBridge(
     override fun connectBestAvailable() = Unit
     override fun selectedLocation(): ConnectLocation? = null
     override fun openLocationsViewController(): LocationsViewController? = null
+    var lastAppliedWindowType: UrnetworkWindowType? = null
+    var lastAppliedFixedIp: Boolean? = null
+    override fun applyPerformanceProfile(windowType: UrnetworkWindowType, fixedIpSize: Boolean) {
+        lastAppliedWindowType = windowType
+        lastAppliedFixedIp = fixedIpSize
+    }
     override fun setProvidePaused(paused: Boolean) = Unit
     override fun isProvidePaused(): Boolean = true
     override fun peerCount(): Int = 0

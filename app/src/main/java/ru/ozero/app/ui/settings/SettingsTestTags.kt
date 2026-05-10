@@ -32,4 +32,6 @@ object SettingsTestTags {
     const val AUTO_MODE_OPEN_ROW = "auto_mode_open_row"
     const val AUTO_MODE_SCREEN = "auto_mode_screen"
     const val AUTO_MODE_INACTIVE_WARNING = "auto_mode_inactive_warning"
+
+    const val LANGUAGE_ROW = "settings_language_row"
 }

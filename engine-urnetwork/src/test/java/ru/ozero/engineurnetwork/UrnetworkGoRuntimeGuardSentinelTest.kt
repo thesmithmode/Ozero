@@ -38,4 +38,30 @@ class UrnetworkGoRuntimeGuardSentinelTest {
                 "конфликтует с libam-go signal handlers process-wide.",
         )
     }
+
+    @Test
+    fun `runStartOnMain early-return paths освобождают guard через cleanupOnFailure`() {
+        val runStartBody = source.substringAfter("private suspend fun runStartOnMain")
+            .substringBefore("override suspend fun stop()")
+
+        val ensureFailIdx = runStartBody.indexOf("runtime ensure failed")
+        assertTrue(ensureFailIdx >= 0, "Сообщение 'runtime ensure failed' не найдено в runStartOnMain")
+        val ensureCleanupIdx = runStartBody.indexOf("cleanupOnFailure", ensureFailIdx)
+        val ensureReturnIdx = runStartBody.indexOf("return UrnetworkSdkBridge.StartResult.Failed", ensureFailIdx)
+        assertTrue(
+            ensureCleanupIdx in (ensureFailIdx + 1) until ensureReturnIdx,
+            "ensure-fail ветка обязана вызывать cleanupOnFailure() ДО return — иначе " +
+                "GoRuntimeGuard sticky остаётся URNETWORK навсегда.",
+        )
+
+        val nullStateIdx = runStartBody.indexOf("localState is null")
+        assertTrue(nullStateIdx >= 0, "Сообщение 'localState is null' не найдено в runStartOnMain")
+        val nullCleanupIdx = runStartBody.indexOf("cleanupOnFailure", nullStateIdx)
+        val nullReturnIdx = runStartBody.indexOf("return UrnetworkSdkBridge.StartResult.Failed", nullStateIdx)
+        assertTrue(
+            nullCleanupIdx in (nullStateIdx + 1) until nullReturnIdx,
+            "localState=null ветка обязана вызывать cleanupOnFailure() ДО return — иначе " +
+                "guard sticky URNETWORK блокирует переключение на WARP.",
+        )
+    }
 }

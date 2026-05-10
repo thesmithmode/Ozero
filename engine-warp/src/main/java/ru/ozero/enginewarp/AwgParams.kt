@@ -6,10 +6,15 @@ data class AwgParams(
     val junkPacketMaxSize: Int = DEFAULT_JMAX,
     val initPacketJunkSize: Int = DEFAULT_S1,
     val responsePacketJunkSize: Int = DEFAULT_S2,
+    val underloadPacketJunkSize: Int = DEFAULT_S3,
+    val payloadPacketJunkSize: Int = DEFAULT_S4,
     val initPacketMagicHeader: Long = DEFAULT_H1,
     val responsePacketMagicHeader: Long = DEFAULT_H2,
     val cookieReplyMagicHeader: Long = DEFAULT_H3,
     val transportMagicHeader: Long = DEFAULT_H4,
+    val payloadPacketSizeCount1: Int = DEFAULT_I1,
+    val payloadPacketSizeCount2: Int = DEFAULT_I2,
+    val payloadPacketSizeCount3: Int = DEFAULT_I5,
 ) {
     init {
         require(junkPacketMinSize <= junkPacketMaxSize) {
@@ -49,16 +54,27 @@ data class AwgParams(
         val SIZE_RANGE = 0..1500
         val HEADER_RANGE = 1L..0xFFFFFFFFL
 
+        const val DEFAULT_S3 = 19
+        const val DEFAULT_S4 = 20
+        const val DEFAULT_I1 = 28
+        const val DEFAULT_I2 = 29
+        const val DEFAULT_I5 = 10
+
         val VANILLA = AwgParams(
             junkPacketCount = 0,
             junkPacketMinSize = 0,
             junkPacketMaxSize = 0,
             initPacketJunkSize = 0,
             responsePacketJunkSize = 0,
+            underloadPacketJunkSize = 0,
+            payloadPacketJunkSize = 0,
             initPacketMagicHeader = 1L,
             responsePacketMagicHeader = 2L,
             cookieReplyMagicHeader = 3L,
             transportMagicHeader = 4L,
+            payloadPacketSizeCount1 = 0,
+            payloadPacketSizeCount2 = 0,
+            payloadPacketSizeCount3 = 0,
         )
     }
 }

@@ -196,12 +196,8 @@ class OzeroVpnService : android.net.VpnService() {
         val settings = withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
             runCatching { settingsRepository.settings.first() }.getOrNull()
         }
-        val splitPackages = withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
-            runCatching { splitTunnelRulesProvider.activePackages() }.getOrNull()
-        } ?: emptySet()
-        val splitConfig = ru.ozero.commonvpn.split.SplitTunnelConfig(
-            mode = settings?.splitMode ?: ru.ozero.enginescore.settings.SplitTunnelMode.ALL,
-            packages = splitPackages,
+        val splitConfig = readSplitConfig(
+            settings?.splitMode ?: ru.ozero.enginescore.settings.SplitTunnelMode.ALL,
         )
         killswitchCached = settings?.killswitchEnabled ?: false
         if (killswitchCached) {
@@ -274,6 +270,18 @@ class OzeroVpnService : android.net.VpnService() {
         if (!usesCustomTun) startHealthKillswitchWatcher(activeEngineId)
         if (usesCustomTun) startPeerWatchdog(activeEngineId)
         startStatsLogger()
+    }
+
+    private suspend fun readSplitConfig(
+        mode: ru.ozero.enginescore.settings.SplitTunnelMode,
+    ): ru.ozero.commonvpn.split.SplitTunnelConfig {
+        val allowlist = withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
+            runCatching { splitTunnelRulesProvider.allowlistPackages() }.getOrNull()
+        } ?: emptySet()
+        val blocklist = withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
+            runCatching { splitTunnelRulesProvider.blocklistPackages() }.getOrNull()
+        } ?: emptySet()
+        return ru.ozero.commonvpn.split.SplitTunnelConfig(mode = mode, allowlist = allowlist, blocklist = blocklist)
     }
 
     private fun startHealthKillswitchWatcher(engineId: EngineId) {
@@ -349,7 +357,11 @@ class OzeroVpnService : android.net.VpnService() {
         val plugin = enginePlugins.firstOrNull { it.id == engineId } ?: return null
         val spec = plugin.tunSpec() ?: return null
         val builder = applyEngineTunSpec(spec, ipv6Enabled)
-        ru.ozero.commonvpn.split.TunBuilderConfigurator(packageName).apply(builder, splitConfig)
+        ru.ozero.commonvpn.split.TunBuilderConfigurator(packageName).apply(
+            builder,
+            splitConfig,
+            excludeSelf = (engineId != ru.ozero.enginescore.EngineId.WARP),
+        )
         val before = TunInterfaceStats.snapshotTunInterfaces()
         val pfd = try {
             builder.establish()

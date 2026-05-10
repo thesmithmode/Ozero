@@ -1,6 +1,7 @@
 package ru.ozero.enginebyedpi
 
 import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -28,6 +29,9 @@ import java.util.concurrent.atomic.AtomicReference
 
 class ByeDpiEngine(
     private val proxy: ByeDpiProxyContract = ByeDpiProxy(),
+    private val socksProbe: suspend (String, Int, Int) -> Long = Socks5HandshakeProbe::probe,
+    private val readyProbeTimeoutMs: Int = READY_PROBE_TIMEOUT_MS,
+    private val readyTotalTimeoutMs: Long = READY_TIMEOUT_MS,
 ) : EnginePlugin {
 
     override val id = EngineId.BYEDPI
@@ -89,13 +93,21 @@ class ByeDpiEngine(
 
     private suspend fun waitSocksReady(port: Int): Long {
         val started = System.currentTimeMillis()
-        while (System.currentTimeMillis() - started < READY_TIMEOUT_MS) {
-            val ok = runCatching { Socks5HandshakeProbe.probe("127.0.0.1", port, READY_PROBE_TIMEOUT_MS) }
-                .isSuccess
-            if (ok) return System.currentTimeMillis() - started
-            delay(READY_RETRY_MS)
-        }
-        return -1
+        withTimeoutOrNull(readyTotalTimeoutMs) {
+            while (true) {
+                val ok = try {
+                    socksProbe("127.0.0.1", port, readyProbeTimeoutMs)
+                    true
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Throwable) {
+                    false
+                }
+                if (ok) return@withTimeoutOrNull
+                delay(READY_RETRY_MS)
+            }
+        } ?: return -1
+        return System.currentTimeMillis() - started
     }
 
     override suspend fun stop() {
@@ -127,17 +139,28 @@ class ByeDpiEngine(
             return ProbeResult.Failure(reason = "движок не запущен")
         }
         return try {
-            val latency = Socks5HandshakeProbe.probe("127.0.0.1", port, timeoutMs = 3_000)
+            val latency = socksProbe("127.0.0.1", port, 3_000)
             ProbeResult.Success(latencyMs = latency)
-        } catch (e: Exception) {
-            PersistentLoggers.warn(TAG, "probe failed: ${e.message}")
-            ProbeResult.Failure(reason = e.message ?: "connection refused")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Throwable) {
+            PersistentLoggers.warn(TAG, "probe failed on port $port")
+            ProbeResult.Failure(reason = "connection refused")
         }
     }
 
     override fun stats(): Flow<EngineStats> = _stats.asStateFlow()
 
     override fun preflight(): EnginePreflight = ByeDpiPreflight()
+
+    override suspend fun ipProbeRoute(socksPort: Int): ru.ozero.enginescore.IpProbeRoute {
+        val port = if (socksPort > 0) socksPort else activeSocksPort
+        return if (port > 0) {
+            ru.ozero.enginescore.IpProbeRoute.Socks("127.0.0.1", port)
+        } else {
+            ru.ozero.enginescore.IpProbeRoute.Default
+        }
+    }
 
     internal fun buildArgs(config: EngineConfig.ByeDpi): Array<String> {
         val extra =

@@ -11,4 +11,6 @@ interface EnginePlugin {
     fun stats(): Flow<EngineStats>
     suspend fun tunSpec(): TunSpec? = null
     fun preflight(): EnginePreflight? = null
+
+    suspend fun ipProbeRoute(socksPort: Int): IpProbeRoute = IpProbeRoute.Default
 }

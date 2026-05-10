@@ -7,11 +7,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import ru.ozero.commonvpn.TunnelController
+import ru.ozero.commonvpn.TunnelState
 import ru.ozero.corestorage.dao.AppSplitRuleDao
 import ru.ozero.corestorage.entity.AppSplitRule
 import ru.ozero.enginescore.settings.SettingsRepository
@@ -23,49 +26,68 @@ class SplitTunnelViewModel @Inject constructor(
     private val appListProvider: AppListProvider,
     private val dao: AppSplitRuleDao,
     private val settingsRepository: SettingsRepository,
+    private val tunnelController: TunnelController,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<SplitTunnelUiState>(SplitTunnelUiState.Loading)
     val uiState: StateFlow<SplitTunnelUiState> = _uiState.asStateFlow()
 
     private val query = MutableStateFlow("")
-    private val apps = MutableStateFlow<List<InstalledApp>>(emptyList())
+    private val apps = MutableStateFlow<List<InstalledApp>?>(null)
 
     init {
         viewModelScope.launch { apps.value = appListProvider.loadApps() }
+        viewModelScope.launch {
+            val current = settingsRepository.settings.map { it.splitMode }.first()
+            if (current == SplitTunnelMode.BYPASS_LAN) {
+                settingsRepository.setSplitMode(SplitTunnelMode.ALL)
+            }
+        }
         combine(
-            apps,
+            apps.filterNotNull(),
             dao.observeAll(),
             settingsRepository.settings.map { it.splitMode },
             query,
-        ) { appsList, rules, mode, q ->
-            val included = rules.map { it.packageName }.toSet()
+            tunnelController.state.map { it is TunnelState.Idle },
+        ) { appsList, rules, persistedMode, q, editable ->
+            val mode = if (persistedMode == SplitTunnelMode.BYPASS_LAN) SplitTunnelMode.ALL else persistedMode
+            val isBlocklist = mode == SplitTunnelMode.BLOCKLIST
+            val included = rules.filter { it.isExcluded == isBlocklist }.map { it.packageName }.toSet()
             val filtered = if (q.isBlank()) appsList else appsList.filter { it.matches(q) }
+            val rows = filtered.map { app ->
+                AppRow(
+                    packageName = app.packageName,
+                    label = app.label,
+                    isSystem = app.isSystem,
+                    included = app.packageName in included,
+                    icon = app.icon,
+                )
+            }.sortedWith(
+                compareByDescending<AppRow> { it.included }
+                    .thenBy { it.label.lowercase() },
+            )
             SplitTunnelUiState.Content(
                 mode = mode,
                 query = q,
-                apps = filtered.map { app ->
-                    AppRow(
-                        packageName = app.packageName,
-                        label = app.label,
-                        isSystem = app.isSystem,
-                        included = app.packageName in included,
-                        icon = app.icon,
-                    )
-                },
+                apps = rows,
                 selectedCount = included.size,
+                editable = editable,
             )
         }.onEach { _uiState.value = it }.launchIn(viewModelScope)
     }
 
     fun onModeChange(mode: SplitTunnelMode) {
+        if (mode == SplitTunnelMode.BYPASS_LAN) return
+        if (tunnelController.state.value !is TunnelState.Idle) return
         viewModelScope.launch { settingsRepository.setSplitMode(mode) }
     }
 
     fun onToggleApp(packageName: String, checked: Boolean) {
+        if (tunnelController.state.value !is TunnelState.Idle) return
         viewModelScope.launch {
             if (checked) {
-                dao.upsert(AppSplitRule(packageName = packageName, isExcluded = false))
+                val mode = settingsRepository.settings.map { it.splitMode }.first()
+                dao.upsert(AppSplitRule(packageName = packageName, isExcluded = mode == SplitTunnelMode.BLOCKLIST))
             } else {
                 dao.delete(packageName)
             }
@@ -82,6 +104,9 @@ class SplitTunnelViewModel @Inject constructor(
             snapshot.forEach { dao.delete(it.packageName) }
         }
     }
+
+    suspend fun loadIcon(packageName: String): androidx.compose.ui.graphics.ImageBitmap? =
+        appListProvider.loadIcon(packageName)
 
     private fun InstalledApp.matches(q: String): Boolean {
         val needle = q.lowercase()

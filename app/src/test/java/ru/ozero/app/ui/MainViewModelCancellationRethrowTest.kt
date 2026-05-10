@@ -14,13 +14,14 @@ class MainViewModelCancellationRethrowTest {
     }
 
     @Test
-    fun `fetchIpInfoViaEngine rethrows CancellationException в onFailure`() {
+    fun `Result_toState rethrows CancellationException в onFailure`() {
         val body = source
-            .substringAfter("private suspend fun fetchIpInfoViaEngine")
-            .substringBefore("private fun engineSocksProxy")
+            .substringAfter("private fun Result<IpInfo>.toState")
+            .substringBefore("fun onConnectClick")
         assertTrue(
-            body.contains("if (it is kotlinx.coroutines.CancellationException) throw it"),
-            "onFailure в fetchIpInfoViaEngine обязан re-throw CancellationException — иначе " +
+            body.contains("if (it is kotlinx.coroutines.CancellationException) throw it") ||
+                body.contains("if (it is CancellationException) throw it"),
+            "Result.toState() обязан re-throw CancellationException в onFailure — иначе " +
                 "viewModelScope.cancel() превращается в IpInfoState.Error на финальной попытке. " +
                 "Body:\n$body",
         )

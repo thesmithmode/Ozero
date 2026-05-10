@@ -53,6 +53,7 @@ import ru.ozero.app.ui.components.OzeroBackgroundState
 import ru.ozero.app.ui.components.PowerDisc
 import ru.ozero.app.ui.components.PowerDiscState
 import ru.ozero.app.ui.theme.OzeroPalette
+import ru.ozero.commonnet.CountryFlag
 import ru.ozero.commonvpn.BytesFormatter
 import ru.ozero.commonvpn.HealthMonitor
 import ru.ozero.commonvpn.TunnelState
@@ -272,7 +273,7 @@ private fun ExpertMainContent(
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
             }
-            if (isConnected && stats != null) {
+            if (isConnected) {
                 TrafficStatsCard(
                     stats = stats,
                     speedHistory = speedHistory,
@@ -391,19 +392,42 @@ private fun IpInfoCard(
                     color = OzeroPalette.Text,
                 )
                 is IpInfoState.Loaded -> {
-                    Text(
-                        text = state.info.ip,
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                        color = OzeroPalette.Text,
-                    )
-                    val country = state.info.country
-                        ?: stringResource(R.string.ip_card_country_unknown)
-                    val location = listOfNotNull(state.info.city, country).joinToString(", ")
-                    Text(
-                        text = location,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = OzeroPalette.Text3,
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        val hasFlag = state.info.countryCode?.length == 2
+                        if (hasFlag) {
+                            Text(
+                                text = CountryFlag.emoji(state.info.countryCode),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                        }
+                        if (state.info.ip.isNotBlank()) {
+                            Text(
+                                text = state.info.ip,
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = OzeroPalette.Text,
+                            )
+                        } else {
+                            Text(
+                                text = state.info.country
+                                    ?: stringResource(R.string.ip_card_country_unknown),
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = OzeroPalette.Text,
+                            )
+                        }
+                    }
+                    if (state.info.ip.isNotBlank()) {
+                        val country = state.info.country
+                            ?: stringResource(R.string.ip_card_country_unknown)
+                        val location = listOfNotNull(state.info.city, country).joinToString(", ")
+                        Text(
+                            text = location,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = OzeroPalette.Text3,
+                        )
+                    }
                 }
                 is IpInfoState.Error -> {
                     Text(
@@ -424,22 +448,23 @@ private fun IpInfoCard(
 
 @Composable
 private fun TrafficStatsCard(
-    stats: TunnelStats,
+    stats: TunnelStats?,
     speedHistory: List<Pair<Float, Float>> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
+    val sessionStartMs = stats?.sessionStartMs ?: 0L
     var nowMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(stats.sessionStartMs) {
+    LaunchedEffect(sessionStartMs) {
         while (true) {
             nowMs = System.currentTimeMillis()
             delay(1_000)
         }
     }
-    val sessionMs = if (stats.sessionStartMs > 0L) nowMs - stats.sessionStartMs else 0L
-    val rxSpeed = BytesFormatter.humanReadablePerSec(stats.bpsIn)
-    val txSpeed = BytesFormatter.humanReadablePerSec(stats.bpsOut)
-    val rxTotal = BytesFormatter.humanReadable(stats.rxBytes)
-    val txTotal = BytesFormatter.humanReadable(stats.txBytes)
+    val sessionMs = if (sessionStartMs > 0L) nowMs - sessionStartMs else 0L
+    val rxSpeed = BytesFormatter.humanReadablePerSec(stats?.bpsIn ?: 0.0)
+    val txSpeed = BytesFormatter.humanReadablePerSec(stats?.bpsOut ?: 0.0)
+    val rxTotal = BytesFormatter.humanReadable(stats?.rxBytes ?: 0L)
+    val txTotal = BytesFormatter.humanReadable(stats?.txBytes ?: 0L)
     val uptime = BytesFormatter.durationHms(sessionMs)
     Card(
         modifier = modifier

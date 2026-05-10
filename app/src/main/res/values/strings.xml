@@ -43,7 +43,7 @@
 
     <!-- Settings -->
     <string name="settings_title">Настройки</string>
-    <string name="settings_split_tunnel_title">Split-tunnel</string>
+    <string name="settings_split_tunnel_title">Раздельное туннелирование</string>
     <string name="settings_split_tunnel_summary">Какие приложения идут через VPN</string>
     <string name="settings_split_mode_all">Все приложения</string>
     <string name="settings_split_mode_bypass_lan">Все, кроме локальной сети</string>
@@ -91,7 +91,7 @@
     <string name="settings_ipv6_summary">Маршрутизировать IPv6 через VPN</string>
     <string name="settings_auto_start_title">Автозапуск при загрузке</string>
     <string name="settings_auto_start_summary">VPN включится автоматически после перезагрузки</string>
-    <string name="settings_allowed_apps_title">Список приложений</string>
+    <string name="settings_allowed_apps_title">Раздельное туннелирование</string>
     <string name="settings_allowed_apps_summary">Откроется в TBD</string>
     <string name="settings_allowed_apps_open_summary">Выбор приложений и режим Split-tunnel</string>
     <string name="settings_servers_title">Серверы / Double-hop</string>
@@ -123,18 +123,21 @@
     <string name="diag_back">Назад</string>
 
     <!-- Split-tunnel screen -->
-    <string name="split_tunnel_title">Список приложений</string>
+    <string name="split_tunnel_title">Раздельное туннелирование</string>
     <string name="split_tunnel_back">Назад</string>
     <string name="split_tunnel_search_hint">Поиск приложения…</string>
     <string name="split_tunnel_no_apps">Ничего не найдено</string>
     <string name="split_tunnel_system_app">Системное</string>
     <string name="split_tunnel_short_all">Все</string>
     <string name="split_tunnel_short_bypass_lan">Без LAN</string>
-    <string name="split_tunnel_short_allowlist">Allowlist</string>
-    <string name="split_tunnel_short_blocklist">Blocklist</string>
+    <string name="split_tunnel_short_allowlist">Включено</string>
+    <string name="split_tunnel_short_blocklist">Исключено</string>
     <string name="split_tunnel_selected_count">Выбрано: %1$d</string>
     <string name="split_tunnel_clear_all">Очистить</string>
     <string name="split_tunnel_mode_hint">Список приложений активен только в режимах Allowlist и Blocklist.</string>
+    <string name="split_tunnel_mode_all_description">Все приложения идут через VPN.</string>
+    <string name="split_tunnel_mode_bypass_lan_description">Все приложения идут через VPN, кроме локальных адресов (LAN).</string>
+    <string name="split_tunnel_disabled_banner">Отключите VPN, чтобы изменить режим</string>
 
     <!-- Servers (double-hop) -->
     <string name="servers_title">Серверы — Double-hop</string>
@@ -201,6 +204,7 @@
     <string name="urnetwork_settings_title">URnetwork</string>
     <string name="urnetwork_consent_warning_title">Внимание</string>
     <string name="urnetwork_consent_warning_body">URnetwork — P2P-сеть, в которой каждый участник может работать как exit-node. Если вы включите URnetwork, ваше устройство будет передавать чужой трафик в открытый интернет от своего IP-адреса. Это может приводить к подозрениям со стороны провайдера и юридическим рискам в некоторых юрисдикциях. Включайте только если понимаете последствия. За exit-node трафик начисляются токены URx на Solana-кошелёк.</string>
+    <string name="urnetwork_consent_short">P2P-сеть: ваш IP может передавать чужой трафик. Токены URx начисляются на Solana-кошелёк.</string>
     <string name="urnetwork_search_hint">Поиск по стране…</string>
     <string name="urnetwork_location_title">Регион выхода</string>
     <string name="urnetwork_location_best_available">Лучший доступный</string>
@@ -209,6 +213,13 @@
     <string name="urnetwork_provide_subtitle">Делиться пропускной способностью с сетью URnetwork</string>
     <string name="urnetwork_peers_connected">Подключено к %1$d peer-ам</string>
     <string name="urnetwork_peers_searching">Поиск peer-ов…</string>
+    <string name="urnetwork_mode_title">Режим</string>
+    <string name="urnetwork_mode_auto">Авто</string>
+    <string name="urnetwork_mode_quality">Веб</string>
+    <string name="urnetwork_mode_speed">Стриминг</string>
+    <string name="urnetwork_mode_hint">Веб — низкая задержка для браузинга. Стриминг — большая ширина для видео.</string>
+    <string name="urnetwork_fixed_ip_size">Фиксированный exit-IP</string>
+    <string name="urnetwork_fixed_ip_size_hint">Один peer вместо пула — стабильный IP сессии</string>
     <string name="urnetwork_about_title">Что такое URnetwork</string>
     <string name="urnetwork_about_body">URnetwork — самая локальная и приватная сеть в мире. Запатентованный протокол держит участников в безопасности. Сейчас в сети больше 30 000 провайдеров, известных инцидентов — ноль.</string>
     <string name="settings_urnetwork_title">URnetwork</string>

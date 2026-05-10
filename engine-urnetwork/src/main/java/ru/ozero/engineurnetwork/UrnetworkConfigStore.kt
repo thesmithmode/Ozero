@@ -1,6 +1,7 @@
 package ru.ozero.engineurnetwork
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 
 interface UrnetworkConfigStore {
     fun walletAddress(): Flow<String>
@@ -10,4 +11,8 @@ interface UrnetworkConfigStore {
     suspend fun setByJwt(value: String?)
     fun byClientJwt(): Flow<String?>
     suspend fun setByClientJwt(value: String?)
+    fun windowType(): Flow<UrnetworkWindowType> = flowOf(UrnetworkWindowType.AUTO)
+    suspend fun setWindowType(value: UrnetworkWindowType) = Unit
+    fun fixedIpSize(): Flow<Boolean> = flowOf(false)
+    suspend fun setFixedIpSize(value: Boolean) = Unit
 }
