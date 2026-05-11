@@ -5,6 +5,10 @@ plugins {
 android {
     namespace = "ru.ozero.enginewarp"
 
+    buildFeatures {
+        aidl = true
+    }
+
     defaultConfig {
         ndk {
             abiFilters += listOf("arm64-v8a")
