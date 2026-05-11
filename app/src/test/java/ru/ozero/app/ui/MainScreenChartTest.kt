@@ -43,7 +43,7 @@ class MainScreenChartTest {
             assertTrue(screenSource.contains(label), "TimeframeOption.$label не найден")
         }
         for (removed in listOf("S5", "H6", "H24")) {
-            assertTrue(!screenSource.contains("    $removed("), "TimeframeOption.$removed должен быть удалён")
+            assertTrue(!screenSource.contains("$removed("), "TimeframeOption.$removed должен быть удалён")
         }
     }
 

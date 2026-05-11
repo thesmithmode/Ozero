@@ -37,6 +37,17 @@ class SplitTunnelVpnServiceSentinelTest {
             .substringBefore("private fun captureTunIfaceName(")
     }
 
+    private val buildTunBlock by lazy {
+        require("internal fun buildTunBuilder(" in source) {
+            "anchor 'internal fun buildTunBuilder(' исчез — обнови sentinel"
+        }
+        require("private fun buildNotification(" in source) {
+            "anchor 'private fun buildNotification(' исчез — обнови sentinel"
+        }
+        source.substringAfter("internal fun buildTunBuilder(")
+            .substringBefore("private fun buildNotification(")
+    }
+
     @Test
     fun `readSplitConfig читает allowlist только в ALLOWLIST режиме`() {
         val allowlistBlock = readSplitConfigBlock.substringBefore("val blocklist")
@@ -87,6 +98,26 @@ class SplitTunnelVpnServiceSentinelTest {
         assertTrue(
             !tunBlock.contains("excludeSelf = true"),
             "excludeSelf не должен быть константой true — WARP требует false (IpProbeRoute.Default design)",
+        )
+    }
+
+    @Test
+    fun `buildTunBuilder не имеет параметра engineId — excludeSelf всегда true`() {
+        val sig = source.substringAfter("internal fun buildTunBuilder(")
+            .substringBefore("): Builder")
+        assertTrue(
+            !sig.contains("engineId"),
+            "buildTunBuilder не должен принимать engineId — вызывается только для не-TunFdAcceptor движков " +
+                "и killswitch TUN; excludeSelf = true там постоянен и не зависит от движка",
+        )
+    }
+
+    @Test
+    fun `buildTunBuilder использует excludeSelf = true для не-WARP движков`() {
+        assertTrue(
+            buildTunBlock.contains("excludeSelf = true"),
+            "buildTunBuilder обязан использовать excludeSelf = true — не-TunFdAcceptor движки " +
+                "не вызывают protect() на outbound сокетах, иначе routing loop через TUN",
         )
     }
 }

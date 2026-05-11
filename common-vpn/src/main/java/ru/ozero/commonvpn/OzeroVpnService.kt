@@ -372,7 +372,7 @@ class OzeroVpnService : android.net.VpnService() {
         ru.ozero.commonvpn.split.TunBuilderConfigurator(packageName).apply(
             builder,
             splitConfig,
-            excludeSelf = (engineId != EngineId.WARP),
+            excludeSelf = (engineId != ru.ozero.enginescore.EngineId.WARP),
         )
         val before = TunInterfaceStats.snapshotTunInterfaces()
         val pfd = try {
@@ -586,7 +586,7 @@ class OzeroVpnService : android.net.VpnService() {
                     }
                     if (read == null) {
                         if (tickCount % STATS_LOG_EVERY == 0) {
-                            Log.w(TAG, "TunnelStats: ни iface, ни uid stats недоступны")
+                            PersistentLoggers.warn(TAG, "TunnelStats: ни iface, ни uid stats недоступны")
                         }
                         tickCount++
                         continue
