@@ -18,6 +18,8 @@ class TunnelController(
     val stagnant: StateFlow<Boolean> = _stagnant.asStateFlow()
     private val _killswitchActive = MutableStateFlow(false)
     val killswitchActive: StateFlow<Boolean> = _killswitchActive.asStateFlow()
+    private val _switching = MutableStateFlow<SwitchingTransition?>(null)
+    val switching: StateFlow<SwitchingTransition?> = _switching.asStateFlow()
     private val lock = Any()
     private var sessionStartMs: Long = 0L
     private var prevTxBytes: Long = 0L
@@ -58,6 +60,17 @@ class TunnelController(
     }
 
     fun onDisconnecting() = transition(TunnelState.Disconnecting)
+
+    fun onSwitchingStarted(from: EngineId?, to: EngineId?) {
+        _switching.value = SwitchingTransition(from, to)
+        PersistentLoggers.info(TAG, "switching started: $from → $to")
+    }
+
+    fun onSwitchingFinished(reason: String) {
+        if (_switching.compareAndSet(_switching.value, null)) {
+            PersistentLoggers.info(TAG, "switching finished: $reason")
+        }
+    }
 
     fun reset() {
         _stats.value = null
@@ -124,6 +137,18 @@ class TunnelController(
                 PersistentLoggers.info(TAG, "${name(current)} → ${name(target)}")
             }
             _state.value = target
+            val sw = _switching.value
+            if (sw != null) {
+                val terminal = when (target) {
+                    is TunnelState.Connected -> true
+                    is TunnelState.Failed -> true
+                    else -> false
+                }
+                if (terminal) {
+                    _switching.value = null
+                    PersistentLoggers.info(TAG, "switching cleared on transition → ${name(target)}")
+                }
+            }
         }
     }
 

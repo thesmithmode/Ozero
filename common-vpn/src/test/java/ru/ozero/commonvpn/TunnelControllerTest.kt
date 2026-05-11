@@ -448,6 +448,63 @@ class TunnelControllerTest {
     }
 
     @Test
+    fun switchingStartedSetsTransitionAndPersistsThroughIdle() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        controller.onSwitchingStarted(from = EngineId.BYEDPI, to = EngineId.URNETWORK)
+        assertNotNull(controller.switching.value)
+
+        controller.onDisconnecting()
+        assertNotNull(controller.switching.value, "switching marker не должен сбрасываться на Disconnecting")
+
+        controller.reset()
+        assertNotNull(controller.switching.value, "switching marker должен пережить reset → Idle во время смены движка")
+
+        controller.onProbing()
+        controller.onConnecting(EngineId.URNETWORK)
+        assertNotNull(controller.switching.value, "switching marker остаётся пока target engine не Connected")
+
+        controller.onEngineStarted(EngineId.URNETWORK, 1080)
+        assertNull(controller.switching.value, "switching marker очищается при достижении Connected(target)")
+    }
+
+    @Test
+    fun switchingClearedOnFailed() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        controller.onSwitchingStarted(EngineId.BYEDPI, EngineId.URNETWORK)
+        controller.onEngineDied(EngineId.BYEDPI, "boom")
+        assertNull(controller.switching.value, "switching marker очищается на Failed чтобы не висеть навсегда")
+    }
+
+    @Test
+    fun switchingFinishedExplicitClears() {
+        controller.onSwitchingStarted(EngineId.BYEDPI, EngineId.WARP)
+        assertNotNull(controller.switching.value)
+        controller.onSwitchingFinished("test")
+        assertNull(controller.switching.value)
+    }
+
+    @Test
+    fun switchingDoesNotClearOnConnectedOfDifferentEngine() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        controller.onSwitchingStarted(EngineId.BYEDPI, EngineId.URNETWORK)
+        controller.onDisconnecting()
+        controller.reset()
+        controller.onProbing()
+        controller.onConnecting(EngineId.WARP)
+        controller.onEngineStarted(EngineId.WARP, 1080)
+        assertNull(
+            controller.switching.value,
+            "Любой Connected target очищает switching: переход к не-target движку = смена закончилась",
+        )
+    }
+
+    @Test
     fun resetClearsStats() {
         controller.onProbing()
         controller.onConnecting(EngineId.BYEDPI)

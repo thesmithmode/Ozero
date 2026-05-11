@@ -26,6 +26,7 @@ import ru.ozero.app.ui.launcher.OnboardingGate
 import ru.ozero.app.ui.launcher.VpnIntentLauncher
 import ru.ozero.app.ui.theme.OzeroTheme
 import ru.ozero.app.vpn.EngineSettingsRestartObserver
+import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginewarp.WarpConfigSlotStore
 import javax.inject.Inject
@@ -41,6 +42,8 @@ class MainActivity : AppCompatActivity() {
     @Inject lateinit var warpConfigSlotStore: WarpConfigSlotStore
 
     @Inject lateinit var logcatReader: LogcatReader
+
+    @Inject lateinit var tunnelController: TunnelController
 
     private lateinit var vpnIntentLauncher: VpnIntentLauncher
     private lateinit var batteryGuard: BatteryGuard
@@ -86,13 +89,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     private suspend fun restartVpnIfConnected(reason: String) {
-        if (viewModel.state.value !is TunnelState.Connected) return
+        val current = viewModel.state.value
+        if (current !is TunnelState.Connected) return
         AppLogger.i(TAG, reason)
-        vpnIntentLauncher.stop()
-        withTimeoutOrNull(5_000L) {
-            viewModel.state.first { it is TunnelState.Idle || it is TunnelState.Failed }
+        tunnelController.onSwitchingStarted(from = current.engineId, to = null)
+        try {
+            vpnIntentLauncher.stop()
+            withTimeoutOrNull(5_000L) {
+                viewModel.state.first { it is TunnelState.Idle || it is TunnelState.Failed }
+            }
+            vpnIntentLauncher.start()
+        } catch (t: Throwable) {
+            tunnelController.onSwitchingFinished("restart failed: ${t.message}")
+            throw t
         }
-        vpnIntentLauncher.start()
     }
 
     private fun observeLiveEngineSettingsChanges() {

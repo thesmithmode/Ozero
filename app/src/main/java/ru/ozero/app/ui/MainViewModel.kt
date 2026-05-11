@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 import ru.ozero.commonnet.IpInfo
 import ru.ozero.commonnet.IpInfoProvider
 import ru.ozero.commonvpn.HealthMonitor
+import ru.ozero.commonvpn.SwitchingTransition
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.commonvpn.TunnelStats
@@ -76,6 +77,13 @@ class MainViewModel @Inject constructor(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
             initialValue = false,
+        )
+
+    val switching: StateFlow<SwitchingTransition?> =
+        tunnelController.switching.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = null,
         )
 
     val healthStatus: StateFlow<HealthMonitor.Status> =

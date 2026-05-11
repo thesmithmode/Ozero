@@ -61,6 +61,7 @@ import ru.ozero.app.ui.theme.OzeroPalette
 import ru.ozero.commonnet.CountryFlag
 import ru.ozero.commonvpn.BytesFormatter
 import ru.ozero.commonvpn.HealthMonitor
+import ru.ozero.commonvpn.SwitchingTransition
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.commonvpn.TunnelStats
 import ru.ozero.enginescore.EngineId
@@ -84,9 +85,10 @@ fun MainScreen(
     val urnetworkPeerSearchSeconds by viewModel.urnetworkPeerSearchSeconds.collectAsStateWithLifecycle()
     val ipInfo by viewModel.ipInfo.collectAsStateWithLifecycle()
     val killswitchActive by viewModel.killswitchActive.collectAsStateWithLifecycle()
+    val switching by viewModel.switching.collectAsStateWithLifecycle()
 
-    val powerState = state.toPowerDiscState()
-    val backgroundState = state.toBackgroundState()
+    val powerState = if (switching != null) PowerDiscState.Connecting else state.toPowerDiscState()
+    val backgroundState = if (switching != null) OzeroBackgroundState.Connecting else state.toBackgroundState()
     val isConnected = state is TunnelState.Connected
 
     OzeroBackground(state = backgroundState) {
@@ -98,6 +100,7 @@ fun MainScreen(
             when (mode) {
                 AppMode.SIMPLE -> SimpleMainContent(
                     tunnelState = state,
+                    switching = switching,
                     powerState = powerState,
                     isConnected = isConnected,
                     manualEngine = manualEngine,
@@ -109,6 +112,7 @@ fun MainScreen(
                 )
                 AppMode.EXPERT -> ExpertMainContent(
                     tunnelState = state,
+                    switching = switching,
                     stats = stats,
                     speedHistory = speedHistory,
                     stagnant = stagnant,
@@ -135,6 +139,7 @@ fun MainScreen(
 @Composable
 private fun SimpleMainContent(
     tunnelState: TunnelState,
+    switching: SwitchingTransition?,
     powerState: PowerDiscState,
     isConnected: Boolean,
     manualEngine: EngineId?,
@@ -153,7 +158,9 @@ private fun SimpleMainContent(
     ) {
         Spacer(modifier = Modifier.height(20.dp))
 
-        AnimatedContent(targetState = tunnelState, label = "status") { s -> StatusLabel(s) }
+        AnimatedContent(targetState = switching to tunnelState, label = "status") { (sw, s) ->
+            StatusLabel(s, sw)
+        }
 
         Box(
             modifier = Modifier.fillMaxWidth(),
@@ -219,6 +226,7 @@ private const val URNETWORK_PEER_SEARCH_VISIBLE_THRESHOLD_S: Int = 20
 @Composable
 private fun ExpertMainContent(
     tunnelState: TunnelState,
+    switching: SwitchingTransition?,
     stats: TunnelStats?,
     speedHistory: List<Pair<Float, Float>>,
     stagnant: Boolean,
@@ -243,7 +251,9 @@ private fun ExpertMainContent(
     ) {
         Spacer(modifier = Modifier.height(16.dp))
 
-        AnimatedContent(targetState = tunnelState, label = "status") { s -> StatusLabel(s) }
+        AnimatedContent(targetState = switching to tunnelState, label = "status") { (sw, s) ->
+            StatusLabel(s, sw)
+        }
 
         Box(
             modifier = Modifier.fillMaxWidth(),
@@ -606,26 +616,32 @@ private fun LiveTrafficChart(
 }
 
 @Composable
-private fun StatusLabel(state: TunnelState) {
-    val labelRes = when (state) {
-        is TunnelState.Idle -> R.string.main_status_disconnected
-        is TunnelState.Probing -> if (state.engineId == ru.ozero.enginescore.EngineId.WARP) {
-            R.string.main_status_probing_warp
-        } else {
-            R.string.main_status_probing
+private fun StatusLabel(state: TunnelState, switching: SwitchingTransition? = null) {
+    val labelRes = when {
+        switching != null -> R.string.main_status_switching
+        else -> when (state) {
+            is TunnelState.Idle -> R.string.main_status_disconnected
+            is TunnelState.Probing -> if (state.engineId == ru.ozero.enginescore.EngineId.WARP) {
+                R.string.main_status_probing_warp
+            } else {
+                R.string.main_status_probing
+            }
+            is TunnelState.Connecting -> R.string.main_status_connecting
+            is TunnelState.Connected -> R.string.main_status_connected
+            is TunnelState.Failed -> R.string.main_status_failed
+            is TunnelState.Disconnecting -> R.string.main_status_disconnecting
         }
-        is TunnelState.Connecting -> R.string.main_status_connecting
-        is TunnelState.Connected -> R.string.main_status_connected
-        is TunnelState.Failed -> R.string.main_status_failed
-        is TunnelState.Disconnecting -> R.string.main_status_disconnecting
     }
-    val engine = when (state) {
-        is TunnelState.Connecting -> state.engineId.name
-        is TunnelState.Connected -> state.engineId.name
-        is TunnelState.Failed -> state.engineId.name
-        else -> null
+    val engine = when {
+        switching != null -> switching.from?.name
+        else -> when (state) {
+            is TunnelState.Connecting -> state.engineId.name
+            is TunnelState.Connected -> state.engineId.name
+            is TunnelState.Failed -> state.engineId.name
+            else -> null
+        }
     }
-    val failedReason = (state as? TunnelState.Failed)?.reason
+    val failedReason = if (switching != null) null else (state as? TunnelState.Failed)?.reason
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = stringResource(labelRes),
