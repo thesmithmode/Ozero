@@ -61,9 +61,7 @@ class OzeroApp : Application(), Configuration.Provider {
         super.onCreate()
         runCatching { System.loadLibrary("am-go") }
             .onFailure { BootFileLogger.error(TAG, "am-go eager load failed", it) }
-        // gojni (URnetwork Go runtime) only in main process.
-        // :engine_warp process hosts only libam-go (WARP).
-        // Both in same process → concurrent GC signal-handler conflict → SIGABRT.
+        // Two Go runtimes in one process → concurrent GC signal-handler conflict → SIGABRT.
         if (!isEngineWarpProcess()) {
             runCatching { System.loadLibrary("gojni") }
                 .onFailure { BootFileLogger.error(TAG, "gojni eager load failed", it) }

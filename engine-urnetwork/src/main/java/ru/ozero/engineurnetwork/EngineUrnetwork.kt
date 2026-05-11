@@ -211,7 +211,7 @@ class EngineUrnetwork(
         const val TUN_MTU = 1440
         const val TUN_PREFIX = 32
         const val STATS_POLL_INTERVAL_MS = 2_000L
-        // libgojni goroutines need time to drain after device.close() before another Go runtime starts
+
         const val URN_STOP_TIMEOUT_MS = 5_000L
     }
 }

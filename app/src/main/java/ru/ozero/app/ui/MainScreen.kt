@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -596,12 +597,12 @@ private fun LiveTrafficChart(
                 val gridDivs = 4
                 for (i in 1 until gridDivs) {
                     val y = h * i / gridDivs
-                    drawLine(gridColor, androidx.compose.ui.geometry.Offset(0f, y), androidx.compose.ui.geometry.Offset(w, y), linePx)
+                    drawLine(gridColor, Offset(0f, y), Offset(w, y), linePx)
                 }
                 val timeDivs = 4
                 for (i in 1 until timeDivs) {
                     val x = w * i / timeDivs
-                    drawLine(gridColor, androidx.compose.ui.geometry.Offset(x, 0f), androidx.compose.ui.geometry.Offset(x, h), linePx)
+                    drawLine(gridColor, Offset(x, 0f), Offset(x, h), linePx)
                 }
                 drawRect(borderColor, style = Stroke(width = linePx))
                 if (history.size < 2 || niceMax <= 0f) return@Canvas

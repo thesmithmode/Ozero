@@ -64,7 +64,8 @@ fun PowerDisc(
     )
     val haloPulse by transition.animateFloat(
         initialValue = 1.0f,
-        targetValue = if (state == PowerDiscState.Connecting || state == PowerDiscState.Switching) HALO_PULSE_PEAK else 1.0f,
+        targetValue = if (state == PowerDiscState.Connecting ||
+            state == PowerDiscState.Switching) HALO_PULSE_PEAK else 1.0f,
         animationSpec = infiniteRepeatable(
             animation = tween(HALO_PULSE_DURATION_MS, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse,

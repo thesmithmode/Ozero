@@ -8,12 +8,6 @@ import android.util.Log
 import org.amnezia.awg.GoBackend
 import ru.ozero.enginewarp.IWarpEngineProcess
 
-/**
- * Isolated service running in :engine_warp process.
- * Hosts libam-go (AmneziaWG Go runtime) separately from the main process which hosts libgojni
- * (URnetwork Go runtime). Keeps their GC cycles and signal handlers in separate address spaces,
- * eliminating the SIGABRT caused by concurrent GC stop-the-world across two Go runtimes.
- */
 class WarpEngineService : Service() {
 
     private val binder = object : IWarpEngineProcess.Stub() {
@@ -62,7 +56,6 @@ class WarpEngineService : Service() {
         if (libraryLoaded) return
         synchronized(this) {
             if (libraryLoaded) return
-            // OzeroApp.onCreate() loads am-go eagerly in :engine_warp process; this is a safety net.
             runCatching { System.loadLibrary("am-go") }
                 .onFailure { Log.e(TAG, "am-go load failed: ${it.message}") }
             libraryLoaded = true
@@ -71,6 +64,7 @@ class WarpEngineService : Service() {
 
     private companion object {
         const val TAG = "WarpEngineService"
+
         @Volatile var libraryLoaded = false
     }
 }
