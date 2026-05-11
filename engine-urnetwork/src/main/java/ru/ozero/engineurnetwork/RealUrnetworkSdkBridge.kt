@@ -21,6 +21,8 @@ import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.enginescore.PersistentLoggers
@@ -44,6 +46,7 @@ class RealUrnetworkSdkBridge(
     private val running = AtomicBoolean(false)
     private val preferredCountryRef = AtomicReference<String?>(null)
     private val bridgeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val lifecycleMutex = Mutex()
 
     override suspend fun start(
         walletAddress: String,
@@ -51,21 +54,23 @@ class RealUrnetworkSdkBridge(
         connectUrl: String,
         byClientJwt: String,
     ): UrnetworkSdkBridge.StartResult {
-        if (running.get()) {
-            PersistentLoggers.warn(TAG, "start called while already running")
-            return UrnetworkSdkBridge.StartResult.Failed("already running")
-        }
         if (byClientJwt.isBlank()) {
             return UrnetworkSdkBridge.StartResult.Failed("byClientJwt is blank")
         }
-        return withTimeoutOrNull(SDK_INIT_TIMEOUT_MS) {
-            withContext(Dispatchers.Main.immediate) {
-                runStartOnMain(byClientJwt)
+        return lifecycleMutex.withLock {
+            if (running.get()) {
+                PersistentLoggers.warn(TAG, "start called while already running")
+                return@withLock UrnetworkSdkBridge.StartResult.Failed("already running")
             }
-        } ?: run {
-            PersistentLoggers.error(TAG, "SDK init timed out after ${SDK_INIT_TIMEOUT_MS}ms")
-            cleanupOnFailure()
-            UrnetworkSdkBridge.StartResult.Failed("URnetwork SDK init timeout (30s)")
+            withTimeoutOrNull(SDK_INIT_TIMEOUT_MS) {
+                withContext(Dispatchers.Main.immediate) {
+                    runStartOnMain(byClientJwt)
+                }
+            } ?: run {
+                PersistentLoggers.error(TAG, "SDK init timed out after ${SDK_INIT_TIMEOUT_MS}ms")
+                cleanupOnFailure()
+                UrnetworkSdkBridge.StartResult.Failed("URnetwork SDK init timeout (30s)")
+            }
         }
     }
 
@@ -137,7 +142,7 @@ class RealUrnetworkSdkBridge(
         return UrnetworkSdkBridge.StartResult.Success
     }
 
-    override suspend fun stop() {
+    override suspend fun stop() = lifecycleMutex.withLock {
         running.set(false)
         runCatching { bridgeScope.coroutineContext.cancelChildren() }
         val completed = withTimeoutOrNull(STOP_TIMEOUT_MS) {

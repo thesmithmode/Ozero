@@ -153,8 +153,9 @@ class MainViewModel @Inject constructor(
     val urnetworkPeerCount: StateFlow<Int> = flow {
         while (true) {
             val s = tunnelController.state.value
-            val active = s is TunnelState.Connected && s.engineId == EngineId.URNETWORK
-            emit(if (active) urnetworkBridge.peerCount() else 0)
+            val active = s is TunnelState.Connected && s.engineId == EngineId.URNETWORK &&
+                runCatching { urnetworkBridge.isRunning() }.getOrDefault(false)
+            emit(if (active) runCatching { urnetworkBridge.peerCount() }.getOrDefault(0) else 0)
             delay(URNETWORK_PEER_POLL_MS)
         }
     }.stateIn(
@@ -168,7 +169,8 @@ class MainViewModel @Inject constructor(
         var graceTicks = 0
         while (true) {
             val s = tunnelController.state.value
-            val active = s is TunnelState.Connected && s.engineId == EngineId.URNETWORK
+            val active = s is TunnelState.Connected && s.engineId == EngineId.URNETWORK &&
+                runCatching { urnetworkBridge.isRunning() }.getOrDefault(false)
             val peers = if (active) runCatching { urnetworkBridge.peerCount() }.getOrDefault(0) else 0
             when {
                 !active -> {
