@@ -53,7 +53,7 @@ fun BackupScreen(
     val filename = stringResource(R.string.backup_filename)
 
     val exportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/json"),
+        ActivityResultContracts.CreateDocument("application/octet-stream"),
     ) { uri: Uri? ->
         if (uri != null) viewModel.export(context, uri)
     }
@@ -125,7 +125,7 @@ fun BackupScreen(
                 }
 
                 OutlinedButton(
-                    onClick = { importLauncher.launch(arrayOf("application/json", "*/*")) },
+                    onClick = { importLauncher.launch(arrayOf("*/*")) },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = state == BackupUiState.Idle,
                 ) {

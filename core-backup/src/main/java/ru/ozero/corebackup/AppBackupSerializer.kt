@@ -49,6 +49,18 @@ object AppBackupSerializer {
         return root.toString(2)
     }
 
+    fun serializeEncrypted(data: AppBackupData): ByteArray =
+        BackupCipher.encrypt(serialize(data).toByteArray(Charsets.UTF_8))
+
+    fun deserializeAuto(bytes: ByteArray): AppBackupData {
+        val json = if (BackupCipher.isEncrypted(bytes)) {
+            BackupCipher.decrypt(bytes).toString(Charsets.UTF_8)
+        } else {
+            bytes.toString(Charsets.UTF_8)
+        }
+        return deserialize(json)
+    }
+
     fun deserialize(json: String): AppBackupData {
         val root = JSONObject(json)
         val version = root.getInt("version")

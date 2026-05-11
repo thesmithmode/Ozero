@@ -135,6 +135,22 @@ class AppBackupSerializerTest {
     }
 
     @Test
+    fun `serializeEncrypted и deserializeAuto roundtrip`() {
+        val bytes = AppBackupSerializer.serializeEncrypted(fullData)
+        val restored = AppBackupSerializer.deserializeAuto(bytes)
+        assertEquals(fullData.exportedAt, restored.exportedAt)
+        assertEquals(fullData.warpSlots[0].privateKey, restored.warpSlots[0].privateKey)
+        assertEquals(fullData.urnetwork.walletOverride, restored.urnetwork.walletOverride)
+    }
+
+    @Test
+    fun `deserializeAuto принимает legacy plaintext JSON`() {
+        val json = AppBackupSerializer.serialize(fullData)
+        val restored = AppBackupSerializer.deserializeAuto(json.toByteArray(Charsets.UTF_8))
+        assertEquals(fullData.exportedAt, restored.exportedAt)
+    }
+
+    @Test
     fun `несколько слотов — порядок сохраняется`() {
         val makeSlot = { n: Int ->
             BackupWarpSlot(
