@@ -135,7 +135,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
                     }
                 }
             } else {
-                flowOf(null)
+                flowOf<UrnetworkSdkBridge.SubscriptionBalanceSnapshot?>(null)
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(POLLER_KEEP_ALIVE_MS), null)
 
