@@ -297,7 +297,7 @@ class MainViewModel @Inject constructor(
 
     private companion object {
         const val IP_TAG = "MainViewModel.ip"
-        const val MAX_SPEED_HISTORY_POINTS = 86_400
+        const val MAX_SPEED_HISTORY_POINTS = 3_600
         const val URNETWORK_PEER_POLL_MS = 2_000L
         const val URNETWORK_PEER_POLL_KEEP_MS = 5_000L
         const val URNETWORK_SEARCH_TICK_MS = 1_000L

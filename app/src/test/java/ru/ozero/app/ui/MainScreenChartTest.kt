@@ -22,11 +22,11 @@ class MainScreenChartTest {
     // ── Sentinel: константы ──────────────────────────────────────────────────
 
     @Test
-    fun `MAX_SPEED_HISTORY_POINTS не меньше 86400 — держит 24ч при 1 тике в секунду`() {
+    fun `MAX_SPEED_HISTORY_POINTS не меньше 3600 — держит 1ч при 1 тике в секунду`() {
         val regex = Regex("MAX_SPEED_HISTORY_POINTS\\s*=\\s*(\\d[\\d_]*)L?")
         val m = regex.find(vmSource) ?: error("MAX_SPEED_HISTORY_POINTS не найден")
         val value = m.groupValues[1].replace("_", "").toLong()
-        assertTrue(value >= 86_400L, "Ожидалось >= 86400, fact=$value")
+        assertTrue(value >= 3_600L, "Ожидалось >= 3600, fact=$value")
     }
 
     @Test
@@ -38,18 +38,47 @@ class MainScreenChartTest {
     }
 
     @Test
-    fun `TimeframeOption содержит все пять вариантов`() {
-        for (label in listOf("S5", "S30", "H1", "H6", "H24")) {
+    fun `TimeframeOption содержит четыре варианта S30 M5 M30 H1`() {
+        for (label in listOf("S30", "M5", "M30", "H1")) {
             assertTrue(screenSource.contains(label), "TimeframeOption.$label не найден")
+        }
+        for (removed in listOf("S5", "H6", "H24")) {
+            assertTrue(!screenSource.contains("    $removed("), "TimeframeOption.$removed должен быть удалён")
         }
     }
 
     @Test
-    fun `TimeframeOption_H24 имеет 86400 точек`() {
-        val regex = Regex("H24\\s*\\(.*?(?:,\\s*)(\\d[\\d_]*)\\s*\\)")
-        val m = regex.find(screenSource) ?: error("H24 entry не найден")
+    fun `TimeframeOption_M5 имеет 300 точек`() {
+        val regex = Regex("M5\\s*\\([^,]+,\\s*(\\d[\\d_]*)\\s*\\)")
+        val m = regex.find(screenSource) ?: error("M5 entry не найден")
         val points = m.groupValues[1].replace("_", "").toInt()
-        assertEquals(86_400, points, "H24 обязан иметь 86400 точек")
+        assertEquals(300, points, "M5 обязан иметь 300 точек")
+    }
+
+    @Test
+    fun `TimeframeOption_M30 имеет 1800 точек`() {
+        val regex = Regex("M30\\s*\\([^,]+,\\s*(\\d[\\d_]*)\\s*\\)")
+        val m = regex.find(screenSource) ?: error("M30 entry не найден")
+        val points = m.groupValues[1].replace("_", "").toInt()
+        assertEquals(1_800, points, "M30 обязан иметь 1800 точек")
+    }
+
+    @Test
+    fun `TimeframeOption_H1 имеет 3600 точек`() {
+        val regex = Regex("H1\\s*\\([^,]+,\\s*(\\d[\\d_]*)\\s*\\)")
+        val m = regex.find(screenSource) ?: error("H1 entry не найден")
+        val points = m.groupValues[1].replace("_", "").toInt()
+        assertEquals(3_600, points, "H1 обязан иметь 3600 точек")
+    }
+
+    @Test
+    fun `displayHistory паддится нулями до полного окна таймфрейма`() {
+        val paddingBlock = screenSource.substringAfter("var selectedTf by remember")
+            .substringBefore("Card(")
+        assertTrue(
+            paddingBlock.contains("List(n - slice.size)") || paddingBlock.contains("List(n -"),
+            "displayHistory обязан паддить нулями слева до полного окна selectedTf.points",
+        )
     }
 
     @Test

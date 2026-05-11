@@ -480,8 +480,10 @@ private fun TrafficStatsCard(
 
     var selectedTf by remember { mutableStateOf(TimeframeOption.S30) }
     val displayHistory = remember(speedHistory, selectedTf) {
-        val slice = speedHistory.takeLast(selectedTf.points)
-        downsample(slice, CHART_MAX_RENDER_POINTS)
+        val n = selectedTf.points
+        val slice = speedHistory.takeLast(n)
+        val padded = if (slice.size < n) List(n - slice.size) { 0f to 0f } + slice else slice
+        downsample(padded, CHART_MAX_RENDER_POINTS)
     }
 
     Card(
@@ -655,11 +657,10 @@ private const val DOCK_TAB_SETTINGS = "settings"
 internal const val CHART_MAX_RENDER_POINTS = 300
 
 private enum class TimeframeOption(val labelRes: Int, val points: Int) {
-    S5(R.string.chart_tf_5s, 5),
     S30(R.string.chart_tf_30s, 30),
+    M5(R.string.chart_tf_5min, 300),
+    M30(R.string.chart_tf_30min, 1_800),
     H1(R.string.chart_tf_1h, 3_600),
-    H6(R.string.chart_tf_6h, 21_600),
-    H24(R.string.chart_tf_24h, 86_400),
 }
 
 internal fun downsample(history: List<Pair<Float, Float>>, maxPoints: Int): List<Pair<Float, Float>> {
