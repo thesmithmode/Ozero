@@ -1,5 +1,32 @@
 # Build Log
 
+## [2026-05-11T00:30:00+03:00] compile | 2026-05-10.md (pass 6 — full recompile verification)
+- Source: daily/2026-05-10.md
+- Articles created: (none — all 4 new concepts already exist from passes 1-5)
+- Articles updated: (none — all updates already applied)
+- Verification: 8 articles reference daily/2026-05-10.md in index, all content matches daily log:
+  - [[concepts/mockk-aar-native-initializer-trap]] — LocationInfo wrapper pattern ✓
+  - [[concepts/kotlin-empty-string-null-coalesce-trap]] — takeIf{isNotBlank()} ✓
+  - [[concepts/viewmodel-polling-runtest-trap]] — advanceTimeBy+runCurrent ✓
+  - [[concepts/hilt-assistedinject-mixed-injection]] — regular vs @Assisted params ✓
+  - [[concepts/byedpi-mock-server-ci-fragility]] — Root Cause 3 injectable lambda ✓
+  - [[concepts/tun-self-exclusion-sdk-engines]] — SOCKS/hev loop mechanism ✓
+  - [[concepts/engine-switch-chain-cascading-failures]] — IP warmup 8s→3s ✓
+  - [[concepts/vpn-ip-detection-contract]] — warmup timing tuning ✓
+- Excluded: Session 13:00 billing/monetization planning (project direction, not technical concept), wiki-find ModuleNotFoundError (tooling issue), naming refactor question (no context)
+
+## [2026-05-10T23:30:00+03:00] compile | 2026-05-10.md (pass 5 — final gaps)
+- Source: daily/2026-05-10.md
+- Articles created: [[concepts/hilt-assistedinject-mixed-injection]]
+- Articles updated: [[concepts/engine-switch-chain-cascading-failures]] (IP warmup 8s→3s from session 17:46), [[concepts/vpn-ip-detection-contract]] (warmup timing + retry tuning from session 17:46)
+- Note: Prior 4 passes missed: (1) @AssistedInject mixed injection pattern from session 14:48 — subagent DI errors exposed the gotcha, (2) IP_INFO_WARMUP_MS tuning 8000→3000 from session 17:46 GROUP B — existing articles still referenced 8s
+
+## [2026-05-10T21:41:00+03:00] compile | 2026-05-10.md (session 4 — end-of-day close)
+- Source: daily/2026-05-10.md
+- Articles created: (none)
+- Articles updated: (none)
+- Note: Session 21:41 — CI green (simplify complete), user asked about naming refactor but no context available. No extractable technical knowledge. Full day compile verified complete across 3 prior passes.
+
 ## [2026-05-10T21:00:00+03:00] compile | 2026-05-10.md (session 3 — full day verification)
 - Source: daily/2026-05-10.md
 - Articles created: (none — all already compiled in passes 18:17 and 19:30)

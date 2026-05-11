@@ -4,8 +4,9 @@ aliases: [ip-detection-contract, ip-checker-architecture, vpn-ip-check]
 tags: [vpn, architecture, networking, ip-detection]
 sources:
   - "daily/2026-05-09.md"
+  - "daily/2026-05-10.md"
 created: 2026-05-09
-updated: 2026-05-09
+updated: 2026-05-10
 ---
 
 # Unified VPN IP Detection Contract
@@ -54,7 +55,7 @@ The IP detection module must:
 5. Catch `EPERM` and degrade gracefully (user message, not crash)
 6. Implement cancellation-aware fetch that survives engine restarts (debounce rapid switching)
 
-Point 6 addresses the engine-switch chain problem ([[concepts/engine-switch-chain-cascading-failures]]): rapid switching cancels the 8-second warmup timer repeatedly, and the IP fetch never fires. The fix is to debounce the warmup timer or use a stable coroutine scope that survives individual engine restarts.
+Point 6 addresses the engine-switch chain problem ([[concepts/engine-switch-chain-cascading-failures]]): rapid switching cancels the warmup timer (reduced from 8s to 3s in v0.0.9, with retries tuned from 4→3 at 1500ms intervals) repeatedly, and the IP fetch never fires. The fix is to debounce the warmup timer or use a stable coroutine scope that survives individual engine restarts.
 
 ### Research Gaps
 
@@ -75,3 +76,4 @@ Point 6 addresses the engine-switch chain problem ([[concepts/engine-switch-chai
 - [[daily/2026-05-09.md]] - Session 19:41: synthesized 4 IP detection failure modes from knowledge base research; per-engine strategy table; unified architectural contract; SOCKS proxy routing as fix for self-excluded engines
 - [[daily/2026-05-09.md]] - Session 13:12: IP warmup cancellation during engine-switch chain identified as missing from prior analysis
 - [[daily/2026-05-09.md]] - Session 18:38: EPERM workaround committed; full SocketFactory fix deferred
+- [[daily/2026-05-10.md]] - Session 17:46: IP_INFO_WARMUP_MS tuned 8000→3000, retries 4→3, retry delay 1000→1500ms

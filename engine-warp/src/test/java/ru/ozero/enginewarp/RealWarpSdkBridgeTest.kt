@@ -401,7 +401,13 @@ class RealWarpSdkBridgeTest {
     fun `concurrent detachTun не вызывает double awgTurnOff на одном handle`() = runTest {
         val runtime = FakeAwgRuntime()
         val (bridge, _) = bridgeWith(runtime)
-        val attached = bridge.attachTun("wg-test", tunFd = 7, iniConfig = validIni, uapiPath = "/tmp", protector = noopProtector)
+        val attached = bridge.attachTun(
+            "wg-test",
+            tunFd = 7,
+            iniConfig = validIni,
+            uapiPath = "/tmp",
+            protector = noopProtector,
+        )
         assertIs<WarpSdkBridge.AttachResult.Success>(attached)
         val beforeOff = runtime.turnOffCalls
         coroutineScope {
@@ -410,7 +416,11 @@ class RealWarpSdkBridgeTest {
             j1.join()
             j2.join()
         }
-        assertEquals(beforeOff + 1, runtime.turnOffCalls, "Параллельный detach должен вызвать awgTurnOff ровно один раз — AtomicInteger.getAndSet")
+        assertEquals(
+            beforeOff + 1,
+            runtime.turnOffCalls,
+            "Параллельный detach должен вызвать awgTurnOff ровно один раз — AtomicInteger.getAndSet",
+        )
         assertFalse(bridge.isRunning())
     }
 }

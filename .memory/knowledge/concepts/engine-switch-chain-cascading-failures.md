@@ -4,8 +4,9 @@ aliases: [rapid-engine-switching, engine-switch-cascade, startVpn-rapid-fire]
 tags: [vpn, architecture, crash, debugging, engine]
 sources:
   - "daily/2026-05-09.md"
+  - "daily/2026-05-10.md"
 created: 2026-05-09
-updated: 2026-05-09
+updated: 2026-05-10
 ---
 
 # Engine-Switch Chain Cascading Failures
@@ -15,7 +16,7 @@ Rapid engine switching (7 `startVpn` calls in 30 seconds) in Ozero v0.0.8 caused
 ## Key Points
 
 - 7 `startVpn` in 30s observed in ozero.log — each interrupts previous engine lifecycle
-- Bug 1: IP display empty — warmup fetch (8s delay) cancelled on every restart, never completes
+- Bug 1: IP display empty — warmup fetch (3s delay, reduced from 8s in v0.0.9) cancelled on every restart, never completes
 - Bug 2: URnetwork broken — `GoRuntimeGuard` owner stuck on previous engine, blocks new engine's `acquire()`
 - Bug 3: Split tunnel empty on entry — initial state `Content(apps=[])` instead of `Loading` causes empty flash
 - Bug 4: Split tunnel ALL mode shows app list — should hide list when mode=ALL (user preference)
@@ -31,7 +32,7 @@ When a user rapidly switches engines (e.g., tapping through WARP → URnetwork �
 
 The log analysis revealed 7 `startVpn` entries in a 30-second window. Each call:
 1. Cancels the previous engine's coroutine scope (interrupting teardown)
-2. Resets the IP warmup timer (8-second delay restarts from zero)
+2. Resets the IP warmup timer (3-second delay, reduced from 8s in v0.0.9, restarts from zero)
 3. Attempts `GoRuntimeGuard.acquire(newOwner)` — fails if previous owner never released
 
 ### GoRuntimeGuard Deadlock
@@ -42,7 +43,7 @@ This contradicts the eager-loading invariant from [[concepts/dual-go-runtime-eag
 
 ### IP Warmup Cancellation
 
-The IP display uses an 8-second warmup delay after engine connect before fetching the external IP. Each engine restart resets this delay. With 7 restarts in 30 seconds, the warmup timer never reaches 8 seconds — the fetch never fires, and the IP display remains empty. Users see "Connected" with no IP address, interpreting it as "VPN not working."
+The IP display uses a warmup delay after engine connect before fetching the external IP (originally 8 seconds, reduced to 3 seconds with 3 retries at 1.5s intervals in v0.0.9). Each engine restart resets this delay. With 7 restarts in 30 seconds, the warmup timer never completes — the fetch never fires, and the IP display remains empty. Users see "Connected" with no IP address, interpreting it as "VPN not working." The v0.0.9 tuning (8→3s, 4→3 retries, 1000→1500ms retry delay) mitigated but did not eliminate this for rapid switching.
 
 ### Split Tunnel State Bugs
 
