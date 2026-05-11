@@ -4,7 +4,7 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import ru.ozero.enginescore.settings.SettingsModel
@@ -35,15 +35,31 @@ class EngineSettingsRestartObserver(
             )
         }
         .distinctUntilChanged()
-        .drop(1)
 
-    private val manualEngineFastPath: Flow<Snapshot> = snapshots
-        .distinctUntilChanged { old, new -> old.manualEngine == new.manualEngine }
+    private val manualEngineFastPath: Flow<Snapshot> = flow {
+        var prev: Snapshot? = null
+        snapshots.collect { current ->
+            val previous = prev
+            if (previous != null && previous.manualEngine != current.manualEngine) {
+                emit(current)
+            }
+            prev = current
+        }
+    }
 
     @OptIn(FlowPreview::class)
-    private val otherChangesDebounced: Flow<Snapshot> = snapshots
-        .distinctUntilChanged { old, new -> old.copy(manualEngine = null) == new.copy(manualEngine = null) }
-        .debounce(RESTART_DEBOUNCE_MS)
+    private val otherChangesDebounced: Flow<Snapshot> = flow {
+        var prev: Snapshot? = null
+        snapshots.collect { current ->
+            val previous = prev
+            if (previous != null &&
+                previous.copy(manualEngine = null) != current.copy(manualEngine = null)
+            ) {
+                emit(current)
+            }
+            prev = current
+        }
+    }.debounce(RESTART_DEBOUNCE_MS)
 
     val triggers: Flow<Snapshot> = merge(manualEngineFastPath, otherChangesDebounced)
 
