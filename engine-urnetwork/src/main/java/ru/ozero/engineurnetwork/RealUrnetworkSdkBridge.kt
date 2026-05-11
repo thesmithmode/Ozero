@@ -23,7 +23,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import ru.ozero.enginescore.GoRuntimeGuard
 import ru.ozero.enginescore.PersistentLoggers
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
@@ -59,20 +58,6 @@ class RealUrnetworkSdkBridge(
         if (byClientJwt.isBlank()) {
             return UrnetworkSdkBridge.StartResult.Failed("byClientJwt is blank")
         }
-        when (val r = GoRuntimeGuard.acquire(GoRuntimeGuard.Owner.URNETWORK)) {
-            is GoRuntimeGuard.Result.Conflict -> {
-                PersistentLoggers.error(
-                    TAG,
-                    "GoRuntime conflict — already active=${r.activeOwner}; second Go runtime в одном " +
-                        "процессе крашит libgojni в gcWriteBarrier. Откат, требуется process restart.",
-                )
-                return UrnetworkSdkBridge.StartResult.Failed(
-                    "Go runtime conflict — ${r.activeOwner} уже активен в этом процессе",
-                )
-            }
-            GoRuntimeGuard.Result.Granted -> Unit
-        }
-
         return withTimeoutOrNull(SDK_INIT_TIMEOUT_MS) {
             withContext(Dispatchers.Main.immediate) {
                 runStartOnMain(byClientJwt)
@@ -181,7 +166,6 @@ class RealUrnetworkSdkBridge(
         if (completed == null) {
             PersistentLoggers.warn(TAG, "stop timed out after ${STOP_TIMEOUT_MS}ms — refs cleared")
         }
-        GoRuntimeGuard.release(GoRuntimeGuard.Owner.URNETWORK)
         Log.i(TAG, "stop complete")
     }
 
@@ -439,7 +423,6 @@ class RealUrnetworkSdkBridge(
 
     private fun cleanupOnFailure() {
         deviceRef.getAndSet(null)?.also { runCatching { it.close() } }
-        GoRuntimeGuard.release(GoRuntimeGuard.Owner.URNETWORK)
     }
 
     private companion object {

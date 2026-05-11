@@ -7,7 +7,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.amnezia.awg.GoBackend
-import ru.ozero.enginescore.GoRuntimeGuard
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.VpnSocketProtector
 import java.io.File
@@ -35,19 +34,6 @@ class RealWarpSdkBridge internal constructor(
         if (structuralError != null) {
             PersistentLoggers.error(TAG, "INI rejected: $structuralError")
             return@withContext WarpSdkBridge.AttachResult.Failed("INI invalid: $structuralError")
-        }
-        when (val r = GoRuntimeGuard.acquire(GoRuntimeGuard.Owner.AMNEZIA_WG)) {
-            is GoRuntimeGuard.Result.Conflict -> {
-                PersistentLoggers.error(
-                    TAG,
-                    "GoRuntime conflict — already active=${r.activeOwner}; second Go runtime в одном " +
-                        "процессе крашит libam-go в gcWriteBarrier. Откат, требуется process restart.",
-                )
-                return@withContext WarpSdkBridge.AttachResult.Failed(
-                    "Go runtime conflict — ${r.activeOwner} уже активен в этом процессе",
-                )
-            }
-            GoRuntimeGuard.Result.Granted -> Unit
         }
         val staleHandle = tunnelHandle
         if (staleHandle != INVALID_HANDLE) {
@@ -78,7 +64,6 @@ class RealWarpSdkBridge internal constructor(
             val dt = System.currentTimeMillis() - started
             PersistentLoggers.warn(TAG, "awgTurnOn JNI exit handle=$handle dt=${dt}ms thread=$threadName")
             if (handle < 0) {
-                GoRuntimeGuard.release(GoRuntimeGuard.Owner.AMNEZIA_WG)
                 return@withContext WarpSdkBridge.AttachResult.Failed("awgTurnOn handle=$handle")
             }
             tunnelHandle = handle
@@ -87,12 +72,10 @@ class RealWarpSdkBridge internal constructor(
                 PersistentLoggers.error(TAG, "protect failed — rolling back to avoid routing loop")
                 runCatching { awgRuntime.turnOff(handle) }
                 tunnelHandle = INVALID_HANDLE
-                GoRuntimeGuard.release(GoRuntimeGuard.Owner.AMNEZIA_WG)
                 return@withContext WarpSdkBridge.AttachResult.Failed("protect underlying sockets failed")
             }
             WarpSdkBridge.AttachResult.Success
         } catch (ce: CancellationException) {
-            GoRuntimeGuard.release(GoRuntimeGuard.Owner.AMNEZIA_WG)
             throw ce
         } catch (t: Throwable) {
             val dt = System.currentTimeMillis() - started
@@ -101,7 +84,6 @@ class RealWarpSdkBridge internal constructor(
                 TAG,
                 "awgTurnOn threw dt=${dt}ms thread=$threadName: $msg (${t.javaClass.name})",
             )
-            GoRuntimeGuard.release(GoRuntimeGuard.Owner.AMNEZIA_WG)
             WarpSdkBridge.AttachResult.Failed("awgTurnOn failed: $msg")
         }
     }
@@ -144,10 +126,7 @@ class RealWarpSdkBridge internal constructor(
     override suspend fun detachTun() {
         withContext(Dispatchers.IO) {
             val h = tunnelHandle
-            if (h == INVALID_HANDLE) {
-                GoRuntimeGuard.release(GoRuntimeGuard.Owner.AMNEZIA_WG)
-                return@withContext
-            }
+            if (h == INVALID_HANDLE) return@withContext
             val started = System.currentTimeMillis()
             val thread = Thread.currentThread().name
             PersistentLoggers.warn(TAG, "awgTurnOff JNI entry handle=$h thread=$thread")
@@ -160,7 +139,6 @@ class RealWarpSdkBridge internal constructor(
                 PersistentLoggers.error(TAG, "awgTurnOff failed dt=${dt}ms: ${t.message} (${t.javaClass.name})")
             } finally {
                 tunnelHandle = INVALID_HANDLE
-                GoRuntimeGuard.release(GoRuntimeGuard.Owner.AMNEZIA_WG)
             }
         }
     }
