@@ -87,7 +87,7 @@ class SplitTunnelVpnServiceSentinelTest {
     @Test
     fun `excludeSelf false для WARP — self-traffic через TUN для корректного IP-probe`() {
         assertTrue(
-            tunBlock.contains("engineId != EngineId.WARP"),
+            tunBlock.contains("engineId != ru.ozero.enginescore.EngineId.WARP"),
             "excludeSelf обязан быть false для WARP: self-traffic должен идти через TUN " +
                 "иначе IP-probe вернёт реальный IP устройства вместо WARP exit IP",
         )
