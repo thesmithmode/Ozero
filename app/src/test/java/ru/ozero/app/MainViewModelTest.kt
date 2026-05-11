@@ -157,7 +157,7 @@ class MainViewModelTest {
         }
     }
 
-    private class FakeUrnetworkBridge(var peers: Int = 0) : UrnetworkSdkBridge {
+    private class FakeUrnetworkBridge(var peers: Int = 0, var running: Boolean = true) : UrnetworkSdkBridge {
         override suspend fun start(
             walletAddress: String,
             apiUrl: String,
@@ -165,7 +165,7 @@ class MainViewModelTest {
             byClientJwt: String,
         ): UrnetworkSdkBridge.StartResult = UrnetworkSdkBridge.StartResult.Success
         override suspend fun stop() = Unit
-        override fun isRunning(): Boolean = false
+        override fun isRunning(): Boolean = running
         override suspend fun attachTun(tunFd: Int): UrnetworkSdkBridge.AttachResult =
             UrnetworkSdkBridge.AttachResult.Success
         override fun connectTo(location: ConnectLocation) = Unit

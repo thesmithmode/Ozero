@@ -399,7 +399,7 @@ class RealWarpSdkBridgeTest {
 
     @Test
     fun `concurrent detachTun не вызывает double awgTurnOff на одном handle`() = runTest {
-        val runtime = FakeAwgRuntime()
+        val runtime = FakeAwgRuntime(returnHandle = 7, socketV4 = 100)
         val (bridge, _) = bridgeWith(runtime)
         val attached = bridge.attachTun(
             "wg-test",
