@@ -611,8 +611,12 @@ private fun LiveTrafficChart(
                 val step = w / (history.size - 1)
                 val curvePx = with(density) { 2.dp.toPx() }
                 val stroke = Stroke(width = curvePx, cap = StrokeCap.Round, join = StrokeJoin.Round)
-                drawPath(Path().apply { addSmooth(history.map { it.first }, step, h, niceMax) }, colorRx, style = stroke)
-                drawPath(Path().apply { addSmooth(history.map { it.second }, step, h, niceMax) }, colorTx, style = stroke)
+                val pathRx = Path()
+                pathRx.addSmooth(history.map { it.first }, step, h, niceMax)
+                drawPath(pathRx, colorRx, style = stroke)
+                val pathTx = Path()
+                pathTx.addSmooth(history.map { it.second }, step, h, niceMax)
+                drawPath(pathTx, colorTx, style = stroke)
             }
         }
         Row(

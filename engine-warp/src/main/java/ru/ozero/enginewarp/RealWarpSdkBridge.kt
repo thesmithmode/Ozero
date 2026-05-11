@@ -12,7 +12,7 @@ import ru.ozero.enginescore.VpnSocketProtector
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 
-class RealWarpSdkBridge constructor(
+class RealWarpSdkBridge(
     private val awgRuntime: AwgRuntime,
 ) : WarpSdkBridge {
 
