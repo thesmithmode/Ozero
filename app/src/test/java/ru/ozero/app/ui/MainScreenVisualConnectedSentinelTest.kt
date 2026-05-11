@@ -56,18 +56,6 @@ class MainScreenVisualConnectedSentinelTest {
         error("закрывающая } для $funName не найдена")
     }
 
-    private fun countOccurrences(text: String, needle: String): Int {
-        var count = 0
-        var i = 0
-        while (true) {
-            val pos = text.indexOf(needle, i)
-            if (pos < 0) break
-            count++
-            i = pos + needle.length
-        }
-        return count
-    }
-
     private fun locateMainScreen(): File {
         val repoRoot = locateRepoRoot()
         val file = File(repoRoot, "app/src/main/java/ru/ozero/app/ui/MainScreen.kt")
