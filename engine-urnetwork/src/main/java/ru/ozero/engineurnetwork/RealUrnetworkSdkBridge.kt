@@ -179,19 +179,30 @@ class RealUrnetworkSdkBridge(
     override fun isRunning(): Boolean = running.get()
 
     override fun connectTo(location: ConnectLocation) {
+        if (!running.get()) {
+            PersistentLoggers.warn(TAG, "connectTo skipped — bridge not running")
+            return
+        }
         runCatching { connectVcRef.get()?.connect(location) }
             .onFailure { PersistentLoggers.warn(TAG, "connect threw: ${it.message}") }
     }
 
     override fun connectBestAvailable() {
+        if (!running.get()) {
+            PersistentLoggers.warn(TAG, "connectBestAvailable skipped — bridge not running")
+            return
+        }
         runCatching { connectVcRef.get()?.connectBestAvailable() }
             .onFailure { PersistentLoggers.warn(TAG, "connectBestAvailable threw: ${it.message}") }
     }
 
-    override fun selectedLocation(): ConnectLocation? =
-        runCatching { connectVcRef.get()?.selectedLocation }.getOrNull()
+    override fun selectedLocation(): ConnectLocation? {
+        if (!running.get()) return null
+        return runCatching { connectVcRef.get()?.selectedLocation }.getOrNull()
+    }
 
     override fun selectedLocationInfo(): UrnetworkSdkBridge.LocationInfo? {
+        if (!running.get()) return null
         val loc = runCatching { selectedLocation() }.getOrNull() ?: return null
         val country = runCatching { loc.country }.getOrNull()?.takeIf { it.isNotBlank() }
             ?: runCatching { loc.name }.getOrNull()?.takeIf { it.isNotBlank() }
@@ -207,23 +218,35 @@ class RealUrnetworkSdkBridge(
         Log.i(TAG, "preferredCountry set to ${cleaned ?: "<auto>"}")
     }
 
-    override fun openLocationsViewController(): LocationsViewController? =
-        runCatching { deviceRef.get()?.openLocationsViewController() }.getOrElse {
+    override fun openLocationsViewController(): LocationsViewController? {
+        if (!running.get()) return null
+        return runCatching { deviceRef.get()?.openLocationsViewController() }.getOrElse {
             PersistentLoggers.warn(TAG, "openLocationsViewController threw: ${it.message}")
             null
         }
+    }
 
     override fun setProvidePaused(paused: Boolean) {
+        if (!running.get()) {
+            PersistentLoggers.warn(TAG, "setProvidePaused skipped — bridge not running")
+            return
+        }
         runCatching {
             deviceRef.get()?.providePaused = paused
             Log.i(TAG, "setProvidePaused paused=$paused OK")
         }.onFailure { PersistentLoggers.warn(TAG, "setProvidePaused($paused) threw: ${it.message}") }
     }
 
-    override fun isProvidePaused(): Boolean =
-        runCatching { deviceRef.get()?.providePaused ?: true }.getOrDefault(true)
+    override fun isProvidePaused(): Boolean {
+        if (!running.get()) return true
+        return runCatching { deviceRef.get()?.providePaused ?: true }.getOrDefault(true)
+    }
 
     override fun applyPerformanceProfile(windowType: UrnetworkWindowType, fixedIpSize: Boolean) {
+        if (!running.get()) {
+            PersistentLoggers.warn(TAG, "applyPerformanceProfile skipped — bridge not running")
+            return
+        }
         if (windowType == UrnetworkWindowType.AUTO) {
             Log.i(TAG, "applyPerformanceProfile skip — AUTO uses SDK defaults")
             return
@@ -247,17 +270,21 @@ class RealUrnetworkSdkBridge(
         }
     }
 
-    override fun peerCount(): Int =
-        runCatching { connectVcRef.get()?.grid?.windowCurrentSize ?: 0 }.getOrDefault(0)
+    override fun peerCount(): Int {
+        if (!running.get()) return 0
+        return runCatching { connectVcRef.get()?.grid?.windowCurrentSize ?: 0 }.getOrDefault(0)
+    }
 
     override fun unpaidByteCount(): Long = unpaidBytesRef.get()
 
     override fun fetchTransferStats() {
+        if (!running.get()) return
         runCatching { walletVcRef.get()?.fetchTransferStats() }
             .onFailure { PersistentLoggers.warn(TAG, "fetchTransferStats threw: ${it.message}") }
     }
 
     override suspend fun fetchSubscriptionBalance(): UrnetworkSdkBridge.SubscriptionBalanceSnapshot? {
+        if (!running.get()) return subscriptionBalanceRef.get()
         val device = deviceRef.get() ?: return null
         val api = runCatching { device.api }.getOrNull() ?: run {
             PersistentLoggers.warn(TAG, "device.api is null — cannot fetch subscription balance")

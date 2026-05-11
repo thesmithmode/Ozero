@@ -16,6 +16,8 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import ru.ozero.commonvpn.TunnelController
+import ru.ozero.enginescore.EngineId
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.UrnetworkWindowType
@@ -40,18 +42,34 @@ class UrnetworkEngineSettingsViewModelTest {
         Dispatchers.resetMain()
     }
 
+    private fun activeTunnel(): TunnelController {
+        val tc = TunnelController()
+        tc.onProbing()
+        tc.onConnecting(EngineId.URNETWORK)
+        tc.onEngineStarted(EngineId.URNETWORK, 1080)
+        return tc
+    }
+
+    private fun idleTunnel(): TunnelController = TunnelController()
+
     @Test
     fun `uiState стартует как Loading`() = runTest {
-        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(), FakeSettingsRepo(), FakeUrnetworkConfigStore())
+        val vm = UrnetworkEngineSettingsViewModel(
+            FakeUrnetworkBridge(),
+            FakeSettingsRepo(),
+            FakeUrnetworkConfigStore(),
+            idleTunnel(),
+        )
         assertSame(UrnetworkSettingsUiState.Loading, vm.uiState.value)
     }
 
     @Test
-    fun `uiState переходит в NotConnected когда bridge не подключён`() = runTest {
+    fun `uiState переходит в NotConnected когда engine не активен`() = runTest {
         val vm = UrnetworkEngineSettingsViewModel(
             FakeUrnetworkBridge(connected = false),
             FakeSettingsRepo(),
             FakeUrnetworkConfigStore(),
+            idleTunnel(),
         )
         advanceUntilIdle()
         assertIs<UrnetworkSettingsUiState.NotConnected>(vm.uiState.value)
@@ -59,7 +77,12 @@ class UrnetworkEngineSettingsViewModelTest {
 
     @Test
     fun `subscriptionBalance стартует с null когда никто не подписан`() = runTest {
-        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(), FakeSettingsRepo(), FakeUrnetworkConfigStore())
+        val vm = UrnetworkEngineSettingsViewModel(
+            FakeUrnetworkBridge(),
+            FakeSettingsRepo(),
+            FakeUrnetworkConfigStore(),
+            idleTunnel(),
+        )
         assertNull(vm.subscriptionBalance.value)
     }
 
@@ -74,7 +97,12 @@ class UrnetworkEngineSettingsViewModelTest {
             store = "google",
         )
         val bridge = FakeUrnetworkBridge(subscriptionBalance = snap)
-        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), FakeUrnetworkConfigStore())
+        val vm = UrnetworkEngineSettingsViewModel(
+            bridge,
+            FakeSettingsRepo(),
+            FakeUrnetworkConfigStore(),
+            activeTunnel(),
+        )
         val first = vm.subscriptionBalance.first { it != null }
         assertEquals(snap, first)
     }
@@ -87,7 +115,12 @@ class UrnetworkEngineSettingsViewModelTest {
             subscriptionBalance = snap,
             balanceCallCounter = callCount,
         )
-        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), FakeUrnetworkConfigStore())
+        val vm = UrnetworkEngineSettingsViewModel(
+            bridge,
+            FakeSettingsRepo(),
+            FakeUrnetworkConfigStore(),
+            activeTunnel(),
+        )
         val collector = backgroundScope.launch { vm.subscriptionBalance.collect {} }
         vm.subscriptionBalance.first { it != null }
         runCurrent()
@@ -126,7 +159,7 @@ class UrnetworkEngineSettingsViewModelTest {
     fun `selectWindowType сохраняет в configStore и применяет profile через bridge`() = runTest {
         val bridge = FakeUrnetworkBridge()
         val store = FakeUrnetworkConfigStore()
-        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store)
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel())
         vm.selectWindowType(UrnetworkWindowType.SPEED)
         advanceUntilIdle()
         assertEquals(UrnetworkWindowType.SPEED, store.windowType().first())
@@ -138,7 +171,7 @@ class UrnetworkEngineSettingsViewModelTest {
         val bridge = FakeUrnetworkBridge()
         val store = FakeUrnetworkConfigStore()
         store.setFixedIpSize(true)
-        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store)
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel())
         vm.selectWindowType(UrnetworkWindowType.AUTO)
         advanceUntilIdle()
         assertEquals(false, store.fixedIpSize().first())
@@ -148,7 +181,7 @@ class UrnetworkEngineSettingsViewModelTest {
     fun `toggleFixedIpSize сохраняет в configStore и применяет profile`() = runTest {
         val bridge = FakeUrnetworkBridge()
         val store = FakeUrnetworkConfigStore()
-        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store)
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel())
         vm.toggleFixedIpSize(true)
         advanceUntilIdle()
         assertEquals(true, store.fixedIpSize().first())
@@ -156,9 +189,25 @@ class UrnetworkEngineSettingsViewModelTest {
     }
 
     @Test
+    fun `selectWindowType не вызывает bridge applyPerformanceProfile когда engine не активен`() = runTest {
+        val bridge = FakeUrnetworkBridge()
+        val store = FakeUrnetworkConfigStore()
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, idleTunnel())
+        vm.selectWindowType(UrnetworkWindowType.SPEED)
+        advanceUntilIdle()
+        assertEquals(UrnetworkWindowType.SPEED, store.windowType().first())
+        assertNull(bridge.lastAppliedWindowType)
+    }
+
+    @Test
     fun `subscriptionBalance остаётся null когда bridge возвращает null (free user)`() = runTest {
         val bridge = FakeUrnetworkBridge(subscriptionBalance = null)
-        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), FakeUrnetworkConfigStore())
+        val vm = UrnetworkEngineSettingsViewModel(
+            bridge,
+            FakeSettingsRepo(),
+            FakeUrnetworkConfigStore(),
+            activeTunnel(),
+        )
         vm.subscriptionBalance.first()
         runCurrent()
         assertNull(vm.subscriptionBalance.value)
@@ -167,9 +216,26 @@ class UrnetworkEngineSettingsViewModelTest {
     @Test
     fun `windowType StateFlow отражает начальное значение из configStore`() = runTest {
         val store = FakeUrnetworkConfigStore()
-        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(), FakeSettingsRepo(), store)
+        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(), FakeSettingsRepo(), store, idleTunnel())
         advanceUntilIdle()
         assertEquals(UrnetworkWindowType.AUTO, vm.windowType.value)
+    }
+
+    @Test
+    fun `peerCount остаётся 0 пока engine не активен`() = runTest {
+        val bridge = FakeUrnetworkBridge()
+        val vm = UrnetworkEngineSettingsViewModel(
+            bridge,
+            FakeSettingsRepo(),
+            FakeUrnetworkConfigStore(),
+            idleTunnel(),
+        )
+        val collector = backgroundScope.launch { vm.peerCount.collect {} }
+        advanceTimeBy(10_000L)
+        runCurrent()
+        collector.cancel()
+        assertEquals(0, vm.peerCount.value)
+        assertEquals(0, bridge.peerCountCallCount.get())
     }
 }
 
@@ -253,7 +319,11 @@ private class FakeUrnetworkBridge(
     }
     override fun setProvidePaused(paused: Boolean) = Unit
     override fun isProvidePaused(): Boolean = true
-    override fun peerCount(): Int = 0
+    val peerCountCallCount = AtomicInteger(0)
+    override fun peerCount(): Int {
+        peerCountCallCount.incrementAndGet()
+        return 0
+    }
     override fun unpaidByteCount(): Long = 0L
     override fun fetchTransferStats() = Unit
     override suspend fun fetchSubscriptionBalance(): UrnetworkSdkBridge.SubscriptionBalanceSnapshot? {

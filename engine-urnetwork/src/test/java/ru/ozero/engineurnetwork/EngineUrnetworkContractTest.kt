@@ -402,7 +402,9 @@ class EngineUrnetworkContractTest {
         override fun selectedLocationInfo(): UrnetworkSdkBridge.LocationInfo? = locationInfoResult
         override fun openLocationsViewController(): com.bringyour.sdk.LocationsViewController? = null
         var lastProvidePaused: Boolean? = null
-        override fun setProvidePaused(paused: Boolean) { lastProvidePaused = paused }
+        override fun setProvidePaused(paused: Boolean) {
+            lastProvidePaused = paused
+        }
         override fun isProvidePaused(): Boolean = true
         override fun peerCount(): Int = 0
         override fun unpaidByteCount(): Long = 0L

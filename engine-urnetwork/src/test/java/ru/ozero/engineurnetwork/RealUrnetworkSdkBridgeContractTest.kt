@@ -150,6 +150,31 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
+    fun `все JNI-методы гейтятся через running get() — SIGABRT guard на UI poll vs teardown race`() {
+        val gatedMethods = listOf(
+            "connectTo", "connectBestAvailable",
+            "selectedLocation", "selectedLocationInfo",
+            "openLocationsViewController",
+            "setProvidePaused", "isProvidePaused",
+            "applyPerformanceProfile",
+            "peerCount", "fetchTransferStats", "fetchSubscriptionBalance",
+        )
+        for (method in gatedMethods) {
+            val signature = "override (?:suspend )?fun $method"
+            val regex = Regex(signature)
+            val match = regex.find(source) ?: error("Не найден метод $method")
+            val body = source.substring(match.range.last + 1).take(400)
+            assertTrue(
+                body.contains("running.get()") || body.contains("!running.get()"),
+                "Метод $method обязан проверять running.get() ДО любого JNI вызова. " +
+                    "Race window: UI VM polls bridge.$method во время engine teardown → " +
+                    "JNI входит в Go-объект который тушит другой поток → SIGABRT в gcWriteBarrier. " +
+                    "Body=${body.take(300)}",
+            )
+        }
+    }
+
+    @Test
     fun `cleanupOnFailure закрывает device без throw`() {
         val cleanupBlock = source.substringAfter("private fun cleanupOnFailure")
             .substringBefore("private companion object")
