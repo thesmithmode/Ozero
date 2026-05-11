@@ -1,5 +1,7 @@
 package ru.ozero.enginewarp
 
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.VpnSocketProtector
@@ -393,5 +395,22 @@ class RealWarpSdkBridgeTest {
             getConfigCalls++
             return null
         }
+    }
+
+    @Test
+    fun `concurrent detachTun не вызывает double awgTurnOff на одном handle`() = runTest {
+        val runtime = FakeAwgRuntime()
+        val (bridge, _) = bridgeWith(runtime)
+        val attached = bridge.attachTun("wg-test", tunFd = 7, iniConfig = validIni, uapiPath = "/tmp", protector = noopProtector)
+        assertIs<WarpSdkBridge.AttachResult.Success>(attached)
+        val beforeOff = runtime.turnOffCalls
+        coroutineScope {
+            val j1 = launch { bridge.detachTun() }
+            val j2 = launch { bridge.detachTun() }
+            j1.join()
+            j2.join()
+        }
+        assertEquals(beforeOff + 1, runtime.turnOffCalls, "Параллельный detach должен вызвать awgTurnOff ровно один раз — AtomicInteger.getAndSet")
+        assertFalse(bridge.isRunning())
     }
 }

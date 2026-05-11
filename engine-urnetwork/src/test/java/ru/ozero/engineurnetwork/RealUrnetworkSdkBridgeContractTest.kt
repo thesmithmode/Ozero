@@ -175,6 +175,16 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
+    fun `start и stop сериализуются через lifecycleMutex`() {
+        assertTrue(
+            source.contains("private val lifecycleMutex = Mutex()") &&
+                source.contains("lifecycleMutex.withLock"),
+            "start/stop обязан проходить через lifecycleMutex. Concurrent start+stop = " +
+                "race на deviceRef/ioLoopRef → потерянные refs → Go-runtime leak → SIGABRT на следующий init.",
+        )
+    }
+
+    @Test
     fun `cleanupOnFailure закрывает device без throw`() {
         val cleanupBlock = source.substringAfter("private fun cleanupOnFailure")
             .substringBefore("private companion object")
