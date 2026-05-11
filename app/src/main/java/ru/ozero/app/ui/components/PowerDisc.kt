@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import ru.ozero.app.R
 import ru.ozero.app.ui.theme.OzeroPalette
 
-enum class PowerDiscState { Off, Connecting, Connected }
+enum class PowerDiscState { Off, Connecting, Switching, Connected }
 
 @Composable
 fun PowerDisc(
@@ -43,11 +43,13 @@ fun PowerDisc(
     val haloColor = when (state) {
         PowerDiscState.Off -> Color.Transparent
         PowerDiscState.Connecting -> OzeroPalette.StateConnecting.copy(alpha = 0.50f)
+        PowerDiscState.Switching -> OzeroPalette.Amber.copy(alpha = 0.60f)
         PowerDiscState.Connected -> OzeroPalette.StateConnected.copy(alpha = 0.55f)
     }
     val edgeColor = when (state) {
         PowerDiscState.Off -> OzeroPalette.GlassEdge
         PowerDiscState.Connecting -> OzeroPalette.StateConnecting.copy(alpha = 0.40f)
+        PowerDiscState.Switching -> OzeroPalette.Amber.copy(alpha = 0.50f)
         PowerDiscState.Connected -> OzeroPalette.StateConnected.copy(alpha = 0.45f)
     }
     val transition = rememberInfiniteTransition(label = "power-disc")
@@ -62,7 +64,7 @@ fun PowerDisc(
     )
     val haloPulse by transition.animateFloat(
         initialValue = 1.0f,
-        targetValue = if (state == PowerDiscState.Connecting) HALO_PULSE_PEAK else 1.0f,
+        targetValue = if (state == PowerDiscState.Connecting || state == PowerDiscState.Switching) HALO_PULSE_PEAK else 1.0f,
         animationSpec = infiniteRepeatable(
             animation = tween(HALO_PULSE_DURATION_MS, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse,

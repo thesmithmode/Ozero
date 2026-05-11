@@ -41,8 +41,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.drawText
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -87,7 +85,7 @@ fun MainScreen(
     val killswitchActive by viewModel.killswitchActive.collectAsStateWithLifecycle()
     val switching by viewModel.switching.collectAsStateWithLifecycle()
 
-    val powerState = if (switching != null) PowerDiscState.Connecting else state.toPowerDiscState()
+    val powerState = if (switching != null) PowerDiscState.Switching else state.toPowerDiscState()
     val backgroundState = if (switching != null) OzeroBackgroundState.Connecting else state.toBackgroundState()
     val isConnected = state is TunnelState.Connected
 
@@ -294,35 +292,33 @@ private fun ExpertMainContent(
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
             }
-            if (isConnected) {
-                TrafficStatsCard(
-                    stats = stats,
-                    speedHistory = speedHistory,
-                    modifier = Modifier.padding(horizontal = 16.dp),
+            TrafficStatsCard(
+                stats = stats,
+                speedHistory = speedHistory,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+            if (isConnected && stagnant) {
+                Text(
+                    text = stringResource(R.string.main_stagnation_warning),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.testTag(MainScreenTestTags.STAGNATION_BADGE),
                 )
-                if (stagnant) {
+            }
+            if (isConnected && healthStatus == HealthMonitor.Status.DEGRADED) {
+                Column(
+                    modifier = Modifier.testTag(MainScreenTestTags.HEALTH_DEGRADED_BADGE),
+                ) {
                     Text(
-                        text = stringResource(R.string.main_stagnation_warning),
+                        text = stringResource(R.string.main_health_degraded),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.testTag(MainScreenTestTags.STAGNATION_BADGE),
                     )
-                }
-                if (healthStatus == HealthMonitor.Status.DEGRADED) {
-                    Column(
-                        modifier = Modifier.testTag(MainScreenTestTags.HEALTH_DEGRADED_BADGE),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.main_health_degraded),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                        Text(
-                            text = stringResource(R.string.main_health_degraded_hint),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                    Text(
+                        text = stringResource(R.string.main_health_degraded_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
 
@@ -525,9 +521,10 @@ private fun TrafficStatsCard(
             }
             LiveTrafficChart(
                 history = displayHistory,
+                selectedTf = selectedTf,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(72.dp),
+                    .height(96.dp),
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -560,59 +557,84 @@ private fun TrafficStatsCard(
 @Composable
 private fun LiveTrafficChart(
     history: List<Pair<Float, Float>>,
+    selectedTf: TimeframeOption,
     modifier: Modifier = Modifier,
 ) {
     val colorRx = OzeroPalette.Aqua
     val colorTx = OzeroPalette.Amber
     val gridColor = OzeroPalette.Text3.copy(alpha = 0.25f)
-    val labelColor = OzeroPalette.Text3
-    val labelStyle = MaterialTheme.typography.labelSmall.copy(color = labelColor)
-    val textMeasurer = rememberTextMeasurer()
+    val borderColor = OzeroPalette.Text3.copy(alpha = 0.35f)
     val density = LocalDensity.current
-    val maxVal = remember(history) {
-        if (history.isEmpty()) 0f else history.maxOf { maxOf(it.first, it.second) }
-    }
-    val maxLabel = if (maxVal > 0f) BytesFormatter.humanReadablePerSec(maxVal.toDouble()) else ""
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val gridStrokePx = with(density) { 1.dp.toPx() }
-        val gridLines = 4
-        for (i in 0..gridLines) {
-            val y = h * i / gridLines
-            drawLine(
-                color = gridColor,
-                start = androidx.compose.ui.geometry.Offset(0f, y),
-                end = androidx.compose.ui.geometry.Offset(w, y),
-                strokeWidth = gridStrokePx,
-            )
-        }
-        if (maxLabel.isNotEmpty()) {
-            val measured = textMeasurer.measure(maxLabel, style = labelStyle)
-            val labelPad = with(density) { 4.dp.toPx() }
-            val tx = w - measured.size.width - labelPad
-            drawText(
-                textLayoutResult = measured,
-                topLeft = androidx.compose.ui.geometry.Offset(tx.coerceAtLeast(0f), labelPad),
-            )
-        }
-        if (history.size < 2 || maxVal <= 0f) return@Canvas
-        val safeMax = maxVal.coerceAtLeast(1f)
-        val step = w / (history.size - 1)
-        val strokePx = with(density) { 2.dp.toPx() }
-        val stroke = Stroke(width = strokePx, cap = StrokeCap.Round, join = StrokeJoin.Round)
 
-        drawPath(
-            Path().apply { addSmooth(history.map { it.first }, step, h, safeMax) },
-            color = colorRx,
-            style = stroke,
-        )
-        drawPath(
-            Path().apply { addSmooth(history.map { it.second }, step, h, safeMax) },
-            color = colorTx,
-            style = stroke,
-        )
+    val niceMax = remember(history) {
+        val raw = if (history.isEmpty()) 0f else history.maxOf { maxOf(it.first, it.second) }
+        chartNiceMax(raw)
     }
+    val maxLabel = BytesFormatter.humanReadablePerSec(niceMax.toDouble())
+    val midLabel = BytesFormatter.humanReadablePerSec((niceMax / 2).toDouble())
+    val axisStyle = MaterialTheme.typography.labelSmall.copy(
+        color = OzeroPalette.Text3,
+        fontSize = androidx.compose.ui.unit.TextUnit(8f, androidx.compose.ui.unit.TextUnitType.Sp),
+    )
+
+    Column(modifier = modifier) {
+        Row(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.width(44.dp).fillMaxHeight(),
+                verticalArrangement = Arrangement.SpaceBetween,
+                horizontalAlignment = Alignment.End,
+            ) {
+                Text(maxLabel, style = axisStyle)
+                Text(midLabel, style = axisStyle)
+                Text("0", style = axisStyle)
+            }
+            Spacer(modifier = Modifier.width(4.dp))
+            Canvas(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                val w = size.width
+                val h = size.height
+                val linePx = with(density) { 1.dp.toPx() }
+                val gridDivs = 4
+                for (i in 1 until gridDivs) {
+                    val y = h * i / gridDivs
+                    drawLine(gridColor, androidx.compose.ui.geometry.Offset(0f, y), androidx.compose.ui.geometry.Offset(w, y), linePx)
+                }
+                val timeDivs = 4
+                for (i in 1 until timeDivs) {
+                    val x = w * i / timeDivs
+                    drawLine(gridColor, androidx.compose.ui.geometry.Offset(x, 0f), androidx.compose.ui.geometry.Offset(x, h), linePx)
+                }
+                drawRect(borderColor, style = Stroke(width = linePx))
+                if (history.size < 2 || niceMax <= 0f) return@Canvas
+                val step = w / (history.size - 1)
+                val curvePx = with(density) { 2.dp.toPx() }
+                val stroke = Stroke(width = curvePx, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                drawPath(Path().apply { addSmooth(history.map { it.first }, step, h, niceMax) }, colorRx, stroke)
+                drawPath(Path().apply { addSmooth(history.map { it.second }, step, h, niceMax) }, colorTx, stroke)
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 48.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(chartTimeAgo(selectedTf.points), style = axisStyle)
+            Text(chartTimeAgo(selectedTf.points * 3 / 4), style = axisStyle)
+            Text(chartTimeAgo(selectedTf.points / 2), style = axisStyle)
+            Text(chartTimeAgo(selectedTf.points / 4), style = axisStyle)
+            Text("now", style = axisStyle)
+        }
+    }
+}
+
+private fun chartNiceMax(bps: Float): Float {
+    if (bps <= 0f) return 10_240f
+    val levels = floatArrayOf(1_024f, 10_240f, 102_400f, 1_048_576f, 10_485_760f, 104_857_600f)
+    return levels.firstOrNull { it > bps * 1.1f } ?: (bps * 2f)
+}
+
+private fun chartTimeAgo(seconds: Int): String = when {
+    seconds >= 3_600 -> "-${seconds / 3_600}h"
+    seconds >= 60 -> "-${seconds / 60}m"
+    else -> "-${seconds}s"
 }
 
 @Composable
