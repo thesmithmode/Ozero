@@ -204,7 +204,10 @@ class MainViewModel @Inject constructor(
                     _speedHistory.value = (prev + Pair(s.bpsIn.toFloat(), s.bpsOut.toFloat()))
                         .takeLast(MAX_SPEED_HISTORY_POINTS)
                 } else {
-                    if (_speedHistory.value.isNotEmpty()) _speedHistory.value = emptyList()
+                    val switchingNow = tunnelController.switching.value != null
+                    if (!switchingNow && _speedHistory.value.isNotEmpty()) {
+                        _speedHistory.value = emptyList()
+                    }
                 }
             }
         }

@@ -1,0 +1,84 @@
+package ru.ozero.app.ui
+
+import org.junit.jupiter.api.Test
+import java.io.File
+import kotlin.test.assertTrue
+
+class MainScreenVisualConnectedSentinelTest {
+
+    @Test
+    fun `MainScreen использует visualConnected вместо isConnected для контентных блоков`() {
+        val source = locateMainScreen().readText()
+
+        assertTrue(
+            source.contains("val visualConnected = isConnected || switching != null"),
+            "MainScreen.kt обязан содержать `val visualConnected = isConnected || switching != null` — " +
+                "блоки контента (IpInfoCard, UrnetworkPeerBadge, stagnant, degraded) обязаны держаться видимыми " +
+                "во время switching, иначе layout прыгает при смене движка",
+        )
+
+        val expertBlock = extractFunBody(source, "ExpertMainContent")
+        val expertRawCount = countOccurrences(expertBlock, "if (isConnected")
+        assertTrue(
+            expertRawCount == 0,
+            "ExpertMainContent не должен использовать `if (isConnected` для условного контента — " +
+                "должен быть `if (visualConnected`. Найдено $expertRawCount сырых isConnected branch",
+        )
+
+        val simpleBlock = extractFunBody(source, "SimpleMainContent")
+        val simpleRawCount = countOccurrences(simpleBlock, "if (isConnected")
+        assertTrue(
+            simpleRawCount == 0,
+            "SimpleMainContent не должен использовать `if (isConnected` для условного контента — " +
+                "должен быть `if (visualConnected`. Найдено $simpleRawCount сырых isConnected branch",
+        )
+    }
+
+    private fun extractFunBody(source: String, funName: String): String {
+        val pattern = Regex("""fun\s+$funName\s*\(""")
+        val match = pattern.find(source) ?: error("$funName не найдена в MainScreen.kt")
+        val start = match.range.first
+        var depth = 0
+        var i = source.indexOf('{', start)
+        val open = i
+        while (i < source.length) {
+            when (source[i]) {
+                '{' -> depth++
+                '}' -> {
+                    depth--
+                    if (depth == 0) return source.substring(open, i + 1)
+                }
+            }
+            i++
+        }
+        error("закрывающая } для $funName не найдена")
+    }
+
+    private fun countOccurrences(text: String, needle: String): Int {
+        var count = 0
+        var i = 0
+        while (true) {
+            val pos = text.indexOf(needle, i)
+            if (pos < 0) break
+            count++
+            i = pos + needle.length
+        }
+        return count
+    }
+
+    private fun locateMainScreen(): File {
+        val repoRoot = locateRepoRoot()
+        val file = File(repoRoot, "app/src/main/java/ru/ozero/app/ui/MainScreen.kt")
+        check(file.isFile) { "MainScreen.kt не найден по пути ${file.absolutePath}" }
+        return file
+    }
+
+    private fun locateRepoRoot(): File {
+        var dir = File(System.getProperty("user.dir") ?: ".").absoluteFile
+        repeat(5) {
+            if (File(dir, "settings.gradle.kts").isFile) return dir
+            dir = dir.parentFile ?: return@repeat
+        }
+        error("repo root (settings.gradle.kts) не найден")
+    }
+}

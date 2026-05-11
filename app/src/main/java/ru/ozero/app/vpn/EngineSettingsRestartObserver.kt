@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginescore.EngineId
@@ -23,8 +24,7 @@ class EngineSettingsRestartObserver(
         val engineAutoPriority: List<EngineId>?,
     )
 
-    @OptIn(FlowPreview::class)
-    val triggers: Flow<Snapshot> = settingsFlow
+    private val snapshots: Flow<Snapshot> = settingsFlow
         .map {
             Snapshot(
                 manualEngine = it.manualEngine,
@@ -36,7 +36,16 @@ class EngineSettingsRestartObserver(
         }
         .distinctUntilChanged()
         .drop(1)
+
+    private val manualEngineFastPath: Flow<Snapshot> = snapshots
+        .distinctUntilChanged { old, new -> old.manualEngine == new.manualEngine }
+
+    @OptIn(FlowPreview::class)
+    private val otherChangesDebounced: Flow<Snapshot> = snapshots
+        .distinctUntilChanged { old, new -> old.copy(manualEngine = null) == new.copy(manualEngine = null) }
         .debounce(RESTART_DEBOUNCE_MS)
+
+    val triggers: Flow<Snapshot> = merge(manualEngineFastPath, otherChangesDebounced)
 
     suspend fun handle(snapshot: Snapshot) {
         if (vpnStateProvider() is TunnelState.Connected) {

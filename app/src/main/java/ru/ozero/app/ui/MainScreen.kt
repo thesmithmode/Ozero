@@ -176,7 +176,8 @@ private fun SimpleMainContent(
             )
         }
 
-        if (isConnected && manualEngine == EngineId.URNETWORK) {
+        val visualConnected = isConnected || switching != null
+        if (visualConnected && manualEngine == EngineId.URNETWORK) {
             UrnetworkPeerBadge(
                 count = urnetworkPeerCount,
                 searchSeconds = urnetworkPeerSearchSeconds,
@@ -274,6 +275,7 @@ private fun ExpertMainContent(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            val visualConnected = isConnected || switching != null
             if (killswitchActive) {
                 Text(
                     text = stringResource(R.string.killswitch_active_badge),
@@ -282,13 +284,13 @@ private fun ExpertMainContent(
                     modifier = Modifier.testTag(MainScreenTestTags.KILLSWITCH_BADGE),
                 )
             }
-            if (isConnected && manualEngine == EngineId.URNETWORK) {
+            if (visualConnected && manualEngine == EngineId.URNETWORK) {
                 UrnetworkPeerBadge(
                     count = urnetworkPeerCount,
                     searchSeconds = urnetworkPeerSearchSeconds,
                 )
             }
-            if (isConnected) {
+            if (visualConnected) {
                 IpInfoCard(
                     state = ipInfo,
                     onRefresh = onRefreshIpInfo,
@@ -300,7 +302,7 @@ private fun ExpertMainContent(
                 speedHistory = speedHistory,
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
-            if (isConnected && stagnant) {
+            if (visualConnected && stagnant) {
                 Text(
                     text = stringResource(R.string.main_stagnation_warning),
                     style = MaterialTheme.typography.bodySmall,
@@ -308,7 +310,7 @@ private fun ExpertMainContent(
                     modifier = Modifier.testTag(MainScreenTestTags.STAGNATION_BADGE),
                 )
             }
-            if (isConnected && healthStatus == HealthMonitor.Status.DEGRADED) {
+            if (visualConnected && healthStatus == HealthMonitor.Status.DEGRADED) {
                 Column(
                     modifier = Modifier.testTag(MainScreenTestTags.HEALTH_DEGRADED_BADGE),
                 ) {

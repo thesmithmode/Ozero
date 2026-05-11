@@ -59,14 +59,13 @@ class OzeroApp : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
-        runCatching { System.loadLibrary("am-go") }
-            .onFailure { BootFileLogger.error(TAG, "am-go eager load failed", it) }
-        // Two Go runtimes in one process → concurrent GC signal-handler conflict → SIGABRT.
-        if (!isEngineWarpProcess()) {
-            runCatching { System.loadLibrary("gojni") }
-                .onFailure { BootFileLogger.error(TAG, "gojni eager load failed", it) }
+        if (isEngineWarpProcess()) {
+            runCatching { System.loadLibrary("am-go") }
+                .onFailure { BootFileLogger.error(TAG, "am-go eager load failed (engine_warp)", it) }
+            return
         }
-        if (isEngineWarpProcess()) return
+        runCatching { System.loadLibrary("gojni") }
+            .onFailure { BootFileLogger.error(TAG, "gojni eager load failed (main)", it) }
         runCatching {
             AppLogger.attach(logBuffer)
         }.onFailure { BootFileLogger.error(TAG, "AppLogger.attach failed", it) }

@@ -238,6 +238,48 @@ class MainViewModelTest {
     }
 
     @Test
+    fun speedHistoryRetainedDuringSwitching() = runTest {
+        val sample = TunnelStats(txPackets = 1, txBytes = 100, rxPackets = 2, rxBytes = 200, timestampMs = 1)
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
+        tunnelController.updateStats(sample)
+        advanceUntilIdle()
+        val historyDuringConnected = viewModel.speedHistory.value
+        assert(historyDuringConnected.isNotEmpty()) { "speedHistory должна заполниться на updateStats" }
+
+        tunnelController.onSwitchingStarted(EngineId.BYEDPI, EngineId.WARP)
+        tunnelController.onDisconnecting()
+        tunnelController.reset()
+        advanceUntilIdle()
+
+        assertEquals(
+            historyDuringConnected,
+            viewModel.speedHistory.value,
+            "speedHistory НЕ должна сбрасываться когда switching активен — это причина прыжков графика",
+        )
+    }
+
+    @Test
+    fun speedHistoryClearedWhenNotSwitching() = runTest {
+        val sample = TunnelStats(txPackets = 1, txBytes = 100, rxPackets = 2, rxBytes = 200, timestampMs = 1)
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
+        tunnelController.updateStats(sample)
+        advanceUntilIdle()
+        assert(viewModel.speedHistory.value.isNotEmpty())
+
+        tunnelController.onDisconnecting()
+        tunnelController.reset()
+        advanceUntilIdle()
+
+        assert(viewModel.speedHistory.value.isEmpty()) {
+            "без активного switching speedHistory обязана очиститься на reset (stats=null)"
+        }
+    }
+
+    @Test
     fun statsMirrorsTunnelController() = runTest {
         val snapshot = TunnelStats(
             txPackets = 5,
