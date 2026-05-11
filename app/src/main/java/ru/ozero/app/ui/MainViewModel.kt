@@ -204,12 +204,9 @@ class MainViewModel @Inject constructor(
                     if (key != lastSessionKey) {
                         lastSessionKey = key
                         _ipInfo.value = IpInfoState.Loading
-                        PersistentLoggers.info(
-                            IP_TAG,
-                            "warmup begin engine=${s.engineId} port=${s.socksPort} delay=${IP_INFO_WARMUP_MS}ms",
-                        )
+                        Log.i(IP_TAG, "warmup begin engine=${s.engineId} port=${s.socksPort} delay=${IP_INFO_WARMUP_MS}ms")
                         delay(IP_INFO_WARMUP_MS)
-                        PersistentLoggers.info(IP_TAG, "warmup done — resolve IP")
+                        Log.i(IP_TAG, "warmup done — resolve IP")
                         val result = resolveIpInfoWithRetry(s.engineId, s.socksPort)
                         when (result) {
                             is IpInfoState.Loaded ->

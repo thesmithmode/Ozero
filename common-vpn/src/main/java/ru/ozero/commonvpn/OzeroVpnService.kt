@@ -574,7 +574,7 @@ class OzeroVpnService : android.net.VpnService() {
                     }
                     if (read == null) {
                         if (tickCount % STATS_LOG_EVERY == 0) {
-                            PersistentLoggers.warn(TAG, "TunnelStats: ни iface, ни uid stats недоступны")
+                            Log.w(TAG, "TunnelStats: ни iface, ни uid stats недоступны")
                         }
                         tickCount++
                         continue

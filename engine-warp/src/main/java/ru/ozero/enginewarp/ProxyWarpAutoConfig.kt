@@ -55,7 +55,7 @@ class ProxyWarpAutoConfig(
             }
             else -> {
                 lastSuccessMs = System.currentTimeMillis()
-                PersistentLoggers.info(TAG, "register: success on mirror")
+                Log.i(TAG, "register: success on mirror")
                 winner
             }
         }

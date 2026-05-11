@@ -168,7 +168,7 @@ class EngineUrnetwork(
         return when (val r = authService.acquireGuestJwt()) {
             is GuestJwtResult.Success -> {
                 configStore.setByJwt(r.byJwt)
-                PersistentLoggers.info(TAG, "guest jwt acquired and persisted")
+                Log.i(TAG, "guest jwt acquired and persisted")
                 r.byJwt
             }
             is GuestJwtResult.Error -> {
@@ -185,7 +185,7 @@ class EngineUrnetwork(
         return when (val r = authService.acquireClientJwt(byJwt)) {
             is ClientJwtResult.Success -> {
                 configStore.setByClientJwt(r.byClientJwt)
-                PersistentLoggers.info(TAG, "client jwt acquired and persisted")
+                Log.i(TAG, "client jwt acquired and persisted")
                 r.byClientJwt
             }
             is ClientJwtResult.Error -> {
