@@ -74,11 +74,12 @@ class ChainOrchestrator(
         }
         snapshot.forEach { plugin ->
             try {
-                val completed = withTimeoutOrNull(PLUGIN_STOP_TIMEOUT_MS) { plugin.stop() }
+                val timeoutMs = plugin.stopTimeoutMs()
+                val completed = withTimeoutOrNull(timeoutMs) { plugin.stop() }
                 if (completed == null) {
                     PersistentLoggers.warn(
                         TAG,
-                        "stop ${plugin.id} timed out after ${PLUGIN_STOP_TIMEOUT_MS}ms — mutex освобождён",
+                        "stop ${plugin.id} timed out after ${timeoutMs}ms — mutex освобождён",
                     )
                 }
             } catch (ce: CancellationException) {
@@ -92,6 +93,5 @@ class ChainOrchestrator(
     private companion object {
         const val TAG = "ChainOrchestrator"
         const val LOOPBACK = "127.0.0.1"
-        const val PLUGIN_STOP_TIMEOUT_MS = 2_000L
     }
 }

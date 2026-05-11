@@ -113,6 +113,11 @@
                 android:value="true" />
         </service>
 
+        <service
+            android:name=".warp.WarpEngineService"
+            android:process=":engine_warp"
+            android:exported="false" />
+
     </application>
 
 </manifest>

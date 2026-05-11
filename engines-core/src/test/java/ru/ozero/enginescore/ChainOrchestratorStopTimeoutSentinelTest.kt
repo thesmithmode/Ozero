@@ -15,8 +15,8 @@ class ChainOrchestratorStopTimeoutSentinelTest {
         val block = source.substringAfter("private suspend fun stopInternal()")
             .substringBefore("private companion object")
         assertTrue(
-            block.contains("withTimeoutOrNull") && block.contains("PLUGIN_STOP_TIMEOUT_MS"),
-            "stopInternal обязан гейтить plugin.stop() через withTimeoutOrNull(PLUGIN_STOP_TIMEOUT_MS). " +
+            block.contains("withTimeoutOrNull") && block.contains("stopTimeoutMs()"),
+            "stopInternal обязан гейтить plugin.stop() через withTimeoutOrNull(plugin.stopTimeoutMs()). " +
                 "Без timeout висящий plugin.stop() блокирует mutex и весь следующий start. Block:\n$block",
         )
     }

@@ -52,6 +52,8 @@ class EngineUrnetwork(
 
     private val _stats = MutableStateFlow(EngineStats())
 
+    override fun stopTimeoutMs(): Long = URN_STOP_TIMEOUT_MS
+
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
         require(config is EngineConfig.Urnetwork) { "EngineUrnetwork требует EngineConfig.Urnetwork" }
         require(upstream is Upstream.None) {
@@ -209,5 +211,7 @@ class EngineUrnetwork(
         const val TUN_MTU = 1440
         const val TUN_PREFIX = 32
         const val STATS_POLL_INTERVAL_MS = 2_000L
+        // libgojni goroutines need time to drain after device.close() before another Go runtime starts
+        const val URN_STOP_TIMEOUT_MS = 5_000L
     }
 }
