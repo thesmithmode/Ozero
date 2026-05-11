@@ -14,8 +14,14 @@ class OzeroAppProcessIsolationTest {
         val amGoCount = countOccurrences(onCreate, "System.loadLibrary(\"am-go\")")
         val gojniCount = countOccurrences(onCreate, "System.loadLibrary(\"gojni\")")
 
-        assertTrue(amGoCount == 1, "am-go loadLibrary должен встречаться ровно один раз в onCreate, найдено $amGoCount")
-        assertTrue(gojniCount == 1, "gojni loadLibrary должен встречаться ровно один раз в onCreate, найдено $gojniCount")
+        assertTrue(
+            amGoCount == 1,
+            "am-go loadLibrary должен встречаться ровно один раз в onCreate, найдено $amGoCount",
+        )
+        assertTrue(
+            gojniCount == 1,
+            "gojni loadLibrary должен встречаться ровно один раз в onCreate, найдено $gojniCount",
+        )
 
         val amGoPos = onCreate.indexOf("System.loadLibrary(\"am-go\")")
         val gojniPos = onCreate.indexOf("System.loadLibrary(\"gojni\")")
