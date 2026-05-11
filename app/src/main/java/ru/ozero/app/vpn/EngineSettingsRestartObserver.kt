@@ -1,12 +1,11 @@
-﻿package ru.ozero.app.vpn
+package ru.ozero.app.vpn
 
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.merge
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginescore.EngineId
@@ -24,7 +23,8 @@ class EngineSettingsRestartObserver(
         val engineAutoPriority: List<EngineId>?,
     )
 
-    private val snapshots: Flow<Snapshot> = settingsFlow
+    @OptIn(FlowPreview::class)
+    val triggers: Flow<Snapshot> = settingsFlow
         .map {
             Snapshot(
                 manualEngine = it.manualEngine,
@@ -35,33 +35,8 @@ class EngineSettingsRestartObserver(
             )
         }
         .distinctUntilChanged()
-
-    private val manualEngineFastPath: Flow<Snapshot> = flow {
-        var prev: Snapshot? = null
-        snapshots.collect { current ->
-            val previous = prev
-            if (previous != null && previous.manualEngine != current.manualEngine) {
-                emit(current)
-            }
-            prev = current
-        }
-    }
-
-    @OptIn(FlowPreview::class)
-    private val otherChangesDebounced: Flow<Snapshot> = flow {
-        var prev: Snapshot? = null
-        snapshots.collect { current ->
-            val previous = prev
-            if (previous != null &&
-                previous.copy(manualEngine = null) != current.copy(manualEngine = null)
-            ) {
-                emit(current)
-            }
-            prev = current
-        }
-    }.debounce(RESTART_DEBOUNCE_MS)
-
-    val triggers: Flow<Snapshot> = merge(manualEngineFastPath, otherChangesDebounced)
+        .drop(1)
+        .debounce(RESTART_DEBOUNCE_MS)
 
     suspend fun handle(snapshot: Snapshot) {
         if (vpnStateProvider() is TunnelState.Connected) {

@@ -310,6 +310,10 @@ class MainViewModel @Inject constructor(
     }
 
     fun onManualEngineSelect(engine: EngineId?) {
+        val current = tunnelController.state.value
+        if (current is TunnelState.Connected && current.engineId != engine) {
+            tunnelController.onSwitchingStarted(from = current.engineId, to = engine)
+        }
         viewModelScope.launch { settingsRepository.setManualEngine(engine) }
     }
 

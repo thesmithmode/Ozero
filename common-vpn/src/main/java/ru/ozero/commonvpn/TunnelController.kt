@@ -1,9 +1,7 @@
 package ru.ozero.commonvpn
 
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,7 +12,7 @@ import ru.ozero.enginescore.PersistentLoggers
 
 class TunnelController(
     private val stagnationMonitor: StatsStagnationMonitor = StatsStagnationMonitor(),
-    private val watchdogScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+    private val watchdogScope: CoroutineScope? = null,
     private val switchingTimeoutMs: Long = SWITCHING_TIMEOUT_MS,
 ) {
 
@@ -75,7 +73,7 @@ class TunnelController(
         _switching.value = transition
         PersistentLoggers.info(TAG, "switching started: $from → $to")
         switchingWatchdogJob?.cancel()
-        switchingWatchdogJob = watchdogScope.launch {
+        switchingWatchdogJob = watchdogScope?.launch {
             delay(switchingTimeoutMs)
             if (_switching.compareAndSet(transition, null)) {
                 PersistentLoggers.warn(

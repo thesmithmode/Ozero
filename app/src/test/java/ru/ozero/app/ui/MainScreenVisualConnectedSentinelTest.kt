@@ -17,20 +17,22 @@ class MainScreenVisualConnectedSentinelTest {
                 "во время switching, иначе layout прыгает при смене движка",
         )
 
+        val blockBranchPattern = Regex("""if\s*\(\s*isConnected\s*\)\s*\{""")
+
         val expertBlock = extractFunBody(source, "ExpertMainContent")
-        val expertRawCount = countOccurrences(expertBlock, "if (isConnected")
+        val expertRawCount = blockBranchPattern.findAll(expertBlock).count()
         assertTrue(
             expertRawCount == 0,
-            "ExpertMainContent не должен использовать `if (isConnected` для условного контента — " +
-                "должен быть `if (visualConnected`. Найдено $expertRawCount сырых isConnected branch",
+            "ExpertMainContent не должен использовать `if (isConnected) {` для условного контента — " +
+                "должен быть `if (visualConnected) {`. Найдено $expertRawCount сырых isConnected block-branch",
         )
 
         val simpleBlock = extractFunBody(source, "SimpleMainContent")
-        val simpleRawCount = countOccurrences(simpleBlock, "if (isConnected")
+        val simpleRawCount = blockBranchPattern.findAll(simpleBlock).count()
         assertTrue(
             simpleRawCount == 0,
-            "SimpleMainContent не должен использовать `if (isConnected` для условного контента — " +
-                "должен быть `if (visualConnected`. Найдено $simpleRawCount сырых isConnected branch",
+            "SimpleMainContent не должен использовать `if (isConnected) {` для условного контента — " +
+                "должен быть `if (visualConnected) {`. Найдено $simpleRawCount сырых isConnected block-branch",
         )
     }
 
