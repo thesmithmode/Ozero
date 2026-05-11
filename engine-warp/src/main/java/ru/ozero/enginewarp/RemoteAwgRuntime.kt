@@ -7,14 +7,10 @@ import android.content.ServiceConnection
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
 import android.util.Log
+import ru.ozero.enginescore.PersistentLoggers
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
-/**
- * AwgRuntime, делегирующий JNI-вызовы libam-go в отдельный процесс (:engine_warp).
- * Изолирует Go-рантайм WARP от Go-рантайма URnetwork (libgojni), устраняя
- * конкуренцию signal-handlers при concurrent GC, которая приводила к SIGABRT.
- */
 class RemoteAwgRuntime(
     private val context: Context,
     private val serviceComponent: ComponentName,
@@ -36,7 +32,7 @@ class RemoteAwgRuntime(
                 }
                 override fun onServiceDisconnected(name: ComponentName) {
                     engine = null
-                    Log.w(TAG, "WarpEngineService disconnected process=$name")
+                    PersistentLoggers.warn(TAG, "WarpEngineService disconnected process=$name")
                 }
             }
             val intent = Intent().setComponent(serviceComponent)
