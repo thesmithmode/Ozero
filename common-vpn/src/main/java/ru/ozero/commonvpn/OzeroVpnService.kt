@@ -372,7 +372,7 @@ class OzeroVpnService : android.net.VpnService() {
         ru.ozero.commonvpn.split.TunBuilderConfigurator(packageName).apply(
             builder,
             splitConfig,
-            excludeSelf = true,
+            excludeSelf = (engineId != EngineId.WARP),
         )
         val before = TunInterfaceStats.snapshotTunInterfaces()
         val pfd = try {

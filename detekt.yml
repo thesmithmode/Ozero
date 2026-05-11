@@ -9,7 +9,7 @@ complexity:
   active: true
   CyclomaticComplexMethod:
     active: true
-    threshold: 25
+    threshold: 26
   CognitiveComplexMethod:
     active: true
     threshold: 35

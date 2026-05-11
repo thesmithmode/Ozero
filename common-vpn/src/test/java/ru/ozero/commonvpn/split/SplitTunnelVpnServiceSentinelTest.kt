@@ -16,8 +16,25 @@ class SplitTunnelVpnServiceSentinelTest {
     }
 
     private val readSplitConfigBlock by lazy {
+        require("private suspend fun readSplitConfig(" in source) {
+            "anchor 'private suspend fun readSplitConfig(' исчез — обнови sentinel"
+        }
+        require("private fun startHealthKillswitchWatcher(" in source) {
+            "anchor 'private fun startHealthKillswitchWatcher(' исчез — обнови sentinel"
+        }
         source.substringAfter("private suspend fun readSplitConfig(")
             .substringBefore("private fun startHealthKillswitchWatcher(")
+    }
+
+    private val tunBlock by lazy {
+        require("private suspend fun establishTunForEngine(" in source) {
+            "anchor 'private suspend fun establishTunForEngine(' исчез — обнови sentinel"
+        }
+        require("private fun captureTunIfaceName(" in source) {
+            "anchor 'private fun captureTunIfaceName(' исчез — обнови sentinel"
+        }
+        source.substringAfter("private suspend fun establishTunForEngine(")
+            .substringBefore("private fun captureTunIfaceName(")
     }
 
     @Test
@@ -57,16 +74,19 @@ class SplitTunnelVpnServiceSentinelTest {
     }
 
     @Test
-    fun `excludeSelf всегда true — не зависит от engineId`() {
-        val tunBlock = source.substringAfter("private suspend fun establishTunForEngine(")
-            .substringBefore("private fun captureTunIfaceName(")
+    fun `excludeSelf false для WARP — self-traffic через TUN для корректного IP-probe`() {
         assertTrue(
-            tunBlock.contains("excludeSelf = true"),
-            "excludeSelf обязан быть true для всех движков без исключений",
+            tunBlock.contains("engineId != EngineId.WARP"),
+            "excludeSelf обязан быть false для WARP: self-traffic должен идти через TUN " +
+                "иначе IP-probe вернёт реальный IP устройства вместо WARP exit IP",
         )
+    }
+
+    @Test
+    fun `excludeSelf не константа true — зависит от engineId`() {
         assertTrue(
-            !tunBlock.contains("excludeSelf = (engineId"),
-            "excludeSelf не должен зависеть от engineId — ранее WARP получал false (баг)",
+            !tunBlock.contains("excludeSelf = true"),
+            "excludeSelf не должен быть константой true — WARP требует false (IpProbeRoute.Default design)",
         )
     }
 }
