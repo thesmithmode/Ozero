@@ -142,7 +142,7 @@ class RealUrnetworkSdkBridge(
         return UrnetworkSdkBridge.StartResult.Success
     }
 
-    override suspend fun stop() = lifecycleMutex.withLock {
+    override suspend fun stop(): Unit = lifecycleMutex.withLock {
         running.set(false)
         runCatching { bridgeScope.coroutineContext.cancelChildren() }
         val completed = withTimeoutOrNull(STOP_TIMEOUT_MS) {
