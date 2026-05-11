@@ -74,11 +74,20 @@ class DataStoreUrnetworkConfigStore(
         dataStore.edit { prefs -> prefs[KEY_FIXED_IP_SIZE] = value }
     }
 
+    override fun provideEnabled(): Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[KEY_PROVIDE_ENABLED] != false
+    }
+
+    override suspend fun setProvideEnabled(value: Boolean) {
+        dataStore.edit { prefs -> prefs[KEY_PROVIDE_ENABLED] = value }
+    }
+
     private companion object {
         val KEY_WALLET_OVERRIDE = stringPreferencesKey("urnetwork_wallet_override")
         val KEY_BY_JWT = stringPreferencesKey("urnetwork_by_jwt")
         val KEY_BY_CLIENT_JWT = stringPreferencesKey("urnetwork_by_client_jwt")
         val KEY_WINDOW_TYPE = stringPreferencesKey("urnetwork_window_type")
         val KEY_FIXED_IP_SIZE = booleanPreferencesKey("urnetwork_fixed_ip_size")
+        val KEY_PROVIDE_ENABLED = booleanPreferencesKey("urnetwork_provide_enabled")
     }
 }

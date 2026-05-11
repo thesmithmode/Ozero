@@ -87,6 +87,9 @@ class EngineUrnetwork(
                 val fixedIp = configStore.fixedIpSize().first()
                 runCatching { sdkBridge.applyPerformanceProfile(windowType, fixedIp) }
                     .onFailure { PersistentLoggers.warn(TAG, "applyPerformanceProfile threw: ${it.message}") }
+                val provideEnabled = configStore.provideEnabled().first()
+                runCatching { sdkBridge.setProvidePaused(!provideEnabled) }
+                    .onFailure { PersistentLoggers.warn(TAG, "setProvidePaused threw: ${it.message}") }
                 Log.i(
                     TAG,
                     "started OK preferredCountry=${config.region ?: "<auto>"} " +

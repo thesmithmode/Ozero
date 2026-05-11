@@ -104,6 +104,27 @@ class UrnetworkConfigStoreTest {
         assertEquals("client.tok", store.byClientJwt().first())
     }
 
+    @Test
+    fun `provideEnabled по умолчанию true`() = runTest {
+        val (store, _) = newStore()
+        assertEquals(true, store.provideEnabled().first())
+    }
+
+    @Test
+    fun `setProvideEnabled(false) персистирует и provideEnabled возвращает false`() = runTest {
+        val (store, _) = newStore()
+        store.setProvideEnabled(false)
+        assertEquals(false, store.provideEnabled().first())
+    }
+
+    @Test
+    fun `setProvideEnabled(true) после false возвращает true`() = runTest {
+        val (store, _) = newStore()
+        store.setProvideEnabled(false)
+        store.setProvideEnabled(true)
+        assertEquals(true, store.provideEnabled().first())
+    }
+
     private class FakePreferencesDataStore : DataStore<Preferences> {
         private val state = MutableStateFlow<Preferences>(emptyPreferences())
         override val data: Flow<Preferences> get() = state

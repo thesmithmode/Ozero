@@ -183,6 +183,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
 
     fun setProvidePaused(paused: Boolean) {
         bridge.setProvidePaused(paused)
+        viewModelScope.launch { configStore.setProvideEnabled(!paused) }
         val current = _uiState.value
         if (current is UrnetworkSettingsUiState.Ready) {
             _uiState.value = current.copy(providePaused = paused)
