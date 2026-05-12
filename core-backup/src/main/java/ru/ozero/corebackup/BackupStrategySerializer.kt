@@ -35,8 +35,9 @@ internal object BackupStrategySerializer {
         stratObj.put("savedStrategies", ssArr)
 
         strat.evolutionMemory?.let { raw ->
-            val parsed = runCatching { JSONObject(raw) }.getOrNull()
-            if (parsed != null) stratObj.put("evolutionMemory", parsed)
+            if (runCatching { JSONObject(raw) }.isSuccess) {
+                stratObj.put("evolutionMemory", raw)
+            }
         }
         return stratObj
     }
@@ -73,8 +74,8 @@ internal object BackupStrategySerializer {
             settings = settings,
             domainLists = domainLists,
             savedStrategies = savedStrategies,
-            evolutionMemory = stratObj.optJSONObject("evolutionMemory")?.toString()
-                ?: stratObj.optString("evolutionMemory").takeIf { it.isNotEmpty() },
+            evolutionMemory = stratObj.optString("evolutionMemory").takeIf { it.isNotEmpty() }
+                ?: stratObj.optJSONObject("evolutionMemory")?.toString(),
         )
     }
 

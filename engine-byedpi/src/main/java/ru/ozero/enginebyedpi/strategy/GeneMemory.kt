@@ -79,7 +79,8 @@ class GeneMemory(private val file: File) {
 
     @Synchronized
     fun importRawJson(json: String) {
-        runCatching { JSONObject(json) }.getOrElse { return }
+        val parsed = runCatching { JSONObject(json) }.getOrNull() ?: return
+        if (parsed.length() == 0) return
         runCatching { file.writeText(json) }
         scores.clear()
         load()
