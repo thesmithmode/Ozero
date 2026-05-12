@@ -92,7 +92,6 @@ class OzeroVpnService : android.net.VpnService() {
         private const val PREFLIGHT_HARD_TIMEOUT_MS = 7_000L
         private const val PEER_WATCHDOG_POLL_MS = 5_000L
         private const val PEER_WATCHDOG_TIMEOUT_MS = 30_000L
-        private const val PEER_WATCHDOG_MAX_RECOVERS = 3
         private const val PEER_WATCHDOG_RECOVER_GRACE_MS = 30_000L
     }
 
@@ -334,14 +333,12 @@ class OzeroVpnService : android.net.VpnService() {
             try {
                 var zeroPeersSince = 0L
                 var hadPeers = false
-                var recoverAttempts = 0
                 while (isActive) {
                     delay(PEER_WATCHDOG_POLL_MS)
                     val peers = plugin.stats().first().activeConnections
                     if (peers > 0) {
                         hadPeers = true
                         zeroPeersSince = 0L
-                        recoverAttempts = 0
                         continue
                     }
                     if (!hadPeers) continue
@@ -351,19 +348,9 @@ class OzeroVpnService : android.net.VpnService() {
                         continue
                     }
                     if (now - zeroPeersSince <= PEER_WATCHDOG_TIMEOUT_MS) continue
-                    if (recoverAttempts >= PEER_WATCHDOG_MAX_RECOVERS) {
-                        handleEngineFailure(
-                            engineId,
-                            "no URnetwork peers for ${PEER_WATCHDOG_TIMEOUT_MS / 1000}s " +
-                                "after $recoverAttempts recover attempts",
-                        )
-                        return@launch
-                    }
-                    recoverAttempts++
                     PersistentLoggers.warn(
                         TAG,
-                        "peer watchdog: 0 peers ${PEER_WATCHDOG_TIMEOUT_MS / 1000}s → " +
-                            "recover attempt $recoverAttempts/$PEER_WATCHDOG_MAX_RECOVERS",
+                        "peer watchdog: 0 peers ${PEER_WATCHDOG_TIMEOUT_MS / 1000}s → recover",
                     )
                     val result = runCatching { plugin.recover() }.getOrElse { t ->
                         EnginePlugin.RecoverResult.Failed("recover threw: ${t.message}")

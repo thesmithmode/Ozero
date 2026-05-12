@@ -114,14 +114,15 @@ class OzeroVpnServicePeerWatchdogTest {
     }
 
     @Test
-    fun `PEER_WATCHDOG_MAX_RECOVERS обязан быть 3 — не менять без оценки агрессивности retry`() {
-        val match = Regex("PEER_WATCHDOG_MAX_RECOVERS\\s*=\\s*(\\d+)").find(source)
-        assertTrue(match != null, "PEER_WATCHDOG_MAX_RECOVERS константа обязана быть в файле")
-        val value = match!!.groupValues[1].toInt()
+    fun `peerWatchdog не имеет жёсткого лимита recover-попыток — бесконечный retry до NotSupported`() {
+        val body = source
+            .substringAfter("private fun startPeerWatchdog")
+            .substringBefore("private suspend fun engineNeedsCustomTun")
         assertTrue(
-            value == 3,
-            "PEER_WATCHDOG_MAX_RECOVERS обязан = 3 (текущий $value): больше — DoS на bridge при " +
-                "затяжных сетевых проблемах; меньше — bridge не успеет recover до handleEngineFailure",
+            !body.contains("PEER_WATCHDOG_MAX_RECOVERS"),
+            "startPeerWatchdog не должен иметь MAX_RECOVERS лимит — watchdog обязан бесконечно " +
+                "переподключаться пока RecoverResult != NotSupported. Пауза между попытками " +
+                "обеспечена zeroPeersSince=0L + PEER_WATCHDOG_TIMEOUT_MS. Body:\n$body",
         )
     }
 
@@ -181,18 +182,16 @@ class OzeroVpnServicePeerWatchdogTest {
     }
 
     @Test
-    fun `peerWatchdog содержит recoverAttempts счётчик с ограничителем`() {
+    fun `peerWatchdog имеет zeroPeersSince сброс после Failed — обеспечивает паузу между retry`() {
         val body = source
             .substringAfter("private fun startPeerWatchdog")
             .substringBefore("private suspend fun engineNeedsCustomTun")
+        val failedBlock = body.substringAfter("RecoverResult.Failed ->")
+            .substringBefore("delay(PEER_WATCHDOG_RECOVER_GRACE_MS)")
         assertTrue(
-            body.contains("recoverAttempts"),
-            "startPeerWatchdog обязан иметь recoverAttempts — счётчик попыток recovery. Body:\n$body",
-        )
-        assertTrue(
-            body.contains("recoverAttempts >= PEER_WATCHDOG_MAX_RECOVERS"),
-            "Должна быть проверка recoverAttempts >= PEER_WATCHDOG_MAX_RECOVERS перед " +
-                "handleEngineFailure — иначе retry бесконечен. Body:\n$body",
+            failedBlock.contains("zeroPeersSince = 0L"),
+            "После Failed обязан zeroPeersSince=0L — без сброса следующий poll сразу снова " +
+                "trigger recover без ожидания PEER_WATCHDOG_TIMEOUT_MS. Block:\n$failedBlock",
         )
     }
 }
