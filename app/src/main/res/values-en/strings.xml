@@ -204,6 +204,14 @@
     <string name="domain_list_add_title">New list</string>
     <string name="domain_list_save">Save</string>
     <string name="domain_list_cancel">Cancel</string>
+    <string name="saved_strategies_title">Saved Strategies</string>
+<string name="saved_strategies_empty">No saved strategies</string>
+    <string name="saved_strategy_save">Save</string>
+    <string name="saved_strategy_apply">Apply</string>
+    <string name="saved_strategy_delete">Delete</string>
+    <string name="saved_strategy_pin">Pin</string>
+    <string name="saved_strategy_unpin">Unpin</string>
+    <string name="saved_strategy_rename_hint">Label (optional)</string>
 
     <!-- URnetwork -->
     <string name="urnetwork_settings_title">URnetwork</string>

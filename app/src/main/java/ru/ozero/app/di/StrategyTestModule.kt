@@ -11,7 +11,9 @@ import ru.ozero.app.ui.strategy.DomainList
 import ru.ozero.app.ui.strategy.DomainListManager
 import ru.ozero.app.ui.strategy.DomainListStore
 import ru.ozero.app.ui.strategy.FileDomainListStore
+import ru.ozero.app.ui.strategy.FileSavedStrategyStore
 import ru.ozero.app.ui.strategy.FileStrategyResultsStore
+import ru.ozero.app.ui.strategy.SavedStrategyStore
 import ru.ozero.app.ui.strategy.SharedPrefsStrategyTestSettingsStore
 import ru.ozero.app.ui.strategy.StrategyAssetSource
 import ru.ozero.app.ui.strategy.StrategyProbeClientFactory
@@ -70,6 +72,12 @@ object StrategyTestModule {
         }
         return DomainListManager(store, builtIns)
     }
+
+    @Provides
+    @Singleton
+    fun provideSavedStrategyStore(
+        @ApplicationContext context: Context,
+    ): SavedStrategyStore = FileSavedStrategyStore(context.filesDir)
 
     @Provides
     fun provideStrategyProbeClientFactory(): StrategyProbeClientFactory =

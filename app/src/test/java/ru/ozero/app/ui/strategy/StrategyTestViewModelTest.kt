@@ -45,6 +45,7 @@ class StrategyTestViewModelTest {
     private lateinit var store: FakeResultsStore
     private lateinit var settingsStore: FakeStrategyTestSettingsStore
     private lateinit var domainStore: FakeDomainListStore
+    private lateinit var savedStore: FakeSavedStrategyStore
     private lateinit var engine: FakeByeDpiEngine
     private lateinit var probe: FakeProbeClient
     private lateinit var tunnel: TunnelController
@@ -60,6 +61,7 @@ class StrategyTestViewModelTest {
         store = FakeResultsStore()
         settingsStore = FakeStrategyTestSettingsStore()
         domainStore = FakeDomainListStore()
+        savedStore = FakeSavedStrategyStore()
         engine = FakeByeDpiEngine()
         probe = FakeProbeClient(engine)
         tunnel = TunnelController()
@@ -83,6 +85,7 @@ class StrategyTestViewModelTest {
             resultsStore = store,
             settingsStore = settingsStore,
             domainListManager = manager,
+            savedStrategyStore = savedStore,
             byeDpiEngine = engine,
             probeFactory = { probe },
             tunnelController = tunnel,
@@ -132,6 +135,7 @@ class StrategyTestViewModelTest {
         val vm = StrategyTestViewModel(
             repository = repo, assetSource = assets, resultsStore = store,
             settingsStore = settingsStore, domainListManager = manager,
+            savedStrategyStore = savedStore,
             byeDpiEngine = engine, probeFactory = { probe }, tunnelController = tunnel,
         ).also { it.ioDispatcher = dispatcher }
         advanceUntilIdle()
@@ -358,6 +362,62 @@ class StrategyTestViewModelTest {
     }
 
     @Test
+    fun `onSave adds command to saved store`() = runTest(dispatcher) {
+        val vm = newVm()
+        advanceUntilIdle()
+        vm.onSave("-Ku -An")
+        advanceUntilIdle()
+        assertEquals(1, vm.savedStrategies.value.size)
+        assertEquals("-Ku -An", vm.savedStrategies.value[0].command)
+    }
+
+    @Test
+    fun `onSave deduplicates same command`() = runTest(dispatcher) {
+        val vm = newVm()
+        advanceUntilIdle()
+        vm.onSave("-cmd")
+        vm.onSave("-cmd")
+        advanceUntilIdle()
+        assertEquals(1, vm.savedStrategies.value.size)
+    }
+
+    @Test
+    fun `onApply also saves command to saved store`() = runTest(dispatcher) {
+        val vm = newVm()
+        advanceUntilIdle()
+        vm.onApply("-applied-cmd")
+        advanceUntilIdle()
+        assertTrue(vm.savedStrategies.value.any { it.command == "-applied-cmd" })
+    }
+
+    @Test
+    fun `onDeleteSaved removes entry from savedStrategies`() = runTest(dispatcher) {
+        val vm = newVm()
+        advanceUntilIdle()
+        vm.onSave("-to-delete")
+        advanceUntilIdle()
+        val id = vm.savedStrategies.value.first().id
+        vm.onDeleteSaved(id)
+        advanceUntilIdle()
+        assertTrue(vm.savedStrategies.value.isEmpty())
+    }
+
+    @Test
+    fun `onPinSaved pins and unpins correctly`() = runTest(dispatcher) {
+        val vm = newVm()
+        advanceUntilIdle()
+        vm.onSave("-pinnable")
+        advanceUntilIdle()
+        val id = vm.savedStrategies.value.first().id
+        vm.onPinSaved(id, true)
+        advanceUntilIdle()
+        assertTrue(vm.savedStrategies.value.first().isPinned)
+        vm.onPinSaved(id, false)
+        advanceUntilIdle()
+        assertFalse(vm.savedStrategies.value.first().isPinned)
+    }
+
+    @Test
     fun `onResetDomainLists restores built-in defaults`() = runTest(dispatcher) {
         val vm = newVm(sites = listOf("a.com"))
         advanceUntilIdle()
@@ -440,6 +500,12 @@ class StrategyTestViewModelTest {
         var stored: StrategyTestSettings = StrategyTestSettings()
         override fun load(): StrategyTestSettings = stored
         override fun save(settings: StrategyTestSettings) { stored = settings }
+    }
+
+    private class FakeSavedStrategyStore : SavedStrategyStore {
+        private var data: List<SavedStrategy> = emptyList()
+        override fun load(): List<SavedStrategy> = data
+        override fun save(strategies: List<SavedStrategy>) { data = strategies }
     }
 
     private class FakeDomainListStore : DomainListStore {

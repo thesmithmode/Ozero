@@ -43,6 +43,7 @@ class StrategyTestViewModel @Inject constructor(
     private val resultsStore: StrategyResultsStore,
     private val settingsStore: StrategyTestSettingsStore,
     private val domainListManager: DomainListManager,
+    private val savedStrategyStore: SavedStrategyStore,
     private val byeDpiEngine: EnginePlugin,
     private val probeFactory: StrategyProbeClientFactory,
     private val tunnelController: TunnelController,
@@ -68,6 +69,9 @@ class StrategyTestViewModel @Inject constructor(
     private val _settings = MutableStateFlow(StrategyTestSettings())
     val settings: StateFlow<StrategyTestSettings> = _settings.asStateFlow()
 
+    private val _savedStrategies = MutableStateFlow<List<SavedStrategy>>(emptyList())
+    val savedStrategies: StateFlow<List<SavedStrategy>> = _savedStrategies.asStateFlow()
+
     private var testJob: Job? = null
 
     init {
@@ -87,6 +91,9 @@ class StrategyTestViewModel @Inject constructor(
             }
             _settings.value = withContext(ioDispatcher) {
                 runCatching { settingsStore.load() }.getOrDefault(StrategyTestSettings())
+            }
+            _savedStrategies.value = withContext(ioDispatcher) {
+                runCatching { savedStrategyStore.load() }.getOrDefault(emptyList())
             }
         }
     }
@@ -180,10 +187,37 @@ class StrategyTestViewModel @Inject constructor(
         _isRunning.value = false
     }
 
+    fun onSave(command: String) {
+        viewModelScope.launch(ioDispatcher) {
+            val updated = runCatching { savedStrategyStore.add(command) }.getOrElse { savedStrategyStore.load() }
+            _savedStrategies.value = updated
+        }
+    }
+
+    fun onDeleteSaved(id: String) {
+        viewModelScope.launch(ioDispatcher) {
+            val updated = runCatching { savedStrategyStore.delete(id) }.getOrElse { savedStrategyStore.load() }
+            _savedStrategies.value = updated
+        }
+    }
+
+    fun onPinSaved(id: String, pin: Boolean) {
+        viewModelScope.launch(ioDispatcher) {
+            val updated = runCatching {
+                if (pin) savedStrategyStore.pin(id) else savedStrategyStore.unpin(id)
+            }.getOrElse { savedStrategyStore.load() }
+            _savedStrategies.value = updated
+        }
+    }
+
     fun onApply(command: String) {
         viewModelScope.launch {
             runCatching { repository.setByedpiWinningArgs(command) }
                 .onFailure { PersistentLoggers.warn(TAG, "onApply failed: ${it.message}") }
+            withContext(ioDispatcher) {
+                val updated = runCatching { savedStrategyStore.add(command) }.getOrElse { savedStrategyStore.load() }
+                _savedStrategies.value = updated
+            }
         }
     }
 

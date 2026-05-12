@@ -16,7 +16,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -64,6 +66,7 @@ fun StrategyTestScreen(
     val isRunning by viewModel.isRunning.collectAsStateWithLifecycle()
     val strategies by viewModel.strategies.collectAsStateWithLifecycle()
     val domainLists by viewModel.domainLists.collectAsStateWithLifecycle()
+    val savedStrategies by viewModel.savedStrategies.collectAsStateWithLifecycle()
     val runSummary by viewModel.runSummary.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
@@ -71,8 +74,10 @@ fun StrategyTestScreen(
 
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showDomainLists by rememberSaveable { mutableStateOf(false) }
+    var showSaved by rememberSaveable { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val domainSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val savedSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     BackHandler {
         if (isRunning) viewModel.onStop() else onBack()
@@ -124,6 +129,23 @@ fun StrategyTestScreen(
             )
         }
     }
+    if (showSaved) {
+        ModalBottomSheet(
+            onDismissRequest = { showSaved = false },
+            sheetState = savedSheetState,
+            modifier = Modifier.testTag("saved_strategies_sheet"),
+        ) {
+            SavedStrategiesSheet(
+                strategies = savedStrategies,
+                onApply = { cmd ->
+                    viewModel.onApply(cmd)
+                    Toast.makeText(context, R.string.strategy_test_applied_toast, Toast.LENGTH_SHORT).show()
+                },
+                onDelete = viewModel::onDeleteSaved,
+                onPin = { id, pin -> viewModel.onPinSaved(id, pin) },
+            )
+        }
+    }
     Scaffold(
         modifier = Modifier.testTag("strategy_test_screen"),
         topBar = {
@@ -138,6 +160,12 @@ fun StrategyTestScreen(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = { showSaved = true },
+                        modifier = Modifier.testTag("saved_strategies_btn"),
+                    ) {
+                        Icon(Icons.Filled.Bookmark, contentDescription = stringResource(R.string.saved_strategies_title))
+                    }
                     IconButton(
                         onClick = { showSettings = true },
                         modifier = Modifier.testTag("strategy_settings_btn"),
@@ -189,6 +217,7 @@ fun StrategyTestScreen(
                 StrategyRow(
                     index = index,
                     item = item,
+                    isSaved = savedStrategies.any { it.command == item.command },
                     onApply = {
                         viewModel.onApply(item.command)
                         Toast.makeText(
@@ -197,6 +226,7 @@ fun StrategyTestScreen(
                             Toast.LENGTH_SHORT,
                         ).show()
                     },
+                    onSave = { viewModel.onSave(item.command) },
                 )
             }
         }
@@ -496,10 +526,101 @@ private fun StrategySettingsSheet(
 }
 
 @Composable
+private fun SavedStrategiesSheet(
+    strategies: List<SavedStrategy>,
+    onApply: (String) -> Unit,
+    onDelete: (String) -> Unit,
+    onPin: (String, Boolean) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.saved_strategies_title),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        if (strategies.isEmpty()) {
+            Text(
+                text = stringResource(R.string.saved_strategies_empty),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(vertical = 8.dp),
+            )
+        }
+        val sorted = strategies.sortedWith(
+            compareByDescending<SavedStrategy> { it.isPinned }.thenByDescending { it.addedAt },
+        )
+        sorted.forEach { saved ->
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("saved_item_${saved.id}"),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    saved.name?.let {
+                        Text(text = it, style = MaterialTheme.typography.labelMedium)
+                    }
+                    Text(
+                        text = saved.command,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        IconButton(
+                            onClick = { onPin(saved.id, !saved.isPinned) },
+                            modifier = Modifier.testTag("saved_pin_${saved.id}"),
+                        ) {
+                            Icon(
+                                Icons.Filled.Star,
+                                contentDescription = stringResource(
+                                    if (saved.isPinned) R.string.saved_strategy_unpin else R.string.saved_strategy_pin,
+                                ),
+                                tint = if (saved.isPinned) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                                },
+                            )
+                        }
+                        TextButton(
+                            onClick = { onApply(saved.command) },
+                            modifier = Modifier.testTag("saved_apply_${saved.id}"),
+                        ) {
+                            Text(stringResource(R.string.saved_strategy_apply))
+                        }
+                        TextButton(
+                            onClick = { onDelete(saved.id) },
+                            modifier = Modifier.testTag("saved_delete_${saved.id}"),
+                        ) {
+                            Text(stringResource(R.string.saved_strategy_delete))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun StrategyRow(
     index: Int,
     item: StrategyResult,
+    isSaved: Boolean,
     onApply: () -> Unit,
+    onSave: () -> Unit,
 ) {
     Card(
         modifier = Modifier
@@ -553,11 +674,27 @@ private fun StrategyRow(
                     },
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                OutlinedButton(
-                    onClick = onApply,
-                    modifier = Modifier.testTag("strategy_apply_$index"),
-                ) {
-                    Text(stringResource(R.string.strategy_test_apply))
+                Row {
+                    IconButton(
+                        onClick = onSave,
+                        modifier = Modifier.testTag("strategy_save_$index"),
+                    ) {
+                        Icon(
+                            Icons.Filled.Bookmark,
+                            contentDescription = stringResource(R.string.saved_strategy_save),
+                            tint = if (isSaved) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                            },
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = onApply,
+                        modifier = Modifier.testTag("strategy_apply_$index"),
+                    ) {
+                        Text(stringResource(R.string.strategy_test_apply))
+                    }
                 }
             }
         }
