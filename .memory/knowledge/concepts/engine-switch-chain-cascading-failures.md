@@ -5,8 +5,9 @@ tags: [vpn, architecture, crash, debugging, engine]
 sources:
   - "daily/2026-05-09.md"
   - "daily/2026-05-10.md"
+  - "daily/2026-05-11.md"
 created: 2026-05-09
-updated: 2026-05-10
+updated: 2026-05-11
 ---
 
 # Engine-Switch Chain Cascading Failures
@@ -61,6 +62,26 @@ A fifth bug was found: `splitMode` was included in `EngineSettingsRestartObserve
 
 Advisor was called before substantive work. Recommendation: treat all bugs as manifestations of one root cause (engine-switch chain) rather than patching each symptom independently. The approach: sentinel tests first, then structural fixes.
 
+### GoRuntimeGuard Removal (v0.0.11)
+
+GoRuntimeGuard was removed entirely in v0.0.11 after analysis confirmed it was a symptom-patch that created a worse failure mode than it prevented. Eager loading in `OzeroApp.onCreate` (see [[concepts/dual-go-runtime-eager-loading]]) already made concurrent Go runtime init/teardown impossible. The guard added a deadlock risk when teardown coroutines were cancelled — a race inherent in the design since `startVpn` cancels the previous scope.
+
+### Engine Ownership Boundary Violation (v0.0.12)
+
+After GoRuntimeGuard removal, a new SIGABRT appeared in v0.0.12: `UrnetworkEngineSettingsViewModel` had polling flows (peerCount/2s, unpaidBytes/30s, subscriptionBalance/60s) calling bridge JNI methods during engine teardown. This is a different class of bug — not engine lifecycle ordering, but UI components violating the Engine Ownership Boundary by accessing native bridge methods concurrently with teardown. See [[concepts/engine-ownership-boundary]].
+
+### Process Isolation (v0.0.12)
+
+The definitive fix for Go runtime conflicts was moving WARP to a separate process (`android:process=":engine_warp"` + AIDL). See [[concepts/go-runtime-process-isolation]].
+
+### Debounce Split and Prev-Tracking (v0.0.12 Session 20:41)
+
+A sixth bug class emerged from the engine-switch chain: `EngineSettingsRestartObserver` used a single 4-second debounce for all settings changes. Manual engine selection (user taps engine chip) shared this debounce with batch settings toggles, making engine switching feel sluggish — the UI turned yellow ("switching") but the actual restart was delayed by the full debounce window.
+
+The fix splits the observer into two paths: manual engine changes trigger instant restart (no debounce), while other settings changes remain debounced. Both paths use explicit prev-tracking (`prev` variable initialized to `null`, set after each emission) to distinguish genuine changes from the initial StateFlow emission. Without prev-tracking, the observer's first emission triggered a spurious VPN restart — on Nubia, this restart during `libam-go` cleanup caused SIGABRT.
+
+Additionally, the Snapshot was found missing `engineAutoPriority` — reordering engines via drag-and-drop didn't trigger restart because the snapshot didn't capture priority changes. This was a regression from the earlier `splitMode` removal (Bug 5). See [[concepts/debounce-split-heterogeneous-flow]] for the full pattern.
+
 ## Related Concepts
 
 - [[concepts/dual-go-runtime-eager-loading]] - GoRuntimeGuard contradicts eager-loading invariant; guard should be removed
@@ -69,8 +90,11 @@ Advisor was called before substantive work. Recommendation: treat all bugs as ma
 - [[connections/false-positive-engine-status]] - IP warmup cancellation is a fourth false-positive status vector
 - [[concepts/vpn-ip-detection-contract]] - Architectural fix for IP detection during rapid switching
 - [[concepts/tun-self-exclusion-sdk-engines]] - Another engine-switching regression in the same release cycle
+- [[concepts/engine-ownership-boundary]] - UI bridge access during teardown is a new failure class discovered in v0.0.12
+- [[concepts/go-runtime-process-isolation]] - Definitive fix for Go runtime conflicts via process isolation
 
 ## Sources
 
 - [[daily/2026-05-09.md]] - Session 13:12: 4 production bugs in v0.0.8 traced to engine-switch chain (7 startVpn in 30s); GoRuntimeGuard deadlock, IP warmup cancelled, split tunnel state bugs; advisor recommended single root cause approach
 - [[daily/2026-05-09.md]] - Session 18:38: splitMode in Snapshot caused VPN restart on tab toggle → SIGABRT; removed from observer; BYPASS_LAN mode removed from UI
+- [[daily/2026-05-11.md]] - Session 11:01: GoRuntimeGuard removed — guard was symptom-patch, eager loading already solved the problem; Session 14:12: Engine Ownership Boundary established; Session 19:49: process isolation for WARP; Session 20:41: debounce split (manualEngine instant, rest debounced) + explicit prev-tracking + missing engineAutoPriority in Snapshot

@@ -78,8 +78,11 @@ class FileSavedStrategyStore(
 }
 
 fun SavedStrategyStore.add(command: String): List<SavedStrategy> = update { existing ->
-    if (existing.any { it.command == command }) existing
-    else existing + SavedStrategy(id = UUID.randomUUID().toString(), command = command)
+    if (existing.any { it.command == command }) {
+        existing
+    } else {
+        existing + SavedStrategy(id = UUID.randomUUID().toString(), command = command)
+    }
 }
 
 fun SavedStrategyStore.pin(id: String): List<SavedStrategy> = update { list ->

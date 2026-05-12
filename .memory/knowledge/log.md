@@ -1,5 +1,28 @@
 # Build Log
 
+## [2026-05-12T19:00:00+03:00] compile | 2026-05-12.md
+- Source: daily/2026-05-12.md
+- Articles created: [[concepts/genetic-strategy-evolution]], [[concepts/gene-memory-concurrency-traps]], [[concepts/backup-awg-field-roundtrip-loss]], [[concepts/urnetwork-control-network-modes]], [[concepts/chart-nice-max-dynamic-scaling]]
+- Connections created: [[connections/audit-driven-concurrency-discovery]]
+- Articles updated: (none)
+- Sessions covered: 11:59 (chartNiceMax), 14:05 (Sprint 3-5 StrategyTest), 15:08 (code review Sprint 2-5), 17:55 (URnetwork modes, decomp refactor), 18:34 (22-finding audit, 5 fix commits)
+- Excluded: @Suppress annotation discipline (existing CLAUDE.md rule), JDK install winget failure (env issue), UnifiedLogger decomp details (refactoring trivia), specific CI run numbers, 7 memory flush failures, Icons.Filled.Bookmark violation (already in feedback_material_icons_core.md), dead settings list (implementation detail), es/pt locale strings (i18n mechanics)
+
+## [2026-05-11T22:30:00+03:00] compile | 2026-05-11.md (pass 2 — session 20:41 coverage)
+- Source: daily/2026-05-11.md
+- Articles created: [[concepts/debounce-split-heterogeneous-flow]]
+- Articles updated: [[concepts/dual-go-runtime-eager-loading]] (asymmetric per-process bootstrap guard), [[concepts/go-runtime-process-isolation]] (asymmetric bootstrap guard + OzeroAppProcessIsolationTest), [[concepts/engine-switch-chain-cascading-failures]] (debounce split + prev-tracking + missing engineAutoPriority in Snapshot)
+- Sessions covered: 20:41 (SIGABRT asymmetric bootstrap, late yellow debounce split, chart jumping visual state, EngineSettingsRestartObserver prev-tracking)
+- Excluded: chartNiceMax() stable Y-axis thresholds (UI detail), drawPath style named arg (ktlint fix), Path() local val (ktlint fix), visualConnected state management (tactical UI — too specific for reusable concept)
+
+## [2026-05-11T20:00:00+03:00] compile | 2026-05-11.md
+- Source: daily/2026-05-11.md
+- Articles created: [[concepts/go-runtime-process-isolation]], [[concepts/engine-ownership-boundary]], [[concepts/split-tunnel-internet-permission-filter]], [[concepts/persistent-logger-accumulation-trap]], [[concepts/sentinel-fqn-desync]]
+- Connections created: [[connections/go-runtime-conflict-resolution-evolution]]
+- Articles updated: [[concepts/dual-go-runtime-eager-loading]] (GoRuntimeGuard removed, process isolation supersedes), [[concepts/engine-switch-chain-cascading-failures]] (GoRuntimeGuard removed, Engine Ownership Boundary, process isolation)
+- Sessions covered: 11:01 (GoRuntimeGuard removal), 11:23 (PersistentLoggers accumulation), 11:38 (split tunnel fixes + timeframe redesign), 12:45 (FQN sentinel desync + CI stabilization), 14:12 (Engine Ownership Boundary + 3 bugs), 19:49 (process isolation + AIDL + CI churn)
+- Excluded: TimeframeOption UI redesign (S30/M5/M30/H1, padding zeros, MAX_SPEED_HISTORY_POINTS 86400→3600) — UI configuration detail, not reusable knowledge; chartNiceMax() thresholds — UI detail; specific CI run numbers; 8 memory flush failures; auto-mode → TopScreen.AutoModeSettings routing fix — minor UI routing bug
+
 ## [2026-05-11T00:30:00+03:00] compile | 2026-05-10.md (pass 6 — full recompile verification)
 - Source: daily/2026-05-10.md
 - Articles created: (none — all 4 new concepts already exist from passes 1-5)
