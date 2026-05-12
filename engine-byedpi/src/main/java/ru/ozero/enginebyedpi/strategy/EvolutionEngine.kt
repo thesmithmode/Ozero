@@ -20,6 +20,7 @@ class EvolutionEngine(
     private val sites: List<String>,
     private val settings: EvolutionSettings = EvolutionSettings(),
     private val socksPort: Int = 1080,
+    private val memory: GeneMemory? = null,
 ) {
 
     data class EvolutionSettings(
@@ -63,6 +64,7 @@ class EvolutionEngine(
                     population = scored,
                 ),
             )
+            memory?.save()
             if (bestFitness >= settings.targetFitness) break
 
             val survivors = evolver.select(scored, settings.eliteCount)
@@ -73,18 +75,29 @@ class EvolutionEngine(
 
     private fun buildInitialPopulation(seedStrategies: List<String>): List<Chromosome> {
         val fromSeeds = seedStrategies.take(settings.populationSize).map(::parseChromosome)
-        val random = (settings.populationSize - fromSeeds.size).coerceAtLeast(0)
-        return fromSeeds + List(random) { pool.randomChromosome() }
+        val fillCount = (settings.populationSize - fromSeeds.size).coerceAtLeast(0)
+        val fill = if (memory != null && memory.hasData()) {
+            List(fillCount) { pool.weightedRandomChromosome(memory) }
+        } else {
+            List(fillCount) { pool.randomChromosome() }
+        }
+        return fromSeeds + fill
     }
 
     private fun buildNextGeneration(survivors: List<Chromosome>): List<Chromosome> {
-        if (survivors.isEmpty()) return List(settings.populationSize) { pool.randomChromosome() }
+        if (survivors.isEmpty()) {
+            return if (memory != null && memory.hasData()) {
+                List(settings.populationSize) { pool.weightedRandomChromosome(memory) }
+            } else {
+                List(settings.populationSize) { pool.randomChromosome() }
+            }
+        }
         val offspring = mutableListOf<Chromosome>()
         offspring.addAll(survivors)
         while (offspring.size < settings.populationSize) {
             val p1 = survivors[Random.nextInt(survivors.size)]
             val p2 = survivors[Random.nextInt(survivors.size)]
-            offspring.add(evolver.mutate(evolver.crossover(p1, p2), settings.mutationRate))
+            offspring.add(evolver.mutate(evolver.crossover(p1, p2), settings.mutationRate, memory = memory))
         }
         return offspring
     }
@@ -92,7 +105,11 @@ class EvolutionEngine(
     private suspend fun evaluatePopulation(
         population: List<Chromosome>,
     ): List<Pair<Chromosome, Double>> =
-        population.map { chromosome -> chromosome to evaluate(chromosome) }
+        population.map { chromosome ->
+            val fitness = evaluate(chromosome)
+            memory?.record(chromosome.map { it.token }, fitness)
+            chromosome to fitness
+        }
 
     private suspend fun evaluate(chromosome: Chromosome): Double {
         if (sites.isEmpty() || chromosome.isEmpty()) return 0.0

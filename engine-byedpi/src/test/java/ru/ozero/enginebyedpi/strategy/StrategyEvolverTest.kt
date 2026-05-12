@@ -62,6 +62,19 @@ class StrategyEvolverTest {
     }
 
     @Test
+    fun `mutate with memory uses weighted gene selection`() {
+        val memory = GeneMemory(java.io.File.createTempFile("mem", ".json").also { it.deleteOnExit() })
+        memory.record(listOf("-a"), fitness = 1.0)
+        val chromosome = parseChromosome("-a -b -c")
+        val vocab = pool.allGenes().map { it.token }.toSet()
+        val mutated = evolver.mutate(chromosome, rate = 1f, random = kotlin.random.Random(42), memory = memory)
+        assertEquals(chromosome.size, mutated.size)
+        mutated.forEach { gene ->
+            assertTrue(vocab.contains(gene.token), "mutated gene '${gene.token}' not in vocab")
+        }
+    }
+
+    @Test
     fun `select returns top-k by fitness descending`() {
         val scored = listOf(
             parseChromosome("-a") to 0.5,

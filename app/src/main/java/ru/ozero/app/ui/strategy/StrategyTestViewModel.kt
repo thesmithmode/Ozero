@@ -23,6 +23,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginebyedpi.strategy.EvolutionEngine
+import ru.ozero.enginebyedpi.strategy.GeneMemory
 import ru.ozero.enginebyedpi.strategy.GenePool
 import ru.ozero.enginebyedpi.strategy.ProbeResult
 import ru.ozero.enginebyedpi.strategy.SocksProbeClient
@@ -59,6 +60,7 @@ class StrategyTestViewModel @Inject constructor(
     private val byeDpiEngine: EnginePlugin,
     private val probeFactory: StrategyProbeClientFactory,
     private val tunnelController: TunnelController,
+    private val geneMemory: GeneMemory,
 ) : ViewModel() {
 
     internal var ioDispatcher: CoroutineDispatcher = Dispatchers.IO
@@ -260,6 +262,7 @@ class StrategyTestViewModel @Inject constructor(
                 eliteCount = snap.evolutionEliteCount,
                 concurrentProbes = max(1, snap.concurrentLimit),
             ),
+            memory = geneMemory,
         )
         _evolutionState.value = EvolutionUiState(maxGenerations = maxGen)
         evolutionEngine.evolve(seedCommands) { result ->

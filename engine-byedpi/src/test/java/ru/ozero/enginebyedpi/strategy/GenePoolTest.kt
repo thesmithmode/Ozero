@@ -71,4 +71,27 @@ class GenePoolTest {
         val chromosome = parseChromosome("  -Ku  -An  ")
         assertEquals(2, chromosome.size)
     }
+
+    @Test
+    fun `weightedRandomGene returns gene from vocabulary`() {
+        val pool = GenePool(seeds)
+        val memory = GeneMemory(java.io.File.createTempFile("mem", ".json").also { it.deleteOnExit() })
+        memory.record(listOf("-Ku"), fitness = 1.0)
+        val vocab = pool.allGenes().map { it.token }.toSet()
+        repeat(20) {
+            val gene = pool.weightedRandomGene(memory, kotlin.random.Random(it.toLong()))
+            assertTrue(vocab.contains(gene.token), "weighted gene '${gene.token}' not in vocab")
+        }
+    }
+
+    @Test
+    fun `weightedRandomChromosome length within range`() {
+        val pool = GenePool(seeds)
+        val memory = GeneMemory(java.io.File.createTempFile("mem2", ".json").also { it.deleteOnExit() })
+        memory.record(listOf("-An"), fitness = 0.8)
+        repeat(20) {
+            val chromosome = pool.weightedRandomChromosome(memory, 3..8, kotlin.random.Random(it.toLong()))
+            assertTrue(chromosome.size in 3..8, "length ${chromosome.size} out of range 3..8")
+        }
+    }
 }

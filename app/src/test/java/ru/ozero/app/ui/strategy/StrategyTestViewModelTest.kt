@@ -17,6 +17,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.commonvpn.TunnelController
+import ru.ozero.enginebyedpi.strategy.GeneMemory
 import ru.ozero.enginebyedpi.strategy.ProbeResult
 import ru.ozero.enginebyedpi.strategy.SocksProbeClient
 import ru.ozero.enginescore.EngineCapabilities
@@ -89,6 +90,7 @@ class StrategyTestViewModelTest {
             byeDpiEngine = engine,
             probeFactory = { probe },
             tunnelController = tunnel,
+            geneMemory = GeneMemory(java.io.File.createTempFile("mem", ".json").also { it.deleteOnExit() }),
         ).also { it.ioDispatcher = dispatcher }
     }
 
@@ -137,6 +139,7 @@ class StrategyTestViewModelTest {
             settingsStore = settingsStore, domainListManager = manager,
             savedStrategyStore = savedStore,
             byeDpiEngine = engine, probeFactory = { probe }, tunnelController = tunnel,
+            geneMemory = GeneMemory(java.io.File.createTempFile("mem", ".json").also { it.deleteOnExit() }),
         ).also { it.ioDispatcher = dispatcher }
         advanceUntilIdle()
         vm.onStart()
