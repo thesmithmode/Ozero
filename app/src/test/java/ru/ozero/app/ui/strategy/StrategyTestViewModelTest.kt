@@ -43,6 +43,7 @@ class StrategyTestViewModelTest {
     private lateinit var repo: FakeSettingsRepository
     private lateinit var assets: FakeAssetSource
     private lateinit var store: FakeResultsStore
+    private lateinit var settingsStore: FakeStrategyTestSettingsStore
     private lateinit var engine: FakeByeDpiEngine
     private lateinit var probe: FakeProbeClient
     private lateinit var tunnel: TunnelController
@@ -56,6 +57,7 @@ class StrategyTestViewModelTest {
             sites = listOf("a.example", "b.example"),
         )
         store = FakeResultsStore()
+        settingsStore = FakeStrategyTestSettingsStore()
         engine = FakeByeDpiEngine()
         probe = FakeProbeClient(engine)
         tunnel = TunnelController()
@@ -70,6 +72,7 @@ class StrategyTestViewModelTest {
         repository = repo,
         assetSource = assets,
         resultsStore = store,
+        settingsStore = settingsStore,
         byeDpiEngine = engine,
         probeFactory = { probe },
         tunnelController = tunnel,
@@ -176,6 +179,92 @@ class StrategyTestViewModelTest {
     }
 
     @Test
+    fun `completed strategies bubble to top during run before all complete`() = runTest(dispatcher) {
+        assets = FakeAssetSource(
+            strategies = listOf("-fast-good", "-slow-bad"),
+            sites = listOf("s1", "s2"),
+        )
+        probe.successFor = { _, cmd -> cmd == "-fast-good" }
+        probe.delayMs = 0L
+        val vm = newVm()
+        advanceUntilIdle()
+        vm.onStart()
+        advanceUntilIdle()
+        val list = vm.strategies.value
+        assertEquals("-fast-good", list[0].command, "completed winner sorted first")
+        assertEquals(100, list[0].successPercentage)
+        assertTrue(list[0].isCompleted)
+    }
+
+    @Test
+    fun `parallel probing issues concurrent probe calls for sites`() = runTest(dispatcher) {
+        assets = FakeAssetSource(
+            strategies = listOf("-cmd1"),
+            sites = listOf("a", "b", "c", "d"),
+        )
+        var maxConcurrent = 0
+        var current = 0
+        val lock = Any()
+        probe.beforeProbe = {
+            synchronized(lock) {
+                current++
+                if (current > maxConcurrent) maxConcurrent = current
+            }
+        }
+        probe.afterProbe = {
+            synchronized(lock) { current-- }
+        }
+        probe.delayMs = 50L
+        val vm = newVm()
+        advanceUntilIdle()
+        vm.onStart()
+        advanceUntilIdle()
+        assertTrue(maxConcurrent > 1, "parallel probes should overlap, maxConcurrent=$maxConcurrent")
+    }
+
+    @Test
+    fun `settings loaded from store on init`() = runTest(dispatcher) {
+        settingsStore.stored = StrategyTestSettings(concurrentLimit = 7, timeoutSeconds = 3)
+        val vm = newVm()
+        advanceUntilIdle()
+        assertEquals(7, vm.settings.value.concurrentLimit)
+        assertEquals(3, vm.settings.value.timeoutSeconds)
+    }
+
+    @Test
+    fun `onSettingsChange saves to store and updates flow`() = runTest(dispatcher) {
+        val vm = newVm()
+        advanceUntilIdle()
+        val updated = StrategyTestSettings(concurrentLimit = 5, sniDomain = "cloudflare.com")
+        vm.onSettingsChange(updated)
+        advanceUntilIdle()
+        assertEquals(updated, vm.settings.value)
+        assertEquals(updated, settingsStore.stored)
+    }
+
+    @Test
+    fun `concurrentLimit from settings caps semaphore`() = runTest(dispatcher) {
+        settingsStore.stored = StrategyTestSettings(concurrentLimit = 2)
+        assets = FakeAssetSource(strategies = listOf("-cmd1"), sites = listOf("a", "b", "c", "d", "e"))
+        var maxConcurrent = 0
+        var current = 0
+        val lock = Any()
+        probe.beforeProbe = {
+            synchronized(lock) {
+                current++
+                if (current > maxConcurrent) maxConcurrent = current
+            }
+        }
+        probe.afterProbe = { synchronized(lock) { current-- } }
+        probe.delayMs = 20L
+        val vm = newVm()
+        advanceUntilIdle()
+        vm.onStart()
+        advanceUntilIdle()
+        assertTrue(maxConcurrent <= 2, "semaphore limit=2, maxConcurrent=$maxConcurrent")
+    }
+
+    @Test
     fun `onApply mid-test does not stop test loop`() = runTest(dispatcher) {
         assets = FakeAssetSource(strategies = listOf("-a", "-b", "-c"), sites = listOf("s1"))
         probe.delayMs = 100L
@@ -220,9 +309,13 @@ class StrategyTestViewModelTest {
     ) : SocksProbeClient {
         var delayMs: Long = 0L
         var successFor: (site: String, cmd: String) -> Boolean = { _, _ -> true }
+        var beforeProbe: () -> Unit = {}
+        var afterProbe: () -> Unit = {}
         override suspend fun probe(site: String): ProbeResult {
+            beforeProbe()
             if (delayMs > 0L) delay(delayMs)
             val ok = successFor(site, engine.lastArgs)
+            afterProbe()
             return ProbeResult(site = site, success = ok, durationMs = 1L)
         }
     }
@@ -256,6 +349,12 @@ class StrategyTestViewModelTest {
 
         override suspend fun probe(): ru.ozero.enginescore.ProbeResult =
             ru.ozero.enginescore.ProbeResult.Success(latencyMs = 0L)
+    }
+
+    private class FakeStrategyTestSettingsStore : StrategyTestSettingsStore {
+        var stored: StrategyTestSettings = StrategyTestSettings()
+        override fun load(): StrategyTestSettings = stored
+        override fun save(settings: StrategyTestSettings) { stored = settings }
     }
 
     private class FakeSettingsRepository : SettingsRepository {

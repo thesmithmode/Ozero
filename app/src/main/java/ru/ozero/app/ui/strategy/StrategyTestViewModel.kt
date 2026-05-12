@@ -6,13 +6,18 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.commonvpn.TunnelController
@@ -24,6 +29,7 @@ import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
 import javax.inject.Inject
+import kotlin.math.max
 
 sealed interface StrategyTestError {
     data object VpnRunning : StrategyTestError
@@ -35,6 +41,7 @@ class StrategyTestViewModel @Inject constructor(
     private val repository: ru.ozero.enginescore.settings.SettingsRepository,
     private val assetSource: StrategyAssetSource,
     private val resultsStore: StrategyResultsStore,
+    private val settingsStore: StrategyTestSettingsStore,
     private val byeDpiEngine: EnginePlugin,
     private val probeFactory: StrategyProbeClientFactory,
     private val tunnelController: TunnelController,
@@ -57,6 +64,9 @@ class StrategyTestViewModel @Inject constructor(
     private val _errorMessage = MutableStateFlow<StrategyTestError?>(null)
     val errorMessage: StateFlow<StrategyTestError?> = _errorMessage.asStateFlow()
 
+    private val _settings = MutableStateFlow(StrategyTestSettings())
+    val settings: StateFlow<StrategyTestSettings> = _settings.asStateFlow()
+
     private var testJob: Job? = null
 
     init {
@@ -74,11 +84,21 @@ class StrategyTestViewModel @Inject constructor(
             _sitesText.value = withContext(ioDispatcher) {
                 runCatching { assetSource.loadSites().joinToString("\n") }.getOrDefault("")
             }
+            _settings.value = withContext(ioDispatcher) {
+                runCatching { settingsStore.load() }.getOrDefault(StrategyTestSettings())
+            }
         }
     }
 
     fun onSitesTextChange(text: String) {
         _sitesText.value = text
+    }
+
+    fun onSettingsChange(newSettings: StrategyTestSettings) {
+        _settings.value = newSettings
+        viewModelScope.launch(ioDispatcher) {
+            runCatching { settingsStore.save(newSettings) }
+        }
     }
 
     private fun parseSites(text: String): List<String> =
@@ -89,7 +109,8 @@ class StrategyTestViewModel @Inject constructor(
 
     private fun List<StrategyResult>.sortedForUi(): List<StrategyResult> =
         sortedWith(
-            compareByDescending<StrategyResult> { it.successPercentage }
+            compareByDescending<StrategyResult> { it.isCompleted }
+                .thenByDescending { it.successPercentage }
                 .thenByDescending { it.successCount }
                 .thenBy { if (it.avgDurationMs > 0) it.avgDurationMs else Long.MAX_VALUE }
                 .thenBy { it.command },
@@ -152,55 +173,67 @@ class StrategyTestViewModel @Inject constructor(
     }
 
     private suspend fun runLoop(sites: List<String>) = coroutineScope {
-        val current = _strategies.value
-        for (index in current.indices) {
+        val snap = _settings.value
+        val startTimeoutMs = snap.timeoutSeconds * 1_000L
+        val concurrentLimit = max(1, snap.concurrentLimit)
+        val commands = _strategies.value.map { it.command }
+        for ((loopIdx, command) in commands.withIndex()) {
             if (!currentCoroutineContext().isActive) return@coroutineScope
-            val strategy = _strategies.value[index]
-            _runSummary.value = "Testing ${index + 1}/${_strategies.value.size}: ${strategy.command}"
-            val started = withTimeoutOrNull(START_TIMEOUT_MS) {
+            _runSummary.value = "Testing ${loopIdx + 1}/${commands.size}: $command"
+            val started = withTimeoutOrNull(startTimeoutMs) {
                 byeDpiEngine.start(
-                    config = EngineConfig.ByeDpi(args = strategy.command, socksPort = SOCKS_PORT),
+                    config = EngineConfig.ByeDpi(args = command, socksPort = SOCKS_PORT),
                     upstream = Upstream.None,
                 )
             }
             if (started !is StartResult.Success) {
                 runCatching { byeDpiEngine.stop() }
-                _strategies.value = _strategies.value.toMutableList().also { list ->
-                    list[index] = list[index].copy(
-                        currentProgress = sites.size,
-                        successCount = 0,
-                        isCompleted = true,
-                        lastError = started?.toString() ?: "start timeout",
-                    )
+                _strategies.update { list ->
+                    list.map { s ->
+                        if (s.command == command) s.copy(
+                            currentProgress = sites.size,
+                            successCount = 0,
+                            isCompleted = true,
+                            lastError = started?.toString() ?: "start timeout",
+                        ) else s
+                    }.sortedForUi()
                 }
                 continue
             }
             val probe: SocksProbeClient = probeFactory.create(SOCKS_PORT)
-            var successCount = 0
-            var totalDuration = 0L
-            for (site in sites) {
-                if (!currentCoroutineContext().isActive) {
-                    runCatching { byeDpiEngine.stop() }
-                    return@coroutineScope
+            val semaphore = Semaphore(concurrentLimit)
+            try {
+                coroutineScope {
+                    sites.map { site ->
+                        async {
+                            semaphore.withPermit {
+                                val result = probe.probe(site)
+                                _strategies.update { list ->
+                                    list.map { s ->
+                                        if (s.command == command) {
+                                            val newProgress = s.currentProgress + 1
+                                            val newSuccess = s.successCount + if (result.success) 1 else 0
+                                            val totalDur = s.avgDurationMs * s.currentProgress + result.durationMs
+                                            s.copy(
+                                                currentProgress = newProgress,
+                                                successCount = newSuccess,
+                                                avgDurationMs = totalDur / newProgress.coerceAtLeast(1),
+                                                lastSite = site,
+                                                lastError = if (result.success) null else "probe failed",
+                                            )
+                                        } else s
+                                    }
+                                }
+                            }
+                        }
+                    }.awaitAll()
                 }
-                val result = probe.probe(site)
-                if (result.success) successCount++
-                totalDuration += result.durationMs
-                _strategies.value = _strategies.value.toMutableList().also { list ->
-                    val cur = list[index]
-                    val processed = cur.currentProgress + 1
-                    list[index] = cur.copy(
-                        currentProgress = processed,
-                        successCount = successCount,
-                        avgDurationMs = totalDuration / processed.coerceAtLeast(1),
-                        lastSite = site,
-                        lastError = if (result.success) null else "probe failed",
-                    )
-                }
+            } finally {
+                runCatching { byeDpiEngine.stop() }
             }
-            runCatching { byeDpiEngine.stop() }
-            _strategies.value = _strategies.value.toMutableList().also { list ->
-                list[index] = list[index].copy(isCompleted = true)
+            _strategies.update { list ->
+                list.map { s -> if (s.command == command) s.copy(isCompleted = true) else s }
+                    .sortedForUi()
             }
         }
     }
@@ -208,6 +241,5 @@ class StrategyTestViewModel @Inject constructor(
     private companion object {
         const val TAG: String = "StrategyTestVM"
         const val SOCKS_PORT: Int = 1080
-        const val START_TIMEOUT_MS: Long = 6_000L
     }
 }

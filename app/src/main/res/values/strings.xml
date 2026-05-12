@@ -199,6 +199,14 @@
     <string name="strategy_test_no_sites">Список тестовых сайтов пуст.</string>
     <string name="strategy_test_error_close">Закрыть</string>
     <string name="strategy_test_sites_label">Сайты для проверки (по одному в строке)</string>
+    <string name="strategy_settings_title">Настройки теста</string>
+    <string name="strategy_settings_requests_per_domain">Запросов на домен (1–20)</string>
+    <string name="strategy_settings_concurrent_limit">Параллельных проб (1–50)</string>
+    <string name="strategy_settings_timeout">Таймаут старта, сек (1–15)</string>
+    <string name="strategy_settings_delay">Задержка между стратегиями, мс (0–5000)</string>
+    <string name="strategy_settings_sni">SNI домен</string>
+    <string name="strategy_settings_use_custom">Свои стратегии</string>
+    <string name="strategy_settings_custom_strategies">Стратегии (по одной в строке)</string>
 
     <!-- URnetwork -->
     <string name="urnetwork_settings_title">URnetwork</string>

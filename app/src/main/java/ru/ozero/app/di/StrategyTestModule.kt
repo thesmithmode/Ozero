@@ -11,6 +11,8 @@ import ru.ozero.app.ui.strategy.FileStrategyResultsStore
 import ru.ozero.app.ui.strategy.StrategyAssetSource
 import ru.ozero.app.ui.strategy.StrategyProbeClientFactory
 import ru.ozero.app.ui.strategy.StrategyResultsStore
+import ru.ozero.app.ui.strategy.SharedPrefsStrategyTestSettingsStore
+import ru.ozero.app.ui.strategy.StrategyTestSettingsStore
 import ru.ozero.enginebyedpi.ByeDpiEngine
 import ru.ozero.enginebyedpi.strategy.HttpSocksProbeClient
 import ru.ozero.enginescore.EnginePlugin
@@ -35,6 +37,12 @@ object StrategyTestModule {
     fun provideStrategyResultsStore(
         @ApplicationContext context: Context,
     ): StrategyResultsStore = FileStrategyResultsStore(context.filesDir)
+
+    @Provides
+    @Singleton
+    fun provideStrategyTestSettingsStore(
+        @ApplicationContext context: Context,
+    ): StrategyTestSettingsStore = SharedPrefsStrategyTestSettingsStore(context)
 
     @Provides
     fun provideStrategyProbeClientFactory(): StrategyProbeClientFactory =

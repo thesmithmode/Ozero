@@ -101,3 +101,12 @@
 - [`translate.md`](C:/Soft/Projects/Ozero/.claude/rules/translate.md) — **Только baseline-локали.** Из правила берём список обязательных локалей: `ru`, `en`, `es`, `pt`. Архитектура (Next.js URL-locales, namespaced JSON) **не применима** — у Ozero Android `values-{en,es,pt}/strings.xml`. Сейчас активны только `ru`+`en` (W9.1), расширение до `es`+`pt` в W9.2.
 
 <!-- === rules:end === -->
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+Rules:
+Две knowledge-системы, обе используются:
+- `graphify-out/` — структура кода (AST граф): `GRAPH_REPORT.md` (god nodes, communities), `graph.json`, `manifest.json`. Читать `GRAPH_REPORT.md` для ориентирования; для связей — `graphify query "..."`, `graphify path "A" "B"`, `graphify explain "..."`. После правок кода — `graphify update .`. Wiki-subdir у graphify не генерируется в этом проекте, не искать.
+- `.memory/knowledge/index.md` — project knowledge (концепции/lessons/connections), compiled из daily logs. Использовать для "почему так сделано", прошлых багов, неочевидных решений.

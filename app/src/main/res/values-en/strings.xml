@@ -185,6 +185,14 @@
     <string name="strategy_test_no_sites">Test sites list is empty.</string>
     <string name="strategy_test_error_close">Close</string>
     <string name="strategy_test_sites_label">Probe sites (one per line)</string>
+    <string name="strategy_settings_title">Test settings</string>
+    <string name="strategy_settings_requests_per_domain">Requests per domain (1–20)</string>
+    <string name="strategy_settings_concurrent_limit">Concurrent probes (1–50)</string>
+    <string name="strategy_settings_timeout">Start timeout, sec (1–15)</string>
+    <string name="strategy_settings_delay">Delay between strategies, ms (0–5000)</string>
+    <string name="strategy_settings_sni">SNI domain</string>
+    <string name="strategy_settings_use_custom">Custom strategies</string>
+    <string name="strategy_settings_custom_strategies">Strategies (one per line)</string>
 
     <!-- URnetwork -->
     <string name="urnetwork_settings_title">URnetwork</string>
