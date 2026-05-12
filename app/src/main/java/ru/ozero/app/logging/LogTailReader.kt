@@ -26,10 +26,11 @@ internal object LogTailReader {
 
     private fun tailOf(file: File, len: Long, maxBytes: Long): String {
         if (len <= maxBytes) return runCatching { file.readText() }.getOrDefault("")
+        val safeBytes = minOf(maxBytes, Int.MAX_VALUE.toLong()).toInt()
         return runCatching {
             RandomAccessFile(file, "r").use { raf ->
-                raf.seek(len - maxBytes)
-                val buf = ByteArray(maxBytes.toInt())
+                raf.seek(len - safeBytes)
+                val buf = ByteArray(safeBytes)
                 val read = raf.read(buf)
                 if (read <= 0) "" else String(buf, 0, read, Charsets.UTF_8)
             }

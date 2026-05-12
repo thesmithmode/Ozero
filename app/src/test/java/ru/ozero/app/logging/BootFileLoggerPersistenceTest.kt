@@ -7,7 +7,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
-import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -17,14 +16,7 @@ class BootFileLoggerPersistenceTest {
 
     @BeforeEach
     fun resetLoggerState() {
-        forceReinit()
-    }
-
-    private fun forceReinit() {
-        val field = LogFileStore::class.java.getDeclaredField("targetRef")
-        field.isAccessible = true
-        @Suppress("UNCHECKED_CAST")
-        (field.get(LogFileStore) as AtomicReference<File?>).set(null)
+        LogFileStore.resetForTest()
     }
 
     private fun mockContext(filesDir: File): Context {
@@ -42,7 +34,7 @@ class BootFileLoggerPersistenceTest {
         val pathBefore = targetBefore.absolutePath
         assertTrue(targetBefore.readText().contains("before-restart-marker"))
 
-        forceReinit()
+        LogFileStore.resetForTest()
         BootFileLogger.init(mockContext(tmp))
         BootFileLogger.warn("Session2", "after-restart-marker")
 
@@ -68,7 +60,7 @@ class BootFileLoggerPersistenceTest {
         val sizeBefore = target.length()
         assertTrue(sizeBefore > 0L, "файл должен содержать запись после error()")
 
-        forceReinit()
+        LogFileStore.resetForTest()
         assertTrue(
             target.exists(),
             "файл boot.log не должен исчезать при сбросе in-memory указателя",

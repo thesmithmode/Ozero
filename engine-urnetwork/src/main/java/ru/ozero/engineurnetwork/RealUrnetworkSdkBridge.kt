@@ -231,15 +231,17 @@ class RealUrnetworkSdkBridge(
         }
     }
 
-    override fun setProvidePaused(paused: Boolean) {
+    private inline fun guardedRun(label: String, block: () -> Unit) {
         if (!running.get()) {
-            PersistentLoggers.warn(TAG, "setProvidePaused skipped — bridge not running")
+            PersistentLoggers.warn(TAG, "$label skipped — bridge not running")
             return
         }
-        runCatching {
-            deviceRef.get()?.providePaused = paused
-            Log.i(TAG, "setProvidePaused paused=$paused OK")
-        }.onFailure { PersistentLoggers.warn(TAG, "setProvidePaused($paused) threw: ${it.message}") }
+        runCatching(block).onFailure { PersistentLoggers.warn(TAG, "$label threw: ${it.message}") }
+    }
+
+    override fun setProvidePaused(paused: Boolean) = guardedRun("setProvidePaused($paused)") {
+        deviceRef.get()?.providePaused = paused
+        Log.i(TAG, "setProvidePaused paused=$paused OK")
     }
 
     override fun isProvidePaused(): Boolean {
@@ -247,27 +249,17 @@ class RealUrnetworkSdkBridge(
         return runCatching { deviceRef.get()?.providePaused ?: true }.getOrDefault(true)
     }
 
-    override fun setProvideControlMode(mode: UrnetworkProvideControlMode) {
-        if (!running.get()) {
-            PersistentLoggers.warn(TAG, "setProvideControlMode skipped — bridge not running")
-            return
-        }
-        runCatching {
+    override fun setProvideControlMode(mode: UrnetworkProvideControlMode) =
+        guardedRun("setProvideControlMode(${mode.rawValue})") {
             deviceRef.get()?.provideControlMode = mode.rawValue
             Log.i(TAG, "setProvideControlMode mode=${mode.rawValue} OK")
-        }.onFailure { PersistentLoggers.warn(TAG, "setProvideControlMode(${mode.rawValue}) threw: ${it.message}") }
-    }
-
-    override fun setProvideNetworkMode(mode: UrnetworkProvideNetworkMode) {
-        if (!running.get()) {
-            PersistentLoggers.warn(TAG, "setProvideNetworkMode skipped — bridge not running")
-            return
         }
-        runCatching {
+
+    override fun setProvideNetworkMode(mode: UrnetworkProvideNetworkMode) =
+        guardedRun("setProvideNetworkMode(${mode.rawValue})") {
             deviceRef.get()?.provideNetworkMode = mode.rawValue
             Log.i(TAG, "setProvideNetworkMode mode=${mode.rawValue} OK")
-        }.onFailure { PersistentLoggers.warn(TAG, "setProvideNetworkMode(${mode.rawValue}) threw: ${it.message}") }
-    }
+        }
 
     override fun applyPerformanceProfile(windowType: UrnetworkWindowType, fixedIpSize: Boolean) {
         if (!running.get()) {

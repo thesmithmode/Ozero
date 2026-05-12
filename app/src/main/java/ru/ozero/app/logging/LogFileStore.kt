@@ -59,4 +59,8 @@ internal object LogFileStore {
         val external = runCatching { context.getExternalFilesDir(null) }.getOrNull()
         return if (external != null) File(external, DIR) else File(context.filesDir, DIR)
     }
+
+    internal fun resetForTest() {
+        targetRef.set(null)
+    }
 }
