@@ -82,6 +82,22 @@ class DataStoreUrnetworkConfigStore(
         dataStore.edit { prefs -> prefs[KEY_PROVIDE_ENABLED] = value }
     }
 
+    override fun provideControlMode(): Flow<UrnetworkProvideControlMode> = dataStore.data.map { prefs ->
+        UrnetworkProvideControlMode.fromRaw(prefs[KEY_PROVIDE_CONTROL_MODE])
+    }
+
+    override suspend fun setProvideControlMode(value: UrnetworkProvideControlMode) {
+        dataStore.edit { prefs -> prefs[KEY_PROVIDE_CONTROL_MODE] = value.rawValue }
+    }
+
+    override fun provideNetworkMode(): Flow<UrnetworkProvideNetworkMode> = dataStore.data.map { prefs ->
+        UrnetworkProvideNetworkMode.fromRaw(prefs[KEY_PROVIDE_NETWORK_MODE])
+    }
+
+    override suspend fun setProvideNetworkMode(value: UrnetworkProvideNetworkMode) {
+        dataStore.edit { prefs -> prefs[KEY_PROVIDE_NETWORK_MODE] = value.rawValue }
+    }
+
     private companion object {
         val KEY_WALLET_OVERRIDE = stringPreferencesKey("urnetwork_wallet_override")
         val KEY_BY_JWT = stringPreferencesKey("urnetwork_by_jwt")
@@ -89,5 +105,7 @@ class DataStoreUrnetworkConfigStore(
         val KEY_WINDOW_TYPE = stringPreferencesKey("urnetwork_window_type")
         val KEY_FIXED_IP_SIZE = booleanPreferencesKey("urnetwork_fixed_ip_size")
         val KEY_PROVIDE_ENABLED = booleanPreferencesKey("urnetwork_provide_enabled")
+        val KEY_PROVIDE_CONTROL_MODE = stringPreferencesKey("urnetwork_provide_control_mode")
+        val KEY_PROVIDE_NETWORK_MODE = stringPreferencesKey("urnetwork_provide_network_mode")
     }
 }

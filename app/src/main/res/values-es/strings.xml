@@ -205,4 +205,12 @@
     <string name="evolution_generation_label">Generación %1$d/%2$d</string>
     <string name="evolution_fitness_label">Mejor resultado: %1$d%%</string>
     <string name="evolution_population_label">Población</string>
+    <string name="urnetwork_provide_control_mode_title">Modo de provisión</string>
+    <string name="urnetwork_provide_control_mode_auto">Auto</string>
+    <string name="urnetwork_provide_control_mode_always">Siempre</string>
+    <string name="urnetwork_provide_control_mode_desc">Auto — el sistema decide cuándo proveer. Siempre — proveer mientras esté conectado.</string>
+    <string name="urnetwork_provide_network_mode_title">Red para proveer</string>
+    <string name="urnetwork_provide_network_mode_wifi">Solo Wi-Fi</string>
+    <string name="urnetwork_provide_network_mode_all">Wi-Fi y móvil</string>
+    <string name="urnetwork_provide_network_mode_desc">Wi-Fi — proveer solo por inalámbrica. Wi-Fi y móvil — también por datos móviles.</string>
 </resources>

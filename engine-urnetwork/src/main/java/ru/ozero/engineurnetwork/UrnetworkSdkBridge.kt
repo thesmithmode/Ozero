@@ -27,6 +27,9 @@ interface UrnetworkSdkBridge {
 
     fun applyPerformanceProfile(windowType: UrnetworkWindowType, fixedIpSize: Boolean) {}
 
+    fun setProvideControlMode(mode: UrnetworkProvideControlMode) {}
+    fun setProvideNetworkMode(mode: UrnetworkProvideNetworkMode) {}
+
     fun peerCount(): Int
 
     fun unpaidByteCount(): Long

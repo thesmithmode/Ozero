@@ -28,6 +28,8 @@ import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
+import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
+import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.UrnetworkWindowType
 import java.util.Locale
@@ -71,6 +73,30 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
 
     val fixedIpSize: StateFlow<Boolean> = configStore.fixedIpSize()
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    val provideControlMode: StateFlow<UrnetworkProvideControlMode> = configStore.provideControlMode()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, UrnetworkProvideControlMode.ALWAYS)
+
+    val provideNetworkMode: StateFlow<UrnetworkProvideNetworkMode> = configStore.provideNetworkMode()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, UrnetworkProvideNetworkMode.WIFI)
+
+    fun selectProvideControlMode(value: UrnetworkProvideControlMode) {
+        viewModelScope.launch {
+            configStore.setProvideControlMode(value)
+            if (isUrnetworkActive.value) {
+                runCatching { bridge.setProvideControlMode(value) }
+            }
+        }
+    }
+
+    fun selectProvideNetworkMode(value: UrnetworkProvideNetworkMode) {
+        viewModelScope.launch {
+            configStore.setProvideNetworkMode(value)
+            if (isUrnetworkActive.value) {
+                runCatching { bridge.setProvideNetworkMode(value) }
+            }
+        }
+    }
 
     fun selectWindowType(value: UrnetworkWindowType) {
         viewModelScope.launch {

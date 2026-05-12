@@ -17,4 +17,8 @@ interface UrnetworkConfigStore {
     suspend fun setFixedIpSize(value: Boolean) = Unit
     fun provideEnabled(): Flow<Boolean> = flowOf(true)
     suspend fun setProvideEnabled(value: Boolean) = Unit
+    fun provideControlMode(): Flow<UrnetworkProvideControlMode> = flowOf(UrnetworkProvideControlMode.ALWAYS)
+    suspend fun setProvideControlMode(value: UrnetworkProvideControlMode) = Unit
+    fun provideNetworkMode(): Flow<UrnetworkProvideNetworkMode> = flowOf(UrnetworkProvideNetworkMode.WIFI)
+    suspend fun setProvideNetworkMode(value: UrnetworkProvideNetworkMode) = Unit
 }

@@ -247,6 +247,28 @@ class RealUrnetworkSdkBridge(
         return runCatching { deviceRef.get()?.providePaused ?: true }.getOrDefault(true)
     }
 
+    override fun setProvideControlMode(mode: UrnetworkProvideControlMode) {
+        if (!running.get()) {
+            PersistentLoggers.warn(TAG, "setProvideControlMode skipped — bridge not running")
+            return
+        }
+        runCatching {
+            deviceRef.get()?.provideControlMode = mode.rawValue
+            Log.i(TAG, "setProvideControlMode mode=${mode.rawValue} OK")
+        }.onFailure { PersistentLoggers.warn(TAG, "setProvideControlMode(${mode.rawValue}) threw: ${it.message}") }
+    }
+
+    override fun setProvideNetworkMode(mode: UrnetworkProvideNetworkMode) {
+        if (!running.get()) {
+            PersistentLoggers.warn(TAG, "setProvideNetworkMode skipped — bridge not running")
+            return
+        }
+        runCatching {
+            deviceRef.get()?.provideNetworkMode = mode.rawValue
+            Log.i(TAG, "setProvideNetworkMode mode=${mode.rawValue} OK")
+        }.onFailure { PersistentLoggers.warn(TAG, "setProvideNetworkMode(${mode.rawValue}) threw: ${it.message}") }
+    }
+
     override fun applyPerformanceProfile(windowType: UrnetworkWindowType, fixedIpSize: Boolean) {
         if (!running.get()) {
             PersistentLoggers.warn(TAG, "applyPerformanceProfile skipped — bridge not running")

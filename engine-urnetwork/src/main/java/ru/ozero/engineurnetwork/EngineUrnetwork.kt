@@ -92,6 +92,12 @@ class EngineUrnetwork(
                 val provideEnabled = configStore.provideEnabled().first()
                 runCatching { sdkBridge.setProvidePaused(!provideEnabled) }
                     .onFailure { PersistentLoggers.warn(TAG, "setProvidePaused threw: ${it.message}") }
+                val controlMode = configStore.provideControlMode().first()
+                runCatching { sdkBridge.setProvideControlMode(controlMode) }
+                    .onFailure { PersistentLoggers.warn(TAG, "setProvideControlMode threw: ${it.message}") }
+                val networkMode = configStore.provideNetworkMode().first()
+                runCatching { sdkBridge.setProvideNetworkMode(networkMode) }
+                    .onFailure { PersistentLoggers.warn(TAG, "setProvideNetworkMode threw: ${it.message}") }
                 Log.i(
                     TAG,
                     "started OK preferredCountry=${config.region ?: "<auto>"} " +
