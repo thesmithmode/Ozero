@@ -261,7 +261,9 @@ class AppBackupManagerTest {
         val provider = FakeStrategyBackupProvider()
         provider.exported = BackupStrategy(
             settings = BackupStrategySettings(requestsPerDomain = 3, evolutionMode = true),
-            domainLists = listOf(BackupDomainList("gen", "General", listOf("a.com"), isActive = true, isBuiltIn = true)),
+            domainLists = listOf(
+                BackupDomainList("gen", "General", listOf("a.com"), isActive = true, isBuiltIn = true),
+            ),
             savedStrategies = listOf(BackupSavedStrategy("s1", "-Ku -An", isPinned = true)),
             evolutionMemory = """{"token":{"wins":1.0,"trials":2.0,"lastMs":0}}""",
         )
@@ -299,7 +301,8 @@ class AppBackupManagerTest {
 
     @Test
     fun `v1 backup import produces null strategy`() = runTest {
-        val v1Json = """{"version":1,"exportedAt":"2025-01-01T00:00:00Z","settings":{},"urnetwork":{},"warpSlots":[],"splitRules":[]}"""
+        val v1Json = """{"version":1,"exportedAt":"2025-01-01T00:00:00Z",""" +
+            """"settings":{},"urnetwork":{},"warpSlots":[],"splitRules":[]}"""
         val data = AppBackupSerializer.deserialize(v1Json)
         assertEquals(1, data.version)
         assertEquals(null, data.strategy)
@@ -308,7 +311,9 @@ class AppBackupManagerTest {
     @Test
     fun `strategy export import roundtrip via serializer`() = runTest {
         val strategy = BackupStrategy(
-            settings = BackupStrategySettings(requestsPerDomain = 2, evolutionMode = true, evolutionMutationRate = 0.3f),
+            settings = BackupStrategySettings(
+                requestsPerDomain = 2, evolutionMode = true, evolutionMutationRate = 0.3f,
+            ),
             domainLists = listOf(BackupDomainList("g", "General", listOf("b.com"), true, true)),
             savedStrategies = listOf(BackupSavedStrategy("s1", "-K -An", null, true)),
             evolutionMemory = """{"k":{"wins":0.5,"trials":1.0,"lastMs":0}}""",

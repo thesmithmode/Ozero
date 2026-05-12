@@ -28,7 +28,9 @@ object BackupModule {
         domainListStore: DomainListStore,
         savedStrategyStore: SavedStrategyStore,
         geneMemory: GeneMemory,
-    ): StrategyBackupProvider = StrategyBackupProviderImpl(settingsStore, domainListStore, savedStrategyStore, geneMemory)
+    ): StrategyBackupProvider = StrategyBackupProviderImpl(
+        settingsStore, domainListStore, savedStrategyStore, geneMemory,
+    )
 
     @Provides
     @Singleton

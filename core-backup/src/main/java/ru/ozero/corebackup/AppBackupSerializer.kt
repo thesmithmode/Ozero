@@ -152,19 +152,21 @@ object AppBackupSerializer {
         val strategy = if (root.has("strategy")) {
             val stratObj = root.getJSONObject("strategy")
             val ss = stratObj.optJSONObject("settings")
-            val backupSettings = if (ss != null) BackupStrategySettings(
-                requestsPerDomain = if (ss.has("requestsPerDomain")) ss.getInt("requestsPerDomain") else null,
-                concurrentLimit = if (ss.has("concurrentLimit")) ss.getInt("concurrentLimit") else null,
-                timeoutSeconds = if (ss.has("timeoutSeconds")) ss.getInt("timeoutSeconds") else null,
-                delayBetweenMs = if (ss.has("delayBetweenMs")) ss.getLong("delayBetweenMs") else null,
-                useCustomStrategies = if (ss.has("useCustomStrategies")) ss.getBoolean("useCustomStrategies") else null,
-                customStrategies = ss.optString("customStrategies").takeIf { it.isNotEmpty() },
-                evolutionMode = if (ss.has("evolutionMode")) ss.getBoolean("evolutionMode") else null,
-                evolutionPopulationSize = if (ss.has("evolutionPopulationSize")) ss.getInt("evolutionPopulationSize") else null,
-                evolutionMaxGenerations = if (ss.has("evolutionMaxGenerations")) ss.getInt("evolutionMaxGenerations") else null,
-                evolutionMutationRate = if (ss.has("evolutionMutationRate")) ss.getDouble("evolutionMutationRate").toFloat() else null,
-                evolutionEliteCount = if (ss.has("evolutionEliteCount")) ss.getInt("evolutionEliteCount") else null,
-            ) else null
+            val backupSettings = if (ss != null) {
+                BackupStrategySettings(
+                    requestsPerDomain = if (ss.has("requestsPerDomain")) ss.getInt("requestsPerDomain") else null,
+                    concurrentLimit = if (ss.has("concurrentLimit")) ss.getInt("concurrentLimit") else null,
+                    timeoutSeconds = if (ss.has("timeoutSeconds")) ss.getInt("timeoutSeconds") else null,
+                    delayBetweenMs = if (ss.has("delayBetweenMs")) ss.getLong("delayBetweenMs") else null,
+                    useCustomStrategies = if (ss.has("useCustomStrategies")) ss.getBoolean("useCustomStrategies") else null,
+                    customStrategies = ss.optString("customStrategies").takeIf { it.isNotEmpty() },
+                    evolutionMode = if (ss.has("evolutionMode")) ss.getBoolean("evolutionMode") else null,
+                    evolutionPopulationSize = ss.intOrNull("evolutionPopulationSize"),
+                    evolutionMaxGenerations = ss.intOrNull("evolutionMaxGenerations"),
+                    evolutionMutationRate = ss.floatOrNull("evolutionMutationRate"),
+                    evolutionEliteCount = ss.intOrNull("evolutionEliteCount"),
+                )
+            } else null
             val dlArr = stratObj.optJSONArray("domainLists") ?: JSONArray()
             val domainLists = (0 until dlArr.length()).map { i ->
                 val obj = dlArr.getJSONObject(i)
@@ -205,6 +207,10 @@ object AppBackupSerializer {
             strategy = strategy,
         )
     }
+
+    private fun JSONObject.intOrNull(key: String): Int? = if (has(key)) getInt(key) else null
+
+    private fun JSONObject.floatOrNull(key: String): Float? = if (has(key)) getDouble(key).toFloat() else null
 
     private fun slotToJson(slot: BackupWarpSlot): JSONObject {
         val obj = JSONObject()
