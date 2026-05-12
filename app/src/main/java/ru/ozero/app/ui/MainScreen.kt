@@ -1,6 +1,9 @@
 package ru.ozero.app.ui
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -9,9 +12,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
@@ -19,12 +24,14 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -32,12 +39,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.drawText
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -56,6 +62,7 @@ import ru.ozero.app.ui.theme.OzeroPalette
 import ru.ozero.commonnet.CountryFlag
 import ru.ozero.commonvpn.BytesFormatter
 import ru.ozero.commonvpn.HealthMonitor
+import ru.ozero.commonvpn.SwitchingTransition
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.commonvpn.TunnelStats
 import ru.ozero.enginescore.EngineId
@@ -79,43 +86,52 @@ fun MainScreen(
     val urnetworkPeerSearchSeconds by viewModel.urnetworkPeerSearchSeconds.collectAsStateWithLifecycle()
     val ipInfo by viewModel.ipInfo.collectAsStateWithLifecycle()
     val killswitchActive by viewModel.killswitchActive.collectAsStateWithLifecycle()
+    val switching by viewModel.switching.collectAsStateWithLifecycle()
 
-    val powerState = state.toPowerDiscState()
-    val backgroundState = state.toBackgroundState()
+    val powerState = if (switching != null) PowerDiscState.Switching else state.toPowerDiscState()
+    val backgroundState = if (switching != null) OzeroBackgroundState.Connecting else state.toBackgroundState()
     val isConnected = state is TunnelState.Connected
 
     OzeroBackground(state = backgroundState) {
-        when (appMode) {
-            AppMode.SIMPLE -> SimpleMainContent(
-                tunnelState = state,
-                powerState = powerState,
-                isConnected = isConnected,
-                manualEngine = manualEngine,
-                urnetworkPeerCount = urnetworkPeerCount,
-                urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
-                onConnectClick = onConnectClick,
-                onOpenEngineParams = onOpenEngineParams,
-                onOpenSettings = onOpenSettings,
-            )
-            AppMode.EXPERT -> ExpertMainContent(
-                tunnelState = state,
-                stats = stats,
-                speedHistory = speedHistory,
-                stagnant = stagnant,
-                healthStatus = healthStatus,
-                powerState = powerState,
-                isConnected = isConnected,
-                manualEngine = manualEngine,
-                urnetworkPeerCount = urnetworkPeerCount,
-                urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
-                ipInfo = ipInfo,
-                killswitchActive = killswitchActive,
-                onConnectClick = onConnectClick,
-                onManualEngineSelect = viewModel::onManualEngineSelect,
-                onRefreshIpInfo = viewModel::refreshIpInfo,
-                onOpenEngineParams = onOpenEngineParams,
-                onOpenSettings = onOpenSettings,
-            )
+        AnimatedContent(
+            targetState = appMode,
+            transitionSpec = { fadeIn() togetherWith fadeOut() },
+            label = "mode_switch",
+        ) { mode ->
+            when (mode) {
+                AppMode.SIMPLE -> SimpleMainContent(
+                    tunnelState = state,
+                    switching = switching,
+                    powerState = powerState,
+                    isConnected = isConnected,
+                    manualEngine = manualEngine,
+                    urnetworkPeerCount = urnetworkPeerCount,
+                    urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
+                    onConnectClick = onConnectClick,
+                    onOpenEngineParams = onOpenEngineParams,
+                    onOpenSettings = onOpenSettings,
+                )
+                AppMode.EXPERT -> ExpertMainContent(
+                    tunnelState = state,
+                    switching = switching,
+                    stats = stats,
+                    speedHistory = speedHistory,
+                    stagnant = stagnant,
+                    healthStatus = healthStatus,
+                    powerState = powerState,
+                    isConnected = isConnected,
+                    manualEngine = manualEngine,
+                    urnetworkPeerCount = urnetworkPeerCount,
+                    urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
+                    ipInfo = ipInfo,
+                    killswitchActive = killswitchActive,
+                    onConnectClick = onConnectClick,
+                    onManualEngineSelect = viewModel::onManualEngineSelect,
+                    onRefreshIpInfo = viewModel::refreshIpInfo,
+                    onOpenEngineParams = onOpenEngineParams,
+                    onOpenSettings = onOpenSettings,
+                )
+            }
         }
     }
 }
@@ -124,6 +140,7 @@ fun MainScreen(
 @Composable
 private fun SimpleMainContent(
     tunnelState: TunnelState,
+    switching: SwitchingTransition?,
     powerState: PowerDiscState,
     isConnected: Boolean,
     manualEngine: EngineId?,
@@ -142,7 +159,9 @@ private fun SimpleMainContent(
     ) {
         Spacer(modifier = Modifier.height(20.dp))
 
-        AnimatedContent(targetState = tunnelState, label = "status") { s -> StatusLabel(s) }
+        AnimatedContent(targetState = switching to tunnelState, label = "status") { (sw, s) ->
+            StatusLabel(s, sw)
+        }
 
         Box(
             modifier = Modifier.fillMaxWidth(),
@@ -157,7 +176,8 @@ private fun SimpleMainContent(
             )
         }
 
-        if (isConnected && manualEngine == EngineId.URNETWORK) {
+        val visualConnected = isConnected || switching != null
+        if (visualConnected && manualEngine == EngineId.URNETWORK) {
             UrnetworkPeerBadge(
                 count = urnetworkPeerCount,
                 searchSeconds = urnetworkPeerSearchSeconds,
@@ -208,6 +228,7 @@ private const val URNETWORK_PEER_SEARCH_VISIBLE_THRESHOLD_S: Int = 20
 @Composable
 private fun ExpertMainContent(
     tunnelState: TunnelState,
+    switching: SwitchingTransition?,
     stats: TunnelStats?,
     speedHistory: List<Pair<Float, Float>>,
     stagnant: Boolean,
@@ -232,7 +253,9 @@ private fun ExpertMainContent(
     ) {
         Spacer(modifier = Modifier.height(16.dp))
 
-        AnimatedContent(targetState = tunnelState, label = "status") { s -> StatusLabel(s) }
+        AnimatedContent(targetState = switching to tunnelState, label = "status") { (sw, s) ->
+            StatusLabel(s, sw)
+        }
 
         Box(
             modifier = Modifier.fillMaxWidth(),
@@ -252,6 +275,7 @@ private fun ExpertMainContent(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            val visualConnected = isConnected || switching != null
             if (killswitchActive) {
                 Text(
                     text = stringResource(R.string.killswitch_active_badge),
@@ -260,48 +284,46 @@ private fun ExpertMainContent(
                     modifier = Modifier.testTag(MainScreenTestTags.KILLSWITCH_BADGE),
                 )
             }
-            if (isConnected && manualEngine == EngineId.URNETWORK) {
+            if (visualConnected && manualEngine == EngineId.URNETWORK) {
                 UrnetworkPeerBadge(
                     count = urnetworkPeerCount,
                     searchSeconds = urnetworkPeerSearchSeconds,
                 )
             }
-            if (isConnected) {
+            if (visualConnected) {
                 IpInfoCard(
                     state = ipInfo,
                     onRefresh = onRefreshIpInfo,
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
             }
-            if (isConnected) {
-                TrafficStatsCard(
-                    stats = stats,
-                    speedHistory = speedHistory,
-                    modifier = Modifier.padding(horizontal = 16.dp),
+            TrafficStatsCard(
+                stats = stats,
+                speedHistory = speedHistory,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+            if (visualConnected && stagnant) {
+                Text(
+                    text = stringResource(R.string.main_stagnation_warning),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.testTag(MainScreenTestTags.STAGNATION_BADGE),
                 )
-                if (stagnant) {
+            }
+            if (visualConnected && healthStatus == HealthMonitor.Status.DEGRADED) {
+                Column(
+                    modifier = Modifier.testTag(MainScreenTestTags.HEALTH_DEGRADED_BADGE),
+                ) {
                     Text(
-                        text = stringResource(R.string.main_stagnation_warning),
+                        text = stringResource(R.string.main_health_degraded),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.testTag(MainScreenTestTags.STAGNATION_BADGE),
                     )
-                }
-                if (healthStatus == HealthMonitor.Status.DEGRADED) {
-                    Column(
-                        modifier = Modifier.testTag(MainScreenTestTags.HEALTH_DEGRADED_BADGE),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.main_health_degraded),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                        Text(
-                            text = stringResource(R.string.main_health_degraded_hint),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                    Text(
+                        text = stringResource(R.string.main_health_degraded_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
 
@@ -411,7 +433,7 @@ private fun IpInfoCard(
                             )
                         } else {
                             Text(
-                                text = state.info.country
+                                text = state.info.country?.takeIf { it.isNotBlank() }
                                     ?: stringResource(R.string.ip_card_country_unknown),
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                                 color = OzeroPalette.Text,
@@ -466,6 +488,15 @@ private fun TrafficStatsCard(
     val rxTotal = BytesFormatter.humanReadable(stats?.rxBytes ?: 0L)
     val txTotal = BytesFormatter.humanReadable(stats?.txBytes ?: 0L)
     val uptime = BytesFormatter.durationHms(sessionMs)
+
+    var selectedTf by remember { mutableStateOf(TimeframeOption.S30) }
+    val displayHistory = remember(speedHistory, selectedTf) {
+        val n = selectedTf.points
+        val slice = speedHistory.takeLast(n)
+        val padded = if (slice.size < n) List(n - slice.size) { 0f to 0f } + slice else slice
+        downsample(padded, CHART_MAX_RENDER_POINTS)
+    }
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -475,32 +506,44 @@ private fun TrafficStatsCard(
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(
-                text = "↓ $rxSpeed   ↑ $txSpeed",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = OzeroPalette.Text,
-            )
-            Text(
-                text = stringResource(R.string.stats_uptime, uptime),
-                style = MaterialTheme.typography.bodySmall,
-                color = OzeroPalette.Text3,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            LiveTrafficChart(
-                history = speedHistory,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(72.dp),
-            )
-            Spacer(modifier = Modifier.height(6.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                Text(
+                    text = "↓ $rxSpeed  ↑ $txSpeed",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = OzeroPalette.Text,
+                )
+                Text(
+                    text = stringResource(R.string.stats_uptime, uptime),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OzeroPalette.Text3,
+                )
+            }
+            LiveTrafficChart(
+                history = displayHistory,
+                selectedTf = selectedTf,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(96.dp),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TimeframeOption.entries.forEach { tf ->
+                    FilterChip(
+                        selected = selectedTf == tf,
+                        onClick = { selectedTf = tf },
+                        label = { Text(stringResource(tf.labelRes), style = MaterialTheme.typography.labelSmall) },
+                    )
+                }
+                Spacer(modifier = Modifier.weight(1f))
                 Text(
                     text = "↓ $rxTotal",
                     style = MaterialTheme.typography.bodySmall,
@@ -519,87 +562,124 @@ private fun TrafficStatsCard(
 @Composable
 private fun LiveTrafficChart(
     history: List<Pair<Float, Float>>,
+    selectedTf: TimeframeOption,
     modifier: Modifier = Modifier,
 ) {
     val colorRx = OzeroPalette.Aqua
     val colorTx = OzeroPalette.Amber
     val gridColor = OzeroPalette.Text3.copy(alpha = 0.25f)
-    val labelColor = OzeroPalette.Text3
-    val labelStyle = MaterialTheme.typography.labelSmall.copy(color = labelColor)
-    val textMeasurer = rememberTextMeasurer()
+    val borderColor = OzeroPalette.Text3.copy(alpha = 0.35f)
     val density = LocalDensity.current
-    val maxVal = remember(history) {
-        if (history.isEmpty()) 0f else history.maxOf { maxOf(it.first, it.second) }
+
+    val niceMax = remember(history) {
+        val raw = if (history.isEmpty()) 0f else history.maxOf { maxOf(it.first, it.second) }
+        chartNiceMax(raw)
     }
-    val maxLabel = if (maxVal > 0f) BytesFormatter.humanReadablePerSec(maxVal.toDouble()) else ""
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val gridStrokePx = with(density) { 1.dp.toPx() }
-        val gridLines = 4
-        for (i in 0..gridLines) {
-            val y = h * i / gridLines
-            drawLine(
-                color = gridColor,
-                start = androidx.compose.ui.geometry.Offset(0f, y),
-                end = androidx.compose.ui.geometry.Offset(w, y),
-                strokeWidth = gridStrokePx,
-            )
-        }
-        if (maxLabel.isNotEmpty()) {
-            val measured = textMeasurer.measure(maxLabel, style = labelStyle)
-            val labelPad = with(density) { 4.dp.toPx() }
-            val tx = w - measured.size.width - labelPad
-            drawText(
-                textLayoutResult = measured,
-                topLeft = androidx.compose.ui.geometry.Offset(tx.coerceAtLeast(0f), labelPad),
-            )
-        }
-        if (history.size < 2 || maxVal <= 0f) return@Canvas
-        val safeMax = maxVal.coerceAtLeast(1f)
-        val step = w / (history.size - 1)
-        val strokePx = with(density) { 2.dp.toPx() }
-        val stroke = Stroke(width = strokePx, cap = StrokeCap.Round, join = StrokeJoin.Round)
+    val maxLabel = BytesFormatter.humanReadablePerSec(niceMax.toDouble())
+    val midLabel = BytesFormatter.humanReadablePerSec((niceMax / 2).toDouble())
+    val axisStyle = MaterialTheme.typography.labelSmall.copy(
+        color = OzeroPalette.Text3,
+        fontSize = androidx.compose.ui.unit.TextUnit(8f, androidx.compose.ui.unit.TextUnitType.Sp),
+    )
 
-        val pathRx = Path()
-        history.forEachIndexed { i, (rx, _) ->
-            val x = i * step
-            val y = h - (rx / safeMax) * h
-            if (i == 0) pathRx.moveTo(x, y) else pathRx.lineTo(x, y)
+    Column(modifier = modifier) {
+        Row(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.width(44.dp).fillMaxHeight(),
+                verticalArrangement = Arrangement.SpaceBetween,
+                horizontalAlignment = Alignment.End,
+            ) {
+                Text(maxLabel, style = axisStyle)
+                Text(midLabel, style = axisStyle)
+                Text("0", style = axisStyle)
+            }
+            Spacer(modifier = Modifier.width(4.dp))
+            Canvas(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                val w = size.width
+                val h = size.height
+                val linePx = with(density) { 1.dp.toPx() }
+                val gridDivs = 4
+                for (i in 1 until gridDivs) {
+                    val y = h * i / gridDivs
+                    drawLine(gridColor, Offset(0f, y), Offset(w, y), linePx)
+                }
+                val timeDivs = 4
+                for (i in 1 until timeDivs) {
+                    val x = w * i / timeDivs
+                    drawLine(gridColor, Offset(x, 0f), Offset(x, h), linePx)
+                }
+                drawRect(borderColor, style = Stroke(width = linePx))
+                if (history.size < 2 || niceMax <= 0f) return@Canvas
+                val step = w / (history.size - 1)
+                val curvePx = with(density) { 2.dp.toPx() }
+                val stroke = Stroke(width = curvePx, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                val pathRx = Path()
+                pathRx.addSmooth(history.map { it.first }, step, h, niceMax)
+                drawPath(pathRx, colorRx, style = stroke)
+                val pathTx = Path()
+                pathTx.addSmooth(history.map { it.second }, step, h, niceMax)
+                drawPath(pathTx, colorTx, style = stroke)
+            }
         }
-        drawPath(pathRx, color = colorRx, style = stroke)
-
-        val pathTx = Path()
-        history.forEachIndexed { i, (_, tx) ->
-            val x = i * step
-            val y = h - (tx / safeMax) * h
-            if (i == 0) pathTx.moveTo(x, y) else pathTx.lineTo(x, y)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 48.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(chartTimeAgo(selectedTf.points), style = axisStyle)
+            Text(chartTimeAgo(selectedTf.points * 3 / 4), style = axisStyle)
+            Text(chartTimeAgo(selectedTf.points / 2), style = axisStyle)
+            Text(chartTimeAgo(selectedTf.points / 4), style = axisStyle)
+            Text("now", style = axisStyle)
         }
-        drawPath(pathTx, color = colorTx, style = stroke)
     }
 }
 
+private fun chartNiceMax(bps: Float): Float {
+    if (bps <= 0f) return 10_240f
+    val levels = floatArrayOf(
+        1_024f, 2_048f, 5_120f,
+        10_240f, 20_480f, 51_200f,
+        102_400f, 204_800f, 512_000f,
+        1_048_576f, 2_097_152f, 5_242_880f,
+        10_485_760f, 20_971_520f, 52_428_800f,
+        104_857_600f, 209_715_200f,
+    )
+    return levels.firstOrNull { it > bps * 1.1f } ?: (bps * 2f)
+}
+
+private fun chartTimeAgo(seconds: Int): String = when {
+    seconds >= 3_600 -> "-${seconds / 3_600}h"
+    seconds >= 60 -> "-${seconds / 60}m"
+    else -> "-${seconds}s"
+}
+
 @Composable
-private fun StatusLabel(state: TunnelState) {
-    val labelRes = when (state) {
-        is TunnelState.Idle -> R.string.main_status_disconnected
-        is TunnelState.Probing -> if (state.engineId == ru.ozero.enginescore.EngineId.WARP) {
-            R.string.main_status_probing_warp
-        } else {
-            R.string.main_status_probing
+private fun StatusLabel(state: TunnelState, switching: SwitchingTransition? = null) {
+    val labelRes = when {
+        switching != null -> R.string.main_status_switching
+        else -> when (state) {
+            is TunnelState.Idle -> R.string.main_status_disconnected
+            is TunnelState.Probing -> if (state.engineId == ru.ozero.enginescore.EngineId.WARP) {
+                R.string.main_status_probing_warp
+            } else {
+                R.string.main_status_probing
+            }
+            is TunnelState.Connecting -> R.string.main_status_connecting
+            is TunnelState.Connected -> R.string.main_status_connected
+            is TunnelState.Failed -> R.string.main_status_failed
+            is TunnelState.Disconnecting -> R.string.main_status_disconnecting
         }
-        is TunnelState.Connecting -> R.string.main_status_connecting
-        is TunnelState.Connected -> R.string.main_status_connected
-        is TunnelState.Failed -> R.string.main_status_failed
-        is TunnelState.Disconnecting -> R.string.main_status_disconnecting
     }
-    val engine = when (state) {
-        is TunnelState.Connecting -> state.engineId.name
-        is TunnelState.Connected -> state.engineId.name
-        is TunnelState.Failed -> state.engineId.name
-        else -> null
+    val engine = when {
+        switching != null -> switching.from?.name
+        else -> when (state) {
+            is TunnelState.Connecting -> state.engineId.name
+            is TunnelState.Connected -> state.engineId.name
+            is TunnelState.Failed -> state.engineId.name
+            else -> null
+        }
     }
-    val failedReason = (state as? TunnelState.Failed)?.reason
+    val failedReason = if (switching != null) null else (state as? TunnelState.Failed)?.reason
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = stringResource(labelRes),
@@ -627,3 +707,35 @@ private fun StatusLabel(state: TunnelState) {
 private const val DOCK_TAB_HOME = "home"
 private const val DOCK_TAB_SERVERS = "servers"
 private const val DOCK_TAB_SETTINGS = "settings"
+
+internal const val CHART_MAX_RENDER_POINTS = 300
+
+private enum class TimeframeOption(val labelRes: Int, val points: Int) {
+    S30(R.string.chart_tf_30s, 30),
+    M5(R.string.chart_tf_5min, 300),
+    M30(R.string.chart_tf_30min, 1_800),
+    H1(R.string.chart_tf_1h, 3_600),
+}
+
+internal fun downsample(history: List<Pair<Float, Float>>, maxPoints: Int): List<Pair<Float, Float>> {
+    if (history.size <= maxPoints) return history
+    val step = history.size.toDouble() / maxPoints
+    return List(maxPoints) { i -> history[(i * step).toInt()] }
+}
+
+private fun Path.addSmooth(values: List<Float>, step: Float, height: Float, safeMax: Float) {
+    if (values.size < 2) {
+        if (values.size == 1) moveTo(0f, height - (values[0] / safeMax) * height)
+        return
+    }
+    val xs = List(values.size) { i -> i * step }
+    val ys = values.map { height - (it / safeMax) * height }
+    moveTo(xs[0], ys[0])
+    val midXs = List(values.size - 1) { i -> (xs[i] + xs[i + 1]) / 2f }
+    val midYs = List(values.size - 1) { i -> (ys[i] + ys[i + 1]) / 2f }
+    lineTo(midXs[0], midYs[0])
+    for (i in 1 until values.size - 1) {
+        quadraticBezierTo(xs[i], ys[i], midXs[i], midYs[i])
+    }
+    lineTo(xs.last(), ys.last())
+}

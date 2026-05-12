@@ -1,23 +1,22 @@
 package ru.ozero.enginebyedpi
 
+import io.mockk.mockk
 import org.junit.jupiter.api.Test
-import kotlin.test.assertTrue
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
 
 class ByeDpiPreflightTest {
 
     @Test
     fun `ByeDpiEngine возвращает ByeDpiPreflight как preflight`() {
-        val source = java.io.File("src/main/java/ru/ozero/enginebyedpi/ByeDpiEngine.kt").readText()
-        assertTrue(
-            source.contains("override fun preflight()") && source.contains("ByeDpiPreflight()"),
-            "ByeDpiEngine.preflight() должен возвращать ByeDpiPreflight",
-        )
+        val proxy = mockk<ByeDpiProxy>(relaxed = true)
+        val engine = ByeDpiEngine(proxy = proxy, socksProbe = { _, _, _ -> 1L })
+        assertIs<ByeDpiPreflight>(engine.preflight())
     }
 
     @Test
     fun `ByeDpiPreflight нацелен на 1 1 1 1 443`() {
-        val source = java.io.File("src/main/java/ru/ozero/enginebyedpi/ByeDpiPreflight.kt").readText()
-        assertTrue(source.contains("1.1.1.1"), "host 1.1.1.1")
-        assertTrue(source.contains("443"), "port 443")
+        assertEquals("1.1.1.1", ByeDpiPreflight.HOST)
+        assertEquals(443, ByeDpiPreflight.PORT)
     }
 }

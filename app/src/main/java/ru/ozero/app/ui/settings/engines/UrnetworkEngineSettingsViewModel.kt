@@ -1,5 +1,6 @@
 package ru.ozero.app.ui.settings.engines
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.bringyour.sdk.ConnectLocation
@@ -7,21 +8,30 @@ import com.bringyour.sdk.FilteredLocations
 import com.bringyour.sdk.LocationsViewController
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import android.util.Log
-import ru.ozero.engineurnetwork.UrnetworkConfigStore
-import ru.ozero.engineurnetwork.UrnetworkSdkBridge
-import ru.ozero.engineurnetwork.UrnetworkWindowType
+import ru.ozero.commonvpn.TunnelController
+import ru.ozero.commonvpn.TunnelState
+import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.settings.SettingsRepository
+import ru.ozero.engineurnetwork.UrnetworkConfigStore
+import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
+import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
+import ru.ozero.engineurnetwork.UrnetworkSdkBridge
+import ru.ozero.engineurnetwork.UrnetworkWindowType
 import java.util.Locale
 import javax.inject.Inject
 
@@ -44,12 +54,19 @@ sealed interface UrnetworkSettingsUiState {
     ) : UrnetworkSettingsUiState
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class UrnetworkEngineSettingsViewModel @Inject constructor(
     private val bridge: UrnetworkSdkBridge,
     private val settingsRepository: SettingsRepository,
     private val configStore: UrnetworkConfigStore,
+    private val tunnelController: TunnelController,
 ) : ViewModel() {
+
+    private val isUrnetworkActive: StateFlow<Boolean> = tunnelController.state
+        .map { s -> s is TunnelState.Connected && s.engineId == EngineId.URNETWORK }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     val windowType: StateFlow<UrnetworkWindowType> = configStore.windowType()
         .stateIn(viewModelScope, SharingStarted.Eagerly, UrnetworkWindowType.AUTO)
@@ -57,20 +74,48 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     val fixedIpSize: StateFlow<Boolean> = configStore.fixedIpSize()
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    val provideControlMode: StateFlow<UrnetworkProvideControlMode> = configStore.provideControlMode()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, UrnetworkProvideControlMode.ALWAYS)
+
+    val provideNetworkMode: StateFlow<UrnetworkProvideNetworkMode> = configStore.provideNetworkMode()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, UrnetworkProvideNetworkMode.WIFI)
+
+    fun selectProvideControlMode(value: UrnetworkProvideControlMode) {
+        viewModelScope.launch {
+            configStore.setProvideControlMode(value)
+            if (isUrnetworkActive.value) {
+                runCatching { bridge.setProvideControlMode(value) }
+            }
+        }
+    }
+
+    fun selectProvideNetworkMode(value: UrnetworkProvideNetworkMode) {
+        viewModelScope.launch {
+            configStore.setProvideNetworkMode(value)
+            if (isUrnetworkActive.value) {
+                runCatching { bridge.setProvideNetworkMode(value) }
+            }
+        }
+    }
+
     fun selectWindowType(value: UrnetworkWindowType) {
         viewModelScope.launch {
             configStore.setWindowType(value)
             if (value == UrnetworkWindowType.AUTO) {
                 configStore.setFixedIpSize(false)
             }
-            runCatching { bridge.applyPerformanceProfile(value, fixedIpSize.value) }
+            if (isUrnetworkActive.value) {
+                runCatching { bridge.applyPerformanceProfile(value, fixedIpSize.value) }
+            }
         }
     }
 
     fun toggleFixedIpSize(value: Boolean) {
         viewModelScope.launch {
             configStore.setFixedIpSize(value)
-            runCatching { bridge.applyPerformanceProfile(windowType.value, value) }
+            if (isUrnetworkActive.value) {
+                runCatching { bridge.applyPerformanceProfile(windowType.value, value) }
+            }
         }
     }
 
@@ -79,48 +124,84 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
 
     val searchQuery = MutableStateFlow("")
 
-    val peerCount: StateFlow<Int> = flow {
-        while (true) {
-            emit(bridge.peerCount())
-            delay(PEER_COUNT_POLL_MS)
+    val peerCount: StateFlow<Int> = isUrnetworkActive.flatMapLatest { active ->
+        if (active) {
+            flow {
+                while (true) {
+                    emit(bridge.peerCount())
+                    delay(PEER_COUNT_POLL_MS)
+                }
+            }
+        } else {
+            flowOf(0)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(POLLER_KEEP_ALIVE_MS), 0)
 
-    val unpaidBytes: StateFlow<Long> = flow {
-        while (true) {
-            bridge.fetchTransferStats()
-            emit(bridge.unpaidByteCount())
-            delay(PROVIDER_STATS_POLL_MS)
+    val unpaidBytes: StateFlow<Long> = isUrnetworkActive.flatMapLatest { active ->
+        if (active) {
+            flow {
+                while (true) {
+                    bridge.fetchTransferStats()
+                    emit(bridge.unpaidByteCount())
+                    delay(PROVIDER_STATS_POLL_MS)
+                }
+            }
+        } else {
+            flowOf(0L)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(POLLER_KEEP_ALIVE_MS), 0L)
 
-    val subscriptionBalance: StateFlow<UrnetworkSdkBridge.SubscriptionBalanceSnapshot?> = flow {
-        while (true) {
-            emit(bridge.fetchSubscriptionBalance())
-            delay(SUBSCRIPTION_BALANCE_POLL_MS)
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(POLLER_KEEP_ALIVE_MS), null)
+    val subscriptionBalance: StateFlow<UrnetworkSdkBridge.SubscriptionBalanceSnapshot?> =
+        isUrnetworkActive.flatMapLatest { active ->
+            if (active) {
+                flow {
+                    while (true) {
+                        emit(bridge.fetchSubscriptionBalance())
+                        delay(SUBSCRIPTION_BALANCE_POLL_MS)
+                    }
+                }
+            } else {
+                flowOf<UrnetworkSdkBridge.SubscriptionBalanceSnapshot?>(null)
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(POLLER_KEEP_ALIVE_MS), null)
 
     @Volatile private var locationsVc: LocationsViewController? = null
     private var allCountries: List<UrnetworkLocationItem> = emptyList()
 
     init {
         viewModelScope.launch {
-            var attempt = 0
-            while (attempt < REFRESH_RETRY_ATTEMPTS && _uiState.value !is UrnetworkSettingsUiState.Ready) {
-                refreshOnce()
-                if (_uiState.value is UrnetworkSettingsUiState.Ready) break
-                attempt++
-                if (attempt < REFRESH_RETRY_ATTEMPTS) delay(REFRESH_RETRY_DELAY_MS)
+            isUrnetworkActive.collect { active ->
+                if (active) {
+                    var attempt = 0
+                    while (attempt < REFRESH_RETRY_ATTEMPTS && _uiState.value !is UrnetworkSettingsUiState.Ready) {
+                        if (!isUrnetworkActive.value) break
+                        refreshOnce()
+                        if (_uiState.value is UrnetworkSettingsUiState.Ready) break
+                        attempt++
+                        if (attempt < REFRESH_RETRY_ATTEMPTS) delay(REFRESH_RETRY_DELAY_MS)
+                    }
+                } else {
+                    teardownLocationsVc()
+                    allCountries = emptyList()
+                    _uiState.value = UrnetworkSettingsUiState.NotConnected
+                }
             }
         }
     }
 
     fun refresh() {
+        if (!isUrnetworkActive.value) {
+            _uiState.value = UrnetworkSettingsUiState.NotConnected
+            return
+        }
         viewModelScope.launch { refreshOnce() }
     }
 
     private suspend fun refreshOnce() {
+        if (!isUrnetworkActive.value) {
+            _uiState.value = UrnetworkSettingsUiState.NotConnected
+            return
+        }
         Log.i(TAG, "refresh: openLocationsViewController")
         val vc = withContext(Dispatchers.Main.immediate) {
             runCatching { bridge.openLocationsViewController() }
@@ -137,10 +218,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
             _uiState.value = UrnetworkSettingsUiState.NotConnected
             return
         }
-        locationsVc?.also {
-            runCatching { it.stop() }
-            runCatching { it.close() }
-        }
+        teardownLocationsVc()
         locationsVc = vc
         withContext(Dispatchers.Main.immediate) {
             runCatching {
@@ -160,6 +238,10 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     }
 
     fun selectLocation(location: ConnectLocation?) {
+        if (!isUrnetworkActive.value) {
+            PersistentLoggers.warn(TAG, "selectLocation skipped — URnetwork engine not active")
+            return
+        }
         if (location == null) {
             bridge.connectBestAvailable()
         } else {
@@ -182,7 +264,10 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     }
 
     fun setProvidePaused(paused: Boolean) {
-        bridge.setProvidePaused(paused)
+        if (isUrnetworkActive.value) {
+            bridge.setProvidePaused(paused)
+        }
+        viewModelScope.launch { configStore.setProvideEnabled(!paused) }
         val current = _uiState.value
         if (current is UrnetworkSettingsUiState.Ready) {
             _uiState.value = current.copy(providePaused = paused)
@@ -229,19 +314,36 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         val current = _uiState.value
         val selectedLocation = if (current is UrnetworkSettingsUiState.Ready) {
             current.selectedLocation
-        } else {
+        } else if (isUrnetworkActive.value) {
             bridge.selectedLocation()
+        } else {
+            null
         }
         val providePaused = if (current is UrnetworkSettingsUiState.Ready) {
             current.providePaused
-        } else {
+        } else if (isUrnetworkActive.value) {
             bridge.isProvidePaused()
+        } else {
+            false
         }
         _uiState.value = UrnetworkSettingsUiState.Ready(
             countries = filtered,
             selectedLocation = selectedLocation,
             providePaused = providePaused,
         )
+    }
+
+    private fun teardownLocationsVc() {
+        locationsVc?.also {
+            runCatching { it.stop() }
+            runCatching { it.close() }
+        }
+        locationsVc = null
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        teardownLocationsVc()
     }
 
     companion object {
@@ -259,14 +361,5 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
             val second = code[1].uppercaseChar().code - 'A'.code + 0x1F1E6
             return String(intArrayOf(first, second), 0, 2)
         }
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        locationsVc?.also {
-            runCatching { it.stop() }
-            runCatching { it.close() }
-        }
-        locationsVc = null
     }
 }

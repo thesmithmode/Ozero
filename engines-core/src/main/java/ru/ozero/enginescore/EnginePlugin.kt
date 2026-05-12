@@ -13,4 +13,10 @@ interface EnginePlugin {
     fun preflight(): EnginePreflight? = null
 
     suspend fun ipProbeRoute(socksPort: Int): IpProbeRoute = IpProbeRoute.Default
+
+    fun stopTimeoutMs(): Long = DEFAULT_STOP_TIMEOUT_MS
+
+    companion object {
+        const val DEFAULT_STOP_TIMEOUT_MS = 2_000L
+    }
 }

@@ -66,7 +66,7 @@ class NativeHevTunnelGateway(
 
     // libhev internal mutex deadlock: TProxyStopService без предшествующего TProxyStartService
     // блокирует следующий start (waits forever на handshake mutex). Поэтому stop() — no-op
-    // если start не был успешен. v1.0.5: воспроизводилось когда URnetwork падал на step 0
+    // если start не был успешен: воспроизводилось когда URnetwork падал на step 0
     // → performShutdown вызывал tunnelGateway.stop() → следующий BYEDPI start висел.
     override fun stop() {
         if (!started.compareAndSet(true, false)) {

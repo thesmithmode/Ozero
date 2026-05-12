@@ -1,5 +1,6 @@
 package ru.ozero.app.di
 
+import android.content.ComponentName
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
@@ -17,6 +18,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
+import ru.ozero.app.warp.WarpEngineService
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
@@ -28,6 +30,7 @@ import ru.ozero.enginewarp.HttpUrlConnectionClient
 import ru.ozero.enginewarp.MirrorRanker
 import ru.ozero.enginewarp.PrefsMirrorRanker
 import ru.ozero.enginewarp.ProxyWarpAutoConfig
+import ru.ozero.enginewarp.RemoteAwgRuntime
 import ru.ozero.enginewarp.RealWarpSdkBridge
 import ru.ozero.enginewarp.WarpAutoConfig
 import ru.ozero.enginewarp.WarpConfFileImporter
@@ -95,7 +98,12 @@ object WarpModule {
     @Singleton
     fun provideWarpSdkBridge(
         @ApplicationContext context: Context,
-    ): WarpSdkBridge = RealWarpSdkBridge(context)
+    ): WarpSdkBridge = RealWarpSdkBridge(
+        RemoteAwgRuntime(
+            context,
+            ComponentName(context, WarpEngineService::class.java),
+        ),
+    )
 
     @Provides
     @Singleton

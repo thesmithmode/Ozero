@@ -115,12 +115,12 @@ jobs:
       - name: Download native binaries
         run: ./gradlew :engine-byedpi:downloadBinaries --stacktrace
 
-      - name: Download URnetwork AAR (urnetwork-sdk only — Portal Tor parity)
+      - name: Get URnetwork AAR tag
+        id: aar-tag
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          mkdir -p engine-urnetwork/libs
           TAG=$(gh release list --limit 100 --json tagName \
             | grep -oE '"urnetwork-sdk-[a-f0-9]{8}"' \
             | head -n1 | tr -d '"')
@@ -128,8 +128,22 @@ jobs:
             echo "::error::no urnetwork-sdk release found"
             exit 1
           fi
-          echo "Download $TAG"
-          gh release download "$TAG" -p "*" -D engine-urnetwork/libs --clobber
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Cache URnetwork AAR
+        uses: actions/cache@v4
+        id: aar-cache
+        with:
+          path: engine-urnetwork/libs
+          key: urnetwork-aar-${{ steps.aar-tag.outputs.tag }}
+
+      - name: Download URnetwork AAR (urnetwork-sdk only — Portal Tor parity)
+        if: steps.aar-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p engine-urnetwork/libs
+          gh release download "${{ steps.aar-tag.outputs.tag }}" -p "*" -D engine-urnetwork/libs --clobber
           ls -la engine-urnetwork/libs/
 
       - name: assembleDebug
@@ -174,12 +188,12 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' }}
 
-      - name: Download URnetwork AAR
+      - name: Get URnetwork AAR tag
+        id: aar-tag
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          mkdir -p engine-urnetwork/libs
           TAG=$(gh release list --limit 100 --json tagName \
             | grep -oE '"urnetwork-sdk-[a-f0-9]{8}"' \
             | head -n1 | tr -d '"')
@@ -187,7 +201,22 @@ jobs:
             echo "::error::no urnetwork-sdk release found"
             exit 1
           fi
-          gh release download "$TAG" -p "*" -D engine-urnetwork/libs --clobber
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Cache URnetwork AAR
+        uses: actions/cache@v4
+        id: aar-cache
+        with:
+          path: engine-urnetwork/libs
+          key: urnetwork-aar-${{ steps.aar-tag.outputs.tag }}
+
+      - name: Download URnetwork AAR
+        if: steps.aar-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p engine-urnetwork/libs
+          gh release download "${{ steps.aar-tag.outputs.tag }}" -p "*" -D engine-urnetwork/libs --clobber
 
       - name: testDebugUnitTest + coverage
         run: ./gradlew :app:testDebugUnitTest :app:jacocoTestReport :app:jacocoTestCoverageVerification --stacktrace --continue
@@ -330,12 +359,12 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' }}
 
-      - name: Download URnetwork AAR
+      - name: Get URnetwork AAR tag
+        id: aar-tag
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          mkdir -p engine-urnetwork/libs
           TAG=$(gh release list --limit 100 --json tagName \
             | grep -oE '"urnetwork-sdk-[a-f0-9]{8}"' \
             | head -n1 | tr -d '"')
@@ -343,7 +372,22 @@ jobs:
             echo "::error::no urnetwork-sdk release found"
             exit 1
           fi
-          gh release download "$TAG" -p "*" -D engine-urnetwork/libs --clobber
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Cache URnetwork AAR
+        uses: actions/cache@v4
+        id: aar-cache
+        with:
+          path: engine-urnetwork/libs
+          key: urnetwork-aar-${{ steps.aar-tag.outputs.tag }}
+
+      - name: Download URnetwork AAR
+        if: steps.aar-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p engine-urnetwork/libs
+          gh release download "${{ steps.aar-tag.outputs.tag }}" -p "*" -D engine-urnetwork/libs --clobber
 
       - name: testDebugUnitTest + coverage
         run: >
@@ -400,12 +444,12 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' }}
 
-      - name: Download URnetwork AAR
+      - name: Get URnetwork AAR tag
+        id: aar-tag
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          mkdir -p engine-urnetwork/libs
           TAG=$(gh release list --limit 100 --json tagName \
             | grep -oE '"urnetwork-sdk-[a-f0-9]{8}"' \
             | head -n1 | tr -d '"')
@@ -413,7 +457,22 @@ jobs:
             echo "::error::no urnetwork-sdk release found"
             exit 1
           fi
-          gh release download "$TAG" -p "*" -D engine-urnetwork/libs --clobber
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Cache URnetwork AAR
+        uses: actions/cache@v4
+        id: aar-cache
+        with:
+          path: engine-urnetwork/libs
+          key: urnetwork-aar-${{ steps.aar-tag.outputs.tag }}
+
+      - name: Download URnetwork AAR
+        if: steps.aar-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p engine-urnetwork/libs
+          gh release download "${{ steps.aar-tag.outputs.tag }}" -p "*" -D engine-urnetwork/libs --clobber
 
       - name: testDebugUnitTest + coverage
         run: >

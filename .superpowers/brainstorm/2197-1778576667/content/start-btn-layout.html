@@ -1,0 +1,102 @@
+<h2>Где кнопка Start и как выглядит сортировка</h2>
+<p class="subtitle">Выбери вариант расположения кнопки «Начать тест» и поведение списка во время теста</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">A — Текущий (кнопка в TopBar)</div>
+    <div class="mockup-body" style="font-size:13px;font-family:monospace">
+      <div style="background:#1e1e2e;color:#cdd6f4;padding:8px;border-radius:4px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+        <span>← Подбор стратегий</span>
+        <button style="background:#313244;color:#cdd6f4;border:none;padding:4px 10px;border-radius:4px;font-size:11px">▶ Начать</button>
+      </div>
+      <div style="background:#181825;color:#a6adc8;padding:6px;border-radius:4px;margin-bottom:6px;font-size:11px">
+        rutracker.org<br>nyaa.si<br>rutor.org
+      </div>
+      <div style="color:#6c7086;font-size:10px;margin-bottom:6px">Тестировано: 0 / 74, 3 сайта</div>
+      <div style="background:#181825;border-radius:4px;padding:6px;margin-bottom:4px">
+        <div style="color:#cdd6f4;font-size:10px">-s1 -q1 -a1 -Y -Ar</div>
+        <div style="color:#6c7086;font-size:9px">ожидание...</div>
+      </div>
+      <div style="background:#181825;border-radius:4px;padding:6px;margin-bottom:4px">
+        <div style="color:#cdd6f4;font-size:10px">-s5 -o2 -At -f-1</div>
+        <div style="color:#6c7086;font-size:9px">ожидание...</div>
+      </div>
+      <div style="background:#181825;border-radius:4px;padding:6px">
+        <div style="color:#cdd6f4;font-size:10px">-Ku -An -d4</div>
+        <div style="color:#6c7086;font-size:9px">ожидание...</div>
+      </div>
+      <div style="color:#585b70;font-size:9px;margin-top:6px">... ещё 71 стратегия</div>
+    </div>
+    <div style="font-size:11px;color:#6c7086;padding:8px">Кнопка в шапке — неочевидно, мелкая, не акцент</div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">B — Кнопка по центру внизу (FAB)</div>
+    <div class="mockup-body" style="font-size:13px;font-family:monospace;position:relative;min-height:260px">
+      <div style="background:#1e1e2e;color:#cdd6f4;padding:8px;border-radius:4px;margin-bottom:8px">
+        <span>← Подбор стратегий</span>
+      </div>
+      <div style="background:#181825;color:#a6adc8;padding:6px;border-radius:4px;margin-bottom:6px;font-size:11px">
+        rutracker.org<br>nyaa.si<br>rutor.org
+      </div>
+      <div style="color:#6c7086;font-size:10px;margin-bottom:6px">Тестировано: 0 / 74, 3 сайта</div>
+      <div style="background:#181825;border-radius:4px;padding:6px;margin-bottom:4px">
+        <div style="color:#cdd6f4;font-size:10px">-s1 -q1 -a1 -Y -Ar</div>
+        <div style="color:#6c7086;font-size:9px">ожидание...</div>
+      </div>
+      <div style="background:#181825;border-radius:4px;padding:6px;margin-bottom:4px">
+        <div style="color:#cdd6f4;font-size:10px">-s5 -o2 -At -f-1</div>
+        <div style="color:#6c7086;font-size:9px">ожидание...</div>
+      </div>
+      <div style="background:#181825;border-radius:4px;padding:6px">
+        <div style="color:#cdd6f4;font-size:10px">-Ku -An -d4</div>
+        <div style="color:#6c7086;font-size:9px">ожидание...</div>
+      </div>
+      <div style="text-align:center;margin-top:10px">
+        <button style="background:#89b4fa;color:#1e1e2e;border:none;padding:10px 40px;border-radius:24px;font-size:13px;font-weight:bold">▶ Начать тест</button>
+      </div>
+    </div>
+    <div style="font-size:11px;color:#6c7086;padding:8px">Акцентная кнопка снизу по центру — очевидна, привычная позиция для Android</div>
+  </div>
+</div>
+
+<div style="margin-top:24px">
+  <h3>Реалтаймовая сортировка во время теста</h3>
+  <p class="subtitle">Какое поведение предпочтительно?</p>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="sort-realtime" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Сортировка в реальном времени</h3>
+      <p>Каждая завершённая стратегия сразу всплывает наверх по %. Список «живёт» — видишь лучших прямо сейчас. Немного визуального хаоса.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="sort-end" onclick="toggleSelect(this)">
+    <div class="letter">D</div>
+    <div class="content">
+      <h3>Сортировка только в конце</h3>
+      <p>Во время теста: завершённые стратегии поднимаются выше незавершённых. Финальная сортировка по % — только когда всё закончилось. Стабильнее для чтения.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="sort-both" onclick="toggleSelect(this)">
+    <div class="letter">E</div>
+    <div class="content">
+      <h3>Завершённые сначала + % в конце</h3>
+      <p>Во время теста: завершённые > незавершённые (как в оригинальном ByeDPI). После всех — дополнительная сортировка по %. Рекомендую этот вариант.</p>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top:16px;background:#313244;border-radius:8px;padding:12px">
+  <div style="color:#a6e3a1;font-size:11px;margin-bottom:6px">★ Как в оригинальном ByeDPI (вариант E):</div>
+  <div style="font-size:11px;color:#cdd6f4;font-family:monospace">
+    <div style="background:#1e1e2e;padding:4px 8px;border-radius:4px;margin-bottom:3px">✓ <span style="color:#a6e3a1">67%</span> · -Ku -An -d4 · avg 312ms   [завершена первой]</div>
+    <div style="background:#1e1e2e;padding:4px 8px;border-radius:4px;margin-bottom:3px">✓ <span style="color:#f38ba8">0%</span> · -s1 -q1 -a1 -Y · avg 0ms   [завершена, провал]</div>
+    <div style="background:#181825;padding:4px 8px;border-radius:4px;margin-bottom:3px;opacity:0.6">⟳ <span style="color:#fab387">33%</span> · -s5 -o2 -At ... · тестируется сейчас</div>
+    <div style="background:#181825;padding:4px 8px;border-radius:4px;margin-bottom:3px;opacity:0.4">○ -f-1 -r1+s ...   [ожидание]</div>
+  </div>
+</div>
+
+<p style="color:#585b70;font-size:11px;margin-top:12px">Кликни варианты выше (можно несколько) или просто напиши в терминале</p>

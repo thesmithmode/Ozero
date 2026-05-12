@@ -49,11 +49,8 @@ class OzeroAppWarmupTest {
         val onCreateBody = funBody(source, "onCreate")
         assertFalse(
             onCreateBody.contains("UrnetworkRuntime.ensure"),
-            "UrnetworkRuntime.ensure() без GoRuntimeGuard.acquire(URNETWORK) активирует libgojni " +
-                "goroutines при старте приложения. Когда пользователь затем выбирает WARP, " +
-                "libam-go запускается concurrent с уже активными libgojni goroutines — " +
-                "два Go GC в одном процессе → gcWriteBarrier abort через 2+ часа (Nubia NX729J v0.2.x). " +
-                "ensure() должен вызываться только из RealUrnetworkSdkBridge после acquire(URNETWORK).",
+            "UrnetworkRuntime.ensure() вызывает SDK init при старте приложения — до любых VPN операций. " +
+                "ensure() должен вызываться только из RealUrnetworkSdkBridge.start().",
         )
     }
 

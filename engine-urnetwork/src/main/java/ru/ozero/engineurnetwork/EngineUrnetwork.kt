@@ -52,6 +52,8 @@ class EngineUrnetwork(
 
     private val _stats = MutableStateFlow(EngineStats())
 
+    override fun stopTimeoutMs(): Long = URN_STOP_TIMEOUT_MS
+
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
         require(config is EngineConfig.Urnetwork) { "EngineUrnetwork требует EngineConfig.Urnetwork" }
         require(upstream is Upstream.None) {
@@ -87,6 +89,15 @@ class EngineUrnetwork(
                 val fixedIp = configStore.fixedIpSize().first()
                 runCatching { sdkBridge.applyPerformanceProfile(windowType, fixedIp) }
                     .onFailure { PersistentLoggers.warn(TAG, "applyPerformanceProfile threw: ${it.message}") }
+                val provideEnabled = configStore.provideEnabled().first()
+                runCatching { sdkBridge.setProvidePaused(!provideEnabled) }
+                    .onFailure { PersistentLoggers.warn(TAG, "setProvidePaused threw: ${it.message}") }
+                val controlMode = configStore.provideControlMode().first()
+                runCatching { sdkBridge.setProvideControlMode(controlMode) }
+                    .onFailure { PersistentLoggers.warn(TAG, "setProvideControlMode threw: ${it.message}") }
+                val networkMode = configStore.provideNetworkMode().first()
+                runCatching { sdkBridge.setProvideNetworkMode(networkMode) }
+                    .onFailure { PersistentLoggers.warn(TAG, "setProvideNetworkMode threw: ${it.message}") }
                 Log.i(
                     TAG,
                     "started OK preferredCountry=${config.region ?: "<auto>"} " +
@@ -168,7 +179,7 @@ class EngineUrnetwork(
         return when (val r = authService.acquireGuestJwt()) {
             is GuestJwtResult.Success -> {
                 configStore.setByJwt(r.byJwt)
-                PersistentLoggers.info(TAG, "guest jwt acquired and persisted")
+                Log.i(TAG, "guest jwt acquired and persisted")
                 r.byJwt
             }
             is GuestJwtResult.Error -> {
@@ -185,7 +196,7 @@ class EngineUrnetwork(
         return when (val r = authService.acquireClientJwt(byJwt)) {
             is ClientJwtResult.Success -> {
                 configStore.setByClientJwt(r.byClientJwt)
-                PersistentLoggers.info(TAG, "client jwt acquired and persisted")
+                Log.i(TAG, "client jwt acquired and persisted")
                 r.byClientJwt
             }
             is ClientJwtResult.Error -> {
@@ -206,5 +217,7 @@ class EngineUrnetwork(
         const val TUN_MTU = 1440
         const val TUN_PREFIX = 32
         const val STATS_POLL_INTERVAL_MS = 2_000L
+
+        const val URN_STOP_TIMEOUT_MS = 5_000L
     }
 }

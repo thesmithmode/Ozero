@@ -59,10 +59,13 @@ class OzeroApp : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
-        runCatching { System.loadLibrary("am-go") }
-            .onFailure { BootFileLogger.error(TAG, "am-go eager load failed", it) }
+        if (isEngineWarpProcess()) {
+            runCatching { System.loadLibrary("am-go") }
+                .onFailure { BootFileLogger.error(TAG, "am-go eager load failed (engine_warp)", it) }
+            return
+        }
         runCatching { System.loadLibrary("gojni") }
-            .onFailure { BootFileLogger.error(TAG, "gojni eager load failed", it) }
+            .onFailure { BootFileLogger.error(TAG, "gojni eager load failed (main)", it) }
         runCatching {
             AppLogger.attach(logBuffer)
         }.onFailure { BootFileLogger.error(TAG, "AppLogger.attach failed", it) }
@@ -75,6 +78,21 @@ class OzeroApp : Application(), Configuration.Provider {
                 .onFailure { BootFileLogger.warn(TAG, "appListProvider prewarm failed", it) }
         }
     }
+
+    private fun isEngineWarpProcess(): Boolean {
+        val name = if (Build.VERSION.SDK_INT >= 28) {
+            getProcessName()
+        } else {
+            readProcessNameLegacy() ?: return false
+        }
+        return name.endsWith(":engine_warp")
+    }
+
+    private fun readProcessNameLegacy(): String? = runCatching {
+        val bytes = java.io.File("/proc/self/cmdline").readBytes()
+        val end = bytes.indexOf(0.toByte()).takeIf { it >= 0 } ?: bytes.size
+        String(bytes, 0, end, Charsets.UTF_8)
+    }.getOrNull()
 
     private companion object {
         const val TAG = "OzeroApp"

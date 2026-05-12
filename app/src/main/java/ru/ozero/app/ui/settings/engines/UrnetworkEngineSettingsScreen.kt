@@ -45,6 +45,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bringyour.sdk.ConnectLocation
 import ru.ozero.app.R
 import ru.ozero.app.ui.theme.OzeroPalette
+import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
+import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
 import ru.ozero.engineurnetwork.UrnetworkWindowType
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -82,6 +84,8 @@ fun UrnetworkEngineSettingsScreen(
             UrnetworkSettingsUiState.NotConnected -> {
                 val windowType by viewModel.windowType.collectAsStateWithLifecycle()
                 val fixedIp by viewModel.fixedIpSize.collectAsStateWithLifecycle()
+                val provideControlMode by viewModel.provideControlMode.collectAsStateWithLifecycle()
+                val provideNetworkMode by viewModel.provideNetworkMode.collectAsStateWithLifecycle()
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -105,10 +109,14 @@ fun UrnetworkEngineSettingsScreen(
                         unpaidBytes = 0L,
                         windowType = windowType,
                         fixedIp = fixedIp,
+                        provideControlMode = provideControlMode,
+                        provideNetworkMode = provideNetworkMode,
                         showProvide = false,
                         onSetProvidePaused = {},
                         onSelectWindowType = viewModel::selectWindowType,
                         onToggleFixedIp = viewModel::toggleFixedIpSize,
+                        onSelectProvideControlMode = viewModel::selectProvideControlMode,
+                        onSelectProvideNetworkMode = viewModel::selectProvideNetworkMode,
                     )
                 }
             }
@@ -119,6 +127,8 @@ fun UrnetworkEngineSettingsScreen(
                 val balance by viewModel.subscriptionBalance.collectAsStateWithLifecycle()
                 val windowType by viewModel.windowType.collectAsStateWithLifecycle()
                 val fixedIp by viewModel.fixedIpSize.collectAsStateWithLifecycle()
+                val provideControlMode by viewModel.provideControlMode.collectAsStateWithLifecycle()
+                val provideNetworkMode by viewModel.provideNetworkMode.collectAsStateWithLifecycle()
                 LocationListContent(
                     modifier = Modifier.padding(padding),
                     countries = current.countries,
@@ -130,11 +140,15 @@ fun UrnetworkEngineSettingsScreen(
                     searchQuery = searchQuery,
                     windowType = windowType,
                     fixedIp = fixedIp,
+                    provideControlMode = provideControlMode,
+                    provideNetworkMode = provideNetworkMode,
                     onSearchQueryChange = viewModel::setSearchQuery,
                     onSelect = viewModel::selectLocation,
                     onSetProvidePaused = viewModel::setProvidePaused,
                     onSelectWindowType = viewModel::selectWindowType,
                     onToggleFixedIp = viewModel::toggleFixedIpSize,
+                    onSelectProvideControlMode = viewModel::selectProvideControlMode,
+                    onSelectProvideNetworkMode = viewModel::selectProvideNetworkMode,
                 )
             }
         }
@@ -154,11 +168,15 @@ private fun LocationListContent(
     searchQuery: String,
     windowType: UrnetworkWindowType,
     fixedIp: Boolean,
+    provideControlMode: UrnetworkProvideControlMode,
+    provideNetworkMode: UrnetworkProvideNetworkMode,
     onSearchQueryChange: (String) -> Unit,
     onSelect: (ConnectLocation?) -> Unit,
     onSetProvidePaused: (Boolean) -> Unit,
     onSelectWindowType: (UrnetworkWindowType) -> Unit,
     onToggleFixedIp: (Boolean) -> Unit,
+    onSelectProvideControlMode: (UrnetworkProvideControlMode) -> Unit,
+    onSelectProvideNetworkMode: (UrnetworkProvideNetworkMode) -> Unit,
 ) {
     val isBestAvailable = selectedLocation == null || selectedLocation.connectLocationId?.bestAvailable == true
     LazyColumn(
@@ -173,10 +191,14 @@ private fun LocationListContent(
                     unpaidBytes = unpaidBytes,
                     windowType = windowType,
                     fixedIp = fixedIp,
+                    provideControlMode = provideControlMode,
+                    provideNetworkMode = provideNetworkMode,
                     showProvide = true,
                     onSetProvidePaused = onSetProvidePaused,
                     onSelectWindowType = onSelectWindowType,
                     onToggleFixedIp = onToggleFixedIp,
+                    onSelectProvideControlMode = onSelectProvideControlMode,
+                    onSelectProvideNetworkMode = onSelectProvideNetworkMode,
                 )
                 ConsumerProgressCard(balance = balance)
                 ConsentRow()
@@ -238,10 +260,14 @@ private fun SettingsCard(
     unpaidBytes: Long,
     windowType: UrnetworkWindowType,
     fixedIp: Boolean,
+    provideControlMode: UrnetworkProvideControlMode,
+    provideNetworkMode: UrnetworkProvideNetworkMode,
     showProvide: Boolean,
     onSetProvidePaused: (Boolean) -> Unit,
     onSelectWindowType: (UrnetworkWindowType) -> Unit,
     onToggleFixedIp: (Boolean) -> Unit,
+    onSelectProvideControlMode: (UrnetworkProvideControlMode) -> Unit,
+    onSelectProvideNetworkMode: (UrnetworkProvideNetworkMode) -> Unit,
 ) {
     Card(
         modifier = Modifier
@@ -251,37 +277,14 @@ private fun SettingsCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             if (showProvide) {
-                SectionLabel(stringResource(R.string.urnetwork_provide_title))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = stringResource(R.string.urnetwork_provide_subtitle),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = OzeroPalette.Text2,
-                        modifier = Modifier.weight(1f).padding(end = 12.dp),
-                    )
-                    Switch(
-                        checked = !providePaused,
-                        onCheckedChange = { checked -> onSetProvidePaused(!checked) },
-                    )
-                }
-                if (!providePaused) {
-                    val mb = unpaidBytes / 1_000_000.0
-                    Text(
-                        text = stringResource(R.string.urnetwork_provider_unpaid, mb),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = OzeroPalette.Teal,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
-                }
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 12.dp),
-                    color = OzeroPalette.Line,
+                ProvideSection(
+                    providePaused = providePaused,
+                    unpaidBytes = unpaidBytes,
+                    provideControlMode = provideControlMode,
+                    provideNetworkMode = provideNetworkMode,
+                    onSetProvidePaused = onSetProvidePaused,
+                    onSelectProvideControlMode = onSelectProvideControlMode,
+                    onSelectProvideNetworkMode = onSelectProvideNetworkMode,
                 )
             }
             ModeSection(
@@ -292,6 +295,146 @@ private fun SettingsCard(
             )
         }
     }
+}
+
+@Composable
+private fun ProvideSection(
+    providePaused: Boolean,
+    unpaidBytes: Long,
+    provideControlMode: UrnetworkProvideControlMode,
+    provideNetworkMode: UrnetworkProvideNetworkMode,
+    onSetProvidePaused: (Boolean) -> Unit,
+    onSelectProvideControlMode: (UrnetworkProvideControlMode) -> Unit,
+    onSelectProvideNetworkMode: (UrnetworkProvideNetworkMode) -> Unit,
+) {
+    ProvideToggleSection(
+        providePaused = providePaused,
+        unpaidBytes = unpaidBytes,
+        onSetProvidePaused = onSetProvidePaused,
+    )
+    SectionDivider()
+    ProvideControlModeSection(
+        selected = provideControlMode,
+        onSelect = onSelectProvideControlMode,
+    )
+    SectionDivider()
+    ProvideNetworkModeSection(
+        selected = provideNetworkMode,
+        onSelect = onSelectProvideNetworkMode,
+    )
+    SectionDivider()
+}
+
+@Composable
+private fun ProvideToggleSection(
+    providePaused: Boolean,
+    unpaidBytes: Long,
+    onSetProvidePaused: (Boolean) -> Unit,
+) {
+    SectionLabel(stringResource(R.string.urnetwork_provide_title))
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(R.string.urnetwork_provide_subtitle),
+            style = MaterialTheme.typography.bodyMedium,
+            color = OzeroPalette.Text2,
+            modifier = Modifier.weight(1f).padding(end = 12.dp),
+        )
+        Switch(
+            checked = !providePaused,
+            onCheckedChange = { checked -> onSetProvidePaused(!checked) },
+        )
+    }
+    if (!providePaused) {
+        val mb = unpaidBytes / 1_000_000.0
+        Text(
+            text = stringResource(R.string.urnetwork_provider_unpaid, mb),
+            style = MaterialTheme.typography.bodySmall,
+            color = OzeroPalette.Teal,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+    }
+}
+
+@Composable
+private fun SectionDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(vertical = 12.dp),
+        color = OzeroPalette.Line,
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ProvideControlModeSection(
+    selected: UrnetworkProvideControlMode,
+    onSelect: (UrnetworkProvideControlMode) -> Unit,
+) {
+    val modes = listOf(
+        UrnetworkProvideControlMode.AUTO to R.string.urnetwork_provide_control_mode_auto,
+        UrnetworkProvideControlMode.ALWAYS to R.string.urnetwork_provide_control_mode_always,
+    )
+    SectionLabel(stringResource(R.string.urnetwork_provide_control_mode_title))
+    SingleChoiceSegmentedButtonRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+    ) {
+        modes.forEachIndexed { index, (mode, labelRes) ->
+            SegmentedButton(
+                selected = mode == selected,
+                onClick = { onSelect(mode) },
+                shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size),
+            ) {
+                Text(stringResource(labelRes))
+            }
+        }
+    }
+    Text(
+        text = stringResource(R.string.urnetwork_provide_control_mode_desc),
+        style = MaterialTheme.typography.bodySmall,
+        color = OzeroPalette.Text3,
+        modifier = Modifier.padding(top = 6.dp),
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ProvideNetworkModeSection(
+    selected: UrnetworkProvideNetworkMode,
+    onSelect: (UrnetworkProvideNetworkMode) -> Unit,
+) {
+    val modes = listOf(
+        UrnetworkProvideNetworkMode.WIFI to R.string.urnetwork_provide_network_mode_wifi,
+        UrnetworkProvideNetworkMode.ALL to R.string.urnetwork_provide_network_mode_all,
+    )
+    SectionLabel(stringResource(R.string.urnetwork_provide_network_mode_title))
+    SingleChoiceSegmentedButtonRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+    ) {
+        modes.forEachIndexed { index, (mode, labelRes) ->
+            SegmentedButton(
+                selected = mode == selected,
+                onClick = { onSelect(mode) },
+                shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size),
+            ) {
+                Text(stringResource(labelRes))
+            }
+        }
+    }
+    Text(
+        text = stringResource(R.string.urnetwork_provide_network_mode_desc),
+        style = MaterialTheme.typography.bodySmall,
+        color = OzeroPalette.Text3,
+        modifier = Modifier.padding(top = 6.dp),
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

@@ -256,6 +256,81 @@ class AppBackupManagerTest {
         assertEquals("com.example", freshDao.rules.value[0].packageName)
     }
 
+    @Test
+    fun `export includes strategy block when provider present`() = runTest {
+        val provider = FakeStrategyBackupProvider()
+        provider.exported = BackupStrategy(
+            settings = BackupStrategySettings(requestsPerDomain = 3, evolutionMode = true),
+            domainLists = listOf(
+                BackupDomainList("gen", "General", listOf("a.com"), isActive = true, isBuiltIn = true),
+            ),
+            savedStrategies = listOf(BackupSavedStrategy("s1", "-Ku -An", isPinned = true)),
+            evolutionMemory = """{"token":{"wins":1.0,"trials":2.0,"lastMs":0}}""",
+        )
+        val mgr = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao, provider)
+        val data = mgr.export()
+        assertEquals(provider.exported, data.strategy)
+    }
+
+    @Test
+    fun `export strategy block null when no provider`() = runTest {
+        val mgr = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao)
+        val data = mgr.export()
+        assertEquals(null, data.strategy)
+    }
+
+    @Test
+    fun `import calls strategy provider when strategy present`() = runTest {
+        val provider = FakeStrategyBackupProvider()
+        val mgr = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao, provider)
+        val strategy = BackupStrategy(
+            domainLists = listOf(BackupDomainList("id1", "List1", listOf("x.com"), isActive = true, isBuiltIn = false)),
+            savedStrategies = listOf(BackupSavedStrategy("id2", "--cmd", isPinned = false)),
+        )
+        mgr.import(makeMinimalBackup().copy(strategy = strategy))
+        assertEquals(strategy, provider.imported)
+    }
+
+    @Test
+    fun `import strategy null does not call provider`() = runTest {
+        val provider = FakeStrategyBackupProvider()
+        val mgr = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao, provider)
+        mgr.import(makeMinimalBackup())
+        assertEquals(null, provider.imported)
+    }
+
+    @Test
+    fun `v1 backup import produces null strategy`() = runTest {
+        val v1Json = """{"version":1,"exportedAt":"2025-01-01T00:00:00Z",""" +
+            """"settings":{},"urnetwork":{},"warpSlots":[],"splitRules":[]}"""
+        val data = AppBackupSerializer.deserialize(v1Json)
+        assertEquals(1, data.version)
+        assertEquals(null, data.strategy)
+    }
+
+    @Test
+    fun `strategy export import roundtrip via serializer`() = runTest {
+        val strategy = BackupStrategy(
+            settings = BackupStrategySettings(
+                requestsPerDomain = 2, evolutionMode = true, evolutionMutationRate = 0.3f,
+            ),
+            domainLists = listOf(BackupDomainList("g", "General", listOf("b.com"), true, true)),
+            savedStrategies = listOf(BackupSavedStrategy("s1", "-K -An", null, true)),
+            evolutionMemory = """{"k":{"wins":0.5,"trials":1.0,"lastMs":0}}""",
+        )
+        val data = makeMinimalBackup().copy(strategy = strategy)
+        val json = AppBackupSerializer.serialize(data)
+        val restored = AppBackupSerializer.deserialize(json)
+        assertEquals(strategy.settings?.requestsPerDomain, restored.strategy?.settings?.requestsPerDomain)
+        assertEquals(strategy.settings?.evolutionMode, restored.strategy?.settings?.evolutionMode)
+        assertEquals(strategy.settings?.evolutionMutationRate, restored.strategy?.settings?.evolutionMutationRate)
+        assertEquals(1, restored.strategy?.domainLists?.size)
+        assertEquals("b.com", restored.strategy?.domainLists?.first()?.domains?.first())
+        assertEquals(1, restored.strategy?.savedStrategies?.size)
+        assertEquals(true, restored.strategy?.savedStrategies?.first()?.isPinned)
+        assertEquals(strategy.evolutionMemory, restored.strategy?.evolutionMemory)
+    }
+
     private fun makeMinimalBackup() = AppBackupData(
         exportedAt = "2026-05-05T00:00:00Z",
         settings = BackupSettings(
@@ -333,6 +408,16 @@ class AppBackupManagerTest {
 
         override suspend fun delete(packageName: String) {
             rules.value = rules.value.filter { it.packageName != packageName }
+        }
+    }
+
+    private class FakeStrategyBackupProvider : StrategyBackupProvider {
+        var exported: BackupStrategy = BackupStrategy()
+        var imported: BackupStrategy? = null
+
+        override suspend fun export(): BackupStrategy = exported
+        override suspend fun import(strategy: BackupStrategy) {
+            imported = strategy
         }
     }
 }

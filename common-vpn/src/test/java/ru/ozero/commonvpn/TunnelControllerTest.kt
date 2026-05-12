@@ -1,5 +1,10 @@
 package ru.ozero.commonvpn
 
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineId
@@ -445,6 +450,143 @@ class TunnelControllerTest {
             "EWMA α=0.4: Δtx=2000B Δt=1s → rawBps=2000 → smoothed=0.4*2000=800.0, got ${snap.bpsOut}",
         )
         assertEquals(0.0, snap.bpsIn, "rx не менялся → bpsIn=0")
+    }
+
+    @Test
+    fun switchingStartedSetsTransitionAndPersistsThroughIdle() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        controller.onSwitchingStarted(from = EngineId.BYEDPI, to = EngineId.URNETWORK)
+        assertNotNull(controller.switching.value)
+
+        controller.onDisconnecting()
+        assertNotNull(controller.switching.value, "switching marker не должен сбрасываться на Disconnecting")
+
+        controller.reset()
+        assertNotNull(controller.switching.value, "switching marker должен пережить reset → Idle во время смены движка")
+
+        controller.onProbing()
+        controller.onConnecting(EngineId.URNETWORK)
+        assertNotNull(controller.switching.value, "switching marker остаётся пока target engine не Connected")
+
+        controller.onEngineStarted(EngineId.URNETWORK, 1080)
+        assertNull(controller.switching.value, "switching marker очищается при достижении Connected(target)")
+    }
+
+    @Test
+    fun switchingClearedOnFailed() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        controller.onSwitchingStarted(EngineId.BYEDPI, EngineId.URNETWORK)
+        controller.onEngineDied(EngineId.BYEDPI, "boom")
+        assertNull(controller.switching.value, "switching marker очищается на Failed чтобы не висеть навсегда")
+    }
+
+    @Test
+    fun switchingFinishedExplicitClears() {
+        controller.onSwitchingStarted(EngineId.BYEDPI, EngineId.WARP)
+        assertNotNull(controller.switching.value)
+        controller.onSwitchingFinished("test")
+        assertNull(controller.switching.value)
+    }
+
+    @Test
+    fun switchingDoesNotClearOnConnectedOfDifferentEngine() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        controller.onSwitchingStarted(EngineId.BYEDPI, EngineId.URNETWORK)
+        controller.onDisconnecting()
+        controller.reset()
+        controller.onProbing()
+        controller.onConnecting(EngineId.WARP)
+        controller.onEngineStarted(EngineId.WARP, 1080)
+        assertNull(
+            controller.switching.value,
+            "Любой Connected target очищает switching: переход к не-target движку = смена закончилась",
+        )
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun switchingWatchdogAutoClearsOnTimeout() = runTest {
+        val testScope = TestScope(StandardTestDispatcher(testScheduler))
+        val timeoutMs = 12_000L
+        val ctl = TunnelController(
+            watchdogScope = testScope,
+            switchingTimeoutMs = timeoutMs,
+        )
+        ctl.onProbing()
+        ctl.onConnecting(EngineId.BYEDPI)
+        ctl.onEngineStarted(EngineId.BYEDPI, 1080)
+        ctl.onSwitchingStarted(from = EngineId.BYEDPI, to = EngineId.URNETWORK)
+        assertNotNull(ctl.switching.value, "switching должен быть установлен сразу")
+        testScope.testScheduler.advanceTimeBy(timeoutMs - 1)
+        assertNotNull(ctl.switching.value, "watchdog не должен срабатывать до таймаута")
+        testScope.testScheduler.advanceTimeBy(2)
+        assertNull(ctl.switching.value, "watchdog обязан auto-clear switching после ${timeoutMs}ms")
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun switchingWatchdogCancelledOnTerminalTransition() = runTest {
+        val testScope = TestScope(StandardTestDispatcher(testScheduler))
+        val timeoutMs = 12_000L
+        val ctl = TunnelController(
+            watchdogScope = testScope,
+            switchingTimeoutMs = timeoutMs,
+        )
+        ctl.onProbing()
+        ctl.onConnecting(EngineId.BYEDPI)
+        ctl.onEngineStarted(EngineId.BYEDPI, 1080)
+        ctl.onSwitchingStarted(from = EngineId.BYEDPI, to = EngineId.URNETWORK)
+        ctl.onDisconnecting()
+        ctl.reset()
+        ctl.onProbing()
+        ctl.onConnecting(EngineId.URNETWORK)
+        ctl.onEngineStarted(EngineId.URNETWORK, 1080)
+        assertNull(ctl.switching.value, "terminal transition обязан очистить switching")
+        testScope.testScheduler.advanceTimeBy(timeoutMs + 1)
+        assertNull(ctl.switching.value, "повторный watchdog после terminal не должен реактивировать switching")
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun switchingWatchdogCancelledOnExplicitFinish() = runTest {
+        val testScope = TestScope(StandardTestDispatcher(testScheduler))
+        val timeoutMs = 12_000L
+        val ctl = TunnelController(
+            watchdogScope = testScope,
+            switchingTimeoutMs = timeoutMs,
+        )
+        ctl.onSwitchingStarted(from = EngineId.BYEDPI, to = EngineId.WARP)
+        ctl.onSwitchingFinished("explicit")
+        assertNull(ctl.switching.value)
+        testScope.testScheduler.advanceTimeBy(timeoutMs + 1)
+        assertNull(ctl.switching.value, "после explicit finish watchdog не должен реактивироваться")
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun switchingWatchdogRestartsOnNewSwitching() = runTest {
+        val testScope = TestScope(StandardTestDispatcher(testScheduler))
+        val timeoutMs = 12_000L
+        val ctl = TunnelController(
+            watchdogScope = testScope,
+            switchingTimeoutMs = timeoutMs,
+        )
+        ctl.onSwitchingStarted(from = EngineId.BYEDPI, to = EngineId.URNETWORK)
+        testScope.testScheduler.advanceTimeBy(6_000L)
+        ctl.onSwitchingStarted(from = EngineId.BYEDPI, to = EngineId.WARP)
+        testScope.testScheduler.advanceTimeBy(7_000L)
+        assertNotNull(
+            ctl.switching.value,
+            "новый onSwitchingStarted перезапускает watchdog — старый timer должен быть отменён",
+        )
+        testScope.testScheduler.advanceTimeBy(timeoutMs)
+        assertNull(ctl.switching.value, "новый watchdog должен сработать на новом таймауте")
     }
 
     @Test

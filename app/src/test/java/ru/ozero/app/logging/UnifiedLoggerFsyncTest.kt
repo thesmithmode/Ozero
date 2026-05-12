@@ -7,7 +7,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
-import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -17,10 +16,7 @@ class UnifiedLoggerFsyncTest {
 
     @BeforeEach
     fun resetLoggerState() {
-        val field = UnifiedLogger::class.java.getDeclaredField("targetRef")
-        field.isAccessible = true
-        @Suppress("UNCHECKED_CAST")
-        (field.get(UnifiedLogger) as AtomicReference<File?>).set(null)
+        LogFileStore.resetForTest()
     }
 
     private fun mockContext(): Context {

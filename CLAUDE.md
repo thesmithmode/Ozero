@@ -56,7 +56,7 @@
 
 ## Native libs
 
-- `System.loadLibrary` — **только lazy** через идемпотентный `loadOnce()` (см. `hev.TProxyService`, `ByeDpiProxy`). Никогда в `Application.onCreate`, `attachBaseContext`, init-блоках, companion object init. Нарушение → SIGSEGV в JNI_OnLoad на Application bootstrap (v1.0.1 краш). Исключение: `libam-go` + `libgojni` загружаются eager-синхронно в `OzeroApp.onCreate` (main thread, до async-корутин) — два Go-рантайма в одном процессе требуют resident coexistence, иначе concurrent JNI_OnLoad → SIGABRT в gcWriteBarrier.
+- `System.loadLibrary` — **только lazy** через идемпотентный `loadOnce()` (см. `hev.TProxyService`, `ByeDpiProxy`). Никогда в `Application.onCreate`, `attachBaseContext`, init-блоках, companion object init. Нарушение → SIGSEGV в JNI_OnLoad на Application bootstrap (v1.0.1 краш). Исключение: per-process eager-load в `OzeroApp.onCreate` через `isEngineWarpProcess()` guard. `libam-go` грузится **только** в `:engine_warp` (Application.onCreate ветка с return после load). `libgojni` грузится **только** в основном процессе. Coexistence двух Go-рантаймов в одном процессе запрещён — конфликт GC signal handlers → SIGABRT (v0.0.12 на Nubia/RedMagic, 6 tombstones). Process-isolation реализован через `android:process=":engine_warp"` на `WarpEngineService` + AIDL `IWarpEngineProcess`. Защищено `OzeroAppProcessIsolationTest`.
 - `loadOnce()` для `libhev-socks5-tunnel` вызывать **только из main thread** (через `OzeroVpnService.startVpn` до `serviceScope.launch`). Загрузка с coroutine worker → SIGSEGV в vendor `libglnubia.so` `nubia::Messager::timerLoop` на Nubia/RedMagic (v1.0.3 краш). Правило защищено `OzeroVpnServiceLifecycleTest`.
 - `libhev-socks5-tunnel.so` собирать с `APP_CFLAGS=-DPKGNAME=hev` (release.yml + ci.yml). Upstream `src/hev-jni.c` defaults `PKGNAME=hev/htproxy`, без override → `FindClass("hev/htproxy/TProxyService")` = NULL → `RegisterNatives(NULL,...)` → ART `JniAbort` при первом старте VPN (v1.0.2 краш). Защищено `JniContractTest` + step `Assert PKGNAME=hev зашит`.
 - `hev.TProxyService` обязан объявлять **все три** `external fun`: `TProxyStartService(String, Int)`, `TProxyStopService()`, `TProxyGetStats(): LongArray`. Upstream `hev-jni.c` регистрирует ровно эти 3 метода через `RegisterNatives`. Отсутствие любого → `NoSuchMethodError` из `Runtime.nativeLoad` → `libhev` не грузится → tunnel не поднимается (v1.0.2 follow-up). Защищено `JniContractTest`.
@@ -68,6 +68,11 @@
 - LogcatReader → in-memory ring buffer для UI Logs tab.
 - Boot log tab отдельный (Settings → Boot log), очистка только вручную.
 - `PersistentLoggers.error/warn` — для критичных событий, обязанных попасть в boot.log на диск (errors, warnings, JNI pre-blocking checkpoints для hang-диагностики). На success-events запрещено: `Log.i/d` достаточно — UnifiedLogger пишет и в logcat, и в файл через один канал. Дубль `Log.i + PersistentLoggers.info` на success → шум, удалять.
+
+## Коммиты — типовые ловушки
+
+- Удалил вызов → удали импорт. ktlint/detekt режут unused imports как errors.
+- Перед commit: `git diff --staged` → проверить нет ли осиротевших import строк.
 
 ## Тесты — типовые ловушки
 
@@ -96,3 +101,12 @@
 - [`translate.md`](C:/Soft/Projects/Ozero/.claude/rules/translate.md) — **Только baseline-локали.** Из правила берём список обязательных локалей: `ru`, `en`, `es`, `pt`. Архитектура (Next.js URL-locales, namespaced JSON) **не применима** — у Ozero Android `values-{en,es,pt}/strings.xml`. Сейчас активны только `ru`+`en` (W9.1), расширение до `es`+`pt` в W9.2.
 
 <!-- === rules:end === -->
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+Rules:
+Две knowledge-системы, обе используются:
+- `graphify-out/` — структура кода (AST граф): `GRAPH_REPORT.md` (god nodes, communities), `graph.json`, `manifest.json`. Читать `GRAPH_REPORT.md` для ориентирования; для связей — `graphify query "..."`, `graphify path "A" "B"`, `graphify explain "..."`. После правок кода — `graphify update .`. Wiki-subdir у graphify не генерируется в этом проекте, не искать.
+- `.memory/knowledge/index.md` — project knowledge (концепции/lessons/connections), compiled из daily logs. Использовать для "почему так сделано", прошлых багов, неочевидных решений.

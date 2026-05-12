@@ -27,6 +27,7 @@ class EngineUrnetworkContractTest {
         override: String? = null,
         byJwt: String? = null,
         byClientJwt: String? = null,
+        provideEnabled: Boolean = true,
         bridge: FakeUrnetworkSdkBridge = FakeUrnetworkSdkBridge(),
         authService: FakeAuthService = FakeAuthService(),
     ): Triple<EngineUrnetwork, FakeUrnetworkSdkBridge, FakeUrnetworkConfigStore> {
@@ -34,6 +35,7 @@ class EngineUrnetworkContractTest {
             override = override,
             byJwt = byJwt,
             byClientJwt = byClientJwt,
+            initialProvideEnabled = provideEnabled,
         )
         return Triple(EngineUrnetwork(store, bridge, authService), bridge, store)
     }
@@ -274,18 +276,36 @@ class EngineUrnetworkContractTest {
         assertEquals("Best Available", route.country)
     }
 
+    @Test
+    fun `start с provideEnabled=true вызывает setProvidePaused(false) на bridge`() = runTest {
+        val bridge = FakeUrnetworkSdkBridge()
+        val (e, _, _) = engine(byJwt = "j", byClientJwt = "cj", provideEnabled = true, bridge = bridge)
+        e.start(baseConfig, Upstream.None)
+        assertEquals(false, bridge.lastProvidePaused)
+    }
+
+    @Test
+    fun `start с provideEnabled=false вызывает setProvidePaused(true) на bridge`() = runTest {
+        val bridge = FakeUrnetworkSdkBridge()
+        val (e, _, _) = engine(byJwt = "j", byClientJwt = "cj", provideEnabled = false, bridge = bridge)
+        e.start(baseConfig, Upstream.None)
+        assertEquals(true, bridge.lastProvidePaused)
+    }
+
     private class FakeUrnetworkConfigStore(
         override: String?,
         byJwt: String? = null,
         byClientJwt: String? = null,
         initialWindowType: UrnetworkWindowType = UrnetworkWindowType.AUTO,
         initialFixedIp: Boolean = false,
+        initialProvideEnabled: Boolean = true,
     ) : UrnetworkConfigStore {
         private val overrideFlow = MutableStateFlow(override)
         val byJwtFlow = MutableStateFlow(byJwt)
         val byClientJwtFlow = MutableStateFlow(byClientJwt)
         private val windowTypeFlow = MutableStateFlow(initialWindowType)
         private val fixedIpFlow = MutableStateFlow(initialFixedIp)
+        private val provideEnabledFlow = MutableStateFlow(initialProvideEnabled)
         override fun walletAddress(): Flow<String> =
             overrideFlow.map { it ?: UrnetworkDefaults.PRESET_WALLET }
         override fun walletOverride(): Flow<String?> = overrideFlow
@@ -307,6 +327,10 @@ class EngineUrnetworkContractTest {
         override fun fixedIpSize(): Flow<Boolean> = fixedIpFlow
         override suspend fun setFixedIpSize(value: Boolean) {
             fixedIpFlow.value = value
+        }
+        override fun provideEnabled(): Flow<Boolean> = provideEnabledFlow
+        override suspend fun setProvideEnabled(value: Boolean) {
+            provideEnabledFlow.value = value
         }
     }
 
@@ -377,7 +401,10 @@ class EngineUrnetworkContractTest {
         override fun selectedLocation(): com.bringyour.sdk.ConnectLocation? = null
         override fun selectedLocationInfo(): UrnetworkSdkBridge.LocationInfo? = locationInfoResult
         override fun openLocationsViewController(): com.bringyour.sdk.LocationsViewController? = null
-        override fun setProvidePaused(paused: Boolean) = Unit
+        var lastProvidePaused: Boolean? = null
+        override fun setProvidePaused(paused: Boolean) {
+            lastProvidePaused = paused
+        }
         override fun isProvidePaused(): Boolean = true
         override fun peerCount(): Int = 0
         override fun unpaidByteCount(): Long = 0L

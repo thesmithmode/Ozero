@@ -157,7 +157,7 @@ class MainViewModelTest {
         }
     }
 
-    private class FakeUrnetworkBridge(var peers: Int = 0) : UrnetworkSdkBridge {
+    private class FakeUrnetworkBridge(var peers: Int = 0, var running: Boolean = true) : UrnetworkSdkBridge {
         override suspend fun start(
             walletAddress: String,
             apiUrl: String,
@@ -165,7 +165,7 @@ class MainViewModelTest {
             byClientJwt: String,
         ): UrnetworkSdkBridge.StartResult = UrnetworkSdkBridge.StartResult.Success
         override suspend fun stop() = Unit
-        override fun isRunning(): Boolean = false
+        override fun isRunning(): Boolean = running
         override suspend fun attachTun(tunFd: Int): UrnetworkSdkBridge.AttachResult =
             UrnetworkSdkBridge.AttachResult.Success
         override fun connectTo(location: ConnectLocation) = Unit
@@ -235,6 +235,48 @@ class MainViewModelTest {
     @Test
     fun statsInitiallyNull() {
         assertNull(viewModel.stats.value)
+    }
+
+    @Test
+    fun speedHistoryRetainedDuringSwitching() = runTest {
+        val sample = TunnelStats(txPackets = 1, txBytes = 100, rxPackets = 2, rxBytes = 200, timestampMs = 1)
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
+        tunnelController.updateStats(sample)
+        advanceUntilIdle()
+        val historyDuringConnected = viewModel.speedHistory.value
+        assert(historyDuringConnected.isNotEmpty()) { "speedHistory должна заполниться на updateStats" }
+
+        tunnelController.onSwitchingStarted(EngineId.BYEDPI, EngineId.WARP)
+        tunnelController.onDisconnecting()
+        tunnelController.reset()
+        advanceUntilIdle()
+
+        assertEquals(
+            historyDuringConnected,
+            viewModel.speedHistory.value,
+            "speedHistory НЕ должна сбрасываться когда switching активен — это причина прыжков графика",
+        )
+    }
+
+    @Test
+    fun speedHistoryClearedWhenNotSwitching() = runTest {
+        val sample = TunnelStats(txPackets = 1, txBytes = 100, rxPackets = 2, rxBytes = 200, timestampMs = 1)
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
+        tunnelController.updateStats(sample)
+        advanceUntilIdle()
+        assert(viewModel.speedHistory.value.isNotEmpty())
+
+        tunnelController.onDisconnecting()
+        tunnelController.reset()
+        advanceUntilIdle()
+
+        assert(viewModel.speedHistory.value.isEmpty()) {
+            "без активного switching speedHistory обязана очиститься на reset (stats=null)"
+        }
     }
 
     @Test
@@ -360,6 +402,7 @@ class MainViewModelTest {
 
     @Test
     fun ipInfoFetchesViaSocksOnByedpiConnected() = runTest {
+        backgroundScope.launch { viewModel.ipInfo.collect {} }
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.BYEDPI)
         tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
@@ -377,6 +420,7 @@ class MainViewModelTest {
 
     @Test
     fun ipInfoFetchesDirectForWarp() = runTest {
+        backgroundScope.launch { viewModel.ipInfo.collect {} }
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.WARP)
         tunnelController.onEngineStarted(EngineId.WARP, 0)
@@ -401,12 +445,14 @@ class MainViewModelTest {
 
     @Test
     fun ipInfoErrorForUrnetworkWhenLocationUnavailable() = runTest {
+        backgroundScope.launch { viewModel.ipInfo.collect {} }
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.URNETWORK)
         tunnelController.onEngineStarted(EngineId.URNETWORK, 0)
-        advanceUntilIdle()
-        kotlinx.coroutines.delay(6_000)
-        advanceUntilIdle()
+        runCurrent()
+        // 3000ms warmup + 2×1500ms retry delays = 6000ms total
+        advanceTimeBy(7_000)
+        runCurrent()
         val s = viewModel.ipInfo.value
         assertIs<IpInfoState.Error>(
             s,
@@ -422,12 +468,13 @@ class MainViewModelTest {
             IpProbeRoute.StaticLocation(country = "Germany", countryCode = "DE")
         }
         val vm = newViewModel(plugins = setOf(byedpiPlugin, warpPlugin, staticUrnetwork))
+        backgroundScope.launch { vm.ipInfo.collect {} }
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.URNETWORK)
         tunnelController.onEngineStarted(EngineId.URNETWORK, 0)
-        advanceUntilIdle()
-        kotlinx.coroutines.delay(2_500)
-        advanceUntilIdle()
+        runCurrent()
+        advanceTimeBy(4_500)
+        runCurrent()
         val s = vm.ipInfo.value
         assertIs<IpInfoState.Loaded>(s)
         assertEquals("", s.info.ip, "StaticLocation не несёт IP — только страну.")
@@ -437,7 +484,32 @@ class MainViewModelTest {
     }
 
     @Test
+    fun ipInfoUpdatesWhenUrnetworkLocationChangesDuringSession() = runTest {
+        var countryCode = "US"
+        val dynamicUrnetwork = FakeEnginePlugin(EngineId.URNETWORK) {
+            IpProbeRoute.StaticLocation(country = "Country", countryCode = countryCode)
+        }
+        val vm = newViewModel(plugins = setOf(byedpiPlugin, warpPlugin, dynamicUrnetwork))
+        backgroundScope.launch { vm.ipInfo.collect {} }
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.URNETWORK)
+        tunnelController.onEngineStarted(EngineId.URNETWORK, 0)
+        runCurrent()
+        advanceTimeBy(4_500)
+        runCurrent()
+        assertEquals("US", (vm.ipInfo.value as IpInfoState.Loaded).info.countryCode)
+        countryCode = "DE"
+        advanceTimeBy(4_000)
+        runCurrent()
+        val s = vm.ipInfo.value
+        assertIs<IpInfoState.Loaded>(s)
+        assertEquals("DE", s.info.countryCode)
+        assertEquals(0, ipInfoProvider.calls, "StaticLocation — нет HTTP запросов.")
+    }
+
+    @Test
     fun ipInfoBackToIdleOnDisconnect() = runTest {
+        backgroundScope.launch { viewModel.ipInfo.collect {} }
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.BYEDPI)
         tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
@@ -451,6 +523,7 @@ class MainViewModelTest {
 
     @Test
     fun ipInfoErrorOnProviderFailure() = runTest {
+        backgroundScope.launch { viewModel.ipInfo.collect {} }
         ipInfoProvider.result = Result.failure(java.io.IOException("network down"))
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.BYEDPI)
@@ -465,6 +538,7 @@ class MainViewModelTest {
 
     @Test
     fun ipInfoNotRefetchedOnSameSession() = runTest {
+        backgroundScope.launch { viewModel.ipInfo.collect {} }
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.BYEDPI)
         tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
@@ -476,6 +550,7 @@ class MainViewModelTest {
 
     @Test
     fun refreshIpInfoForcesRefetch() = runTest {
+        backgroundScope.launch { viewModel.ipInfo.collect {} }
         viewModel.refreshIpInfo()
         advanceUntilIdle()
         val s = viewModel.ipInfo.value

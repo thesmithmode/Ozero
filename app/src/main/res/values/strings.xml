@@ -199,6 +199,36 @@
     <string name="strategy_test_no_sites">Список тестовых сайтов пуст.</string>
     <string name="strategy_test_error_close">Закрыть</string>
     <string name="strategy_test_sites_label">Сайты для проверки (по одному в строке)</string>
+    <string name="strategy_settings_title">Настройки теста</string>
+    <string name="strategy_settings_requests_per_domain">Запросов на домен (1–20)</string>
+    <string name="strategy_settings_concurrent_limit">Параллельных проб (1–50)</string>
+    <string name="strategy_settings_timeout">Таймаут старта, сек (1–15)</string>
+    <string name="strategy_settings_delay">Задержка между стратегиями, мс (0–5000)</string>
+    <string name="strategy_settings_use_custom">Свои стратегии</string>
+    <string name="strategy_settings_custom_strategies">Стратегии (по одной в строке)</string>
+    <string name="domain_lists_title">Списки сайтов</string>
+    <string name="domain_lists_manage">Управление</string>
+    <string name="domain_list_add">Добавить список</string>
+    <string name="domain_list_sites_count">%1$d сайтов</string>
+    <string name="domain_list_delete">Удалить</string>
+    <string name="domain_list_reset_defaults">Сбросить</string>
+    <string name="domain_list_name_hint">Название списка</string>
+    <string name="domain_list_sites_hint">Сайты (один на строку)</string>
+    <string name="domain_list_add_title">Новый список</string>
+    <string name="domain_list_save">Сохранить</string>
+    <string name="domain_list_cancel">Отмена</string>
+    <string name="saved_strategies_title">Сохранённые стратегии</string>
+    <string name="saved_strategies_empty">Нет сохранённых стратегий</string>
+    <string name="saved_strategy_save">Сохранить</string>
+    <string name="saved_strategy_apply">Применить</string>
+    <string name="saved_strategy_delete">Удалить</string>
+    <string name="saved_strategy_pin">Закрепить</string>
+    <string name="saved_strategy_unpin">Открепить</string>
+    <string name="saved_strategy_rename_hint">Название (необязательно)</string>
+    <string name="evolution_mode_toggle">Режим эволюции</string>
+    <string name="evolution_generation_label">Поколение %1$d/%2$d</string>
+    <string name="evolution_fitness_label">Лучший результат: %1$d%%</string>
+    <string name="evolution_population_label">Популяция</string>
 
     <!-- URnetwork -->
     <string name="urnetwork_settings_title">URnetwork</string>
@@ -211,6 +241,14 @@
     <string name="urnetwork_location_connect_first">Подключитесь к URnetwork чтобы увидеть доступные регионы</string>
     <string name="urnetwork_provide_title">Предоставлять трафик</string>
     <string name="urnetwork_provide_subtitle">Делиться пропускной способностью с сетью URnetwork</string>
+    <string name="urnetwork_provide_control_mode_title">Режим предоставления</string>
+    <string name="urnetwork_provide_control_mode_auto">Авто</string>
+    <string name="urnetwork_provide_control_mode_always">Всегда</string>
+    <string name="urnetwork_provide_control_mode_desc">Авто — система решает когда раздавать. Всегда — раздавать пока подключён.</string>
+    <string name="urnetwork_provide_network_mode_title">Сеть для раздачи</string>
+    <string name="urnetwork_provide_network_mode_wifi">Только Wi-Fi</string>
+    <string name="urnetwork_provide_network_mode_all">Wi-Fi и мобильные</string>
+    <string name="urnetwork_provide_network_mode_desc">Wi-Fi — раздача только через беспроводную сеть. Wi-Fi и мобильные — также через сотовый трафик.</string>
     <string name="urnetwork_peers_connected">Подключено к %1$d peer-ам</string>
     <string name="urnetwork_peers_searching">Поиск peer-ов…</string>
     <string name="urnetwork_mode_title">Режим</string>
@@ -301,9 +339,9 @@
     <string name="backup_import_success">Настройки успешно импортированы. Перезапустите приложение для применения.</string>
     <string name="backup_error">Ошибка: %1$s</string>
     <string name="backup_in_progress">Выполняется…</string>
-    <string name="backup_filename">ozero_backup.json</string>
+    <string name="backup_filename">ozero_backup.ozb</string>
     <!-- IP display -->
-    <string name="ip_card_title">Ваш выход</string>
+    <string name="ip_card_title">Выходной узел</string>
     <string name="ip_card_loading">Определяем IP…</string>
     <string name="ip_card_error">Не удалось получить IP: %1$s</string>
     <string name="ip_card_refresh">Обновить</string>
@@ -315,4 +353,9 @@
     <string name="settings_always_on_banner_title">Усильте защиту</string>
     <string name="settings_always_on_banner_body">Включите «Всегда включён» в настройках VPN Android для защиты от утечек при перезагрузке</string>
     <string name="settings_always_on_banner_configure">Настроить</string>
+    <!-- Chart timeframe -->
+    <string name="chart_tf_30s">30с</string>
+    <string name="chart_tf_5min">5м</string>
+    <string name="chart_tf_30min">30м</string>
+    <string name="chart_tf_1h">1ч</string>
 </resources>

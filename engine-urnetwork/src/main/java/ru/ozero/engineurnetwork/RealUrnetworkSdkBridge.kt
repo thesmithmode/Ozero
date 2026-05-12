@@ -21,9 +21,10 @@ import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import ru.ozero.enginescore.GoRuntimeGuard
 import ru.ozero.enginescore.PersistentLoggers
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
@@ -45,6 +46,7 @@ class RealUrnetworkSdkBridge(
     private val running = AtomicBoolean(false)
     private val preferredCountryRef = AtomicReference<String?>(null)
     private val bridgeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val lifecycleMutex = Mutex()
 
     override suspend fun start(
         walletAddress: String,
@@ -52,35 +54,23 @@ class RealUrnetworkSdkBridge(
         connectUrl: String,
         byClientJwt: String,
     ): UrnetworkSdkBridge.StartResult {
-        if (running.get()) {
-            PersistentLoggers.warn(TAG, "start called while already running")
-            return UrnetworkSdkBridge.StartResult.Failed("already running")
-        }
         if (byClientJwt.isBlank()) {
             return UrnetworkSdkBridge.StartResult.Failed("byClientJwt is blank")
         }
-        when (val r = GoRuntimeGuard.acquire(GoRuntimeGuard.Owner.URNETWORK)) {
-            is GoRuntimeGuard.Result.Conflict -> {
-                PersistentLoggers.error(
-                    TAG,
-                    "GoRuntime conflict — already active=${r.activeOwner}; second Go runtime в одном " +
-                        "процессе крашит libgojni в gcWriteBarrier. Откат, требуется process restart.",
-                )
-                return UrnetworkSdkBridge.StartResult.Failed(
-                    "Go runtime conflict — ${r.activeOwner} уже активен в этом процессе",
-                )
+        return lifecycleMutex.withLock {
+            if (running.get()) {
+                PersistentLoggers.warn(TAG, "start called while already running")
+                return@withLock UrnetworkSdkBridge.StartResult.Failed("already running")
             }
-            GoRuntimeGuard.Result.Granted -> Unit
-        }
-
-        return withTimeoutOrNull(SDK_INIT_TIMEOUT_MS) {
-            withContext(Dispatchers.Main.immediate) {
-                runStartOnMain(byClientJwt)
+            withTimeoutOrNull(SDK_INIT_TIMEOUT_MS) {
+                withContext(Dispatchers.Main.immediate) {
+                    runStartOnMain(byClientJwt)
+                }
+            } ?: run {
+                PersistentLoggers.error(TAG, "SDK init timed out after ${SDK_INIT_TIMEOUT_MS}ms")
+                cleanupOnFailure()
+                UrnetworkSdkBridge.StartResult.Failed("URnetwork SDK init timeout (30s)")
             }
-        } ?: run {
-            PersistentLoggers.error(TAG, "SDK init timed out after ${SDK_INIT_TIMEOUT_MS}ms")
-            cleanupOnFailure()
-            UrnetworkSdkBridge.StartResult.Failed("URnetwork SDK init timeout (30s)")
         }
     }
 
@@ -152,7 +142,7 @@ class RealUrnetworkSdkBridge(
         return UrnetworkSdkBridge.StartResult.Success
     }
 
-    override suspend fun stop() {
+    override suspend fun stop(): Unit = lifecycleMutex.withLock {
         running.set(false)
         runCatching { bridgeScope.coroutineContext.cancelChildren() }
         val completed = withTimeoutOrNull(STOP_TIMEOUT_MS) {
@@ -181,7 +171,6 @@ class RealUrnetworkSdkBridge(
         if (completed == null) {
             PersistentLoggers.warn(TAG, "stop timed out after ${STOP_TIMEOUT_MS}ms — refs cleared")
         }
-        GoRuntimeGuard.release(GoRuntimeGuard.Owner.URNETWORK)
         Log.i(TAG, "stop complete")
     }
 
@@ -195,25 +184,36 @@ class RealUrnetworkSdkBridge(
     override fun isRunning(): Boolean = running.get()
 
     override fun connectTo(location: ConnectLocation) {
+        if (!running.get()) {
+            PersistentLoggers.warn(TAG, "connectTo skipped — bridge not running")
+            return
+        }
         runCatching { connectVcRef.get()?.connect(location) }
             .onFailure { PersistentLoggers.warn(TAG, "connect threw: ${it.message}") }
     }
 
     override fun connectBestAvailable() {
+        if (!running.get()) {
+            PersistentLoggers.warn(TAG, "connectBestAvailable skipped — bridge not running")
+            return
+        }
         runCatching { connectVcRef.get()?.connectBestAvailable() }
             .onFailure { PersistentLoggers.warn(TAG, "connectBestAvailable threw: ${it.message}") }
     }
 
-    override fun selectedLocation(): ConnectLocation? =
-        runCatching { connectVcRef.get()?.selectedLocation }.getOrNull()
+    override fun selectedLocation(): ConnectLocation? {
+        if (!running.get()) return null
+        return runCatching { connectVcRef.get()?.selectedLocation }.getOrNull()
+    }
 
     override fun selectedLocationInfo(): UrnetworkSdkBridge.LocationInfo? {
+        if (!running.get()) return null
         val loc = runCatching { selectedLocation() }.getOrNull() ?: return null
-        val country = runCatching { loc.country }.getOrNull()
-            ?: runCatching { loc.name }.getOrNull()
+        val country = runCatching { loc.country }.getOrNull()?.takeIf { it.isNotBlank() }
+            ?: runCatching { loc.name }.getOrNull()?.takeIf { it.isNotBlank() }
         val code = runCatching { loc.countryCode?.trim()?.uppercase() }.getOrNull()
             ?.takeIf { it.length == 2 }
-        val name = runCatching { loc.name }.getOrNull()
+        val name = runCatching { loc.name }.getOrNull()?.takeIf { it.isNotBlank() }
         return UrnetworkSdkBridge.LocationInfo(country = country, countryCode = code, name = name)
     }
 
@@ -223,23 +223,49 @@ class RealUrnetworkSdkBridge(
         Log.i(TAG, "preferredCountry set to ${cleaned ?: "<auto>"}")
     }
 
-    override fun openLocationsViewController(): LocationsViewController? =
-        runCatching { deviceRef.get()?.openLocationsViewController() }.getOrElse {
+    override fun openLocationsViewController(): LocationsViewController? {
+        if (!running.get()) return null
+        return runCatching { deviceRef.get()?.openLocationsViewController() }.getOrElse {
             PersistentLoggers.warn(TAG, "openLocationsViewController threw: ${it.message}")
             null
         }
-
-    override fun setProvidePaused(paused: Boolean) {
-        runCatching {
-            deviceRef.get()?.providePaused = paused
-            Log.i(TAG, "setProvidePaused paused=$paused OK")
-        }.onFailure { PersistentLoggers.warn(TAG, "setProvidePaused($paused) threw: ${it.message}") }
     }
 
-    override fun isProvidePaused(): Boolean =
-        runCatching { deviceRef.get()?.providePaused ?: true }.getOrDefault(true)
+    private inline fun guardedRun(label: String, block: () -> Unit) {
+        if (!running.get()) {
+            PersistentLoggers.warn(TAG, "$label skipped — bridge not running")
+            return
+        }
+        runCatching(block).onFailure { PersistentLoggers.warn(TAG, "$label threw: ${it.message}") }
+    }
+
+    override fun setProvidePaused(paused: Boolean) = guardedRun("setProvidePaused($paused)") {
+        deviceRef.get()?.providePaused = paused
+        Log.i(TAG, "setProvidePaused paused=$paused OK")
+    }
+
+    override fun isProvidePaused(): Boolean {
+        if (!running.get()) return true
+        return runCatching { deviceRef.get()?.providePaused ?: true }.getOrDefault(true)
+    }
+
+    override fun setProvideControlMode(mode: UrnetworkProvideControlMode) =
+        guardedRun("setProvideControlMode(${mode.rawValue})") {
+            deviceRef.get()?.provideControlMode = mode.rawValue
+            Log.i(TAG, "setProvideControlMode mode=${mode.rawValue} OK")
+        }
+
+    override fun setProvideNetworkMode(mode: UrnetworkProvideNetworkMode) =
+        guardedRun("setProvideNetworkMode(${mode.rawValue})") {
+            deviceRef.get()?.provideNetworkMode = mode.rawValue
+            Log.i(TAG, "setProvideNetworkMode mode=${mode.rawValue} OK")
+        }
 
     override fun applyPerformanceProfile(windowType: UrnetworkWindowType, fixedIpSize: Boolean) {
+        if (!running.get()) {
+            PersistentLoggers.warn(TAG, "applyPerformanceProfile skipped — bridge not running")
+            return
+        }
         if (windowType == UrnetworkWindowType.AUTO) {
             Log.i(TAG, "applyPerformanceProfile skip — AUTO uses SDK defaults")
             return
@@ -263,17 +289,21 @@ class RealUrnetworkSdkBridge(
         }
     }
 
-    override fun peerCount(): Int =
-        runCatching { connectVcRef.get()?.grid?.windowCurrentSize ?: 0 }.getOrDefault(0)
+    override fun peerCount(): Int {
+        if (!running.get()) return 0
+        return runCatching { connectVcRef.get()?.grid?.windowCurrentSize ?: 0 }.getOrDefault(0)
+    }
 
     override fun unpaidByteCount(): Long = unpaidBytesRef.get()
 
     override fun fetchTransferStats() {
+        if (!running.get()) return
         runCatching { walletVcRef.get()?.fetchTransferStats() }
             .onFailure { PersistentLoggers.warn(TAG, "fetchTransferStats threw: ${it.message}") }
     }
 
     override suspend fun fetchSubscriptionBalance(): UrnetworkSdkBridge.SubscriptionBalanceSnapshot? {
+        if (!running.get()) return subscriptionBalanceRef.get()
         val device = deviceRef.get() ?: return null
         val api = runCatching { device.api }.getOrNull() ?: run {
             PersistentLoggers.warn(TAG, "device.api is null — cannot fetch subscription balance")
@@ -439,7 +469,6 @@ class RealUrnetworkSdkBridge(
 
     private fun cleanupOnFailure() {
         deviceRef.getAndSet(null)?.also { runCatching { it.close() } }
-        GoRuntimeGuard.release(GoRuntimeGuard.Owner.URNETWORK)
     }
 
     private companion object {

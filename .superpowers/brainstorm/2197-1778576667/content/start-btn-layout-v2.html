@@ -1,0 +1,60 @@
+<h2>Кнопка под полем сайтов, над списком стратегий</h2>
+<p class="subtitle">Уточни детали поведения кнопки во время теста</p>
+
+<div class="mockup">
+  <div class="mockup-header">Новый layout StrategyTestScreen</div>
+  <div class="mockup-body" style="font-size:13px;font-family:monospace">
+
+    <div style="background:#1e1e2e;color:#cdd6f4;padding:8px;border-radius:4px;margin-bottom:10px">
+      ← Подбор стратегий
+    </div>
+
+    <div style="color:#a6adc8;font-size:10px;margin-bottom:4px">Сайты для тестирования</div>
+    <div style="background:#181825;color:#a6adc8;padding:8px;border-radius:4px;margin-bottom:10px;font-size:11px;border:1px solid #313244">
+      rutracker.org<br>nyaa.si<br>rutor.org<br>speedtest.net
+    </div>
+
+    <div style="text-align:center;margin-bottom:10px">
+      <button style="background:#89b4fa;color:#1e1e2e;border:none;padding:10px 60px;border-radius:8px;font-size:14px;font-weight:bold;width:100%">▶ Начать тест</button>
+    </div>
+
+    <div style="color:#6c7086;font-size:10px;margin-bottom:6px">— Результаты (74 стратегии) —</div>
+
+    <div style="background:#181825;border-radius:4px;padding:6px;margin-bottom:4px">
+      <div style="color:#cdd6f4;font-size:10px">-s1 -q1 -a1 -Y -Ar</div>
+      <div style="color:#6c7086;font-size:9px">ожидание...</div>
+    </div>
+    <div style="background:#181825;border-radius:4px;padding:6px;margin-bottom:4px">
+      <div style="color:#cdd6f4;font-size:10px">-s5 -o2 -At -f-1</div>
+      <div style="color:#6c7086;font-size:9px">ожидание...</div>
+    </div>
+    <div style="background:#181825;border-radius:4px;padding:6px">
+      <div style="color:#cdd6f4;font-size:10px">-Ku -An -d4</div>
+      <div style="color:#6c7086;font-size:9px">ожидание...</div>
+    </div>
+    <div style="color:#585b70;font-size:9px;margin-top:4px">... ещё 71</div>
+  </div>
+</div>
+
+<div style="margin-top:20px">
+  <h3>Что происходит с кнопкой во время теста?</h3>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="replace-stop" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Заменяется на «Стоп»</h3>
+      <p>На том же месте — кнопка меняет цвет/текст на «■ Остановить». Поле сайтов становится read-only.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="both-visible" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Обе кнопки одновременно</h3>
+      <p>Во время теста появляется «■ Стоп» рядом, «Начать» серая/disabled. После — возвращается активная.</p>
+    </div>
+  </div>
+</div>
+
+<p style="color:#585b70;font-size:11px;margin-top:12px">Скажи в терминале если хочешь другое поведение</p>

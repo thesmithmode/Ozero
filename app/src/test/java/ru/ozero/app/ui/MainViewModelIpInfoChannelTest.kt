@@ -15,14 +15,49 @@ class MainViewModelIpInfoChannelTest {
     }
 
     @Test
-    fun `IP_INFO_WARMUP_MS не меньше 8 секунд — URnetwork peer-search долгий`() {
+    fun `IP_INFO_WARMUP_MS от 2 секунд — даёт туннелю стабилизироваться перед IP-resolve`() {
         val regex = Regex("IP_INFO_WARMUP_MS\\s*=\\s*(\\d[\\d_]*)L")
         val m = regex.find(source) ?: error("IP_INFO_WARMUP_MS не найден")
         val warmupMs = m.groupValues[1].replace("_", "").toLong()
         assertTrue(
-            warmupMs >= 8_000L,
-            "IP_INFO_WARMUP_MS обязан быть >= 8000ms — иначе URnetwork не успевает поднять " +
-                "P2P пиров и IP-detect возвращает ошибку до того как туннель готов. Fact=$warmupMs",
+            warmupMs >= 2_000L,
+            "IP_INFO_WARMUP_MS обязан быть >= 2000ms — туннелю нужно время стабилизироваться. " +
+                "URnetwork location реактивно обновляется через URNETWORK_LOCATION_POLL_MS polling. " +
+                "Fact=$warmupMs",
+        )
+    }
+
+    @Test
+    fun `URNETWORK_LOCATION_POLL_MS определён для реактивного обновления выходного узла`() {
+        val regex = Regex("URNETWORK_LOCATION_POLL_MS\\s*=\\s*(\\d[\\d_]*)L")
+        val m = regex.find(source) ?: error("URNETWORK_LOCATION_POLL_MS не найден")
+        val pollMs = m.groupValues[1].replace("_", "").toLong()
+        assertTrue(
+            pollMs in 2_000L..10_000L,
+            "URNETWORK_LOCATION_POLL_MS обязан быть 2s–10s: реже — UX деградирует, " +
+                "чаще — батарея. Fact=$pollMs",
+        )
+    }
+
+    @Test
+    fun `MainViewModel содержит polling-flow для URnetwork location через flatMapLatest + WhileSubscribed`() {
+        assertTrue(
+            source.contains("flatMapLatest"),
+            "MainViewModel обязан использовать flatMapLatest для URnetwork location polling — " +
+                "отменяет предыдущий цикл при смене движка.",
+        )
+        assertTrue(
+            source.contains("URNETWORK_LOCATION_POLL_MS"),
+            "Polling-цикл обязан использовать URNETWORK_LOCATION_POLL_MS.",
+        )
+        assertTrue(
+            source.contains("WhileSubscribed"),
+            "Polling обязан запускаться только при наличии подписчика — SharingStarted.WhileSubscribed. " +
+                "Иначе while(true) в init блокирует runTest auto-advanceUntilIdle (CI hang).",
+        )
+        assertTrue(
+            source.contains("urnetworkLocationOverride"),
+            "Override-flow обязан называться urnetworkLocationOverride — комбинируется с _ipInfo.",
         )
     }
 

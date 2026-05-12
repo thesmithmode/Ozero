@@ -1,13 +1,19 @@
 package ru.ozero.commonvpn
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.PersistentLoggers
 
 class TunnelController(
     private val stagnationMonitor: StatsStagnationMonitor = StatsStagnationMonitor(),
+    private val watchdogScope: CoroutineScope? = null,
+    private val switchingTimeoutMs: Long = SWITCHING_TIMEOUT_MS,
 ) {
 
     private val _state = MutableStateFlow<TunnelState>(TunnelState.Idle)
@@ -18,7 +24,10 @@ class TunnelController(
     val stagnant: StateFlow<Boolean> = _stagnant.asStateFlow()
     private val _killswitchActive = MutableStateFlow(false)
     val killswitchActive: StateFlow<Boolean> = _killswitchActive.asStateFlow()
+    private val _switching = MutableStateFlow<SwitchingTransition?>(null)
+    val switching: StateFlow<SwitchingTransition?> = _switching.asStateFlow()
     private val lock = Any()
+    private var switchingWatchdogJob: Job? = null
     private var sessionStartMs: Long = 0L
     private var prevTxBytes: Long = 0L
     private var prevRxBytes: Long = 0L
@@ -58,6 +67,30 @@ class TunnelController(
     }
 
     fun onDisconnecting() = transition(TunnelState.Disconnecting)
+
+    fun onSwitchingStarted(from: EngineId?, to: EngineId?) {
+        val transition = SwitchingTransition(from, to)
+        _switching.value = transition
+        PersistentLoggers.info(TAG, "switching started: $from → $to")
+        switchingWatchdogJob?.cancel()
+        switchingWatchdogJob = watchdogScope?.launch {
+            delay(switchingTimeoutMs)
+            if (_switching.compareAndSet(transition, null)) {
+                PersistentLoggers.warn(
+                    TAG,
+                    "switching watchdog cleared after ${switchingTimeoutMs}ms: $from → $to",
+                )
+            }
+        }
+    }
+
+    fun onSwitchingFinished(reason: String) {
+        if (_switching.compareAndSet(_switching.value, null)) {
+            switchingWatchdogJob?.cancel()
+            switchingWatchdogJob = null
+            PersistentLoggers.info(TAG, "switching finished: $reason")
+        }
+    }
 
     fun reset() {
         _stats.value = null
@@ -124,6 +157,20 @@ class TunnelController(
                 PersistentLoggers.info(TAG, "${name(current)} → ${name(target)}")
             }
             _state.value = target
+            val sw = _switching.value
+            if (sw != null) {
+                val terminal = when (target) {
+                    is TunnelState.Connected -> true
+                    is TunnelState.Failed -> true
+                    else -> false
+                }
+                if (terminal) {
+                    _switching.value = null
+                    switchingWatchdogJob?.cancel()
+                    switchingWatchdogJob = null
+                    PersistentLoggers.info(TAG, "switching cleared on transition → ${name(target)}")
+                }
+            }
         }
     }
 
@@ -161,5 +208,6 @@ class TunnelController(
     private companion object {
         const val TAG = "TunnelController"
         const val EWMA_ALPHA = 0.4
+        const val SWITCHING_TIMEOUT_MS = 12_000L
     }
 }

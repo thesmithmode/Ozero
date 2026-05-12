@@ -1,10 +1,9 @@
 package ru.ozero.app.ui.splittunnel
 
+import android.Manifest
 import android.content.Context
-import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.LauncherApps
-import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
@@ -64,29 +63,34 @@ class DefaultAppListProvider @Inject constructor(
     private fun loadMetadata(): List<InstalledApp> {
         val pm = context.packageManager
         val ownPackage = context.packageName
-        val launchableSet = queryLaunchablePackages(pm)
         val infos = mutableMapOf<String, ApplicationInfo>()
-        for (info in pm.getInstalledApplications(0)) {
-            infos[info.packageName] = info
-        }
 
-        runCatching {
-            val launcherApps = context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as? LauncherApps
-            if (launcherApps != null) {
-                for (profile in launcherApps.profiles) {
+        pm.getPackagesHoldingPermissions(arrayOf(Manifest.permission.INTERNET), 0)
+            .forEach { pi ->
+                pi.applicationInfo?.let { infos[pi.packageName] = it }
+            }
+
+        val launcherApps = context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as? LauncherApps
+        if (launcherApps != null) {
+            for (profile in launcherApps.profiles) {
+                runCatching {
                     val activities = launcherApps.getActivityList(null, profile)
                     for (activity in activities) {
-                        val appInfo = activity.applicationInfo
-                        infos[appInfo.packageName] = appInfo
+                        val info = activity.applicationInfo
+                        if (!infos.containsKey(info.packageName)) {
+                            infos[info.packageName] = info
+                        }
                     }
                 }
             }
         }
 
         return infos.values.asSequence()
-            .filter { isUserVisibleApp(it, launchableSet, ownPackage) }
+            .filter { it.packageName != ownPackage }
             .map { info ->
-                val label = runCatching { info.loadLabel(pm).toString() }.getOrNull().orEmpty()
+                val label = runCatching { info.loadLabel(pm).toString() }
+                    .getOrNull()
+                    .orEmpty()
                     .ifBlank { info.packageName }
                 InstalledApp(
                     packageName = info.packageName,
@@ -98,26 +102,11 @@ class DefaultAppListProvider @Inject constructor(
             .sortedWith(compareBy({ it.isSystem }, { it.label.lowercase() }))
             .toList()
     }
-
-    private fun queryLaunchablePackages(pm: PackageManager): Set<String> {
-        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-        return runCatching {
-            pm.queryIntentActivities(intent, 0).mapTo(HashSet()) { it.activityInfo.packageName }
-        }.getOrDefault(emptySet())
-    }
 }
 
-internal fun isUserVisibleApp(
-    info: ApplicationInfo,
-    launchableSet: Set<String>,
-    ownPackage: String,
-): Boolean {
-    if (info.packageName == ownPackage) return false
-    val isSystem = (info.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-    val isUpdatedSystem = (info.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
-    if (!isSystem || isUpdatedSystem) return true
-    return info.packageName in launchableSet
-}
+internal fun holdsInternetPermission(
+    permissions: Array<String>?,
+): Boolean = permissions?.any { it == Manifest.permission.INTERNET } == true
 
 private fun drawableToImageBitmap(drawable: Drawable): ImageBitmap? = runCatching {
     if (drawable is BitmapDrawable) {

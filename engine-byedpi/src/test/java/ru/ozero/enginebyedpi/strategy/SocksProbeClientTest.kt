@@ -70,12 +70,13 @@ class SocksProbeClientTest {
     }
 
     @Test
-    fun `exception в openConnection — failure с error message`() = runTest {
-        val opener = { _: URL, _: Proxy -> throw IOException("connection refused") }
+    fun `exception в openConnection — failure с error class without message`() = runTest {
+        val opener = { _: URL, _: Proxy -> throw IOException("connection refused to example.com:443") }
         val result = client(opener).probe("example.com")
         assertFalse(result.success)
         assertNotNull(result.error)
-        assertTrue(result.error!!.contains("connection refused"))
+        assertEquals("IOException", result.error)
+        assertFalse(result.error!!.contains("example.com"), "hostname must not leak via error message")
     }
 
     @Test

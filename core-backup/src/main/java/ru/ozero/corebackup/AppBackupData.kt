@@ -7,11 +7,48 @@ data class AppBackupData(
     val urnetwork: BackupUrnetwork,
     val warpSlots: List<BackupWarpSlot>,
     val splitRules: List<BackupSplitRule>,
+    val strategy: BackupStrategy? = null,
 ) {
     companion object {
-        const val CURRENT_VERSION = 1
+        const val CURRENT_VERSION = 2
     }
 }
+
+data class BackupStrategy(
+    val settings: BackupStrategySettings? = null,
+    val domainLists: List<BackupDomainList> = emptyList(),
+    val savedStrategies: List<BackupSavedStrategy> = emptyList(),
+    val evolutionMemory: String? = null,
+)
+
+data class BackupStrategySettings(
+    val requestsPerDomain: Int? = null,
+    val concurrentLimit: Int? = null,
+    val timeoutSeconds: Int? = null,
+    val delayBetweenMs: Long? = null,
+    val useCustomStrategies: Boolean? = null,
+    val customStrategies: String? = null,
+    val evolutionMode: Boolean? = null,
+    val evolutionPopulationSize: Int? = null,
+    val evolutionMaxGenerations: Int? = null,
+    val evolutionMutationRate: Float? = null,
+    val evolutionEliteCount: Int? = null,
+)
+
+data class BackupDomainList(
+    val id: String,
+    val name: String,
+    val domains: List<String>,
+    val isActive: Boolean,
+    val isBuiltIn: Boolean,
+)
+
+data class BackupSavedStrategy(
+    val id: String,
+    val command: String,
+    val name: String? = null,
+    val isPinned: Boolean = false,
+)
 
 data class BackupSettings(
     val splitMode: String?,

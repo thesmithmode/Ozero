@@ -9,6 +9,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import ru.ozero.app.data.RoomSessionStatsRecorder
 import ru.ozero.app.data.RoomSplitTunnelRulesProvider
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import ru.ozero.commonvpn.HealthMonitor
 import ru.ozero.commonvpn.HevTunnelGateway
 import ru.ozero.commonvpn.NativeHevTunnelGateway
@@ -25,7 +28,9 @@ object VpnModule {
 
     @Provides
     @Singleton
-    fun provideTunnelController(): TunnelController = TunnelController()
+    fun provideTunnelController(): TunnelController = TunnelController(
+        watchdogScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+    )
 
     @Provides
     @Singleton

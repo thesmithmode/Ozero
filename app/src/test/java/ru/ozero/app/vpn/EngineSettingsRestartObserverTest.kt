@@ -164,6 +164,7 @@ class EngineSettingsRestartObserverTest {
             byedpiWinningArgs = null,
             ipv6Enabled = false,
             customDnsServers = emptyList(),
+            engineAutoPriority = null,
         )
         observer.handle(snapshot)
         assertTrue(restarts.isEmpty(), "no restart while Idle")
@@ -171,6 +172,62 @@ class EngineSettingsRestartObserverTest {
         state.value = TunnelState.Connected(EngineId.BYEDPI, 1080)
         observer.handle(snapshot)
         assertEquals(listOf(snapshot), restarts, "restart fires when Connected")
+    }
+
+    @Test
+    fun `engineAutoPriority изменился в auto-mode → restart триггерится`() = runTest(dispatcher) {
+        val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
+        val observer = newObserver(flow, alwaysConnected())
+        val collected = mutableListOf<EngineSettingsRestartObserver.Snapshot>()
+        val job = launch { observer.triggers.toList(collected) }
+        advanceUntilIdle()
+
+        val autoMode = SettingsModel.DEFAULT.copy(manualEngine = null)
+        flow.emit(autoMode)
+        flow.emit(
+            autoMode.copy(
+                engineAutoPriority = listOf(EngineId.URNETWORK, EngineId.WARP, EngineId.BYEDPI),
+            ),
+        )
+        advanceUntilIdle()
+
+        assertEquals(
+            1,
+            collected.size,
+            "В auto-mode reorder engine priority должен дропнуть VPN и перевыбрать топ-приоритетный движок. " +
+                "Иначе пользователь меняет порядок а соединение продолжает использовать старый выбор — " +
+                "новая схема не применяется.",
+        )
+        assertEquals(
+            listOf(EngineId.URNETWORK, EngineId.WARP, EngineId.BYEDPI),
+            collected.single().engineAutoPriority,
+        )
+        job.cancel()
+    }
+
+    @Test
+    fun `engineAutoPriority изменился в manual-mode → restart НЕ триггерится`() = runTest(dispatcher) {
+        val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
+        val observer = newObserver(flow, alwaysConnected())
+        val collected = mutableListOf<EngineSettingsRestartObserver.Snapshot>()
+        val job = launch { observer.triggers.toList(collected) }
+        advanceUntilIdle()
+
+        val manualMode = SettingsModel.DEFAULT.copy(manualEngine = EngineId.BYEDPI)
+        flow.emit(manualMode)
+        flow.emit(
+            manualMode.copy(
+                engineAutoPriority = listOf(EngineId.URNETWORK, EngineId.WARP, EngineId.BYEDPI),
+            ),
+        )
+        advanceUntilIdle()
+
+        assertTrue(
+            collected.isEmpty(),
+            "В manual-mode auto-priority irrelevant — reorder в Auto-Mode секции настроек не должен " +
+                "дропать VPN если юзер вручную выбрал движок.",
+        )
+        job.cancel()
     }
 
     @Test

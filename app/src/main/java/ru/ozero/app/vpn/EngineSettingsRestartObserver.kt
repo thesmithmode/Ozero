@@ -1,4 +1,4 @@
-﻿package ru.ozero.app.vpn
+package ru.ozero.app.vpn
 
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
@@ -20,6 +20,7 @@ class EngineSettingsRestartObserver(
         val byedpiWinningArgs: String?,
         val ipv6Enabled: Boolean,
         val customDnsServers: List<String>,
+        val engineAutoPriority: List<EngineId>?,
     )
 
     @OptIn(FlowPreview::class)
@@ -30,6 +31,7 @@ class EngineSettingsRestartObserver(
                 byedpiWinningArgs = it.byedpiWinningArgs?.trim(),
                 ipv6Enabled = it.ipv6Enabled,
                 customDnsServers = it.customDnsServers,
+                engineAutoPriority = if (it.manualEngine == null) it.engineAutoPriority else null,
             )
         }
         .distinctUntilChanged()

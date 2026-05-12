@@ -139,10 +139,10 @@ class SettingsRepositoryTest {
     }
 
     @Test
-    fun `engineAutoPriority default содержит ByeDPI WARP URnetwork в этом порядке`() = runTest {
+    fun `engineAutoPriority default содержит WARP URnetwork ByeDPI в этом порядке`() = runTest {
         val current = repository.settings.first()
         assertEquals(
-            listOf(EngineId.BYEDPI, EngineId.WARP, EngineId.URNETWORK),
+            listOf(EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI),
             current.engineAutoPriority,
         )
     }

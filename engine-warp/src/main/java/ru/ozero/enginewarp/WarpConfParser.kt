@@ -52,7 +52,6 @@ internal object WarpConfParser {
     } catch (e: LinkageError) {
         throw e
     } catch (t: Throwable) {
-        if (t is VirtualMachineError || t is ThreadDeath || t is LinkageError) throw t
         Result.failure(IOException("WireGuard conf parse: ${t.message}", t))
     }
 

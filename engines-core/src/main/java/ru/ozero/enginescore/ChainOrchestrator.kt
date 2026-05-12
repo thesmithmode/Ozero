@@ -4,6 +4,7 @@ import android.util.Log
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 
 class ChainOrchestrator(
     private val engines: Set<EnginePlugin>,
@@ -73,7 +74,14 @@ class ChainOrchestrator(
         }
         snapshot.forEach { plugin ->
             try {
-                plugin.stop()
+                val timeoutMs = plugin.stopTimeoutMs()
+                val completed = withTimeoutOrNull(timeoutMs) { plugin.stop() }
+                if (completed == null) {
+                    PersistentLoggers.warn(
+                        TAG,
+                        "stop ${plugin.id} timed out after ${timeoutMs}ms — mutex освобождён",
+                    )
+                }
             } catch (ce: CancellationException) {
                 throw ce
             } catch (t: Throwable) {

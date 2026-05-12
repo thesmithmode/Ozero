@@ -20,6 +20,7 @@ class LoggingContractTest {
         "app/src/main/java/ru/ozero/app/ui/diag/DiagnosticsTester.kt",
         "app/src/main/java/ru/ozero/app/ui/diag/DiagnosticsViewModel.kt",
         "app/src/main/java/ru/ozero/app/BootReceiver.kt",
+        "app/src/main/java/ru/ozero/app/warp/WarpEngineService.kt",
         "engines-core/src/main/java/ru/ozero/enginescore/PersistentLogger.kt",
         "engines-core/src/main/java/ru/ozero/enginescore/probe/Socks5HandshakeProbe.kt",
         "common-dns/src/main/java/ru/ozero/commondns/DnsResolver.kt",

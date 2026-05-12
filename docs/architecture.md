@@ -33,7 +33,7 @@
 
 | Модуль | Ответственность |
 |--------|----------------|
-| `:engines-core` | `EnginePlugin` интерфейс, `ChainOrchestrator`, `IpProbeRoute`, `SettingsRepository`, `SettingsModel`, `Socks5HandshakeProbe`, `GoRuntimeGuard`, `Upstream`, `TunFdAcceptor`, `TunSpec`, `EnginePreflight`, `PersistentLoggers` |
+| `:engines-core` | `EnginePlugin` интерфейс, `ChainOrchestrator`, `IpProbeRoute`, `SettingsRepository`, `SettingsModel`, `Socks5HandshakeProbe`, `Upstream`, `TunFdAcceptor`, `TunSpec`, `EnginePreflight`, `PersistentLoggers` |
 | `:common-vpn` | `OzeroVpnService`, `HevTunnelGateway` (JNI→libhev), `TunnelController`, `TunnelState`, `HealthMonitor`, `ManualEngineConfigBuilder`, `hev.TProxyService`, split-tunnel, stats |
 | `:common-dns` | DoH client |
 | `:common-net` | HTTP utilities |

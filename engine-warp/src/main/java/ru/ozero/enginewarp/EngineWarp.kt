@@ -138,7 +138,7 @@ class EngineWarp(
                 return null
             }
             runCatching { configStore.addSlot("WARP Auto", fresh.config, fresh.rawIni) }
-                .onSuccess { PersistentLoggers.info(TAG, "auto-registered config saved as slot $it") }
+                .onSuccess { Log.i(TAG, "auto-registered config saved as slot $it") }
                 .onFailure { PersistentLoggers.warn(TAG, "addSlot failed: ${it.message}") }
             buildResolved(fresh.config, fresh.rawIni, source = "auto")
         }

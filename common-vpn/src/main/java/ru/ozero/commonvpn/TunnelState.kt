@@ -2,6 +2,8 @@ package ru.ozero.commonvpn
 
 import ru.ozero.enginescore.EngineId
 
+data class SwitchingTransition(val from: EngineId?, val to: EngineId?)
+
 sealed class TunnelState {
     data object Idle : TunnelState()
     data class Probing(val engineId: EngineId? = null) : TunnelState()

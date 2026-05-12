@@ -4,8 +4,10 @@ aliases: [warp-awg-migration, wireguard-replacement, awg-warp]
 tags: [warp, amneziawg, engine, architecture]
 sources:
   - "daily/2026-05-04.md"
+  - "daily/2026-05-07.md"
+  - "daily/2026-05-08.md"
 created: 2026-05-04
-updated: 2026-05-04
+updated: 2026-05-08
 ---
 
 # AmneziaWG Integration for WARP Engine
@@ -14,11 +16,11 @@ Ozero's WARP engine was refactored to use AmneziaWG2 instead of the Wireguard li
 
 ## Key Points
 
-- Replaced `com.wireguard.android:tunnel` dependency with `com.zaneschepke:amneziawg-android:2.3.7`
-- WarpConfig expanded to include `AwgParams` (H-values, obfuscation settings) alongside original connection fields
+- **Phase 1 (2026-05-04)**: Replaced `com.wireguard.android:tunnel` with `com.zaneschepke:amneziawg-android:2.3.7`; WarpConfig expanded 8→19 keys; `AwgBackend` abstraction
+- **Phase 2 (2026-05-08)**: Maven `libam-go.so` (sha256=`cc119dbc`, 8589456B) ≠ PORTAL_WG v1.4.3 binary (sha256=`2ebc0ee9`, 8578640B); migrated to checked-in SO from PORTAL_WG
 - DataStore schema expanded from 8 keys to 19 keys — AWG H-values stored as String (no `longPreferencesKey` support in Amnezia)
 - RealWarpSdkBridge refactored to use `AwgBackend` internal interface, decoupling from GoBackend for testability
-- New test infrastructure: `mockwebserver` added to `:engine-warp` for config parsing tests
+- AWG obfuscation (Jc=5, Jmin=100, Jmax=200, H1-H4) required for Russian ISPs with TSPU — vanilla WireGuard blocked
 
 ## Details
 
@@ -50,13 +52,32 @@ The bridge was refactored to use an internal `AwgBackend` interface, abstracting
 
 ### Test Coverage
 
-New tests cover:
+Phase 1 tests:
 - WarpIniBuilderTest (13 cases): INI parsing, H-value extraction, DNS server parsing
 - WarpAutoConfigTest (+8 cases): config URL parsing and WarpConfig instantiation
 - WarpConfigStoreTest (+3 cases): DataStore key management
 - RealWarpSdkBridgeTest (10 cases): start/stop lifecycle with mocked AwgBackend
-- WireguardKeyPairGeneratorTest (6 cases): key generation
 - HttpUrlConnectionClientTest (7 cases): HTTP client with timeout handling
+- `WireguardKeyPairGeneratorTest` deleted alongside `WireguardKeyPairGenerator.kt` (dead code — never called)
+
+Phase 2 additions:
+- `AmneziaWgRuntimeBinaryTest`: verifies packaged `libam-go.so` SHA256 matches PORTAL_WG reference (`2EBC0EE9...`)
+- `NoMavenAmneziawgTest`: sentinel — `zaneschepke` must not appear in gradle/libs.versions.toml
+- `release.yml` step: assert libam-go.so SHA256 before publishing APK
+
+### Phase 2: Runtime Binary Migration (2026-05-08)
+
+After Phase 1, WARP continued crashing under AWG obfuscation configs containing I1 field. SHA256 comparison identified the root cause: the Maven zaneschepke binary differs from the PORTAL_WG v1.4.3 binary despite identical version labels. All prior Kotlin-side fixes (raw INI passthrough, awgTurnOn guards) addressed symptoms; the native runtime itself was incompatible.
+
+Migration approach:
+1. Remove `implementation(libs.amneziawg.android)` from `engine-warp/build.gradle.kts`
+2. Copy `libam-go.so`, `libam.so`, `libam-quick.so` from PORTAL_WG v1.4.3 → `engine-warp/src/main/jniLibs/arm64-v8a/`
+3. Add Java glue: `GoBackend` (7 native methods), `ProxyGoBackend` (6 native methods), `SocketProtector` (interface) — all required by `RegisterNatives` in `JNI_OnLoad` (see [[concepts/amneziawg-jni-classpath-completeness]])
+4. Restrict ABI to arm64-v8a (`ndk { abiFilters += listOf("arm64-v8a") }`) — PORTAL_WG provides no x86_64 binary
+5. Add `.gitignore` exception `!engine-warp/src/main/jniLibs/**/*.so` (Python template `*.so` rule silently blocked tracking — see [[concepts/gitignore-jnilibs-conflict]])
+6. SHA256 sentinel test + `release.yml` assertion gate against future binary regression
+
+Pre-JNI `PersistentLoggers.warn` checkpoints added before/after every `awgTurnOn`/`awgTurnOff`/`loadOnce` call in `RealWarpSdkBridge` — eliminates pre-SIGSEGV diagnostic silence.
 
 ## Related Concepts
 
@@ -68,3 +89,5 @@ New tests cover:
 ## Sources
 
 - [[daily/2026-05-04.md]] - Session 12:05: AWG WARP swap completed; WarpConfig expansion, DataStore schema 8→19 keys, AwgBackend abstraction, 49 new tests added; CI green on commit 1077a02
+- [[daily/2026-05-07.md]] - AWG obfuscation requirement confirmed for Russian ISPs (TSPU blocks vanilla WG); forceVanilla reverted; AwgParams() ≠ VANILLA confusion documented
+- [[daily/2026-05-08.md]] - Session 12:05/12:18: Maven libam-go.so sha256 mismatch discovered; Phase 2 migration to PORTAL_WG SO committed; Java glue added; SHA256 sentinel + release.yml assertion; WireguardKeyPairGenerator dead code deleted

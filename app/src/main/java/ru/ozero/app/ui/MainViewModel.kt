@@ -4,19 +4,24 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ru.ozero.commonnet.IpInfo
 import ru.ozero.commonnet.IpInfoProvider
 import ru.ozero.commonvpn.HealthMonitor
+import ru.ozero.commonvpn.SwitchingTransition
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.commonvpn.TunnelStats
@@ -74,6 +79,13 @@ class MainViewModel @Inject constructor(
             initialValue = false,
         )
 
+    val switching: StateFlow<SwitchingTransition?> =
+        tunnelController.switching.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = null,
+        )
+
     val healthStatus: StateFlow<HealthMonitor.Status> =
         healthMonitor.status.stateIn(
             scope = viewModelScope,
@@ -103,13 +115,48 @@ class MainViewModel @Inject constructor(
     val speedHistory: StateFlow<List<Pair<Float, Float>>> = _speedHistory.asStateFlow()
 
     private val _ipInfo = MutableStateFlow<IpInfoState>(IpInfoState.Idle)
-    val ipInfo: StateFlow<IpInfoState> = _ipInfo.asStateFlow()
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val urnetworkLocationOverride: StateFlow<IpInfoState.Loaded?> =
+        tunnelController.state
+            .map { (it as? TunnelState.Connected)?.engineId == EngineId.URNETWORK }
+            .distinctUntilChanged()
+            .flatMapLatest { isUrnetwork ->
+                if (!isUrnetwork) {
+                    flowOf<IpInfoState.Loaded?>(null)
+                } else {
+                    flow<IpInfoState.Loaded?> {
+                        while (true) {
+                            delay(URNETWORK_LOCATION_POLL_MS)
+                            val r = resolveOnce(EngineId.URNETWORK, 0)
+                            if (r is IpInfoState.Loaded) emit(r)
+                        }
+                    }
+                }
+            }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(0),
+                initialValue = null,
+            )
+
+    val ipInfo: StateFlow<IpInfoState> = combine(
+        _ipInfo,
+        urnetworkLocationOverride,
+    ) { base, override -> override ?: base }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(0),
+            initialValue = IpInfoState.Idle,
+        )
 
     val urnetworkPeerCount: StateFlow<Int> = flow {
         while (true) {
             val s = tunnelController.state.value
-            val active = s is TunnelState.Connected && s.engineId == EngineId.URNETWORK
-            emit(if (active) urnetworkBridge.peerCount() else 0)
+            val active = s is TunnelState.Connected &&
+                s.engineId == EngineId.URNETWORK &&
+                runCatching { urnetworkBridge.isRunning() }.getOrDefault(false)
+            emit(if (active) runCatching { urnetworkBridge.peerCount() }.getOrDefault(0) else 0)
             delay(URNETWORK_PEER_POLL_MS)
         }
     }.stateIn(
@@ -123,7 +170,9 @@ class MainViewModel @Inject constructor(
         var graceTicks = 0
         while (true) {
             val s = tunnelController.state.value
-            val active = s is TunnelState.Connected && s.engineId == EngineId.URNETWORK
+            val active = s is TunnelState.Connected &&
+                s.engineId == EngineId.URNETWORK &&
+                runCatching { urnetworkBridge.isRunning() }.getOrDefault(false)
             val peers = if (active) runCatching { urnetworkBridge.peerCount() }.getOrDefault(0) else 0
             when {
                 !active -> {
@@ -149,13 +198,21 @@ class MainViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
+            var lastRecordMs = 0L
             tunnelController.stats.collect { s ->
                 if (s != null) {
-                    val prev = _speedHistory.value
-                    _speedHistory.value = (prev + Pair(s.bpsIn.toFloat(), s.bpsOut.toFloat()))
-                        .takeLast(SPEED_HISTORY_SIZE)
+                    val now = System.currentTimeMillis()
+                    if (now - lastRecordMs >= SPEED_SAMPLE_INTERVAL_MS) {
+                        lastRecordMs = now
+                        val prev = _speedHistory.value
+                        _speedHistory.value = (prev + Pair(s.bpsIn.toFloat(), s.bpsOut.toFloat()))
+                            .takeLast(MAX_SPEED_HISTORY_POINTS)
+                    }
                 } else {
-                    if (_speedHistory.value.isNotEmpty()) _speedHistory.value = emptyList()
+                    val switchingNow = tunnelController.switching.value != null
+                    if (!switchingNow && _speedHistory.value.isNotEmpty()) {
+                        _speedHistory.value = emptyList()
+                    }
                 }
             }
         }
@@ -167,12 +224,12 @@ class MainViewModel @Inject constructor(
                     if (key != lastSessionKey) {
                         lastSessionKey = key
                         _ipInfo.value = IpInfoState.Loading
-                        PersistentLoggers.info(
+                        Log.i(
                             IP_TAG,
                             "warmup begin engine=${s.engineId} port=${s.socksPort} delay=${IP_INFO_WARMUP_MS}ms",
                         )
                         delay(IP_INFO_WARMUP_MS)
-                        PersistentLoggers.info(IP_TAG, "warmup done — resolve IP")
+                        Log.i(IP_TAG, "warmup done — resolve IP")
                         val result = resolveIpInfoWithRetry(s.engineId, s.socksPort)
                         when (result) {
                             is IpInfoState.Loaded ->
@@ -258,18 +315,24 @@ class MainViewModel @Inject constructor(
     }
 
     fun onManualEngineSelect(engine: EngineId?) {
+        val current = tunnelController.state.value
+        if (current is TunnelState.Connected && current.engineId != engine) {
+            tunnelController.onSwitchingStarted(from = current.engineId, to = engine)
+        }
         viewModelScope.launch { settingsRepository.setManualEngine(engine) }
     }
 
     private companion object {
         const val IP_TAG = "MainViewModel.ip"
-        const val SPEED_HISTORY_SIZE = 60
+        const val MAX_SPEED_HISTORY_POINTS = 3_600
+        const val SPEED_SAMPLE_INTERVAL_MS = 1_000L
         const val URNETWORK_PEER_POLL_MS = 2_000L
         const val URNETWORK_PEER_POLL_KEEP_MS = 5_000L
         const val URNETWORK_SEARCH_TICK_MS = 1_000L
         const val URNETWORK_STARTUP_GRACE_TICKS = 10
-        const val IP_INFO_WARMUP_MS = 8_000L
-        const val IP_INFO_RETRY_ATTEMPTS = 4
-        const val IP_INFO_RETRY_DELAY_MS = 1_000L
+        const val IP_INFO_WARMUP_MS = 3_000L
+        const val IP_INFO_RETRY_ATTEMPTS = 3
+        const val IP_INFO_RETRY_DELAY_MS = 1_500L
+        const val URNETWORK_LOCATION_POLL_MS = 4_000L
     }
 }

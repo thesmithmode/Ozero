@@ -85,6 +85,7 @@ fun RootNavigation(
                     onOpenSettings = { navigate(TopScreen.Settings) },
                     onOpenEngineParams = { engineId ->
                         when (engineId) {
+                            null -> navigate(TopScreen.AutoModeSettings)
                             EngineId.WARP -> navigate(TopScreen.WarpEngineSettings)
                             EngineId.URNETWORK -> navigate(TopScreen.UrnetworkEngineSettings)
                             EngineId.BYEDPI -> navigate(TopScreen.ByeDpiEngineSettings)

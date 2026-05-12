@@ -185,6 +185,36 @@
     <string name="strategy_test_no_sites">Test sites list is empty.</string>
     <string name="strategy_test_error_close">Close</string>
     <string name="strategy_test_sites_label">Probe sites (one per line)</string>
+    <string name="strategy_settings_title">Test settings</string>
+    <string name="strategy_settings_requests_per_domain">Requests per domain (1–20)</string>
+    <string name="strategy_settings_concurrent_limit">Concurrent probes (1–50)</string>
+    <string name="strategy_settings_timeout">Start timeout, sec (1–15)</string>
+    <string name="strategy_settings_delay">Delay between strategies, ms (0–5000)</string>
+    <string name="strategy_settings_use_custom">Custom strategies</string>
+    <string name="strategy_settings_custom_strategies">Strategies (one per line)</string>
+    <string name="domain_lists_title">Site Lists</string>
+    <string name="domain_lists_manage">Manage</string>
+    <string name="domain_list_add">Add list</string>
+    <string name="domain_list_sites_count">%1$d sites</string>
+    <string name="domain_list_delete">Delete</string>
+    <string name="domain_list_reset_defaults">Reset</string>
+    <string name="domain_list_name_hint">List name</string>
+    <string name="domain_list_sites_hint">Sites (one per line)</string>
+    <string name="domain_list_add_title">New list</string>
+    <string name="domain_list_save">Save</string>
+    <string name="domain_list_cancel">Cancel</string>
+    <string name="saved_strategies_title">Saved Strategies</string>
+<string name="saved_strategies_empty">No saved strategies</string>
+    <string name="saved_strategy_save">Save</string>
+    <string name="saved_strategy_apply">Apply</string>
+    <string name="saved_strategy_delete">Delete</string>
+    <string name="saved_strategy_pin">Pin</string>
+    <string name="saved_strategy_unpin">Unpin</string>
+    <string name="saved_strategy_rename_hint">Label (optional)</string>
+    <string name="evolution_mode_toggle">Evolution mode</string>
+    <string name="evolution_generation_label">Generation %1$d/%2$d</string>
+    <string name="evolution_fitness_label">Best fitness: %1$d%%</string>
+    <string name="evolution_population_label">Population</string>
 
     <!-- URnetwork -->
     <string name="urnetwork_settings_title">URnetwork</string>
@@ -197,6 +227,14 @@
     <string name="urnetwork_location_connect_first">Connect to URnetwork to view available regions</string>
     <string name="urnetwork_provide_title">Provide bandwidth</string>
     <string name="urnetwork_provide_subtitle">Share bandwidth with the URnetwork mesh</string>
+    <string name="urnetwork_provide_control_mode_title">Provide control mode</string>
+    <string name="urnetwork_provide_control_mode_auto">Auto</string>
+    <string name="urnetwork_provide_control_mode_always">Always</string>
+    <string name="urnetwork_provide_control_mode_desc">Auto — the system decides when to provide. Always — keep providing while connected.</string>
+    <string name="urnetwork_provide_network_mode_title">Provide on network</string>
+    <string name="urnetwork_provide_network_mode_wifi">Wi-Fi only</string>
+    <string name="urnetwork_provide_network_mode_all">Wi-Fi and cellular</string>
+    <string name="urnetwork_provide_network_mode_desc">Wi-Fi — provide only over wireless. Wi-Fi and cellular — also over mobile data.</string>
     <string name="urnetwork_peers_connected">Connected to %1$d peers</string>
     <string name="urnetwork_peers_searching">Searching peers…</string>
     <string name="urnetwork_mode_title">Mode</string>
@@ -287,14 +325,14 @@
     <string name="backup_import_success">Settings imported successfully. Restart the app to apply changes.</string>
     <string name="backup_error">Error: %1$s</string>
     <string name="backup_in_progress">Processing…</string>
-    <string name="backup_filename">ozero_backup.json</string>
+    <string name="backup_filename">ozero_backup.ozb</string>
     <string name="urnetwork_peer_count_label">Peers: %1$d</string>
     <string name="urnetwork_peer_searching">Peers unavailable, retrying connection %1$d s</string>
     <string name="urnetwork_provider_unpaid">Unpaid traffic: %1$.2f MB</string>
     <string name="urnetwork_consumed_label">Consumed</string>
     <string name="urnetwork_consumed_format">%1$s of %2$s MB</string>
     <string name="urnetwork_pending_label">Pending: %1$s MB</string>
-    <string name="ip_card_title">Your exit</string>
+    <string name="ip_card_title">Exit node</string>
     <string name="ip_card_loading">Resolving IP…</string>
     <string name="ip_card_error">Failed to fetch IP: %1$s</string>
     <string name="ip_card_refresh">Refresh</string>
@@ -305,4 +343,9 @@
     <string name="settings_always_on_banner_title">Strengthen protection</string>
     <string name="settings_always_on_banner_body">Enable Always-on VPN in Android settings to prevent leaks on reboot</string>
     <string name="settings_always_on_banner_configure">Configure</string>
+    <!-- Chart timeframe -->
+    <string name="chart_tf_30s">30s</string>
+    <string name="chart_tf_5min">5m</string>
+    <string name="chart_tf_30min">30m</string>
+    <string name="chart_tf_1h">1h</string>
 </resources>

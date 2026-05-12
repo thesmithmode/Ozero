@@ -13,14 +13,17 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.IpProbeRoute
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
+import ru.ozero.enginescore.settings.HostsMode
 import java.io.IOException
 import java.util.concurrent.CountDownLatch
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ByeDpiEngineTest {
@@ -53,10 +56,10 @@ class ByeDpiEngineTest {
     @Test
     fun capabilitiesLocalOnly() {
         val caps = engine.capabilities
-        assert(caps.localOnly)
-        assert(!caps.requiresServer)
-        assert(caps.supportsTcp)
-        assert(!caps.supportsUdp)
+        assertTrue(caps.localOnly)
+        assertFalse(caps.requiresServer)
+        assertTrue(caps.supportsTcp)
+        assertFalse(caps.supportsUdp)
     }
 
     @Test
@@ -158,7 +161,7 @@ class ByeDpiEngineTest {
     fun buildHostsArgs_disabledMode_returnsEmpty() {
         val args = engine.buildHostsArgs(
             EngineConfig.ByeDpi(
-                hostsMode = ru.ozero.enginescore.settings.HostsMode.DISABLED,
+                hostsMode = HostsMode.DISABLED,
                 hosts = listOf("youtube.com"),
             ),
         )
@@ -169,7 +172,7 @@ class ByeDpiEngineTest {
     fun buildHostsArgs_emptyList_returnsEmpty() {
         val args = engine.buildHostsArgs(
             EngineConfig.ByeDpi(
-                hostsMode = ru.ozero.enginescore.settings.HostsMode.WHITELIST,
+                hostsMode = HostsMode.WHITELIST,
                 hosts = emptyList(),
             ),
         )
@@ -180,7 +183,7 @@ class ByeDpiEngineTest {
     fun buildHostsArgs_whitelistMode_addsHflag() {
         val args = engine.buildHostsArgs(
             EngineConfig.ByeDpi(
-                hostsMode = ru.ozero.enginescore.settings.HostsMode.WHITELIST,
+                hostsMode = HostsMode.WHITELIST,
                 hosts = listOf("youtube.com", "discord.com"),
             ),
         )
@@ -191,7 +194,7 @@ class ByeDpiEngineTest {
     fun buildHostsArgs_blacklistMode_addsHflagAndAn() {
         val args = engine.buildHostsArgs(
             EngineConfig.ByeDpi(
-                hostsMode = ru.ozero.enginescore.settings.HostsMode.BLACKLIST,
+                hostsMode = HostsMode.BLACKLIST,
                 hosts = listOf("ads.example.com"),
             ),
         )
@@ -203,7 +206,7 @@ class ByeDpiEngineTest {
         val args = engine.buildArgs(
             EngineConfig.ByeDpi(
                 socksPort = 1080,
-                hostsMode = ru.ozero.enginescore.settings.HostsMode.WHITELIST,
+                hostsMode = HostsMode.WHITELIST,
                 hosts = listOf("youtube.com"),
             ),
         ).toList()
@@ -251,7 +254,7 @@ class ByeDpiEngineTest {
     @Test
     fun ipProbeRouteReturnsSocksWhenPortGivenExplicitly() = runTest {
         val route = engine.ipProbeRoute(socksPort = 1080)
-        assertIs<ru.ozero.enginescore.IpProbeRoute.Socks>(route)
+        assertIs<IpProbeRoute.Socks>(route)
         assertEquals("127.0.0.1", route.host)
         assertEquals(1080, route.port)
     }
@@ -259,6 +262,6 @@ class ByeDpiEngineTest {
     @Test
     fun ipProbeRouteReturnsDefaultBeforeStartWhenPortZero() = runTest {
         val route = engine.ipProbeRoute(socksPort = 0)
-        assertIs<ru.ozero.enginescore.IpProbeRoute.Default>(route)
+        assertIs<IpProbeRoute.Default>(route)
     }
 }

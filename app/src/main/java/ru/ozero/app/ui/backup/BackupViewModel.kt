@@ -28,9 +28,9 @@ class BackupViewModel @Inject constructor(
             _uiState.value = BackupUiState.InProgress
             runCatching {
                 val data = backupManager.export()
-                val json = AppBackupSerializer.serialize(data)
+                val bytes = AppBackupSerializer.serializeEncrypted(data)
                 context.contentResolver.openOutputStream(uri)?.use { stream ->
-                    stream.write(json.toByteArray(Charsets.UTF_8))
+                    stream.write(bytes)
                 } ?: throw IOException("Cannot open output stream for $uri")
             }.fold(
                 onSuccess = { _uiState.value = BackupUiState.ExportSuccess },
@@ -46,10 +46,9 @@ class BackupViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = BackupUiState.InProgress
             runCatching {
-                val json = context.contentResolver.openInputStream(uri)?.use { stream ->
-                    stream.readBytes().toString(Charsets.UTF_8)
-                } ?: throw IOException("Cannot open input stream for $uri")
-                val data = AppBackupSerializer.deserialize(json)
+                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    ?: throw IOException("Cannot open input stream for $uri")
+                val data = AppBackupSerializer.deserializeAuto(bytes)
                 backupManager.import(data)
             }.fold(
                 onSuccess = { _uiState.value = BackupUiState.ImportSuccess },

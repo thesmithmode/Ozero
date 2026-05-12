@@ -1,5 +1,6 @@
 package ru.ozero.enginewarp
 
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -123,7 +124,7 @@ class DataStoreWarpConfigSlotStore(
             val id = UUID.randomUUID().toString()
             val slot = WarpConfigSlot(id = id, name = "Migrated", config = legacyConfig, isActive = true)
             prefs[KEY_SLOTS] = serializeSlots(listOf(slot))
-            PersistentLoggers.info(TAG, "migrated legacy WARP config to slot $id")
+            Log.i(TAG, "migrated legacy WARP config to slot $id")
         }
     }
 

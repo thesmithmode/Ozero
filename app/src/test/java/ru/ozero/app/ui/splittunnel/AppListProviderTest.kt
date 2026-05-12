@@ -1,6 +1,6 @@
 package ru.ozero.app.ui.splittunnel
 
-import android.content.pm.ApplicationInfo
+import android.Manifest
 import org.junit.jupiter.api.Test
 import java.io.File
 import kotlin.test.assertFalse
@@ -9,72 +9,106 @@ import kotlin.test.assertTrue
 class AppListProviderTest {
 
     @Test
-    fun `own package исключён всегда`() {
-        val info = makeInfo("ru.ozero.app", flags = 0)
+    fun `holdsInternetPermission true когда INTERNET в списке`() {
+        assertTrue(
+            holdsInternetPermission(arrayOf(Manifest.permission.INTERNET)),
+            "PackageInfo с INTERNET в requestedPermissions должен возвращать true.",
+        )
+    }
+
+    @Test
+    fun `holdsInternetPermission true среди других permissions`() {
+        assertTrue(
+            holdsInternetPermission(
+                arrayOf(
+                    Manifest.permission.CAMERA,
+                    Manifest.permission.INTERNET,
+                    Manifest.permission.READ_CONTACTS,
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun `holdsInternetPermission false когда нет INTERNET`() {
+        assertFalse(holdsInternetPermission(arrayOf(Manifest.permission.CAMERA)))
+    }
+
+    @Test
+    fun `holdsInternetPermission false для null permissions`() {
+        assertFalse(holdsInternetPermission(null))
+    }
+
+    @Test
+    fun `holdsInternetPermission false для пустого массива`() {
+        assertFalse(holdsInternetPermission(emptyArray()))
+    }
+
+    @Test
+    fun `loadMetadata использует getPackagesHoldingPermissions INTERNET`() {
+        val source = readProviderSource()
+        assertTrue(
+            source.contains("getPackagesHoldingPermissions") &&
+                source.contains("Manifest.permission.INTERNET"),
+            "loadMetadata обязан использовать getPackagesHoldingPermissions(INTERNET) " +
+                "вместо getInstalledApplications + системного фильтра. " +
+                "amnezia/PORTAL WG показывает все приложения с INTERNET — это включает " +
+                "Google Play Services, WebView providers, push-сервисы, captive-portal-login, " +
+                "которые наш старый фильтр isUserVisibleApp скрывал как 'pure system'.",
+        )
+    }
+
+    @Test
+    fun `loadMetadata исключает own package`() {
+        val source = readProviderSource()
+        assertTrue(
+            source.contains("it.packageName != ownPackage"),
+            "loadMetadata обязан фильтровать сам Ozero — нет смысла туннелировать сам себя.",
+        )
+    }
+
+    @Test
+    fun `loadMetadata НЕ использует устаревший фильтр isUserVisibleApp`() {
+        val source = readProviderSource()
         assertFalse(
-            isUserVisibleApp(info, emptySet(), "ru.ozero.app"),
-            "Сам Ozero не показывать в split-tunnel — нет смысла туннелировать сам себя.",
+            source.contains("isUserVisibleApp"),
+            "isUserVisibleApp фильтр удалён — он скрывал системные сервисы " +
+                "(Play Services, push-only) которые юзер хочет видеть в split-tunnel.",
         )
     }
 
     @Test
-    fun `user app без launcher отображается`() {
-        val info = makeInfo("com.example.bg", flags = 0)
+    fun `loadMetadata добавляет work profile приложения через LauncherApps`() {
+        val source = readProviderSource()
         assertTrue(
-            isUserVisibleApp(info, emptySet(), "ru.ozero.app"),
-            "User-installed app без LAUNCHER intent должен быть в split-tunnel списке — " +
-                "это background services / push-only apps которые юзер всё равно ставил сам.",
+            source.contains("LauncherApps") &&
+                source.contains("launcherApps.profiles") &&
+                source.contains("launcherApps.getActivityList"),
+            "Cross-profile work profile apps собираются через LauncherApps.profiles → getActivityList. " +
+                "PORTAL WG показывает приложения work profile отдельно от main user — " +
+                "split-tunnel должен покрывать оба профиля одинаково.",
         )
     }
 
     @Test
-    fun `user app с launcher отображается`() {
-        val info = makeInfo("com.example.app", flags = 0)
-        assertTrue(isUserVisibleApp(info, setOf("com.example.app"), "ru.ozero.app"))
-    }
-
-    @Test
-    fun `system app без launcher скрыт`() {
-        val info = makeInfo("com.android.systemservice", flags = ApplicationInfo.FLAG_SYSTEM)
-        assertFalse(
-            isUserVisibleApp(info, emptySet(), "ru.ozero.app"),
-            "Pure system service без launcher — мусор в UI, скрыть.",
-        )
-    }
-
-    @Test
-    fun `system app с launcher отображается`() {
-        val info = makeInfo("com.android.settings", flags = ApplicationInfo.FLAG_SYSTEM)
+    fun `LauncherApps итерация profiles защищена runCatching per-profile`() {
+        val source = readProviderSource()
+        val profilesBlock = source.substringAfter("for (profile in launcherApps.profiles)")
         assertTrue(
-            isUserVisibleApp(info, setOf("com.android.settings"), "ru.ozero.app"),
-            "System app с LAUNCHER (Settings, Calculator) — пользователь хочет таргетить.",
-        )
-    }
-
-    @Test
-    fun `updated system app отображается даже без launcher`() {
-        val info = makeInfo(
-            "com.google.android.gms",
-            flags = ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP,
-        )
-        assertTrue(
-            isUserVisibleApp(info, emptySet(), "ru.ozero.app"),
-            "Updated system apps (Play Services, Chrome) — фактически user apps, показывать.",
+            profilesBlock.trimStart().startsWith("{") && profilesBlock.contains("runCatching"),
+            "runCatching обязан быть ВНУТРИ цикла per-profile. " +
+                "Иначе SecurityException на locked work profile дропает все следующие профили.",
         )
     }
 
     @Test
     fun `loadApps кэширует — повторный вызов не сканирует PackageManager заново`() {
-        val source = File(
-            System.getProperty("user.dir") ?: ".",
-            "src/main/java/ru/ozero/app/ui/splittunnel/AppListProvider.kt",
-        ).readText()
+        val source = readProviderSource()
         assertTrue(
             source.contains("@Volatile private var listCache: List<InstalledApp>?") &&
                 source.contains("listCache?.let { return"),
             "DefaultAppListProvider обязан кэшировать loadApps() — повторный сканс PackageManager " +
-                "при каждом открытии split-tunnel экрана = bottleneck (200+ приложений). " +
-                "PORTAL_WG-style: загрузить один раз, переиспользовать. Source:\n${source.take(2000)}",
+                "при каждом открытии split-tunnel экрана = bottleneck (200+ приложений).",
         )
         assertTrue(
             source.contains("@Singleton"),
@@ -84,19 +118,14 @@ class AppListProviderTest {
 
     @Test
     fun `loadIcon кэширует результат`() {
-        val source = File(
-            System.getProperty("user.dir") ?: ".",
-            "src/main/java/ru/ozero/app/ui/splittunnel/AppListProvider.kt",
-        ).readText()
+        val source = readProviderSource()
         assertTrue(
-            source.contains("iconCache") &&
-                source.contains("iconCache[packageName]"),
+            source.contains("iconCache") && source.contains("iconCache[packageName]"),
             "loadIcon обязан кэшировать ImageBitmap — иначе при scroll LazyColumn повторные " +
                 "decodes одной и той же иконки = jank.",
         )
         assertTrue(
-            source.contains("loadMetadata") &&
-                source.contains("icon = null"),
+            source.contains("loadMetadata") && source.contains("icon = null"),
             "loadApps обязан возвращать metadata БЕЗ иконок — иконки lazy через loadIcon. " +
                 "Иначе первый вход в split-tunnel = 1-3 сек блокировки на 200+ apps * loadIcon.",
         )
@@ -110,15 +139,13 @@ class AppListProviderTest {
         val text = manifest.readText()
         assertTrue(
             text.contains("android.permission.QUERY_ALL_PACKAGES"),
-            "Без QUERY_ALL_PACKAGES Android 11+ возвращает обрезанный getInstalledApplications " +
-                "и пользователь не видит часть приложений в split-tunnel.",
+            "Без QUERY_ALL_PACKAGES Android 11+ возвращает обрезанный список и " +
+                "getPackagesHoldingPermissions не видит приложения вне <queries>.",
         )
     }
 
-    private fun makeInfo(pkg: String, flags: Int): ApplicationInfo {
-        val info = ApplicationInfo()
-        info.packageName = pkg
-        info.flags = flags
-        return info
-    }
+    private fun readProviderSource(): String = File(
+        System.getProperty("user.dir") ?: ".",
+        "src/main/java/ru/ozero/app/ui/splittunnel/AppListProvider.kt",
+    ).readText()
 }

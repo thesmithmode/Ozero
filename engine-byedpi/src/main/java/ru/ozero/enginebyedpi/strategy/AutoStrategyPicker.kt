@@ -1,10 +1,14 @@
 package ru.ozero.enginebyedpi.strategy
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.coroutineScope
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.PersistentLoggers
@@ -86,28 +90,30 @@ class AutoStrategyPicker(
             )
         }
 
-        var success = 0
-        var totalDur = 0L
-        for (site in sites) {
-            if (!currentCoroutineContext().isActive) break
-            val result = probeClient.probe(site)
-            if (result.success) success++
-            totalDur += result.durationMs
+        return try {
+            val semaphore = Semaphore(CONCURRENT_PROBES_DEFAULT)
+            val results = coroutineScope {
+                sites.map { site ->
+                    async { semaphore.withPermit { probeClient.probe(site) } }
+                }.awaitAll()
+            }
+            val success = results.count { it.success }
+            val totalDur = results.sumOf { it.durationMs }
+            StrategyScore(
+                strategy = strategy,
+                totalProbes = results.size,
+                successCount = success,
+                avgDurationMs = if (results.isEmpty()) 0L else totalDur / results.size,
+            )
+        } finally {
+            runCatching { byeDpiEngine.stop() }
         }
-
-        runCatching { byeDpiEngine.stop() }
-
-        return StrategyScore(
-            strategy = strategy,
-            totalProbes = sites.size,
-            successCount = success,
-            avgDurationMs = if (sites.isEmpty()) 0L else totalDur / sites.size,
-        )
     }
 
     companion object {
         const val START_TIMEOUT_MS: Long = 6_000L
         const val BETWEEN_STRATEGY_DELAY_MS: Long = 500L
+        const val CONCURRENT_PROBES_DEFAULT: Int = 20
         private const val TAG: String = "AutoStrategyPicker"
     }
 }

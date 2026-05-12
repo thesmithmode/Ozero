@@ -275,12 +275,24 @@ class OzeroVpnService : android.net.VpnService() {
     private suspend fun readSplitConfig(
         mode: ru.ozero.enginescore.settings.SplitTunnelMode,
     ): ru.ozero.commonvpn.split.SplitTunnelConfig {
-        val allowlist = withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
-            runCatching { splitTunnelRulesProvider.allowlistPackages() }.getOrNull()
-        } ?: emptySet()
-        val blocklist = withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
-            runCatching { splitTunnelRulesProvider.blocklistPackages() }.getOrNull()
-        } ?: emptySet()
+        val allowlist = if (mode == ru.ozero.enginescore.settings.SplitTunnelMode.ALLOWLIST) {
+            val r = withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
+                runCatching { splitTunnelRulesProvider.allowlistPackages() }.getOrNull()
+            }
+            if (r == null) PersistentLoggers.warn(TAG, "allowlist read timeout — fallback emptySet")
+            r ?: emptySet()
+        } else {
+            emptySet()
+        }
+        val blocklist = if (mode == ru.ozero.enginescore.settings.SplitTunnelMode.BLOCKLIST) {
+            val r = withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
+                runCatching { splitTunnelRulesProvider.blocklistPackages() }.getOrNull()
+            }
+            if (r == null) PersistentLoggers.warn(TAG, "blocklist read timeout — fallback emptySet")
+            r ?: emptySet()
+        } else {
+            emptySet()
+        }
         return ru.ozero.commonvpn.split.SplitTunnelConfig(mode = mode, allowlist = allowlist, blocklist = blocklist)
     }
 
@@ -860,7 +872,7 @@ class OzeroVpnService : android.net.VpnService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             runCatching { builder.setMetered(false) }
         }
-        ru.ozero.commonvpn.split.TunBuilderConfigurator(packageName).apply(builder, splitConfig)
+        ru.ozero.commonvpn.split.TunBuilderConfigurator(packageName).apply(builder, splitConfig, excludeSelf = true)
         return builder
     }
 
