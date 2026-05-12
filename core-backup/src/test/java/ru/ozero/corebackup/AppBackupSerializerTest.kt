@@ -54,7 +54,7 @@ class AppBackupSerializerTest {
         val json = AppBackupSerializer.serialize(fullData)
         val restored = AppBackupSerializer.deserialize(json)
 
-        assertEquals(1, restored.version)
+        assertEquals(AppBackupData.CURRENT_VERSION, restored.version)
         assertEquals("2026-05-05T12:00:00Z", restored.exportedAt)
 
         val s = restored.settings

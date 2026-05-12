@@ -10,6 +10,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -261,7 +262,7 @@ class StrategyTestViewModel @Inject constructor(
         val timeoutMs = snap.timeoutSeconds * 1_000L
         val evolutionEngine = EvolutionEngine(
             byeDpiEngine = byeDpiEngine,
-            probeFactory = { port, timeout -> probeFactory.create(port, timeout) },
+            probeFactory = { port, timeout -> probeFactory.create(port, timeout.toInt()) },
             evolver = evolver,
             pool = genePool,
             sites = sites,
@@ -310,7 +311,7 @@ class StrategyTestViewModel @Inject constructor(
                 applyEngineStartFailure(command, sites, started)
                 continue
             }
-            val probe: SocksProbeClient = probeFactory.create(SOCKS_PORT, startTimeoutMs)
+            val probe: SocksProbeClient = probeFactory.create(SOCKS_PORT, startTimeoutMs.toInt())
             val semaphore = Semaphore(concurrentLimit)
             try {
                 coroutineScope {
