@@ -16,7 +16,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
@@ -203,7 +202,7 @@ private fun StrategyTestScaffold(
                         modifier = Modifier.testTag("saved_strategies_btn"),
                     ) {
                         Icon(
-                            Icons.Filled.Bookmark,
+                            Icons.Filled.Star,
                             contentDescription = stringResource(R.string.saved_strategies_title),
                         )
                     }
@@ -776,7 +775,7 @@ private fun StrategyRow(
                         modifier = Modifier.testTag("strategy_save_$index"),
                     ) {
                         Icon(
-                            Icons.Filled.Bookmark,
+                            Icons.Filled.Star,
                             contentDescription = stringResource(R.string.saved_strategy_save),
                             tint = if (isSaved) {
                                 MaterialTheme.colorScheme.primary
