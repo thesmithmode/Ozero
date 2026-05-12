@@ -30,6 +30,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.resume
 
+class SdkLocationToken(val sdk: ConnectLocation) : UrnetworkSdkBridge.LocationToken {
+    override val countryCode: String? = runCatching { sdk.countryCode }.getOrNull()
+}
+
 @Suppress("TooManyFunctions")
 class RealUrnetworkSdkBridge(
     private val app: Application,
@@ -183,12 +187,13 @@ class RealUrnetworkSdkBridge(
 
     override fun isRunning(): Boolean = running.get()
 
-    override fun connectTo(location: ConnectLocation) {
+    override fun connectTo(location: UrnetworkSdkBridge.LocationToken) {
         if (!running.get()) {
             PersistentLoggers.warn(TAG, "connectTo skipped — bridge not running")
             return
         }
-        runCatching { connectVcRef.get()?.connect(location) }
+        val sdkLoc = (location as? SdkLocationToken)?.sdk ?: return
+        runCatching { connectVcRef.get()?.connect(sdkLoc) }
             .onFailure { PersistentLoggers.warn(TAG, "connect threw: ${it.message}") }
     }
 
@@ -201,14 +206,15 @@ class RealUrnetworkSdkBridge(
             .onFailure { PersistentLoggers.warn(TAG, "connectBestAvailable threw: ${it.message}") }
     }
 
-    override fun selectedLocation(): ConnectLocation? {
+    override fun selectedLocation(): UrnetworkSdkBridge.LocationToken? {
         if (!running.get()) return null
-        return runCatching { connectVcRef.get()?.selectedLocation }.getOrNull()
+        val loc = runCatching { connectVcRef.get()?.selectedLocation }.getOrNull() ?: return null
+        return SdkLocationToken(loc)
     }
 
     override fun selectedLocationInfo(): UrnetworkSdkBridge.LocationInfo? {
         if (!running.get()) return null
-        val loc = runCatching { selectedLocation() }.getOrNull() ?: return null
+        val loc = runCatching { connectVcRef.get()?.selectedLocation }.getOrNull() ?: return null
         val country = runCatching { loc.country }.getOrNull()?.takeIf { it.isNotBlank() }
             ?: runCatching { loc.name }.getOrNull()?.takeIf { it.isNotBlank() }
         val code = runCatching { loc.countryCode?.trim()?.uppercase() }.getOrNull()

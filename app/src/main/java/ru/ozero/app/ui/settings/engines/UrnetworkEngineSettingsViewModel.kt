@@ -3,8 +3,8 @@ package ru.ozero.app.ui.settings.engines
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.bringyour.sdk.ConnectLocation
 import com.bringyour.sdk.FilteredLocations
+import ru.ozero.engineurnetwork.SdkLocationToken
 import com.bringyour.sdk.LocationsViewController
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -37,7 +37,7 @@ import java.util.Locale
 import javax.inject.Inject
 
 data class UrnetworkLocationItem(
-    val location: ConnectLocation,
+    val location: UrnetworkSdkBridge.LocationToken,
     val name: String,
     val nameRu: String,
     val countryCode: String,
@@ -50,7 +50,7 @@ sealed interface UrnetworkSettingsUiState {
     data object NotConnected : UrnetworkSettingsUiState
     data class Ready(
         val countries: List<UrnetworkLocationItem>,
-        val selectedLocation: ConnectLocation?,
+        val selectedLocation: UrnetworkSdkBridge.LocationToken?,
         val providePaused: Boolean,
     ) : UrnetworkSettingsUiState
 }
@@ -214,7 +214,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         }
     }
 
-    fun selectLocation(location: ConnectLocation?) {
+    fun selectLocation(location: UrnetworkSdkBridge.LocationToken?) {
         if (!isUrnetworkActive.value) {
             PersistentLoggers.warn(TAG, "selectLocation skipped — URnetwork engine not active")
             return
@@ -280,7 +280,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
                 val code = loc.countryCode ?: ""
                 add(
                     UrnetworkLocationItem(
-                        location = loc,
+                        location = SdkLocationToken(loc),
                         name = loc.name ?: loc.country ?: "Unknown",
                         nameRu = if (code.length == 2) {
                             Locale("", code).getDisplayCountry(Locale("ru"))

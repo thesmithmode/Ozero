@@ -1,6 +1,5 @@
 package ru.ozero.engineurnetwork
 
-import com.bringyour.sdk.ConnectLocation
 import com.bringyour.sdk.LocationsViewController
 
 interface UrnetworkSdkBridge {
@@ -14,9 +13,9 @@ interface UrnetworkSdkBridge {
     fun isRunning(): Boolean
     suspend fun attachTun(tunFd: Int): AttachResult
 
-    fun connectTo(location: ConnectLocation)
+    fun connectTo(location: LocationToken)
     fun connectBestAvailable()
-    fun selectedLocation(): ConnectLocation?
+    fun selectedLocation(): LocationToken?
     fun selectedLocationInfo(): LocationInfo? = null
     fun openLocationsViewController(): LocationsViewController?
 
@@ -36,6 +35,10 @@ interface UrnetworkSdkBridge {
     fun fetchTransferStats()
 
     suspend fun fetchSubscriptionBalance(): SubscriptionBalanceSnapshot?
+
+    interface LocationToken {
+        val countryCode: String?
+    }
 
     data class LocationInfo(
         val country: String?,

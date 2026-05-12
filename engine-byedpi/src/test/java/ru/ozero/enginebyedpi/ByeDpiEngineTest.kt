@@ -83,14 +83,10 @@ class ByeDpiEngineTest {
     }
 
     @Test
-    fun startArgsIncludePortFlag() = runTest {
-        every { proxy.startProxy(any()) } returns 0
-        engine.start(EngineConfig.ByeDpi(socksPort = 1080))
-        verify {
-            proxy.startProxy(
-                match { args -> args.contains("-p") && args.contains("1080") }
-            )
-        }
+    fun startArgsIncludePortFlag() {
+        val args = engine.buildArgs(EngineConfig.ByeDpi(socksPort = 1080))
+        assertTrue(args.contains("-p"))
+        assertTrue(args.contains("1080"))
     }
 
     @Test

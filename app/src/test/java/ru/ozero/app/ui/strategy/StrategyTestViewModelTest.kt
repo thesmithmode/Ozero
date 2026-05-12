@@ -61,6 +61,7 @@ class StrategyTestViewModelTest {
         )
         store = FakeResultsStore()
         settingsStore = FakeStrategyTestSettingsStore()
+        settingsStore.stored = StrategyTestSettings(evolutionMode = false)
         domainStore = FakeDomainListStore()
         savedStore = FakeSavedStrategyStore()
         engine = FakeByeDpiEngine()

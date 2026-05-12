@@ -41,10 +41,10 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.bringyour.sdk.ConnectLocation
 import ru.ozero.app.R
 import ru.ozero.app.ui.theme.OzeroPalette
 import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
+import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
 import ru.ozero.engineurnetwork.UrnetworkWindowType
 
@@ -156,7 +156,7 @@ fun UrnetworkEngineSettingsScreen(
 private fun LocationListContent(
     modifier: Modifier,
     countries: List<UrnetworkLocationItem>,
-    selectedLocation: ConnectLocation?,
+    selectedLocation: UrnetworkSdkBridge.LocationToken?,
     providePaused: Boolean,
     peerCount: Int,
     switchingCountry: Boolean,
@@ -166,7 +166,7 @@ private fun LocationListContent(
     provideControlMode: UrnetworkProvideControlMode,
     provideNetworkMode: UrnetworkProvideNetworkMode,
     onSearchQueryChange: (String) -> Unit,
-    onSelect: (ConnectLocation?) -> Unit,
+    onSelect: (UrnetworkSdkBridge.LocationToken?) -> Unit,
     onSetProvidePaused: (Boolean) -> Unit,
     onSelectWindowType: (UrnetworkWindowType) -> Unit,
     onToggleFixedIp: (Boolean) -> Unit,

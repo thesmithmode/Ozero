@@ -158,9 +158,9 @@ class EngineUrnetworkStatsPollingTest {
 
         override fun isRunning(): Boolean = running
         override suspend fun attachTun(tunFd: Int) = UrnetworkSdkBridge.AttachResult.Success
-        override fun connectTo(location: com.bringyour.sdk.ConnectLocation) = Unit
+        override fun connectTo(location: UrnetworkSdkBridge.LocationToken) = Unit
         override fun connectBestAvailable() = Unit
-        override fun selectedLocation(): com.bringyour.sdk.ConnectLocation? = null
+        override fun selectedLocation(): UrnetworkSdkBridge.LocationToken? = null
         override fun openLocationsViewController(): com.bringyour.sdk.LocationsViewController? = null
         override fun setProvidePaused(paused: Boolean) = Unit
         override fun isProvidePaused(): Boolean = true

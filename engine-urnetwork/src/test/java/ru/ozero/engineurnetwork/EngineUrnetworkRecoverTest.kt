@@ -1,8 +1,6 @@
 package ru.ozero.engineurnetwork
 
-import com.bringyour.sdk.ConnectLocation
 import com.bringyour.sdk.LocationsViewController
-import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -67,7 +65,7 @@ class EngineUrnetworkRecoverTest {
     fun `recover вызывает connectTo когда selectedLocation не null`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val scope = CoroutineScope(SupervisorJob() + dispatcher)
-        val fakeLocation = mockk<ConnectLocation>(relaxed = true)
+        val fakeLocation = FakeLocation()
         val bridge = FakeRecoverBridge(running = true, location = fakeLocation)
         val engine = EngineUrnetwork(
             configStore = FakeStore(byJwt = "j", byClientJwt = "cj"),
@@ -91,7 +89,7 @@ class EngineUrnetworkRecoverTest {
         val scope = CoroutineScope(SupervisorJob() + dispatcher)
         val bridge = FakeRecoverBridge(
             running = true,
-            location = mockk<ConnectLocation>(relaxed = true),
+            location = FakeLocation(),
             throwOnConnect = RuntimeException("sdk transient"),
         )
         val engine = EngineUrnetwork(
@@ -108,14 +106,16 @@ class EngineUrnetworkRecoverTest {
         scope.cancel()
     }
 
+    private data class FakeLocation(override val countryCode: String? = null) : UrnetworkSdkBridge.LocationToken
+
     private class FakeRecoverBridge(
         var running: Boolean,
-        var location: ConnectLocation? = null,
+        var location: UrnetworkSdkBridge.LocationToken? = null,
         val throwOnConnect: Throwable? = null,
     ) : UrnetworkSdkBridge {
         var connectToCalls: Int = 0
         var connectBestAvailableCalls: Int = 0
-        var lastConnectToLocation: ConnectLocation? = null
+        var lastConnectToLocation: UrnetworkSdkBridge.LocationToken? = null
 
         override suspend fun start(
             walletAddress: String,
@@ -135,7 +135,7 @@ class EngineUrnetworkRecoverTest {
 
         override suspend fun attachTun(tunFd: Int) = UrnetworkSdkBridge.AttachResult.Success
 
-        override fun connectTo(location: ConnectLocation) {
+        override fun connectTo(location: UrnetworkSdkBridge.LocationToken) {
             connectToCalls++
             lastConnectToLocation = location
             throwOnConnect?.let { throw it }
@@ -146,7 +146,7 @@ class EngineUrnetworkRecoverTest {
             throwOnConnect?.let { throw it }
         }
 
-        override fun selectedLocation(): ConnectLocation? = location
+        override fun selectedLocation(): UrnetworkSdkBridge.LocationToken? = location
 
         override fun openLocationsViewController(): LocationsViewController? = null
 

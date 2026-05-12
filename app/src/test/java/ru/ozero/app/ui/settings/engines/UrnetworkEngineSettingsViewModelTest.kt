@@ -1,9 +1,6 @@
 package ru.ozero.app.ui.settings.engines
 
-import com.bringyour.sdk.ConnectLocation
 import com.bringyour.sdk.LocationsViewController
-import io.mockk.every
-import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -161,10 +158,8 @@ class UrnetworkEngineSettingsViewModelTest {
 
     @Test
     fun `selectLocation активирует switchingCountry когда страна меняется`() = runTest {
-        val locA = mockk<ConnectLocation>(relaxed = true)
-        every { locA.countryCode } returns "US"
-        val locB = mockk<ConnectLocation>(relaxed = true)
-        every { locB.countryCode } returns "DE"
+        val locA = FakeLocationToken("US")
+        val locB = FakeLocationToken("DE")
         val bridge = FakeUrnetworkBridge(
             connected = true,
             initialLocation = locA,
@@ -183,10 +178,8 @@ class UrnetworkEngineSettingsViewModelTest {
 
     @Test
     fun `switchingCountry очищается после 15s budget когда peers не появились`() = runTest {
-        val locA = mockk<ConnectLocation>(relaxed = true)
-        every { locA.countryCode } returns "US"
-        val locB = mockk<ConnectLocation>(relaxed = true)
-        every { locB.countryCode } returns "DE"
+        val locA = FakeLocationToken("US")
+        val locB = FakeLocationToken("DE")
         val bridge = FakeUrnetworkBridge(
             connected = true,
             initialLocation = locA,
@@ -276,9 +269,11 @@ private class FakeUrnetworkConfigStore : UrnetworkConfigStore {
     }
 }
 
+private data class FakeLocationToken(override val countryCode: String?) : UrnetworkSdkBridge.LocationToken
+
 private class FakeUrnetworkBridge(
     private val connected: Boolean = false,
-    private val initialLocation: ConnectLocation? = null,
+    private val initialLocation: UrnetworkSdkBridge.LocationToken? = null,
     private val peerCountValue: Int = 0,
 ) : UrnetworkSdkBridge {
     override suspend fun start(
@@ -292,9 +287,9 @@ private class FakeUrnetworkBridge(
     override fun isRunning(): Boolean = connected
     override suspend fun attachTun(tunFd: Int): UrnetworkSdkBridge.AttachResult =
         UrnetworkSdkBridge.AttachResult.Success
-    override fun connectTo(location: ConnectLocation) = Unit
+    override fun connectTo(location: UrnetworkSdkBridge.LocationToken) = Unit
     override fun connectBestAvailable() = Unit
-    override fun selectedLocation(): ConnectLocation? = initialLocation
+    override fun selectedLocation(): UrnetworkSdkBridge.LocationToken? = initialLocation
     override fun openLocationsViewController(): LocationsViewController? = null
     var lastAppliedWindowType: UrnetworkWindowType? = null
     var lastAppliedFixedIp: Boolean? = null

@@ -27,7 +27,7 @@ class UrnetworkCountryPersistenceTest {
     @Test
     fun `selectLocation persists countryCode в SettingsRepository`() {
         val body = viewModelSource
-            .substringAfter("fun selectLocation(location: ConnectLocation?)")
+            .substringAfter("fun selectLocation(location: UrnetworkSdkBridge.LocationToken?)")
             .substringBefore("fun setSearchQuery")
         assertTrue(
             body.contains("settingsRepository.setUrnetworkCountryCode("),
@@ -39,7 +39,7 @@ class UrnetworkCountryPersistenceTest {
     @Test
     fun `selectLocation также пингует bridge setPreferredCountry`() {
         val body = viewModelSource
-            .substringAfter("fun selectLocation(location: ConnectLocation?)")
+            .substringAfter("fun selectLocation(location: UrnetworkSdkBridge.LocationToken?)")
             .substringBefore("fun setSearchQuery")
         assertTrue(
             body.contains("bridge.setPreferredCountry("),

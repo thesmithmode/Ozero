@@ -1,6 +1,5 @@
 package ru.ozero.app
 
-import com.bringyour.sdk.ConnectLocation
 import com.bringyour.sdk.LocationsViewController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -168,9 +167,9 @@ class MainViewModelTest {
         override fun isRunning(): Boolean = running
         override suspend fun attachTun(tunFd: Int): UrnetworkSdkBridge.AttachResult =
             UrnetworkSdkBridge.AttachResult.Success
-        override fun connectTo(location: ConnectLocation) = Unit
+        override fun connectTo(location: UrnetworkSdkBridge.LocationToken) = Unit
         override fun connectBestAvailable() = Unit
-        override fun selectedLocation(): ConnectLocation? = null
+        override fun selectedLocation(): UrnetworkSdkBridge.LocationToken? = null
         override fun openLocationsViewController(): LocationsViewController? = null
         override fun setProvidePaused(paused: Boolean) = Unit
         override fun isProvidePaused(): Boolean = true
