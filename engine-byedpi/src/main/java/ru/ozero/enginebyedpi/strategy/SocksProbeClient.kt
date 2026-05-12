@@ -73,7 +73,7 @@ class HttpSocksProbeClient(
                 site = site,
                 success = false,
                 durationMs = nowMs() - started,
-                error = "${e.javaClass.simpleName}: ${e.message.orEmpty()}",
+                error = e.javaClass.simpleName,
             )
         } finally {
             runCatching { connection?.disconnect() }

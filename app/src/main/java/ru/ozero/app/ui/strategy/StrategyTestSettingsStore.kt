@@ -17,7 +17,7 @@ class SharedPrefsStrategyTestSettingsStore(context: Context) : StrategyTestSetti
         timeoutSeconds = prefs.getInt(KEY_TIMEOUT_SECONDS, 5),
         delayBetweenMs = prefs.getLong(KEY_DELAY_BETWEEN_MS, 500L),
         useCustomStrategies = prefs.getBoolean(KEY_USE_CUSTOM, false),
-        customStrategies = prefs.getString(KEY_CUSTOM_STRATEGIES, "") ?: "",
+        customStrategies = (prefs.getString(KEY_CUSTOM_STRATEGIES, "") ?: "").take(MAX_CUSTOM_STRATEGIES_LEN),
         evolutionMode = prefs.getBoolean(KEY_EVOLUTION_MODE, false),
         evolutionPopulationSize = prefs.getInt(KEY_EVOLUTION_POPULATION_SIZE, 20),
         evolutionMaxGenerations = prefs.getInt(KEY_EVOLUTION_MAX_GENERATIONS, 10),
@@ -32,7 +32,7 @@ class SharedPrefsStrategyTestSettingsStore(context: Context) : StrategyTestSetti
             .putInt(KEY_TIMEOUT_SECONDS, settings.timeoutSeconds)
             .putLong(KEY_DELAY_BETWEEN_MS, settings.delayBetweenMs)
             .putBoolean(KEY_USE_CUSTOM, settings.useCustomStrategies)
-            .putString(KEY_CUSTOM_STRATEGIES, settings.customStrategies)
+            .putString(KEY_CUSTOM_STRATEGIES, settings.customStrategies.take(MAX_CUSTOM_STRATEGIES_LEN))
             .putBoolean(KEY_EVOLUTION_MODE, settings.evolutionMode)
             .putInt(KEY_EVOLUTION_POPULATION_SIZE, settings.evolutionPopulationSize)
             .putInt(KEY_EVOLUTION_MAX_GENERATIONS, settings.evolutionMaxGenerations)
@@ -54,5 +54,6 @@ class SharedPrefsStrategyTestSettingsStore(context: Context) : StrategyTestSetti
         private const val KEY_EVOLUTION_MAX_GENERATIONS = "byedpi_proxytest_evolution_max_generations"
         private const val KEY_EVOLUTION_MUTATION_RATE = "byedpi_proxytest_evolution_mutation_rate"
         private const val KEY_EVOLUTION_ELITE_COUNT = "byedpi_proxytest_evolution_elite_count"
+        private const val MAX_CUSTOM_STRATEGIES_LEN = 16_384
     }
 }

@@ -26,13 +26,18 @@ class FileDomainListStore(
                 DomainList(
                     id = o.getString("id"),
                     name = o.getString("name"),
-                    domains = (0 until domainsArr.length()).map { domainsArr.getString(it) },
+                    domains = (0 until domainsArr.length())
+                        .map { domainsArr.getString(it) }
+                        .filter(::isValidDomain),
                     isActive = o.optBoolean("isActive", true),
                     isBuiltIn = o.optBoolean("isBuiltIn", false),
                 )
             }
         }.getOrDefault(emptyList())
     }
+
+    private fun isValidDomain(d: String): Boolean =
+        d.length in 1..253 && DOMAIN_REGEX.matches(d)
 
     override fun save(lists: List<DomainList>) {
         val array = JSONArray()
@@ -49,5 +54,9 @@ class FileDomainListStore(
             )
         }
         runCatching { file.writeText(array.toString()) }
+    }
+
+    private companion object {
+        val DOMAIN_REGEX = Regex("^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
     }
 }

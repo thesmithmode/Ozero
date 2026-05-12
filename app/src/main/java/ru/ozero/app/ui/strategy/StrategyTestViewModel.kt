@@ -255,8 +255,7 @@ class StrategyTestViewModel @Inject constructor(
     private suspend fun runEvolution(sites: List<String>) {
         val snap = _settings.value
         val seedCommands = _strategies.value.map { it.command }
-        val sniSeeds = domainListManager.getActiveDomains(_domainLists.value).map { "-s $it" }
-        val genePool = GenePool(seedCommands + sniSeeds)
+        val genePool = GenePool(seedCommands)
         val evolver = StrategyEvolver(genePool)
         val maxGen = snap.evolutionMaxGenerations
         val timeoutMs = snap.timeoutSeconds * 1_000L
