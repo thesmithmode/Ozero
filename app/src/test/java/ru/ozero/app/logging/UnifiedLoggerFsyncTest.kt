@@ -17,10 +17,10 @@ class UnifiedLoggerFsyncTest {
 
     @BeforeEach
     fun resetLoggerState() {
-        val field = UnifiedLogger::class.java.getDeclaredField("targetRef")
+        val field = LogFileStore::class.java.getDeclaredField("targetRef")
         field.isAccessible = true
         @Suppress("UNCHECKED_CAST")
-        (field.get(UnifiedLogger) as AtomicReference<File?>).set(null)
+        (field.get(LogFileStore) as AtomicReference<File?>).set(null)
     }
 
     private fun mockContext(): Context {
