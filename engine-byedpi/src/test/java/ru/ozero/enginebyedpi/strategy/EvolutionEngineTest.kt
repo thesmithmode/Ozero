@@ -82,7 +82,7 @@ class EvolutionEngineTest {
             settings = EvolutionEngine.EvolutionSettings(populationSize = 2, maxGenerations = 2),
         )
         val result = evolutionEngine.evolve(seeds) {}
-        assertTrue(result.isEmpty() || result.isNotEmpty())
+        assertTrue(result.isNotEmpty(), "empty sites should still return a seed chromosome, got: $result")
     }
 
     @Test

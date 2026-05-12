@@ -26,8 +26,8 @@ class GeneMemoryTest {
         mem.record(listOf("-a", "-b"), fitness = 1.0)
         val scoreA = mem.ucbScore("-a")
         val scoreUnknown = mem.ucbScore("-z")
-        assertTrue(scoreA >= 0.0)
-        assertTrue(scoreUnknown > scoreA || scoreUnknown > 1.0)
+        assertTrue(scoreA > 0.0, "recorded token must have positive score, got $scoreA")
+        assertTrue(scoreUnknown > scoreA, "unexplored token wins UCB over single-trial token: $scoreUnknown vs $scoreA")
     }
 
     @Test
