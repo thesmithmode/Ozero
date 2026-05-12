@@ -207,6 +207,17 @@
     <string name="strategy_settings_sni">SNI домен</string>
     <string name="strategy_settings_use_custom">Свои стратегии</string>
     <string name="strategy_settings_custom_strategies">Стратегии (по одной в строке)</string>
+    <string name="domain_lists_title">Списки сайтов</string>
+    <string name="domain_lists_manage">Управление</string>
+    <string name="domain_list_add">Добавить список</string>
+    <string name="domain_list_sites_count">%1$d сайтов</string>
+    <string name="domain_list_delete">Удалить</string>
+    <string name="domain_list_reset_defaults">Сбросить</string>
+    <string name="domain_list_name_hint">Название списка</string>
+    <string name="domain_list_sites_hint">Сайты (один на строку)</string>
+    <string name="domain_list_add_title">Новый список</string>
+    <string name="domain_list_save">Сохранить</string>
+    <string name="domain_list_cancel">Отмена</string>
 
     <!-- URnetwork -->
     <string name="urnetwork_settings_title">URnetwork</string>

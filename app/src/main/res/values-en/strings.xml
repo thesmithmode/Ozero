@@ -193,6 +193,17 @@
     <string name="strategy_settings_sni">SNI domain</string>
     <string name="strategy_settings_use_custom">Custom strategies</string>
     <string name="strategy_settings_custom_strategies">Strategies (one per line)</string>
+    <string name="domain_lists_title">Site Lists</string>
+    <string name="domain_lists_manage">Manage</string>
+    <string name="domain_list_add">Add list</string>
+    <string name="domain_list_sites_count">%1$d sites</string>
+    <string name="domain_list_delete">Delete</string>
+    <string name="domain_list_reset_defaults">Reset</string>
+    <string name="domain_list_name_hint">List name</string>
+    <string name="domain_list_sites_hint">Sites (one per line)</string>
+    <string name="domain_list_add_title">New list</string>
+    <string name="domain_list_save">Save</string>
+    <string name="domain_list_cancel">Cancel</string>
 
     <!-- URnetwork -->
     <string name="urnetwork_settings_title">URnetwork</string>

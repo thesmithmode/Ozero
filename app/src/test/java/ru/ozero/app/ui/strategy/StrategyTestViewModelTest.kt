@@ -44,6 +44,7 @@ class StrategyTestViewModelTest {
     private lateinit var assets: FakeAssetSource
     private lateinit var store: FakeResultsStore
     private lateinit var settingsStore: FakeStrategyTestSettingsStore
+    private lateinit var domainStore: FakeDomainListStore
     private lateinit var engine: FakeByeDpiEngine
     private lateinit var probe: FakeProbeClient
     private lateinit var tunnel: TunnelController
@@ -58,6 +59,7 @@ class StrategyTestViewModelTest {
         )
         store = FakeResultsStore()
         settingsStore = FakeStrategyTestSettingsStore()
+        domainStore = FakeDomainListStore()
         engine = FakeByeDpiEngine()
         probe = FakeProbeClient(engine)
         tunnel = TunnelController()
@@ -68,15 +70,24 @@ class StrategyTestViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun newVm(): StrategyTestViewModel = StrategyTestViewModel(
-        repository = repo,
-        assetSource = assets,
-        resultsStore = store,
-        settingsStore = settingsStore,
-        byeDpiEngine = engine,
-        probeFactory = { probe },
-        tunnelController = tunnel,
-    ).also { it.ioDispatcher = dispatcher }
+    private fun defaultSites() = listOf("a.example", "b.example")
+
+    private fun newVm(sites: List<String> = defaultSites()): StrategyTestViewModel {
+        val builtIns = listOf(
+            DomainList(id = "test", name = "Test", domains = sites, isActive = true, isBuiltIn = true),
+        )
+        val manager = DomainListManager(domainStore, builtIns)
+        return StrategyTestViewModel(
+            repository = repo,
+            assetSource = assets,
+            resultsStore = store,
+            settingsStore = settingsStore,
+            domainListManager = manager,
+            byeDpiEngine = engine,
+            probeFactory = { probe },
+            tunnelController = tunnel,
+        ).also { it.ioDispatcher = dispatcher }
+    }
 
     @Test
     fun `init loads 74 strategies from asset`() = runTest(dispatcher) {
@@ -86,6 +97,16 @@ class StrategyTestViewModelTest {
         assertEquals(74, list.size)
         assertEquals(STRATEGIES_74.first(), list.first().command)
         assertTrue(list.all { !it.isCompleted })
+    }
+
+    @Test
+    fun `init loads domain lists from manager`() = runTest(dispatcher) {
+        val vm = newVm(sites = listOf("x.com", "y.com"))
+        advanceUntilIdle()
+        val lists = vm.domainLists.value
+        assertEquals(1, lists.size)
+        assertEquals(listOf("x.com", "y.com"), lists.first().domains)
+        assertTrue(lists.first().isActive)
     }
 
     @Test
@@ -100,6 +121,24 @@ class StrategyTestViewModelTest {
         assertNotNull(vm.errorMessage.value)
         assertFalse(vm.isRunning.value)
         assertEquals(0, engine.startCount)
+    }
+
+    @Test
+    fun `onStart emits NoSites error when all domain lists inactive`() = runTest(dispatcher) {
+        val builtIns = listOf(
+            DomainList(id = "t", name = "T", domains = listOf("a.com"), isActive = false, isBuiltIn = true),
+        )
+        val manager = DomainListManager(domainStore, builtIns)
+        val vm = StrategyTestViewModel(
+            repository = repo, assetSource = assets, resultsStore = store,
+            settingsStore = settingsStore, domainListManager = manager,
+            byeDpiEngine = engine, probeFactory = { probe }, tunnelController = tunnel,
+        ).also { it.ioDispatcher = dispatcher }
+        advanceUntilIdle()
+        vm.onStart()
+        advanceUntilIdle()
+        assertEquals(StrategyTestError.NoSites, vm.errorMessage.value)
+        assertFalse(vm.isRunning.value)
     }
 
     @Test
@@ -131,7 +170,7 @@ class StrategyTestViewModelTest {
     fun `during run individual strategy progress updates currentProgress`() = runTest(dispatcher) {
         assets = FakeAssetSource(strategies = listOf("-cmd1", "-cmd2"), sites = listOf("a", "b"))
         probe.successFor = { site, _ -> site == "a" }
-        val vm = newVm()
+        val vm = newVm(sites = listOf("a", "b"))
         advanceUntilIdle()
         vm.onStart()
         advanceUntilIdle()
@@ -147,7 +186,7 @@ class StrategyTestViewModelTest {
     fun `after all complete strategies sorted by successPercentage descending`() = runTest(dispatcher) {
         assets = FakeAssetSource(strategies = listOf("-loser", "-winner"), sites = listOf("s1"))
         probe.successFor = { _, cmd -> cmd.contains("winner") }
-        val vm = newVm()
+        val vm = newVm(sites = listOf("s1"))
         advanceUntilIdle()
         vm.onStart()
         advanceUntilIdle()
@@ -167,7 +206,7 @@ class StrategyTestViewModelTest {
             sites = listOf("a", "b"),
         )
         probe.delayMs = 10_000L
-        val vm = newVm()
+        val vm = newVm(sites = listOf("a", "b"))
         advanceUntilIdle()
         vm.onStart()
         advanceTimeBy(50L)
@@ -186,7 +225,7 @@ class StrategyTestViewModelTest {
         )
         probe.successFor = { _, cmd -> cmd == "-fast-good" }
         probe.delayMs = 0L
-        val vm = newVm()
+        val vm = newVm(sites = listOf("s1", "s2"))
         advanceUntilIdle()
         vm.onStart()
         advanceUntilIdle()
@@ -215,7 +254,7 @@ class StrategyTestViewModelTest {
             synchronized(lock) { current-- }
         }
         probe.delayMs = 50L
-        val vm = newVm()
+        val vm = newVm(sites = listOf("a", "b", "c", "d"))
         advanceUntilIdle()
         vm.onStart()
         advanceUntilIdle()
@@ -257,7 +296,7 @@ class StrategyTestViewModelTest {
         }
         probe.afterProbe = { synchronized(lock) { current-- } }
         probe.delayMs = 20L
-        val vm = newVm()
+        val vm = newVm(sites = listOf("a", "b", "c", "d", "e"))
         advanceUntilIdle()
         vm.onStart()
         advanceUntilIdle()
@@ -268,7 +307,7 @@ class StrategyTestViewModelTest {
     fun `onApply mid-test does not stop test loop`() = runTest(dispatcher) {
         assets = FakeAssetSource(strategies = listOf("-a", "-b", "-c"), sites = listOf("s1"))
         probe.delayMs = 100L
-        val vm = newVm()
+        val vm = newVm(sites = listOf("s1"))
         advanceUntilIdle()
         vm.onStart()
         advanceTimeBy(50L)
@@ -282,6 +321,52 @@ class StrategyTestViewModelTest {
         advanceUntilIdle()
         assertFalse(vm.isRunning.value)
         assertTrue(vm.strategies.value.all { it.isCompleted })
+    }
+
+    @Test
+    fun `onToggleDomainList flips active state`() = runTest(dispatcher) {
+        val vm = newVm(sites = listOf("a.com"))
+        advanceUntilIdle()
+        assertTrue(vm.domainLists.value.first().isActive)
+        vm.onToggleDomainList("test")
+        advanceUntilIdle()
+        assertFalse(vm.domainLists.value.first().isActive)
+    }
+
+    @Test
+    fun `onAddDomainList appends custom list`() = runTest(dispatcher) {
+        val vm = newVm()
+        advanceUntilIdle()
+        vm.onAddDomainList("My List", listOf("x.com", "y.com"))
+        advanceUntilIdle()
+        val lists = vm.domainLists.value
+        assertEquals(2, lists.size)
+        assertEquals("My List", lists.last().name)
+        assertFalse(lists.last().isBuiltIn)
+    }
+
+    @Test
+    fun `onDeleteDomainList removes list by id`() = runTest(dispatcher) {
+        val vm = newVm()
+        advanceUntilIdle()
+        vm.onAddDomainList("To Delete", listOf("z.com"))
+        advanceUntilIdle()
+        val toDelete = vm.domainLists.value.last()
+        vm.onDeleteDomainList(toDelete.id)
+        advanceUntilIdle()
+        assertFalse(vm.domainLists.value.any { it.id == toDelete.id })
+    }
+
+    @Test
+    fun `onResetDomainLists restores built-in defaults`() = runTest(dispatcher) {
+        val vm = newVm(sites = listOf("a.com"))
+        advanceUntilIdle()
+        vm.onToggleDomainList("test")
+        advanceUntilIdle()
+        assertFalse(vm.domainLists.value.first().isActive)
+        vm.onResetDomainLists()
+        advanceUntilIdle()
+        assertTrue(vm.domainLists.value.first().isActive)
     }
 
     private companion object {
@@ -355,6 +440,12 @@ class StrategyTestViewModelTest {
         var stored: StrategyTestSettings = StrategyTestSettings()
         override fun load(): StrategyTestSettings = stored
         override fun save(settings: StrategyTestSettings) { stored = settings }
+    }
+
+    private class FakeDomainListStore : DomainListStore {
+        var data: List<DomainList> = emptyList()
+        override fun load(): List<DomainList> = data
+        override fun save(lists: List<DomainList>) { data = lists }
     }
 
     private class FakeSettingsRepository : SettingsRepository {

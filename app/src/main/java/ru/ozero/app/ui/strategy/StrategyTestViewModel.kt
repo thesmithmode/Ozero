@@ -42,6 +42,7 @@ class StrategyTestViewModel @Inject constructor(
     private val assetSource: StrategyAssetSource,
     private val resultsStore: StrategyResultsStore,
     private val settingsStore: StrategyTestSettingsStore,
+    private val domainListManager: DomainListManager,
     private val byeDpiEngine: EnginePlugin,
     private val probeFactory: StrategyProbeClientFactory,
     private val tunnelController: TunnelController,
@@ -55,8 +56,8 @@ class StrategyTestViewModel @Inject constructor(
     private val _isRunning = MutableStateFlow(false)
     val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
 
-    private val _sitesText = MutableStateFlow("")
-    val sitesText: StateFlow<String> = _sitesText.asStateFlow()
+    private val _domainLists = MutableStateFlow<List<DomainList>>(emptyList())
+    val domainLists: StateFlow<List<DomainList>> = _domainLists.asStateFlow()
 
     private val _runSummary = MutableStateFlow("")
     val runSummary: StateFlow<String> = _runSummary.asStateFlow()
@@ -81,8 +82,8 @@ class StrategyTestViewModel @Inject constructor(
             _strategies.value = commands.map { cmd ->
                 byCmd[cmd] ?: StrategyResult(command = cmd)
             }.sortedForUi()
-            _sitesText.value = withContext(ioDispatcher) {
-                runCatching { assetSource.loadSites().joinToString("\n") }.getOrDefault("")
+            _domainLists.value = withContext(ioDispatcher) {
+                runCatching { domainListManager.load() }.getOrDefault(emptyList())
             }
             _settings.value = withContext(ioDispatcher) {
                 runCatching { settingsStore.load() }.getOrDefault(StrategyTestSettings())
@@ -90,8 +91,28 @@ class StrategyTestViewModel @Inject constructor(
         }
     }
 
-    fun onSitesTextChange(text: String) {
-        _sitesText.value = text
+    fun onToggleDomainList(id: String) {
+        val updated = domainListManager.toggle(_domainLists.value, id)
+        _domainLists.value = updated
+        viewModelScope.launch(ioDispatcher) { runCatching { domainListManager.save(updated) } }
+    }
+
+    fun onAddDomainList(name: String, domains: List<String>) {
+        val updated = domainListManager.addCustom(_domainLists.value, name, domains)
+        _domainLists.value = updated
+        viewModelScope.launch(ioDispatcher) { runCatching { domainListManager.save(updated) } }
+    }
+
+    fun onDeleteDomainList(id: String) {
+        val updated = domainListManager.delete(_domainLists.value, id)
+        _domainLists.value = updated
+        viewModelScope.launch(ioDispatcher) { runCatching { domainListManager.save(updated) } }
+    }
+
+    fun onResetDomainLists() {
+        val updated = domainListManager.resetToDefaults(_domainLists.value)
+        _domainLists.value = updated
+        viewModelScope.launch(ioDispatcher) { runCatching { domainListManager.save(updated) } }
     }
 
     fun onSettingsChange(newSettings: StrategyTestSettings) {
@@ -100,12 +121,6 @@ class StrategyTestViewModel @Inject constructor(
             runCatching { settingsStore.save(newSettings) }
         }
     }
-
-    private fun parseSites(text: String): List<String> =
-        text.lines()
-            .map { it.trim() }
-            .filter { it.isNotEmpty() && !it.startsWith("#") }
-            .distinct()
 
     private fun List<StrategyResult>.sortedForUi(): List<StrategyResult> =
         sortedWith(
@@ -128,7 +143,7 @@ class StrategyTestViewModel @Inject constructor(
         }
         _isRunning.value = true
         testJob = viewModelScope.launch {
-            val sites = parseSites(_sitesText.value)
+            val sites = domainListManager.getActiveDomains(_domainLists.value)
             if (sites.isEmpty()) {
                 _errorMessage.value = StrategyTestError.NoSites
                 _isRunning.value = false

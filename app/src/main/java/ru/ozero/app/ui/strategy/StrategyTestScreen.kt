@@ -15,12 +15,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -60,14 +63,16 @@ fun StrategyTestScreen(
 ) {
     val isRunning by viewModel.isRunning.collectAsStateWithLifecycle()
     val strategies by viewModel.strategies.collectAsStateWithLifecycle()
-    val sitesText by viewModel.sitesText.collectAsStateWithLifecycle()
+    val domainLists by viewModel.domainLists.collectAsStateWithLifecycle()
     val runSummary by viewModel.runSummary.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showDomainLists by rememberSaveable { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val domainSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     BackHandler {
         if (isRunning) viewModel.onStop() else onBack()
@@ -103,6 +108,22 @@ fun StrategyTestScreen(
             )
         }
     }
+    if (showDomainLists) {
+        ModalBottomSheet(
+            onDismissRequest = { showDomainLists = false },
+            sheetState = domainSheetState,
+            modifier = Modifier.testTag("domain_lists_sheet"),
+        ) {
+            DomainListsSheet(
+                lists = domainLists,
+                onToggle = viewModel::onToggleDomainList,
+                onAdd = viewModel::onAddDomainList,
+                onDelete = viewModel::onDeleteDomainList,
+                onReset = viewModel::onResetDomainLists,
+                enabled = !isRunning,
+            )
+        }
+    }
     Scaffold(
         modifier = Modifier.testTag("strategy_test_screen"),
         topBar = {
@@ -134,16 +155,11 @@ fun StrategyTestScreen(
         ) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    OutlinedTextField(
-                        value = sitesText,
-                        onValueChange = viewModel::onSitesTextChange,
+                    DomainListsHeader(
+                        lists = domainLists,
+                        onToggle = viewModel::onToggleDomainList,
+                        onManageClick = { showDomainLists = true },
                         enabled = !isRunning,
-                        minLines = 3,
-                        maxLines = 6,
-                        label = { Text(stringResource(R.string.strategy_test_sites_label)) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("strategy_sites_input"),
                     )
                     Button(
                         onClick = if (isRunning) viewModel::onStop else viewModel::onStart,
@@ -185,6 +201,208 @@ fun StrategyTestScreen(
             }
         }
     }
+}
+
+@Composable
+private fun DomainListsHeader(
+    lists: List<DomainList>,
+    onToggle: (String) -> Unit,
+    onManageClick: () -> Unit,
+    enabled: Boolean,
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        modifier = Modifier.fillMaxWidth().testTag("domain_lists_header"),
+    ) {
+        Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = stringResource(R.string.domain_lists_title),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                TextButton(
+                    onClick = onManageClick,
+                    modifier = Modifier.testTag("domain_lists_manage_btn"),
+                ) {
+                    Text(stringResource(R.string.domain_lists_manage))
+                }
+            }
+            lists.forEach { list ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("domain_list_row_${list.id}"),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(
+                        checked = list.isActive,
+                        onCheckedChange = { if (enabled) onToggle(list.id) },
+                        enabled = enabled,
+                        modifier = Modifier.testTag("domain_list_check_${list.id}"),
+                    )
+                    Text(
+                        text = "${list.name} (${list.domains.size})",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DomainListsSheet(
+    lists: List<DomainList>,
+    onToggle: (String) -> Unit,
+    onAdd: (String, List<String>) -> Unit,
+    onDelete: (String) -> Unit,
+    onReset: () -> Unit,
+    enabled: Boolean,
+) {
+    var showAddDialog by rememberSaveable { mutableStateOf(false) }
+
+    if (showAddDialog) {
+        AddDomainListDialog(
+            onConfirm = { name, sites ->
+                onAdd(name, sites)
+                showAddDialog = false
+            },
+            onDismiss = { showAddDialog = false },
+        )
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = stringResource(R.string.domain_lists_title),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Row {
+                TextButton(onClick = onReset, enabled = enabled) {
+                    Text(stringResource(R.string.domain_list_reset_defaults))
+                }
+                FloatingActionButton(
+                    onClick = { if (enabled) showAddDialog = true },
+                    modifier = Modifier.testTag("domain_list_add_fab"),
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.domain_list_add))
+                }
+            }
+        }
+        lists.forEach { list ->
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("domain_list_card_${list.id}"),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                ),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(
+                        checked = list.isActive,
+                        onCheckedChange = { if (enabled) onToggle(list.id) },
+                        enabled = enabled,
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = list.name, style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            text = stringResource(R.string.domain_list_sites_count, list.domains.size),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (list.domains.isNotEmpty()) {
+                            Text(
+                                text = list.domains.take(3).joinToString(", "),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    if (!list.isBuiltIn) {
+                        TextButton(
+                            onClick = { onDelete(list.id) },
+                            enabled = enabled,
+                            modifier = Modifier.testTag("domain_list_delete_${list.id}"),
+                        ) {
+                            Text(stringResource(R.string.domain_list_delete))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AddDomainListDialog(
+    onConfirm: (name: String, sites: List<String>) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var name by rememberSaveable { mutableStateOf("") }
+    var sitesText by rememberSaveable { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.domain_list_add_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text(stringResource(R.string.domain_list_name_hint)) },
+                    modifier = Modifier.fillMaxWidth().testTag("add_list_name"),
+                    singleLine = true,
+                )
+                OutlinedTextField(
+                    value = sitesText,
+                    onValueChange = { sitesText = it },
+                    label = { Text(stringResource(R.string.domain_list_sites_hint)) },
+                    modifier = Modifier.fillMaxWidth().testTag("add_list_sites"),
+                    minLines = 3,
+                    maxLines = 8,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val sites = sitesText.lines().map(String::trim).filter(String::isNotEmpty)
+                    if (name.isNotBlank() && sites.isNotEmpty()) onConfirm(name.trim(), sites)
+                },
+                modifier = Modifier.testTag("add_list_confirm"),
+            ) {
+                Text(stringResource(R.string.domain_list_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.domain_list_cancel))
+            }
+        },
+    )
 }
 
 @Composable
