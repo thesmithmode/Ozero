@@ -431,7 +431,9 @@ class StrategyTestViewModelTest {
 
     @Test
     fun `evolution mode runs when settings evolutionMode true`() = runTest(dispatcher) {
-        settingsStore.stored = StrategyTestSettings(evolutionMode = true, evolutionMaxGenerations = 1, evolutionPopulationSize = 2)
+        settingsStore.stored = StrategyTestSettings(
+            evolutionMode = true, evolutionMaxGenerations = 1, evolutionPopulationSize = 2,
+        )
         assets = FakeAssetSource(strategies = listOf("-cmd1", "-cmd2"), sites = listOf("s1"))
         val vm = newVm(sites = listOf("s1"))
         advanceUntilIdle()
@@ -442,7 +444,9 @@ class StrategyTestViewModelTest {
 
     @Test
     fun `evolution state emitted during evolution run`() = runTest(dispatcher) {
-        settingsStore.stored = StrategyTestSettings(evolutionMode = true, evolutionMaxGenerations = 2, evolutionPopulationSize = 2)
+        settingsStore.stored = StrategyTestSettings(
+            evolutionMode = true, evolutionMaxGenerations = 2, evolutionPopulationSize = 2,
+        )
         assets = FakeAssetSource(strategies = listOf("-cmd1"), sites = listOf("s1"))
         val vm = newVm(sites = listOf("s1"))
         advanceUntilIdle()
@@ -521,19 +525,25 @@ class StrategyTestViewModelTest {
     private class FakeStrategyTestSettingsStore : StrategyTestSettingsStore {
         var stored: StrategyTestSettings = StrategyTestSettings()
         override fun load(): StrategyTestSettings = stored
-        override fun save(settings: StrategyTestSettings) { stored = settings }
+        override fun save(settings: StrategyTestSettings) {
+            stored = settings
+        }
     }
 
     private class FakeSavedStrategyStore : SavedStrategyStore {
         private var data: List<SavedStrategy> = emptyList()
         override fun load(): List<SavedStrategy> = data
-        override fun save(strategies: List<SavedStrategy>) { data = strategies }
+        override fun save(strategies: List<SavedStrategy>) {
+            data = strategies
+        }
     }
 
     private class FakeDomainListStore : DomainListStore {
         var data: List<DomainList> = emptyList()
         override fun load(): List<DomainList> = data
-        override fun save(lists: List<DomainList>) { data = lists }
+        override fun save(lists: List<DomainList>) {
+            data = lists
+        }
     }
 
     private class FakeSettingsRepository : SettingsRepository {

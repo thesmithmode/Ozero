@@ -32,7 +32,10 @@ class DomainListStoreTest {
     @Test
     fun `save then load round-trips all fields`() {
         val lists = listOf(
-            DomainList(id = "id1", name = "General", domains = listOf("a.com", "b.com"), isActive = true, isBuiltIn = true),
+            DomainList(
+                id = "id1", name = "General", domains = listOf("a.com", "b.com"),
+                isActive = true, isBuiltIn = true,
+            ),
             DomainList(id = "id2", name = "Custom", domains = listOf("c.com"), isActive = false, isBuiltIn = false),
         )
         store.save(lists)

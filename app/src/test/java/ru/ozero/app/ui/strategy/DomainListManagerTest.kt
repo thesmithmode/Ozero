@@ -11,9 +11,18 @@ class DomainListManagerTest {
     private lateinit var store: FakeStore
     private lateinit var manager: DomainListManager
 
-    private val builtIn1 = DomainList(id = "general", name = "General", domains = listOf("a.com", "b.com"), isActive = true, isBuiltIn = true)
-    private val builtIn2 = DomainList(id = "youtube", name = "YouTube", domains = listOf("yt.com"), isActive = true, isBuiltIn = true)
-    private val builtIn3 = DomainList(id = "inactive", name = "Inactive", domains = listOf("c.com"), isActive = false, isBuiltIn = true)
+    private val builtIn1 = DomainList(
+        id = "general", name = "General", domains = listOf("a.com", "b.com"),
+        isActive = true, isBuiltIn = true,
+    )
+    private val builtIn2 = DomainList(
+        id = "youtube", name = "YouTube", domains = listOf("yt.com"),
+        isActive = true, isBuiltIn = true,
+    )
+    private val builtIn3 = DomainList(
+        id = "inactive", name = "Inactive", domains = listOf("c.com"),
+        isActive = false, isBuiltIn = true,
+    )
 
     @BeforeEach
     fun setUp() {
@@ -155,6 +164,8 @@ class DomainListManagerTest {
         var data: List<DomainList> = emptyList()
         var saved: List<DomainList> = emptyList()
         override fun load(): List<DomainList> = data
-        override fun save(lists: List<DomainList>) { saved = lists }
+        override fun save(lists: List<DomainList>) {
+            saved = lists
+        }
     }
 }

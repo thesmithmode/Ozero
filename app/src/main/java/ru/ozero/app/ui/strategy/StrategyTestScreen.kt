@@ -147,6 +147,43 @@ fun StrategyTestScreen(
             )
         }
     }
+    StrategyTestScaffold(
+        isRunning = isRunning,
+        strategies = strategies,
+        domainLists = domainLists,
+        savedStrategies = savedStrategies,
+        evolutionState = evolutionState,
+        runSummary = runSummary,
+        onBack = onBack,
+        onShowSaved = { showSaved = true },
+        onShowSettings = { showSettings = true },
+        onShowDomainLists = { showDomainLists = true },
+        onToggleDomainList = viewModel::onToggleDomainList,
+        onRunToggle = if (isRunning) viewModel::onStop else viewModel::onStart,
+        onApply = viewModel::onApply,
+        onSave = viewModel::onSave,
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun StrategyTestScaffold(
+    isRunning: Boolean,
+    strategies: List<StrategyResult>,
+    domainLists: List<DomainList>,
+    savedStrategies: List<SavedStrategy>,
+    evolutionState: EvolutionUiState?,
+    runSummary: String,
+    onBack: () -> Unit,
+    onShowSaved: () -> Unit,
+    onShowSettings: () -> Unit,
+    onShowDomainLists: () -> Unit,
+    onToggleDomainList: (String) -> Unit,
+    onRunToggle: () -> Unit,
+    onApply: (String) -> Unit,
+    onSave: (String) -> Unit,
+) {
+    val context = LocalContext.current
     Scaffold(
         modifier = Modifier.testTag("strategy_test_screen"),
         topBar = {
@@ -162,13 +199,16 @@ fun StrategyTestScreen(
                 },
                 actions = {
                     IconButton(
-                        onClick = { showSaved = true },
+                        onClick = onShowSaved,
                         modifier = Modifier.testTag("saved_strategies_btn"),
                     ) {
-                        Icon(Icons.Filled.Bookmark, contentDescription = stringResource(R.string.saved_strategies_title))
+                        Icon(
+                            Icons.Filled.Bookmark,
+                            contentDescription = stringResource(R.string.saved_strategies_title),
+                        )
                     }
                     IconButton(
-                        onClick = { showSettings = true },
+                        onClick = onShowSettings,
                         modifier = Modifier.testTag("strategy_settings_btn"),
                     ) {
                         Icon(Icons.Filled.Settings, contentDescription = null)
@@ -186,15 +226,17 @@ fun StrategyTestScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     DomainListsHeader(
                         lists = domainLists,
-                        onToggle = viewModel::onToggleDomainList,
-                        onManageClick = { showDomainLists = true },
+                        onToggle = onToggleDomainList,
+                        onManageClick = onShowDomainLists,
                         enabled = !isRunning,
                     )
                     Button(
-                        onClick = if (isRunning) viewModel::onStop else viewModel::onStart,
+                        onClick = onRunToggle,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .testTag(if (isRunning) "strategy_test_stop_btn" else "strategy_test_start_btn"),
+                            .testTag(
+                                if (isRunning) "strategy_test_stop_btn" else "strategy_test_start_btn",
+                            ),
                     ) {
                         Text(
                             stringResource(
@@ -209,9 +251,7 @@ fun StrategyTestScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    evolutionState?.let { evo ->
-                        EvolutionStateCard(state = evo)
-                    }
+                    evolutionState?.let { evo -> EvolutionStateCard(state = evo) }
                 }
             }
             itemsIndexed(
@@ -223,14 +263,10 @@ fun StrategyTestScreen(
                     item = item,
                     isSaved = savedStrategies.any { it.command == item.command },
                     onApply = {
-                        viewModel.onApply(item.command)
-                        Toast.makeText(
-                            context,
-                            R.string.strategy_test_applied_toast,
-                            Toast.LENGTH_SHORT,
-                        ).show()
+                        onApply(item.command)
+                        Toast.makeText(context, R.string.strategy_test_applied_toast, Toast.LENGTH_SHORT).show()
                     },
-                    onSave = { viewModel.onSave(item.command) },
+                    onSave = { onSave(item.command) },
                 )
             }
         }

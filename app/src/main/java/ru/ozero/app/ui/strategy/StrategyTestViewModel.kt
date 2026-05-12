@@ -24,6 +24,7 @@ import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginebyedpi.strategy.EvolutionEngine
 import ru.ozero.enginebyedpi.strategy.GenePool
+import ru.ozero.enginebyedpi.strategy.ProbeResult
 import ru.ozero.enginebyedpi.strategy.SocksProbeClient
 import ru.ozero.enginebyedpi.strategy.StrategyEvolver
 import ru.ozero.enginebyedpi.strategy.toCommand
@@ -291,16 +292,7 @@ class StrategyTestViewModel @Inject constructor(
             }
             if (started !is StartResult.Success) {
                 runCatching { byeDpiEngine.stop() }
-                _strategies.update { list ->
-                    list.map { s ->
-                        if (s.command == command) s.copy(
-                            currentProgress = sites.size,
-                            successCount = 0,
-                            isCompleted = true,
-                            lastError = started?.toString() ?: "start timeout",
-                        ) else s
-                    }.sortedForUi()
-                }
+                applyEngineStartFailure(command, sites, started)
                 continue
             }
             val probe: SocksProbeClient = probeFactory.create(SOCKS_PORT)
@@ -311,22 +303,7 @@ class StrategyTestViewModel @Inject constructor(
                         async {
                             semaphore.withPermit {
                                 val result = probe.probe(site)
-                                _strategies.update { list ->
-                                    list.map { s ->
-                                        if (s.command == command) {
-                                            val newProgress = s.currentProgress + 1
-                                            val newSuccess = s.successCount + if (result.success) 1 else 0
-                                            val totalDur = s.avgDurationMs * s.currentProgress + result.durationMs
-                                            s.copy(
-                                                currentProgress = newProgress,
-                                                successCount = newSuccess,
-                                                avgDurationMs = totalDur / newProgress.coerceAtLeast(1),
-                                                lastSite = site,
-                                                lastError = if (result.success) null else "probe failed",
-                                            )
-                                        } else s
-                                    }
-                                }
+                                applyProbeResult(command, site, result)
                             }
                         }
                     }.awaitAll()
@@ -334,12 +311,56 @@ class StrategyTestViewModel @Inject constructor(
             } finally {
                 runCatching { byeDpiEngine.stop() }
             }
-            _strategies.update { list ->
-                list.map { s -> if (s.command == command) s.copy(isCompleted = true) else s }
-                    .sortedForUi()
-            }
+            markStrategyCompleted(command)
         }
     }
+
+    private fun applyEngineStartFailure(command: String, sites: List<String>, started: StartResult?) =
+        _strategies.update { list ->
+            list.map { s ->
+                if (s.command == command) {
+                    s.copy(
+                        currentProgress = sites.size,
+                        successCount = 0,
+                        isCompleted = true,
+                        lastError = started?.toString() ?: "start timeout",
+                    )
+                } else {
+                    s
+                }
+            }.sortedForUi()
+        }
+
+    private fun applyProbeResult(command: String, site: String, result: ProbeResult) =
+        _strategies.update { list ->
+            list.map { s ->
+                if (s.command == command) {
+                    val newProgress = s.currentProgress + 1
+                    val newSuccess = s.successCount + if (result.success) 1 else 0
+                    val totalDur = s.avgDurationMs * s.currentProgress + result.durationMs
+                    s.copy(
+                        currentProgress = newProgress,
+                        successCount = newSuccess,
+                        avgDurationMs = totalDur / newProgress.coerceAtLeast(1),
+                        lastSite = site,
+                        lastError = if (result.success) null else "probe failed",
+                    )
+                } else {
+                    s
+                }
+            }
+        }
+
+    private fun markStrategyCompleted(command: String) =
+        _strategies.update { list ->
+            list.map { s ->
+                if (s.command == command) {
+                    s.copy(isCompleted = true)
+                } else {
+                    s
+                }
+            }.sortedForUi()
+        }
 
     private companion object {
         const val TAG: String = "StrategyTestVM"

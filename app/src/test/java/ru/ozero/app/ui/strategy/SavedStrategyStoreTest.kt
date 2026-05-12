@@ -105,10 +105,12 @@ class SavedStrategyStoreTest {
 
     @Test
     fun `delete extension removes entry by id`() {
-        store.save(listOf(
-            SavedStrategy(id = "keep", command = "-k", addedAt = 1L),
-            SavedStrategy(id = "del", command = "-d", addedAt = 2L),
-        ))
+        store.save(
+            listOf(
+                SavedStrategy(id = "keep", command = "-k", addedAt = 1L),
+                SavedStrategy(id = "del", command = "-d", addedAt = 2L),
+            ),
+        )
         store.delete("del")
         val loaded = store.load()
         assertEquals(1, loaded.size)
