@@ -173,7 +173,15 @@ class StrategyTestViewModel @Inject constructor(
                 _isRunning.value = false
                 return@launch
             }
-            _strategies.value = _strategies.value.map {
+            val snap = _settings.value
+            val commands: List<String> = if (snap.useCustomStrategies && snap.customStrategies.isNotBlank()) {
+                snap.customStrategies.lines().map(String::trim).filter(String::isNotEmpty)
+            } else {
+                _strategies.value.map { it.command }
+            }
+            _strategies.value = commands.map { cmd ->
+                _strategies.value.find { it.command == cmd } ?: StrategyResult(command = cmd)
+            }.map {
                 it.copy(
                     successCount = 0,
                     totalRequests = sites.size,
@@ -246,12 +254,14 @@ class StrategyTestViewModel @Inject constructor(
     private suspend fun runEvolution(sites: List<String>) {
         val snap = _settings.value
         val seedCommands = _strategies.value.map { it.command }
-        val genePool = GenePool(seedCommands)
+        val sniSeeds = domainListManager.getActiveDomains(_domainLists.value).map { "-s $it" }
+        val genePool = GenePool(seedCommands + sniSeeds)
         val evolver = StrategyEvolver(genePool)
         val maxGen = snap.evolutionMaxGenerations
+        val timeoutMs = snap.timeoutSeconds * 1_000L
         val evolutionEngine = EvolutionEngine(
             byeDpiEngine = byeDpiEngine,
-            probeFactory = { port -> probeFactory.create(port) },
+            probeFactory = { port, timeout -> probeFactory.create(port, timeout) },
             evolver = evolver,
             pool = genePool,
             sites = sites,
@@ -261,6 +271,7 @@ class StrategyTestViewModel @Inject constructor(
                 mutationRate = snap.evolutionMutationRate,
                 eliteCount = snap.evolutionEliteCount,
                 concurrentProbes = max(1, snap.concurrentLimit),
+                timeoutMs = timeoutMs,
             ),
             memory = geneMemory,
         )
@@ -283,6 +294,7 @@ class StrategyTestViewModel @Inject constructor(
         val snap = _settings.value
         val startTimeoutMs = snap.timeoutSeconds * 1_000L
         val concurrentLimit = max(1, snap.concurrentLimit)
+        val requestsPerDomain = snap.requestsPerDomain.coerceAtLeast(1)
         val commands = _strategies.value.map { it.command }
         for ((loopIdx, command) in commands.withIndex()) {
             if (!currentCoroutineContext().isActive) return@coroutineScope
@@ -298,14 +310,19 @@ class StrategyTestViewModel @Inject constructor(
                 applyEngineStartFailure(command, sites, started)
                 continue
             }
-            val probe: SocksProbeClient = probeFactory.create(SOCKS_PORT)
+            val probe: SocksProbeClient = probeFactory.create(SOCKS_PORT, startTimeoutMs)
             val semaphore = Semaphore(concurrentLimit)
             try {
                 coroutineScope {
                     sites.map { site ->
                         async {
                             semaphore.withPermit {
-                                val result = probe.probe(site)
+                                var result = probe.probe(site)
+                                var attempt = 1
+                                while (!result.success && attempt < requestsPerDomain) {
+                                    result = probe.probe(site)
+                                    attempt++
+                                }
                                 applyProbeResult(command, site, result)
                             }
                         }
@@ -315,6 +332,7 @@ class StrategyTestViewModel @Inject constructor(
                 runCatching { byeDpiEngine.stop() }
             }
             markStrategyCompleted(command)
+            if (snap.delayBetweenMs > 0L) delay(snap.delayBetweenMs)
         }
     }
 

@@ -88,7 +88,7 @@ class StrategyTestViewModelTest {
             domainListManager = manager,
             savedStrategyStore = savedStore,
             byeDpiEngine = engine,
-            probeFactory = { probe },
+            probeFactory = { _, _ -> probe },
             tunnelController = tunnel,
             geneMemory = GeneMemory(java.io.File.createTempFile("mem", ".json").also { it.deleteOnExit() }),
         ).also { it.ioDispatcher = dispatcher }
@@ -138,7 +138,7 @@ class StrategyTestViewModelTest {
             repository = repo, assetSource = assets, resultsStore = store,
             settingsStore = settingsStore, domainListManager = manager,
             savedStrategyStore = savedStore,
-            byeDpiEngine = engine, probeFactory = { probe }, tunnelController = tunnel,
+            byeDpiEngine = engine, probeFactory = { _, _ -> probe }, tunnelController = tunnel,
             geneMemory = GeneMemory(java.io.File.createTempFile("mem", ".json").also { it.deleteOnExit() }),
         ).also { it.ioDispatcher = dispatcher }
         advanceUntilIdle()
@@ -281,7 +281,7 @@ class StrategyTestViewModelTest {
     fun `onSettingsChange saves to store and updates flow`() = runTest(dispatcher) {
         val vm = newVm()
         advanceUntilIdle()
-        val updated = StrategyTestSettings(concurrentLimit = 5, sniDomain = "cloudflare.com")
+        val updated = StrategyTestSettings(concurrentLimit = 5)
         vm.onSettingsChange(updated)
         advanceUntilIdle()
         assertEquals(updated, vm.settings.value)
@@ -456,6 +456,62 @@ class StrategyTestViewModelTest {
         vm.onStart()
         advanceUntilIdle()
         assertFalse(vm.isRunning.value)
+    }
+
+    @Test
+    fun `runLoop uses requestsPerDomain retry until first success`() = runTest(dispatcher) {
+        settingsStore.stored = StrategyTestSettings(requestsPerDomain = 3)
+        assets = FakeAssetSource(strategies = listOf("-cmd1"), sites = listOf("a", "b"))
+        var callCount = 0
+        probe.successFor = { _, _ -> false }
+        probe.beforeProbe = { callCount++ }
+        val vm = newVm(sites = listOf("a", "b"))
+        advanceUntilIdle()
+        vm.onStart()
+        advanceUntilIdle()
+        assertEquals(6, callCount, "2 sites × 3 attempts each = 6 probes when all fail")
+    }
+
+    @Test
+    fun `runLoop stops retrying after first success`() = runTest(dispatcher) {
+        settingsStore.stored = StrategyTestSettings(requestsPerDomain = 3)
+        assets = FakeAssetSource(strategies = listOf("-cmd1"), sites = listOf("a"))
+        var callCount = 0
+        probe.successFor = { _, _ -> true }
+        probe.beforeProbe = { callCount++ }
+        val vm = newVm(sites = listOf("a"))
+        advanceUntilIdle()
+        vm.onStart()
+        advanceUntilIdle()
+        assertEquals(1, callCount, "stops after first success")
+    }
+
+    @Test
+    fun `runLoop respects delayBetweenMs between strategies`() = runTest(dispatcher) {
+        settingsStore.stored = StrategyTestSettings(delayBetweenMs = 500L)
+        assets = FakeAssetSource(strategies = listOf("-cmd1", "-cmd2"), sites = listOf("s1"))
+        val vm = newVm(sites = listOf("s1"))
+        advanceUntilIdle()
+        vm.onStart()
+        advanceTimeBy(300L)
+        runCurrent()
+        assertTrue(vm.isRunning.value, "still running after 300ms (delay=500ms between strategies)")
+        advanceUntilIdle()
+        assertFalse(vm.isRunning.value)
+    }
+
+    @Test
+    fun `onStart with useCustomStrategies uses customStrategies list`() = runTest(dispatcher) {
+        settingsStore.stored = StrategyTestSettings(
+            useCustomStrategies = true,
+            customStrategies = "--cmd1\n--cmd2\n  \n--cmd3",
+        )
+        val vm = newVm()
+        advanceUntilIdle()
+        vm.onStart()
+        advanceUntilIdle()
+        val commands = vm.strategies.value.map { it.command }
+        assertEquals(listOf("--cmd1", "--cmd2", "--cmd3"), commands.filter { it.startsWith("--cmd") }.sorted())
     }
 
     private companion object {

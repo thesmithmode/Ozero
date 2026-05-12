@@ -190,7 +190,6 @@
     <string name="strategy_settings_concurrent_limit">Concurrent probes (1–50)</string>
     <string name="strategy_settings_timeout">Start timeout, sec (1–15)</string>
     <string name="strategy_settings_delay">Delay between strategies, ms (0–5000)</string>
-    <string name="strategy_settings_sni">SNI domain</string>
     <string name="strategy_settings_use_custom">Custom strategies</string>
     <string name="strategy_settings_custom_strategies">Strategies (one per line)</string>
     <string name="domain_lists_title">Site Lists</string>

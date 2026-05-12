@@ -1,6 +1,7 @@
 package ru.ozero.enginebyedpi.strategy
 
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
@@ -14,13 +15,14 @@ import kotlin.random.Random
 
 class EvolutionEngine(
     private val byeDpiEngine: EnginePlugin,
-    private val probeFactory: (socksPort: Int) -> SocksProbeClient,
+    private val probeFactory: (socksPort: Int, timeoutMs: Long) -> SocksProbeClient,
     private val evolver: StrategyEvolver,
     private val pool: GenePool,
     private val sites: List<String>,
     private val settings: EvolutionSettings = EvolutionSettings(),
     private val socksPort: Int = 1080,
     private val memory: GeneMemory? = null,
+    private val random: Random = Random.Default,
 ) {
 
     data class EvolutionSettings(
@@ -30,6 +32,7 @@ class EvolutionEngine(
         val eliteCount: Int = 5,
         val targetFitness: Double = 1.0,
         val concurrentProbes: Int = 10,
+        val timeoutMs: Long = 5_000L,
     )
 
     data class GenerationResult(
@@ -95,8 +98,8 @@ class EvolutionEngine(
         val offspring = mutableListOf<Chromosome>()
         offspring.addAll(survivors)
         while (offspring.size < settings.populationSize) {
-            val p1 = survivors[Random.nextInt(survivors.size)]
-            val p2 = survivors[Random.nextInt(survivors.size)]
+            val p1 = survivors[random.nextInt(survivors.size)]
+            val p2 = survivors[random.nextInt(survivors.size)]
             offspring.add(evolver.mutate(evolver.crossover(p1, p2), settings.mutationRate, memory = memory))
         }
         return offspring
@@ -104,12 +107,15 @@ class EvolutionEngine(
 
     private suspend fun evaluatePopulation(
         population: List<Chromosome>,
-    ): List<Pair<Chromosome, Double>> =
-        population.map { chromosome ->
-            val fitness = evaluate(chromosome)
-            memory?.record(chromosome.map { it.token }, fitness)
-            chromosome to fitness
+    ): List<Pair<Chromosome, Double>> {
+        val results = coroutineScope {
+            population.map { chromosome -> async { chromosome to evaluate(chromosome) } }.awaitAll()
         }
+        results.forEach { (chromosome, fitness) ->
+            memory?.record(chromosome.map { it.token }, fitness)
+        }
+        return results
+    }
 
     private suspend fun evaluate(chromosome: Chromosome): Double {
         if (sites.isEmpty() || chromosome.isEmpty()) return 0.0
@@ -123,7 +129,7 @@ class EvolutionEngine(
             return 0.0
         }
         return try {
-            val probe = probeFactory(socksPort)
+            val probe = probeFactory(socksPort, settings.timeoutMs)
             val semaphore = Semaphore(settings.concurrentProbes.coerceAtLeast(1))
             coroutineScope {
                 sites.map { site ->

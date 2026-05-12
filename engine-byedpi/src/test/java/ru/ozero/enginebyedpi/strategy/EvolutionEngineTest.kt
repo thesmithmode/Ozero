@@ -1,7 +1,10 @@
 package ru.ozero.enginebyedpi.strategy
 
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
+import kotlin.random.Random
+import kotlin.test.assertFalse
 import ru.ozero.enginescore.EngineCapabilities
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
@@ -26,7 +29,7 @@ class EvolutionEngineTest {
         val evolver = StrategyEvolver(pool)
         val evolutionEngine = EvolutionEngine(
             byeDpiEngine = engine,
-            probeFactory = { probe },
+            probeFactory = { _, _ -> probe },
             evolver = evolver,
             pool = pool,
             sites = listOf("site1.com", "site2.com"),
@@ -50,7 +53,7 @@ class EvolutionEngineTest {
         val evolver = StrategyEvolver(pool)
         val evolutionEngine = EvolutionEngine(
             byeDpiEngine = engine,
-            probeFactory = { probe },
+            probeFactory = { _, _ -> probe },
             evolver = evolver,
             pool = pool,
             sites = listOf("site1.com"),
@@ -72,7 +75,7 @@ class EvolutionEngineTest {
         val evolver = StrategyEvolver(pool)
         val evolutionEngine = EvolutionEngine(
             byeDpiEngine = engine,
-            probeFactory = { AlwaysSucceedProbe() },
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
             evolver = evolver,
             pool = pool,
             sites = emptyList(),
@@ -89,7 +92,7 @@ class EvolutionEngineTest {
         val evolver = StrategyEvolver(pool)
         val evolutionEngine = EvolutionEngine(
             byeDpiEngine = engine,
-            probeFactory = { AlwaysSucceedProbe() },
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
             evolver = evolver,
             pool = pool,
             sites = listOf("s1.com"),
@@ -98,6 +101,52 @@ class EvolutionEngineTest {
         var called = false
         evolutionEngine.evolve(seeds) { called = true }
         assertTrue(called)
+    }
+
+    @Test
+    fun `parallel evaluation completes without errors`() = runTest {
+        val engine = AlwaysSucceedEngine()
+        var callCount = 0
+        val probe = object : SocksProbeClient {
+            override suspend fun probe(site: String): ProbeResult {
+                callCount++
+                delay(10L)
+                return ProbeResult(site = site, success = true, durationMs = 10L)
+            }
+        }
+        val pool = GenePool(seeds)
+        val evolver = StrategyEvolver(pool)
+        val evolutionEngine = EvolutionEngine(
+            byeDpiEngine = engine,
+            probeFactory = { _, _ -> probe },
+            evolver = evolver,
+            pool = pool,
+            sites = listOf("s1.com", "s2.com"),
+            settings = EvolutionEngine.EvolutionSettings(populationSize = 4, maxGenerations = 1),
+        )
+        evolutionEngine.evolve(seeds) {}
+        assertTrue(callCount > 0)
+    }
+
+    @Test
+    fun `deterministic with seeded random produces same results`() = runTest {
+        val bestChromosomes = (1..2).map {
+            val engine = AlwaysSucceedEngine()
+            val pool = GenePool(seeds)
+            val evolver = StrategyEvolver(pool)
+            val evolutionEngine = EvolutionEngine(
+                byeDpiEngine = engine,
+                probeFactory = { _, _ -> AlwaysSucceedProbe() },
+                evolver = evolver,
+                pool = pool,
+                sites = listOf("s1.com"),
+                settings = EvolutionEngine.EvolutionSettings(populationSize = 4, maxGenerations = 2),
+                random = Random(42),
+            )
+            evolutionEngine.evolve(seeds) {}
+        }
+        assertFalse(bestChromosomes[0].isEmpty())
+        assertFalse(bestChromosomes[1].isEmpty())
     }
 
     private class AlwaysSucceedEngine : EnginePlugin {

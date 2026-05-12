@@ -566,13 +566,6 @@ private fun StrategySettingsSheet(
             label = { Text(stringResource(R.string.strategy_settings_delay)) },
             modifier = Modifier.fillMaxWidth().testTag("settings_delay"),
         )
-        OutlinedTextField(
-            value = settings.sniDomain,
-            onValueChange = { onSettingsChange(settings.copy(sniDomain = it)) },
-            enabled = enabled,
-            label = { Text(stringResource(R.string.strategy_settings_sni)) },
-            modifier = Modifier.fillMaxWidth().testTag("settings_sni"),
-        )
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,

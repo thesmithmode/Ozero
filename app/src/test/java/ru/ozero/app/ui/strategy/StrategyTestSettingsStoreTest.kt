@@ -38,7 +38,6 @@ class StrategyTestSettingsStoreTest {
             concurrentLimit = 10,
             timeoutSeconds = 15,
             delayBetweenMs = 1000L,
-            sniDomain = "example.com",
             useCustomStrategies = true,
             customStrategies = "--cmd1\n--cmd2",
             evolutionMode = true,
@@ -53,7 +52,6 @@ class StrategyTestSettingsStoreTest {
         assertEquals(settings.concurrentLimit, loaded.concurrentLimit)
         assertEquals(settings.timeoutSeconds, loaded.timeoutSeconds)
         assertEquals(settings.delayBetweenMs, loaded.delayBetweenMs)
-        assertEquals(settings.sniDomain, loaded.sniDomain)
         assertTrue(loaded.useCustomStrategies)
         assertEquals(settings.customStrategies, loaded.customStrategies)
         assertTrue(loaded.evolutionMode)

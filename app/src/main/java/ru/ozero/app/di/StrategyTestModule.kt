@@ -88,5 +88,5 @@ object StrategyTestModule {
 
     @Provides
     fun provideStrategyProbeClientFactory(): StrategyProbeClientFactory =
-        StrategyProbeClientFactory { socksPort -> HttpSocksProbeClient(proxyPort = socksPort) }
+        StrategyProbeClientFactory { socksPort, timeoutMs -> HttpSocksProbeClient(proxyPort = socksPort, timeoutMs = timeoutMs) }
 }

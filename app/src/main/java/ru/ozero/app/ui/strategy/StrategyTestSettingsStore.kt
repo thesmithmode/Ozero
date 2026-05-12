@@ -16,7 +16,6 @@ class SharedPrefsStrategyTestSettingsStore(context: Context) : StrategyTestSetti
         concurrentLimit = prefs.getInt(KEY_CONCURRENT_LIMIT, 20),
         timeoutSeconds = prefs.getInt(KEY_TIMEOUT_SECONDS, 5),
         delayBetweenMs = prefs.getLong(KEY_DELAY_BETWEEN_MS, 500L),
-        sniDomain = prefs.getString(KEY_SNI_DOMAIN, "google.com") ?: "google.com",
         useCustomStrategies = prefs.getBoolean(KEY_USE_CUSTOM, false),
         customStrategies = prefs.getString(KEY_CUSTOM_STRATEGIES, "") ?: "",
         evolutionMode = prefs.getBoolean(KEY_EVOLUTION_MODE, false),
@@ -32,7 +31,6 @@ class SharedPrefsStrategyTestSettingsStore(context: Context) : StrategyTestSetti
             .putInt(KEY_CONCURRENT_LIMIT, settings.concurrentLimit)
             .putInt(KEY_TIMEOUT_SECONDS, settings.timeoutSeconds)
             .putLong(KEY_DELAY_BETWEEN_MS, settings.delayBetweenMs)
-            .putString(KEY_SNI_DOMAIN, settings.sniDomain)
             .putBoolean(KEY_USE_CUSTOM, settings.useCustomStrategies)
             .putString(KEY_CUSTOM_STRATEGIES, settings.customStrategies)
             .putBoolean(KEY_EVOLUTION_MODE, settings.evolutionMode)
@@ -49,7 +47,6 @@ class SharedPrefsStrategyTestSettingsStore(context: Context) : StrategyTestSetti
         private const val KEY_CONCURRENT_LIMIT = "byedpi_proxytest_concurrent_limit"
         private const val KEY_TIMEOUT_SECONDS = "byedpi_proxytest_timeout_seconds"
         private const val KEY_DELAY_BETWEEN_MS = "byedpi_proxytest_delay_between_ms"
-        private const val KEY_SNI_DOMAIN = "byedpi_proxytest_sni_domain"
         private const val KEY_USE_CUSTOM = "byedpi_proxytest_use_custom"
         private const val KEY_CUSTOM_STRATEGIES = "byedpi_proxytest_custom_strategies"
         private const val KEY_EVOLUTION_MODE = "byedpi_proxytest_evolution_mode"
