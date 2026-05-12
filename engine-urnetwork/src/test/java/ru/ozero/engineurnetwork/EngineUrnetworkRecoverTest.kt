@@ -2,6 +2,7 @@ package ru.ozero.engineurnetwork
 
 import com.bringyour.sdk.ConnectLocation
 import com.bringyour.sdk.LocationsViewController
+import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -20,6 +21,7 @@ import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.Upstream
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class EngineUrnetworkRecoverTest {
 
@@ -61,12 +63,60 @@ class EngineUrnetworkRecoverTest {
         scope.cancel()
     }
 
+    @Test
+    fun `recover вызывает connectTo когда selectedLocation не null`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(SupervisorJob() + dispatcher)
+        val fakeLocation = mockk<ConnectLocation>(relaxed = true)
+        val bridge = FakeRecoverBridge(running = true, location = fakeLocation)
+        val engine = EngineUrnetwork(
+            configStore = FakeStore(byJwt = "j", byClientJwt = "cj"),
+            sdkBridge = bridge,
+            authService = FakeAuth(),
+            pluginScope = scope,
+        )
+        engine.start(baseConfig, Upstream.None)
+        runCurrent()
+        val result = engine.recover()
+        assertIs<EnginePlugin.RecoverResult.Success>(result)
+        assertEquals(1, bridge.connectToCalls)
+        assertEquals(0, bridge.connectBestAvailableCalls)
+        assertEquals(fakeLocation, bridge.lastConnectToLocation)
+        scope.cancel()
+    }
+
+    @Test
+    fun `recover возвращает Failed когда bridge connectTo бросает исключение`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(SupervisorJob() + dispatcher)
+        val bridge = FakeRecoverBridge(
+            running = true,
+            location = mockk<ConnectLocation>(relaxed = true),
+            throwOnConnect = RuntimeException("sdk transient"),
+        )
+        val engine = EngineUrnetwork(
+            configStore = FakeStore(byJwt = "j", byClientJwt = "cj"),
+            sdkBridge = bridge,
+            authService = FakeAuth(),
+            pluginScope = scope,
+        )
+        engine.start(baseConfig, Upstream.None)
+        runCurrent()
+        val result = engine.recover()
+        assertIs<EnginePlugin.RecoverResult.Failed>(result)
+        assertTrue(result.reason.contains("sdk transient"), "reason должен содержать причину: ${result.reason}")
+        scope.cancel()
+    }
+
     private class FakeRecoverBridge(
         var running: Boolean,
         var location: ConnectLocation? = null,
+        val throwOnConnect: Throwable? = null,
     ) : UrnetworkSdkBridge {
         var connectToCalls: Int = 0
         var connectBestAvailableCalls: Int = 0
+        var lastConnectToLocation: ConnectLocation? = null
+
         override suspend fun start(
             walletAddress: String,
             apiUrl: String,
@@ -76,18 +126,40 @@ class EngineUrnetworkRecoverTest {
             running = true
             return UrnetworkSdkBridge.StartResult.Success
         }
-        override suspend fun stop() { running = false }
+
+        override suspend fun stop() {
+            running = false
+        }
+
         override fun isRunning(): Boolean = running
+
         override suspend fun attachTun(tunFd: Int) = UrnetworkSdkBridge.AttachResult.Success
-        override fun connectTo(location: ConnectLocation) { connectToCalls++ }
-        override fun connectBestAvailable() { connectBestAvailableCalls++ }
+
+        override fun connectTo(location: ConnectLocation) {
+            connectToCalls++
+            lastConnectToLocation = location
+            throwOnConnect?.let { throw it }
+        }
+
+        override fun connectBestAvailable() {
+            connectBestAvailableCalls++
+            throwOnConnect?.let { throw it }
+        }
+
         override fun selectedLocation(): ConnectLocation? = location
+
         override fun openLocationsViewController(): LocationsViewController? = null
+
         override fun setProvidePaused(paused: Boolean) = Unit
+
         override fun isProvidePaused(): Boolean = true
+
         override fun peerCount(): Int = 0
+
         override fun unpaidByteCount(): Long = 0L
+
         override fun fetchTransferStats() = Unit
+
         override suspend fun fetchSubscriptionBalance(): UrnetworkSdkBridge.SubscriptionBalanceSnapshot? = null
     }
 
@@ -98,18 +170,32 @@ class EngineUrnetworkRecoverTest {
         private val overrideFlow = MutableStateFlow<String?>(null)
         private val byJwtFlow = MutableStateFlow(byJwt)
         private val byClientJwtFlow = MutableStateFlow(byClientJwt)
+
         override fun walletOverride(): Flow<String?> = overrideFlow
+
         override fun walletAddress(): Flow<String> =
             overrideFlow.map { it ?: UrnetworkDefaults.PRESET_WALLET }
-        override suspend fun setWalletOverride(value: String?) { overrideFlow.value = value }
+
+        override suspend fun setWalletOverride(value: String?) {
+            overrideFlow.value = value
+        }
+
         override fun byJwt(): Flow<String?> = byJwtFlow
-        override suspend fun setByJwt(value: String?) { byJwtFlow.value = value }
+
+        override suspend fun setByJwt(value: String?) {
+            byJwtFlow.value = value
+        }
+
         override fun byClientJwt(): Flow<String?> = byClientJwtFlow
-        override suspend fun setByClientJwt(value: String?) { byClientJwtFlow.value = value }
+
+        override suspend fun setByClientJwt(value: String?) {
+            byClientJwtFlow.value = value
+        }
     }
 
     private class FakeAuth : UrnetworkAuthService {
         override suspend fun acquireGuestJwt(): GuestJwtResult = GuestJwtResult.Success("g")
+
         override suspend fun acquireClientJwt(byJwt: String): ClientJwtResult = ClientJwtResult.Success("c")
     }
 }

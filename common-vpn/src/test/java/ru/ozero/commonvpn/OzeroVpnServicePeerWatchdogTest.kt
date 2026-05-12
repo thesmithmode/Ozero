@@ -112,4 +112,87 @@ class OzeroVpnServicePeerWatchdogTest {
             "OzeroVpnService обязан иметь PEER_WATCHDOG_POLL_MS константу.",
         )
     }
+
+    @Test
+    fun `PEER_WATCHDOG_MAX_RECOVERS обязан быть 3 — не менять без оценки агрессивности retry`() {
+        val match = Regex("PEER_WATCHDOG_MAX_RECOVERS\\s*=\\s*(\\d+)").find(source)
+        assertTrue(match != null, "PEER_WATCHDOG_MAX_RECOVERS константа обязана быть в файле")
+        val value = match!!.groupValues[1].toInt()
+        assertTrue(
+            value == 3,
+            "PEER_WATCHDOG_MAX_RECOVERS обязан = 3 (текущий $value): больше — DoS на bridge при " +
+                "затяжных сетевых проблемах; меньше — bridge не успеет recover до handleEngineFailure",
+        )
+    }
+
+    @Test
+    fun `peerWatchdog вызывает plugin recover при таймауте`() {
+        val body = source
+            .substringAfter("private fun startPeerWatchdog")
+            .substringBefore("private suspend fun engineNeedsCustomTun")
+        assertTrue(
+            body.contains("plugin.recover()"),
+            "startPeerWatchdog обязан вызывать plugin.recover() перед handleEngineFailure — " +
+                "иначе watchdog убивает соединение без попытки восстановления. Body:\n$body",
+        )
+    }
+
+    @Test
+    fun `peerWatchdog обрабатывает все три варианта RecoverResult`() {
+        val body = source
+            .substringAfter("private fun startPeerWatchdog")
+            .substringBefore("private suspend fun engineNeedsCustomTun")
+        assertTrue(
+            body.contains("RecoverResult.Success") &&
+                body.contains("RecoverResult.NotSupported") &&
+                body.contains("RecoverResult.Failed"),
+            "startPeerWatchdog обязан явно обрабатывать все три RecoverResult — иначе when " +
+                "не exhaustive после расширения. Body:\n$body",
+        )
+    }
+
+    @Test
+    fun `peerWatchdog при NotSupported делает handleEngineFailure без retry`() {
+        val body = source
+            .substringAfter("private fun startPeerWatchdog")
+            .substringBefore("private suspend fun engineNeedsCustomTun")
+        val notSupportedBlock = body.substringAfter("RecoverResult.NotSupported")
+            .substringBefore("RecoverResult.Failed")
+        assertTrue(
+            notSupportedBlock.contains("handleEngineFailure") && notSupportedBlock.contains("return@launch"),
+            "NotSupported = recover не предусмотрен → сразу fail-fast handleEngineFailure + return@launch. " +
+                "Block:\n$notSupportedBlock",
+        )
+    }
+
+    @Test
+    fun `peerWatchdog после Success сбрасывает zeroPeersSince в 0L`() {
+        val body = source
+            .substringAfter("private fun startPeerWatchdog")
+            .substringBefore("private suspend fun engineNeedsCustomTun")
+        val successBlock = body.substringAfter("RecoverResult.Success ->")
+            .substringBefore("RecoverResult.NotSupported")
+        assertTrue(
+            successBlock.contains("zeroPeersSince = 0L"),
+            "После Success обязан zeroPeersSince=0L — без сброса следующая итерация после grace " +
+                "сработает мгновенно (now - zeroPeersSince > TIMEOUT) и watchdog зашпарит retry " +
+                "без реальной паузы. Block:\n$successBlock",
+        )
+    }
+
+    @Test
+    fun `peerWatchdog содержит recoverAttempts счётчик с ограничителем`() {
+        val body = source
+            .substringAfter("private fun startPeerWatchdog")
+            .substringBefore("private suspend fun engineNeedsCustomTun")
+        assertTrue(
+            body.contains("recoverAttempts"),
+            "startPeerWatchdog обязан иметь recoverAttempts — счётчик попыток recovery. Body:\n$body",
+        )
+        assertTrue(
+            body.contains("recoverAttempts >= PEER_WATCHDOG_MAX_RECOVERS"),
+            "Должна быть проверка recoverAttempts >= PEER_WATCHDOG_MAX_RECOVERS перед " +
+                "handleEngineFailure — иначе retry бесконечен. Body:\n$body",
+        )
+    }
 }

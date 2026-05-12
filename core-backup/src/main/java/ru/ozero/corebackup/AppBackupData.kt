@@ -97,6 +97,8 @@ data class BackupWarpSlot(
     val awgS4: Int? = null,
     val awgI1: Int? = null,
     val awgI2: Int? = null,
+    val awgI3: Int? = null,
+    val awgI4: Int? = null,
     val awgI5: Int? = null,
 )
 

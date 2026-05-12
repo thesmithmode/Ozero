@@ -9,6 +9,7 @@ import com.bringyour.sdk.LocationsViewController
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -140,35 +141,8 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(POLLER_KEEP_ALIVE_MS), 0)
 
-    val unpaidBytes: StateFlow<Long> = isUrnetworkActive.flatMapLatest { active ->
-        if (active) {
-            flow {
-                while (true) {
-                    bridge.fetchTransferStats()
-                    emit(bridge.unpaidByteCount())
-                    delay(PROVIDER_STATS_POLL_MS)
-                }
-            }
-        } else {
-            flowOf(0L)
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(POLLER_KEEP_ALIVE_MS), 0L)
-
-    val subscriptionBalance: StateFlow<UrnetworkSdkBridge.SubscriptionBalanceSnapshot?> =
-        isUrnetworkActive.flatMapLatest { active ->
-            if (active) {
-                flow {
-                    while (true) {
-                        emit(bridge.fetchSubscriptionBalance())
-                        delay(SUBSCRIPTION_BALANCE_POLL_MS)
-                    }
-                }
-            } else {
-                flowOf<UrnetworkSdkBridge.SubscriptionBalanceSnapshot?>(null)
-            }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(POLLER_KEEP_ALIVE_MS), null)
-
     @Volatile private var locationsVc: LocationsViewController? = null
+    private var switchingJob: Job? = null
     private var allCountries: List<UrnetworkLocationItem> = emptyList()
 
     init {
@@ -266,13 +240,15 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     }
 
     private fun startSwitchingIndicator() {
+        switchingJob?.cancel()
         _switchingCountry.value = true
-        viewModelScope.launch {
-            val start = System.currentTimeMillis()
-            while (System.currentTimeMillis() - start < SWITCHING_INDICATOR_MAX_MS) {
+        switchingJob = viewModelScope.launch {
+            var elapsed = 0L
+            while (elapsed < SWITCHING_INDICATOR_MAX_MS) {
                 if (!isUrnetworkActive.value) break
                 if (bridge.peerCount() > 0) break
                 delay(SWITCHING_INDICATOR_POLL_MS)
+                elapsed += SWITCHING_INDICATOR_POLL_MS
             }
             delay(SWITCHING_INDICATOR_SETTLE_MS)
             _switchingCountry.value = false
@@ -370,8 +346,6 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     companion object {
         private const val TAG = "UrnetworkSettingsVM"
         private const val PEER_COUNT_POLL_MS = 2_000L
-        private const val PROVIDER_STATS_POLL_MS = 30_000L
-        private const val SUBSCRIPTION_BALANCE_POLL_MS = 60_000L
         private const val POLLER_KEEP_ALIVE_MS = 5_000L
         private const val REFRESH_RETRY_ATTEMPTS = 15
         private const val REFRESH_RETRY_DELAY_MS = 2_000L

@@ -329,10 +329,6 @@
     <string name="backup_filename">ozero_backup.ozb</string>
     <string name="urnetwork_peer_count_label">Peers: %1$d</string>
     <string name="urnetwork_peer_searching">Peers unavailable, retrying connection %1$d s</string>
-    <string name="urnetwork_provider_unpaid">Unpaid traffic: %1$.2f MB</string>
-    <string name="urnetwork_consumed_label">Consumed</string>
-    <string name="urnetwork_consumed_format">%1$s of %2$s MB</string>
-    <string name="urnetwork_pending_label">Pending: %1$s MB</string>
     <string name="ip_card_title">Exit node</string>
     <string name="ip_card_loading">Resolving IP…</string>
     <string name="ip_card_error">Failed to fetch IP: %1$s</string>

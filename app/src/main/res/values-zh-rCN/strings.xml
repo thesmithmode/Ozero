@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Ozero</string>
 
@@ -159,7 +159,6 @@
     <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
     <string name="urnetwork_peer_count_label">对等点: %1$d</string>
     <string name="urnetwork_peer_searching">对等点不可用，重试连接 %1$d 秒</string>
-    <string name="urnetwork_provider_unpaid">未付款流量: %1$.2f MB</string>
     <string name="settings_auto_priority_title">Auto 模式优先级</string>
     <string name="settings_auto_priority_summary">Ozero 按此顺序尝试引擎。首个可用的为活动引擎。</string>
     <string name="settings_auto_priority_move_up">上移</string>

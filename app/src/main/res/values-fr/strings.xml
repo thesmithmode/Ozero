@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Ozero</string>
 
@@ -159,7 +159,6 @@
     <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
     <string name="urnetwork_peer_count_label">Pairs: %1$d</string>
     <string name="urnetwork_peer_searching">Pairs indisponibles, nouvelle tentative %1$d s</string>
-    <string name="urnetwork_provider_unpaid">Trafic non payé: %1$.2f MB</string>
     <string name="settings_auto_priority_title">Priorité du mode Auto</string>
     <string name="settings_auto_priority_summary">Ozero essaie les moteurs dans cet ordre. Le premier fonctionnel — actif.</string>
     <string name="settings_auto_priority_move_up">Monter</string>

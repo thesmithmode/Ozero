@@ -31,14 +31,4 @@ class EnginePluginRecoverTest {
         val plugin = StubPlugin()
         assertIs<EnginePlugin.RecoverResult.NotSupported>(plugin.recover())
     }
-
-    @Test
-    fun `RecoverResult Success Failed NotSupported все различимы`() {
-        val success: EnginePlugin.RecoverResult = EnginePlugin.RecoverResult.Success
-        val failed: EnginePlugin.RecoverResult = EnginePlugin.RecoverResult.Failed("reason")
-        val notSupported: EnginePlugin.RecoverResult = EnginePlugin.RecoverResult.NotSupported
-        assertIs<EnginePlugin.RecoverResult.Success>(success)
-        assertIs<EnginePlugin.RecoverResult.Failed>(failed)
-        assertIs<EnginePlugin.RecoverResult.NotSupported>(notSupported)
-    }
 }

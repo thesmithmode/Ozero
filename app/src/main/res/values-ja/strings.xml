@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Ozero</string>
 
@@ -159,7 +159,6 @@
     <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
     <string name="urnetwork_peer_count_label">ピア: %1$d</string>
     <string name="urnetwork_peer_searching">ピアが利用できません、接続を再試行中 %1$d 秒</string>
-    <string name="urnetwork_provider_unpaid">未払いトラフィック: %1$.2f MB</string>
     <string name="settings_auto_priority_title">Auto モードの優先順位</string>
     <string name="settings_auto_priority_summary">Ozero はこの順序でエンジンを試します。最初に動作するものがアクティブ。</string>
     <string name="settings_auto_priority_move_up">上へ</string>

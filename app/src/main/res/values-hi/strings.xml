@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Ozero</string>
 
@@ -159,7 +159,6 @@
     <string name="stats_history_traffic">↓ %1$s   ↑ %2$s</string>
     <string name="urnetwork_peer_count_label">पीयर: %1$d</string>
     <string name="urnetwork_peer_searching">पीयर अनुपलब्ध, कनेक्शन पुनः प्रयास %1$d s</string>
-    <string name="urnetwork_provider_unpaid">अनभुगतान ट्रैफ़िक: %1$.2f MB</string>
     <string name="settings_auto_priority_title">Auto-मोड प्राथमिकता</string>
     <string name="settings_auto_priority_summary">Ozero इस क्रम में एंजन आज़माता है। पहला काम करने वाला — सक्रिय।</string>
     <string name="settings_auto_priority_move_up">ऊपर</string>

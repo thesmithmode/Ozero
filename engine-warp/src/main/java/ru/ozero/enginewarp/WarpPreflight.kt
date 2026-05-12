@@ -12,7 +12,7 @@ class WarpPreflight(
         return TcpProbe.probe(host = host, port = port, timeoutMs = TIMEOUT_MS, protector = protector)
     }
 
-    private fun resolveTarget(): Pair<String, Int> {
+    internal fun resolveTarget(): Pair<String, Int> {
         val endpoint = peerEndpointProvider()?.trim().orEmpty()
         if (endpoint.isEmpty()) return FALLBACK_HOST to FALLBACK_PORT
         val sep = endpoint.lastIndexOf(':')
@@ -22,8 +22,11 @@ class WarpPreflight(
         return host to FALLBACK_PORT
     }
 
-    private fun isPlainIp(host: String): Boolean =
-        host.isNotEmpty() && host.all { it.isDigit() || it == '.' || it == ':' }
+    private fun isPlainIp(host: String): Boolean {
+        if (host.isEmpty()) return false
+        if (host.contains(':')) return false
+        return host.all { it.isDigit() || it == '.' }
+    }
 
     private companion object {
         const val FALLBACK_HOST = "1.1.1.1"

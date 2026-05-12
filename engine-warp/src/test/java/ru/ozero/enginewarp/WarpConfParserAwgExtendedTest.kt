@@ -80,4 +80,36 @@ class WarpConfParserAwgExtendedTest {
         kotlin.test.assertTrue(ini.contains("I3 = 41"), "I3 должен быть в построенном INI")
         kotlin.test.assertTrue(ini.contains("I4 = 43"), "I4 должен быть в построенном INI")
     }
+
+    @Test
+    fun `builder опускает I3 I4 когда они равны нулю - дефолтному значению`() {
+        val confWithDefaultI3I4 = baseConf.replace("I3 = 41", "I3 = 0").replace("I4 = 43", "I4 = 0")
+        val cfg = WarpConfParser.parse(confWithDefaultI3I4).getOrThrow()
+        val ini = WarpIniBuilder.build(cfg)
+        kotlin.test.assertFalse(ini.contains("I3 = "), "I3 не должен печататься при значении 0")
+        kotlin.test.assertFalse(ini.contains("I4 = "), "I4 не должен печататься при значении 0")
+    }
+
+    @Test
+    fun `round-trip parse build parse сохраняет все AWG поля`() {
+        val original = WarpConfParser.parse(baseConf).getOrThrow().awgParams
+        val ini = WarpIniBuilder.build(WarpConfParser.parse(baseConf).getOrThrow())
+        val roundTrip = WarpConfParser.parse(ini).getOrThrow().awgParams
+        assertEquals(original.junkPacketCount, roundTrip.junkPacketCount)
+        assertEquals(original.junkPacketMinSize, roundTrip.junkPacketMinSize)
+        assertEquals(original.junkPacketMaxSize, roundTrip.junkPacketMaxSize)
+        assertEquals(original.initPacketJunkSize, roundTrip.initPacketJunkSize)
+        assertEquals(original.responsePacketJunkSize, roundTrip.responsePacketJunkSize)
+        assertEquals(original.underloadPacketJunkSize, roundTrip.underloadPacketJunkSize)
+        assertEquals(original.payloadPacketJunkSize, roundTrip.payloadPacketJunkSize)
+        assertEquals(original.initPacketMagicHeader, roundTrip.initPacketMagicHeader)
+        assertEquals(original.responsePacketMagicHeader, roundTrip.responsePacketMagicHeader)
+        assertEquals(original.cookieReplyMagicHeader, roundTrip.cookieReplyMagicHeader)
+        assertEquals(original.transportMagicHeader, roundTrip.transportMagicHeader)
+        assertEquals(original.payloadPacketSizeCount1, roundTrip.payloadPacketSizeCount1)
+        assertEquals(original.payloadPacketSizeCount2, roundTrip.payloadPacketSizeCount2)
+        assertEquals(original.payloadPacketSizeCount3, roundTrip.payloadPacketSizeCount3)
+        assertEquals(original.specialJunk3, roundTrip.specialJunk3)
+        assertEquals(original.specialJunk4, roundTrip.specialJunk4)
+    }
 }

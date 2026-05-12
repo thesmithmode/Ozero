@@ -370,7 +370,7 @@ class OzeroVpnService : android.net.VpnService() {
                     }
                     when (result) {
                         EnginePlugin.RecoverResult.Success -> {
-                            zeroPeersSince = now
+                            zeroPeersSince = 0L
                         }
                         EnginePlugin.RecoverResult.NotSupported -> {
                             handleEngineFailure(
@@ -382,7 +382,7 @@ class OzeroVpnService : android.net.VpnService() {
                         }
                         is EnginePlugin.RecoverResult.Failed -> {
                             PersistentLoggers.warn(TAG, "recover failed: ${result.reason}")
-                            zeroPeersSince = now
+                            zeroPeersSince = 0L
                         }
                     }
                     delay(PEER_WATCHDOG_RECOVER_GRACE_MS)
