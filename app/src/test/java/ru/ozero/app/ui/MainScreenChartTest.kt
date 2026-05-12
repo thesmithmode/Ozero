@@ -112,6 +112,23 @@ class MainScreenChartTest {
         )
     }
 
+    @Test
+    fun `chartNiceMax содержит 1-2-5 гранулярные уровни`() {
+        val body = screenSource.substringAfter("private fun chartNiceMax")
+            .substringBefore("private fun chartTimeAgo")
+        assertTrue(body.contains("2_048") || body.contains("2048"), "2KB/s уровень отсутствует")
+        assertTrue(body.contains("20_480") || body.contains("20480"), "20KB/s уровень отсутствует")
+        assertTrue(body.contains("51_200") || body.contains("51200"), "50KB/s уровень отсутствует")
+    }
+
+    @Test
+    fun `SPEED_SAMPLE_INTERVAL_MS не менее 1000 — граф не обновляется чаще раза в секунду`() {
+        val regex = Regex("SPEED_SAMPLE_INTERVAL_MS\\s*=\\s*(\\d[\\d_]*)L?")
+        val m = regex.find(vmSource) ?: error("SPEED_SAMPLE_INTERVAL_MS не найден в MainViewModel")
+        val value = m.groupValues[1].replace("_", "").toLong()
+        assertTrue(value >= 1_000L, "Ожидалось >= 1000, fact=$value")
+    }
+
     // ── Поведение: downsample ────────────────────────────────────────────────
 
     @Test

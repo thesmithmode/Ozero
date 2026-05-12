@@ -198,11 +198,16 @@ class MainViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
+            var lastRecordMs = 0L
             tunnelController.stats.collect { s ->
                 if (s != null) {
-                    val prev = _speedHistory.value
-                    _speedHistory.value = (prev + Pair(s.bpsIn.toFloat(), s.bpsOut.toFloat()))
-                        .takeLast(MAX_SPEED_HISTORY_POINTS)
+                    val now = System.currentTimeMillis()
+                    if (now - lastRecordMs >= SPEED_SAMPLE_INTERVAL_MS) {
+                        lastRecordMs = now
+                        val prev = _speedHistory.value
+                        _speedHistory.value = (prev + Pair(s.bpsIn.toFloat(), s.bpsOut.toFloat()))
+                            .takeLast(MAX_SPEED_HISTORY_POINTS)
+                    }
                 } else {
                     val switchingNow = tunnelController.switching.value != null
                     if (!switchingNow && _speedHistory.value.isNotEmpty()) {
@@ -320,6 +325,7 @@ class MainViewModel @Inject constructor(
     private companion object {
         const val IP_TAG = "MainViewModel.ip"
         const val MAX_SPEED_HISTORY_POINTS = 3_600
+        const val SPEED_SAMPLE_INTERVAL_MS = 1_000L
         const val URNETWORK_PEER_POLL_MS = 2_000L
         const val URNETWORK_PEER_POLL_KEEP_MS = 5_000L
         const val URNETWORK_SEARCH_TICK_MS = 1_000L

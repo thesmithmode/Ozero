@@ -636,7 +636,14 @@ private fun LiveTrafficChart(
 
 private fun chartNiceMax(bps: Float): Float {
     if (bps <= 0f) return 10_240f
-    val levels = floatArrayOf(1_024f, 10_240f, 102_400f, 1_048_576f, 10_485_760f, 104_857_600f)
+    val levels = floatArrayOf(
+        1_024f, 2_048f, 5_120f,
+        10_240f, 20_480f, 51_200f,
+        102_400f, 204_800f, 512_000f,
+        1_048_576f, 2_097_152f, 5_242_880f,
+        10_485_760f, 20_971_520f, 52_428_800f,
+        104_857_600f, 209_715_200f,
+    )
     return levels.firstOrNull { it > bps * 1.1f } ?: (bps * 2f)
 }
 
