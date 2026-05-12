@@ -135,6 +135,44 @@ class AppBackupSerializerTest {
     }
 
     @Test
+    fun `версия 0 — также отклоняется`() {
+        val json = """{"version":0,"exportedAt":"","settings":{},"urnetwork":{},"warpSlots":[],"splitRules":[]}"""
+        val ex = runCatching { AppBackupSerializer.deserialize(json) }.exceptionOrNull()
+        assertTrue(ex is AppBackupSerializer.BackupParseException, "version 0 must throw BackupParseException")
+    }
+
+    @Test
+    fun `malformed JSON — BackupParseException вместо crash`() {
+        val ex = runCatching { AppBackupSerializer.deserialize("not a json at all") }.exceptionOrNull()
+        assertTrue(ex is AppBackupSerializer.BackupParseException, "malformed must wrap as BackupParseException: $ex")
+    }
+
+    @Test
+    fun `deserializeAuto rejects oversized payload`() {
+        val huge = ByteArray(11 * 1024 * 1024) { 'a'.code.toByte() }
+        val ex = runCatching { AppBackupSerializer.deserializeAuto(huge) }.exceptionOrNull()
+        assertTrue(ex is AppBackupSerializer.BackupParseException, "11MB must be rejected: $ex")
+    }
+
+    @Test
+    fun `AWG расширенные поля переживают roundtrip`() {
+        val slot = fullData.warpSlots[0].copy(
+            awgS3 = 7,
+            awgS4 = 11,
+            awgI1 = 13,
+            awgI2 = 17,
+            awgI5 = 19,
+        )
+        val data = fullData.copy(warpSlots = listOf(slot))
+        val restored = AppBackupSerializer.deserialize(AppBackupSerializer.serialize(data))
+        assertEquals(7, restored.warpSlots[0].awgS3)
+        assertEquals(11, restored.warpSlots[0].awgS4)
+        assertEquals(13, restored.warpSlots[0].awgI1)
+        assertEquals(17, restored.warpSlots[0].awgI2)
+        assertEquals(19, restored.warpSlots[0].awgI5)
+    }
+
+    @Test
     fun `serializeEncrypted и deserializeAuto roundtrip`() {
         val bytes = AppBackupSerializer.serializeEncrypted(fullData)
         val restored = AppBackupSerializer.deserializeAuto(bytes)
