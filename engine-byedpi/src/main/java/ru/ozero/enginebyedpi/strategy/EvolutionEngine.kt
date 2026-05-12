@@ -108,8 +108,9 @@ class EvolutionEngine(
     private suspend fun evaluatePopulation(
         population: List<Chromosome>,
     ): List<Pair<Chromosome, Double>> {
-        val results = coroutineScope {
-            population.map { chromosome -> async { chromosome to evaluate(chromosome) } }.awaitAll()
+        val results = population.map { chromosome ->
+            if (!currentCoroutineContext().isActive) return@map chromosome to 0.0
+            chromosome to evaluate(chromosome)
         }
         results.forEach { (chromosome, fitness) ->
             memory?.record(chromosome.map { it.token }, fitness)

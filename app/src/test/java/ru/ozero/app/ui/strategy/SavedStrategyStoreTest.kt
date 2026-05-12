@@ -132,4 +132,15 @@ class SavedStrategyStoreTest {
         assertTrue(unpinnedLoaded.none { it.id == "u1" }, "oldest unpinned dropped")
         assertTrue(unpinnedLoaded.none { it.id == "u2" }, "second oldest dropped")
     }
+
+    @Test
+    fun `concurrent add preserves all distinct commands`() {
+        val big = FileSavedStrategyStore(tempDir, "race.json", maxUnpinned = 1_000)
+        val threads = (1..8).map { idx ->
+            Thread { repeat(20) { i -> big.add("--cmd-$idx-$i") } }.also { it.start() }
+        }
+        threads.forEach { it.join() }
+        val distinct = big.load().map { it.command }.toSet()
+        assertEquals(8 * 20, distinct.size, "no commands lost to race: ${distinct.size}")
+    }
 }

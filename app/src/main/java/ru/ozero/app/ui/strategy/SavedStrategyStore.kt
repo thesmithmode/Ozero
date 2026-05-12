@@ -8,6 +8,11 @@ import java.util.UUID
 interface SavedStrategyStore {
     fun load(): List<SavedStrategy>
     fun save(strategies: List<SavedStrategy>)
+    fun update(transform: (List<SavedStrategy>) -> List<SavedStrategy>): List<SavedStrategy> {
+        val updated = transform(load())
+        save(updated)
+        return updated
+    }
 }
 
 class FileSavedStrategyStore(
@@ -18,6 +23,14 @@ class FileSavedStrategyStore(
 
     private val file = File(filesDir, fileName)
 
+    @Synchronized
+    override fun update(transform: (List<SavedStrategy>) -> List<SavedStrategy>): List<SavedStrategy> {
+        val updated = transform(load())
+        save(updated)
+        return updated
+    }
+
+    @Synchronized
     override fun load(): List<SavedStrategy> {
         if (!file.exists()) return emptyList()
         return runCatching {
@@ -35,6 +48,7 @@ class FileSavedStrategyStore(
         }.getOrDefault(emptyList())
     }
 
+    @Synchronized
     override fun save(strategies: List<SavedStrategy>) {
         val trimmed = trimToLimit(strategies)
         val array = JSONArray()
@@ -63,34 +77,23 @@ class FileSavedStrategyStore(
     }
 }
 
-fun SavedStrategyStore.add(command: String): List<SavedStrategy> {
-    val existing = load()
-    if (existing.any { it.command == command }) return existing
-    val updated = existing + SavedStrategy(id = UUID.randomUUID().toString(), command = command)
-    save(updated)
-    return updated
+fun SavedStrategyStore.add(command: String): List<SavedStrategy> = update { existing ->
+    if (existing.any { it.command == command }) existing
+    else existing + SavedStrategy(id = UUID.randomUUID().toString(), command = command)
 }
 
-fun SavedStrategyStore.pin(id: String): List<SavedStrategy> {
-    val updated = load().map { if (it.id == id) it.copy(isPinned = true) else it }
-    save(updated)
-    return updated
+fun SavedStrategyStore.pin(id: String): List<SavedStrategy> = update { list ->
+    list.map { if (it.id == id) it.copy(isPinned = true) else it }
 }
 
-fun SavedStrategyStore.unpin(id: String): List<SavedStrategy> {
-    val updated = load().map { if (it.id == id) it.copy(isPinned = false) else it }
-    save(updated)
-    return updated
+fun SavedStrategyStore.unpin(id: String): List<SavedStrategy> = update { list ->
+    list.map { if (it.id == id) it.copy(isPinned = false) else it }
 }
 
-fun SavedStrategyStore.rename(id: String, name: String): List<SavedStrategy> {
-    val updated = load().map { if (it.id == id) it.copy(name = name.takeIf { it.isNotBlank() }) else it }
-    save(updated)
-    return updated
+fun SavedStrategyStore.rename(id: String, name: String): List<SavedStrategy> = update { list ->
+    list.map { if (it.id == id) it.copy(name = name.takeIf { it.isNotBlank() }) else it }
 }
 
-fun SavedStrategyStore.delete(id: String): List<SavedStrategy> {
-    val updated = load().filter { it.id != id }
-    save(updated)
-    return updated
+fun SavedStrategyStore.delete(id: String): List<SavedStrategy> = update { list ->
+    list.filter { it.id != id }
 }

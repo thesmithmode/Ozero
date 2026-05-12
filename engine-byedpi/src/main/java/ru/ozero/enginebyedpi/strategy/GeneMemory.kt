@@ -12,6 +12,7 @@ class GeneMemory(private val file: File) {
 
     private val scores = mutableMapOf<String, Score>()
 
+    @Synchronized
     fun load() {
         if (!file.exists()) return
         val now = System.currentTimeMillis()
@@ -31,6 +32,7 @@ class GeneMemory(private val file: File) {
         }
     }
 
+    @Synchronized
     fun save() {
         runCatching {
             val obj = JSONObject()
@@ -50,6 +52,7 @@ class GeneMemory(private val file: File) {
         }
     }
 
+    @Synchronized
     fun record(tokens: List<String>, fitness: Double) {
         val now = System.currentTimeMillis()
         for (token in tokens) {
@@ -58,6 +61,7 @@ class GeneMemory(private val file: File) {
         }
     }
 
+    @Synchronized
     fun ucbScore(token: String): Double {
         val s = scores[token] ?: return SCORE_UNEXPLORED
         if (s.trials < 1.0) return SCORE_UNEXPLORED
@@ -67,11 +71,15 @@ class GeneMemory(private val file: File) {
         return exploitation + exploration
     }
 
+    @Synchronized
     fun hasData(): Boolean = scores.isNotEmpty()
 
+    @Synchronized
     fun rawJson(): String? = runCatching { if (file.exists()) file.readText() else null }.getOrNull()
 
+    @Synchronized
     fun importRawJson(json: String) {
+        runCatching { JSONObject(json) }.getOrElse { return }
         runCatching { file.writeText(json) }
         scores.clear()
         load()

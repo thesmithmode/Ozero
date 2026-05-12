@@ -111,4 +111,30 @@ class GeneMemoryTest {
             assertTrue(s.isFinite(), "score for $token must be finite")
         }
     }
+
+    @Test
+    fun `concurrent record does not corrupt scores`() {
+        val mem = memory()
+        val threads = (1..8).map { idx ->
+            Thread {
+                repeat(200) { mem.record(listOf("-t$idx"), fitness = 1.0) }
+            }.also { it.start() }
+        }
+        threads.forEach { it.join() }
+        (1..8).forEach { idx ->
+            val s = mem.ucbScore("-t$idx")
+            assertTrue(s.isFinite() && s > 0.0, "score -t$idx finite positive after concurrent record: $s")
+        }
+    }
+
+    @Test
+    fun `importRawJson rejects malformed JSON without writing to file`() {
+        val mem = memory()
+        mem.record(listOf("-keep"), fitness = 1.0)
+        mem.save()
+        mem.importRawJson("not a json")
+        val mem2 = GeneMemory(File(tempDir, "test_memory.json"))
+        mem2.load()
+        assertTrue(mem2.hasData(), "valid prior state must survive failed import")
+    }
 }
