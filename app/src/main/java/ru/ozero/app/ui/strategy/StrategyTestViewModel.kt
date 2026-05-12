@@ -22,7 +22,11 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
+import ru.ozero.enginebyedpi.strategy.EvolutionEngine
+import ru.ozero.enginebyedpi.strategy.GenePool
 import ru.ozero.enginebyedpi.strategy.SocksProbeClient
+import ru.ozero.enginebyedpi.strategy.StrategyEvolver
+import ru.ozero.enginebyedpi.strategy.toCommand
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.PersistentLoggers
@@ -35,6 +39,13 @@ sealed interface StrategyTestError {
     data object VpnRunning : StrategyTestError
     data object NoSites : StrategyTestError
 }
+
+data class EvolutionUiState(
+    val generation: Int = 0,
+    val maxGenerations: Int = 0,
+    val bestFitness: Double = 0.0,
+    val topChromosomes: List<Pair<String, Double>> = emptyList(),
+)
 
 @HiltViewModel
 class StrategyTestViewModel @Inject constructor(
@@ -71,6 +82,9 @@ class StrategyTestViewModel @Inject constructor(
 
     private val _savedStrategies = MutableStateFlow<List<SavedStrategy>>(emptyList())
     val savedStrategies: StateFlow<List<SavedStrategy>> = _savedStrategies.asStateFlow()
+
+    private val _evolutionState = MutableStateFlow<EvolutionUiState?>(null)
+    val evolutionState: StateFlow<EvolutionUiState?> = _evolutionState.asStateFlow()
 
     private var testJob: Job? = null
 
@@ -168,8 +182,13 @@ class StrategyTestViewModel @Inject constructor(
                 )
             }
             _runSummary.value = "0/${_strategies.value.size} strategies, ${sites.size} sites"
+            val useEvolution = _settings.value.evolutionMode
             try {
-                runLoop(sites)
+                if (useEvolution) {
+                    runEvolution(sites)
+                } else {
+                    runLoop(sites)
+                }
             } finally {
                 _strategies.value = _strategies.value.sortedForUi()
                 withContext(ioDispatcher) {
@@ -218,6 +237,41 @@ class StrategyTestViewModel @Inject constructor(
                 val updated = runCatching { savedStrategyStore.add(command) }.getOrElse { savedStrategyStore.load() }
                 _savedStrategies.value = updated
             }
+        }
+    }
+
+    private suspend fun runEvolution(sites: List<String>) {
+        val snap = _settings.value
+        val seedCommands = _strategies.value.map { it.command }
+        val genePool = GenePool(seedCommands)
+        val evolver = StrategyEvolver(genePool)
+        val maxGen = snap.evolutionMaxGenerations
+        val evolutionEngine = EvolutionEngine(
+            byeDpiEngine = byeDpiEngine,
+            probeFactory = { port -> probeFactory.create(port) },
+            evolver = evolver,
+            pool = genePool,
+            sites = sites,
+            settings = EvolutionEngine.EvolutionSettings(
+                populationSize = snap.evolutionPopulationSize,
+                maxGenerations = maxGen,
+                mutationRate = snap.evolutionMutationRate,
+                eliteCount = snap.evolutionEliteCount,
+                concurrentProbes = max(1, snap.concurrentLimit),
+            ),
+        )
+        _evolutionState.value = EvolutionUiState(maxGenerations = maxGen)
+        evolutionEngine.evolve(seedCommands) { result ->
+            _evolutionState.value = EvolutionUiState(
+                generation = result.generation,
+                maxGenerations = maxGen,
+                bestFitness = result.bestFitness,
+                topChromosomes = result.population
+                    .sortedByDescending { it.second }
+                    .take(5)
+                    .map { it.first.toCommand() to it.second },
+            )
+            _runSummary.value = "Gen ${result.generation}/$maxGen · best ${(result.bestFitness * 100).toInt()}%"
         }
     }
 

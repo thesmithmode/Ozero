@@ -67,6 +67,7 @@ fun StrategyTestScreen(
     val strategies by viewModel.strategies.collectAsStateWithLifecycle()
     val domainLists by viewModel.domainLists.collectAsStateWithLifecycle()
     val savedStrategies by viewModel.savedStrategies.collectAsStateWithLifecycle()
+    val evolutionState by viewModel.evolutionState.collectAsStateWithLifecycle()
     val runSummary by viewModel.runSummary.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
@@ -207,6 +208,9 @@ fun StrategyTestScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+                    evolutionState?.let { evo ->
+                        EvolutionStateCard(state = evo)
                     }
                 }
             }
@@ -436,6 +440,45 @@ private fun AddDomainListDialog(
 }
 
 @Composable
+private fun EvolutionStateCard(state: EvolutionUiState) {
+    Card(
+        modifier = Modifier.fillMaxWidth().testTag("evolution_state_card"),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = stringResource(R.string.evolution_generation_label, state.generation, state.maxGenerations),
+                style = MaterialTheme.typography.labelMedium,
+            )
+            LinearProgressIndicator(
+                progress = { if (state.maxGenerations > 0) state.generation.toFloat() / state.maxGenerations else 0f },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                text = stringResource(R.string.evolution_fitness_label, (state.bestFitness * 100).toInt()),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            if (state.topChromosomes.isNotEmpty()) {
+                Text(
+                    text = stringResource(R.string.evolution_population_label),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+                state.topChromosomes.forEach { (cmd, fitness) ->
+                    Text(
+                        text = "$cmd — ${(fitness * 100).toInt()}%",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun StrategySettingsSheet(
     settings: StrategyTestSettings,
     onSettingsChange: (StrategyTestSettings) -> Unit,
@@ -520,6 +563,23 @@ private fun StrategySettingsSheet(
                 maxLines = 10,
                 label = { Text(stringResource(R.string.strategy_settings_custom_strategies)) },
                 modifier = Modifier.fillMaxWidth().testTag("settings_custom_strategies"),
+            )
+        }
+        HorizontalDivider()
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = stringResource(R.string.evolution_mode_toggle),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Switch(
+                checked = settings.evolutionMode,
+                onCheckedChange = { onSettingsChange(settings.copy(evolutionMode = it)) },
+                enabled = enabled,
+                modifier = Modifier.testTag("settings_evolution_toggle"),
             )
         }
     }

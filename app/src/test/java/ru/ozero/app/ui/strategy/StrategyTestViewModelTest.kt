@@ -429,6 +429,28 @@ class StrategyTestViewModelTest {
         assertTrue(vm.domainLists.value.first().isActive)
     }
 
+    @Test
+    fun `evolution mode runs when settings evolutionMode true`() = runTest(dispatcher) {
+        settingsStore.stored = StrategyTestSettings(evolutionMode = true, evolutionMaxGenerations = 1, evolutionPopulationSize = 2)
+        assets = FakeAssetSource(strategies = listOf("-cmd1", "-cmd2"), sites = listOf("s1"))
+        val vm = newVm(sites = listOf("s1"))
+        advanceUntilIdle()
+        vm.onStart()
+        advanceUntilIdle()
+        assertFalse(vm.isRunning.value)
+    }
+
+    @Test
+    fun `evolution state emitted during evolution run`() = runTest(dispatcher) {
+        settingsStore.stored = StrategyTestSettings(evolutionMode = true, evolutionMaxGenerations = 2, evolutionPopulationSize = 2)
+        assets = FakeAssetSource(strategies = listOf("-cmd1"), sites = listOf("s1"))
+        val vm = newVm(sites = listOf("s1"))
+        advanceUntilIdle()
+        vm.onStart()
+        advanceUntilIdle()
+        assertFalse(vm.isRunning.value)
+    }
+
     private companion object {
         val STRATEGIES_74: List<String> = (1..74).map { "-strategy$it" }
     }

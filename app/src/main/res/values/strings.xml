@@ -226,6 +226,10 @@
     <string name="saved_strategy_pin">Закрепить</string>
     <string name="saved_strategy_unpin">Открепить</string>
     <string name="saved_strategy_rename_hint">Название (необязательно)</string>
+    <string name="evolution_mode_toggle">Режим эволюции</string>
+    <string name="evolution_generation_label">Поколение %1$d/%2$d</string>
+    <string name="evolution_fitness_label">Лучший результат: %1$d%%</string>
+    <string name="evolution_population_label">Популяция</string>
 
     <!-- URnetwork -->
     <string name="urnetwork_settings_title">URnetwork</string>

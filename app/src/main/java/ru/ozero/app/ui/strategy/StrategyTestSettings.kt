@@ -8,4 +8,9 @@ data class StrategyTestSettings(
     val sniDomain: String = "google.com",
     val useCustomStrategies: Boolean = false,
     val customStrategies: String = "",
+    val evolutionMode: Boolean = false,
+    val evolutionPopulationSize: Int = 20,
+    val evolutionMaxGenerations: Int = 10,
+    val evolutionMutationRate: Float = 0.2f,
+    val evolutionEliteCount: Int = 5,
 )
