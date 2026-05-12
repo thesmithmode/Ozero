@@ -19,6 +19,11 @@ class SharedPrefsStrategyTestSettingsStore(context: Context) : StrategyTestSetti
         sniDomain = prefs.getString(KEY_SNI_DOMAIN, "google.com") ?: "google.com",
         useCustomStrategies = prefs.getBoolean(KEY_USE_CUSTOM, false),
         customStrategies = prefs.getString(KEY_CUSTOM_STRATEGIES, "") ?: "",
+        evolutionMode = prefs.getBoolean(KEY_EVOLUTION_MODE, false),
+        evolutionPopulationSize = prefs.getInt(KEY_EVOLUTION_POPULATION_SIZE, 20),
+        evolutionMaxGenerations = prefs.getInt(KEY_EVOLUTION_MAX_GENERATIONS, 10),
+        evolutionMutationRate = prefs.getFloat(KEY_EVOLUTION_MUTATION_RATE, 0.2f),
+        evolutionEliteCount = prefs.getInt(KEY_EVOLUTION_ELITE_COUNT, 5),
     )
 
     override fun save(settings: StrategyTestSettings) {
@@ -30,6 +35,11 @@ class SharedPrefsStrategyTestSettingsStore(context: Context) : StrategyTestSetti
             .putString(KEY_SNI_DOMAIN, settings.sniDomain)
             .putBoolean(KEY_USE_CUSTOM, settings.useCustomStrategies)
             .putString(KEY_CUSTOM_STRATEGIES, settings.customStrategies)
+            .putBoolean(KEY_EVOLUTION_MODE, settings.evolutionMode)
+            .putInt(KEY_EVOLUTION_POPULATION_SIZE, settings.evolutionPopulationSize)
+            .putInt(KEY_EVOLUTION_MAX_GENERATIONS, settings.evolutionMaxGenerations)
+            .putFloat(KEY_EVOLUTION_MUTATION_RATE, settings.evolutionMutationRate)
+            .putInt(KEY_EVOLUTION_ELITE_COUNT, settings.evolutionEliteCount)
             .apply()
     }
 
@@ -42,5 +52,10 @@ class SharedPrefsStrategyTestSettingsStore(context: Context) : StrategyTestSetti
         private const val KEY_SNI_DOMAIN = "byedpi_proxytest_sni_domain"
         private const val KEY_USE_CUSTOM = "byedpi_proxytest_use_custom"
         private const val KEY_CUSTOM_STRATEGIES = "byedpi_proxytest_custom_strategies"
+        private const val KEY_EVOLUTION_MODE = "byedpi_proxytest_evolution_mode"
+        private const val KEY_EVOLUTION_POPULATION_SIZE = "byedpi_proxytest_evolution_population_size"
+        private const val KEY_EVOLUTION_MAX_GENERATIONS = "byedpi_proxytest_evolution_max_generations"
+        private const val KEY_EVOLUTION_MUTATION_RATE = "byedpi_proxytest_evolution_mutation_rate"
+        private const val KEY_EVOLUTION_ELITE_COUNT = "byedpi_proxytest_evolution_elite_count"
     }
 }
