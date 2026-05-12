@@ -46,6 +46,50 @@ object AppBackupSerializer {
         }
         root.put("splitRules", rulesArr)
 
+        data.strategy?.let { strat ->
+            val stratObj = JSONObject()
+            strat.settings?.let { ss ->
+                val sObj = JSONObject()
+                ss.requestsPerDomain?.let { sObj.put("requestsPerDomain", it) }
+                ss.concurrentLimit?.let { sObj.put("concurrentLimit", it) }
+                ss.timeoutSeconds?.let { sObj.put("timeoutSeconds", it) }
+                ss.delayBetweenMs?.let { sObj.put("delayBetweenMs", it) }
+                ss.useCustomStrategies?.let { sObj.put("useCustomStrategies", it) }
+                ss.customStrategies?.let { sObj.put("customStrategies", it) }
+                ss.evolutionMode?.let { sObj.put("evolutionMode", it) }
+                ss.evolutionPopulationSize?.let { sObj.put("evolutionPopulationSize", it) }
+                ss.evolutionMaxGenerations?.let { sObj.put("evolutionMaxGenerations", it) }
+                ss.evolutionMutationRate?.let { sObj.put("evolutionMutationRate", it) }
+                ss.evolutionEliteCount?.let { sObj.put("evolutionEliteCount", it) }
+                stratObj.put("settings", sObj)
+            }
+            val dlArr = JSONArray()
+            for (dl in strat.domainLists) {
+                val obj = JSONObject()
+                obj.put("id", dl.id)
+                obj.put("name", dl.name)
+                obj.put("isActive", dl.isActive)
+                obj.put("isBuiltIn", dl.isBuiltIn)
+                val domains = JSONArray()
+                dl.domains.forEach { domains.put(it) }
+                obj.put("domains", domains)
+                dlArr.put(obj)
+            }
+            stratObj.put("domainLists", dlArr)
+            val ssArr = JSONArray()
+            for (ss in strat.savedStrategies) {
+                val obj = JSONObject()
+                obj.put("id", ss.id)
+                obj.put("command", ss.command)
+                obj.put("isPinned", ss.isPinned)
+                ss.name?.let { obj.put("name", it) }
+                ssArr.put(obj)
+            }
+            stratObj.put("savedStrategies", ssArr)
+            strat.evolutionMemory?.let { stratObj.put("evolutionMemory", it) }
+            root.put("strategy", stratObj)
+        }
+
         return root.toString(2)
     }
 
@@ -105,6 +149,52 @@ object AppBackupSerializer {
             )
         }
 
+        val strategy = if (root.has("strategy")) {
+            val stratObj = root.getJSONObject("strategy")
+            val ss = stratObj.optJSONObject("settings")
+            val backupSettings = if (ss != null) BackupStrategySettings(
+                requestsPerDomain = if (ss.has("requestsPerDomain")) ss.getInt("requestsPerDomain") else null,
+                concurrentLimit = if (ss.has("concurrentLimit")) ss.getInt("concurrentLimit") else null,
+                timeoutSeconds = if (ss.has("timeoutSeconds")) ss.getInt("timeoutSeconds") else null,
+                delayBetweenMs = if (ss.has("delayBetweenMs")) ss.getLong("delayBetweenMs") else null,
+                useCustomStrategies = if (ss.has("useCustomStrategies")) ss.getBoolean("useCustomStrategies") else null,
+                customStrategies = ss.optString("customStrategies").takeIf { it.isNotEmpty() },
+                evolutionMode = if (ss.has("evolutionMode")) ss.getBoolean("evolutionMode") else null,
+                evolutionPopulationSize = if (ss.has("evolutionPopulationSize")) ss.getInt("evolutionPopulationSize") else null,
+                evolutionMaxGenerations = if (ss.has("evolutionMaxGenerations")) ss.getInt("evolutionMaxGenerations") else null,
+                evolutionMutationRate = if (ss.has("evolutionMutationRate")) ss.getDouble("evolutionMutationRate").toFloat() else null,
+                evolutionEliteCount = if (ss.has("evolutionEliteCount")) ss.getInt("evolutionEliteCount") else null,
+            ) else null
+            val dlArr = stratObj.optJSONArray("domainLists") ?: JSONArray()
+            val domainLists = (0 until dlArr.length()).map { i ->
+                val obj = dlArr.getJSONObject(i)
+                val domainsArr = obj.optJSONArray("domains") ?: JSONArray()
+                BackupDomainList(
+                    id = obj.getString("id"),
+                    name = obj.getString("name"),
+                    isActive = obj.optBoolean("isActive", true),
+                    isBuiltIn = obj.optBoolean("isBuiltIn", false),
+                    domains = (0 until domainsArr.length()).map { domainsArr.getString(it) },
+                )
+            }
+            val savedArr = stratObj.optJSONArray("savedStrategies") ?: JSONArray()
+            val savedStrategies = (0 until savedArr.length()).map { i ->
+                val obj = savedArr.getJSONObject(i)
+                BackupSavedStrategy(
+                    id = obj.getString("id"),
+                    command = obj.getString("command"),
+                    isPinned = obj.optBoolean("isPinned", false),
+                    name = obj.optString("name").takeIf { it.isNotEmpty() },
+                )
+            }
+            BackupStrategy(
+                settings = backupSettings,
+                domainLists = domainLists,
+                savedStrategies = savedStrategies,
+                evolutionMemory = stratObj.optString("evolutionMemory").takeIf { it.isNotEmpty() },
+            )
+        } else null
+
         return AppBackupData(
             version = version,
             exportedAt = exportedAt,
@@ -112,6 +202,7 @@ object AppBackupSerializer {
             urnetwork = urnetwork,
             warpSlots = warpSlots,
             splitRules = splitRules,
+            strategy = strategy,
         )
     }
 

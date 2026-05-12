@@ -21,6 +21,7 @@ class AppBackupManager(
     private val warpSlotStore: WarpConfigSlotStore,
     private val urnetworkStore: UrnetworkConfigStore,
     private val splitRuleDao: AppSplitRuleDao,
+    private val strategyProvider: StrategyBackupProvider? = null,
 ) {
 
     suspend fun export(): AppBackupData {
@@ -52,12 +53,15 @@ class AppBackupManager(
             BackupSplitRule(packageName = rule.packageName, isExcluded = rule.isExcluded)
         }
 
+        val strategy = strategyProvider?.export()
+
         return AppBackupData(
             exportedAt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).format(Date()),
             settings = settings,
             urnetwork = urnetwork,
             warpSlots = warpSlots,
             splitRules = splitRules,
+            strategy = strategy,
         )
     }
 
@@ -84,6 +88,8 @@ class AppBackupManager(
         if (data.warpSlots.isNotEmpty()) {
             warpSlotStore.replaceAll(data.warpSlots.map { it.toSlot() })
         }
+
+        data.strategy?.let { strategyProvider?.import(it) }
 
         if (data.splitRules.isNotEmpty()) {
             val existingRules = splitRuleDao.observeAll().first()

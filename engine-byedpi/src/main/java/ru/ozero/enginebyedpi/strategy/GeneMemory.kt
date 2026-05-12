@@ -69,6 +69,14 @@ class GeneMemory(private val file: File) {
 
     fun hasData(): Boolean = scores.isNotEmpty()
 
+    fun rawJson(): String? = runCatching { if (file.exists()) file.readText() else null }.getOrNull()
+
+    fun importRawJson(json: String) {
+        runCatching { file.writeText(json) }
+        scores.clear()
+        load()
+    }
+
     companion object {
         private const val DECAY_PER_DAY = 0.95
         private const val EXPLORE_WEIGHT = 0.3
