@@ -1,5 +1,25 @@
 # Build Log
 
+## [2026-05-13T00:30:00+03:00] compile | 2026-05-12.md (pass 3 — verification)
+- Source: daily/2026-05-12.md
+- Articles created: (none)
+- Articles updated: (none)
+- Verification: 6 articles reference daily/2026-05-12.md in index, all content matches daily log:
+  - [[concepts/genetic-strategy-evolution]] — StrategyGene + GenePool + sequential evaluation ✓
+  - [[concepts/gene-memory-concurrency-traps]] — HashMap race + SavedStrategyStore Mutex + importRawJson validation ✓
+  - [[concepts/backup-awg-field-roundtrip-loss]] — 5 missing AWG fields + AppBackupSerializer hardening ✓
+  - [[concepts/urnetwork-control-network-modes]] — AUTO/ALWAYS + WIFI/ALL + provideControlMode≠WindowType ✓
+  - [[concepts/chart-nice-max-dynamic-scaling]] — 17 thresholds 1-2-5 + SPEED_SAMPLE_INTERVAL_MS ✓
+  - [[connections/audit-driven-concurrency-discovery]] — 6-subagent audit pattern ✓
+- Excluded: SNI seed tokenizer issue (Sprint 5 impl detail), @Suppress("LongMethod") discipline (CLAUDE.md rule), engineAutoPriority default order (minor config), v0.0.13 lint cycle (covered pass 2), JDK Temurin winget failure (env issue), Logger reflection fragility (tech debt trivia)
+
+## [2026-05-12T23:00:00+03:00] compile | 2026-05-12.md (pass 2 — session 18:55 coverage)
+- Source: daily/2026-05-12.md
+- Articles created: (none)
+- Articles updated: (none)
+- Sessions covered: 18:55 (v0.0.13 release, lint double-red CI, squash dev→main)
+- Excluded: v0.0.13 release operational details (reinforces existing [[concepts/ci-workflow-discipline]] and [[concepts/release-process]], no new concept); lint misfires (unused import, regex line, single-line if brace) — already covered by feedback_ktlint_traps memory
+
 ## [2026-05-12T19:00:00+03:00] compile | 2026-05-12.md
 - Source: daily/2026-05-12.md
 - Articles created: [[concepts/genetic-strategy-evolution]], [[concepts/gene-memory-concurrency-traps]], [[concepts/backup-awg-field-roundtrip-loss]], [[concepts/urnetwork-control-network-modes]], [[concepts/chart-nice-max-dynamic-scaling]]
