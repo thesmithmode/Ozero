@@ -15,6 +15,8 @@ data class AwgParams(
     val payloadPacketSizeCount1: Int = DEFAULT_I1,
     val payloadPacketSizeCount2: Int = DEFAULT_I2,
     val payloadPacketSizeCount3: Int = DEFAULT_I5,
+    val specialJunk3: Int = DEFAULT_I3,
+    val specialJunk4: Int = DEFAULT_I4,
 ) {
     init {
         require(junkPacketMinSize <= junkPacketMaxSize) {
@@ -58,6 +60,8 @@ data class AwgParams(
         const val DEFAULT_S4 = 20
         const val DEFAULT_I1 = 28
         const val DEFAULT_I2 = 29
+        const val DEFAULT_I3 = 0
+        const val DEFAULT_I4 = 0
         const val DEFAULT_I5 = 10
 
         val VANILLA = AwgParams(
@@ -75,6 +79,8 @@ data class AwgParams(
             payloadPacketSizeCount1 = 0,
             payloadPacketSizeCount2 = 0,
             payloadPacketSizeCount3 = 0,
+            specialJunk3 = 0,
+            specialJunk4 = 0,
         )
     }
 }

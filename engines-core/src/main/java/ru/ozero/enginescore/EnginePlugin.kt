@@ -16,6 +16,14 @@ interface EnginePlugin {
 
     fun stopTimeoutMs(): Long = DEFAULT_STOP_TIMEOUT_MS
 
+    suspend fun recover(): RecoverResult = RecoverResult.NotSupported
+
+    sealed class RecoverResult {
+        data object Success : RecoverResult()
+        data class Failed(val reason: String) : RecoverResult()
+        data object NotSupported : RecoverResult()
+    }
+
     companion object {
         const val DEFAULT_STOP_TIMEOUT_MS = 2_000L
     }

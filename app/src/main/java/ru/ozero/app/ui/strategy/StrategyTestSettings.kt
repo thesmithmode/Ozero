@@ -7,7 +7,7 @@ data class StrategyTestSettings(
     val delayBetweenMs: Long = 500L,
     val useCustomStrategies: Boolean = false,
     val customStrategies: String = "",
-    val evolutionMode: Boolean = false,
+    val evolutionMode: Boolean = true,
     val evolutionPopulationSize: Int = 20,
     val evolutionMaxGenerations: Int = 10,
     val evolutionMutationRate: Float = 0.2f,

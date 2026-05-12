@@ -369,7 +369,7 @@ class StrategyTestViewModel @Inject constructor(
                 } else {
                     s
                 }
-            }
+            }.sortedForUi()
         }
 
     private fun markStrategyCompleted(command: String) =

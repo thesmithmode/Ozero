@@ -99,9 +99,16 @@ internal object WarpConfParser {
         junkPacketMaxSize = iface["jmax"]?.toIntOrNull() ?: AwgParams.DEFAULT_JMAX,
         initPacketJunkSize = iface["s1"]?.toIntOrNull() ?: AwgParams.DEFAULT_S1,
         responsePacketJunkSize = iface["s2"]?.toIntOrNull() ?: AwgParams.DEFAULT_S2,
+        underloadPacketJunkSize = iface["s3"]?.toIntOrNull() ?: AwgParams.DEFAULT_S3,
+        payloadPacketJunkSize = iface["s4"]?.toIntOrNull() ?: AwgParams.DEFAULT_S4,
         initPacketMagicHeader = iface["h1"]?.toLongOrNull() ?: AwgParams.DEFAULT_H1,
         responsePacketMagicHeader = iface["h2"]?.toLongOrNull() ?: AwgParams.DEFAULT_H2,
         cookieReplyMagicHeader = iface["h3"]?.toLongOrNull() ?: AwgParams.DEFAULT_H3,
         transportMagicHeader = iface["h4"]?.toLongOrNull() ?: AwgParams.DEFAULT_H4,
+        payloadPacketSizeCount1 = iface["i1"]?.toIntOrNull() ?: AwgParams.DEFAULT_I1,
+        payloadPacketSizeCount2 = iface["i2"]?.toIntOrNull() ?: AwgParams.DEFAULT_I2,
+        specialJunk3 = iface["i3"]?.toIntOrNull() ?: AwgParams.DEFAULT_I3,
+        specialJunk4 = iface["i4"]?.toIntOrNull() ?: AwgParams.DEFAULT_I4,
+        payloadPacketSizeCount3 = iface["i5"]?.toIntOrNull() ?: AwgParams.DEFAULT_I5,
     )
 }

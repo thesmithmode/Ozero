@@ -74,7 +74,8 @@ class EngineWarp(
 
     override fun stats(): Flow<EngineStats> = _stats.asStateFlow()
 
-    override fun preflight(): ru.ozero.enginescore.EnginePreflight = WarpPreflight()
+    override fun preflight(): ru.ozero.enginescore.EnginePreflight =
+        WarpPreflight(peerEndpointProvider = { resolvedConfig?.peerEndpoint })
 
     override suspend fun tunSpec(): TunSpec? {
         val cfg = resolvedConfig

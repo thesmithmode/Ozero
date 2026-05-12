@@ -35,6 +35,8 @@ internal object BackupWarpSerializer {
         slot.awgS4?.let { obj.put("awgS4", it) }
         slot.awgI1?.let { obj.put("awgI1", it) }
         slot.awgI2?.let { obj.put("awgI2", it) }
+        slot.awgI3?.let { obj.put("awgI3", it) }
+        slot.awgI4?.let { obj.put("awgI4", it) }
         slot.awgI5?.let { obj.put("awgI5", it) }
         return obj
     }
@@ -73,6 +75,8 @@ internal object BackupWarpSerializer {
             awgS4 = if (obj.has("awgS4")) obj.optInt("awgS4", 0) else null,
             awgI1 = if (obj.has("awgI1")) obj.optInt("awgI1", 0) else null,
             awgI2 = if (obj.has("awgI2")) obj.optInt("awgI2", 0) else null,
+            awgI3 = if (obj.has("awgI3")) obj.optInt("awgI3", 0) else null,
+            awgI4 = if (obj.has("awgI4")) obj.optInt("awgI4", 0) else null,
             awgI5 = if (obj.has("awgI5")) obj.optInt("awgI5", 0) else null,
         )
     }

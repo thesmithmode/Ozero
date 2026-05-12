@@ -134,6 +134,8 @@ class AppBackupManager(
             awgS4 = awg.payloadPacketJunkSize,
             awgI1 = awg.payloadPacketSizeCount1,
             awgI2 = awg.payloadPacketSizeCount2,
+            awgI3 = awg.specialJunk3,
+            awgI4 = awg.specialJunk4,
             awgI5 = awg.payloadPacketSizeCount3,
         )
     }
@@ -168,6 +170,8 @@ class AppBackupManager(
                     payloadPacketJunkSize = awgS4 ?: AwgParams.DEFAULT_S4,
                     payloadPacketSizeCount1 = awgI1 ?: AwgParams.DEFAULT_I1,
                     payloadPacketSizeCount2 = awgI2 ?: AwgParams.DEFAULT_I2,
+                    specialJunk3 = awgI3 ?: AwgParams.DEFAULT_I3,
+                    specialJunk4 = awgI4 ?: AwgParams.DEFAULT_I4,
                     payloadPacketSizeCount3 = awgI5 ?: AwgParams.DEFAULT_I5,
                 ),
             ),

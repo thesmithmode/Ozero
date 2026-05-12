@@ -8,7 +8,7 @@
     <string name="main_disconnect">Disconnect</string>
     <string name="main_status_disconnected">Disconnected</string>
     <string name="main_status_probing">Searching route…</string>
-    <string name="main_status_probing_warp">Getting WARP config…</string>
+    <string name="main_status_probing_warp">Connecting to WARP…</string>
     <string name="main_status_connecting">Connecting…</string>
     <string name="main_status_connected">Connected</string>
     <string name="main_status_switching">Switching…</string>
@@ -219,8 +219,8 @@
     <!-- URnetwork -->
     <string name="urnetwork_settings_title">URnetwork</string>
     <string name="urnetwork_consent_warning_title">Warning</string>
-    <string name="urnetwork_consent_warning_body">URnetwork is a P2P network where every participant can act as an exit node. If you enable URnetwork, your device will relay other users\' traffic to the open internet from your own IP address. This may attract attention from your ISP and carries legal risks in some jurisdictions. Enable only if you understand the consequences. URx tokens on Solana are credited for exit-node traffic.</string>
-    <string name="urnetwork_consent_short">P2P network: your IP may relay others\' traffic. URx tokens are credited to your Solana wallet.</string>
+    <string name="urnetwork_consent_warning_body">URnetwork is a P2P network where every participant can act as an exit node. If you enable URnetwork, your device will relay other users\' traffic to the open internet from your own IP address. This may attract attention from your ISP and carries legal risks in some jurisdictions. Enable only if you understand the consequences.</string>
+    <string name="urnetwork_consent_short">P2P network: your IP may relay others\' traffic.</string>
     <string name="urnetwork_search_hint">Search country…</string>
     <string name="urnetwork_location_title">Exit region</string>
     <string name="urnetwork_location_best_available">Best available</string>
@@ -237,6 +237,7 @@
     <string name="urnetwork_provide_network_mode_desc">Wi-Fi — provide only over wireless. Wi-Fi and cellular — also over mobile data.</string>
     <string name="urnetwork_peers_connected">Connected to %1$d peers</string>
     <string name="urnetwork_peers_searching">Searching peers…</string>
+    <string name="urnetwork_country_switching">Switching country…</string>
     <string name="urnetwork_mode_title">Mode</string>
     <string name="urnetwork_mode_auto">Auto</string>
     <string name="urnetwork_mode_quality">Web</string>
@@ -247,7 +248,7 @@
     <string name="urnetwork_about_title">About URnetwork</string>
     <string name="urnetwork_about_body">URnetwork is the most local and most private network on the planet. A patented protocol keeps participants safe. The mesh has more than 30,000 providers today and zero known incidents.</string>
     <string name="settings_urnetwork_title">URnetwork</string>
-    <string name="settings_urnetwork_summary">P2P mesh — exit-node + Solana wallet</string>
+    <string name="settings_urnetwork_summary">P2P mesh — exit-node</string>
 
     <!-- WARP -->
     <string name="warp_settings_title">WARP</string>

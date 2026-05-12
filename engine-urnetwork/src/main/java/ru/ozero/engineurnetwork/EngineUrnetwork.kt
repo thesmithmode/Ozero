@@ -120,6 +120,21 @@ class EngineUrnetwork(
         sdkBridge.stop()
     }
 
+    override suspend fun recover(): EnginePlugin.RecoverResult {
+        if (!sdkBridge.isRunning()) {
+            return EnginePlugin.RecoverResult.Failed("bridge not running")
+        }
+        val location = sdkBridge.selectedLocation()
+        return runCatching {
+            if (location != null) sdkBridge.connectTo(location) else sdkBridge.connectBestAvailable()
+            Log.i(TAG, "recover: re-issued connect (location=${location?.country ?: "<best>"})")
+            EnginePlugin.RecoverResult.Success
+        }.getOrElse { t ->
+            PersistentLoggers.warn(TAG, "recover threw: ${t.message}")
+            EnginePlugin.RecoverResult.Failed("recover: ${t.message}")
+        }
+    }
+
     private fun startStatsPolling() {
         statsJobRef.getAndSet(null)?.cancel()
         val sessionStart = System.currentTimeMillis()

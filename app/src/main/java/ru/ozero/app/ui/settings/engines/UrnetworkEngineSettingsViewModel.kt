@@ -122,6 +122,9 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<UrnetworkSettingsUiState>(UrnetworkSettingsUiState.Loading)
     val uiState: StateFlow<UrnetworkSettingsUiState> = _uiState.asStateFlow()
 
+    private val _switchingCountry = MutableStateFlow(false)
+    val switchingCountry: StateFlow<Boolean> = _switchingCountry.asStateFlow()
+
     val searchQuery = MutableStateFlow("")
 
     val peerCount: StateFlow<Int> = isUrnetworkActive.flatMapLatest { active ->
@@ -242,19 +245,37 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
             PersistentLoggers.warn(TAG, "selectLocation skipped — URnetwork engine not active")
             return
         }
+        val previousCountry = bridge.selectedLocation()?.countryCode
+        val targetCountry = location?.countryCode
         if (location == null) {
             bridge.connectBestAvailable()
         } else {
             bridge.connectTo(location)
         }
-        val countryCode = location?.countryCode
         viewModelScope.launch {
-            runCatching { settingsRepository.setUrnetworkCountryCode(countryCode) }
+            runCatching { settingsRepository.setUrnetworkCountryCode(targetCountry) }
         }
-        runCatching { bridge.setPreferredCountry(countryCode) }
+        runCatching { bridge.setPreferredCountry(targetCountry) }
         val current = _uiState.value
         if (current is UrnetworkSettingsUiState.Ready) {
             _uiState.value = current.copy(selectedLocation = location)
+        }
+        if (previousCountry != targetCountry) {
+            startSwitchingIndicator()
+        }
+    }
+
+    private fun startSwitchingIndicator() {
+        _switchingCountry.value = true
+        viewModelScope.launch {
+            val start = System.currentTimeMillis()
+            while (System.currentTimeMillis() - start < SWITCHING_INDICATOR_MAX_MS) {
+                if (!isUrnetworkActive.value) break
+                if (bridge.peerCount() > 0) break
+                delay(SWITCHING_INDICATOR_POLL_MS)
+            }
+            delay(SWITCHING_INDICATOR_SETTLE_MS)
+            _switchingCountry.value = false
         }
     }
 
@@ -354,6 +375,9 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         private const val POLLER_KEEP_ALIVE_MS = 5_000L
         private const val REFRESH_RETRY_ATTEMPTS = 15
         private const val REFRESH_RETRY_DELAY_MS = 2_000L
+        private const val SWITCHING_INDICATOR_POLL_MS = 1_000L
+        private const val SWITCHING_INDICATOR_MAX_MS = 15_000L
+        private const val SWITCHING_INDICATOR_SETTLE_MS = 1_500L
 
         fun countryCodeToFlag(code: String): String {
             if (code.length != 2) return ""

@@ -8,7 +8,7 @@
     <string name="main_disconnect">Отключиться</string>
     <string name="main_status_disconnected">Отключено</string>
     <string name="main_status_probing">Поиск маршрута…</string>
-    <string name="main_status_probing_warp">Получение конфига WARP…</string>
+    <string name="main_status_probing_warp">Подключение к WARP…</string>
     <string name="main_status_connecting">Подключение…</string>
     <string name="main_status_connected">Подключено</string>
     <string name="main_status_switching">Переключение…</string>
@@ -233,8 +233,8 @@
     <!-- URnetwork -->
     <string name="urnetwork_settings_title">URnetwork</string>
     <string name="urnetwork_consent_warning_title">Внимание</string>
-    <string name="urnetwork_consent_warning_body">URnetwork — P2P-сеть, в которой каждый участник может работать как exit-node. Если вы включите URnetwork, ваше устройство будет передавать чужой трафик в открытый интернет от своего IP-адреса. Это может приводить к подозрениям со стороны провайдера и юридическим рискам в некоторых юрисдикциях. Включайте только если понимаете последствия. За exit-node трафик начисляются токены URx на Solana-кошелёк.</string>
-    <string name="urnetwork_consent_short">P2P-сеть: ваш IP может передавать чужой трафик. Токены URx начисляются на Solana-кошелёк.</string>
+    <string name="urnetwork_consent_warning_body">URnetwork — P2P-сеть, в которой каждый участник может работать как exit-node. Если вы включите URnetwork, ваше устройство будет передавать чужой трафик в открытый интернет от своего IP-адреса. Это может приводить к подозрениям со стороны провайдера и юридическим рискам в некоторых юрисдикциях. Включайте только если понимаете последствия.</string>
+    <string name="urnetwork_consent_short">P2P-сеть: ваш IP может передавать чужой трафик.</string>
     <string name="urnetwork_search_hint">Поиск по стране…</string>
     <string name="urnetwork_location_title">Регион выхода</string>
     <string name="urnetwork_location_best_available">Лучший доступный</string>
@@ -251,6 +251,7 @@
     <string name="urnetwork_provide_network_mode_desc">Wi-Fi — раздача только через беспроводную сеть. Wi-Fi и мобильные — также через сотовый трафик.</string>
     <string name="urnetwork_peers_connected">Подключено к %1$d peer-ам</string>
     <string name="urnetwork_peers_searching">Поиск peer-ов…</string>
+    <string name="urnetwork_country_switching">Переключение страны…</string>
     <string name="urnetwork_mode_title">Режим</string>
     <string name="urnetwork_mode_auto">Авто</string>
     <string name="urnetwork_mode_quality">Веб</string>
@@ -261,7 +262,7 @@
     <string name="urnetwork_about_title">Что такое URnetwork</string>
     <string name="urnetwork_about_body">URnetwork — самая локальная и приватная сеть в мире. Запатентованный протокол держит участников в безопасности. Сейчас в сети больше 30 000 провайдеров, известных инцидентов — ноль.</string>
     <string name="settings_urnetwork_title">URnetwork</string>
-    <string name="settings_urnetwork_summary">P2P mesh — exit-node + Solana-кошелёк</string>
+    <string name="settings_urnetwork_summary">P2P mesh — exit-node</string>
 
     <!-- WARP -->
     <string name="warp_settings_title">WARP</string>

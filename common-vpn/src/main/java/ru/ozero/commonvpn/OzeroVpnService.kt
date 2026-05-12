@@ -30,6 +30,7 @@ import ru.ozero.enginescore.ChainResult
 import ru.ozero.enginescore.ChainStep
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.EnginePlugin
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
@@ -59,7 +60,7 @@ class OzeroVpnService : android.net.VpnService() {
 
     @Inject lateinit var healthMonitor: HealthMonitor
 
-    @Inject lateinit var enginePlugins: Set<@JvmSuppressWildcards ru.ozero.enginescore.EnginePlugin>
+    @Inject lateinit var enginePlugins: Set<@JvmSuppressWildcards EnginePlugin>
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val sessionIdRef = AtomicReference<Long>(-1L)
@@ -91,6 +92,8 @@ class OzeroVpnService : android.net.VpnService() {
         private const val PREFLIGHT_HARD_TIMEOUT_MS = 7_000L
         private const val PEER_WATCHDOG_POLL_MS = 5_000L
         private const val PEER_WATCHDOG_TIMEOUT_MS = 30_000L
+        private const val PEER_WATCHDOG_MAX_RECOVERS = 3
+        private const val PEER_WATCHDOG_RECOVER_GRACE_MS = 30_000L
     }
 
     override fun onCreate() {
@@ -331,21 +334,58 @@ class OzeroVpnService : android.net.VpnService() {
             try {
                 var zeroPeersSince = 0L
                 var hadPeers = false
+                var recoverAttempts = 0
                 while (isActive) {
                     delay(PEER_WATCHDOG_POLL_MS)
                     val peers = plugin.stats().first().activeConnections
                     if (peers > 0) {
                         hadPeers = true
                         zeroPeersSince = 0L
-                    } else if (hadPeers) {
-                        val now = System.currentTimeMillis()
-                        if (zeroPeersSince == 0L) {
+                        recoverAttempts = 0
+                        continue
+                    }
+                    if (!hadPeers) continue
+                    val now = System.currentTimeMillis()
+                    if (zeroPeersSince == 0L) {
+                        zeroPeersSince = now
+                        continue
+                    }
+                    if (now - zeroPeersSince <= PEER_WATCHDOG_TIMEOUT_MS) continue
+                    if (recoverAttempts >= PEER_WATCHDOG_MAX_RECOVERS) {
+                        handleEngineFailure(
+                            engineId,
+                            "no URnetwork peers for ${PEER_WATCHDOG_TIMEOUT_MS / 1000}s " +
+                                "after $recoverAttempts recover attempts",
+                        )
+                        return@launch
+                    }
+                    recoverAttempts++
+                    PersistentLoggers.warn(
+                        TAG,
+                        "peer watchdog: 0 peers ${PEER_WATCHDOG_TIMEOUT_MS / 1000}s → " +
+                            "recover attempt $recoverAttempts/$PEER_WATCHDOG_MAX_RECOVERS",
+                    )
+                    val result = runCatching { plugin.recover() }.getOrElse { t ->
+                        EnginePlugin.RecoverResult.Failed("recover threw: ${t.message}")
+                    }
+                    when (result) {
+                        EnginePlugin.RecoverResult.Success -> {
                             zeroPeersSince = now
-                        } else if (now - zeroPeersSince > PEER_WATCHDOG_TIMEOUT_MS) {
-                            handleEngineFailure(engineId, "no URnetwork peers for ${PEER_WATCHDOG_TIMEOUT_MS / 1000}s")
+                        }
+                        EnginePlugin.RecoverResult.NotSupported -> {
+                            handleEngineFailure(
+                                engineId,
+                                "no URnetwork peers for ${PEER_WATCHDOG_TIMEOUT_MS / 1000}s " +
+                                    "(recover not supported)",
+                            )
                             return@launch
                         }
+                        is EnginePlugin.RecoverResult.Failed -> {
+                            PersistentLoggers.warn(TAG, "recover failed: ${result.reason}")
+                            zeroPeersSince = now
+                        }
                     }
+                    delay(PEER_WATCHDOG_RECOVER_GRACE_MS)
                 }
             } catch (ce: kotlinx.coroutines.CancellationException) {
                 throw ce

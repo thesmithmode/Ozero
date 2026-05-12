@@ -161,10 +161,17 @@ class DataStoreWarpConfigSlotStore(
             junkPacketMaxSize = awgObj.optInt("jmax", AwgParams.DEFAULT_JMAX),
             initPacketJunkSize = awgObj.optInt("s1", AwgParams.DEFAULT_S1),
             responsePacketJunkSize = awgObj.optInt("s2", AwgParams.DEFAULT_S2),
+            underloadPacketJunkSize = awgObj.optInt("s3", AwgParams.DEFAULT_S3),
+            payloadPacketJunkSize = awgObj.optInt("s4", AwgParams.DEFAULT_S4),
             initPacketMagicHeader = awgObj.optLong("h1", AwgParams.DEFAULT_H1),
             responsePacketMagicHeader = awgObj.optLong("h2", AwgParams.DEFAULT_H2),
             cookieReplyMagicHeader = awgObj.optLong("h3", AwgParams.DEFAULT_H3),
             transportMagicHeader = awgObj.optLong("h4", AwgParams.DEFAULT_H4),
+            payloadPacketSizeCount1 = awgObj.optInt("i1", AwgParams.DEFAULT_I1),
+            payloadPacketSizeCount2 = awgObj.optInt("i2", AwgParams.DEFAULT_I2),
+            specialJunk3 = awgObj.optInt("i3", AwgParams.DEFAULT_I3),
+            specialJunk4 = awgObj.optInt("i4", AwgParams.DEFAULT_I4),
+            payloadPacketSizeCount3 = awgObj.optInt("i5", AwgParams.DEFAULT_I5),
         )
         val config = WarpConfig(
             privateKey = configObj.getString("priv"),
@@ -218,10 +225,17 @@ class DataStoreWarpConfigSlotStore(
             awgObj.put("jmax", awg.junkPacketMaxSize)
             awgObj.put("s1", awg.initPacketJunkSize)
             awgObj.put("s2", awg.responsePacketJunkSize)
+            awgObj.put("s3", awg.underloadPacketJunkSize)
+            awgObj.put("s4", awg.payloadPacketJunkSize)
             awgObj.put("h1", awg.initPacketMagicHeader)
             awgObj.put("h2", awg.responsePacketMagicHeader)
             awgObj.put("h3", awg.cookieReplyMagicHeader)
             awgObj.put("h4", awg.transportMagicHeader)
+            awgObj.put("i1", awg.payloadPacketSizeCount1)
+            awgObj.put("i2", awg.payloadPacketSizeCount2)
+            awgObj.put("i3", awg.specialJunk3)
+            awgObj.put("i4", awg.specialJunk4)
+            awgObj.put("i5", awg.payloadPacketSizeCount3)
             configObj.put("awgParams", awgObj)
             obj.put("config", configObj)
             arr.put(obj)

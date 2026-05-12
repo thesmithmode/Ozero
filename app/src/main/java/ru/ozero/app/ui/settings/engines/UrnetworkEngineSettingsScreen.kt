@@ -21,7 +21,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -106,7 +105,6 @@ fun UrnetworkEngineSettingsScreen(
                     }
                     SettingsCard(
                         providePaused = true,
-                        unpaidBytes = 0L,
                         windowType = windowType,
                         fixedIp = fixedIp,
                         provideControlMode = provideControlMode,
@@ -123,8 +121,7 @@ fun UrnetworkEngineSettingsScreen(
             is UrnetworkSettingsUiState.Ready -> {
                 val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
                 val peerCount by viewModel.peerCount.collectAsStateWithLifecycle()
-                val unpaidBytes by viewModel.unpaidBytes.collectAsStateWithLifecycle()
-                val balance by viewModel.subscriptionBalance.collectAsStateWithLifecycle()
+                val switchingCountry by viewModel.switchingCountry.collectAsStateWithLifecycle()
                 val windowType by viewModel.windowType.collectAsStateWithLifecycle()
                 val fixedIp by viewModel.fixedIpSize.collectAsStateWithLifecycle()
                 val provideControlMode by viewModel.provideControlMode.collectAsStateWithLifecycle()
@@ -135,8 +132,7 @@ fun UrnetworkEngineSettingsScreen(
                     selectedLocation = current.selectedLocation,
                     providePaused = current.providePaused,
                     peerCount = peerCount,
-                    unpaidBytes = unpaidBytes,
-                    balance = balance,
+                    switchingCountry = switchingCountry,
                     searchQuery = searchQuery,
                     windowType = windowType,
                     fixedIp = fixedIp,
@@ -163,8 +159,7 @@ private fun LocationListContent(
     selectedLocation: ConnectLocation?,
     providePaused: Boolean,
     peerCount: Int,
-    unpaidBytes: Long,
-    balance: ru.ozero.engineurnetwork.UrnetworkSdkBridge.SubscriptionBalanceSnapshot?,
+    switchingCountry: Boolean,
     searchQuery: String,
     windowType: UrnetworkWindowType,
     fixedIp: Boolean,
@@ -185,10 +180,9 @@ private fun LocationListContent(
     ) {
         item {
             Column(modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)) {
-                StatusRow(peerCount = peerCount)
+                StatusRow(peerCount = peerCount, switchingCountry = switchingCountry)
                 SettingsCard(
                     providePaused = providePaused,
-                    unpaidBytes = unpaidBytes,
                     windowType = windowType,
                     fixedIp = fixedIp,
                     provideControlMode = provideControlMode,
@@ -200,8 +194,6 @@ private fun LocationListContent(
                     onSelectProvideControlMode = onSelectProvideControlMode,
                     onSelectProvideNetworkMode = onSelectProvideNetworkMode,
                 )
-                ConsumerProgressCard(balance = balance)
-                ConsentRow()
                 Text(
                     text = stringResource(R.string.urnetwork_location_title),
                     style = MaterialTheme.typography.titleSmall,
@@ -257,7 +249,6 @@ private fun LocationListContent(
 @Composable
 private fun SettingsCard(
     providePaused: Boolean,
-    unpaidBytes: Long,
     windowType: UrnetworkWindowType,
     fixedIp: Boolean,
     provideControlMode: UrnetworkProvideControlMode,
@@ -279,7 +270,6 @@ private fun SettingsCard(
             if (showProvide) {
                 ProvideSection(
                     providePaused = providePaused,
-                    unpaidBytes = unpaidBytes,
                     provideControlMode = provideControlMode,
                     provideNetworkMode = provideNetworkMode,
                     onSetProvidePaused = onSetProvidePaused,
@@ -300,7 +290,6 @@ private fun SettingsCard(
 @Composable
 private fun ProvideSection(
     providePaused: Boolean,
-    unpaidBytes: Long,
     provideControlMode: UrnetworkProvideControlMode,
     provideNetworkMode: UrnetworkProvideNetworkMode,
     onSetProvidePaused: (Boolean) -> Unit,
@@ -309,7 +298,6 @@ private fun ProvideSection(
 ) {
     ProvideToggleSection(
         providePaused = providePaused,
-        unpaidBytes = unpaidBytes,
         onSetProvidePaused = onSetProvidePaused,
     )
     SectionDivider()
@@ -328,7 +316,6 @@ private fun ProvideSection(
 @Composable
 private fun ProvideToggleSection(
     providePaused: Boolean,
-    unpaidBytes: Long,
     onSetProvidePaused: (Boolean) -> Unit,
 ) {
     SectionLabel(stringResource(R.string.urnetwork_provide_title))
@@ -348,15 +335,6 @@ private fun ProvideToggleSection(
         Switch(
             checked = !providePaused,
             onCheckedChange = { checked -> onSetProvidePaused(!checked) },
-        )
-    }
-    if (!providePaused) {
-        val mb = unpaidBytes / 1_000_000.0
-        Text(
-            text = stringResource(R.string.urnetwork_provider_unpaid, mb),
-            style = MaterialTheme.typography.bodySmall,
-            color = OzeroPalette.Teal,
-            modifier = Modifier.padding(top = 4.dp),
         )
     }
 }
@@ -498,11 +476,23 @@ private fun ModeSection(
 }
 
 @Composable
-private fun StatusRow(peerCount: Int) {
-    val (dot, label, dotColor) = if (peerCount > 0) {
-        Triple("●", stringResource(R.string.urnetwork_peers_connected, peerCount), OzeroPalette.StateConnected)
-    } else {
-        Triple("●", stringResource(R.string.urnetwork_peers_searching), OzeroPalette.StateConnecting)
+private fun StatusRow(peerCount: Int, switchingCountry: Boolean = false) {
+    val (dot, label, dotColor) = when {
+        switchingCountry -> Triple(
+            "●",
+            stringResource(R.string.urnetwork_country_switching),
+            OzeroPalette.StateConnecting,
+        )
+        peerCount > 0 -> Triple(
+            "●",
+            stringResource(R.string.urnetwork_peers_connected, peerCount),
+            OzeroPalette.StateConnected,
+        )
+        else -> Triple(
+            "●",
+            stringResource(R.string.urnetwork_peers_searching),
+            OzeroPalette.StateConnecting,
+        )
     }
     Row(
         modifier = Modifier
@@ -516,81 +506,6 @@ private fun StatusRow(peerCount: Int) {
             text = label,
             style = MaterialTheme.typography.bodySmall,
             color = OzeroPalette.Text2,
-        )
-    }
-}
-
-@Composable
-private fun ConsumerProgressCard(
-    balance: ru.ozero.engineurnetwork.UrnetworkSdkBridge.SubscriptionBalanceSnapshot?,
-) {
-    if (balance == null || balance.startBalanceBytes <= 0L) return
-    val usedBytes = balance.usedBytes.coerceAtLeast(0L)
-    val totalBytes = balance.startBalanceBytes
-    val usedMb = usedBytes / 1_000_000.0
-    val totalMb = totalBytes / 1_000_000.0
-    val pendingMb = balance.pendingBytes / 1_000_000.0
-    val progress = if (totalBytes > 0) (usedBytes.toFloat() / totalBytes).coerceIn(0f, 1f) else 0f
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 8.dp),
-        colors = CardDefaults.cardColors(containerColor = OzeroPalette.Bg1),
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            SectionLabel(stringResource(R.string.urnetwork_consumed_label))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 6.dp, bottom = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    text = String.format(java.util.Locale.US, "%.2f MB", usedMb),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = OzeroPalette.Text,
-                )
-                Text(
-                    text = String.format(java.util.Locale.US, "/ %.2f MB", totalMb),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = OzeroPalette.Text3,
-                )
-            }
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier.fillMaxWidth(),
-                color = OzeroPalette.Teal,
-                trackColor = OzeroPalette.Bg2,
-            )
-            if (balance.pendingBytes > 0L) {
-                Text(
-                    text = stringResource(
-                        R.string.urnetwork_pending_label,
-                        String.format(java.util.Locale.US, "%.2f", pendingMb),
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = OzeroPalette.Text3,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ConsentRow() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 10.dp, bottom = 2.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.Top,
-    ) {
-        Text(text = "⚠", style = MaterialTheme.typography.bodySmall, color = OzeroPalette.Amber)
-        Text(
-            text = stringResource(R.string.urnetwork_consent_short),
-            style = MaterialTheme.typography.bodySmall,
-            color = OzeroPalette.Text3,
         )
     }
 }

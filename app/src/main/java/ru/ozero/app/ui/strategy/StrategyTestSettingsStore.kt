@@ -18,7 +18,7 @@ class SharedPrefsStrategyTestSettingsStore(context: Context) : StrategyTestSetti
         delayBetweenMs = prefs.getLong(KEY_DELAY_BETWEEN_MS, 500L),
         useCustomStrategies = prefs.getBoolean(KEY_USE_CUSTOM, false),
         customStrategies = (prefs.getString(KEY_CUSTOM_STRATEGIES, "") ?: "").take(MAX_CUSTOM_STRATEGIES_LEN),
-        evolutionMode = prefs.getBoolean(KEY_EVOLUTION_MODE, false),
+        evolutionMode = prefs.getBoolean(KEY_EVOLUTION_MODE, true),
         evolutionPopulationSize = prefs.getInt(KEY_EVOLUTION_POPULATION_SIZE, 20),
         evolutionMaxGenerations = prefs.getInt(KEY_EVOLUTION_MAX_GENERATIONS, 10),
         evolutionMutationRate = prefs.getFloat(KEY_EVOLUTION_MUTATION_RATE, 0.2f),

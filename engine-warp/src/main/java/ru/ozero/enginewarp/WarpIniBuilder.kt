@@ -38,6 +38,8 @@ object WarpIniBuilder {
         appendLine("H4 = ${p.transportMagicHeader}")
         appendLine("I1 = ${p.payloadPacketSizeCount1}")
         appendLine("I2 = ${p.payloadPacketSizeCount2}")
+        if (p.specialJunk3 != 0) appendLine("I3 = ${p.specialJunk3}")
+        if (p.specialJunk4 != 0) appendLine("I4 = ${p.specialJunk4}")
         appendLine("I5 = ${p.payloadPacketSizeCount3}")
     }
 }
