@@ -103,7 +103,7 @@ class WarpEngineSettingsViewModel @Inject constructor(
         it.editDraft?.doHProvider ?: DoHProvider.SYSTEM
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(0),
+        started = SharingStarted.Eagerly,
         initialValue = DoHProvider.SYSTEM,
     )
 
