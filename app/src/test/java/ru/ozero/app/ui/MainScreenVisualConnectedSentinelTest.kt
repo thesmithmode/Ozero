@@ -36,6 +36,17 @@ class MainScreenVisualConnectedSentinelTest {
         )
     }
 
+    @Test
+    fun `backgroundState для URnetwork connected с 0 peers совпадает с Connecting чтобы не было желтозелёного наложения`() {
+        val source = locateMainScreen().readText()
+        assertTrue(
+            source.contains("state.engineId == EngineId.URNETWORK && urnetworkPeerCount == 0") &&
+                source.contains("OzeroBackgroundState.Connecting"),
+            "MainScreen.kt обязан делать backgroundState = Connecting когда URnetwork connected + peers==0, " +
+                "иначе жёлтая кнопка (Connecting) отображается поверх зелёного фона (Connected) — наложение цветов",
+        )
+    }
+
     private fun extractFunBody(source: String, funName: String): String {
         val pattern = Regex("""fun\s+$funName\s*\(""")
         val match = pattern.find(source) ?: error("$funName не найдена в MainScreen.kt")
