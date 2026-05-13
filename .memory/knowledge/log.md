@@ -1,5 +1,20 @@
 # Build Log
 
+## [2026-05-13T02:00:00+03:00] compile | 2026-05-12.md (pass 5 — session 21:19 engine diagnostics)
+- Source: daily/2026-05-12.md
+- Articles created: [[concepts/warp-preflight-dns-exhaustion]], [[concepts/urnetwork-peer-watchdog-recovery]], [[concepts/byedpi-strategy-runtime-disconnect]]
+- Connections created: [[connections/engine-specific-failure-diagnostics]]
+- Articles updated: [[concepts/urnetwork-sdk-integration]] (peer discovery loss, recover() watchdog, Solana/wallet UI removal, country switch UX)
+- Sessions covered: 21:19 (6-subagent diagnostic: WARP DNS preflight 5s×3 exhaustion, URnetwork peer loss after 4-5 min + recover(), ByeDPI jniStartProxy=-1 + static winning args, country switch UX, Solana/URx UI cleanup, EnginePlugin FQN→imports)
+- Excluded: EnginePlugin FQN→imports (code cleanup, not concept), specific sentinel test names (implementation detail), WARP preflight DNS fix #12 status (in-progress work)
+
+## [2026-05-13T01:30:00+03:00] compile | 2026-05-12.md (pass 4 — residual patterns)
+- Source: daily/2026-05-12.md
+- Articles created: [[concepts/test-tautology-always-green]]
+- Articles updated: [[concepts/gene-memory-concurrency-traps]] (SNI seed tokenizer trap added), [[connections/ci-false-green-vectors]] (tautology assertions as third false-green vector)
+- Sessions covered: 17:55 (Logger reflection fragility), 18:34 (tautology `isEmpty() || isNotEmpty()`, SNI seed `"-s domain"` split), 20:54 (commit/push discipline — feedback memory only, no wiki concept)
+- Rationale: pass 3 excluded "Logger reflection fragility" and "tautology assertions" as trivia; on re-review, both are reusable testing anti-patterns that compound existing CI false-green vectors — worth documenting
+
 ## [2026-05-13T00:30:00+03:00] compile | 2026-05-12.md (pass 3 — verification)
 - Source: daily/2026-05-12.md
 - Articles created: (none)

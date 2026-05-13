@@ -76,11 +76,16 @@ suspend fun add(strategy: SavedStrategy) {
 
 `GeneMemory.importRawJson(json: String)` was writing the raw JSON to disk before parsing it. If the JSON was malformed, the file on disk became corrupt, and subsequent reads would fail. The fix: parse into the in-memory map first (catching `JSONException`), then write to disk only on successful parse.
 
+### SNI Seed Tokenizer Trap
+
+`GenePool` populates its SNI vocabulary from domain list presets. When a preset contains compound args like `"-s domain.com"`, the pool's `split(" ")` tokenizer breaks it into `["-s", "domain.com"]` — two separate tokens where one was intended. The `-s` fragment becomes a standalone "domain" in the vocabulary, producing invalid ByeDPI args when mutated into the `-H` flag gene. The fix requires a context-aware tokenizer that respects quoted or flag-prefixed compound values rather than naive whitespace splitting.
+
 ## Related Concepts
 
 - [[concepts/genetic-strategy-evolution]] - The system where these components live; evaluation is sequential but UI/persistence access is concurrent
 - [[concepts/warp-slot-corrupt-json-resilience]] - Same pattern: JSON persistence with corruption risk; per-slot try/catch is the WARP equivalent of GeneMemory's validation-first approach
+- [[concepts/test-tautology-always-green]] - Logger/GeneMemory tests also exhibited tautology assertions discovered in the same audit
 
 ## Sources
 
-- [[daily/2026-05-12.md]] - Session 18:34: audit found GeneMemory.scores HashMap race (fix: ConcurrentHashMap + @Synchronized), SavedStrategyStore.add non-atomic (fix: Mutex), importRawJson write-before-validate (fix: validate first)
+- [[daily/2026-05-12.md]] - Session 18:34: audit found GeneMemory.scores HashMap race (fix: ConcurrentHashMap + @Synchronized), SavedStrategyStore.add non-atomic (fix: Mutex), importRawJson write-before-validate (fix: validate first), SNI seed `"-s domain"` splits into 2 tokens in GenePool (fix: smart tokenizer)

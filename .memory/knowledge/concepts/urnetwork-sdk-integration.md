@@ -6,8 +6,9 @@ sources:
   - "daily/2026-05-01.md"
   - "daily/2026-05-02.md"
   - "daily/2026-05-05.md"
+  - "daily/2026-05-12.md"
 created: 2026-05-01
-updated: 2026-05-05
+updated: 2026-05-12
 ---
 
 # URnetwork SDK Integration
@@ -59,6 +60,18 @@ Two SIGABRT causes identified during device testing:
 
 The SIGABRT appeared after Nubia-guard removal (commit `47d0156`) — the guard was masking the underlying misconfiguration.
 
+### Peer Discovery Loss and Watchdog Recovery (2026-05-12)
+
+Production log analysis (6-subagent diagnostic session) revealed that URnetwork peers drain after 4-5 minutes of connected operation. Peer count drops from 7+ to 0 with no re-discovery triggered by the Go SDK. Fix: `OzeroVpnService` calls `sdkBridge.recover()` before transitioning to Failed state, triggering SDK-level peer re-discovery without full VPN restart. See [[concepts/urnetwork-peer-watchdog-recovery]].
+
+### UI Cleanup: Solana/URx/Wallet Removal (2026-05-12)
+
+Solana, URx token, wallet address, and balance UI elements removed from URnetwork settings and strings.xml. VM pollers for `unpaidBytes` and `subscriptionBalance` retained (bridge methods exist) but UI no longer displays them. Ozero uses URnetwork as a pure P2P VPN engine without the cryptocurrency/payment layer.
+
+### Country Switch UX (2026-05-12)
+
+`switchingCountry` flag added to URnetwork ViewModel. When user selects a different exit country, StatusRow shows "Переключение страны…" and the engine performs soft peer re-discovery targeting the new country's relay nodes. Uses the watchdog `recover()` mechanism for non-destructive mesh refresh.
+
 ## Remaining Work
 
 - CI verification of full fix chain (env + bundle fields)
@@ -71,8 +84,10 @@ The SIGABRT appeared after Nubia-guard removal (commit `47d0156`) — the guard 
 - [[concepts/xray-aar-build-research]] - Same Dockerfile infrastructure and gomobile pattern used for Xray AAR
 - [[concepts/urnetwork-networkspace-init]] - First-run initialization flow for NetworkSpace creation
 - [[connections/symptom-fix-vs-system-removal]] - Consent removal decision pattern
+- [[concepts/urnetwork-peer-watchdog-recovery]] - Peer discovery loss and auto-recovery pattern
 
 ## Sources
 
 - [[daily/2026-05-01.md]] - URnetwork SDK 4-iteration build, userwireguard.aar success, Dockerfile SHA env trap, remaining integration tasks identified
 - [[daily/2026-05-02.md]] - Consent system removed, stop() leak fixed, NetworkSpace init flow discovered via bytecode introspection, RealBridge implemented
+- [[daily/2026-05-12.md]] - Session 21:19: peer discovery loss after 4-5 min diagnosed; recover() watchdog added; Solana/URx/wallet UI removed; country switch UX with switchingCountry flag

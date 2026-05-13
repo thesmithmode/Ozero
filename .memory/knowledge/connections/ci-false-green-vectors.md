@@ -4,10 +4,12 @@ connects:
   - "concepts/junit-platform-silent-skip"
   - "concepts/gradle-continue-full-failures"
   - "concepts/ci-workflow-discipline"
+  - "concepts/test-tautology-always-green"
 sources:
   - "daily/2026-05-01.md"
+  - "daily/2026-05-12.md"
 created: 2026-05-01
-updated: 2026-05-01
+updated: 2026-05-12
 ---
 
 # Connection: CI False Green Vectors
@@ -36,8 +38,14 @@ In Ozero's v0.0.2 development cycle:
 
 The fix chain demonstrates that CI truthfulness is a multi-layered property requiring active verification at each layer.
 
+### Tautology Assertions (2026-05-12)
+
+A third false-green vector was identified during a 6-subagent audit: test assertions that are logically always true (e.g., `assertTrue(list.isEmpty() || list.isNotEmpty())`). These tests run, pass, and contribute to coverage metrics — but verify nothing about the implementation. Unlike the first two vectors (tests don't run, or modules are skipped), tautology tests actively inflate both test counts and coverage percentages, making the false green harder to detect. See [[concepts/test-tautology-always-green]].
+
 ## Related Concepts
 
 - [[concepts/junit-platform-silent-skip]] - Test runner misconfiguration vector: tests exist but don't execute
 - [[concepts/gradle-continue-full-failures]] - Build orchestration vector: failures in early modules hide later modules
 - [[concepts/ci-workflow-discipline]] - The CI workflow where both vectors were discovered and fixed
+- [[concepts/test-tautology-always-green]] - Assertion logic vector: tests run and pass but verify nothing
+- [[concepts/sentinel-fqn-desync]] - Naming mismatch vector: sentinel matches wrong string, passes vacuously
