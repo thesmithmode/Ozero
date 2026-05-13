@@ -111,7 +111,10 @@ fun SavedStrategyStore.markVerified(commands: Set<String>, nowMs: Long): List<Sa
     list.map { s -> if (commands.contains(s.command)) s.copy(lastVerifiedAtMs = nowMs) else s }
 }
 
-fun SavedStrategyStore.markBestOnNetwork(commands: Set<String>, networkId: String): List<SavedStrategy> = update { list ->
+fun SavedStrategyStore.markBestOnNetwork(
+    commands: Set<String>,
+    networkId: String,
+): List<SavedStrategy> = update { list ->
     list.map { s ->
         if (commands.contains(s.command)) s.copy(bestNetworks = s.bestNetworks + networkId) else s
     }
