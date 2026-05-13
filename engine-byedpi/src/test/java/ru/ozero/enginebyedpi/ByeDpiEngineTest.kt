@@ -248,6 +248,16 @@ class ByeDpiEngineTest {
     }
 
     @Test
+    fun buildArgs_noProgramNameInArray_cCodeAddsOwn() {
+        val args = engine.buildArgs(EngineConfig.ByeDpi(socksPort = 1080)).toList()
+        assertTrue(
+            args.none { it == "ciadpi" || it == "byedpi" },
+            "C-код сам добавляет argv[0]=byedpi — программное имя в Java-массиве дублирует его и ломает getopt: $args",
+        )
+        assertTrue(args.contains("--ip"), "buildArgs должен передавать --ip bind-address: $args")
+    }
+
+    @Test
     fun ipProbeRouteReturnsSocksWhenPortGivenExplicitly() = runTest {
         val route = engine.ipProbeRoute(socksPort = 1080)
         assertIs<IpProbeRoute.Socks>(route)

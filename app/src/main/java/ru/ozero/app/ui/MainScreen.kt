@@ -88,14 +88,7 @@ fun MainScreen(
     val killswitchActive by viewModel.killswitchActive.collectAsStateWithLifecycle()
     val switching by viewModel.switching.collectAsStateWithLifecycle()
 
-    val currentState = state
-    val powerState = when {
-        switching != null -> PowerDiscState.Switching
-        currentState is TunnelState.Connected &&
-            currentState.engineId == EngineId.URNETWORK &&
-            urnetworkPeerCount == 0 -> PowerDiscState.Connecting
-        else -> currentState.toPowerDiscState()
-    }
+    val powerState = computePowerDiscState(state, switching, urnetworkPeerCount)
     val backgroundState = if (switching != null) OzeroBackgroundState.Connecting else state.toBackgroundState()
     val isConnected = state is TunnelState.Connected
 
@@ -372,13 +365,18 @@ private fun commonDockTabs(): List<DockTab> {
     }
 }
 
-private fun TunnelState.toPowerDiscState(): PowerDiscState = when (this) {
-    is TunnelState.Connected -> PowerDiscState.Connected
-    is TunnelState.Probing,
-    is TunnelState.Connecting,
-    is TunnelState.Disconnecting,
-    -> PowerDiscState.Connecting
-    is TunnelState.Idle, is TunnelState.Failed -> PowerDiscState.Off
+private fun computePowerDiscState(
+    state: TunnelState,
+    switching: SwitchingTransition?,
+    urnetworkPeerCount: Int,
+): PowerDiscState = when {
+    switching != null -> PowerDiscState.Switching
+    state is TunnelState.Connected && state.engineId == EngineId.URNETWORK && urnetworkPeerCount == 0 ->
+        PowerDiscState.Connecting
+    state is TunnelState.Connected -> PowerDiscState.Connected
+    state is TunnelState.Probing || state is TunnelState.Connecting || state is TunnelState.Disconnecting ->
+        PowerDiscState.Connecting
+    else -> PowerDiscState.Off
 }
 
 private fun TunnelState.toBackgroundState(): OzeroBackgroundState = when (this) {
