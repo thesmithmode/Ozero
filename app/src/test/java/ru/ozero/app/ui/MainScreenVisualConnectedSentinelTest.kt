@@ -40,10 +40,14 @@ class MainScreenVisualConnectedSentinelTest {
     fun `backgroundState для URnetwork с 0 peers — Connecting (без желтозелёного наложения)`() {
         val source = locateMainScreen().readText()
         assertTrue(
-            source.contains("state.engineId == EngineId.URNETWORK && urnetworkPeerCount == 0") &&
-                source.contains("OzeroBackgroundState.Connecting"),
-            "MainScreen.kt обязан делать backgroundState = Connecting когда URnetwork connected + peers==0, " +
-                "иначе жёлтая кнопка (Connecting) отображается поверх зелёного фона (Connected) — наложение цветов",
+            source.contains("val backgroundState = powerState.toBackgroundState()"),
+            "backgroundState обязан выводиться из powerState.toBackgroundState() — единый источник истины, " +
+                "без дублирования логики между powerState и backgroundState",
+        )
+        assertTrue(
+            source.contains("state.engineId == EngineId.URNETWORK && urnetworkPeerCount == 0"),
+            "computePowerDiscState обязан обрабатывать случай URnetwork + peers==0 → Connecting, " +
+                "иначе жёлтая кнопка отображается поверх зелёного фона при поиске пиров",
         )
     }
 

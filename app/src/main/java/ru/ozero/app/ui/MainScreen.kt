@@ -89,12 +89,7 @@ fun MainScreen(
     val switching by viewModel.switching.collectAsStateWithLifecycle()
 
     val powerState = computePowerDiscState(state, switching, urnetworkPeerCount)
-    val backgroundState = when {
-        switching != null -> OzeroBackgroundState.Connecting
-        state is TunnelState.Connected && state.engineId == EngineId.URNETWORK && urnetworkPeerCount == 0 ->
-            OzeroBackgroundState.Connecting
-        else -> state.toBackgroundState()
-    }
+    val backgroundState = powerState.toBackgroundState()
     val isConnected = state is TunnelState.Connected
 
     OzeroBackground(state = backgroundState) {
@@ -384,13 +379,10 @@ private fun computePowerDiscState(
     else -> PowerDiscState.Off
 }
 
-private fun TunnelState.toBackgroundState(): OzeroBackgroundState = when (this) {
-    is TunnelState.Connected -> OzeroBackgroundState.Connected
-    is TunnelState.Probing,
-    is TunnelState.Connecting,
-    is TunnelState.Disconnecting,
-    -> OzeroBackgroundState.Connecting
-    is TunnelState.Idle, is TunnelState.Failed -> OzeroBackgroundState.Off
+private fun PowerDiscState.toBackgroundState(): OzeroBackgroundState = when (this) {
+    PowerDiscState.Connected -> OzeroBackgroundState.Connected
+    PowerDiscState.Connecting, PowerDiscState.Switching -> OzeroBackgroundState.Connecting
+    PowerDiscState.Off -> OzeroBackgroundState.Off
 }
 
 @Composable
