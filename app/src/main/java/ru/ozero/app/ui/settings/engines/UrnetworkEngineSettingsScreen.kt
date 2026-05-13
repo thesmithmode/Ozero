@@ -337,8 +337,14 @@ private fun ProvideSection(
                 onClick = {
                     when (index) {
                         0 -> onSetProvidePaused(true)
-                        1 -> { onSetProvidePaused(false); onSelectProvideControlMode(UrnetworkProvideControlMode.AUTO) }
-                        else -> { onSetProvidePaused(false); onSelectProvideControlMode(UrnetworkProvideControlMode.ALWAYS) }
+                        1 -> {
+                            onSetProvidePaused(false)
+                            onSelectProvideControlMode(UrnetworkProvideControlMode.AUTO)
+                        }
+                        else -> {
+                            onSetProvidePaused(false)
+                            onSelectProvideControlMode(UrnetworkProvideControlMode.ALWAYS)
+                        }
                     }
                 },
                 shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size),
