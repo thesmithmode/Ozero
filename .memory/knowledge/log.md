@@ -1,5 +1,19 @@
 # Build Log
 
+## [2026-05-14T09:00:00+03:00] compile | 2026-05-13.md (pass 4 — verification)
+- Source: daily/2026-05-13.md
+- Result: ALREADY COMPILED — all content covered by 3 prior compile passes (19:00, 22:00 on 2026-05-13; 00:15 on 2026-05-14)
+- Articles created: (none)
+- Articles updated: (none)
+- Verification: 5 new articles on disk, index complete, both updated articles contain 2026-05-13 content:
+  - [[concepts/byedpi-args-parsing]] — double argv[0] trap (C native-lib.c + Kotlin buildArgs) ✓
+  - [[concepts/genetic-strategy-evolution]] — fitness cache, hyperbolic formula, 75 seeds, persistent TTL 24h, per-network isolation, staleness, auto-save, targetFitness 0.85 ✓
+  - [[concepts/kotlin-trailing-lambda-parameter-trap]] ✓
+  - [[concepts/stateIn-eagerly-test-trap]] ✓
+  - [[concepts/native-binary-auto-update-pipeline]] ✓
+  - [[concepts/warp-doh-per-slot-config]] ✓
+  - [[concepts/urnetwork-connectstatus-mr-mapping]] ✓
+
 ## [2026-05-14T00:15:00+03:00] compile | 2026-05-13.md (pass 3 — evening GA session 19:34 + git commits)
 - Source: daily/2026-05-13.md
 - Articles created: (none)
