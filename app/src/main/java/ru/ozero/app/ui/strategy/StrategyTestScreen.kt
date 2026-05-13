@@ -250,23 +250,35 @@ private fun StrategyTestScaffold(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    evolutionState?.let { evo -> EvolutionStateCard(state = evo) }
+                    evolutionState?.let { evo ->
+                        EvolutionStateCard(
+                            state = evo,
+                            savedStrategies = savedStrategies,
+                            onApply = { cmd ->
+                                onApply(cmd)
+                                Toast.makeText(context, R.string.strategy_test_applied_toast, Toast.LENGTH_SHORT).show()
+                            },
+                            onSave = onSave,
+                        )
+                    }
                 }
             }
-            itemsIndexed(
-                items = strategies,
-                key = { index, item -> item.command + "_" + index },
-            ) { index, item ->
-                StrategyRow(
-                    index = index,
-                    item = item,
-                    isSaved = savedStrategies.any { it.command == item.command },
-                    onApply = {
-                        onApply(item.command)
-                        Toast.makeText(context, R.string.strategy_test_applied_toast, Toast.LENGTH_SHORT).show()
-                    },
-                    onSave = { onSave(item.command) },
-                )
+            if (evolutionState == null) {
+                itemsIndexed(
+                    items = strategies,
+                    key = { index, item -> item.command + "_" + index },
+                ) { index, item ->
+                    StrategyRow(
+                        index = index,
+                        item = item,
+                        isSaved = savedStrategies.any { it.command == item.command },
+                        onApply = {
+                            onApply(item.command)
+                            Toast.makeText(context, R.string.strategy_test_applied_toast, Toast.LENGTH_SHORT).show()
+                        },
+                        onSave = { onSave(item.command) },
+                    )
+                }
             }
         }
     }
@@ -475,38 +487,104 @@ private fun AddDomainListDialog(
 }
 
 @Composable
-private fun EvolutionStateCard(state: EvolutionUiState) {
+private fun EvolutionStateCard(
+    state: EvolutionUiState,
+    savedStrategies: List<SavedStrategy> = emptyList(),
+    onApply: (String) -> Unit = {},
+    onSave: (String) -> Unit = {},
+) {
     Card(
         modifier = Modifier.fillMaxWidth().testTag("evolution_state_card"),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
     ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                text = stringResource(R.string.evolution_generation_label, state.generation, state.maxGenerations),
-                style = MaterialTheme.typography.labelMedium,
-            )
-            LinearProgressIndicator(
-                progress = { if (state.maxGenerations > 0) state.generation.toFloat() / state.maxGenerations else 0f },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Text(
-                text = stringResource(R.string.evolution_fitness_label, (state.bestFitness * 100).toInt()),
-                style = MaterialTheme.typography.bodySmall,
-            )
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (state.isInitializing) {
+                Text(
+                    text = stringResource(R.string.evolution_initializing),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            } else {
+                Text(
+                    text = stringResource(R.string.evolution_generation_label, state.generation, state.maxGenerations),
+                    style = MaterialTheme.typography.labelMedium,
+                )
+                LinearProgressIndicator(
+                    progress = { if (state.maxGenerations > 0) state.generation.toFloat() / state.maxGenerations else 0f },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (state.bestFitness > 0.0) {
+                    Text(
+                        text = stringResource(R.string.evolution_fitness_label, (state.bestFitness * 100).toInt()),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+            if (state.evaluatingCommand != null) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = stringResource(R.string.evolution_evaluating_label, state.evaluatingIndex, state.evaluatingTotal),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                    LinearProgressIndicator(
+                        progress = { if (state.evaluatingTotal > 0) state.evaluatingIndex.toFloat() / state.evaluatingTotal else 0f },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        text = state.evaluatingCommand,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
+            }
             if (state.topChromosomes.isNotEmpty()) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f))
                 Text(
                     text = stringResource(R.string.evolution_population_label),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
-                state.topChromosomes.forEach { (cmd, fitness) ->
-                    Text(
-                        text = "$cmd — ${(fitness * 100).toInt()}%",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                state.topChromosomes.forEachIndexed { idx, (cmd, fitness) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("evolution_top_$idx"),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "${(fitness * 100).toInt()}% — $cmd",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        IconButton(
+                            onClick = { onSave(cmd) },
+                            modifier = Modifier.testTag("evolution_save_$idx"),
+                        ) {
+                            Icon(
+                                Icons.Filled.Star,
+                                contentDescription = stringResource(R.string.saved_strategy_save),
+                                tint = if (savedStrategies.any { it.command == cmd }) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                                },
+                            )
+                        }
+                        OutlinedButton(
+                            onClick = { onApply(cmd) },
+                            modifier = Modifier.testTag("evolution_apply_$idx"),
+                        ) {
+                            Text(stringResource(R.string.strategy_test_apply))
+                        }
+                    }
                 }
             }
         }

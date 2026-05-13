@@ -48,6 +48,10 @@ data class EvolutionUiState(
     val maxGenerations: Int = 0,
     val bestFitness: Double = 0.0,
     val topChromosomes: List<Pair<String, Double>> = emptyList(),
+    val isInitializing: Boolean = true,
+    val evaluatingIndex: Int = 0,
+    val evaluatingTotal: Int = 0,
+    val evaluatingCommand: String? = null,
 )
 
 @HiltViewModel
@@ -202,6 +206,7 @@ class StrategyTestViewModel @Inject constructor(
                     runLoop(sites)
                 }
             } finally {
+                _evolutionState.update { it?.copy(evaluatingCommand = null, isInitializing = false) }
                 _strategies.value = _strategies.value.sortedForUi()
                 withContext(ioDispatcher) {
                     runCatching { resultsStore.save(_strategies.value) }
@@ -275,19 +280,41 @@ class StrategyTestViewModel @Inject constructor(
             ),
             memory = geneMemory,
         )
-        _evolutionState.value = EvolutionUiState(maxGenerations = maxGen)
-        evolutionEngine.evolve(seedCommands) { result ->
-            _evolutionState.value = EvolutionUiState(
-                generation = result.generation,
-                maxGenerations = maxGen,
-                bestFitness = result.bestFitness,
-                topChromosomes = result.population
-                    .sortedByDescending { it.second }
-                    .take(5)
-                    .map { it.first.toCommand() to it.second },
-            )
-            _runSummary.value = "Gen ${result.generation}/$maxGen · best ${(result.bestFitness * 100).toInt()}%"
-        }
+        _evolutionState.value = EvolutionUiState(
+            maxGenerations = maxGen,
+            evaluatingTotal = snap.evolutionPopulationSize,
+            isInitializing = true,
+        )
+        evolutionEngine.evolve(
+            seedStrategies = seedCommands,
+            onGeneration = { result ->
+                _evolutionState.update { current ->
+                    EvolutionUiState(
+                        generation = result.generation,
+                        maxGenerations = maxGen,
+                        bestFitness = result.bestFitness,
+                        topChromosomes = result.population
+                            .sortedByDescending { it.second }
+                            .take(5)
+                            .map { it.first.toCommand() to it.second },
+                        isInitializing = false,
+                        evaluatingIndex = current?.evaluatingIndex ?: 0,
+                        evaluatingTotal = snap.evolutionPopulationSize,
+                        evaluatingCommand = current?.evaluatingCommand,
+                    )
+                }
+                _runSummary.value = "Gen ${result.generation}/$maxGen · best ${(result.bestFitness * 100).toInt()}%"
+            },
+            onChromosomeEval = { index, total, command ->
+                _evolutionState.update { current ->
+                    current?.copy(
+                        evaluatingIndex = index + 1,
+                        evaluatingTotal = total,
+                        evaluatingCommand = command,
+                    )
+                }
+            },
+        )
     }
 
     private suspend fun runLoop(sites: List<String>) = coroutineScope {

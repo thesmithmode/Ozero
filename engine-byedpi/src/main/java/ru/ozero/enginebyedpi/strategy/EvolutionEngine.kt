@@ -44,6 +44,7 @@ class EvolutionEngine(
     suspend fun evolve(
         seedStrategies: List<String>,
         onGeneration: (GenerationResult) -> Unit,
+        onChromosomeEval: (index: Int, total: Int, command: String) -> Unit = { _, _, _ -> },
     ): Chromosome {
         var population = buildInitialPopulation(seedStrategies)
         var best: Chromosome = population.firstOrNull() ?: return emptyList()
@@ -52,7 +53,7 @@ class EvolutionEngine(
         for (generation in 1..settings.maxGenerations) {
             if (!currentCoroutineContext().isActive) break
 
-            val scored = evaluatePopulation(population)
+            val scored = evaluatePopulation(population, onChromosomeEval)
             val genBest = scored.maxByOrNull { it.second }
             if (genBest != null && genBest.second > bestFitness) {
                 bestFitness = genBest.second
@@ -106,9 +107,11 @@ class EvolutionEngine(
 
     private suspend fun evaluatePopulation(
         population: List<Chromosome>,
+        onChromosomeEval: (index: Int, total: Int, command: String) -> Unit = { _, _, _ -> },
     ): List<Pair<Chromosome, Double>> {
-        val results = population.map { chromosome ->
-            if (!currentCoroutineContext().isActive) return@map chromosome to 0.0
+        val results = population.mapIndexed { index, chromosome ->
+            if (!currentCoroutineContext().isActive) return@mapIndexed chromosome to 0.0
+            onChromosomeEval(index, population.size, chromosome.toCommand())
             chromosome to evaluate(chromosome)
         }
         results.forEach { (chromosome, fitness) ->

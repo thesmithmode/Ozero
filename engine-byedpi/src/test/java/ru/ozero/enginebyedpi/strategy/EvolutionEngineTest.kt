@@ -129,6 +129,30 @@ class EvolutionEngineTest {
     }
 
     @Test
+    fun `onChromosomeEval fires for each chromosome in each generation`() = runTest {
+        val engine = AlwaysSucceedEngine()
+        val pool = GenePool(seeds)
+        val evolver = StrategyEvolver(pool)
+        val evolutionEngine = EvolutionEngine(
+            byeDpiEngine = engine,
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = evolver,
+            pool = pool,
+            sites = listOf("s1.com"),
+            settings = EvolutionEngine.EvolutionSettings(populationSize = 3, maxGenerations = 2),
+        )
+        val evalEvents = mutableListOf<Triple<Int, Int, String>>()
+        evolutionEngine.evolve(
+            seedStrategies = seeds,
+            onGeneration = {},
+            onChromosomeEval = { index, total, command -> evalEvents.add(Triple(index, total, command)) },
+        )
+        assertEquals(6, evalEvents.size, "3 chromosomes × 2 generations = 6 eval events")
+        assertTrue(evalEvents.all { it.second == 3 }, "total always equals populationSize")
+        assertEquals(listOf(0, 1, 2, 0, 1, 2), evalEvents.map { it.first })
+    }
+
+    @Test
     fun `deterministic with seeded random produces same results`() = runTest {
         val bestChromosomes = (1..2).map {
             val engine = AlwaysSucceedEngine()

@@ -224,7 +224,9 @@
     <string name="evolution_mode_toggle">Режим эволюции</string>
     <string name="evolution_generation_label">Поколение %1$d/%2$d</string>
     <string name="evolution_fitness_label">Лучший результат: %1$d%%</string>
-    <string name="evolution_population_label">Популяция</string>
+    <string name="evolution_population_label">Лучшие стратегии</string>
+    <string name="evolution_initializing">Подготовка популяции…</string>
+    <string name="evolution_evaluating_label">Тестируется %1$d/%2$d</string>
 
     <!-- URnetwork -->
     <string name="urnetwork_settings_title">URnetwork</string>
