@@ -129,6 +129,52 @@ class EvolutionEngineTest {
     }
 
     @Test
+    fun `stagnationCount increments when fitness does not improve`() = runTest {
+        val engine = AlwaysSucceedEngine()
+        val probe = AlwaysFailProbe()
+        val pool = GenePool(seeds)
+        val evolver = StrategyEvolver(pool)
+        val evolutionEngine = EvolutionEngine(
+            byeDpiEngine = engine,
+            probeFactory = { _, _ -> probe },
+            evolver = evolver,
+            pool = pool,
+            sites = listOf("s1.com"),
+            settings = EvolutionEngine.EvolutionSettings(
+                populationSize = 2,
+                maxGenerations = 6,
+                targetFitness = 1.0,
+            ),
+        )
+        val stagnationCounts = mutableListOf<Int>()
+        evolutionEngine.evolve(seeds) { result -> stagnationCounts.add(result.stagnationCount) }
+        assertTrue(stagnationCounts.any { it >= 2 }, "should detect stagnation: $stagnationCounts")
+    }
+
+    @Test
+    fun `evolve exits early when stagnation exceeds half of maxGenerations`() = runTest {
+        val engine = AlwaysSucceedEngine()
+        val probe = AlwaysFailProbe()
+        val pool = GenePool(seeds)
+        val evolver = StrategyEvolver(pool)
+        val evolutionEngine = EvolutionEngine(
+            byeDpiEngine = engine,
+            probeFactory = { _, _ -> probe },
+            evolver = evolver,
+            pool = pool,
+            sites = listOf("s1.com"),
+            settings = EvolutionEngine.EvolutionSettings(
+                populationSize = 2,
+                maxGenerations = 10,
+                targetFitness = 1.0,
+            ),
+        )
+        var generationCount = 0
+        evolutionEngine.evolve(seeds) { generationCount++ }
+        assertTrue(generationCount < 10, "should exit early due to stagnation, ran $generationCount gens")
+    }
+
+    @Test
     fun `onChromosomeEval fires for each chromosome in each generation`() = runTest {
         val engine = AlwaysSucceedEngine()
         val pool = GenePool(seeds)

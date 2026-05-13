@@ -52,6 +52,7 @@ data class EvolutionUiState(
     val evaluatingIndex: Int = 0,
     val evaluatingTotal: Int = 0,
     val evaluatingCommand: String? = null,
+    val stagnationCount: Int = 0,
 )
 
 @HiltViewModel
@@ -66,6 +67,7 @@ class StrategyTestViewModel @Inject constructor(
     private val probeFactory: StrategyProbeClientFactory,
     private val tunnelController: TunnelController,
     private val geneMemory: GeneMemory,
+    private val usageHistoryStore: UsageHistoryStore,
 ) : ViewModel() {
 
     internal var ioDispatcher: CoroutineDispatcher = Dispatchers.IO
@@ -90,6 +92,9 @@ class StrategyTestViewModel @Inject constructor(
 
     private val _savedStrategies = MutableStateFlow<List<SavedStrategy>>(emptyList())
     val savedStrategies: StateFlow<List<SavedStrategy>> = _savedStrategies.asStateFlow()
+
+    private val _usageHistory = MutableStateFlow<List<UsageEntry>>(emptyList())
+    val usageHistory: StateFlow<List<UsageEntry>> = _usageHistory.asStateFlow()
 
     private val _evolutionState = MutableStateFlow<EvolutionUiState?>(null)
     val evolutionState: StateFlow<EvolutionUiState?> = _evolutionState.asStateFlow()
@@ -116,6 +121,9 @@ class StrategyTestViewModel @Inject constructor(
             }
             _savedStrategies.value = withContext(ioDispatcher) {
                 runCatching { savedStrategyStore.load() }.getOrDefault(emptyList())
+            }
+            _usageHistory.value = withContext(ioDispatcher) {
+                runCatching { usageHistoryStore.load() }.getOrDefault(emptyList())
             }
         }
     }
@@ -246,6 +254,13 @@ class StrategyTestViewModel @Inject constructor(
         }
     }
 
+    fun onRename(id: String, name: String) {
+        viewModelScope.launch(ioDispatcher) {
+            val updated = runCatching { savedStrategyStore.rename(id, name) }.getOrElse { savedStrategyStore.load() }
+            _savedStrategies.value = updated
+        }
+    }
+
     fun onApply(command: String) {
         viewModelScope.launch {
             runCatching { repository.setByedpiWinningArgs(command) }
@@ -253,6 +268,9 @@ class StrategyTestViewModel @Inject constructor(
             withContext(ioDispatcher) {
                 val updated = runCatching { savedStrategyStore.add(command) }.getOrElse { savedStrategyStore.load() }
                 _savedStrategies.value = updated
+                val savedName = updated.find { it.command == command }?.name
+                runCatching { usageHistoryStore.record(command, savedName) }
+                _usageHistory.value = runCatching { usageHistoryStore.load() }.getOrDefault(_usageHistory.value)
             }
         }
     }
@@ -301,6 +319,7 @@ class StrategyTestViewModel @Inject constructor(
                         evaluatingIndex = current?.evaluatingIndex ?: 0,
                         evaluatingTotal = snap.evolutionPopulationSize,
                         evaluatingCommand = current?.evaluatingCommand,
+                        stagnationCount = result.stagnationCount,
                     )
                 }
                 _runSummary.value = "Gen ${result.generation}/$maxGen · best ${(result.bestFitness * 100).toInt()}%"

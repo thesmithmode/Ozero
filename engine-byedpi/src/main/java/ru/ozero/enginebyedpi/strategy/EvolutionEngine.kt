@@ -39,6 +39,7 @@ class EvolutionEngine(
         val best: Chromosome,
         val bestFitness: Double,
         val population: List<Pair<Chromosome, Double>>,
+        val stagnationCount: Int = 0,
     )
 
     suspend fun evolve(
@@ -49,15 +50,25 @@ class EvolutionEngine(
         var population = buildInitialPopulation(seedStrategies)
         var best: Chromosome = population.firstOrNull() ?: return emptyList()
         var bestFitness = 0.0
+        var stagnationCount = 0
 
         for (generation in 1..settings.maxGenerations) {
             if (!currentCoroutineContext().isActive) break
+
+            val effectiveMutationRate = if (stagnationCount >= 2) {
+                (settings.mutationRate * (1f + stagnationCount * 0.5f)).coerceAtMost(0.9f)
+            } else {
+                settings.mutationRate
+            }
 
             val scored = evaluatePopulation(population, onChromosomeEval)
             val genBest = scored.maxByOrNull { it.second }
             if (genBest != null && genBest.second > bestFitness) {
                 bestFitness = genBest.second
                 best = genBest.first
+                stagnationCount = 0
+            } else {
+                stagnationCount++
             }
             onGeneration(
                 GenerationResult(
@@ -65,13 +76,19 @@ class EvolutionEngine(
                     best = best,
                     bestFitness = bestFitness,
                     population = scored,
+                    stagnationCount = stagnationCount,
                 ),
             )
             memory?.save()
             if (bestFitness >= settings.targetFitness) break
+            if (stagnationCount >= settings.maxGenerations / 2) break
 
             val survivors = evolver.select(scored, settings.eliteCount)
-            population = buildNextGeneration(survivors)
+            population = if (stagnationCount >= 2) {
+                buildDiverseGeneration(survivors, effectiveMutationRate)
+            } else {
+                buildNextGeneration(survivors, effectiveMutationRate)
+            }
         }
         return best
     }
@@ -87,7 +104,10 @@ class EvolutionEngine(
         return fromSeeds + fill
     }
 
-    private fun buildNextGeneration(survivors: List<Chromosome>): List<Chromosome> {
+    private fun buildNextGeneration(
+        survivors: List<Chromosome>,
+        mutationRate: Float = settings.mutationRate,
+    ): List<Chromosome> {
         if (survivors.isEmpty()) {
             return if (memory != null && memory.hasData()) {
                 List(settings.populationSize) { pool.weightedRandomChromosome(memory) }
@@ -100,7 +120,28 @@ class EvolutionEngine(
         while (offspring.size < settings.populationSize) {
             val p1 = survivors[random.nextInt(survivors.size)]
             val p2 = survivors[random.nextInt(survivors.size)]
-            offspring.add(evolver.mutate(evolver.crossover(p1, p2), settings.mutationRate, memory = memory))
+            offspring.add(evolver.mutate(evolver.crossover(p1, p2), mutationRate, memory = memory))
+        }
+        return offspring
+    }
+
+    private fun buildDiverseGeneration(
+        elites: List<Chromosome>,
+        mutationRate: Float,
+    ): List<Chromosome> {
+        val offspring = mutableListOf<Chromosome>()
+        offspring.addAll(elites)
+        val randomCount = (settings.populationSize - elites.size) / 2
+        val mutatedCount = settings.populationSize - elites.size - randomCount
+        repeat(randomCount) {
+            offspring.add(
+                if (memory != null && memory.hasData()) pool.weightedRandomChromosome(memory, random = random)
+                else pool.randomChromosome(random = random),
+            )
+        }
+        repeat(mutatedCount) {
+            val parent = elites[random.nextInt(elites.size)]
+            offspring.add(evolver.mutate(parent, mutationRate, random = random, memory = memory))
         }
         return offspring
     }

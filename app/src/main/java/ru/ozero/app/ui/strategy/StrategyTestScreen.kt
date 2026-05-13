@@ -70,6 +70,7 @@ fun StrategyTestScreen(
     val runSummary by viewModel.runSummary.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val usageHistory by viewModel.usageHistory.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var showSettings by rememberSaveable { mutableStateOf(false) }
@@ -137,12 +138,14 @@ fun StrategyTestScreen(
         ) {
             SavedStrategiesSheet(
                 strategies = savedStrategies,
+                usageHistory = usageHistory,
                 onApply = { cmd ->
                     viewModel.onApply(cmd)
                     Toast.makeText(context, R.string.strategy_test_applied_toast, Toast.LENGTH_SHORT).show()
                 },
                 onDelete = viewModel::onDeleteSaved,
                 onPin = { id, pin -> viewModel.onPinSaved(id, pin) },
+                onRename = viewModel::onRename,
             )
         }
     }
@@ -519,6 +522,13 @@ private fun EvolutionStateCard(
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
+                if (state.stagnationCount >= 2) {
+                    Text(
+                        text = stringResource(R.string.evolution_stagnating),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
             }
             if (state.evaluatingCommand != null) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -694,89 +704,252 @@ private fun StrategySettingsSheet(
 @Composable
 private fun SavedStrategiesSheet(
     strategies: List<SavedStrategy>,
+    usageHistory: List<UsageEntry>,
     onApply: (String) -> Unit,
     onDelete: (String) -> Unit,
     onPin: (String, Boolean) -> Unit,
+    onRename: (String, String) -> Unit,
 ) {
+    var renamingId by rememberSaveable { mutableStateOf<String?>(null) }
+    var renameText by rememberSaveable { mutableStateOf("") }
+    var savedExpanded by rememberSaveable { mutableStateOf(true) }
+    var historyExpanded by rememberSaveable { mutableStateOf(true) }
+
+    renamingId?.let { id ->
+        AlertDialog(
+            onDismissRequest = { renamingId = null },
+            title = { Text(stringResource(R.string.saved_strategy_rename_title)) },
+            text = {
+                OutlinedTextField(
+                    value = renameText,
+                    onValueChange = { renameText = it },
+                    label = { Text(stringResource(R.string.saved_strategy_rename_hint)) },
+                    modifier = Modifier.fillMaxWidth().testTag("rename_field"),
+                    singleLine = true,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onRename(id, renameText)
+                        renamingId = null
+                    },
+                    modifier = Modifier.testTag("rename_confirm"),
+                ) { Text(stringResource(R.string.domain_list_save)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { renamingId = null }) {
+                    Text(stringResource(R.string.domain_list_cancel))
+                }
+            },
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text(
-            text = stringResource(R.string.saved_strategies_title),
-            style = MaterialTheme.typography.titleMedium,
+        SectionHeader(
+            title = stringResource(R.string.saved_strategies_title),
+            expanded = savedExpanded,
+            onToggle = { savedExpanded = !savedExpanded },
         )
-        if (strategies.isEmpty()) {
-            Text(
-                text = stringResource(R.string.saved_strategies_empty),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = 8.dp),
+        if (savedExpanded) {
+            if (strategies.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.saved_strategies_empty),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 8.dp, bottom = 4.dp),
+                )
+            }
+            val sorted = strategies.sortedWith(
+                compareByDescending<SavedStrategy> { it.isPinned }.thenByDescending { it.addedAt },
             )
-        }
-        val sorted = strategies.sortedWith(
-            compareByDescending<SavedStrategy> { it.isPinned }.thenByDescending { it.addedAt },
-        )
-        sorted.forEach { saved ->
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("saved_item_${saved.id}"),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            ) {
-                Column(
-                    modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    saved.name?.let {
-                        Text(text = it, style = MaterialTheme.typography.labelMedium)
-                    }
-                    Text(
-                        text = saved.command,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
-                    ) {
-                        IconButton(
-                            onClick = { onPin(saved.id, !saved.isPinned) },
-                            modifier = Modifier.testTag("saved_pin_${saved.id}"),
-                        ) {
-                            Icon(
-                                Icons.Filled.Star,
-                                contentDescription = stringResource(
-                                    if (saved.isPinned) R.string.saved_strategy_unpin else R.string.saved_strategy_pin,
-                                ),
-                                tint = if (saved.isPinned) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                                },
-                            )
-                        }
-                        TextButton(
-                            onClick = { onApply(saved.command) },
-                            modifier = Modifier.testTag("saved_apply_${saved.id}"),
-                        ) {
-                            Text(stringResource(R.string.saved_strategy_apply))
-                        }
-                        TextButton(
-                            onClick = { onDelete(saved.id) },
-                            modifier = Modifier.testTag("saved_delete_${saved.id}"),
-                        ) {
-                            Text(stringResource(R.string.saved_strategy_delete))
-                        }
-                    }
-                }
+            sorted.forEach { saved ->
+                SavedStrategyCard(
+                    saved = saved,
+                    onApply = { onApply(saved.command) },
+                    onDelete = { onDelete(saved.id) },
+                    onPin = { onPin(saved.id, !saved.isPinned) },
+                    onRename = {
+                        renameText = saved.name ?: ""
+                        renamingId = saved.id
+                    },
+                )
             }
         }
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+        SectionHeader(
+            title = stringResource(R.string.usage_history_title),
+            expanded = historyExpanded,
+            onToggle = { historyExpanded = !historyExpanded },
+        )
+        if (historyExpanded) {
+            if (usageHistory.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.usage_history_empty),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 8.dp, bottom = 4.dp),
+                )
+            }
+            usageHistory.take(20).forEachIndexed { idx, entry ->
+                HistoryEntryRow(
+                    entry = entry,
+                    index = idx,
+                    onApply = { onApply(entry.command) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionHeader(title: String, expanded: Boolean, onToggle: () -> Unit) {
+    TextButton(
+        onClick = onToggle,
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
+    ) {
+        Text(
+            text = if (expanded) "▼ $title" else "▶ $title",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun SavedStrategyCard(
+    saved: SavedStrategy,
+    onApply: () -> Unit,
+    onDelete: () -> Unit,
+    onPin: () -> Unit,
+    onRename: () -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp)
+            .testTag("saved_item_${saved.id}"),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = saved.name ?: saved.command.take(30),
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                IconButton(
+                    onClick = onRename,
+                    modifier = Modifier.testTag("saved_rename_${saved.id}"),
+                ) {
+                    Icon(
+                        Icons.Filled.Settings,
+                        contentDescription = stringResource(R.string.saved_strategy_rename_title),
+                    )
+                }
+                IconButton(
+                    onClick = onPin,
+                    modifier = Modifier.testTag("saved_pin_${saved.id}"),
+                ) {
+                    Icon(
+                        Icons.Filled.Star,
+                        contentDescription = stringResource(
+                            if (saved.isPinned) R.string.saved_strategy_unpin else R.string.saved_strategy_pin,
+                        ),
+                        tint = if (saved.isPinned) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                    )
+                }
+            }
+            if (saved.name != null) {
+                Text(
+                    text = saved.command,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(
+                    onClick = onApply,
+                    modifier = Modifier.testTag("saved_apply_${saved.id}"),
+                ) { Text(stringResource(R.string.saved_strategy_apply)) }
+                TextButton(
+                    onClick = onDelete,
+                    modifier = Modifier.testTag("saved_delete_${saved.id}"),
+                ) { Text(stringResource(R.string.saved_strategy_delete)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistoryEntryRow(entry: UsageEntry, index: Int, onApply: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp)
+            .testTag("history_item_$index"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            entry.name?.let {
+                Text(text = it, style = MaterialTheme.typography.labelSmall)
+            }
+            Text(
+                text = entry.command,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = formatRelativeTime(entry.appliedAt),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            )
+        }
+        TextButton(
+            onClick = onApply,
+            modifier = Modifier.testTag("history_apply_$index"),
+        ) { Text(stringResource(R.string.saved_strategy_apply)) }
+    }
+}
+
+private fun formatRelativeTime(epochMs: Long): String {
+    val diffMs = System.currentTimeMillis() - epochMs
+    val mins = diffMs / 60_000
+    val hours = mins / 60
+    val days = hours / 24
+    return when {
+        mins < 1 -> "только что"
+        mins < 60 -> "$mins мин назад"
+        hours < 24 -> "$hours ч назад"
+        else -> "$days д назад"
     }
 }
 

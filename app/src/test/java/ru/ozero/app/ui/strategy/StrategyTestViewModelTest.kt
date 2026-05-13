@@ -47,6 +47,7 @@ class StrategyTestViewModelTest {
     private lateinit var settingsStore: FakeStrategyTestSettingsStore
     private lateinit var domainStore: FakeDomainListStore
     private lateinit var savedStore: FakeSavedStrategyStore
+    private lateinit var usageStore: FakeUsageHistoryStore
     private lateinit var engine: FakeByeDpiEngine
     private lateinit var probe: FakeProbeClient
     private lateinit var tunnel: TunnelController
@@ -64,6 +65,7 @@ class StrategyTestViewModelTest {
         settingsStore.stored = StrategyTestSettings(evolutionMode = false)
         domainStore = FakeDomainListStore()
         savedStore = FakeSavedStrategyStore()
+        usageStore = FakeUsageHistoryStore()
         engine = FakeByeDpiEngine()
         probe = FakeProbeClient(engine)
         tunnel = TunnelController()
@@ -92,6 +94,7 @@ class StrategyTestViewModelTest {
             probeFactory = { _, _ -> probe },
             tunnelController = tunnel,
             geneMemory = GeneMemory(java.io.File.createTempFile("mem", ".json").also { it.deleteOnExit() }),
+            usageHistoryStore = usageStore,
         ).also { it.ioDispatcher = dispatcher }
     }
 
@@ -515,6 +518,42 @@ class StrategyTestViewModelTest {
         assertEquals(listOf("--cmd1", "--cmd2", "--cmd3"), commands.filter { it.startsWith("--cmd") }.sorted())
     }
 
+    @Test
+    fun `onRename updates saved strategy name`() = runTest(dispatcher) {
+        val vm = newVm()
+        advanceUntilIdle()
+        vm.onSave("-Ku -An")
+        advanceUntilIdle()
+        val id = vm.savedStrategies.value.first().id
+        vm.onRename(id, "Для ютуба")
+        advanceUntilIdle()
+        assertEquals("Для ютуба", vm.savedStrategies.value.first().name)
+    }
+
+    @Test
+    fun `onApply records command in usageHistory`() = runTest(dispatcher) {
+        val vm = newVm()
+        advanceUntilIdle()
+        vm.onApply("-Ku -An")
+        advanceUntilIdle()
+        assertEquals(1, usageStore.recorded.size)
+        assertEquals("-Ku -An", usageStore.recorded[0].first)
+    }
+
+    @Test
+    fun `onApply records saved name in usage history when available`() = runTest(dispatcher) {
+        val vm = newVm()
+        advanceUntilIdle()
+        vm.onSave("-Ku -An")
+        advanceUntilIdle()
+        val id = vm.savedStrategies.value.first().id
+        vm.onRename(id, "Мой VPN")
+        advanceUntilIdle()
+        vm.onApply("-Ku -An")
+        advanceUntilIdle()
+        assertEquals("Мой VPN", usageStore.recorded.last().second)
+    }
+
     private companion object {
         val STRATEGIES_74: List<String> = (1..74).map { "-strategy$it" }
     }
@@ -596,6 +635,12 @@ class StrategyTestViewModelTest {
         override fun save(strategies: List<SavedStrategy>) {
             data = strategies
         }
+    }
+
+    private class FakeUsageHistoryStore : UsageHistoryStore {
+        val recorded = mutableListOf<Pair<String, String?>>()
+        override fun load(): List<UsageEntry> = recorded.map { (cmd, name) -> UsageEntry(cmd, name = name) }
+        override fun record(command: String, name: String?) { recorded.add(command to name) }
     }
 
     private class FakeDomainListStore : DomainListStore {

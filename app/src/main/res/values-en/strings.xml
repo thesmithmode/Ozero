@@ -223,6 +223,10 @@
     <string name="evolution_population_label">Best strategies</string>
     <string name="evolution_initializing">Preparing population…</string>
     <string name="evolution_evaluating_label">Testing %1$d/%2$d</string>
+    <string name="evolution_stagnating">Stuck — exploring new variants…</string>
+    <string name="saved_strategy_rename_title">Rename</string>
+    <string name="usage_history_title">Usage history</string>
+    <string name="usage_history_empty">Not used yet</string>
 
     <!-- URnetwork -->
     <string name="urnetwork_settings_title">URnetwork</string>

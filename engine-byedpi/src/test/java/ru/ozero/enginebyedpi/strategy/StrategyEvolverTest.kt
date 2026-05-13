@@ -103,4 +103,38 @@ class StrategyEvolverTest {
     fun `select empty list returns empty`() {
         assertEquals(emptyList(), evolver.select(emptyList(), k = 5))
     }
+
+    @Test
+    fun `insert adds one gene to chromosome`() {
+        val chromosome = parseChromosome("-a -b -c")
+        val result = evolver.insert(chromosome, Random(0))
+        assertEquals(chromosome.size + 1, result.size)
+    }
+
+    @Test
+    fun `insert on empty chromosome returns single gene`() {
+        val result = evolver.insert(emptyList(), Random(0))
+        assertEquals(1, result.size)
+    }
+
+    @Test
+    fun `delete removes one gene from chromosome`() {
+        val chromosome = parseChromosome("-a -b -c -d")
+        val result = evolver.delete(chromosome, Random(0))
+        assertEquals(chromosome.size - 1, result.size)
+    }
+
+    @Test
+    fun `delete on single gene chromosome returns unchanged`() {
+        val chromosome = parseChromosome("-a")
+        val result = evolver.delete(chromosome, Random(0))
+        assertEquals(chromosome, result)
+    }
+
+    @Test
+    fun `mutate with rate 1 may change chromosome length via insert or delete`() {
+        val chromosome = parseChromosome("-a -b -c -d -e -f -g -h")
+        val results = (1..50).map { evolver.mutate(chromosome, rate = 1f, random = Random(it)) }
+        assertTrue(results.any { it.size != chromosome.size }, "at least one mutation should change length")
+    }
 }

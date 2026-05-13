@@ -13,8 +13,10 @@ import ru.ozero.app.ui.strategy.DomainListStore
 import ru.ozero.app.ui.strategy.FileDomainListStore
 import ru.ozero.app.ui.strategy.FileSavedStrategyStore
 import ru.ozero.app.ui.strategy.FileStrategyResultsStore
+import ru.ozero.app.ui.strategy.FileUsageHistoryStore
 import ru.ozero.app.ui.strategy.SavedStrategyStore
 import ru.ozero.app.ui.strategy.SharedPrefsStrategyTestSettingsStore
+import ru.ozero.app.ui.strategy.UsageHistoryStore
 import ru.ozero.app.ui.strategy.StrategyAssetSource
 import ru.ozero.app.ui.strategy.StrategyProbeClientFactory
 import ru.ozero.app.ui.strategy.StrategyResultsStore
@@ -80,6 +82,12 @@ object StrategyTestModule {
     fun provideSavedStrategyStore(
         @ApplicationContext context: Context,
     ): SavedStrategyStore = FileSavedStrategyStore(context.filesDir)
+
+    @Provides
+    @Singleton
+    fun provideUsageHistoryStore(
+        @ApplicationContext context: Context,
+    ): UsageHistoryStore = FileUsageHistoryStore(context.filesDir)
 
     @Provides
     @Singleton
