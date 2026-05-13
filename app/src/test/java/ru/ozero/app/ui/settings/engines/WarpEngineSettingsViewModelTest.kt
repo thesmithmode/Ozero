@@ -1,8 +1,5 @@
 package ru.ozero.app.ui.settings.engines
 
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -23,8 +20,8 @@ import ru.ozero.enginewarp.RegisteredWarpConfig
 import ru.ozero.enginewarp.WarpAutoConfig
 import ru.ozero.enginewarp.WarpConfig
 import ru.ozero.enginewarp.WarpConfigSlot
+import ru.ozero.enginewarp.DoHProvider
 import ru.ozero.enginewarp.WarpConfigSlotStore
-import ru.ozero.enginewarp.WarpDoHStore
 import ru.ozero.enginewarp.WarpFileImporter
 import java.io.ByteArrayInputStream
 import java.io.IOException
@@ -42,7 +39,6 @@ class WarpEngineSettingsViewModelTest {
     private lateinit var store: FakeWarpStore
     private lateinit var auto: FakeAutoConfig
     private lateinit var importer: FakeFileImporter
-    private lateinit var doHStore: WarpDoHStore
     private lateinit var vm: WarpEngineSettingsViewModel
 
     @BeforeEach
@@ -51,8 +47,7 @@ class WarpEngineSettingsViewModelTest {
         store = FakeWarpStore()
         auto = FakeAutoConfig()
         importer = FakeFileImporter()
-        doHStore = makeDoHStore()
-        vm = WarpEngineSettingsViewModel(store, auto, importer, doHStore)
+        vm = WarpEngineSettingsViewModel(store, auto, importer)
     }
 
     @AfterEach
@@ -63,7 +58,7 @@ class WarpEngineSettingsViewModelTest {
     @Test
     fun `init подхватывает слоты из store`() = runTest {
         store.addSlot("Test", SAMPLE)
-        val freshVm = WarpEngineSettingsViewModel(store, FakeAutoConfig(), FakeFileImporter(), makeDoHStore())
+        val freshVm = WarpEngineSettingsViewModel(store, FakeAutoConfig(), FakeFileImporter())
         advanceUntilIdle()
         assertEquals(1, freshVm.uiState.value.slots.size)
         assertEquals("Test", freshVm.uiState.value.slots[0].name)
@@ -80,7 +75,7 @@ class WarpEngineSettingsViewModelTest {
     fun `init с непустым store — auto-trigger НЕ срабатывает`() = runTest {
         store.addSlot("Existing", SAMPLE)
         val freshAuto = FakeAutoConfig()
-        val freshVm = WarpEngineSettingsViewModel(store, freshAuto, FakeFileImporter(), makeDoHStore())
+        val freshVm = WarpEngineSettingsViewModel(store, freshAuto, FakeFileImporter())
         advanceUntilIdle()
         assertEquals(0, freshAuto.callCount, "Непустой store не должен триггерить auto-register")
         assertEquals(1, freshVm.uiState.value.slots.size)
@@ -90,7 +85,7 @@ class WarpEngineSettingsViewModelTest {
     fun `auto-trigger respects cooldown — НЕ срабатывает пока active`() = runTest {
         val freshStore = FakeWarpStore()
         val freshAuto = FakeAutoConfig().apply { cooldownMs = 30_000L }
-        WarpEngineSettingsViewModel(freshStore, freshAuto, FakeFileImporter(), makeDoHStore())
+        WarpEngineSettingsViewModel(freshStore, freshAuto, FakeFileImporter())
         advanceUntilIdle()
         assertEquals(0, freshAuto.callCount, "Активный cooldown блокирует auto-trigger")
     }
@@ -114,7 +109,7 @@ class WarpEngineSettingsViewModelTest {
             override suspend fun migrateIfNeeded() = error("migration boom")
         }
         val freshAuto = FakeAutoConfig()
-        val freshVm = WarpEngineSettingsViewModel(throwingStore, freshAuto, FakeFileImporter(), makeDoHStore())
+        val freshVm = WarpEngineSettingsViewModel(throwingStore, freshAuto, FakeFileImporter())
         advanceUntilIdle()
         assertEquals(0, freshAuto.callCount, "Migration fail блокирует auto-trigger")
         assertEquals("migration boom", freshVm.uiState.value.errorMessage)
@@ -406,7 +401,7 @@ class WarpEngineSettingsViewModelTest {
         val throwingStore = object : FakeWarpStore() {
             override suspend fun migrateIfNeeded() = error("migration boom")
         }
-        val vm = WarpEngineSettingsViewModel(throwingStore, FakeAutoConfig(), FakeFileImporter(), makeDoHStore())
+        val vm = WarpEngineSettingsViewModel(throwingStore, FakeAutoConfig(), FakeFileImporter())
         advanceUntilIdle()
         assertEquals("migration boom", vm.uiState.value.errorMessage)
     }
@@ -418,6 +413,50 @@ class WarpEngineSettingsViewModelTest {
         vm.onGenerate()
         advanceUntilIdle()
         assertNull(vm.uiState.value.progressText, "progressText сбрасывается после успеха")
+    }
+
+    @Test
+    fun `onStartEdit открывает draft с doHProvider из слота`() = runTest {
+        val id = store.addSlot("S", SAMPLE.copy(doHProvider = DoHProvider.GOOGLE_8888))
+        advanceUntilIdle()
+        vm.onStartEdit(id)
+        assertEquals(DoHProvider.GOOGLE_8888, vm.uiState.value.editDraft?.doHProvider)
+    }
+
+    @Test
+    fun `onSetDoHProvider обновляет doHProvider в draft`() = runTest {
+        val id = store.addSlot("S", SAMPLE)
+        advanceUntilIdle()
+        vm.onStartEdit(id)
+        vm.onSetDoHProvider(DoHProvider.CLOUDFLARE_1111)
+        assertEquals(DoHProvider.CLOUDFLARE_1111, vm.uiState.value.editDraft?.doHProvider)
+    }
+
+    @Test
+    fun `onSetDoHProvider без открытого draft — ничего не меняет`() = runTest {
+        advanceUntilIdle()
+        vm.onSetDoHProvider(DoHProvider.CLOUDFLARE_1111)
+        assertNull(vm.uiState.value.editDraft)
+    }
+
+    @Test
+    fun `onSaveEdit сохраняет doHProvider в WarpConfig`() = runTest {
+        val id = store.addSlot("S", SAMPLE)
+        advanceUntilIdle()
+        vm.onStartEdit(id)
+        vm.onSetDoHProvider(DoHProvider.ADGUARD)
+        vm.onSaveEdit()
+        advanceUntilIdle()
+        assertEquals(DoHProvider.ADGUARD, store.lastUpdateCall?.third?.doHProvider)
+    }
+
+    @Test
+    fun `selectedDoHProvider отражает doHProvider из draft`() = runTest {
+        val id = store.addSlot("S", SAMPLE.copy(doHProvider = DoHProvider.GOOGLE_8844))
+        advanceUntilIdle()
+        vm.onStartEdit(id)
+        advanceUntilIdle()
+        assertEquals(DoHProvider.GOOGLE_8844, vm.selectedDoHProvider.value)
     }
 
     private open class FakeWarpStore : WarpConfigSlotStore {
@@ -510,18 +549,6 @@ class WarpEngineSettingsViewModelTest {
     }
 
     private companion object {
-        fun makeDoHStore(): WarpDoHStore = WarpDoHStore(
-            PreferenceDataStoreFactory.create(
-                scope = CoroutineScope(Dispatchers.Unconfined),
-                produceFile = {
-                    java.io.File(
-                        System.getProperty("java.io.tmpdir"),
-                        "test_doh_${System.nanoTime()}.preferences_pb",
-                    )
-                },
-            ),
-        )
-
         val SAMPLE = WarpConfig(
             privateKey = "priv",
             publicKey = "pub",

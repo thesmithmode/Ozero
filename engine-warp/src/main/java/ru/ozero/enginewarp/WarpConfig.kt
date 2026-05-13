@@ -13,6 +13,7 @@ data class WarpConfig(
     val keepaliveSeconds: Int = DEFAULT_KEEPALIVE,
     val allowedIps: List<String> = listOf("0.0.0.0/0", "::/0"),
     val awgParams: AwgParams = AwgParams(),
+    val doHProvider: DoHProvider = DoHProvider.SYSTEM,
 ) {
     override fun toString(): String {
         val peerFingerprint = if (peerPublicKey.length >= 8) {

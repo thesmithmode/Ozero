@@ -27,7 +27,6 @@ class EngineWarp(
     private val uapiPathProvider: () -> String,
     private val socketProtector: VpnSocketProtector = VpnSocketProtectorHolder,
     private val ipv6EnabledProvider: () -> Boolean = { false },
-    private val doHProvider: () -> DoHProvider = { DoHProvider.SYSTEM },
 ) : EnginePlugin, TunFdAcceptor {
 
     override val id = EngineId.WARP
@@ -197,7 +196,7 @@ class EngineWarp(
         val host = ep.substring(0, sep)
         val port = ep.substring(sep + 1)
         if (host.isBlank() || isLikelyIpAddress(host)) return cfg
-        val provider = doHProvider()
+        val provider = resolvedConfig?.doHProvider ?: DoHProvider.SYSTEM
         Log.i(TAG, "resolveEndpointHost host=$host provider=${provider.name}")
         for (attempt in 0..2) {
             val resolved = if (provider.isSystem) {

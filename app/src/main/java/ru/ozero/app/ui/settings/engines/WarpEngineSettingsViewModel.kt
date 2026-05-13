@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ru.ozero.enginewarp.AwgParams
@@ -19,7 +20,6 @@ import ru.ozero.enginewarp.WarpAutoConfig
 import ru.ozero.enginewarp.WarpConfig
 import ru.ozero.enginewarp.WarpConfigSlot
 import ru.ozero.enginewarp.WarpConfigSlotStore
-import ru.ozero.enginewarp.WarpDoHStore
 import ru.ozero.enginewarp.WarpFileImporter
 import java.io.InputStream
 import java.text.SimpleDateFormat
@@ -49,6 +49,7 @@ data class WarpEditDraft(
     val h2: String,
     val h3: String,
     val h4: String,
+    val doHProvider: DoHProvider = DoHProvider.SYSTEM,
 )
 
 data class WarpSettingsUiState(
@@ -68,7 +69,6 @@ class WarpEngineSettingsViewModel @Inject constructor(
     private val store: WarpConfigSlotStore,
     private val autoConfig: WarpAutoConfig,
     private val fileImporter: WarpFileImporter,
-    private val doHStore: WarpDoHStore,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(WarpSettingsUiState())
@@ -99,14 +99,18 @@ class WarpEngineSettingsViewModel @Inject constructor(
         }
     }
 
-    val selectedDoHProvider: StateFlow<DoHProvider> = doHStore.provider.stateIn(
+    val selectedDoHProvider: StateFlow<DoHProvider> = uiState.map {
+        it.editDraft?.doHProvider ?: DoHProvider.SYSTEM
+    }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(0),
         initialValue = DoHProvider.SYSTEM,
     )
 
     fun onSetDoHProvider(provider: DoHProvider) {
-        viewModelScope.launch { doHStore.setProvider(provider) }
+        _uiState.value = _uiState.value.copy(
+            editDraft = _uiState.value.editDraft?.copy(doHProvider = provider),
+        )
     }
 
     val cooldownRemainingMs: StateFlow<Long> = flow {
@@ -227,6 +231,7 @@ class WarpEngineSettingsViewModel @Inject constructor(
                 h2 = awg.responsePacketMagicHeader.toString(),
                 h3 = awg.cookieReplyMagicHeader.toString(),
                 h4 = awg.transportMagicHeader.toString(),
+                doHProvider = cfg.doHProvider,
             ),
         )
     }
@@ -276,6 +281,7 @@ class WarpEngineSettingsViewModel @Inject constructor(
                 cookieReplyMagicHeader = h3,
                 transportMagicHeader = h4,
             ),
+            doHProvider = draft.doHProvider,
         )
         val slotId = draft.slotId
         val name = draft.name.trim().ifBlank { "WARP" }

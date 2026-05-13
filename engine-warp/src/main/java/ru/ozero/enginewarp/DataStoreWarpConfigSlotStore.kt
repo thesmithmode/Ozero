@@ -185,6 +185,9 @@ class DataStoreWarpConfigSlotStore(
             dnsServers = dns,
             keepaliveSeconds = configObj.optInt("keepalive", WarpConfig.DEFAULT_KEEPALIVE),
             awgParams = awg,
+            doHProvider = configObj.optString("doHProvider", "").let { name ->
+                DoHProvider.entries.firstOrNull { it.name == name } ?: DoHProvider.SYSTEM
+            },
         )
         val rawIni = obj.optString("rawIni", "").takeIf { it.isNotEmpty() }
         return WarpConfigSlot(
@@ -237,6 +240,7 @@ class DataStoreWarpConfigSlotStore(
             awgObj.put("i4", awg.specialJunk4)
             awgObj.put("i5", awg.payloadPacketSizeCount3)
             configObj.put("awgParams", awgObj)
+            configObj.put("doHProvider", cfg.doHProvider.name)
             obj.put("config", configObj)
             arr.put(obj)
         }

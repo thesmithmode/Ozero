@@ -76,7 +76,6 @@ fun WarpEngineSettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val cooldownRemainingMs by viewModel.cooldownRemainingMs.collectAsStateWithLifecycle()
-    val selectedDoHProvider by viewModel.selectedDoHProvider.collectAsStateWithLifecycle()
 
     if (state.editDraft != null) {
         BackHandler { viewModel.onEditCancel() }
@@ -133,8 +132,6 @@ fun WarpEngineSettingsScreen(
             WarpScreenContent(
                 state = state,
                 cooldownRemainingMs = cooldownRemainingMs,
-                selectedDoHProvider = selectedDoHProvider,
-                onSetDoHProvider = viewModel::onSetDoHProvider,
                 modifier = Modifier.fillMaxSize(),
                 onGenerate = viewModel::onGenerate,
                 onCancelGenerate = viewModel::onCancelGenerate,
@@ -216,6 +213,10 @@ private fun WarpEditScreen(
             WarpInterfaceSection(draft, onDraftChange)
             WarpPeerSection(draft, onDraftChange)
             WarpAwgSection(draft, onDraftChange)
+        WarpDoHSection(
+            selected = draft.doHProvider,
+            onSelect = { onDraftChange(draft.copy(doHProvider = it)) },
+        )
         }
     }
 }
@@ -478,8 +479,6 @@ private fun WarpTextField(
 private fun WarpScreenContent(
     state: WarpSettingsUiState,
     cooldownRemainingMs: Long,
-    selectedDoHProvider: ru.ozero.enginewarp.DoHProvider,
-    onSetDoHProvider: (ru.ozero.enginewarp.DoHProvider) -> Unit,
     modifier: Modifier = Modifier,
     onGenerate: () -> Unit,
     onCancelGenerate: () -> Unit,
@@ -505,8 +504,6 @@ private fun WarpScreenContent(
         } else {
             SlotListContent(
                 state = state,
-                selectedDoHProvider = selectedDoHProvider,
-                onSetDoHProvider = onSetDoHProvider,
                 onSetActive = onSetActive,
                 onStartEdit = onStartEdit,
                 onDeleteSlot = onDeleteSlot,
@@ -568,8 +565,6 @@ private fun WarpProgressCard(
 @Composable
 private fun SlotListContent(
     state: WarpSettingsUiState,
-    selectedDoHProvider: ru.ozero.enginewarp.DoHProvider,
-    onSetDoHProvider: (ru.ozero.enginewarp.DoHProvider) -> Unit,
     onSetActive: (String) -> Unit,
     onStartEdit: (String) -> Unit,
     onDeleteSlot: (String) -> Unit,
@@ -596,12 +591,6 @@ private fun SlotListContent(
                 onSetActive = { onSetActive(slot.id) },
                 onStartEdit = { onStartEdit(slot.id) },
                 onDelete = { onDeleteSlot(slot.id) },
-            )
-        }
-        item {
-            WarpDoHSection(
-                selected = selectedDoHProvider,
-                onSelect = onSetDoHProvider,
             )
         }
     }
