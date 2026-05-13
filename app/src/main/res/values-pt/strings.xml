@@ -221,4 +221,143 @@
     <string name="urnetwork_shared_traffic_balance">Saldo</string>
     <string name="urnetwork_shared_traffic_used">Usado</string>
     <string name="urnetwork_shared_traffic_plan">Plano</string>
+
+    <!-- Tabs missing -->
+    <string name="tab_stats">Estatísticas</string>
+    <string name="tab_subs">Assinatura</string>
+    <string name="tab_engine">Motor</string>
+    <string name="tab_servers">Parâmetros</string>
+    <string name="subs_screen_title">Assinatura</string>
+    <string name="subs_placeholder_title">Em desenvolvimento</string>
+    <string name="subs_placeholder_body">Recursos premium e doações aparecerão nas próximas versões.</string>
+
+    <!-- Backup -->
+    <string name="backup_title">Exportar / Importar</string>
+    <string name="backup_summary">Salve ou restaure todos os ajustes</string>
+    <string name="backup_export_button">Exportar ajustes</string>
+    <string name="backup_import_button">Importar ajustes</string>
+    <string name="backup_warning">O arquivo de backup contém dados sensíveis (chaves WireGuard, tokens). Guarde-o em local seguro.</string>
+    <string name="backup_export_success">Ajustes exportados com sucesso</string>
+    <string name="backup_import_success">Ajustes importados. Reinicie o app para aplicar as alterações.</string>
+    <string name="backup_error">Erro: %1$s</string>
+    <string name="backup_in_progress">Processando…</string>
+    <string name="backup_filename">ozero_backup.ozb</string>
+
+    <!-- IP card -->
+    <string name="ip_card_title">Nó de saída</string>
+    <string name="ip_card_loading">Resolvendo IP…</string>
+    <string name="ip_card_error">Falha ao obter IP: %1$s</string>
+    <string name="ip_card_refresh">Atualizar</string>
+    <string name="ip_card_country_unknown">País desconhecido</string>
+
+    <!-- Kill switch -->
+    <string name="settings_killswitch_title">Kill switch</string>
+    <string name="settings_killswitch_summary">Bloqueia todo o tráfego quando o túnel cai, até reconectar</string>
+    <string name="killswitch_active_badge">Kill switch ativo — tráfego bloqueado</string>
+
+    <!-- Always-on banner -->
+    <string name="settings_always_on_banner_title">Reforce a proteção</string>
+    <string name="settings_always_on_banner_body">Ative VPN sempre ativa nas configurações do Android para evitar vazamentos ao reiniciar</string>
+    <string name="settings_always_on_banner_configure">Configurar</string>
+
+    <!-- App mode -->
+    <string name="settings_app_mode_title">Modo de interface</string>
+    <string name="settings_app_mode_simple">Simples</string>
+    <string name="settings_app_mode_simple_hint">Um botão e um país. Ozero escolhe o motor automaticamente.</string>
+    <string name="settings_app_mode_expert">Especialista</string>
+    <string name="settings_app_mode_expert_hint">Seleção manual de motor, estatísticas e configurações avançadas.</string>
+    <string name="mode_expert_badge">ESPECIALISTA</string>
+
+    <!-- Onboarding mode -->
+    <string name="onboarding_mode_title">Escolha um modo</string>
+    <string name="onboarding_mode_body">Você pode mudar isso a qualquer hora nos Ajustes.</string>
+
+    <!-- Engine chip / misc -->
+    <string name="engine_chip_auto">Auto</string>
+    <string name="main_status_probing_warp">Conectando ao WARP…</string>
+
+    <!-- Chart timeframe -->
+    <string name="chart_tf_30s">30s</string>
+    <string name="chart_tf_5min">5m</string>
+    <string name="chart_tf_30min">30m</string>
+    <string name="chart_tf_1h">1h</string>
+
+    <!-- Domain lists -->
+    <string name="domain_lists_title">Listas de sites</string>
+    <string name="domain_lists_manage">Gerenciar</string>
+
+    <!-- Saved strategies -->
+    <string name="saved_strategies_title">Estratégias salvas</string>
+    <string name="saved_strategies_empty">Nenhuma estratégia salva</string>
+
+    <!-- Split tunnel extras -->
+    <string name="split_tunnel_selected_count">Selecionados: %1$d</string>
+    <string name="split_tunnel_clear_all">Limpar</string>
+    <string name="split_tunnel_mode_hint">A lista de apps só se aplica nos modos Lista de permissão e Lista de bloqueio.</string>
+    <string name="split_tunnel_mode_all_description">Todos os apps passam pela VPN.</string>
+    <string name="split_tunnel_mode_bypass_lan_description">Todos os apps passam pela VPN, exceto os locais (LAN).</string>
+    <string name="split_tunnel_disabled_banner">Desconecte a VPN para mudar o modo</string>
+
+    <!-- URnetwork -->
+    <string name="urnetwork_settings_title">URnetwork</string>
+    <string name="urnetwork_consent_warning_title">Aviso</string>
+    <string name="urnetwork_consent_warning_body">URnetwork é uma rede P2P onde cada participante pode atuar como nó de saída. Se você ativar o URnetwork, seu dispositivo retransmitirá tráfego de outros usuários para a internet a partir do seu próprio IP. Isso pode chamar a atenção do seu ISP e apresenta riscos legais em algumas jurisdições. Ative somente se entender as consequências.</string>
+    <string name="urnetwork_consent_short">Rede P2P: seu IP pode retransmitir tráfego de outros.</string>
+    <string name="urnetwork_search_hint">Buscar país…</string>
+    <string name="urnetwork_location_title">Região de saída</string>
+    <string name="urnetwork_location_best_available">Melhor disponível</string>
+    <string name="urnetwork_location_connect_first">Conecte-se ao URnetwork para ver as regiões disponíveis</string>
+    <string name="urnetwork_provide_title">Compartilhar largura de banda</string>
+    <string name="urnetwork_provide_subtitle">Compartilhe largura de banda com a malha URnetwork</string>
+    <string name="urnetwork_country_switching">Trocando país…</string>
+    <string name="urnetwork_mode_title">Modo</string>
+    <string name="urnetwork_mode_auto">Auto</string>
+    <string name="urnetwork_mode_quality">Web</string>
+    <string name="urnetwork_mode_speed">Streaming</string>
+    <string name="urnetwork_mode_hint">Web — baixa latência para navegação. Streaming — alto volume para vídeo.</string>
+    <string name="urnetwork_fixed_ip_size">IP de saída fixo</string>
+    <string name="urnetwork_fixed_ip_size_hint">Um par em vez de pool — IP de sessão estável</string>
+    <string name="urnetwork_about_title">Sobre URnetwork</string>
+    <string name="urnetwork_about_body">URnetwork é a rede mais local e mais privada do planeta. Um protocolo patenteado mantém os participantes seguros. A malha tem mais de 30.000 provedores e zero incidentes conhecidos.</string>
+    <string name="urnetwork_peers_connected">Conectado a %1$d pares</string>
+    <string name="urnetwork_peers_searching">Buscando pares…</string>
+    <string name="settings_urnetwork_title">URnetwork</string>
+    <string name="settings_urnetwork_summary">Malha P2P — nó de saída</string>
+
+    <!-- WARP -->
+    <string name="warp_settings_title">WARP</string>
+    <string name="settings_warp_title">WARP</string>
+    <string name="settings_warp_summary">Cloudflare WARP — configuração automática</string>
+    <string name="warp_no_config">Configuração não gerada</string>
+    <string name="warp_generate">Gerar</string>
+    <string name="warp_regenerate">Regenerar</string>
+    <string name="warp_clear">Limpar</string>
+    <string name="warp_registering">Obtendo configuração WARP dos espelhos… (até 90 s)</string>
+    <string name="warp_cancel_generation">Cancelar geração</string>
+    <string name="warp_endpoint_label">Endpoint:</string>
+    <string name="warp_license_label">Licença:</string>
+    <string name="warp_import_file">Importar de arquivo .conf</string>
+    <string name="warp_no_license">—</string>
+    <string name="warp_import_error">Erro de importação</string>
+    <string name="warp_imported">Configuração importada</string>
+    <string name="warp_address_label">Endereço:</string>
+    <string name="warp_rename_title">Renomear</string>
+    <string name="warp_rename_ok">OK</string>
+    <string name="warp_rename_cancel">Cancelar</string>
+    <string name="warp_edit_required_fields">PrivateKey, Endpoint, PublicKey (Peer), Address são obrigatórios</string>
+    <string name="warp_edit_title">Editar configuração</string>
+    <string name="warp_edit_save">Salvar</string>
+    <string name="warp_field_name">Nome</string>
+    <string name="warp_field_private_key">PrivateKey</string>
+    <string name="warp_field_public_key">PublicKey</string>
+    <string name="warp_field_address_v4">Endereço (IPv4)</string>
+    <string name="warp_field_address_v6">Endereço (IPv6)</string>
+    <string name="warp_field_dns">DNS (separados por vírgula)</string>
+    <string name="warp_field_mtu">MTU</string>
+    <string name="warp_field_endpoint">Endpoint</string>
+    <string name="warp_field_peer_public_key">PublicKey (Peer)</string>
+    <string name="warp_field_keepalive">PersistentKeepalive</string>
+    <string name="warp_section_interface">Interface</string>
+    <string name="warp_section_peer">Par</string>
+    <string name="warp_section_awg">AmneziaWG</string>
 </resources>

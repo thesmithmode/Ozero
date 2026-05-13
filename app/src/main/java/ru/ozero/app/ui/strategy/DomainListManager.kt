@@ -53,12 +53,15 @@ class DomainListManager(
     companion object {
         val BUILT_IN_CONFIGS: List<Triple<String, String, Boolean>> = listOf(
             Triple("general", "General", true),
-            Triple("youtube", "YouTube", true),
-            Triple("googlevideo", "Google Video", true),
+            Triple("youtube_lite", "YouTube (основные)", true),
+            Triple("telegram_lite", "Telegram (основные)", true),
+            Triple("instagram_lite", "Instagram (основные)", true),
+            Triple("googlevideo", "Google Video", false),
+            Triple("youtube", "YouTube (все домены)", false),
             Triple("cloudflare", "Cloudflare", false),
             Triple("discord", "Discord", false),
             Triple("social", "Social Media", false),
-            Triple("telegram", "Telegram", false),
+            Triple("telegram", "Telegram (все домены)", false),
         )
     }
 }

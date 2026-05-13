@@ -30,6 +30,12 @@
     <string name="tab_settings">Settings</string>
     <string name="tab_servers">Params</string>
     <string name="tab_diagnostics">Diagnostics</string>
+    <string name="tab_stats">Stats</string>
+    <string name="tab_subs">Subscription</string>
+    <string name="tab_engine">Engine</string>
+    <string name="subs_screen_title">Subscription</string>
+    <string name="subs_placeholder_title">Coming soon</string>
+    <string name="subs_placeholder_body">Premium features and donations will appear in upcoming releases.</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
