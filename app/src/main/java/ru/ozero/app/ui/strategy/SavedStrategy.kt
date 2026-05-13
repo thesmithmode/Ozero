@@ -7,4 +7,5 @@ data class SavedStrategy(
     val isPinned: Boolean = false,
     val addedAt: Long = System.currentTimeMillis(),
     val lastVerifiedAtMs: Long = 0L,
+    val bestNetworks: Set<String> = emptySet(),
 )

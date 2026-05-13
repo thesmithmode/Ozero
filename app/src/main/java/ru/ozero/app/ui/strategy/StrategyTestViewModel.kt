@@ -102,6 +102,9 @@ class StrategyTestViewModel @Inject constructor(
     private val _evolutionState = MutableStateFlow<EvolutionUiState?>(null)
     val evolutionState: StateFlow<EvolutionUiState?> = _evolutionState.asStateFlow()
 
+    private val _currentNetworkId = MutableStateFlow("")
+    val currentNetworkId: StateFlow<String> = _currentNetworkId.asStateFlow()
+
     private var testJob: Job? = null
 
     init {
@@ -290,6 +293,7 @@ class StrategyTestViewModel @Inject constructor(
         val maxGen = snap.evolutionMaxGenerations
         val timeoutMs = snap.timeoutSeconds * 1_000L
         val network = withContext(ioDispatcher) { networkProfileDetector.current() }
+        _currentNetworkId.value = network.id
         val resources = withContext(ioDispatcher) { evolutionResources.forNetwork(network.id) }
         val evolutionEngine = EvolutionEngine(
             byeDpiEngine = byeDpiEngine,
@@ -368,6 +372,12 @@ class StrategyTestViewModel @Inject constructor(
         withContext(ioDispatcher) {
             runCatching { savedStrategyStore.markVerified(seedCommands.toSet(), System.currentTimeMillis()) }
                 .onSuccess { _savedStrategies.value = it }
+        }
+        if (finalCmd.isNotBlank() && lastBestFitness > 0.0) {
+            withContext(ioDispatcher) {
+                runCatching { savedStrategyStore.markBestOnNetwork(setOf(finalCmd), network.id) }
+                    .onSuccess { _savedStrategies.value = it }
+            }
         }
     }
 

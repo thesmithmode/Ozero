@@ -178,4 +178,59 @@ class SavedStrategyStoreTest {
         val distinct = big.load().map { it.command }.toSet()
         assertEquals(8 * 20, distinct.size, "no commands lost to race: ${distinct.size}")
     }
+
+    @Test
+    fun `bestNetworks round-trips`() {
+        store.save(
+            listOf(
+                SavedStrategy(
+                    id = "n",
+                    command = "-n",
+                    addedAt = 1L,
+                    bestNetworks = setOf("net-a", "net-b"),
+                ),
+            ),
+        )
+        val loaded = store.load()
+        assertEquals(setOf("net-a", "net-b"), loaded[0].bestNetworks)
+    }
+
+    @Test
+    fun `bestNetworks defaults to empty when missing in stored file`() {
+        File(tempDir, "saved_strategies.json").writeText(
+            """[{"id":"x","command":"-x","name":"","isPinned":false,"addedAt":1}]""",
+        )
+        assertEquals(emptySet<String>(), store.load()[0].bestNetworks)
+    }
+
+    @Test
+    fun `markBestOnNetwork adds networkId only to matching commands`() {
+        store.save(
+            listOf(
+                SavedStrategy(id = "a", command = "-cmdA", addedAt = 1L),
+                SavedStrategy(id = "b", command = "-cmdB", addedAt = 2L),
+            ),
+        )
+        store.markBestOnNetwork(setOf("-cmdA"), "net-wifi")
+        val loaded = store.load().associateBy { it.id }
+        assertEquals(setOf("net-wifi"), loaded["a"]!!.bestNetworks)
+        assertEquals(emptySet<String>(), loaded["b"]!!.bestNetworks)
+    }
+
+    @Test
+    fun `markBestOnNetwork accumulates multiple networks`() {
+        store.save(listOf(SavedStrategy(id = "a", command = "-a", addedAt = 1L)))
+        store.markBestOnNetwork(setOf("-a"), "net-1")
+        store.markBestOnNetwork(setOf("-a"), "net-2")
+        assertEquals(setOf("net-1", "net-2"), store.load()[0].bestNetworks)
+    }
+
+    @Test
+    fun `markBestOnNetwork with empty commands is no-op`() {
+        store.save(
+            listOf(SavedStrategy(id = "a", command = "-a", addedAt = 1L, bestNetworks = setOf("net-x"))),
+        )
+        store.markBestOnNetwork(emptySet(), "net-y")
+        assertEquals(setOf("net-x"), store.load()[0].bestNetworks)
+    }
 }

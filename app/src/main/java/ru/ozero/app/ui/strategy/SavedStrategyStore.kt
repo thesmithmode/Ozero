@@ -44,6 +44,9 @@ class FileSavedStrategyStore(
                     isPinned = o.optBoolean("isPinned", false),
                     addedAt = o.optLong("addedAt", 0L),
                     lastVerifiedAtMs = o.optLong("lastVerifiedAtMs", 0L),
+                    bestNetworks = o.optJSONArray("bestNetworks")?.let { arr ->
+                        (0 until arr.length()).map { arr.getString(it) }.toSet()
+                    } ?: emptySet(),
                 )
             }
         }.getOrDefault(emptyList())
@@ -61,7 +64,8 @@ class FileSavedStrategyStore(
                     .put("name", s.name ?: "")
                     .put("isPinned", s.isPinned)
                     .put("addedAt", s.addedAt)
-                    .put("lastVerifiedAtMs", s.lastVerifiedAtMs),
+                    .put("lastVerifiedAtMs", s.lastVerifiedAtMs)
+                    .put("bestNetworks", JSONArray(s.bestNetworks.toList())),
             )
         }
         runCatching { file.writeText(array.toString()) }
@@ -105,4 +109,10 @@ fun SavedStrategyStore.delete(id: String): List<SavedStrategy> = update { list -
 
 fun SavedStrategyStore.markVerified(commands: Set<String>, nowMs: Long): List<SavedStrategy> = update { list ->
     list.map { s -> if (commands.contains(s.command)) s.copy(lastVerifiedAtMs = nowMs) else s }
+}
+
+fun SavedStrategyStore.markBestOnNetwork(commands: Set<String>, networkId: String): List<SavedStrategy> = update { list ->
+    list.map { s ->
+        if (commands.contains(s.command)) s.copy(bestNetworks = s.bestNetworks + networkId) else s
+    }
 }
