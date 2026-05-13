@@ -372,7 +372,7 @@ private fun computePowerDiscState(
 ): PowerDiscState = when {
     switching != null -> PowerDiscState.Switching
     state is TunnelState.Connected && state.engineId == EngineId.URNETWORK && urnetworkPeerCount == 0 ->
-        PowerDiscState.Connecting
+        PowerDiscState.Switching
     state is TunnelState.Connected -> PowerDiscState.Connected
     state is TunnelState.Probing || state is TunnelState.Connecting || state is TunnelState.Disconnecting ->
         PowerDiscState.Connecting

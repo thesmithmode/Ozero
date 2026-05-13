@@ -217,7 +217,7 @@
     <string name="urnetwork_provide_network_mode_desc">Wi-Fi — prover só por wireless. Wi-Fi e dados móveis — também por celular.</string>
     <string name="urnetwork_shared_traffic_title">Tráfego compartilhado</string>
     <string name="urnetwork_shared_traffic_unavailable">Estatísticas indisponíveis. Certifique-se de estar conectado ao URnetwork.</string>
-    <string name="urnetwork_shared_traffic_provided">Fornecido (não pago)</string>
+    <string name="urnetwork_shared_traffic_provided">Fornecido</string>
     <string name="urnetwork_shared_traffic_plan">Plano</string>
 
     <!-- Tabs missing -->

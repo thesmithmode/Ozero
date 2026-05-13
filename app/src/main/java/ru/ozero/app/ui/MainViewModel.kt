@@ -118,19 +118,19 @@ class MainViewModel @Inject constructor(
     private val _ipInfo = MutableStateFlow<IpInfoState>(IpInfoState.Idle)
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val urnetworkLocationOverride: StateFlow<IpInfoState.Loaded?> =
+    private val urnetworkLocationOverride: StateFlow<IpInfoState?> =
         tunnelController.state
             .map { (it as? TunnelState.Connected)?.engineId == EngineId.URNETWORK }
             .distinctUntilChanged()
             .flatMapLatest { isUrnetwork ->
                 if (!isUrnetwork) {
-                    flowOf<IpInfoState.Loaded?>(null)
+                    flowOf<IpInfoState?>(null)
                 } else {
-                    flow<IpInfoState.Loaded?> {
+                    flow<IpInfoState?> {
                         while (true) {
                             delay(URNETWORK_LOCATION_POLL_MS)
                             val r = resolveOnce(EngineId.URNETWORK, 0)
-                            if (r is IpInfoState.Loaded) emit(r)
+                            if (r is IpInfoState.Loaded || r is IpInfoState.AutoSelected) emit(r)
                         }
                     }
                 }
@@ -266,6 +266,7 @@ class MainViewModel @Inject constructor(
         repeat(IP_INFO_RETRY_ATTEMPTS) { attempt ->
             when (val s = resolveOnce(engineId, socksPort)) {
                 is IpInfoState.Loaded -> return s
+                is IpInfoState.AutoSelected -> return s
                 is IpInfoState.Error -> lastError = s.message
                 else -> Unit
             }
