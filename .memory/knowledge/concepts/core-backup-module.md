@@ -4,8 +4,9 @@ aliases: [ozero-backup, settings-export-import, core-backup]
 tags: [architecture, backup, android, storage]
 sources:
   - "daily/2026-05-05.md"
+  - "daily/2026-05-12.md"
 created: 2026-05-05
-updated: 2026-05-05
+updated: 2026-05-12
 ---
 
 # Core Backup Module Design
@@ -20,6 +21,7 @@ Ozero's `:core-backup` module provides export/import of all application settings
 - WireGuard private keys appear in plaintext in the exported file — a non-blocking warning is shown on the export screen; user is responsible for file security
 - No file-level encryption or password protection — explicitly out of scope
 - Threat vector mitigated by existing `allowBackup=false` + `data_extraction_rules` in manifest — system auto-backup already excluded; SAF export is intentional and user-initiated
+- AES-GCM cipher key in `AppBackupCipher` is hardcoded intentionally — enables one-click cross-device restore without user password; not a security bug (by design)
 
 ## Details
 
@@ -46,6 +48,14 @@ WireGuard private keys (generated in `:engine-warp` for AmneziaWG) are stored in
 
 The existing `allowBackup=false` in AndroidManifest and `data_extraction_rules` already prevent system-initiated backup of DataStore files (which would be invisible to the user and unencrypted). SAF export is intentional and user-visible.
 
+### Hardcoded Cipher Key Design Decision
+
+`AppBackupCipher` uses a hardcoded AES-GCM key to encrypt backup files. This is a deliberate product decision: the primary use case is one-click restore when moving to a new device. Requiring a user-provided password would add friction to this flow and risk users forgetting their backup password and losing configurations permanently.
+
+The hardcoded key means the encryption provides obfuscation (backup file not readable in a text editor) rather than strong protection against an adversary with access to the file. This trade-off is accepted: the threat model for backup files is accidental corruption and unauthorized distribution, not targeted cryptographic attack. The `allowBackup=false` + `data_extraction_rules` in the manifest already prevent automatic system backup of DataStore files to cloud storage.
+
+This design was challenged during an audit (2026-05-12) where the hardcoded key was flagged as a P1 security bug. The decision was reaffirmed: the key is hardcoded intentionally and documented as such.
+
 ### Exclusions
 
 Not included in export scope:
@@ -62,3 +72,4 @@ Not included in export scope:
 ## Sources
 
 - [[daily/2026-05-05.md]] - Session 12:01: adversarial review found corrupt JSON → all slots lost; decision to build core-backup module with SAF export/import, JSON format, WG key warning non-blocking, no encryption
+- [[daily/2026-05-12.md]] - Session 18:34: audit flagged AppBackupCipher hardcoded AES-GCM key as P1 bug; reaffirmed as intentional design for one-click cross-device restore

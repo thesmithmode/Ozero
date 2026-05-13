@@ -1,5 +1,33 @@
 # Build Log
 
+## [2026-05-14T00:15:00+03:00] compile | 2026-05-13.md (pass 3 — evening GA session 19:34 + git commits)
+- Source: daily/2026-05-13.md
+- Articles created: (none)
+- Articles updated: [[concepts/genetic-strategy-evolution]] (persistent StrategyFitnessCache TTL 24h, SavedStrategy.lastVerifiedAtMs staleness 7-day threshold + StalenessLabel composable, per-network GeneMemory + StrategyFitnessCache via NetworkProfileDetector + EvolutionResourcesProvider, auto-save best chromosome, targetFitness 0.85 default, 75 upstream seeds from ByeByeDPI with pinned priority)
+- Index updated: genetic-strategy-evolution summary expanded
+- Sessions covered: 19:34 (persistent fitness cache, staleness tracking, per-network memory isolation, auto-save best, targetFitness, 75 upstream seeds, pinned priority seeds)
+- Git commits covered: 3a33e6e0 (per-network GeneMemory), 177b7461 (staleness lastVerifiedAtMs), ac50c8f8 (persistent StrategyFitnessCache TTL 24h), c2a6054b (ktlint, 75 seeds, pinned priority, auto-save, targetFitness)
+- Excluded: ktlint line-length fixes (mechanical), per-network DI wiring details (implementation), specific test method names (trivia)
+
+## [2026-05-13T22:00:00+03:00] compile | 2026-05-13.md (pass 2 — residual concepts)
+- Source: daily/2026-05-13.md
+- Articles created: [[concepts/urnetwork-connectstatus-mr-mapping]]
+- Articles updated: [[concepts/genetic-strategy-evolution]] (chromosome fitness cache, hyperbolic latency formula dead code note, ByeDpiKnownSeeds + population 25 + stagnationThreshold coerceAtLeast(3)), [[concepts/byedpi-args-parsing]] (double argv[0] registration trap: C native-lib.c + Kotlin buildArgs both prepend, first real flag dropped)
+- Index updated: byedpi-args-parsing and genetic-strategy-evolution rows updated with 2026-05-13 sources; urnetwork-connectstatus-mr-mapping row added
+- Sessions covered: GA cache/latency-fitness/known-seeds/population25/stagnation CI fix; double argv[0] bug (f0e9f206); native-auto-apply.yml pipeline; warp-doh-per-slot refactor; trailing lambda trap; stateIn(Eagerly) vs WhileSubscribed test trap; URnetwork ConnectStatus→MR.strings regression
+- Note: kotlin-trailing-lambda-parameter-trap, stateIn-eagerly-test-trap, native-binary-auto-update-pipeline, warp-doh-per-slot-config already existed from pass 1 — verified content complete, no updates needed
+
+## [2026-05-13T19:00:54+03:00] compile | 2026-05-13.md
+- Source: daily/2026-05-13.md
+- Articles created: [[concepts/kotlin-trailing-lambda-parameter-trap]], [[concepts/stateIn-eagerly-test-trap]], [[concepts/native-binary-auto-update-pipeline]], [[concepts/warp-doh-per-slot-config]]
+- Articles updated: [[concepts/genetic-strategy-evolution]] (chromosome cache, hyperbolic latency fitness, ByeDpiKnownSeeds, population 25)
+
+## [2026-05-12T23:59:00+03:00] compile | daily/2026-05-12.md
+- Source: daily/2026-05-12.md
+- Articles created: [[concepts/suppress-annotation-decomposition]]
+- Articles updated: [[concepts/core-backup-module]] (hardcoded AES-GCM key by design), [[concepts/genetic-strategy-evolution]] (dead settings anti-pattern)
+- Note: Most 2026-05-12 concepts were already compiled in prior sessions — chart scaling, genetic algorithm, concurrency traps, backup serializer, URnetwork modes, tautology tests, ByeDPI runtime disconnect, peer watchdog, WARP DNS exhaustion, audit-driven discovery
+
 ## [2026-05-13T02:00:00+03:00] compile | 2026-05-12.md (pass 5 — session 21:19 engine diagnostics)
 - Source: daily/2026-05-12.md
 - Articles created: [[concepts/warp-preflight-dns-exhaustion]], [[concepts/urnetwork-peer-watchdog-recovery]], [[concepts/byedpi-strategy-runtime-disconnect]]
