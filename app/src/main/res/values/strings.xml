@@ -250,9 +250,7 @@
     <string name="urnetwork_provide_network_mode_desc">Wi-Fi — раздача только через беспроводную сеть. Wi-Fi и мобильные — также через сотовый трафик.</string>
     <string name="urnetwork_shared_traffic_title">Расшаренный трафик</string>
     <string name="urnetwork_shared_traffic_unavailable">Статистика недоступна. Убедитесь, что подключены к URnetwork.</string>
-    <string name="urnetwork_shared_traffic_pending">В обработке</string>
-    <string name="urnetwork_shared_traffic_balance">Баланс</string>
-    <string name="urnetwork_shared_traffic_used">Использовано</string>
+    <string name="urnetwork_shared_traffic_provided">Предоставлено (неоплаченных)</string>
     <string name="urnetwork_shared_traffic_plan">Тариф</string>
     <string name="urnetwork_peers_connected">Подключено к %1$d peer-ам</string>
     <string name="urnetwork_peers_searching">Поиск peer-ов…</string>

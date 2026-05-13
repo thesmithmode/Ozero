@@ -30,7 +30,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
 import ru.ozero.app.ui.theme.OzeroPalette
 import ru.ozero.app.ui.utils.formatBytes
-import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,7 +37,8 @@ fun UrnetworkSharedTrafficScreen(
     onBack: () -> Unit,
     viewModel: UrnetworkSharedTrafficViewModel = hiltViewModel(),
 ) {
-    val balance by viewModel.balance.collectAsStateWithLifecycle()
+    val unpaidBytes by viewModel.unpaidBytes.collectAsStateWithLifecycle()
+    val plan by viewModel.plan.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     Scaffold(
         topBar = {
@@ -59,7 +59,7 @@ fun UrnetworkSharedTrafficScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (isLoading && balance == null) {
+            if (isLoading) {
                 Column(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.Center,
@@ -67,59 +67,30 @@ fun UrnetworkSharedTrafficScreen(
                 ) {
                     CircularProgressIndicator()
                 }
-            } else if (balance == null) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = OzeroPalette.Bg1),
-                ) {
-                    Text(
-                        text = stringResource(R.string.urnetwork_shared_traffic_unavailable),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = OzeroPalette.Text2,
-                        modifier = Modifier.padding(16.dp),
-                    )
-                }
             } else {
-                BalanceCard(balance = balance!!)
+                ProvidedTrafficCard(unpaidBytes = unpaidBytes, plan = plan)
             }
         }
     }
 }
 
 @Composable
-private fun BalanceCard(balance: UrnetworkSdkBridge.SubscriptionBalanceSnapshot) {
+private fun ProvidedTrafficCard(unpaidBytes: Long, plan: String?) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = OzeroPalette.Bg1),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            BalanceRow(
-                label = stringResource(R.string.urnetwork_shared_traffic_pending),
-                value = formatBytes(balance.pendingBytes),
+            TrafficRow(
+                label = stringResource(R.string.urnetwork_shared_traffic_provided),
+                value = formatBytes(unpaidBytes),
             )
-            HorizontalDivider(
-                modifier = Modifier.padding(vertical = 10.dp),
-                color = OzeroPalette.Line,
-            )
-            BalanceRow(
-                label = stringResource(R.string.urnetwork_shared_traffic_balance),
-                value = formatBytes(balance.balanceBytes),
-            )
-            HorizontalDivider(
-                modifier = Modifier.padding(vertical = 10.dp),
-                color = OzeroPalette.Line,
-            )
-            BalanceRow(
-                label = stringResource(R.string.urnetwork_shared_traffic_used),
-                value = formatBytes(balance.usedBytes.coerceAtLeast(0L)),
-            )
-            val plan = balance.plan
             if (plan != null) {
                 HorizontalDivider(
                     modifier = Modifier.padding(vertical = 10.dp),
                     color = OzeroPalette.Line,
                 )
-                BalanceRow(
+                TrafficRow(
                     label = stringResource(R.string.urnetwork_shared_traffic_plan),
                     value = plan,
                 )
@@ -129,7 +100,7 @@ private fun BalanceCard(balance: UrnetworkSdkBridge.SubscriptionBalanceSnapshot)
 }
 
 @Composable
-private fun BalanceRow(label: String, value: String) {
+private fun TrafficRow(label: String, value: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,

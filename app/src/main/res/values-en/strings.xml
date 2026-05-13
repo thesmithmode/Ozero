@@ -246,9 +246,7 @@
     <string name="urnetwork_provide_network_mode_desc">Wi-Fi — provide only over wireless. Wi-Fi and cellular — also over mobile data.</string>
     <string name="urnetwork_shared_traffic_title">Shared traffic</string>
     <string name="urnetwork_shared_traffic_unavailable">Statistics unavailable. Make sure you are connected to URnetwork.</string>
-    <string name="urnetwork_shared_traffic_pending">Pending</string>
-    <string name="urnetwork_shared_traffic_balance">Balance</string>
-    <string name="urnetwork_shared_traffic_used">Used</string>
+    <string name="urnetwork_shared_traffic_provided">Provided (unpaid)</string>
     <string name="urnetwork_shared_traffic_plan">Plan</string>
     <string name="urnetwork_peers_connected">Connected to %1$d peers</string>
     <string name="urnetwork_peers_searching">Searching peers…</string>
