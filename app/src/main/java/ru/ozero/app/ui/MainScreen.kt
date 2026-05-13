@@ -88,12 +88,13 @@ fun MainScreen(
     val killswitchActive by viewModel.killswitchActive.collectAsStateWithLifecycle()
     val switching by viewModel.switching.collectAsStateWithLifecycle()
 
+    val currentState = state
     val powerState = when {
         switching != null -> PowerDiscState.Switching
-        state is TunnelState.Connected &&
-            state.engineId == EngineId.URNETWORK &&
+        currentState is TunnelState.Connected &&
+            currentState.engineId == EngineId.URNETWORK &&
             urnetworkPeerCount == 0 -> PowerDiscState.Connecting
-        else -> state.toPowerDiscState()
+        else -> currentState.toPowerDiscState()
     }
     val backgroundState = if (switching != null) OzeroBackgroundState.Connecting else state.toBackgroundState()
     val isConnected = state is TunnelState.Connected

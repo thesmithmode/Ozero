@@ -113,14 +113,15 @@ private fun BalanceCard(balance: UrnetworkSdkBridge.SubscriptionBalanceSnapshot)
                 label = stringResource(R.string.urnetwork_shared_traffic_used),
                 value = formatBytes(balance.usedBytes.coerceAtLeast(0L)),
             )
-            if (balance.plan != null) {
+            val plan = balance.plan
+            if (plan != null) {
                 HorizontalDivider(
                     modifier = Modifier.padding(vertical = 10.dp),
                     color = OzeroPalette.Line,
                 )
                 BalanceRow(
                     label = stringResource(R.string.urnetwork_shared_traffic_plan),
-                    value = balance.plan,
+                    value = plan,
                 )
             }
         }
