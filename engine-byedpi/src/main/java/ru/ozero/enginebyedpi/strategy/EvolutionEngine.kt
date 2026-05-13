@@ -135,8 +135,11 @@ class EvolutionEngine(
         val mutatedCount = settings.populationSize - elites.size - randomCount
         repeat(randomCount) {
             offspring.add(
-                if (memory != null && memory.hasData()) pool.weightedRandomChromosome(memory, random = random)
-                else pool.randomChromosome(random = random),
+                if (memory != null && memory.hasData()) {
+                    pool.weightedRandomChromosome(memory, random = random)
+                } else {
+                    pool.randomChromosome(random = random)
+                },
             )
         }
         repeat(mutatedCount) {

@@ -39,8 +39,11 @@ class StrategyEvolver(private val pool: GenePool) {
         if (chromosome.isEmpty()) return chromosome
         var result: Chromosome = chromosome.map { gene ->
             if (random.nextFloat() < rate) {
-                if (memory != null && memory.hasData()) pool.weightedRandomGene(memory, random)
-                else pool.randomGene(random)
+                if (memory != null && memory.hasData()) {
+                    pool.weightedRandomGene(memory, random)
+                } else {
+                    pool.randomGene(random)
+                }
             } else {
                 gene
             }

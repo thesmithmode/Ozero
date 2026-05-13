@@ -514,7 +514,9 @@ private fun EvolutionStateCard(
                     style = MaterialTheme.typography.labelMedium,
                 )
                 LinearProgressIndicator(
-                    progress = { if (state.maxGenerations > 0) state.generation.toFloat() / state.maxGenerations else 0f },
+                    progress = {
+                        if (state.maxGenerations > 0) state.generation.toFloat() / state.maxGenerations else 0f
+                    },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 if (state.bestFitness > 0.0) {
@@ -534,12 +536,22 @@ private fun EvolutionStateCard(
             if (state.evaluatingCommand != null) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        text = stringResource(R.string.evolution_evaluating_label, state.evaluatingIndex, state.evaluatingTotal),
+                        text = stringResource(
+                            R.string.evolution_evaluating_label,
+                            state.evaluatingIndex,
+                            state.evaluatingTotal,
+                        ),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
                     LinearProgressIndicator(
-                        progress = { if (state.evaluatingTotal > 0) state.evaluatingIndex.toFloat() / state.evaluatingTotal else 0f },
+                        progress = {
+                            if (state.evaluatingTotal > 0) {
+                                state.evaluatingIndex.toFloat() / state.evaluatingTotal
+                            } else {
+                                0f
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Text(
@@ -553,50 +565,65 @@ private fun EvolutionStateCard(
                 }
             }
             if (state.topChromosomes.isNotEmpty()) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f))
-                Text(
-                    text = stringResource(R.string.evolution_population_label),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                EvolutionTopChromosomes(
+                    chromosomes = state.topChromosomes,
+                    savedStrategies = savedStrategies,
+                    onSave = onSave,
+                    onApply = onApply,
                 )
-                state.topChromosomes.forEachIndexed { idx, (cmd, fitness) ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("evolution_top_$idx"),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "${(fitness * 100).toInt()}% — $cmd",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontFamily = FontFamily.Monospace,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        IconButton(
-                            onClick = { onSave(cmd) },
-                            modifier = Modifier.testTag("evolution_save_$idx"),
-                        ) {
-                            Icon(
-                                Icons.Filled.Star,
-                                contentDescription = stringResource(R.string.saved_strategy_save),
-                                tint = if (savedStrategies.any { it.command == cmd }) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                                },
-                            )
-                        }
-                        OutlinedButton(
-                            onClick = { onApply(cmd) },
-                            modifier = Modifier.testTag("evolution_apply_$idx"),
-                        ) {
-                            Text(stringResource(R.string.strategy_test_apply))
-                        }
-                    }
-                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EvolutionTopChromosomes(
+    chromosomes: List<Pair<String, Double>>,
+    savedStrategies: List<SavedStrategy>,
+    onSave: (String) -> Unit,
+    onApply: (String) -> Unit,
+) {
+    HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f))
+    Text(
+        text = stringResource(R.string.evolution_population_label),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onPrimaryContainer,
+    )
+    chromosomes.forEachIndexed { idx, (cmd, fitness) ->
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("evolution_top_$idx"),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "${(fitness * 100).toInt()}% — $cmd",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            IconButton(
+                onClick = { onSave(cmd) },
+                modifier = Modifier.testTag("evolution_save_$idx"),
+            ) {
+                Icon(
+                    Icons.Filled.Star,
+                    contentDescription = stringResource(R.string.saved_strategy_save),
+                    tint = if (savedStrategies.any { it.command == cmd }) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                    },
+                )
+            }
+            OutlinedButton(
+                onClick = { onApply(cmd) },
+                modifier = Modifier.testTag("evolution_apply_$idx"),
+            ) {
+                Text(stringResource(R.string.strategy_test_apply))
             }
         }
     }
@@ -875,8 +902,11 @@ private fun SavedStrategyCard(
                         contentDescription = stringResource(
                             if (saved.isPinned) R.string.saved_strategy_unpin else R.string.saved_strategy_pin,
                         ),
-                        tint = if (saved.isPinned) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                        tint = if (saved.isPinned) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                        },
                     )
                 }
             }
