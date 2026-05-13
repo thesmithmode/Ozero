@@ -229,24 +229,20 @@ class EngineUrnetworkContractTest {
     }
 
     @Test
-    fun `ipProbeRoute возвращает Unavailable когда selectedLocation null`() = runTest {
+    fun `ipProbeRoute возвращает AutoSelected когда selectedLocation null (Best Available режим)`() = runTest {
         val (e, _, _) = engine()
         val route = e.ipProbeRoute(0)
-        assertIs<ru.ozero.enginescore.IpProbeRoute.Unavailable>(
+        assertIs<ru.ozero.enginescore.IpProbeRoute.AutoSelected>(
             route,
-            "URnetwork без selectedLocation = страна неизвестна. " +
-                "ipProbeRoute обязан вернуть Unavailable, не Default — иначе MainViewModel " +
-                "пойдёт fetch() через TUN и получит провайдерский IP вместо exit-страны.",
-        )
-        assertTrue(
-            route.reason.isNotEmpty(),
-            "Unavailable.reason обязан содержать причину для UI/логов.",
+            "selectedLocation==null = Best Available режим. UI обязан показывать 'Авто', " +
+                "не ошибку 'не удалось получить IP'.",
         )
     }
 
     @Test
     fun `ipProbeRoute возвращает StaticLocation с кодом когда selectedLocation валидный`() = runTest {
         val bridge = FakeUrnetworkSdkBridge().also {
+            it.selectedLocationResult = object : UrnetworkSdkBridge.LocationToken { override val countryCode = "IN" }
             it.locationInfoResult = UrnetworkSdkBridge.LocationInfo(
                 country = "India",
                 countryCode = "IN",
@@ -261,19 +257,21 @@ class EngineUrnetworkContractTest {
     }
 
     @Test
-    fun `ipProbeRoute возвращает StaticLocation с null кодом когда countryCode null (Best Available)`() = runTest {
+    fun `ipProbeRoute возвращает Unavailable когда selectedLocation не null но country и name оба пустые`() = runTest {
         val bridge = FakeUrnetworkSdkBridge().also {
+            it.selectedLocationResult = object : UrnetworkSdkBridge.LocationToken { override val countryCode = "US" }
             it.locationInfoResult = UrnetworkSdkBridge.LocationInfo(
                 country = null,
-                countryCode = null,
-                name = "Best Available",
+                countryCode = "US",
+                name = null,
             )
         }
         val (e, _, _) = engine(bridge = bridge)
         val route = e.ipProbeRoute(0)
-        assertIs<ru.ozero.enginescore.IpProbeRoute.StaticLocation>(route)
-        assertNull(route.countryCode, "Best Available не имеет countryCode — null, флаг не отображается")
-        assertEquals("Best Available", route.country)
+        assertIs<ru.ozero.enginescore.IpProbeRoute.Unavailable>(
+            route,
+            "selectedLocation не null, но country и name = null — нечего отображать, Unavailable",
+        )
     }
 
     @Test
@@ -396,9 +394,11 @@ class EngineUrnetworkContractTest {
             return UrnetworkSdkBridge.AttachResult.Success
         }
 
+        var selectedLocationResult: UrnetworkSdkBridge.LocationToken? = null
+
         override fun connectTo(location: UrnetworkSdkBridge.LocationToken) = Unit
         override fun connectBestAvailable() = Unit
-        override fun selectedLocation(): UrnetworkSdkBridge.LocationToken? = null
+        override fun selectedLocation(): UrnetworkSdkBridge.LocationToken? = selectedLocationResult
         override fun selectedLocationInfo(): UrnetworkSdkBridge.LocationInfo? = locationInfoResult
         override fun openLocationsViewController(): com.bringyour.sdk.LocationsViewController? = null
         var lastProvidePaused: Boolean? = null
