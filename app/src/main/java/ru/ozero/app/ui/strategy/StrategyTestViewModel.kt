@@ -25,12 +25,12 @@ import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginebyedpi.strategy.ByeDpiKnownSeeds
 import ru.ozero.enginebyedpi.strategy.EvolutionEngine
-import ru.ozero.enginebyedpi.strategy.GeneMemory
+import ru.ozero.enginebyedpi.strategy.EvolutionResourcesProvider
 import ru.ozero.enginebyedpi.strategy.GenePool
 import ru.ozero.enginebyedpi.strategy.ProbeResult
+import ru.ozero.commonnet.NetworkProfileDetector
 import ru.ozero.enginebyedpi.strategy.SocksProbeClient
 import ru.ozero.enginebyedpi.strategy.StrategyEvolver
-import ru.ozero.enginebyedpi.strategy.StrategyFitnessCache
 import ru.ozero.enginebyedpi.strategy.toCommand
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EnginePlugin
@@ -68,8 +68,8 @@ class StrategyTestViewModel @Inject constructor(
     private val byeDpiEngine: EnginePlugin,
     private val probeFactory: StrategyProbeClientFactory,
     private val tunnelController: TunnelController,
-    private val geneMemory: GeneMemory,
-    private val fitnessCache: StrategyFitnessCache,
+    private val evolutionResources: EvolutionResourcesProvider,
+    private val networkProfileDetector: NetworkProfileDetector,
     private val usageHistoryStore: UsageHistoryStore,
 ) : ViewModel() {
 
@@ -289,6 +289,8 @@ class StrategyTestViewModel @Inject constructor(
         val evolver = StrategyEvolver(genePool)
         val maxGen = snap.evolutionMaxGenerations
         val timeoutMs = snap.timeoutSeconds * 1_000L
+        val network = withContext(ioDispatcher) { networkProfileDetector.current() }
+        val resources = withContext(ioDispatcher) { evolutionResources.forNetwork(network.id) }
         val evolutionEngine = EvolutionEngine(
             byeDpiEngine = byeDpiEngine,
             probeFactory = { port, timeout -> probeFactory.create(port, timeout.toInt()) },
@@ -304,8 +306,8 @@ class StrategyTestViewModel @Inject constructor(
                 concurrentProbes = max(1, snap.concurrentLimit),
                 timeoutMs = timeoutMs,
             ),
-            memory = geneMemory,
-            fitnessCachePersistent = fitnessCache,
+            memory = resources.memory,
+            fitnessCachePersistent = resources.fitnessCache,
         )
         _evolutionState.value = EvolutionUiState(
             maxGenerations = maxGen,

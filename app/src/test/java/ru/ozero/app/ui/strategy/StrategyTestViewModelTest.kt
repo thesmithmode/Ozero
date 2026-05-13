@@ -17,10 +17,11 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.commonvpn.TunnelController
-import ru.ozero.enginebyedpi.strategy.GeneMemory
+import ru.ozero.commonnet.NetworkProfile
+import ru.ozero.commonnet.NetworkProfileDetector
+import ru.ozero.enginebyedpi.strategy.DefaultEvolutionResourcesProvider
 import ru.ozero.enginebyedpi.strategy.ProbeResult
 import ru.ozero.enginebyedpi.strategy.SocksProbeClient
-import ru.ozero.enginebyedpi.strategy.StrategyFitnessCache
 import ru.ozero.enginescore.EngineCapabilities
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
@@ -94,10 +95,12 @@ class StrategyTestViewModelTest {
             byeDpiEngine = engine,
             probeFactory = { _, _ -> probe },
             tunnelController = tunnel,
-            geneMemory = GeneMemory(java.io.File.createTempFile("mem", ".json").also { it.deleteOnExit() }),
-            fitnessCache = StrategyFitnessCache(
-                java.io.File.createTempFile("fc", ".json").also { it.deleteOnExit() },
+            evolutionResources = DefaultEvolutionResourcesProvider(
+                java.nio.file.Files.createTempDirectory("evres").toFile().also { it.deleteOnExit() },
             ),
+            networkProfileDetector = object : NetworkProfileDetector {
+                override fun current(): NetworkProfile = NetworkProfile.NONE
+            },
             usageHistoryStore = usageStore,
         ).also { it.ioDispatcher = dispatcher }
     }
@@ -147,10 +150,12 @@ class StrategyTestViewModelTest {
             settingsStore = settingsStore, domainListManager = manager,
             savedStrategyStore = savedStore,
             byeDpiEngine = engine, probeFactory = { _, _ -> probe }, tunnelController = tunnel,
-            geneMemory = GeneMemory(java.io.File.createTempFile("mem", ".json").also { it.deleteOnExit() }),
-            fitnessCache = StrategyFitnessCache(
-                java.io.File.createTempFile("fc", ".json").also { it.deleteOnExit() },
+            evolutionResources = DefaultEvolutionResourcesProvider(
+                java.nio.file.Files.createTempDirectory("evres2").toFile().also { it.deleteOnExit() },
             ),
+            networkProfileDetector = object : NetworkProfileDetector {
+                override fun current(): NetworkProfile = NetworkProfile.NONE
+            },
             usageHistoryStore = usageStore,
         ).also { it.ioDispatcher = dispatcher }
         advanceUntilIdle()

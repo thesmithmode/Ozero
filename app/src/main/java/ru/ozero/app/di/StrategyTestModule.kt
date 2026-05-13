@@ -22,11 +22,12 @@ import ru.ozero.app.ui.strategy.StrategyProbeClientFactory
 import ru.ozero.app.ui.strategy.StrategyResultsStore
 import ru.ozero.app.ui.strategy.StrategyTestSettingsStore
 import ru.ozero.enginebyedpi.ByeDpiEngine
-import ru.ozero.enginebyedpi.strategy.GeneMemory
+import ru.ozero.commonnet.AndroidNetworkProfileDetector
+import ru.ozero.commonnet.NetworkProfileDetector
+import ru.ozero.enginebyedpi.strategy.DefaultEvolutionResourcesProvider
+import ru.ozero.enginebyedpi.strategy.EvolutionResourcesProvider
 import ru.ozero.enginebyedpi.strategy.HttpSocksProbeClient
-import ru.ozero.enginebyedpi.strategy.StrategyFitnessCache
 import ru.ozero.enginescore.EnginePlugin
-import java.io.File
 import javax.inject.Singleton
 
 @Module
@@ -92,13 +93,15 @@ object StrategyTestModule {
 
     @Provides
     @Singleton
-    fun provideGeneMemory(@ApplicationContext context: Context): GeneMemory =
-        GeneMemory(File(context.filesDir, "evolution_memory.json")).also { it.load() }
+    fun provideEvolutionResourcesProvider(
+        @ApplicationContext context: Context,
+    ): EvolutionResourcesProvider = DefaultEvolutionResourcesProvider(context.filesDir)
 
     @Provides
     @Singleton
-    fun provideStrategyFitnessCache(@ApplicationContext context: Context): StrategyFitnessCache =
-        StrategyFitnessCache(File(context.filesDir, "fitness_cache.json")).also { it.load() }
+    fun provideNetworkProfileDetector(
+        @ApplicationContext context: Context,
+    ): NetworkProfileDetector = AndroidNetworkProfileDetector(context)
 
     @Provides
     fun provideStrategyProbeClientFactory(): StrategyProbeClientFactory =
