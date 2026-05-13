@@ -26,5 +26,15 @@ object DnsPresets {
         DnsPreset("yandex", "Yandex", listOf("77.88.8.8", "77.88.8.1")),
         DnsPreset("adguard", "AdGuard", listOf("94.140.14.14", "94.140.15.15")),
         DnsPreset("quad9", "Quad9", listOf("9.9.9.9", "149.112.112.112")),
+        DnsPreset(
+            "malw", "dns.malw.link",
+            listOf("84.21.189.133", "2a12:bec4:1460:d5::2", "64.188.98.242", "2a01:ecc0:2c1:2::2"),
+        ),
+        DnsPreset(
+            "xbox_dns", "xbox-dns.ru",
+            listOf("111.88.96.50", "111.88.96.51", "2a00:ab00:1233:26::50", "2a00:ab00:1233:26::51"),
+        ),
+        DnsPreset("astracat", "astracat", listOf("77.239.113.0", "108.165.164.201")),
+        DnsPreset("geohide", "geohide", listOf("95.182.120.241", "45.155.204.190", "2a0c:9300:0:54::1")),
     )
 }

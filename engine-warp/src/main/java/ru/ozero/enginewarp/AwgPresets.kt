@@ -88,5 +88,69 @@ object AwgPresets {
         ),
     )
 
-    val ALL: List<AwgPreset> = listOf(DEFAULT_WARP, NO_OBFUSCATION, LIGHT, TSPU, AGGRESSIVE)
+    val I1_V1 = AwgPreset(
+        id = "i1_v1",
+        name = "I1 вариант 1",
+        params = AwgParams(
+            junkPacketCount = 5,
+            junkPacketMinSize = 100,
+            junkPacketMaxSize = 200,
+            payloadPacketSizeCount1 = 28,
+            payloadPacketSizeCount2 = 29,
+            payloadPacketSizeCount3 = 10,
+        ),
+    )
+
+    val I1_V2 = AwgPreset(
+        id = "i1_v2",
+        name = "I1 вариант 2",
+        params = AwgParams(
+            junkPacketCount = 5,
+            junkPacketMinSize = 100,
+            junkPacketMaxSize = 200,
+            payloadPacketSizeCount1 = 50,
+            payloadPacketSizeCount2 = 60,
+            payloadPacketSizeCount3 = 20,
+        ),
+    )
+
+    val I1_V3 = AwgPreset(
+        id = "i1_v3",
+        name = "I1 вариант 3",
+        params = AwgParams(
+            junkPacketCount = 4,
+            junkPacketMinSize = 40,
+            junkPacketMaxSize = 70,
+            payloadPacketSizeCount1 = 28,
+            payloadPacketSizeCount2 = 29,
+            payloadPacketSizeCount3 = 10,
+        ),
+    )
+
+    val I1_V4 = AwgPreset(
+        id = "i1_v4",
+        name = "I1 вариант 4 (2 конфига)",
+        params = AwgParams(
+            junkPacketCount = 4,
+            junkPacketMinSize = 40,
+            junkPacketMaxSize = 70,
+            payloadPacketSizeCount1 = 50,
+            payloadPacketSizeCount2 = 60,
+            payloadPacketSizeCount3 = 10,
+        ),
+    )
+
+    val I1_OFF = AwgPreset(
+        id = "i1_off",
+        name = "Отключить I1",
+        params = AwgParams(
+            payloadPacketSizeCount1 = 0,
+            payloadPacketSizeCount2 = 0,
+            payloadPacketSizeCount3 = 0,
+        ),
+    )
+
+    val ALL: List<AwgPreset> = listOf(
+        DEFAULT_WARP, NO_OBFUSCATION, LIGHT, TSPU, AGGRESSIVE, I1_V1, I1_V2, I1_V3, I1_V4, I1_OFF,
+    )
 }

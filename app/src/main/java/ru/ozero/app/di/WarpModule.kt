@@ -24,6 +24,7 @@ import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginewarp.DataStoreWarpConfigSlotStore
 import ru.ozero.enginewarp.DataStoreWarpConfigStore
+import ru.ozero.enginewarp.DoHProvider
 import ru.ozero.enginewarp.EngineWarp
 import ru.ozero.enginewarp.HttpClient
 import ru.ozero.enginewarp.HttpUrlConnectionClient
@@ -34,6 +35,7 @@ import ru.ozero.enginewarp.RemoteAwgRuntime
 import ru.ozero.enginewarp.RealWarpSdkBridge
 import ru.ozero.enginewarp.WarpAutoConfig
 import ru.ozero.enginewarp.WarpConfFileImporter
+import ru.ozero.enginewarp.WarpDoHStore
 import ru.ozero.enginewarp.WarpFileImporter
 import ru.ozero.enginewarp.WarpConfigSlotStore
 import ru.ozero.enginewarp.WarpSdkBridge
@@ -107,6 +109,12 @@ object WarpModule {
 
     @Provides
     @Singleton
+    fun provideWarpDoHStore(
+        @WarpPrefs dataStore: DataStore<Preferences>,
+    ): WarpDoHStore = WarpDoHStore(dataStore)
+
+    @Provides
+    @Singleton
     @IntoSet
     fun provideEngineWarp(
         @ApplicationContext context: Context,
@@ -114,6 +122,7 @@ object WarpModule {
         store: WarpConfigSlotStore,
         bridge: WarpSdkBridge,
         settingsRepository: SettingsRepository,
+        doHStore: WarpDoHStore,
     ): EnginePlugin = EngineWarp(
         autoConfig = autoConfig,
         configStore = store,
@@ -125,6 +134,13 @@ object WarpModule {
                 withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
                     runCatching { settingsRepository.settings.first() }.getOrNull()
                 }?.ipv6Enabled ?: SettingsModel.DEFAULT_IPV6_ENABLED
+            }
+        },
+        doHProvider = {
+            runBlocking {
+                withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
+                    runCatching { doHStore.provider.first() }.getOrNull()
+                } ?: DoHProvider.SYSTEM
             }
         },
     )

@@ -27,6 +27,7 @@ class EngineWarp(
     private val uapiPathProvider: () -> String,
     private val socketProtector: VpnSocketProtector = VpnSocketProtectorHolder,
     private val ipv6EnabledProvider: () -> Boolean = { false },
+    private val doHProvider: () -> DoHProvider = { DoHProvider.SYSTEM },
 ) : EnginePlugin, TunFdAcceptor {
 
     override val id = EngineId.WARP
@@ -196,17 +197,38 @@ class EngineWarp(
         val host = ep.substring(0, sep)
         val port = ep.substring(sep + 1)
         if (host.isBlank() || isLikelyIpAddress(host)) return cfg
+        val provider = doHProvider()
+        Log.i(TAG, "resolveEndpointHost host=$host provider=${provider.name}")
         for (attempt in 0..2) {
-            val resolved = runCatching { java.net.InetAddress.getByName(host).hostAddress }.getOrNull()
+            val resolved = if (provider.isSystem) {
+                runCatching { java.net.InetAddress.getByName(host).hostAddress }.getOrNull()
+            } else {
+                resolveViaDoH(host, provider.url)
+            }
             if (!resolved.isNullOrBlank()) {
-                Log.i(TAG, "endpoint resolved $host → $resolved (attempt ${attempt + 1})")
+                Log.i(TAG, "endpoint resolved $host → $resolved via ${provider.name} (attempt ${attempt + 1})")
                 return cfg.copy(peerEndpoint = "$resolved:$port")
             }
             if (attempt < 2) runCatching { Thread.sleep(200L shl attempt) }
         }
-        PersistentLoggers.warn(TAG, "endpoint resolve failed after 3 attempts for $host")
+        PersistentLoggers.warn(TAG, "endpoint resolve failed after 3 attempts for $host via ${provider.name}")
         return cfg
     }
+
+    private fun resolveViaDoH(host: String, dohUrl: String): String? = runCatching {
+        val url = java.net.URL("$dohUrl?name=$host&type=A")
+        val conn = url.openConnection() as java.net.HttpURLConnection
+        try {
+            conn.setRequestProperty("Accept", "application/dns-json")
+            conn.connectTimeout = DOH_CONNECT_TIMEOUT_MS
+            conn.readTimeout = DOH_READ_TIMEOUT_MS
+            if (conn.responseCode != 200) return@runCatching null
+            val body = conn.inputStream.bufferedReader().readText()
+            Regex("\"data\"\\s*:\\s*\"([0-9]{1,3}(?:\\.[0-9]{1,3}){3})\"").find(body)?.groupValues?.get(1)
+        } finally {
+            conn.disconnect()
+        }
+    }.getOrNull()
 
     private fun applyEndpointToRawIni(rawIni: String, resolvedEndpoint: String): String =
         rawIni.lineSequence().joinToString("\n") { line ->
@@ -229,5 +251,7 @@ class EngineWarp(
         const val TAG = "EngineWarp"
         const val WARP_NO_SOCKS_PORT = 0
         const val TUNNEL_NAME = "ozero-warp"
+        const val DOH_CONNECT_TIMEOUT_MS = 3_000
+        const val DOH_READ_TIMEOUT_MS = 3_000
     }
 }

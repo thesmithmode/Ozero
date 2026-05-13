@@ -76,6 +76,7 @@ fun WarpEngineSettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val cooldownRemainingMs by viewModel.cooldownRemainingMs.collectAsStateWithLifecycle()
+    val selectedDoHProvider by viewModel.selectedDoHProvider.collectAsStateWithLifecycle()
 
     if (state.editDraft != null) {
         BackHandler { viewModel.onEditCancel() }
@@ -132,6 +133,8 @@ fun WarpEngineSettingsScreen(
             WarpScreenContent(
                 state = state,
                 cooldownRemainingMs = cooldownRemainingMs,
+                selectedDoHProvider = selectedDoHProvider,
+                onSetDoHProvider = viewModel::onSetDoHProvider,
                 modifier = Modifier.fillMaxSize(),
                 onGenerate = viewModel::onGenerate,
                 onCancelGenerate = viewModel::onCancelGenerate,
@@ -406,6 +409,44 @@ private fun applyPreset(draft: WarpEditDraft, preset: AwgPreset): WarpEditDraft 
 }
 
 @Composable
+private fun WarpDoHSection(
+    selected: ru.ozero.enginewarp.DoHProvider,
+    onSelect: (ru.ozero.enginewarp.DoHProvider) -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth().testTag("warp_doh_section")) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = "Протокол DNS (endpoint resolve)",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            ru.ozero.enginewarp.DoHProvider.entries.forEach { provider ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .selectable(
+                            selected = selected == provider,
+                            onClick = { onSelect(provider) },
+                        )
+                        .testTag("warp_doh_${provider.name.lowercase()}"),
+                ) {
+                    RadioButton(
+                        selected = selected == provider,
+                        onClick = { onSelect(provider) },
+                    )
+                    Text(
+                        text = provider.displayName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(start = 4.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun SectionLabel(text: String) {
     Text(
         text = text,
@@ -437,6 +478,8 @@ private fun WarpTextField(
 private fun WarpScreenContent(
     state: WarpSettingsUiState,
     cooldownRemainingMs: Long,
+    selectedDoHProvider: ru.ozero.enginewarp.DoHProvider,
+    onSetDoHProvider: (ru.ozero.enginewarp.DoHProvider) -> Unit,
     modifier: Modifier = Modifier,
     onGenerate: () -> Unit,
     onCancelGenerate: () -> Unit,
@@ -462,6 +505,8 @@ private fun WarpScreenContent(
         } else {
             SlotListContent(
                 state = state,
+                selectedDoHProvider = selectedDoHProvider,
+                onSetDoHProvider = onSetDoHProvider,
                 onSetActive = onSetActive,
                 onStartEdit = onStartEdit,
                 onDeleteSlot = onDeleteSlot,
@@ -523,6 +568,8 @@ private fun WarpProgressCard(
 @Composable
 private fun SlotListContent(
     state: WarpSettingsUiState,
+    selectedDoHProvider: ru.ozero.enginewarp.DoHProvider,
+    onSetDoHProvider: (ru.ozero.enginewarp.DoHProvider) -> Unit,
     onSetActive: (String) -> Unit,
     onStartEdit: (String) -> Unit,
     onDeleteSlot: (String) -> Unit,
@@ -549,6 +596,12 @@ private fun SlotListContent(
                 onSetActive = { onSetActive(slot.id) },
                 onStartEdit = { onStartEdit(slot.id) },
                 onDelete = { onDeleteSlot(slot.id) },
+            )
+        }
+        item {
+            WarpDoHSection(
+                selected = selectedDoHProvider,
+                onSelect = onSetDoHProvider,
             )
         }
     }
