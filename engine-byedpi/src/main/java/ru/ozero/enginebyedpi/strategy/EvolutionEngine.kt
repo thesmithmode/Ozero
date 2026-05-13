@@ -51,6 +51,7 @@ class EvolutionEngine(
         var best: Chromosome = population.firstOrNull() ?: return emptyList()
         var bestFitness = 0.0
         var stagnationCount = 0
+        val fitnessCache = HashMap<Chromosome, Double>()
 
         for (generation in 1..settings.maxGenerations) {
             if (!currentCoroutineContext().isActive) break
@@ -61,7 +62,7 @@ class EvolutionEngine(
                 settings.mutationRate
             }
 
-            val scored = evaluatePopulation(population, onChromosomeEval)
+            val scored = evaluatePopulation(population, onChromosomeEval, fitnessCache)
             val genBest = scored.maxByOrNull { it.second }
             if (genBest != null && genBest.second > bestFitness) {
                 bestFitness = genBest.second
@@ -152,11 +153,13 @@ class EvolutionEngine(
     private suspend fun evaluatePopulation(
         population: List<Chromosome>,
         onChromosomeEval: (index: Int, total: Int, command: String) -> Unit = { _, _, _ -> },
+        fitnessCache: MutableMap<Chromosome, Double> = HashMap(),
     ): List<Pair<Chromosome, Double>> {
         val results = population.mapIndexed { index, chromosome ->
             if (!currentCoroutineContext().isActive) return@mapIndexed chromosome to 0.0
             onChromosomeEval(index, population.size, chromosome.toCommand())
-            chromosome to evaluate(chromosome)
+            val fitness = fitnessCache.getOrPut(chromosome) { evaluate(chromosome) }
+            chromosome to fitness
         }
         results.forEach { (chromosome, fitness) ->
             memory?.record(chromosome.map { it.token }, fitness)
@@ -178,15 +181,23 @@ class EvolutionEngine(
         return try {
             val probe = probeFactory(socksPort, settings.timeoutMs)
             val semaphore = Semaphore(settings.concurrentProbes.coerceAtLeast(1))
-            coroutineScope {
+            val probeResults = coroutineScope {
                 sites.map { site ->
                     async {
                         semaphore.withPermit {
-                            runCatching { probe.probe(site) }.getOrNull()?.success == true
+                            runCatching { probe.probe(site) }.getOrNull()
                         }
                     }
                 }.map { it.await() }
-            }.count { it }.toDouble() / sites.size
+            }
+            val successCount = probeResults.count { it?.success == true }
+            if (successCount == 0) return@try 0.0
+            val successRate = successCount.toDouble() / sites.size
+            val avgLatencyMs = probeResults
+                .filter { it?.success == true }
+                .mapNotNull { it?.durationMs }
+                .average()
+            successRate * (1.0 / (1.0 + avgLatencyMs / 2000.0))
         } finally {
             runCatching { byeDpiEngine.stop() }
         }

@@ -147,7 +147,10 @@ class EvolutionEngineTest {
             ),
         )
         val stagnationCounts = mutableListOf<Int>()
-        evolutionEngine.evolve(seedStrategies = seeds, onGeneration = { result -> stagnationCounts.add(result.stagnationCount) })
+        evolutionEngine.evolve(
+            seedStrategies = seeds,
+            onGeneration = { result -> stagnationCounts.add(result.stagnationCount) },
+        )
         assertTrue(stagnationCounts.any { it >= 2 }, "should detect stagnation: $stagnationCounts")
     }
 
@@ -217,6 +220,74 @@ class EvolutionEngineTest {
         }
         assertFalse(bestChromosomes[0].isEmpty())
         assertFalse(bestChromosomes[1].isEmpty())
+    }
+
+    @Test
+    fun `cache skips duplicate chromosome evaluations`() = runTest {
+        val engine = CountingEngine()
+        val pool = GenePool(seeds)
+        val evolver = StrategyEvolver(pool)
+        val evolutionEngine = EvolutionEngine(
+            byeDpiEngine = engine,
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = evolver,
+            pool = pool,
+            sites = listOf("s1.com"),
+            settings = EvolutionEngine.EvolutionSettings(
+                populationSize = 4,
+                maxGenerations = 2,
+                targetFitness = 0.0,
+            ),
+        )
+        evolutionEngine.evolve(seedStrategies = seeds, onGeneration = {})
+        assertTrue(engine.startCount < 4 * 2, "cache should skip re-evaluation: starts=${engine.startCount}")
+    }
+
+    @Test
+    fun `latency fitness penalizes slow probes vs fast probes`() = runTest {
+        val fastProbe = object : SocksProbeClient {
+            override suspend fun probe(site: String) = ProbeResult(site = site, success = true, durationMs = 100L)
+        }
+        val slowProbe = object : SocksProbeClient {
+            override suspend fun probe(site: String) = ProbeResult(site = site, success = true, durationMs = 4000L)
+        }
+        fun makeEngine(probe: SocksProbeClient): EvolutionEngine {
+            val pool = GenePool(seeds)
+            return EvolutionEngine(
+                byeDpiEngine = AlwaysSucceedEngine(),
+                probeFactory = { _, _ -> probe },
+                evolver = StrategyEvolver(pool),
+                pool = pool,
+                sites = listOf("s1.com"),
+                settings = EvolutionEngine.EvolutionSettings(
+                    populationSize = 2,
+                    maxGenerations = 1,
+                    targetFitness = 0.0,
+                ),
+            )
+        }
+        var fastFitness = 0.0
+        var slowFitness = 0.0
+        makeEngine(fastProbe).evolve(seedStrategies = seeds, onGeneration = { fastFitness = it.bestFitness })
+        makeEngine(slowProbe).evolve(seedStrategies = seeds, onGeneration = { slowFitness = it.bestFitness })
+        assertTrue(fastFitness > slowFitness, "fast probe fitness=$fastFitness should exceed slow=$slowFitness")
+    }
+
+    private class CountingEngine : EnginePlugin {
+        var startCount = 0
+        override val id = EngineId.BYEDPI
+        override val capabilities = EngineCapabilities(
+            supportsTcp = true, supportsUdp = false, supportsDoH = false,
+            localOnly = true, requiresServer = false, supportsUpstreamSocks = false,
+        )
+        override fun stats(): Flow<EngineStats> = MutableStateFlow(EngineStats())
+        override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
+            startCount++
+            return StartResult.Success(socksPort = 1080)
+        }
+        override suspend fun stop() = Unit
+        override suspend fun probe(): ru.ozero.enginescore.ProbeResult =
+            ru.ozero.enginescore.ProbeResult.Success(latencyMs = 0)
     }
 
     private class AlwaysSucceedEngine : EnginePlugin {

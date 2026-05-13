@@ -8,7 +8,7 @@ data class StrategyTestSettings(
     val useCustomStrategies: Boolean = false,
     val customStrategies: String = "",
     val evolutionMode: Boolean = true,
-    val evolutionPopulationSize: Int = 20,
+    val evolutionPopulationSize: Int = 25,
     val evolutionMaxGenerations: Int = 10,
     val evolutionMutationRate: Float = 0.2f,
     val evolutionEliteCount: Int = 5,

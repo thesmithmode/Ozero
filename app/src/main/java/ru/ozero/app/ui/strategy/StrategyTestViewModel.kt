@@ -23,6 +23,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
+import ru.ozero.enginebyedpi.strategy.ByeDpiKnownSeeds
 import ru.ozero.enginebyedpi.strategy.EvolutionEngine
 import ru.ozero.enginebyedpi.strategy.GeneMemory
 import ru.ozero.enginebyedpi.strategy.GenePool
@@ -279,7 +280,8 @@ class StrategyTestViewModel @Inject constructor(
 
     private suspend fun runEvolution(sites: List<String>) {
         val snap = _settings.value
-        val seedCommands = _strategies.value.map { it.command }
+        val userSeeds = _strategies.value.map { it.command }
+        val seedCommands = (userSeeds + ByeDpiKnownSeeds.commands).distinct()
         val genePool = GenePool(seedCommands)
         val evolver = StrategyEvolver(genePool)
         val maxGen = snap.evolutionMaxGenerations
