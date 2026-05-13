@@ -163,7 +163,6 @@ class EngineUrnetwork(
         val info = sdkBridge.selectedLocationInfo()
             ?: return ru.ozero.enginescore.IpProbeRoute.Unavailable("URnetwork location pending")
         val country = info.country ?: info.name
-            ?: return ru.ozero.enginescore.IpProbeRoute.Unavailable("URnetwork location pending")
         return ru.ozero.enginescore.IpProbeRoute.StaticLocation(country, info.countryCode)
     }
 
