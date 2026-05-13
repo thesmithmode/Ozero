@@ -6,7 +6,7 @@ import java.io.File
 
 interface UsageHistoryStore {
     fun load(): List<UsageEntry>
-    fun record(command: String, name: String?)
+    fun record(command: String, name: String?): List<UsageEntry>
 }
 
 class FileUsageHistoryStore(
@@ -34,10 +34,8 @@ class FileUsageHistoryStore(
     }
 
     @Synchronized
-    override fun record(command: String, name: String?) {
-        val existing = load().toMutableList()
-        existing.add(0, UsageEntry(command = command, name = name))
-        val trimmed = existing.take(maxEntries)
+    override fun record(command: String, name: String?): List<UsageEntry> {
+        val trimmed = (listOf(UsageEntry(command = command, name = name)) + load()).take(maxEntries)
         val array = JSONArray()
         trimmed.forEach { e ->
             array.put(
@@ -48,5 +46,6 @@ class FileUsageHistoryStore(
             )
         }
         runCatching { file.writeText(array.toString()) }
+        return trimmed
     }
 }

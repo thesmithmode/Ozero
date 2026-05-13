@@ -16,6 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
@@ -799,7 +800,7 @@ private fun SavedStrategiesSheet(
                     modifier = Modifier.padding(start = 8.dp, bottom = 4.dp),
                 )
             }
-            usageHistory.take(20).forEachIndexed { idx, entry ->
+            usageHistory.forEachIndexed { idx, entry ->
                 HistoryEntryRow(
                     entry = entry,
                     index = idx,
@@ -861,7 +862,7 @@ private fun SavedStrategyCard(
                     modifier = Modifier.testTag("saved_rename_${saved.id}"),
                 ) {
                     Icon(
-                        Icons.Filled.Settings,
+                        Icons.Filled.Edit,
                         contentDescription = stringResource(R.string.saved_strategy_rename_title),
                     )
                 }

@@ -640,7 +640,10 @@ class StrategyTestViewModelTest {
     private class FakeUsageHistoryStore : UsageHistoryStore {
         val recorded = mutableListOf<Pair<String, String?>>()
         override fun load(): List<UsageEntry> = recorded.map { (cmd, name) -> UsageEntry(cmd, name = name) }
-        override fun record(command: String, name: String?) { recorded.add(command to name) }
+        override fun record(command: String, name: String?): List<UsageEntry> {
+            recorded.add(0, command to name)
+            return load()
+        }
     }
 
     private class FakeDomainListStore : DomainListStore {

@@ -269,8 +269,10 @@ class StrategyTestViewModel @Inject constructor(
                 val updated = runCatching { savedStrategyStore.add(command) }.getOrElse { savedStrategyStore.load() }
                 _savedStrategies.value = updated
                 val savedName = updated.find { it.command == command }?.name
-                runCatching { usageHistoryStore.record(command, savedName) }
-                _usageHistory.value = runCatching { usageHistoryStore.load() }.getOrDefault(_usageHistory.value)
+                val newHistory = runCatching { usageHistoryStore.record(command, savedName) }
+                    .onFailure { PersistentLoggers.warn(TAG, "history record failed: ${it.message}") }
+                    .getOrNull()
+                if (newHistory != null) _usageHistory.value = newHistory
             }
         }
     }

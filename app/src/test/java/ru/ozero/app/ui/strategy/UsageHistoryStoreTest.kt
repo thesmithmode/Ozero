@@ -62,6 +62,13 @@ class UsageHistoryStoreTest {
     }
 
     @Test
+    fun `record returns updated list without extra load call`() {
+        val result = store.record("-Ku -An", name = "Test")
+        assertEquals(1, result.size)
+        assertEquals("-Ku -An", result[0].command)
+    }
+
+    @Test
     fun `load survives corrupted file`() {
         File(tempDir, "strategy_usage_history.json").writeText("not valid json")
         assertEquals(emptyList(), store.load())
