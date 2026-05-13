@@ -768,7 +768,10 @@ class OzeroVpnService : android.net.VpnService() {
             val nativeStopThread = Thread({
                 runCatching { tunnelGateway.stop() }
                     .onFailure { PersistentLoggers.warn(TAG, "tunnelGateway.stop threw: ${it.message}") }
-            }, "ozero-native-stop").also { it.isDaemon = true; it.start() }
+            }, "ozero-native-stop").also {
+                it.isDaemon = true
+                it.start()
+            }
             val stopStart = System.currentTimeMillis()
             val chainOk = withTimeoutOrNull(PARALLEL_STOP_TIMEOUT_MS) { chainStopJob.join() }
             if (chainOk == null) {
