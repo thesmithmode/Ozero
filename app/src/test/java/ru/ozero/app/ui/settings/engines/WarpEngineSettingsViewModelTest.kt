@@ -18,7 +18,6 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import ru.ozero.enginewarp.DoHProvider
 import ru.ozero.enginewarp.ImportedWarpConfig
 import ru.ozero.enginewarp.RegisteredWarpConfig
 import ru.ozero.enginewarp.WarpAutoConfig
