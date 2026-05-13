@@ -37,7 +37,7 @@ class MainScreenVisualConnectedSentinelTest {
     }
 
     @Test
-    fun `backgroundState для URnetwork connected с 0 peers совпадает с Connecting чтобы не было желтозелёного наложения`() {
+    fun `backgroundState для URnetwork с 0 peers — Connecting (без желтозелёного наложения)`() {
         val source = locateMainScreen().readText()
         assertTrue(
             source.contains("state.engineId == EngineId.URNETWORK && urnetworkPeerCount == 0") &&

@@ -29,6 +29,7 @@ class StrategyTestSettingsStoreTest {
         assertEquals(10, s.evolutionMaxGenerations)
         assertEquals(0.2f, s.evolutionMutationRate)
         assertEquals(5, s.evolutionEliteCount)
+        assertEquals(0.85f, s.evolutionTargetFitness)
     }
 
     @Test
@@ -45,6 +46,7 @@ class StrategyTestSettingsStoreTest {
             evolutionMaxGenerations = 25,
             evolutionMutationRate = 0.4f,
             evolutionEliteCount = 8,
+            evolutionTargetFitness = 0.7f,
         )
         store.save(settings)
         val loaded = store.load()
@@ -59,6 +61,7 @@ class StrategyTestSettingsStoreTest {
         assertEquals(settings.evolutionMaxGenerations, loaded.evolutionMaxGenerations)
         assertEquals(settings.evolutionMutationRate, loaded.evolutionMutationRate)
         assertEquals(settings.evolutionEliteCount, loaded.evolutionEliteCount)
+        assertEquals(settings.evolutionTargetFitness, loaded.evolutionTargetFitness)
     }
 
     @Test

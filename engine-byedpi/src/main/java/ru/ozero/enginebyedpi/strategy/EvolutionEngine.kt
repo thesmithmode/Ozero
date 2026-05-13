@@ -133,7 +133,8 @@ class EvolutionEngine(
         while (offspring.size < settings.populationSize) {
             val p1 = survivors[random.nextInt(survivors.size)]
             val p2 = survivors[random.nextInt(survivors.size)]
-            offspring.add(evolver.mutate(evolver.crossover(p1, p2, random), mutationRate, random = random, memory = memory))
+            val child = evolver.crossover(p1, p2, random)
+            offspring.add(evolver.mutate(child, mutationRate, random = random, memory = memory))
         }
         return offspring
     }

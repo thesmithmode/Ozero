@@ -12,4 +12,5 @@ data class StrategyTestSettings(
     val evolutionMaxGenerations: Int = 10,
     val evolutionMutationRate: Float = 0.2f,
     val evolutionEliteCount: Int = 5,
+    val evolutionTargetFitness: Float = 0.85f,
 )

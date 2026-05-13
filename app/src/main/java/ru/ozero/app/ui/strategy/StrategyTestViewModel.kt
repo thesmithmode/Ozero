@@ -280,8 +280,9 @@ class StrategyTestViewModel @Inject constructor(
 
     private suspend fun runEvolution(sites: List<String>) {
         val snap = _settings.value
+        val pinnedCommands = _savedStrategies.value.filter { it.isPinned }.map { it.command }
         val userSeeds = _strategies.value.map { it.command }
-        val seedCommands = (userSeeds + ByeDpiKnownSeeds.commands).distinct()
+        val seedCommands = (pinnedCommands + userSeeds + ByeDpiKnownSeeds.commands).distinct()
         val genePool = GenePool(seedCommands)
         val evolver = StrategyEvolver(genePool)
         val maxGen = snap.evolutionMaxGenerations
@@ -297,6 +298,7 @@ class StrategyTestViewModel @Inject constructor(
                 maxGenerations = maxGen,
                 mutationRate = snap.evolutionMutationRate,
                 eliteCount = snap.evolutionEliteCount,
+                targetFitness = snap.evolutionTargetFitness.toDouble(),
                 concurrentProbes = max(1, snap.concurrentLimit),
                 timeoutMs = timeoutMs,
             ),
@@ -307,7 +309,9 @@ class StrategyTestViewModel @Inject constructor(
             evaluatingTotal = snap.evolutionPopulationSize,
             isInitializing = true,
         )
-        evolutionEngine.evolve(
+        var lastBestFitness = 0.0
+        var lastBestCommand: String? = null
+        val best = evolutionEngine.evolve(
             seedStrategies = seedCommands,
             onGeneration = { result ->
                 _evolutionState.update { current ->
@@ -327,6 +331,17 @@ class StrategyTestViewModel @Inject constructor(
                     )
                 }
                 _runSummary.value = "Gen ${result.generation}/$maxGen · best ${(result.bestFitness * 100).toInt()}%"
+                if (result.bestFitness > lastBestFitness) {
+                    lastBestFitness = result.bestFitness
+                    val cmd = result.best.toCommand()
+                    if (cmd.isNotBlank() && cmd != lastBestCommand) {
+                        lastBestCommand = cmd
+                        viewModelScope.launch(ioDispatcher) {
+                            runCatching { savedStrategyStore.add(cmd) }
+                                .onSuccess { _savedStrategies.value = it }
+                        }
+                    }
+                }
             },
             onChromosomeEval = { index, total, command ->
                 _evolutionState.update { current ->
@@ -338,6 +353,13 @@ class StrategyTestViewModel @Inject constructor(
                 }
             },
         )
+        val finalCmd = best.toCommand()
+        if (finalCmd.isNotBlank() && lastBestFitness > 0.0) {
+            withContext(ioDispatcher) {
+                runCatching { savedStrategyStore.add(finalCmd) }
+                    .onSuccess { _savedStrategies.value = it }
+            }
+        }
     }
 
     private suspend fun runLoop(sites: List<String>) = coroutineScope {
