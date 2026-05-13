@@ -82,7 +82,7 @@ class EvolutionEngine(
             )
             memory?.save()
             if (bestFitness >= settings.targetFitness) break
-            if (stagnationCount >= settings.maxGenerations / 2) break
+            if (stagnationCount >= (settings.maxGenerations / 2).coerceAtLeast(3)) break
 
             val survivors = evolver.select(scored, settings.eliteCount)
             population = if (stagnationCount >= 2) {

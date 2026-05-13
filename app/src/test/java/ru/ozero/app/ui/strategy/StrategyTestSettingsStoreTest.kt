@@ -25,7 +25,7 @@ class StrategyTestSettingsStoreTest {
         assertFalse(s.useCustomStrategies)
         assertEquals("", s.customStrategies)
         assertTrue(s.evolutionMode, "evolutionMode default обязан быть true — sentinel против отката")
-        assertEquals(20, s.evolutionPopulationSize)
+        assertEquals(25, s.evolutionPopulationSize)
         assertEquals(10, s.evolutionMaxGenerations)
         assertEquals(0.2f, s.evolutionMutationRate)
         assertEquals(5, s.evolutionEliteCount)
