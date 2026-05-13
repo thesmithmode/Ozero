@@ -29,6 +29,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
 import ru.ozero.app.ui.theme.OzeroPalette
+import ru.ozero.app.ui.utils.formatBytes
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -94,7 +95,7 @@ private fun BalanceCard(balance: UrnetworkSdkBridge.SubscriptionBalanceSnapshot)
         Column(modifier = Modifier.padding(16.dp)) {
             BalanceRow(
                 label = stringResource(R.string.urnetwork_shared_traffic_pending),
-                value = formatSharedBytes(balance.pendingBytes),
+                value = formatBytes(balance.pendingBytes),
             )
             HorizontalDivider(
                 modifier = Modifier.padding(vertical = 10.dp),
@@ -102,7 +103,7 @@ private fun BalanceCard(balance: UrnetworkSdkBridge.SubscriptionBalanceSnapshot)
             )
             BalanceRow(
                 label = stringResource(R.string.urnetwork_shared_traffic_balance),
-                value = formatSharedBytes(balance.balanceBytes),
+                value = formatBytes(balance.balanceBytes),
             )
             HorizontalDivider(
                 modifier = Modifier.padding(vertical = 10.dp),
@@ -110,7 +111,7 @@ private fun BalanceCard(balance: UrnetworkSdkBridge.SubscriptionBalanceSnapshot)
             )
             BalanceRow(
                 label = stringResource(R.string.urnetwork_shared_traffic_used),
-                value = formatSharedBytes(balance.usedBytes.coerceAtLeast(0L)),
+                value = formatBytes(balance.usedBytes.coerceAtLeast(0L)),
             )
             if (balance.plan != null) {
                 HorizontalDivider(
@@ -147,12 +148,3 @@ private fun BalanceRow(label: String, value: String) {
     }
 }
 
-private fun formatSharedBytes(bytes: Long): String {
-    if (bytes <= 0L) return "0 МБ"
-    val gb = bytes / (1024.0 * 1024.0 * 1024.0)
-    if (gb >= 1.0) return "%.2f ГБ".format(gb)
-    val mb = bytes / (1024.0 * 1024.0)
-    if (mb >= 1.0) return "%.1f МБ".format(mb)
-    val kb = bytes / 1024.0
-    return "%.0f КБ".format(kb)
-}

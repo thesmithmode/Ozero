@@ -148,7 +148,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
                     emit(bridge.unpaidByteCount())
                     delay(SHARED_TRAFFIC_POLL_MS)
                 }
-            }
+            }.distinctUntilChanged()
         } else {
             flowOf(0L)
         }
