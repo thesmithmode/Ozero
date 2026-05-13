@@ -81,14 +81,13 @@ class OzeroVpnService : android.net.VpnService() {
         private const val SESSION_NAME = "Ozero"
         private const val TAG = "OzeroVpnService"
         private const val CHAIN_START_TIMEOUT_MS = 30_000L
-        private const val CHAIN_STOP_TIMEOUT_MS = 3_000L
-        private const val NATIVE_STOP_TIMEOUT_MS = 3_000L
+        private const val PARALLEL_STOP_TIMEOUT_MS = 4_000L
         private const val SHUTDOWN_JOIN_TIMEOUT_MS = 7_000L
         private const val STATS_SAMPLE_INTERVAL_MS = 1_000L
         private const val STATS_LOG_EVERY = 30
         private const val STATS_NOTIFY_EVERY = 1
         private const val SETTINGS_READ_TIMEOUT_MS = 1_500L
-        private const val ON_DESTROY_SHUTDOWN_TIMEOUT_MS = 4_000L
+        private const val ON_DESTROY_SHUTDOWN_TIMEOUT_MS = 5_000L
         private const val PREFLIGHT_HARD_TIMEOUT_MS = 7_000L
         private const val PEER_WATCHDOG_POLL_MS = 5_000L
         private const val PEER_WATCHDOG_TIMEOUT_MS = 30_000L
@@ -121,7 +120,7 @@ class OzeroVpnService : android.net.VpnService() {
     private val starting = AtomicBoolean(false)
     private val stopping = AtomicBoolean(false)
     private val stopSignal = AtomicBoolean(false)
-    private val lastStopStartId = AtomicInteger(-1)
+    private val latestStartId = AtomicInteger(-1)
 
     @Volatile
     private var killswitchCached: Boolean = false
@@ -139,11 +138,9 @@ class OzeroVpnService : android.net.VpnService() {
                 stopSelf(startId)
                 return START_NOT_STICKY
             }
+            latestStartId.set(startId)
             when (intent?.action) {
-                ACTION_STOP -> {
-                    lastStopStartId.set(startId)
-                    stopVpn()
-                }
+                ACTION_STOP -> stopVpn()
                 ACTION_START, null -> {
                     stopping.set(false)
                     startVpn()
@@ -768,25 +765,21 @@ class OzeroVpnService : android.net.VpnService() {
                 runCatching { chainOrchestrator.stop() }
                     .onFailure { PersistentLoggers.warn(TAG, "chainOrchestrator.stop threw: ${it.message}") }
             }
-            val chainOk = withTimeoutOrNull(CHAIN_STOP_TIMEOUT_MS) { chainStopJob.join() }
-            if (chainOk == null) {
-                PersistentLoggers.warn(TAG, "chainOrchestrator.stop hung > ${CHAIN_STOP_TIMEOUT_MS}ms")
-            } else {
-                Log.i(TAG, "chainOrchestrator.stop completed")
-            }
-
             val nativeStopThread = Thread({
                 runCatching { tunnelGateway.stop() }
                     .onFailure { PersistentLoggers.warn(TAG, "tunnelGateway.stop threw: ${it.message}") }
-            }, "ozero-native-stop")
-            nativeStopThread.isDaemon = true
-            nativeStopThread.start()
-            nativeStopThread.join(NATIVE_STOP_TIMEOUT_MS)
+            }, "ozero-native-stop").also { it.isDaemon = true; it.start() }
+            val stopStart = System.currentTimeMillis()
+            val chainOk = withTimeoutOrNull(PARALLEL_STOP_TIMEOUT_MS) { chainStopJob.join() }
+            if (chainOk == null) {
+                PersistentLoggers.warn(TAG, "chainOrchestrator.stop hung > ${PARALLEL_STOP_TIMEOUT_MS}ms")
+            } else {
+                Log.i(TAG, "chainOrchestrator.stop completed")
+            }
+            val remaining = maxOf(0L, PARALLEL_STOP_TIMEOUT_MS - (System.currentTimeMillis() - stopStart))
+            nativeStopThread.join(remaining)
             if (nativeStopThread.isAlive) {
-                PersistentLoggers.warn(
-                    TAG,
-                    "native tunnel stop hung > ${NATIVE_STOP_TIMEOUT_MS}ms — abandon thread",
-                )
+                PersistentLoggers.warn(TAG, "native tunnel stop hung — abandon thread")
             } else {
                 Log.i(TAG, "native tunnel stop completed")
             }
@@ -805,7 +798,7 @@ class OzeroVpnService : android.net.VpnService() {
                 @Suppress("DEPRECATION")
                 stopForeground(true)
             }
-            if (callStopSelf) stopSelf(lastStopStartId.get())
+            if (callStopSelf) stopSelf(latestStartId.get())
             PersistentLoggers.info(TAG, "performShutdown end")
         }
     }

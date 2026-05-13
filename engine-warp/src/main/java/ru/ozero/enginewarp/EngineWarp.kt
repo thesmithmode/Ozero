@@ -196,18 +196,16 @@ class EngineWarp(
         val host = ep.substring(0, sep)
         val port = ep.substring(sep + 1)
         if (host.isBlank() || isLikelyIpAddress(host)) return cfg
-        return runCatching {
-            val resolved = java.net.InetAddress.getByName(host).hostAddress
-            if (resolved.isNullOrBlank()) {
-                cfg
-            } else {
-                Log.i(TAG, "endpoint resolved $host → $resolved")
-                cfg.copy(peerEndpoint = "$resolved:$port")
+        for (attempt in 0..2) {
+            val resolved = runCatching { java.net.InetAddress.getByName(host).hostAddress }.getOrNull()
+            if (!resolved.isNullOrBlank()) {
+                Log.i(TAG, "endpoint resolved $host → $resolved (attempt ${attempt + 1})")
+                return cfg.copy(peerEndpoint = "$resolved:$port")
             }
-        }.getOrElse { t ->
-            PersistentLoggers.warn(TAG, "endpoint resolve failed for $host: ${t.message}")
-            cfg
+            if (attempt < 2) runCatching { Thread.sleep(200L shl attempt) }
         }
+        PersistentLoggers.warn(TAG, "endpoint resolve failed after 3 attempts for $host")
+        return cfg
     }
 
     private fun applyEndpointToRawIni(rawIni: String, resolvedEndpoint: String): String =

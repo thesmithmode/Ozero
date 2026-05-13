@@ -149,17 +149,17 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `performShutdown использует stopSelf с lastStopStartId — не голый stopSelf`() {
+    fun `performShutdown использует stopSelf с latestStartId — не голый stopSelf`() {
         val body = source.substringAfter("private suspend fun performShutdown(")
             .substringBefore("internal fun buildTunBuilder")
         assertTrue(
-            body.contains("stopSelf(lastStopStartId.get())"),
-            "performShutdown обязан вызывать stopSelf(lastStopStartId.get()), а не безаргументный stopSelf(). " +
+            body.contains("stopSelf(latestStartId.get())"),
+            "performShutdown обязан вызывать stopSelf(latestStartId.get()), а не безаргументный stopSelf(). " +
                 "stopSelf(startId) — no-op если пришёл новый intents, что исключает onDestroy при engine switch. " +
                 "Голый stopSelf() безусловно планирует onDestroy → ForegroundServiceDidNotStartInTimeException.",
         )
         assertFalse(
-            body.contains(Regex("(?<!lastStopStartId\\.get\\(\\))\\bstopSelf\\(\\)")),
+            body.contains(Regex("(?<!latestStartId\\.get\\(\\))\\bstopSelf\\(\\)")),
             "performShutdown не должен содержать голый stopSelf() без аргумента",
         )
     }
@@ -175,13 +175,13 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `ACTION_STOP сохраняет startId в lastStopStartId перед stopVpn`() {
+    fun `onStartCommand обновляет latestStartId до обработки action`() {
         val body = source.substringAfter("override fun onStartCommand").substringBefore("private fun startVpn()")
-        val stopBlock = body.substringAfter("ACTION_STOP").substringBefore("ACTION_START")
+        val beforeWhen = body.substringBefore("when (intent?.action)")
         assertTrue(
-            stopBlock.contains("lastStopStartId.set(startId)"),
-            "При ACTION_STOP обязан сохранить startId в lastStopStartId до вызова stopVpn(), " +
-                "иначе performShutdown не знает какой startId передать в stopSelf(startId).",
+            beforeWhen.contains("latestStartId.set(startId)"),
+            "latestStartId.set(startId) обязан быть ДО when(intent?.action), " +
+                "чтобы START_STICKY restart (action=null) тоже обновлял startId.",
         )
     }
 

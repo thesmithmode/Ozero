@@ -1,16 +1,14 @@
 package ru.ozero.enginewarp
 
-import ru.ozero.commonvpn.probe.TcpProbe
 import ru.ozero.enginescore.EnginePreflight
 import ru.ozero.enginescore.SocketProtector
 
 class WarpPreflight(
     private val peerEndpointProvider: () -> String? = { null },
 ) : EnginePreflight {
-    override suspend fun probe(protector: SocketProtector): EnginePreflight.Result {
-        val (host, port) = resolveTarget()
-        return TcpProbe.probe(host = host, port = port, timeoutMs = TIMEOUT_MS, protector = protector)
-    }
+
+    override suspend fun probe(protector: SocketProtector): EnginePreflight.Result =
+        EnginePreflight.Result.Ok
 
     internal fun resolveTarget(): Pair<String, Int> {
         val endpoint = peerEndpointProvider()?.trim().orEmpty()
@@ -41,6 +39,5 @@ class WarpPreflight(
     private companion object {
         const val FALLBACK_HOST = "1.1.1.1"
         const val FALLBACK_PORT = 443
-        const val TIMEOUT_MS = 5_000L
     }
 }

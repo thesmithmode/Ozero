@@ -1,9 +1,28 @@
 package ru.ozero.enginewarp
 
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
+import ru.ozero.enginescore.EnginePreflight
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 
 class WarpPreflightTest {
+
+    @Test
+    fun `probe всегда Ok независимо от endpoint`() = runTest {
+        assertIs<EnginePreflight.Result.Ok>(
+            WarpPreflight(peerEndpointProvider = { "203.0.113.5:4500" })
+                .probe(protector = {}),
+        )
+    }
+
+    @Test
+    fun `probe Ok когда provider null`() = runTest {
+        assertIs<EnginePreflight.Result.Ok>(
+            WarpPreflight(peerEndpointProvider = { null })
+                .probe(protector = {}),
+        )
+    }
 
     @Test
     fun `resolveTarget использует peerEndpoint IP когда provider возвращает валидный endpoint`() {
