@@ -43,6 +43,7 @@ class FileSavedStrategyStore(
                     name = o.optString("name").takeIf { it.isNotBlank() },
                     isPinned = o.optBoolean("isPinned", false),
                     addedAt = o.optLong("addedAt", 0L),
+                    lastVerifiedAtMs = o.optLong("lastVerifiedAtMs", 0L),
                 )
             }
         }.getOrDefault(emptyList())
@@ -59,7 +60,8 @@ class FileSavedStrategyStore(
                     .put("command", s.command)
                     .put("name", s.name ?: "")
                     .put("isPinned", s.isPinned)
-                    .put("addedAt", s.addedAt),
+                    .put("addedAt", s.addedAt)
+                    .put("lastVerifiedAtMs", s.lastVerifiedAtMs),
             )
         }
         runCatching { file.writeText(array.toString()) }
@@ -99,4 +101,8 @@ fun SavedStrategyStore.rename(id: String, name: String): List<SavedStrategy> = u
 
 fun SavedStrategyStore.delete(id: String): List<SavedStrategy> = update { list ->
     list.filter { it.id != id }
+}
+
+fun SavedStrategyStore.markVerified(commands: Set<String>, nowMs: Long): List<SavedStrategy> = update { list ->
+    list.map { s -> if (commands.contains(s.command)) s.copy(lastVerifiedAtMs = nowMs) else s }
 }

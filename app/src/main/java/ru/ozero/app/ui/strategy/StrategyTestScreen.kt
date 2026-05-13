@@ -920,6 +920,7 @@ private fun SavedStrategyCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            StalenessLabel(lastVerifiedAtMs = saved.lastVerifiedAtMs)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
@@ -970,6 +971,30 @@ private fun HistoryEntryRow(entry: UsageEntry, index: Int, onApply: () -> Unit) 
         ) { Text(stringResource(R.string.saved_strategy_apply)) }
     }
 }
+
+@Composable
+private fun StalenessLabel(lastVerifiedAtMs: Long) {
+    if (lastVerifiedAtMs <= 0L) {
+        Text(
+            text = "Не проверена",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+        )
+        return
+    }
+    val ageMs = System.currentTimeMillis() - lastVerifiedAtMs
+    val days = ageMs / (24L * 60L * 60L * 1000L)
+    val stale = days >= STALE_THRESHOLD_DAYS
+    Text(
+        text = if (stale) "Давно не проверена · ${formatRelativeTime(lastVerifiedAtMs)}"
+        else "Проверена · ${formatRelativeTime(lastVerifiedAtMs)}",
+        style = MaterialTheme.typography.bodySmall,
+        color = if (stale) MaterialTheme.colorScheme.error
+        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+    )
+}
+
+private const val STALE_THRESHOLD_DAYS: Long = 7L
 
 private fun formatRelativeTime(epochMs: Long): String {
     val diffMs = System.currentTimeMillis() - epochMs

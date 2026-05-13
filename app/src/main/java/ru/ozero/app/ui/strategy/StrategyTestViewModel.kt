@@ -363,6 +363,10 @@ class StrategyTestViewModel @Inject constructor(
                     .onSuccess { _savedStrategies.value = it }
             }
         }
+        withContext(ioDispatcher) {
+            runCatching { savedStrategyStore.markVerified(seedCommands.toSet(), System.currentTimeMillis()) }
+                .onSuccess { _savedStrategies.value = it }
+        }
     }
 
     private suspend fun runLoop(sites: List<String>) = coroutineScope {

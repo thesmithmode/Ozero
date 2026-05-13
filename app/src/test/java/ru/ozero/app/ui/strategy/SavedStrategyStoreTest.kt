@@ -134,6 +134,41 @@ class SavedStrategyStoreTest {
     }
 
     @Test
+    fun `lastVerifiedAtMs round-trips`() {
+        store.save(listOf(SavedStrategy(id = "v", command = "-v", addedAt = 1L, lastVerifiedAtMs = 42L)))
+        assertEquals(42L, store.load()[0].lastVerifiedAtMs)
+    }
+
+    @Test
+    fun `lastVerifiedAtMs defaults to 0 when missing in stored file`() {
+        File(tempDir, "saved_strategies.json").writeText(
+            """[{"id":"x","command":"-x","name":"","isPinned":false,"addedAt":1}]""",
+        )
+        assertEquals(0L, store.load()[0].lastVerifiedAtMs)
+    }
+
+    @Test
+    fun `markVerified updates lastVerifiedAtMs for matching commands only`() {
+        store.save(
+            listOf(
+                SavedStrategy(id = "a", command = "-cmdA", addedAt = 1L),
+                SavedStrategy(id = "b", command = "-cmdB", addedAt = 2L),
+            ),
+        )
+        store.markVerified(setOf("-cmdA"), 999L)
+        val loaded = store.load().associateBy { it.id }
+        assertEquals(999L, loaded["a"]!!.lastVerifiedAtMs)
+        assertEquals(0L, loaded["b"]!!.lastVerifiedAtMs)
+    }
+
+    @Test
+    fun `markVerified with empty set is no-op`() {
+        store.save(listOf(SavedStrategy(id = "a", command = "-c", addedAt = 1L, lastVerifiedAtMs = 50L)))
+        store.markVerified(emptySet(), 999L)
+        assertEquals(50L, store.load()[0].lastVerifiedAtMs)
+    }
+
+    @Test
     fun `concurrent add preserves all distinct commands`() {
         val big = FileSavedStrategyStore(tempDir, "race.json", maxUnpinned = 1_000)
         val threads = (1..8).map { idx ->
