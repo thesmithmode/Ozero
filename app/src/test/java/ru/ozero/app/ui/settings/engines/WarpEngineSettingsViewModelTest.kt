@@ -80,7 +80,7 @@ class WarpEngineSettingsViewModelTest {
     fun `init с непустым store — auto-trigger НЕ срабатывает`() = runTest {
         store.addSlot("Existing", SAMPLE)
         val freshAuto = FakeAutoConfig()
-        val freshVm = WarpEngineSettingsViewModel(store, freshAuto, FakeFileImporter())
+        val freshVm = WarpEngineSettingsViewModel(store, freshAuto, FakeFileImporter(), makeDoHStore())
         advanceUntilIdle()
         assertEquals(0, freshAuto.callCount, "Непустой store не должен триггерить auto-register")
         assertEquals(1, freshVm.uiState.value.slots.size)
@@ -114,7 +114,7 @@ class WarpEngineSettingsViewModelTest {
             override suspend fun migrateIfNeeded() = error("migration boom")
         }
         val freshAuto = FakeAutoConfig()
-        val freshVm = WarpEngineSettingsViewModel(throwingStore, freshAuto, FakeFileImporter())
+        val freshVm = WarpEngineSettingsViewModel(throwingStore, freshAuto, FakeFileImporter(), makeDoHStore())
         advanceUntilIdle()
         assertEquals(0, freshAuto.callCount, "Migration fail блокирует auto-trigger")
         assertEquals("migration boom", freshVm.uiState.value.errorMessage)

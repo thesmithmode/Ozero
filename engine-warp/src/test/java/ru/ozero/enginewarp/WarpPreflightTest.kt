@@ -12,7 +12,7 @@ class WarpPreflightTest {
     fun `probe всегда Ok независимо от endpoint`() = runTest {
         assertIs<EnginePreflight.Result.Ok>(
             WarpPreflight(peerEndpointProvider = { "203.0.113.5:4500" })
-                .probe(protector = {}),
+                .probe(protector = { true }),
         )
     }
 
@@ -20,7 +20,7 @@ class WarpPreflightTest {
     fun `probe Ok когда provider null`() = runTest {
         assertIs<EnginePreflight.Result.Ok>(
             WarpPreflight(peerEndpointProvider = { null })
-                .probe(protector = {}),
+                .probe(protector = { true }),
         )
     }
 
