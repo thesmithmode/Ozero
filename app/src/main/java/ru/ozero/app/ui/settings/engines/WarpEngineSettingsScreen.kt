@@ -213,10 +213,10 @@ private fun WarpEditScreen(
             WarpInterfaceSection(draft, onDraftChange)
             WarpPeerSection(draft, onDraftChange)
             WarpAwgSection(draft, onDraftChange)
-        WarpDoHSection(
-            selected = draft.doHProvider,
-            onSelect = { onDraftChange(draft.copy(doHProvider = it)) },
-        )
+            WarpDoHSection(
+                selected = draft.doHProvider,
+                onSelect = { onDraftChange(draft.copy(doHProvider = it)) },
+            )
         }
     }
 }
