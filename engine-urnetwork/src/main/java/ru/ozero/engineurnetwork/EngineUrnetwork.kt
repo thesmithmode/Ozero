@@ -127,7 +127,7 @@ class EngineUrnetwork(
         val location = sdkBridge.selectedLocation()
         return runCatching {
             if (location != null) sdkBridge.connectTo(location) else sdkBridge.connectBestAvailable()
-            Log.i(TAG, "recover: re-issued connect (location=${location?.country ?: "<best>"})")
+            Log.i(TAG, "recover: re-issued connect (location=${location?.countryCode ?: "<best>"})")
             EnginePlugin.RecoverResult.Success
         }.getOrElse { t ->
             PersistentLoggers.warn(TAG, "recover threw: ${t.message}")
