@@ -191,7 +191,7 @@ class EvolutionEngine(
                 }.map { it.await() }
             }
             val successCount = probeResults.count { it?.success == true }
-            if (successCount == 0) return@try 0.0
+            if (successCount == 0) return 0.0
             val successRate = successCount.toDouble() / sites.size
             val avgLatencyMs = probeResults
                 .filter { it?.success == true }
