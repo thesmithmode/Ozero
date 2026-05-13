@@ -72,6 +72,7 @@ fun StrategyTestScreen(
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val usageHistory by viewModel.usageHistory.collectAsStateWithLifecycle()
+    val currentNetworkId by viewModel.currentNetworkId.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var showSettings by rememberSaveable { mutableStateOf(false) }
@@ -140,6 +141,7 @@ fun StrategyTestScreen(
             SavedStrategiesSheet(
                 strategies = savedStrategies,
                 usageHistory = usageHistory,
+                currentNetworkId = currentNetworkId,
                 onApply = { cmd ->
                     viewModel.onApply(cmd)
                     Toast.makeText(context, R.string.strategy_test_applied_toast, Toast.LENGTH_SHORT).show()
@@ -733,6 +735,7 @@ private fun StrategySettingsSheet(
 private fun SavedStrategiesSheet(
     strategies: List<SavedStrategy>,
     usageHistory: List<UsageEntry>,
+    currentNetworkId: String,
     onApply: (String) -> Unit,
     onDelete: (String) -> Unit,
     onPin: (String, Boolean) -> Unit,
@@ -800,6 +803,7 @@ private fun SavedStrategiesSheet(
             sorted.forEach { saved ->
                 SavedStrategyCard(
                     saved = saved,
+                    currentNetworkId = currentNetworkId,
                     onApply = { onApply(saved.command) },
                     onDelete = { onDelete(saved.id) },
                     onPin = { onPin(saved.id, !saved.isPinned) },
@@ -856,6 +860,7 @@ private fun SectionHeader(title: String, expanded: Boolean, onToggle: () -> Unit
 @Composable
 private fun SavedStrategyCard(
     saved: SavedStrategy,
+    currentNetworkId: String,
     onApply: () -> Unit,
     onDelete: () -> Unit,
     onPin: () -> Unit,
@@ -921,6 +926,7 @@ private fun SavedStrategyCard(
                 )
             }
             StalenessLabel(lastVerifiedAtMs = saved.lastVerifiedAtMs)
+            NetworkBadge(bestNetworks = saved.bestNetworks, currentNetworkId = currentNetworkId)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
@@ -985,13 +991,34 @@ private fun StalenessLabel(lastVerifiedAtMs: Long) {
     val ageMs = System.currentTimeMillis() - lastVerifiedAtMs
     val days = ageMs / (24L * 60L * 60L * 1000L)
     val stale = days >= STALE_THRESHOLD_DAYS
+    val text = if (stale) {
+        "Давно не проверена · ${formatRelativeTime(lastVerifiedAtMs)}"
+    } else {
+        "Проверена · ${formatRelativeTime(lastVerifiedAtMs)}"
+    }
+    val color = if (stale) {
+        MaterialTheme.colorScheme.error
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+    }
     Text(
-        text = if (stale) "Давно не проверена · ${formatRelativeTime(lastVerifiedAtMs)}"
-        else "Проверена · ${formatRelativeTime(lastVerifiedAtMs)}",
+        text = text,
         style = MaterialTheme.typography.bodySmall,
-        color = if (stale) MaterialTheme.colorScheme.error
-        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+        color = color,
     )
+}
+
+@Composable
+private fun NetworkBadge(bestNetworks: Set<String>, currentNetworkId: String) {
+    if (bestNetworks.isEmpty()) return
+    val onCurrentNetwork = currentNetworkId.isNotBlank() && bestNetworks.contains(currentNetworkId)
+    val text = if (onCurrentNetwork) "Лучшая на этой сети" else "Найдена на другой сети"
+    val color = if (onCurrentNetwork) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+    }
+    Text(text = text, style = MaterialTheme.typography.bodySmall, color = color)
 }
 
 private const val STALE_THRESHOLD_DAYS: Long = 7L
