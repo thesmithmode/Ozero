@@ -20,6 +20,7 @@ import ru.ozero.commonvpn.TunnelController
 import ru.ozero.enginebyedpi.strategy.GeneMemory
 import ru.ozero.enginebyedpi.strategy.ProbeResult
 import ru.ozero.enginebyedpi.strategy.SocksProbeClient
+import ru.ozero.enginebyedpi.strategy.StrategyFitnessCache
 import ru.ozero.enginescore.EngineCapabilities
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
@@ -94,6 +95,9 @@ class StrategyTestViewModelTest {
             probeFactory = { _, _ -> probe },
             tunnelController = tunnel,
             geneMemory = GeneMemory(java.io.File.createTempFile("mem", ".json").also { it.deleteOnExit() }),
+            fitnessCache = StrategyFitnessCache(
+                java.io.File.createTempFile("fc", ".json").also { it.deleteOnExit() },
+            ),
             usageHistoryStore = usageStore,
         ).also { it.ioDispatcher = dispatcher }
     }
@@ -144,6 +148,9 @@ class StrategyTestViewModelTest {
             savedStrategyStore = savedStore,
             byeDpiEngine = engine, probeFactory = { _, _ -> probe }, tunnelController = tunnel,
             geneMemory = GeneMemory(java.io.File.createTempFile("mem", ".json").also { it.deleteOnExit() }),
+            fitnessCache = StrategyFitnessCache(
+                java.io.File.createTempFile("fc", ".json").also { it.deleteOnExit() },
+            ),
             usageHistoryStore = usageStore,
         ).also { it.ioDispatcher = dispatcher }
         advanceUntilIdle()

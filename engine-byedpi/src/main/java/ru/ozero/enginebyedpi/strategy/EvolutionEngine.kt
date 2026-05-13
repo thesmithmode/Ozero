@@ -21,6 +21,7 @@ class EvolutionEngine(
     private val settings: EvolutionSettings = EvolutionSettings(),
     private val socksPort: Int = 1080,
     private val memory: GeneMemory? = null,
+    private val fitnessCachePersistent: StrategyFitnessCache? = null,
     private val random: Random = Random.Default,
 ) {
 
@@ -84,6 +85,7 @@ class EvolutionEngine(
                 ),
             )
             memory?.save()
+            fitnessCachePersistent?.save()
             if (bestFitness >= settings.targetFitness) break
             if (stagnationCount >= exitThreshold) break
 
@@ -189,7 +191,17 @@ class EvolutionEngine(
         val results = population.mapIndexed { index, chromosome ->
             if (!currentCoroutineContext().isActive) return@mapIndexed chromosome to 0.0
             onChromosomeEval(index, population.size, chromosome.toCommand())
-            val fitness = fitnessCache.getOrPut(chromosome) { evaluate(chromosome) }
+            val fitness = fitnessCache.getOrPut(chromosome) {
+                val command = chromosome.toCommand()
+                val persistedHit = fitnessCachePersistent?.get(command)
+                if (persistedHit != null) {
+                    persistedHit
+                } else {
+                    val computed = evaluate(chromosome)
+                    if (command.isNotBlank()) fitnessCachePersistent?.put(command, computed)
+                    computed
+                }
+            }
             chromosome to fitness
         }
         results.forEach { (chromosome, fitness) ->

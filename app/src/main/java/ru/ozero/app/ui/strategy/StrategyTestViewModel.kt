@@ -30,6 +30,7 @@ import ru.ozero.enginebyedpi.strategy.GenePool
 import ru.ozero.enginebyedpi.strategy.ProbeResult
 import ru.ozero.enginebyedpi.strategy.SocksProbeClient
 import ru.ozero.enginebyedpi.strategy.StrategyEvolver
+import ru.ozero.enginebyedpi.strategy.StrategyFitnessCache
 import ru.ozero.enginebyedpi.strategy.toCommand
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EnginePlugin
@@ -68,6 +69,7 @@ class StrategyTestViewModel @Inject constructor(
     private val probeFactory: StrategyProbeClientFactory,
     private val tunnelController: TunnelController,
     private val geneMemory: GeneMemory,
+    private val fitnessCache: StrategyFitnessCache,
     private val usageHistoryStore: UsageHistoryStore,
 ) : ViewModel() {
 
@@ -303,6 +305,7 @@ class StrategyTestViewModel @Inject constructor(
                 timeoutMs = timeoutMs,
             ),
             memory = geneMemory,
+            fitnessCachePersistent = fitnessCache,
         )
         _evolutionState.value = EvolutionUiState(
             maxGenerations = maxGen,

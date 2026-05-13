@@ -24,6 +24,7 @@ import ru.ozero.app.ui.strategy.StrategyTestSettingsStore
 import ru.ozero.enginebyedpi.ByeDpiEngine
 import ru.ozero.enginebyedpi.strategy.GeneMemory
 import ru.ozero.enginebyedpi.strategy.HttpSocksProbeClient
+import ru.ozero.enginebyedpi.strategy.StrategyFitnessCache
 import ru.ozero.enginescore.EnginePlugin
 import java.io.File
 import javax.inject.Singleton
@@ -93,6 +94,11 @@ object StrategyTestModule {
     @Singleton
     fun provideGeneMemory(@ApplicationContext context: Context): GeneMemory =
         GeneMemory(File(context.filesDir, "evolution_memory.json")).also { it.load() }
+
+    @Provides
+    @Singleton
+    fun provideStrategyFitnessCache(@ApplicationContext context: Context): StrategyFitnessCache =
+        StrategyFitnessCache(File(context.filesDir, "fitness_cache.json")).also { it.load() }
 
     @Provides
     fun provideStrategyProbeClientFactory(): StrategyProbeClientFactory =
