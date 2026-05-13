@@ -147,4 +147,3 @@ private fun BalanceRow(label: String, value: String) {
         )
     }
 }
-

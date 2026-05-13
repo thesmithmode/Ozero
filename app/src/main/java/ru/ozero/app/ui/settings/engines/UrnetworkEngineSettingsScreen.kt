@@ -530,7 +530,6 @@ private fun SharedTrafficSection(sharedTrafficBytes: Long, onClick: () -> Unit) 
     }
 }
 
-
 @Composable
 private fun SectionLabel(text: String) {
     Text(

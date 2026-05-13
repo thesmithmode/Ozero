@@ -26,6 +26,14 @@ import ru.ozero.app.ui.splittunnel.SplitTunnelScreen
 import ru.ozero.app.ui.stats.StatsHistoryScreen
 import ru.ozero.app.ui.strategy.StrategyTestScreen
 
+private fun engineParamsTarget(engineId: EngineId?): TopScreen = when (engineId) {
+    null -> TopScreen.AutoModeSettings
+    EngineId.WARP -> TopScreen.WarpEngineSettings
+    EngineId.URNETWORK -> TopScreen.UrnetworkEngineSettings
+    EngineId.BYEDPI -> TopScreen.ByeDpiEngineSettings
+    else -> TopScreen.Servers
+}
+
 @Composable
 fun RootNavigation(
     viewModel: MainViewModel,
@@ -88,15 +96,7 @@ fun RootNavigation(
                     viewModel = viewModel,
                     onConnectClick = onConnectClick,
                     onOpenSettings = { navigate(TopScreen.Settings) },
-                    onOpenEngineParams = { engineId ->
-                        when (engineId) {
-                            null -> navigate(TopScreen.AutoModeSettings)
-                            EngineId.WARP -> navigate(TopScreen.WarpEngineSettings)
-                            EngineId.URNETWORK -> navigate(TopScreen.UrnetworkEngineSettings)
-                            EngineId.BYEDPI -> navigate(TopScreen.ByeDpiEngineSettings)
-                            else -> navigate(TopScreen.Servers)
-                        }
-                    },
+                    onOpenEngineParams = { engineId -> navigate(engineParamsTarget(engineId)) },
                 )
         }
     }
