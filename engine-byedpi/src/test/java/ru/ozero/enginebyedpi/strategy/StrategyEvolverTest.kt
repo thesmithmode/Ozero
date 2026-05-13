@@ -26,6 +26,38 @@ class StrategyEvolverTest {
     }
 
     @Test
+    fun `crossover uses aligned split point — no interleaving of parent genes`() {
+        val p1 = parseChromosome("-a -b -c -d")
+        val p2 = parseChromosome("-w -x -y -z")
+        val p1Tokens = p1.map { it.token }.toSet()
+        val p2Tokens = p2.map { it.token }.toSet()
+        repeat(20) { seed ->
+            val child = evolver.crossover(p1, p2, Random(seed))
+            val p1Part = child.takeWhile { it.token in p1Tokens }
+            val p2Part = child.dropWhile { it.token in p1Tokens }
+            assertTrue(
+                p2Part.all { it.token in p2Tokens },
+                "seed=$seed: tail should be only p2 genes, got $child",
+            )
+            assertTrue(
+                p1Part.all { it.token in p1Tokens },
+                "seed=$seed: head should be only p1 genes, got $child",
+            )
+        }
+    }
+
+    @Test
+    fun `crossover length equals sum of used parts from both parents`() {
+        val p1 = parseChromosome("-a -b -c -d")
+        val p2 = parseChromosome("-x -y -z")
+        repeat(10) { seed ->
+            val child = evolver.crossover(p1, p2, Random(seed))
+            assertTrue(child.size >= 1, "child must not be empty, seed=$seed")
+            assertTrue(child.size <= p1.size + p2.size, "child too long, seed=$seed: $child")
+        }
+    }
+
+    @Test
     fun `crossover with empty parent1 returns parent2`() {
         val result = evolver.crossover(emptyList(), parseChromosome("-a"), Random(0))
         assertEquals(parseChromosome("-a"), result)
@@ -102,6 +134,53 @@ class StrategyEvolverTest {
     @Test
     fun `select empty list returns empty`() {
         assertEquals(emptyList(), evolver.select(emptyList(), k = 5))
+    }
+
+    @Test
+    fun `tournament returns k chromosomes`() {
+        val scored = listOf(
+            parseChromosome("-a") to 0.5,
+            parseChromosome("-b") to 1.0,
+            parseChromosome("-c") to 0.2,
+            parseChromosome("-d") to 0.8,
+            parseChromosome("-e") to 0.6,
+        )
+        val selected = evolver.tournament(scored, k = 3, random = Random(42))
+        assertEquals(3, selected.size)
+    }
+
+    @Test
+    fun `tournament with empty list returns empty`() {
+        assertEquals(emptyList(), evolver.tournament(emptyList(), k = 3))
+    }
+
+    @Test
+    fun `tournament k greater than list size is clamped`() {
+        val scored = listOf(
+            parseChromosome("-a") to 0.5,
+            parseChromosome("-b") to 1.0,
+        )
+        val selected = evolver.tournament(scored, k = 10, random = Random(0))
+        assertEquals(2, selected.size)
+    }
+
+    @Test
+    fun `tournament favors higher fitness chromosomes`() {
+        val winner = parseChromosome("-best")
+        val scored = listOf(
+            parseChromosome("-bad1") to 0.0,
+            parseChromosome("-bad2") to 0.0,
+            parseChromosome("-bad3") to 0.0,
+            parseChromosome("-bad4") to 0.0,
+            winner to 1.0,
+        )
+        val counts = mutableMapOf<Chromosome, Int>()
+        repeat(50) {
+            val picked = evolver.tournament(scored, k = 1, tournamentSize = 3, random = Random(it))
+            counts[picked[0]] = (counts[picked[0]] ?: 0) + 1
+        }
+        val winnerCount = counts[winner] ?: 0
+        assertTrue(winnerCount > 10, "winner should be selected frequently, got $winnerCount/50")
     }
 
     @Test

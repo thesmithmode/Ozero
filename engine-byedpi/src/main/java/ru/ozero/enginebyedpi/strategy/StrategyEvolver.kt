@@ -10,11 +10,8 @@ class StrategyEvolver(private val pool: GenePool) {
         random: Random = Random.Default,
     ): Chromosome {
         if (parent1.isEmpty() || parent2.isEmpty()) return parent1.ifEmpty { parent2 }
-        val splitPoint = random.nextInt(parent1.size)
-        return parent1.subList(0, splitPoint) + parent2.subList(
-            (random.nextInt(parent2.size)),
-            parent2.size,
-        )
+        val splitPoint = random.nextInt(minOf(parent1.size, parent2.size).coerceAtLeast(1))
+        return parent1.subList(0, splitPoint) + parent2.subList(splitPoint, parent2.size)
     }
 
     fun insert(chromosome: Chromosome, random: Random = Random.Default): Chromosome {
@@ -60,4 +57,21 @@ class StrategyEvolver(private val pool: GenePool) {
         scored.sortedByDescending { it.second }
             .take(k)
             .map { it.first }
+
+    fun tournament(
+        scored: List<Pair<Chromosome, Double>>,
+        k: Int,
+        tournamentSize: Int = 3,
+        random: Random = Random.Default,
+    ): List<Chromosome> {
+        if (scored.isEmpty()) return emptyList()
+        val effectiveSize = tournamentSize.coerceAtMost(scored.size)
+        val result = mutableListOf<Chromosome>()
+        repeat(k.coerceAtMost(scored.size)) {
+            val contenders = scored.indices.shuffled(random).take(effectiveSize)
+            val winner = contenders.maxByOrNull { scored[it].second } ?: contenders.first()
+            result.add(scored[winner].first)
+        }
+        return result
+    }
 }

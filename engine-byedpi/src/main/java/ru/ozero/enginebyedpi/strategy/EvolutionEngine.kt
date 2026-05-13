@@ -53,6 +53,9 @@ class EvolutionEngine(
         var stagnationCount = 0
         val fitnessCache = HashMap<Chromosome, Double>()
 
+        val exitThreshold = (settings.maxGenerations / 2).coerceAtLeast(3)
+        val injectThreshold = (exitThreshold / 2).coerceAtLeast(1)
+
         for (generation in 1..settings.maxGenerations) {
             if (!currentCoroutineContext().isActive) break
 
@@ -82,25 +85,34 @@ class EvolutionEngine(
             )
             memory?.save()
             if (bestFitness >= settings.targetFitness) break
-            if (stagnationCount >= (settings.maxGenerations / 2).coerceAtLeast(3)) break
+            if (stagnationCount >= exitThreshold) break
 
-            val survivors = evolver.select(scored, settings.eliteCount)
-            population = if (stagnationCount >= 2) {
-                buildDiverseGeneration(survivors, effectiveMutationRate)
-            } else {
-                buildNextGeneration(survivors, effectiveMutationRate)
-            }
+            val survivors = evolver.tournament(scored, settings.eliteCount, random = random)
+            population = when {
+                stagnationCount >= injectThreshold ->
+                    buildSeedInjection(survivors, seedStrategies, effectiveMutationRate)
+                stagnationCount >= 2 ->
+                    buildDiverseGeneration(survivors, effectiveMutationRate)
+                else ->
+                    buildNextGeneration(survivors, effectiveMutationRate)
+            }.withElite(best)
         }
         return best
     }
 
+    private fun List<Chromosome>.withElite(elite: Chromosome): List<Chromosome> {
+        if (isEmpty() || contains(elite)) return this
+        return listOf(elite) + drop(1)
+    }
+
     private fun buildInitialPopulation(seedStrategies: List<String>): List<Chromosome> {
-        val fromSeeds = seedStrategies.take(settings.populationSize).map(::parseChromosome)
+        val shuffled = seedStrategies.shuffled(random)
+        val fromSeeds = shuffled.take(settings.populationSize).map(::parseChromosome)
         val fillCount = (settings.populationSize - fromSeeds.size).coerceAtLeast(0)
         val fill = if (memory != null && memory.hasData()) {
             List(fillCount) { pool.weightedRandomChromosome(memory) }
         } else {
-            List(fillCount) { pool.randomChromosome() }
+            List(fillCount) { pool.randomChromosome(random = random) }
         }
         return fromSeeds + fill
     }
@@ -121,7 +133,7 @@ class EvolutionEngine(
         while (offspring.size < settings.populationSize) {
             val p1 = survivors[random.nextInt(survivors.size)]
             val p2 = survivors[random.nextInt(survivors.size)]
-            offspring.add(evolver.mutate(evolver.crossover(p1, p2), mutationRate, memory = memory))
+            offspring.add(evolver.mutate(evolver.crossover(p1, p2, random), mutationRate, random = random, memory = memory))
         }
         return offspring
     }
@@ -148,6 +160,24 @@ class EvolutionEngine(
             offspring.add(evolver.mutate(parent, mutationRate, random = random, memory = memory))
         }
         return offspring
+    }
+
+    private fun buildSeedInjection(
+        elites: List<Chromosome>,
+        seedStrategies: List<String>,
+        mutationRate: Float,
+    ): List<Chromosome> {
+        val top = elites.take(2)
+        val freshCount = settings.populationSize - top.size
+        val fresh = seedStrategies.shuffled(random).take(freshCount).map(::parseChromosome)
+        val fill = when {
+            fresh.size >= freshCount -> fresh
+            top.isNotEmpty() -> fresh + List(freshCount - fresh.size) {
+                evolver.mutate(top[random.nextInt(top.size)], mutationRate, random = random, memory = memory)
+            }
+            else -> fresh + List(freshCount - fresh.size) { pool.randomChromosome(random = random) }
+        }
+        return top + fill
     }
 
     private suspend fun evaluatePopulation(
