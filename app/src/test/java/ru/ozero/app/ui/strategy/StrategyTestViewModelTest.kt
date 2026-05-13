@@ -461,7 +461,7 @@ class StrategyTestViewModelTest {
 
     @Test
     fun `runLoop uses requestsPerDomain retry until first success`() = runTest(dispatcher) {
-        settingsStore.stored = StrategyTestSettings(requestsPerDomain = 3)
+        settingsStore.stored = StrategyTestSettings(requestsPerDomain = 3, evolutionMode = false)
         assets = FakeAssetSource(strategies = listOf("-cmd1"), sites = listOf("a", "b"))
         var callCount = 0
         probe.successFor = { _, _ -> false }
@@ -475,7 +475,7 @@ class StrategyTestViewModelTest {
 
     @Test
     fun `runLoop stops retrying after first success`() = runTest(dispatcher) {
-        settingsStore.stored = StrategyTestSettings(requestsPerDomain = 3)
+        settingsStore.stored = StrategyTestSettings(requestsPerDomain = 3, evolutionMode = false)
         assets = FakeAssetSource(strategies = listOf("-cmd1"), sites = listOf("a"))
         var callCount = 0
         probe.successFor = { _, _ -> true }
@@ -489,7 +489,7 @@ class StrategyTestViewModelTest {
 
     @Test
     fun `runLoop respects delayBetweenMs between strategies`() = runTest(dispatcher) {
-        settingsStore.stored = StrategyTestSettings(delayBetweenMs = 500L)
+        settingsStore.stored = StrategyTestSettings(delayBetweenMs = 500L, evolutionMode = false)
         assets = FakeAssetSource(strategies = listOf("-cmd1", "-cmd2"), sites = listOf("s1"))
         val vm = newVm(sites = listOf("s1"))
         advanceUntilIdle()

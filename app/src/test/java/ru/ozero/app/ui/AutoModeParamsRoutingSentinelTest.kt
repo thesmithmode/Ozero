@@ -14,12 +14,12 @@ class AutoModeParamsRoutingSentinelTest {
 
     @Test
     fun `null engineId роутится в AutoModeSettings, не в Servers`() {
-        val whenBlock = source
-            .substringAfter("onOpenEngineParams = { engineId ->")
-            .substringBefore("},")
+        val helperBlock = source
+            .substringAfter("private fun engineParamsTarget(engineId: EngineId?)")
+            .substringBefore("}")
         assertTrue(
-            whenBlock.contains("null -> navigate(TopScreen.AutoModeSettings)"),
-            "При engineId=null (auto-режим) вкладка Параметры должна открывать AutoModeSettings. " +
+            helperBlock.contains("null -> TopScreen.AutoModeSettings"),
+            "При engineId=null (auto-режим) engineParamsTarget должен возвращать AutoModeSettings. " +
                 "Ветка null отсутствует — нажатие Параметры в auto-режиме открывает Servers вместо " +
                 "экрана приоритетов движков.",
         )
@@ -27,13 +27,13 @@ class AutoModeParamsRoutingSentinelTest {
 
     @Test
     fun `null ветка стоит до else в when блоке`() {
-        val whenBlock = source
-            .substringAfter("onOpenEngineParams = { engineId ->")
-            .substringBefore("},")
-        val nullIdx = whenBlock.indexOf("null -> navigate(TopScreen.AutoModeSettings)")
-        val elseIdx = whenBlock.indexOf("else ->")
-        assertTrue(nullIdx >= 0, "null-ветка отсутствует в when(engineId)")
-        assertTrue(elseIdx >= 0, "else-ветка отсутствует в when(engineId)")
+        val helperBlock = source
+            .substringAfter("private fun engineParamsTarget(engineId: EngineId?)")
+            .substringBefore("}")
+        val nullIdx = helperBlock.indexOf("null -> TopScreen.AutoModeSettings")
+        val elseIdx = helperBlock.indexOf("else ->")
+        assertTrue(nullIdx >= 0, "null-ветка отсутствует в engineParamsTarget when(engineId)")
+        assertTrue(elseIdx >= 0, "else-ветка отсутствует в engineParamsTarget when(engineId)")
         assertTrue(nullIdx < elseIdx, "null-ветка должна быть до else (иначе else перехватит null)")
     }
 }

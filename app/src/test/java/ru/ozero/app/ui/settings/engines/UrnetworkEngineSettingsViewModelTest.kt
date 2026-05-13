@@ -171,6 +171,7 @@ class UrnetworkEngineSettingsViewModelTest {
             FakeUrnetworkConfigStore(),
             activeTunnel(),
         )
+        runCurrent()
         vm.selectLocation(locB)
         runCurrent()
         assertEquals(true, vm.switchingCountry.value)
@@ -191,6 +192,7 @@ class UrnetworkEngineSettingsViewModelTest {
             FakeUrnetworkConfigStore(),
             activeTunnel(),
         )
+        runCurrent()
         vm.selectLocation(locB)
         runCurrent()
         assertEquals(true, vm.switchingCountry.value)
