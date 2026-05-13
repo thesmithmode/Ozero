@@ -17,4 +17,5 @@ enum class TopScreen {
     Backup,
     AutoModeSettings,
     Language,
+    UrnetworkSharedTraffic,
 }

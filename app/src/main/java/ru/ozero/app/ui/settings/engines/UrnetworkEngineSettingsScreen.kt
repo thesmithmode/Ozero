@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -52,6 +53,7 @@ import ru.ozero.engineurnetwork.UrnetworkWindowType
 @Composable
 fun UrnetworkEngineSettingsScreen(
     onBack: () -> Unit,
+    onOpenSharedTraffic: () -> Unit,
     viewModel: UrnetworkEngineSettingsViewModel = hiltViewModel(),
 ) {
     BackHandler(onBack = onBack)
@@ -109,12 +111,14 @@ fun UrnetworkEngineSettingsScreen(
                         fixedIp = fixedIp,
                         provideControlMode = provideControlMode,
                         provideNetworkMode = provideNetworkMode,
+                        sharedTrafficBytes = 0L,
                         showProvide = false,
                         onSetProvidePaused = {},
                         onSelectWindowType = viewModel::selectWindowType,
                         onToggleFixedIp = viewModel::toggleFixedIpSize,
                         onSelectProvideControlMode = viewModel::selectProvideControlMode,
                         onSelectProvideNetworkMode = viewModel::selectProvideNetworkMode,
+                        onOpenSharedTraffic = onOpenSharedTraffic,
                     )
                 }
             }
@@ -126,6 +130,7 @@ fun UrnetworkEngineSettingsScreen(
                 val fixedIp by viewModel.fixedIpSize.collectAsStateWithLifecycle()
                 val provideControlMode by viewModel.provideControlMode.collectAsStateWithLifecycle()
                 val provideNetworkMode by viewModel.provideNetworkMode.collectAsStateWithLifecycle()
+                val sharedTrafficBytes by viewModel.sharedTrafficBytes.collectAsStateWithLifecycle()
                 LocationListContent(
                     modifier = Modifier.padding(padding),
                     countries = current.countries,
@@ -138,6 +143,7 @@ fun UrnetworkEngineSettingsScreen(
                     fixedIp = fixedIp,
                     provideControlMode = provideControlMode,
                     provideNetworkMode = provideNetworkMode,
+                    sharedTrafficBytes = sharedTrafficBytes,
                     onSearchQueryChange = viewModel::setSearchQuery,
                     onSelect = viewModel::selectLocation,
                     onSetProvidePaused = viewModel::setProvidePaused,
@@ -145,6 +151,7 @@ fun UrnetworkEngineSettingsScreen(
                     onToggleFixedIp = viewModel::toggleFixedIpSize,
                     onSelectProvideControlMode = viewModel::selectProvideControlMode,
                     onSelectProvideNetworkMode = viewModel::selectProvideNetworkMode,
+                    onOpenSharedTraffic = onOpenSharedTraffic,
                 )
             }
         }
@@ -165,6 +172,7 @@ private fun LocationListContent(
     fixedIp: Boolean,
     provideControlMode: UrnetworkProvideControlMode,
     provideNetworkMode: UrnetworkProvideNetworkMode,
+    sharedTrafficBytes: Long,
     onSearchQueryChange: (String) -> Unit,
     onSelect: (UrnetworkSdkBridge.LocationToken?) -> Unit,
     onSetProvidePaused: (Boolean) -> Unit,
@@ -172,8 +180,9 @@ private fun LocationListContent(
     onToggleFixedIp: (Boolean) -> Unit,
     onSelectProvideControlMode: (UrnetworkProvideControlMode) -> Unit,
     onSelectProvideNetworkMode: (UrnetworkProvideNetworkMode) -> Unit,
+    onOpenSharedTraffic: () -> Unit,
 ) {
-    val isBestAvailable = selectedLocation == null || selectedLocation.connectLocationId?.bestAvailable == true
+    val isBestAvailable = selectedLocation == null
     LazyColumn(
         modifier = modifier.fillMaxSize().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp),
@@ -187,12 +196,14 @@ private fun LocationListContent(
                     fixedIp = fixedIp,
                     provideControlMode = provideControlMode,
                     provideNetworkMode = provideNetworkMode,
+                    sharedTrafficBytes = sharedTrafficBytes,
                     showProvide = true,
                     onSetProvidePaused = onSetProvidePaused,
                     onSelectWindowType = onSelectWindowType,
                     onToggleFixedIp = onToggleFixedIp,
                     onSelectProvideControlMode = onSelectProvideControlMode,
                     onSelectProvideNetworkMode = onSelectProvideNetworkMode,
+                    onOpenSharedTraffic = onOpenSharedTraffic,
                 )
                 Text(
                     text = stringResource(R.string.urnetwork_location_title),
@@ -231,8 +242,7 @@ private fun LocationListContent(
         }
         items(countries, key = { it.countryCode.ifEmpty { it.name } }) { item ->
             val selected = !isBestAvailable &&
-                selectedLocation?.countryCode == item.countryCode &&
-                selectedLocation.country == item.location.country
+                selectedLocation?.countryCode == item.countryCode
             LocationRow(
                 name = item.name,
                 flag = item.flag,
@@ -253,12 +263,14 @@ private fun SettingsCard(
     fixedIp: Boolean,
     provideControlMode: UrnetworkProvideControlMode,
     provideNetworkMode: UrnetworkProvideNetworkMode,
+    sharedTrafficBytes: Long,
     showProvide: Boolean,
     onSetProvidePaused: (Boolean) -> Unit,
     onSelectWindowType: (UrnetworkWindowType) -> Unit,
     onToggleFixedIp: (Boolean) -> Unit,
     onSelectProvideControlMode: (UrnetworkProvideControlMode) -> Unit,
     onSelectProvideNetworkMode: (UrnetworkProvideNetworkMode) -> Unit,
+    onOpenSharedTraffic: () -> Unit,
 ) {
     Card(
         modifier = Modifier
@@ -276,6 +288,11 @@ private fun SettingsCard(
                     onSelectProvideControlMode = onSelectProvideControlMode,
                     onSelectProvideNetworkMode = onSelectProvideNetworkMode,
                 )
+                SharedTrafficSection(
+                    sharedTrafficBytes = sharedTrafficBytes,
+                    onClick = onOpenSharedTraffic,
+                )
+                SectionDivider()
             }
             ModeSection(
                 selected = windowType,
@@ -287,6 +304,7 @@ private fun SettingsCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ProvideSection(
     providePaused: Boolean,
@@ -296,14 +314,43 @@ private fun ProvideSection(
     onSelectProvideControlMode: (UrnetworkProvideControlMode) -> Unit,
     onSelectProvideNetworkMode: (UrnetworkProvideNetworkMode) -> Unit,
 ) {
-    ProvideToggleSection(
-        providePaused = providePaused,
-        onSetProvidePaused = onSetProvidePaused,
+    val modes = listOf(
+        R.string.urnetwork_provide_mode_never,
+        R.string.urnetwork_provide_control_mode_auto,
+        R.string.urnetwork_provide_control_mode_always,
     )
-    SectionDivider()
-    ProvideControlModeSection(
-        selected = provideControlMode,
-        onSelect = onSelectProvideControlMode,
+    val selectedIndex = when {
+        providePaused -> 0
+        provideControlMode == UrnetworkProvideControlMode.AUTO -> 1
+        else -> 2
+    }
+    SectionLabel(stringResource(R.string.urnetwork_provide_title))
+    SingleChoiceSegmentedButtonRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+    ) {
+        modes.forEachIndexed { index, labelRes ->
+            SegmentedButton(
+                selected = index == selectedIndex,
+                onClick = {
+                    when (index) {
+                        0 -> onSetProvidePaused(true)
+                        1 -> { onSetProvidePaused(false); onSelectProvideControlMode(UrnetworkProvideControlMode.AUTO) }
+                        else -> { onSetProvidePaused(false); onSelectProvideControlMode(UrnetworkProvideControlMode.ALWAYS) }
+                    }
+                },
+                shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size),
+            ) {
+                Text(stringResource(labelRes))
+            }
+        }
+    }
+    Text(
+        text = stringResource(R.string.urnetwork_provide_mode_desc),
+        style = MaterialTheme.typography.bodySmall,
+        color = OzeroPalette.Text3,
+        modifier = Modifier.padding(top = 6.dp),
     )
     SectionDivider()
     ProvideNetworkModeSection(
@@ -314,70 +361,10 @@ private fun ProvideSection(
 }
 
 @Composable
-private fun ProvideToggleSection(
-    providePaused: Boolean,
-    onSetProvidePaused: (Boolean) -> Unit,
-) {
-    SectionLabel(stringResource(R.string.urnetwork_provide_title))
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = stringResource(R.string.urnetwork_provide_subtitle),
-            style = MaterialTheme.typography.bodyMedium,
-            color = OzeroPalette.Text2,
-            modifier = Modifier.weight(1f).padding(end = 12.dp),
-        )
-        Switch(
-            checked = !providePaused,
-            onCheckedChange = { checked -> onSetProvidePaused(!checked) },
-        )
-    }
-}
-
-@Composable
 private fun SectionDivider() {
     HorizontalDivider(
         modifier = Modifier.padding(vertical = 12.dp),
         color = OzeroPalette.Line,
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ProvideControlModeSection(
-    selected: UrnetworkProvideControlMode,
-    onSelect: (UrnetworkProvideControlMode) -> Unit,
-) {
-    val modes = listOf(
-        UrnetworkProvideControlMode.AUTO to R.string.urnetwork_provide_control_mode_auto,
-        UrnetworkProvideControlMode.ALWAYS to R.string.urnetwork_provide_control_mode_always,
-    )
-    SectionLabel(stringResource(R.string.urnetwork_provide_control_mode_title))
-    SingleChoiceSegmentedButtonRow(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 8.dp),
-    ) {
-        modes.forEachIndexed { index, (mode, labelRes) ->
-            SegmentedButton(
-                selected = mode == selected,
-                onClick = { onSelect(mode) },
-                shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size),
-            ) {
-                Text(stringResource(labelRes))
-            }
-        }
-    }
-    Text(
-        text = stringResource(R.string.urnetwork_provide_control_mode_desc),
-        style = MaterialTheme.typography.bodySmall,
-        color = OzeroPalette.Text3,
-        modifier = Modifier.padding(top = 6.dp),
     )
 }
 
@@ -508,6 +495,42 @@ private fun StatusRow(peerCount: Int, switchingCountry: Boolean = false) {
             color = OzeroPalette.Text2,
         )
     }
+}
+
+@Composable
+private fun SharedTrafficSection(sharedTrafficBytes: Long, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.urnetwork_shared_traffic_title),
+                style = MaterialTheme.typography.bodyMedium,
+                color = OzeroPalette.Text,
+            )
+            Text(
+                text = formatBytes(sharedTrafficBytes),
+                style = MaterialTheme.typography.bodySmall,
+                color = OzeroPalette.Text2,
+            )
+        }
+        Text(text = "›", style = MaterialTheme.typography.bodyLarge, color = OzeroPalette.Text3)
+    }
+}
+
+private fun formatBytes(bytes: Long): String {
+    if (bytes <= 0L) return "0 МБ"
+    val gb = bytes / (1024.0 * 1024.0 * 1024.0)
+    if (gb >= 1.0) return "%.2f ГБ".format(gb)
+    val mb = bytes / (1024.0 * 1024.0)
+    if (mb >= 1.0) return "%.1f МБ".format(mb)
+    val kb = bytes / 1024.0
+    return "%.0f КБ".format(kb)
 }
 
 @Composable

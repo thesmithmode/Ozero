@@ -50,9 +50,24 @@ class WarpPreflightTest {
     }
 
     @Test
-    fun `resolveTarget использует fallback для IPv6 адреса`() {
+    fun `resolveTarget извлекает IPv6 хост из bracketed endpoint`() {
         val preflight = WarpPreflight(peerEndpointProvider = { "[2606:4700:d0::a29f:c001]:4500" })
+        val (host, port) = preflight.resolveTarget()
+        assertEquals("2606:4700:d0::a29f:c001", host)
+        assertEquals(443, port)
+    }
+
+    @Test
+    fun `resolveTarget использует fallback когда IPv6 без скобок`() {
+        val preflight = WarpPreflight(peerEndpointProvider = { "2606:4700:d0::a29f:c001" })
         val (host, _) = preflight.resolveTarget()
-        assertEquals("1.1.1.1", host, "IPv6 fallback — текущий isPlainIp поддерживает только IPv4")
+        assertEquals("1.1.1.1", host)
+    }
+
+    @Test
+    fun `resolveTarget использует fallback когда скобки пустые`() {
+        val preflight = WarpPreflight(peerEndpointProvider = { "[]:4500" })
+        val (host, _) = preflight.resolveTarget()
+        assertEquals("1.1.1.1", host)
     }
 }

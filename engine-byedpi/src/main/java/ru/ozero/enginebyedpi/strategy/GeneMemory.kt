@@ -75,7 +75,25 @@ class GeneMemory(private val file: File) {
     fun hasData(): Boolean = scores.isNotEmpty()
 
     @Synchronized
-    fun rawJson(): String? = runCatching { if (file.exists()) file.readText() else null }.getOrNull()
+    fun rawJson(): String? {
+        if (scores.isEmpty()) return null
+        return runCatching {
+            val obj = JSONObject()
+            scores.forEach { (token, score) ->
+                if (score.trials >= MIN_TRIALS_TO_PERSIST) {
+                    obj.put(
+                        token,
+                        JSONObject().apply {
+                            put("wins", score.wins)
+                            put("trials", score.trials)
+                            put("lastMs", score.lastUpdatedMs)
+                        },
+                    )
+                }
+            }
+            obj.toString()
+        }.getOrNull()
+    }
 
     @Synchronized
     fun importRawJson(json: String) {

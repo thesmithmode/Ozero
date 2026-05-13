@@ -20,6 +20,7 @@ import ru.ozero.app.ui.settings.LanguageScreen
 import ru.ozero.app.ui.settings.SettingsScreen
 import ru.ozero.app.ui.settings.engines.ByeDpiEngineSettingsScreen
 import ru.ozero.app.ui.settings.engines.UrnetworkEngineSettingsScreen
+import ru.ozero.app.ui.settings.engines.UrnetworkSharedTrafficScreen
 import ru.ozero.app.ui.settings.engines.WarpEngineSettingsScreen
 import ru.ozero.app.ui.splittunnel.SplitTunnelScreen
 import ru.ozero.app.ui.stats.StatsHistoryScreen
@@ -73,7 +74,11 @@ fun RootNavigation(
                     onBack = { back() },
                     onOpenStrategyTest = { navigate(TopScreen.StrategyTest) },
                 )
-            TopScreen.UrnetworkEngineSettings -> UrnetworkEngineSettingsScreen(onBack = { back() })
+            TopScreen.UrnetworkEngineSettings -> UrnetworkEngineSettingsScreen(
+                onBack = { back() },
+                onOpenSharedTraffic = { navigate(TopScreen.UrnetworkSharedTraffic) },
+            )
+            TopScreen.UrnetworkSharedTraffic -> UrnetworkSharedTrafficScreen(onBack = { back() })
             TopScreen.WarpEngineSettings -> WarpEngineSettingsScreen(onBack = { back() })
             TopScreen.StrategyTest -> StrategyTestScreen(onBack = { back() })
             TopScreen.ManualServer -> ManualServerScreen(onBack = { back() })

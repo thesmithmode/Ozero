@@ -141,6 +141,19 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(POLLER_KEEP_ALIVE_MS), 0)
 
+    val sharedTrafficBytes: StateFlow<Long> = isUrnetworkActive.flatMapLatest { active ->
+        if (active) {
+            flow {
+                while (true) {
+                    emit(bridge.unpaidByteCount())
+                    delay(SHARED_TRAFFIC_POLL_MS)
+                }
+            }
+        } else {
+            flowOf(0L)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(POLLER_KEEP_ALIVE_MS), 0L)
+
     @Volatile private var locationsVc: LocationsViewController? = null
     private var switchingJob: Job? = null
     private var allCountries: List<UrnetworkLocationItem> = emptyList()
@@ -352,6 +365,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         private const val SWITCHING_INDICATOR_POLL_MS = 1_000L
         private const val SWITCHING_INDICATOR_MAX_MS = 15_000L
         private const val SWITCHING_INDICATOR_SETTLE_MS = 1_500L
+        private const val SHARED_TRAFFIC_POLL_MS = 10_000L
 
         fun countryCodeToFlag(code: String): String {
             if (code.length != 2) return ""

@@ -204,12 +204,20 @@
     <string name="evolution_generation_label">Geração %1$d/%2$d</string>
     <string name="evolution_fitness_label">Melhor resultado: %1$d%%</string>
     <string name="evolution_population_label">População</string>
+    <string name="urnetwork_provide_mode_never">Nunca</string>
     <string name="urnetwork_provide_control_mode_title">Modo de provisão</string>
     <string name="urnetwork_provide_control_mode_auto">Auto</string>
     <string name="urnetwork_provide_control_mode_always">Sempre</string>
     <string name="urnetwork_provide_control_mode_desc">Auto — o sistema decide quando prover. Sempre — prover enquanto estiver conectado.</string>
+    <string name="urnetwork_provide_mode_desc">Nunca — desativado. Auto — sistema decide. Sempre — compartilhar enquanto conectado.</string>
     <string name="urnetwork_provide_network_mode_title">Rede para prover</string>
     <string name="urnetwork_provide_network_mode_wifi">Apenas Wi-Fi</string>
     <string name="urnetwork_provide_network_mode_all">Wi-Fi e dados móveis</string>
     <string name="urnetwork_provide_network_mode_desc">Wi-Fi — prover só por wireless. Wi-Fi e dados móveis — também por celular.</string>
+    <string name="urnetwork_shared_traffic_title">Tráfego compartilhado</string>
+    <string name="urnetwork_shared_traffic_unavailable">Estatísticas indisponíveis. Certifique-se de estar conectado ao URnetwork.</string>
+    <string name="urnetwork_shared_traffic_pending">Em processamento</string>
+    <string name="urnetwork_shared_traffic_balance">Saldo</string>
+    <string name="urnetwork_shared_traffic_used">Usado</string>
+    <string name="urnetwork_shared_traffic_plan">Plano</string>
 </resources>

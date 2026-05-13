@@ -15,18 +15,28 @@ class WarpPreflight(
     internal fun resolveTarget(): Pair<String, Int> {
         val endpoint = peerEndpointProvider()?.trim().orEmpty()
         if (endpoint.isEmpty()) return FALLBACK_HOST to FALLBACK_PORT
-        val sep = endpoint.lastIndexOf(':')
-        if (sep <= 0) return FALLBACK_HOST to FALLBACK_PORT
-        val host = endpoint.substring(0, sep).trim().trim('[', ']')
-        if (!isPlainIp(host)) return FALLBACK_HOST to FALLBACK_PORT
+        val host = parseHost(endpoint) ?: return FALLBACK_HOST to FALLBACK_PORT
         return host to FALLBACK_PORT
     }
 
-    private fun isPlainIp(host: String): Boolean {
-        if (host.isEmpty()) return false
-        if (host.contains(':')) return false
-        return host.all { it.isDigit() || it == '.' }
+    private fun parseHost(endpoint: String): String? {
+        if (endpoint.startsWith('[')) {
+            val close = endpoint.indexOf(']')
+            if (close < 2) return null
+            val host = endpoint.substring(1, close)
+            return if (isIpv6(host)) host else null
+        }
+        val sep = endpoint.lastIndexOf(':')
+        if (sep <= 0) return null
+        val host = endpoint.substring(0, sep)
+        return if (isIpv4(host)) host else null
     }
+
+    private fun isIpv4(host: String): Boolean =
+        host.isNotEmpty() && host.all { it.isDigit() || it == '.' }
+
+    private fun isIpv6(host: String): Boolean =
+        host.isNotEmpty() && host.all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' || it == ':' }
 
     private companion object {
         const val FALLBACK_HOST = "1.1.1.1"
