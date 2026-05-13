@@ -74,24 +74,32 @@ class UrnetworkSharedTrafficViewModelTest {
     }
 
     @Test
-    fun `unpaidBytes показывает ПРЕДОСТАВЛЕННЫЙ трафик а не потреблённый из subscriptionBalance`() = runTest(dispatcher) {
-        bridge.unpaidBytes = 50_000_000L
-        bridge.plan = "free"
-        vm = UrnetworkSharedTrafficViewModel(bridge)
-        advanceUntilIdle()
-        assertEquals(50_000_000L, vm.unpaidBytes.value,
-            "Расшаренный трафик = unpaidByteCount (предоставлено другим), " +
-                "не usedBytes из subscriptionBalance (это потребление).")
-    }
+    fun `unpaidBytes показывает ПРЕДОСТАВЛЕННЫЙ трафик а не потреблённый из subscriptionBalance`() =
+        runTest(dispatcher) {
+            bridge.unpaidBytes = 50_000_000L
+            bridge.plan = "free"
+            vm = UrnetworkSharedTrafficViewModel(bridge)
+            advanceUntilIdle()
+            assertEquals(
+                50_000_000L,
+                vm.unpaidBytes.value,
+                "Расшаренный трафик = unpaidByteCount (предоставлено другим), " +
+                    "не usedBytes из subscriptionBalance (это потребление).",
+            )
+        }
 
     private class FakeBridge : UrnetworkSdkBridge {
         var unpaidBytes = 0L
         var plan: String? = null
         var balanceResult: UrnetworkSdkBridge.SubscriptionBalanceSnapshot? = null
-            get() = if (plan != null) UrnetworkSdkBridge.SubscriptionBalanceSnapshot(
-                balanceBytes = 0L, pendingBytes = 0L, startBalanceBytes = 0L,
-                usedBytes = 0L, plan = plan, store = null,
-            ) else field
+            get() = if (plan != null) {
+                UrnetworkSdkBridge.SubscriptionBalanceSnapshot(
+                    balanceBytes = 0L, pendingBytes = 0L, startBalanceBytes = 0L,
+                    usedBytes = 0L, plan = plan, store = null,
+                )
+            } else {
+                field
+            }
         var fetchTransferStatsCalls = 0
 
         override suspend fun start(walletAddress: String, apiUrl: String, connectUrl: String, byClientJwt: String) =
@@ -107,7 +115,9 @@ class UrnetworkSharedTrafficViewModelTest {
         override fun isProvidePaused() = false
         override fun peerCount() = 0
         override fun unpaidByteCount(): Long = unpaidBytes
-        override fun fetchTransferStats() { fetchTransferStatsCalls++ }
+        override fun fetchTransferStats() {
+            fetchTransferStatsCalls++
+        }
         override suspend fun fetchSubscriptionBalance() = balanceResult
     }
 }

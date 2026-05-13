@@ -242,7 +242,9 @@ class EngineUrnetworkContractTest {
     @Test
     fun `ipProbeRoute возвращает StaticLocation с кодом когда selectedLocation валидный`() = runTest {
         val bridge = FakeUrnetworkSdkBridge().also {
-            it.selectedLocationResult = object : UrnetworkSdkBridge.LocationToken { override val countryCode = "IN" }
+            it.selectedLocationResult = object : UrnetworkSdkBridge.LocationToken {
+                override val countryCode = "IN"
+            }
             it.locationInfoResult = UrnetworkSdkBridge.LocationInfo(
                 country = "India",
                 countryCode = "IN",
@@ -259,7 +261,9 @@ class EngineUrnetworkContractTest {
     @Test
     fun `ipProbeRoute возвращает Unavailable когда selectedLocation не null но country и name оба пустые`() = runTest {
         val bridge = FakeUrnetworkSdkBridge().also {
-            it.selectedLocationResult = object : UrnetworkSdkBridge.LocationToken { override val countryCode = "US" }
+            it.selectedLocationResult = object : UrnetworkSdkBridge.LocationToken {
+                override val countryCode = "US"
+            }
             it.locationInfoResult = UrnetworkSdkBridge.LocationInfo(
                 country = null,
                 countryCode = "US",
