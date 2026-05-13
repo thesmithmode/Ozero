@@ -144,6 +144,7 @@ class StrategyTestViewModelTest {
             savedStrategyStore = savedStore,
             byeDpiEngine = engine, probeFactory = { _, _ -> probe }, tunnelController = tunnel,
             geneMemory = GeneMemory(java.io.File.createTempFile("mem", ".json").also { it.deleteOnExit() }),
+            usageHistoryStore = usageStore,
         ).also { it.ioDispatcher = dispatcher }
         advanceUntilIdle()
         vm.onStart()

@@ -40,7 +40,7 @@ class EvolutionEngineTest {
             ),
         )
         var generationCount = 0
-        val best = evolutionEngine.evolve(seeds) { generationCount++ }
+        val best = evolutionEngine.evolve(seedStrategies = seeds, onGeneration = { generationCount++ })
         assertTrue(best.isNotEmpty())
         assertTrue(generationCount >= 1)
     }
@@ -64,7 +64,7 @@ class EvolutionEngineTest {
             ),
         )
         var generationCount = 0
-        evolutionEngine.evolve(seeds) { generationCount++ }
+        evolutionEngine.evolve(seedStrategies = seeds, onGeneration = { generationCount++ })
         assertEquals(3, generationCount)
     }
 
@@ -81,7 +81,7 @@ class EvolutionEngineTest {
             sites = emptyList(),
             settings = EvolutionEngine.EvolutionSettings(populationSize = 2, maxGenerations = 2),
         )
-        val result = evolutionEngine.evolve(seeds) {}
+        val result = evolutionEngine.evolve(seedStrategies = seeds, onGeneration = {})
         assertTrue(result.isNotEmpty(), "empty sites should still return a seed chromosome, got: $result")
     }
 
@@ -99,7 +99,7 @@ class EvolutionEngineTest {
             settings = EvolutionEngine.EvolutionSettings(populationSize = 2, maxGenerations = 2),
         )
         var called = false
-        evolutionEngine.evolve(seeds) { called = true }
+        evolutionEngine.evolve(seedStrategies = seeds, onGeneration = { called = true })
         assertTrue(called)
     }
 
@@ -124,7 +124,7 @@ class EvolutionEngineTest {
             sites = listOf("s1.com", "s2.com"),
             settings = EvolutionEngine.EvolutionSettings(populationSize = 4, maxGenerations = 1),
         )
-        evolutionEngine.evolve(seeds) {}
+        evolutionEngine.evolve(seedStrategies = seeds, onGeneration = {})
         assertTrue(callCount > 0)
     }
 
@@ -147,7 +147,7 @@ class EvolutionEngineTest {
             ),
         )
         val stagnationCounts = mutableListOf<Int>()
-        evolutionEngine.evolve(seeds) { result -> stagnationCounts.add(result.stagnationCount) }
+        evolutionEngine.evolve(seedStrategies = seeds, onGeneration = { result -> stagnationCounts.add(result.stagnationCount) })
         assertTrue(stagnationCounts.any { it >= 2 }, "should detect stagnation: $stagnationCounts")
     }
 
@@ -170,7 +170,7 @@ class EvolutionEngineTest {
             ),
         )
         var generationCount = 0
-        evolutionEngine.evolve(seeds) { generationCount++ }
+        evolutionEngine.evolve(seedStrategies = seeds, onGeneration = { generationCount++ })
         assertTrue(generationCount < 10, "should exit early due to stagnation, ran $generationCount gens")
     }
 
@@ -213,7 +213,7 @@ class EvolutionEngineTest {
                 settings = EvolutionEngine.EvolutionSettings(populationSize = 4, maxGenerations = 2),
                 random = Random(42),
             )
-            evolutionEngine.evolve(seeds) {}
+            evolutionEngine.evolve(seedStrategies = seeds, onGeneration = {})
         }
         assertFalse(bestChromosomes[0].isEmpty())
         assertFalse(bestChromosomes[1].isEmpty())
