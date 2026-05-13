@@ -205,6 +205,7 @@
     <string name="evolution_fitness_label">Mejor resultado: %1$d%%</string>
     <string name="evolution_population_label">Población</string>
     <string name="urnetwork_provide_mode_never">Nunca</string>
+    <string name="urnetwork_auto_select">Selección automática</string>
     <string name="urnetwork_provide_control_mode_title">Modo de provisión</string>
     <string name="urnetwork_provide_control_mode_auto">Auto</string>
     <string name="urnetwork_provide_control_mode_always">Siempre</string>

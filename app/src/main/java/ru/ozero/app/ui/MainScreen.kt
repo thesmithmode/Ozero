@@ -88,7 +88,13 @@ fun MainScreen(
     val killswitchActive by viewModel.killswitchActive.collectAsStateWithLifecycle()
     val switching by viewModel.switching.collectAsStateWithLifecycle()
 
-    val powerState = if (switching != null) PowerDiscState.Switching else state.toPowerDiscState()
+    val powerState = when {
+        switching != null -> PowerDiscState.Switching
+        state is TunnelState.Connected &&
+            state.engineId == EngineId.URNETWORK &&
+            urnetworkPeerCount == 0 -> PowerDiscState.Connecting
+        else -> state.toPowerDiscState()
+    }
     val backgroundState = if (switching != null) OzeroBackgroundState.Connecting else state.toBackgroundState()
     val isConnected = state is TunnelState.Connected
 
@@ -410,6 +416,11 @@ private fun IpInfoCard(
             when (state) {
                 is IpInfoState.Idle, is IpInfoState.Loading -> Text(
                     text = stringResource(R.string.ip_card_loading),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = OzeroPalette.Text,
+                )
+                is IpInfoState.AutoSelected -> Text(
+                    text = stringResource(R.string.urnetwork_auto_select),
                     style = MaterialTheme.typography.titleMedium,
                     color = OzeroPalette.Text,
                 )

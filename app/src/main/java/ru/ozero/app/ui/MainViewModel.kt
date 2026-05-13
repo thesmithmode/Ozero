@@ -37,6 +37,7 @@ import javax.inject.Inject
 sealed class IpInfoState {
     data object Idle : IpInfoState()
     data object Loading : IpInfoState()
+    data object AutoSelected : IpInfoState()
     data class Loaded(val info: IpInfo) : IpInfoState()
     data class Error(val message: String) : IpInfoState()
 }
@@ -281,6 +282,7 @@ class MainViewModel @Inject constructor(
             .getOrElse { return IpInfoState.Error(it.message ?: it.javaClass.simpleName) }
         return when (route) {
             IpProbeRoute.Default -> ipInfoProvider.fetch().toState()
+            IpProbeRoute.AutoSelected -> IpInfoState.AutoSelected
             is IpProbeRoute.Socks -> ipInfoProvider.fetchVia(route.host, route.port).toState()
             is IpProbeRoute.StaticLocation -> IpInfoState.Loaded(
                 IpInfo(
