@@ -12,7 +12,6 @@ import ru.ozero.app.ui.strategy.StrategyTestSettingsStore
 import ru.ozero.corebackup.AppBackupManager
 import ru.ozero.corebackup.StrategyBackupProvider
 import ru.ozero.corestorage.dao.AppSplitRuleDao
-import ru.ozero.enginebyedpi.strategy.GeneMemory
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.enginewarp.WarpConfigSlotStore
 import javax.inject.Singleton
@@ -27,9 +26,8 @@ object BackupModule {
         settingsStore: StrategyTestSettingsStore,
         domainListStore: DomainListStore,
         savedStrategyStore: SavedStrategyStore,
-        geneMemory: GeneMemory,
     ): StrategyBackupProvider = StrategyBackupProviderImpl(
-        settingsStore, domainListStore, savedStrategyStore, geneMemory,
+        settingsStore, domainListStore, savedStrategyStore,
     )
 
     @Provides

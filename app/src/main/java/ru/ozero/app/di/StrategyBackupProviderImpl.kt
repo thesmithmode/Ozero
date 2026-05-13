@@ -11,24 +11,17 @@ import ru.ozero.corebackup.BackupSavedStrategy
 import ru.ozero.corebackup.BackupStrategy
 import ru.ozero.corebackup.BackupStrategySettings
 import ru.ozero.corebackup.StrategyBackupProvider
-import ru.ozero.enginebyedpi.strategy.GeneMemory
 
 class StrategyBackupProviderImpl(
     private val settingsStore: StrategyTestSettingsStore,
     private val domainListStore: DomainListStore,
     private val savedStrategyStore: SavedStrategyStore,
-    private val geneMemory: GeneMemory,
 ) : StrategyBackupProvider {
 
     override suspend fun export(): BackupStrategy {
         val s = runCatching { settingsStore.load() }.getOrDefault(StrategyTestSettings())
         val domainLists = runCatching { domainListStore.load() }.getOrDefault(emptyList())
         val savedStrategies = runCatching { savedStrategyStore.load() }.getOrDefault(emptyList())
-        val evolutionMemory = runCatching {
-            geneMemory.save()
-            geneMemory.rawJson()
-        }.getOrNull()
-
         return BackupStrategy(
             settings = BackupStrategySettings(
                 requestsPerDomain = s.requestsPerDomain,
@@ -45,7 +38,7 @@ class StrategyBackupProviderImpl(
             ),
             domainLists = domainLists.map { it.toBackup() },
             savedStrategies = savedStrategies.map { it.toBackup() },
-            evolutionMemory = evolutionMemory,
+            evolutionMemory = null,
         )
     }
 
@@ -73,9 +66,6 @@ class StrategyBackupProviderImpl(
         }
         if (strategy.savedStrategies.isNotEmpty()) {
             savedStrategyStore.save(strategy.savedStrategies.map { it.toSaved() })
-        }
-        strategy.evolutionMemory?.let { json ->
-            runCatching { geneMemory.importRawJson(json) }
         }
     }
 
