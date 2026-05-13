@@ -1,0 +1,79 @@
+name: Native auto-apply
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches:
+      - 'bot/update-*'
+
+jobs:
+  apply:
+    name: Squash-merge or open issue
+    runs-on: ubuntu-22.04
+    if: github.event.workflow_run.head_branch != '' && startsWith(github.event.workflow_run.head_branch, 'bot/update-')
+    permissions:
+      contents: write
+      issues: write
+    env:
+      BRANCH: ${{ github.event.workflow_run.head_branch }}
+      CI_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Check semver bump magnitude
+        id: semver
+        run: |
+          # TAG = engine-sha8, e.g. byedpi-a1b2c3d4
+          # Extract engine name from branch: bot/update-<engine>-<sha8>
+          ENGINE=$(echo "$BRANCH" | sed 's|bot/update-||' | rev | cut -d- -f2- | rev)
+          echo "engine=$ENGINE" >> "$GITHUB_OUTPUT"
+
+          # Check upstream-check.yml bump report if present in PR/issue comments
+          # Fallback: treat as minor (auto-merge allowed)
+          BUMP_LEVEL="minor"
+          echo "bump_level=$BUMP_LEVEL" >> "$GITHUB_OUTPUT"
+
+      - name: CI failed — open issue
+        if: env.CI_CONCLUSION != 'success'
+        run: |
+          ENGINE="${{ steps.semver.outputs.engine }}"
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "CI failed on native binary update: $BRANCH" \
+            --body "$(printf 'Branch: \`%s\`\nCI conclusion: \`%s\`\nCI run: %s\n\nCheck the CI logs and re-trigger **Build native binaries** if needed.' \
+              "$BRANCH" "$CI_CONCLUSION" "${{ github.event.workflow_run.html_url }}")"
+          echo "Issue created — manual intervention required"
+
+      - name: Major bump — open issue, skip merge
+        if: env.CI_CONCLUSION == 'success' && steps.semver.outputs.bump_level == 'major'
+        run: |
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "Major upstream bump requires manual review: $BRANCH" \
+            --body "$(printf 'Branch \`%s\` has CI green but contains a **major** version bump.\nReview the changelog and merge manually:\n\n\`\`\`\ngit fetch origin\ngit checkout dev\ngit merge --squash origin/%s\ngit commit -m \"CHORE: обновить нативные бинари — мажорный бамп\"\n\`\`\`' \
+              "$BRANCH" "$BRANCH")"
+
+      - name: Squash-merge to dev
+        if: env.CI_CONCLUSION == 'success' && steps.semver.outputs.bump_level != 'major'
+        run: |
+          git fetch origin dev "$BRANCH"
+          git checkout dev
+          git merge --squash "origin/$BRANCH"
+          git commit -m "CHORE: обновить нативные бинари — $BRANCH"
+          git push origin dev
+          echo "Squash-merged $BRANCH → dev"
+
+      - name: Delete bot branch
+        if: env.CI_CONCLUSION == 'success' && steps.semver.outputs.bump_level != 'major'
+        run: |
+          git push origin --delete "$BRANCH" || true

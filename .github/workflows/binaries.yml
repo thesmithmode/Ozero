@@ -381,6 +381,100 @@ jobs:
                 gh release delete "$old" --yes --cleanup-tag -R "${{ github.repository }}" || true
               done
 
+  update-repo:
+    name: Commit artifacts to bot branch
+    needs: build
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.build.outputs.tag }}
+      ARTIFACT: ${{ needs.build.outputs.artifact }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p out
+          gh release download "$TAG" --dir out -R "${{ github.repository }}"
+          ls -la out/
+
+      - name: Copy artifacts to repo destinations
+        run: |
+          set -euo pipefail
+          case "$ARTIFACT" in
+            byedpi)
+              for ABI in arm64-v8a armeabi-v7a x86_64 x86; do
+                SRC="out/libbyedpi-${ABI}.so"
+                DST="engine-byedpi/src/main/jniLibs/${ABI}/libbyedpi.so"
+                if [ -f "$SRC" ]; then
+                  mkdir -p "$(dirname "$DST")"
+                  cp "$SRC" "$DST"
+                  echo "Copied $SRC → $DST"
+                fi
+              done
+              ;;
+            amneziawg)
+              AAR="out/libamneziawg.aar"
+              [ -f "$AAR" ] || { echo "No AAR found in out/"; ls out/; exit 1; }
+              TMPDIR=$(mktemp -d)
+              unzip -q "$AAR" "jni/**" -d "$TMPDIR" || true
+              for ABI in arm64-v8a armeabi-v7a x86_64; do
+                SRC_DIR="$TMPDIR/jni/$ABI"
+                DST_DIR="engine-warp/src/main/jniLibs/$ABI"
+                if [ -d "$SRC_DIR" ]; then
+                  mkdir -p "$DST_DIR"
+                  cp "$SRC_DIR"/*.so "$DST_DIR/"
+                  echo "Copied $ABI .so files to $DST_DIR"
+                fi
+              done
+              rm -rf "$TMPDIR"
+              ;;
+            urnetwork-sdk)
+              AAR="out/URnetworkSdk.aar"
+              [ -f "$AAR" ] || { echo "No URnetworkSdk.aar found"; ls out/; exit 1; }
+              mkdir -p engine-urnetwork/libs
+              cp "$AAR" engine-urnetwork/libs/URnetworkSdk.aar
+              echo "Copied URnetworkSdk.aar → engine-urnetwork/libs/"
+              ;;
+            userwireguard)
+              AAR="out/userwireguard.aar"
+              [ -f "$AAR" ] || { echo "No userwireguard.aar found"; ls out/; exit 1; }
+              mkdir -p engine-urnetwork/libs
+              cp "$AAR" engine-urnetwork/libs/userwireguard.aar
+              echo "Copied userwireguard.aar → engine-urnetwork/libs/"
+              ;;
+            *)
+              echo "No repo-copy mapping for artifact=$ARTIFACT — skipping update-repo"
+              exit 0
+              ;;
+          esac
+
+      - name: Commit and push to bot branch
+        run: |
+          set -euo pipefail
+          BRANCH="bot/update-${TAG}"
+          git checkout -b "$BRANCH"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes — artifacts identical to current repo state"
+            exit 0
+          fi
+          git commit -m "CHORE: обновить нативные бинари — ${TAG}"
+          git push origin "$BRANCH"
+          echo "Pushed to $BRANCH"
+
   # Lock-файл обновляется вручную через build-tools/regen_lock.py — workflow
   # его не правит. Причина: dev-flow в проекте — squash merge feature-веток
   # вручную, поэтому auto-PR от бота избыточен и плодил orphan-ветки
