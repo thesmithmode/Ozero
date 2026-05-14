@@ -5,7 +5,9 @@ import android.content.Context
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -27,6 +29,7 @@ class TelegramProxyCoordinatorTest {
 
     private val dispatcher = UnconfinedTestDispatcher()
     private val testScope = TestScope(dispatcher)
+    private val coordinatorScope = CoroutineScope(dispatcher + SupervisorJob())
 
     private lateinit var tunnelStateFlow: MutableStateFlow<TunnelState>
     private lateinit var configFlow: MutableStateFlow<TelegramProxyConfig>
@@ -64,7 +67,7 @@ class TelegramProxyCoordinatorTest {
             override suspend fun setSecret(value: String) {}
         }
 
-        coordinator = TelegramProxyCoordinator(mockProxy, mockTunnelController, fakeConfigStore, testScope)
+        coordinator = TelegramProxyCoordinator(mockProxy, mockTunnelController, fakeConfigStore, coordinatorScope)
     }
 
     @Test

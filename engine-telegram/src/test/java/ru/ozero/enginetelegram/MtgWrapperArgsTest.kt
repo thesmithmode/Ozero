@@ -20,7 +20,7 @@ class MtgWrapperArgsTest {
     @BeforeEach
     fun setUp() {
         fakeBinary = File(tempDir.toFile(), "libmtg.so")
-        fakeBinary.writeText("#!/bin/sh\nprintf '%s\\n' \"\$@\"")
+        fakeBinary.writeText("#!/bin/sh\nprintf '%s\\n' \"\$0\" \"\$@\"")
         fakeBinary.setExecutable(true)
         wrapper = MtgWrapper(tempDir.toFile().absolutePath)
     }

@@ -1,11 +1,15 @@
 package ru.ozero.enginetelegram
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -22,15 +26,22 @@ class DataStoreTelegramConfigStoreTest {
 
     private val dispatcher = UnconfinedTestDispatcher()
     private val testScope = TestScope(dispatcher)
+    private lateinit var datastoreScope: CoroutineScope
     private lateinit var store: DataStoreTelegramConfigStore
 
     @BeforeEach
     fun setUp() {
+        datastoreScope = CoroutineScope(dispatcher + SupervisorJob())
         val dataStore = PreferenceDataStoreFactory.create(
-            scope = testScope,
+            scope = datastoreScope,
             produceFile = { tempDir.resolve("test_prefs.preferences_pb").toFile() },
         )
         store = DataStoreTelegramConfigStore(dataStore)
+    }
+
+    @AfterEach
+    fun tearDown() {
+        datastoreScope.cancel()
     }
 
     @Test

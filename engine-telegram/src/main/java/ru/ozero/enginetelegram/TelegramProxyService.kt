@@ -17,10 +17,10 @@ import ru.ozero.enginescore.Upstream
 import java.util.concurrent.atomic.AtomicReference
 
 class TelegramProxyService(
-    context: Context,
+    private val context: Context,
     private val configStore: TelegramConfigStore,
 ) {
-    private val wrapper = MtgWrapper(context.applicationInfo.nativeLibraryDir)
+    private val wrapper by lazy { MtgWrapper(context.applicationInfo.nativeLibraryDir) }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val processRef = AtomicReference<Process?>(null)
     private val jobRef = AtomicReference<Job?>(null)
