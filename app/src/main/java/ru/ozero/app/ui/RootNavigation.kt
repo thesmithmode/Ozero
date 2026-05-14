@@ -99,6 +99,7 @@ fun RootNavigation(
                     viewModel = viewModel,
                     onConnectClick = onConnectClick,
                     onOpenSettings = { navigate(TopScreen.Settings) },
+                    onOpenSplitTunnel = { navigate(TopScreen.SplitTunnel) },
                     onOpenEngineParams = { engineId -> navigate(engineParamsTarget(engineId)) },
                 )
         }

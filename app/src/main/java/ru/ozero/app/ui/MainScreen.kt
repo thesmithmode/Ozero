@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
@@ -73,6 +74,7 @@ fun MainScreen(
     viewModel: MainViewModel,
     onConnectClick: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenSplitTunnel: () -> Unit = {},
     onOpenEngineParams: (EngineId?) -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -108,7 +110,7 @@ fun MainScreen(
                     urnetworkPeerCount = urnetworkPeerCount,
                     urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
                     onConnectClick = onConnectClick,
-                    onOpenEngineParams = onOpenEngineParams,
+                    onOpenSplitTunnel = onOpenSplitTunnel,
                     onOpenSettings = onOpenSettings,
                 )
                 AppMode.EXPERT -> ExpertMainContent(
@@ -129,6 +131,7 @@ fun MainScreen(
                     onManualEngineSelect = viewModel::onManualEngineSelect,
                     onRefreshIpInfo = viewModel::refreshIpInfo,
                     onOpenEngineParams = onOpenEngineParams,
+                    onOpenSplitTunnel = onOpenSplitTunnel,
                     onOpenSettings = onOpenSettings,
                 )
             }
@@ -147,7 +150,7 @@ private fun SimpleMainContent(
     urnetworkPeerCount: Int,
     urnetworkPeerSearchSeconds: Int,
     onConnectClick: () -> Unit,
-    onOpenEngineParams: (EngineId?) -> Unit,
+    onOpenSplitTunnel: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     Column(
@@ -189,11 +192,11 @@ private fun SimpleMainContent(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             BottomDock(
-                tabs = commonDockTabs(),
+                tabs = simpleDockTabs(),
                 activeTabId = DOCK_TAB_HOME,
                 onTabSelected = { id ->
                     when (id) {
-                        DOCK_TAB_SERVERS -> onOpenEngineParams(manualEngine)
+                        DOCK_TAB_SPLIT_TUNNEL -> onOpenSplitTunnel()
                         DOCK_TAB_SETTINGS -> onOpenSettings()
                     }
                 },
@@ -244,6 +247,7 @@ private fun ExpertMainContent(
     onManualEngineSelect: (EngineId?) -> Unit,
     onRefreshIpInfo: () -> Unit,
     onOpenEngineParams: (EngineId?) -> Unit,
+    onOpenSplitTunnel: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     Column(
@@ -334,11 +338,12 @@ private fun ExpertMainContent(
             )
 
             BottomDock(
-                tabs = commonDockTabs(),
+                tabs = expertDockTabs(),
                 activeTabId = DOCK_TAB_HOME,
                 onTabSelected = { id ->
                     when (id) {
                         DOCK_TAB_SERVERS -> onOpenEngineParams(manualEngine)
+                        DOCK_TAB_SPLIT_TUNNEL -> onOpenSplitTunnel()
                         DOCK_TAB_SETTINGS -> onOpenSettings()
                     }
                 },
@@ -352,14 +357,30 @@ private fun ExpertMainContent(
 }
 
 @Composable
-private fun commonDockTabs(): List<DockTab> {
+private fun simpleDockTabs(): List<DockTab> {
+    val labelHome = stringResource(R.string.tab_main)
+    val labelSplit = stringResource(R.string.tab_split_tunnel)
+    val labelSettings = stringResource(R.string.tab_settings)
+    return remember(labelHome, labelSplit, labelSettings) {
+        listOf(
+            DockTab(DOCK_TAB_HOME, Icons.Filled.Home, labelHome),
+            DockTab(DOCK_TAB_SPLIT_TUNNEL, Icons.Filled.List, labelSplit),
+            DockTab(DOCK_TAB_SETTINGS, Icons.Filled.Settings, labelSettings),
+        )
+    }
+}
+
+@Composable
+private fun expertDockTabs(): List<DockTab> {
     val labelHome = stringResource(R.string.tab_main)
     val labelServers = stringResource(R.string.tab_servers)
+    val labelSplit = stringResource(R.string.tab_split_tunnel)
     val labelSettings = stringResource(R.string.tab_settings)
-    return remember(labelHome, labelServers, labelSettings) {
+    return remember(labelHome, labelServers, labelSplit, labelSettings) {
         listOf(
             DockTab(DOCK_TAB_HOME, Icons.Filled.Home, labelHome),
             DockTab(DOCK_TAB_SERVERS, Icons.Filled.LocationOn, labelServers),
+            DockTab(DOCK_TAB_SPLIT_TUNNEL, Icons.Filled.List, labelSplit),
             DockTab(DOCK_TAB_SETTINGS, Icons.Filled.Settings, labelSettings),
         )
     }
@@ -713,6 +734,7 @@ private fun StatusLabel(state: TunnelState, switching: SwitchingTransition? = nu
 
 private const val DOCK_TAB_HOME = "home"
 private const val DOCK_TAB_SERVERS = "servers"
+private const val DOCK_TAB_SPLIT_TUNNEL = "split_tunnel"
 private const val DOCK_TAB_SETTINGS = "settings"
 
 internal const val CHART_MAX_RENDER_POINTS = 300
