@@ -1,5 +1,22 @@
 # Build Log
 
+## [2026-05-15T00:30:00] compile | Daily Log 2026-05-14 (pass 4)
+- Source: daily/2026-05-14.md
+- Articles created: [[concepts/engine-telegram-mtproxy]]
+- Articles updated: [[concepts/native-binary-auto-update-pipeline]] (binaries.lock.yaml + regen_lock.py + ProcessBuilder pattern), [[concepts/ci-workflow-discipline]] (new module must be explicitly in CI test job)
+- Index updated: 1 new row
+
+## [2026-05-14T23:59:00] compile | Daily Log 2026-05-14
+- Source: daily/2026-05-14.md
+- Articles created: [[concepts/shell-mock-positional-arg-trap]]
+- Articles updated: [[concepts/runtest-uncompleted-coroutines-trap]] (TelegramProxyCoordinator + DataStore scope cases), [[concepts/robolectric-hilt-eager-init-trap]] (TelegramProxyService lazy fix), [[concepts/byedpi-mock-server-ci-fragility]] (root cause 4: mock returns 0 instantly), [[concepts/github-draft-release-visibility]] (3 draft releases fixed), [[concepts/combined-aidl-race-elimination]] (WARP H3/H4 fixes), [[concepts/go-runtime-process-isolation]] (combined AIDL + adoptFd), [[concepts/engine-await-ready-pattern]] (URnetwork peerCount + WARP UAPI), [[concepts/warp-uapi-handshake-polling]] (LocalSocket implementation), [[concepts/warp-false-connected-no-handshake]] (awaitReady integration), [[concepts/byedpi-native-thread-join-race]] (second join after forceClose), [[concepts/android-foreground-service-long-operation]] (StrategyScanService), [[connections/engine-readiness-vs-false-connected]] (awaitReady unification), [[concepts/genetic-strategy-evolution]] (GA v2: popSize 30, maxGen 20, fitness formula)
+
+## [2026-05-14T22:00:00] compile | Daily Log 2026-05-14
+- Source: daily/2026-05-14.md
+- Articles created: [[concepts/android-foreground-service-long-operation]]
+- Articles updated: (none — prior session articles for 2026-05-14 were already compiled)
+- Key extractions: FGS pattern for 6-min strategy scanning, START_NOT_STICKY rationale, finally>onCleared cleanup discipline, notification ID collision avoidance, mockk relaxed Context test pattern
+
 ## [2026-05-14T19:00:00+03:00] compile | 2026-05-14.md (pass 1)
 - Source: daily/2026-05-14.md
 - Result: 7 new articles, 1 connection, 4 articles updated
