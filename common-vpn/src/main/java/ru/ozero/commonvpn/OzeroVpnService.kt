@@ -253,6 +253,8 @@ class OzeroVpnService : android.net.VpnService() {
         val chainResult = startChain(activeEngineId, activeConfig) ?: return
         if (!routeTrafficForEngine(activeEngineId, fd, chainResult.finalSocksPort)) return
 
+        enginePlugins.firstOrNull { it.id == activeEngineId }?.awaitReady()
+
         tunnelController.onEngineStarted(activeEngineId, chainResult.finalSocksPort)
         val nowMs = System.currentTimeMillis()
         sessionStartMsRef.set(nowMs)

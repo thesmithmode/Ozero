@@ -10,12 +10,14 @@ import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.TunAttachResult
 import ru.ozero.enginescore.TunFdAcceptor
 import ru.ozero.enginescore.Upstream
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 class EngineWarpContractTest {
 
@@ -38,6 +40,9 @@ class EngineWarpContractTest {
         bridge: FakeWarpSdkBridge = FakeWarpSdkBridge(),
         uapiPath: String = "/data/data/ru.ozero.app",
         ipv6Enabled: Boolean = true,
+        handshakeChecker: (String, String) -> Boolean = { _, _ -> true },
+        warpReadyTimeoutMs: Long = 500L,
+        warpReadyPollMs: Long = 50L,
     ): Triple<EngineWarp, FakeWarpAutoConfig, FakeWarpConfigSlotStore> {
         val store = FakeWarpConfigSlotStore(activeConfig = activeConfig, activeRawIni = activeRawIni)
         val auto = FakeWarpAutoConfig(autoConfigResult)
@@ -48,6 +53,9 @@ class EngineWarpContractTest {
             uapiPathProvider = { uapiPath },
             socketProtector = ru.ozero.enginescore.VpnSocketProtector { true },
             ipv6EnabledProvider = { ipv6Enabled },
+            handshakeChecker = handshakeChecker,
+            warpReadyTimeoutMs = warpReadyTimeoutMs,
+            warpReadyPollMs = warpReadyPollMs,
         )
         return Triple(e, auto, store)
     }
@@ -316,8 +324,73 @@ class EngineWarpContractTest {
             uapiPathProvider = { "/tmp" },
             socketProtector = ru.ozero.enginescore.VpnSocketProtector { true },
             ipv6EnabledProvider = { ipv6Enabled },
+            handshakeChecker = { _, _ -> true },
         )
         return Triple(e, auto, store)
+    }
+
+    @Test
+    fun `awaitReady возвращается немедленно когда handshake уже выполнен`() = runTest {
+        val calls = AtomicInteger(0)
+        val (e, _, _) = engine(
+            activeConfig = sampleConfig,
+            handshakeChecker = { _, _ -> calls.incrementAndGet(); true },
+        )
+        e.start(EngineConfig.Warp, Upstream.None)
+        e.awaitReady()
+        assertTrue(calls.get() >= 1, "handshakeChecker должен быть вызван хотя бы раз")
+    }
+
+    @Test
+    fun `awaitReady ждёт пока handshake не завершится`() = runTest {
+        val calls = AtomicInteger(0)
+        val (e, _, _) = engine(
+            activeConfig = sampleConfig,
+            handshakeChecker = { _, _ -> calls.incrementAndGet() >= 3 },
+            warpReadyTimeoutMs = 5_000L,
+            warpReadyPollMs = 50L,
+        )
+        e.start(EngineConfig.Warp, Upstream.None)
+        e.awaitReady()
+        assertTrue(calls.get() >= 3, "awaitReady должен опросить хотя бы 3 раза, calls=${calls.get()}")
+    }
+
+    @Test
+    fun `awaitReady завершается по таймауту — не зависает и не бросает`() = runTest {
+        val (e, _, _) = engine(
+            activeConfig = sampleConfig,
+            handshakeChecker = { _, _ -> false },
+            warpReadyTimeoutMs = 300L,
+            warpReadyPollMs = 50L,
+        )
+        e.start(EngineConfig.Warp, Upstream.None)
+        var returned = false
+        try {
+            e.awaitReady()
+            returned = true
+        } catch (_: Throwable) {
+            fail("awaitReady не должен бросать исключение при таймауте")
+        }
+        assertTrue(returned, "awaitReady обязан вернуться после таймаута")
+    }
+
+    @Test
+    fun `awaitReady при исключении из handshakeChecker — не пробрасывает`() = runTest {
+        val (e, _, _) = engine(
+            activeConfig = sampleConfig,
+            handshakeChecker = { _, _ -> throw RuntimeException("uapi unavailable") },
+            warpReadyTimeoutMs = 300L,
+            warpReadyPollMs = 50L,
+        )
+        e.start(EngineConfig.Warp, Upstream.None)
+        var returned = false
+        try {
+            e.awaitReady()
+            returned = true
+        } catch (_: Throwable) {
+            fail("awaitReady не должен пробрасывать исключения из handshakeChecker")
+        }
+        assertTrue(returned, "awaitReady должен вернуться даже если handshakeChecker бросает")
     }
 
     private class FakeWarpAutoConfig(

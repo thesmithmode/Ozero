@@ -7,6 +7,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,6 +36,8 @@ class EngineUrnetwork(
     private val authService: UrnetworkAuthService,
     private val pluginScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
     private val statsPollIntervalMs: Long = STATS_POLL_INTERVAL_MS,
+    private val peerReadyTimeoutMs: Long = PEER_READY_TIMEOUT_MS,
+    private val peerReadyPollMs: Long = PEER_READY_POLL_MS,
 ) : EnginePlugin, TunFdAcceptor {
 
     private val statsJobRef = AtomicReference<Job?>(null)
@@ -180,6 +183,22 @@ class EngineUrnetwork(
         routeAllV6 = false,
     )
 
+    override suspend fun awaitReady() {
+        val reached = withTimeoutOrNull(peerReadyTimeoutMs) {
+            while (true) {
+                val peers = runCatching { sdkBridge.peerCount() }.getOrDefault(0)
+                if (peers > 0) {
+                    Log.i(TAG, "awaitReady: peers=$peers — engine ready")
+                    return@withTimeoutOrNull Unit
+                }
+                delay(peerReadyPollMs)
+            }
+        }
+        if (reached == null) {
+            PersistentLoggers.warn(TAG, "awaitReady: нет пиров за ${peerReadyTimeoutMs}ms — продолжаем")
+        }
+    }
+
     override suspend fun attachTun(tunFd: Int): TunAttachResult {
         PersistentLoggers.info(TAG, "attachTun fd=$tunFd")
         return when (val r = sdkBridge.attachTun(tunFd)) {
@@ -235,5 +254,7 @@ class EngineUrnetwork(
         const val STATS_POLL_INTERVAL_MS = 2_000L
 
         const val URN_STOP_TIMEOUT_MS = 5_000L
+        const val PEER_READY_TIMEOUT_MS = 15_000L
+        const val PEER_READY_POLL_MS = 200L
     }
 }

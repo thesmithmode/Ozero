@@ -12,6 +12,8 @@ interface EnginePlugin {
     suspend fun tunSpec(): TunSpec? = null
     fun preflight(): EnginePreflight? = null
 
+    suspend fun awaitReady() = Unit
+
     suspend fun ipProbeRoute(socksPort: Int): IpProbeRoute = IpProbeRoute.Default
 
     fun stopTimeoutMs(): Long = DEFAULT_STOP_TIMEOUT_MS

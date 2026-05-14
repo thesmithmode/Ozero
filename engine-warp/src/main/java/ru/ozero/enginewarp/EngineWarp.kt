@@ -1,10 +1,12 @@
 package ru.ozero.enginewarp
 
 import android.util.Log
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.enginescore.EngineCapabilities
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
@@ -27,6 +29,9 @@ class EngineWarp(
     private val uapiPathProvider: () -> String,
     private val socketProtector: VpnSocketProtector = VpnSocketProtectorHolder,
     private val ipv6EnabledProvider: () -> Boolean = { false },
+    private val handshakeChecker: (uapiPath: String, tunnelName: String) -> Boolean = WarpHandshakeUapi::check,
+    private val warpReadyTimeoutMs: Long = WARP_READY_TIMEOUT_MS,
+    private val warpReadyPollMs: Long = WARP_READY_POLL_MS,
 ) : EnginePlugin, TunFdAcceptor {
 
     override val id = EngineId.WARP
@@ -67,6 +72,23 @@ class EngineWarp(
         sdkBridge.detachTun()
         resolvedConfig = null
         resolvedIni = null
+    }
+
+    override suspend fun awaitReady() {
+        val uapiPath = uapiPathProvider()
+        val reached = withTimeoutOrNull(warpReadyTimeoutMs) {
+            while (true) {
+                val ready = runCatching { handshakeChecker(uapiPath, TUNNEL_NAME) }.getOrDefault(false)
+                if (ready) {
+                    Log.i(TAG, "awaitReady: WireGuard handshake complete")
+                    return@withTimeoutOrNull Unit
+                }
+                delay(warpReadyPollMs)
+            }
+        }
+        if (reached == null) {
+            PersistentLoggers.warn(TAG, "awaitReady: WireGuard handshake timeout ${warpReadyTimeoutMs}ms — proceeding")
+        }
     }
 
     override suspend fun probe(): ProbeResult =
@@ -252,5 +274,7 @@ class EngineWarp(
         const val TUNNEL_NAME = "ozero-warp"
         const val DOH_CONNECT_TIMEOUT_MS = 3_000
         const val DOH_READ_TIMEOUT_MS = 3_000
+        const val WARP_READY_TIMEOUT_MS = 10_000L
+        const val WARP_READY_POLL_MS = 300L
     }
 }
