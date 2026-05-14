@@ -25,6 +25,12 @@ updated: 2026-05-09
 - **EngineUrnetwork** → `IpProbeRoute.StaticLocation` через `sdkBridge.selectedLocation()`. Go SDK обязан excludeSelf из своего TUN ([[concepts/tun-self-exclusion-sdk-engines]]) → self HTTP уходит мимо TUN → real IP, не VPN. SDK сам отдаёт страну peer'а через `ConnectLocation.country/countryCode`.
 - **EngineWarp** → не overrides → `Default` → `IpInfoProvider.fetch()` через TUN. WG socket protect()-ается, self-traffic роутится через TUN автоматически. Sentinel `MainViewModelIpInfoChannelTest::fetchOnce_не_использует_fetchViaSocketFactory` запрещает `bindSocketToNetwork` (EPERM на VPN-network).
 
+## StaticLocation — null country контракт
+
+`StaticLocation(country, countryCode)` — `country` (display name) может быть `null` когда `countryCode` существует. Это валидное состояние, не ошибка. `IpInfoCard` обрабатывает `null` через `?: stringResource(R.string.unknown)` → показывает "Unknown".
+
+Sentinel-ловушка: тест проверял `Unavailable` когда country И name оба null, но правильный контракт — `StaticLocation(null, code)` когда countryCode есть. Возврат `Unavailable` в этом случае = неверно. Sentinel обновлён: `ipProbeRoute` с `selectedLocation(country=null, countryCode="US")` → `StaticLocation(null, "US")`, не `Unavailable`.
+
 ## Почему "просто пинг" не работает универсально
 
 Юзер спросил "почему нельзя просто пингануть сайт и получить IP?". Ответ — реализация физически разная:

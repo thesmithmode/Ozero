@@ -1,5 +1,21 @@
 # Build Log
 
+## [2026-05-14T11:00:00+03:00] compile | 2026-05-13.md (pass 6 — format upgrade + sentinel note)
+- Source: daily/2026-05-13.md
+- Result: 1 article reformatted to wiki schema; 1 article updated with sentinel note
+- Articles created: (none)
+- Articles updated:
+  - [[concepts/urnetwork-location-token-best-available]] — переписан в AGENTS.md wiki формат (YAML frontmatter, Key Points, Details, Anti-Pattern, Related Concepts, Sources); убран informal Russian style, добавлены wikilinks
+  - [[concepts/ip-probe-route-architecture]] — добавлен раздел "StaticLocation — null country контракт": country может быть null когда countryCode существует; IpInfoCard обрабатывает через stringResource; sentinel обновлён с Unavailable на StaticLocation(null, code)
+
+## [2026-05-14T10:00:00+03:00] compile | 2026-05-13.md (pass 5 — net-new content)
+- Source: daily/2026-05-13.md
+- Result: 1 new article created (session 20:35 content missed by prior passes)
+- Articles created:
+  - [[concepts/urnetwork-location-token-best-available]] — LocationToken.fromConnectLocation drops bestAvailable flag; isBestAvailable=false after DataStore round-trip; fix = add field + = false default + Serializer update
+- Articles updated: (none)
+- Index: 1 row added
+
 ## [2026-05-14T09:00:00+03:00] compile | 2026-05-13.md (pass 4 — verification)
 - Source: daily/2026-05-13.md
 - Result: ALREADY COMPILED — all content covered by 3 prior compile passes (19:00, 22:00 on 2026-05-13; 00:15 on 2026-05-14)
