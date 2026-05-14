@@ -1,5 +1,17 @@
 # Build Log
 
+## [2026-05-15T02:00:00] compile | Daily Log 2026-05-14 (pass 6 — post-compaction)
+- Source: daily/2026-05-14.md
+- Articles created: [[concepts/urnetwork-relay-always]] (session 20:30 — relay-always architecture, UrnetworkRelayCoordinator, SDK tunnelStarted/providePaused decoupling, PRESET_WALLET dead code, monetization constraints)
+- Articles updated: [[concepts/byedpi-mock-server-ci-fragility]] (RC4 extended: added probe-before-isActive production ordering fix, commit b61550bc; existing test fix documented as Problem B)
+- Index updated: 1 new row, total 113
+
+## [2026-05-15T01:00:00] compile | Daily Log 2026-05-14 (pass 5 — verification)
+- Source: daily/2026-05-14.md
+- Articles created: none (all created in passes 1-4)
+- Articles updated: none (all updated in passes 1-4)
+- Verification: confirmed all 11 "existing" articles present on disk and indexed; confirmed 5 target articles (byedpi-mock-server-ci-fragility, genetic-strategy-evolution, ci-workflow-discipline, go-runtime-process-isolation, warp-false-connected-no-handshake) contain 2026-05-14.md content; index has 112 rows covering all sessions
+
 ## [2026-05-15T00:30:00] compile | Daily Log 2026-05-14 (pass 4)
 - Source: daily/2026-05-14.md
 - Articles created: [[concepts/engine-telegram-mtproxy]]

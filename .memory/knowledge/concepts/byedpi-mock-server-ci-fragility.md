@@ -174,9 +174,33 @@ ServerSocket + daemon thread полностью удалены из тестов
 
 Тесты suspend функций, использующих `withContext(Dispatchers.IO)` → инжектировать зависимость. Статические объекты с реальным IO — неизбежный источник flakiness под CI нагрузкой.
 
-## Root Cause 4: Mock `returns 0` Instantly Completes proxyJob
+## Root Cause 4: Mock `returns 0` Instantly Completes proxyJob + Probe Ordering
 
-After adding `if (!proxyJob.isActive) return Failure` guard in `waitSocksReady` (commit 73622376), tests using `every { startProxy } returns 0` broke: the mock returns immediately → `proxyJob` completes → `waitSocksReady` sees `!isActive` → early `Failure` return.
+After adding `if (!proxyJob.isActive) return Failure` guard in `waitSocksReady` (commit 73622376), two related problems emerged.
+
+### Problem A: Probe After isActive Check (Production Code — commit b61550bc)
+
+Original ordering in `waitSocksReady`:
+1. Check `!proxyJob.isActive` → return -1 if true
+2. Run probe
+
+When mock returned 0 instantly, `proxyJob` completed before `waitSocksReady` ran the `!isActive` check → probe was skipped → returned -1 (Failure) even though the socket was ready.
+
+Fix (commit `b61550bc`): reorder probe FIRST, then job-check:
+```kotlin
+while (true) {
+    val ok = probe(...)          // probe FIRST — check socket regardless of job state
+    if (ok) return elapsed
+    if (!proxyJob.isActive) return -1  // job-check AFTER probe
+    delay(RETRY_MS)
+}
+```
+
+Rule: if the probe succeeds, the job being inactive is irrelevant — readiness is confirmed. Only check job liveness when probe fails (to avoid spinning forever).
+
+### Problem B: Tests Using `returns 0` Broke After b61550bc
+
+After reordering, tests using `every { startProxy } returns 0` still broke: the mock returns immediately → `proxyJob` completes → `waitSocksReady` sees `!isActive` → early `Failure` return.
 
 ### The Mechanism
 
@@ -205,3 +229,4 @@ Mock blocking native JNI calls with `answers { blockingOp; returnValue }`, not `
 - [[daily/2026-05-09.md]] - Session 12:27: first observation of flaky test — green in runs 25596700209/25596517936, failed in next run
 - [[daily/2026-05-10.md]] - Session: second root cause after unbounded accept fix — `System.currentTimeMillis()` outer loop vs virtual clock; fix = `withTimeoutOrNull(readyTotalTimeoutMs)` + injectable params
 - [[daily/2026-05-14.md]] - Session 18:00+: Root Cause 4 — mock `returns 0` completes proxyJob instantly → `!isActive` guard triggers early Failure; fix = `answers { latch.await(); 0 }`; `backgroundScope` for pluginScope in stats polling
+- [[daily/2026-05-14.md]] - Session 20:30: Root Cause 4 production fix (commit b61550bc) — probe ordering: probe FIRST, then `!isActive` check; prevents probe skip when proxyJob completed before check reached
