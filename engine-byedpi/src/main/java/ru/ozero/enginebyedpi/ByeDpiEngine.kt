@@ -117,7 +117,6 @@ class ByeDpiEngine(
         var probeSuccess = false
         withTimeoutOrNull(readyTotalTimeoutMs) {
             while (true) {
-                if (!proxyJob.isActive) return@withTimeoutOrNull
                 val ok = try {
                     socksProbe("127.0.0.1", port, readyProbeTimeoutMs)
                     true
@@ -130,6 +129,7 @@ class ByeDpiEngine(
                     probeSuccess = true
                     return@withTimeoutOrNull
                 }
+                if (!proxyJob.isActive) return@withTimeoutOrNull
                 delay(READY_RETRY_MS)
             }
         }
