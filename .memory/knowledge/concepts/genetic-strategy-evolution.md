@@ -5,8 +5,9 @@ tags: [byedpi, architecture, genetic-algorithm, optimization]
 sources:
   - "daily/2026-05-12.md"
   - "daily/2026-05-13.md"
+  - "daily/2026-05-14.md"
 created: 2026-05-12
-updated: 2026-05-13
+updated: 2026-05-14
 ---
 
 # Genetic Algorithm for ByeDPI Strategy Optimization
@@ -22,9 +23,9 @@ Ozero Sprint 5 introduced a genetic algorithm layer on top of ByeDPI's auto-stra
 - `SavedStrategyStore` allows users to bookmark winning strategies from either the fixed-list test or the evolutionary search
 - Chromosome fitness cache (`HashMap<Chromosome, Double>` inside `evolve()`) prevents redundant `byeDpiEngine.start()` calls for repeated chromosomes
 - Persistent `StrategyFitnessCache` with TTL 24h skips already-tested strategies across sessions; DI-injected singleton
-- Fitness formula: `successRate * (1.0 / (1.0 + avgLatencyMs / 2000.0))` — hyperbolic latency penalty (linear `1 - 0.2*lat/timeout` gives <1% effect, is dead code)
+- Fitness formula v2: `successRate^1.5 * (1 - clamp(avgLatency, 0, 3000) / 3000)` — power-law success amplification + linear latency penalty capped at 3s; replaces v1 hyperbolic `1/(1+lat/2000)` which gave <1% effect
 - `ByeDpiKnownSeeds` object in `engine-byedpi` module provides 75 upstream strategies as evolution seeds; pinned priority seeds fed first; `runEvolution()` merges `userSeeds + ByeDpiKnownSeeds.commands`
-- Population size default raised 20→25 in `StrategyTestSettings`; `stagnationThreshold` must use `coerceAtLeast(3)` to prevent degenerate single-generation cutoff; `targetFitness` default 0.85
+- GA v2 defaults: populationSize 30, maxGen 20, eliteCount 3, targetFitness 0.85; initial population split 40% seed / 30% memory / 30% random; `stagnationThreshold` must use `coerceAtLeast(3)` to prevent degenerate single-generation cutoff
 - Auto-save best chromosome to `SavedStrategyStore` after each evolution run
 - `SavedStrategy.lastVerifiedAtMs` tracks staleness; `markVerified` called after successful evolve; `StalenessLabel` composable shows warning after 7-day threshold
 - Per-network `GeneMemory` + `StrategyFitnessCache` via `NetworkProfileDetector` + `EvolutionResourcesProvider` — replaces global singleton with per-network instances
@@ -48,7 +49,22 @@ The sequential evaluation constraint was discovered during code review: `List.ma
 
 ### Fitness Formula Evolution
 
-The original fitness formula was pure success rate (0–1). Sprint 5 added a latency term. The linear form `1 - 0.2 * avgLatency / timeout` was implemented first but produces less than 1% effect on scores in practice — effectively dead code. The correct form is hyperbolic: `successRate * (1.0 / (1.0 + avgLatencyMs / 2000.0))`. At 2000ms latency, the multiplier is 0.5; at 200ms, it is 0.91. This gives meaningful separation between fast and slow strategies with equal success rates, without dominating the success signal.
+The original fitness formula was pure success rate (0–1). Sprint 5 added a latency term through three iterations:
+
+1. **Linear (dead code)**: `1 - 0.2 * avgLatency / timeout` — <1% effect, no practical separation
+2. **Hyperbolic v1**: `successRate * (1.0 / (1.0 + avgLatencyMs / 2000.0))` — 0.5x at 2000ms, 0.91x at 200ms
+3. **Power-law v2** (current): `successRate^1.5 * (1 - clamp(avgLatency, 0, 3000) / 3000)` — `^1.5` amplifies high success (0.8→0.72, 0.95→0.92); linear latency penalty capped at 3s
+
+### GA v2 Parameter Tuning (2026-05-14)
+
+| Parameter | v1 | v2 | Rationale |
+|-----------|----|----|-----------|
+| populationSize | 20→25 | 30 | More genetic diversity per generation |
+| maxGen | 10 | 20 | More generations before stagnation |
+| eliteCount | 5 | 3 | Less exploitation lock-in, more exploration |
+| Initial pop | 100% seed | 40% seed / 30% memory / 30% random | Cross-session learning + diversity |
+
+The initial population split balances exploitation (seed+memory) with exploration (random). 5 sentinel tests guard GA v2 parameters.
 
 ### Known Seeds Bootstrap
 
@@ -95,6 +111,26 @@ The initial architecture used a single global `GeneMemory` and `StrategyFitnessC
 
 `NetworkProfileDetector` identifies the current network profile (WiFi SSID, mobile carrier, connection type). `EvolutionResourcesProvider` returns the appropriate `GeneMemory` and `StrategyFitnessCache` instances for the detected profile. When the network changes (e.g., switching from WiFi to mobile data), the provider returns a different memory/cache pair, ensuring evolution history is isolated per network environment. This is a structural change from singleton to provider pattern in the DI graph.
 
+### GA v2 Parameter Tuning (2026-05-14)
+
+The `feat/ga-byedpi-v2` branch introduced significant parameter changes:
+
+- **Population size**: 20→30. Larger population explores more of the strategy space per generation
+- **Max generations**: 10→20. Doubles the evolution runway before giving up
+- **Elite count**: 5→3. Fewer elites increases selection pressure, pushing toward convergence faster
+- **Target fitness**: 0.7→0.85. Higher bar for "good enough" before early stopping
+- **Fitness formula**: `successRate^1.5 * (1 - clamp(avgLatency, 0, 3000) / 3000)`. The `^1.5` exponent penalizes strategies with merely adequate success rates more aggressively. The latency term uses linear decay from 3000ms ceiling instead of the hyperbolic `1/(1+lat/2000)` form — produces stronger separation at higher latencies
+- **Initial population composition**: 40% seed (from `ByeDpiKnownSeeds`), 30% memory (from `GeneMemory` best performers), 30% random (fresh exploration). Previous split was not explicitly controlled
+- **5 sentinel tests** cover the new parameter defaults
+
+### Cache Poisoning Fix
+
+Migration from old fitness formula to new one leaves stale `0.0` scores in `StrategyFitnessCache`. The `get()` method now skips entries with `fitness == 0.0` — treating them as cache misses rather than valid zero-fitness results. Real fitness from the new formula is always > 0 for any strategy that was actually tested.
+
+### Min Chromosome Length
+
+Raised from 3→5 to prevent degenerate configurations (e.g., just `--ip 0.0.0.0 --port 1080`) that technically parse but produce no DPI bypass effect.
+
 ## Related Concepts
 
 - [[concepts/byedpi-auto-strategy-testing]] - The fixed-list strategy testing that this genetic algorithm extends
@@ -106,3 +142,4 @@ The initial architecture used a single global `GeneMemory` and `StrategyFitnessC
 
 - [[daily/2026-05-12.md]] - Session 14:05: Sprint 5 implementation (StrategyGene + GenePool + EvolutionEngine + GeneMemory); Session 15:08: code review found sequential evaluation requirement, dead settings, SNI→GenePool vocabulary; Session 18:34: audit found GeneMemory race condition, SavedStrategyStore atomicity, importRawJson validation order
 - [[daily/2026-05-13.md]] - Chromosome fitness cache, hyperbolic latency fitness formula (linear form dead code), ByeDpiKnownSeeds 75 upstream seeds with pinned priority, population size 25, stagnationThreshold coerceAtLeast(3) CI fix, persistent StrategyFitnessCache TTL 24h, SavedStrategy.lastVerifiedAtMs staleness 7-day threshold + StalenessLabel, auto-save best chromosome, targetFitness 0.85, per-network GeneMemory + StrategyFitnessCache via NetworkProfileDetector + EvolutionResourcesProvider
+- [[daily/2026-05-14.md]] - GA v2: popSize 30, maxGen 20, eliteCount 3, targetFitness 0.85, fitness=successRate^1.5*(1-clamp(lat)/3000), initial pop 40/30/30, cache poisoning 0.0 skip, min chromosome length 5, 5 sentinel tests

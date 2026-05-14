@@ -5,8 +5,9 @@ tags: [testing, ci, byedpi, gotcha, flaky-tests]
 sources:
   - "daily/2026-05-09.md"
   - "daily/2026-05-10.md"
+  - "daily/2026-05-14.md"
 created: 2026-05-09
-updated: 2026-05-10
+updated: 2026-05-14
 ---
 
 # Mock SOCKS5 Server CI Fragility: repeat=N Exhaustion + Real-Time Clock Mismatch
@@ -173,8 +174,34 @@ ServerSocket + daemon thread полностью удалены из тестов
 
 Тесты suspend функций, использующих `withContext(Dispatchers.IO)` → инжектировать зависимость. Статические объекты с реальным IO — неизбежный источник flakiness под CI нагрузкой.
 
+## Root Cause 4: Mock `returns 0` Instantly Completes proxyJob
+
+After adding `if (!proxyJob.isActive) return Failure` guard in `waitSocksReady` (commit 73622376), tests using `every { startProxy } returns 0` broke: the mock returns immediately → `proxyJob` completes → `waitSocksReady` sees `!isActive` → early `Failure` return.
+
+### The Mechanism
+
+In production, `jniStartProxy()` blocks the coroutine thread for the lifetime of the native proxy (seconds to hours). The mock `returns 0` completes in nanoseconds, making `proxyJob.isActive` false before `waitSocksReady` starts polling.
+
+### The Fix: `answers { latch.await(); 0 }`
+
+```kotlin
+val latch = CountDownLatch(1)
+every { proxy.startProxy(any()) } answers { latch.await(); 0 }
+```
+
+The `answers` block runs on the coroutine thread, blocking it just like the real JNI call. `proxyJob.isActive` remains true during `waitSocksReady` polling. Tests call `latch.countDown()` when they need the proxy to "stop".
+
+### `backgroundScope` for pluginScope
+
+`EngineUrnetworkAwaitReadyTest` had a related issue: `startStatsPolling` launches `while(true)` in `pluginScope`. When `pluginScope = this` (TestScope), `runTest` waits forever. Fix: `pluginScope = backgroundScope` — auto-cancelled when test completes. This is the canonical kotlinx-coroutines-test 1.7+ pattern for long-running background jobs.
+
+### Rule
+
+Mock blocking native JNI calls with `answers { blockingOp; returnValue }`, not `returns returnValue`. `returns` completes instantly, violating the temporal contract of blocking JNI.
+
 ## Sources
 
 - [[daily/2026-05-09.md]] - Session 16:19: `ByeDpiEngineTest.startSuccessWhenSocksPortReady` flaky on CI; root cause = `acceptSocks5InBackground` with `repeat` limit exhausted under load; fix = unlimited accept until socket close; ktlint masking delayed discovery
 - [[daily/2026-05-09.md]] - Session 12:27: first observation of flaky test — green in runs 25596700209/25596517936, failed in next run
 - [[daily/2026-05-10.md]] - Session: second root cause after unbounded accept fix — `System.currentTimeMillis()` outer loop vs virtual clock; fix = `withTimeoutOrNull(readyTotalTimeoutMs)` + injectable params
+- [[daily/2026-05-14.md]] - Session 18:00+: Root Cause 4 — mock `returns 0` completes proxyJob instantly → `!isActive` guard triggers early Failure; fix = `answers { latch.await(); 0 }`; `backgroundScope` for pluginScope in stats polling

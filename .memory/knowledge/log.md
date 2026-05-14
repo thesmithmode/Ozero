@@ -1,5 +1,37 @@
 # Build Log
 
+## [2026-05-14T19:00:00+03:00] compile | 2026-05-14.md (pass 1)
+- Source: daily/2026-05-14.md
+- Result: 7 new articles, 1 connection, 4 articles updated
+- Articles created:
+  - [[concepts/runtest-uncompleted-coroutines-trap]] — testScope children infinite coroutines, @AfterEach too late, backgroundScope pattern, DataStore scope
+  - [[concepts/engine-await-ready-pattern]] — awaitReady() default no-op, URnetwork peerCount 200ms/15s, WARP UAPI 300ms/10s, between routeTrafficForEngine and onEngineStarted
+  - [[concepts/warp-uapi-handshake-polling]] — LocalSocket UAPI polling last_handshake_time_sec, NOT awgGetConfig JNI (SIGSEGV), WarpHandshakeUapi.kt
+  - [[concepts/byedpi-native-thread-join-race]] — proxyJob.cancel() ≠ native C exit, second join after forceClose(), g_proxy_running flag race
+  - [[concepts/robolectric-hilt-eager-init-trap]] — @HiltAndroidApp loads real Application in Robolectric, eager field init NPE, lazy + @Config fix
+  - [[concepts/github-draft-release-visibility]] — gh release list omits drafts, asset URLs 404 unauth, fix = --draft=false
+  - [[concepts/combined-aidl-race-elimination]] — turnOnAndGetSockets combined AIDL method, ParcelFileDescriptor.adoptFd().close()
+- Connections created:
+  - [[connections/engine-readiness-vs-false-connected]] — awaitReady() unifies false-connected fix across engines
+- Articles updated:
+  - [[concepts/warp-false-connected-no-handshake]] — UAPI socket polling implementation, awaitReady integration, NOT awgGetConfig JNI
+  - [[concepts/genetic-strategy-evolution]] — GA v2 params (pop30, gen20, elite3, target0.85, fitness^1.5, initial 40/30/30), cache poisoning fix, min length 5
+  - [[concepts/go-runtime-process-isolation]] — combined AIDL turnOnAndGetSockets (H3), ParcelFileDescriptor.adoptFd().close() (H4)
+  - [[concepts/byedpi-mock-server-ci-fragility]] — Root Cause 4: mock returns 0 instant proxyJob completion; fix = answers{latch.await();0}; backgroundScope for pluginScope
+- Index: 9 rows added, 4 rows updated
+- Sessions covered: 10:00 (detekt/ktlint, foreground service), 13:56 (feat/mtg CI), 15:xx (UncompletedCoroutinesError x6+7, Robolectric NPE), 17:xx (root fixes: separate scope, DataStore scope, lazy init, $0 printf), 14:17-14:39 (CI iterations), 15:56 (code review + Split Tunneling tabs/ViewModel), 16:20 (awaitReady URnetwork + ByeDPI join race), 16:33-16:50 (WARP UAPI handshake, awaitReady), 17:47 (combined AIDL H3/H4, URnetwork window), 18:00+ (draft releases, GA v2, CI red fixes, backgroundScope)
+- Excluded: detekt SheetTarget enum (implementation detail), ktlint line-breaks (mechanical), SplitTunneling tabs/ViewModel (UI wiring), foreground service StrategyScanService (implementation), specific CI run numbers, memory flush failures, task tracking feedback (already in feedback memory)
+
+## [2026-05-14T14:00:00+03:00] compile | 2026-05-13.md (pass 7 — sentinel-protecting-bug + stateIn dedup)
+- Source: daily/2026-05-13.md
+- Result: 1 new article, 1 updated
+- Articles created:
+  - [[concepts/sentinel-protecting-bug-trap]] — sentinel guards buggy behavior (Unavailable instead of StaticLocation), blocks correct fix; EngineUrnetworkContractTest incident; prevention: grep sentinels when fixing functions
+- Articles updated:
+  - [[concepts/stateIn-eagerly-test-trap]] — added StateFlow dedup section: distinctUntilChanged() redundant on stateIn() output, StateFlow deduplicates by equality
+- Index: 1 row added (sentinel-protecting-bug-trap), 1 row updated (stateIn summary)
+- Sessions covered: 20:53 (sentinel blocking correct fix), 21:13 (sentinel rewrite + distinctUntilChanged redundancy confirmed)
+
 ## [2026-05-14T11:00:00+03:00] compile | 2026-05-13.md (pass 6 — format upgrade + sentinel note)
 - Source: daily/2026-05-13.md
 - Result: 1 article reformatted to wiki schema; 1 article updated with sentinel note
