@@ -36,7 +36,7 @@ class EngineUrnetworkAwaitReadyTest {
     @Test
     fun `awaitReady возвращается немедленно когда peerCount уже больше нуля`() = runTest {
         val bridge = CountableBridge(fixedPeers = 3)
-        val eng = engine(bridge, this)
+        val eng = engine(bridge, backgroundScope)
         eng.start(baseConfig, Upstream.None)
 
         eng.awaitReady()
@@ -48,7 +48,7 @@ class EngineUrnetworkAwaitReadyTest {
     fun `awaitReady ждёт пока peerCount не станет положительным`() = runTest {
         val bridge = CountableBridge(fixedPeers = 0)
         bridge.peerCountProvider = { if (bridge.peerCountCalls.get() >= 3) 1 else 0 }
-        val eng = engine(bridge, this, peerReadyPollMs = 50L)
+        val eng = engine(bridge, backgroundScope, peerReadyPollMs = 50L)
         eng.start(baseConfig, Upstream.None)
 
         eng.awaitReady()
@@ -62,7 +62,7 @@ class EngineUrnetworkAwaitReadyTest {
     @Test
     fun `awaitReady завершается по таймауту когда peers никогда не появляются`() = runTest {
         val bridge = CountableBridge(fixedPeers = 0)
-        val eng = engine(bridge, this, peerReadyTimeoutMs = 300L, peerReadyPollMs = 50L)
+        val eng = engine(bridge, backgroundScope, peerReadyTimeoutMs = 300L, peerReadyPollMs = 50L)
         eng.start(baseConfig, Upstream.None)
 
         var returned = false
@@ -80,7 +80,7 @@ class EngineUrnetworkAwaitReadyTest {
         val bridge = CountableBridge(fixedPeers = 0).also {
             it.peerCountProvider = { throw IllegalStateException("bridge unavailable") }
         }
-        val eng = engine(bridge, this, peerReadyTimeoutMs = 300L, peerReadyPollMs = 50L)
+        val eng = engine(bridge, backgroundScope, peerReadyTimeoutMs = 300L, peerReadyPollMs = 50L)
         eng.start(baseConfig, Upstream.None)
 
         var returned = false

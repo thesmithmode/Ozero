@@ -188,7 +188,11 @@ class EvolutionEngineTest {
             evolver = evolver,
             pool = pool,
             sites = listOf("s1.com"),
-            settings = EvolutionEngine.EvolutionSettings(populationSize = 3, maxGenerations = 2),
+            settings = EvolutionEngine.EvolutionSettings(
+                populationSize = 3,
+                maxGenerations = 2,
+                targetFitness = 1.01,
+            ),
         )
         val evalEvents = mutableListOf<Triple<Int, Int, String>>()
         evolutionEngine.evolve(
