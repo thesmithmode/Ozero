@@ -334,7 +334,10 @@ class EngineWarpContractTest {
         val calls = AtomicInteger(0)
         val (e, _, _) = engine(
             activeConfig = sampleConfig,
-            handshakeChecker = { _, _ -> calls.incrementAndGet(); true },
+            handshakeChecker = { _, _ ->
+                calls.incrementAndGet()
+                true
+            },
         )
         e.start(EngineConfig.Warp, Upstream.None)
         e.awaitReady()
@@ -378,7 +381,7 @@ class EngineWarpContractTest {
     fun `awaitReady при исключении из handshakeChecker — не пробрасывает`() = runTest {
         val (e, _, _) = engine(
             activeConfig = sampleConfig,
-            handshakeChecker = { _, _ -> throw RuntimeException("uapi unavailable") },
+            handshakeChecker = { _, _ -> throw IllegalStateException("uapi unavailable") },
             warpReadyTimeoutMs = 300L,
             warpReadyPollMs = 50L,
         )

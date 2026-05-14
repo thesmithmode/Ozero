@@ -302,7 +302,7 @@ class ByeDpiEngineTest {
     }
 
     @Test
-    fun `start — forceClose вызывается когда stopProxy не помог и второй join ждёт выхода нативного потока`() = runTest {
+    fun `start — forceClose когда stopProxy не помог + второй join ждёт нативный поток`() = runTest {
         val proxyStarted = CountDownLatch(1)
         val nativeThreadExit = CountDownLatch(1)
         val orderedProxy: ByeDpiProxy = mockk(relaxed = true)
@@ -335,7 +335,10 @@ class ByeDpiEngineTest {
         mockkObject(ByeDpiProxy.Companion)
         every { ByeDpiProxy.loadOnce() } just runs
         every { ByeDpiProxy.libraryLoaded } returns true
-        every { blockingProxy.startProxy(any()) } answers { latch.await(); 0 }
+        every { blockingProxy.startProxy(any()) } answers {
+            latch.await()
+            0
+        }
         val eng = ByeDpiEngine(blockingProxy, socksProbe = { _, _, _ -> 1L })
         eng.start(EngineConfig.ByeDpi(socksPort = 1080))
         every { blockingProxy.startProxy(any()) } returns 0

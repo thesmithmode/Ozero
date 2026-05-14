@@ -53,7 +53,10 @@ class EngineUrnetworkAwaitReadyTest {
 
         eng.awaitReady()
 
-        assertTrue(bridge.peerCountCalls.get() >= 3, "awaitReady должен опросить минимум 3 раза до успеха, calls=${bridge.peerCountCalls.get()}")
+        assertTrue(
+            bridge.peerCountCalls.get() >= 3,
+            "awaitReady должен опросить минимум 3 раза до успеха, calls=${bridge.peerCountCalls.get()}",
+        )
     }
 
     @Test
@@ -75,7 +78,7 @@ class EngineUrnetworkAwaitReadyTest {
     @Test
     fun `awaitReady при peerCount бросает исключение — не пробрасывает`() = runTest {
         val bridge = CountableBridge(fixedPeers = 0).also {
-            it.peerCountProvider = { throw RuntimeException("bridge unavailable") }
+            it.peerCountProvider = { throw IllegalStateException("bridge unavailable") }
         }
         val eng = engine(bridge, this, peerReadyTimeoutMs = 300L, peerReadyPollMs = 50L)
         eng.start(baseConfig, Upstream.None)
