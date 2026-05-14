@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.commonvpn.TunnelController
@@ -33,6 +34,11 @@ class TelegramProxyCoordinatorTest {
     private lateinit var mockTunnelController: TunnelController
     private lateinit var fakeConfigStore: TelegramConfigStore
     private lateinit var coordinator: TelegramProxyCoordinator
+
+    @AfterEach
+    fun tearDown() {
+        coordinator.stop()
+    }
 
     @BeforeEach
     fun setUp() {

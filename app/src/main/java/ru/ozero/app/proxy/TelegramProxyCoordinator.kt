@@ -2,6 +2,7 @@ package ru.ozero.app.proxy
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -20,8 +21,10 @@ class TelegramProxyCoordinator(
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) {
 
+    private var job: Job? = null
+
     fun start() {
-        combine(
+        job = combine(
             tunnelController.state,
             configStore.config(),
         ) { tunnelState, config ->
@@ -45,5 +48,10 @@ class TelegramProxyCoordinator(
                 proxyService.start(config, upstream)
             }
             .launchIn(scope)
+    }
+
+    fun stop() {
+        job?.cancel()
+        job = null
     }
 }

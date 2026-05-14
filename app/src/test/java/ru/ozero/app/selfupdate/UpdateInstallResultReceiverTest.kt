@@ -1,5 +1,6 @@
 package ru.ozero.app.selfupdate
 
+import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInstaller
@@ -16,7 +17,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [33])
+@Config(sdk = [33], application = Application::class)
 class UpdateInstallResultReceiverTest {
 
     private val context = mockk<Context>(relaxed = true)
