@@ -7,6 +7,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <!-- Android 14+: тип FGS для OzeroVpnService = specialUse (см. common-vpn manifest). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- Android 14+: тип FGS для StrategyScanService = dataSync. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <!-- Android 13 (API 33+): runtime-permission, без неё system-tray notification VPN не покажет -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -116,6 +118,11 @@
         <service
             android:name=".warp.WarpEngineService"
             android:process=":engine_warp"
+            android:exported="false" />
+
+        <service
+            android:name=".ui.strategy.StrategyScanService"
+            android:foregroundServiceType="dataSync"
             android:exported="false" />
 
     </application>

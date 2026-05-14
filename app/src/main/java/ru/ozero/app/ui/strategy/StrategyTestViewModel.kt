@@ -1,7 +1,10 @@
 package ru.ozero.app.ui.strategy
 
+import android.content.Context
+import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -49,6 +52,7 @@ data class EvolutionUiState(
     val generation: Int = 0,
     val maxGenerations: Int = 0,
     val bestFitness: Double = 0.0,
+    val bestSuccessRate: Double = 0.0,
     val topChromosomes: List<Pair<String, Double>> = emptyList(),
     val isInitializing: Boolean = true,
     val evaluatingIndex: Int = 0,
@@ -59,6 +63,7 @@ data class EvolutionUiState(
 
 @HiltViewModel
 class StrategyTestViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val repository: ru.ozero.enginescore.settings.SettingsRepository,
     private val assetSource: StrategyAssetSource,
     private val resultsStore: StrategyResultsStore,
@@ -184,7 +189,9 @@ class StrategyTestViewModel @Inject constructor(
             _errorMessage.value = StrategyTestError.VpnRunning
             return
         }
+        _evolutionState.value = null
         _isRunning.value = true
+        context.startForegroundService(Intent(context, StrategyScanService::class.java))
         testJob = viewModelScope.launch {
             val sites = domainListManager.getActiveDomains(_domainLists.value)
             if (sites.isEmpty()) {
@@ -227,6 +234,7 @@ class StrategyTestViewModel @Inject constructor(
                 }
                 _runSummary.value = ""
                 _isRunning.value = false
+                context.stopService(Intent(context, StrategyScanService::class.java))
             }
         }
     }
@@ -235,12 +243,18 @@ class StrategyTestViewModel @Inject constructor(
         testJob?.cancel()
         testJob = null
         _isRunning.value = false
+        context.stopService(Intent(context, StrategyScanService::class.java))
     }
 
-    fun onSave(command: String) {
-        viewModelScope.launch(ioDispatcher) {
-            val updated = runCatching { savedStrategyStore.add(command) }.getOrElse { savedStrategyStore.load() }
-            _savedStrategies.value = updated
+    fun onToggleSave(command: String) {
+        val existing = _savedStrategies.value.find { it.command == command }
+        if (existing != null) {
+            onDeleteSaved(existing.id)
+        } else {
+            viewModelScope.launch(ioDispatcher) {
+                val updated = runCatching { savedStrategyStore.add(command) }.getOrElse { savedStrategyStore.load() }
+                _savedStrategies.value = updated
+            }
         }
     }
 
@@ -328,6 +342,7 @@ class StrategyTestViewModel @Inject constructor(
                         generation = result.generation,
                         maxGenerations = maxGen,
                         bestFitness = result.bestFitness,
+                        bestSuccessRate = result.bestSuccessRate,
                         topChromosomes = result.population
                             .sortedByDescending { it.second }
                             .take(5)
@@ -339,7 +354,8 @@ class StrategyTestViewModel @Inject constructor(
                         stagnationCount = result.stagnationCount,
                     )
                 }
-                _runSummary.value = "Gen ${result.generation}/$maxGen · best ${(result.bestFitness * 100).toInt()}%"
+                val successPct = (result.bestSuccessRate * 100).toInt()
+                _runSummary.value = "Gen ${result.generation}/$maxGen · доступность $successPct%"
                 if (result.bestFitness > lastBestFitness) {
                     lastBestFitness = result.bestFitness
                     val cmd = result.best.toCommand()

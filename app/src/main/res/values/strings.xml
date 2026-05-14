@@ -221,9 +221,16 @@
     <string name="saved_strategy_pin">Закрепить</string>
     <string name="saved_strategy_unpin">Открепить</string>
     <string name="saved_strategy_rename_hint">Название (необязательно)</string>
+    <string name="scan_mode_fast">Быстрый</string>
+    <string name="scan_mode_deep">Глубокий</string>
+    <string name="scan_mode_fast_desc">Перебирает готовые стратегии по очереди</string>
+    <string name="scan_mode_deep_desc">Генетический подбор — ищет новые комбинации</string>
+    <string name="strategy_settings_save">Сохранить</string>
+    <string name="strategy_settings_field_empty">Поле не может быть пустым</string>
     <string name="evolution_mode_toggle">Режим эволюции</string>
     <string name="evolution_generation_label">Поколение %1$d/%2$d</string>
     <string name="evolution_fitness_label">Лучший результат: %1$d%%</string>
+    <string name="evolution_access_label">Доступность: %1$d%%</string>
     <string name="evolution_population_label">Лучшие стратегии</string>
     <string name="evolution_initializing">Подготовка популяции…</string>
     <string name="evolution_evaluating_label">Тестируется %1$d/%2$d</string>
@@ -231,6 +238,8 @@
     <string name="saved_strategy_rename_title">Переименовать</string>
     <string name="usage_history_title">История применений</string>
     <string name="usage_history_empty">Ещё не применялись</string>
+    <string name="strategy_scan_notification_title">Подбор стратегий ByeDPI…</string>
+    <string name="strategy_scan_channel_name">Подбор стратегий</string>
 
     <!-- URnetwork -->
     <string name="urnetwork_settings_title">URnetwork</string>

@@ -217,9 +217,16 @@
     <string name="saved_strategy_pin">Pin</string>
     <string name="saved_strategy_unpin">Unpin</string>
     <string name="saved_strategy_rename_hint">Label (optional)</string>
+    <string name="scan_mode_fast">Quick</string>
+    <string name="scan_mode_deep">Deep</string>
+    <string name="scan_mode_fast_desc">Tests ready-made strategies one by one</string>
+    <string name="scan_mode_deep_desc">Genetic search — discovers new combinations</string>
+    <string name="strategy_settings_save">Save</string>
+    <string name="strategy_settings_field_empty">Field cannot be empty</string>
     <string name="evolution_mode_toggle">Evolution mode</string>
     <string name="evolution_generation_label">Generation %1$d/%2$d</string>
     <string name="evolution_fitness_label">Best fitness: %1$d%%</string>
+    <string name="evolution_access_label">Availability: %1$d%%</string>
     <string name="evolution_population_label">Best strategies</string>
     <string name="evolution_initializing">Preparing population…</string>
     <string name="evolution_evaluating_label">Testing %1$d/%2$d</string>
@@ -227,6 +234,8 @@
     <string name="saved_strategy_rename_title">Rename</string>
     <string name="usage_history_title">Usage history</string>
     <string name="usage_history_empty">Not used yet</string>
+    <string name="strategy_scan_notification_title">ByeDPI strategy scan…</string>
+    <string name="strategy_scan_channel_name">Strategy scan</string>
 
     <!-- URnetwork -->
     <string name="urnetwork_settings_title">URnetwork</string>

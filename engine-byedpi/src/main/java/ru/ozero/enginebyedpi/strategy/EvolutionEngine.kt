@@ -39,9 +39,12 @@ class EvolutionEngine(
         val generation: Int,
         val best: Chromosome,
         val bestFitness: Double,
+        val bestSuccessRate: Double,
         val population: List<Pair<Chromosome, Double>>,
         val stagnationCount: Int = 0,
     )
+
+    private data class EvalResult(val fitness: Double, val successRate: Double)
 
     suspend fun evolve(
         seedStrategies: List<String>,
@@ -51,8 +54,9 @@ class EvolutionEngine(
         var population = buildInitialPopulation(seedStrategies)
         var best: Chromosome = population.firstOrNull() ?: return emptyList()
         var bestFitness = 0.0
+        var bestSuccessRate = 0.0
         var stagnationCount = 0
-        val fitnessCache = HashMap<Chromosome, Double>()
+        val evalCache = HashMap<Chromosome, EvalResult>()
 
         val exitThreshold = (settings.maxGenerations / 2).coerceAtLeast(3)
         val injectThreshold = (exitThreshold / 2).coerceAtLeast(1)
@@ -66,10 +70,12 @@ class EvolutionEngine(
                 settings.mutationRate
             }
 
-            val scored = evaluatePopulation(population, onChromosomeEval, fitnessCache)
-            val genBest = scored.maxByOrNull { it.second }
-            if (genBest != null && genBest.second > bestFitness) {
-                bestFitness = genBest.second
+            val scored = evaluatePopulation(population, onChromosomeEval, evalCache)
+            val fitnessPairs = scored.map { (ch, er) -> ch to er.fitness }
+            val genBest = scored.maxByOrNull { it.second.fitness }
+            if (genBest != null && genBest.second.fitness > bestFitness) {
+                bestFitness = genBest.second.fitness
+                bestSuccessRate = genBest.second.successRate
                 best = genBest.first
                 stagnationCount = 0
             } else {
@@ -80,7 +86,8 @@ class EvolutionEngine(
                     generation = generation,
                     best = best,
                     bestFitness = bestFitness,
-                    population = scored,
+                    bestSuccessRate = bestSuccessRate,
+                    population = fitnessPairs,
                     stagnationCount = stagnationCount,
                 ),
             )
@@ -89,7 +96,7 @@ class EvolutionEngine(
             if (bestFitness >= settings.targetFitness) break
             if (stagnationCount >= exitThreshold) break
 
-            val survivors = evolver.tournament(scored, settings.eliteCount, random = random)
+            val survivors = evolver.tournament(fitnessPairs, settings.eliteCount, random = random)
             population = when {
                 stagnationCount >= injectThreshold ->
                     buildSeedInjection(survivors, seedStrategies, effectiveMutationRate)
@@ -186,32 +193,32 @@ class EvolutionEngine(
     private suspend fun evaluatePopulation(
         population: List<Chromosome>,
         onChromosomeEval: (index: Int, total: Int, command: String) -> Unit = { _, _, _ -> },
-        fitnessCache: MutableMap<Chromosome, Double> = HashMap(),
-    ): List<Pair<Chromosome, Double>> {
+        evalCache: MutableMap<Chromosome, EvalResult> = HashMap(),
+    ): List<Pair<Chromosome, EvalResult>> {
         val results = population.mapIndexed { index, chromosome ->
-            if (!currentCoroutineContext().isActive) return@mapIndexed chromosome to 0.0
+            if (!currentCoroutineContext().isActive) return@mapIndexed chromosome to EvalResult(0.0, 0.0)
             onChromosomeEval(index, population.size, chromosome.toCommand())
-            val fitness = fitnessCache.getOrPut(chromosome) {
+            val evalResult = evalCache.getOrPut(chromosome) {
                 val command = chromosome.toCommand()
-                val persistedHit = fitnessCachePersistent?.get(command)
-                if (persistedHit != null) {
-                    persistedHit
+                val persistedFitness = fitnessCachePersistent?.get(command)
+                if (persistedFitness != null) {
+                    EvalResult(fitness = persistedFitness, successRate = persistedFitness)
                 } else {
                     val computed = evaluate(chromosome)
-                    if (command.isNotBlank()) fitnessCachePersistent?.put(command, computed)
+                    if (command.isNotBlank()) fitnessCachePersistent?.put(command, computed.fitness)
                     computed
                 }
             }
-            chromosome to fitness
+            chromosome to evalResult
         }
-        results.forEach { (chromosome, fitness) ->
-            memory?.record(chromosome.map { it.token }, fitness)
+        results.forEach { (chromosome, evalResult) ->
+            memory?.record(chromosome.map { it.token }, evalResult.fitness)
         }
         return results
     }
 
-    private suspend fun evaluate(chromosome: Chromosome): Double {
-        if (sites.isEmpty() || chromosome.isEmpty()) return 0.0
+    private suspend fun evaluate(chromosome: Chromosome): EvalResult {
+        if (sites.isEmpty() || chromosome.isEmpty()) return EvalResult(0.0, 0.0)
         val command = chromosome.toCommand()
         val started = byeDpiEngine.start(
             config = EngineConfig.ByeDpi(args = command, socksPort = socksPort),
@@ -219,7 +226,7 @@ class EvolutionEngine(
         )
         if (started !is StartResult.Success) {
             runCatching { byeDpiEngine.stop() }
-            return 0.0
+            return EvalResult(0.0, 0.0)
         }
         return try {
             val probe = probeFactory(socksPort, settings.timeoutMs)
@@ -234,13 +241,14 @@ class EvolutionEngine(
                 }.map { it.await() }
             }
             val successCount = probeResults.count { it?.success == true }
-            if (successCount == 0) return 0.0
+            if (successCount == 0) return EvalResult(0.0, 0.0)
             val successRate = successCount.toDouble() / sites.size
             val avgLatencyMs = probeResults
                 .filter { it?.success == true }
                 .mapNotNull { it?.durationMs }
                 .average()
-            successRate * (1.0 / (1.0 + avgLatencyMs / 2000.0))
+            val fitness = successRate * (1.0 / (1.0 + avgLatencyMs / 2000.0))
+            EvalResult(fitness = fitness, successRate = successRate)
         } finally {
             runCatching { byeDpiEngine.stop() }
         }

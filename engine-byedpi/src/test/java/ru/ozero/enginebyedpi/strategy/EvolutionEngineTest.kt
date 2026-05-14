@@ -244,6 +244,34 @@ class EvolutionEngineTest {
     }
 
     @Test
+    fun `bestSuccessRate equals raw success ratio independent of latency`() = runTest {
+        val slowProbe = object : SocksProbeClient {
+            override suspend fun probe(site: String) = ProbeResult(site = site, success = true, durationMs = 8000L)
+        }
+        val pool = GenePool(seeds)
+        val evolutionEngine = EvolutionEngine(
+            byeDpiEngine = AlwaysSucceedEngine(),
+            probeFactory = { _, _ -> slowProbe },
+            evolver = StrategyEvolver(pool),
+            pool = pool,
+            sites = listOf("s1.com", "s2.com"),
+            settings = EvolutionEngine.EvolutionSettings(
+                populationSize = 2,
+                maxGenerations = 1,
+                targetFitness = 0.0,
+            ),
+        )
+        var capturedResult: EvolutionEngine.GenerationResult? = null
+        evolutionEngine.evolve(seedStrategies = seeds, onGeneration = { capturedResult = it })
+        val result = capturedResult!!
+        assertTrue(result.bestSuccessRate > 0.0, "all probes succeed so successRate > 0")
+        assertTrue(
+            result.bestSuccessRate > result.bestFitness,
+            "high latency penalizes fitness but not successRate: rate=${result.bestSuccessRate} fitness=${result.bestFitness}",
+        )
+    }
+
+    @Test
     fun `latency fitness penalizes slow probes vs fast probes`() = runTest {
         val fastProbe = object : SocksProbeClient {
             override suspend fun probe(site: String) = ProbeResult(site = site, success = true, durationMs = 100L)

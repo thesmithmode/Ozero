@@ -35,6 +35,9 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -85,6 +88,7 @@ fun StrategyTestScreen(
     BackHandler {
         if (isRunning) viewModel.onStop() else onBack()
     }
+
     val errorText = when (errorMessage) {
         StrategyTestError.VpnRunning -> stringResource(R.string.strategy_test_vpn_running_error)
         StrategyTestError.NoSites -> stringResource(R.string.strategy_test_no_sites)
@@ -159,16 +163,26 @@ fun StrategyTestScreen(
         savedStrategies = savedStrategies,
         evolutionState = evolutionState,
         runSummary = runSummary,
+        settings = settings,
         onBack = onBack,
-        onShowSaved = { showSaved = true },
-        onShowSettings = { showSettings = true },
-        onShowDomainLists = { showDomainLists = true },
+        onShowSheet = { target ->
+            when (target) {
+                SheetTarget.Saved -> showSaved = true
+                SheetTarget.Settings -> showSettings = true
+                SheetTarget.DomainLists -> showDomainLists = true
+            }
+        },
         onToggleDomainList = viewModel::onToggleDomainList,
+        onModeChange = { deep ->
+            if (!isRunning) viewModel.onSettingsChange(settings.copy(evolutionMode = deep))
+        },
         onRunToggle = if (isRunning) viewModel::onStop else viewModel::onStart,
         onApply = viewModel::onApply,
-        onSave = viewModel::onSave,
+        onToggleSave = viewModel::onToggleSave,
     )
 }
+
+private enum class SheetTarget { Saved, Settings, DomainLists }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -179,16 +193,17 @@ private fun StrategyTestScaffold(
     savedStrategies: List<SavedStrategy>,
     evolutionState: EvolutionUiState?,
     runSummary: String,
+    settings: StrategyTestSettings,
     onBack: () -> Unit,
-    onShowSaved: () -> Unit,
-    onShowSettings: () -> Unit,
-    onShowDomainLists: () -> Unit,
+    onShowSheet: (SheetTarget) -> Unit,
     onToggleDomainList: (String) -> Unit,
+    onModeChange: (deep: Boolean) -> Unit,
     onRunToggle: () -> Unit,
     onApply: (String) -> Unit,
-    onSave: (String) -> Unit,
+    onToggleSave: (String) -> Unit,
 ) {
     val context = LocalContext.current
+    val isDeepMode = settings.evolutionMode
     Scaffold(
         modifier = Modifier.testTag("strategy_test_screen"),
         topBar = {
@@ -204,7 +219,7 @@ private fun StrategyTestScaffold(
                 },
                 actions = {
                     IconButton(
-                        onClick = onShowSaved,
+                        onClick = { onShowSheet(SheetTarget.Saved) },
                         modifier = Modifier.testTag("saved_strategies_btn"),
                     ) {
                         Icon(
@@ -213,7 +228,7 @@ private fun StrategyTestScaffold(
                         )
                     }
                     IconButton(
-                        onClick = onShowSettings,
+                        onClick = { onShowSheet(SheetTarget.Settings) },
                         modifier = Modifier.testTag("strategy_settings_btn"),
                     ) {
                         Icon(Icons.Filled.Settings, contentDescription = null)
@@ -228,11 +243,16 @@ private fun StrategyTestScaffold(
             contentPadding = PaddingValues(8.dp),
         ) {
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ScanModeSelector(
+                        isDeep = isDeepMode,
+                        enabled = !isRunning,
+                        onModeChange = onModeChange,
+                    )
                     DomainListsHeader(
                         lists = domainLists,
                         onToggle = onToggleDomainList,
-                        onManageClick = onShowDomainLists,
+                        onManageClick = { onShowSheet(SheetTarget.DomainLists) },
                         enabled = !isRunning,
                     )
                     Button(
@@ -256,20 +276,26 @@ private fun StrategyTestScaffold(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    evolutionState?.let { evo ->
-                        EvolutionStateCard(
-                            state = evo,
-                            savedStrategies = savedStrategies,
-                            onApply = { cmd ->
-                                onApply(cmd)
-                                Toast.makeText(context, R.string.strategy_test_applied_toast, Toast.LENGTH_SHORT).show()
-                            },
-                            onSave = onSave,
-                        )
+                    if (isDeepMode) {
+                        evolutionState?.let { evo ->
+                            EvolutionStateCard(
+                                state = evo,
+                                savedStrategies = savedStrategies,
+                                onApply = { cmd ->
+                                    onApply(cmd)
+                                    Toast.makeText(
+                                        context,
+                                        R.string.strategy_test_applied_toast,
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                },
+                                onToggleSave = onToggleSave,
+                            )
+                        }
                     }
                 }
             }
-            if (evolutionState == null) {
+            if (!isDeepMode) {
                 itemsIndexed(
                     items = strategies,
                     key = { index, item -> item.command + "_" + index },
@@ -282,10 +308,39 @@ private fun StrategyTestScaffold(
                             onApply(item.command)
                             Toast.makeText(context, R.string.strategy_test_applied_toast, Toast.LENGTH_SHORT).show()
                         },
-                        onSave = { onSave(item.command) },
+                        onToggleSave = { onToggleSave(item.command) },
                     )
                 }
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ScanModeSelector(
+    isDeep: Boolean,
+    enabled: Boolean,
+    onModeChange: (deep: Boolean) -> Unit,
+) {
+    SingleChoiceSegmentedButtonRow(
+        modifier = Modifier.fillMaxWidth().testTag("scan_mode_selector"),
+    ) {
+        SegmentedButton(
+            selected = !isDeep,
+            onClick = { if (enabled) onModeChange(false) },
+            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+            modifier = Modifier.testTag("scan_mode_fast"),
+        ) {
+            Text(stringResource(R.string.scan_mode_fast))
+        }
+        SegmentedButton(
+            selected = isDeep,
+            onClick = { if (enabled) onModeChange(true) },
+            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+            modifier = Modifier.testTag("scan_mode_deep"),
+        ) {
+            Text(stringResource(R.string.scan_mode_deep))
         }
     }
 }
@@ -397,9 +452,7 @@ private fun DomainListsSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("domain_list_card_${list.id}"),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                ),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             ) {
                 Row(
                     modifier = Modifier
@@ -497,7 +550,7 @@ private fun EvolutionStateCard(
     state: EvolutionUiState,
     savedStrategies: List<SavedStrategy> = emptyList(),
     onApply: (String) -> Unit = {},
-    onSave: (String) -> Unit = {},
+    onToggleSave: (String) -> Unit = {},
 ) {
     Card(
         modifier = Modifier.fillMaxWidth().testTag("evolution_state_card"),
@@ -521,9 +574,9 @@ private fun EvolutionStateCard(
                     },
                     modifier = Modifier.fillMaxWidth(),
                 )
-                if (state.bestFitness > 0.0) {
+                if (state.bestSuccessRate > 0.0) {
                     Text(
-                        text = stringResource(R.string.evolution_fitness_label, (state.bestFitness * 100).toInt()),
+                        text = stringResource(R.string.evolution_access_label, (state.bestSuccessRate * 100).toInt()),
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -570,7 +623,7 @@ private fun EvolutionStateCard(
                 EvolutionTopChromosomes(
                     chromosomes = state.topChromosomes,
                     savedStrategies = savedStrategies,
-                    onSave = onSave,
+                    onToggleSave = onToggleSave,
                     onApply = onApply,
                 )
             }
@@ -582,7 +635,7 @@ private fun EvolutionStateCard(
 private fun EvolutionTopChromosomes(
     chromosomes: List<Pair<String, Double>>,
     savedStrategies: List<SavedStrategy>,
-    onSave: (String) -> Unit,
+    onToggleSave: (String) -> Unit,
     onApply: (String) -> Unit,
 ) {
     HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f))
@@ -592,6 +645,7 @@ private fun EvolutionTopChromosomes(
         color = MaterialTheme.colorScheme.onPrimaryContainer,
     )
     chromosomes.forEachIndexed { idx, (cmd, fitness) ->
+        val isSaved = savedStrategies.any { it.command == cmd }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -608,13 +662,13 @@ private fun EvolutionTopChromosomes(
                 )
             }
             IconButton(
-                onClick = { onSave(cmd) },
+                onClick = { onToggleSave(cmd) },
                 modifier = Modifier.testTag("evolution_save_$idx"),
             ) {
                 Icon(
                     Icons.Filled.Star,
                     contentDescription = stringResource(R.string.saved_strategy_save),
-                    tint = if (savedStrategies.any { it.command == cmd }) {
+                    tint = if (isSaved) {
                         MaterialTheme.colorScheme.primary
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
@@ -632,11 +686,56 @@ private fun EvolutionTopChromosomes(
 }
 
 @Composable
+private fun CustomStrategiesSection(
+    settings: StrategyTestSettings,
+    onSettingsChange: (StrategyTestSettings) -> Unit,
+    enabled: Boolean,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            text = stringResource(R.string.strategy_settings_use_custom),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Switch(
+            checked = settings.useCustomStrategies,
+            onCheckedChange = { onSettingsChange(settings.copy(useCustomStrategies = it)) },
+            enabled = enabled,
+            modifier = Modifier.testTag("settings_use_custom_toggle"),
+        )
+    }
+    if (settings.useCustomStrategies) {
+        OutlinedTextField(
+            value = settings.customStrategies,
+            onValueChange = { onSettingsChange(settings.copy(customStrategies = it)) },
+            enabled = enabled,
+            minLines = 4,
+            maxLines = 10,
+            label = { Text(stringResource(R.string.strategy_settings_custom_strategies)) },
+            modifier = Modifier.fillMaxWidth().testTag("settings_custom_strategies"),
+        )
+    }
+}
+
+@Composable
 private fun StrategySettingsSheet(
     settings: StrategyTestSettings,
     onSettingsChange: (StrategyTestSettings) -> Unit,
     enabled: Boolean,
 ) {
+    var requestsPerDomainDraft by rememberSaveable { mutableStateOf(settings.requestsPerDomain.toString()) }
+    var concurrentLimitDraft by rememberSaveable { mutableStateOf(settings.concurrentLimit.toString()) }
+    var timeoutSecondsDraft by rememberSaveable { mutableStateOf(settings.timeoutSeconds.toString()) }
+    var delayBetweenMsDraft by rememberSaveable { mutableStateOf(settings.delayBetweenMs.toString()) }
+
+    var requestsError by rememberSaveable { mutableStateOf(false) }
+    var concurrentError by rememberSaveable { mutableStateOf(false) }
+    var timeoutError by rememberSaveable { mutableStateOf(false) }
+    var delayError by rememberSaveable { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -649,84 +748,98 @@ private fun StrategySettingsSheet(
             style = MaterialTheme.typography.titleMedium,
         )
         OutlinedTextField(
-            value = settings.requestsPerDomain.toString(),
-            onValueChange = { v ->
-                v.toIntOrNull()?.coerceIn(1, 20)?.let { onSettingsChange(settings.copy(requestsPerDomain = it)) }
+            value = requestsPerDomainDraft,
+            onValueChange = {
+                requestsPerDomainDraft = it
+                requestsError = it.isBlank()
             },
             enabled = enabled,
+            isError = requestsError,
+            supportingText = if (requestsError) {
+                { Text(stringResource(R.string.strategy_settings_field_empty)) }
+            } else {
+                null
+            },
             label = { Text(stringResource(R.string.strategy_settings_requests_per_domain)) },
             modifier = Modifier.fillMaxWidth().testTag("settings_requests_per_domain"),
         )
         OutlinedTextField(
-            value = settings.concurrentLimit.toString(),
-            onValueChange = { v ->
-                v.toIntOrNull()?.coerceIn(1, 50)?.let { onSettingsChange(settings.copy(concurrentLimit = it)) }
+            value = concurrentLimitDraft,
+            onValueChange = {
+                concurrentLimitDraft = it
+                concurrentError = it.isBlank()
             },
             enabled = enabled,
+            isError = concurrentError,
+            supportingText = if (concurrentError) {
+                { Text(stringResource(R.string.strategy_settings_field_empty)) }
+            } else {
+                null
+            },
             label = { Text(stringResource(R.string.strategy_settings_concurrent_limit)) },
             modifier = Modifier.fillMaxWidth().testTag("settings_concurrent_limit"),
         )
         OutlinedTextField(
-            value = settings.timeoutSeconds.toString(),
-            onValueChange = { v ->
-                v.toIntOrNull()?.coerceIn(1, 15)?.let { onSettingsChange(settings.copy(timeoutSeconds = it)) }
+            value = timeoutSecondsDraft,
+            onValueChange = {
+                timeoutSecondsDraft = it
+                timeoutError = it.isBlank()
             },
             enabled = enabled,
+            isError = timeoutError,
+            supportingText = if (timeoutError) {
+                { Text(stringResource(R.string.strategy_settings_field_empty)) }
+            } else {
+                null
+            },
             label = { Text(stringResource(R.string.strategy_settings_timeout)) },
             modifier = Modifier.fillMaxWidth().testTag("settings_timeout"),
         )
         OutlinedTextField(
-            value = settings.delayBetweenMs.toString(),
-            onValueChange = { v ->
-                v.toLongOrNull()?.coerceIn(0L, 5000L)?.let { onSettingsChange(settings.copy(delayBetweenMs = it)) }
+            value = delayBetweenMsDraft,
+            onValueChange = {
+                delayBetweenMsDraft = it
+                delayError = it.isBlank()
             },
             enabled = enabled,
+            isError = delayError,
+            supportingText = if (delayError) {
+                { Text(stringResource(R.string.strategy_settings_field_empty)) }
+            } else {
+                null
+            },
             label = { Text(stringResource(R.string.strategy_settings_delay)) },
             modifier = Modifier.fillMaxWidth().testTag("settings_delay"),
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = stringResource(R.string.strategy_settings_use_custom),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Switch(
-                checked = settings.useCustomStrategies,
-                onCheckedChange = { onSettingsChange(settings.copy(useCustomStrategies = it)) },
-                enabled = enabled,
-                modifier = Modifier.testTag("settings_use_custom_toggle"),
-            )
+        if (!settings.evolutionMode) {
+            CustomStrategiesSection(settings = settings, onSettingsChange = onSettingsChange, enabled = enabled)
         }
-        if (settings.useCustomStrategies) {
-            OutlinedTextField(
-                value = settings.customStrategies,
-                onValueChange = { onSettingsChange(settings.copy(customStrategies = it)) },
-                enabled = enabled,
-                minLines = 4,
-                maxLines = 10,
-                label = { Text(stringResource(R.string.strategy_settings_custom_strategies)) },
-                modifier = Modifier.fillMaxWidth().testTag("settings_custom_strategies"),
-            )
-        }
-        HorizontalDivider()
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+        Button(
+            onClick = {
+                val requests = requestsPerDomainDraft.toIntOrNull()?.coerceIn(1, 20)
+                val concurrent = concurrentLimitDraft.toIntOrNull()?.coerceIn(1, 50)
+                val timeout = timeoutSecondsDraft.toIntOrNull()?.coerceIn(1, 15)
+                val delay = delayBetweenMsDraft.toLongOrNull()?.coerceIn(0L, 5000L)
+                requestsError = requests == null
+                concurrentError = concurrent == null
+                timeoutError = timeout == null
+                delayError = delay == null
+                val allFieldsValid = requests != null && concurrent != null && timeout != null && delay != null
+                if (allFieldsValid) {
+                    onSettingsChange(
+                        settings.copy(
+                            requestsPerDomain = requests,
+                            concurrentLimit = concurrent,
+                            timeoutSeconds = timeout,
+                            delayBetweenMs = delay,
+                        ),
+                    )
+                }
+            },
+            enabled = enabled,
+            modifier = Modifier.fillMaxWidth().testTag("settings_save_btn"),
         ) {
-            Text(
-                text = stringResource(R.string.evolution_mode_toggle),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Switch(
-                checked = settings.evolutionMode,
-                onCheckedChange = { onSettingsChange(settings.copy(evolutionMode = it)) },
-                enabled = enabled,
-                modifier = Modifier.testTag("settings_evolution_toggle"),
-            )
+            Text(stringResource(R.string.strategy_settings_save))
         }
     }
 }
@@ -1001,11 +1114,7 @@ private fun StalenessLabel(lastVerifiedAtMs: Long) {
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
     }
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodySmall,
-        color = color,
-    )
+    Text(text = text, style = MaterialTheme.typography.bodySmall, color = color)
 }
 
 @Composable
@@ -1042,15 +1151,13 @@ private fun StrategyRow(
     item: StrategyResult,
     isSaved: Boolean,
     onApply: () -> Unit,
-    onSave: () -> Unit,
+    onToggleSave: () -> Unit,
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("strategy_item_$index"),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-        ),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -1098,7 +1205,7 @@ private fun StrategyRow(
                 )
                 Row {
                     IconButton(
-                        onClick = onSave,
+                        onClick = onToggleSave,
                         modifier = Modifier.testTag("strategy_save_$index"),
                     ) {
                         Icon(

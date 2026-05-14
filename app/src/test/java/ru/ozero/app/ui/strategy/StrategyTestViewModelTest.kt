@@ -1,5 +1,6 @@
 package ru.ozero.app.ui.strategy
 
+import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -86,6 +87,7 @@ class StrategyTestViewModelTest {
         )
         val manager = DomainListManager(domainStore, builtIns)
         return StrategyTestViewModel(
+            context = mockk(relaxed = true),
             repository = repo,
             assetSource = assets,
             resultsStore = store,
@@ -146,6 +148,7 @@ class StrategyTestViewModelTest {
         )
         val manager = DomainListManager(domainStore, builtIns)
         val vm = StrategyTestViewModel(
+            context = mockk(relaxed = true),
             repository = repo, assetSource = assets, resultsStore = store,
             settingsStore = settingsStore, domainListManager = manager,
             savedStrategyStore = savedStore,
@@ -382,23 +385,25 @@ class StrategyTestViewModelTest {
     }
 
     @Test
-    fun `onSave adds command to saved store`() = runTest(dispatcher) {
+    fun `onToggleSave adds command when not saved`() = runTest(dispatcher) {
         val vm = newVm()
         advanceUntilIdle()
-        vm.onSave("-Ku -An")
+        vm.onToggleSave("-Ku -An")
         advanceUntilIdle()
         assertEquals(1, vm.savedStrategies.value.size)
         assertEquals("-Ku -An", vm.savedStrategies.value[0].command)
     }
 
     @Test
-    fun `onSave deduplicates same command`() = runTest(dispatcher) {
+    fun `onToggleSave removes command when already saved`() = runTest(dispatcher) {
         val vm = newVm()
         advanceUntilIdle()
-        vm.onSave("-cmd")
-        vm.onSave("-cmd")
+        vm.onToggleSave("-cmd")
         advanceUntilIdle()
         assertEquals(1, vm.savedStrategies.value.size)
+        vm.onToggleSave("-cmd")
+        advanceUntilIdle()
+        assertEquals(0, vm.savedStrategies.value.size)
     }
 
     @Test
@@ -414,7 +419,7 @@ class StrategyTestViewModelTest {
     fun `onDeleteSaved removes entry from savedStrategies`() = runTest(dispatcher) {
         val vm = newVm()
         advanceUntilIdle()
-        vm.onSave("-to-delete")
+        vm.onToggleSave("-to-delete")
         advanceUntilIdle()
         val id = vm.savedStrategies.value.first().id
         vm.onDeleteSaved(id)
@@ -426,7 +431,7 @@ class StrategyTestViewModelTest {
     fun `onPinSaved pins and unpins correctly`() = runTest(dispatcher) {
         val vm = newVm()
         advanceUntilIdle()
-        vm.onSave("-pinnable")
+        vm.onToggleSave("-pinnable")
         advanceUntilIdle()
         val id = vm.savedStrategies.value.first().id
         vm.onPinSaved(id, true)
@@ -535,12 +540,24 @@ class StrategyTestViewModelTest {
     fun `onRename updates saved strategy name`() = runTest(dispatcher) {
         val vm = newVm()
         advanceUntilIdle()
-        vm.onSave("-Ku -An")
+        vm.onToggleSave("-Ku -An")
         advanceUntilIdle()
         val id = vm.savedStrategies.value.first().id
         vm.onRename(id, "Для ютуба")
         advanceUntilIdle()
         assertEquals("Для ютуба", vm.savedStrategies.value.first().name)
+    }
+
+    @Test
+    fun `evolutionState is null at start of static scan`() = runTest(dispatcher) {
+        settingsStore.stored = StrategyTestSettings(evolutionMode = false)
+        assets = FakeAssetSource(strategies = listOf("-cmd1"), sites = listOf("s1"))
+        val vm = newVm(sites = listOf("s1"))
+        advanceUntilIdle()
+        vm.onStart()
+        advanceUntilIdle()
+        assertFalse(vm.isRunning.value)
+        assertEquals(null, vm.evolutionState.value)
     }
 
     @Test
@@ -557,7 +574,7 @@ class StrategyTestViewModelTest {
     fun `onApply records saved name in usage history when available`() = runTest(dispatcher) {
         val vm = newVm()
         advanceUntilIdle()
-        vm.onSave("-Ku -An")
+        vm.onToggleSave("-Ku -An")
         advanceUntilIdle()
         val id = vm.savedStrategies.value.first().id
         vm.onRename(id, "Мой VPN")
