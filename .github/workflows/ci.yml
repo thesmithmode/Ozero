@@ -394,6 +394,7 @@ jobs:
           ./gradlew
           :engine-urnetwork:testDebugUnitTest :engine-urnetwork:jacocoTestReport :engine-urnetwork:jacocoTestCoverageVerification
           :engine-byedpi:testDebugUnitTest :engine-byedpi:jacocoTestReport :engine-byedpi:jacocoTestCoverageVerification
+          :engine-telegram:testDebugUnitTest :engine-telegram:jacocoTestReport :engine-telegram:jacocoTestCoverageVerification
           --stacktrace --continue
 
       - name: Upload coverage reports
@@ -404,6 +405,7 @@ jobs:
           path: |
             engine-urnetwork/build/reports/jacoco/**
             engine-byedpi/build/reports/jacoco/**
+            engine-telegram/build/reports/jacoco/**
           retention-days: 14
 
       - name: Upload test reports
@@ -414,6 +416,7 @@ jobs:
           path: |
             engine-urnetwork/build/reports/tests/**
             engine-byedpi/build/reports/tests/**
+            engine-telegram/build/reports/tests/**
           retention-days: 14
 
   test-core-modules:

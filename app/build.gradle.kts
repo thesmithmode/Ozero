@@ -108,6 +108,7 @@ dependencies {
     implementation(project(":engine-byedpi"))
     implementation(project(":engine-urnetwork"))
     implementation(project(":engine-warp"))
+    implementation(project(":engine-telegram"))
     implementation(project(":core-backup"))
 
     implementation(

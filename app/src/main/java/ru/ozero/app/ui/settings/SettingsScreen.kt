@@ -64,6 +64,7 @@ fun SettingsScreen(
     onOpenBackup: () -> Unit = {},
     onOpenAutoModeSettings: () -> Unit = {},
     onOpenLanguage: () -> Unit = {},
+    onOpenTelegramProxySettings: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -85,6 +86,7 @@ fun SettingsScreen(
             onOpenBackup = onOpenBackup,
             onOpenAutoModeSettings = onOpenAutoModeSettings,
             onOpenLanguage = onOpenLanguage,
+            onOpenTelegramProxySettings = onOpenTelegramProxySettings,
         ),
         onIpv6Toggle = viewModel::onIpv6Toggle,
         onAutoStartToggle = viewModel::onAutoStartToggle,
@@ -201,6 +203,7 @@ private fun ContentBody(
                 onOpenUrnetwork = nav.onOpenUrnetworkSettings,
                 onOpenWarp = nav.onOpenWarpSettings,
                 onOpenManualServer = nav.onOpenManualServer,
+                onOpenTelegramProxy = nav.onOpenTelegramProxySettings,
             )
         }
         item { SectionDivider() }
@@ -399,6 +402,7 @@ private fun EnginesSection(
     onOpenUrnetwork: () -> Unit,
     onOpenWarp: () -> Unit,
     onOpenManualServer: () -> Unit,
+    onOpenTelegramProxy: () -> Unit,
 ) {
     NavRow(
         title = "ByeDPI args",
@@ -432,6 +436,13 @@ private fun EnginesSection(
         summary = "VLESS / Trojan / Hysteria2 / Shadowsocks URI",
         tag = "settings_manual_server_row",
         onClick = onOpenManualServer,
+        enabled = true,
+    )
+    NavRow(
+        title = "Telegram MTProxy",
+        summary = "Локальный MTProxy для Telegram через VPN",
+        tag = "settings_telegram_proxy_row",
+        onClick = onOpenTelegramProxy,
         enabled = true,
     )
 }

@@ -1,5 +1,5 @@
-tag: tor-0253c6b2
-generated_at: 2026-04-26T11:53:42Z
+tag: mtg-3ad1935b
+generated_at: 2026-05-14T10:47:33Z
 artifacts:
   - name: libbyedpi-arm64-v8a.so
     engine: byedpi
@@ -173,3 +173,33 @@ artifacts:
     size_bytes: 27070800
     source_repo: https://github.com/tladesignz/IPtProxy
     source_commit: v5.4.1
+  - name: libmtg-arm64-v8a.so
+    engine: mtg
+    abi: arm64-v8a
+    destination: jniLibs
+    target_filename: libmtg.so
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/mtg-3ad1935b/libmtg-arm64-v8a.so
+    sha256: 535e257cf84b54d1dfa57ccba8d0d9a6c0ffbc568b9528a2e8cf30b503a01ecf
+    size_bytes: 11468984
+    source_repo: https://github.com/9seconds/mtg
+    source_commit: 269852a4f1287ef10762a0d27b1f2605532804c1
+  - name: libmtg-armeabi-v7a.so
+    engine: mtg
+    abi: armeabi-v7a
+    destination: jniLibs
+    target_filename: libmtg.so
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/mtg-3ad1935b/libmtg-armeabi-v7a.so
+    sha256: f99b32650dc8abad5e85899d98731a05beac4cec91478296f1f9a3faa81f8f95
+    size_bytes: 11731128
+    source_repo: https://github.com/9seconds/mtg
+    source_commit: 269852a4f1287ef10762a0d27b1f2605532804c1
+  - name: libmtg-x86_64.so
+    engine: mtg
+    abi: x86_64
+    destination: jniLibs
+    target_filename: libmtg.so
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/mtg-3ad1935b/libmtg-x86_64.so
+    sha256: f4907dba30d6c008635baea03557c2a7d51caf51ccacfa8b690d4b2789773576
+    size_bytes: 12193976
+    source_repo: https://github.com/9seconds/mtg
+    source_commit: 269852a4f1287ef10762a0d27b1f2605532804c1

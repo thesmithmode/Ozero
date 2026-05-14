@@ -14,4 +14,5 @@ data class SettingsNavActions(
     val onOpenBackup: () -> Unit = {},
     val onOpenAutoModeSettings: () -> Unit = {},
     val onOpenLanguage: () -> Unit = {},
+    val onOpenTelegramProxySettings: () -> Unit = {},
 )

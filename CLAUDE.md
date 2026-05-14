@@ -84,6 +84,13 @@
 
 - Каждый engine (Xray, Hy2, Awg, Naive, Tor, ByeDpi) обязан иметь settings screen в `app/src/main/java/.../ui/settings/engines/` для пользовательского override config (subscription URL, server picker, args, bridges, и т.д.).
 
+## MTProxy / Subprocess-proxy паттерн
+
+- `engine-telegram` — не VPN routing engine, а side-car proxy subprocess. Не реализует `Engine` интерфейс, не регистрируется через `@IntoSet`.
+- Subprocess запускается через `ProcessBuilder` из `nativeLibraryDir`. Бинарь (`libmtg.so`) — prebuilt Go binary, помещается прямо в `jniLibs/<abi>/`. **Не** грузить через `System.loadLibrary` — бинарь запускается как отдельный процесс, не как .so.
+- Routing через VPN: при WARP (`socksPort == 0`) subprocess наследует UID → трафик через TUN автоматически (`excludeSelf=false`). При SOCKS-engine — передать `--socks5-proxy-url socks5://127.0.0.1:<port>` (loopback минует TUN).
+- `TelegramProxyCoordinator` — единственная точка связи VPN state и proxy: наблюдает `TunnelController.state` + `configStore.config()` через `combine`, выбирает upstream, вызывает `start/stop`. Инициализируется в `OzeroApp.onCreate` через Hilt inject + `runCatching`.
+
 ## Контекст-файлы (читать в начале каждой сессии)
 
 - `.claude/Контекст/Architect.md` — карта связей между модулями + неочевидные решения (loadOnce/main thread, PKGNAME, два слоя Engine+Delegate, и т.д.). Обновлять при изменении модулей или появлении новых неочевидных инвариантов. Не превращать в ридми — только связи и обоснования.

@@ -60,6 +60,11 @@ ENGINE_CONFIGS = {
         "filename_re": re.compile(r"^libiptproxy-(?P<abi>[a-z0-9_-]+)\.so$"),
         "destination": "jniLibs",
     },
+    "mtg": {
+        "filename_re": re.compile(r"^libmtg-(?P<abi>[a-z0-9_-]+)\.so$"),
+        "destination": "jniLibs",
+        "target_filename": "libmtg.so",
+    },
 }
 
 

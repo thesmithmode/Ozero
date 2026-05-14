@@ -16,6 +16,7 @@ import ru.ozero.app.logging.AppLogger
 import ru.ozero.app.logging.BootDiagnostics
 import ru.ozero.app.logging.BootFileLogger
 import ru.ozero.app.logging.LogBuffer
+import ru.ozero.app.proxy.TelegramProxyCoordinator
 import ru.ozero.app.ui.onboarding.FirstRunBootstrap
 import ru.ozero.app.ui.splittunnel.AppListProvider
 import javax.inject.Inject
@@ -30,6 +31,8 @@ class OzeroApp : Application(), Configuration.Provider {
     @Inject lateinit var firstRunBootstrap: FirstRunBootstrap
 
     @Inject lateinit var appListProvider: AppListProvider
+
+    @Inject lateinit var telegramProxyCoordinator: TelegramProxyCoordinator
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -77,6 +80,8 @@ class OzeroApp : Application(), Configuration.Provider {
             runCatching { appListProvider.loadApps() }
                 .onFailure { BootFileLogger.warn(TAG, "appListProvider prewarm failed", it) }
         }
+        runCatching { telegramProxyCoordinator.start() }
+            .onFailure { BootFileLogger.warn(TAG, "telegramProxyCoordinator.start failed", it) }
     }
 
     private fun isEngineWarpProcess(): Boolean {
