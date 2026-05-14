@@ -344,7 +344,7 @@ class ByeDpiEngineTest {
         }
         every { blockingProxy.stopProxy() } answers {
             firstLatch.countDown()
-            Unit
+            0
         }
         val eng = ByeDpiEngine(blockingProxy, socksProbe = { _, _, _ -> 1L })
         eng.start(EngineConfig.ByeDpi(socksPort = 1080))
