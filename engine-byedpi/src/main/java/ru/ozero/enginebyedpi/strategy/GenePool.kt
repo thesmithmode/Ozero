@@ -45,6 +45,22 @@ class GenePool(seedStrategies: List<String>) {
         return List(size) { weightedRandomGene(memory, random) }
     }
 
+    fun randomSubsequence(
+        sourceCommands: List<String>,
+        minLen: Int = 2,
+        maxLen: Int = 5,
+        random: Random = Random.Default,
+    ): Chromosome {
+        if (sourceCommands.isEmpty()) return randomChromosome(minLen..maxLen, random)
+        val source = sourceCommands[random.nextInt(sourceCommands.size)]
+        val tokens = source.split(" ").filter(String::isNotBlank)
+        if (tokens.size <= minLen) return tokens.map(::StrategyGene)
+        val start = random.nextInt(tokens.size - minLen + 1)
+        val actualMax = minOf(maxLen, tokens.size - start)
+        val len = random.nextInt(minLen, actualMax + 1)
+        return tokens.subList(start, start + len).map(::StrategyGene)
+    }
+
     fun vocabularySize(): Int = vocabulary.size
 
     fun allGenes(): List<StrategyGene> = vocabulary.toList()

@@ -114,4 +114,65 @@ class GenePoolTest {
             assertTrue(chromosome.size in 3..8, "length ${chromosome.size} out of range 3..8")
         }
     }
+
+    @Test
+    fun `randomSubsequence length within specified range`() {
+        val pool = GenePool(seeds)
+        val sources = listOf("-a -b -c -d -e -f -g -h -i -j")
+        repeat(30) {
+            val chromosome = pool.randomSubsequence(sources, minLen = 2, maxLen = 5, random = Random(it.toLong()))
+            assertTrue(chromosome.size in 2..5, "subsequence length ${chromosome.size} out of range 2..5")
+        }
+    }
+
+    @Test
+    fun `randomSubsequence tokens all come from source command`() {
+        val pool = GenePool(seeds)
+        val sourceCommand = "-x1 -x2 -x3 -x4 -x5"
+        val sourceTokens = sourceCommand.split(" ").filter(String::isNotBlank).toSet()
+        repeat(20) {
+            val chromosome = pool.randomSubsequence(listOf(sourceCommand), random = Random(it.toLong()))
+            chromosome.forEach { gene ->
+                assertTrue(gene.token in sourceTokens, "gene '${gene.token}' not from source command")
+            }
+        }
+    }
+
+    @Test
+    fun `randomSubsequence with empty sources falls back to random chromosome`() {
+        val pool = GenePool(seeds)
+        val chromosome = pool.randomSubsequence(emptyList(), minLen = 2, maxLen = 4, random = Random(0))
+        assertTrue(chromosome.size in 2..4, "fallback chromosome length ${chromosome.size} out of range 2..4")
+        val vocab = pool.allGenes().map { it.token }.toSet()
+        chromosome.forEach { gene ->
+            assertTrue(gene.token in vocab, "fallback gene '${gene.token}' not in vocabulary")
+        }
+    }
+
+    @Test
+    fun `randomSubsequence with source shorter than minLen returns available tokens`() {
+        val pool = GenePool(seeds)
+        val shortSource = "-only"
+        val chromosome = pool.randomSubsequence(listOf(shortSource), minLen = 3, maxLen = 5, random = Random(0))
+        assertTrue(chromosome.isNotEmpty(), "short source should return non-empty chromosome")
+    }
+
+    @Test
+    fun `randomSubsequence is contiguous subarray of source`() {
+        val pool = GenePool(seeds)
+        val source = "-t1 -t2 -t3 -t4 -t5 -t6 -t7 -t8"
+        val tokens = source.split(" ").filter(String::isNotBlank)
+        repeat(20) { seed ->
+            val chromosome = pool.randomSubsequence(listOf(source), minLen = 2, maxLen = 4, random = Random(seed.toLong()))
+            val subsequence = chromosome.map { it.token }
+            var found = false
+            for (start in 0..tokens.size - subsequence.size) {
+                if (tokens.subList(start, start + subsequence.size) == subsequence) {
+                    found = true
+                    break
+                }
+            }
+            assertTrue(found, "seed=$seed: $subsequence is not a contiguous subarray of $tokens")
+        }
+    }
 }
