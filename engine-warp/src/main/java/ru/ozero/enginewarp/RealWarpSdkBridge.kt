@@ -126,7 +126,7 @@ class RealWarpSdkBridge(
     private fun closeRawFd(rawFd: Int, label: String) {
         if (rawFd <= 0) return
         runCatching { ParcelFileDescriptor.adoptFd(rawFd).close() }
-            .onFailure { Log.w(TAG, "close raw fd=$rawFd ($label) failed: ${it.message}") }
+            .onFailure { PersistentLoggers.warn(TAG, "close raw fd=$rawFd ($label) failed: ${it.message}") }
     }
 
     override suspend fun detachTun() {
