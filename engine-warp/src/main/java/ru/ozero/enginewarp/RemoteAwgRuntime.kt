@@ -36,7 +36,7 @@ class RemoteAwgRuntime(
                 }
             }
             val intent = Intent().setComponent(serviceComponent)
-            val bound = context.bindService(intent, conn, Context.BIND_AUTO_CREATE)
+            val bound = context.bindService(intent, conn, Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT)
             if (!bound) error("bindService failed for $serviceComponent — service не зарегистрирован в манифесте?")
             if (!latch.await(CONNECT_TIMEOUT_S, TimeUnit.SECONDS)) {
                 error("WarpEngineService connect timeout after ${CONNECT_TIMEOUT_S}s")
@@ -67,6 +67,19 @@ class RemoteAwgRuntime(
     override fun getSocketV6(handle: Int): Int {
         val pfd = runCatching { engine?.socketV6Fd(handle) }.getOrNull() ?: return -1
         return pfd.detachFd()
+    }
+
+    override fun turnOnAndGetSockets(name: String, tunFd: Int, ini: String, uapiPath: String): AwgTurnOnResult {
+        val e = ensureConnected()
+        val pfd = ParcelFileDescriptor.fromFd(tunFd)
+        val combined = try {
+            e.turnOnAndGetSockets(pfd, name, ini, uapiPath)
+        } finally {
+            runCatching { pfd.close() }
+        }
+        val v4 = combined.socketV4?.detachFd() ?: -1
+        val v6 = combined.socketV6?.detachFd() ?: -1
+        return AwgTurnOnResult(combined.handle, v4, v6)
     }
 
     override fun version(): String =

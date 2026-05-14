@@ -357,11 +357,13 @@ class RealWarpSdkBridgeTest {
         var socketV4: Int = 0,
         var socketV6: Int = 0,
         var version: String = "fake-runtime",
+        var overrideCombined: Boolean = false,
     ) : AwgRuntime {
         var turnOnCalls: Int = 0
         var turnOffCalls: Int = 0
         var getConfigCalls: Int = 0
         var versionCalls: Int = 0
+        var combinedCalls: Int = 0
         var lastName: String? = null
         var lastFd: Int = -1
         var lastIni: String? = null
@@ -395,6 +397,64 @@ class RealWarpSdkBridgeTest {
             getConfigCalls++
             return null
         }
+
+        override fun turnOnAndGetSockets(
+            name: String,
+            tunFd: Int,
+            ini: String,
+            uapiPath: String,
+        ): AwgTurnOnResult {
+            combinedCalls++
+            if (!overrideCombined) {
+                return super.turnOnAndGetSockets(name, tunFd, ini, uapiPath)
+            }
+            lastName = name
+            lastFd = tunFd
+            lastIni = ini
+            lastUapi = uapiPath
+            throwOnTurnOn?.let { throw it }
+            return AwgTurnOnResult(returnHandle, socketV4, socketV6)
+        }
+    }
+
+    @Test
+    fun `attachTun использует turnOnAndGetSockets — один объединённый вызов вместо trio (H1 anti-race)`() = runTest {
+        val rt = FakeAwgRuntime(returnHandle = 9, socketV4 = 100, socketV6 = 200, overrideCombined = true)
+        val (b, _) = bridgeWith(rt)
+        val r = b.attachTun("ozero-warp", 5, validIni, "/x", noopProtector)
+        assertEquals(WarpSdkBridge.AttachResult.Success, r)
+        assertEquals(1, rt.combinedCalls, "должен вызываться объединённый turnOnAndGetSockets, не trio")
+        assertEquals(0, rt.turnOnCalls, "отдельный turnOn НЕ должен вызываться при override combined")
+    }
+
+    @Test
+    fun `attachTun — combined handle отрицательный → Failed без protect`() = runTest {
+        val rt = FakeAwgRuntime(returnHandle = -3, socketV4 = 0, socketV6 = 0, overrideCombined = true)
+        val (b, _) = bridgeWith(rt)
+        val protectedFds = mutableListOf<Int>()
+        val protector = VpnSocketProtector { fd ->
+            protectedFds.add(fd)
+            true
+        }
+        val r = b.attachTun("n", 5, validIni, "/x", protector)
+        val f = assertIs<WarpSdkBridge.AttachResult.Failed>(r)
+        assertTrue(f.reason.contains("handle=-3"))
+        assertTrue(protectedFds.isEmpty(), "protect НЕ вызывается при отрицательном handle")
+    }
+
+    @Test
+    fun `attachTun combined success — protect для v4 и v6 sockets из одного AIDL вызова`() = runTest {
+        val rt = FakeAwgRuntime(returnHandle = 7, socketV4 = 111, socketV6 = 222, overrideCombined = true)
+        val (b, _) = bridgeWith(rt)
+        val protectedFds = mutableListOf<Int>()
+        val protector = VpnSocketProtector { fd ->
+            protectedFds.add(fd)
+            true
+        }
+        val r = b.attachTun("n", 5, validIni, "/x", protector)
+        assertEquals(WarpSdkBridge.AttachResult.Success, r)
+        assertTrue(protectedFds.contains(111), "v4 сокет защищён")
+        assertTrue(protectedFds.contains(222), "v6 сокет защищён")
     }
 
     @Test
