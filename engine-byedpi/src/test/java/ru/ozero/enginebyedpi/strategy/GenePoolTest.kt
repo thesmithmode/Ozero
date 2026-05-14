@@ -163,7 +163,9 @@ class GenePoolTest {
         val source = "-t1 -t2 -t3 -t4 -t5 -t6 -t7 -t8"
         val tokens = source.split(" ").filter(String::isNotBlank)
         repeat(20) { seed ->
-            val chromosome = pool.randomSubsequence(listOf(source), minLen = 2, maxLen = 4, random = Random(seed.toLong()))
+            val chromosome = pool.randomSubsequence(
+                listOf(source), minLen = 2, maxLen = 4, random = Random(seed.toLong()),
+            )
             val subsequence = chromosome.map { it.token }
             var found = false
             for (start in 0..tokens.size - subsequence.size) {

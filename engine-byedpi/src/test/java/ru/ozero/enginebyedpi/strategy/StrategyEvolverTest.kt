@@ -123,7 +123,8 @@ class StrategyEvolverTest {
         val p2 = parseChromosome("-x -y -z -w -v")
         repeat(10) { seed ->
             val child = evolver.crossoverUniform(p1, p2, Random(seed))
-            assertEquals(maxOf(p1.size, p2.size), child.size, "seed=$seed: uniform child must equal longer parent length")
+            val expected = maxOf(p1.size, p2.size)
+            assertEquals(expected, child.size, "seed=$seed: uniform child must equal longer parent")
         }
     }
 
@@ -170,7 +171,9 @@ class StrategyEvolverTest {
         val chromosome = parseChromosome("-a -b -c -d -e")
         repeat(20) { seed ->
             val result = evolver.swap(chromosome, Random(seed))
-            assertEquals(chromosome.sortedBy { it.token }, result.sortedBy { it.token }, "swap must not change gene set, seed=$seed")
+            val sortedOriginal = chromosome.sortedBy { it.token }
+            val sortedResult = result.sortedBy { it.token }
+            assertEquals(sortedOriginal, sortedResult, "swap must not change gene set, seed=$seed")
         }
     }
 
