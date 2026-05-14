@@ -12,7 +12,11 @@ import com.bringyour.sdk.PerformanceProfile
 import com.bringyour.sdk.Sdk
 import com.bringyour.sdk.WindowSizeSettings
 import com.bringyour.sdk.SubscriptionBalanceCallback
+import com.bringyour.sdk.AccountWalletsListener
+import com.bringyour.sdk.Id
+import com.bringyour.sdk.Sub
 import com.bringyour.sdk.WalletViewController
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -68,7 +72,7 @@ class RealUrnetworkSdkBridge(
             }
             withTimeoutOrNull(SDK_INIT_TIMEOUT_MS) {
                 withContext(Dispatchers.Main.immediate) {
-                    runStartOnMain(byClientJwt)
+                    runStartOnMain(byClientJwt, walletAddress)
                 }
             } ?: run {
                 PersistentLoggers.error(TAG, "SDK init timed out after ${SDK_INIT_TIMEOUT_MS}ms")
@@ -78,7 +82,10 @@ class RealUrnetworkSdkBridge(
         }
     }
 
-    private suspend fun runStartOnMain(byClientJwt: String): UrnetworkSdkBridge.StartResult {
+    private suspend fun runStartOnMain(
+        byClientJwt: String,
+        walletAddress: String,
+    ): UrnetworkSdkBridge.StartResult {
         val space = try {
             UrnetworkRuntime.ensure(app)
         } catch (t: Throwable) {
@@ -131,15 +138,19 @@ class RealUrnetworkSdkBridge(
         }
 
         deviceRef.set(device)
-        runCatching {
+        val walletVcStarted = runCatching {
             val walletVc = device.openWalletViewController()
             walletVcRef.set(walletVc)
             walletVc?.addUnpaidByteCountListener { ubc -> unpaidBytesRef.set(ubc) }
             walletVc?.start()
             walletVc?.fetchTransferStats()
             Log.i(TAG, "WalletViewController opened — provider stats listener attached")
+            walletVc
         }.onFailure {
             PersistentLoggers.warn(TAG, "WalletViewController init threw: ${it.message}")
+        }.getOrNull()
+        if (walletVcStarted != null) {
+            setupPayoutWallet(walletVcStarted, walletAddress)
         }
         running.set(true)
         PersistentLoggers.info(TAG, "device created — awaiting attachTun(fd) before tunnelStarted")
@@ -473,6 +484,76 @@ class RealUrnetworkSdkBridge(
         }
     }
 
+    private suspend fun setupPayoutWallet(walletVc: WalletViewController, walletAddress: String) {
+        if (walletAddress.isBlank()) {
+            Log.i(TAG, "setupPayoutWallet skipped — empty walletAddress")
+            return
+        }
+        runCatching {
+            val existing = awaitWalletsChanged(walletVc, WALLET_FETCH_TIMEOUT_MS) {
+                walletVc.fetchAccountWallets()
+            }
+            var walletId: Id? = findWalletIdByAddress(walletVc, walletAddress)
+            if (walletId == null && existing != null) {
+                val added = awaitWalletsChanged(walletVc, WALLET_ADD_TIMEOUT_MS) {
+                    walletVc.addExternalWallet(walletAddress, WALLET_BLOCKCHAIN_SOLANA)
+                }
+                if (added != null) {
+                    walletId = findWalletIdByAddress(walletVc, walletAddress)
+                }
+            }
+            if (walletId != null) {
+                walletVc.updatePayoutWallet(walletId)
+                PersistentLoggers.warn(
+                    TAG,
+                    "payout wallet set: ${walletAddress.take(WALLET_LOG_PREFIX)}…",
+                )
+            } else {
+                PersistentLoggers.warn(
+                    TAG,
+                    "payout wallet setup: walletId not found for ${walletAddress.take(WALLET_LOG_PREFIX)}…",
+                )
+            }
+        }.onFailure {
+            PersistentLoggers.warn(TAG, "setupPayoutWallet threw: ${it.message}")
+        }
+    }
+
+    private suspend fun awaitWalletsChanged(
+        walletVc: WalletViewController,
+        timeoutMs: Long,
+        trigger: () -> Unit,
+    ): Unit? {
+        val deferred = CompletableDeferred<Unit>()
+        var sub: Sub? = null
+        sub = walletVc.addAccountWalletsListener(
+            AccountWalletsListener {
+                runCatching { sub?.close() }
+                deferred.complete(Unit)
+            },
+        )
+        return withTimeoutOrNull(timeoutMs) {
+            runCatching { trigger() }
+                .onFailure { PersistentLoggers.warn(TAG, "wallets trigger threw: ${it.message}") }
+            deferred.await()
+        }.also {
+            if (it == null) runCatching { sub?.close() }
+        }
+    }
+
+    private fun findWalletIdByAddress(walletVc: WalletViewController, address: String): Id? {
+        val list = runCatching { walletVc.wallets }.getOrNull() ?: return null
+        val count = runCatching { list.len() }.getOrDefault(0L)
+        for (i in 0 until count) {
+            val w = runCatching { list.get(i) }.getOrNull() ?: continue
+            val addr = runCatching { w.walletAddress }.getOrNull()
+            if (addr == address) {
+                return runCatching { w.walletId }.getOrNull()
+            }
+        }
+        return null
+    }
+
     private fun cleanupOnFailure() {
         deviceRef.getAndSet(null)?.also { runCatching { it.close() } }
     }
@@ -484,5 +565,9 @@ class RealUrnetworkSdkBridge(
         const val STOP_TIMEOUT_MS = 3_000L
         const val DEFAULT_APP_VERSION = "0.0.2"
         const val PREFERRED_COUNTRY_TIMEOUT_MS = 8_000L
+        const val WALLET_FETCH_TIMEOUT_MS = 5_000L
+        const val WALLET_ADD_TIMEOUT_MS = 10_000L
+        const val WALLET_LOG_PREFIX = 8
+        const val WALLET_BLOCKCHAIN_SOLANA = "solana"
     }
 }

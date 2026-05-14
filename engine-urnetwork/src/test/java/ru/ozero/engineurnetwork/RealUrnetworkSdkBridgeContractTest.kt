@@ -185,6 +185,42 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
+    fun `setupPayoutWallet вызывается после walletVc start с walletAddress`() {
+        val startBlock = source.substringAfter("private suspend fun runStartOnMain")
+            .substringBefore("override suspend fun stop")
+        assertTrue(
+            startBlock.contains("setupPayoutWallet("),
+            "runStartOnMain обязан вызвать setupPayoutWallet после walletVc.start()",
+        )
+        assertTrue(
+            source.contains("private suspend fun setupPayoutWallet"),
+            "setupPayoutWallet должен быть private suspend fun",
+        )
+    }
+
+    @Test
+    fun `setupPayoutWallet вызывает addExternalWallet и updatePayoutWallet`() {
+        val block = source.substringAfter("private suspend fun setupPayoutWallet")
+            .substringBefore("private fun cleanupOnFailure")
+        assertTrue(block.contains("addExternalWallet("), "должен вызвать addExternalWallet")
+        assertTrue(block.contains("updatePayoutWallet("), "должен вызвать updatePayoutWallet")
+        assertTrue(
+            block.contains("walletAddress.isBlank()"),
+            "пустой walletAddress — ранний возврат, JNI не дёргать",
+        )
+    }
+
+    @Test
+    fun `setupPayoutWallet оборачивает SDK-вызовы в runCatching — не валит старт движка`() {
+        val block = source.substringAfter("private suspend fun setupPayoutWallet")
+            .substringBefore("private fun cleanupOnFailure")
+        assertTrue(
+            block.contains("runCatching"),
+            "setupPayoutWallet обязан runCatching — иначе SDK throw валит старт engine",
+        )
+    }
+
+    @Test
     fun `cleanupOnFailure закрывает device без throw`() {
         val cleanupBlock = source.substringAfter("private fun cleanupOnFailure")
             .substringBefore("private companion object")
