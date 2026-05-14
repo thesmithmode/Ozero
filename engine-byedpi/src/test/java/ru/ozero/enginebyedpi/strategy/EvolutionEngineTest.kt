@@ -301,6 +301,31 @@ class EvolutionEngineTest {
         assertTrue(fastFitness > slowFitness, "fast probe fitness=$fastFitness should exceed slow=$slowFitness")
     }
 
+    @Test
+    fun `default targetFitness is below 1_0 to be reachable`() {
+        val settings = EvolutionEngine.EvolutionSettings()
+        assertTrue(settings.targetFitness < 1.0, "targetFitness ${settings.targetFitness} unreachable — must be < 1.0")
+    }
+
+    @Test
+    fun `start failure result not cached in persistent fitness cache`() = runTest {
+        val engine = AlwaysFailEngine()
+        val pool = GenePool(seeds)
+        val cacheFile = java.io.File.createTempFile("fit", ".json").also { it.deleteOnExit() }
+        val fitnessCache = StrategyFitnessCache(cacheFile)
+        val evolutionEngine = EvolutionEngine(
+            byeDpiEngine = engine,
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(pool),
+            pool = pool,
+            sites = listOf("s1.com"),
+            settings = EvolutionEngine.EvolutionSettings(populationSize = 2, maxGenerations = 1),
+            fitnessCachePersistent = fitnessCache,
+        )
+        evolutionEngine.evolve(seedStrategies = seeds, onGeneration = {})
+        assertEquals(0, fitnessCache.size(), "start failures must not poison persistent fitness cache")
+    }
+
     private class CountingEngine : EnginePlugin {
         var startCount = 0
         override val id = EngineId.BYEDPI

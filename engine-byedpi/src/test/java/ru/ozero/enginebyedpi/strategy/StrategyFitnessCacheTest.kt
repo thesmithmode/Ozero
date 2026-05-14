@@ -126,4 +126,18 @@ class StrategyFitnessCacheTest {
         cache.get("-K")
         assertEquals(0, cache.size())
     }
+
+    @Test
+    fun `get returns null for zero fitness to purge poisoned cache entries`() {
+        val cache = newCache()
+        cache.put("-K -s2 -e2 -An -f0x81", 0.0)
+        assertNull(cache.get("-K -s2 -e2 -An -f0x81"), "zero fitness must be treated as stale/poisoned")
+    }
+
+    @Test
+    fun `get returns null for negative fitness`() {
+        val cache = newCache()
+        cache.put("-cmd", -0.1)
+        assertNull(cache.get("-cmd"))
+    }
 }

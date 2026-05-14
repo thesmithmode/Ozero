@@ -30,7 +30,7 @@ class EvolutionEngine(
         val maxGenerations: Int = 10,
         val mutationRate: Float = 0.2f,
         val eliteCount: Int = 5,
-        val targetFitness: Double = 1.0,
+        val targetFitness: Double = 0.7,
         val concurrentProbes: Int = 10,
         val timeoutMs: Long = 5_000L,
     )
@@ -44,7 +44,11 @@ class EvolutionEngine(
         val stagnationCount: Int = 0,
     )
 
-    private data class EvalResult(val fitness: Double, val successRate: Double)
+    private data class EvalResult(
+        val fitness: Double,
+        val successRate: Double,
+        val startFailed: Boolean = false,
+    )
 
     suspend fun evolve(
         seedStrategies: List<String>,
@@ -205,7 +209,9 @@ class EvolutionEngine(
                     EvalResult(fitness = persistedFitness, successRate = persistedFitness)
                 } else {
                     val computed = evaluate(chromosome)
-                    if (command.isNotBlank()) fitnessCachePersistent?.put(command, computed.fitness)
+                    if (command.isNotBlank() && !computed.startFailed) {
+                        fitnessCachePersistent?.put(command, computed.fitness)
+                    }
                     computed
                 }
             }
@@ -225,8 +231,7 @@ class EvolutionEngine(
             upstream = Upstream.None,
         )
         if (started !is StartResult.Success) {
-            runCatching { byeDpiEngine.stop() }
-            return EvalResult(0.0, 0.0)
+            return EvalResult(0.0, 0.0, startFailed = true)
         }
         return try {
             val probe = probeFactory(socksPort, settings.timeoutMs)

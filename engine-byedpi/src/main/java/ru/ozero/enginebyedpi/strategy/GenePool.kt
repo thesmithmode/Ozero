@@ -29,7 +29,7 @@ class GenePool(seedStrategies: List<String>) {
     }
 
     fun randomChromosome(
-        length: IntRange = 3..12,
+        length: IntRange = 5..12,
         random: Random = Random.Default,
     ): Chromosome {
         val size = random.nextInt(length.first, length.last + 1)
@@ -38,7 +38,7 @@ class GenePool(seedStrategies: List<String>) {
 
     fun weightedRandomChromosome(
         memory: GeneMemory,
-        length: IntRange = 3..12,
+        length: IntRange = 5..12,
         random: Random = Random.Default,
     ): Chromosome {
         val size = random.nextInt(length.first, length.last + 1)

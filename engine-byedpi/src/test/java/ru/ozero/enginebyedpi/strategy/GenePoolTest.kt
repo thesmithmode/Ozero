@@ -85,6 +85,26 @@ class GenePoolTest {
     }
 
     @Test
+    fun `default randomChromosome min length is 5`() {
+        val pool = GenePool(seeds)
+        repeat(50) {
+            val chromosome = pool.randomChromosome(random = Random(it.toLong()))
+            assertTrue(chromosome.size >= 5, "default min length must be 5, got ${chromosome.size}")
+        }
+    }
+
+    @Test
+    fun `default weightedRandomChromosome min length is 5`() {
+        val pool = GenePool(seeds)
+        val memory = GeneMemory(java.io.File.createTempFile("mem3", ".json").also { it.deleteOnExit() })
+        memory.record(listOf("-An"), fitness = 0.8)
+        repeat(50) {
+            val chromosome = pool.weightedRandomChromosome(memory, random = Random(it.toLong()))
+            assertTrue(chromosome.size >= 5, "default min length must be 5, got ${chromosome.size}")
+        }
+    }
+
+    @Test
     fun `weightedRandomChromosome length within range`() {
         val pool = GenePool(seeds)
         val memory = GeneMemory(java.io.File.createTempFile("mem2", ".json").also { it.deleteOnExit() })

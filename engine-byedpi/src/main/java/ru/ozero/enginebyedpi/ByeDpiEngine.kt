@@ -63,6 +63,20 @@ class ByeDpiEngine(
             return StartResult.Failure(reason = "byedpi native library не загружена: ${ByeDpiProxy.loadError}")
         }
         Log.i(TAG, "start socksPort=${config.socksPort} args=${config.args}")
+        val oldJob = proxyJobRef.getAndSet(null)
+        if (oldJob != null && oldJob.isActive) {
+            PersistentLoggers.warn(TAG, "start: предыдущий прокси ещё активен — останавливаю")
+            runCatching { proxy.stopProxy() }
+                .onFailure { PersistentLoggers.warn(TAG, "oldProxy jniStopProxy: ${it.message}") }
+            withTimeoutOrNull(STOP_GRACE_MS) { oldJob.join() }
+            if (oldJob.isActive) {
+                runCatching { proxy.forceClose() }
+                    .onFailure { PersistentLoggers.warn(TAG, "oldProxy jniForceClose: ${it.message}") }
+                withTimeoutOrNull(STOP_GRACE_MS) { oldJob.join() }
+                if (oldJob.isActive) oldJob.cancel()
+            }
+        }
+
         val args = buildArgs(config)
         val proxyJob = proxyScope.launch {
             val code = runCatching { proxy.startProxy(args) }
@@ -73,29 +87,37 @@ class ByeDpiEngine(
             }
             activeSocksPort = 0
         }
-        proxyJobRef.getAndSet(proxyJob)?.cancel()
+        proxyJobRef.set(proxyJob)
 
-        val readyAt = waitSocksReady(config.socksPort)
+        val readyAt = waitSocksReady(config.socksPort, proxyJob)
         return if (readyAt >= 0) {
             activeSocksPort = config.socksPort
             Log.i(TAG, "started socksPort=${config.socksPort} readyMs=$readyAt")
             StartResult.Success(socksPort = config.socksPort)
         } else {
             PersistentLoggers.error(TAG, "byedpi не вышел на порт ${config.socksPort} за ${READY_TIMEOUT_MS}ms")
-            runCatching { proxy.stopProxy() }
-                .onFailure { PersistentLoggers.warn(TAG, "jniStopProxy on failure: ${it.message}") }
-            runCatching { proxy.forceClose() }
-                .onFailure { PersistentLoggers.warn(TAG, "jniForceClose on failure: ${it.message}") }
+            if (proxyJob.isActive) {
+                runCatching { proxy.stopProxy() }
+                    .onFailure { PersistentLoggers.warn(TAG, "jniStopProxy on failure: ${it.message}") }
+                withTimeoutOrNull(STOP_GRACE_MS) { proxyJob.join() }
+                if (proxyJob.isActive) {
+                    PersistentLoggers.warn(TAG, "proxyJob всё ещё активен — jniForceClose в failure path")
+                    runCatching { proxy.forceClose() }
+                        .onFailure { PersistentLoggers.warn(TAG, "jniForceClose on failure: ${it.message}") }
+                }
+            }
             proxyJob.cancel()
             proxyJobRef.compareAndSet(proxyJob, null)
             StartResult.Failure(reason = "byedpi не открыл socks порт ${config.socksPort}")
         }
     }
 
-    private suspend fun waitSocksReady(port: Int): Long {
+    private suspend fun waitSocksReady(port: Int, proxyJob: Job): Long {
         val started = System.currentTimeMillis()
+        var probeSuccess = false
         withTimeoutOrNull(readyTotalTimeoutMs) {
             while (true) {
+                if (!proxyJob.isActive) return@withTimeoutOrNull
                 val ok = try {
                     socksProbe("127.0.0.1", port, readyProbeTimeoutMs)
                     true
@@ -104,11 +126,14 @@ class ByeDpiEngine(
                 } catch (_: Throwable) {
                     false
                 }
-                if (ok) return@withTimeoutOrNull
+                if (ok) {
+                    probeSuccess = true
+                    return@withTimeoutOrNull
+                }
                 delay(READY_RETRY_MS)
             }
-        } ?: return -1
-        return System.currentTimeMillis() - started
+        }
+        return if (probeSuccess) System.currentTimeMillis() - started else -1
     }
 
     override suspend fun stop() {
