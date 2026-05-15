@@ -163,7 +163,7 @@ private fun SimpleMainContent(
         Spacer(modifier = Modifier.height(20.dp))
 
         AnimatedContent(targetState = switching to tunnelState, label = "status") { (sw, s) ->
-            StatusLabel(s, sw)
+            StatusLabel(s, sw, urnetworkPeerCount)
         }
 
         Box(
@@ -258,7 +258,7 @@ private fun ExpertMainContent(
         Spacer(modifier = Modifier.height(16.dp))
 
         AnimatedContent(targetState = switching to tunnelState, label = "status") { (sw, s) ->
-            StatusLabel(s, sw)
+            StatusLabel(s, sw, urnetworkPeerCount)
         }
 
         Box(
@@ -682,9 +682,16 @@ private fun chartTimeAgo(seconds: Int): String = when {
 }
 
 @Composable
-private fun StatusLabel(state: TunnelState, switching: SwitchingTransition? = null) {
+private fun StatusLabel(
+    state: TunnelState,
+    switching: SwitchingTransition? = null,
+    urnetworkPeerCount: Int = 0,
+) {
     val labelRes = when {
         switching != null -> R.string.main_status_switching
+        state is TunnelState.Connected &&
+            state.engineId == EngineId.URNETWORK &&
+            urnetworkPeerCount == 0 -> R.string.main_status_urnetwork_searching
         else -> when (state) {
             is TunnelState.Idle -> R.string.main_status_disconnected
             is TunnelState.Probing -> if (state.engineId == ru.ozero.enginescore.EngineId.WARP) {
