@@ -968,7 +968,6 @@ class OzeroVpnService : android.net.VpnService() {
 
     override fun onDestroy() {
         PersistentLoggers.info(TAG, "onDestroy entry")
-        socketProtector?.let { ru.ozero.enginescore.VpnSocketProtectorHolder.unbind(it) }
         if (stopping.compareAndSet(false, true)) {
             runBlocking(Dispatchers.IO) {
                 val ok = withTimeoutOrNull(ON_DESTROY_SHUTDOWN_TIMEOUT_MS) { performShutdown(callStopSelf = false) }
@@ -980,6 +979,7 @@ class OzeroVpnService : android.net.VpnService() {
                 }
             }
         }
+        socketProtector?.let { ru.ozero.enginescore.VpnSocketProtectorHolder.unbind(it) }
         runCatching { healthMonitor.stop() }
         serviceScope.cancel()
         runCatching { tunFdRef.getAndSet(null)?.close() }

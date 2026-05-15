@@ -53,6 +53,24 @@ class VpnServiceLifecycleContractTest {
     }
 
     @Test
+    fun `socketProtector unbind ПОСЛЕ performShutdown в onDestroy — socket leak guard`() {
+        val onDestroyBody = source.substringAfter("override fun onDestroy")
+            .substringBefore("private fun enterForegroundOrLog")
+        val performShutdownIdx = onDestroyBody.indexOf("performShutdown(callStopSelf = false)")
+        val unbindIdx = onDestroyBody.indexOf("VpnSocketProtectorHolder.unbind")
+        assertTrue(
+            performShutdownIdx > 0 && unbindIdx > 0,
+            "onDestroy обязан вызывать performShutdown и unbind socketProtector",
+        )
+        assertTrue(
+            unbindIdx > performShutdownIdx,
+            "VpnSocketProtectorHolder.unbind обязан быть ПОСЛЕ performShutdown — иначе движки во время " +
+                "graceful flush получают protect()=false на новые сокеты → leak в VPN-loop. " +
+                "Текущие позиции: performShutdown@$performShutdownIdx unbind@$unbindIdx.",
+        )
+    }
+
+    @Test
     fun `pipeline_stop защищён timeout-ом в shutdown path`() {
         val onDestroyBody = source.substringAfter("override fun onDestroy")
             .substringBefore("private companion object")
