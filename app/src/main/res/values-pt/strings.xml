@@ -358,4 +358,23 @@
     <string name="warp_section_interface">Interface</string>
     <string name="warp_section_peer">Par</string>
     <string name="warp_section_awg">AmneziaWG</string>
+
+    <!-- ByeDPI strategy scanning + URnetwork peer search (W9.2 parity) -->
+    <string name="tab_split_tunnel">Túnel dividido</string>
+    <string name="main_status_urnetwork_searching">Buscando pares…</string>
+    <string name="scan_mode_fast">Rápido</string>
+    <string name="scan_mode_deep">Profundo</string>
+    <string name="scan_mode_fast_desc">Testa estratégias prontas em sequência</string>
+    <string name="scan_mode_deep_desc">Busca genética — encontra novas combinações</string>
+    <string name="strategy_settings_save">Salvar</string>
+    <string name="strategy_settings_field_empty">O campo não pode estar vazio</string>
+    <string name="evolution_access_label">Disponibilidade: %1$d%%</string>
+    <string name="evolution_initializing">Preparando população…</string>
+    <string name="evolution_evaluating_label">Testando %1$d/%2$d</string>
+    <string name="evolution_stagnating">Estagnado — buscando outras opções…</string>
+    <string name="saved_strategy_rename_title">Renomear</string>
+    <string name="usage_history_title">Histórico de uso</string>
+    <string name="usage_history_empty">Ainda não aplicadas</string>
+    <string name="strategy_scan_notification_title">Seleção de estratégias ByeDPI…</string>
+    <string name="strategy_scan_channel_name">Seleção de estratégias</string>
 </resources>
