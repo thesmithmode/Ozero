@@ -1,6 +1,7 @@
 package ru.ozero.engineurnetwork
 
 import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -128,11 +129,13 @@ class EngineUrnetwork(
             return EnginePlugin.RecoverResult.Failed("bridge not running")
         }
         val location = sdkBridge.selectedLocation()
-        return runCatching {
+        return try {
             if (location != null) sdkBridge.connectTo(location) else sdkBridge.connectBestAvailable()
             Log.i(TAG, "recover: re-issued connect (location=${location?.countryCode ?: "<best>"})")
             EnginePlugin.RecoverResult.Success
-        }.getOrElse { t ->
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
             PersistentLoggers.warn(TAG, "recover threw: ${t.message}")
             EnginePlugin.RecoverResult.Failed("recover: ${t.message}")
         }
