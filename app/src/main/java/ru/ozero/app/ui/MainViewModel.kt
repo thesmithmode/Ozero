@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
@@ -219,7 +220,7 @@ class MainViewModel @Inject constructor(
         }
         viewModelScope.launch {
             var lastSessionKey: String? = null
-            tunnelController.state.collect { s ->
+            tunnelController.state.collectLatest { s ->
                 if (s is TunnelState.Connected) {
                     val key = "${s.engineId}:${s.socksPort}"
                     if (key != lastSessionKey) {

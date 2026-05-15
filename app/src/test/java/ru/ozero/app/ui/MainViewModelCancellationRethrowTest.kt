@@ -14,6 +14,20 @@ class MainViewModelCancellationRethrowTest {
     }
 
     @Test
+    fun `IP resolve init block использует collectLatest — race guard на старый IP после disconnect`() {
+        val initBlock = source.substringAfter("init {").substringBefore("fun refreshIpInfo")
+        val ipResolveSection = initBlock.substringAfter("lastSessionKey: String?")
+            .substringBefore("private fun")
+        assertTrue(
+            ipResolveSection.contains("tunnelController.state.collectLatest"),
+            "IP resolve init block обязан использовать collectLatest, не collect. " +
+                "Race: connect → 3s warmup + resolveIpInfoWithRetry в полёте → disconnect → state=Idle сбрасывает " +
+                "_ipInfo, старый callback дописывает Loaded поверх Idle. " +
+                "collectLatest cancel'ит in-flight resolve на новой emission.",
+        )
+    }
+
+    @Test
     fun `Result_toState rethrows CancellationException в onFailure`() {
         val body = source
             .substringAfter("private fun Result<IpInfo>.toState")
