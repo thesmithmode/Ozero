@@ -35,7 +35,7 @@ jobs:
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v6
         with:
-          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' }}
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: ktlint + detekt
         run: ./gradlew ktlintCheck detekt --stacktrace --continue
@@ -89,7 +89,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: kotlin-style
-    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' }}
+    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/') }}
     permissions:
       contents: read
 
@@ -110,7 +110,7 @@ jobs:
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v6
         with:
-          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' }}
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: Download native binaries
         run: ./gradlew :engine-byedpi:downloadBinaries --stacktrace
@@ -165,7 +165,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: kotlin-style
-    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' }}
+    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/') }}
     permissions:
       contents: read
 
@@ -186,7 +186,7 @@ jobs:
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v6
         with:
-          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' }}
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: Get URnetwork AAR tag
         id: aar-tag
@@ -242,7 +242,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: kotlin-style
-    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' }}
+    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/') }}
     permissions:
       contents: read
 
@@ -263,7 +263,7 @@ jobs:
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v6
         with:
-          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' }}
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: testDebugUnitTest + coverage
         run: ./gradlew :common-vpn:testDebugUnitTest :common-vpn:jacocoTestReport :common-vpn:jacocoTestCoverageVerification --stacktrace --continue
@@ -289,7 +289,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: kotlin-style
-    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' }}
+    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/') }}
     permissions:
       contents: read
 
@@ -310,7 +310,7 @@ jobs:
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v6
         with:
-          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' }}
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: testDebugUnitTest + coverage
         run: ./gradlew :engine-warp:testDebugUnitTest :engine-warp:jacocoTestReport :engine-warp:jacocoTestCoverageVerification --stacktrace --continue
@@ -336,7 +336,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: kotlin-style
-    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' }}
+    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/') }}
     permissions:
       contents: read
 
@@ -357,7 +357,7 @@ jobs:
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v6
         with:
-          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' }}
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: Get URnetwork AAR tag
         id: aar-tag
@@ -424,7 +424,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: kotlin-style
-    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' }}
+    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/') }}
     permissions:
       contents: read
 
@@ -445,7 +445,7 @@ jobs:
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v6
         with:
-          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' }}
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: Get URnetwork AAR tag
         id: aar-tag
