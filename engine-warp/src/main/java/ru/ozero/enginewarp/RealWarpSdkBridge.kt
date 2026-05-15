@@ -1,13 +1,10 @@
 package ru.ozero.enginewarp
 
-import android.content.Context
 import android.os.ParcelFileDescriptor
 import android.util.Log
-import com.getkeepsafe.relinker.ReLinker
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.amnezia.awg.GoBackend
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.VpnSocketProtector
 import java.io.File
@@ -16,8 +13,6 @@ import java.util.concurrent.atomic.AtomicInteger
 class RealWarpSdkBridge(
     private val awgRuntime: AwgRuntime,
 ) : WarpSdkBridge {
-
-    constructor(context: Context) : this(ReLinkerAwgRuntime(context))
 
     private val tunnelHandle = AtomicInteger(INVALID_HANDLE)
 
@@ -234,69 +229,3 @@ interface AwgRuntime {
 }
 
 data class AwgTurnOnResult(val handle: Int, val socketV4Fd: Int, val socketV6Fd: Int)
-
-class ReLinkerAwgRuntime(context: Context) : AwgRuntime {
-    private val appContext = context.applicationContext
-
-    @Volatile private var loaded = false
-    private val lock = Any()
-
-    private fun loadOnce() {
-        if (loaded) return
-        synchronized(lock) {
-            if (loaded) return
-            val started = System.currentTimeMillis()
-            val thread = Thread.currentThread().name
-            try {
-                ReLinker.loadLibrary(appContext, LIB_NAME)
-                loaded = true
-                val dt = System.currentTimeMillis() - started
-                Log.d(TAG, "ReLinker.loadLibrary $LIB_NAME ok dt=${dt}ms thread=$thread")
-            } catch (e: Throwable) {
-                val dt = System.currentTimeMillis() - started
-                PersistentLoggers.error(
-                    TAG,
-                    "ReLinker.loadLibrary $LIB_NAME failed dt=${dt}ms thread=$thread err=${e.message} (${e.javaClass.name})",
-                )
-                throw e
-            }
-        }
-    }
-
-    override fun turnOn(name: String, tunFd: Int, ini: String, uapiPath: String): Int {
-        loadOnce()
-        return GoBackend.awgTurnOn(name, tunFd, ini, uapiPath)
-    }
-
-    override fun version(): String = runCatching {
-        loadOnce()
-        GoBackend.awgVersion() ?: "null"
-    }.getOrElse { it.javaClass.simpleName }
-
-    override fun getConfig(handle: Int): String? {
-        loadOnce()
-        return runCatching { GoBackend.awgGetConfig(handle) }.getOrNull()
-    }
-
-    override fun turnOff(handle: Int) {
-        loadOnce()
-        GoBackend.awgTurnOff(handle)
-    }
-
-    override fun getSocketV4(handle: Int): Int {
-        loadOnce()
-        return GoBackend.awgGetSocketV4(handle)
-    }
-
-    override fun getSocketV6(handle: Int): Int {
-        loadOnce()
-        return GoBackend.awgGetSocketV6(handle)
-    }
-
-    fun preload() = loadOnce()
-
-    private companion object {
-        const val TAG = "ReLinkerAwgRuntime"
-        const val LIB_NAME = "am-go"
-    }
-}

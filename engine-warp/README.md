@@ -25,16 +25,14 @@ bundled sample КИБЕРЩИТ-X/assets/bundled/str_warp_2.conf.
   `Tunnel` API. Maven artifact `com.wireguard.android:tunnel:1.0.20230706` уже
   подключён в `engine-warp/build.gradle.kts`, кастомный AAR build не требуется.
 
-## Switch Stub → Real
+## DI wiring
 
 В `app/src/main/java/ru/ozero/app/di/WarpModule.kt`:
 
-1. Удалить `provideWarpSdkBridge()` со `StubWarpSdkBridge()`.
-2. Раскомментировать соседний блок с `RealWarpSdkBridge(context)`.
-3. Убедиться что `@ApplicationContext context: Context` инжектится — Hilt уже
-   умеет его предоставлять, импорт уже есть.
-4. `RealWarpSdkBridge` владеет одним `GoBackend(context)` per process — Hilt
-   `@Singleton` гарантирует это.
+`RealWarpSdkBridge(RemoteAwgRuntime(context, WarpEngineService))` — bridge
+делегирует AWG-вызовы в isolated process `:engine_warp` через AIDL. Singleton
+гарантируется Hilt. Process-isolation защищает от dual-Go-runtime SIGABRT
+(libam-go в :engine_warp, libgojni в main). См. `OzeroAppProcessIsolationTest`.
 
 ## Open TODO в RealWarpSdkBridge
 
