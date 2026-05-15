@@ -10,6 +10,13 @@
 #include "byedpi/error.h"
 #include "main.h"
 
+/* Known limitation: server_fd объявлен в upstream byedpi как обычный int (не _Atomic).
+ * Race window: jniStopProxy и jniForceClose оба читают server_fd без синхронизации;
+ * между read и close()/shutdown() kernel может переиспользовать слот fd → close/shutdown
+ * чужого socket. Локальный mutex здесь = полу-фикс: upstream main() в submodule пишет
+ * server_fd init/cleanup тоже без наших локов. Полный fix требует форка byedpi submodule
+ * для смены типа на _Atomic int. За всю историю прода race не воспроизведён, поэтому
+ * скип. См. memory/feedback_byedpi_native_guard_ownership.md. */
 extern int server_fd;
 /* Атомарный CAS-guard от двойного запуска: раньше int-флаг читался/писался
  * без синхронизации, две параллельные jniStartProxy могли пройти guard
@@ -39,9 +46,20 @@ void reset_params(void) {
 
 JNIEXPORT jint JNICALL
 Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniStartProxy(JNIEnv *env, __attribute__((unused)) jobject thiz, jobjectArray args) {
-    /* CAS 0→1: только первый caller проходит, второй сразу получает -1. */
-    int expected = 0;
-    if (!atomic_compare_exchange_strong(&g_proxy_running, &expected, 1)) {
+    /* Bounded retry CAS: Kotlin oldJob.cancel() НЕ убивает блокирующий JNI,
+     * поэтому guard может удерживаться отменённой старой main(). Spin до 1s
+     * (100×10ms) даёт upstream main() уйти естественно после close(fd) перед
+     * тем как новый start вернёт -1. */
+    int acquired = 0;
+    for (int attempt = 0; attempt < 100; attempt++) {
+        int expected = 0;
+        if (atomic_compare_exchange_strong(&g_proxy_running, &expected, 1)) {
+            acquired = 1;
+            break;
+        }
+        usleep(10000);
+    }
+    if (!acquired) {
         return -1;
     }
 

@@ -41,6 +41,28 @@ class NativeLibSafetyContractTest {
     }
 
     @Test
+    fun `jniStartProxy имеет bounded retry для cancel-edge guard hold`() {
+        val startBody = Regex(
+            """Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniStartProxy[^{]*\{(.*?)(?=^JNIEXPORT|\z)""",
+            setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.MULTILINE),
+        ).find(nativeLib)?.groupValues?.get(1)
+            ?: error("jniStartProxy не найден в native-lib.c")
+
+        val hasRetryLoop = Regex(
+            """for\s*\([^)]*attempt[^)]*<\s*100[^)]*\)\s*\{[^}]*atomic_compare_exchange_strong[^}]*usleep\(10000\)""",
+            RegexOption.DOT_MATCHES_ALL,
+        ).containsMatchIn(startBody)
+
+        assertTrue(
+            hasRetryLoop,
+            "jniStartProxy обязан иметь bounded retry CAS (100×10ms=1s spin). Без него " +
+                "после Kotlin oldJob.cancel() guard остаётся удержан старым JNI → " +
+                "новый jniStartProxy вернёт -1 → engine.start() Failure без причины. " +
+                "Retry даёт upstream main() уйти после close(fd).",
+        )
+    }
+
+    @Test
     fun `jniForceClose не сбрасывает g_proxy_running — guard owned by jniStartProxy`() {
         val forceCloseBody = Regex(
             """Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniForceClose[^{]*\{(.*?)^\}""",

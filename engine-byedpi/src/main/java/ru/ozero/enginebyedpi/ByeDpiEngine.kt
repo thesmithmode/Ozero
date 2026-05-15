@@ -6,6 +6,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.Executors
 import ru.ozero.enginescore.EngineCapabilities
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EnginePreflight
@@ -48,7 +50,10 @@ class ByeDpiEngine(
 
     @Volatile private var activeSocksPort: Int = 0
     private val _stats = MutableStateFlow(EngineStats())
-    private val proxyScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val proxyDispatcher = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "byedpi-proxy").apply { isDaemon = true }
+    }.asCoroutineDispatcher()
+    private val proxyScope = CoroutineScope(SupervisorJob() + proxyDispatcher)
     private val proxyJobRef = AtomicReference<Job?>(null)
 
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
