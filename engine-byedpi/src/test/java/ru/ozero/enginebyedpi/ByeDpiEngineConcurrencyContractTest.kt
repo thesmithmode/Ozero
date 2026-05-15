@@ -12,45 +12,56 @@ class ByeDpiEngineConcurrencyContractTest {
     }
 
     @Test
-    fun `proxyScope использует dedicated dispatcher не Dispatchers IO`() {
+    fun `proxyDispatcher = Dispatchers IO limitedParallelism 1`() {
+        val pattern = Regex(
+            """proxyDispatcher\s*=\s*Dispatchers\.IO\.limitedParallelism\(\s*1\s*\)""",
+        )
+        assertTrue(
+            pattern.containsMatchIn(engineSource),
+            "proxyDispatcher обязан быть Dispatchers.IO.limitedParallelism(1). " +
+                "Сериализует byedpi JNI на ОДИН concurrent dispatch (queue безопасно " +
+                "сериализует start/stop sequence), но из общего IO пула — без owned thread, " +
+                "без daemon-leak, без обязательного close().",
+        )
+    }
+
+    @Test
+    fun `proxyScope использует proxyDispatcher не сырой Dispatchers IO`() {
         val proxyScopeLine = engineSource.lines().firstOrNull { it.contains("val proxyScope") }
             ?: error("val proxyScope не найден в ByeDpiEngine.kt")
 
         assertTrue(
-            !proxyScopeLine.contains("Dispatchers.IO"),
-            "proxyScope обязан использовать dedicated dispatcher, не Dispatchers.IO. " +
+            proxyScopeLine.contains("proxyDispatcher") && !proxyScopeLine.contains("Dispatchers.IO"),
+            "proxyScope обязан использовать ограниченный proxyDispatcher, не сырой Dispatchers.IO. " +
                 "Текущая строка: $proxyScopeLine. " +
-                "Dispatchers.IO leak'ает потоки в общем пуле (cap 64) когда Kotlin oldJob.cancel() " +
-                "не убивает блокирующий JNI — старый поток остаётся занят upstream main() пока " +
-                "тот не вернётся. Повторение → исчерпание пула.",
+                "Без bound: блокирующий JNI после coroutine.cancel() может занять до 64 IO " +
+                "потоков (cap пула) при restart storm.",
         )
     }
 
     @Test
-    fun `proxyDispatcher объявлен как single-thread Executor с named thread`() {
+    fun `JNI_GUARD_BUSY константа объявлена в companion object`() {
         val pattern = Regex(
-            """proxyDispatcher\s*=\s*Executors\.newSingleThreadExecutor\s*\{""" +
-                """[^}]*Thread\([^)]+,\s*"byedpi-proxy"\)""",
-            RegexOption.DOT_MATCHES_ALL,
+            """const\s+val\s+JNI_GUARD_BUSY\s*=\s*-2""",
         )
         assertTrue(
             pattern.containsMatchIn(engineSource),
-            "proxyDispatcher обязан быть Executors.newSingleThreadExecutor с named thread " +
-                "\"byedpi-proxy\" — даёт observable утечку в logcat/profiler если упадёт, " +
-                "и изолирует JNI блок от общего IO пула.",
+            "JNI_GUARD_BUSY = -2 обязан быть const в companion object. " +
+                "Должен совпадать с #define JNI_GUARD_BUSY в native-lib.c — " +
+                "Kotlin layer различает guard busy от real failure (-1).",
         )
     }
 
     @Test
-    fun `proxyDispatcher thread помечен isDaemon true`() {
+    fun `start обрабатывает JNI_GUARD_BUSY отдельной веткой логирования`() {
         val pattern = Regex(
-            """Thread\([^)]+,\s*"byedpi-proxy"\)\.apply\s*\{[^}]*isDaemon\s*=\s*true""",
+            """code\s*==\s*JNI_GUARD_BUSY[^"]*"[^"]*guard busy""",
             RegexOption.DOT_MATCHES_ALL,
         )
         assertTrue(
             pattern.containsMatchIn(engineSource),
-            "byedpi-proxy thread обязан быть isDaemon=true — иначе блок'нутый JNI " +
-                "удержит JVM от завершения процесса.",
+            "start() обязан различать JNI_GUARD_BUSY (warn) от прочих non-zero codes (error). " +
+                "Без discrimination guard busy выглядит как real failure → ложные алерты в логах.",
         )
     }
 }

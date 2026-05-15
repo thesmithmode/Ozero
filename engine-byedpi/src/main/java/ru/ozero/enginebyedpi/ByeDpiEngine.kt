@@ -4,9 +4,9 @@ import android.util.Log
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import java.util.concurrent.Executors
 import ru.ozero.enginescore.EngineCapabilities
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EnginePreflight
@@ -50,9 +49,8 @@ class ByeDpiEngine(
 
     @Volatile private var activeSocksPort: Int = 0
     private val _stats = MutableStateFlow(EngineStats())
-    private val proxyDispatcher = Executors.newSingleThreadExecutor { runnable ->
-        Thread(runnable, "byedpi-proxy").apply { isDaemon = true }
-    }.asCoroutineDispatcher()
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val proxyDispatcher = Dispatchers.IO.limitedParallelism(1)
     private val proxyScope = CoroutineScope(SupervisorJob() + proxyDispatcher)
     private val proxyJobRef = AtomicReference<Job?>(null)
 
@@ -87,8 +85,13 @@ class ByeDpiEngine(
             val code = runCatching { proxy.startProxy(args) }
                 .onFailure { PersistentLoggers.error(TAG, "jniStartProxy threw: ${it.message}") }
                 .getOrElse { -1 }
-            if (code != 0) {
-                PersistentLoggers.error(TAG, "jniStartProxy завершился с кодом $code")
+            when {
+                code == 0 -> { /* success — main() returned 0 */ }
+                code == JNI_GUARD_BUSY -> PersistentLoggers.warn(
+                    TAG,
+                    "jniStartProxy guard busy — старая main() ещё держит CAS; queue serialization",
+                )
+                else -> PersistentLoggers.error(TAG, "jniStartProxy завершился с кодом $code")
             }
             activeSocksPort = 0
         }
@@ -215,6 +218,7 @@ class ByeDpiEngine(
     private companion object {
         const val TAG = "ByeDpiEngine"
         const val READY_TIMEOUT_MS = 5_000L
+        const val JNI_GUARD_BUSY = -2
         const val READY_PROBE_TIMEOUT_MS = 500
         const val READY_RETRY_MS = 100L
         const val STOP_GRACE_MS = 1_500L

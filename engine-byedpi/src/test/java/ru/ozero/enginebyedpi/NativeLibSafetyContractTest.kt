@@ -12,6 +12,28 @@ class NativeLibSafetyContractTest {
     }
 
     @Test
+    fun `JNI_GUARD_BUSY определён как -2`() {
+        assertTrue(
+            Regex("""#define\s+JNI_GUARD_BUSY\s+\(\s*-2\s*\)""").containsMatchIn(nativeLib),
+            "JNI_GUARD_BUSY должен быть #define -2. Distinct от -1 (OOM/JNI/upstream fail) " +
+                "чтобы Kotlin различал guard busy vs real failure. Совпадает с ByeDpiEngine.JNI_GUARD_BUSY.",
+        )
+    }
+
+    @Test
+    fun `jniStartProxy возвращает JNI_GUARD_BUSY при CAS fail`() {
+        val pattern = Regex(
+            """atomic_compare_exchange_strong\(\&g_proxy_running[^)]+\)\s*\)\s*\{\s*return\s+JNI_GUARD_BUSY""",
+            RegexOption.DOT_MATCHES_ALL,
+        )
+        assertTrue(
+            pattern.containsMatchIn(nativeLib),
+            "jniStartProxy на CAS fail обязан возвращать JNI_GUARD_BUSY (не -1). " +
+                "Иначе Kotlin не различит guard busy от real failure.",
+        )
+    }
+
+    @Test
     fun `strdup для argv0 имеет NULL-check на OOM`() {
         val pattern = Regex(
             """argv\[0\]\s*=\s*strdup\("byedpi"\)\s*;\s*if\s*\(!\s*argv\[0\]\s*\)""",
@@ -20,45 +42,47 @@ class NativeLibSafetyContractTest {
         assertTrue(
             pattern.containsMatchIn(nativeLib),
             "argv[0] = strdup(\"byedpi\") обязан иметь immediate NULL-check. " +
-                "Без него strdup-возврат NULL (OOM) → SIGSEGV в upstream getopt parsing. " +
-                "Defensive cleanup: free(argv) + atomic_store(g_proxy_running, 0) + return -1.",
+                "Без него strdup-возврат NULL (OOM) → SIGSEGV в upstream getopt parsing.",
         )
     }
 
     @Test
-    fun `NULL-check для argv0 содержит cleanup free и release guard`() {
+    fun `argv loop strdup имеет NULL-check на каждой итерации`() {
         val pattern = Regex(
-            """if\s*\(!\s*argv\[0\]\s*\)\s*\{[^}]*free\(argv\)[^}]*""" +
-                """atomic_store\(\&g_proxy_running,\s*0\)[^}]*return\s+-1""",
+            """char\s+\*copy\s*=\s*strdup\(arg_str\)\s*;[^}]*if\s*\(!\s*copy\s*\)""",
             RegexOption.DOT_MATCHES_ALL,
         )
         assertTrue(
             pattern.containsMatchIn(nativeLib),
-            "NULL-check блок для argv[0] обязан выполнить полный cleanup: " +
-                "free(argv) + atomic_store(&g_proxy_running, 0) + return -1. " +
-                "Иначе leak памяти и stuck guard на OOM-path.",
+            "Per-iter strdup в argv loop обязан иметь NULL-check. " +
+                "Иначе OOM в середине loop → NULL в argv → upstream getopt UB (SIGSEGV). " +
+                "На fail полный cleanup через jni_start_fail.",
         )
     }
 
     @Test
-    fun `jniStartProxy имеет bounded retry для cancel-edge guard hold`() {
-        val startBody = Regex(
-            """Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniStartProxy[^{]*\{(.*?)(?=^JNIEXPORT|\z)""",
-            setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.MULTILINE),
-        ).find(nativeLib)?.groupValues?.get(1)
-            ?: error("jniStartProxy не найден в native-lib.c")
-
-        val hasRetryLoop = Regex(
-            """for\s*\([^)]*attempt[^)]*<\s*100[^)]*\)\s*\{[^}]*atomic_compare_exchange_strong[^}]*usleep\(10000\)""",
+    fun `JNI ExceptionCheck после GetObjectArrayElement`() {
+        val pattern = Regex(
+            """GetObjectArrayElement\(env,\s*args,\s*i\)\s*;[^}]*ExceptionCheck\(env\)""",
             RegexOption.DOT_MATCHES_ALL,
-        ).containsMatchIn(startBody)
-
+        )
         assertTrue(
-            hasRetryLoop,
-            "jniStartProxy обязан иметь bounded retry CAS (100×10ms=1s spin). Без него " +
-                "после Kotlin oldJob.cancel() guard остаётся удержан старым JNI → " +
-                "новый jniStartProxy вернёт -1 → engine.start() Failure без причины. " +
-                "Retry даёт upstream main() уйти после close(fd).",
+            pattern.containsMatchIn(nativeLib),
+            "После GetObjectArrayElement обязан быть ExceptionCheck — pending JNI exception " +
+                "(ArrayIndexOutOfBoundsException, OOM) приведёт к misbehavior в main() если игнорировать.",
+        )
+    }
+
+    @Test
+    fun `JNI ExceptionCheck после GetStringUTFChars`() {
+        val pattern = Regex(
+            """GetStringUTFChars\(env,\s*arg,\s*0\)\s*;[^}]*ExceptionCheck\(env\)""",
+            RegexOption.DOT_MATCHES_ALL,
+        )
+        assertTrue(
+            pattern.containsMatchIn(nativeLib),
+            "После GetStringUTFChars обязан быть ExceptionCheck — pending OOM exception " +
+                "в JNI не вернёт control в Java сразу, main() запустится в broken state.",
         )
     }
 
@@ -76,6 +100,22 @@ class NativeLibSafetyContractTest {
                 "jniStartProxy CAS пройдёт пока старая main() ещё в cleanup → " +
                 "concurrent main() с shared upstream globals → memory corruption. " +
                 "Guard релизит только jniStartProxy после возврата main().",
+        )
+    }
+
+    @Test
+    fun `jniStartProxy НЕ имеет blocking spin retry`() {
+        val startBody = Regex(
+            """Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniStartProxy[^{]*\{(.*?)(?=^JNIEXPORT|\z)""",
+            setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.MULTILINE),
+        ).find(nativeLib)?.groupValues?.get(1)
+            ?: error("jniStartProxy не найден в native-lib.c")
+
+        assertTrue(
+            !startBody.contains("usleep"),
+            "jniStartProxy НЕ должен делать blocking usleep — Kotlin coroutine на " +
+                "limitedParallelism(1) dispatcher не сможет дождаться отмены, и serializing " +
+                "queue застрянет на спине. Retry обязан быть в Kotlin (delay(), cooperative).",
         )
     }
 }
