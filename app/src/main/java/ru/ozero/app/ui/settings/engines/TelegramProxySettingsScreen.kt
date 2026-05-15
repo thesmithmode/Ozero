@@ -77,6 +77,7 @@ fun TelegramProxySettingsScreen(
                     onSavePort = viewModel::onSavePort,
                     onSaveDomain = viewModel::onSaveDomain,
                     onRegenerateSecret = viewModel::onRegenerateSecret,
+                    onDismissGenerateError = viewModel::onDismissGenerateError,
                 )
             }
         }
@@ -93,6 +94,7 @@ private fun ContentBody(
     onSavePort: () -> Unit,
     onSaveDomain: () -> Unit,
     onRegenerateSecret: () -> Unit,
+    onDismissGenerateError: () -> Unit = {},
 ) {
     val context = LocalContext.current
     Column(
@@ -174,7 +176,7 @@ private fun ContentBody(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Button(
-                onClick = onRegenerateSecret,
+                onClick = { onDismissGenerateError(); onRegenerateSecret() },
                 enabled = !s.generatingSecret,
                 modifier = Modifier.weight(1f),
             ) {
@@ -183,6 +185,14 @@ private fun ContentBody(
                 }
                 Text(if (s.secret.isBlank()) "Сгенерировать ключ" else "Сменить ключ")
             }
+        }
+
+        if (s.generateError) {
+            Text(
+                text = "Ошибка генерации ключа. Проверьте логи.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
         }
 
         val link = s.tgLink

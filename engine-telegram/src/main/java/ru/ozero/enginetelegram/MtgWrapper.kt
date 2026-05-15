@@ -10,13 +10,23 @@ class MtgWrapper(private val nativeLibDir: String) {
     private val binary: File get() = File(nativeLibDir, "libmtg.so")
 
     suspend fun generateSecret(domain: String): String? = withContext(Dispatchers.IO) {
+        if (!binary.exists()) {
+            Log.e(TAG, "generateSecret: binary not found at ${binary.absolutePath}")
+            return@withContext null
+        }
         runCatching {
             val process = ProcessBuilder(binary.absolutePath, "generate-secret", "--hex", domain)
                 .redirectErrorStream(true)
                 .start()
             val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
-            process.waitFor()
-            output.lines().lastOrNull { it.isNotBlank() }?.trim()
+            val exitCode = process.waitFor()
+            if (exitCode != 0) {
+                Log.e(TAG, "generateSecret exitCode=$exitCode output=$output")
+                return@runCatching null
+            }
+            val secret = output.lines().lastOrNull { it.isNotBlank() }?.trim()
+            if (secret == null) Log.e(TAG, "generateSecret: empty output")
+            secret
         }.onFailure { Log.e(TAG, "generateSecret failed: ${it.message}") }.getOrNull()
     }
 
