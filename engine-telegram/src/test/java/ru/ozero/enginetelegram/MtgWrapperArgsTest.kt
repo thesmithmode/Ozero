@@ -75,6 +75,20 @@ class MtgWrapperArgsTest {
             val result = wrapper.generateSecret("example.com")
             assertTrue(result == "ee5a401c3a9990adbfd", "должна вернуться последняя непустая строка вывода")
         }
+
+        @Test
+        fun `should return null and not hang when binary hangs longer than timeout`() = runTest {
+            fakeBinary.writeText("#!/bin/sh\nsleep 120")
+            fakeBinary.setExecutable(true)
+            val startMs = System.currentTimeMillis()
+            val result = wrapper.generateSecret("example.com")
+            val elapsedMs = System.currentTimeMillis() - startMs
+            assertNull(result, "hanging binary должен дать null после timeout")
+            assertTrue(
+                elapsedMs < 30_000,
+                "generateSecret обязан принудительно завершить процесс за ≤10s timeout, прошло ${elapsedMs}ms",
+            )
+        }
     }
 
     private fun collectArgs(process: Process): List<String> {
