@@ -379,4 +379,80 @@
     <string name="chart_tf_5min">5м</string>
     <string name="chart_tf_30min">30м</string>
     <string name="chart_tf_1h">1ч</string>
+
+    <!-- Manual server -->
+    <string name="manual_server_title">Добавить сервер</string>
+    <string name="manual_server_hint">Вставьте VLESS / Trojan / Hysteria2 / Shadowsocks URI. Сервер будет добавлен в БД и подхвачен engine кандидатами при следующем подключении.</string>
+    <string name="manual_server_uri_label">Server URI</string>
+    <string name="manual_server_add">Добавить</string>
+    <string name="manual_server_clear">Очистить</string>
+    <string name="manual_server_error_prefix">Ошибка: %1$s</string>
+    <string name="manual_server_success_prefix">OK: добавлен сервер %1$s</string>
+    <string name="manual_server_error_empty_uri">Пустой URI</string>
+    <string name="manual_server_error_import_unavailable">Импорт недоступен в этой версии</string>
+
+    <!-- Logs screen -->
+    <string name="logs_title_fmt">Логи (%1$dKB)</string>
+    <string name="logs_back_cd">Назад</string>
+    <string name="logs_copy">Копировать</string>
+    <string name="logs_clear_cd">Очистить</string>
+    <string name="logs_share_cd">Поделиться</string>
+    <string name="logs_empty">(пусто — лог ещё не записан)</string>
+    <string name="logs_share_chooser_title">Поделиться ozero.log</string>
+    <string name="logs_copy_empty_toast">Пусто — нечего копировать</string>
+    <string name="logs_copy_done_toast_fmt">Скопировано (%1$d симв.)</string>
+
+    <!-- ByeDPI engine settings -->
+    <string name="byedpi_args_description">Аргументы запуска libbyedpi. Используются для обхода ТСПУ DPI. Подробности: github.com/hufrea/byedpi</string>
+    <string name="byedpi_args_label">ByeDPI args</string>
+    <string name="byedpi_using_default_fmt">Используется default: %1$s</string>
+    <string name="byedpi_using_override">Сохранённый override активен</string>
+    <string name="byedpi_save">Сохранить</string>
+    <string name="byedpi_reset">Сброс</string>
+
+    <!-- Telegram MTProxy settings -->
+    <string name="telegram_proxy_title">Telegram MTProxy</string>
+    <string name="telegram_proxy_description">Локальный MTProxy сервер для Telegram. Трафик идёт через активный VPN движок.</string>
+    <string name="telegram_proxy_enable">Включить MTProxy</string>
+    <string name="telegram_proxy_state_idle">Выключен</string>
+    <string name="telegram_proxy_state_starting">Запускается…</string>
+    <string name="telegram_proxy_state_running_fmt">Работает на порту %1$d</string>
+    <string name="telegram_proxy_state_error_fmt">Ошибка: %1$s</string>
+    <string name="telegram_proxy_port_label">Порт</string>
+    <string name="telegram_proxy_save">Сохранить</string>
+    <string name="telegram_proxy_domain_label">FakeTLS домен</string>
+    <string name="telegram_proxy_secret_missing">Secret не сгенерирован. Нажмите кнопку ниже.</string>
+    <string name="telegram_proxy_secret_value_fmt">Secret: %1$s</string>
+    <string name="telegram_proxy_generate_secret">Сгенерировать ключ</string>
+    <string name="telegram_proxy_rotate_secret">Сменить ключ</string>
+    <string name="telegram_proxy_generate_error">Ошибка генерации ключа. Проверьте логи.</string>
+    <string name="telegram_proxy_link_label">Ссылка для Telegram:</string>
+    <string name="telegram_proxy_copy">Копировать</string>
+    <string name="telegram_proxy_open_in_tg">Открыть в Telegram</string>
+
+    <!-- Settings additional rows -->
+    <string name="settings_byedpi_title">ByeDPI args</string>
+    <string name="settings_byedpi_summary">Настройки обхода ТСПУ</string>
+    <string name="settings_manual_server_title">Добавить сервер вручную</string>
+    <string name="settings_manual_server_summary">VLESS / Trojan / Hysteria2 / Shadowsocks URI</string>
+    <string name="settings_telegram_proxy_title">Telegram MTProxy</string>
+    <string name="settings_telegram_proxy_summary">Локальный MTProxy для Telegram через VPN</string>
+    <string name="settings_logs">Логи</string>
+
+    <!-- WARP engine settings -->
+    <string name="warp_progress_mirror_fmt">Зеркало %1$s</string>
+    <string name="warp_validation_required_fields">PrivateKey, Endpoint, PublicKey (Peer), Address обязательны</string>
+    <string name="warp_doh_section_label">Протокол DNS (endpoint resolve)</string>
+    <string name="warp_next_generation_in_fmt">Следующая генерация через %1$s</string>
+
+    <!-- Strategy test relative time -->
+    <string name="strategy_staleness_unverified">Не проверена</string>
+    <string name="strategy_staleness_stale_fmt">Давно не проверена · %1$s</string>
+    <string name="strategy_staleness_fresh_fmt">Проверена · %1$s</string>
+    <string name="strategy_badge_best_on_network">Лучшая на этой сети</string>
+    <string name="strategy_badge_best_other_network">Найдена на другой сети</string>
+    <string name="strategy_time_just_now">только что</string>
+    <string name="strategy_time_min_ago_fmt">%1$d мин назад</string>
+    <string name="strategy_time_hour_ago_fmt">%1$d ч назад</string>
+    <string name="strategy_time_day_ago_fmt">%1$d д назад</string>
 </resources>

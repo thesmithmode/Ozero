@@ -33,11 +33,11 @@ class ManualServerViewModelTest {
     }
 
     @Test
-    fun `onAdd empty uri produces Error пустой URI`() {
+    fun `onAdd empty uri produces Error EMPTY_URI`() {
         val v = vm()
         v.onAdd()
         val e = assertIs<ManualServerUiState.Error>(v.uiState.value)
-        assertEquals("пустой URI", e.reason)
+        assertEquals(ManualServerUiState.Error.Reason.EMPTY_URI, e.reason)
         assertEquals("", e.uri)
     }
 
@@ -47,16 +47,16 @@ class ManualServerViewModelTest {
         v.onUriChange("   ")
         v.onAdd()
         val e = assertIs<ManualServerUiState.Error>(v.uiState.value)
-        assertEquals("пустой URI", e.reason)
+        assertEquals(ManualServerUiState.Error.Reason.EMPTY_URI, e.reason)
     }
 
     @Test
-    fun `onAdd valid uri returns import unavailable Error v этой версии`() {
+    fun `onAdd valid uri returns IMPORT_UNAVAILABLE Error`() {
         val v = vm()
         v.onUriChange("vless://server.example:443")
         v.onAdd()
         val e = assertIs<ManualServerUiState.Error>(v.uiState.value)
-        assertEquals("импорт недоступен в этой версии", e.reason)
+        assertEquals(ManualServerUiState.Error.Reason.IMPORT_UNAVAILABLE, e.reason)
         assertEquals("vless://server.example:443", e.uri)
     }
 

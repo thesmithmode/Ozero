@@ -408,12 +408,12 @@ class WarpEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `onGenerate передаёт прогресс через progressText`() = runTest {
+    fun `onGenerate сбрасывает progressMirror после успеха`() = runTest {
         auto.setConfig(SAMPLE)
         auto.progressToEmit = "3/78"
         vm.onGenerate()
         advanceUntilIdle()
-        assertNull(vm.uiState.value.progressText, "progressText сбрасывается после успеха")
+        assertNull(vm.uiState.value.progressMirror, "progressMirror сбрасывается после успеха")
     }
 
     @Test

@@ -1,5 +1,6 @@
 package ru.ozero.app.ui.settings.engines
 
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import ru.ozero.app.R
 import ru.ozero.enginewarp.AwgParams
 import ru.ozero.enginewarp.DoHProvider
 import ru.ozero.enginewarp.WarpAutoConfig
@@ -57,7 +59,8 @@ data class WarpSettingsUiState(
     val activeSlotId: String? = null,
     val isRegistering: Boolean = false,
     val errorMessage: String? = null,
-    val progressText: String? = null,
+    @StringRes val errorMessageRes: Int? = null,
+    val progressMirror: String? = null,
     val progressCurrent: Int = 0,
     val progressTotal: Int = 0,
     val importSuccessCount: Int = 0,
@@ -126,7 +129,12 @@ class WarpEngineSettingsViewModel @Inject constructor(
 
     fun onGenerate() {
         if (_uiState.value.isRegistering) return
-        _uiState.value = _uiState.value.copy(isRegistering = true, errorMessage = null, progressText = null)
+        _uiState.value = _uiState.value.copy(
+            isRegistering = true,
+            errorMessage = null,
+            errorMessageRes = null,
+            progressMirror = null,
+        )
         registerJob = viewModelScope.launch {
             try {
                 val result = autoConfig.register(onProgress = { progress ->
@@ -134,7 +142,7 @@ class WarpEngineSettingsViewModel @Inject constructor(
                     val current = parts.getOrNull(0)?.toIntOrNull() ?: 0
                     val total = parts.getOrNull(1)?.toIntOrNull() ?: 0
                     _uiState.value = _uiState.value.copy(
-                        progressText = "Зеркало $progress",
+                        progressMirror = progress,
                         progressCurrent = current,
                         progressTotal = total,
                     )
@@ -146,19 +154,21 @@ class WarpEngineSettingsViewModel @Inject constructor(
                         _uiState.value = _uiState.value.copy(
                             isRegistering = false,
                             errorMessage = null,
-                            progressText = null,
+                            errorMessageRes = null,
+                            progressMirror = null,
                         )
                     },
                     onFailure = { t ->
                         _uiState.value = _uiState.value.copy(
                             isRegistering = false,
                             errorMessage = t.message ?: "register failed",
-                            progressText = null,
+                            errorMessageRes = null,
+                            progressMirror = null,
                         )
                     },
                 )
             } catch (ce: CancellationException) {
-                _uiState.value = _uiState.value.copy(isRegistering = false, progressText = null)
+                _uiState.value = _uiState.value.copy(isRegistering = false, progressMirror = null)
                 throw ce
             } finally {
                 registerJob = null
@@ -181,12 +191,14 @@ class WarpEngineSettingsViewModel @Inject constructor(
                     store.setActive(id)
                     _uiState.value = _uiState.value.copy(
                         errorMessage = null,
+                        errorMessageRes = null,
                         importSuccessCount = _uiState.value.importSuccessCount + 1,
                     )
                 },
                 onFailure = { t ->
                     _uiState.value = _uiState.value.copy(
                         errorMessage = t.message ?: "import failed",
+                        errorMessageRes = null,
                     )
                 },
             )
@@ -244,7 +256,10 @@ class WarpEngineSettingsViewModel @Inject constructor(
         val draft = _uiState.value.editDraft ?: return
         val requiredFields = listOf(draft.privateKey, draft.peerPublicKey, draft.endpoint, draft.addressV4)
         if (requiredFields.any { it.isBlank() }) {
-            _uiState.value = _uiState.value.copy(errorMessage = VALIDATION_REQUIRED_FIELDS)
+            _uiState.value = _uiState.value.copy(
+                errorMessage = null,
+                errorMessageRes = R.string.warp_validation_required_fields,
+            )
             return
         }
         val mtu = draft.mtu.toIntOrNull() ?: WarpConfig.DEFAULT_MTU
@@ -287,9 +302,18 @@ class WarpEngineSettingsViewModel @Inject constructor(
         val name = draft.name.trim().ifBlank { "WARP" }
         viewModelScope.launch {
             runCatching { store.updateSlot(slotId, name, config) }
-                .onSuccess { _uiState.value = _uiState.value.copy(editDraft = null) }
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(
+                        editDraft = null,
+                        errorMessage = null,
+                        errorMessageRes = null,
+                    )
+                }
                 .onFailure { t ->
-                    _uiState.value = _uiState.value.copy(errorMessage = t.message ?: "save failed")
+                    _uiState.value = _uiState.value.copy(
+                        errorMessage = t.message ?: "save failed",
+                        errorMessageRes = null,
+                    )
                 }
         }
     }
@@ -299,7 +323,6 @@ class WarpEngineSettingsViewModel @Inject constructor(
     }
 
     private companion object {
-        const val VALIDATION_REQUIRED_FIELDS = "PrivateKey, Endpoint, PublicKey (Peer), Address обязательны"
         const val COOLDOWN_POLL_INTERVAL_MS = 1_000L
     }
 }

@@ -489,12 +489,16 @@ private fun WarpScreenContent(
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         if (state.slots.isEmpty()) {
+            val progressLabel = state.progressMirror?.let {
+                stringResource(R.string.warp_progress_mirror_fmt, it)
+            }
+            val resolvedError = state.errorMessageRes?.let { stringResource(it) } ?: state.errorMessage
             EmptyConfigCard(
                 isRegistering = state.isRegistering,
-                progressText = state.progressText,
+                progressText = progressLabel,
                 progressCurrent = state.progressCurrent,
                 progressTotal = state.progressTotal,
-                errorMessage = state.errorMessage,
+                errorMessage = resolvedError,
                 cooldownRemainingMs = cooldownRemainingMs,
                 onGenerate = onGenerate,
                 onCancelGenerate = onCancelGenerate,
@@ -509,8 +513,11 @@ private fun WarpScreenContent(
                 onDeleteSlot = onDeleteSlot,
             )
             if (state.isRegistering) {
+                val mirrorText = state.progressMirror?.let {
+                    stringResource(R.string.warp_progress_mirror_fmt, it)
+                }
                 WarpProgressCard(
-                    progressText = state.progressText ?: stringResource(R.string.warp_registering),
+                    progressText = mirrorText ?: stringResource(R.string.warp_registering),
                     progressCurrent = state.progressCurrent,
                     progressTotal = state.progressTotal,
                     onCancel = onCancelGenerate,

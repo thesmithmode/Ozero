@@ -26,9 +26,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import ru.ozero.app.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,7 +44,7 @@ fun ManualServerScreen(
         modifier = Modifier.testTag("manual_server"),
         topBar = {
             TopAppBar(
-                title = { Text("Добавить сервер") },
+                title = { Text(stringResource(R.string.manual_server_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
@@ -60,8 +62,7 @@ fun ManualServerScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = "Вставьте VLESS / Trojan / Hysteria2 / Shadowsocks URI. Сервер будет добавлен в БД и " +
-                    "подхвачен engine кандидатами при следующем подключении.",
+                text = stringResource(R.string.manual_server_hint),
                 style = MaterialTheme.typography.bodyMedium,
             )
             val currentUri = when (val s = state) {
@@ -73,7 +74,7 @@ fun ManualServerScreen(
             OutlinedTextField(
                 value = currentUri,
                 onValueChange = viewModel::onUriChange,
-                label = { Text("Server URI") },
+                label = { Text(stringResource(R.string.manual_server_uri_label)) },
                 modifier = Modifier.fillMaxWidth().testTag("manual_uri_field"),
                 singleLine = false,
                 minLines = 2,
@@ -84,15 +85,21 @@ fun ManualServerScreen(
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
                 is ManualServerUiState.Error -> {
+                    val reasonText = when (s.reason) {
+                        ManualServerUiState.Error.Reason.EMPTY_URI ->
+                            stringResource(R.string.manual_server_error_empty_uri)
+                        ManualServerUiState.Error.Reason.IMPORT_UNAVAILABLE ->
+                            stringResource(R.string.manual_server_error_import_unavailable)
+                    }
                     Text(
-                        text = "Ошибка: ${s.reason}",
+                        text = stringResource(R.string.manual_server_error_prefix, reasonText),
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
                 is ManualServerUiState.Success -> {
                     Text(
-                        text = "OK: добавлен сервер ${s.protocol}",
+                        text = stringResource(R.string.manual_server_success_prefix, s.protocol),
                         color = Color(0xFF2E7D32),
                         style = MaterialTheme.typography.bodyMedium,
                     )
@@ -105,14 +112,14 @@ fun ManualServerScreen(
                     (state is ManualServerUiState.Idle || state is ManualServerUiState.Error),
                 modifier = Modifier.fillMaxWidth().testTag("manual_add_btn"),
             ) {
-                Text("Добавить")
+                Text(stringResource(R.string.manual_server_add))
             }
             if (state is ManualServerUiState.Success || state is ManualServerUiState.Error) {
                 OutlinedButton(
                     onClick = viewModel::onDismissResult,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Очистить")
+                    Text(stringResource(R.string.manual_server_clear))
                 }
             }
         }

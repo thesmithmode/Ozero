@@ -14,7 +14,9 @@ sealed interface ManualServerUiState {
 
     data class Success(val protocol: String) : ManualServerUiState
 
-    data class Error(val reason: String, val uri: String) : ManualServerUiState
+    data class Error(val reason: Reason, val uri: String) : ManualServerUiState {
+        enum class Reason { EMPTY_URI, IMPORT_UNAVAILABLE }
+    }
 }
 
 @HiltViewModel
@@ -41,10 +43,16 @@ class ManualServerViewModel @Inject constructor() : ViewModel() {
             else -> return
         }.trim()
         if (uri.isEmpty()) {
-            _uiState.value = ManualServerUiState.Error(reason = "пустой URI", uri = uri)
+            _uiState.value = ManualServerUiState.Error(
+                reason = ManualServerUiState.Error.Reason.EMPTY_URI,
+                uri = uri,
+            )
             return
         }
-        _uiState.value = ManualServerUiState.Error(reason = "импорт недоступен в этой версии", uri = uri)
+        _uiState.value = ManualServerUiState.Error(
+            reason = ManualServerUiState.Error.Reason.IMPORT_UNAVAILABLE,
+            uri = uri,
+        )
     }
 
     fun onDismissResult() {
