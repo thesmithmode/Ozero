@@ -254,6 +254,24 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
+    fun `setupPayoutWallet success логирует через Log_i не PersistentLoggers_warn`() {
+        val block = source.substringAfter("private suspend fun setupPayoutWallet")
+            .substringBefore("private fun cleanupOnFailure")
+        val successFragment = block.substringAfter("updatePayoutWallet(walletId)")
+            .substringBefore("} else {")
+        assertTrue(
+            successFragment.contains("Log.i") && successFragment.contains("payout wallet set"),
+            "Success-event 'payout wallet set' обязан логироваться через Log.i, не PersistentLoggers.warn — " +
+                "warn-level на success = ложный шум в boot.log + alerting noise. " +
+                "PersistentLoggers.warn остаётся только для аномалий (walletId not found, threw).",
+        )
+        assertTrue(
+            !successFragment.contains("PersistentLoggers.warn"),
+            "Success-event не должен использовать PersistentLoggers.warn — это ошибка severity для нормального пути.",
+        )
+    }
+
+    @Test
     fun `cleanupOnFailure закрывает device без throw`() {
         val cleanupBlock = source.substringAfter("private fun cleanupOnFailure")
             .substringBefore("private companion object")

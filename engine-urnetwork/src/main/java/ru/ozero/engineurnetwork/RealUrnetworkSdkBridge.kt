@@ -166,7 +166,7 @@ class RealUrnetworkSdkBridge(
         return UrnetworkSdkBridge.StartResult.Success
     }
 
-    override suspend fun stop(): Unit {
+    override suspend fun stop() {
         running.set(false)
         startJobRef.getAndSet(null)?.let { active ->
             if (active.isActive) {
@@ -525,10 +525,7 @@ class RealUrnetworkSdkBridge(
             }
             if (walletId != null) {
                 walletVc.updatePayoutWallet(walletId)
-                PersistentLoggers.warn(
-                    TAG,
-                    "payout wallet set: ${walletAddress.take(WALLET_LOG_PREFIX)}…",
-                )
+                Log.i(TAG, "payout wallet set: ${walletAddress.take(WALLET_LOG_PREFIX)}…")
             } else {
                 PersistentLoggers.warn(
                     TAG,
