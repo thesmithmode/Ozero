@@ -53,6 +53,20 @@ class ByeDpiEngineConcurrencyContractTest {
     }
 
     @Test
+    fun `startProxyWithRecovery вызывает emergencyReset на JNI_GUARD_BUSY`() {
+        val pattern = Regex(
+            """if\s*\(code\s*!=\s*JNI_GUARD_BUSY\)\s*return\s+code""" +
+                """[^}]*proxy\.emergencyReset\(\)""",
+            RegexOption.DOT_MATCHES_ALL,
+        )
+        assertTrue(
+            pattern.containsMatchIn(engineSource),
+            "startProxyWithRecovery обязан вызывать proxy.emergencyReset() при code == JNI_GUARD_BUSY. " +
+                "Иначе wedged old main() оставит engine permanent unusable до process restart.",
+        )
+    }
+
+    @Test
     fun `start обрабатывает JNI_GUARD_BUSY отдельной веткой логирования`() {
         val pattern = Regex(
             """code\s*==\s*JNI_GUARD_BUSY[^"]*"[^"]*guard busy""",

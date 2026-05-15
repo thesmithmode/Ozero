@@ -104,6 +104,21 @@ class NativeLibSafetyContractTest {
     }
 
     @Test
+    fun `jniEmergencyReset использует atomic_exchange для сброса guard`() {
+        val resetBody = Regex(
+            """Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniEmergencyReset[^{]*\{(.*?)^\}""",
+            setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.MULTILINE),
+        ).find(nativeLib)?.groupValues?.get(1)
+            ?: error("jniEmergencyReset не найден в native-lib.c")
+
+        assertTrue(
+            resetBody.contains("atomic_exchange(&g_proxy_running, 0)"),
+            "jniEmergencyReset обязан использовать atomic_exchange(&g_proxy_running, 0). " +
+                "Возвращает старое значение (1 = был wedge / 0 = noop) для logging в Kotlin.",
+        )
+    }
+
+    @Test
     fun `jniStartProxy НЕ имеет blocking spin retry`() {
         val startBody = Regex(
             """Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniStartProxy[^{]*\{(.*?)(?=^JNIEXPORT|\z)""",

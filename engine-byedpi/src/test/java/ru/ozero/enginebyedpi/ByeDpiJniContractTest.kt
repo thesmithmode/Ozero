@@ -69,6 +69,28 @@ class ByeDpiJniContractTest {
     }
 
     @Test
+    fun `ByeDpiProxyContract объявляет emergencyReset`() {
+        val pattern = Regex("fun\\s+emergencyReset\\s*\\(\\s*\\)\\s*:\\s*Int")
+        assertTrue(
+            pattern.containsMatchIn(proxySource),
+            "ByeDpiProxyContract должен объявлять `fun emergencyReset(): Int` для hang recovery " +
+                "после JNI_GUARD_BUSY от jniStartProxy.",
+        )
+    }
+
+    @Test
+    fun `jniEmergencyReset external fun имеет сигнатуру () Int`() {
+        val pattern = Regex(
+            "private\\s+external\\s+fun\\s+jniEmergencyReset\\s*\\(\\s*\\)\\s*:\\s*Int",
+        )
+        assertTrue(
+            pattern.containsMatchIn(proxySource),
+            "ByeDpiProxy должен объявлять `private external fun jniEmergencyReset(): Int`. " +
+                "Изменение сигнатуры = NoSuchMethodError в JNI_OnLoad.",
+        )
+    }
+
+    @Test
     fun `loadOnce загружает библиотеку с именем byedpi`() {
         assertTrue(
             proxySource.contains("System.loadLibrary(\"byedpi\")"),

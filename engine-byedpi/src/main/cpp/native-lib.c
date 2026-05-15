@@ -140,7 +140,21 @@ Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniForceClose(__attribute__((unused)) JNI
      * возврата main(). Premature release провоцировал race: вторая jniStartProxy
      * проходила CAS пока старая main() ещё в cleanup → concurrent main() с
      * shared upstream globals (server_fd, params) = memory corruption.
-     * Trade-off: если upstream main() зависнет после close(fd), guard залипнет
-     * до restart процесса — считаем upstream bug. */
+     * Recovery от wedged main() — через jniEmergencyReset, вызываемый Kotlin'ом
+     * ТОЛЬКО после code == JNI_GUARD_BUSY (т.е. после полного cleanup sequence). */
     return rc;
+}
+
+JNIEXPORT jint JNICALL
+Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniEmergencyReset(__attribute__((unused)) JNIEnv *env, __attribute__((unused)) jobject thiz) {
+    /* EMERGENCY ONLY: безопасный вызов только после серии stop+forceClose+join failures
+     * + jniStartProxy вернул JNI_GUARD_BUSY (т.е. подтверждённый wedge старой main()).
+     * Принудительно сбрасывает CAS guard атомарным exchange. Возвращает старое
+     * значение (1 = был wedge, 0 = guard уже свободен — emergencyReset noop).
+     *
+     * Race window vs полное зависание engine: если старая main() ВНЕЗАПНО оживёт
+     * после нашего exchange, две main() пересекутся на shared globals. Trade-off
+     * принят: краш памяти при wedge крайне маловероятен (main() реально мёртв);
+     * permanent dead engine иначе невосстановимо до process restart. */
+    return atomic_exchange(&g_proxy_running, 0);
 }

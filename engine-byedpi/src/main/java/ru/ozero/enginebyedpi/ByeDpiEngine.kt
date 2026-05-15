@@ -49,6 +49,7 @@ class ByeDpiEngine(
 
     @Volatile private var activeSocksPort: Int = 0
     private val _stats = MutableStateFlow(EngineStats())
+
     @OptIn(ExperimentalCoroutinesApi::class)
     private val proxyDispatcher = Dispatchers.IO.limitedParallelism(1)
     private val proxyScope = CoroutineScope(SupervisorJob() + proxyDispatcher)
@@ -82,9 +83,7 @@ class ByeDpiEngine(
 
         val args = buildArgs(config)
         val proxyJob = proxyScope.launch {
-            val code = runCatching { proxy.startProxy(args) }
-                .onFailure { PersistentLoggers.error(TAG, "jniStartProxy threw: ${it.message}") }
-                .getOrElse { -1 }
+            val code = startProxyWithRecovery(args)
             when {
                 code == 0 -> { /* success — main() returned 0 */ }
                 code == JNI_GUARD_BUSY -> PersistentLoggers.warn(
@@ -118,6 +117,24 @@ class ByeDpiEngine(
             proxyJobRef.compareAndSet(proxyJob, null)
             StartResult.Failure(reason = "byedpi не открыл socks порт ${config.socksPort}")
         }
+    }
+
+    private fun startProxyWithRecovery(args: Array<String>): Int {
+        val code = runCatching { proxy.startProxy(args) }
+            .onFailure { PersistentLoggers.error(TAG, "jniStartProxy threw: ${it.message}") }
+            .getOrElse { -1 }
+        if (code != JNI_GUARD_BUSY) return code
+
+        val priorGuardState = runCatching { proxy.emergencyReset() }
+            .onFailure { PersistentLoggers.error(TAG, "emergencyReset threw: ${it.message}") }
+            .getOrElse { 0 }
+        PersistentLoggers.error(
+            TAG,
+            "byedpi hang detected — emergencyReset выполнен (prior guard=$priorGuardState); retry start",
+        )
+        return runCatching { proxy.startProxy(args) }
+            .onFailure { PersistentLoggers.error(TAG, "jniStartProxy threw after reset: ${it.message}") }
+            .getOrElse { -1 }
     }
 
     private suspend fun waitSocksReady(port: Int, proxyJob: Job): Long {
