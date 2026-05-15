@@ -17,12 +17,17 @@ class RemoteAwgRuntime(
 ) : AwgRuntime {
 
     @Volatile private var engine: IWarpEngineProcess? = null
+    @Volatile private var serviceConnection: ServiceConnection? = null
     private val bindLock = Any()
 
     private fun ensureConnected(): IWarpEngineProcess {
         engine?.let { return it }
         synchronized(bindLock) {
             engine?.let { return it }
+            serviceConnection?.let { stale ->
+                runCatching { context.unbindService(stale) }
+                serviceConnection = null
+            }
             val latch = CountDownLatch(1)
             val conn = object : ServiceConnection {
                 override fun onServiceConnected(name: ComponentName, binder: IBinder) {
@@ -34,14 +39,41 @@ class RemoteAwgRuntime(
                     engine = null
                     PersistentLoggers.warn(TAG, "WarpEngineService disconnected process=$name")
                 }
+                override fun onBindingDied(name: ComponentName?) {
+                    engine = null
+                    val ref = serviceConnection
+                    serviceConnection = null
+                    if (ref != null) runCatching { context.unbindService(ref) }
+                    PersistentLoggers.warn(TAG, "WarpEngineService binding died process=$name — connection unbound")
+                }
             }
             val intent = Intent().setComponent(serviceComponent)
             val bound = context.bindService(intent, conn, Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT)
-            if (!bound) error("bindService failed for $serviceComponent — service не зарегистрирован в манифесте?")
+            if (!bound) {
+                runCatching { context.unbindService(conn) }
+                error("bindService failed for $serviceComponent — service не зарегистрирован в манифесте?")
+            }
+            serviceConnection = conn
             if (!latch.await(CONNECT_TIMEOUT_S, TimeUnit.SECONDS)) {
+                runCatching { context.unbindService(conn) }
+                serviceConnection = null
                 error("WarpEngineService connect timeout after ${CONNECT_TIMEOUT_S}s")
             }
-            return engine ?: error("WarpEngineService engine null after connect")
+            return engine ?: run {
+                runCatching { context.unbindService(conn) }
+                serviceConnection = null
+                error("WarpEngineService engine null after connect")
+            }
+        }
+    }
+
+    fun close() {
+        synchronized(bindLock) {
+            engine = null
+            serviceConnection?.let { conn ->
+                runCatching { context.unbindService(conn) }
+                serviceConnection = null
+            }
         }
     }
 
