@@ -19,8 +19,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CallSplit
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
@@ -364,7 +364,7 @@ private fun simpleDockTabs(): List<DockTab> {
     return remember(labelHome, labelSplit, labelSettings) {
         listOf(
             DockTab(DOCK_TAB_HOME, Icons.Filled.Home, labelHome),
-            DockTab(DOCK_TAB_SPLIT_TUNNEL, Icons.Filled.List, labelSplit),
+            DockTab(DOCK_TAB_SPLIT_TUNNEL, Icons.Filled.CallSplit, labelSplit),
             DockTab(DOCK_TAB_SETTINGS, Icons.Filled.Settings, labelSettings),
         )
     }
@@ -380,7 +380,7 @@ private fun expertDockTabs(): List<DockTab> {
         listOf(
             DockTab(DOCK_TAB_HOME, Icons.Filled.Home, labelHome),
             DockTab(DOCK_TAB_SERVERS, Icons.Filled.LocationOn, labelServers),
-            DockTab(DOCK_TAB_SPLIT_TUNNEL, Icons.Filled.List, labelSplit),
+            DockTab(DOCK_TAB_SPLIT_TUNNEL, Icons.Filled.CallSplit, labelSplit),
             DockTab(DOCK_TAB_SETTINGS, Icons.Filled.Settings, labelSettings),
         )
     }
