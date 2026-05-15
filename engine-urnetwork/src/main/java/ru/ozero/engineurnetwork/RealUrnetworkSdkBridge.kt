@@ -19,6 +19,7 @@ import com.bringyour.sdk.WalletViewController
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelChildren
@@ -55,6 +56,7 @@ class RealUrnetworkSdkBridge(
     private val preferredCountryRef = AtomicReference<String?>(null)
     private val bridgeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lifecycleMutex = Mutex()
+    private val startJobRef = AtomicReference<Job?>(null)
 
     override suspend fun start(
         walletAddress: String,
@@ -65,19 +67,26 @@ class RealUrnetworkSdkBridge(
         if (byClientJwt.isBlank()) {
             return UrnetworkSdkBridge.StartResult.Failed("byClientJwt is blank")
         }
+        val myJob = coroutineContext[Job]
+            ?: return UrnetworkSdkBridge.StartResult.Failed("start called outside coroutine context")
         return lifecycleMutex.withLock {
             if (running.get()) {
                 PersistentLoggers.warn(TAG, "start called while already running")
                 return@withLock UrnetworkSdkBridge.StartResult.Failed("already running")
             }
-            withTimeoutOrNull(SDK_INIT_TIMEOUT_MS) {
-                withContext(Dispatchers.Main.immediate) {
-                    runStartOnMain(byClientJwt, walletAddress)
+            startJobRef.set(myJob)
+            try {
+                withTimeoutOrNull(SDK_INIT_TIMEOUT_MS) {
+                    withContext(Dispatchers.Main.immediate) {
+                        runStartOnMain(byClientJwt, walletAddress)
+                    }
+                } ?: run {
+                    PersistentLoggers.error(TAG, "SDK init timed out after ${SDK_INIT_TIMEOUT_MS}ms")
+                    cleanupOnFailure()
+                    UrnetworkSdkBridge.StartResult.Failed("URnetwork SDK init timeout (30s)")
                 }
-            } ?: run {
-                PersistentLoggers.error(TAG, "SDK init timed out after ${SDK_INIT_TIMEOUT_MS}ms")
-                cleanupOnFailure()
-                UrnetworkSdkBridge.StartResult.Failed("URnetwork SDK init timeout (30s)")
+            } finally {
+                startJobRef.compareAndSet(myJob, null)
             }
         }
     }
@@ -157,8 +166,20 @@ class RealUrnetworkSdkBridge(
         return UrnetworkSdkBridge.StartResult.Success
     }
 
-    override suspend fun stop(): Unit = lifecycleMutex.withLock {
+    override suspend fun stop(): Unit {
         running.set(false)
+        startJobRef.getAndSet(null)?.let { active ->
+            if (active.isActive) {
+                PersistentLoggers.warn(TAG, "stop: cancelling in-flight start() to release lifecycleMutex")
+                active.cancel()
+            }
+        }
+        lifecycleMutex.withLock {
+            stopUnderLock()
+        }
+    }
+
+    private suspend fun stopUnderLock() {
         runCatching { bridgeScope.coroutineContext.cancelChildren() }
         val completed = withTimeoutOrNull(STOP_TIMEOUT_MS) {
             withContext(Dispatchers.Main.immediate) {

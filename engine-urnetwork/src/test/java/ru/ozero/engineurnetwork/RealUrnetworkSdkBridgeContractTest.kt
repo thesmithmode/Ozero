@@ -19,6 +19,39 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
+    fun `stop() сбрасывает running и cancel'ит in-flight start ДО lifecycleMutex withLock`() {
+        val stopBlock = source.substringAfter("override suspend fun stop():")
+            .substringBefore("private suspend fun stopUnderLock")
+        val runningSetFalseIdx = stopBlock.indexOf("running.set(false)")
+        val startCancelIdx = stopBlock.indexOf("startJobRef.getAndSet(null)")
+        val withLockIdx = stopBlock.indexOf("lifecycleMutex.withLock")
+        assertTrue(runningSetFalseIdx in 0 until withLockIdx) {
+            "running.set(false) обязан быть ДО lifecycleMutex.withLock — иначе stop ждёт мьютекс " +
+                "за 30s start init, а JNI gates остаются открытыми."
+        }
+        assertTrue(startCancelIdx in 0 until withLockIdx) {
+            "startJobRef.getAndSet(null) с cancel обязан быть ДО lifecycleMutex.withLock — иначе " +
+                "stop тщетно ждёт mutex который держит in-flight start. Симптом: 'already running' " +
+                "на следующий start после неудачной попытки переключения движка."
+        }
+    }
+
+    @Test
+    fun `start() регистрирует свой Job в startJobRef для stop()-cancel`() {
+        val startBlock = source.substringAfter("override suspend fun start(")
+            .substringBefore("private suspend fun runStartOnMain")
+        assertTrue(
+            startBlock.contains("startJobRef.set"),
+            "start() обязан зарегистрировать свой Job в startJobRef — иначе stop() не сможет " +
+                "cancel'ить in-flight init для освобождения lifecycleMutex.",
+        )
+        assertTrue(
+            startBlock.contains("startJobRef.compareAndSet"),
+            "start() обязан очищать startJobRef в finally — иначе stale Job-ref после успешного start.",
+        )
+    }
+
+    @Test
     fun `start() требует non-blank byClientJwt`() {
         assertTrue(source.contains("byClientJwt.isBlank()") && source.contains("byClientJwt is blank"))
     }
