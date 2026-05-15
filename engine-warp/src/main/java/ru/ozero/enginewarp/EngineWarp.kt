@@ -12,6 +12,7 @@ import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.EngineStats
+import ru.ozero.enginescore.IpProbeRoute
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
@@ -93,6 +94,15 @@ class EngineWarp(
 
     override suspend fun probe(): ProbeResult =
         ProbeResult.Failure(reason = "WARP не предоставляет SOCKS-интерфейс")
+
+    override suspend fun ipProbeRoute(socksPort: Int): IpProbeRoute {
+        val connected = resolvedConfig?.peerEndpoint?.isNotBlank() == true
+        return if (connected) {
+            IpProbeRoute.StaticLocation(country = "Cloudflare WARP", countryCode = null)
+        } else {
+            IpProbeRoute.Unavailable("WARP не подключён")
+        }
+    }
 
     override fun stats(): Flow<EngineStats> = _stats.asStateFlow()
 

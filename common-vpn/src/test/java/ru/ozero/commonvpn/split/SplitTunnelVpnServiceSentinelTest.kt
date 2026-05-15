@@ -85,19 +85,26 @@ class SplitTunnelVpnServiceSentinelTest {
     }
 
     @Test
-    fun `excludeSelf false для WARP — self-traffic через TUN для корректного IP-probe`() {
+    fun `establishTunForEngine использует excludeSelf = true для всех движков`() {
         assertTrue(
-            tunBlock.contains("engineId != ru.ozero.enginescore.EngineId.WARP"),
-            "excludeSelf обязан быть false для WARP: self-traffic должен идти через TUN " +
-                "иначе IP-probe вернёт реальный IP устройства вместо WARP exit IP",
+            tunBlock.contains("excludeSelf = true"),
+            "excludeSelf обязан быть true для всех движков без исключений — " +
+                "без addDisallowedApplication Android не активирует per-app VPN mode " +
+                "и трафик самого приложения попадает в TUN, ломая инициализацию движков " +
+                "(особенно WARP AWG). Регрессия commit 5a8089dd: условный excludeSelf для WARP " +
+                "ради IP-probe сломал split tunnel ALL mode.",
         )
     }
 
     @Test
-    fun `excludeSelf не константа true — зависит от engineId`() {
+    fun `common-vpn не знает про конкретные движки в split tunnel логике`() {
         assertTrue(
-            !tunBlock.contains("excludeSelf = true"),
-            "excludeSelf не должен быть константой true — WARP требует false (IpProbeRoute.Default design)",
+            !tunBlock.contains("EngineId.WARP") && !tunBlock.contains("EngineId.BYEDPI") &&
+                !tunBlock.contains("EngineId.URNETWORK"),
+            "establishTunForEngine не должен ссылаться на конкретные EngineId — " +
+                "common-vpn — VPN core инфраструктура, не должен знать про детали движков " +
+                "(нарушение модульности и low coupling). Engine-specific поведение " +
+                "(IP-probe, capabilities) выражается через EnginePlugin contract.",
         )
     }
 

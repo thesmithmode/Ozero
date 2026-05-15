@@ -6,6 +6,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.IpProbeRoute
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.TunAttachResult
 import ru.ozero.enginescore.TunFdAcceptor
@@ -152,6 +153,36 @@ class EngineWarpContractTest {
         e.start(EngineConfig.Warp, Upstream.None)
         e.stop()
         assertEquals(1, bridge.detachCalls)
+    }
+
+    @Test
+    fun `ipProbeRoute до start возвращает Unavailable — WARP не подключён`() = runTest {
+        val (e, _, _) = engine(activeConfig = sampleConfig)
+        val route = e.ipProbeRoute(socksPort = 0)
+        assertIs<IpProbeRoute.Unavailable>(route)
+    }
+
+    @Test
+    fun `ipProbeRoute после start возвращает StaticLocation Cloudflare WARP`() = runTest {
+        val (e, _, _) = engine(activeConfig = sampleConfig)
+        e.start(EngineConfig.Warp, Upstream.None)
+        val route = e.ipProbeRoute(socksPort = 0)
+        val loc = assertIs<IpProbeRoute.StaticLocation>(route)
+        assertEquals("Cloudflare WARP", loc.country)
+        assertNull(loc.countryCode)
+    }
+
+    @Test
+    fun `ipProbeRoute не возвращает Default — иначе fetch покажет реальный IP вместо WARP`() = runTest {
+        val (e, _, _) = engine(activeConfig = sampleConfig)
+        e.start(EngineConfig.Warp, Upstream.None)
+        val route = e.ipProbeRoute(socksPort = 0)
+        assertFalse(
+            route is IpProbeRoute.Default,
+            "WARP обязан override'ить ipProbeRoute — Default → fetch() из main app → реальный IP " +
+                "устройства (с excludeSelf=true). Регрессия защиты: возврат к Default ввёл бы UX обман " +
+                "пользователю.",
+        )
     }
 
     @Test

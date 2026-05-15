@@ -135,8 +135,7 @@ class MainViewModelIpInfoChannelTest {
             "resolveOnce обязан НЕ использовать fetchViaSocketFactory: " +
                 "Network.socketFactory.createSocket() для VPN-network вызывает bindSocketToNetwork " +
                 "и получает EPERM (Operation not permitted) — system-only привилегия. " +
-                "Self-traffic роутится через TUN автоматически, " +
-                "т.к. TunBuilderConfigurator более не excludeSelf по умолчанию.",
+                "Engine сам решает IpProbeRoute (Default/Socks/StaticLocation/Unavailable).",
         )
     }
 
@@ -144,8 +143,8 @@ class MainViewModelIpInfoChannelTest {
     fun `MainViewModel не зависит от VpnNetworkLocator`() {
         assertFalse(
             source.contains("VpnNetworkLocator"),
-            "MainViewModel обязан НЕ инъектить VpnNetworkLocator: bind на VPN network даёт EPERM, " +
-                "fix — не excludeSelf в TunBuilder, тогда self-traffic роутится через TUN автоматически.",
+            "MainViewModel обязан НЕ инъектить VpnNetworkLocator: bind на VPN network даёт EPERM. " +
+                "IP-probe routing делегирован в plugin.ipProbeRoute() — engine выбирает стратегию.",
         )
     }
 

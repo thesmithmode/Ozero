@@ -411,20 +411,25 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `establishTunForEngine excludeSelf true для всех кроме WARP`() {
+    fun `establishTunForEngine excludeSelf true для всех движков без исключений`() {
         val body = source
             .substringAfter("private suspend fun establishTunForEngine(")
             .substringBefore("internal fun applyEngineTunSpec")
-        assertFalse(
-            body.contains("excludeSelf = (engineId == ru.ozero.enginescore.EngineId.URNETWORK)"),
-            "excludeSelf must cover ByeDPI too — ciadpi JNI не вызывает protect(), " +
-                "outbound сокеты идут через TUN → loop. Правильно: excludeSelf = (engineId != WARP).",
-        )
         assertTrue(
-            body.contains("excludeSelf = (engineId != ru.ozero.enginescore.EngineId.WARP)"),
-            "WARP: AWG сокет защищён VpnSocketProtectorHolder → excludeSelf=false OK. " +
-                "ByeDPI + URnetwork: нет protect() → excludeSelf=true обязателен → нет routing loop. " +
-                "Регрессия 4624406: excludeSelf=false для ByeDPI → ciadpi outbound через TUN → SOCKS loop → нет сети.",
+            body.contains("excludeSelf = true"),
+            "excludeSelf обязан быть true для ВСЕХ движков (включая WARP). " +
+                "Причины: (1) ByeDPI/URnetwork outbound через TUN → loop без excludeSelf; " +
+                "(2) WARP без addDisallowedApplication → Android не активирует per-app VPN mode → " +
+                "self-traffic в TUN мешает AWG init → канал 'запустился' но трафик мёртв. " +
+                "Регрессия 5a8089dd: excludeSelf=(engineId != WARP) ради IP-probe через TUN " +
+                "сломал split tunnel ALL для всех движков (через auto-mode — WARP первый, " +
+                "не fallback на ByeDPI/URnetwork при traffic-fail).",
+        )
+        assertFalse(
+            body.contains("engineId == ") || body.contains("engineId != "),
+            "establishTunForEngine не должен ветвиться по engineId — common-vpn не знает про движки. " +
+                "Engine-specific поведение (IP-probe) выражается через EnginePlugin contract " +
+                "(см. EngineWarp.ipProbeRoute override).",
         )
     }
 }
