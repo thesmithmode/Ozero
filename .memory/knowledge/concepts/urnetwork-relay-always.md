@@ -5,7 +5,7 @@ tags: [urnetwork, relay, architecture, coordinator-pattern]
 sources:
   - "daily/2026-05-14.md"
 created: 2026-05-14
-updated: 2026-05-14
+updated: 2026-05-15
 ---
 
 # URnetwork Relay-Always Architecture
@@ -20,7 +20,7 @@ URnetwork SDK decouples TUN-routing (`tunnelStarted`) from relay contribution (`
 - When URnetwork is the active engine → additionally `tunnelStarted = true`
 - Relay activates automatically whenever VPN is running; no user toggle
 - Each user earns independently — no API to aggregate relay earnings across multiple users to one wallet
-- `PRESET_WALLET` constant in `UrnetworkDefaults` is dead code — hardcoded value is passed to `start()` but `addExternalWallet`/`updatePayoutWallet` SDK calls are not invoked in `runStartOnMain()`
+- `URnetworkBridge.setupPayoutWallet(address)` auto-binds dev payout wallet to guest accounts on engine start. 3 contract tests in `URnetworkBridgeSetupPayoutWalletTest`
 
 ## Architecture
 
@@ -46,4 +46,4 @@ URnetwork SDK decouples TUN-routing (`tunnelStarted`) from relay contribution (`
 
 ## Sources
 
-- [[daily/2026-05-14.md]] — Session 20:30: architectural discussion of relay-always, SDK `tunnelStarted` vs `providePaused` decoupling, PRESET_WALLET dead code, monetization constraints
+- [[daily/2026-05-14.md]] — Session 20:30: architectural discussion of relay-always, SDK `tunnelStarted` vs `providePaused` decoupling, monetization constraints; Session 21:29: `setupPayoutWallet` implementation + contract tests

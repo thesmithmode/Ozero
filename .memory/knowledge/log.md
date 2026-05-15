@@ -1,5 +1,11 @@
 # Build Log
 
+## [2026-05-15T03:00:00] compile | Daily Log 2026-05-14 (pass 7 — final)
+- Source: daily/2026-05-14.md
+- Articles updated: [[concepts/urnetwork-relay-always]] (Session 21:29: setupPayoutWallet auto-bind implementation + 3 contract tests, replaced PRESET_WALLET dead code note)
+- Index updated: 1 row updated, total 113
+- Verification: all sessions 10:00–21:29 now covered; no remaining gaps
+
 ## [2026-05-15T02:00:00] compile | Daily Log 2026-05-14 (pass 6 — post-compaction)
 - Source: daily/2026-05-14.md
 - Articles created: [[concepts/urnetwork-relay-always]] (session 20:30 — relay-always architecture, UrnetworkRelayCoordinator, SDK tunnelStarted/providePaused decoupling, PRESET_WALLET dead code, monetization constraints)
