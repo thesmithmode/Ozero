@@ -120,6 +120,11 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         }
     }
 
+    private val userSelectedCountryCode: StateFlow<String?> = settingsRepository.settings
+        .map { it.urnetworkCountryCode }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
     private val _uiState = MutableStateFlow<UrnetworkSettingsUiState>(UrnetworkSettingsUiState.Loading)
     val uiState: StateFlow<UrnetworkSettingsUiState> = _uiState.asStateFlow()
 
@@ -324,7 +329,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         val current = _uiState.value
         val selectedLocation = if (current is UrnetworkSettingsUiState.Ready) {
             current.selectedLocation
-        } else if (isUrnetworkActive.value) {
+        } else if (isUrnetworkActive.value && userSelectedCountryCode.value != null) {
             bridge.selectedLocation()
         } else {
             null
