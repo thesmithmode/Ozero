@@ -221,14 +221,11 @@ class OzeroVpnService : android.net.VpnService() {
         }
         if (pick == null) {
             val mode = if (manualEngine == null) "auto" else "manual"
-            val targetForUi = manualEngine
-                ?: settings?.engineAutoPriority?.firstOrNull()
-                ?: enginePlugins.firstOrNull()?.id
-                ?: run {
-                    PersistentLoggers.error(TAG, "no plugins registered — отказ старта")
-                    stopVpn()
-                    return
-                }
+            val targetForUi = resolveTargetForUi(manualEngine, settings) ?: run {
+                PersistentLoggers.error(TAG, "no plugins registered — отказ старта")
+                stopVpn()
+                return
+            }
             PersistentLoggers.error(
                 TAG,
                 "no engine reachable ($mode mode) — отказ старта",
@@ -446,6 +443,13 @@ class OzeroVpnService : android.net.VpnService() {
         engineId: EngineId,
         settings: ru.ozero.enginescore.settings.SettingsModel?,
     ): EngineConfig? = enginePlugins.firstOrNull { it.id == engineId }?.buildManualConfig(settings)
+
+    private fun resolveTargetForUi(
+        manualEngine: EngineId?,
+        settings: ru.ozero.enginescore.settings.SettingsModel?,
+    ): EngineId? = manualEngine
+        ?: settings?.engineAutoPriority?.firstOrNull()
+        ?: enginePlugins.firstOrNull()?.id
 
     private fun autoCandidates(
         settings: ru.ozero.enginescore.settings.SettingsModel?,
