@@ -33,6 +33,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.enginescore.PersistentLoggers
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.coroutines.coroutineContext
 import kotlin.coroutines.resume
 
 class SdkLocationToken(val sdk: ConnectLocation) : UrnetworkSdkBridge.LocationToken {
