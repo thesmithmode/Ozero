@@ -27,6 +27,7 @@ import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.IpProbeRoute
 import ru.ozero.enginescore.probe.Socks5HandshakeProbe
 import ru.ozero.enginescore.settings.HostsMode
+import ru.ozero.enginescore.settings.SettingsModel
 import java.util.concurrent.atomic.AtomicReference
 
 class ByeDpiEngine(
@@ -54,6 +55,13 @@ class ByeDpiEngine(
     private val proxyDispatcher = Dispatchers.IO.limitedParallelism(1)
     private val proxyScope = CoroutineScope(SupervisorJob() + proxyDispatcher)
     private val proxyJobRef = AtomicReference<Job?>(null)
+
+    override fun buildManualConfig(settings: SettingsModel?): EngineConfig = EngineConfig.ByeDpi(
+        args = settings?.byedpiWinningArgs?.takeIf { it.isNotBlank() }
+            ?: EngineConfig.ByeDpi().args,
+        hostsMode = settings?.hostsMode ?: HostsMode.DISABLED,
+        hosts = settings?.hosts.orEmpty(),
+    )
 
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
         require(config is EngineConfig.ByeDpi) { "ByeDpiEngine требует EngineConfig.ByeDpi" }

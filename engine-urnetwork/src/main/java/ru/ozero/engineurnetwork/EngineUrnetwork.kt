@@ -28,6 +28,7 @@ import ru.ozero.enginescore.TunAttachResult
 import ru.ozero.enginescore.TunFdAcceptor
 import ru.ozero.enginescore.TunSpec
 import ru.ozero.enginescore.Upstream
+import ru.ozero.enginescore.settings.SettingsModel
 import java.util.concurrent.atomic.AtomicReference
 
 class EngineUrnetwork(
@@ -56,6 +57,16 @@ class EngineUrnetwork(
     private val _stats = MutableStateFlow(EngineStats())
 
     override fun stopTimeoutMs(): Long = URN_STOP_TIMEOUT_MS
+
+    override fun buildManualConfig(settings: SettingsModel?): EngineConfig = EngineConfig.Urnetwork(
+        jwtToken = settings?.urnetworkJwt.orEmpty(),
+        region = settings?.urnetworkCountryCode,
+    )
+
+    override fun statsLabel(stats: EngineStats): String? {
+        val peers = stats.activeConnections
+        return if (peers > 0) "$peers peers" else null
+    }
 
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
         require(config is EngineConfig.Urnetwork) { "EngineUrnetwork требует EngineConfig.Urnetwork" }

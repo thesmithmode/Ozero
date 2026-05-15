@@ -221,7 +221,14 @@ class OzeroVpnService : android.net.VpnService() {
         }
         if (pick == null) {
             val mode = if (manualEngine == null) "auto" else "manual"
-            val targetForUi = if (manualEngine != null) manualEngine else EngineId.BYEDPI
+            val targetForUi = manualEngine
+                ?: settings?.engineAutoPriority?.firstOrNull()
+                ?: enginePlugins.firstOrNull()?.id
+                ?: run {
+                    PersistentLoggers.error(TAG, "no plugins registered — отказ старта")
+                    stopVpn()
+                    return
+                }
             PersistentLoggers.error(
                 TAG,
                 "no engine reachable ($mode mode) — отказ старта",
@@ -438,7 +445,7 @@ class OzeroVpnService : android.net.VpnService() {
     private fun buildEngineConfig(
         engineId: EngineId,
         settings: ru.ozero.enginescore.settings.SettingsModel?,
-    ): EngineConfig? = ManualEngineConfigBuilder.build(engineId, settings)
+    ): EngineConfig? = enginePlugins.firstOrNull { it.id == engineId }?.buildManualConfig(settings)
 
     private fun autoCandidates(
         settings: ru.ozero.enginescore.settings.SettingsModel?,
@@ -675,13 +682,8 @@ class OzeroVpnService : android.net.VpnService() {
             chainOrchestrator.activeEngines()
                 .mapNotNull { plugin ->
                     val flow = plugin.stats() as? kotlinx.coroutines.flow.StateFlow<*>
-                    val stats = flow?.value as? ru.ozero.enginescore.EngineStats
-                    val peers = stats?.activeConnections ?: 0
-                    when {
-                        plugin.id == EngineId.URNETWORK && peers > 0 -> "$peers peers"
-                        peers > 0 -> "$peers conns"
-                        else -> null
-                    }
+                    val stats = flow?.value as? ru.ozero.enginescore.EngineStats ?: return@mapNotNull null
+                    plugin.statsLabel(stats)
                 }
                 .joinToString(" · ")
         }.getOrDefault("")

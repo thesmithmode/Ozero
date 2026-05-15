@@ -22,6 +22,7 @@ import ru.ozero.enginescore.TunSpec
 import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.VpnSocketProtector
 import ru.ozero.enginescore.VpnSocketProtectorHolder
+import ru.ozero.enginescore.settings.SettingsModel
 
 class EngineWarp(
     private val autoConfig: WarpAutoConfig,
@@ -53,6 +54,8 @@ class EngineWarp(
 
     @Volatile
     private var resolvedIni: String? = null
+
+    override fun buildManualConfig(settings: SettingsModel?): EngineConfig = EngineConfig.Warp
 
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
         require(config is EngineConfig.Warp) { "EngineWarp требует EngineConfig.Warp" }

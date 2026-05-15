@@ -16,7 +16,7 @@
 ├────────────────────────────────────────────────────────────┤
 │  Chain              ChainOrchestrator (последовательный     │
 │                     старт engines, rollback при отказе)     │
-│                     ManualEngineConfigBuilder (chain of 1)  │
+│                     EnginePlugin.buildManualConfig (1-step) │
 ├────────────────────────────────────────────────────────────┤
 │  Engines            ByeDpiEngine / EngineWarp /             │
 │                     EngineUrnetwork                         │
@@ -34,7 +34,7 @@
 | Модуль | Ответственность |
 |--------|----------------|
 | `:engines-core` | `EnginePlugin` интерфейс, `ChainOrchestrator`, `IpProbeRoute`, `SettingsRepository`, `SettingsModel`, `Socks5HandshakeProbe`, `Upstream`, `TunFdAcceptor`, `TunSpec`, `EnginePreflight`, `PersistentLoggers` |
-| `:common-vpn` | `OzeroVpnService`, `HevTunnelGateway` (JNI→libhev), `TunnelController`, `TunnelState`, `HealthMonitor`, `ManualEngineConfigBuilder`, `hev.TProxyService`, split-tunnel, stats |
+| `:common-vpn` | `OzeroVpnService`, `HevTunnelGateway` (JNI→libhev), `TunnelController`, `TunnelState`, `HealthMonitor`, `hev.TProxyService`, split-tunnel, stats |
 | `:common-dns` | DoH client |
 | `:common-net` | HTTP utilities |
 | `:common-crypto` | Ed25519 verifier (подписки, self-update) |
