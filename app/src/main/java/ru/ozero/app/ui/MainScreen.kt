@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CallSplit
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Settings
@@ -59,6 +58,7 @@ import ru.ozero.app.ui.components.OzeroBackground
 import ru.ozero.app.ui.components.OzeroBackgroundState
 import ru.ozero.app.ui.components.PowerDisc
 import ru.ozero.app.ui.components.PowerDiscState
+import ru.ozero.app.ui.icons.OzeroIcons
 import ru.ozero.app.ui.theme.OzeroPalette
 import ru.ozero.commonnet.CountryFlag
 import ru.ozero.commonvpn.BytesFormatter
@@ -364,7 +364,7 @@ private fun simpleDockTabs(): List<DockTab> {
     return remember(labelHome, labelSplit, labelSettings) {
         listOf(
             DockTab(DOCK_TAB_HOME, Icons.Filled.Home, labelHome),
-            DockTab(DOCK_TAB_SPLIT_TUNNEL, Icons.Filled.CallSplit, labelSplit),
+            DockTab(DOCK_TAB_SPLIT_TUNNEL, OzeroIcons.CallSplit, labelSplit),
             DockTab(DOCK_TAB_SETTINGS, Icons.Filled.Settings, labelSettings),
         )
     }
@@ -380,7 +380,7 @@ private fun expertDockTabs(): List<DockTab> {
         listOf(
             DockTab(DOCK_TAB_HOME, Icons.Filled.Home, labelHome),
             DockTab(DOCK_TAB_SERVERS, Icons.Filled.LocationOn, labelServers),
-            DockTab(DOCK_TAB_SPLIT_TUNNEL, Icons.Filled.CallSplit, labelSplit),
+            DockTab(DOCK_TAB_SPLIT_TUNNEL, OzeroIcons.CallSplit, labelSplit),
             DockTab(DOCK_TAB_SETTINGS, Icons.Filled.Settings, labelSettings),
         )
     }
