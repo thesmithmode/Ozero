@@ -11,7 +11,7 @@ appcompat = "1.7.1"
 # Compose
 composeBom = "2024.09.01"
 activityCompose = "1.9.2"
-lifecycleViewmodelCompose = "2.8.6"
+lifecycleViewmodelCompose = "2.10.0"
 hiltNavigationCompose = "1.2.0"
 
 # DataStore
