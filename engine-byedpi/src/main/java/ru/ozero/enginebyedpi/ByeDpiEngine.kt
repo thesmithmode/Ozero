@@ -120,21 +120,30 @@ class ByeDpiEngine(
     }
 
     private fun startProxyWithRecovery(args: Array<String>): Int {
-        val code = runCatching { proxy.startProxy(args) }
-            .onFailure { PersistentLoggers.error(TAG, "jniStartProxy threw: ${it.message}") }
-            .getOrElse { -1 }
+        val code = safeJniCall(fallback = -1, tag = "jniStartProxy threw") {
+            proxy.startProxy(args)
+        }
         if (code != JNI_GUARD_BUSY) return code
 
-        val priorGuardState = runCatching { proxy.emergencyReset() }
-            .onFailure { PersistentLoggers.error(TAG, "emergencyReset threw: ${it.message}") }
-            .getOrElse { 0 }
+        val priorGuardState = safeJniCall(fallback = 0, tag = "emergencyReset threw") {
+            proxy.emergencyReset()
+        }
         PersistentLoggers.error(
             TAG,
             "byedpi hang detected — emergencyReset выполнен (prior guard=$priorGuardState); retry start",
         )
-        return runCatching { proxy.startProxy(args) }
-            .onFailure { PersistentLoggers.error(TAG, "jniStartProxy threw after reset: ${it.message}") }
-            .getOrElse { -1 }
+        return safeJniCall(fallback = -1, tag = "jniStartProxy threw after reset") {
+            proxy.startProxy(args)
+        }
+    }
+
+    private inline fun <T> safeJniCall(fallback: T, tag: String, block: () -> T): T = try {
+        block()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (t: Throwable) {
+        PersistentLoggers.error(TAG, "$tag: ${t.message}")
+        fallback
     }
 
     private suspend fun waitSocksReady(port: Int, proxyJob: Job): Long {

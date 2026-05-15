@@ -1,5 +1,6 @@
 package ru.ozero.enginebyedpi
 
+import android.util.Log
 import ru.ozero.enginescore.PersistentLoggers
 
 interface ByeDpiProxyContract {
@@ -52,7 +53,7 @@ class ByeDpiProxy : ByeDpiProxyContract {
                 try {
                     System.loadLibrary("byedpi")
                     libraryLoaded = true
-                    PersistentLoggers.info(TAG, "libbyedpi loaded")
+                    Log.i(TAG, "libbyedpi loaded")
                 } catch (e: UnsatisfiedLinkError) {
                     loadError = e.message ?: e.javaClass.simpleName
                     libraryLoaded = false

@@ -94,12 +94,25 @@ class NativeLibSafetyContractTest {
         ).find(nativeLib)?.groupValues?.get(1)
             ?: error("jniForceClose не найден в native-lib.c")
 
+        val guardMutators = listOf(
+            "atomic_store(&g_proxy_running",
+            "atomic_exchange(&g_proxy_running",
+            "atomic_fetch_and(&g_proxy_running",
+            "atomic_fetch_or(&g_proxy_running",
+            "atomic_fetch_xor(&g_proxy_running",
+            "atomic_fetch_sub(&g_proxy_running",
+            "atomic_fetch_add(&g_proxy_running",
+            "atomic_compare_exchange_strong(&g_proxy_running",
+            "atomic_compare_exchange_weak(&g_proxy_running",
+        )
+        val violations = guardMutators.filter { forceCloseBody.contains(it) }
         assertTrue(
-            !forceCloseBody.contains("atomic_store(&g_proxy_running"),
-            "jniForceClose НЕ должен сбрасывать g_proxy_running — иначе вторая " +
-                "jniStartProxy CAS пройдёт пока старая main() ещё в cleanup → " +
+            violations.isEmpty(),
+            "jniForceClose НЕ должен мутировать g_proxy_running ЛЮБЫМИ atomic_*. " +
+                "Найдены нарушители: $violations. Guard owned by jniStartProxy — " +
+                "premature release → вторая CAS пройдёт пока старая main() в cleanup → " +
                 "concurrent main() с shared upstream globals → memory corruption. " +
-                "Guard релизит только jniStartProxy после возврата main().",
+                "См. feedback_byedpi_native_guard_ownership.",
         )
     }
 
