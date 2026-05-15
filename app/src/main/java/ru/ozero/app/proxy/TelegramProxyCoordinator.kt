@@ -53,5 +53,6 @@ class TelegramProxyCoordinator(
     fun stop() {
         job?.cancel()
         job = null
+        proxyService.stop()
     }
 }

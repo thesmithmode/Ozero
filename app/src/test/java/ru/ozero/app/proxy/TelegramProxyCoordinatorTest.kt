@@ -118,4 +118,17 @@ class TelegramProxyCoordinatorTest {
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 9090)
         verify { mockProxy.start(config, Upstream.Socks5("127.0.0.1", 9090)) }
     }
+
+    @Test
+    fun `coordinator stop() обязан остановить proxyService — иначе зомби mtg-процесс`() =
+        testScope.runTest {
+            val config = TelegramProxyConfig(enabled = true, secret = "abc")
+            coordinator.start()
+            configFlow.value = config
+            tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
+
+            coordinator.stop()
+
+            verify(atLeast = 1) { mockProxy.stop() }
+        }
 }
