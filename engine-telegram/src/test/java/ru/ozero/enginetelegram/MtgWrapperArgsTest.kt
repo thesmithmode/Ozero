@@ -1,9 +1,13 @@
 package ru.ozero.enginetelegram
 
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
@@ -28,6 +32,49 @@ class MtgWrapperArgsTest {
     @AfterEach
     fun tearDown() {
         fakeBinary.delete()
+    }
+
+    @Nested
+    inner class GenerateSecret {
+
+        @Test
+        fun `should return null when binary does not exist`() = runTest {
+            fakeBinary.delete()
+            val result = wrapper.generateSecret("example.com")
+            assertNull(result, "generateSecret должен вернуть null если binary не существует на диске")
+        }
+
+        @Test
+        fun `should pass generate-secret --hex domain args to binary`() = runTest {
+            val recordFile = File(tempDir.toFile(), "args.txt")
+            val recordPath = recordFile.absolutePath
+            fakeBinary.writeText(
+                "#!/bin/sh\nprintf '%s\\n' \"\$@\" > '$recordPath'\nprintf 'fakesecret'",
+            )
+            fakeBinary.setExecutable(true)
+            val result = wrapper.generateSecret("example.com")
+            assertNotNull(result)
+            val recordedArgs = recordFile.readLines().filter { it.isNotBlank() }
+            assertTrue("generate-secret" in recordedArgs, "generate-secret не найден в: $recordedArgs")
+            assertTrue("--hex" in recordedArgs, "--hex не найден в: $recordedArgs")
+            assertTrue("example.com" in recordedArgs, "domain не найден в: $recordedArgs")
+        }
+
+        @Test
+        fun `should return null on non-zero exit code`() = runTest {
+            fakeBinary.writeText("#!/bin/sh\nexit 1")
+            fakeBinary.setExecutable(true)
+            val result = wrapper.generateSecret("example.com")
+            assertNull(result, "generateSecret должен вернуть null при ненулевом exit code")
+        }
+
+        @Test
+        fun `should return last non-blank line of output as secret`() = runTest {
+            fakeBinary.writeText("#!/bin/sh\nprintf 'ee5a401c3a9990adbfd\n'")
+            fakeBinary.setExecutable(true)
+            val result = wrapper.generateSecret("example.com")
+            assertTrue(result == "ee5a401c3a9990adbfd", "должна вернуться последняя непустая строка вывода")
+        }
     }
 
     private fun collectArgs(process: Process): List<String> {
