@@ -55,6 +55,11 @@ Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniStartProxy(JNIEnv *env, __attribute__(
     }
 
     argv[0] = strdup("byedpi");
+    if (!argv[0]) {
+        free(argv);
+        atomic_store(&g_proxy_running, 0);
+        return -1;
+    }
 
     for (int i = 0; i < user_argc; i++) {
         jstring arg = (jstring) (*env)->GetObjectArrayElement(env, args, i);
@@ -87,11 +92,15 @@ Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniStopProxy(__attribute__((unused)) JNIE
 JNIEXPORT jint JNICALL
 Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniForceClose(__attribute__((unused)) JNIEnv *env, __attribute__((unused)) jobject thiz) {
     if (server_fd < 0) {
-        atomic_store(&g_proxy_running, 0);
         return -1;
     }
     int rc = close(server_fd);
     server_fd = -1;
-    atomic_store(&g_proxy_running, 0);
+    /* Guard g_proxy_running НЕ сбрасываем здесь — отпустит jniStartProxy после
+     * возврата main(). Premature release провоцировал race: вторая jniStartProxy
+     * проходила CAS пока старая main() ещё в cleanup → concurrent main() с
+     * shared upstream globals (server_fd, params) = memory corruption.
+     * Trade-off: если upstream main() зависнет после close(fd), guard залипнет
+     * до restart процесса — считаем upstream bug. */
     return rc;
 }
