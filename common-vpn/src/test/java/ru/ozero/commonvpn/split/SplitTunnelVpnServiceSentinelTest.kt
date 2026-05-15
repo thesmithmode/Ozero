@@ -99,7 +99,8 @@ class SplitTunnelVpnServiceSentinelTest {
     @Test
     fun `common-vpn не знает про конкретные движки в split tunnel логике`() {
         assertTrue(
-            !tunBlock.contains("EngineId.WARP") && !tunBlock.contains("EngineId.BYEDPI") &&
+            !tunBlock.contains("EngineId.WARP") &&
+                !tunBlock.contains("EngineId.BYEDPI") &&
                 !tunBlock.contains("EngineId.URNETWORK"),
             "establishTunForEngine не должен ссылаться на конкретные EngineId — " +
                 "common-vpn — VPN core инфраструктура, не должен знать про детали движков " +

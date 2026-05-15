@@ -96,7 +96,6 @@ private fun ContentBody(
     onRegenerateSecret: () -> Unit,
     onDismissGenerateError: () -> Unit = {},
 ) {
-    val context = LocalContext.current
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -176,7 +175,10 @@ private fun ContentBody(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Button(
-                onClick = { onDismissGenerateError(); onRegenerateSecret() },
+                onClick = {
+                    onDismissGenerateError()
+                    onRegenerateSecret()
+                },
                 enabled = !s.generatingSecret,
                 modifier = Modifier.weight(1f),
             ) {
@@ -197,36 +199,42 @@ private fun ContentBody(
 
         val link = s.tgLink
         if (link != null) {
-            HorizontalDivider()
-            Text("Ссылка для Telegram:", style = MaterialTheme.typography.bodyMedium)
-            Text(
-                text = link,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                OutlinedButton(
-                    onClick = {
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText("tg_proxy", link))
-                    },
-                    modifier = Modifier.weight(1f),
-                ) { Text("Копировать") }
-                Button(
-                    onClick = {
-                        runCatching {
-                            context.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse(link))
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                            )
-                        }
-                    },
-                    modifier = Modifier.weight(1f),
-                ) { Text("Открыть в Telegram") }
-            }
+            TgLinkSection(link = link)
         }
+    }
+}
+
+@Composable
+private fun TgLinkSection(link: String) {
+    val context = LocalContext.current
+    HorizontalDivider()
+    Text("Ссылка для Telegram:", style = MaterialTheme.typography.bodyMedium)
+    Text(
+        text = link,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.primary,
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        OutlinedButton(
+            onClick = {
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("tg_proxy", link))
+            },
+            modifier = Modifier.weight(1f),
+        ) { Text("Копировать") }
+        Button(
+            onClick = {
+                runCatching {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse(link))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
+            },
+            modifier = Modifier.weight(1f),
+        ) { Text("Открыть в Telegram") }
     }
 }
