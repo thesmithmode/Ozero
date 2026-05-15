@@ -208,6 +208,42 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
+    fun `attachTun сериализуется через lifecycleMutex — guard на race со stop`() {
+        val attachOuterBlock = source.substringAfter("override suspend fun attachTun")
+            .substringBefore("private suspend fun attachTunUnderLock")
+        assertTrue(
+            attachOuterBlock.contains("lifecycleMutex.withLock"),
+            "attachTun обязан брать lifecycleMutex.withLock перед делегацией в attachTunUnderLock — " +
+                "иначе concurrent stop() закрывает device/connectVc/ioLoop пока attachTun дёргает Sdk.newIoLoop. " +
+                "Race window: stopUnderLock освобождает refs → attachTunUnderLock ставит ioLoopRef поверх — " +
+                "висячий loop без device → SIGABRT в Go-runtime на следующий poll.",
+        )
+        assertTrue(
+            attachOuterBlock.contains("attachJobRef.set(myJob)"),
+            "attachTun обязан регистрировать свой Job в attachJobRef — иначе stop() не сможет cancel'ить " +
+                "in-flight attachTun для освобождения lifecycleMutex.",
+        )
+        assertTrue(
+            attachOuterBlock.contains("attachJobRef.compareAndSet(myJob, null)"),
+            "attachTun обязан очищать attachJobRef в finally — иначе stale Job-ref после успешного attachTun.",
+        )
+    }
+
+    @Test
+    fun `stop отменяет in-flight attachTun ДО lifecycleMutex withLock`() {
+        val stopBlock = source.substringAfter("override suspend fun stop()")
+            .substringBefore("private suspend fun stopUnderLock")
+        val attachCancelIdx = stopBlock.indexOf("attachJobRef.getAndSet(null)")
+        val withLockIdx = stopBlock.indexOf("lifecycleMutex.withLock")
+        assertTrue(
+            attachCancelIdx in 0 until withLockIdx,
+            "attachJobRef.getAndSet(null) с cancel обязан быть ДО lifecycleMutex.withLock — иначе stop " +
+                "висит за timeout пока attachTun держит mutex с blocking Sdk.newIoLoop. " +
+                "Симптом: stop timed out after Xms — refs cleared, зомби IoLoop остался жив.",
+        )
+    }
+
+    @Test
     fun `start и stop сериализуются через lifecycleMutex`() {
         assertTrue(
             source.contains("private val lifecycleMutex = Mutex()") &&

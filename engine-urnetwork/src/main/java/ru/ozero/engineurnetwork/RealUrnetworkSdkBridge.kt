@@ -57,6 +57,7 @@ class RealUrnetworkSdkBridge(
     private val bridgeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lifecycleMutex = Mutex()
     private val startJobRef = AtomicReference<Job?>(null)
+    private val attachJobRef = AtomicReference<Job?>(null)
 
     override suspend fun start(
         walletAddress: String,
@@ -171,6 +172,12 @@ class RealUrnetworkSdkBridge(
         startJobRef.getAndSet(null)?.let { active ->
             if (active.isActive) {
                 PersistentLoggers.warn(TAG, "stop: cancelling in-flight start() to release lifecycleMutex")
+                active.cancel()
+            }
+        }
+        attachJobRef.getAndSet(null)?.let { active ->
+            if (active.isActive) {
+                PersistentLoggers.warn(TAG, "stop: cancelling in-flight attachTun() to release lifecycleMutex")
                 active.cancel()
             }
         }
@@ -399,6 +406,20 @@ class RealUrnetworkSdkBridge(
     override suspend fun attachTun(tunFd: Int): UrnetworkSdkBridge.AttachResult {
         if (tunFd < 0) {
             return UrnetworkSdkBridge.AttachResult.Failed("invalid fd=$tunFd")
+        }
+        val myJob = coroutineContext[Job]
+            ?: return UrnetworkSdkBridge.AttachResult.Failed("attachTun called outside coroutine context")
+        attachJobRef.set(myJob)
+        return try {
+            lifecycleMutex.withLock { attachTunUnderLock(tunFd) }
+        } finally {
+            attachJobRef.compareAndSet(myJob, null)
+        }
+    }
+
+    private suspend fun attachTunUnderLock(tunFd: Int): UrnetworkSdkBridge.AttachResult {
+        if (!running.get()) {
+            return UrnetworkSdkBridge.AttachResult.Failed("bridge stopped — attachTun aborted")
         }
         val device = deviceRef.get()
             ?: return UrnetworkSdkBridge.AttachResult.Failed("DeviceLocal not initialised — call start() first")
