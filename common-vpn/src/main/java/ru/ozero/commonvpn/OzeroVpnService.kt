@@ -395,6 +395,9 @@ class OzeroVpnService : android.net.VpnService() {
         val plugin = enginePlugins.firstOrNull { it.id == engineId } ?: return null
         val spec = plugin.tunSpec() ?: return null
         val builder = applyEngineTunSpec(spec, ipv6Enabled)
+        // excludeSelf=true обязателен для всех движков: split tunnel ALL требует addDisallowedApplication(),
+        // иначе Android не активирует per-app VPN mode → recursive loopback ломает upstream.
+        // IP-probe routing per engine — через EnginePlugin.ipProbeRoute(), не через split tunnel.
         ru.ozero.commonvpn.split.TunBuilderConfigurator(packageName).apply(
             builder,
             splitConfig,
