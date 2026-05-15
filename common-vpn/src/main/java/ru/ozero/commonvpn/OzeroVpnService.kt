@@ -547,6 +547,7 @@ class OzeroVpnService : android.net.VpnService() {
             val result = try {
                 engine.attachTun(rawDupFd)
             } catch (t: Throwable) {
+                runCatching { ParcelFileDescriptor.adoptFd(rawDupFd).close() }
                 runCatching { tunFdRef.getAndSet(null)?.close() }
                 PersistentLoggers.error(TAG, "attachTun threw, fd closed: ${t.message}")
                 runCatching { chainOrchestrator.stop() }
@@ -558,6 +559,7 @@ class OzeroVpnService : android.net.VpnService() {
                     true
                 }
                 is ru.ozero.enginescore.TunAttachResult.Failure -> {
+                    runCatching { ParcelFileDescriptor.adoptFd(rawDupFd).close() }
                     runCatching { tunFdRef.getAndSet(null)?.close() }
                     PersistentLoggers.error(TAG, "attachTun failed: ${result.reason}")
                     runCatching { chainOrchestrator.stop() }

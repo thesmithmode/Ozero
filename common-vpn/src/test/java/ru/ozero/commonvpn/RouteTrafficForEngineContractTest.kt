@@ -98,4 +98,17 @@ class RouteTrafficForEngineContractTest {
                 "detached fd, double-close = native crash.",
         )
     }
+
+    @Test
+    fun `rawDupFd закрывается через adoptFd на failure paths attachTun`() {
+        val acceptorBranch = routeBody.substringAfter("TunFdAcceptor").substringBefore("startNativeTunnel")
+        val adoptCount = acceptorBranch.split("ParcelFileDescriptor.adoptFd(rawDupFd)").size - 1
+        assertTrue(
+            adoptCount >= 2,
+            "rawDupFd = fd.dup().detachFd() — kernel-level fd без PFD-обёртки. На failure paths " +
+                "(catch + TunAttachResult.Failure) обязан ParcelFileDescriptor.adoptFd(rawDupFd).close() — " +
+                "иначе каждый неуспешный reconnect leakит kernel fd → RLIMIT_NOFILE → VPN start failures. " +
+                "Найдено вызовов: $adoptCount, ожидается ≥2.",
+        )
+    }
 }
