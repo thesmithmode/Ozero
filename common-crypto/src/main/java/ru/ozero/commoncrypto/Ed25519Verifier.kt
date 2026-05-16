@@ -7,6 +7,7 @@ object Ed25519Verifier {
     private const val SIG_SIZE = 64
     private const val PUBKEY_SIZE = 32
 
+    @Suppress("SwallowedException")
     fun verify(message: ByteArray, signature: ByteArray, publicKeyRaw32: ByteArray): Boolean {
         if (signature.size != SIG_SIZE) return false
         if (publicKeyRaw32.size != PUBKEY_SIZE) return false
