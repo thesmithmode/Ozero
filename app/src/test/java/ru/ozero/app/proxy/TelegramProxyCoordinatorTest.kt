@@ -23,6 +23,8 @@ import ru.ozero.enginetelegram.TelegramProxyService
 import ru.ozero.enginetelegram.TelegramProxyState
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.Upstream
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TelegramProxyCoordinatorTest {
@@ -131,4 +133,24 @@ class TelegramProxyCoordinatorTest {
 
             verify(atLeast = 1) { mockProxy.stop() }
         }
+
+    @Test
+    fun `job hold через AtomicReference — concurrency race fix`() {
+        val src = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/proxy/TelegramProxyCoordinator.kt",
+        ).readText()
+        assertFalse(
+            src.contains("private var job:") || src.contains("var job: Job?"),
+            "job не должен быть plain var Job? — race между start/stop. Использовать AtomicReference.",
+        )
+        assertTrue(
+            src.contains("AtomicReference<Job?>"),
+            "jobRef обязан быть AtomicReference<Job?>",
+        )
+        assertTrue(
+            src.contains("jobRef.getAndSet("),
+            "start/stop обязан использовать getAndSet для атомарной замены и cancel предыдущего.",
+        )
+    }
 }
