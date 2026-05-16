@@ -405,8 +405,8 @@ private fun EnginesSection(
     onOpenTelegramProxy: () -> Unit,
 ) {
     NavRow(
-        title = "ByeDPI args",
-        summary = "Настройки обхода ТСПУ",
+        title = stringResource(R.string.settings_byedpi_title),
+        summary = stringResource(R.string.settings_byedpi_summary),
         tag = "settings_byedpi_engine_row",
         onClick = onOpenByeDpi,
         enabled = true,
@@ -432,15 +432,15 @@ private fun EnginesSection(
         enabled = true,
     )
     NavRow(
-        title = "Добавить сервер вручную",
-        summary = "VLESS / Trojan / Hysteria2 / Shadowsocks URI",
+        title = stringResource(R.string.settings_manual_server_title),
+        summary = stringResource(R.string.settings_manual_server_summary),
         tag = "settings_manual_server_row",
         onClick = onOpenManualServer,
         enabled = true,
     )
     NavRow(
-        title = "Telegram MTProxy",
-        summary = "Локальный MTProxy для Telegram через VPN",
+        title = stringResource(R.string.settings_telegram_proxy_title),
+        summary = stringResource(R.string.settings_telegram_proxy_summary),
         tag = "settings_telegram_proxy_row",
         onClick = onOpenTelegramProxy,
         enabled = true,
@@ -453,7 +453,7 @@ private fun LogsSection(onOpenLogs: () -> Unit) {
         onClick = onOpenLogs,
         modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
     ) {
-        Text("Логи")
+        Text(stringResource(R.string.settings_logs))
     }
 }
 

@@ -76,8 +76,7 @@ fun ByeDpiEngineSettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Text(
-                        text = "Аргументы запуска libbyedpi. Используются для обхода ТСПУ DPI. " +
-                            "Подробности: github.com/hufrea/byedpi",
+                        text = stringResource(R.string.byedpi_args_description),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     OutlinedTextField(
@@ -89,9 +88,9 @@ fun ByeDpiEngineSettingsScreen(
                     )
                     Text(
                         text = if (s.usingDefault) {
-                            "Используется default: ${s.defaultArgs}"
+                            stringResource(R.string.byedpi_using_default_fmt, s.defaultArgs)
                         } else {
-                            "Сохранённый override активен"
+                            stringResource(R.string.byedpi_using_override)
                         },
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -104,14 +103,14 @@ fun ByeDpiEngineSettingsScreen(
                             enabled = s.dirty,
                             modifier = Modifier.weight(1f).testTag("byedpi_save_btn"),
                         ) {
-                            Text("Сохранить")
+                            Text(stringResource(R.string.byedpi_save))
                         }
                         OutlinedButton(
                             onClick = viewModel::onResetToDefault,
                             enabled = !s.usingDefault,
                             modifier = Modifier.weight(1f).testTag("byedpi_reset_btn"),
                         ) {
-                            Text("Сброс")
+                            Text(stringResource(R.string.byedpi_reset))
                         }
                     }
 

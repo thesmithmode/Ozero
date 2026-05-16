@@ -1095,7 +1095,7 @@ private fun HistoryEntryRow(entry: UsageEntry, index: Int, onApply: () -> Unit) 
 private fun StalenessLabel(lastVerifiedAtMs: Long) {
     if (lastVerifiedAtMs <= 0L) {
         Text(
-            text = "Не проверена",
+            text = stringResource(R.string.strategy_staleness_unverified),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
         )
@@ -1105,9 +1105,9 @@ private fun StalenessLabel(lastVerifiedAtMs: Long) {
     val days = ageMs / (24L * 60L * 60L * 1000L)
     val stale = days >= STALE_THRESHOLD_DAYS
     val text = if (stale) {
-        "Давно не проверена · ${formatRelativeTime(lastVerifiedAtMs)}"
+        stringResource(R.string.strategy_staleness_stale_fmt, formatRelativeTime(lastVerifiedAtMs))
     } else {
-        "Проверена · ${formatRelativeTime(lastVerifiedAtMs)}"
+        stringResource(R.string.strategy_staleness_fresh_fmt, formatRelativeTime(lastVerifiedAtMs))
     }
     val color = if (stale) {
         MaterialTheme.colorScheme.error
@@ -1121,7 +1121,7 @@ private fun StalenessLabel(lastVerifiedAtMs: Long) {
 private fun NetworkBadge(bestNetworks: Set<String>, currentNetworkId: String) {
     if (bestNetworks.isEmpty()) return
     val onCurrentNetwork = currentNetworkId.isNotBlank() && bestNetworks.contains(currentNetworkId)
-    val text = if (onCurrentNetwork) "Лучшая на этой сети" else "Найдена на другой сети"
+    val text = if (onCurrentNetwork) stringResource(R.string.strategy_badge_best_on_network) else stringResource(R.string.strategy_badge_best_other_network)
     val color = if (onCurrentNetwork) {
         MaterialTheme.colorScheme.primary
     } else {
@@ -1132,16 +1132,17 @@ private fun NetworkBadge(bestNetworks: Set<String>, currentNetworkId: String) {
 
 private const val STALE_THRESHOLD_DAYS: Long = 7L
 
+@Composable
 private fun formatRelativeTime(epochMs: Long): String {
     val diffMs = System.currentTimeMillis() - epochMs
     val mins = diffMs / 60_000
     val hours = mins / 60
     val days = hours / 24
     return when {
-        mins < 1 -> "только что"
-        mins < 60 -> "$mins мин назад"
-        hours < 24 -> "$hours ч назад"
-        else -> "$days д назад"
+        mins < 1 -> stringResource(R.string.strategy_time_just_now)
+        mins < 60 -> stringResource(R.string.strategy_time_min_ago_fmt, mins)
+        hours < 24 -> stringResource(R.string.strategy_time_hour_ago_fmt, hours)
+        else -> stringResource(R.string.strategy_time_day_ago_fmt, days)
     }
 }
 

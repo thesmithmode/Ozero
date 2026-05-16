@@ -417,7 +417,7 @@ private fun WarpDoHSection(
     Card(modifier = Modifier.fillMaxWidth().testTag("warp_doh_section")) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
-                text = "Протокол DNS (endpoint resolve)",
+                text = stringResource(R.string.warp_doh_section_label),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
@@ -640,7 +640,7 @@ private fun WarpActionRow(
     Column(modifier = modifier.fillMaxWidth()) {
         if (cooldownRemainingMs > 0) {
             Text(
-                text = "Следующая генерация через ${formatCooldown(cooldownRemainingMs)}",
+                text = stringResource(R.string.warp_next_generation_in_fmt, formatCooldown(cooldownRemainingMs)),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp),
@@ -698,7 +698,7 @@ private fun EmptyConfigCard(
             }
             if (cooldownRemainingMs > 0) {
                 Text(
-                    text = "Следующая генерация через ${formatCooldown(cooldownRemainingMs)}",
+                    text = stringResource(R.string.warp_next_generation_in_fmt, formatCooldown(cooldownRemainingMs)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
