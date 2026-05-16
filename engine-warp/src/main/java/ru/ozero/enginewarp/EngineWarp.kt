@@ -1,11 +1,13 @@
 package ru.ozero.enginewarp
 
 import android.util.Log
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.enginescore.EngineCapabilities
 import ru.ozero.enginescore.EngineConfig
@@ -180,7 +182,7 @@ class EngineWarp(
         }
     }
 
-    private fun buildResolved(config: WarpConfig, rawIni: String?, source: String): ResolvedWarp {
+    private suspend fun buildResolved(config: WarpConfig, rawIni: String?, source: String): ResolvedWarp {
         val resolvedConfig = resolveEndpointHost(config)
         val ipv6Allowed = ipv6EnabledProvider()
         val baseIni = if (!rawIni.isNullOrBlank()) {
@@ -224,7 +226,7 @@ class EngineWarp(
         return out.toString()
     }
 
-    private fun resolveEndpointHost(cfg: WarpConfig): WarpConfig {
+    private suspend fun resolveEndpointHost(cfg: WarpConfig): WarpConfig {
         val ep = cfg.peerEndpoint
         val sep = ep.lastIndexOf(':')
         if (sep < 0) return cfg
@@ -235,15 +237,17 @@ class EngineWarp(
         Log.i(TAG, "resolveEndpointHost host=$host provider=${provider.name}")
         for (attempt in 0..2) {
             val resolved = if (provider.isSystem) {
-                runCatching { java.net.InetAddress.getByName(host).hostAddress }.getOrNull()
+                withContext(Dispatchers.IO) {
+                    runCatching { java.net.InetAddress.getByName(host).hostAddress }.getOrNull()
+                }
             } else {
-                resolveViaDoH(host, provider.url)
+                withContext(Dispatchers.IO) { resolveViaDoH(host, provider.url) }
             }
             if (!resolved.isNullOrBlank()) {
                 Log.i(TAG, "endpoint resolved $host → $resolved via ${provider.name} (attempt ${attempt + 1})")
                 return cfg.copy(peerEndpoint = "$resolved:$port")
             }
-            if (attempt < 2) runCatching { Thread.sleep(200L shl attempt) }
+            if (attempt < 2) delay(200L shl attempt)
         }
         PersistentLoggers.warn(TAG, "endpoint resolve failed after 3 attempts for $host via ${provider.name}")
         return cfg
