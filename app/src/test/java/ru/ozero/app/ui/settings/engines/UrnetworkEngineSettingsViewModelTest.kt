@@ -18,6 +18,8 @@ import org.junit.jupiter.api.Test
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.enginescore.EngineId
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
+import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
+import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.UrnetworkWindowType
 import java.util.concurrent.atomic.AtomicInteger
@@ -124,6 +126,50 @@ class UrnetworkEngineSettingsViewModelTest {
         advanceUntilIdle()
         assertEquals(true, store.fixedIpSize().first())
         assertEquals(true, bridge.lastAppliedFixedIp)
+    }
+
+    @Test
+    fun `selectProvideControlMode сохраняет в configStore и применяет к bridge при active engine`() = runTest {
+        val bridge = FakeUrnetworkBridge()
+        val store = FakeUrnetworkConfigStore()
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel())
+        vm.selectProvideControlMode(UrnetworkProvideControlMode.AUTO)
+        advanceUntilIdle()
+        assertEquals(UrnetworkProvideControlMode.AUTO, store.provideControlMode().first())
+        assertEquals(UrnetworkProvideControlMode.AUTO, bridge.lastProvideControlMode)
+    }
+
+    @Test
+    fun `selectProvideControlMode не вызывает bridge при idle engine — только persist в store`() = runTest {
+        val bridge = FakeUrnetworkBridge()
+        val store = FakeUrnetworkConfigStore()
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, idleTunnel())
+        vm.selectProvideControlMode(UrnetworkProvideControlMode.AUTO)
+        advanceUntilIdle()
+        assertEquals(UrnetworkProvideControlMode.AUTO, store.provideControlMode().first())
+        assertNull(bridge.lastProvideControlMode, "bridge не должен трогаться при idle engine")
+    }
+
+    @Test
+    fun `selectProvideNetworkMode сохраняет в configStore и применяет к bridge при active engine`() = runTest {
+        val bridge = FakeUrnetworkBridge()
+        val store = FakeUrnetworkConfigStore()
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel())
+        vm.selectProvideNetworkMode(UrnetworkProvideNetworkMode.ALL)
+        advanceUntilIdle()
+        assertEquals(UrnetworkProvideNetworkMode.ALL, store.provideNetworkMode().first())
+        assertEquals(UrnetworkProvideNetworkMode.ALL, bridge.lastProvideNetworkMode)
+    }
+
+    @Test
+    fun `selectProvideNetworkMode не вызывает bridge при idle engine — только persist в store`() = runTest {
+        val bridge = FakeUrnetworkBridge()
+        val store = FakeUrnetworkConfigStore()
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, idleTunnel())
+        vm.selectProvideNetworkMode(UrnetworkProvideNetworkMode.ALL)
+        advanceUntilIdle()
+        assertEquals(UrnetworkProvideNetworkMode.ALL, store.provideNetworkMode().first())
+        assertNull(bridge.lastProvideNetworkMode, "bridge не должен трогаться при idle engine")
     }
 
     @Test
@@ -342,6 +388,16 @@ private class FakeUrnetworkConfigStore : UrnetworkConfigStore {
     override suspend fun setFixedIpSize(value: Boolean) {
         fixedIp.value = value
     }
+    private val provideControl = kotlinx.coroutines.flow.MutableStateFlow(UrnetworkProvideControlMode.ALWAYS)
+    private val provideNetwork = kotlinx.coroutines.flow.MutableStateFlow(UrnetworkProvideNetworkMode.WIFI)
+    override fun provideControlMode(): kotlinx.coroutines.flow.Flow<UrnetworkProvideControlMode> = provideControl
+    override suspend fun setProvideControlMode(value: UrnetworkProvideControlMode) {
+        provideControl.value = value
+    }
+    override fun provideNetworkMode(): kotlinx.coroutines.flow.Flow<UrnetworkProvideNetworkMode> = provideNetwork
+    override suspend fun setProvideNetworkMode(value: UrnetworkProvideNetworkMode) {
+        provideNetwork.value = value
+    }
 }
 
 private data class FakeLocationToken(override val countryCode: String?) : UrnetworkSdkBridge.LocationToken
@@ -371,6 +427,14 @@ private class FakeUrnetworkBridge(
     override fun applyPerformanceProfile(windowType: UrnetworkWindowType, fixedIpSize: Boolean) {
         lastAppliedWindowType = windowType
         lastAppliedFixedIp = fixedIpSize
+    }
+    var lastProvideControlMode: UrnetworkProvideControlMode? = null
+    override fun setProvideControlMode(mode: UrnetworkProvideControlMode) {
+        lastProvideControlMode = mode
+    }
+    var lastProvideNetworkMode: UrnetworkProvideNetworkMode? = null
+    override fun setProvideNetworkMode(mode: UrnetworkProvideNetworkMode) {
+        lastProvideNetworkMode = mode
     }
     override fun setProvidePaused(paused: Boolean) = Unit
     override fun isProvidePaused(): Boolean = true
