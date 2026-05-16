@@ -4,7 +4,6 @@ import android.content.Intent
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.os.Process
-import android.util.Log
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,7 +28,6 @@ fun interface ProcessKiller {
 }
 
 @AndroidEntryPoint
-@Suppress("TooManyFunctions", "LargeClass")
 class OzeroVpnService : android.net.VpnService() {
 
     @Inject lateinit var chainOrchestrator: ChainOrchestrator
@@ -113,6 +111,42 @@ class OzeroVpnService : android.net.VpnService() {
             stopVpnRequest = { stopVpn() },
         )
     }
+    private val shutdownCoord by lazy {
+        ShutdownCoordinator(
+            scope = serviceScope,
+            deps = ShutdownCollaborators(
+                tunnelController = tunnelController,
+                healthMonitor = healthMonitor,
+                chainOrchestrator = chainOrchestrator,
+                tunnelGateway = tunnelGateway,
+                statsLogger = statsLogger,
+                engineWatchdog = engineWatchdog,
+                sessionStatsRecorder = sessionStatsRecorder,
+            ),
+            state = ShutdownState(
+                tunFdRef = tunFdRef,
+                tunIfaceNameRef = tunIfaceNameRef,
+                lockdownStartupFdRef = lockdownStartupFdRef,
+                sessionStartMsRef = sessionStartMsRef,
+                sessionIdRef = sessionIdRef,
+                startJobRef = startJobRef,
+                shutdownJobRef = shutdownJobRef,
+                starting = starting,
+                stopping = stopping,
+                stopSignal = stopSignal,
+            ),
+            latestStartIdProvider = { latestStartId.get() },
+            stopForegroundRequest = {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                } else {
+                    @Suppress("DEPRECATION")
+                    stopForeground(true)
+                }
+            },
+            stopSelfRequest = { id -> stopSelf(id) },
+        )
+    }
 
     companion object {
         const val ACTION_START = "ru.ozero.vpn.ACTION_START"
@@ -123,7 +157,6 @@ class OzeroVpnService : android.net.VpnService() {
         const val TUN_PREFIX_LENGTH_V6 = TunBuilderHelper.TUN_PREFIX_LENGTH_V6
         val TUN_DNS_SERVERS: List<String> = TunBuilderHelper.TUN_DNS_SERVERS
         private const val TAG = "OzeroVpnService"
-        private const val PARALLEL_STOP_TIMEOUT_MS = 4_000L
         private const val SHUTDOWN_JOIN_TIMEOUT_MS = 7_000L
         private const val ON_DESTROY_SHUTDOWN_TIMEOUT_MS = 5_000L
     }
@@ -235,100 +268,7 @@ class OzeroVpnService : android.net.VpnService() {
         }.getOrDefault("")
     }
 
-    private fun stopVpn() {
-        if (!stopping.compareAndSet(false, true)) return
-        stopSignal.set(true)
-        PersistentLoggers.info(TAG, "stopVpn entry")
-        runCatching { tunnelController.onKillswitchReleased() }
-        val priorState = tunnelController.state.value
-        tunnelController.onDisconnecting()
-        startJobRef.getAndSet(null)?.cancel()
-        statsLogger.cancel()
-        engineWatchdog.cancelWatchers()
-        lockdownStartupFdRef.getAndSet(null)?.runCatching { close() }
-        runCatching { healthMonitor.stop() }
-        val endStatus = if (priorState is TunnelState.Failed) {
-            SessionStatsRecorder.Status.FAILED
-        } else {
-            SessionStatsRecorder.Status.DISCONNECTED
-        }
-        recordSessionEnd(endStatus)
-        val job = serviceScope.launch { performShutdown() }
-        shutdownJobRef.set(job)
-    }
-
-    private fun recordSessionEnd(status: SessionStatsRecorder.Status) {
-        val id = sessionIdRef.getAndSet(-1L)
-        if (id < 0) return
-        val startMs = sessionStartMsRef.getAndSet(0L)
-        val nowMs = System.currentTimeMillis()
-        val durationMs = if (startMs > 0L) (nowMs - startMs).coerceAtLeast(0L) else 0L
-        val lastStats = tunnelController.stats.value
-        val rxBytes = lastStats?.rxBytes ?: 0L
-        val txBytes = lastStats?.txBytes ?: 0L
-        serviceScope.launch {
-            runCatching {
-                sessionStatsRecorder.endSession(
-                    id = id,
-                    endedAt = nowMs,
-                    rxBytes = rxBytes,
-                    txBytes = txBytes,
-                    durationMs = durationMs,
-                    status = status,
-                )
-            }.onFailure { PersistentLoggers.warn(TAG, "endSession threw: ${it.message}") }
-        }
-    }
-
-    private suspend fun performShutdown(callStopSelf: Boolean = true) {
-        PersistentLoggers.info(TAG, "performShutdown begin")
-        try {
-            statsLogger.cancel()
-
-            val chainStopJob = serviceScope.launch {
-                runCatching { chainOrchestrator.stop() }
-                    .onFailure { PersistentLoggers.warn(TAG, "chainOrchestrator.stop threw: ${it.message}") }
-            }
-            val nativeStopThread = Thread({
-                runCatching { tunnelGateway.stop() }
-                    .onFailure { PersistentLoggers.warn(TAG, "tunnelGateway.stop threw: ${it.message}") }
-            }, "ozero-native-stop").also {
-                it.isDaemon = true
-                it.start()
-            }
-            val stopStart = System.currentTimeMillis()
-            val chainOk = withTimeoutOrNull(PARALLEL_STOP_TIMEOUT_MS) { chainStopJob.join() }
-            if (chainOk == null) {
-                PersistentLoggers.warn(TAG, "chainOrchestrator.stop hung > ${PARALLEL_STOP_TIMEOUT_MS}ms")
-            } else {
-                Log.i(TAG, "chainOrchestrator.stop completed")
-            }
-            val remaining = maxOf(0L, PARALLEL_STOP_TIMEOUT_MS - (System.currentTimeMillis() - stopStart))
-            nativeStopThread.join(remaining)
-            if (nativeStopThread.isAlive) {
-                PersistentLoggers.warn(TAG, "native tunnel stop hung — abandon thread")
-            } else {
-                Log.i(TAG, "native tunnel stop completed")
-            }
-
-            runCatching { tunFdRef.getAndSet(null)?.close() }
-                .onFailure { PersistentLoggers.warn(TAG, "tunFd.close threw: ${it.message}") }
-        } finally {
-            tunnelController.reset()
-            starting.set(false)
-            stopping.set(false)
-            stopSignal.set(false)
-            tunIfaceNameRef.set(null)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                stopForeground(STOP_FOREGROUND_REMOVE)
-            } else {
-                @Suppress("DEPRECATION")
-                stopForeground(true)
-            }
-            if (callStopSelf) stopSelf(latestStartId.get())
-            PersistentLoggers.info(TAG, "performShutdown end")
-        }
-    }
+    private fun stopVpn() = shutdownCoord.stopVpn()
 
     override fun onRevoke() {
         PersistentLoggers.warn(TAG, "onRevoke — VPN permission revoked")
@@ -340,7 +280,9 @@ class OzeroVpnService : android.net.VpnService() {
         PersistentLoggers.info(TAG, "onDestroy entry")
         if (stopping.compareAndSet(false, true)) {
             runBlocking(Dispatchers.IO) {
-                val ok = withTimeoutOrNull(ON_DESTROY_SHUTDOWN_TIMEOUT_MS) { performShutdown(callStopSelf = false) }
+                val ok = withTimeoutOrNull(ON_DESTROY_SHUTDOWN_TIMEOUT_MS) {
+                    shutdownCoord.performShutdown(callStopSelf = false)
+                }
                 if (ok == null) {
                     PersistentLoggers.warn(
                         TAG,

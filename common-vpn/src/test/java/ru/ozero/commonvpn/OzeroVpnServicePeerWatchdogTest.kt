@@ -27,13 +27,20 @@ class OzeroVpnServicePeerWatchdogTest {
         f.readText()
     }
 
+    private val shutdownSource by lazy {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/ShutdownCoordinator.kt")
+        assertTrue(f.exists(), "ShutdownCoordinator.kt не найден: $f")
+        f.readText()
+    }
+
     @Test
     fun `anchors — все функции-границы существуют в источнике`() {
         listOf(
-            "private fun stopVpn",
-            "private fun recordSessionEnd",
+            "fun stopVpn(",
+            "private fun recordSessionEnd(",
         ).forEach { anchor ->
-            assertTrue(serviceSource.contains(anchor), "Anchor потерян в OzeroVpnService.kt: '$anchor'")
+            assertTrue(shutdownSource.contains(anchor), "Anchor потерян в ShutdownCoordinator.kt: '$anchor'")
         }
         listOf(
             "suspend fun run()",
@@ -104,11 +111,11 @@ class OzeroVpnServicePeerWatchdogTest {
 
     @Test
     fun `cancelWatchers вызывается из stopVpn`() {
-        val body = serviceSource
-            .substringAfter("private fun stopVpn")
-            .substringBefore("private fun recordSessionEnd")
+        val body = shutdownSource
+            .substringAfter("fun stopVpn(")
+            .substringBefore("suspend fun performShutdown(")
         assertTrue(
-            body.contains("engineWatchdog.cancelWatchers()"),
+            body.contains("deps.engineWatchdog.cancelWatchers()"),
             "stopVpn обязан вызвать engineWatchdog.cancelWatchers() — иначе watcher jobs утекут. Body:\n$body",
         )
     }

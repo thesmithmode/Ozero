@@ -35,6 +35,13 @@ class OzeroVpnServiceLifecycleTest {
         f.readText()
     }
 
+    private val shutdownSource by lazy {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/ShutdownCoordinator.kt")
+        assertTrue(f.exists(), "ShutdownCoordinator.kt не найден: $f")
+        f.readText()
+    }
+
     @Test
     fun `onCreate переопределён и вызывает super`() {
         assertTrue(source.contains("override fun onCreate()"))
@@ -105,8 +112,8 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `performShutdown stop order — chainOrchestrator ПЕРЕД tunnelGateway`() {
-        val body = source.substringAfter("private suspend fun performShutdown(")
-            .substringBefore("override fun onRevoke()")
+        val body = shutdownSource.substringAfter("suspend fun performShutdown(")
+            .substringBefore("private fun recordSessionEnd(")
         val chainIdx = body.indexOf("chainOrchestrator.stop()")
         val nativeIdx = body.indexOf("tunnelGateway.stop()")
         assertTrue(
@@ -120,10 +127,10 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `performShutdown закрывает TUN fd ПОСЛЕ tunnelGateway_stop в finally`() {
-        val body = source.substringAfter("private suspend fun performShutdown(")
-            .substringBefore("override fun onRevoke()")
+        val body = shutdownSource.substringAfter("suspend fun performShutdown(")
+            .substringBefore("private fun recordSessionEnd(")
         val nativeIdx = body.indexOf("tunnelGateway.stop()")
-        val closeIdx = body.indexOf("tunFdRef.getAndSet(null)?.close()")
+        val closeIdx = body.indexOf("state.tunFdRef.getAndSet(null)?.close()")
         assertTrue(
             nativeIdx in 0 until closeIdx,
             "tunFd закрывается ПОСЛЕ tunnelGateway.stop() (libhev). Сначала kill byedpi → " +
@@ -133,7 +140,7 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `stopVpn не force-killит процесс`() {
-        val body = source.substringAfter("private fun stopVpn()").substringBefore("private fun recordSessionEnd")
+        val body = shutdownSource.substringAfter("fun stopVpn(").substringBefore("suspend fun performShutdown(")
         assertFalse(body.contains("processKiller.kill(Process.myPid())"))
     }
 
@@ -152,17 +159,17 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `performShutdown использует stopSelf с latestStartId — не голый stopSelf`() {
-        val body = source.substringAfter("private suspend fun performShutdown(")
-            .substringBefore("override fun onRevoke()")
+        val body = shutdownSource.substringAfter("suspend fun performShutdown(")
+            .substringBefore("private fun recordSessionEnd(")
         assertTrue(
-            body.contains("stopSelf(latestStartId.get())"),
-            "performShutdown обязан вызывать stopSelf(latestStartId.get()), а не безаргументный stopSelf(). " +
+            body.contains("stopSelfRequest(latestStartIdProvider())"),
+            "performShutdown обязан вызывать stopSelfRequest(latestStartIdProvider()), а не безаргументный. " +
                 "stopSelf(startId) — no-op если пришёл новый intents, что исключает onDestroy при engine switch. " +
                 "Голый stopSelf() безусловно планирует onDestroy → ForegroundServiceDidNotStartInTimeException.",
         )
         assertFalse(
-            body.contains(Regex("(?<!latestStartId\\.get\\(\\))\\bstopSelf\\(\\)")),
-            "performShutdown не должен содержать голый stopSelf() без аргумента",
+            body.contains(Regex("(?<!latestStartIdProvider\\(\\))\\bstopSelfRequest\\(\\)")),
+            "performShutdown не должен содержать голый stopSelfRequest() без аргумента",
         )
     }
 
@@ -170,7 +177,7 @@ class OzeroVpnServiceLifecycleTest {
     fun `onDestroy вызывает performShutdown с callStopSelf=false`() {
         val body = source.substringAfter("override fun onDestroy()").substringBefore("\n}\n")
         assertTrue(
-            body.contains("performShutdown(callStopSelf = false)"),
+            body.contains("shutdownCoord.performShutdown(callStopSelf = false)"),
             "onDestroy должен передавать callStopSelf=false — сервис уже умирает, " +
                 "второй stopSelf() из onDestroy-пути не нужен и вреден.",
         )
@@ -226,12 +233,12 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `tunIfaceNameRef сбрасывается в null в performShutdown finally`() {
-        val body = source
-            .substringAfter("private suspend fun performShutdown(")
-            .substringBefore("override fun onRevoke()")
-        val finallyBlock = body.substringAfter("} finally {").substringBefore("if (callStopSelf)")
+        val body = shutdownSource
+            .substringAfter("suspend fun performShutdown(")
+            .substringBefore("private fun recordSessionEnd(")
+        val finallyBlock = body.substringAfter("} finally {").substringBefore("companion object")
         assertTrue(
-            finallyBlock.contains("tunIfaceNameRef.set(null)"),
+            finallyBlock.contains("state.tunIfaceNameRef.set(null)"),
             "performShutdown finally обязан сбрасывать tunIfaceNameRef — иначе stale имя в новой сессии вернёт чужие байты",
         )
     }
@@ -453,13 +460,18 @@ class OzeroVpnServiceLifecycleTest {
             "private var socketProtector",
             "override fun onStartCommand",
             "private fun startVpn()",
-            "private fun stopVpn()",
-            "private suspend fun performShutdown(",
             "override fun onRevoke()",
             "override fun onDestroy()",
             "private fun engineExtras(",
         ).forEach { anchor ->
             assertTrue(source.contains(anchor), "Anchor потерян в OzeroVpnService.kt: '$anchor'")
+        }
+        listOf(
+            "fun stopVpn(",
+            "suspend fun performShutdown(",
+            "private fun recordSessionEnd(",
+        ).forEach { anchor ->
+            assertTrue(shutdownSource.contains(anchor), "Anchor потерян в ShutdownCoordinator.kt: '$anchor'")
         }
         listOf(
             "suspend fun run()",

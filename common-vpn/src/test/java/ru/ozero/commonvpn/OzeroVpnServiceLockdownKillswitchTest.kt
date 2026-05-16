@@ -34,6 +34,13 @@ class OzeroVpnServiceLockdownKillswitchTest {
         f.readText()
     }
 
+    private val shutdownSource by lazy {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/ShutdownCoordinator.kt")
+        assertTrue(f.exists(), "ShutdownCoordinator.kt не найден: $f")
+        f.readText()
+    }
+
     private val runBody by lazy {
         require("suspend fun run()" in startSequenceSource) {
             "anchor 'suspend fun run()' исчез — обнови sentinel"
@@ -56,10 +63,10 @@ class OzeroVpnServiceLockdownKillswitchTest {
             assertTrue(helperSource.contains(anchor), "Anchor потерян в TunBuilderHelper.kt: '$anchor'")
         }
         listOf(
-            "private fun stopVpn",
-            "private fun recordSessionEnd",
+            "fun stopVpn(",
+            "private fun recordSessionEnd(",
         ).forEach { anchor ->
-            assertTrue(serviceSource.contains(anchor), "Anchor потерян в OzeroVpnService.kt: '$anchor'")
+            assertTrue(shutdownSource.contains(anchor), "Anchor потерян в ShutdownCoordinator.kt: '$anchor'")
         }
         listOf(
             "suspend fun run()",
@@ -185,9 +192,9 @@ class OzeroVpnServiceLockdownKillswitchTest {
 
     @Test
     fun `lockdownStartupFdRef очищается в stopVpn`() {
-        val body = serviceSource
-            .substringAfter("private fun stopVpn")
-            .substringBefore("private fun recordSessionEnd")
+        val body = shutdownSource
+            .substringAfter("fun stopVpn(")
+            .substringBefore("suspend fun performShutdown(")
         assertTrue(
             body.contains("lockdownStartupFdRef.getAndSet(null)"),
             "stopVpn обязан закрывать lockdownStartupFdRef — иначе fd утечёт при остановке VPN до старта движка.",
