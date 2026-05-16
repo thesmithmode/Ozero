@@ -14,6 +14,20 @@ class OzeroVpnServiceIpv6BlackholeTest {
     }
 
     @Test
+    fun `anchors — все функции-границы существуют в источнике`() {
+        listOf(
+            "private fun blackholeIpv6",
+            "internal fun buildTunBuilder",
+            "private fun buildNotification",
+            "internal fun applyEngineTunSpec",
+            "private suspend fun establishTunForEngine",
+            "private fun captureTunIfaceName",
+        ).forEach { anchor ->
+            assertTrue(source.contains(anchor), "Anchor потерян в OzeroVpnService.kt: '$anchor'")
+        }
+    }
+
+    @Test
     fun `blackholeIpv6 helper существует и добавляет address+route`() {
         assertTrue(
             source.contains("private fun blackholeIpv6"),

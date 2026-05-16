@@ -55,6 +55,18 @@ class OzeroVpnServiceIpv6Test {
     }
 
     @Test
+    fun `anchors — все функции-границы существуют в источнике`() {
+        listOf(
+            "internal fun buildTunBuilder",
+            "private fun buildNotification",
+            "private fun startVpn()",
+            "private fun stopVpn()",
+        ).forEach { anchor ->
+            assertTrue(source.contains(anchor), "Anchor потерян в OzeroVpnService.kt: '$anchor'")
+        }
+    }
+
+    @Test
     fun `OzeroVpnService инжектит SettingsRepository`() {
         assertTrue(
             source.contains("@Inject lateinit var settingsRepository"),

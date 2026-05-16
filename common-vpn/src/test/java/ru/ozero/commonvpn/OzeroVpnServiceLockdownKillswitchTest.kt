@@ -14,6 +14,24 @@ class OzeroVpnServiceLockdownKillswitchTest {
     }
 
     @Test
+    fun `anchors — все функции-границы существуют в источнике`() {
+        listOf(
+            "private fun applyLockdown",
+            "private fun blackholeIpv6",
+            "internal fun applyEngineTunSpec",
+            "internal fun buildTunBuilder",
+            "private fun buildNotification",
+            "private suspend fun runStartSequence",
+            "private fun startHealthKillswitchWatcher",
+            "private fun enterKillswitchMode",
+            "private fun stopVpn",
+            "private fun recordSessionEnd",
+        ).forEach { anchor ->
+            assertTrue(source.contains(anchor), "Anchor потерян в OzeroVpnService.kt: '$anchor'")
+        }
+    }
+
+    @Test
     fun `applyLockdown существует и вызывает setUnderlyingNetworks null`() {
         assertTrue(
             source.contains("private fun applyLockdown"),

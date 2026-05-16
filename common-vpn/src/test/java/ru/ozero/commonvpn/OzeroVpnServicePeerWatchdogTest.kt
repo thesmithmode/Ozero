@@ -14,6 +14,21 @@ class OzeroVpnServicePeerWatchdogTest {
     }
 
     @Test
+    fun `anchors — все функции-границы существуют в источнике`() {
+        listOf(
+            "private suspend fun runStartSequence",
+            "private fun startHealthKillswitchWatcher",
+            "private fun enterKillswitchMode",
+            "private fun stopVpn",
+            "private fun recordSessionEnd",
+            "private fun startPeerWatchdog",
+            "private suspend fun engineNeedsCustomTun",
+        ).forEach { anchor ->
+            assertTrue(source.contains(anchor), "Anchor потерян в OzeroVpnService.kt: '$anchor'")
+        }
+    }
+
+    @Test
     fun `peerWatchJobRef объявлен в сервисе`() {
         assertTrue(
             source.contains("peerWatchJobRef"),

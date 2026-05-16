@@ -411,6 +411,35 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
+    fun `anchors — все функции-границы существуют в источнике`() {
+        listOf(
+            "override fun onCreate()",
+            "private val tunFdRef",
+            "override fun onStartCommand",
+            "private fun startVpn()",
+            "private fun stopVpn()",
+            "private suspend fun performShutdown(",
+            "internal fun buildTunBuilder",
+            "private fun buildNotification",
+            "override fun onRevoke()",
+            "override fun onDestroy()",
+            "private fun enterForegroundOrLog",
+            "private suspend fun engineNeedsCustomTun",
+            "private fun startStatsLogger()",
+            "private fun updateNotificationWithStats",
+            "private suspend fun runStartSequence()",
+            "private suspend fun pickAutoCandidateWithPreflight",
+            "private fun autoCandidates",
+            "private fun pickActiveEngine(",
+            "private fun establishTun(",
+            "private suspend fun establishTunForEngine(",
+            "internal fun applyEngineTunSpec",
+        ).forEach { anchor ->
+            assertTrue(source.contains(anchor), "Anchor потерян в OzeroVpnService.kt: '$anchor'")
+        }
+    }
+
+    @Test
     fun `establishTunForEngine excludeSelf true для всех движков без исключений`() {
         val body = source
             .substringAfter("private suspend fun establishTunForEngine(")
