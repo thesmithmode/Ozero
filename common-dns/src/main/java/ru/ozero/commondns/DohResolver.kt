@@ -24,10 +24,20 @@ class DohResolver(
 ) {
 
     suspend fun resolve(hostname: String): DohResult =
-        execute(DnsMessage.buildAQuery(hostname), parseV6 = false)
+        buildOrFail(hostname) { DnsMessage.buildAQuery(it) }?.let { execute(it, parseV6 = false) }
+            ?: DohResult.Failure("invalid hostname")
 
     suspend fun resolveAAAA(hostname: String): DohResult =
-        execute(DnsMessage.buildAAAAQuery(hostname), parseV6 = true)
+        buildOrFail(hostname) { DnsMessage.buildAAAAQuery(it) }?.let { execute(it, parseV6 = true) }
+            ?: DohResult.Failure("invalid hostname")
+
+    private fun buildOrFail(hostname: String, builder: (String) -> ByteArray): ByteArray? =
+        try {
+            builder(hostname)
+        } catch (e: IllegalArgumentException) {
+            PersistentLoggers.warn(TAG, "DoH invalid hostname: ${e.message}")
+            null
+        }
 
     private suspend fun execute(query: ByteArray, parseV6: Boolean): DohResult = withContext(Dispatchers.IO) {
         Log.i(TAG, "resolve via $endpoint v6=$parseV6")

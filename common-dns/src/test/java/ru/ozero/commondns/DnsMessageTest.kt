@@ -61,4 +61,33 @@ class DnsMessageTest {
         )
         assertTrue(DnsMessage.parseAAnswers(body).isEmpty())
     }
+
+    @Test
+    fun `buildAQuery бросает IllegalArgumentException на label > 63 байт`() {
+        val tooLong = "a".repeat(64) + ".com"
+        val e = kotlin.runCatching { DnsMessage.buildAQuery(tooLong) }.exceptionOrNull()
+        assertTrue(e is IllegalArgumentException, "ожидалась IllegalArgumentException, был: $e")
+        assertTrue(e!!.message?.contains("label") == true, "msg: ${e.message}")
+    }
+
+    @Test
+    fun `buildAQuery accept ровно 63 байта label — RFC 1035 boundary`() {
+        val ok = "a".repeat(63) + ".com"
+        DnsMessage.buildAQuery(ok)
+    }
+
+    @Test
+    fun `buildAQuery бросает на total name > 255 байт`() {
+        val labels = generateSequence { "a".repeat(50) }.take(6).joinToString(".")
+        val e = kotlin.runCatching { DnsMessage.buildAQuery(labels) }.exceptionOrNull()
+        assertTrue(e is IllegalArgumentException, "ожидалась IllegalArgumentException, был: $e")
+        assertTrue(e!!.message?.contains("имя") == true, "msg: ${e.message}")
+    }
+
+    @Test
+    fun `buildAQuery бросает на пустой hostname`() {
+        val e = kotlin.runCatching { DnsMessage.buildAQuery("") }.exceptionOrNull()
+        assertTrue(e is IllegalArgumentException)
+    }
+
 }
