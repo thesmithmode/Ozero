@@ -13,6 +13,13 @@ class OzeroVpnServicePeerWatchdogTest {
         f.readText()
     }
 
+    private val startSequenceSource by lazy {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/StartSequenceCoordinator.kt")
+        assertTrue(f.exists(), "StartSequenceCoordinator.kt не найден: $f")
+        f.readText()
+    }
+
     private val watchdogSource by lazy {
         val moduleRoot = File(System.getProperty("user.dir") ?: ".")
         val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/EngineWatchdogCoordinator.kt")
@@ -23,12 +30,20 @@ class OzeroVpnServicePeerWatchdogTest {
     @Test
     fun `anchors — все функции-границы существуют в источнике`() {
         listOf(
-            "private suspend fun runStartSequence",
             "private fun stopVpn",
             "private fun recordSessionEnd",
-            "private suspend fun engineNeedsCustomTun",
         ).forEach { anchor ->
             assertTrue(serviceSource.contains(anchor), "Anchor потерян в OzeroVpnService.kt: '$anchor'")
+        }
+        listOf(
+            "suspend fun run()",
+            "private suspend fun readSplitConfig",
+            "suspend fun engineNeedsCustomTun",
+        ).forEach { anchor ->
+            assertTrue(
+                startSequenceSource.contains(anchor),
+                "Anchor потерян в StartSequenceCoordinator.kt: '$anchor'",
+            )
         }
         listOf(
             "fun startHealthKillswitchWatcher(",
@@ -58,9 +73,9 @@ class OzeroVpnServicePeerWatchdogTest {
 
     @Test
     fun `startPeerWatchdog запускается только для usesCustomTun`() {
-        val body = serviceSource
-            .substringAfter("private suspend fun runStartSequence")
-            .substringBefore("private suspend fun readSplitConfig")
+        val body = startSequenceSource
+            .substringAfter("suspend fun run()")
+            .substringBefore("suspend fun engineNeedsCustomTun")
         assertTrue(
             body.contains("usesCustomTun") && body.contains("startPeerWatchdog"),
             "startPeerWatchdog обязан вызываться условно по usesCustomTun — " +

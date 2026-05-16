@@ -13,6 +13,13 @@ class OzeroVpnServiceLockdownKillswitchTest {
         f.readText()
     }
 
+    private val startSequenceSource by lazy {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/StartSequenceCoordinator.kt")
+        assertTrue(f.exists(), "StartSequenceCoordinator.kt не найден: $f")
+        f.readText()
+    }
+
     private val helperSource by lazy {
         val moduleRoot = File(System.getProperty("user.dir") ?: ".")
         val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/TunBuilderHelper.kt")
@@ -27,6 +34,17 @@ class OzeroVpnServiceLockdownKillswitchTest {
         f.readText()
     }
 
+    private val runBody by lazy {
+        require("suspend fun run()" in startSequenceSource) {
+            "anchor 'suspend fun run()' исчез — обнови sentinel"
+        }
+        require("suspend fun engineNeedsCustomTun" in startSequenceSource) {
+            "anchor 'suspend fun engineNeedsCustomTun' исчез — обнови sentinel"
+        }
+        startSequenceSource.substringAfter("suspend fun run()")
+            .substringBefore("suspend fun engineNeedsCustomTun")
+    }
+
     @Test
     fun `anchors — функции-границы существуют`() {
         listOf(
@@ -38,11 +56,18 @@ class OzeroVpnServiceLockdownKillswitchTest {
             assertTrue(helperSource.contains(anchor), "Anchor потерян в TunBuilderHelper.kt: '$anchor'")
         }
         listOf(
-            "private suspend fun runStartSequence",
             "private fun stopVpn",
             "private fun recordSessionEnd",
         ).forEach { anchor ->
             assertTrue(serviceSource.contains(anchor), "Anchor потерян в OzeroVpnService.kt: '$anchor'")
+        }
+        listOf(
+            "suspend fun run()",
+        ).forEach { anchor ->
+            assertTrue(
+                startSequenceSource.contains(anchor),
+                "Anchor потерян в StartSequenceCoordinator.kt: '$anchor'",
+            )
         }
         listOf(
             "fun startHealthKillswitchWatcher(",
@@ -96,13 +121,10 @@ class OzeroVpnServiceLockdownKillswitchTest {
     }
 
     @Test
-    fun `runStartSequence запускает health killswitch watcher`() {
-        val body = serviceSource
-            .substringAfter("private suspend fun runStartSequence")
-            .substringBefore("private suspend fun readSplitConfig")
+    fun `StartSequenceCoordinator run запускает health killswitch watcher`() {
         assertTrue(
-            body.contains("engineWatchdog.startHealthKillswitchWatcher("),
-            "runStartSequence обязан стартовать health watcher — иначе HealthMonitor.DEGRADED " +
+            runBody.contains("engineWatchdog.startHealthKillswitchWatcher("),
+            "run обязан стартовать health watcher — иначе HealthMonitor.DEGRADED " +
                 "не триггерит killswitch и движок продолжает «бутафорное» состояние.",
         )
     }
@@ -136,14 +158,11 @@ class OzeroVpnServiceLockdownKillswitchTest {
     }
 
     @Test
-    fun `lockdownStartupTun устанавливается до выбора движка в runStartSequence`() {
-        val body = serviceSource
-            .substringAfter("private suspend fun runStartSequence")
-            .substringBefore("private fun startHealthKillswitchWatcher")
-        val lockdownIdx = body.indexOf("lockdownStartupFdRef.set")
-        val pickIdx = body.indexOf("pickAutoCandidateWithPreflight")
-        assertTrue(lockdownIdx >= 0, "lockdownStartupFdRef.set не найден в runStartSequence. Body:\n$body")
-        assertTrue(pickIdx >= 0, "pickAutoCandidateWithPreflight не найден в runStartSequence. Body:\n$body")
+    fun `lockdownStartupTun устанавливается до выбора движка в StartSequenceCoordinator run`() {
+        val lockdownIdx = runBody.indexOf("lockdownStartupFdRef.set")
+        val pickIdx = runBody.indexOf("pickAutoCandidateWithPreflight")
+        assertTrue(lockdownIdx >= 0, "lockdownStartupFdRef.set не найден в run. Body:\n$runBody")
+        assertTrue(pickIdx >= 0, "pickAutoCandidateWithPreflight не найден в run. Body:\n$runBody")
         assertTrue(
             lockdownIdx < pickIdx,
             "lockdownStartupFdRef.set обязан быть РАНЬШЕ pickAutoCandidateWithPreflight — " +
@@ -152,14 +171,11 @@ class OzeroVpnServiceLockdownKillswitchTest {
     }
 
     @Test
-    fun `lockdownStartupFdRef закрывается после установки реального TUN в runStartSequence`() {
-        val body = serviceSource
-            .substringAfter("private suspend fun runStartSequence")
-            .substringBefore("private fun startHealthKillswitchWatcher")
-        val establishIdx = body.indexOf("establishTun")
-        val clearIdx = body.indexOf("lockdownStartupFdRef.getAndSet(null)")
-        assertTrue(establishIdx >= 0, "establishTun не найден в runStartSequence. Body:\n$body")
-        assertTrue(clearIdx >= 0, "lockdownStartupFdRef.getAndSet(null) не найден в runStartSequence.")
+    fun `lockdownStartupFdRef закрывается после установки реального TUN в StartSequenceCoordinator run`() {
+        val establishIdx = runBody.indexOf("establishTun")
+        val clearIdx = runBody.indexOf("lockdownStartupFdRef.getAndSet(null)")
+        assertTrue(establishIdx >= 0, "establishTun не найден в run. Body:\n$runBody")
+        assertTrue(clearIdx >= 0, "lockdownStartupFdRef.getAndSet(null) не найден в run.")
         assertTrue(
             clearIdx > establishIdx,
             "lockdownStartupFdRef должен очищаться ПОСЛЕ establish реального TUN. " +

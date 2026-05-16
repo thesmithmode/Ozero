@@ -6,12 +6,12 @@ import kotlin.test.assertTrue
 
 class SplitTunnelVpnServiceSentinelTest {
 
-    private val serviceSource by lazy {
+    private val startSequenceSource by lazy {
         val f = File(
             System.getProperty("user.dir") ?: ".",
-            "src/main/java/ru/ozero/commonvpn/OzeroVpnService.kt",
+            "src/main/java/ru/ozero/commonvpn/StartSequenceCoordinator.kt",
         )
-        assertTrue(f.exists(), "OzeroVpnService.kt не найден: $f")
+        assertTrue(f.exists(), "StartSequenceCoordinator.kt не найден: $f")
         f.readText()
     }
 
@@ -25,24 +25,24 @@ class SplitTunnelVpnServiceSentinelTest {
     }
 
     private val readSplitConfigBlock by lazy {
-        require("private suspend fun readSplitConfig(" in serviceSource) {
+        require("private suspend fun readSplitConfig(" in startSequenceSource) {
             "anchor 'private suspend fun readSplitConfig(' исчез — обнови sentinel"
         }
-        require("private suspend fun awaitEngineReady(" in serviceSource) {
+        require("private suspend fun awaitEngineReady(" in startSequenceSource) {
             "anchor 'private suspend fun awaitEngineReady(' исчез — обнови sentinel"
         }
-        serviceSource.substringAfter("private suspend fun readSplitConfig(")
+        startSequenceSource.substringAfter("private suspend fun readSplitConfig(")
             .substringBefore("private suspend fun awaitEngineReady(")
     }
 
     private val tunBlock by lazy {
-        require("private suspend fun establishTunForEngine(" in serviceSource) {
+        require("private suspend fun establishTunForEngine(" in startSequenceSource) {
             "anchor 'private suspend fun establishTunForEngine(' исчез — обнови sentinel"
         }
-        require("private fun captureTunIfaceName(" in serviceSource) {
+        require("private fun captureTunIfaceName(" in startSequenceSource) {
             "anchor 'private fun captureTunIfaceName(' исчез — обнови sentinel"
         }
-        serviceSource.substringAfter("private suspend fun establishTunForEngine(")
+        startSequenceSource.substringAfter("private suspend fun establishTunForEngine(")
             .substringBefore("private fun captureTunIfaceName(")
     }
 
