@@ -26,6 +26,19 @@ class TrafficStatsCardSentinelTest {
     }
 
     @Test
+    fun `TrafficStatsCard LaunchedEffect выходит когда sessionStartMs lt eq 0 — нет idle recompose 1Hz`() {
+        val card = source.substringAfter("private fun TrafficStatsCard(")
+            .substringBefore("private fun ", missingDelimiterValue = source)
+        val effectBlock = card.substringAfter("LaunchedEffect(sessionStartMs)")
+            .substringBefore("}\n", missingDelimiterValue = card)
+        assertTrue(
+            effectBlock.contains("if (sessionStartMs <= 0L) return@LaunchedEffect"),
+            "LaunchedEffect обязан early-return при sessionStartMs<=0L — иначе 1Hz nowMs recompose " +
+                "крутится впустую вне активной сессии и жжёт батарею. Block:\n${effectBlock.take(400)}",
+        )
+    }
+
+    @Test
     fun `главный экран рендерит TrafficStatsCard без gate stats != null`() {
         val expertBlock = source.substringAfter("ExpertMainContent")
             .substringBefore("@Composable\nprivate fun TrafficStatsCard(")

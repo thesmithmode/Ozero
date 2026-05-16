@@ -505,6 +505,7 @@ private fun TrafficStatsCard(
     val sessionStartMs = stats?.sessionStartMs ?: 0L
     var nowMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(sessionStartMs) {
+        if (sessionStartMs <= 0L) return@LaunchedEffect
         while (true) {
             nowMs = System.currentTimeMillis()
             delay(1_000)
