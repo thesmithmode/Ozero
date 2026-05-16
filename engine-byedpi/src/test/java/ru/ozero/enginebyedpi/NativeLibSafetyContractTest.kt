@@ -63,26 +63,28 @@ class NativeLibSafetyContractTest {
     @Test
     fun `JNI ExceptionCheck после GetObjectArrayElement`() {
         val pattern = Regex(
-            """GetObjectArrayElement\(env,\s*args,\s*i\)\s*;[^}]*ExceptionCheck\(env\)""",
+            """GetObjectArrayElement\(env,\s*args,\s*i\)\s*;\s*if\s*\(\s*\(\*env\)->ExceptionCheck\(env\)""",
             RegexOption.DOT_MATCHES_ALL,
         )
         assertTrue(
             pattern.containsMatchIn(nativeLib),
-            "После GetObjectArrayElement обязан быть ExceptionCheck — pending JNI exception " +
-                "(ArrayIndexOutOfBoundsException, OOM) приведёт к misbehavior в main() если игнорировать.",
+            "После GetObjectArrayElement обязан быть ExceptionCheck как ПЕРВЫЙ оператор — " +
+                "pending JNI exception (ArrayIndexOutOfBoundsException, OOM) приведёт к " +
+                "misbehavior в main() если пропустить. Паттерн: только whitespace между ; и if(ExceptionCheck).",
         )
     }
 
     @Test
     fun `JNI ExceptionCheck после GetStringUTFChars`() {
         val pattern = Regex(
-            """GetStringUTFChars\(env,\s*arg,\s*0\)\s*;[^}]*ExceptionCheck\(env\)""",
+            """GetStringUTFChars\(env,\s*arg,\s*0\)\s*;\s*if\s*\(\s*\(\*env\)->ExceptionCheck\(env\)""",
             RegexOption.DOT_MATCHES_ALL,
         )
         assertTrue(
             pattern.containsMatchIn(nativeLib),
-            "После GetStringUTFChars обязан быть ExceptionCheck — pending OOM exception " +
-                "в JNI не вернёт control в Java сразу, main() запустится в broken state.",
+            "После GetStringUTFChars обязан быть ExceptionCheck как ПЕРВЫЙ оператор — " +
+                "pending OOM exception в JNI не вернёт control в Java сразу, " +
+                "main() запустится в broken state. Паттерн: только whitespace между ; и if(ExceptionCheck).",
         )
     }
 
@@ -139,9 +141,11 @@ class NativeLibSafetyContractTest {
         ).find(nativeLib)?.groupValues?.get(1)
             ?: error("jniStartProxy не найден в native-lib.c")
 
+        val blockingCalls = listOf("usleep", "nanosleep", "sched_yield", "pthread_yield", "sleep(")
+        val violations = blockingCalls.filter { startBody.contains(it) }
         assertTrue(
-            !startBody.contains("usleep"),
-            "jniStartProxy НЕ должен делать blocking usleep — Kotlin coroutine на " +
+            violations.isEmpty(),
+            "jniStartProxy НЕ должен делать blocking spin: $violations — Kotlin coroutine на " +
                 "limitedParallelism(1) dispatcher не сможет дождаться отмены, и serializing " +
                 "queue застрянет на спине. Retry обязан быть в Kotlin (delay(), cooperative).",
         )
