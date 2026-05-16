@@ -102,57 +102,82 @@ fun MainScreen(
         ) { mode ->
             when (mode) {
                 AppMode.SIMPLE -> SimpleMainContent(
-                    tunnelState = state,
-                    switching = switching,
-                    powerState = powerState,
-                    isConnected = isConnected,
-                    manualEngine = manualEngine,
-                    urnetworkPeerCount = urnetworkPeerCount,
-                    urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
-                    onConnectClick = onConnectClick,
-                    onOpenSplitTunnel = onOpenSplitTunnel,
-                    onOpenSettings = onOpenSettings,
+                    state = SimpleMainState(
+                        tunnelState = state,
+                        switching = switching,
+                        powerState = powerState,
+                        isConnected = isConnected,
+                        manualEngine = manualEngine,
+                        urnetworkPeerCount = urnetworkPeerCount,
+                        urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
+                    ),
+                    callbacks = SimpleMainCallbacks(
+                        onConnectClick = onConnectClick,
+                        onOpenSplitTunnel = onOpenSplitTunnel,
+                        onOpenSettings = onOpenSettings,
+                    ),
                 )
                 AppMode.EXPERT -> ExpertMainContent(
-                    tunnelState = state,
-                    switching = switching,
-                    stats = stats,
-                    speedHistory = speedHistory,
-                    stagnant = stagnant,
-                    healthStatus = healthStatus,
-                    powerState = powerState,
-                    isConnected = isConnected,
-                    manualEngine = manualEngine,
-                    urnetworkPeerCount = urnetworkPeerCount,
-                    urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
-                    ipInfo = ipInfo,
-                    killswitchActive = killswitchActive,
-                    onConnectClick = onConnectClick,
-                    onManualEngineSelect = viewModel::onManualEngineSelect,
-                    onRefreshIpInfo = viewModel::refreshIpInfo,
-                    onOpenEngineParams = onOpenEngineParams,
-                    onOpenSplitTunnel = onOpenSplitTunnel,
-                    onOpenSettings = onOpenSettings,
+                    state = ExpertMainState(
+                        tunnelState = state,
+                        switching = switching,
+                        stats = stats,
+                        speedHistory = speedHistory,
+                        stagnant = stagnant,
+                        healthStatus = healthStatus,
+                        powerState = powerState,
+                        isConnected = isConnected,
+                        manualEngine = manualEngine,
+                        urnetworkPeerCount = urnetworkPeerCount,
+                        urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
+                        ipInfo = ipInfo,
+                        killswitchActive = killswitchActive,
+                    ),
+                    callbacks = ExpertMainCallbacks(
+                        onConnectClick = onConnectClick,
+                        onManualEngineSelect = viewModel::onManualEngineSelect,
+                        onRefreshIpInfo = viewModel::refreshIpInfo,
+                        onOpenEngineParams = onOpenEngineParams,
+                        onOpenSplitTunnel = onOpenSplitTunnel,
+                        onOpenSettings = onOpenSettings,
+                    ),
                 )
             }
         }
     }
 }
 
-@Suppress("LongParameterList")
+data class SimpleMainState(
+    val tunnelState: TunnelState,
+    val switching: SwitchingTransition?,
+    val powerState: PowerDiscState,
+    val isConnected: Boolean,
+    val manualEngine: EngineId?,
+    val urnetworkPeerCount: Int,
+    val urnetworkPeerSearchSeconds: Int,
+)
+
+data class SimpleMainCallbacks(
+    val onConnectClick: () -> Unit,
+    val onOpenSplitTunnel: () -> Unit,
+    val onOpenSettings: () -> Unit,
+)
+
 @Composable
 private fun SimpleMainContent(
-    tunnelState: TunnelState,
-    switching: SwitchingTransition?,
-    powerState: PowerDiscState,
-    isConnected: Boolean,
-    manualEngine: EngineId?,
-    urnetworkPeerCount: Int,
-    urnetworkPeerSearchSeconds: Int,
-    onConnectClick: () -> Unit,
-    onOpenSplitTunnel: () -> Unit,
-    onOpenSettings: () -> Unit,
+    state: SimpleMainState,
+    callbacks: SimpleMainCallbacks,
 ) {
+    val tunnelState = state.tunnelState
+    val switching = state.switching
+    val powerState = state.powerState
+    val isConnected = state.isConnected
+    val manualEngine = state.manualEngine
+    val urnetworkPeerCount = state.urnetworkPeerCount
+    val urnetworkPeerSearchSeconds = state.urnetworkPeerSearchSeconds
+    val onConnectClick = callbacks.onConnectClick
+    val onOpenSplitTunnel = callbacks.onOpenSplitTunnel
+    val onOpenSettings = callbacks.onOpenSettings
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -227,29 +252,55 @@ private fun UrnetworkPeerBadge(count: Int, searchSeconds: Int) {
 
 private const val URNETWORK_PEER_SEARCH_VISIBLE_THRESHOLD_S: Int = 20
 
-@Suppress("LongParameterList")
+data class ExpertMainState(
+    val tunnelState: TunnelState,
+    val switching: SwitchingTransition?,
+    val stats: TunnelStats?,
+    val speedHistory: List<Pair<Float, Float>>,
+    val stagnant: Boolean,
+    val healthStatus: HealthMonitor.Status,
+    val powerState: PowerDiscState,
+    val isConnected: Boolean,
+    val manualEngine: EngineId?,
+    val urnetworkPeerCount: Int,
+    val urnetworkPeerSearchSeconds: Int,
+    val ipInfo: IpInfoState,
+    val killswitchActive: Boolean,
+)
+
+data class ExpertMainCallbacks(
+    val onConnectClick: () -> Unit,
+    val onManualEngineSelect: (EngineId?) -> Unit,
+    val onRefreshIpInfo: () -> Unit,
+    val onOpenEngineParams: (EngineId?) -> Unit,
+    val onOpenSplitTunnel: () -> Unit,
+    val onOpenSettings: () -> Unit,
+)
+
 @Composable
 private fun ExpertMainContent(
-    tunnelState: TunnelState,
-    switching: SwitchingTransition?,
-    stats: TunnelStats?,
-    speedHistory: List<Pair<Float, Float>>,
-    stagnant: Boolean,
-    healthStatus: HealthMonitor.Status,
-    powerState: PowerDiscState,
-    isConnected: Boolean,
-    manualEngine: EngineId?,
-    urnetworkPeerCount: Int,
-    urnetworkPeerSearchSeconds: Int,
-    ipInfo: IpInfoState,
-    killswitchActive: Boolean,
-    onConnectClick: () -> Unit,
-    onManualEngineSelect: (EngineId?) -> Unit,
-    onRefreshIpInfo: () -> Unit,
-    onOpenEngineParams: (EngineId?) -> Unit,
-    onOpenSplitTunnel: () -> Unit,
-    onOpenSettings: () -> Unit,
+    state: ExpertMainState,
+    callbacks: ExpertMainCallbacks,
 ) {
+    val tunnelState = state.tunnelState
+    val switching = state.switching
+    val stats = state.stats
+    val speedHistory = state.speedHistory
+    val stagnant = state.stagnant
+    val healthStatus = state.healthStatus
+    val powerState = state.powerState
+    val isConnected = state.isConnected
+    val manualEngine = state.manualEngine
+    val urnetworkPeerCount = state.urnetworkPeerCount
+    val urnetworkPeerSearchSeconds = state.urnetworkPeerSearchSeconds
+    val ipInfo = state.ipInfo
+    val killswitchActive = state.killswitchActive
+    val onConnectClick = callbacks.onConnectClick
+    val onManualEngineSelect = callbacks.onManualEngineSelect
+    val onRefreshIpInfo = callbacks.onRefreshIpInfo
+    val onOpenEngineParams = callbacks.onOpenEngineParams
+    val onOpenSplitTunnel = callbacks.onOpenSplitTunnel
+    val onOpenSettings = callbacks.onOpenSettings
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
