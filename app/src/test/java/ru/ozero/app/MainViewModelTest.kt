@@ -105,6 +105,7 @@ class MainViewModelTest {
             supportsDoH = false,
             localOnly = true,
             requiresServer = false,
+            supportsUpstreamSocks = false,
         )
         override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult =
             StartResult.Failure("test fake")
