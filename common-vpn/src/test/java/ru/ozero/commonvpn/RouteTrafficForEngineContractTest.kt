@@ -8,8 +8,8 @@ class RouteTrafficForEngineContractTest {
 
     private val source by lazy {
         val moduleRoot = File(System.getProperty("user.dir") ?: ".")
-        val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/OzeroVpnService.kt")
-        assertTrue(f.exists(), "OzeroVpnService.kt не найден: $f")
+        val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/StartSequenceCoordinator.kt")
+        assertTrue(f.exists(), "StartSequenceCoordinator.kt не найден: $f")
         f.readText()
     }
 

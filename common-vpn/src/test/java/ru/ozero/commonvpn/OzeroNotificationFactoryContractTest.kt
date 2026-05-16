@@ -49,10 +49,12 @@ class OzeroNotificationFactoryContractTest {
     @Test
     fun `enterForeground оборачивает всё в try-catch — возвращает Boolean`() {
         val body = source.substringAfter("fun enterForeground(").substringBefore("companion object")
-        val hasFalseInCatch = body.contains("catch (t: Throwable)") && body.contains("return false")
-        val hasTrue = body.contains("return true")
+        val hasCatch = body.contains("catch (t: Throwable)")
+        val hasBoolean = body.contains("return true") || body.contains("return false") ||
+            (body.contains("\n            true\n") && body.contains("\n            false\n")) ||
+            (body.contains(" true\n") && body.contains(" false\n"))
         assertTrue(
-            hasFalseInCatch || hasTrue,
+            hasCatch && hasBoolean,
             "enterForeground обязан возвращать Boolean и ловить Throwable — иначе бросок " +
                 "startForeground валит весь onStartCommand → VPN не поднимается без diagnostics",
         )

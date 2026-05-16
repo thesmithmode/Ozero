@@ -13,15 +13,15 @@ class OzeroVpnServiceIpv6BlackholeTest {
         f.readText()
     }
 
-    private val serviceSource by lazy {
+    private val coordinatorSource by lazy {
         val moduleRoot = File(System.getProperty("user.dir") ?: ".")
-        val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/OzeroVpnService.kt")
-        assertTrue(f.exists(), "OzeroVpnService.kt не найден: $f")
+        val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/StartSequenceCoordinator.kt")
+        assertTrue(f.exists(), "StartSequenceCoordinator.kt не найден: $f")
         f.readText()
     }
 
     @Test
-    fun `anchors — функции-границы существуют в helper и сервисе`() {
+    fun `anchors — функции-границы существуют в helper и coordinator`() {
         listOf(
             "private fun blackholeIpv6",
             "fun buildTunBuilder(",
@@ -33,7 +33,10 @@ class OzeroVpnServiceIpv6BlackholeTest {
             "private suspend fun establishTunForEngine(",
             "private fun captureTunIfaceName(",
         ).forEach { anchor ->
-            assertTrue(serviceSource.contains(anchor), "Anchor потерян в OzeroVpnService.kt: '$anchor'")
+            assertTrue(
+                coordinatorSource.contains(anchor),
+                "Anchor потерян в StartSequenceCoordinator.kt: '$anchor'",
+            )
         }
     }
 
@@ -97,7 +100,7 @@ class OzeroVpnServiceIpv6BlackholeTest {
 
     @Test
     fun `establishTunForEngine принимает ipv6Enabled и пропускает в applyEngineTunSpec`() {
-        val sig = serviceSource
+        val sig = coordinatorSource
             .substringAfter("private suspend fun establishTunForEngine")
             .substringBefore("): ParcelFileDescriptor?")
         assertTrue(
@@ -105,7 +108,7 @@ class OzeroVpnServiceIpv6BlackholeTest {
             "establishTunForEngine обязан принимать ipv6Enabled чтобы WARP/URnetwork TUN " +
                 "уважал пользовательский switch IPv6.",
         )
-        val body = serviceSource
+        val body = coordinatorSource
             .substringAfter("private suspend fun establishTunForEngine")
             .substringBefore("private fun captureTunIfaceName")
         assertTrue(

@@ -13,6 +13,13 @@ class OzeroVpnServiceIpv6Test {
         f.readText()
     }
 
+    private val coordinatorSource by lazy {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/StartSequenceCoordinator.kt")
+        assertTrue(f.exists(), "StartSequenceCoordinator.kt не найден: $f")
+        f.readText()
+    }
+
     private val helperSource by lazy {
         val moduleRoot = File(System.getProperty("user.dir") ?: ".")
         val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/TunBuilderHelper.kt")
@@ -50,15 +57,15 @@ class OzeroVpnServiceIpv6Test {
     }
 
     @Test
-    fun `startVpn читает ipv6Enabled из settingsRepository перед buildTunBuilder`() {
-        val body = serviceSource.substringAfter("private fun startVpn()").substringBefore("private fun stopVpn()")
+    fun `run читает ipv6Enabled из settingsRepository перед buildTunBuilder`() {
+        val body = coordinatorSource.substringAfter("suspend fun run()").substringBefore("suspend fun engineNeedsCustomTun")
         val readIdx = body.indexOf("settingsRepository.settings")
         val builderIdx = body.indexOf("tunBuilderHelper.buildTunBuilder(")
         assertTrue(
             readIdx in 0 until builderIdx,
-            "startVpn обязан читать settings ДО buildTunBuilder для передачи ipv6Enabled",
+            "run() обязан читать settings ДО buildTunBuilder для передачи ipv6Enabled",
         )
-        assertTrue(body.contains("ipv6Enabled"), "startVpn должен передавать ipv6Enabled в buildTunBuilder")
+        assertTrue(body.contains("ipv6Enabled"), "run() должен передавать ipv6Enabled в buildTunBuilder")
     }
 
     @Test

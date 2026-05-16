@@ -21,6 +21,20 @@ class TunnelStatsLoggerContractTest {
         f.readText()
     }
 
+    private val coordinatorSource by lazy {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/StartSequenceCoordinator.kt")
+        assertTrue(f.exists(), "StartSequenceCoordinator.kt не найден: $f")
+        f.readText()
+    }
+
+    private val shutdownSource by lazy {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/ShutdownCoordinator.kt")
+        assertTrue(f.exists(), "ShutdownCoordinator.kt не найден: $f")
+        f.readText()
+    }
+
     @Test
     fun `companion exposes sampling и notification constants`() {
         assertEquals(1_000L, TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
@@ -148,29 +162,29 @@ class TunnelStatsLoggerContractTest {
 
     @Test
     fun `runStartSequence вызывает statsLogger start`() {
-        val body = serviceSource
-            .substringAfter("private suspend fun runStartSequence")
-            .substringBefore("private suspend fun readSplitConfig")
+        val body = coordinatorSource
+            .substringAfter("suspend fun run()")
+            .substringBefore("suspend fun engineNeedsCustomTun")
         assertTrue(
-            body.contains("statsLogger.start()"),
-            "runStartSequence обязан стартовать stats logger. Body:\n$body",
+            body.contains("statsLogger.start()") || body.contains("deps.statsLogger.start()"),
+            "StartSequenceCoordinator.run() обязан стартовать stats logger. Body:\n$body",
         )
     }
 
     @Test
     fun `stopVpn и performShutdown вызывают statsLogger cancel`() {
-        val stopBody = serviceSource
-            .substringAfter("private fun stopVpn")
-            .substringBefore("private fun recordSessionEnd")
+        val stopBody = shutdownSource
+            .substringAfter("fun stopVpn()")
+            .substringBefore("suspend fun performShutdown(")
         assertTrue(
-            stopBody.contains("statsLogger.cancel()"),
+            stopBody.contains("statsLogger.cancel()") || stopBody.contains("deps.statsLogger.cancel()"),
             "stopVpn обязан отменить stats logger. Body:\n$stopBody",
         )
-        val shutdownBody = serviceSource
-            .substringAfter("private suspend fun performShutdown")
-            .substringBefore("override fun onDestroy")
+        val shutdownBody = shutdownSource
+            .substringAfter("suspend fun performShutdown(")
+            .substringBefore("private fun recordSessionEnd")
         assertTrue(
-            shutdownBody.contains("statsLogger.cancel()"),
+            shutdownBody.contains("statsLogger.cancel()") || shutdownBody.contains("deps.statsLogger.cancel()"),
             "performShutdown обязан отменить stats logger. Body:\n$shutdownBody",
         )
     }

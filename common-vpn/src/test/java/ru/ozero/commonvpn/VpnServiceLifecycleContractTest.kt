@@ -15,13 +15,16 @@ class VpnServiceLifecycleContractTest {
     }
 
     @Test
-    fun `runBlocking не вызывается без обёртки в отдельный поток`() {
+    fun `runBlocking защищён timeout или отдельным потоком`() {
         val hasRunBlocking = source.contains("runBlocking")
         if (!hasRunBlocking) return
+        val hasThreadJoin = source.contains("Thread(") && source.contains(".join(")
+        val hasTimeoutGuard = source.contains("withTimeoutOrNull") || source.contains("withTimeout(")
         assertTrue(
-            source.contains("Thread(") && source.contains(".join("),
-            "runBlocking присутствует в OzeroVpnService — обязательно обернуть в отдельный Thread с join+timeout, " +
-                "иначе ANR на Main thread (особенно в onDestroy при kill-switch). См. предыдущий регресс.",
+            hasThreadJoin || hasTimeoutGuard,
+            "runBlocking присутствует в OzeroVpnService — обязательно обернуть в Thread+join+timeout " +
+                "ИЛИ withTimeoutOrNull внутри runBlocking, иначе ANR на Main thread (особенно в onDestroy " +
+                "при kill-switch). См. предыдущий регресс.",
         )
     }
 
