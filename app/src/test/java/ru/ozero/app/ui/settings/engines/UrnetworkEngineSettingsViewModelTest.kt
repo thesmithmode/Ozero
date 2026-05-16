@@ -271,7 +271,9 @@ class UrnetworkEngineSettingsViewModelTest {
             System.getProperty("user.dir") ?: ".",
             "src/main/java/ru/ozero/app/ui/settings/engines/UrnetworkEngineSettingsViewModel.kt",
         ).readText()
-        val selectBody = source.substringAfter("fun selectLocation(").substringBefore("private fun startSwitchingIndicator")
+        val selectBody = source
+            .substringAfter("fun selectLocation(")
+            .substringBefore("private fun startSwitchingIndicator")
         kotlin.test.assertFalse(
             selectBody.contains("_uiState.value = current.copy"),
             "selectLocation не должен использовать read-modify-write через value=copy — race condition.",
@@ -289,7 +291,9 @@ class UrnetworkEngineSettingsViewModelTest {
             pauseBody.contains("_uiState.update"),
             "setProvidePaused обязан использовать _uiState.update для атомарного обновления.",
         )
-        val filterBody = source.substringAfter("private fun applyFilter(").substringBefore("private fun teardownLocationsVc")
+        val filterBody = source
+            .substringAfter("private fun applyFilter(")
+            .substringBefore("private fun teardownLocationsVc")
         kotlin.test.assertFalse(
             filterBody.contains("_uiState.value = UrnetworkSettingsUiState.Ready"),
             "applyFilter не должен использовать _uiState.value = Ready — race condition.",
@@ -305,7 +309,12 @@ class UrnetworkEngineSettingsViewModelTest {
         val locA = FakeLocationToken("US")
         val locB = FakeLocationToken("DE")
         val bridge = FakeUrnetworkBridge(connected = true, initialLocation = locA)
-        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), FakeUrnetworkConfigStore(), activeTunnel())
+        val vm = UrnetworkEngineSettingsViewModel(
+            bridge,
+            FakeSettingsRepo(),
+            FakeUrnetworkConfigStore(),
+            activeTunnel(),
+        )
         advanceUntilIdle()
         vm.refresh()
         advanceUntilIdle()

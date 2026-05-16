@@ -406,9 +406,18 @@ class EngineWarpContractTest {
         } catch (_: Throwable) {
             fail("awaitReady не должен бросать исключение при таймауте")
         }
-        val timeout = assertIs<EnginePlugin.ReadyResult.Timeout>(result, "timeout обязан вернуть Timeout (root fix #59)")
-        assertTrue(timeout.reason.contains("WARP"), "reason должен содержать имя движка, было: ${timeout.reason}")
-        assertTrue(timeout.reason.contains("300"), "reason должен содержать timeout ms, было: ${timeout.reason}")
+        val timeout = assertIs<EnginePlugin.ReadyResult.Timeout>(
+            result,
+            "timeout обязан вернуть Timeout (root fix #59)",
+        )
+        assertTrue(
+            timeout.reason.contains("WARP"),
+            "reason должен содержать имя движка, было: ${timeout.reason}",
+        )
+        assertTrue(
+            timeout.reason.contains("300"),
+            "reason должен содержать timeout ms, было: ${timeout.reason}",
+        )
     }
 
     @Test
@@ -425,7 +434,10 @@ class EngineWarpContractTest {
         } catch (_: Throwable) {
             fail("awaitReady не должен пробрасывать исключения из handshakeChecker")
         }
-        assertIs<EnginePlugin.ReadyResult.Timeout>(result, "handshake throw → Timeout (root fix #59)")
+        assertIs<EnginePlugin.ReadyResult.Timeout>(
+            result,
+            "handshake throw → Timeout (root fix #59)",
+        )
     }
 
     private class FakeWarpAutoConfig(

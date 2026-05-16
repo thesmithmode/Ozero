@@ -257,14 +257,7 @@ class OzeroVpnService : android.net.VpnService() {
         val chainResult = startChain(activeEngineId, activeConfig) ?: return
         if (!routeTrafficForEngine(activeEngineId, fd, chainResult.finalSocksPort)) return
 
-        val readyResult = enginePlugins.firstOrNull { it.id == activeEngineId }?.awaitReady()
-            ?: ru.ozero.enginescore.EnginePlugin.ReadyResult.Ready
-        if (readyResult is ru.ozero.enginescore.EnginePlugin.ReadyResult.Timeout) {
-            PersistentLoggers.warn(
-                TAG,
-                "awaitReady timeout for $activeEngineId: ${readyResult.reason} — watchdog will catch",
-            )
-        }
+        awaitEngineReady(activeEngineId)
 
         tunnelController.onEngineStarted(activeEngineId, chainResult.finalSocksPort)
         val nowMs = System.currentTimeMillis()
@@ -391,6 +384,17 @@ class OzeroVpnService : android.net.VpnService() {
             }
         }
         peerWatchJobRef.set(job)
+    }
+
+    private suspend fun awaitEngineReady(engineId: EngineId) {
+        val plugin = enginePlugins.firstOrNull { it.id == engineId } ?: return
+        val result = plugin.awaitReady()
+        if (result is ru.ozero.enginescore.EnginePlugin.ReadyResult.Timeout) {
+            PersistentLoggers.warn(
+                TAG,
+                "awaitReady timeout for $engineId: ${result.reason} — watchdog will catch",
+            )
+        }
     }
 
     private suspend fun engineNeedsCustomTun(engineId: EngineId): Boolean {

@@ -363,23 +363,38 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `runStartSequence обрабатывает ReadyResult Timeout логом — не маскирует как Ready`() {
+    fun `runStartSequence вызывает awaitEngineReady ДО onEngineStarted — readiness gate`() {
         val body = source.substringAfter("private suspend fun runStartSequence()")
             .substringBefore("private suspend fun engineNeedsCustomTun")
         assertTrue(
-            body.contains("awaitReady()"),
-            "runStartSequence обязан звать awaitReady — readiness gate перед onEngineStarted",
+            body.contains("awaitEngineReady("),
+            "runStartSequence обязан звать awaitEngineReady — readiness gate перед onEngineStarted",
         )
-        assertTrue(
-            body.contains("ReadyResult.Timeout"),
-            "runStartSequence обязан проверять ReadyResult.Timeout — root fix #59: " +
-                "без этого timeout молча проходит как success и UI показывает Connected без peers",
-        )
-        val awaitIdx = body.indexOf("awaitReady()")
+        val awaitIdx = body.indexOf("awaitEngineReady(")
         val onStartedIdx = body.indexOf("onEngineStarted(")
         assertTrue(
             awaitIdx in 0 until onStartedIdx,
-            "awaitReady должен идти ДО onEngineStarted — readiness gate. awaitIdx=$awaitIdx, onStartedIdx=$onStartedIdx",
+            "awaitEngineReady должен идти ДО onEngineStarted — readiness gate. " +
+                "awaitIdx=$awaitIdx, onStartedIdx=$onStartedIdx",
+        )
+    }
+
+    @Test
+    fun `awaitEngineReady обрабатывает ReadyResult Timeout логом — не маскирует как Ready`() {
+        val body = source.substringAfter("private suspend fun awaitEngineReady(")
+            .substringBefore("private suspend fun engineNeedsCustomTun")
+        assertTrue(
+            body.contains("awaitReady()"),
+            "awaitEngineReady обязан звать plugin.awaitReady() — readiness signal",
+        )
+        assertTrue(
+            body.contains("ReadyResult.Timeout"),
+            "awaitEngineReady обязан проверять ReadyResult.Timeout — root fix #59: " +
+                "без явного match на Timeout sealed class теряет point — компилятор не enforce exhaustiveness",
+        )
+        assertTrue(
+            body.contains("PersistentLoggers.warn"),
+            "Timeout обязан логироваться через PersistentLoggers.warn — попадание в boot.log для диагностики",
         )
     }
 
@@ -446,6 +461,7 @@ class OzeroVpnServiceLifecycleTest {
             "override fun onDestroy()",
             "private fun enterForegroundOrLog",
             "private suspend fun engineNeedsCustomTun",
+            "private suspend fun awaitEngineReady(",
             "private fun startStatsLogger()",
             "private fun updateNotificationWithStats",
             "private suspend fun runStartSequence()",

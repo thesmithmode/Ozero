@@ -75,9 +75,18 @@ class EngineUrnetworkAwaitReadyTest {
         } catch (_: Throwable) {
             fail("awaitReady не должен бросать исключение при таймауте")
         }
-        val timeout = assertIs<EnginePlugin.ReadyResult.Timeout>(result, "timeout обязан вернуть Timeout, не Ready (root fix #59)")
-        assertTrue(timeout.reason.contains("URnetwork"), "reason должен содержать имя движка для диагностики, было: ${timeout.reason}")
-        assertTrue(timeout.reason.contains("300"), "reason должен содержать timeout ms для диагностики, было: ${timeout.reason}")
+        val timeout = assertIs<EnginePlugin.ReadyResult.Timeout>(
+            result,
+            "timeout обязан вернуть Timeout, не Ready (root fix #59)",
+        )
+        assertTrue(
+            timeout.reason.contains("URnetwork"),
+            "reason должен содержать имя движка для диагностики, было: ${timeout.reason}",
+        )
+        assertTrue(
+            timeout.reason.contains("300"),
+            "reason должен содержать timeout ms для диагностики, было: ${timeout.reason}",
+        )
     }
 
     @Test
@@ -93,7 +102,10 @@ class EngineUrnetworkAwaitReadyTest {
         } catch (_: Throwable) {
             fail("awaitReady не должен пробрасывать исключения из peerCount")
         }
-        assertIs<EnginePlugin.ReadyResult.Timeout>(result, "bridge throw → 0 peers → Timeout (root fix #59)")
+        assertIs<EnginePlugin.ReadyResult.Timeout>(
+            result,
+            "bridge throw → 0 peers → Timeout (root fix #59)",
+        )
     }
 
     private object MinimalConfigStore : UrnetworkConfigStore {
