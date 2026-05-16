@@ -21,8 +21,10 @@ import java.util.concurrent.atomic.AtomicReference
 class TelegramProxyService(
     private val context: Context,
     private val configStore: TelegramConfigStore,
+    private val wrapperFactory: (String) -> MtgWrapper = { MtgWrapper(it) },
+    private val startupCheckMs: Long = STARTUP_CHECK_MS,
 ) {
-    private val wrapper by lazy { MtgWrapper(context.applicationInfo.nativeLibraryDir) }
+    private val wrapper by lazy { wrapperFactory(context.applicationInfo.nativeLibraryDir) }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val processRef = AtomicReference<Process?>(null)
     private val jobRef = AtomicReference<Job?>(null)
@@ -65,7 +67,7 @@ class TelegramProxyService(
                 }
                 newProcess
             }
-            delay(STARTUP_CHECK_MS)
+            delay(startupCheckMs)
             if (!process.isAlive) {
                 val output = withContext(Dispatchers.IO) { process.inputStream.bufferedReader().use { it.readText() } }
                 Log.e(TAG, "mtg exited early: $output")
