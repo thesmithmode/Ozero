@@ -76,22 +76,15 @@ class WarpEngineService : Service() {
     override fun onBind(intent: Intent): IBinder = binder
 
     private fun ensureLibraryLoaded() {
-        if (libraryLoaded) return
-        synchronized(this) {
-            if (libraryLoaded) return
-            try {
-                System.loadLibrary("am-go")
-                libraryLoaded = true
-            } catch (t: Throwable) {
-                Log.e(TAG, "am-go load failed: ${t.message}")
-                throw t
-            }
+        try {
+            System.loadLibrary("am-go")
+        } catch (t: Throwable) {
+            Log.e(TAG, "am-go load failed: ${t.message}")
+            throw t
         }
     }
 
     private companion object {
         const val TAG = "WarpEngineService"
-
-        @Volatile var libraryLoaded = false
     }
 }
