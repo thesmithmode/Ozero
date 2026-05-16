@@ -10,6 +10,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
@@ -171,7 +175,19 @@ class OzeroVpnService : android.net.VpnService() {
         }
         socketProtector = ru.ozero.enginescore.VpnSocketProtector { fd -> protect(fd) }
         ru.ozero.enginescore.VpnSocketProtectorHolder.bind(socketProtector!!)
+        observeKillswitchSetting()
         PersistentLoggers.info(TAG, "onCreate after super (Hilt inject done)")
+    }
+
+    private fun observeKillswitchSetting() {
+        settingsRepository.settings
+            .map { it.killswitchEnabled }
+            .distinctUntilChanged()
+            .onEach { enabled ->
+                killswitchCached = enabled
+                PersistentLoggers.info(TAG, "killswitch live update: $enabled")
+            }
+            .launchIn(serviceScope)
     }
 
     private var socketProtector: ru.ozero.enginescore.VpnSocketProtector? = null
