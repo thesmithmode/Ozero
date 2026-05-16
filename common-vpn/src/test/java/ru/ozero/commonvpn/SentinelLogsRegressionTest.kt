@@ -7,7 +7,6 @@ import kotlin.test.assertTrue
 class SentinelLogsRegressionTest {
 
     private val gatewaySrc by lazy { read("src/main/java/ru/ozero/commonvpn/HevTunnelGateway.kt") }
-    private val serviceSrc by lazy { read("src/main/java/ru/ozero/commonvpn/OzeroVpnService.kt") }
     private val shutdownSrc by lazy { read("src/main/java/ru/ozero/commonvpn/ShutdownCoordinator.kt") }
 
     @Test

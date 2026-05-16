@@ -58,7 +58,9 @@ class OzeroVpnServiceIpv6Test {
 
     @Test
     fun `run читает ipv6Enabled из settingsRepository перед buildTunBuilder`() {
-        val body = coordinatorSource.substringAfter("suspend fun run()").substringBefore("suspend fun engineNeedsCustomTun")
+        val body = coordinatorSource
+            .substringAfter("suspend fun run()")
+            .substringBefore("suspend fun engineNeedsCustomTun")
         val readIdx = body.indexOf("settingsRepository.settings")
         val builderIdx = body.indexOf("tunBuilderHelper.buildTunBuilder(")
         assertTrue(

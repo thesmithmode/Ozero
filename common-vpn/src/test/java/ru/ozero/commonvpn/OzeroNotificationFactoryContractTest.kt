@@ -50,7 +50,8 @@ class OzeroNotificationFactoryContractTest {
     fun `enterForeground оборачивает всё в try-catch — возвращает Boolean`() {
         val body = source.substringAfter("fun enterForeground(").substringBefore("companion object")
         val hasCatch = body.contains("catch (t: Throwable)")
-        val hasBoolean = body.contains("return true") || body.contains("return false") ||
+        val hasBoolean = body.contains("return true") ||
+            body.contains("return false") ||
             (body.contains("\n            true\n") && body.contains("\n            false\n")) ||
             (body.contains(" true\n") && body.contains(" false\n"))
         assertTrue(
