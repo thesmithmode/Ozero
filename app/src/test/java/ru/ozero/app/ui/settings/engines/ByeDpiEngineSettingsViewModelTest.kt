@@ -90,6 +90,41 @@ class ByeDpiEngineSettingsViewModelTest {
     }
 
     @Test
+    fun `onSave с default args выставляет defaultAccepted=true в repo`() = runTest(dispatcher) {
+        advanceUntilIdle()
+        vm.onArgsChange(EngineConfig.ByeDpi().args)
+        vm.onSave()
+        advanceUntilIdle()
+        assertEquals(listOf(true), repo.defaultAcceptedUpdates)
+    }
+
+    @Test
+    fun `onSave с custom args НЕ выставляет defaultAccepted`() = runTest(dispatcher) {
+        advanceUntilIdle()
+        vm.onArgsChange("-Ku -An -d4")
+        vm.onSave()
+        advanceUntilIdle()
+        assertEquals(emptyList<Boolean>(), repo.defaultAcceptedUpdates)
+    }
+
+    @Test
+    fun `onResetToDefault выставляет defaultAccepted=true`() = runTest(dispatcher) {
+        repo.emit(SettingsModel.DEFAULT.copy(byedpiWinningArgs = "-X"))
+        advanceUntilIdle()
+        vm.onResetToDefault()
+        advanceUntilIdle()
+        assertEquals(listOf(true), repo.defaultAcceptedUpdates)
+    }
+
+    @Test
+    fun `Content прокидывает defaultAccepted из модели`() = runTest(dispatcher) {
+        repo.emit(SettingsModel.DEFAULT.copy(byedpiDefaultAccepted = true))
+        advanceUntilIdle()
+        val state = vm.uiState.value as ByeDpiSettingsUiState.Content
+        assertTrue(state.defaultAccepted)
+    }
+
+    @Test
     fun `onResetToDefault сбрасывает args на default и сохраняет null`() = runTest(dispatcher) {
         repo.emit(SettingsModel.DEFAULT.copy(byedpiWinningArgs = "-X"))
         advanceUntilIdle()
@@ -105,6 +140,7 @@ class ByeDpiEngineSettingsViewModelTest {
         override val settings: Flow<SettingsModel> = state.asStateFlow()
 
         val byedpiUpdates = mutableListOf<String?>()
+        val defaultAcceptedUpdates = mutableListOf<Boolean>()
 
         fun emit(model: SettingsModel) {
             state.value = model
@@ -128,6 +164,11 @@ class ByeDpiEngineSettingsViewModelTest {
         override suspend fun setByedpiWinningArgs(args: String?) {
             byedpiUpdates += args
             state.value = state.value.copy(byedpiWinningArgs = args)
+        }
+
+        override suspend fun setByedpiDefaultAccepted(accepted: Boolean) {
+            defaultAcceptedUpdates += accepted
+            state.value = state.value.copy(byedpiDefaultAccepted = accepted)
         }
     }
 }

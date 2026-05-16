@@ -20,6 +20,7 @@ sealed interface ByeDpiSettingsUiState {
         val args: String,
         val savedArgs: String?,
         val defaultArgs: String,
+        val defaultAccepted: Boolean,
     ) : ByeDpiSettingsUiState {
         val dirty: Boolean get() = args != (savedArgs ?: defaultArgs)
         val usingDefault: Boolean get() = savedArgs.isNullOrBlank()
@@ -50,6 +51,7 @@ class ByeDpiEngineSettingsViewModel @Inject constructor(
                     args = nextArgs,
                     savedArgs = saved,
                     defaultArgs = defaultArgs,
+                    defaultAccepted = model.byedpiDefaultAccepted,
                 )
             }
             .launchIn(viewModelScope)
@@ -65,12 +67,16 @@ class ByeDpiEngineSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             val toSave = state.args.takeIf { it.isNotBlank() && it != defaultArgs }
             repository.setByedpiWinningArgs(toSave)
+            if (toSave == null) {
+                repository.setByedpiDefaultAccepted(true)
+            }
         }
     }
 
     fun onResetToDefault() {
         viewModelScope.launch {
             repository.setByedpiWinningArgs(null)
+            repository.setByedpiDefaultAccepted(true)
             val state = _uiState.value as? ByeDpiSettingsUiState.Content
             if (state != null) {
                 _uiState.value = state.copy(args = defaultArgs)

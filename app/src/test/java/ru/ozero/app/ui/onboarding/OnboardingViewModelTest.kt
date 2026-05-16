@@ -162,6 +162,7 @@ class OnboardingViewModelTest {
         override suspend fun setUrnetworkJwt(jwt: String?) = Unit
         override suspend fun setUrnetworkCountryCode(code: String?) = Unit
         override suspend fun setByedpiWinningArgs(args: String?) = Unit
+        override suspend fun setByedpiDefaultAccepted(accepted: Boolean) = Unit
         override suspend fun setCustomDnsServers(servers: List<String>) = Unit
         override suspend fun setHostsMode(mode: HostsMode) = Unit
         override suspend fun setHosts(hosts: List<String>) = Unit

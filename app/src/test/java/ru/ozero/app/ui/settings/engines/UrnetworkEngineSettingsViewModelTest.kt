@@ -363,6 +363,7 @@ private class FakeSettingsRepo : ru.ozero.enginescore.settings.SettingsRepositor
         countryCodeUpdates += code
     }
     override suspend fun setByedpiWinningArgs(args: String?) = Unit
+    override suspend fun setByedpiDefaultAccepted(accepted: Boolean) = Unit
     override suspend fun setCustomDnsServers(servers: List<String>) = Unit
     override suspend fun setHostsMode(mode: ru.ozero.enginescore.settings.HostsMode) = Unit
     override suspend fun setHosts(hosts: List<String>) = Unit

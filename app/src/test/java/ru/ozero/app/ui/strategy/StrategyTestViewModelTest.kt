@@ -712,5 +712,9 @@ class StrategyTestViewModelTest {
             byedpiUpdates += args
             state.value = state.value.copy(byedpiWinningArgs = args)
         }
+
+        override suspend fun setByedpiDefaultAccepted(accepted: Boolean) {
+            state.value = state.value.copy(byedpiDefaultAccepted = accepted)
+        }
     }
 }
