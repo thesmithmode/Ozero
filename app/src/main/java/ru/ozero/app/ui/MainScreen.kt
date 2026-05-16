@@ -331,56 +331,19 @@ private fun ExpertMainContent(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             val visualConnected = isConnected || switching != null
-            if (killswitchActive) {
-                Text(
-                    text = stringResource(R.string.killswitch_active_badge),
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.testTag(MainScreenTestTags.KILLSWITCH_BADGE),
-                )
-            }
-            if (visualConnected && manualEngine == EngineId.URNETWORK) {
-                UrnetworkPeerBadge(
-                    count = urnetworkPeerCount,
-                    searchSeconds = urnetworkPeerSearchSeconds,
-                )
-            }
-            if (visualConnected) {
-                IpInfoCard(
-                    state = ipInfo,
-                    onRefresh = onRefreshIpInfo,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
-            }
-            TrafficStatsCard(
+            ExpertStatusBadges(
+                visualConnected = visualConnected,
+                killswitchActive = killswitchActive,
+                manualEngine = manualEngine,
+                urnetworkPeerCount = urnetworkPeerCount,
+                urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
+                ipInfo = ipInfo,
                 stats = stats,
                 speedHistory = speedHistory,
-                modifier = Modifier.padding(horizontal = 16.dp),
+                stagnant = stagnant,
+                healthStatus = healthStatus,
+                onRefreshIpInfo = onRefreshIpInfo,
             )
-            if (visualConnected && stagnant) {
-                Text(
-                    text = stringResource(R.string.main_stagnation_warning),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.testTag(MainScreenTestTags.STAGNATION_BADGE),
-                )
-            }
-            if (visualConnected && healthStatus == HealthMonitor.Status.DEGRADED) {
-                Column(
-                    modifier = Modifier.testTag(MainScreenTestTags.HEALTH_DEGRADED_BADGE),
-                ) {
-                    Text(
-                        text = stringResource(R.string.main_health_degraded),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                    Text(
-                        text = stringResource(R.string.main_health_degraded_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
 
             EngineChipsRow(
                 selectedEngine = manualEngine,
@@ -403,6 +366,71 @@ private fun ExpertMainContent(
                     .padding(horizontal = 16.dp),
             )
             Spacer(modifier = Modifier.height(8.dp))
+        }
+    }
+}
+
+@Composable
+@Suppress("LongParameterList")
+private fun ExpertStatusBadges(
+    visualConnected: Boolean,
+    killswitchActive: Boolean,
+    manualEngine: EngineId?,
+    urnetworkPeerCount: Int,
+    urnetworkPeerSearchSeconds: Int,
+    ipInfo: IpInfoState,
+    stats: TunnelStats?,
+    speedHistory: List<Pair<Float, Float>>,
+    stagnant: Boolean,
+    healthStatus: HealthMonitor.Status,
+    onRefreshIpInfo: () -> Unit,
+) {
+    if (killswitchActive) {
+        Text(
+            text = stringResource(R.string.killswitch_active_badge),
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.testTag(MainScreenTestTags.KILLSWITCH_BADGE),
+        )
+    }
+    if (visualConnected && manualEngine == EngineId.URNETWORK) {
+        UrnetworkPeerBadge(
+            count = urnetworkPeerCount,
+            searchSeconds = urnetworkPeerSearchSeconds,
+        )
+    }
+    if (visualConnected) {
+        IpInfoCard(
+            state = ipInfo,
+            onRefresh = onRefreshIpInfo,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+    }
+    TrafficStatsCard(
+        stats = stats,
+        speedHistory = speedHistory,
+        modifier = Modifier.padding(horizontal = 16.dp),
+    )
+    if (visualConnected && stagnant) {
+        Text(
+            text = stringResource(R.string.main_stagnation_warning),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.testTag(MainScreenTestTags.STAGNATION_BADGE),
+        )
+    }
+    if (visualConnected && healthStatus == HealthMonitor.Status.DEGRADED) {
+        Column(modifier = Modifier.testTag(MainScreenTestTags.HEALTH_DEGRADED_BADGE)) {
+            Text(
+                text = stringResource(R.string.main_health_degraded),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+            Text(
+                text = stringResource(R.string.main_health_degraded_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

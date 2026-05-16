@@ -67,7 +67,7 @@ class MainContentStateHolderSentinelTest {
     }
 
     @Test
-    fun `state holder data classes объявлены — ExpertMainState ExpertMainCallbacks SimpleMainState SimpleMainCallbacks`() {
+    fun `state holder data classes объявлены`() {
         val required = listOf(
             "data class ExpertMainState(",
             "data class ExpertMainCallbacks(",
