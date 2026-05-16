@@ -1121,7 +1121,11 @@ private fun StalenessLabel(lastVerifiedAtMs: Long) {
 private fun NetworkBadge(bestNetworks: Set<String>, currentNetworkId: String) {
     if (bestNetworks.isEmpty()) return
     val onCurrentNetwork = currentNetworkId.isNotBlank() && bestNetworks.contains(currentNetworkId)
-    val text = if (onCurrentNetwork) stringResource(R.string.strategy_badge_best_on_network) else stringResource(R.string.strategy_badge_best_other_network)
+    val text = if (onCurrentNetwork) {
+        stringResource(R.string.strategy_badge_best_on_network)
+    } else {
+        stringResource(R.string.strategy_badge_best_other_network)
+    }
     val color = if (onCurrentNetwork) {
         MaterialTheme.colorScheme.primary
     } else {

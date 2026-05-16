@@ -152,6 +152,10 @@ internal fun copyToClipboard(context: Context, label: String, text: String) {
     val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     cm.setPrimaryClip(ClipData.newPlainText(label, text))
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-        Toast.makeText(context, context.getString(R.string.logs_copy_done_toast_fmt, text.length), Toast.LENGTH_SHORT).show()
+        Toast.makeText(
+            context,
+            context.getString(R.string.logs_copy_done_toast_fmt, text.length),
+            Toast.LENGTH_SHORT,
+        ).show()
     }
 }

@@ -121,8 +121,10 @@ private fun ContentBody(
                     text = when (s.proxyState) {
                         TelegramProxyState.Idle -> stringResource(R.string.telegram_proxy_state_idle)
                         TelegramProxyState.Starting -> stringResource(R.string.telegram_proxy_state_starting)
-                        is TelegramProxyState.Running -> stringResource(R.string.telegram_proxy_state_running_fmt, s.proxyState.port)
-                        is TelegramProxyState.Error -> stringResource(R.string.telegram_proxy_state_error_fmt, s.proxyState.message)
+                        is TelegramProxyState.Running ->
+                            stringResource(R.string.telegram_proxy_state_running_fmt, s.proxyState.port)
+                        is TelegramProxyState.Error ->
+                            stringResource(R.string.telegram_proxy_state_error_fmt, s.proxyState.message)
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = when (s.proxyState) {
@@ -187,7 +189,13 @@ private fun ContentBody(
                 if (s.generatingSecret) {
                     CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp))
                 }
-                Text(if (s.secret.isBlank()) stringResource(R.string.telegram_proxy_generate_secret) else stringResource(R.string.telegram_proxy_rotate_secret))
+                Text(
+                    if (s.secret.isBlank()) {
+                        stringResource(R.string.telegram_proxy_generate_secret)
+                    } else {
+                        stringResource(R.string.telegram_proxy_rotate_secret)
+                    },
+                )
             }
         }
 
