@@ -89,5 +89,4 @@ class DnsMessageTest {
         val e = kotlin.runCatching { DnsMessage.buildAQuery("") }.exceptionOrNull()
         assertTrue(e is IllegalArgumentException)
     }
-
 }
