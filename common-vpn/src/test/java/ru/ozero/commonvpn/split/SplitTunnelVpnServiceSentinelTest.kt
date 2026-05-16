@@ -28,11 +28,11 @@ class SplitTunnelVpnServiceSentinelTest {
         require("private suspend fun readSplitConfig(" in serviceSource) {
             "anchor 'private suspend fun readSplitConfig(' исчез — обнови sentinel"
         }
-        require("private fun startHealthKillswitchWatcher(" in serviceSource) {
-            "anchor 'private fun startHealthKillswitchWatcher(' исчез — обнови sentinel"
+        require("private suspend fun awaitEngineReady(" in serviceSource) {
+            "anchor 'private suspend fun awaitEngineReady(' исчез — обнови sentinel"
         }
         serviceSource.substringAfter("private suspend fun readSplitConfig(")
-            .substringBefore("private fun startHealthKillswitchWatcher(")
+            .substringBefore("private suspend fun awaitEngineReady(")
     }
 
     private val tunBlock by lazy {

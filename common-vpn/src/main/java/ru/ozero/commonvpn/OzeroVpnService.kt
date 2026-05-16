@@ -12,9 +12,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
@@ -68,6 +66,22 @@ class OzeroVpnService : android.net.VpnService() {
         OzeroNotificationFactory(this, OzeroVpnService::class.java)
     }
     private val tunBuilderHelper by lazy { TunBuilderHelper(this) }
+    private val engineWatchdog by lazy {
+        EngineWatchdogCoordinator(
+            scope = serviceScope,
+            healthMonitor = healthMonitor,
+            enginePlugins = enginePlugins,
+            tunnelController = tunnelController,
+            chainOrchestrator = chainOrchestrator,
+            notificationFactory = notificationFactory,
+            tunFdRef = tunFdRef,
+            statsJobRef = statsJobRef,
+            stopping = stopping,
+            starting = starting,
+            killswitchProvider = { killswitchCached },
+            stopVpnRequest = { stopVpn() },
+        )
+    }
 
     companion object {
         const val ACTION_START = "ru.ozero.vpn.ACTION_START"
@@ -87,9 +101,6 @@ class OzeroVpnService : android.net.VpnService() {
         private const val SETTINGS_READ_TIMEOUT_MS = 1_500L
         private const val ON_DESTROY_SHUTDOWN_TIMEOUT_MS = 5_000L
         private const val PREFLIGHT_HARD_TIMEOUT_MS = 7_000L
-        private const val PEER_WATCHDOG_POLL_MS = 5_000L
-        private const val PEER_WATCHDOG_TIMEOUT_MS = 30_000L
-        private const val PEER_WATCHDOG_RECOVER_GRACE_MS = 30_000L
     }
 
     override fun onCreate() {
@@ -112,9 +123,7 @@ class OzeroVpnService : android.net.VpnService() {
     private val startJobRef = AtomicReference<Job?>(null)
     private val statsJobRef = AtomicReference<Job?>(null)
     private val shutdownJobRef = AtomicReference<Job?>(null)
-    private val healthWatchJobRef = AtomicReference<Job?>(null)
     private val lockdownStartupFdRef = AtomicReference<ParcelFileDescriptor?>(null)
-    private val peerWatchJobRef = AtomicReference<Job?>(null)
     private val starting = AtomicBoolean(false)
     private val stopping = AtomicBoolean(false)
     private val stopSignal = AtomicBoolean(false)
@@ -270,8 +279,8 @@ class OzeroVpnService : android.net.VpnService() {
                     PersistentLoggers.warn(TAG, "healthMonitor.start threw: ${t.message}")
                 }
         }
-        if (!usesCustomTun) startHealthKillswitchWatcher(activeEngineId)
-        if (usesCustomTun) startPeerWatchdog(activeEngineId)
+        if (!usesCustomTun) engineWatchdog.startHealthKillswitchWatcher(activeEngineId)
+        if (usesCustomTun) engineWatchdog.startPeerWatchdog(activeEngineId)
         startStatsLogger()
     }
 
@@ -297,91 +306,6 @@ class OzeroVpnService : android.net.VpnService() {
             emptySet()
         }
         return ru.ozero.commonvpn.split.SplitTunnelConfig(mode = mode, allowlist = allowlist, blocklist = blocklist)
-    }
-
-    private fun startHealthKillswitchWatcher(engineId: EngineId) {
-        healthWatchJobRef.getAndSet(null)?.cancel()
-        val job = serviceScope.launch {
-            try {
-                healthMonitor.status
-                    .filter { it == HealthMonitor.Status.DEGRADED }
-                    .first()
-                if (killswitchCached && tunFdRef.get() != null && !stopping.get()) {
-                    PersistentLoggers.warn(
-                        TAG,
-                        "health degraded → killswitch fire engine=$engineId",
-                    )
-                    enterKillswitchMode(engineId, "health degraded")
-                } else {
-                    PersistentLoggers.warn(
-                        TAG,
-                        "health degraded но killswitch off (cached=$killswitchCached) — без partial-shutdown",
-                    )
-                }
-            } catch (ce: kotlinx.coroutines.CancellationException) {
-                throw ce
-            } catch (t: Throwable) {
-                PersistentLoggers.warn(TAG, "health killswitch watcher threw: ${t.message}")
-            }
-        }
-        healthWatchJobRef.set(job)
-    }
-
-    private fun startPeerWatchdog(engineId: EngineId) {
-        peerWatchJobRef.getAndSet(null)?.cancel()
-        val plugin = enginePlugins.firstOrNull { it.id == engineId } ?: return
-        val job = serviceScope.launch {
-            try {
-                var zeroPeersSince = 0L
-                var hadPeers = false
-                while (isActive) {
-                    delay(PEER_WATCHDOG_POLL_MS)
-                    val peers = plugin.stats().first().activeConnections
-                    if (peers > 0) {
-                        hadPeers = true
-                        zeroPeersSince = 0L
-                        continue
-                    }
-                    if (!hadPeers) continue
-                    val now = System.currentTimeMillis()
-                    if (zeroPeersSince == 0L) {
-                        zeroPeersSince = now
-                        continue
-                    }
-                    if (now - zeroPeersSince <= PEER_WATCHDOG_TIMEOUT_MS) continue
-                    PersistentLoggers.warn(
-                        TAG,
-                        "peer watchdog: 0 peers ${PEER_WATCHDOG_TIMEOUT_MS / 1000}s → recover",
-                    )
-                    val result = runCatching { plugin.recover() }.getOrElse { t ->
-                        EnginePlugin.RecoverResult.Failed("recover threw: ${t.message}")
-                    }
-                    when (result) {
-                        EnginePlugin.RecoverResult.Success -> {
-                            zeroPeersSince = 0L
-                        }
-                        EnginePlugin.RecoverResult.NotSupported -> {
-                            handleEngineFailure(
-                                engineId,
-                                "no URnetwork peers for ${PEER_WATCHDOG_TIMEOUT_MS / 1000}s " +
-                                    "(recover not supported)",
-                            )
-                            return@launch
-                        }
-                        is EnginePlugin.RecoverResult.Failed -> {
-                            PersistentLoggers.warn(TAG, "recover failed: ${result.reason}")
-                            zeroPeersSince = 0L
-                        }
-                    }
-                    delay(PEER_WATCHDOG_RECOVER_GRACE_MS)
-                }
-            } catch (ce: kotlinx.coroutines.CancellationException) {
-                throw ce
-            } catch (t: Throwable) {
-                PersistentLoggers.warn(TAG, "peer watchdog threw: ${t.message}")
-            }
-        }
-        peerWatchJobRef.set(job)
     }
 
     private suspend fun awaitEngineReady(engineId: EngineId) {
@@ -518,8 +442,11 @@ class OzeroVpnService : android.net.VpnService() {
     ): ParcelFileDescriptor? {
         val before = TunInterfaceStats.snapshotTunInterfaces()
         val fd = try {
-            tunBuilderHelper.buildTunBuilder(splitConfig = splitConfig, ipv6Enabled = ipv6, customDnsServers = customDns)
-                .establish()
+            tunBuilderHelper.buildTunBuilder(
+                splitConfig = splitConfig,
+                ipv6Enabled = ipv6,
+                customDnsServers = customDns,
+            ).establish()
         } catch (t: Throwable) {
             PersistentLoggers.error(TAG, "establish threw: ${t.message}")
             stopVpn()
@@ -549,7 +476,7 @@ class OzeroVpnService : android.net.VpnService() {
         }
         Log.i(TAG, "chain result=$chainResult engineId=$engineId")
         if (chainResult !is ChainResult.Success) {
-            handleEngineFailure(engineId, chainResult?.toString() ?: "timeout")
+            engineWatchdog.handleEngineFailure(engineId, chainResult?.toString() ?: "timeout")
             return null
         }
         tunnelController.onConnecting(engineId)
@@ -571,7 +498,7 @@ class OzeroVpnService : android.net.VpnService() {
                 runCatching { tunFdRef.getAndSet(null)?.close() }
                 PersistentLoggers.error(TAG, "attachTun threw, fd closed: ${t.message}")
                 runCatching { chainOrchestrator.stop() }
-                handleEngineFailure(engineId, "attachTun threw: ${t.message}")
+                engineWatchdog.handleEngineFailure(engineId, "attachTun threw: ${t.message}")
                 return false
             }
             return when (result) {
@@ -583,7 +510,7 @@ class OzeroVpnService : android.net.VpnService() {
                     runCatching { tunFdRef.getAndSet(null)?.close() }
                     PersistentLoggers.error(TAG, "attachTun failed: ${result.reason}")
                     runCatching { chainOrchestrator.stop() }
-                    handleEngineFailure(engineId, "attachTun: ${result.reason}")
+                    engineWatchdog.handleEngineFailure(engineId, "attachTun: ${result.reason}")
                     false
                 }
             }
@@ -609,7 +536,7 @@ class OzeroVpnService : android.net.VpnService() {
         if (code != 0) {
             PersistentLoggers.error(TAG, "tunnel start failed code=$code")
             runCatching { chainOrchestrator.stop() }
-            handleEngineFailure(engineId, "tunnel code=$code")
+            engineWatchdog.handleEngineFailure(engineId, "tunnel code=$code")
             return false
         }
         return true
@@ -696,33 +623,6 @@ class OzeroVpnService : android.net.VpnService() {
         }.getOrDefault("")
     }
 
-    private fun handleEngineFailure(engineId: EngineId, reason: String) {
-        val fdAlive = tunFdRef.get() != null
-        if (killswitchCached && fdAlive) {
-            enterKillswitchMode(engineId, reason)
-        } else {
-            tunnelController.onEngineDied(engineId, reason)
-            stopVpn()
-        }
-    }
-
-    private fun enterKillswitchMode(engineId: EngineId, reason: String) {
-        PersistentLoggers.warn(TAG, "killswitch engaging: engine=$engineId reason=$reason")
-        tunnelController.onKillswitchEngaged(engineId, reason)
-        statsJobRef.getAndSet(null)?.cancel()
-        healthWatchJobRef.getAndSet(null)?.cancel()
-        peerWatchJobRef.getAndSet(null)?.cancel()
-        serviceScope.launch {
-            runCatching { chainOrchestrator.stop() }
-                .onFailure { t ->
-                    PersistentLoggers.warn(TAG, "killswitch: chainOrchestrator.stop threw: ${t.message}")
-                }
-        }
-        runCatching { healthMonitor.stop() }
-        notificationFactory.notifyStats("Killswitch активен — трафик заблокирован")
-        starting.set(false)
-    }
-
     private fun stopVpn() {
         if (!stopping.compareAndSet(false, true)) return
         stopSignal.set(true)
@@ -732,8 +632,7 @@ class OzeroVpnService : android.net.VpnService() {
         tunnelController.onDisconnecting()
         startJobRef.getAndSet(null)?.cancel()
         statsJobRef.getAndSet(null)?.cancel()
-        healthWatchJobRef.getAndSet(null)?.cancel()
-        peerWatchJobRef.getAndSet(null)?.cancel()
+        engineWatchdog.cancelWatchers()
         lockdownStartupFdRef.getAndSet(null)?.runCatching { close() }
         runCatching { healthMonitor.stop() }
         val endStatus = if (priorState is TunnelState.Failed) {

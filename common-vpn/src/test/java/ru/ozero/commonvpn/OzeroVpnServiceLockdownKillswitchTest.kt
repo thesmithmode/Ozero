@@ -20,6 +20,13 @@ class OzeroVpnServiceLockdownKillswitchTest {
         f.readText()
     }
 
+    private val watchdogSource by lazy {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/EngineWatchdogCoordinator.kt")
+        assertTrue(f.exists(), "EngineWatchdogCoordinator.kt не найден: $f")
+        f.readText()
+    }
+
     @Test
     fun `anchors — функции-границы существуют`() {
         listOf(
@@ -32,12 +39,19 @@ class OzeroVpnServiceLockdownKillswitchTest {
         }
         listOf(
             "private suspend fun runStartSequence",
-            "private fun startHealthKillswitchWatcher",
-            "private fun enterKillswitchMode",
             "private fun stopVpn",
             "private fun recordSessionEnd",
         ).forEach { anchor ->
             assertTrue(serviceSource.contains(anchor), "Anchor потерян в OzeroVpnService.kt: '$anchor'")
+        }
+        listOf(
+            "fun startHealthKillswitchWatcher(",
+            "private fun enterKillswitchMode(",
+        ).forEach { anchor ->
+            assertTrue(
+                watchdogSource.contains(anchor),
+                "Anchor потерян в EngineWatchdogCoordinator.kt: '$anchor'",
+            )
         }
     }
 
@@ -85,19 +99,19 @@ class OzeroVpnServiceLockdownKillswitchTest {
     fun `runStartSequence запускает health killswitch watcher`() {
         val body = serviceSource
             .substringAfter("private suspend fun runStartSequence")
-            .substringBefore("private fun startHealthKillswitchWatcher")
+            .substringBefore("private suspend fun readSplitConfig")
         assertTrue(
-            body.contains("startHealthKillswitchWatcher("),
+            body.contains("engineWatchdog.startHealthKillswitchWatcher("),
             "runStartSequence обязан стартовать health watcher — иначе HealthMonitor.DEGRADED " +
                 "не триггерит killswitch и движок продолжает «бутафорное» состояние.",
         )
     }
 
     @Test
-    fun `startHealthKillswitchWatcher триггерит enterKillswitchMode при DEGRADED + killswitchCached`() {
-        val body = serviceSource
-            .substringAfter("private fun startHealthKillswitchWatcher")
-            .substringBefore("private fun enterKillswitchMode")
+    fun `startHealthKillswitchWatcher триггерит enterKillswitchMode при DEGRADED + killswitch`() {
+        val body = watchdogSource
+            .substringAfter("fun startHealthKillswitchWatcher")
+            .substringBefore("fun startPeerWatchdog")
         assertTrue(
             body.contains("HealthMonitor.Status.DEGRADED"),
             "watcher обязан фильтровать DEGRADED. Body:\n$body",
@@ -107,8 +121,8 @@ class OzeroVpnServiceLockdownKillswitchTest {
             "watcher обязан вызывать enterKillswitchMode при degraded. Body:\n$body",
         )
         assertTrue(
-            body.contains("killswitchCached"),
-            "watcher обязан проверять killswitchCached перед fire. Body:\n$body",
+            body.contains("killswitchProvider()"),
+            "watcher обязан проверять killswitchProvider() перед fire. Body:\n$body",
         )
     }
 
