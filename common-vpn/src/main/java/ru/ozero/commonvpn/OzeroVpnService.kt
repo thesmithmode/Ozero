@@ -938,5 +938,4 @@ class OzeroVpnService : android.net.VpnService() {
         runCatching { tunFdRef.getAndSet(null)?.close() }
         super.onDestroy()
     }
-
 }
