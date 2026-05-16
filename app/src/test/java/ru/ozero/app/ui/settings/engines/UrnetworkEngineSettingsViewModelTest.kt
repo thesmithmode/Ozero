@@ -202,6 +202,79 @@ class UrnetworkEngineSettingsViewModelTest {
     }
 
     @Test
+    fun `sentinel — init использует collectLatest а не collect`() {
+        val source = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/ui/settings/engines/UrnetworkEngineSettingsViewModel.kt",
+        ).readText()
+        val initBlock = source.substringAfter("init {").substringBefore("fun refresh()")
+        kotlin.test.assertTrue(
+            initBlock.contains("collectLatest"),
+            "init обязан использовать collectLatest чтобы при active=false отменить текущий retry-loop. " +
+                "collect не отменяет предыдущий блок — два параллельных loop при быстром active flip.",
+        )
+        kotlin.test.assertFalse(
+            initBlock.contains(".collect {"),
+            "init не должен использовать .collect — только collectLatest для cancel semantics.",
+        )
+    }
+
+    @Test
+    fun `sentinel — selectLocation и setProvidePaused используют update а не value assignment`() {
+        val source = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/ui/settings/engines/UrnetworkEngineSettingsViewModel.kt",
+        ).readText()
+        val selectBody = source.substringAfter("fun selectLocation(").substringBefore("private fun startSwitchingIndicator")
+        kotlin.test.assertFalse(
+            selectBody.contains("_uiState.value = current.copy"),
+            "selectLocation не должен использовать read-modify-write через value=copy — race condition.",
+        )
+        kotlin.test.assertTrue(
+            selectBody.contains("_uiState.update"),
+            "selectLocation обязан использовать _uiState.update для атомарного обновления.",
+        )
+        val pauseBody = source.substringAfter("fun setProvidePaused(").substringBefore("private fun updateLocations")
+        kotlin.test.assertFalse(
+            pauseBody.contains("_uiState.value = current.copy"),
+            "setProvidePaused не должен использовать read-modify-write через value=copy — race condition.",
+        )
+        kotlin.test.assertTrue(
+            pauseBody.contains("_uiState.update"),
+            "setProvidePaused обязан использовать _uiState.update для атомарного обновления.",
+        )
+        val filterBody = source.substringAfter("private fun applyFilter(").substringBefore("private fun teardownLocationsVc")
+        kotlin.test.assertFalse(
+            filterBody.contains("_uiState.value = UrnetworkSettingsUiState.Ready"),
+            "applyFilter не должен использовать _uiState.value = Ready — race condition.",
+        )
+        kotlin.test.assertTrue(
+            filterBody.contains("_uiState.update"),
+            "applyFilter обязан использовать _uiState.update для атомарного обновления.",
+        )
+    }
+
+    @Test
+    fun `selectLocation обновляет selectedLocation в uiState без полного пересоздания`() = runTest {
+        val locA = FakeLocationToken("US")
+        val locB = FakeLocationToken("DE")
+        val bridge = FakeUrnetworkBridge(connected = true, initialLocation = locA)
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), FakeUrnetworkConfigStore(), activeTunnel())
+        advanceUntilIdle()
+        vm.refresh()
+        advanceUntilIdle()
+        val stateBeforeSelect = vm.uiState.value
+        if (stateBeforeSelect is UrnetworkSettingsUiState.Ready) {
+            vm.selectLocation(locB)
+            runCurrent()
+            val stateAfter = vm.uiState.value
+            if (stateAfter is UrnetworkSettingsUiState.Ready) {
+                assertEquals(locB, stateAfter.selectedLocation)
+            }
+        }
+    }
+
+    @Test
     fun `peerCount остаётся 0 пока engine не активен`() = runTest {
         val bridge = FakeUrnetworkBridge()
         val vm = UrnetworkEngineSettingsViewModel(

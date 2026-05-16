@@ -15,12 +15,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.ozero.commonvpn.TunnelController
@@ -165,7 +167,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            isUrnetworkActive.collect { active ->
+            isUrnetworkActive.collectLatest { active ->
                 if (active) {
                     var attempt = 0
                     while (attempt < REFRESH_RETRY_ATTEMPTS && _uiState.value !is UrnetworkSettingsUiState.Ready) {
@@ -248,9 +250,8 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
             runCatching { settingsRepository.setUrnetworkCountryCode(targetCountry) }
         }
         runCatching { bridge.setPreferredCountry(targetCountry) }
-        val current = _uiState.value
-        if (current is UrnetworkSettingsUiState.Ready) {
-            _uiState.value = current.copy(selectedLocation = location)
+        _uiState.update { current ->
+            if (current is UrnetworkSettingsUiState.Ready) current.copy(selectedLocation = location) else current
         }
         if (previousCountry != targetCountry) {
             startSwitchingIndicator()
@@ -283,9 +284,8 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
             bridge.setProvidePaused(paused)
         }
         viewModelScope.launch { configStore.setProvideEnabled(!paused) }
-        val current = _uiState.value
-        if (current is UrnetworkSettingsUiState.Ready) {
-            _uiState.value = current.copy(providePaused = paused)
+        _uiState.update { current ->
+            if (current is UrnetworkSettingsUiState.Ready) current.copy(providePaused = paused) else current
         }
     }
 
@@ -326,26 +326,27 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
                     item.countryCode.lowercase().contains(q)
             }
         }
-        val current = _uiState.value
-        val selectedLocation = if (current is UrnetworkSettingsUiState.Ready) {
-            current.selectedLocation
-        } else if (isUrnetworkActive.value && userSelectedCountryCode.value != null) {
-            bridge.selectedLocation()
-        } else {
-            null
+        _uiState.update { current ->
+            val selectedLocation = if (current is UrnetworkSettingsUiState.Ready) {
+                current.selectedLocation
+            } else if (isUrnetworkActive.value && userSelectedCountryCode.value != null) {
+                bridge.selectedLocation()
+            } else {
+                null
+            }
+            val providePaused = if (current is UrnetworkSettingsUiState.Ready) {
+                current.providePaused
+            } else if (isUrnetworkActive.value) {
+                bridge.isProvidePaused()
+            } else {
+                false
+            }
+            UrnetworkSettingsUiState.Ready(
+                countries = filtered,
+                selectedLocation = selectedLocation,
+                providePaused = providePaused,
+            )
         }
-        val providePaused = if (current is UrnetworkSettingsUiState.Ready) {
-            current.providePaused
-        } else if (isUrnetworkActive.value) {
-            bridge.isProvidePaused()
-        } else {
-            false
-        }
-        _uiState.value = UrnetworkSettingsUiState.Ready(
-            countries = filtered,
-            selectedLocation = selectedLocation,
-            providePaused = providePaused,
-        )
     }
 
     private fun teardownLocationsVc() {
