@@ -130,7 +130,10 @@ class TelegramProxyServiceStateTest {
         val mockProcess = mockk<Process>(relaxed = true)
         every { mockProcess.isAlive } returns true
         every { mockProcess.inputStream } returns "".byteInputStream()
-        every { mockProcess.waitFor() } answers { exitLatch.await(); 0 }
+        every { mockProcess.waitFor() } answers {
+            exitLatch.await()
+            0
+        }
         every { mockWrapper.startProxy(any(), any(), any(), any()) } answers {
             startingSignal.countDown()
             exitLatch.await()
@@ -153,7 +156,10 @@ class TelegramProxyServiceStateTest {
         val mockProcess = mockk<Process>(relaxed = true)
         every { mockProcess.isAlive } returns true
         every { mockProcess.inputStream } returns "".byteInputStream()
-        every { mockProcess.waitFor() } answers { exitLatch.await(); 0 }
+        every { mockProcess.waitFor() } answers {
+            exitLatch.await()
+            0
+        }
         every { mockWrapper.startProxy(any(), any(), any(), any()) } returns mockProcess
 
         val svc = makeService(mockWrapper)
@@ -220,7 +226,10 @@ class TelegramProxyServiceStateTest {
         val mockProcess = mockk<Process>(relaxed = true)
         every { mockProcess.isAlive } returns true
         every { mockProcess.inputStream } returns "".byteInputStream()
-        every { mockProcess.waitFor() } answers { exitLatch.await(); 0 }
+        every { mockProcess.waitFor() } answers {
+            exitLatch.await()
+            0
+        }
         every { mockWrapper.startProxy(any(), any(), any(), any()) } returns mockProcess
 
         val svc = makeService(mockWrapper)
@@ -247,7 +256,10 @@ class TelegramProxyServiceStateTest {
         val mockProcess = mockk<Process>(relaxed = true)
         every { mockProcess.isAlive } returns true
         every { mockProcess.inputStream } returns "".byteInputStream()
-        every { mockProcess.waitFor() } answers { exitLatch.await(); 0 }
+        every { mockProcess.waitFor() } answers {
+            exitLatch.await()
+            0
+        }
         every { mockWrapper.startProxy(any(), any(), any(), any()) } answers {
             capturedUpstream = arg<String?>(3)
             mockProcess

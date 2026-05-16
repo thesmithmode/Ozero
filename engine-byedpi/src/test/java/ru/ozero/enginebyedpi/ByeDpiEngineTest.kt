@@ -335,10 +335,17 @@ class ByeDpiEngineTest {
     fun `startProxyWithRecovery — normal path skips emergencyReset`() = runTest {
         val startCalled = CountDownLatch(1)
         val normalProxy = mockk<ByeDpiProxy>(relaxed = true)
-        every { normalProxy.startProxy(any()) } answers { startCalled.countDown(); proxyRunning.await(); 0 }
+        every { normalProxy.startProxy(any()) } answers {
+            startCalled.countDown()
+            proxyRunning.await()
+            0
+        }
         val normalEngine = ByeDpiEngine(
             normalProxy,
-            socksProbe = { _, _, _ -> startCalled.await(); 1L },
+            socksProbe = { _, _, _ ->
+                startCalled.await()
+                1L
+            },
         )
         val result = normalEngine.start(EngineConfig.ByeDpi(socksPort = 1080))
         assertIs<StartResult.Success>(result)
@@ -351,13 +358,21 @@ class ByeDpiEngineTest {
         var callCount = 0
         val recProxy = mockk<ByeDpiProxy>(relaxed = true)
         every { recProxy.startProxy(any()) } answers {
-            if (callCount++ == 0) -2
-            else { secondCallStarted.countDown(); proxyRunning.await(); 0 }
+            if (callCount++ == 0) {
+                -2
+            } else {
+                secondCallStarted.countDown()
+                proxyRunning.await()
+                0
+            }
         }
         every { recProxy.emergencyReset() } returns 1
         val recEngine = ByeDpiEngine(
             recProxy,
-            socksProbe = { _, _, _ -> secondCallStarted.await(); 1L },
+            socksProbe = { _, _, _ ->
+                secondCallStarted.await()
+                1L
+            },
         )
         val result = recEngine.start(EngineConfig.ByeDpi(socksPort = 1080))
         assertIs<StartResult.Success>(result)
@@ -390,13 +405,21 @@ class ByeDpiEngineTest {
         var callCount = 0
         val recProxy = mockk<ByeDpiProxy>(relaxed = true)
         every { recProxy.startProxy(any()) } answers {
-            if (callCount++ == 0) -2
-            else { secondCallStarted.countDown(); proxyRunning.await(); 0 }
+            if (callCount++ == 0) {
+                -2
+            } else {
+                secondCallStarted.countDown()
+                proxyRunning.await()
+                0
+            }
         }
         every { recProxy.emergencyReset() } throws RuntimeException("reset failed")
         val recEngine = ByeDpiEngine(
             recProxy,
-            socksProbe = { _, _, _ -> secondCallStarted.await(); 1L },
+            socksProbe = { _, _, _ ->
+                secondCallStarted.await()
+                1L
+            },
         )
         val result = recEngine.start(EngineConfig.ByeDpi(socksPort = 1080))
         assertIs<StartResult.Success>(result)
