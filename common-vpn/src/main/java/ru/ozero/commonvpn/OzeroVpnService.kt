@@ -56,11 +56,11 @@ class OzeroVpnService : android.net.VpnService() {
 
     internal var processKiller: ProcessKiller = ProcessKiller { pid -> Process.killProcess(pid) }
 
-    private val notificationFactory by lazy {
+    private val notificationFactory: OzeroNotificationFactory by lazy {
         OzeroNotificationFactory(this, OzeroVpnService::class.java)
     }
-    private val tunBuilderHelper by lazy { TunBuilderHelper(this) }
-    private val statsLogger by lazy {
+    private val tunBuilderHelper: TunBuilderHelper by lazy { TunBuilderHelper(this) }
+    private val statsLogger: TunnelStatsLogger by lazy {
         TunnelStatsLogger(
             scope = serviceScope,
             tunnelController = tunnelController,
@@ -71,7 +71,7 @@ class OzeroVpnService : android.net.VpnService() {
             engineExtras = ::engineExtras,
         )
     }
-    private val startSequence by lazy {
+    private val startSequence: StartSequenceCoordinator by lazy {
         StartSequenceCoordinator(
             packageName = packageName,
             deps = StartSequenceCollaborators(
@@ -99,7 +99,7 @@ class OzeroVpnService : android.net.VpnService() {
             stopVpnRequest = { stopVpn() },
         )
     }
-    private val engineWatchdog by lazy {
+    private val engineWatchdog: EngineWatchdogCoordinator by lazy {
         EngineWatchdogCoordinator(
             scope = serviceScope,
             healthMonitor = healthMonitor,
@@ -115,7 +115,7 @@ class OzeroVpnService : android.net.VpnService() {
             stopVpnRequest = { stopVpn() },
         )
     }
-    private val shutdownCoord by lazy {
+    private val shutdownCoord: ShutdownCoordinator by lazy {
         ShutdownCoordinator(
             scope = serviceScope,
             deps = ShutdownCollaborators(

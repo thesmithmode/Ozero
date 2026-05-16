@@ -111,7 +111,7 @@ class ShutdownCoordinatorContractTest {
     @Test
     fun `OzeroVpnService строит ShutdownCoordinator через by lazy`() {
         assertTrue(
-            serviceSource.contains("shutdownCoord by lazy {") &&
+            serviceSource.contains("shutdownCoord: ShutdownCoordinator by lazy {") &&
                 serviceSource.contains("ShutdownCoordinator("),
             "OzeroVpnService обязан инжектить shutdownCoord через by lazy.",
         )

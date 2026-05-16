@@ -62,7 +62,7 @@ class StartSequenceCoordinatorContractTest {
     @Test
     fun `OzeroVpnService строит StartSequenceCoordinator через by lazy и вызывает run в startVpn`() {
         assertTrue(
-            serviceSource.contains("startSequence by lazy {") &&
+            serviceSource.contains("startSequence: StartSequenceCoordinator by lazy {") &&
                 serviceSource.contains("StartSequenceCoordinator("),
             "OzeroVpnService обязан инжектить startSequence через by lazy.",
         )

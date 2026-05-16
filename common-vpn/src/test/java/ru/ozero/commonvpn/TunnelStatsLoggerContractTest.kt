@@ -126,7 +126,7 @@ class TunnelStatsLoggerContractTest {
     @Test
     fun `OzeroVpnService строит TunnelStatsLogger через by lazy`() {
         assertTrue(
-            serviceSource.contains("statsLogger by lazy {") &&
+            serviceSource.contains("statsLogger: TunnelStatsLogger by lazy {") &&
                 serviceSource.contains("TunnelStatsLogger("),
             "OzeroVpnService обязан инжектить statsLogger через by lazy.",
         )
