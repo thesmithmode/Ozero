@@ -6,40 +6,50 @@ import kotlin.test.assertTrue
 
 class OzeroVpnServiceLockdownKillswitchTest {
 
-    private val source by lazy {
+    private val serviceSource by lazy {
         val moduleRoot = File(System.getProperty("user.dir") ?: ".")
         val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/OzeroVpnService.kt")
         assertTrue(f.exists(), "OzeroVpnService.kt не найден: $f")
         f.readText()
     }
 
+    private val helperSource by lazy {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/TunBuilderHelper.kt")
+        assertTrue(f.exists(), "TunBuilderHelper.kt не найден: $f")
+        f.readText()
+    }
+
     @Test
-    fun `anchors — все функции-границы существуют в источнике`() {
+    fun `anchors — функции-границы существуют`() {
         listOf(
             "private fun applyLockdown",
             "private fun blackholeIpv6",
-            "internal fun applyEngineTunSpec",
-            "internal fun buildTunBuilder",
-            "override fun onRevoke()",
+            "fun applyEngineTunSpec(",
+            "fun buildTunBuilder(",
+        ).forEach { anchor ->
+            assertTrue(helperSource.contains(anchor), "Anchor потерян в TunBuilderHelper.kt: '$anchor'")
+        }
+        listOf(
             "private suspend fun runStartSequence",
             "private fun startHealthKillswitchWatcher",
             "private fun enterKillswitchMode",
             "private fun stopVpn",
             "private fun recordSessionEnd",
         ).forEach { anchor ->
-            assertTrue(source.contains(anchor), "Anchor потерян в OzeroVpnService.kt: '$anchor'")
+            assertTrue(serviceSource.contains(anchor), "Anchor потерян в OzeroVpnService.kt: '$anchor'")
         }
     }
 
     @Test
     fun `applyLockdown существует и вызывает setUnderlyingNetworks null`() {
         assertTrue(
-            source.contains("private fun applyLockdown"),
-            "OzeroVpnService обязан иметь private fun applyLockdown — Amnezia/PORTAL_WG pattern: " +
+            helperSource.contains("private fun applyLockdown"),
+            "TunBuilderHelper обязан иметь private fun applyLockdown — Amnezia/PORTAL_WG pattern: " +
                 "setUnderlyingNetworks(null) запрещает OS использовать underlying network вне TUN. " +
                 "Без него VPN не enforces lockdown — трафик утекает мимо туннеля при degraded engine.",
         )
-        val body = source
+        val body = helperSource
             .substringAfter("private fun applyLockdown")
             .substringBefore("private fun blackholeIpv6")
         assertTrue(
@@ -50,9 +60,9 @@ class OzeroVpnServiceLockdownKillswitchTest {
 
     @Test
     fun `applyEngineTunSpec вызывает applyLockdown`() {
-        val body = source
-            .substringAfter("internal fun applyEngineTunSpec")
-            .substringBefore("private fun applyLockdown")
+        val body = helperSource
+            .substringAfter("fun applyEngineTunSpec(")
+            .substringBefore("fun buildTunBuilder(")
         assertTrue(
             body.contains("applyLockdown(builder"),
             "applyEngineTunSpec обязан вызывать applyLockdown — иначе TUN строится без " +
@@ -62,9 +72,9 @@ class OzeroVpnServiceLockdownKillswitchTest {
 
     @Test
     fun `buildTunBuilder вызывает applyLockdown`() {
-        val body = source
-            .substringAfter("internal fun buildTunBuilder")
-            .substringBefore("override fun onRevoke()")
+        val body = helperSource
+            .substringAfter("fun buildTunBuilder(")
+            .substringBefore("private fun applyLockdown")
         assertTrue(
             body.contains("applyLockdown(builder"),
             "buildTunBuilder обязан вызывать applyLockdown — для ByeDPI/non-customTun engines.",
@@ -73,7 +83,7 @@ class OzeroVpnServiceLockdownKillswitchTest {
 
     @Test
     fun `runStartSequence запускает health killswitch watcher`() {
-        val body = source
+        val body = serviceSource
             .substringAfter("private suspend fun runStartSequence")
             .substringBefore("private fun startHealthKillswitchWatcher")
         assertTrue(
@@ -85,7 +95,7 @@ class OzeroVpnServiceLockdownKillswitchTest {
 
     @Test
     fun `startHealthKillswitchWatcher триггерит enterKillswitchMode при DEGRADED + killswitchCached`() {
-        val body = source
+        val body = serviceSource
             .substringAfter("private fun startHealthKillswitchWatcher")
             .substringBefore("private fun enterKillswitchMode")
         assertTrue(
@@ -105,7 +115,7 @@ class OzeroVpnServiceLockdownKillswitchTest {
     @Test
     fun `lockdownStartupFdRef объявлен в сервисе`() {
         assertTrue(
-            source.contains("lockdownStartupFdRef"),
+            serviceSource.contains("lockdownStartupFdRef"),
             "OzeroVpnService обязан иметь lockdownStartupFdRef — instant lockdown TUN fd " +
                 "для закрытия startup race gap при killswitch=ON.",
         )
@@ -113,7 +123,7 @@ class OzeroVpnServiceLockdownKillswitchTest {
 
     @Test
     fun `lockdownStartupTun устанавливается до выбора движка в runStartSequence`() {
-        val body = source
+        val body = serviceSource
             .substringAfter("private suspend fun runStartSequence")
             .substringBefore("private fun startHealthKillswitchWatcher")
         val lockdownIdx = body.indexOf("lockdownStartupFdRef.set")
@@ -129,7 +139,7 @@ class OzeroVpnServiceLockdownKillswitchTest {
 
     @Test
     fun `lockdownStartupFdRef закрывается после установки реального TUN в runStartSequence`() {
-        val body = source
+        val body = serviceSource
             .substringAfter("private suspend fun runStartSequence")
             .substringBefore("private fun startHealthKillswitchWatcher")
         val establishIdx = body.indexOf("establishTun")
@@ -145,7 +155,7 @@ class OzeroVpnServiceLockdownKillswitchTest {
 
     @Test
     fun `lockdownStartupFdRef очищается в stopVpn`() {
-        val body = source
+        val body = serviceSource
             .substringAfter("private fun stopVpn")
             .substringBefore("private fun recordSessionEnd")
         assertTrue(

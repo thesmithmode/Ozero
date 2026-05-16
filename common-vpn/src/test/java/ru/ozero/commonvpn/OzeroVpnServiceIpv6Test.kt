@@ -6,16 +6,23 @@ import kotlin.test.assertTrue
 
 class OzeroVpnServiceIpv6Test {
 
-    private val source by lazy {
+    private val serviceSource by lazy {
         val moduleRoot = File(System.getProperty("user.dir") ?: ".")
         val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/OzeroVpnService.kt")
         assertTrue(f.exists(), "OzeroVpnService.kt не найден: $f")
         f.readText()
     }
 
+    private val helperSource by lazy {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/TunBuilderHelper.kt")
+        assertTrue(f.exists(), "TunBuilderHelper.kt не найден: $f")
+        f.readText()
+    }
+
     @Test
     fun `buildTunBuilder принимает ipv6Enabled параметр`() {
-        val sig = source.substringAfter("internal fun buildTunBuilder").substringBefore("): Builder")
+        val sig = helperSource.substringAfter("fun buildTunBuilder(").substringBefore("): VpnService.Builder")
         assertTrue(
             sig.contains("ipv6Enabled"),
             "buildTunBuilder обязан иметь параметр ipv6Enabled для conditional IPv6 routes",
@@ -24,8 +31,8 @@ class OzeroVpnServiceIpv6Test {
 
     @Test
     fun `buildTunBuilder добавляет IPv6 route ВСЕГДА - null-route при ipv6Enabled false`() {
-        val body = source.substringAfter("internal fun buildTunBuilder")
-            .substringBefore("override fun onRevoke()")
+        val body = helperSource.substringAfter("fun buildTunBuilder(")
+            .substringBefore("private fun applyLockdown")
         assertTrue(
             body.contains("addRoute(\"::\", 0)") || body.contains("addRoute(\"::\",0)"),
             "buildTunBuilder обязан добавлять addRoute IPv6 default (::/0) ВСЕГДА — " +
@@ -44,9 +51,9 @@ class OzeroVpnServiceIpv6Test {
 
     @Test
     fun `startVpn читает ipv6Enabled из settingsRepository перед buildTunBuilder`() {
-        val body = source.substringAfter("private fun startVpn()").substringBefore("private fun stopVpn()")
+        val body = serviceSource.substringAfter("private fun startVpn()").substringBefore("private fun stopVpn()")
         val readIdx = body.indexOf("settingsRepository.settings")
-        val builderIdx = body.indexOf("buildTunBuilder(")
+        val builderIdx = body.indexOf("tunBuilderHelper.buildTunBuilder(")
         assertTrue(
             readIdx in 0 until builderIdx,
             "startVpn обязан читать settings ДО buildTunBuilder для передачи ipv6Enabled",
@@ -55,21 +62,19 @@ class OzeroVpnServiceIpv6Test {
     }
 
     @Test
-    fun `anchors — все функции-границы существуют в источнике`() {
-        listOf(
-            "internal fun buildTunBuilder",
-            "override fun onRevoke()",
-            "private fun startVpn()",
-            "private fun stopVpn()",
-        ).forEach { anchor ->
-            assertTrue(source.contains(anchor), "Anchor потерян в OzeroVpnService.kt: '$anchor'")
+    fun `anchors — функции-границы существуют`() {
+        listOf("fun buildTunBuilder(").forEach { anchor ->
+            assertTrue(helperSource.contains(anchor), "Anchor потерян в TunBuilderHelper.kt: '$anchor'")
+        }
+        listOf("private fun startVpn()", "private fun stopVpn()").forEach { anchor ->
+            assertTrue(serviceSource.contains(anchor), "Anchor потерян в OzeroVpnService.kt: '$anchor'")
         }
     }
 
     @Test
     fun `OzeroVpnService инжектит SettingsRepository`() {
         assertTrue(
-            source.contains("@Inject lateinit var settingsRepository"),
+            serviceSource.contains("@Inject lateinit var settingsRepository"),
             "OzeroVpnService обязан @Inject settingsRepository — SettingsRepository доступен через :engines-core",
         )
     }

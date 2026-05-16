@@ -436,7 +436,6 @@ class OzeroVpnServiceLifecycleTest {
             "private fun startVpn()",
             "private fun stopVpn()",
             "private suspend fun performShutdown(",
-            "internal fun buildTunBuilder",
             "override fun onRevoke()",
             "override fun onDestroy()",
             "private suspend fun engineNeedsCustomTun",
@@ -449,7 +448,6 @@ class OzeroVpnServiceLifecycleTest {
             "private fun pickActiveEngine(",
             "private fun establishTun(",
             "private suspend fun establishTunForEngine(",
-            "internal fun applyEngineTunSpec",
         ).forEach { anchor ->
             assertTrue(source.contains(anchor), "Anchor потерян в OzeroVpnService.kt: '$anchor'")
         }
@@ -459,7 +457,7 @@ class OzeroVpnServiceLifecycleTest {
     fun `establishTunForEngine excludeSelf true для всех движков без исключений`() {
         val body = source
             .substringAfter("private suspend fun establishTunForEngine(")
-            .substringBefore("internal fun applyEngineTunSpec")
+            .substringBefore("private fun captureTunIfaceName(")
         assertTrue(
             body.contains("excludeSelf = true"),
             "excludeSelf обязан быть true для ВСЕХ движков (включая WARP). " +

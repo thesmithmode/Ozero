@@ -6,7 +6,7 @@ import kotlin.test.assertTrue
 
 class SplitTunnelVpnServiceSentinelTest {
 
-    private val source by lazy {
+    private val serviceSource by lazy {
         val f = File(
             System.getProperty("user.dir") ?: ".",
             "src/main/java/ru/ozero/commonvpn/OzeroVpnService.kt",
@@ -15,37 +15,46 @@ class SplitTunnelVpnServiceSentinelTest {
         f.readText()
     }
 
+    private val helperSource by lazy {
+        val f = File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/commonvpn/TunBuilderHelper.kt",
+        )
+        assertTrue(f.exists(), "TunBuilderHelper.kt не найден: $f")
+        f.readText()
+    }
+
     private val readSplitConfigBlock by lazy {
-        require("private suspend fun readSplitConfig(" in source) {
+        require("private suspend fun readSplitConfig(" in serviceSource) {
             "anchor 'private suspend fun readSplitConfig(' исчез — обнови sentinel"
         }
-        require("private fun startHealthKillswitchWatcher(" in source) {
+        require("private fun startHealthKillswitchWatcher(" in serviceSource) {
             "anchor 'private fun startHealthKillswitchWatcher(' исчез — обнови sentinel"
         }
-        source.substringAfter("private suspend fun readSplitConfig(")
+        serviceSource.substringAfter("private suspend fun readSplitConfig(")
             .substringBefore("private fun startHealthKillswitchWatcher(")
     }
 
     private val tunBlock by lazy {
-        require("private suspend fun establishTunForEngine(" in source) {
+        require("private suspend fun establishTunForEngine(" in serviceSource) {
             "anchor 'private suspend fun establishTunForEngine(' исчез — обнови sentinel"
         }
-        require("private fun captureTunIfaceName(" in source) {
+        require("private fun captureTunIfaceName(" in serviceSource) {
             "anchor 'private fun captureTunIfaceName(' исчез — обнови sentinel"
         }
-        source.substringAfter("private suspend fun establishTunForEngine(")
+        serviceSource.substringAfter("private suspend fun establishTunForEngine(")
             .substringBefore("private fun captureTunIfaceName(")
     }
 
     private val buildTunBlock by lazy {
-        require("internal fun buildTunBuilder(" in source) {
-            "anchor 'internal fun buildTunBuilder(' исчез — обнови sentinel"
+        require("fun buildTunBuilder(" in helperSource) {
+            "anchor 'fun buildTunBuilder(' исчез в TunBuilderHelper — обнови sentinel"
         }
-        require("override fun onRevoke(" in source) {
-            "anchor 'override fun onRevoke(' исчез — обнови sentinel"
+        require("private fun applyLockdown" in helperSource) {
+            "anchor 'private fun applyLockdown' исчез в TunBuilderHelper — обнови sentinel"
         }
-        source.substringAfter("internal fun buildTunBuilder(")
-            .substringBefore("override fun onRevoke(")
+        helperSource.substringAfter("fun buildTunBuilder(")
+            .substringBefore("private fun applyLockdown")
     }
 
     @Test
@@ -111,8 +120,8 @@ class SplitTunnelVpnServiceSentinelTest {
 
     @Test
     fun `buildTunBuilder не имеет параметра engineId — excludeSelf всегда true`() {
-        val sig = source.substringAfter("internal fun buildTunBuilder(")
-            .substringBefore("): Builder")
+        val sig = helperSource.substringAfter("fun buildTunBuilder(")
+            .substringBefore("): VpnService.Builder")
         assertTrue(
             !sig.contains("engineId"),
             "buildTunBuilder не должен принимать engineId — вызывается только для не-TunFdAcceptor движков " +
