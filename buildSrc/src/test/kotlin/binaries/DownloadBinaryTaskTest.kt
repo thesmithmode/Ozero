@@ -66,8 +66,8 @@ class DownloadBinaryTaskTest {
         val lockPath = writeLock(data, "/lib.so")
 
         val project = ProjectBuilder.builder().withProjectDir(tmp.toFile()).build()
-        val moduleDir = tmp.resolve("module")
-        Files.createDirectories(moduleDir)
+        val testModuleDir = tmp.resolve("module")
+        Files.createDirectories(testModuleDir)
 
         val task = project.tasks.register(
             "downloadBinaries",
@@ -75,7 +75,7 @@ class DownloadBinaryTaskTest {
             Action<DownloadBinaryTask> {
                 lockFile.set(lockPath.toFile())
                 cacheDir.set(tmp.resolve("cache").toFile())
-                moduleDir.set(moduleDir.toFile())
+                moduleDir.set(testModuleDir.toFile())
                 requestedArtifacts.set(listOf("libbyedpi-arm64-v8a.so"))
                 retryDelaysMs.set(listOf(0L, 0L, 0L))
             },
@@ -83,7 +83,7 @@ class DownloadBinaryTaskTest {
 
         task.run()
 
-        val expected = moduleDir.resolve("src/main/jniLibs/arm64-v8a/libbyedpi-arm64-v8a.so")
+        val expected = testModuleDir.resolve("src/main/jniLibs/arm64-v8a/libbyedpi-arm64-v8a.so")
         assertThat(Files.exists(expected)).isTrue()
         assertThat(Files.readAllBytes(expected)).isEqualTo(data)
     }
@@ -94,8 +94,8 @@ class DownloadBinaryTaskTest {
         val lockPath = writeLock(data, "/x.so")
 
         val project = ProjectBuilder.builder().withProjectDir(tmp.toFile()).build()
-        val moduleDir = tmp.resolve("module")
-        Files.createDirectories(moduleDir)
+        val testModuleDir = tmp.resolve("module")
+        Files.createDirectories(testModuleDir)
 
         val task = project.tasks.register(
             "downloadBinaries",
@@ -103,7 +103,7 @@ class DownloadBinaryTaskTest {
             Action<DownloadBinaryTask> {
                 lockFile.set(lockPath.toFile())
                 cacheDir.set(tmp.resolve("cache").toFile())
-                moduleDir.set(moduleDir.toFile())
+                moduleDir.set(testModuleDir.toFile())
                 requestedArtifacts.set(listOf("not-in-lock.so"))
                 retryDelaysMs.set(listOf(0L, 0L, 0L))
             },
@@ -122,15 +122,15 @@ class DownloadBinaryTaskTest {
         val lockPath = writeLock(data, "/lib.so")
 
         val project = ProjectBuilder.builder().withProjectDir(tmp.toFile()).build()
-        val moduleDir = tmp.resolve("module")
-        Files.createDirectories(moduleDir)
+        val testModuleDir = tmp.resolve("module")
+        Files.createDirectories(testModuleDir)
         val task = project.tasks.register(
             "downloadBinaries",
             DownloadBinaryTask::class.java,
             Action<DownloadBinaryTask> {
                 lockFile.set(lockPath.toFile())
                 cacheDir.set(tmp.resolve("cache").toFile())
-                moduleDir.set(moduleDir.toFile())
+                moduleDir.set(testModuleDir.toFile())
                 requestedArtifacts.set(listOf("libbyedpi-arm64-v8a.so"))
                 retryDelaysMs.set(listOf(0L, 0L, 0L))
             },
@@ -138,7 +138,7 @@ class DownloadBinaryTaskTest {
 
         task.run()
         task.run()
-        val expected = moduleDir.resolve("src/main/jniLibs/arm64-v8a/libbyedpi-arm64-v8a.so")
+        val expected = testModuleDir.resolve("src/main/jniLibs/arm64-v8a/libbyedpi-arm64-v8a.so")
         assertThat(Files.exists(expected)).isTrue()
         assertThat(server.requestCount).isEqualTo(1)
     }

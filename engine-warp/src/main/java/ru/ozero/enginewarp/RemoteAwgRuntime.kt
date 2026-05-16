@@ -19,8 +19,7 @@ class RemoteAwgRuntime(
     @Volatile
     private var engine: IWarpEngineProcess? = null
 
-    @Volatile
-    private var serviceConnection: ServiceConnection? = null
+    @Volatile private var serviceConnection: ServiceConnection? = null
     private val bindLock = Any()
 
     private fun ensureConnected(): IWarpEngineProcess {

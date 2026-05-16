@@ -20,7 +20,7 @@ class RealUrnetworkSdkBridgeContractTest {
 
     @Test
     fun `stop() сбрасывает running и cancel'ит in-flight start ДО lifecycleMutex withLock`() {
-        val stopBlock = source.substringAfter("override suspend fun stop():")
+        val stopBlock = source.substringAfter("override suspend fun stop() {")
             .substringBefore("private suspend fun stopUnderLock")
         val runningSetFalseIdx = stopBlock.indexOf("running.set(false)")
         val startCancelIdx = stopBlock.indexOf("startJobRef.getAndSet(null)")
