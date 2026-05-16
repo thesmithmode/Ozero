@@ -370,7 +370,7 @@ class WarpEngineSettingsViewModelTest {
         vm.onSaveEdit()
         advanceUntilIdle()
         assertNotNull(vm.uiState.value.editDraft, "draft должен оставаться открытым при ошибке валидации")
-        assertNotNull(vm.uiState.value.errorMessage)
+        assertNotNull(vm.uiState.value.errorMessageRes)
         assertNull(store.lastUpdateCall, "updateSlot не должен вызываться при невалидных данных")
     }
 

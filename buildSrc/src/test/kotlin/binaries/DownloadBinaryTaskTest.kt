@@ -72,12 +72,12 @@ class DownloadBinaryTaskTest {
         val task = project.tasks.register(
             "downloadBinaries",
             DownloadBinaryTask::class.java,
-            Action<DownloadBinaryTask> { t ->
-                t.lockFile.set(lockPath.toFile())
-                t.cacheDir.set(tmp.resolve("cache").toFile())
-                t.moduleDir.set(moduleDir.toFile())
-                t.requestedArtifacts.set(listOf("libbyedpi-arm64-v8a.so"))
-                t.retryDelaysMs.set(listOf(0L, 0L, 0L))
+            Action<DownloadBinaryTask> {
+                lockFile.set(lockPath.toFile())
+                cacheDir.set(tmp.resolve("cache").toFile())
+                moduleDir.set(moduleDir.toFile())
+                requestedArtifacts.set(listOf("libbyedpi-arm64-v8a.so"))
+                retryDelaysMs.set(listOf(0L, 0L, 0L))
             },
         ).get()
 
@@ -100,12 +100,12 @@ class DownloadBinaryTaskTest {
         val task = project.tasks.register(
             "downloadBinaries",
             DownloadBinaryTask::class.java,
-            Action<DownloadBinaryTask> { t ->
-                t.lockFile.set(lockPath.toFile())
-                t.cacheDir.set(tmp.resolve("cache").toFile())
-                t.moduleDir.set(moduleDir.toFile())
-                t.requestedArtifacts.set(listOf("not-in-lock.so"))
-                t.retryDelaysMs.set(listOf(0L, 0L, 0L))
+            Action<DownloadBinaryTask> {
+                lockFile.set(lockPath.toFile())
+                cacheDir.set(tmp.resolve("cache").toFile())
+                moduleDir.set(moduleDir.toFile())
+                requestedArtifacts.set(listOf("not-in-lock.so"))
+                retryDelaysMs.set(listOf(0L, 0L, 0L))
             },
         ).get()
 
@@ -127,12 +127,12 @@ class DownloadBinaryTaskTest {
         val task = project.tasks.register(
             "downloadBinaries",
             DownloadBinaryTask::class.java,
-            Action<DownloadBinaryTask> { t ->
-                t.lockFile.set(lockPath.toFile())
-                t.cacheDir.set(tmp.resolve("cache").toFile())
-                t.moduleDir.set(moduleDir.toFile())
-                t.requestedArtifacts.set(listOf("libbyedpi-arm64-v8a.so"))
-                t.retryDelaysMs.set(listOf(0L, 0L, 0L))
+            Action<DownloadBinaryTask> {
+                lockFile.set(lockPath.toFile())
+                cacheDir.set(tmp.resolve("cache").toFile())
+                moduleDir.set(moduleDir.toFile())
+                requestedArtifacts.set(listOf("libbyedpi-arm64-v8a.so"))
+                retryDelaysMs.set(listOf(0L, 0L, 0L))
             },
         ).get()
 

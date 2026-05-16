@@ -21,12 +21,12 @@ class MtgWrapper(private val nativeLibDir: String) {
             process = ProcessBuilder(binary.absolutePath, "generate-secret", "--hex", domain)
                 .redirectErrorStream(true)
                 .start()
-            val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
             val finished = process.waitFor(GENERATE_SECRET_TIMEOUT_S, TimeUnit.SECONDS)
             if (!finished) {
                 Log.e(TAG, "generateSecret timeout > ${GENERATE_SECRET_TIMEOUT_S}s")
                 return@withContext null
             }
+            val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
             val exitCode = process.exitValue()
             if (exitCode != 0) {
                 Log.e(TAG, "generateSecret exitCode=$exitCode output=$output")

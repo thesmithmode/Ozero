@@ -25,15 +25,17 @@ class RealUrnetworkSdkBridgeContractTest {
         val runningSetFalseIdx = stopBlock.indexOf("running.set(false)")
         val startCancelIdx = stopBlock.indexOf("startJobRef.getAndSet(null)")
         val withLockIdx = stopBlock.indexOf("lifecycleMutex.withLock")
-        assertTrue(runningSetFalseIdx in 0 until withLockIdx) {
+        assertTrue(
+            runningSetFalseIdx in 0 until withLockIdx,
             "running.set(false) обязан быть ДО lifecycleMutex.withLock — иначе stop ждёт мьютекс " +
-                "за 30s start init, а JNI gates остаются открытыми."
-        }
-        assertTrue(startCancelIdx in 0 until withLockIdx) {
+                "за 30s start init, а JNI gates остаются открытыми.",
+        )
+        assertTrue(
+            startCancelIdx in 0 until withLockIdx,
             "startJobRef.getAndSet(null) с cancel обязан быть ДО lifecycleMutex.withLock — иначе " +
                 "stop тщетно ждёт mutex который держит in-flight start. Симптом: 'already running' " +
-                "на следующий start после неудачной попытки переключения движка."
-        }
+                "на следующий start после неудачной попытки переключения движка.",
+        )
     }
 
     @Test
