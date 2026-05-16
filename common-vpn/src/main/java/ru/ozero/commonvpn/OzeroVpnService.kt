@@ -1,8 +1,5 @@
 package ru.ozero.commonvpn
 
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.content.Intent
 import android.os.Build
 import android.os.ParcelFileDescriptor
@@ -68,11 +65,13 @@ class OzeroVpnService : android.net.VpnService() {
 
     internal var processKiller: ProcessKiller = ProcessKiller { pid -> Process.killProcess(pid) }
 
+    private val notificationFactory by lazy {
+        OzeroNotificationFactory(this, OzeroVpnService::class.java)
+    }
+
     companion object {
         const val ACTION_START = "ru.ozero.vpn.ACTION_START"
         const val ACTION_STOP = "ru.ozero.vpn.ACTION_STOP"
-        const val CHANNEL_ID = "ozero_vpn"
-        const val NOTIFICATION_ID = 1
         const val TUN_ADDRESS = "10.10.10.10"
         const val TUN_PREFIX_LENGTH = 32
         const val TUN_ADDRESS_V6 = "fd00::1"
@@ -127,7 +126,7 @@ class OzeroVpnService : android.net.VpnService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         PersistentLoggers.info(TAG, "onStartCommand action=${intent?.action} startId=$startId")
-        val foregroundOk = enterForegroundOrLog()
+        val foregroundOk = notificationFactory.enterForeground(this)
         if (!foregroundOk) {
             stopSelf(startId)
             return START_NOT_STICKY
@@ -656,8 +655,12 @@ class OzeroVpnService : android.net.VpnService() {
                     )
                     tunnelController.updateStats(snapshot)
                     tickCount++
-                    if (tickCount % STATS_NOTIFY_EVERY == 0) {
-                        updateNotificationWithStats(tunnelController.stats.value)
+                    if (tickCount % STATS_NOTIFY_EVERY == 0 && !stopSignal.get()) {
+                        tunnelController.stats.value?.let { stats ->
+                            notificationFactory.notifyStats(
+                                NotificationStatsFormatter.format(stats, engineExtras()),
+                            )
+                        }
                     }
                     if (tickCount % STATS_LOG_EVERY == 0) {
                         val dTx = txBytes - prevTx
@@ -679,16 +682,6 @@ class OzeroVpnService : android.net.VpnService() {
             }
         }
         statsJobRef.set(job)
-    }
-
-    private fun updateNotificationWithStats(snapshot: TunnelStats?) {
-        if (stopSignal.get() || snapshot == null) return
-        runCatching {
-            val nm = getSystemService(NotificationManager::class.java) ?: return
-            val text = NotificationStatsFormatter.format(snapshot, engineExtras())
-            val n = buildNotification(text)
-            nm.notify(NOTIFICATION_ID, n)
-        }.onFailure { PersistentLoggers.warn(TAG, "updateNotificationWithStats: ${it.message}") }
     }
 
     private fun engineExtras(): String {
@@ -727,10 +720,7 @@ class OzeroVpnService : android.net.VpnService() {
                 }
         }
         runCatching { healthMonitor.stop() }
-        runCatching {
-            val nm = getSystemService(NotificationManager::class.java) ?: return@runCatching
-            nm.notify(NOTIFICATION_ID, buildNotification("Killswitch активен — трафик заблокирован"))
-        }.onFailure { PersistentLoggers.warn(TAG, "killswitch: notification update threw: ${it.message}") }
+        notificationFactory.notifyStats("Killswitch активен — трафик заблокирован")
         starting.set(false)
     }
 
@@ -923,60 +913,6 @@ class OzeroVpnService : android.net.VpnService() {
         return builder
     }
 
-    private fun buildNotification(contentText: String? = null): Notification {
-        val contentIntent = packageManager.getLaunchIntentForPackage(packageName)?.let {
-            android.app.PendingIntent.getActivity(
-                this, 0, it,
-                android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT,
-            )
-        }
-        val stopIntent = Intent(this, OzeroVpnService::class.java).setAction(ACTION_STOP)
-        val stopPending = android.app.PendingIntent.getService(
-            this, 1, stopIntent,
-            android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT,
-        )
-        val stopAction = Notification.Action.Builder(
-            android.R.drawable.ic_menu_close_clear_cancel, "Stop", stopPending,
-        ).build()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            getSystemService(NotificationManager::class.java)?.createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, "Ozero VPN", NotificationManager.IMPORTANCE_LOW),
-            )
-            return Notification.Builder(this, CHANNEL_ID)
-                .setContentTitle("Ozero VPN активен")
-                .setSmallIcon(android.R.drawable.ic_lock_lock)
-                .setOngoing(true)
-                .setOnlyAlertOnce(true)
-                .addAction(stopAction)
-                .apply {
-                    if (contentText != null) {
-                        val firstLine = contentText.substringBefore('\n')
-                        setContentText(firstLine)
-                        setStyle(Notification.BigTextStyle().bigText(contentText))
-                    }
-                    if (contentIntent != null) setContentIntent(contentIntent)
-                }
-                .build()
-        }
-        @Suppress("DEPRECATION")
-        return Notification.Builder(this)
-            .setContentTitle("Ozero VPN активен")
-            .setSmallIcon(android.R.drawable.ic_lock_lock)
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .addAction(stopAction)
-            .apply {
-                if (contentText != null) {
-                    val firstLine = contentText.substringBefore('\n')
-                    setContentText(firstLine)
-                    @Suppress("DEPRECATION")
-                    setStyle(Notification.BigTextStyle().bigText(contentText))
-                }
-                if (contentIntent != null) setContentIntent(contentIntent)
-            }
-            .build()
-    }
-
     override fun onRevoke() {
         PersistentLoggers.warn(TAG, "onRevoke — VPN permission revoked")
         stopVpn()
@@ -1003,26 +939,4 @@ class OzeroVpnService : android.net.VpnService() {
         super.onDestroy()
     }
 
-    private fun enterForegroundOrLog(): Boolean {
-        return try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                val n = buildNotification()
-                val su = android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-                val fb = android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MANIFEST
-                try {
-                    startForeground(NOTIFICATION_ID, n, su)
-                } catch (t: Throwable) {
-                    PersistentLoggers.warn(TAG, "startForeground SPECIAL_USE rejected, fallback to MANIFEST type", t)
-                    startForeground(NOTIFICATION_ID, n, fb)
-                }
-            } else {
-                startForeground(NOTIFICATION_ID, buildNotification())
-            }
-            Log.i(TAG, "startForeground OK")
-            true
-        } catch (t: Throwable) {
-            PersistentLoggers.error(TAG, "startForeground threw: ${t.message}", t)
-            false
-        }
-    }
 }

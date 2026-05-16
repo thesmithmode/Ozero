@@ -20,7 +20,7 @@ class OzeroVpnServiceLockdownKillswitchTest {
             "private fun blackholeIpv6",
             "internal fun applyEngineTunSpec",
             "internal fun buildTunBuilder",
-            "private fun buildNotification",
+            "override fun onRevoke()",
             "private suspend fun runStartSequence",
             "private fun startHealthKillswitchWatcher",
             "private fun enterKillswitchMode",
@@ -64,7 +64,7 @@ class OzeroVpnServiceLockdownKillswitchTest {
     fun `buildTunBuilder вызывает applyLockdown`() {
         val body = source
             .substringAfter("internal fun buildTunBuilder")
-            .substringBefore("private fun buildNotification")
+            .substringBefore("override fun onRevoke()")
         assertTrue(
             body.contains("applyLockdown(builder"),
             "buildTunBuilder обязан вызывать applyLockdown — для ByeDPI/non-customTun engines.",

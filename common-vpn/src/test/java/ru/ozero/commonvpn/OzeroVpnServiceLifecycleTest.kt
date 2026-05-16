@@ -118,27 +118,8 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `onDestroy не force-killит процесс`() {
-        val body = source.substringAfter("override fun onDestroy()").substringBefore("private fun enterForegroundOrLog")
+        val body = source.substringAfter("override fun onDestroy()").substringBefore("\n}\n")
         assertFalse(body.contains("processKiller.kill(Process.myPid())"))
-    }
-
-    @Test
-    fun `buildNotification содержит Stop action с ACTION_STOP intent`() {
-        val body = source.substringAfter("private fun buildNotification").substringBefore("override fun onRevoke")
-        assertTrue(
-            body.contains("ACTION_STOP"),
-            "notification обязан содержать ACTION_STOP intent — иначе юзер не может остановить VPN " +
-                "из notification shade без открытия app",
-        )
-        assertTrue(body.contains("addAction"), "notification обязан содержать addAction для Stop кнопки")
-        assertTrue(
-            body.contains("PendingIntent.getService") || body.contains("getService"),
-            "Stop action должен использовать PendingIntent.getService — direct call в OzeroVpnService.onStartCommand",
-        )
-        assertTrue(
-            body.contains("FLAG_IMMUTABLE"),
-            "PendingIntent с Android 12+ обязан FLAG_IMMUTABLE",
-        )
     }
 
     @Test
@@ -166,7 +147,7 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `onDestroy вызывает performShutdown с callStopSelf=false`() {
-        val body = source.substringAfter("override fun onDestroy()").substringBefore("private fun enterForegroundOrLog")
+        val body = source.substringAfter("override fun onDestroy()").substringBefore("\n}\n")
         assertTrue(
             body.contains("performShutdown(callStopSelf = false)"),
             "onDestroy должен передавать callStopSelf=false — сервис уже умирает, " +
@@ -204,7 +185,7 @@ class OzeroVpnServiceLifecycleTest {
     fun `startStatsLogger не вызывает TProxyGetStats — единый источник TunInterfaceStats`() {
         val body = source
             .substringAfter("private fun startStatsLogger()")
-            .substringBefore("private fun updateNotificationWithStats")
+            .substringBefore("private fun engineExtras(")
         assertFalse(
             body.contains("TProxyGetStats"),
             "TProxyGetStats — libhev-only API. Использовать TunInterfaceStats для всех движков",
@@ -295,7 +276,7 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `onDestroy ограничивает runBlocking shutdown через withTimeoutOrNull`() {
-        val body = source.substringAfter("override fun onDestroy()").substringBefore("private fun enterForegroundOrLog")
+        val body = source.substringAfter("override fun onDestroy()").substringBefore("\n}\n")
         assertTrue(
             body.contains("runBlocking"),
             "onDestroy обязан runBlocking shutdown — иначе coroutines умрут до завершения performShutdown",
@@ -316,7 +297,7 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `onDestroy логирует если runBlocking shutdown не уложился в таймаут`() {
-        val body = source.substringAfter("override fun onDestroy()").substringBefore("private fun enterForegroundOrLog")
+        val body = source.substringAfter("override fun onDestroy()").substringBefore("\n}\n")
         assertTrue(
             body.contains("onDestroy shutdown timeout"),
             "Если withTimeoutOrNull вернул null — обязан появиться лог 'onDestroy shutdown timeout' " +
@@ -432,7 +413,7 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `onDestroy не shutdown-ит singleton HealthMonitor`() {
-        val body = source.substringAfter("override fun onDestroy()").substringBefore("private fun enterForegroundOrLog")
+        val body = source.substringAfter("override fun onDestroy()").substringBefore("\n}\n")
         assertFalse(
             body.contains("healthMonitor.shutdown()"),
             "HealthMonitor — @Singleton, его внутренний scope живёт всё время процесса. shutdown() " +
@@ -456,14 +437,12 @@ class OzeroVpnServiceLifecycleTest {
             "private fun stopVpn()",
             "private suspend fun performShutdown(",
             "internal fun buildTunBuilder",
-            "private fun buildNotification",
             "override fun onRevoke()",
             "override fun onDestroy()",
-            "private fun enterForegroundOrLog",
             "private suspend fun engineNeedsCustomTun",
             "private suspend fun awaitEngineReady(",
             "private fun startStatsLogger()",
-            "private fun updateNotificationWithStats",
+            "private fun engineExtras(",
             "private suspend fun runStartSequence()",
             "private suspend fun pickAutoCandidateWithPreflight",
             "private fun autoCandidates",

@@ -18,7 +18,7 @@ class OzeroVpnServiceIpv6BlackholeTest {
         listOf(
             "private fun blackholeIpv6",
             "internal fun buildTunBuilder",
-            "private fun buildNotification",
+            "override fun onRevoke()",
             "internal fun applyEngineTunSpec",
             "private suspend fun establishTunForEngine",
             "private fun captureTunIfaceName",
@@ -48,7 +48,7 @@ class OzeroVpnServiceIpv6BlackholeTest {
     fun `buildTunBuilder вызывает blackholeIpv6 при ipv6Enabled false`() {
         val body = source
             .substringAfter("internal fun buildTunBuilder")
-            .substringBefore("private fun buildNotification")
+            .substringBefore("override fun onRevoke()")
         assertTrue(
             body.contains("blackholeIpv6(builder"),
             "buildTunBuilder обязан вызывать blackholeIpv6 в else-ветке при ipv6Enabled=false для закрытия IPv6 leak",

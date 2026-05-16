@@ -176,6 +176,17 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
+    fun `stop() закрывает walletVcRef — SDK освобождает Sub listeners при close VC`() {
+        val stopBlock = source.substringAfter("override suspend fun stop").substringBefore("override fun isRunning")
+        assertTrue(
+            stopBlock.contains("walletVcRef.getAndSet(null)"),
+            "stopUnderLock обязан забирать walletVcRef.getAndSet(null) — иначе sticky ref + " +
+                "addUnpaidByteCountListener Sub утекает до конца процесса. " +
+                "Pattern: walletVc.close() освобождает Sub'ы (upstream WalletViewModel.kt:522-526).",
+        )
+    }
+
+    @Test
     fun `stop() очищает ioLoop через runCatching`() {
         val stopBlock = source.substringAfter("override suspend fun stop").substringBefore("override fun isRunning")
         assertTrue(stopBlock.contains("running.set(false)"))

@@ -41,11 +41,11 @@ class SplitTunnelVpnServiceSentinelTest {
         require("internal fun buildTunBuilder(" in source) {
             "anchor 'internal fun buildTunBuilder(' исчез — обнови sentinel"
         }
-        require("private fun buildNotification(" in source) {
-            "anchor 'private fun buildNotification(' исчез — обнови sentinel"
+        require("override fun onRevoke(" in source) {
+            "anchor 'override fun onRevoke(' исчез — обнови sentinel"
         }
         source.substringAfter("internal fun buildTunBuilder(")
-            .substringBefore("private fun buildNotification(")
+            .substringBefore("override fun onRevoke(")
     }
 
     @Test

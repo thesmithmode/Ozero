@@ -25,7 +25,7 @@ class OzeroVpnServiceIpv6Test {
     @Test
     fun `buildTunBuilder добавляет IPv6 route ВСЕГДА - null-route при ipv6Enabled false`() {
         val body = source.substringAfter("internal fun buildTunBuilder")
-            .substringBefore("private fun buildNotification")
+            .substringBefore("override fun onRevoke()")
         assertTrue(
             body.contains("addRoute(\"::\", 0)") || body.contains("addRoute(\"::\",0)"),
             "buildTunBuilder обязан добавлять addRoute IPv6 default (::/0) ВСЕГДА — " +
@@ -58,7 +58,7 @@ class OzeroVpnServiceIpv6Test {
     fun `anchors — все функции-границы существуют в источнике`() {
         listOf(
             "internal fun buildTunBuilder",
-            "private fun buildNotification",
+            "override fun onRevoke()",
             "private fun startVpn()",
             "private fun stopVpn()",
         ).forEach { anchor ->
