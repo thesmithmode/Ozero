@@ -1,4 +1,4 @@
-package ru.ozero.commonvpn
+﻿package ru.ozero.commonvpn
 
 import android.content.Intent
 import android.os.Build
@@ -11,7 +11,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -33,8 +32,6 @@ import javax.inject.Inject
 fun interface ProcessKiller {
     fun kill(pid: Int)
 }
-
-private data class TunnelStatsReadResult(val rxBytes: Long, val txBytes: Long, val source: String)
 
 @AndroidEntryPoint
 @Suppress("TooManyFunctions", "LargeClass")
@@ -66,6 +63,17 @@ class OzeroVpnService : android.net.VpnService() {
         OzeroNotificationFactory(this, OzeroVpnService::class.java)
     }
     private val tunBuilderHelper by lazy { TunBuilderHelper(this) }
+    private val statsLogger by lazy {
+        TunnelStatsLogger(
+            scope = serviceScope,
+            tunnelController = tunnelController,
+            notificationFactory = notificationFactory,
+            tunIfaceNameRef = tunIfaceNameRef,
+            stopSignal = stopSignal,
+            statsJobRef = statsJobRef,
+            engineExtras = ::engineExtras,
+        )
+    }
     private val engineWatchdog by lazy {
         EngineWatchdogCoordinator(
             scope = serviceScope,
@@ -95,9 +103,6 @@ class OzeroVpnService : android.net.VpnService() {
         private const val CHAIN_START_TIMEOUT_MS = 30_000L
         private const val PARALLEL_STOP_TIMEOUT_MS = 4_000L
         private const val SHUTDOWN_JOIN_TIMEOUT_MS = 7_000L
-        private const val STATS_SAMPLE_INTERVAL_MS = 1_000L
-        private const val STATS_LOG_EVERY = 30
-        private const val STATS_NOTIFY_EVERY = 1
         private const val SETTINGS_READ_TIMEOUT_MS = 1_500L
         private const val ON_DESTROY_SHUTDOWN_TIMEOUT_MS = 5_000L
         private const val PREFLIGHT_HARD_TIMEOUT_MS = 7_000L
@@ -281,7 +286,7 @@ class OzeroVpnService : android.net.VpnService() {
         }
         if (!usesCustomTun) engineWatchdog.startHealthKillswitchWatcher(activeEngineId)
         if (usesCustomTun) engineWatchdog.startPeerWatchdog(activeEngineId)
-        startStatsLogger()
+        statsLogger.start()
     }
 
     private suspend fun readSplitConfig(
@@ -542,73 +547,6 @@ class OzeroVpnService : android.net.VpnService() {
         return true
     }
 
-    private fun startStatsLogger() {
-        statsJobRef.getAndSet(null)?.cancel()
-        val job = serviceScope.launch {
-            var prevTx = 0L
-            var prevRx = 0L
-            var tickCount = 0
-            try {
-                while (true) {
-                    delay(STATS_SAMPLE_INTERVAL_MS)
-                    if (stopSignal.get()) return@launch
-                    val iface = tunIfaceNameRef.get()
-                    val read = if (iface != null) {
-                        TunInterfaceStats.readTunStats(iface)?.let {
-                            TunnelStatsReadResult(it.rxBytes, it.txBytes, "iface=$iface")
-                        }
-                    } else {
-                        null
-                    } ?: UidTrafficStats.read()?.let {
-                        TunnelStatsReadResult(it.rxBytes, it.txBytes, "uid")
-                    }
-                    if (read == null) {
-                        if (tickCount % STATS_LOG_EVERY == 0) {
-                            PersistentLoggers.warn(TAG, "TunnelStats: ни iface, ни uid stats недоступны")
-                        }
-                        tickCount++
-                        continue
-                    }
-                    val rxBytes = read.rxBytes
-                    val txBytes = read.txBytes
-                    val source = read.source
-                    val snapshot = TunnelStats(
-                        txPackets = 0L,
-                        txBytes = txBytes,
-                        rxPackets = 0L,
-                        rxBytes = rxBytes,
-                        timestampMs = System.currentTimeMillis(),
-                    )
-                    tunnelController.updateStats(snapshot)
-                    tickCount++
-                    if (tickCount % STATS_NOTIFY_EVERY == 0 && !stopSignal.get()) {
-                        tunnelController.stats.value?.let { stats ->
-                            notificationFactory.notifyStats(
-                                NotificationStatsFormatter.format(stats, engineExtras()),
-                            )
-                        }
-                    }
-                    if (tickCount % STATS_LOG_EVERY == 0) {
-                        val dTx = txBytes - prevTx
-                        val dRx = rxBytes - prevRx
-                        Log.i(
-                            TAG,
-                            "TunnelStats[$source] tx=${BytesFormatter.humanReadable(txBytes)} " +
-                                "rx=${BytesFormatter.humanReadable(rxBytes)} " +
-                                "Δtx=${BytesFormatter.humanReadable(dTx)} Δrx=${BytesFormatter.humanReadable(dRx)}",
-                        )
-                        prevTx = txBytes
-                        prevRx = rxBytes
-                    }
-                }
-            } catch (ce: kotlinx.coroutines.CancellationException) {
-                throw ce
-            } catch (t: Throwable) {
-                PersistentLoggers.warn(TAG, "stats logger threw: ${t.message}")
-            }
-        }
-        statsJobRef.set(job)
-    }
 
     private fun engineExtras(): String {
         if (!::chainOrchestrator.isInitialized) return ""
@@ -631,7 +569,7 @@ class OzeroVpnService : android.net.VpnService() {
         val priorState = tunnelController.state.value
         tunnelController.onDisconnecting()
         startJobRef.getAndSet(null)?.cancel()
-        statsJobRef.getAndSet(null)?.cancel()
+        statsLogger.cancel()
         engineWatchdog.cancelWatchers()
         lockdownStartupFdRef.getAndSet(null)?.runCatching { close() }
         runCatching { healthMonitor.stop() }
@@ -671,7 +609,7 @@ class OzeroVpnService : android.net.VpnService() {
     private suspend fun performShutdown(callStopSelf: Boolean = true) {
         PersistentLoggers.info(TAG, "performShutdown begin")
         try {
-            statsJobRef.getAndSet(null)?.cancel()
+            statsLogger.cancel()
 
             val chainStopJob = serviceScope.launch {
                 runCatching { chainOrchestrator.stop() }
