@@ -8,6 +8,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import ru.ozero.enginescore.PersistentLoggers
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
@@ -39,7 +40,7 @@ class DohResolver(
         try {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    Log.w(TAG, "HTTP ${response.code}")
+                    PersistentLoggers.warn(TAG, "DoH $endpoint HTTP ${response.code}")
                     return@use DohResult.Failure("HTTP ${response.code}", response.code)
                 }
                 val body = response.body?.bytes() ?: return@use DohResult.Failure("empty body")
@@ -47,7 +48,7 @@ class DohResolver(
                 if (addresses.isEmpty()) DohResult.Failure("нет записей") else DohResult.Ok(addresses)
             }
         } catch (e: IOException) {
-            Log.w(TAG, "IO fail: ${e.message}")
+            PersistentLoggers.warn(TAG, "DoH $endpoint IO fail: ${e.message}", e)
             DohResult.Failure(e.message ?: "network error")
         }
     }

@@ -1,6 +1,7 @@
 package ru.ozero.commondns
 
 import android.util.Log
+import ru.ozero.enginescore.PersistentLoggers
 
 fun interface DnsResolver {
     suspend fun resolve(hostname: String): DohResult
@@ -21,7 +22,7 @@ class DnsResolverChain(private val resolvers: List<DnsResolver>) : DnsResolver {
                     return r
                 }
                 is DohResult.Failure -> {
-                    Log.w(TAG, "resolver #$index fail: ${r.reason}")
+                    PersistentLoggers.warn(TAG, "resolver #$index fail для $hostname: ${r.reason}")
                     lastFailure = r
                 }
             }
