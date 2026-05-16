@@ -63,7 +63,7 @@ class DnsMessageTest {
     }
 
     @Test
-    fun `buildAQuery бросает IllegalArgumentException на label > 63 байт`() {
+    fun `buildAQuery бросает IllegalArgumentException на label больше 63 байт`() {
         val tooLong = "a".repeat(64) + ".com"
         val e = kotlin.runCatching { DnsMessage.buildAQuery(tooLong) }.exceptionOrNull()
         assertTrue(e is IllegalArgumentException, "ожидалась IllegalArgumentException, был: $e")
@@ -77,7 +77,7 @@ class DnsMessageTest {
     }
 
     @Test
-    fun `buildAQuery бросает на total name > 255 байт`() {
+    fun `buildAQuery бросает на total name больше 255 байт`() {
         val labels = generateSequence { "a".repeat(50) }.take(6).joinToString(".")
         val e = kotlin.runCatching { DnsMessage.buildAQuery(labels) }.exceptionOrNull()
         assertTrue(e is IllegalArgumentException, "ожидалась IllegalArgumentException, был: $e")

@@ -78,7 +78,7 @@ class TunBuilderHelperContractTest {
     }
 
     @Test
-    fun `blackholeIpv6 добавляет ULA address fd00 и :: 0 route`() {
+    fun `blackholeIpv6 добавляет ULA address fd00 и route default`() {
         val body = source.substringAfter("private fun blackholeIpv6").substringBefore("companion object")
         assertTrue(body.contains("addAddress(TUN_ADDRESS_V6"), "blackhole обязан addAddress IPv6")
         assertTrue(body.contains("addRoute(\"::\", 0)"), "blackhole обязан addRoute :: 0")

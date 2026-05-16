@@ -80,8 +80,8 @@ class TelegramProxyServiceStateTest {
 
     private fun awaitState(
         svc: TelegramProxyService,
-        condition: (TelegramProxyState) -> Boolean,
         timeoutMs: Long = 3_000,
+        condition: (TelegramProxyState) -> Boolean,
     ): TelegramProxyState {
         val latch = CountDownLatch(1)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

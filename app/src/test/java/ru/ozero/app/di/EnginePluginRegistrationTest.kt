@@ -86,12 +86,11 @@ class EnginePluginRegistrationTest {
     fun `routeTrafficForEngine ищет engine по EngineId через firstOrNull`() {
         val src = File(
             moduleRoot,
-            "../common-vpn/src/main/java/ru/ozero/commonvpn/OzeroVpnService.kt",
+            "../common-vpn/src/main/java/ru/ozero/commonvpn/StartSequenceCoordinator.kt",
         ).readText()
         val routeBlock = src.substringAfter("private suspend fun routeTrafficForEngine")
-            .substringBefore("private suspend fun startNativeTunnel")
         assertTrue(
-            routeBlock.contains("enginePlugins.firstOrNull { it.id == engineId }"),
+            routeBlock.contains("deps.enginePlugins.firstOrNull { it.id == engineId }"),
             "routeTrafficForEngine обязан использовать enginePlugins.firstOrNull { it.id == engineId } — " +
                 "если изменить лookup на по-классу или по hash — DI graph рассыпается без compile error.",
         )
