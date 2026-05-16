@@ -196,7 +196,7 @@ class EngineUrnetwork(
         routeAllV6 = false,
     )
 
-    override suspend fun awaitReady() {
+    override suspend fun awaitReady(): EnginePlugin.ReadyResult {
         val reached = withTimeoutOrNull(peerReadyTimeoutMs) {
             while (true) {
                 val peers = runCatching { sdkBridge.peerCount() }.getOrDefault(0)
@@ -207,8 +207,12 @@ class EngineUrnetwork(
                 delay(peerReadyPollMs)
             }
         }
-        if (reached == null) {
-            PersistentLoggers.warn(TAG, "awaitReady: нет пиров за ${peerReadyTimeoutMs}ms — продолжаем")
+        return if (reached != null) {
+            EnginePlugin.ReadyResult.Ready
+        } else {
+            val reason = "URnetwork: нет пиров за ${peerReadyTimeoutMs}ms"
+            PersistentLoggers.warn(TAG, "awaitReady timeout — $reason — peer watchdog возьмёт")
+            EnginePlugin.ReadyResult.Timeout(reason)
         }
     }
 

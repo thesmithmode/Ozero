@@ -257,7 +257,14 @@ class OzeroVpnService : android.net.VpnService() {
         val chainResult = startChain(activeEngineId, activeConfig) ?: return
         if (!routeTrafficForEngine(activeEngineId, fd, chainResult.finalSocksPort)) return
 
-        enginePlugins.firstOrNull { it.id == activeEngineId }?.awaitReady()
+        val readyResult = enginePlugins.firstOrNull { it.id == activeEngineId }?.awaitReady()
+            ?: ru.ozero.enginescore.EnginePlugin.ReadyResult.Ready
+        if (readyResult is ru.ozero.enginescore.EnginePlugin.ReadyResult.Timeout) {
+            PersistentLoggers.warn(
+                TAG,
+                "awaitReady timeout for $activeEngineId: ${readyResult.reason} — watchdog will catch",
+            )
+        }
 
         tunnelController.onEngineStarted(activeEngineId, chainResult.finalSocksPort)
         val nowMs = System.currentTimeMillis()

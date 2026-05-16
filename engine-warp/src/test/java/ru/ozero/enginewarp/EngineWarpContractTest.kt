@@ -6,6 +6,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.IpProbeRoute
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.TunAttachResult
@@ -361,7 +362,7 @@ class EngineWarpContractTest {
     }
 
     @Test
-    fun `awaitReady возвращается немедленно когда handshake уже выполнен`() = runTest {
+    fun `awaitReady возвращает Ready немедленно когда handshake уже выполнен`() = runTest {
         val calls = AtomicInteger(0)
         val (e, _, _) = engine(
             activeConfig = sampleConfig,
@@ -371,12 +372,13 @@ class EngineWarpContractTest {
             },
         )
         e.start(EngineConfig.Warp, Upstream.None)
-        e.awaitReady()
+        val result = e.awaitReady()
+        assertEquals(EnginePlugin.ReadyResult.Ready, result, "handshake ok → Ready")
         assertTrue(calls.get() >= 1, "handshakeChecker должен быть вызван хотя бы раз")
     }
 
     @Test
-    fun `awaitReady ждёт пока handshake не завершится`() = runTest {
+    fun `awaitReady возвращает Ready после ожидания пока handshake не завершится`() = runTest {
         val calls = AtomicInteger(0)
         val (e, _, _) = engine(
             activeConfig = sampleConfig,
@@ -385,12 +387,13 @@ class EngineWarpContractTest {
             warpReadyPollMs = 50L,
         )
         e.start(EngineConfig.Warp, Upstream.None)
-        e.awaitReady()
+        val result = e.awaitReady()
+        assertEquals(EnginePlugin.ReadyResult.Ready, result, "eventual handshake → Ready")
         assertTrue(calls.get() >= 3, "awaitReady должен опросить хотя бы 3 раза, calls=${calls.get()}")
     }
 
     @Test
-    fun `awaitReady завершается по таймауту — не зависает и не бросает`() = runTest {
+    fun `awaitReady возвращает Timeout по истечении срока — не маскирует как Ready`() = runTest {
         val (e, _, _) = engine(
             activeConfig = sampleConfig,
             handshakeChecker = { _, _ -> false },
@@ -398,18 +401,18 @@ class EngineWarpContractTest {
             warpReadyPollMs = 50L,
         )
         e.start(EngineConfig.Warp, Upstream.None)
-        var returned = false
-        try {
+        val result = try {
             e.awaitReady()
-            returned = true
         } catch (_: Throwable) {
             fail("awaitReady не должен бросать исключение при таймауте")
         }
-        assertTrue(returned, "awaitReady обязан вернуться после таймаута")
+        val timeout = assertIs<EnginePlugin.ReadyResult.Timeout>(result, "timeout обязан вернуть Timeout (root fix #59)")
+        assertTrue(timeout.reason.contains("WARP"), "reason должен содержать имя движка, было: ${timeout.reason}")
+        assertTrue(timeout.reason.contains("300"), "reason должен содержать timeout ms, было: ${timeout.reason}")
     }
 
     @Test
-    fun `awaitReady при исключении из handshakeChecker — не пробрасывает`() = runTest {
+    fun `awaitReady возвращает Timeout если handshakeChecker всегда кидает исключение`() = runTest {
         val (e, _, _) = engine(
             activeConfig = sampleConfig,
             handshakeChecker = { _, _ -> throw IllegalStateException("uapi unavailable") },
@@ -417,14 +420,12 @@ class EngineWarpContractTest {
             warpReadyPollMs = 50L,
         )
         e.start(EngineConfig.Warp, Upstream.None)
-        var returned = false
-        try {
+        val result = try {
             e.awaitReady()
-            returned = true
         } catch (_: Throwable) {
             fail("awaitReady не должен пробрасывать исключения из handshakeChecker")
         }
-        assertTrue(returned, "awaitReady должен вернуться даже если handshakeChecker бросает")
+        assertIs<EnginePlugin.ReadyResult.Timeout>(result, "handshake throw → Timeout (root fix #59)")
     }
 
     private class FakeWarpAutoConfig(

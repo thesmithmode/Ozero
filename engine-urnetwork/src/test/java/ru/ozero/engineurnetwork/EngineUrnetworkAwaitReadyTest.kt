@@ -9,8 +9,11 @@ import ru.ozero.engineurnetwork.auth.ClientJwtResult
 import ru.ozero.engineurnetwork.auth.GuestJwtResult
 import ru.ozero.engineurnetwork.auth.UrnetworkAuthService
 import ru.ozero.enginescore.EngineConfig
+import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.Upstream
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
@@ -34,25 +37,27 @@ class EngineUrnetworkAwaitReadyTest {
     )
 
     @Test
-    fun `awaitReady возвращается немедленно когда peerCount уже больше нуля`() = runTest {
+    fun `awaitReady возвращает Ready немедленно когда peerCount уже больше нуля`() = runTest {
         val bridge = CountableBridge(fixedPeers = 3)
         val eng = engine(bridge, backgroundScope)
         eng.start(baseConfig, Upstream.None)
 
-        eng.awaitReady()
+        val result = eng.awaitReady()
 
+        assertEquals(EnginePlugin.ReadyResult.Ready, result, "peers>0 → Ready без timeout")
         assertTrue(bridge.peerCountCalls.get() >= 1, "peerCount должен быть опрошен хотя бы раз")
     }
 
     @Test
-    fun `awaitReady ждёт пока peerCount не станет положительным`() = runTest {
+    fun `awaitReady возвращает Ready после ожидания пока peerCount не станет положительным`() = runTest {
         val bridge = CountableBridge(fixedPeers = 0)
         bridge.peerCountProvider = { if (bridge.peerCountCalls.get() >= 3) 1 else 0 }
         val eng = engine(bridge, backgroundScope, peerReadyPollMs = 50L)
         eng.start(baseConfig, Upstream.None)
 
-        eng.awaitReady()
+        val result = eng.awaitReady()
 
+        assertEquals(EnginePlugin.ReadyResult.Ready, result, "eventual peers>0 → Ready")
         assertTrue(
             bridge.peerCountCalls.get() >= 3,
             "awaitReady должен опросить минимум 3 раза до успеха, calls=${bridge.peerCountCalls.get()}",
@@ -60,37 +65,35 @@ class EngineUrnetworkAwaitReadyTest {
     }
 
     @Test
-    fun `awaitReady завершается по таймауту когда peers никогда не появляются`() = runTest {
+    fun `awaitReady возвращает Timeout когда peers никогда не появляются — не маскирует как Ready`() = runTest {
         val bridge = CountableBridge(fixedPeers = 0)
         val eng = engine(bridge, backgroundScope, peerReadyTimeoutMs = 300L, peerReadyPollMs = 50L)
         eng.start(baseConfig, Upstream.None)
 
-        var returned = false
-        try {
+        val result = try {
             eng.awaitReady()
-            returned = true
         } catch (_: Throwable) {
             fail("awaitReady не должен бросать исключение при таймауте")
         }
-        assertTrue(returned, "awaitReady обязан вернуться после таймаута, не зависнуть")
+        val timeout = assertIs<EnginePlugin.ReadyResult.Timeout>(result, "timeout обязан вернуть Timeout, не Ready (root fix #59)")
+        assertTrue(timeout.reason.contains("URnetwork"), "reason должен содержать имя движка для диагностики, было: ${timeout.reason}")
+        assertTrue(timeout.reason.contains("300"), "reason должен содержать timeout ms для диагностики, было: ${timeout.reason}")
     }
 
     @Test
-    fun `awaitReady при peerCount бросает исключение — не пробрасывает`() = runTest {
+    fun `awaitReady возвращает Timeout если peerCount всегда кидает исключение`() = runTest {
         val bridge = CountableBridge(fixedPeers = 0).also {
             it.peerCountProvider = { throw IllegalStateException("bridge unavailable") }
         }
         val eng = engine(bridge, backgroundScope, peerReadyTimeoutMs = 300L, peerReadyPollMs = 50L)
         eng.start(baseConfig, Upstream.None)
 
-        var returned = false
-        try {
+        val result = try {
             eng.awaitReady()
-            returned = true
         } catch (_: Throwable) {
             fail("awaitReady не должен пробрасывать исключения из peerCount")
         }
-        assertTrue(returned, "awaitReady должен вернуться даже если peerCount бросает")
+        assertIs<EnginePlugin.ReadyResult.Timeout>(result, "bridge throw → 0 peers → Timeout (root fix #59)")
     }
 
     private object MinimalConfigStore : UrnetworkConfigStore {

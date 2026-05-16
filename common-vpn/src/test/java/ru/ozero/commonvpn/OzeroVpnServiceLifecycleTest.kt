@@ -363,6 +363,27 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
+    fun `runStartSequence обрабатывает ReadyResult Timeout логом — не маскирует как Ready`() {
+        val body = source.substringAfter("private suspend fun runStartSequence()")
+            .substringBefore("private suspend fun engineNeedsCustomTun")
+        assertTrue(
+            body.contains("awaitReady()"),
+            "runStartSequence обязан звать awaitReady — readiness gate перед onEngineStarted",
+        )
+        assertTrue(
+            body.contains("ReadyResult.Timeout"),
+            "runStartSequence обязан проверять ReadyResult.Timeout — root fix #59: " +
+                "без этого timeout молча проходит как success и UI показывает Connected без peers",
+        )
+        val awaitIdx = body.indexOf("awaitReady()")
+        val onStartedIdx = body.indexOf("onEngineStarted(")
+        assertTrue(
+            awaitIdx in 0 until onStartedIdx,
+            "awaitReady должен идти ДО onEngineStarted — readiness gate. awaitIdx=$awaitIdx, onStartedIdx=$onStartedIdx",
+        )
+    }
+
+    @Test
     fun `manual-mode не зовёт pickAutoCandidateWithPreflight`() {
         val body = source.substringAfter("private suspend fun runStartSequence()")
             .substringBefore("private suspend fun engineNeedsCustomTun")

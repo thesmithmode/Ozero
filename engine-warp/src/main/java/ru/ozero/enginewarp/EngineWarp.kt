@@ -80,7 +80,7 @@ class EngineWarp(
         resolvedIni = null
     }
 
-    override suspend fun awaitReady() {
+    override suspend fun awaitReady(): EnginePlugin.ReadyResult {
         val uapiPath = uapiPathProvider()
         val reached = withTimeoutOrNull(warpReadyTimeoutMs) {
             while (true) {
@@ -92,8 +92,12 @@ class EngineWarp(
                 delay(warpReadyPollMs)
             }
         }
-        if (reached == null) {
-            PersistentLoggers.warn(TAG, "awaitReady: WireGuard handshake timeout ${warpReadyTimeoutMs}ms — proceeding")
+        return if (reached != null) {
+            EnginePlugin.ReadyResult.Ready
+        } else {
+            val reason = "WARP: WireGuard handshake timeout ${warpReadyTimeoutMs}ms"
+            PersistentLoggers.warn(TAG, "awaitReady timeout — $reason — proceeding")
+            EnginePlugin.ReadyResult.Timeout(reason)
         }
     }
 
