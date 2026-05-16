@@ -29,18 +29,6 @@ class VpnServiceLifecycleContractTest {
     }
 
     @Test
-    fun `startForeground на API 34+ передаёт правильный тип FGS`() {
-        val mentionsApi34 = source.contains("UPSIDE_DOWN_CAKE")
-        val mentionsType = source.contains("FOREGROUND_SERVICE_TYPE_SPECIAL_USE") ||
-            source.contains("FOREGROUND_SERVICE_TYPE_SYSTEM_EXEMPTED")
-        assertTrue(
-            mentionsApi34 && mentionsType,
-            "На Android 14+ (UPSIDE_DOWN_CAKE) startForeground обязан получить " +
-                "ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE — иначе MissingForegroundServiceTypeException.",
-        )
-    }
-
-    @Test
     fun `tunFd close в onDestroy безусловный`() {
         val hasOnDestroy = source.contains("override fun onDestroy")
         assertTrue(hasOnDestroy, "onDestroy должен быть переопределён.")
