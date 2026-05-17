@@ -191,15 +191,17 @@ class TelegramProxyServiceStateTest {
     @Test
     fun `should set Error when process exits unexpectedly after Running`() {
         val mockWrapper = mockk<MtgWrapper>()
+        val exitLatch = CountDownLatch(1)
         val mockProcess = mockk<Process>(relaxed = true)
         every { mockProcess.isAlive } returns true
         every { mockProcess.inputStream } returns "".byteInputStream()
-        every { mockProcess.waitFor() } returns 0
+        every { mockProcess.waitFor() } answers { exitLatch.await(); 0 }
         every { mockWrapper.startProxy(any(), any(), any(), any()) } returns mockProcess
 
         val svc = makeService(mockWrapper)
         svc.start(TelegramProxyConfig(enabled = true, secret = "abc", port = 8080), Upstream.None)
         awaitState(svc) { it is TelegramProxyState.Running }
+        exitLatch.countDown()
         val state = awaitState(svc) { it is TelegramProxyState.Error }
         assertIs<TelegramProxyState.Error>(state)
         assertTrue(state.message.contains("unexpectedly"), "message='${state.message}'")
