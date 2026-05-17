@@ -326,7 +326,7 @@ class RealUrnetworkSdkBridge(
             }
             val sizes = WindowSizeSettings()
             sizes.windowSizeMin = if (fixedIpSize) 1 else 2
-            sizes.windowSizeMax = if (fixedIpSize) 1 else 4
+            sizes.windowSizeMax = if (fixedIpSize) 1 else WINDOW_SIZE_MAX_EXPERIMENTAL
             profile.windowSize = sizes
             device.performanceProfile = profile
             Log.i(TAG, "applyPerformanceProfile windowType=${windowType.rawValue} fixedIp=$fixedIpSize OK")
@@ -604,6 +604,7 @@ class RealUrnetworkSdkBridge(
         const val SUBSCRIPTION_BALANCE_TIMEOUT_MS = 10_000L
         const val STOP_TIMEOUT_MS = 3_000L
         const val DEFAULT_APP_VERSION = "0.0.2"
+        const val WINDOW_SIZE_MAX_EXPERIMENTAL = 6
         const val PREFERRED_COUNTRY_TIMEOUT_MS = 8_000L
         const val WALLET_FETCH_TIMEOUT_MS = 5_000L
         const val WALLET_ADD_TIMEOUT_MS = 10_000L
