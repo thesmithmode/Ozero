@@ -4,8 +4,9 @@ aliases: [warp-process-isolation, engine-warp-aidl, go-runtime-separate-process]
 tags: [native, jni, android, go, architecture, crash, warp]
 sources:
   - "daily/2026-05-11.md"
+  - "daily/2026-05-14.md"
 created: 2026-05-11
-updated: 2026-05-11
+updated: 2026-05-14
 ---
 
 # Go Runtime Process Isolation via android:process + AIDL
@@ -59,14 +60,22 @@ Two build changes were required:
 1. `engine-warp/build.gradle.kts`: `buildFeatures { aidl = true }` to enable AIDL compilation
 2. `RealWarpSdkBridge`: constructor changed from `internal` to `public` — `internal` blocks cross-module instantiation, and the service process needs to create the bridge instance
 
+### Combined AIDL Method (2026-05-14)
+
+The original AIDL interface had separate `turnOn` and `getSockets` methods. Sequential IPC calls create a race window — engine state can change between calls. H3 fix replaced them with a single `turnOnAndGetSockets` method returning `WarpTurnOnResult` (manual Parcelable with handle + `ParcelFileDescriptor` list). This eliminates the entire race class. See [[concepts/combined-aidl-race-elimination]].
+
+Additionally, H4 fix replaced Java reflection for fd cleanup (`FileDescriptor.class.getDeclaredField("fd")`) with `ParcelFileDescriptor.adoptFd(rawFd).close()` — standard Android API, no reflection warnings on newer Android versions.
+
 ## Related Concepts
 
 - [[concepts/dual-go-runtime-eager-loading]] - The prior approach (single-process eager loading) that process isolation supersedes
 - [[concepts/engine-switch-chain-cascading-failures]] - GoRuntimeGuard deadlock that motivated the move to process isolation
 - [[concepts/warp-handle-leak-sigabrt]] - Go GC SIGABRT from handle leaks; process isolation prevents cross-runtime GC corruption
 - [[connections/go-runtime-conflict-resolution-evolution]] - The three-phase evolution from eager loading to process isolation
+- [[concepts/combined-aidl-race-elimination]] - Combined AIDL method replacing sequential IPC calls; eliminates race between turnOn and getSockets
 
 ## Sources
 
 - [[daily/2026-05-11.md]] - Session 19:49: process isolation via `android:process=":engine_warp"` + AIDL IPC; `buildFeatures.aidl=true` required; WarpEngineService added to LoggingContractTest whitelist; RemoteAwgRuntime `Log.w` → `PersistentLoggers.warn`
 - [[daily/2026-05-11.md]] - Session 20:41: asymmetric per-process bootstrap guard — am-go only in :engine_warp (return after load), gojni only in main process; old unconditional dual-load was dead code preserving the conflict; 6 Nubia tombstones confirmed SIGABRT until bootstrap split; protected by OzeroAppProcessIsolationTest
+- [[daily/2026-05-14.md]] - Session 17:47: combined turnOnAndGetSockets AIDL method (H3 fix) + ParcelFileDescriptor.adoptFd().close() replacing reflection (H4 fix)

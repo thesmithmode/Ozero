@@ -6,16 +6,20 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.EnginePlugin
+import ru.ozero.enginescore.IpProbeRoute
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.TunAttachResult
 import ru.ozero.enginescore.TunFdAcceptor
 import ru.ozero.enginescore.Upstream
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 class EngineWarpContractTest {
 
@@ -38,6 +42,9 @@ class EngineWarpContractTest {
         bridge: FakeWarpSdkBridge = FakeWarpSdkBridge(),
         uapiPath: String = "/data/data/ru.ozero.app",
         ipv6Enabled: Boolean = true,
+        handshakeChecker: (String, String) -> Boolean = { _, _ -> true },
+        warpReadyTimeoutMs: Long = 500L,
+        warpReadyPollMs: Long = 50L,
     ): Triple<EngineWarp, FakeWarpAutoConfig, FakeWarpConfigSlotStore> {
         val store = FakeWarpConfigSlotStore(activeConfig = activeConfig, activeRawIni = activeRawIni)
         val auto = FakeWarpAutoConfig(autoConfigResult)
@@ -48,6 +55,9 @@ class EngineWarpContractTest {
             uapiPathProvider = { uapiPath },
             socketProtector = ru.ozero.enginescore.VpnSocketProtector { true },
             ipv6EnabledProvider = { ipv6Enabled },
+            handshakeChecker = handshakeChecker,
+            warpReadyTimeoutMs = warpReadyTimeoutMs,
+            warpReadyPollMs = warpReadyPollMs,
         )
         return Triple(e, auto, store)
     }
@@ -144,6 +154,36 @@ class EngineWarpContractTest {
         e.start(EngineConfig.Warp, Upstream.None)
         e.stop()
         assertEquals(1, bridge.detachCalls)
+    }
+
+    @Test
+    fun `ipProbeRoute до start возвращает Unavailable — WARP не подключён`() = runTest {
+        val (e, _, _) = engine(activeConfig = sampleConfig)
+        val route = e.ipProbeRoute(socksPort = 0)
+        assertIs<IpProbeRoute.Unavailable>(route)
+    }
+
+    @Test
+    fun `ipProbeRoute после start возвращает StaticLocation Cloudflare WARP`() = runTest {
+        val (e, _, _) = engine(activeConfig = sampleConfig)
+        e.start(EngineConfig.Warp, Upstream.None)
+        val route = e.ipProbeRoute(socksPort = 0)
+        val loc = assertIs<IpProbeRoute.StaticLocation>(route)
+        assertEquals("Cloudflare WARP", loc.country)
+        assertNull(loc.countryCode)
+    }
+
+    @Test
+    fun `ipProbeRoute не возвращает Default — иначе fetch покажет реальный IP вместо WARP`() = runTest {
+        val (e, _, _) = engine(activeConfig = sampleConfig)
+        e.start(EngineConfig.Warp, Upstream.None)
+        val route = e.ipProbeRoute(socksPort = 0)
+        assertFalse(
+            route is IpProbeRoute.Default,
+            "WARP обязан override'ить ipProbeRoute — Default → fetch() из main app → реальный IP " +
+                "устройства (с excludeSelf=true). Регрессия защиты: возврат к Default ввёл бы UX обман " +
+                "пользователю.",
+        )
     }
 
     @Test
@@ -316,8 +356,88 @@ class EngineWarpContractTest {
             uapiPathProvider = { "/tmp" },
             socketProtector = ru.ozero.enginescore.VpnSocketProtector { true },
             ipv6EnabledProvider = { ipv6Enabled },
+            handshakeChecker = { _, _ -> true },
         )
         return Triple(e, auto, store)
+    }
+
+    @Test
+    fun `awaitReady возвращает Ready немедленно когда handshake уже выполнен`() = runTest {
+        val calls = AtomicInteger(0)
+        val (e, _, _) = engine(
+            activeConfig = sampleConfig,
+            handshakeChecker = { _, _ ->
+                calls.incrementAndGet()
+                true
+            },
+        )
+        e.start(EngineConfig.Warp, Upstream.None)
+        val result = e.awaitReady()
+        assertEquals(EnginePlugin.ReadyResult.Ready, result, "handshake ok → Ready")
+        assertTrue(calls.get() >= 1, "handshakeChecker должен быть вызван хотя бы раз")
+    }
+
+    @Test
+    fun `awaitReady возвращает Ready после ожидания пока handshake не завершится`() = runTest {
+        val calls = AtomicInteger(0)
+        val (e, _, _) = engine(
+            activeConfig = sampleConfig,
+            handshakeChecker = { _, _ -> calls.incrementAndGet() >= 3 },
+            warpReadyTimeoutMs = 5_000L,
+            warpReadyPollMs = 50L,
+        )
+        e.start(EngineConfig.Warp, Upstream.None)
+        val result = e.awaitReady()
+        assertEquals(EnginePlugin.ReadyResult.Ready, result, "eventual handshake → Ready")
+        assertTrue(calls.get() >= 3, "awaitReady должен опросить хотя бы 3 раза, calls=${calls.get()}")
+    }
+
+    @Test
+    fun `awaitReady возвращает Timeout по истечении срока — не маскирует как Ready`() = runTest {
+        val (e, _, _) = engine(
+            activeConfig = sampleConfig,
+            handshakeChecker = { _, _ -> false },
+            warpReadyTimeoutMs = 300L,
+            warpReadyPollMs = 50L,
+        )
+        e.start(EngineConfig.Warp, Upstream.None)
+        val result = try {
+            e.awaitReady()
+        } catch (_: Throwable) {
+            fail("awaitReady не должен бросать исключение при таймауте")
+        }
+        val timeout = assertIs<EnginePlugin.ReadyResult.Timeout>(
+            result,
+            "timeout обязан вернуть Timeout (root fix #59)",
+        )
+        assertTrue(
+            timeout.reason.contains("WARP"),
+            "reason должен содержать имя движка, было: ${timeout.reason}",
+        )
+        assertTrue(
+            timeout.reason.contains("300"),
+            "reason должен содержать timeout ms, было: ${timeout.reason}",
+        )
+    }
+
+    @Test
+    fun `awaitReady возвращает Timeout если handshakeChecker всегда кидает исключение`() = runTest {
+        val (e, _, _) = engine(
+            activeConfig = sampleConfig,
+            handshakeChecker = { _, _ -> throw IllegalStateException("uapi unavailable") },
+            warpReadyTimeoutMs = 300L,
+            warpReadyPollMs = 50L,
+        )
+        e.start(EngineConfig.Warp, Upstream.None)
+        val result = try {
+            e.awaitReady()
+        } catch (_: Throwable) {
+            fail("awaitReady не должен пробрасывать исключения из handshakeChecker")
+        }
+        assertIs<EnginePlugin.ReadyResult.Timeout>(
+            result,
+            "handshake throw → Timeout (root fix #59)",
+        )
     }
 
     private class FakeWarpAutoConfig(

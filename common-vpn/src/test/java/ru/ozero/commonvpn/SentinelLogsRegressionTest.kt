@@ -7,7 +7,7 @@ import kotlin.test.assertTrue
 class SentinelLogsRegressionTest {
 
     private val gatewaySrc by lazy { read("src/main/java/ru/ozero/commonvpn/HevTunnelGateway.kt") }
-    private val serviceSrc by lazy { read("src/main/java/ru/ozero/commonvpn/OzeroVpnService.kt") }
+    private val shutdownSrc by lazy { read("src/main/java/ru/ozero/commonvpn/ShutdownCoordinator.kt") }
 
     @Test
     fun `gateway start логирует libraryLoaded ДО проверки isLoaded`() {
@@ -49,8 +49,8 @@ class SentinelLogsRegressionTest {
 
     @Test
     fun `service performShutdown закрывает tunFd ПОСЛЕ tunnelGateway_stop`() {
-        val body = serviceSrc.substringAfter("private suspend fun performShutdown(")
-            .substringBefore("internal fun buildTunBuilder")
+        val body = shutdownSrc.substringAfter("suspend fun performShutdown(")
+            .substringBefore("private fun recordSessionEnd")
         val nativeIdx = body.indexOf("tunnelGateway.stop()")
         val closeIdx = body.indexOf("tunFdRef.getAndSet(null)?.close()")
         assertTrue(nativeIdx >= 0, "tunnelGateway.stop() должен присутствовать в performShutdown")

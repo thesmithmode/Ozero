@@ -24,8 +24,6 @@ dependencies {
     implementation(libs.hilt.android)
     implementation(libs.datastore.preferences)
 
-    implementation(libs.relinker)
-
     testImplementation(libs.bundles.junit5)
     testRuntimeOnly(libs.junit.jupiter.engine)
     testImplementation(libs.bundles.testing.unit)

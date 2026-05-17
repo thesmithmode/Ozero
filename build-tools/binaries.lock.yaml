@@ -1,46 +1,6 @@
-tag: mtg-3ad1935b
-generated_at: 2026-05-14T10:47:33Z
+tag: byedpi-aeb849b7
+generated_at: 2026-05-16T09:26:37Z
 artifacts:
-  - name: libbyedpi-arm64-v8a.so
-    engine: byedpi
-    abi: arm64-v8a
-    destination: jniLibs
-    target_filename: libbyedpi.so
-    download_url: https://github.com/thesmithmode/Ozero/releases/download/byedpi-39af2ae9/libbyedpi-arm64-v8a.so
-    sha256: 8d5cc16a6f07c53827c6edc12560d651daa968820a3f6eba470b0a934e570880
-    size_bytes: 319768
-    source_repo: https://github.com/hufrea/byedpi
-    source_commit: 7efde1b1296eaaa187b70e951894dde17527489c
-  - name: libbyedpi-armeabi-v7a.so
-    engine: byedpi
-    abi: armeabi-v7a
-    destination: jniLibs
-    target_filename: libbyedpi.so
-    download_url: https://github.com/thesmithmode/Ozero/releases/download/byedpi-39af2ae9/libbyedpi-armeabi-v7a.so
-    sha256: eafab2550dd260df908929589634d98ab87cbade6d4485204d15f4a66ad30f80
-    size_bytes: 237728
-    source_repo: https://github.com/hufrea/byedpi
-    source_commit: 7efde1b1296eaaa187b70e951894dde17527489c
-  - name: libbyedpi-x86.so
-    engine: byedpi
-    abi: x86
-    destination: jniLibs
-    target_filename: libbyedpi.so
-    download_url: https://github.com/thesmithmode/Ozero/releases/download/byedpi-39af2ae9/libbyedpi-x86.so
-    sha256: 88de284762863b4e76b7407a2577956ee99a2ea376a5e49e38f6133cac35ff8a
-    size_bytes: 254792
-    source_repo: https://github.com/hufrea/byedpi
-    source_commit: 7efde1b1296eaaa187b70e951894dde17527489c
-  - name: libbyedpi-x86_64.so
-    engine: byedpi
-    abi: x86_64
-    destination: jniLibs
-    target_filename: libbyedpi.so
-    download_url: https://github.com/thesmithmode/Ozero/releases/download/byedpi-39af2ae9/libbyedpi-x86_64.so
-    sha256: 94ff2dfe51c9814aaca8cbbd3673c316b2d8faac1b73ada1e0d6437b932433fc
-    size_bytes: 308288
-    source_repo: https://github.com/hufrea/byedpi
-    source_commit: 7efde1b1296eaaa187b70e951894dde17527489c
   - name: libxray.aar
     engine: xray
     destination: libs
@@ -203,3 +163,43 @@ artifacts:
     size_bytes: 12193976
     source_repo: https://github.com/9seconds/mtg
     source_commit: 269852a4f1287ef10762a0d27b1f2605532804c1
+  - name: libbyedpi-arm64-v8a.so
+    engine: byedpi
+    abi: arm64-v8a
+    destination: jniLibs
+    target_filename: libbyedpi.so
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/byedpi-aeb849b7/libbyedpi-arm64-v8a.so
+    sha256: 7c895ebf3572d5485674393992e72ea9b54e5329317407bc3d6e85c5d7b7244e
+    size_bytes: 326224
+    source_repo: https://github.com/hufrea/byedpi
+    source_commit: 7efde1b1296eaaa187b70e951894dde17527489c
+  - name: libbyedpi-armeabi-v7a.so
+    engine: byedpi
+    abi: armeabi-v7a
+    destination: jniLibs
+    target_filename: libbyedpi.so
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/byedpi-aeb849b7/libbyedpi-armeabi-v7a.so
+    sha256: 72ab9df47b9f2e35ece813cf7e7617b1bb9054d9ad87aa05b302ed5e19390a50
+    size_bytes: 239992
+    source_repo: https://github.com/hufrea/byedpi
+    source_commit: 7efde1b1296eaaa187b70e951894dde17527489c
+  - name: libbyedpi-x86.so
+    engine: byedpi
+    abi: x86
+    destination: jniLibs
+    target_filename: libbyedpi.so
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/byedpi-aeb849b7/libbyedpi-x86.so
+    sha256: 25c68f647f67b15f7e5e4df9c9c81831e8e34524b616236a038bbd67cffc9729
+    size_bytes: 256864
+    source_repo: https://github.com/hufrea/byedpi
+    source_commit: 7efde1b1296eaaa187b70e951894dde17527489c
+  - name: libbyedpi-x86_64.so
+    engine: byedpi
+    abi: x86_64
+    destination: jniLibs
+    target_filename: libbyedpi.so
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/byedpi-aeb849b7/libbyedpi-x86_64.so
+    sha256: ad7d9616ff9f674a69d97f7a14106faf1579226d1a26ed83b9799557c4070650
+    size_bytes: 311344
+    source_repo: https://github.com/hufrea/byedpi
+    source_commit: 7efde1b1296eaaa187b70e951894dde17527489c

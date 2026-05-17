@@ -1,12 +1,13 @@
 package ru.ozero.engineurnetwork
 
 import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,6 +28,7 @@ import ru.ozero.enginescore.TunAttachResult
 import ru.ozero.enginescore.TunFdAcceptor
 import ru.ozero.enginescore.TunSpec
 import ru.ozero.enginescore.Upstream
+import ru.ozero.enginescore.settings.SettingsModel
 import java.util.concurrent.atomic.AtomicReference
 
 class EngineUrnetwork(
@@ -35,6 +37,8 @@ class EngineUrnetwork(
     private val authService: UrnetworkAuthService,
     private val pluginScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
     private val statsPollIntervalMs: Long = STATS_POLL_INTERVAL_MS,
+    private val peerReadyTimeoutMs: Long = PEER_READY_TIMEOUT_MS,
+    private val peerReadyPollMs: Long = PEER_READY_POLL_MS,
 ) : EnginePlugin, TunFdAcceptor {
 
     private val statsJobRef = AtomicReference<Job?>(null)
@@ -53,6 +57,16 @@ class EngineUrnetwork(
     private val _stats = MutableStateFlow(EngineStats())
 
     override fun stopTimeoutMs(): Long = URN_STOP_TIMEOUT_MS
+
+    override fun buildManualConfig(settings: SettingsModel?): EngineConfig = EngineConfig.Urnetwork(
+        jwtToken = settings?.urnetworkJwt.orEmpty(),
+        region = settings?.urnetworkCountryCode,
+    )
+
+    override fun statsLabel(stats: EngineStats): String? {
+        val peers = stats.activeConnections
+        return if (peers > 0) "$peers peers" else null
+    }
 
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
         require(config is EngineConfig.Urnetwork) { "EngineUrnetwork требует EngineConfig.Urnetwork" }
@@ -125,11 +139,13 @@ class EngineUrnetwork(
             return EnginePlugin.RecoverResult.Failed("bridge not running")
         }
         val location = sdkBridge.selectedLocation()
-        return runCatching {
+        return try {
             if (location != null) sdkBridge.connectTo(location) else sdkBridge.connectBestAvailable()
             Log.i(TAG, "recover: re-issued connect (location=${location?.countryCode ?: "<best>"})")
             EnginePlugin.RecoverResult.Success
-        }.getOrElse { t ->
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
             PersistentLoggers.warn(TAG, "recover threw: ${t.message}")
             EnginePlugin.RecoverResult.Failed("recover: ${t.message}")
         }
@@ -180,6 +196,26 @@ class EngineUrnetwork(
         routeAllV6 = false,
     )
 
+    override suspend fun awaitReady(): EnginePlugin.ReadyResult {
+        val reached = withTimeoutOrNull(peerReadyTimeoutMs) {
+            while (true) {
+                val peers = runCatching { sdkBridge.peerCount() }.getOrDefault(0)
+                if (peers > 0) {
+                    Log.i(TAG, "awaitReady: peers=$peers — engine ready")
+                    return@withTimeoutOrNull Unit
+                }
+                delay(peerReadyPollMs)
+            }
+        }
+        return if (reached != null) {
+            EnginePlugin.ReadyResult.Ready
+        } else {
+            val reason = "URnetwork: нет пиров за ${peerReadyTimeoutMs}ms"
+            PersistentLoggers.warn(TAG, "awaitReady timeout — $reason — peer watchdog возьмёт")
+            EnginePlugin.ReadyResult.Timeout(reason)
+        }
+    }
+
     override suspend fun attachTun(tunFd: Int): TunAttachResult {
         PersistentLoggers.info(TAG, "attachTun fd=$tunFd")
         return when (val r = sdkBridge.attachTun(tunFd)) {
@@ -222,11 +258,6 @@ class EngineUrnetwork(
         }
     }
 
-    fun shutdown() {
-        statsJobRef.getAndSet(null)?.cancel()
-        pluginScope.cancel()
-    }
-
     private companion object {
         const val TAG = "EngineUrnetwork"
         const val WALLET_LOG_PREFIX_LEN = 6
@@ -235,5 +266,7 @@ class EngineUrnetwork(
         const val STATS_POLL_INTERVAL_MS = 2_000L
 
         const val URN_STOP_TIMEOUT_MS = 5_000L
+        const val PEER_READY_TIMEOUT_MS = 15_000L
+        const val PEER_READY_POLL_MS = 200L
     }
 }

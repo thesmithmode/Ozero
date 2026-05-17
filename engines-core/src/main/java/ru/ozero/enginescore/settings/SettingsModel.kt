@@ -12,6 +12,7 @@ data class SettingsModel(
     val urnetworkJwt: String? = DEFAULT_URNETWORK_JWT,
     val urnetworkCountryCode: String? = DEFAULT_URNETWORK_COUNTRY_CODE,
     val byedpiWinningArgs: String? = DEFAULT_BYEDPI_WINNING_ARGS,
+    val byedpiDefaultAccepted: Boolean = DEFAULT_BYEDPI_DEFAULT_ACCEPTED,
     val customDnsServers: List<String> = DEFAULT_CUSTOM_DNS_SERVERS,
     val hostsMode: HostsMode = DEFAULT_HOSTS_MODE,
     val hosts: List<String> = DEFAULT_HOSTS,
@@ -32,6 +33,7 @@ data class SettingsModel(
         val DEFAULT_URNETWORK_JWT: String? = null
         val DEFAULT_URNETWORK_COUNTRY_CODE: String? = null
         val DEFAULT_BYEDPI_WINNING_ARGS: String? = null
+        const val DEFAULT_BYEDPI_DEFAULT_ACCEPTED: Boolean = false
         val DEFAULT_CUSTOM_DNS_SERVERS: List<String> = emptyList()
         val DEFAULT_HOSTS_MODE: HostsMode = HostsMode.DISABLED
         val DEFAULT_HOSTS: List<String> = emptyList()

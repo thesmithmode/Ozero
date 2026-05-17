@@ -1,0 +1,176 @@
+package ru.ozero.commonvpn
+
+import org.junit.jupiter.api.Test
+import java.io.File
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+class StartSequenceCoordinatorContractTest {
+
+    private val source by lazy {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/StartSequenceCoordinator.kt")
+        assertTrue(f.exists(), "StartSequenceCoordinator.kt не найден: $f")
+        f.readText()
+    }
+
+    private val serviceSource by lazy {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/OzeroVpnService.kt")
+        assertTrue(f.exists(), "OzeroVpnService.kt не найден: $f")
+        f.readText()
+    }
+
+    @Test
+    fun `companion exposes timeout константы`() {
+        assertEquals(1_500L, StartSequenceCoordinator.SETTINGS_READ_TIMEOUT_MS)
+        assertEquals(30_000L, StartSequenceCoordinator.CHAIN_START_TIMEOUT_MS)
+        assertEquals(7_000L, StartSequenceCoordinator.PREFLIGHT_HARD_TIMEOUT_MS)
+    }
+
+    @Test
+    fun `public API — run + engineNeedsCustomTun`() {
+        listOf("suspend fun run(", "suspend fun engineNeedsCustomTun(").forEach { anchor ->
+            assertTrue(source.contains(anchor), "API anchor потерян: '$anchor'")
+        }
+    }
+
+    @Test
+    fun `bundle classes objявлены — StartSequenceState и StartSequenceCollaborators`() {
+        listOf(
+            "class StartSequenceState(",
+            "class StartSequenceCollaborators(",
+        ).forEach { anchor ->
+            assertTrue(source.contains(anchor), "Bundle anchor потерян: '$anchor'")
+        }
+    }
+
+    @Test
+    fun `coordinator не зависит от OzeroVpnService — тестируемость`() {
+        assertTrue(
+            !source.contains("OzeroVpnService"),
+            "StartSequenceCoordinator не должен ссылаться на OzeroVpnService — нарушение модульности.",
+        )
+        val classDecl = source.substringAfter("class StartSequenceCoordinator(").substringBefore("{").trim()
+        assertTrue(
+            classDecl.contains("killswitchSetter: (Boolean) -> Unit") &&
+                classDecl.contains("stopVpnRequest: () -> Unit"),
+            "Coordinator зависит от callbacks, не от service напрямую. Decl:\n$classDecl",
+        )
+    }
+
+    @Test
+    fun `OzeroVpnService строит StartSequenceCoordinator через by lazy и вызывает run в startVpn`() {
+        assertTrue(
+            serviceSource.contains("startSequence: StartSequenceCoordinator by lazy {") &&
+                serviceSource.contains("StartSequenceCoordinator("),
+            "OzeroVpnService обязан инжектить startSequence через by lazy.",
+        )
+        assertTrue(
+            serviceSource.contains("startSequence.run()"),
+            "startVpn обязан вызывать startSequence.run() вместо inline runStartSequence.",
+        )
+    }
+
+    @Test
+    fun `OzeroVpnService больше не имеет inline runStartSequence и related extracted методов`() {
+        listOf(
+            "private suspend fun runStartSequence",
+            "private suspend fun pickAutoCandidateWithPreflight",
+            "private suspend fun establishTunForEngine",
+            "private fun establishTun(",
+            "private fun pickActiveEngine",
+            "private fun captureTunIfaceName",
+            "private fun autoCandidates",
+            "private fun buildEngineConfig",
+            "private fun resolveTargetForUi",
+            "private suspend fun startChain",
+            "private suspend fun routeTrafficForEngine",
+            "private suspend fun startNativeTunnel",
+            "private suspend fun readSplitConfig",
+            "private suspend fun awaitEngineReady",
+            "private suspend fun engineNeedsCustomTun",
+            "SETTINGS_READ_TIMEOUT_MS",
+            "CHAIN_START_TIMEOUT_MS",
+            "PREFLIGHT_HARD_TIMEOUT_MS",
+        ).forEach { anchor ->
+            assertTrue(
+                !serviceSource.contains(anchor),
+                "OzeroVpnService.kt не должен больше содержать '$anchor' — извлечено в StartSequenceCoordinator.",
+            )
+        }
+    }
+
+    @Test
+    fun `run ветка killswitch строит instant lockdown TUN ДО pickAuto`() {
+        val body = source.substringAfter("suspend fun run(").substringBefore("suspend fun engineNeedsCustomTun(")
+        val killswitchIdx = body.indexOf("if (killswitch) {")
+        val pickIdx = body.indexOf("pickAutoCandidateWithPreflight(")
+        assertTrue(killswitchIdx in 0 until pickIdx, "Killswitch lockdown TUN строится ДО pickAuto.")
+        assertTrue(
+            body.contains("state.lockdownStartupFdRef.set(fd)"),
+            "Killswitch ветка обязана сохранять lockdownStartupFdRef.",
+        )
+    }
+
+    @Test
+    fun `run уважает stopping signal — early return перед каждой долгой операцией`() {
+        val body = source.substringAfter("suspend fun run(").substringBefore("suspend fun engineNeedsCustomTun(")
+        val stoppingChecks = body.split("state.stopping.get()").size - 1
+        assertTrue(
+            stoppingChecks >= 2,
+            "run обязан проверять state.stopping минимум 2 раза (вход + между establish и chain). " +
+                "Найдено: $stoppingChecks",
+        )
+    }
+
+    @Test
+    fun `run вызывает awaitEngineReady ДО onEngineStarted — readiness gate`() {
+        val body = source.substringAfter("suspend fun run(").substringBefore("suspend fun engineNeedsCustomTun(")
+        val awaitIdx = body.indexOf("awaitEngineReady(")
+        val onStartedIdx = body.indexOf("onEngineStarted(")
+        assertTrue(
+            awaitIdx in 0 until onStartedIdx,
+            "awaitEngineReady ОБЯЗАН быть ДО onEngineStarted — readiness gate. " +
+                "awaitIdx=$awaitIdx, onStartedIdx=$onStartedIdx",
+        )
+    }
+
+    @Test
+    fun `pickAutoCandidateWithPreflight использует no-op SocketProtector`() {
+        val body = source.substringAfter("private suspend fun pickAutoCandidateWithPreflight(")
+            .substringBefore("private suspend fun establishTunForEngine(")
+        assertTrue(
+            body.contains("SocketProtector { _ -> true }"),
+            "preflight обязан использовать no-op protector — TUN ещё не создан на момент preflight.",
+        )
+    }
+
+    @Test
+    fun `establishTunForEngine использует excludeSelf = true`() {
+        val body = source.substringAfter("private suspend fun establishTunForEngine(")
+            .substringBefore("private fun captureTunIfaceName(")
+        assertTrue(
+            body.contains("excludeSelf = true"),
+            "establishTunForEngine обязан использовать excludeSelf=true для всех движков.",
+        )
+    }
+
+    @Test
+    fun `routeTrafficForEngine — TunFdAcceptor ветка через attachTun, иначе native tunnel`() {
+        val body = source.substringAfter("private suspend fun routeTrafficForEngine(")
+            .substringBefore("private suspend fun startNativeTunnel(")
+        assertTrue(body.contains("engine is TunFdAcceptor"), "TunFdAcceptor проверка обязательна.")
+        assertTrue(body.contains("attachTun(rawDupFd)"), "attachTun вызов обязателен.")
+        assertTrue(body.contains("startNativeTunnel("), "Fallback на startNativeTunnel обязателен.")
+    }
+
+    @Test
+    fun `killswitchSetter получает значение из settings — без побочных эффектов`() {
+        val body = source.substringAfter("suspend fun run(").substringBefore("suspend fun engineNeedsCustomTun(")
+        assertTrue(
+            body.contains("killswitchSetter(killswitch)"),
+            "run обязан проталкивать killswitch значение в сервис через killswitchSetter callback.",
+        )
+    }
+}

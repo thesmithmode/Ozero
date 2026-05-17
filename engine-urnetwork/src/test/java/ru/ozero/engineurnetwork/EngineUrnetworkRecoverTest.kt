@@ -1,6 +1,7 @@
 package ru.ozero.engineurnetwork
 
 import com.bringyour.sdk.LocationsViewController
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -11,6 +12,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import ru.ozero.engineurnetwork.auth.ClientJwtResult
 import ru.ozero.engineurnetwork.auth.GuestJwtResult
 import ru.ozero.engineurnetwork.auth.UrnetworkAuthService
@@ -80,6 +82,29 @@ class EngineUrnetworkRecoverTest {
         assertEquals(1, bridge.connectToCalls)
         assertEquals(0, bridge.connectBestAvailableCalls)
         assertEquals(fakeLocation, bridge.lastConnectToLocation)
+        scope.cancel()
+    }
+
+    @Test
+    fun `recover пробрасывает CancellationException — не глотает coroutine cancel`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(SupervisorJob() + dispatcher)
+        val bridge = FakeRecoverBridge(
+            running = true,
+            location = FakeLocation(),
+            throwOnConnect = CancellationException("upstream cancel"),
+        )
+        val engine = EngineUrnetwork(
+            configStore = FakeStore(byJwt = "j", byClientJwt = "cj"),
+            sdkBridge = bridge,
+            authService = FakeAuth(),
+            pluginScope = scope,
+        )
+        engine.start(baseConfig, Upstream.None)
+        runCurrent()
+        assertThrows<CancellationException> {
+            engine.recover()
+        }
         scope.cancel()
     }
 

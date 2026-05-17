@@ -3,6 +3,7 @@
 
 # AI-агенты и IDE (локальные, не для репо)
 .claude/*
+.planning/
 .gemini/
 GEMINI.md
 opencode.json

@@ -250,6 +250,15 @@ class SettingsRepositoryTest {
     }
 
     @Test
+    fun `setByedpiDefaultAccepted persists boolean`() = runTest {
+        assertFalse(repository.settings.first().byedpiDefaultAccepted)
+        repository.setByedpiDefaultAccepted(true)
+        assertTrue(repository.settings.first().byedpiDefaultAccepted)
+        repository.setByedpiDefaultAccepted(false)
+        assertFalse(repository.settings.first().byedpiDefaultAccepted)
+    }
+
+    @Test
     fun `customDnsServers default empty list`() = runTest {
         assertTrue(repository.settings.first().customDnsServers.isEmpty())
     }

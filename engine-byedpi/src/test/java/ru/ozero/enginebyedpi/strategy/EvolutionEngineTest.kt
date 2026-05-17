@@ -188,7 +188,11 @@ class EvolutionEngineTest {
             evolver = evolver,
             pool = pool,
             sites = listOf("s1.com"),
-            settings = EvolutionEngine.EvolutionSettings(populationSize = 3, maxGenerations = 2),
+            settings = EvolutionEngine.EvolutionSettings(
+                populationSize = 3,
+                maxGenerations = 2,
+                targetFitness = 1.01,
+            ),
         )
         val evalEvents = mutableListOf<Triple<Int, Int, String>>()
         evolutionEngine.evolve(
@@ -299,6 +303,226 @@ class EvolutionEngineTest {
         makeEngine(fastProbe).evolve(seedStrategies = seeds, onGeneration = { fastFitness = it.bestFitness })
         makeEngine(slowProbe).evolve(seedStrategies = seeds, onGeneration = { slowFitness = it.bestFitness })
         assertTrue(fastFitness > slowFitness, "fast probe fitness=$fastFitness should exceed slow=$slowFitness")
+    }
+
+    @Test
+    fun `computeProbeScore returns 1_0 for full success`() {
+        val engine = EvolutionEngine(
+            byeDpiEngine = AlwaysSucceedEngine(),
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(GenePool(seeds)),
+            pool = GenePool(seeds),
+            sites = listOf("s1"),
+        )
+        assertEquals(1.0, engine.computeProbeScore(ProbeResult(site = "s", success = true, durationMs = 1L)))
+    }
+
+    @Test
+    fun `computeProbeScore returns 0_0 for null`() {
+        val engine = EvolutionEngine(
+            byeDpiEngine = AlwaysSucceedEngine(),
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(GenePool(seeds)),
+            pool = GenePool(seeds),
+            sites = listOf("s1"),
+        )
+        assertEquals(0.0, engine.computeProbeScore(null))
+    }
+
+    @Test
+    fun `computeProbeScore returns partial score for HTTP response without full content`() {
+        val engine = EvolutionEngine(
+            byeDpiEngine = AlwaysSucceedEngine(),
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(GenePool(seeds)),
+            pool = GenePool(seeds),
+            sites = listOf("s1"),
+        )
+        val headersOnly = engine.computeProbeScore(
+            ProbeResult(site = "s", success = false, durationMs = 1L, responseCode = 200, actualLength = 0L),
+        )
+        val withContent = engine.computeProbeScore(
+            ProbeResult(site = "s", success = false, durationMs = 1L, responseCode = 200, actualLength = 512L),
+        )
+        val noResponse = engine.computeProbeScore(
+            ProbeResult(site = "s", success = false, durationMs = 1L),
+        )
+        assertTrue(headersOnly > 0.0, "HTTP headers bypassed DPI — partial credit")
+        assertTrue(withContent > headersOnly, "partial content scores higher than headers only")
+        assertEquals(0.0, noResponse, "no HTTP response = fully blocked")
+    }
+
+    @Test
+    fun `computeProbeScore treats all 1xx-5xx response codes as DPI bypass`() {
+        val engine = EvolutionEngine(
+            byeDpiEngine = AlwaysSucceedEngine(),
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(GenePool(seeds)),
+            pool = GenePool(seeds),
+            sites = listOf("s1"),
+        )
+        for (code in listOf(100, 200, 301, 403, 500, 599)) {
+            val score = engine.computeProbeScore(
+                ProbeResult(site = "s", success = false, durationMs = 1L, responseCode = code),
+            )
+            assertTrue(score > 0.0, "responseCode=$code should be > 0 (DPI bypassed)")
+        }
+        assertEquals(
+            0.0,
+            engine.computeProbeScore(ProbeResult(site = "s", success = false, durationMs = 1L, responseCode = -1)),
+            "responseCode=-1 means no HTTP response = DPI blocked",
+        )
+    }
+
+    @Test
+    fun `granular fitness produces non-zero score for HTTP-only probes`() = runTest {
+        val httpOnlyProbe = object : SocksProbeClient {
+            override suspend fun probe(site: String) = ProbeResult(
+                site = site,
+                success = false,
+                durationMs = 100L,
+                responseCode = 200,
+                actualLength = 512L,
+            )
+        }
+        val pool = GenePool(seeds)
+        val evolutionEngine = EvolutionEngine(
+            byeDpiEngine = AlwaysSucceedEngine(),
+            probeFactory = { _, _ -> httpOnlyProbe },
+            evolver = StrategyEvolver(pool),
+            pool = pool,
+            sites = listOf("s1.com", "s2.com"),
+            settings = EvolutionEngine.EvolutionSettings(
+                populationSize = 2,
+                maxGenerations = 1,
+                targetFitness = 0.0,
+            ),
+        )
+        var capturedResult: EvolutionEngine.GenerationResult? = null
+        evolutionEngine.evolve(seedStrategies = seeds, onGeneration = { capturedResult = it })
+        val result = capturedResult!!
+        assertTrue(result.bestFitness > 0.0, "HTTP-only probes must produce non-zero fitness (granular scoring)")
+        assertEquals(0.0, result.bestSuccessRate, "successRate = 0 since no probe was fully successful")
+    }
+
+    @Test
+    fun `no mutation rate boost on stagnation — constant mutationRate`() {
+        val source = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+        ).resolve("src/main/java/ru/ozero/enginebyedpi/strategy/EvolutionEngine.kt").readText()
+        assertTrue(
+            !source.contains("stagnationCount * 0.5f") && !source.contains("stagnationCount * 0.5"),
+            "Mutation rate boost on stagnation is a костыль removed in favour of granular fitness. " +
+                "Do not re-introduce it.",
+        )
+    }
+
+    @Test
+    fun `default targetFitness is below 1_0 to be reachable`() {
+        val settings = EvolutionEngine.EvolutionSettings()
+        assertTrue(settings.targetFitness < 1.0, "targetFitness ${settings.targetFitness} unreachable — must be < 1.0")
+    }
+
+    @Test
+    fun `default settings reflect v2 parameters`() {
+        val s = EvolutionEngine.EvolutionSettings()
+        assertEquals(30, s.populationSize, "v2 default populationSize must be 30")
+        assertEquals(20, s.maxGenerations, "v2 default maxGenerations must be 20")
+        assertEquals(3, s.eliteCount, "v2 default eliteCount must be 3")
+        assertEquals(0.85, s.targetFitness, "v2 default targetFitness must be 0.85")
+        assertEquals(0.4, s.initialSeedRatio, "v2 seed quota = 40%")
+        assertEquals(0.3, s.initialMemoryRatio, "v2 memory quota = 30%")
+        assertEquals(3_000.0, s.latencyClampMs, "v2 latency clamp = 3000ms")
+        assertEquals(1.5, s.successRateExponent, "v2 successRate exponent = 1.5")
+    }
+
+    @Test
+    fun `computeFitness clamps latency above ceiling to zero score`() {
+        val engine = EvolutionEngine(
+            byeDpiEngine = AlwaysSucceedEngine(),
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(GenePool(seeds)),
+            pool = GenePool(seeds),
+            sites = listOf("s1"),
+        )
+        val above = engine.computeFitness(successRate = 1.0, avgLatencyMs = 5_000.0)
+        val atCeiling = engine.computeFitness(successRate = 1.0, avgLatencyMs = 3_000.0)
+        val below = engine.computeFitness(successRate = 1.0, avgLatencyMs = 100.0)
+        assertEquals(0.0, above, "5000ms must clamp to ceiling → fitness 0")
+        assertEquals(0.0, atCeiling, "3000ms (ceiling) → fitness 0")
+        assertTrue(below > 0.9, "100ms latency → near-1 fitness, got $below")
+    }
+
+    @Test
+    fun `computeFitness exponentially penalises partial success rate`() {
+        val engine = EvolutionEngine(
+            byeDpiEngine = AlwaysSucceedEngine(),
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(GenePool(seeds)),
+            pool = GenePool(seeds),
+            sites = listOf("s1"),
+        )
+        val full = engine.computeFitness(successRate = 1.0, avgLatencyMs = 100.0)
+        val half = engine.computeFitness(successRate = 0.5, avgLatencyMs = 100.0)
+        assertTrue(full > 0.0 && half > 0.0)
+        assertTrue(half / full < 0.5, "exponent 1.5 must penalise 50% rate harder than linear: ratio=${half / full}")
+    }
+
+    @Test
+    fun `computeFitness returns zero for zero success regardless of latency`() {
+        val engine = EvolutionEngine(
+            byeDpiEngine = AlwaysSucceedEngine(),
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(GenePool(seeds)),
+            pool = GenePool(seeds),
+            sites = listOf("s1"),
+        )
+        assertEquals(0.0, engine.computeFitness(0.0, 50.0))
+        assertEquals(0.0, engine.computeFitness(0.0, 0.0))
+    }
+
+    @Test
+    fun `initial population mixes seed memory random per v2 ratios`() = runTest {
+        val abundantSeeds = List(100) { "-seed$it" }
+        val engine = EvolutionEngine(
+            byeDpiEngine = AlwaysSucceedEngine(),
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(GenePool(abundantSeeds)),
+            pool = GenePool(abundantSeeds),
+            sites = listOf("s1"),
+            settings = EvolutionEngine.EvolutionSettings(
+                populationSize = 10,
+                maxGenerations = 1,
+                targetFitness = 0.0,
+            ),
+            random = Random(0),
+        )
+        val commands = mutableSetOf<String>()
+        engine.evolve(
+            seedStrategies = abundantSeeds,
+            onGeneration = {},
+            onChromosomeEval = { _, _, cmd -> commands.add(cmd) },
+        )
+        assertTrue(commands.size >= 5, "v2 mix must produce diverse population, distinct=${commands.size}")
+    }
+
+    @Test
+    fun `start failure result not cached in persistent fitness cache`() = runTest {
+        val engine = AlwaysFailEngine()
+        val pool = GenePool(seeds)
+        val cacheFile = java.io.File.createTempFile("fit", ".json").also { it.deleteOnExit() }
+        val fitnessCache = StrategyFitnessCache(cacheFile)
+        val evolutionEngine = EvolutionEngine(
+            byeDpiEngine = engine,
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(pool),
+            pool = pool,
+            sites = listOf("s1.com"),
+            settings = EvolutionEngine.EvolutionSettings(populationSize = 2, maxGenerations = 1),
+            fitnessCachePersistent = fitnessCache,
+        )
+        evolutionEngine.evolve(seedStrategies = seeds, onGeneration = {})
+        assertEquals(0, fitnessCache.size(), "start failures must not poison persistent fitness cache")
     }
 
     private class CountingEngine : EnginePlugin {

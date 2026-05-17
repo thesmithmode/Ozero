@@ -370,7 +370,7 @@ class WarpEngineSettingsViewModelTest {
         vm.onSaveEdit()
         advanceUntilIdle()
         assertNotNull(vm.uiState.value.editDraft, "draft должен оставаться открытым при ошибке валидации")
-        assertNotNull(vm.uiState.value.errorMessage)
+        assertNotNull(vm.uiState.value.errorMessageRes)
         assertNull(store.lastUpdateCall, "updateSlot не должен вызываться при невалидных данных")
     }
 
@@ -408,12 +408,12 @@ class WarpEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `onGenerate передаёт прогресс через progressText`() = runTest {
+    fun `onGenerate сбрасывает progressMirror после успеха`() = runTest {
         auto.setConfig(SAMPLE)
         auto.progressToEmit = "3/78"
         vm.onGenerate()
         advanceUntilIdle()
-        assertNull(vm.uiState.value.progressText, "progressText сбрасывается после успеха")
+        assertNull(vm.uiState.value.progressMirror, "progressMirror сбрасывается после успеха")
     }
 
     @Test

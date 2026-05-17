@@ -1,5 +1,72 @@
 # Build Log
 
+## [2026-05-15T03:00:00] compile | Daily Log 2026-05-14 (pass 7 — final)
+- Source: daily/2026-05-14.md
+- Articles updated: [[concepts/urnetwork-relay-always]] (Session 21:29: setupPayoutWallet auto-bind implementation + 3 contract tests, replaced PRESET_WALLET dead code note)
+- Index updated: 1 row updated, total 113
+- Verification: all sessions 10:00–21:29 now covered; no remaining gaps
+
+## [2026-05-15T02:00:00] compile | Daily Log 2026-05-14 (pass 6 — post-compaction)
+- Source: daily/2026-05-14.md
+- Articles created: [[concepts/urnetwork-relay-always]] (session 20:30 — relay-always architecture, UrnetworkRelayCoordinator, SDK tunnelStarted/providePaused decoupling, PRESET_WALLET dead code, monetization constraints)
+- Articles updated: [[concepts/byedpi-mock-server-ci-fragility]] (RC4 extended: added probe-before-isActive production ordering fix, commit b61550bc; existing test fix documented as Problem B)
+- Index updated: 1 new row, total 113
+
+## [2026-05-15T01:00:00] compile | Daily Log 2026-05-14 (pass 5 — verification)
+- Source: daily/2026-05-14.md
+- Articles created: none (all created in passes 1-4)
+- Articles updated: none (all updated in passes 1-4)
+- Verification: confirmed all 11 "existing" articles present on disk and indexed; confirmed 5 target articles (byedpi-mock-server-ci-fragility, genetic-strategy-evolution, ci-workflow-discipline, go-runtime-process-isolation, warp-false-connected-no-handshake) contain 2026-05-14.md content; index has 112 rows covering all sessions
+
+## [2026-05-15T00:30:00] compile | Daily Log 2026-05-14 (pass 4)
+- Source: daily/2026-05-14.md
+- Articles created: [[concepts/engine-telegram-mtproxy]]
+- Articles updated: [[concepts/native-binary-auto-update-pipeline]] (binaries.lock.yaml + regen_lock.py + ProcessBuilder pattern), [[concepts/ci-workflow-discipline]] (new module must be explicitly in CI test job)
+- Index updated: 1 new row
+
+## [2026-05-14T23:59:00] compile | Daily Log 2026-05-14
+- Source: daily/2026-05-14.md
+- Articles created: [[concepts/shell-mock-positional-arg-trap]]
+- Articles updated: [[concepts/runtest-uncompleted-coroutines-trap]] (TelegramProxyCoordinator + DataStore scope cases), [[concepts/robolectric-hilt-eager-init-trap]] (TelegramProxyService lazy fix), [[concepts/byedpi-mock-server-ci-fragility]] (root cause 4: mock returns 0 instantly), [[concepts/github-draft-release-visibility]] (3 draft releases fixed), [[concepts/combined-aidl-race-elimination]] (WARP H3/H4 fixes), [[concepts/go-runtime-process-isolation]] (combined AIDL + adoptFd), [[concepts/engine-await-ready-pattern]] (URnetwork peerCount + WARP UAPI), [[concepts/warp-uapi-handshake-polling]] (LocalSocket implementation), [[concepts/warp-false-connected-no-handshake]] (awaitReady integration), [[concepts/byedpi-native-thread-join-race]] (second join after forceClose), [[concepts/android-foreground-service-long-operation]] (StrategyScanService), [[connections/engine-readiness-vs-false-connected]] (awaitReady unification), [[concepts/genetic-strategy-evolution]] (GA v2: popSize 30, maxGen 20, fitness formula)
+
+## [2026-05-14T22:00:00] compile | Daily Log 2026-05-14
+- Source: daily/2026-05-14.md
+- Articles created: [[concepts/android-foreground-service-long-operation]]
+- Articles updated: (none — prior session articles for 2026-05-14 were already compiled)
+- Key extractions: FGS pattern for 6-min strategy scanning, START_NOT_STICKY rationale, finally>onCleared cleanup discipline, notification ID collision avoidance, mockk relaxed Context test pattern
+
+## [2026-05-14T19:00:00+03:00] compile | 2026-05-14.md (pass 1)
+- Source: daily/2026-05-14.md
+- Result: 7 new articles, 1 connection, 4 articles updated
+- Articles created:
+  - [[concepts/runtest-uncompleted-coroutines-trap]] — testScope children infinite coroutines, @AfterEach too late, backgroundScope pattern, DataStore scope
+  - [[concepts/engine-await-ready-pattern]] — awaitReady() default no-op, URnetwork peerCount 200ms/15s, WARP UAPI 300ms/10s, between routeTrafficForEngine and onEngineStarted
+  - [[concepts/warp-uapi-handshake-polling]] — LocalSocket UAPI polling last_handshake_time_sec, NOT awgGetConfig JNI (SIGSEGV), WarpHandshakeUapi.kt
+  - [[concepts/byedpi-native-thread-join-race]] — proxyJob.cancel() ≠ native C exit, second join after forceClose(), g_proxy_running flag race
+  - [[concepts/robolectric-hilt-eager-init-trap]] — @HiltAndroidApp loads real Application in Robolectric, eager field init NPE, lazy + @Config fix
+  - [[concepts/github-draft-release-visibility]] — gh release list omits drafts, asset URLs 404 unauth, fix = --draft=false
+  - [[concepts/combined-aidl-race-elimination]] — turnOnAndGetSockets combined AIDL method, ParcelFileDescriptor.adoptFd().close()
+- Connections created:
+  - [[connections/engine-readiness-vs-false-connected]] — awaitReady() unifies false-connected fix across engines
+- Articles updated:
+  - [[concepts/warp-false-connected-no-handshake]] — UAPI socket polling implementation, awaitReady integration, NOT awgGetConfig JNI
+  - [[concepts/genetic-strategy-evolution]] — GA v2 params (pop30, gen20, elite3, target0.85, fitness^1.5, initial 40/30/30), cache poisoning fix, min length 5
+  - [[concepts/go-runtime-process-isolation]] — combined AIDL turnOnAndGetSockets (H3), ParcelFileDescriptor.adoptFd().close() (H4)
+  - [[concepts/byedpi-mock-server-ci-fragility]] — Root Cause 4: mock returns 0 instant proxyJob completion; fix = answers{latch.await();0}; backgroundScope for pluginScope
+- Index: 9 rows added, 4 rows updated
+- Sessions covered: 10:00 (detekt/ktlint, foreground service), 13:56 (feat/mtg CI), 15:xx (UncompletedCoroutinesError x6+7, Robolectric NPE), 17:xx (root fixes: separate scope, DataStore scope, lazy init, $0 printf), 14:17-14:39 (CI iterations), 15:56 (code review + Split Tunneling tabs/ViewModel), 16:20 (awaitReady URnetwork + ByeDPI join race), 16:33-16:50 (WARP UAPI handshake, awaitReady), 17:47 (combined AIDL H3/H4, URnetwork window), 18:00+ (draft releases, GA v2, CI red fixes, backgroundScope)
+- Excluded: detekt SheetTarget enum (implementation detail), ktlint line-breaks (mechanical), SplitTunneling tabs/ViewModel (UI wiring), foreground service StrategyScanService (implementation), specific CI run numbers, memory flush failures, task tracking feedback (already in feedback memory)
+
+## [2026-05-14T14:00:00+03:00] compile | 2026-05-13.md (pass 7 — sentinel-protecting-bug + stateIn dedup)
+- Source: daily/2026-05-13.md
+- Result: 1 new article, 1 updated
+- Articles created:
+  - [[concepts/sentinel-protecting-bug-trap]] — sentinel guards buggy behavior (Unavailable instead of StaticLocation), blocks correct fix; EngineUrnetworkContractTest incident; prevention: grep sentinels when fixing functions
+- Articles updated:
+  - [[concepts/stateIn-eagerly-test-trap]] — added StateFlow dedup section: distinctUntilChanged() redundant on stateIn() output, StateFlow deduplicates by equality
+- Index: 1 row added (sentinel-protecting-bug-trap), 1 row updated (stateIn summary)
+- Sessions covered: 20:53 (sentinel blocking correct fix), 21:13 (sentinel rewrite + distinctUntilChanged redundancy confirmed)
+
 ## [2026-05-14T11:00:00+03:00] compile | 2026-05-13.md (pass 6 — format upgrade + sentinel note)
 - Source: daily/2026-05-13.md
 - Result: 1 article reformatted to wiki schema; 1 article updated with sentinel note

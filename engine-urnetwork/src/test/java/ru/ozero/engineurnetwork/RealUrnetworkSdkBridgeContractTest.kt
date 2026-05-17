@@ -14,8 +14,56 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
-    fun `start() guard already running`() {
-        assertTrue(source.contains("running.get()") && source.contains("already running"))
+    fun `start() guard already running возвращает Success — идемпотентен для RelayCoordinator`() {
+        val guardBlock = source.substringAfter("if (running.get())").substringBefore("startJobRef.set")
+        assertTrue(
+            source.contains("running.get()"),
+            "start() обязан проверять running.get() при двойном вызове",
+        )
+        assertTrue(
+            guardBlock.contains("StartResult.Success"),
+            "start() при already running обязан возвращать Success (идемпотентность для RelayCoordinator) — " +
+                "возврат Failed блокирует relay когда URnetwork-движок уже запущен bridge.",
+        )
+        assertTrue(
+            !guardBlock.contains("StartResult.Failed"),
+            "start() при already running НЕ должен возвращать Failed — relay coordinator не сможет запустить relay.",
+        )
+    }
+
+    @Test
+    fun `stop() сбрасывает running и cancel'ит in-flight start ДО lifecycleMutex withLock`() {
+        val stopBlock = source.substringAfter("override suspend fun stop() {")
+            .substringBefore("private suspend fun stopUnderLock")
+        val runningSetFalseIdx = stopBlock.indexOf("running.set(false)")
+        val startCancelIdx = stopBlock.indexOf("startJobRef.getAndSet(null)")
+        val withLockIdx = stopBlock.indexOf("lifecycleMutex.withLock")
+        assertTrue(
+            runningSetFalseIdx in 0 until withLockIdx,
+            "running.set(false) обязан быть ДО lifecycleMutex.withLock — иначе stop ждёт мьютекс " +
+                "за 30s start init, а JNI gates остаются открытыми.",
+        )
+        assertTrue(
+            startCancelIdx in 0 until withLockIdx,
+            "startJobRef.getAndSet(null) с cancel обязан быть ДО lifecycleMutex.withLock — иначе " +
+                "stop тщетно ждёт mutex который держит in-flight start. Симптом: 'already running' " +
+                "на следующий start после неудачной попытки переключения движка.",
+        )
+    }
+
+    @Test
+    fun `start() регистрирует свой Job в startJobRef для stop()-cancel`() {
+        val startBlock = source.substringAfter("override suspend fun start(")
+            .substringBefore("private suspend fun runStartOnMain")
+        assertTrue(
+            startBlock.contains("startJobRef.set"),
+            "start() обязан зарегистрировать свой Job в startJobRef — иначе stop() не сможет " +
+                "cancel'ить in-flight init для освобождения lifecycleMutex.",
+        )
+        assertTrue(
+            startBlock.contains("startJobRef.compareAndSet"),
+            "start() обязан очищать startJobRef в finally — иначе stale Job-ref после успешного start.",
+        )
     }
 
     @Test
@@ -141,6 +189,17 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
+    fun `stop() закрывает walletVcRef — SDK освобождает Sub listeners при close VC`() {
+        val stopBlock = source.substringAfter("override suspend fun stop").substringBefore("override fun isRunning")
+        assertTrue(
+            stopBlock.contains("walletVcRef.getAndSet(null)"),
+            "stopUnderLock обязан забирать walletVcRef.getAndSet(null) — иначе sticky ref + " +
+                "addUnpaidByteCountListener Sub утекает до конца процесса. " +
+                "Pattern: walletVc.close() освобождает Sub'ы (upstream WalletViewModel.kt:522-526).",
+        )
+    }
+
+    @Test
     fun `stop() очищает ioLoop через runCatching`() {
         val stopBlock = source.substringAfter("override suspend fun stop").substringBefore("override fun isRunning")
         assertTrue(stopBlock.contains("running.set(false)"))
@@ -175,12 +234,102 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
+    fun `attachTun сериализуется через lifecycleMutex — guard на race со stop`() {
+        val attachOuterBlock = source.substringAfter("override suspend fun attachTun")
+            .substringBefore("private suspend fun attachTunUnderLock")
+        assertTrue(
+            attachOuterBlock.contains("lifecycleMutex.withLock"),
+            "attachTun обязан брать lifecycleMutex.withLock перед делегацией в attachTunUnderLock — " +
+                "иначе concurrent stop() закрывает device/connectVc/ioLoop пока attachTun дёргает Sdk.newIoLoop. " +
+                "Race window: stopUnderLock освобождает refs → attachTunUnderLock ставит ioLoopRef поверх — " +
+                "висячий loop без device → SIGABRT в Go-runtime на следующий poll.",
+        )
+        assertTrue(
+            attachOuterBlock.contains("attachJobRef.set(myJob)"),
+            "attachTun обязан регистрировать свой Job в attachJobRef — иначе stop() не сможет cancel'ить " +
+                "in-flight attachTun для освобождения lifecycleMutex.",
+        )
+        assertTrue(
+            attachOuterBlock.contains("attachJobRef.compareAndSet(myJob, null)"),
+            "attachTun обязан очищать attachJobRef в finally — иначе stale Job-ref после успешного attachTun.",
+        )
+    }
+
+    @Test
+    fun `stop отменяет in-flight attachTun ДО lifecycleMutex withLock`() {
+        val stopBlock = source.substringAfter("override suspend fun stop()")
+            .substringBefore("private suspend fun stopUnderLock")
+        val attachCancelIdx = stopBlock.indexOf("attachJobRef.getAndSet(null)")
+        val withLockIdx = stopBlock.indexOf("lifecycleMutex.withLock")
+        assertTrue(
+            attachCancelIdx in 0 until withLockIdx,
+            "attachJobRef.getAndSet(null) с cancel обязан быть ДО lifecycleMutex.withLock — иначе stop " +
+                "висит за timeout пока attachTun держит mutex с blocking Sdk.newIoLoop. " +
+                "Симптом: stop timed out after Xms — refs cleared, зомби IoLoop остался жив.",
+        )
+    }
+
+    @Test
     fun `start и stop сериализуются через lifecycleMutex`() {
         assertTrue(
             source.contains("private val lifecycleMutex = Mutex()") &&
                 source.contains("lifecycleMutex.withLock"),
             "start/stop обязан проходить через lifecycleMutex. Concurrent start+stop = " +
                 "race на deviceRef/ioLoopRef → потерянные refs → Go-runtime leak → SIGABRT на следующий init.",
+        )
+    }
+
+    @Test
+    fun `setupPayoutWallet вызывается после walletVc start с walletAddress`() {
+        val startBlock = source.substringAfter("private suspend fun runStartOnMain")
+            .substringBefore("override suspend fun stop")
+        assertTrue(
+            startBlock.contains("setupPayoutWallet("),
+            "runStartOnMain обязан вызвать setupPayoutWallet после walletVc.start()",
+        )
+        assertTrue(
+            source.contains("private suspend fun setupPayoutWallet"),
+            "setupPayoutWallet должен быть private suspend fun",
+        )
+    }
+
+    @Test
+    fun `setupPayoutWallet вызывает addExternalWallet и updatePayoutWallet`() {
+        val block = source.substringAfter("private suspend fun setupPayoutWallet")
+            .substringBefore("private fun cleanupOnFailure")
+        assertTrue(block.contains("addExternalWallet("), "должен вызвать addExternalWallet")
+        assertTrue(block.contains("updatePayoutWallet("), "должен вызвать updatePayoutWallet")
+        assertTrue(
+            block.contains("walletAddress.isBlank()"),
+            "пустой walletAddress — ранний возврат, JNI не дёргать",
+        )
+    }
+
+    @Test
+    fun `setupPayoutWallet оборачивает SDK-вызовы в runCatching — не валит старт движка`() {
+        val block = source.substringAfter("private suspend fun setupPayoutWallet")
+            .substringBefore("private fun cleanupOnFailure")
+        assertTrue(
+            block.contains("runCatching"),
+            "setupPayoutWallet обязан runCatching — иначе SDK throw валит старт engine",
+        )
+    }
+
+    @Test
+    fun `setupPayoutWallet success логирует через Log_i не PersistentLoggers_warn`() {
+        val block = source.substringAfter("private suspend fun setupPayoutWallet")
+            .substringBefore("private fun cleanupOnFailure")
+        val successFragment = block.substringAfter("updatePayoutWallet(walletId)")
+            .substringBefore("} else {")
+        assertTrue(
+            successFragment.contains("Log.i") && successFragment.contains("payout wallet set"),
+            "Success-event 'payout wallet set' обязан логироваться через Log.i, не PersistentLoggers.warn — " +
+                "warn-level на success = ложный шум в boot.log + alerting noise. " +
+                "PersistentLoggers.warn остаётся только для аномалий (walletId not found, threw).",
+        )
+        assertTrue(
+            !successFragment.contains("PersistentLoggers.warn"),
+            "Success-event не должен использовать PersistentLoggers.warn — это ошибка severity для нормального пути.",
         )
     }
 

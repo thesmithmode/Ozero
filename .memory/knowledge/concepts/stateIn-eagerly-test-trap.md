@@ -5,7 +5,7 @@ tags: [kotlin, testing, coroutines, viewmodel, gotcha]
 sources:
   - "daily/2026-05-13.md"
 created: 2026-05-13
-updated: 2026-05-13
+updated: 2026-05-14
 ---
 
 # stateIn(WhileSubscribed) Test Trap: .value Without Subscriber
@@ -62,6 +62,12 @@ If `WhileSubscribed` is semantically correct for the API (e.g., resources should
 
 This is more verbose but preserves `WhileSubscribed` semantics in production.
 
+### StateFlow Deduplication: distinctUntilChanged() Redundant on stateIn
+
+`stateIn()` produces a `StateFlow`, which inherently deduplicates emissions by structural equality (`equals()`). Adding `.distinctUntilChanged()` before or after `stateIn()` is redundant — the StateFlow contract already guarantees no duplicate consecutive emissions. This applies to both `Eagerly` and `WhileSubscribed` variants.
+
+Confirmed in session 21:13 (2026-05-13): polling loop with `stateIn` + `data class` state (where `equals()` is auto-generated) does not need `distinctUntilChanged()`. `AutoSelected` singleton and `Loaded` data class both provide correct equality semantics. Three-agent review confirmed this as sufficient dedup protection.
+
 ## Related Concepts
 
 - [[concepts/viewmodel-stateflow-test-race]] - Related ViewModel test race: VM created before state setup → wrong initial emission; both are lifecycle ordering issues in tests
@@ -70,4 +76,4 @@ This is more verbose but preserves `WhileSubscribed` semantics in production.
 
 ## Sources
 
-- [[daily/2026-05-13.md]] - Session 15:06: `WarpEngineSettingsViewModel.selectedDoHProvider` with `WhileSubscribed(0)` → test read `.value` without subscriber → saw `initialValue` not current state; fix = `SharingStarted.Eagerly`
+- [[daily/2026-05-13.md]] - Session 15:06: `WarpEngineSettingsViewModel.selectedDoHProvider` with `WhileSubscribed(0)` → test read `.value` without subscriber → saw `initialValue` not current state; fix = `SharingStarted.Eagerly`; Session 21:13: `distinctUntilChanged()` confirmed redundant on StateFlow from `stateIn()` — StateFlow deduplicates by equality

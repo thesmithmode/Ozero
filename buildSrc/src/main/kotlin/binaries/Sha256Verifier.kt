@@ -8,11 +8,14 @@ import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
 import java.security.DigestInputStream
 import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.locks.ReentrantLock
 
 class IntegrityException(message: String) : RuntimeException(message)
 
 object Sha256Verifier {
     private const val BUFFER_SIZE = 8192
+    private val inProcessLocks = ConcurrentHashMap<Path, ReentrantLock>()
 
     fun streamingHash(input: InputStream): String {
         val md = MessageDigest.getInstance("SHA-256")
@@ -37,16 +40,19 @@ object Sha256Verifier {
     }
 
     fun <T> withFileLock(lockFile: Path, block: () -> T): T {
-        val parent = lockFile.parent ?: lockFile.toAbsolutePath().parent
-        Files.createDirectories(parent)
-        FileChannel.open(
-            lockFile,
-            StandardOpenOption.CREATE,
-            StandardOpenOption.WRITE,
-        ).use { ch ->
-            ch.lock().use {
-                return block()
+        val key = lockFile.toAbsolutePath().normalize()
+        val inProcessLock = inProcessLocks.computeIfAbsent(key) { ReentrantLock() }
+        inProcessLock.lock()
+        try {
+            val parent = key.parent
+            Files.createDirectories(parent)
+            FileChannel.open(key, StandardOpenOption.CREATE, StandardOpenOption.WRITE).use { ch ->
+                ch.lock().use {
+                    return block()
+                }
             }
+        } finally {
+            inProcessLock.unlock()
         }
     }
 }

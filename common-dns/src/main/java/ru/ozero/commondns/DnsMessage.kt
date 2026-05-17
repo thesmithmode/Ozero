@@ -12,15 +12,27 @@ internal object DnsMessage {
     fun buildAAAAQuery(hostname: String): ByteArray = buildQuery(hostname, qtype = 28)
 
     private fun buildQuery(hostname: String, qtype: Int): ByteArray {
+        val labels = hostname.split(".").filter { it.isNotEmpty() }
+        require(labels.isNotEmpty()) { "DNS hostname пустой" }
+        val labelBytes = labels.map { it.toByteArray(Charsets.US_ASCII) }
+        labelBytes.forEach {
+            require(it.size in 1..MAX_LABEL_BYTES) {
+                "DNS label длина ${it.size} вне [1..$MAX_LABEL_BYTES] (RFC 1035 §2.3.4)"
+            }
+        }
+        val totalNameBytes = labelBytes.sumOf { it.size + 1 } + 1
+        require(totalNameBytes <= MAX_NAME_BYTES) {
+            "DNS имя $totalNameBytes байт > $MAX_NAME_BYTES (RFC 1035 §2.3.4)"
+        }
         val buf = ByteArrayOutputStream()
         val id = ByteArray(2)
         random.nextBytes(id)
         buf.write(id)
         buf.write(byteArrayOf(0x01, 0x00))
         buf.write(byteArrayOf(0, 1, 0, 0, 0, 0, 0, 0))
-        hostname.split(".").filter { it.isNotEmpty() }.forEach { label ->
-            buf.write(label.length)
-            buf.write(label.toByteArray())
+        labelBytes.forEach { bytes ->
+            buf.write(bytes.size)
+            buf.write(bytes)
         }
         buf.write(0)
         buf.write(byteArrayOf(0, (qtype and 0xFF).toByte(), 0, 1))
@@ -92,4 +104,6 @@ internal object DnsMessage {
     }
 
     private const val MAX_LABEL_ITER = 128
+    private const val MAX_LABEL_BYTES = 63
+    private const val MAX_NAME_BYTES = 255
 }

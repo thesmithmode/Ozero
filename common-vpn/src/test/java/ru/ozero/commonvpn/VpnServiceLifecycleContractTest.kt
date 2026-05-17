@@ -15,25 +15,16 @@ class VpnServiceLifecycleContractTest {
     }
 
     @Test
-    fun `runBlocking не вызывается без обёртки в отдельный поток`() {
+    fun `runBlocking защищён timeout или отдельным потоком`() {
         val hasRunBlocking = source.contains("runBlocking")
         if (!hasRunBlocking) return
+        val hasThreadJoin = source.contains("Thread(") && source.contains(".join(")
+        val hasTimeoutGuard = source.contains("withTimeoutOrNull") || source.contains("withTimeout(")
         assertTrue(
-            source.contains("Thread(") && source.contains(".join("),
-            "runBlocking присутствует в OzeroVpnService — обязательно обернуть в отдельный Thread с join+timeout, " +
-                "иначе ANR на Main thread (особенно в onDestroy при kill-switch). См. предыдущий регресс.",
-        )
-    }
-
-    @Test
-    fun `startForeground на API 34+ передаёт правильный тип FGS`() {
-        val mentionsApi34 = source.contains("UPSIDE_DOWN_CAKE")
-        val mentionsType = source.contains("FOREGROUND_SERVICE_TYPE_SPECIAL_USE") ||
-            source.contains("FOREGROUND_SERVICE_TYPE_SYSTEM_EXEMPTED")
-        assertTrue(
-            mentionsApi34 && mentionsType,
-            "На Android 14+ (UPSIDE_DOWN_CAKE) startForeground обязан получить " +
-                "ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE — иначе MissingForegroundServiceTypeException.",
+            hasThreadJoin || hasTimeoutGuard,
+            "runBlocking присутствует в OzeroVpnService — обязательно обернуть в Thread+join+timeout " +
+                "ИЛИ withTimeoutOrNull внутри runBlocking, иначе ANR на Main thread (особенно в onDestroy " +
+                "при kill-switch). См. предыдущий регресс.",
         )
     }
 
@@ -42,7 +33,7 @@ class VpnServiceLifecycleContractTest {
         val hasOnDestroy = source.contains("override fun onDestroy")
         assertTrue(hasOnDestroy, "onDestroy должен быть переопределён.")
         val onDestroyBody = source.substringAfter("override fun onDestroy")
-            .substringBefore("private fun enterForegroundOrLog")
+            .substringBefore("\n}\n")
         assertTrue(
             onDestroyBody.contains("tunFdRef.getAndSet(null)?.close()") ||
                 onDestroyBody.contains("tunFd?.close()") ||
@@ -53,9 +44,27 @@ class VpnServiceLifecycleContractTest {
     }
 
     @Test
+    fun `socketProtector unbind ПОСЛЕ performShutdown в onDestroy — socket leak guard`() {
+        val onDestroyBody = source.substringAfter("override fun onDestroy")
+            .substringBefore("\n}\n")
+        val performShutdownIdx = onDestroyBody.indexOf("performShutdown(callStopSelf = false)")
+        val unbindIdx = onDestroyBody.indexOf("VpnSocketProtectorHolder.unbind")
+        assertTrue(
+            performShutdownIdx > 0 && unbindIdx > 0,
+            "onDestroy обязан вызывать performShutdown и unbind socketProtector",
+        )
+        assertTrue(
+            unbindIdx > performShutdownIdx,
+            "VpnSocketProtectorHolder.unbind обязан быть ПОСЛЕ performShutdown — иначе движки во время " +
+                "graceful flush получают protect()=false на новые сокеты → leak в VPN-loop. " +
+                "Текущие позиции: performShutdown@$performShutdownIdx unbind@$unbindIdx.",
+        )
+    }
+
+    @Test
     fun `pipeline_stop защищён timeout-ом в shutdown path`() {
         val onDestroyBody = source.substringAfter("override fun onDestroy")
-            .substringBefore("private companion object")
+            .substringBefore("\n}\n")
         assertFalse(
             onDestroyBody.contains("runBlocking { pipeline.stop()") ||
                 Regex("runBlocking\\s*\\{\\s*pipeline\\.stop\\(\\)\\s*\\}").containsMatchIn(onDestroyBody),

@@ -1,6 +1,7 @@
 package ru.ozero.enginescore
 
 import kotlinx.coroutines.flow.Flow
+import ru.ozero.enginescore.settings.SettingsModel
 
 interface EnginePlugin {
     val id: EngineId
@@ -12,9 +13,23 @@ interface EnginePlugin {
     suspend fun tunSpec(): TunSpec? = null
     fun preflight(): EnginePreflight? = null
 
+    suspend fun awaitReady(): ReadyResult = ReadyResult.Ready
+
+    sealed class ReadyResult {
+        data object Ready : ReadyResult()
+        data class Timeout(val reason: String) : ReadyResult()
+    }
+
     suspend fun ipProbeRoute(socksPort: Int): IpProbeRoute = IpProbeRoute.Default
 
     fun stopTimeoutMs(): Long = DEFAULT_STOP_TIMEOUT_MS
+
+    fun buildManualConfig(settings: SettingsModel?): EngineConfig? = null
+
+    fun statsLabel(stats: EngineStats): String? {
+        val peers = stats.activeConnections
+        return if (peers > 0) "$peers conns" else null
+    }
 
     suspend fun recover(): RecoverResult = RecoverResult.NotSupported
 

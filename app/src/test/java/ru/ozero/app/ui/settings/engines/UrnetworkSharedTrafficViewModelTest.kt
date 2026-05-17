@@ -12,7 +12,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class UrnetworkSharedTrafficViewModelTest {
@@ -41,22 +40,6 @@ class UrnetworkSharedTrafficViewModelTest {
     }
 
     @Test
-    fun `после init показывает plan из subscriptionBalance`() = runTest(dispatcher) {
-        bridge.plan = "pro"
-        vm = UrnetworkSharedTrafficViewModel(bridge)
-        advanceUntilIdle()
-        assertEquals("pro", vm.plan.value)
-    }
-
-    @Test
-    fun `plan null если fetchSubscriptionBalance возвращает null`() = runTest(dispatcher) {
-        bridge.balanceResult = null
-        vm = UrnetworkSharedTrafficViewModel(bridge)
-        advanceUntilIdle()
-        assertNull(vm.plan.value)
-    }
-
-    @Test
     fun `isLoading false после загрузки`() = runTest(dispatcher) {
         vm = UrnetworkSharedTrafficViewModel(bridge)
         advanceUntilIdle()
@@ -74,32 +57,26 @@ class UrnetworkSharedTrafficViewModelTest {
     }
 
     @Test
-    fun `unpaidBytes показывает ПРЕДОСТАВЛЕННЫЙ трафик а не потреблённый из subscriptionBalance`() =
-        runTest(dispatcher) {
-            bridge.unpaidBytes = 50_000_000L
-            bridge.plan = "free"
-            vm = UrnetworkSharedTrafficViewModel(bridge)
-            advanceUntilIdle()
-            assertEquals(
-                50_000_000L,
-                vm.unpaidBytes.value,
-                "Расшаренный трафик = unpaidByteCount (предоставлено другим), " +
-                    "не usedBytes из subscriptionBalance (это потребление).",
-            )
-        }
+    fun `unpaidBytes 0 при старте`() = runTest(dispatcher) {
+        bridge.unpaidBytes = 0L
+        vm = UrnetworkSharedTrafficViewModel(bridge)
+        advanceUntilIdle()
+        assertEquals(0L, vm.unpaidBytes.value)
+    }
+
+    @Test
+    fun `unpaidBytes обновляется после refresh`() = runTest(dispatcher) {
+        bridge.unpaidBytes = 1_000_000L
+        vm = UrnetworkSharedTrafficViewModel(bridge)
+        advanceUntilIdle()
+        bridge.unpaidBytes = 2_000_000L
+        vm.refresh()
+        advanceUntilIdle()
+        assertEquals(2_000_000L, vm.unpaidBytes.value)
+    }
 
     private class FakeBridge : UrnetworkSdkBridge {
         var unpaidBytes = 0L
-        var plan: String? = null
-        var balanceResult: UrnetworkSdkBridge.SubscriptionBalanceSnapshot? = null
-            get() = if (plan != null) {
-                UrnetworkSdkBridge.SubscriptionBalanceSnapshot(
-                    balanceBytes = 0L, pendingBytes = 0L, startBalanceBytes = 0L,
-                    usedBytes = 0L, plan = plan, store = null,
-                )
-            } else {
-                field
-            }
         var fetchTransferStatsCalls = 0
 
         override suspend fun start(walletAddress: String, apiUrl: String, connectUrl: String, byClientJwt: String) =
@@ -118,6 +95,6 @@ class UrnetworkSharedTrafficViewModelTest {
         override fun fetchTransferStats() {
             fetchTransferStatsCalls++
         }
-        override suspend fun fetchSubscriptionBalance() = balanceResult
+        override suspend fun fetchSubscriptionBalance() = null
     }
 }

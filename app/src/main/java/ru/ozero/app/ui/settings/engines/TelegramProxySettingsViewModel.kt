@@ -24,6 +24,7 @@ sealed interface TelegramProxyUiState {
         val secret: String,
         val proxyState: TelegramProxyState,
         val generatingSecret: Boolean = false,
+        val generateError: Boolean = false,
     ) : TelegramProxyUiState {
         val tgLink: String?
             get() = if (secret.isNotBlank()) {
@@ -94,11 +95,16 @@ class TelegramProxySettingsViewModel @Inject constructor(
     fun onRegenerateSecret() {
         val s = _uiState.value as? TelegramProxyUiState.Content ?: return
         if (s.generatingSecret) return
-        _uiState.value = s.copy(generatingSecret = true)
+        _uiState.value = s.copy(generatingSecret = true, generateError = false)
         viewModelScope.launch {
-            proxyService.generateAndSaveSecret(s.domain.ifBlank { TelegramProxyConfig.DEFAULT_DOMAIN })
+            val result = proxyService.generateAndSaveSecret(s.domain.ifBlank { TelegramProxyConfig.DEFAULT_DOMAIN })
             val current = _uiState.value as? TelegramProxyUiState.Content ?: return@launch
-            _uiState.value = current.copy(generatingSecret = false)
+            _uiState.value = current.copy(generatingSecret = false, generateError = result == null)
         }
+    }
+
+    fun onDismissGenerateError() {
+        val s = _uiState.value as? TelegramProxyUiState.Content ?: return
+        _uiState.value = s.copy(generateError = false)
     }
 }

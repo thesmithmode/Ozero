@@ -7,6 +7,7 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 import org.amnezia.awg.GoBackend
 import ru.ozero.enginewarp.IWarpEngineProcess
+import ru.ozero.enginewarp.WarpTurnOnResult
 
 class WarpEngineService : Service() {
 
@@ -48,23 +49,42 @@ class WarpEngineService : Service() {
             ensureLibraryLoaded()
             GoBackend.awgVersion() ?: "null"
         }.getOrDefault("error")
+
+        override fun turnOnAndGetSockets(
+            tunFd: ParcelFileDescriptor,
+            name: String,
+            iniConfig: String,
+            uapiPath: String,
+        ): WarpTurnOnResult {
+            ensureLibraryLoaded()
+            val rawFd = tunFd.detachFd()
+            Log.i(TAG, "awgTurnOn(combined) name=$name fd=$rawFd iniLen=${iniConfig.length}")
+            val handle = GoBackend.awgTurnOn(name, rawFd, iniConfig, uapiPath)
+            if (handle < 0) return WarpTurnOnResult(handle, null, null)
+            val v4Pfd = runCatching {
+                val v4Fd = GoBackend.awgGetSocketV4(handle)
+                if (v4Fd > 0) ParcelFileDescriptor.fromFd(v4Fd) else null
+            }.getOrNull()
+            val v6Pfd = runCatching {
+                val v6Fd = GoBackend.awgGetSocketV6(handle)
+                if (v6Fd > 0) ParcelFileDescriptor.fromFd(v6Fd) else null
+            }.getOrNull()
+            return WarpTurnOnResult(handle, v4Pfd, v6Pfd)
+        }
     }
 
     override fun onBind(intent: Intent): IBinder = binder
 
     private fun ensureLibraryLoaded() {
-        if (libraryLoaded) return
-        synchronized(this) {
-            if (libraryLoaded) return
-            runCatching { System.loadLibrary("am-go") }
-                .onFailure { Log.e(TAG, "am-go load failed: ${it.message}") }
-            libraryLoaded = true
+        try {
+            System.loadLibrary("am-go")
+        } catch (t: Throwable) {
+            Log.e(TAG, "am-go load failed: ${t.message}")
+            throw t
         }
     }
 
     private companion object {
         const val TAG = "WarpEngineService"
-
-        @Volatile var libraryLoaded = false
     }
 }

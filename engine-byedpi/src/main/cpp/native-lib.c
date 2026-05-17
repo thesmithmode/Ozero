@@ -10,6 +10,12 @@
 #include "byedpi/error.h"
 #include "main.h"
 
+/* Known limitation: server_fd объявлен в upstream byedpi как обычный int (не _Atomic).
+ * Race window между jniStopProxy и jniForceClose: оба читают server_fd без синхронизации;
+ * между read и close()/shutdown() kernel может переиспользовать слот fd → close/shutdown
+ * чужого socket. Локальный mutex = полу-фикс (upstream main() в submodule тоже пишет fd
+ * без наших локов). Полный fix требует форка byedpi submodule для смены типа на
+ * _Atomic int. За прод race не воспроизведён, акцептовано как known limitation. */
 extern int server_fd;
 /* Атомарный CAS-guard от двойного запуска: раньше int-флаг читался/писался
  * без синхронизации, две параллельные jniStartProxy могли пройти guard
@@ -37,32 +43,72 @@ void reset_params(void) {
     params = default_params;
 }
 
+/* Освобождает argv[0..count) и сам массив. */
+static void free_argv(char **argv, int count) {
+    for (int i = 0; i < count; i++) {
+        if (argv[i]) free(argv[i]);
+    }
+    free(argv);
+}
+
+/* Полный teardown при ошибке: освобождает argv и отпускает CAS guard. */
+static jint jni_start_fail(char **argv, int filled, jint code) {
+    if (argv) free_argv(argv, filled);
+    atomic_store(&g_proxy_running, 0);
+    return code;
+}
+
+#define JNI_GUARD_BUSY (-2)
+
 JNIEXPORT jint JNICALL
 Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniStartProxy(JNIEnv *env, __attribute__((unused)) jobject thiz, jobjectArray args) {
-    /* CAS 0→1: только первый caller проходит, второй сразу получает -1. */
+    /* CAS 0→1: один caller проходит. Guard busy = JNI_GUARD_BUSY (-2), отличимо
+     * от -1 (OOM/JNI/upstream). Kotlin layer должен делать retry через cooperative
+     * delay() — НЕ блокировать здесь, иначе сериализуется single-thread dispatcher. */
     int expected = 0;
     if (!atomic_compare_exchange_strong(&g_proxy_running, &expected, 1)) {
-        return -1;
+        return JNI_GUARD_BUSY;
     }
 
     int user_argc = (*env)->GetArrayLength(env, args);
     int argc = user_argc + 1;
     char **argv = calloc((size_t)argc + 1u, sizeof(char *));
-
     if (!argv) {
         atomic_store(&g_proxy_running, 0);
         return -1;
     }
 
     argv[0] = strdup("byedpi");
+    if (!argv[0]) {
+        return jni_start_fail(argv, 0, -1);
+    }
 
     for (int i = 0; i < user_argc; i++) {
         jstring arg = (jstring) (*env)->GetObjectArrayElement(env, args, i);
+        if ((*env)->ExceptionCheck(env)) {
+            (*env)->ExceptionClear(env);
+            return jni_start_fail(argv, i + 1, -1);
+        }
         if (!arg) { argv[i + 1] = NULL; continue; }
+
         const char *arg_str = (*env)->GetStringUTFChars(env, arg, 0);
-        argv[i + 1] = arg_str ? strdup(arg_str) : NULL;
-        if (arg_str) (*env)->ReleaseStringUTFChars(env, arg, arg_str);
+        if ((*env)->ExceptionCheck(env)) {
+            (*env)->ExceptionClear(env);
+            (*env)->DeleteLocalRef(env, arg);
+            return jni_start_fail(argv, i + 1, -1);
+        }
+        if (!arg_str) {
+            (*env)->DeleteLocalRef(env, arg);
+            return jni_start_fail(argv, i + 1, -1);
+        }
+
+        char *copy = strdup(arg_str);
+        (*env)->ReleaseStringUTFChars(env, arg, arg_str);
         (*env)->DeleteLocalRef(env, arg);
+        if (!copy) {
+            return jni_start_fail(argv, i + 1, -1);
+        }
+        argv[i + 1] = copy;
     }
 
     reset_params();
@@ -70,8 +116,7 @@ Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniStartProxy(JNIEnv *env, __attribute__(
 
     int result = main(argc, argv);
 
-    for (int i = 0; i < argc; i++) free(argv[i]);
-    free(argv);
+    free_argv(argv, argc);
     atomic_store(&g_proxy_running, 0);
 
     return result;
@@ -87,11 +132,29 @@ Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniStopProxy(__attribute__((unused)) JNIE
 JNIEXPORT jint JNICALL
 Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniForceClose(__attribute__((unused)) JNIEnv *env, __attribute__((unused)) jobject thiz) {
     if (server_fd < 0) {
-        atomic_store(&g_proxy_running, 0);
         return -1;
     }
     int rc = close(server_fd);
     server_fd = -1;
-    atomic_store(&g_proxy_running, 0);
+    /* Guard g_proxy_running НЕ сбрасываем здесь — отпустит jniStartProxy после
+     * возврата main(). Premature release провоцировал race: вторая jniStartProxy
+     * проходила CAS пока старая main() ещё в cleanup → concurrent main() с
+     * shared upstream globals (server_fd, params) = memory corruption.
+     * Recovery от wedged main() — через jniEmergencyReset, вызываемый Kotlin'ом
+     * ТОЛЬКО после code == JNI_GUARD_BUSY (т.е. после полного cleanup sequence). */
     return rc;
+}
+
+JNIEXPORT jint JNICALL
+Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniEmergencyReset(__attribute__((unused)) JNIEnv *env, __attribute__((unused)) jobject thiz) {
+    /* EMERGENCY ONLY: безопасный вызов только после серии stop+forceClose+join failures
+     * + jniStartProxy вернул JNI_GUARD_BUSY (т.е. подтверждённый wedge старой main()).
+     * Принудительно сбрасывает CAS guard атомарным exchange. Возвращает старое
+     * значение (1 = был wedge, 0 = guard уже свободен — emergencyReset noop).
+     *
+     * Race window vs полное зависание engine: если старая main() ВНЕЗАПНО оживёт
+     * после нашего exchange, две main() пересекутся на shared globals. Trade-off
+     * принят: краш памяти при wedge крайне маловероятен (main() реально мёртв);
+     * permanent dead engine иначе невосстановимо до process restart. */
+    return atomic_exchange(&g_proxy_running, 0);
 }

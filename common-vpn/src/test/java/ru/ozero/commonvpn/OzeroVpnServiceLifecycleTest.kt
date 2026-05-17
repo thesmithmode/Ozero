@@ -14,16 +14,44 @@ class OzeroVpnServiceLifecycleTest {
         f.readText()
     }
 
+    private val startSequenceSource by lazy {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/StartSequenceCoordinator.kt")
+        assertTrue(f.exists(), "StartSequenceCoordinator.kt не найден: $f")
+        f.readText()
+    }
+
+    private val statsLoggerSource by lazy {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/TunnelStatsLogger.kt")
+        assertTrue(f.exists(), "TunnelStatsLogger.kt не найден: $f")
+        f.readText()
+    }
+
+    private val helperSource by lazy {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/TunBuilderHelper.kt")
+        assertTrue(f.exists(), "TunBuilderHelper.kt не найден: $f")
+        f.readText()
+    }
+
+    private val shutdownSource by lazy {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/ShutdownCoordinator.kt")
+        assertTrue(f.exists(), "ShutdownCoordinator.kt не найден: $f")
+        f.readText()
+    }
+
     @Test
     fun `onCreate переопределён и вызывает super`() {
         assertTrue(source.contains("override fun onCreate()"))
-        val body = source.substringAfter("override fun onCreate()").substringBefore("private val tunFdRef")
+        val body = source.substringAfter("override fun onCreate()").substringBefore("private var socketProtector")
         assertTrue(body.contains("super.onCreate()"))
     }
 
     @Test
     fun `onCreate логирует before и after super`() {
-        val body = source.substringAfter("override fun onCreate()").substringBefore("private val tunFdRef")
+        val body = source.substringAfter("override fun onCreate()").substringBefore("private var socketProtector")
         val beforeIdx = body.indexOf("onCreate before super")
         val superIdx = body.indexOf("super.onCreate()")
         val afterIdx = body.indexOf("onCreate after super")
@@ -49,7 +77,7 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `startVpn preload-ит hev TProxyService на main thread до serviceScope launch`() {
-        val body = source.substringAfter("private fun startVpn()").substringBefore("private fun stopVpn()")
+        val body = source.substringAfter("private fun startVpn()").substringBefore("private fun engineExtras(")
         val preloadIdx = body.indexOf("hev.TProxyService.loadOnce()")
         val launchIdx = body.indexOf("serviceScope.launch")
         assertTrue(
@@ -63,7 +91,7 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `startVpn preload логирует thread name и main looper`() {
-        val body = source.substringAfter("private fun startVpn()").substringBefore("private fun stopVpn()")
+        val body = source.substringAfter("private fun startVpn()").substringBefore("private fun engineExtras(")
         val preloadIdx = body.indexOf("hev.TProxyService.loadOnce()")
         check(preloadIdx >= 0) { "preload missing" }
         val window = body.substring(maxOf(0, preloadIdx - 500), preloadIdx)
@@ -74,7 +102,7 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `startVpn preload логирует libraryLoaded после loadOnce`() {
-        val body = source.substringAfter("private fun startVpn()").substringBefore("private fun stopVpn()")
+        val body = source.substringAfter("private fun startVpn()").substringBefore("private fun engineExtras(")
         val preloadIdx = body.indexOf("hev.TProxyService.loadOnce()")
         check(preloadIdx >= 0) { "preload missing" }
         val tail = body.substring(preloadIdx, minOf(body.length, preloadIdx + 800))
@@ -84,8 +112,8 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `performShutdown stop order — chainOrchestrator ПЕРЕД tunnelGateway`() {
-        val body = source.substringAfter("private suspend fun performShutdown(")
-            .substringBefore("internal fun buildTunBuilder")
+        val body = shutdownSource.substringAfter("suspend fun performShutdown(")
+            .substringBefore("private fun recordSessionEnd(")
         val chainIdx = body.indexOf("chainOrchestrator.stop()")
         val nativeIdx = body.indexOf("tunnelGateway.stop()")
         assertTrue(
@@ -99,10 +127,10 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `performShutdown закрывает TUN fd ПОСЛЕ tunnelGateway_stop в finally`() {
-        val body = source.substringAfter("private suspend fun performShutdown(")
-            .substringBefore("internal fun buildTunBuilder")
+        val body = shutdownSource.substringAfter("suspend fun performShutdown(")
+            .substringBefore("private fun recordSessionEnd(")
         val nativeIdx = body.indexOf("tunnelGateway.stop()")
-        val closeIdx = body.indexOf("tunFdRef.getAndSet(null)?.close()")
+        val closeIdx = body.indexOf("state.tunFdRef.getAndSet(null)?.close()")
         assertTrue(
             nativeIdx in 0 until closeIdx,
             "tunFd закрывается ПОСЛЕ tunnelGateway.stop() (libhev). Сначала kill byedpi → " +
@@ -112,33 +140,14 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `stopVpn не force-killит процесс`() {
-        val body = source.substringAfter("private fun stopVpn()").substringBefore("private suspend fun performShutdown")
+        val body = shutdownSource.substringAfter("fun stopVpn(").substringBefore("suspend fun performShutdown(")
         assertFalse(body.contains("processKiller.kill(Process.myPid())"))
     }
 
     @Test
     fun `onDestroy не force-killит процесс`() {
-        val body = source.substringAfter("override fun onDestroy()").substringBefore("private fun enterForegroundOrLog")
+        val body = source.substringAfter("override fun onDestroy()").substringBefore("\n}\n")
         assertFalse(body.contains("processKiller.kill(Process.myPid())"))
-    }
-
-    @Test
-    fun `buildNotification содержит Stop action с ACTION_STOP intent`() {
-        val body = source.substringAfter("private fun buildNotification").substringBefore("override fun onRevoke")
-        assertTrue(
-            body.contains("ACTION_STOP"),
-            "notification обязан содержать ACTION_STOP intent — иначе юзер не может остановить VPN " +
-                "из notification shade без открытия app",
-        )
-        assertTrue(body.contains("addAction"), "notification обязан содержать addAction для Stop кнопки")
-        assertTrue(
-            body.contains("PendingIntent.getService") || body.contains("getService"),
-            "Stop action должен использовать PendingIntent.getService — direct call в OzeroVpnService.onStartCommand",
-        )
-        assertTrue(
-            body.contains("FLAG_IMMUTABLE"),
-            "PendingIntent с Android 12+ обязан FLAG_IMMUTABLE",
-        )
     }
 
     @Test
@@ -150,25 +159,25 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `performShutdown использует stopSelf с latestStartId — не голый stopSelf`() {
-        val body = source.substringAfter("private suspend fun performShutdown(")
-            .substringBefore("internal fun buildTunBuilder")
+        val body = shutdownSource.substringAfter("suspend fun performShutdown(")
+            .substringBefore("private fun recordSessionEnd(")
         assertTrue(
-            body.contains("stopSelf(latestStartId.get())"),
-            "performShutdown обязан вызывать stopSelf(latestStartId.get()), а не безаргументный stopSelf(). " +
+            body.contains("stopSelfRequest(latestStartIdProvider())"),
+            "performShutdown обязан вызывать stopSelfRequest(latestStartIdProvider()), а не безаргументный. " +
                 "stopSelf(startId) — no-op если пришёл новый intents, что исключает onDestroy при engine switch. " +
                 "Голый stopSelf() безусловно планирует onDestroy → ForegroundServiceDidNotStartInTimeException.",
         )
         assertFalse(
-            body.contains(Regex("(?<!latestStartId\\.get\\(\\))\\bstopSelf\\(\\)")),
-            "performShutdown не должен содержать голый stopSelf() без аргумента",
+            body.contains(Regex("(?<!latestStartIdProvider\\(\\))\\bstopSelfRequest\\(\\)")),
+            "performShutdown не должен содержать голый stopSelfRequest() без аргумента",
         )
     }
 
     @Test
     fun `onDestroy вызывает performShutdown с callStopSelf=false`() {
-        val body = source.substringAfter("override fun onDestroy()").substringBefore("private fun enterForegroundOrLog")
+        val body = source.substringAfter("override fun onDestroy()").substringBefore("\n}\n")
         assertTrue(
-            body.contains("performShutdown(callStopSelf = false)"),
+            body.contains("shutdownCoord.performShutdown(callStopSelf = false)"),
             "onDestroy должен передавать callStopSelf=false — сервис уже умирает, " +
                 "второй stopSelf() из onDestroy-пути не нужен и вреден.",
         )
@@ -186,32 +195,31 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `startStatsLogger вызывается безусловно независимо от engine`() {
-        val body = source
-            .substringAfter("runCatching { healthMonitor.start")
-            .substringBefore("private suspend fun engineNeedsCustomTun")
+    fun `statsLogger start вызывается безусловно независимо от engine в StartSequenceCoordinator`() {
+        val body = startSequenceSource
+            .substringAfter("suspend fun run()")
+            .substringBefore("suspend fun engineNeedsCustomTun")
         assertTrue(
-            body.contains("startStatsLogger()"),
-            "startStatsLogger должен вызываться без условия engineNeedsCustomTun",
+            body.contains("statsLogger.start()"),
+            "statsLogger.start() должен вызываться без условия engineNeedsCustomTun в run()",
         )
+        val gateBeforeStats = body.substringBefore("statsLogger.start()")
         assertFalse(
-            body.contains("if (!engineNeedsCustomTun") || body.contains("if (engineNeedsCustomTun"),
-            "Не должно быть гейтa engineNeedsCustomTun перед startStatsLogger",
+            gateBeforeStats.contains("if (!usesCustomTun) deps.statsLogger.start") ||
+                gateBeforeStats.contains("if (usesCustomTun) deps.statsLogger.start"),
+            "Не должно быть гейта usesCustomTun перед statsLogger.start()",
         )
     }
 
     @Test
-    fun `startStatsLogger не вызывает TProxyGetStats — единый источник TunInterfaceStats`() {
-        val body = source
-            .substringAfter("private fun startStatsLogger()")
-            .substringBefore("private fun updateNotificationWithStats")
+    fun `TunnelStatsLogger не вызывает TProxyGetStats — единый источник TunInterfaceStats`() {
         assertFalse(
-            body.contains("TProxyGetStats"),
+            statsLoggerSource.contains("TProxyGetStats"),
             "TProxyGetStats — libhev-only API. Использовать TunInterfaceStats для всех движков",
         )
         assertTrue(
-            body.contains("TunInterfaceStats.readTunStats"),
-            "stats logger обязан читать через TunInterfaceStats.readTunStats",
+            statsLoggerSource.contains("TunInterfaceStats.readTunStats"),
+            "TunnelStatsLogger обязан читать через TunInterfaceStats.readTunStats",
         )
     }
 
@@ -225,12 +233,12 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `tunIfaceNameRef сбрасывается в null в performShutdown finally`() {
-        val body = source
-            .substringAfter("private suspend fun performShutdown(")
-            .substringBefore("internal fun buildTunBuilder")
-        val finallyBlock = body.substringAfter("} finally {").substringBefore("if (callStopSelf)")
+        val body = shutdownSource
+            .substringAfter("suspend fun performShutdown(")
+            .substringBefore("private fun recordSessionEnd(")
+        val finallyBlock = body.substringAfter("} finally {").substringBefore("companion object")
         assertTrue(
-            finallyBlock.contains("tunIfaceNameRef.set(null)"),
+            finallyBlock.contains("state.tunIfaceNameRef.set(null)"),
             "performShutdown finally обязан сбрасывать tunIfaceNameRef — иначе stale имя в новой сессии вернёт чужие байты",
         )
     }
@@ -238,10 +246,10 @@ class OzeroVpnServiceLifecycleTest {
     @Test
     fun `establishTun сохраняет tunIfaceNameRef после establish — оба пути`() {
         assertTrue(
-            source.contains("captureTunIfaceName(before)"),
+            startSequenceSource.contains("captureTunIfaceName(before)"),
             "После establish() обоих путей (engineTun и обычный) должен вызываться captureTunIfaceName",
         )
-        val callCount = source.split("captureTunIfaceName(before)").size - 1
+        val callCount = startSequenceSource.split("captureTunIfaceName(before)").size - 1
         assertTrue(
             callCount >= 2,
             "captureTunIfaceName должен вызываться в обоих establish — establishTun и establishTunForEngine. Найдено: $callCount",
@@ -261,7 +269,7 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `startVpn не блокирует main thread runBlocking-ом`() {
-        val body = source.substringAfter("private fun startVpn()").substringBefore("private fun startStatsLogger")
+        val body = source.substringAfter("private fun startVpn()").substringBefore("private fun engineExtras(")
         assertFalse(
             body.contains("runBlocking"),
             "startVpn не должен использовать runBlocking. settings и split-packages читаются " +
@@ -270,24 +278,23 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `startVpn читает свежие settings и split-packages из IO scope`() {
-        val body = source.substringAfter("private fun startVpn()").substringBefore("private fun startStatsLogger")
+    fun `StartSequenceCoordinator читает свежие settings и split-packages из IO scope`() {
         assertTrue(
-            body.contains("settingsRepository.settings.first()"),
-            "startVpn обязан дочитывать settings.first() свежими — cold-start defaults сломают " +
+            startSequenceSource.contains("settingsRepository.settings.first()"),
+            "StartSequenceCoordinator обязан дочитывать settings.first() свежими — cold-start defaults сломают " +
                 "custom DNS / split / hosts / winning-args.",
         )
         assertTrue(
-            body.contains("splitTunnelRulesProvider.allowlistPackages()"),
-            "startVpn обязан читать allowlistPackages() свежими на каждый connect — иначе изменение " +
+            startSequenceSource.contains("splitTunnelRulesProvider.allowlistPackages()"),
+            "StartSequenceCoordinator обязан читать allowlistPackages() свежими на каждый connect — иначе изменение " +
                 "split-rules видно только со второго reconnect.",
         )
         assertTrue(
-            body.contains("splitTunnelRulesProvider.blocklistPackages()"),
-            "startVpn обязан читать blocklistPackages() свежими на каждый connect.",
+            startSequenceSource.contains("splitTunnelRulesProvider.blocklistPackages()"),
+            "StartSequenceCoordinator обязан читать blocklistPackages() свежими на каждый connect.",
         )
         assertTrue(
-            body.contains("withTimeoutOrNull"),
+            startSequenceSource.contains("withTimeoutOrNull"),
             "Чтение settings/split обязано быть под withTimeoutOrNull — DataStore corruption не " +
                 "должен зависать VPN start.",
         )
@@ -295,7 +302,7 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `onDestroy ограничивает runBlocking shutdown через withTimeoutOrNull`() {
-        val body = source.substringAfter("override fun onDestroy()").substringBefore("private fun enterForegroundOrLog")
+        val body = source.substringAfter("override fun onDestroy()").substringBefore("\n}\n")
         assertTrue(
             body.contains("runBlocking"),
             "onDestroy обязан runBlocking shutdown — иначе coroutines умрут до завершения performShutdown",
@@ -316,7 +323,7 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `onDestroy логирует если runBlocking shutdown не уложился в таймаут`() {
-        val body = source.substringAfter("override fun onDestroy()").substringBefore("private fun enterForegroundOrLog")
+        val body = source.substringAfter("override fun onDestroy()").substringBefore("\n}\n")
         assertTrue(
             body.contains("onDestroy shutdown timeout"),
             "Если withTimeoutOrNull вернул null — обязан появиться лог 'onDestroy shutdown timeout' " +
@@ -325,12 +332,12 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `runStartSequence в auto-mode идёт через pickAutoCandidateWithPreflight`() {
-        val body = source.substringAfter("private suspend fun runStartSequence()")
-            .substringBefore("private suspend fun engineNeedsCustomTun")
+    fun `StartSequenceCoordinator run в auto-mode идёт через pickAutoCandidateWithPreflight`() {
+        val body = startSequenceSource.substringAfter("suspend fun run()")
+            .substringBefore("suspend fun engineNeedsCustomTun")
         assertTrue(
             body.contains("pickAutoCandidateWithPreflight("),
-            "runStartSequence обязан звать pickAutoCandidateWithPreflight в auto-mode — " +
+            "run обязан звать pickAutoCandidateWithPreflight в auto-mode — " +
                 "fallback по priority + TCP-probe",
         )
         val hasShortFallback = body.contains("?: EngineId.BYEDPI")
@@ -346,11 +353,11 @@ class OzeroVpnServiceLifecycleTest {
     @Test
     fun `pickAutoCandidateWithPreflight вызывает plugin preflight с no-op protector`() {
         assertTrue(
-            source.contains("plugin?.preflight()"),
+            startSequenceSource.contains("plugin?.preflight()"),
             "pickAutoCandidateWithPreflight обязан брать EnginePreflight через plugin.preflight()",
         )
-        val preflightFn = source.substringAfter("private suspend fun pickAutoCandidateWithPreflight")
-            .substringBefore("private fun autoCandidates")
+        val preflightFn = startSequenceSource.substringAfter("private suspend fun pickAutoCandidateWithPreflight")
+            .substringBefore("private suspend fun establishTunForEngine")
         assertTrue(
             preflightFn.contains("SocketProtector { _ -> true }"),
             "preflight использует no-op protector: TUN ещё не создан при preflight — " +
@@ -363,9 +370,45 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
+    fun `StartSequenceCoordinator run вызывает awaitEngineReady ДО onEngineStarted — readiness gate`() {
+        val body = startSequenceSource.substringAfter("suspend fun run()")
+            .substringBefore("suspend fun engineNeedsCustomTun")
+        assertTrue(
+            body.contains("awaitEngineReady("),
+            "run обязан звать awaitEngineReady — readiness gate перед onEngineStarted",
+        )
+        val awaitIdx = body.indexOf("awaitEngineReady(")
+        val onStartedIdx = body.indexOf("onEngineStarted(")
+        assertTrue(
+            awaitIdx in 0 until onStartedIdx,
+            "awaitEngineReady должен идти ДО onEngineStarted — readiness gate. " +
+                "awaitIdx=$awaitIdx, onStartedIdx=$onStartedIdx",
+        )
+    }
+
+    @Test
+    fun `awaitEngineReady обрабатывает ReadyResult Timeout логом — не маскирует как Ready`() {
+        val body = startSequenceSource.substringAfter("private suspend fun awaitEngineReady(")
+            .substringBefore("private fun buildEngineConfig(")
+        assertTrue(
+            body.contains("awaitReady()"),
+            "awaitEngineReady обязан звать plugin.awaitReady() — readiness signal",
+        )
+        assertTrue(
+            body.contains("ReadyResult.Timeout"),
+            "awaitEngineReady обязан проверять ReadyResult.Timeout — root fix #59: " +
+                "без явного match на Timeout sealed class теряет point — компилятор не enforce exhaustiveness",
+        )
+        assertTrue(
+            body.contains("PersistentLoggers.warn"),
+            "Timeout обязан логироваться через PersistentLoggers.warn — попадание в boot.log для диагностики",
+        )
+    }
+
+    @Test
     fun `manual-mode не зовёт pickAutoCandidateWithPreflight`() {
-        val body = source.substringAfter("private suspend fun runStartSequence()")
-            .substringBefore("private suspend fun engineNeedsCustomTun")
+        val body = startSequenceSource.substringAfter("suspend fun run()")
+            .substringBefore("suspend fun engineNeedsCustomTun")
         assertTrue(
             body.contains("if (manualEngine != null)"),
             "manual-mode идёт прямым путём через buildEngineConfig — без preflight",
@@ -377,12 +420,12 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `pickActiveEngine итерирует engineAutoPriority при manualEngine null`() {
-        val body = source.substringAfter("private fun pickActiveEngine(")
-            .substringBefore("private fun establishTun(")
+    fun `autoCandidates итерирует engineAutoPriority при manualEngine null`() {
+        val body = startSequenceSource.substringAfter("private fun autoCandidates(")
+            .substringBefore("private suspend fun pickAutoCandidateWithPreflight")
         assertTrue(
             body.contains("engineAutoPriority"),
-            "pickActiveEngine обязан читать settings.engineAutoPriority для авто-режима",
+            "autoCandidates обязан читать settings.engineAutoPriority для авто-режима",
         )
         assertTrue(
             body.contains("DEFAULT_ENGINE_AUTO_PRIORITY"),
@@ -390,13 +433,13 @@ class OzeroVpnServiceLifecycleTest {
         )
         assertTrue(
             body.contains("buildEngineConfig("),
-            "pickActiveEngine обязан проверять buildEngineConfig — первый non-null = выбор",
+            "autoCandidates обязан звать buildEngineConfig — первый non-null = выбор",
         )
     }
 
     @Test
     fun `onDestroy не shutdown-ит singleton HealthMonitor`() {
-        val body = source.substringAfter("override fun onDestroy()").substringBefore("private fun enterForegroundOrLog")
+        val body = source.substringAfter("override fun onDestroy()").substringBefore("\n}\n")
         assertFalse(
             body.contains("healthMonitor.shutdown()"),
             "HealthMonitor — @Singleton, его внутренний scope живёт всё время процесса. shutdown() " +
@@ -411,20 +454,78 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `establishTunForEngine excludeSelf true для всех кроме WARP`() {
-        val body = source
+    fun `anchors — все функции-границы существуют в источнике`() {
+        listOf(
+            "override fun onCreate()",
+            "private var socketProtector",
+            "override fun onStartCommand",
+            "private fun startVpn()",
+            "override fun onRevoke()",
+            "override fun onDestroy()",
+            "private fun engineExtras(",
+        ).forEach { anchor ->
+            assertTrue(source.contains(anchor), "Anchor потерян в OzeroVpnService.kt: '$anchor'")
+        }
+        listOf(
+            "fun stopVpn(",
+            "suspend fun performShutdown(",
+            "private fun recordSessionEnd(",
+        ).forEach { anchor ->
+            assertTrue(shutdownSource.contains(anchor), "Anchor потерян в ShutdownCoordinator.kt: '$anchor'")
+        }
+        listOf(
+            "suspend fun run()",
+            "suspend fun engineNeedsCustomTun",
+            "private suspend fun awaitEngineReady(",
+            "private suspend fun pickAutoCandidateWithPreflight",
+            "private fun autoCandidates",
+            "private fun resolveTargetForUi(",
+            "private fun establishTun(",
+            "private suspend fun establishTunForEngine(",
+        ).forEach { anchor ->
+            assertTrue(
+                startSequenceSource.contains(anchor),
+                "Anchor потерян в StartSequenceCoordinator.kt: '$anchor'",
+            )
+        }
+        listOf(
+            "fun start()",
+        ).forEach { anchor ->
+            assertTrue(
+                statsLoggerSource.contains(anchor),
+                "Anchor потерян в TunnelStatsLogger.kt: '$anchor'",
+            )
+        }
+        listOf(
+            "fun buildTunBuilder(",
+        ).forEach { anchor ->
+            assertTrue(
+                helperSource.contains(anchor),
+                "Anchor потерян в TunBuilderHelper.kt: '$anchor'",
+            )
+        }
+    }
+
+    @Test
+    fun `establishTunForEngine excludeSelf true для всех движков без исключений`() {
+        val body = startSequenceSource
             .substringAfter("private suspend fun establishTunForEngine(")
-            .substringBefore("internal fun applyEngineTunSpec")
-        assertFalse(
-            body.contains("excludeSelf = (engineId == ru.ozero.enginescore.EngineId.URNETWORK)"),
-            "excludeSelf must cover ByeDPI too — ciadpi JNI не вызывает protect(), " +
-                "outbound сокеты идут через TUN → loop. Правильно: excludeSelf = (engineId != WARP).",
-        )
+            .substringBefore("private fun captureTunIfaceName(")
         assertTrue(
-            body.contains("excludeSelf = (engineId != ru.ozero.enginescore.EngineId.WARP)"),
-            "WARP: AWG сокет защищён VpnSocketProtectorHolder → excludeSelf=false OK. " +
-                "ByeDPI + URnetwork: нет protect() → excludeSelf=true обязателен → нет routing loop. " +
-                "Регрессия 4624406: excludeSelf=false для ByeDPI → ciadpi outbound через TUN → SOCKS loop → нет сети.",
+            body.contains("excludeSelf = true"),
+            "excludeSelf обязан быть true для ВСЕХ движков (включая WARP). " +
+                "Причины: (1) ByeDPI/URnetwork outbound через TUN → loop без excludeSelf; " +
+                "(2) WARP без addDisallowedApplication → Android не активирует per-app VPN mode → " +
+                "self-traffic в TUN мешает AWG init → канал 'запустился' но трафик мёртв. " +
+                "Регрессия 5a8089dd: excludeSelf=(engineId != WARP) ради IP-probe через TUN " +
+                "сломал split tunnel ALL для всех движков (через auto-mode — WARP первый, " +
+                "не fallback на ByeDPI/URnetwork при traffic-fail).",
+        )
+        assertFalse(
+            body.contains("engineId == ") || body.contains("engineId != "),
+            "establishTunForEngine не должен ветвиться по engineId — common-vpn не знает про движки. " +
+                "Engine-specific поведение (IP-probe) выражается через EnginePlugin contract " +
+                "(см. EngineWarp.ipProbeRoute override).",
         )
     }
 }

@@ -44,7 +44,7 @@ object LockFileParser {
 
     private fun parseArtifact(m: Map<String, Any?>, idx: Int, path: Path): Artifact {
         fun req(key: String): String =
-            (m[key] as? String)
+            m[key]?.toString()
                 ?: throw LockFileException("Artifact #$idx missing required field '$key' in $path")
 
         fun reqLong(key: String): Long =
@@ -73,8 +73,8 @@ object LockFileParser {
         val downloadUrl = req("download_url")
         val uri = runCatching { java.net.URI(downloadUrl) }
             .getOrElse { throw LockFileException("Artifact '$name' has invalid download_url in $path") }
-        if (!uri.isAbsolute || uri.scheme != "https") {
-            throw LockFileException("Artifact '$name' download_url must be absolute https URL in $path")
+        if (!uri.isAbsolute) {
+            throw LockFileException("Artifact '$name' download_url must be an absolute URL in $path")
         }
         val sha256 = req("sha256")
         if (!SHA256_REGEX.matches(sha256)) {

@@ -1,23 +1,48 @@
 package ru.ozero.enginetelegram
 
 import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 class MtgWrapper(private val nativeLibDir: String) {
 
     private val binary: File get() = File(nativeLibDir, "libmtg.so")
 
     suspend fun generateSecret(domain: String): String? = withContext(Dispatchers.IO) {
-        runCatching {
-            val process = ProcessBuilder(binary.absolutePath, "generate-secret", "--hex", domain)
+        if (!binary.exists()) {
+            Log.e(TAG, "generateSecret: binary not found at ${binary.absolutePath}")
+            return@withContext null
+        }
+        var process: Process? = null
+        try {
+            process = ProcessBuilder(binary.absolutePath, "generate-secret", "--hex", domain)
                 .redirectErrorStream(true)
                 .start()
+            val finished = process.waitFor(GENERATE_SECRET_TIMEOUT_S, TimeUnit.SECONDS)
+            if (!finished) {
+                Log.e(TAG, "generateSecret timeout > ${GENERATE_SECRET_TIMEOUT_S}s")
+                return@withContext null
+            }
             val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
-            process.waitFor()
-            output.lines().lastOrNull { it.isNotBlank() }?.trim()
-        }.onFailure { Log.e(TAG, "generateSecret failed: ${it.message}") }.getOrNull()
+            val exitCode = process.exitValue()
+            if (exitCode != 0) {
+                Log.e(TAG, "generateSecret exitCode=$exitCode output=$output")
+                return@withContext null
+            }
+            val secret = output.lines().lastOrNull { it.isNotBlank() }?.trim()
+            if (secret == null) Log.e(TAG, "generateSecret: empty output")
+            secret
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            Log.e(TAG, "generateSecret failed: ${t.message}")
+            null
+        } finally {
+            process?.let { p -> if (p.isAlive) runCatching { p.destroyForcibly() } }
+        }
     }
 
     fun startProxy(
@@ -52,5 +77,6 @@ class MtgWrapper(private val nativeLibDir: String) {
 
     private companion object {
         const val TAG = "MtgWrapper"
+        const val GENERATE_SECRET_TIMEOUT_S = 10L
     }
 }

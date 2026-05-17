@@ -1,15 +1,20 @@
 package ru.ozero.enginewarp
 
 import android.util.Log
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.enginescore.EngineCapabilities
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.EngineStats
+import ru.ozero.enginescore.IpProbeRoute
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
@@ -19,6 +24,7 @@ import ru.ozero.enginescore.TunSpec
 import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.VpnSocketProtector
 import ru.ozero.enginescore.VpnSocketProtectorHolder
+import ru.ozero.enginescore.settings.SettingsModel
 
 class EngineWarp(
     private val autoConfig: WarpAutoConfig,
@@ -27,6 +33,9 @@ class EngineWarp(
     private val uapiPathProvider: () -> String,
     private val socketProtector: VpnSocketProtector = VpnSocketProtectorHolder,
     private val ipv6EnabledProvider: () -> Boolean = { false },
+    private val handshakeChecker: (uapiPath: String, tunnelName: String) -> Boolean = WarpHandshakeUapi::check,
+    private val warpReadyTimeoutMs: Long = WARP_READY_TIMEOUT_MS,
+    private val warpReadyPollMs: Long = WARP_READY_POLL_MS,
 ) : EnginePlugin, TunFdAcceptor {
 
     override val id = EngineId.WARP
@@ -47,6 +56,8 @@ class EngineWarp(
 
     @Volatile
     private var resolvedIni: String? = null
+
+    override fun buildManualConfig(settings: SettingsModel?): EngineConfig = EngineConfig.Warp
 
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
         require(config is EngineConfig.Warp) { "EngineWarp требует EngineConfig.Warp" }
@@ -69,8 +80,38 @@ class EngineWarp(
         resolvedIni = null
     }
 
+    override suspend fun awaitReady(): EnginePlugin.ReadyResult {
+        val uapiPath = uapiPathProvider()
+        val reached = withTimeoutOrNull(warpReadyTimeoutMs) {
+            while (true) {
+                val ready = runCatching { handshakeChecker(uapiPath, TUNNEL_NAME) }.getOrDefault(false)
+                if (ready) {
+                    Log.i(TAG, "awaitReady: WireGuard handshake complete")
+                    return@withTimeoutOrNull Unit
+                }
+                delay(warpReadyPollMs)
+            }
+        }
+        return if (reached != null) {
+            EnginePlugin.ReadyResult.Ready
+        } else {
+            val reason = "WARP: WireGuard handshake timeout ${warpReadyTimeoutMs}ms"
+            PersistentLoggers.warn(TAG, "awaitReady timeout — $reason — proceeding")
+            EnginePlugin.ReadyResult.Timeout(reason)
+        }
+    }
+
     override suspend fun probe(): ProbeResult =
         ProbeResult.Failure(reason = "WARP не предоставляет SOCKS-интерфейс")
+
+    override suspend fun ipProbeRoute(socksPort: Int): IpProbeRoute {
+        val connected = resolvedConfig?.peerEndpoint?.isNotBlank() == true
+        return if (connected) {
+            IpProbeRoute.StaticLocation(country = "Cloudflare WARP", countryCode = null)
+        } else {
+            IpProbeRoute.Unavailable("WARP не подключён")
+        }
+    }
 
     override fun stats(): Flow<EngineStats> = _stats.asStateFlow()
 
@@ -145,7 +186,7 @@ class EngineWarp(
         }
     }
 
-    private fun buildResolved(config: WarpConfig, rawIni: String?, source: String): ResolvedWarp {
+    private suspend fun buildResolved(config: WarpConfig, rawIni: String?, source: String): ResolvedWarp {
         val resolvedConfig = resolveEndpointHost(config)
         val ipv6Allowed = ipv6EnabledProvider()
         val baseIni = if (!rawIni.isNullOrBlank()) {
@@ -189,7 +230,7 @@ class EngineWarp(
         return out.toString()
     }
 
-    private fun resolveEndpointHost(cfg: WarpConfig): WarpConfig {
+    private suspend fun resolveEndpointHost(cfg: WarpConfig): WarpConfig {
         val ep = cfg.peerEndpoint
         val sep = ep.lastIndexOf(':')
         if (sep < 0) return cfg
@@ -200,15 +241,17 @@ class EngineWarp(
         Log.i(TAG, "resolveEndpointHost host=$host provider=${provider.name}")
         for (attempt in 0..2) {
             val resolved = if (provider.isSystem) {
-                runCatching { java.net.InetAddress.getByName(host).hostAddress }.getOrNull()
+                withContext(Dispatchers.IO) {
+                    runCatching { java.net.InetAddress.getByName(host).hostAddress }.getOrNull()
+                }
             } else {
-                resolveViaDoH(host, provider.url)
+                withContext(Dispatchers.IO) { resolveViaDoH(host, provider.url) }
             }
             if (!resolved.isNullOrBlank()) {
                 Log.i(TAG, "endpoint resolved $host → $resolved via ${provider.name} (attempt ${attempt + 1})")
                 return cfg.copy(peerEndpoint = "$resolved:$port")
             }
-            if (attempt < 2) runCatching { Thread.sleep(200L shl attempt) }
+            if (attempt < 2) delay(200L shl attempt)
         }
         PersistentLoggers.warn(TAG, "endpoint resolve failed after 3 attempts for $host via ${provider.name}")
         return cfg
@@ -252,5 +295,7 @@ class EngineWarp(
         const val TUNNEL_NAME = "ozero-warp"
         const val DOH_CONNECT_TIMEOUT_MS = 3_000
         const val DOH_READ_TIMEOUT_MS = 3_000
+        const val WARP_READY_TIMEOUT_MS = 10_000L
+        const val WARP_READY_POLL_MS = 300L
     }
 }

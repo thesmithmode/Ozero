@@ -34,9 +34,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import ru.ozero.app.R
 import ru.ozero.enginetelegram.TelegramProxyState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -50,7 +52,7 @@ fun TelegramProxySettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Telegram MTProxy") },
+                title = { Text(stringResource(R.string.telegram_proxy_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
@@ -77,6 +79,7 @@ fun TelegramProxySettingsScreen(
                     onSavePort = viewModel::onSavePort,
                     onSaveDomain = viewModel::onSaveDomain,
                     onRegenerateSecret = viewModel::onRegenerateSecret,
+                    onDismissGenerateError = viewModel::onDismissGenerateError,
                 )
             }
         }
@@ -93,8 +96,8 @@ private fun ContentBody(
     onSavePort: () -> Unit,
     onSaveDomain: () -> Unit,
     onRegenerateSecret: () -> Unit,
+    onDismissGenerateError: () -> Unit = {},
 ) {
-    val context = LocalContext.current
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -103,7 +106,7 @@ private fun ContentBody(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
-            text = "Локальный MTProxy сервер для Telegram. Трафик идёт через активный VPN движок.",
+            text = stringResource(R.string.telegram_proxy_description),
             style = MaterialTheme.typography.bodyMedium,
         )
 
@@ -113,13 +116,15 @@ private fun ContentBody(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Column(modifier = Modifier.fillMaxWidth(0.78f)) {
-                Text("Включить MTProxy", style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.telegram_proxy_enable), style = MaterialTheme.typography.bodyLarge)
                 Text(
                     text = when (s.proxyState) {
-                        TelegramProxyState.Idle -> "Выключен"
-                        TelegramProxyState.Starting -> "Запускается…"
-                        is TelegramProxyState.Running -> "Работает на порту ${s.proxyState.port}"
-                        is TelegramProxyState.Error -> "Ошибка: ${s.proxyState.message}"
+                        TelegramProxyState.Idle -> stringResource(R.string.telegram_proxy_state_idle)
+                        TelegramProxyState.Starting -> stringResource(R.string.telegram_proxy_state_starting)
+                        is TelegramProxyState.Running ->
+                            stringResource(R.string.telegram_proxy_state_running_fmt, s.proxyState.port)
+                        is TelegramProxyState.Error ->
+                            stringResource(R.string.telegram_proxy_state_error_fmt, s.proxyState.message)
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = when (s.proxyState) {
@@ -137,20 +142,20 @@ private fun ContentBody(
         OutlinedTextField(
             value = s.port,
             onValueChange = onPortChange,
-            label = { Text("Порт") },
+            label = { Text(stringResource(R.string.telegram_proxy_port_label)) },
             modifier = Modifier.fillMaxWidth(),
             trailingIcon = {
-                OutlinedButton(onClick = onSavePort) { Text("Сохранить") }
+                OutlinedButton(onClick = onSavePort) { Text(stringResource(R.string.telegram_proxy_save)) }
             },
         )
 
         OutlinedTextField(
             value = s.domain,
             onValueChange = onDomainChange,
-            label = { Text("FakeTLS домен") },
+            label = { Text(stringResource(R.string.telegram_proxy_domain_label)) },
             modifier = Modifier.fillMaxWidth(),
             trailingIcon = {
-                OutlinedButton(onClick = onSaveDomain) { Text("Сохранить") }
+                OutlinedButton(onClick = onSaveDomain) { Text(stringResource(R.string.telegram_proxy_save)) }
             },
         )
 
@@ -158,12 +163,12 @@ private fun ContentBody(
 
         if (s.secret.isNotBlank()) {
             Text(
-                text = "Secret: ${s.secret}",
+                text = stringResource(R.string.telegram_proxy_secret_value_fmt, s.secret),
                 style = MaterialTheme.typography.bodySmall,
             )
         } else {
             Text(
-                text = "Secret не сгенерирован. Нажмите кнопку ниже.",
+                text = stringResource(R.string.telegram_proxy_secret_missing),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
             )
@@ -174,49 +179,72 @@ private fun ContentBody(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Button(
-                onClick = onRegenerateSecret,
+                onClick = {
+                    onDismissGenerateError()
+                    onRegenerateSecret()
+                },
                 enabled = !s.generatingSecret,
                 modifier = Modifier.weight(1f),
             ) {
                 if (s.generatingSecret) {
                     CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp))
                 }
-                Text(if (s.secret.isBlank()) "Сгенерировать ключ" else "Сменить ключ")
+                Text(
+                    if (s.secret.isBlank()) {
+                        stringResource(R.string.telegram_proxy_generate_secret)
+                    } else {
+                        stringResource(R.string.telegram_proxy_rotate_secret)
+                    },
+                )
             }
+        }
+
+        if (s.generateError) {
+            Text(
+                text = stringResource(R.string.telegram_proxy_generate_error),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
         }
 
         val link = s.tgLink
         if (link != null) {
-            HorizontalDivider()
-            Text("Ссылка для Telegram:", style = MaterialTheme.typography.bodyMedium)
-            Text(
-                text = link,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                OutlinedButton(
-                    onClick = {
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText("tg_proxy", link))
-                    },
-                    modifier = Modifier.weight(1f),
-                ) { Text("Копировать") }
-                Button(
-                    onClick = {
-                        runCatching {
-                            context.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse(link))
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                            )
-                        }
-                    },
-                    modifier = Modifier.weight(1f),
-                ) { Text("Открыть в Telegram") }
-            }
+            TgLinkSection(link = link)
         }
+    }
+}
+
+@Composable
+private fun TgLinkSection(link: String) {
+    val context = LocalContext.current
+    HorizontalDivider()
+    Text(stringResource(R.string.telegram_proxy_link_label), style = MaterialTheme.typography.bodyMedium)
+    Text(
+        text = link,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.primary,
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        OutlinedButton(
+            onClick = {
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("tg_proxy", link))
+            },
+            modifier = Modifier.weight(1f),
+        ) { Text(stringResource(R.string.telegram_proxy_copy)) }
+        Button(
+            onClick = {
+                runCatching {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse(link))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
+            },
+            modifier = Modifier.weight(1f),
+        ) { Text(stringResource(R.string.telegram_proxy_open_in_tg)) }
     }
 }

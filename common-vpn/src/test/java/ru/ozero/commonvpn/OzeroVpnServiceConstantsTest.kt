@@ -52,11 +52,11 @@ class OzeroVpnServiceConstantsTest {
 
     @Test
     fun notificationIdIsPositive() {
-        assert(OzeroVpnService.NOTIFICATION_ID > 0)
+        assert(OzeroNotificationFactory.NOTIFICATION_ID > 0)
     }
 
     @Test
     fun channelIdIsNonEmpty() {
-        assert(OzeroVpnService.CHANNEL_ID.isNotEmpty())
+        assert(OzeroNotificationFactory.CHANNEL_ID.isNotEmpty())
     }
 }

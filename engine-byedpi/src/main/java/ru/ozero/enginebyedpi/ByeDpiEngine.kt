@@ -4,6 +4,7 @@ import android.util.Log
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
@@ -26,6 +27,7 @@ import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.IpProbeRoute
 import ru.ozero.enginescore.probe.Socks5HandshakeProbe
 import ru.ozero.enginescore.settings.HostsMode
+import ru.ozero.enginescore.settings.SettingsModel
 import java.util.concurrent.atomic.AtomicReference
 
 class ByeDpiEngine(
@@ -48,8 +50,18 @@ class ByeDpiEngine(
 
     @Volatile private var activeSocksPort: Int = 0
     private val _stats = MutableStateFlow(EngineStats())
-    private val proxyScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val proxyDispatcher = Dispatchers.IO.limitedParallelism(1)
+    private val proxyScope = CoroutineScope(SupervisorJob() + proxyDispatcher)
     private val proxyJobRef = AtomicReference<Job?>(null)
+
+    override fun buildManualConfig(settings: SettingsModel?): EngineConfig = EngineConfig.ByeDpi(
+        args = settings?.byedpiWinningArgs?.takeIf { it.isNotBlank() }
+            ?: EngineConfig.ByeDpi().args,
+        hostsMode = settings?.hostsMode ?: HostsMode.DISABLED,
+        hosts = settings?.hosts.orEmpty(),
+    )
 
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
         require(config is EngineConfig.ByeDpi) { "ByeDpiEngine требует EngineConfig.ByeDpi" }
@@ -63,37 +75,88 @@ class ByeDpiEngine(
             return StartResult.Failure(reason = "byedpi native library не загружена: ${ByeDpiProxy.loadError}")
         }
         Log.i(TAG, "start socksPort=${config.socksPort} args=${config.args}")
+        val oldJob = proxyJobRef.getAndSet(null)
+        if (oldJob != null && oldJob.isActive) {
+            PersistentLoggers.warn(TAG, "start: предыдущий прокси ещё активен — останавливаю")
+            runCatching { proxy.stopProxy() }
+                .onFailure { PersistentLoggers.warn(TAG, "oldProxy jniStopProxy: ${it.message}") }
+            withTimeoutOrNull(STOP_GRACE_MS) { oldJob.join() }
+            if (oldJob.isActive) {
+                runCatching { proxy.forceClose() }
+                    .onFailure { PersistentLoggers.warn(TAG, "oldProxy jniForceClose: ${it.message}") }
+                withTimeoutOrNull(STOP_GRACE_MS) { oldJob.join() }
+                if (oldJob.isActive) oldJob.cancel()
+            }
+        }
+
         val args = buildArgs(config)
         val proxyJob = proxyScope.launch {
-            val code = runCatching { proxy.startProxy(args) }
-                .onFailure { PersistentLoggers.error(TAG, "jniStartProxy threw: ${it.message}") }
-                .getOrElse { -1 }
-            if (code != 0) {
-                PersistentLoggers.error(TAG, "jniStartProxy завершился с кодом $code")
+            val code = startProxyWithRecovery(args)
+            when {
+                code == 0 -> { /* success — main() returned 0 */ }
+                code == JNI_GUARD_BUSY -> PersistentLoggers.warn(
+                    TAG,
+                    "jniStartProxy guard busy — старая main() ещё держит CAS; queue serialization",
+                )
+                else -> PersistentLoggers.error(TAG, "jniStartProxy завершился с кодом $code")
             }
             activeSocksPort = 0
         }
-        proxyJobRef.getAndSet(proxyJob)?.cancel()
+        proxyJobRef.set(proxyJob)
 
-        val readyAt = waitSocksReady(config.socksPort)
+        val readyAt = waitSocksReady(config.socksPort, proxyJob)
         return if (readyAt >= 0) {
             activeSocksPort = config.socksPort
             Log.i(TAG, "started socksPort=${config.socksPort} readyMs=$readyAt")
             StartResult.Success(socksPort = config.socksPort)
         } else {
             PersistentLoggers.error(TAG, "byedpi не вышел на порт ${config.socksPort} за ${READY_TIMEOUT_MS}ms")
-            runCatching { proxy.stopProxy() }
-                .onFailure { PersistentLoggers.warn(TAG, "jniStopProxy on failure: ${it.message}") }
-            runCatching { proxy.forceClose() }
-                .onFailure { PersistentLoggers.warn(TAG, "jniForceClose on failure: ${it.message}") }
+            if (proxyJob.isActive) {
+                runCatching { proxy.stopProxy() }
+                    .onFailure { PersistentLoggers.warn(TAG, "jniStopProxy on failure: ${it.message}") }
+                withTimeoutOrNull(STOP_GRACE_MS) { proxyJob.join() }
+                if (proxyJob.isActive) {
+                    PersistentLoggers.warn(TAG, "proxyJob всё ещё активен — jniForceClose в failure path")
+                    runCatching { proxy.forceClose() }
+                        .onFailure { PersistentLoggers.warn(TAG, "jniForceClose on failure: ${it.message}") }
+                }
+            }
             proxyJob.cancel()
             proxyJobRef.compareAndSet(proxyJob, null)
             StartResult.Failure(reason = "byedpi не открыл socks порт ${config.socksPort}")
         }
     }
 
-    private suspend fun waitSocksReady(port: Int): Long {
+    private fun startProxyWithRecovery(args: Array<String>): Int {
+        val code = safeJniCall(fallback = -1, tag = "jniStartProxy threw") {
+            proxy.startProxy(args)
+        }
+        if (code != JNI_GUARD_BUSY) return code
+
+        val priorGuardState = safeJniCall(fallback = 0, tag = "emergencyReset threw") {
+            proxy.emergencyReset()
+        }
+        PersistentLoggers.error(
+            TAG,
+            "byedpi hang detected — emergencyReset выполнен (prior guard=$priorGuardState); retry start",
+        )
+        return safeJniCall(fallback = -1, tag = "jniStartProxy threw after reset") {
+            proxy.startProxy(args)
+        }
+    }
+
+    private inline fun <T> safeJniCall(fallback: T, tag: String, block: () -> T): T = try {
+        block()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (t: Throwable) {
+        PersistentLoggers.error(TAG, "$tag: ${t.message}")
+        fallback
+    }
+
+    private suspend fun waitSocksReady(port: Int, proxyJob: Job): Long {
         val started = System.currentTimeMillis()
+        var probeSuccess = false
         withTimeoutOrNull(readyTotalTimeoutMs) {
             while (true) {
                 val ok = try {
@@ -104,11 +167,15 @@ class ByeDpiEngine(
                 } catch (_: Throwable) {
                     false
                 }
-                if (ok) return@withTimeoutOrNull
+                if (ok) {
+                    probeSuccess = true
+                    return@withTimeoutOrNull
+                }
+                if (!proxyJob.isActive) return@withTimeoutOrNull
                 delay(READY_RETRY_MS)
             }
-        } ?: return -1
-        return System.currentTimeMillis() - started
+        }
+        return if (probeSuccess) System.currentTimeMillis() - started else -1
     }
 
     override suspend fun stop() {
@@ -185,6 +252,7 @@ class ByeDpiEngine(
     private companion object {
         const val TAG = "ByeDpiEngine"
         const val READY_TIMEOUT_MS = 5_000L
+        const val JNI_GUARD_BUSY = -2
         const val READY_PROBE_TIMEOUT_MS = 500
         const val READY_RETRY_MS = 100L
         const val STOP_GRACE_MS = 1_500L

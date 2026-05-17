@@ -13,6 +13,7 @@ import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginetelegram.TelegramConfigStore
 import ru.ozero.enginetelegram.TelegramProxyService
 import ru.ozero.enginescore.Upstream
+import java.util.concurrent.atomic.AtomicReference
 
 class TelegramProxyCoordinator(
     private val proxyService: TelegramProxyService,
@@ -21,10 +22,10 @@ class TelegramProxyCoordinator(
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) {
 
-    private var job: Job? = null
+    private val jobRef = AtomicReference<Job?>(null)
 
     fun start() {
-        job = combine(
+        val newJob = combine(
             tunnelController.state,
             configStore.config(),
         ) { tunnelState, config ->
@@ -48,10 +49,11 @@ class TelegramProxyCoordinator(
                 proxyService.start(config, upstream)
             }
             .launchIn(scope)
+        jobRef.getAndSet(newJob)?.cancel()
     }
 
     fun stop() {
-        job?.cancel()
-        job = null
+        jobRef.getAndSet(null)?.cancel()
+        proxyService.stop()
     }
 }

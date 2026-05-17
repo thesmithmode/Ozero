@@ -18,6 +18,8 @@ import org.junit.jupiter.api.Test
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.enginescore.EngineId
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
+import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
+import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.UrnetworkWindowType
 import java.util.concurrent.atomic.AtomicInteger
@@ -127,6 +129,50 @@ class UrnetworkEngineSettingsViewModelTest {
     }
 
     @Test
+    fun `selectProvideControlMode сохраняет в configStore и применяет к bridge при active engine`() = runTest {
+        val bridge = FakeUrnetworkBridge()
+        val store = FakeUrnetworkConfigStore()
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel())
+        vm.selectProvideControlMode(UrnetworkProvideControlMode.AUTO)
+        advanceUntilIdle()
+        assertEquals(UrnetworkProvideControlMode.AUTO, store.provideControlMode().first())
+        assertEquals(UrnetworkProvideControlMode.AUTO, bridge.lastProvideControlMode)
+    }
+
+    @Test
+    fun `selectProvideControlMode не вызывает bridge при idle engine — только persist в store`() = runTest {
+        val bridge = FakeUrnetworkBridge()
+        val store = FakeUrnetworkConfigStore()
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, idleTunnel())
+        vm.selectProvideControlMode(UrnetworkProvideControlMode.AUTO)
+        advanceUntilIdle()
+        assertEquals(UrnetworkProvideControlMode.AUTO, store.provideControlMode().first())
+        assertNull(bridge.lastProvideControlMode, "bridge не должен трогаться при idle engine")
+    }
+
+    @Test
+    fun `selectProvideNetworkMode сохраняет в configStore и применяет к bridge при active engine`() = runTest {
+        val bridge = FakeUrnetworkBridge()
+        val store = FakeUrnetworkConfigStore()
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel())
+        vm.selectProvideNetworkMode(UrnetworkProvideNetworkMode.ALL)
+        advanceUntilIdle()
+        assertEquals(UrnetworkProvideNetworkMode.ALL, store.provideNetworkMode().first())
+        assertEquals(UrnetworkProvideNetworkMode.ALL, bridge.lastProvideNetworkMode)
+    }
+
+    @Test
+    fun `selectProvideNetworkMode не вызывает bridge при idle engine — только persist в store`() = runTest {
+        val bridge = FakeUrnetworkBridge()
+        val store = FakeUrnetworkConfigStore()
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, idleTunnel())
+        vm.selectProvideNetworkMode(UrnetworkProvideNetworkMode.ALL)
+        advanceUntilIdle()
+        assertEquals(UrnetworkProvideNetworkMode.ALL, store.provideNetworkMode().first())
+        assertNull(bridge.lastProvideNetworkMode, "bridge не должен трогаться при idle engine")
+    }
+
+    @Test
     fun `selectWindowType не вызывает bridge applyPerformanceProfile когда engine не активен`() = runTest {
         val bridge = FakeUrnetworkBridge()
         val store = FakeUrnetworkConfigStore()
@@ -202,6 +248,147 @@ class UrnetworkEngineSettingsViewModelTest {
     }
 
     @Test
+    fun `sentinel — init использует collectLatest а не collect`() {
+        val source = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/ui/settings/engines/UrnetworkEngineSettingsViewModel.kt",
+        ).readText()
+        val initBlock = source.substringAfter("init {").substringBefore("fun refresh()")
+        kotlin.test.assertTrue(
+            initBlock.contains("collectLatest"),
+            "init обязан использовать collectLatest чтобы при active=false отменить текущий retry-loop. " +
+                "collect не отменяет предыдущий блок — два параллельных loop при быстром active flip.",
+        )
+        kotlin.test.assertFalse(
+            initBlock.contains(".collect {"),
+            "init не должен использовать .collect — только collectLatest для cancel semantics.",
+        )
+    }
+
+    @Test
+    fun `sentinel — selectLocation и setProvidePaused используют update а не value assignment`() {
+        val source = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/ui/settings/engines/UrnetworkEngineSettingsViewModel.kt",
+        ).readText()
+        val selectBody = source
+            .substringAfter("fun selectLocation(")
+            .substringBefore("private fun startSwitchingIndicator")
+        kotlin.test.assertFalse(
+            selectBody.contains("_uiState.value = current.copy"),
+            "selectLocation не должен использовать read-modify-write через value=copy — race condition.",
+        )
+        kotlin.test.assertTrue(
+            selectBody.contains("_uiState.update"),
+            "selectLocation обязан использовать _uiState.update для атомарного обновления.",
+        )
+        val pauseBody = source.substringAfter("fun setProvidePaused(").substringBefore("private fun updateLocations")
+        kotlin.test.assertFalse(
+            pauseBody.contains("_uiState.value = current.copy"),
+            "setProvidePaused не должен использовать read-modify-write через value=copy — race condition.",
+        )
+        kotlin.test.assertTrue(
+            pauseBody.contains("_uiState.update"),
+            "setProvidePaused обязан использовать _uiState.update для атомарного обновления.",
+        )
+        val filterBody = source
+            .substringAfter("private fun applyFilter(")
+            .substringBefore("private fun teardownLocationsVc")
+        kotlin.test.assertFalse(
+            filterBody.contains("_uiState.value = UrnetworkSettingsUiState.Ready"),
+            "applyFilter не должен использовать _uiState.value = Ready — race condition.",
+        )
+        kotlin.test.assertTrue(
+            filterBody.contains("_uiState.update"),
+            "applyFilter обязан использовать _uiState.update для атомарного обновления.",
+        )
+    }
+
+    @Test
+    fun `selectLocation обновляет selectedLocation в uiState без полного пересоздания`() = runTest {
+        val locA = FakeLocationToken("US")
+        val locB = FakeLocationToken("DE")
+        val bridge = FakeUrnetworkBridge(connected = true, initialLocation = locA)
+        val vm = UrnetworkEngineSettingsViewModel(
+            bridge,
+            FakeSettingsRepo(),
+            FakeUrnetworkConfigStore(),
+            activeTunnel(),
+        )
+        advanceUntilIdle()
+        vm.refresh()
+        advanceUntilIdle()
+        val stateBeforeSelect = vm.uiState.value
+        if (stateBeforeSelect is UrnetworkSettingsUiState.Ready) {
+            vm.selectLocation(locB)
+            runCurrent()
+            val stateAfter = vm.uiState.value
+            if (stateAfter is UrnetworkSettingsUiState.Ready) {
+                assertEquals(locB, stateAfter.selectedLocation)
+            }
+        }
+    }
+
+    @Test
+    fun `sentinel — updateLocations читает regions и cities из FilteredLocations`() {
+        val source = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/ui/settings/engines/UrnetworkEngineSettingsViewModel.kt",
+        ).readText()
+        val updateBody = source
+            .substringAfter("private fun updateLocations(")
+            .substringBefore("private fun buildLocationList")
+        kotlin.test.assertTrue(
+            updateBody.contains("filtered.regions"),
+            "updateLocations обязан читать filtered.regions — иначе регионы никогда не загружаются",
+        )
+        kotlin.test.assertTrue(
+            updateBody.contains("filtered.cities"),
+            "updateLocations обязан читать filtered.cities — иначе города никогда не загружаются",
+        )
+    }
+
+    @Test
+    fun `sentinel — UrnetworkSettingsUiState_Ready содержит поля regions и cities`() {
+        val source = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/ui/settings/engines/UrnetworkEngineSettingsViewModel.kt",
+        ).readText()
+        val readyBlock = source.substringAfter("data class Ready(").substringBefore(") : UrnetworkSettingsUiState")
+        kotlin.test.assertTrue(
+            readyBlock.contains("regions"),
+            "UrnetworkSettingsUiState.Ready обязан иметь поле regions",
+        )
+        kotlin.test.assertTrue(
+            readyBlock.contains("cities"),
+            "UrnetworkSettingsUiState.Ready обязан иметь поле cities",
+        )
+    }
+
+    @Test
+    fun `sentinel — CheckIpRow открывает ur_io_ip через LocalUriHandler`() {
+        val source = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/ui/settings/engines/UrnetworkEngineSettingsScreen.kt",
+        ).readText()
+        val checkIpBlock = source
+            .substringAfter("private fun CheckIpRow()")
+            .substringBefore("\nprivate fun ")
+        kotlin.test.assertTrue(
+            checkIpBlock.contains("openUri"),
+            "CheckIpRow обязан вызывать openUri — иначе клик не откроет браузер",
+        )
+        kotlin.test.assertTrue(
+            checkIpBlock.contains("https://ur.io/ip"),
+            "CheckIpRow обязан передавать https://ur.io/ip в openUri",
+        )
+        kotlin.test.assertTrue(
+            checkIpBlock.contains("LocalUriHandler"),
+            "CheckIpRow обязан использовать LocalUriHandler",
+        )
+    }
+
+    @Test
     fun `peerCount остаётся 0 пока engine не активен`() = runTest {
         val bridge = FakeUrnetworkBridge()
         val vm = UrnetworkEngineSettingsViewModel(
@@ -235,6 +422,7 @@ private class FakeSettingsRepo : ru.ozero.enginescore.settings.SettingsRepositor
         countryCodeUpdates += code
     }
     override suspend fun setByedpiWinningArgs(args: String?) = Unit
+    override suspend fun setByedpiDefaultAccepted(accepted: Boolean) = Unit
     override suspend fun setCustomDnsServers(servers: List<String>) = Unit
     override suspend fun setHostsMode(mode: ru.ozero.enginescore.settings.HostsMode) = Unit
     override suspend fun setHosts(hosts: List<String>) = Unit
@@ -269,6 +457,16 @@ private class FakeUrnetworkConfigStore : UrnetworkConfigStore {
     override suspend fun setFixedIpSize(value: Boolean) {
         fixedIp.value = value
     }
+    private val provideControl = kotlinx.coroutines.flow.MutableStateFlow(UrnetworkProvideControlMode.ALWAYS)
+    private val provideNetwork = kotlinx.coroutines.flow.MutableStateFlow(UrnetworkProvideNetworkMode.WIFI)
+    override fun provideControlMode(): kotlinx.coroutines.flow.Flow<UrnetworkProvideControlMode> = provideControl
+    override suspend fun setProvideControlMode(value: UrnetworkProvideControlMode) {
+        provideControl.value = value
+    }
+    override fun provideNetworkMode(): kotlinx.coroutines.flow.Flow<UrnetworkProvideNetworkMode> = provideNetwork
+    override suspend fun setProvideNetworkMode(value: UrnetworkProvideNetworkMode) {
+        provideNetwork.value = value
+    }
 }
 
 private data class FakeLocationToken(override val countryCode: String?) : UrnetworkSdkBridge.LocationToken
@@ -298,6 +496,14 @@ private class FakeUrnetworkBridge(
     override fun applyPerformanceProfile(windowType: UrnetworkWindowType, fixedIpSize: Boolean) {
         lastAppliedWindowType = windowType
         lastAppliedFixedIp = fixedIpSize
+    }
+    var lastProvideControlMode: UrnetworkProvideControlMode? = null
+    override fun setProvideControlMode(mode: UrnetworkProvideControlMode) {
+        lastProvideControlMode = mode
+    }
+    var lastProvideNetworkMode: UrnetworkProvideNetworkMode? = null
+    override fun setProvideNetworkMode(mode: UrnetworkProvideNetworkMode) {
+        lastProvideNetworkMode = mode
     }
     override fun setProvidePaused(paused: Boolean) = Unit
     override fun isProvidePaused(): Boolean = true

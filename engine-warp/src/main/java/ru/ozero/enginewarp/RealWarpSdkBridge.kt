@@ -1,12 +1,10 @@
 package ru.ozero.enginewarp
 
-import android.content.Context
+import android.os.ParcelFileDescriptor
 import android.util.Log
-import com.getkeepsafe.relinker.ReLinker
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.amnezia.awg.GoBackend
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.VpnSocketProtector
 import java.io.File
@@ -15,8 +13,6 @@ import java.util.concurrent.atomic.AtomicInteger
 class RealWarpSdkBridge(
     private val awgRuntime: AwgRuntime,
 ) : WarpSdkBridge {
-
-    constructor(context: Context) : this(ReLinkerAwgRuntime(context))
 
     private val tunnelHandle = AtomicInteger(INVALID_HANDLE)
 
@@ -59,14 +55,18 @@ class RealWarpSdkBridge(
             "awgTurnOn JNI entry name=$tunnelName fd=$tunFd iniLen=${iniConfig.length} thread=$threadName version=$runtimeVersion",
         )
         try {
-            val handle = awgRuntime.turnOn(tunnelName, tunFd, iniConfig, uapiPath)
+            val combined = awgRuntime.turnOnAndGetSockets(tunnelName, tunFd, iniConfig, uapiPath)
+            val handle = combined.handle
             val dt = System.currentTimeMillis() - started
-            PersistentLoggers.warn(TAG, "awgTurnOn JNI exit handle=$handle dt=${dt}ms thread=$threadName")
+            PersistentLoggers.warn(
+                TAG,
+                "awgTurnOn JNI exit handle=$handle v4=${combined.socketV4Fd} v6=${combined.socketV6Fd} dt=${dt}ms thread=$threadName",
+            )
             if (handle < 0) {
                 return@withContext WarpSdkBridge.AttachResult.Failed("awgTurnOn handle=$handle")
             }
             tunnelHandle.set(handle)
-            val protectOk = protectUnderlyingSockets(handle, protector)
+            val protectOk = protectSockets(combined.socketV4Fd, combined.socketV6Fd, protector)
             if (!protectOk) {
                 PersistentLoggers.error(TAG, "protect failed — rolling back to avoid routing loop")
                 if (tunnelHandle.compareAndSet(handle, INVALID_HANDLE)) {
@@ -88,15 +88,7 @@ class RealWarpSdkBridge(
         }
     }
 
-    private fun protectUnderlyingSockets(handle: Int, protector: VpnSocketProtector): Boolean {
-        val v4 = runCatching { awgRuntime.getSocketV4(handle) }.getOrElse {
-            PersistentLoggers.warn(TAG, "awgGetSocketV4 threw: ${it.message}")
-            -1
-        }
-        val v6 = runCatching { awgRuntime.getSocketV6(handle) }.getOrElse {
-            PersistentLoggers.warn(TAG, "awgGetSocketV6 threw: ${it.message}")
-            -1
-        }
+    private fun protectSockets(v4: Int, v6: Int, protector: VpnSocketProtector): Boolean {
         if (v4 <= 0 && v6 <= 0) {
             PersistentLoggers.error(TAG, "no underlying sockets available v4=$v4 v6=$v6")
             return false
@@ -105,8 +97,10 @@ class RealWarpSdkBridge(
         if (v4 > 0) {
             val ok = protector.protect(v4)
             Log.i(TAG, "protect v4 sock=$v4 ok=$ok")
+            closeRawFd(v4, "v4")
             if (!ok) {
                 PersistentLoggers.error(TAG, "protect v4 returned false — VpnService binding lost")
+                closeRawFd(v6, "v6")
                 return false
             }
             anyProtected = true
@@ -114,6 +108,7 @@ class RealWarpSdkBridge(
         if (v6 > 0) {
             val ok = protector.protect(v6)
             Log.i(TAG, "protect v6 sock=$v6 ok=$ok")
+            closeRawFd(v6, "v6")
             if (!ok) {
                 PersistentLoggers.warn(TAG, "protect v6 returned false — continuing v4-only")
             } else {
@@ -121,6 +116,12 @@ class RealWarpSdkBridge(
             }
         }
         return anyProtected
+    }
+
+    private fun closeRawFd(rawFd: Int, label: String) {
+        if (rawFd <= 0) return
+        runCatching { ParcelFileDescriptor.adoptFd(rawFd).close() }
+            .onFailure { PersistentLoggers.warn(TAG, "close raw fd=$rawFd ($label) failed: ${it.message}") }
     }
 
     override suspend fun detachTun() {
@@ -217,70 +218,14 @@ interface AwgRuntime {
 
     @Deprecated("awgGetConfig causes SIGSEGV on partial-handshake handle, use only post-disconnect")
     fun getConfig(handle: Int): String? = null
-}
 
-class ReLinkerAwgRuntime(context: Context) : AwgRuntime {
-    private val appContext = context.applicationContext
-
-    @Volatile private var loaded = false
-    private val lock = Any()
-
-    private fun loadOnce() {
-        if (loaded) return
-        synchronized(lock) {
-            if (loaded) return
-            val started = System.currentTimeMillis()
-            val thread = Thread.currentThread().name
-            try {
-                ReLinker.loadLibrary(appContext, LIB_NAME)
-                loaded = true
-                val dt = System.currentTimeMillis() - started
-                Log.d(TAG, "ReLinker.loadLibrary $LIB_NAME ok dt=${dt}ms thread=$thread")
-            } catch (e: Throwable) {
-                val dt = System.currentTimeMillis() - started
-                PersistentLoggers.error(
-                    TAG,
-                    "ReLinker.loadLibrary $LIB_NAME failed dt=${dt}ms thread=$thread err=${e.message} (${e.javaClass.name})",
-                )
-                throw e
-            }
-        }
-    }
-
-    override fun turnOn(name: String, tunFd: Int, ini: String, uapiPath: String): Int {
-        loadOnce()
-        return GoBackend.awgTurnOn(name, tunFd, ini, uapiPath)
-    }
-
-    override fun version(): String = runCatching {
-        loadOnce()
-        GoBackend.awgVersion() ?: "null"
-    }.getOrElse { it.javaClass.simpleName }
-
-    override fun getConfig(handle: Int): String? {
-        loadOnce()
-        return runCatching { GoBackend.awgGetConfig(handle) }.getOrNull()
-    }
-
-    override fun turnOff(handle: Int) {
-        loadOnce()
-        GoBackend.awgTurnOff(handle)
-    }
-
-    override fun getSocketV4(handle: Int): Int {
-        loadOnce()
-        return GoBackend.awgGetSocketV4(handle)
-    }
-
-    override fun getSocketV6(handle: Int): Int {
-        loadOnce()
-        return GoBackend.awgGetSocketV6(handle)
-    }
-
-    fun preload() = loadOnce()
-
-    private companion object {
-        const val TAG = "ReLinkerAwgRuntime"
-        const val LIB_NAME = "am-go"
+    fun turnOnAndGetSockets(name: String, tunFd: Int, ini: String, uapiPath: String): AwgTurnOnResult {
+        val handle = turnOn(name, tunFd, ini, uapiPath)
+        if (handle < 0) return AwgTurnOnResult(handle, -1, -1)
+        val v4 = runCatching { getSocketV4(handle) }.getOrDefault(-1)
+        val v6 = runCatching { getSocketV6(handle) }.getOrDefault(-1)
+        return AwgTurnOnResult(handle, v4, v6)
     }
 }
+
+data class AwgTurnOnResult(val handle: Int, val socketV4Fd: Int, val socketV6Fd: Int)

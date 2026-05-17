@@ -11,9 +11,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,6 +36,52 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
+
+private val DNS_PRESETS: List<Pair<String, List<String>>> = listOf(
+    "Google" to listOf("8.8.8.8", "8.8.4.4"),
+    "Cloudflare" to listOf("1.1.1.1", "1.0.0.1"),
+    "Quad9" to listOf("9.9.9.9", "149.112.112.112"),
+)
+
+@Composable
+private fun DnsSection(
+    dnsText: String,
+    onPreset: (List<String>) -> Unit,
+    onDnsChange: (String) -> Unit,
+) {
+    Text(
+        text = stringResource(R.string.byedpi_dns_label),
+        style = MaterialTheme.typography.titleSmall,
+    )
+    Text(
+        text = stringResource(R.string.byedpi_dns_description),
+        style = MaterialTheme.typography.bodySmall,
+    )
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        item {
+            FilterChip(
+                selected = dnsText.isBlank(),
+                onClick = { onPreset(emptyList()) },
+                label = { Text(stringResource(R.string.byedpi_dns_auto)) },
+                modifier = Modifier.testTag("byedpi_dns_preset_auto"),
+            )
+        }
+        items(DNS_PRESETS) { (label, servers) ->
+            FilterChip(
+                selected = dnsText.trim() == servers.joinToString(", "),
+                onClick = { onPreset(servers) },
+                label = { Text(label) },
+            )
+        }
+    }
+    OutlinedTextField(
+        value = dnsText,
+        onValueChange = onDnsChange,
+        label = { Text(stringResource(R.string.byedpi_dns_field_label)) },
+        modifier = Modifier.fillMaxWidth().testTag("byedpi_dns_field"),
+        singleLine = true,
+    )
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,8 +125,7 @@ fun ByeDpiEngineSettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Text(
-                        text = "Аргументы запуска libbyedpi. Используются для обхода ТСПУ DPI. " +
-                            "Подробности: github.com/hufrea/byedpi",
+                        text = stringResource(R.string.byedpi_args_description),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     OutlinedTextField(
@@ -89,9 +137,9 @@ fun ByeDpiEngineSettingsScreen(
                     )
                     Text(
                         text = if (s.usingDefault) {
-                            "Используется default: ${s.defaultArgs}"
+                            stringResource(R.string.byedpi_using_default_fmt, s.defaultArgs)
                         } else {
-                            "Сохранённый override активен"
+                            stringResource(R.string.byedpi_using_override)
                         },
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -104,16 +152,24 @@ fun ByeDpiEngineSettingsScreen(
                             enabled = s.dirty,
                             modifier = Modifier.weight(1f).testTag("byedpi_save_btn"),
                         ) {
-                            Text("Сохранить")
+                            Text(stringResource(R.string.byedpi_save))
                         }
                         OutlinedButton(
                             onClick = viewModel::onResetToDefault,
                             enabled = !s.usingDefault,
                             modifier = Modifier.weight(1f).testTag("byedpi_reset_btn"),
                         ) {
-                            Text("Сброс")
+                            Text(stringResource(R.string.byedpi_reset))
                         }
                     }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    DnsSection(
+                        dnsText = s.dnsText,
+                        onPreset = viewModel::onDnsPreset,
+                        onDnsChange = viewModel::onDnsChange,
+                    )
 
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 

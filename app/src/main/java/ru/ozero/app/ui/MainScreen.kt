@@ -58,6 +58,7 @@ import ru.ozero.app.ui.components.OzeroBackground
 import ru.ozero.app.ui.components.OzeroBackgroundState
 import ru.ozero.app.ui.components.PowerDisc
 import ru.ozero.app.ui.components.PowerDiscState
+import ru.ozero.app.ui.icons.OzeroIcons
 import ru.ozero.app.ui.theme.OzeroPalette
 import ru.ozero.commonnet.CountryFlag
 import ru.ozero.commonvpn.BytesFormatter
@@ -73,6 +74,7 @@ fun MainScreen(
     viewModel: MainViewModel,
     onConnectClick: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenSplitTunnel: () -> Unit = {},
     onOpenEngineParams: (EngineId?) -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -100,56 +102,82 @@ fun MainScreen(
         ) { mode ->
             when (mode) {
                 AppMode.SIMPLE -> SimpleMainContent(
-                    tunnelState = state,
-                    switching = switching,
-                    powerState = powerState,
-                    isConnected = isConnected,
-                    manualEngine = manualEngine,
-                    urnetworkPeerCount = urnetworkPeerCount,
-                    urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
-                    onConnectClick = onConnectClick,
-                    onOpenEngineParams = onOpenEngineParams,
-                    onOpenSettings = onOpenSettings,
+                    state = SimpleMainState(
+                        tunnelState = state,
+                        switching = switching,
+                        powerState = powerState,
+                        isConnected = isConnected,
+                        manualEngine = manualEngine,
+                        urnetworkPeerCount = urnetworkPeerCount,
+                        urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
+                    ),
+                    callbacks = SimpleMainCallbacks(
+                        onConnectClick = onConnectClick,
+                        onOpenSplitTunnel = onOpenSplitTunnel,
+                        onOpenSettings = onOpenSettings,
+                    ),
                 )
                 AppMode.EXPERT -> ExpertMainContent(
-                    tunnelState = state,
-                    switching = switching,
-                    stats = stats,
-                    speedHistory = speedHistory,
-                    stagnant = stagnant,
-                    healthStatus = healthStatus,
-                    powerState = powerState,
-                    isConnected = isConnected,
-                    manualEngine = manualEngine,
-                    urnetworkPeerCount = urnetworkPeerCount,
-                    urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
-                    ipInfo = ipInfo,
-                    killswitchActive = killswitchActive,
-                    onConnectClick = onConnectClick,
-                    onManualEngineSelect = viewModel::onManualEngineSelect,
-                    onRefreshIpInfo = viewModel::refreshIpInfo,
-                    onOpenEngineParams = onOpenEngineParams,
-                    onOpenSettings = onOpenSettings,
+                    state = ExpertMainState(
+                        tunnelState = state,
+                        switching = switching,
+                        stats = stats,
+                        speedHistory = speedHistory,
+                        stagnant = stagnant,
+                        healthStatus = healthStatus,
+                        powerState = powerState,
+                        isConnected = isConnected,
+                        manualEngine = manualEngine,
+                        urnetworkPeerCount = urnetworkPeerCount,
+                        urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
+                        ipInfo = ipInfo,
+                        killswitchActive = killswitchActive,
+                    ),
+                    callbacks = ExpertMainCallbacks(
+                        onConnectClick = onConnectClick,
+                        onManualEngineSelect = viewModel::onManualEngineSelect,
+                        onRefreshIpInfo = viewModel::refreshIpInfo,
+                        onOpenEngineParams = onOpenEngineParams,
+                        onOpenSplitTunnel = onOpenSplitTunnel,
+                        onOpenSettings = onOpenSettings,
+                    ),
                 )
             }
         }
     }
 }
 
-@Suppress("LongParameterList")
+data class SimpleMainState(
+    val tunnelState: TunnelState,
+    val switching: SwitchingTransition?,
+    val powerState: PowerDiscState,
+    val isConnected: Boolean,
+    val manualEngine: EngineId?,
+    val urnetworkPeerCount: Int,
+    val urnetworkPeerSearchSeconds: Int,
+)
+
+data class SimpleMainCallbacks(
+    val onConnectClick: () -> Unit,
+    val onOpenSplitTunnel: () -> Unit,
+    val onOpenSettings: () -> Unit,
+)
+
 @Composable
 private fun SimpleMainContent(
-    tunnelState: TunnelState,
-    switching: SwitchingTransition?,
-    powerState: PowerDiscState,
-    isConnected: Boolean,
-    manualEngine: EngineId?,
-    urnetworkPeerCount: Int,
-    urnetworkPeerSearchSeconds: Int,
-    onConnectClick: () -> Unit,
-    onOpenEngineParams: (EngineId?) -> Unit,
-    onOpenSettings: () -> Unit,
+    state: SimpleMainState,
+    callbacks: SimpleMainCallbacks,
 ) {
+    val tunnelState = state.tunnelState
+    val switching = state.switching
+    val powerState = state.powerState
+    val isConnected = state.isConnected
+    val manualEngine = state.manualEngine
+    val urnetworkPeerCount = state.urnetworkPeerCount
+    val urnetworkPeerSearchSeconds = state.urnetworkPeerSearchSeconds
+    val onConnectClick = callbacks.onConnectClick
+    val onOpenSplitTunnel = callbacks.onOpenSplitTunnel
+    val onOpenSettings = callbacks.onOpenSettings
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -160,7 +188,7 @@ private fun SimpleMainContent(
         Spacer(modifier = Modifier.height(20.dp))
 
         AnimatedContent(targetState = switching to tunnelState, label = "status") { (sw, s) ->
-            StatusLabel(s, sw)
+            StatusLabel(s, sw, urnetworkPeerCount)
         }
 
         Box(
@@ -189,11 +217,11 @@ private fun SimpleMainContent(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             BottomDock(
-                tabs = commonDockTabs(),
+                tabs = simpleDockTabs(),
                 activeTabId = DOCK_TAB_HOME,
                 onTabSelected = { id ->
                     when (id) {
-                        DOCK_TAB_SERVERS -> onOpenEngineParams(manualEngine)
+                        DOCK_TAB_SPLIT_TUNNEL -> onOpenSplitTunnel()
                         DOCK_TAB_SETTINGS -> onOpenSettings()
                     }
                 },
@@ -224,28 +252,55 @@ private fun UrnetworkPeerBadge(count: Int, searchSeconds: Int) {
 
 private const val URNETWORK_PEER_SEARCH_VISIBLE_THRESHOLD_S: Int = 20
 
-@Suppress("LongParameterList")
+data class ExpertMainState(
+    val tunnelState: TunnelState,
+    val switching: SwitchingTransition?,
+    val stats: TunnelStats?,
+    val speedHistory: List<Pair<Float, Float>>,
+    val stagnant: Boolean,
+    val healthStatus: HealthMonitor.Status,
+    val powerState: PowerDiscState,
+    val isConnected: Boolean,
+    val manualEngine: EngineId?,
+    val urnetworkPeerCount: Int,
+    val urnetworkPeerSearchSeconds: Int,
+    val ipInfo: IpInfoState,
+    val killswitchActive: Boolean,
+)
+
+data class ExpertMainCallbacks(
+    val onConnectClick: () -> Unit,
+    val onManualEngineSelect: (EngineId?) -> Unit,
+    val onRefreshIpInfo: () -> Unit,
+    val onOpenEngineParams: (EngineId?) -> Unit,
+    val onOpenSplitTunnel: () -> Unit,
+    val onOpenSettings: () -> Unit,
+)
+
 @Composable
 private fun ExpertMainContent(
-    tunnelState: TunnelState,
-    switching: SwitchingTransition?,
-    stats: TunnelStats?,
-    speedHistory: List<Pair<Float, Float>>,
-    stagnant: Boolean,
-    healthStatus: HealthMonitor.Status,
-    powerState: PowerDiscState,
-    isConnected: Boolean,
-    manualEngine: EngineId?,
-    urnetworkPeerCount: Int,
-    urnetworkPeerSearchSeconds: Int,
-    ipInfo: IpInfoState,
-    killswitchActive: Boolean,
-    onConnectClick: () -> Unit,
-    onManualEngineSelect: (EngineId?) -> Unit,
-    onRefreshIpInfo: () -> Unit,
-    onOpenEngineParams: (EngineId?) -> Unit,
-    onOpenSettings: () -> Unit,
+    state: ExpertMainState,
+    callbacks: ExpertMainCallbacks,
 ) {
+    val tunnelState = state.tunnelState
+    val switching = state.switching
+    val stats = state.stats
+    val speedHistory = state.speedHistory
+    val stagnant = state.stagnant
+    val healthStatus = state.healthStatus
+    val powerState = state.powerState
+    val isConnected = state.isConnected
+    val manualEngine = state.manualEngine
+    val urnetworkPeerCount = state.urnetworkPeerCount
+    val urnetworkPeerSearchSeconds = state.urnetworkPeerSearchSeconds
+    val ipInfo = state.ipInfo
+    val killswitchActive = state.killswitchActive
+    val onConnectClick = callbacks.onConnectClick
+    val onManualEngineSelect = callbacks.onManualEngineSelect
+    val onRefreshIpInfo = callbacks.onRefreshIpInfo
+    val onOpenEngineParams = callbacks.onOpenEngineParams
+    val onOpenSplitTunnel = callbacks.onOpenSplitTunnel
+    val onOpenSettings = callbacks.onOpenSettings
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -254,7 +309,7 @@ private fun ExpertMainContent(
         Spacer(modifier = Modifier.height(16.dp))
 
         AnimatedContent(targetState = switching to tunnelState, label = "status") { (sw, s) ->
-            StatusLabel(s, sw)
+            StatusLabel(s, sw, urnetworkPeerCount)
         }
 
         Box(
@@ -276,56 +331,19 @@ private fun ExpertMainContent(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             val visualConnected = isConnected || switching != null
-            if (killswitchActive) {
-                Text(
-                    text = stringResource(R.string.killswitch_active_badge),
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.testTag(MainScreenTestTags.KILLSWITCH_BADGE),
-                )
-            }
-            if (visualConnected && manualEngine == EngineId.URNETWORK) {
-                UrnetworkPeerBadge(
-                    count = urnetworkPeerCount,
-                    searchSeconds = urnetworkPeerSearchSeconds,
-                )
-            }
-            if (visualConnected) {
-                IpInfoCard(
-                    state = ipInfo,
-                    onRefresh = onRefreshIpInfo,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
-            }
-            TrafficStatsCard(
+            ExpertStatusBadges(
+                visualConnected = visualConnected,
+                killswitchActive = killswitchActive,
+                manualEngine = manualEngine,
+                urnetworkPeerCount = urnetworkPeerCount,
+                urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
+                ipInfo = ipInfo,
                 stats = stats,
                 speedHistory = speedHistory,
-                modifier = Modifier.padding(horizontal = 16.dp),
+                stagnant = stagnant,
+                healthStatus = healthStatus,
+                onRefreshIpInfo = onRefreshIpInfo,
             )
-            if (visualConnected && stagnant) {
-                Text(
-                    text = stringResource(R.string.main_stagnation_warning),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.testTag(MainScreenTestTags.STAGNATION_BADGE),
-                )
-            }
-            if (visualConnected && healthStatus == HealthMonitor.Status.DEGRADED) {
-                Column(
-                    modifier = Modifier.testTag(MainScreenTestTags.HEALTH_DEGRADED_BADGE),
-                ) {
-                    Text(
-                        text = stringResource(R.string.main_health_degraded),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                    Text(
-                        text = stringResource(R.string.main_health_degraded_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
 
             EngineChipsRow(
                 selectedEngine = manualEngine,
@@ -334,11 +352,12 @@ private fun ExpertMainContent(
             )
 
             BottomDock(
-                tabs = commonDockTabs(),
+                tabs = expertDockTabs(),
                 activeTabId = DOCK_TAB_HOME,
                 onTabSelected = { id ->
                     when (id) {
                         DOCK_TAB_SERVERS -> onOpenEngineParams(manualEngine)
+                        DOCK_TAB_SPLIT_TUNNEL -> onOpenSplitTunnel()
                         DOCK_TAB_SETTINGS -> onOpenSettings()
                     }
                 },
@@ -352,14 +371,95 @@ private fun ExpertMainContent(
 }
 
 @Composable
-private fun commonDockTabs(): List<DockTab> {
+@Suppress("LongParameterList")
+private fun ExpertStatusBadges(
+    visualConnected: Boolean,
+    killswitchActive: Boolean,
+    manualEngine: EngineId?,
+    urnetworkPeerCount: Int,
+    urnetworkPeerSearchSeconds: Int,
+    ipInfo: IpInfoState,
+    stats: TunnelStats?,
+    speedHistory: List<Pair<Float, Float>>,
+    stagnant: Boolean,
+    healthStatus: HealthMonitor.Status,
+    onRefreshIpInfo: () -> Unit,
+) {
+    if (killswitchActive) {
+        Text(
+            text = stringResource(R.string.killswitch_active_badge),
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.testTag(MainScreenTestTags.KILLSWITCH_BADGE),
+        )
+    }
+    if (visualConnected && manualEngine == EngineId.URNETWORK) {
+        UrnetworkPeerBadge(
+            count = urnetworkPeerCount,
+            searchSeconds = urnetworkPeerSearchSeconds,
+        )
+    }
+    if (visualConnected) {
+        IpInfoCard(
+            state = ipInfo,
+            onRefresh = onRefreshIpInfo,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+    }
+    TrafficStatsCard(
+        stats = stats,
+        speedHistory = speedHistory,
+        modifier = Modifier.padding(horizontal = 16.dp),
+    )
+    if (visualConnected && stagnant) {
+        Text(
+            text = stringResource(R.string.main_stagnation_warning),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.testTag(MainScreenTestTags.STAGNATION_BADGE),
+        )
+    }
+    if (visualConnected && healthStatus == HealthMonitor.Status.DEGRADED) {
+        Column(modifier = Modifier.testTag(MainScreenTestTags.HEALTH_DEGRADED_BADGE)) {
+            Text(
+                text = stringResource(R.string.main_health_degraded),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+            Text(
+                text = stringResource(R.string.main_health_degraded_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun simpleDockTabs(): List<DockTab> {
+    val labelHome = stringResource(R.string.tab_main)
+    val labelSplit = stringResource(R.string.tab_split_tunnel)
+    val labelSettings = stringResource(R.string.tab_settings)
+    return remember(labelHome, labelSplit, labelSettings) {
+        listOf(
+            DockTab(DOCK_TAB_HOME, Icons.Filled.Home, labelHome),
+            DockTab(DOCK_TAB_SPLIT_TUNNEL, OzeroIcons.CallSplit, labelSplit),
+            DockTab(DOCK_TAB_SETTINGS, Icons.Filled.Settings, labelSettings),
+        )
+    }
+}
+
+@Composable
+private fun expertDockTabs(): List<DockTab> {
     val labelHome = stringResource(R.string.tab_main)
     val labelServers = stringResource(R.string.tab_servers)
+    val labelSplit = stringResource(R.string.tab_split_tunnel)
     val labelSettings = stringResource(R.string.tab_settings)
-    return remember(labelHome, labelServers, labelSettings) {
+    return remember(labelHome, labelServers, labelSplit, labelSettings) {
         listOf(
             DockTab(DOCK_TAB_HOME, Icons.Filled.Home, labelHome),
             DockTab(DOCK_TAB_SERVERS, Icons.Filled.LocationOn, labelServers),
+            DockTab(DOCK_TAB_SPLIT_TUNNEL, OzeroIcons.CallSplit, labelSplit),
             DockTab(DOCK_TAB_SETTINGS, Icons.Filled.Settings, labelSettings),
         )
     }
@@ -484,6 +584,7 @@ private fun TrafficStatsCard(
     val sessionStartMs = stats?.sessionStartMs ?: 0L
     var nowMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(sessionStartMs) {
+        if (sessionStartMs <= 0L) return@LaunchedEffect
         while (true) {
             nowMs = System.currentTimeMillis()
             delay(1_000)
@@ -661,9 +762,16 @@ private fun chartTimeAgo(seconds: Int): String = when {
 }
 
 @Composable
-private fun StatusLabel(state: TunnelState, switching: SwitchingTransition? = null) {
+private fun StatusLabel(
+    state: TunnelState,
+    switching: SwitchingTransition? = null,
+    urnetworkPeerCount: Int = 0,
+) {
     val labelRes = when {
         switching != null -> R.string.main_status_switching
+        state is TunnelState.Connected &&
+            state.engineId == EngineId.URNETWORK &&
+            urnetworkPeerCount == 0 -> R.string.main_status_urnetwork_searching
         else -> when (state) {
             is TunnelState.Idle -> R.string.main_status_disconnected
             is TunnelState.Probing -> if (state.engineId == ru.ozero.enginescore.EngineId.WARP) {
@@ -713,6 +821,7 @@ private fun StatusLabel(state: TunnelState, switching: SwitchingTransition? = nu
 
 private const val DOCK_TAB_HOME = "home"
 private const val DOCK_TAB_SERVERS = "servers"
+private const val DOCK_TAB_SPLIT_TUNNEL = "split_tunnel"
 private const val DOCK_TAB_SETTINGS = "settings"
 
 internal const val CHART_MAX_RENDER_POINTS = 300

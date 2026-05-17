@@ -36,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -135,6 +136,8 @@ fun UrnetworkEngineSettingsScreen(
                 LocationListContent(
                     modifier = Modifier.padding(padding),
                     countries = current.countries,
+                    regions = current.regions,
+                    cities = current.cities,
                     selectedLocation = current.selectedLocation,
                     providePaused = current.providePaused,
                     peerCount = peerCount,
@@ -159,11 +162,13 @@ fun UrnetworkEngineSettingsScreen(
     }
 }
 
-@Suppress("LongParameterList")
+@Suppress("LongParameterList", "LongMethod")
 @Composable
 private fun LocationListContent(
     modifier: Modifier,
     countries: List<UrnetworkLocationItem>,
+    regions: List<UrnetworkLocationItem>,
+    cities: List<UrnetworkLocationItem>,
     selectedLocation: UrnetworkSdkBridge.LocationToken?,
     providePaused: Boolean,
     peerCount: Int,
@@ -241,17 +246,68 @@ private fun LocationListContent(
                 HorizontalDivider(color = OzeroPalette.Line)
             }
         }
-        items(countries, key = { it.countryCode.ifEmpty { it.name } }) { item ->
-            val selected = !isBestAvailable &&
-                selectedLocation?.countryCode == item.countryCode
-            LocationRow(
-                name = item.name,
-                flag = item.flag,
-                providerCount = item.providerCount,
-                selected = selected,
-                onClick = { onSelect(item.location) },
-            )
-            HorizontalDivider(color = OzeroPalette.Line)
+        if (countries.isNotEmpty()) {
+            items(countries, key = { "c/${it.countryCode.ifEmpty { it.name }}" }) { item ->
+                val selected = !isBestAvailable &&
+                    selectedLocation?.countryCode == item.location.countryCode &&
+                    selectedLocation?.region == null &&
+                    selectedLocation?.city == null
+                LocationRow(
+                    name = item.name,
+                    flag = item.flag,
+                    providerCount = item.providerCount,
+                    selected = selected,
+                    onClick = { onSelect(item.location) },
+                )
+                HorizontalDivider(color = OzeroPalette.Line)
+            }
+        }
+        if (regions.isNotEmpty()) {
+            item {
+                Text(
+                    text = stringResource(R.string.urnetwork_location_regions),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = OzeroPalette.Text2,
+                    modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
+                )
+            }
+            items(regions, key = { "r/${it.countryCode}/${it.name}" }) { item ->
+                val selected = !isBestAvailable &&
+                    selectedLocation?.countryCode == item.location.countryCode &&
+                    selectedLocation?.region == item.location.region &&
+                    selectedLocation?.city == null
+                LocationRow(
+                    name = item.name,
+                    flag = item.flag,
+                    providerCount = item.providerCount,
+                    selected = selected,
+                    onClick = { onSelect(item.location) },
+                )
+                HorizontalDivider(color = OzeroPalette.Line)
+            }
+        }
+        if (cities.isNotEmpty()) {
+            item {
+                Text(
+                    text = stringResource(R.string.urnetwork_location_cities),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = OzeroPalette.Text2,
+                    modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
+                )
+            }
+            items(cities, key = { "ct/${it.countryCode}/${it.name}" }) { item ->
+                val selected = !isBestAvailable &&
+                    selectedLocation?.countryCode == item.location.countryCode &&
+                    selectedLocation?.city == item.location.city
+                LocationRow(
+                    name = item.name,
+                    flag = item.flag,
+                    providerCount = item.providerCount,
+                    selected = selected,
+                    onClick = { onSelect(item.location) },
+                )
+                HorizontalDivider(color = OzeroPalette.Line)
+            }
         }
     }
 }
@@ -301,6 +357,8 @@ private fun SettingsCard(
                 onSelect = onSelectWindowType,
                 onToggleFixedIp = onToggleFixedIp,
             )
+            SectionDivider()
+            CheckIpRow()
         }
     }
 }
@@ -501,6 +559,26 @@ private fun StatusRow(peerCount: Int, switchingCountry: Boolean = false) {
             style = MaterialTheme.typography.bodySmall,
             color = OzeroPalette.Text2,
         )
+    }
+}
+
+@Composable
+private fun CheckIpRow() {
+    val uriHandler = LocalUriHandler.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { uriHandler.openUri("https://ur.io/ip") }
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(R.string.urnetwork_check_ip),
+            style = MaterialTheme.typography.bodyMedium,
+            color = OzeroPalette.Text,
+        )
+        Text(text = "›", style = MaterialTheme.typography.bodyLarge, color = OzeroPalette.Text3)
     }
 }
 

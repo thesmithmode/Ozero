@@ -26,13 +26,13 @@ class StrategyEvolverTest {
     }
 
     @Test
-    fun `crossover uses aligned split point — no interleaving of parent genes`() {
+    fun `crossoverSinglePoint — head from parent1, tail from parent2`() {
         val p1 = parseChromosome("-a -b -c -d")
         val p2 = parseChromosome("-w -x -y -z")
         val p1Tokens = p1.map { it.token }.toSet()
         val p2Tokens = p2.map { it.token }.toSet()
         repeat(20) { seed ->
-            val child = evolver.crossover(p1, p2, Random(seed))
+            val child = evolver.crossoverSinglePoint(p1, p2, Random(seed))
             val p1Part = child.takeWhile { it.token in p1Tokens }
             val p2Part = child.dropWhile { it.token in p1Tokens }
             assertTrue(
@@ -42,6 +42,166 @@ class StrategyEvolverTest {
             assertTrue(
                 p1Part.all { it.token in p1Tokens },
                 "seed=$seed: head should be only p1 genes, got $child",
+            )
+        }
+    }
+
+    @Test
+    fun `crossoverTwoPoint produces child with genes only from parents`() {
+        val p1 = parseChromosome("-a -b -c -d")
+        val p2 = parseChromosome("-w -x -y -z")
+        val allTokens = (p1 + p2).map { it.token }.toSet()
+        repeat(20) { seed ->
+            val child = evolver.crossoverTwoPoint(p1, p2, Random(seed))
+            assertTrue(child.isNotEmpty(), "seed=$seed: child must not be empty")
+            child.forEach { gene ->
+                assertTrue(gene.token in allTokens, "seed=$seed: unknown gene '${gene.token}' in child: $child")
+            }
+        }
+    }
+
+    @Test
+    fun `crossoverTwoPoint contains genes from both parents over many runs`() {
+        val p1 = parseChromosome("-a -b -c -d -e")
+        val p2 = parseChromosome("-w -x -y -z -v")
+        val p1Tokens = p1.map { it.token }.toSet()
+        val p2Tokens = p2.map { it.token }.toSet()
+        var hasP1 = false
+        var hasP2 = false
+        repeat(50) { seed ->
+            val child = evolver.crossoverTwoPoint(p1, p2, Random(seed))
+            if (child.any { it.token in p1Tokens }) hasP1 = true
+            if (child.any { it.token in p2Tokens }) hasP2 = true
+        }
+        assertTrue(hasP1, "two-point crossover should produce children with parent1 genes")
+        assertTrue(hasP2, "two-point crossover should produce children with parent2 genes")
+    }
+
+    @Test
+    fun `crossoverTwoPoint length does not exceed parents combined`() {
+        val p1 = parseChromosome("-a -b -c -d")
+        val p2 = parseChromosome("-x -y -z")
+        repeat(20) { seed ->
+            val child = evolver.crossoverTwoPoint(p1, p2, Random(seed))
+            assertTrue(child.size >= 1, "child must not be empty, seed=$seed")
+            assertTrue(child.size <= p1.size + p2.size, "child too long, seed=$seed: $child")
+        }
+    }
+
+    @Test
+    fun `crossoverTwoPoint with empty parent1 returns parent2`() {
+        val p2 = parseChromosome("-a -b")
+        assertEquals(p2, evolver.crossoverTwoPoint(emptyList(), p2, Random(0)))
+    }
+
+    @Test
+    fun `crossoverTwoPoint with empty parent2 returns parent1`() {
+        val p1 = parseChromosome("-a -b")
+        assertEquals(p1, evolver.crossoverTwoPoint(p1, emptyList(), Random(0)))
+    }
+
+    @Test
+    fun `crossoverUniform result contains genes from both parents`() {
+        val p1 = parseChromosome("-a -b -c -d -e")
+        val p2 = parseChromosome("-w -x -y -z -v")
+        val p1Tokens = p1.map { it.token }.toSet()
+        val p2Tokens = p2.map { it.token }.toSet()
+        var hasP1 = false
+        var hasP2 = false
+        repeat(50) { seed ->
+            val child = evolver.crossoverUniform(p1, p2, Random(seed))
+            if (child.any { it.token in p1Tokens }) hasP1 = true
+            if (child.any { it.token in p2Tokens }) hasP2 = true
+        }
+        assertTrue(hasP1, "uniform crossover should produce children with parent1 genes")
+        assertTrue(hasP2, "uniform crossover should produce children with parent2 genes")
+    }
+
+    @Test
+    fun `crossoverUniform length equals length of longer parent`() {
+        val p1 = parseChromosome("-a -b -c")
+        val p2 = parseChromosome("-x -y -z -w -v")
+        repeat(10) { seed ->
+            val child = evolver.crossoverUniform(p1, p2, Random(seed))
+            val expected = maxOf(p1.size, p2.size)
+            assertEquals(expected, child.size, "seed=$seed: uniform child must equal longer parent")
+        }
+    }
+
+    @Test
+    fun `crossoverUniform with empty parent1 returns parent2`() {
+        val p2 = parseChromosome("-x -y")
+        assertEquals(p2, evolver.crossoverUniform(emptyList(), p2, Random(0)))
+    }
+
+    @Test
+    fun `crossoverUniform with empty parent2 returns parent1`() {
+        val p1 = parseChromosome("-a -b")
+        assertEquals(p1, evolver.crossoverUniform(p1, emptyList(), Random(0)))
+    }
+
+    @Test
+    fun `crossover dispatches to multiple operators — uniform or two-point produces interleaved genes`() {
+        val p1 = parseChromosome("-a -b -c -d -e")
+        val p2 = parseChromosome("-w -x -y -z -v")
+        val p1Tokens = p1.map { it.token }.toSet()
+        val p2Tokens = p2.map { it.token }.toSet()
+        var hasInterleaved = false
+        repeat(100) { seed ->
+            val child = evolver.crossover(p1, p2, Random(seed))
+            val hasMixedOrder = child.indices.any { i ->
+                i > 0 && child[i].token in p1Tokens && child[i - 1].token in p2Tokens
+            }
+            if (hasMixedOrder) hasInterleaved = true
+        }
+        assertTrue(hasInterleaved, "crossover should use uniform or two-point operator at least once in 100 runs")
+    }
+
+    @Test
+    fun `swap returns same length chromosome`() {
+        val chromosome = parseChromosome("-a -b -c -d")
+        repeat(20) { seed ->
+            val result = evolver.swap(chromosome, Random(seed))
+            assertEquals(chromosome.size, result.size, "swap must preserve length, seed=$seed")
+        }
+    }
+
+    @Test
+    fun `swap result contains same genes reordered`() {
+        val chromosome = parseChromosome("-a -b -c -d -e")
+        repeat(20) { seed ->
+            val result = evolver.swap(chromosome, Random(seed))
+            val sortedOriginal = chromosome.sortedBy { it.token }
+            val sortedResult = result.sortedBy { it.token }
+            assertEquals(sortedOriginal, sortedResult, "swap must not change gene set, seed=$seed")
+        }
+    }
+
+    @Test
+    fun `swap on single gene chromosome returns unchanged`() {
+        val chromosome = parseChromosome("-a")
+        assertEquals(chromosome, evolver.swap(chromosome, Random(0)))
+    }
+
+    @Test
+    fun `swap exchanges two different gene positions over many runs`() {
+        val chromosome = parseChromosome("-a -b -c -d -e")
+        var swappedAtLeastOnce = false
+        repeat(30) { seed ->
+            val result = evolver.swap(chromosome, Random(seed))
+            if (result != chromosome) swappedAtLeastOnce = true
+        }
+        assertTrue(swappedAtLeastOnce, "swap should reorder genes in at least some runs")
+    }
+
+    @Test
+    fun `mutate size stays within one of original when swap fires alongside insert and delete`() {
+        val chromosome = parseChromosome("-a -b -c -d -e -f")
+        repeat(50) { seed ->
+            val result = evolver.mutate(chromosome, rate = 1f, random = Random(seed))
+            assertTrue(
+                result.size in (chromosome.size - 1)..(chromosome.size + 1),
+                "seed=$seed: size ${result.size} should be within ±1 of ${chromosome.size} (swap never changes length)",
             )
         }
     }

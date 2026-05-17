@@ -19,6 +19,8 @@ Ozero's native engines (ByeDPI, AmneziaWG, Hysteria2) are compiled by `binaries.
 - Coverage ≥95% + contract tests are gates before automerge
 - Limitation: auto-update cannot catch runtime SIGSEGV on vendor ROMs or handshake timeouts — only compile-time + contract-level regressions
 - Contract tests that guard auto-update: `ByeDpiJniContractTest` (3 external fun + loadLibrary), AmneziaWgRuntimeBinaryTest (SHA256)
+- `binaries.lock.yaml` stores per-ABI SHA256 hashes; `regen_lock.py` requires downloaded `.so` + `manifest.yaml` to regenerate
+- Prebuilt Go binaries (e.g., `libmtg.so`) follow the same lock pattern but are run via `ProcessBuilder`, not `System.loadLibrary`
 
 ## Details
 

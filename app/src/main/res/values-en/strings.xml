@@ -14,6 +14,7 @@
     <string name="main_status_switching">Switching…</string>
     <string name="main_status_disconnecting">Disconnecting…</string>
     <string name="main_status_failed">Error</string>
+    <string name="main_status_urnetwork_searching">Searching peers…</string>
     <string name="main_active_engine">Active engine: %1$s</string>
     <string name="stats_session">Session: ↓ %1$s ↑ %2$s</string>
     <string name="stats_uptime">Uptime: %1$s</string>
@@ -29,6 +30,7 @@
     <string name="tab_main">Home</string>
     <string name="tab_settings">Settings</string>
     <string name="tab_servers">Params</string>
+    <string name="tab_split_tunnel">Split Tunneling</string>
     <string name="tab_diagnostics">Diagnostics</string>
     <string name="tab_stats">Stats</string>
     <string name="tab_subs">Subscription</string>
@@ -247,6 +249,9 @@
     <string name="urnetwork_location_best_available">Best available</string>
     <string name="urnetwork_auto_select">Auto select</string>
     <string name="urnetwork_location_connect_first">Connect to URnetwork to view available regions</string>
+    <string name="urnetwork_location_regions">Regions</string>
+    <string name="urnetwork_location_cities">Cities</string>
+    <string name="urnetwork_check_ip">Check IP address</string>
     <string name="urnetwork_provide_title">Share bandwidth</string>
     <string name="urnetwork_provide_subtitle">Share bandwidth with the URnetwork mesh</string>
     <string name="urnetwork_provide_mode_never">Never</string>
@@ -263,6 +268,13 @@
     <string name="urnetwork_shared_traffic_unavailable">Statistics unavailable. Make sure you are connected to URnetwork.</string>
     <string name="urnetwork_shared_traffic_provided">Provided</string>
     <string name="urnetwork_shared_traffic_plan">Plan</string>
+    <string name="urnetwork_shared_traffic_balance">Balance</string>
+    <string name="urnetwork_points_title">Points</string>
+    <string name="urnetwork_points_payout">Payouts</string>
+    <string name="urnetwork_points_referral">Referrals</string>
+    <string name="urnetwork_points_reliability">Reliability</string>
+    <string name="urnetwork_points_multiplier">Multiplier</string>
+    <string name="urnetwork_points_total">Total points</string>
     <string name="urnetwork_peers_connected">Connected to %1$d peers</string>
     <string name="urnetwork_peers_searching">Searching peers…</string>
     <string name="urnetwork_country_switching">Switching country…</string>
@@ -373,4 +385,84 @@
     <string name="chart_tf_5min">5m</string>
     <string name="chart_tf_30min">30m</string>
     <string name="chart_tf_1h">1h</string>
+
+    <!-- Manual server -->
+    <string name="manual_server_title">Add server</string>
+    <string name="manual_server_hint">Paste a VLESS / Trojan / Hysteria2 / Shadowsocks URI. The server will be saved to the database and picked up by engine candidates on the next connection.</string>
+    <string name="manual_server_uri_label">Server URI</string>
+    <string name="manual_server_add">Add</string>
+    <string name="manual_server_clear">Clear</string>
+    <string name="manual_server_error_prefix">Error: %1$s</string>
+    <string name="manual_server_success_prefix">OK: added server %1$s</string>
+    <string name="manual_server_error_empty_uri">Empty URI</string>
+    <string name="manual_server_error_import_unavailable">Import is not available in this build</string>
+
+    <!-- Logs screen -->
+    <string name="logs_title_fmt">Logs (%1$dKB)</string>
+    <string name="logs_back_cd">Back</string>
+    <string name="logs_copy">Copy</string>
+    <string name="logs_clear_cd">Clear</string>
+    <string name="logs_share_cd">Share</string>
+    <string name="logs_empty">(empty — log has not been written yet)</string>
+    <string name="logs_share_chooser_title">Share ozero.log</string>
+    <string name="logs_copy_empty_toast">Empty — nothing to copy</string>
+    <string name="logs_copy_done_toast_fmt">Copied (%1$d chars)</string>
+
+    <!-- ByeDPI engine settings -->
+    <string name="byedpi_args_description">libbyedpi launch arguments. Used to bypass DPI inspection. Details: github.com/hufrea/byedpi</string>
+    <string name="byedpi_args_label">ByeDPI args</string>
+    <string name="byedpi_using_default_fmt">Using default: %1$s</string>
+    <string name="byedpi_using_override">Saved override is active</string>
+    <string name="byedpi_save">Save</string>
+    <string name="byedpi_reset">Reset</string>
+    <string name="byedpi_dns_label">DNS servers</string>
+    <string name="byedpi_dns_description">Override DNS for the VPN tunnel. System DNS is used by default.</string>
+    <string name="byedpi_dns_auto">Auto</string>
+    <string name="byedpi_dns_field_label">DNS addresses (comma-separated)</string>
+
+    <!-- Telegram MTProxy settings -->
+    <string name="telegram_proxy_title">Telegram MTProxy</string>
+    <string name="telegram_proxy_description">Local MTProxy server for Telegram. Traffic goes through the active VPN engine.</string>
+    <string name="telegram_proxy_enable">Enable MTProxy</string>
+    <string name="telegram_proxy_state_idle">Off</string>
+    <string name="telegram_proxy_state_starting">Starting…</string>
+    <string name="telegram_proxy_state_running_fmt">Running on port %1$d</string>
+    <string name="telegram_proxy_state_error_fmt">Error: %1$s</string>
+    <string name="telegram_proxy_port_label">Port</string>
+    <string name="telegram_proxy_save">Save</string>
+    <string name="telegram_proxy_domain_label">FakeTLS domain</string>
+    <string name="telegram_proxy_secret_missing">Secret is not generated. Tap the button below.</string>
+    <string name="telegram_proxy_secret_value_fmt">Secret: %1$s</string>
+    <string name="telegram_proxy_generate_secret">Generate key</string>
+    <string name="telegram_proxy_rotate_secret">Rotate key</string>
+    <string name="telegram_proxy_generate_error">Failed to generate key. Check logs.</string>
+    <string name="telegram_proxy_link_label">Telegram link:</string>
+    <string name="telegram_proxy_copy">Copy</string>
+    <string name="telegram_proxy_open_in_tg">Open in Telegram</string>
+
+    <!-- Settings additional rows -->
+    <string name="settings_byedpi_title">ByeDPI args</string>
+    <string name="settings_byedpi_summary">DPI bypass settings</string>
+    <string name="settings_manual_server_title">Add server manually</string>
+    <string name="settings_manual_server_summary">VLESS / Trojan / Hysteria2 / Shadowsocks URI</string>
+    <string name="settings_telegram_proxy_title">Telegram MTProxy</string>
+    <string name="settings_telegram_proxy_summary">Local MTProxy for Telegram over VPN</string>
+    <string name="settings_logs">Logs</string>
+
+    <!-- WARP engine settings -->
+    <string name="warp_progress_mirror_fmt">Mirror %1$s</string>
+    <string name="warp_validation_required_fields">PrivateKey, Endpoint, PublicKey (Peer), Address are required</string>
+    <string name="warp_doh_section_label">DNS protocol (endpoint resolve)</string>
+    <string name="warp_next_generation_in_fmt">Next generation in %1$s</string>
+
+    <!-- Strategy test relative time -->
+    <string name="strategy_staleness_unverified">Not verified</string>
+    <string name="strategy_staleness_stale_fmt">Verified long ago · %1$s</string>
+    <string name="strategy_staleness_fresh_fmt">Verified · %1$s</string>
+    <string name="strategy_badge_best_on_network">Best on this network</string>
+    <string name="strategy_badge_best_other_network">Found on a different network</string>
+    <string name="strategy_time_just_now">just now</string>
+    <string name="strategy_time_min_ago_fmt">%1$d min ago</string>
+    <string name="strategy_time_hour_ago_fmt">%1$d h ago</string>
+    <string name="strategy_time_day_ago_fmt">%1$d d ago</string>
 </resources>

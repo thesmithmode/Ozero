@@ -18,6 +18,7 @@ import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.settings.HostsMode
+import io.mockk.coVerify
 import java.io.IOException
 import java.util.concurrent.CountDownLatch
 import kotlin.test.assertEquals
@@ -64,7 +65,10 @@ class ByeDpiEngineTest {
 
     @Test
     fun startSuccessWhenSocksPortReady() = runTest {
-        every { proxy.startProxy(any()) } returns 0
+        every { proxy.startProxy(any()) } answers {
+            proxyRunning.await()
+            0
+        }
         val result = engine.start(EngineConfig.ByeDpi(socksPort = 1080))
         assertIs<StartResult.Success>(result)
         assertEquals(1080, result.socksPort)
@@ -269,5 +273,180 @@ class ByeDpiEngineTest {
     fun ipProbeRouteReturnsDefaultBeforeStartWhenPortZero() = runTest {
         val route = engine.ipProbeRoute(socksPort = 0)
         assertIs<IpProbeRoute.Default>(route)
+    }
+
+    @Test
+    fun startFailureNoStopProxyWhenProxyReturnedErrorImmediately() = runTest {
+        val failEngine = ByeDpiEngine(
+            proxy,
+            socksProbe = { _, _, _ -> throw IOException("refused") },
+            readyTotalTimeoutMs = 200,
+        )
+        every { proxy.startProxy(any()) } returns -1
+        val result = failEngine.start(EngineConfig.ByeDpi(socksPort = 19001))
+        assertIs<StartResult.Failure>(result)
+        coVerify(exactly = 0) { proxy.stopProxy() }
+        coVerify(exactly = 0) { proxy.forceClose() }
+    }
+
+    @Test
+    fun startFailureFastWhenProxyDiesImmediately() = runTest {
+        val failEngine = ByeDpiEngine(
+            proxy,
+            socksProbe = { _, _, _ -> throw IOException("refused") },
+            readyTotalTimeoutMs = 5_000,
+        )
+        every { proxy.startProxy(any()) } returns -1
+        val t0 = System.currentTimeMillis()
+        val result = failEngine.start(EngineConfig.ByeDpi(socksPort = 19002))
+        val elapsed = System.currentTimeMillis() - t0
+        assertIs<StartResult.Failure>(result)
+        assertTrue(elapsed < 2_000, "Должен завершиться быстро когда прокси умер: elapsed=${elapsed}ms")
+    }
+
+    @Test
+    fun `start — forceClose когда stopProxy не помог + второй join ждёт нативный поток`() = runTest {
+        val proxyStarted = CountDownLatch(1)
+        val nativeThreadExit = CountDownLatch(1)
+        val orderedProxy: ByeDpiProxy = mockk(relaxed = true)
+        mockkObject(ByeDpiProxy.Companion)
+        every { ByeDpiProxy.loadOnce() } just runs
+        every { ByeDpiProxy.libraryLoaded } returns true
+        every { orderedProxy.startProxy(any()) } answers {
+            proxyStarted.countDown()
+            nativeThreadExit.await()
+            0
+        }
+        every { orderedProxy.forceClose() } answers {
+            nativeThreadExit.countDown()
+            0
+        }
+        val eng = ByeDpiEngine(orderedProxy, socksProbe = { _, _, _ -> 1L })
+        eng.start(EngineConfig.ByeDpi(socksPort = 1080))
+        proxyStarted.await()
+        every { orderedProxy.startProxy(any()) } returns 0
+        val result = eng.start(EngineConfig.ByeDpi(socksPort = 1081))
+        assertIs<StartResult.Success>(result)
+        coVerify(atLeast = 1) { orderedProxy.forceClose() }
+        unmockkObject(ByeDpiProxy.Companion)
+    }
+
+    @Test
+    fun `startProxyWithRecovery — normal path skips emergencyReset`() = runTest {
+        val startCalled = CountDownLatch(1)
+        val normalProxy = mockk<ByeDpiProxy>(relaxed = true)
+        every { normalProxy.startProxy(any()) } answers {
+            startCalled.countDown()
+            proxyRunning.await()
+            0
+        }
+        val normalEngine = ByeDpiEngine(
+            normalProxy,
+            socksProbe = { _, _, _ ->
+                startCalled.await()
+                1L
+            },
+        )
+        val result = normalEngine.start(EngineConfig.ByeDpi(socksPort = 1080))
+        assertIs<StartResult.Success>(result)
+        verify(exactly = 0) { normalProxy.emergencyReset() }
+    }
+
+    @Test
+    fun `startProxyWithRecovery — guard busy calls emergencyReset then retries start`() = runTest {
+        val secondCallStarted = CountDownLatch(1)
+        var callCount = 0
+        val recProxy = mockk<ByeDpiProxy>(relaxed = true)
+        every { recProxy.startProxy(any()) } answers {
+            if (callCount++ == 0) {
+                -2
+            } else {
+                secondCallStarted.countDown()
+                proxyRunning.await()
+                0
+            }
+        }
+        every { recProxy.emergencyReset() } returns 1
+        val recEngine = ByeDpiEngine(
+            recProxy,
+            socksProbe = { _, _, _ ->
+                secondCallStarted.await()
+                1L
+            },
+        )
+        val result = recEngine.start(EngineConfig.ByeDpi(socksPort = 1080))
+        assertIs<StartResult.Success>(result)
+        verify(exactly = 1) { recProxy.emergencyReset() }
+        verify(exactly = 2) { recProxy.startProxy(any()) }
+    }
+
+    @Test
+    fun `startProxyWithRecovery — guard busy retry fails returns Failure`() = runTest {
+        var callCount = 0
+        val recProxy = mockk<ByeDpiProxy>(relaxed = true)
+        every { recProxy.startProxy(any()) } answers {
+            if (callCount++ == 0) -2 else -1
+        }
+        every { recProxy.emergencyReset() } returns 1
+        val failEngine = ByeDpiEngine(
+            recProxy,
+            socksProbe = { _, _, _ -> throw IOException("refused") },
+            readyTotalTimeoutMs = 300,
+        )
+        val result = failEngine.start(EngineConfig.ByeDpi(socksPort = 1080))
+        assertIs<StartResult.Failure>(result)
+        verify(exactly = 1) { recProxy.emergencyReset() }
+        verify(exactly = 2) { recProxy.startProxy(any()) }
+    }
+
+    @Test
+    fun `startProxyWithRecovery — emergencyReset throws still retries startProxy`() = runTest {
+        val secondCallStarted = CountDownLatch(1)
+        var callCount = 0
+        val recProxy = mockk<ByeDpiProxy>(relaxed = true)
+        every { recProxy.startProxy(any()) } answers {
+            if (callCount++ == 0) {
+                -2
+            } else {
+                secondCallStarted.countDown()
+                proxyRunning.await()
+                0
+            }
+        }
+        every { recProxy.emergencyReset() } throws RuntimeException("reset failed")
+        val recEngine = ByeDpiEngine(
+            recProxy,
+            socksProbe = { _, _, _ ->
+                secondCallStarted.await()
+                1L
+            },
+        )
+        val result = recEngine.start(EngineConfig.ByeDpi(socksPort = 1080))
+        assertIs<StartResult.Success>(result)
+        verify(exactly = 2) { recProxy.startProxy(any()) }
+    }
+
+    @Test
+    fun startStopsOldProxyBeforeLaunchingNew() = runTest {
+        val firstLatch = CountDownLatch(1)
+        val blockingProxy: ByeDpiProxy = mockk(relaxed = true)
+        mockkObject(ByeDpiProxy.Companion)
+        every { ByeDpiProxy.loadOnce() } just runs
+        every { ByeDpiProxy.libraryLoaded } returns true
+        every { blockingProxy.startProxy(any()) } answers {
+            firstLatch.await()
+            0
+        }
+        every { blockingProxy.stopProxy() } answers {
+            firstLatch.countDown()
+            0
+        }
+        val eng = ByeDpiEngine(blockingProxy, socksProbe = { _, _, _ -> 1L })
+        eng.start(EngineConfig.ByeDpi(socksPort = 1080))
+        every { blockingProxy.startProxy(any()) } returns 0
+        val result = eng.start(EngineConfig.ByeDpi(socksPort = 1080))
+        assertIs<StartResult.Success>(result)
+        coVerify(atLeast = 1) { blockingProxy.stopProxy() }
+        unmockkObject(ByeDpiProxy.Companion)
     }
 }

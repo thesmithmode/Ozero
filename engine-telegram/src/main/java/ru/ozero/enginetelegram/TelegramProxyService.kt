@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import ru.ozero.enginescore.Upstream
 import java.util.concurrent.atomic.AtomicReference
@@ -19,11 +21,14 @@ import java.util.concurrent.atomic.AtomicReference
 class TelegramProxyService(
     private val context: Context,
     private val configStore: TelegramConfigStore,
+    private val wrapperFactory: (String) -> MtgWrapper = { MtgWrapper(it) },
+    private val startupCheckMs: Long = STARTUP_CHECK_MS,
 ) {
-    private val wrapper by lazy { MtgWrapper(context.applicationInfo.nativeLibraryDir) }
+    private val wrapper by lazy { wrapperFactory(context.applicationInfo.nativeLibraryDir) }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val processRef = AtomicReference<Process?>(null)
     private val jobRef = AtomicReference<Job?>(null)
+    private val runMutex = Mutex()
 
     private val _state = MutableStateFlow<TelegramProxyState>(TelegramProxyState.Idle)
     val state: StateFlow<TelegramProxyState> = _state.asStateFlow()
@@ -34,7 +39,7 @@ class TelegramProxyService(
             return
         }
         jobRef.getAndSet(
-            scope.launch { runProxy(config, upstream) },
+            scope.launch { runMutex.withLock { runProxy(config, upstream) } },
         )?.cancel()
     }
 
@@ -56,10 +61,13 @@ class TelegramProxyService(
             ?.let { "socks5://${it.host}:${it.port}" }
         try {
             val process = withContext(Dispatchers.IO) {
-                wrapper.startProxy(config.port, config.secret, upstream = upstreamUrl)
-                    .also { processRef.set(it) }
+                val newProcess = wrapper.startProxy(config.port, config.secret, upstream = upstreamUrl)
+                processRef.getAndSet(newProcess)?.let { stale ->
+                    runCatching { stale.destroyForcibly() }
+                }
+                newProcess
             }
-            delay(STARTUP_CHECK_MS)
+            delay(startupCheckMs)
             if (!process.isAlive) {
                 val output = withContext(Dispatchers.IO) { process.inputStream.bufferedReader().use { it.readText() } }
                 Log.e(TAG, "mtg exited early: $output")

@@ -82,7 +82,7 @@
 
 ## Per-engine UI
 
-- Каждый engine (Xray, Hy2, Awg, Naive, Tor, ByeDpi) обязан иметь settings screen в `app/src/main/java/.../ui/settings/engines/` для пользовательского override config (subscription URL, server picker, args, bridges, и т.д.).
+- Каждый engine (текущие модули: byedpi, telegram, urnetwork, warp) обязан иметь settings screen в `app/src/main/java/.../ui/settings/engines/` для пользовательского override config (subscription URL, server picker, args, bridges, и т.д.). При добавлении нового `engine-*` модуля — добавить сюда.
 
 ## MTProxy / Subprocess-proxy паттерн
 

@@ -23,6 +23,8 @@ import ru.ozero.enginetelegram.TelegramProxyService
 import ru.ozero.enginetelegram.TelegramProxyState
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.Upstream
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TelegramProxyCoordinatorTest {
@@ -117,5 +119,38 @@ class TelegramProxyCoordinatorTest {
         configFlow.value = config
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 9090)
         verify { mockProxy.start(config, Upstream.Socks5("127.0.0.1", 9090)) }
+    }
+
+    @Test
+    fun `coordinator stop() обязан остановить proxyService — иначе зомби mtg-процесс`() =
+        testScope.runTest {
+            val config = TelegramProxyConfig(enabled = true, secret = "abc")
+            coordinator.start()
+            configFlow.value = config
+            tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
+
+            coordinator.stop()
+
+            verify(atLeast = 1) { mockProxy.stop() }
+        }
+
+    @Test
+    fun `job hold через AtomicReference — concurrency race fix`() {
+        val src = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/proxy/TelegramProxyCoordinator.kt",
+        ).readText()
+        assertFalse(
+            src.contains("private var job:") || src.contains("var job: Job?"),
+            "job не должен быть plain var Job? — race между start/stop. Использовать AtomicReference.",
+        )
+        assertTrue(
+            src.contains("AtomicReference<Job?>"),
+            "jobRef обязан быть AtomicReference<Job?>",
+        )
+        assertTrue(
+            src.contains("jobRef.getAndSet("),
+            "start/stop обязан использовать getAndSet для атомарной замены и cancel предыдущего.",
+        )
     }
 }

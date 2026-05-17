@@ -4,8 +4,9 @@ aliases: [awg-false-connected, warp-no-handshake, connected-but-no-tunnel]
 tags: [warp, amneziawg, gotcha, ui, debugging]
 sources:
   - "daily/2026-05-07.md"
+  - "daily/2026-05-14.md"
 created: 2026-05-07
-updated: 2026-05-07
+updated: 2026-05-14
 ---
 
 # WARP False Connected State: awgTurnOn OK Without Handshake
@@ -77,13 +78,24 @@ This false-connected pattern was identified in session 15:11 alongside the AWG o
 
 The same session identified suspicious DNS servers in the mirror auto-config response (`176.99.11.77`, `80.78.247.254`) — IPs that do not belong to Cloudflare. If the DNS servers are unreachable or return incorrect answers, applications behind the VPN cannot resolve hostnames even if the handshake succeeds. This creates a second layer of false connectivity: handshake completes but DNS fails.
 
+### Implementation: UAPI Socket Polling (2026-05-14)
+
+The handshake polling was implemented via `WarpHandshakeUapi.kt` using `LocalSocket` to read from the UAPI socket at `$dataDir/ozero-warp.sock`. The key decision: do NOT use `awgGetConfig(handle)` JNI for polling — calling it during partial handshake can SIGSEGV (Go runtime accesses incomplete state). The UAPI socket is a standard Unix domain socket read, no Go runtime involvement.
+
+Polling parameters: 300ms interval, 10s timeout. Integrated into `EngineWarp.awaitReady()` — called between `routeTrafficForEngine()` and `onEngineStarted()` in the VPN start sequence. UI shows "Connected" only after `last_handshake_time_sec > 0` confirmed.
+
+See [[concepts/warp-uapi-handshake-polling]] for full implementation details and [[concepts/engine-await-ready-pattern]] for the cross-engine readiness architecture.
+
 ## Related Concepts
 
 - [[concepts/amneziawg-turnon-minus-one]] - The complementary failure mode: awgTurnOn returns -1 (complete failure); this article covers the case where awgTurnOn succeeds but connectivity does not follow
 - [[concepts/warp-awg-obfuscation-russian-isps]] - AWG obfuscation is required for handshake to succeed under TSPU; without it, this false-connected state is the inevitable result
 - [[concepts/health-monitor-p2p-mismatch]] - Another false-positive status signal: HealthMonitor reports DEGRADED for working P2P engine; both are instances of status signals not matching actual connectivity
 - [[concepts/warp-handle-leak-sigabrt]] - Unpaired handles from false-connected sessions may accumulate if the bridge does not clean up stale handles
+- [[concepts/warp-uapi-handshake-polling]] - Implementation: UAPI socket polling for handshake verification (not JNI)
+- [[concepts/engine-await-ready-pattern]] - Cross-engine readiness gate architecture that uses handshake polling as WARP's signal
 
 ## Sources
 
 - [[daily/2026-05-07.md]] - Session 15:11: `awgTurnOn OK` + state=Connected does not mean real handshake; need polling `last_handshake_time_sec` from `awgGetConfig`; handshake polling identified as required follow-up; mirror DNS suspicion (176.99.11.77, 80.78.247.254 — not Cloudflare)
+- [[daily/2026-05-14.md]] - Session 16:41: handshake polling implemented via WarpHandshakeUapi.kt + LocalSocket (not awgGetConfig JNI — SIGSEGV risk); 300ms/10s; integrated into EngineWarp.awaitReady()

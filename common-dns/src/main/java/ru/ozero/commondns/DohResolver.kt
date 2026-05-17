@@ -8,6 +8,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import ru.ozero.enginescore.PersistentLoggers
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
@@ -23,10 +24,20 @@ class DohResolver(
 ) {
 
     suspend fun resolve(hostname: String): DohResult =
-        execute(DnsMessage.buildAQuery(hostname), parseV6 = false)
+        buildOrFail(hostname) { DnsMessage.buildAQuery(it) }?.let { execute(it, parseV6 = false) }
+            ?: DohResult.Failure("invalid hostname")
 
     suspend fun resolveAAAA(hostname: String): DohResult =
-        execute(DnsMessage.buildAAAAQuery(hostname), parseV6 = true)
+        buildOrFail(hostname) { DnsMessage.buildAAAAQuery(it) }?.let { execute(it, parseV6 = true) }
+            ?: DohResult.Failure("invalid hostname")
+
+    private fun buildOrFail(hostname: String, builder: (String) -> ByteArray): ByteArray? =
+        try {
+            builder(hostname)
+        } catch (e: IllegalArgumentException) {
+            PersistentLoggers.warn(TAG, "DoH invalid hostname: ${e.message}")
+            null
+        }
 
     private suspend fun execute(query: ByteArray, parseV6: Boolean): DohResult = withContext(Dispatchers.IO) {
         Log.i(TAG, "resolve via $endpoint v6=$parseV6")
@@ -39,7 +50,7 @@ class DohResolver(
         try {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    Log.w(TAG, "HTTP ${response.code}")
+                    PersistentLoggers.warn(TAG, "DoH $endpoint HTTP ${response.code}")
                     return@use DohResult.Failure("HTTP ${response.code}", response.code)
                 }
                 val body = response.body?.bytes() ?: return@use DohResult.Failure("empty body")
@@ -47,7 +58,7 @@ class DohResolver(
                 if (addresses.isEmpty()) DohResult.Failure("нет записей") else DohResult.Ok(addresses)
             }
         } catch (e: IOException) {
-            Log.w(TAG, "IO fail: ${e.message}")
+            PersistentLoggers.warn(TAG, "DoH $endpoint IO fail: ${e.message}", e)
             DohResult.Failure(e.message ?: "network error")
         }
     }

@@ -6,5 +6,5 @@ data class EngineCapabilities(
     val supportsDoH: Boolean,
     val localOnly: Boolean,
     val requiresServer: Boolean,
-    val supportsUpstreamSocks: Boolean = false,
+    val supportsUpstreamSocks: Boolean,
 )

@@ -93,6 +93,10 @@ class SettingsRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun setByedpiDefaultAccepted(accepted: Boolean) {
+        dataStore.edit { it[SettingsKeys.BYDPI_DEFAULT_ACCEPTED] = accepted }
+    }
+
     override suspend fun setCustomDnsServers(servers: List<String>) {
         dataStore.edit { prefs ->
             val cleaned = servers
@@ -156,6 +160,8 @@ class SettingsRepositoryImpl @Inject constructor(
         urnetworkCountryCode = this[SettingsKeys.URNETWORK_COUNTRY_CODE]
             ?: SettingsModel.DEFAULT_URNETWORK_COUNTRY_CODE,
         byedpiWinningArgs = this[SettingsKeys.BYDPI_WINNING_ARGS],
+        byedpiDefaultAccepted = this[SettingsKeys.BYDPI_DEFAULT_ACCEPTED]
+            ?: SettingsModel.DEFAULT_BYEDPI_DEFAULT_ACCEPTED,
         customDnsServers = readCustomDnsServers(),
         hostsMode = readHostsMode(),
         hosts = readHosts(),

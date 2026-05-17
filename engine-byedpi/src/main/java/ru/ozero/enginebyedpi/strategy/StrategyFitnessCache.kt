@@ -52,6 +52,10 @@ class StrategyFitnessCache(
             entries.remove(command)
             return null
         }
+        if (entry.fitness <= 0.0) {
+            entries.remove(command)
+            return null
+        }
         return entry.fitness
     }
 

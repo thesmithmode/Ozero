@@ -6,8 +6,9 @@ sources:
   - "daily/2026-04-29.md"
   - "daily/2026-05-01.md"
   - "daily/2026-05-02.md"
+  - "daily/2026-05-14.md"
 created: 2026-04-29
-updated: 2026-05-02
+updated: 2026-05-14
 ---
 
 # CI Workflow Discipline
@@ -44,6 +45,12 @@ Both rules were codified in the global `CLAUDE.md` as permanent CI practices aft
 
 A third CI truthfulness issue was discovered: GitHub Actions `needs:` dependencies create hard gates where a failing predecessor silently skips all successors. During v0.0.2-5, a detekt threshold failure in the `kotlin-style` job caused `assemble-debug` to be skipped entirely, hiding a compile error (`Os.close(Int)` — nonexistent API) that was only caught later in `release.yml`. This is a job-level analog of Gradle's task-level fail-fast. See [[concepts/ci-job-dependency-masking]] for the full incident analysis.
 
+### New Module Must Be Explicitly Added to CI Test Job (2026-05-14)
+
+A fourth CI truthfulness rule: when a new Gradle module is created, it is NOT automatically included in the CI test job. Gradle's `:test` task runs only modules listed in `settings.gradle` AND explicitly included in the CI command. If `ci.yml` runs `./gradlew :app:test :engines-core:test` (explicit list), a new module `engine-telegram` will be silently skipped — zero tests, zero failures, false green.
+
+Rule: whenever a new `engine-*` module is added, immediately verify that `ci.yml` includes it in the test command. A `BUILD SUCCESSFUL — 0 tests run` on the new module is the signal to check the CI config.
+
 ## Related Concepts
 
 - [[concepts/release-process]] - Release tagging happens only after CI is green on `dev`
@@ -57,3 +64,4 @@ A third CI truthfulness issue was discovered: GitHub Actions `needs:` dependenci
 - [[daily/2026-04-29.md]] - CI failed twice on v1.0.5 batch (ktlint+detekt, then tests), third run green; confirmed rule about not waiting for CI on side branches
 - [[daily/2026-05-01.md]] - `--continue` added to ci.yml; N > 0 test verification rule established after useJUnitPlatform() revealed 3 months of silent test skipping
 - [[daily/2026-05-02.md]] - detekt failure in `kotlin-style` job masked compile error in `assemble-debug` via `needs:` dependency chain
+- [[daily/2026-05-14.md]] - new `engine-telegram` module silently skipped by CI test job; explicit module list in ci.yml required

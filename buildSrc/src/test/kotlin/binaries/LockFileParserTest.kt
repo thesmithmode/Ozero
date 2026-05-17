@@ -130,7 +130,7 @@ class LockFileParserTest {
         )
         assertThatThrownBy { LockFileParser.parse(f) }
             .isInstanceOf(LockFileException::class.java)
-            .hasMessageContaining("duplicate")
+            .hasMessageContaining("Duplicate")
     }
 
     @Test
@@ -209,7 +209,7 @@ class LockFileParserTest {
     }
 
     @Test
-    fun `reject non-https download url`() {
+    fun `reject relative download url`() {
         val f = write(
             """
             tag: binaries-x
@@ -219,7 +219,7 @@ class LockFileParserTest {
                 engine: x
                 abi: arm64-v8a
                 destination: jniLibs
-                download_url: http://example.com/x.so
+                download_url: /relative/path/x.so
                 sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
                 size_bytes: 1
                 source_repo: https://example.com
@@ -228,7 +228,7 @@ class LockFileParserTest {
         )
         assertThatThrownBy { LockFileParser.parse(f) }
             .isInstanceOf(LockFileException::class.java)
-            .hasMessageContaining("https")
+            .hasMessageContaining("absolute")
     }
 
     @Test

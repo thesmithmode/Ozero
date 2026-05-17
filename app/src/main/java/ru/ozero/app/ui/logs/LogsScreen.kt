@@ -31,8 +31,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import ru.ozero.app.R
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -68,25 +70,25 @@ internal fun LogsScreenContent(
             TopAppBar(
                 title = {
                     val sizeKb = state.fileSize / 1024
-                    Text("Логи (${sizeKb}KB)")
+                    Text(stringResource(R.string.logs_title_fmt, sizeKb))
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Назад",
+                            contentDescription = stringResource(R.string.logs_back_cd),
                         )
                     }
                 },
                 actions = {
                     TextButton(onClick = { copyToClipboard(ctx, "ozero.log", onCopy()) }) {
-                        Text("Копировать")
+                        Text(stringResource(R.string.logs_copy))
                     }
                     IconButton(onClick = onClear) {
-                        Icon(Icons.Default.Delete, contentDescription = "Очистить")
+                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.logs_clear_cd))
                     }
                     IconButton(onClick = { shareLogFile(ctx) }) {
-                        Icon(Icons.Default.Share, contentDescription = "Поделиться")
+                        Icon(Icons.Default.Share, contentDescription = stringResource(R.string.logs_share_cd))
                     }
                 },
             )
@@ -117,8 +119,9 @@ private fun LogsBody(state: LogsUiState, padding: PaddingValues) {
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
         }
+        val emptyLabel = stringResource(R.string.logs_empty)
         Text(
-            text = if (state.tail.isBlank()) "(пусто — лог ещё не записан)" else state.tail,
+            text = if (state.tail.isBlank()) emptyLabel else state.tail,
             fontFamily = FontFamily.Monospace,
             style = MaterialTheme.typography.bodySmall,
         )
@@ -135,7 +138,7 @@ private fun shareLogFile(ctx: Context) {
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
     ctx.startActivity(
-        Intent.createChooser(intent, "Поделиться ozero.log").apply {
+        Intent.createChooser(intent, ctx.getString(R.string.logs_share_chooser_title)).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         },
     )
@@ -143,12 +146,16 @@ private fun shareLogFile(ctx: Context) {
 
 internal fun copyToClipboard(context: Context, label: String, text: String) {
     if (text.isBlank()) {
-        Toast.makeText(context, "Пусто — нечего копировать", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.logs_copy_empty_toast), Toast.LENGTH_SHORT).show()
         return
     }
     val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     cm.setPrimaryClip(ClipData.newPlainText(label, text))
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-        Toast.makeText(context, "Скопировано (${text.length} симв.)", Toast.LENGTH_SHORT).show()
+        Toast.makeText(
+            context,
+            context.getString(R.string.logs_copy_done_toast_fmt, text.length),
+            Toast.LENGTH_SHORT,
+        ).show()
     }
 }

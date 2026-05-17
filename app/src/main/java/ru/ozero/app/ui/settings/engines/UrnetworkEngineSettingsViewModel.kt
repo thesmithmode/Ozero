@@ -15,12 +15,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.ozero.commonvpn.TunnelController
@@ -50,6 +52,8 @@ sealed interface UrnetworkSettingsUiState {
     data object NotConnected : UrnetworkSettingsUiState
     data class Ready(
         val countries: List<UrnetworkLocationItem>,
+        val regions: List<UrnetworkLocationItem>,
+        val cities: List<UrnetworkLocationItem>,
         val selectedLocation: UrnetworkSdkBridge.LocationToken?,
         val providePaused: Boolean,
     ) : UrnetworkSettingsUiState
@@ -65,7 +69,13 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val isUrnetworkActive: StateFlow<Boolean> = tunnelController.state
-        .map { s -> s is TunnelState.Connected && s.engineId == EngineId.URNETWORK }
+        .map { s ->
+            when (s) {
+                is TunnelState.Connecting -> s.engineId == EngineId.URNETWORK
+                is TunnelState.Connected -> s.engineId == EngineId.URNETWORK
+                else -> false
+            }
+        }
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
@@ -120,6 +130,11 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         }
     }
 
+    private val userSelectedCountryCode: StateFlow<String?> = settingsRepository.settings
+        .map { it.urnetworkCountryCode }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
     private val _uiState = MutableStateFlow<UrnetworkSettingsUiState>(UrnetworkSettingsUiState.Loading)
     val uiState: StateFlow<UrnetworkSettingsUiState> = _uiState.asStateFlow()
 
@@ -157,10 +172,12 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     @Volatile private var locationsVc: LocationsViewController? = null
     private var switchingJob: Job? = null
     private var allCountries: List<UrnetworkLocationItem> = emptyList()
+    private var allRegions: List<UrnetworkLocationItem> = emptyList()
+    private var allCities: List<UrnetworkLocationItem> = emptyList()
 
     init {
         viewModelScope.launch {
-            isUrnetworkActive.collect { active ->
+            isUrnetworkActive.collectLatest { active ->
                 if (active) {
                     var attempt = 0
                     while (attempt < REFRESH_RETRY_ATTEMPTS && _uiState.value !is UrnetworkSettingsUiState.Ready) {
@@ -173,6 +190,8 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
                 } else {
                     teardownLocationsVc()
                     allCountries = emptyList()
+                    allRegions = emptyList()
+                    allCities = emptyList()
                     _uiState.value = UrnetworkSettingsUiState.NotConnected
                 }
             }
@@ -243,9 +262,8 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
             runCatching { settingsRepository.setUrnetworkCountryCode(targetCountry) }
         }
         runCatching { bridge.setPreferredCountry(targetCountry) }
-        val current = _uiState.value
-        if (current is UrnetworkSettingsUiState.Ready) {
-            _uiState.value = current.copy(selectedLocation = location)
+        _uiState.update { current ->
+            if (current is UrnetworkSettingsUiState.Ready) current.copy(selectedLocation = location) else current
         }
         if (previousCountry != targetCountry) {
             startSwitchingIndicator()
@@ -278,16 +296,22 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
             bridge.setProvidePaused(paused)
         }
         viewModelScope.launch { configStore.setProvideEnabled(!paused) }
-        val current = _uiState.value
-        if (current is UrnetworkSettingsUiState.Ready) {
-            _uiState.value = current.copy(providePaused = paused)
+        _uiState.update { current ->
+            if (current is UrnetworkSettingsUiState.Ready) current.copy(providePaused = paused) else current
         }
     }
 
     private fun updateLocations(filtered: FilteredLocations?) {
         if (filtered == null) return
-        allCountries = buildList {
-            val list = filtered.countries ?: return@buildList
+        allCountries = buildLocationList(filtered.countries)
+        allRegions = buildLocationList(filtered.regions)
+        allCities = buildLocationList(filtered.cities)
+        applyFilter(searchQuery.value)
+    }
+
+    private fun buildLocationList(list: com.bringyour.sdk.ConnectLocationList?): List<UrnetworkLocationItem> =
+        buildList {
+            if (list == null) return@buildList
             for (i in 0 until list.len()) {
                 val loc = list.get(i) ?: continue
                 val code = loc.countryCode ?: ""
@@ -307,40 +331,44 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
                 )
             }
         }
-        applyFilter(searchQuery.value)
-    }
 
     private fun applyFilter(query: String) {
         val q = query.trim().lowercase()
-        val filtered = if (q.isEmpty()) {
-            allCountries
+        fun List<UrnetworkLocationItem>.applyQuery() = if (q.isEmpty()) {
+            this
         } else {
-            allCountries.filter { item ->
+            filter { item ->
                 item.name.lowercase().contains(q) ||
                     item.nameRu.lowercase().contains(q) ||
                     item.countryCode.lowercase().contains(q)
             }
         }
-        val current = _uiState.value
-        val selectedLocation = if (current is UrnetworkSettingsUiState.Ready) {
-            current.selectedLocation
-        } else if (isUrnetworkActive.value) {
-            bridge.selectedLocation()
-        } else {
-            null
+        val filteredCountries = allCountries.applyQuery()
+        val filteredRegions = allRegions.applyQuery()
+        val filteredCities = allCities.applyQuery()
+        _uiState.update { current ->
+            val selectedLocation = if (current is UrnetworkSettingsUiState.Ready) {
+                current.selectedLocation
+            } else if (isUrnetworkActive.value && userSelectedCountryCode.value != null) {
+                bridge.selectedLocation()
+            } else {
+                null
+            }
+            val providePaused = if (current is UrnetworkSettingsUiState.Ready) {
+                current.providePaused
+            } else if (isUrnetworkActive.value) {
+                bridge.isProvidePaused()
+            } else {
+                false
+            }
+            UrnetworkSettingsUiState.Ready(
+                countries = filteredCountries,
+                regions = filteredRegions,
+                cities = filteredCities,
+                selectedLocation = selectedLocation,
+                providePaused = providePaused,
+            )
         }
-        val providePaused = if (current is UrnetworkSettingsUiState.Ready) {
-            current.providePaused
-        } else if (isUrnetworkActive.value) {
-            bridge.isProvidePaused()
-        } else {
-            false
-        }
-        _uiState.value = UrnetworkSettingsUiState.Ready(
-            countries = filtered,
-            selectedLocation = selectedLocation,
-            providePaused = providePaused,
-        )
     }
 
     private fun teardownLocationsVc() {

@@ -78,6 +78,23 @@ class Ed25519VerifierTest {
     }
 
     @Test
+    fun `verify не маскирует Error — fatal JVM errors прокидываются`() {
+        val src = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/commoncrypto/Ed25519Verifier.kt",
+        ).readText()
+        assertFalse(
+            src.contains("runCatching"),
+            "runCatching ловит Throwable включая OutOfMemoryError/StackOverflowError — " +
+                "fatal errors маскируются как false. Использовать try/catch (Exception).",
+        )
+        assertTrue(
+            src.contains("catch (e: Exception)"),
+            "verify обязан catch Exception, не Throwable — Error-производные должны прокидываться.",
+        )
+    }
+
+    @Test
     fun `empty message with valid signature still works`() {
         val (priv, pub) = keypair()
         val msg = ByteArray(0)

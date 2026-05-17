@@ -8,8 +8,8 @@ class RouteTrafficForEngineContractTest {
 
     private val source by lazy {
         val moduleRoot = File(System.getProperty("user.dir") ?: ".")
-        val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/OzeroVpnService.kt")
-        assertTrue(f.exists(), "OzeroVpnService.kt не найден: $f")
+        val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/StartSequenceCoordinator.kt")
+        assertTrue(f.exists(), "StartSequenceCoordinator.kt не найден: $f")
         f.readText()
     }
 
@@ -96,6 +96,19 @@ class RouteTrafficForEngineContractTest {
                 acceptorBranch.contains("tunFdRef.set(null)"),
             "После detachFd() tunFdRef обязан очиститься — иначе onDestroy попытается close уже " +
                 "detached fd, double-close = native crash.",
+        )
+    }
+
+    @Test
+    fun `rawDupFd закрывается через adoptFd на failure paths attachTun`() {
+        val acceptorBranch = routeBody.substringAfter("TunFdAcceptor").substringBefore("startNativeTunnel")
+        val adoptCount = acceptorBranch.split("ParcelFileDescriptor.adoptFd(rawDupFd)").size - 1
+        assertTrue(
+            adoptCount >= 2,
+            "rawDupFd = fd.dup().detachFd() — kernel-level fd без PFD-обёртки. На failure paths " +
+                "(catch + TunAttachResult.Failure) обязан ParcelFileDescriptor.adoptFd(rawDupFd).close() — " +
+                "иначе каждый неуспешный reconnect leakит kernel fd → RLIMIT_NOFILE → VPN start failures. " +
+                "Найдено вызовов: $adoptCount, ожидается ≥2.",
         )
     }
 }

@@ -2,6 +2,7 @@ package ru.ozero.engineurnetwork
 
 import com.bringyour.sdk.LocationsViewController
 
+@Suppress("TooManyFunctions")
 interface UrnetworkSdkBridge {
     suspend fun start(
         walletAddress: String,
@@ -36,14 +37,28 @@ interface UrnetworkSdkBridge {
 
     suspend fun fetchSubscriptionBalance(): SubscriptionBalanceSnapshot?
 
+    suspend fun fetchAccountPoints(): AccountPointsSnapshot? = null
+
     interface LocationToken {
         val countryCode: String?
+        val region: String?
+            get() = null
+        val city: String?
+            get() = null
     }
 
     data class LocationInfo(
         val country: String?,
         val countryCode: String?,
         val name: String?,
+    )
+
+    data class AccountPointsSnapshot(
+        val totalPoints: Double,
+        val payoutPoints: Double,
+        val referralPoints: Double,
+        val reliabilityPoints: Double,
+        val multiplierPoints: Double,
     )
 
     data class SubscriptionBalanceSnapshot(

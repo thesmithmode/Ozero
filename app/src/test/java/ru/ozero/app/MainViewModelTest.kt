@@ -67,7 +67,9 @@ class MainViewModelTest {
         byedpiPlugin = FakeEnginePlugin(EngineId.BYEDPI) { port ->
             IpProbeRoute.Socks("127.0.0.1", if (port > 0) port else 1080)
         }
-        warpPlugin = FakeEnginePlugin(EngineId.WARP) { IpProbeRoute.Default }
+        warpPlugin = FakeEnginePlugin(EngineId.WARP) {
+            IpProbeRoute.StaticLocation(country = "Cloudflare WARP", countryCode = null)
+        }
         urnetworkPlugin = FakeEnginePlugin(EngineId.URNETWORK) {
             IpProbeRoute.Unavailable("URnetwork location pending")
         }
@@ -103,6 +105,7 @@ class MainViewModelTest {
             supportsDoH = false,
             localOnly = true,
             requiresServer = false,
+            supportsUpstreamSocks = false,
         )
         override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult =
             StartResult.Failure("test fake")
@@ -418,7 +421,7 @@ class MainViewModelTest {
     }
 
     @Test
-    fun ipInfoFetchesDirectForWarp() = runTest {
+    fun ipInfoStaticLocationForWarp() = runTest {
         backgroundScope.launch { viewModel.ipInfo.collect {} }
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.WARP)
@@ -427,18 +430,17 @@ class MainViewModelTest {
         kotlinx.coroutines.delay(2_500)
         advanceUntilIdle()
         val s = viewModel.ipInfo.value
-        assertIs<IpInfoState.Loaded>(
+        val loaded = assertIs<IpInfoState.Loaded>(
             s,
-            "WARP — full-tun, self-traffic роутится через TUN. ipProbeRoute=Default → " +
-                "ipInfoProvider.fetch() возвращает IP виден миру через WARP.",
+            "WARP — ipProbeRoute=StaticLocation('Cloudflare WARP') → IpInfoState.Loaded без HTTP fetch. " +
+                "Архитектура: excludeSelf=true для всех движков (split tunnel ALL должен работать) → " +
+                "self-fetch бы вернул реальный IP устройства, поэтому WARP override'ит ipProbeRoute " +
+                "на StaticLocation вместо Default. Регрессия commit 5a8089dd: WARP полагался на " +
+                "excludeSelf=false для self-traffic через TUN → ломал per-app VPN mode.",
         )
-        assertEquals(1, ipInfoProvider.fetchCalls)
+        assertEquals("Cloudflare WARP", loaded.info.country)
+        assertEquals(0, ipInfoProvider.fetchCalls)
         assertEquals(0, ipInfoProvider.fetchViaCalls)
-        assertEquals(
-            false,
-            ipInfoProvider.lastSocketFactoryUsed,
-            "WARP не должен пытаться bind на VPN network через socketFactory — EPERM в production.",
-        )
         assertNull(ipInfoProvider.lastSocksHost)
     }
 
@@ -577,6 +579,7 @@ class MainViewModelTest {
         override suspend fun setUrnetworkJwt(jwt: String?) = Unit
         override suspend fun setUrnetworkCountryCode(code: String?) = Unit
         override suspend fun setByedpiWinningArgs(args: String?) = Unit
+        override suspend fun setByedpiDefaultAccepted(accepted: Boolean) = Unit
         override suspend fun setCustomDnsServers(servers: List<String>) = Unit
         override suspend fun setHostsMode(mode: HostsMode) = Unit
         override suspend fun setHosts(hosts: List<String>) = Unit
