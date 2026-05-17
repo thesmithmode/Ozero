@@ -72,9 +72,7 @@ fun UrnetworkSharedTrafficScreen(
                 }
             } else {
                 ProvidedTrafficCard(unpaidBytes = unpaidBytes, plan = plan, balanceBytes = balanceBytes)
-                if (accountPoints != null) {
-                    AccountPointsCard(points = accountPoints)
-                }
+                accountPoints?.let { AccountPointsCard(points = it) }
             }
         }
     }
