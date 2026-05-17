@@ -275,7 +275,7 @@ class EvolutionEngine(
             val successCount = probeResults.count { it?.success == true }
             val successRate = successCount.toDouble() / sites.size
             val avgLatencyMs = probeResults
-                .filter { it?.success == true }
+                .filter { it?.success == true || (it?.responseCode ?: -1) in 100..599 }
                 .mapNotNull { it?.durationMs }
                 .let { if (it.isEmpty()) settings.latencyClampMs else it.average() }
             val fitness = computeFitness(avgScore, avgLatencyMs)
