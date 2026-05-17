@@ -62,7 +62,7 @@ class EvolutionEngine(
     ): Chromosome {
         var population = buildInitialPopulation(seedStrategies)
         var best: Chromosome = population.firstOrNull() ?: return emptyList()
-        var bestFitness = 0.0
+        var bestFitness = -1.0
         var bestSuccessRate = 0.0
         var stagnationCount = 0
         val evalCache = HashMap<Chromosome, EvalResult>()
