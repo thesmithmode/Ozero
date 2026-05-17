@@ -306,6 +306,118 @@ class EvolutionEngineTest {
     }
 
     @Test
+    fun `computeProbeScore returns 1_0 for full success`() {
+        val engine = EvolutionEngine(
+            byeDpiEngine = AlwaysSucceedEngine(),
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(GenePool(seeds)),
+            pool = GenePool(seeds),
+            sites = listOf("s1"),
+        )
+        assertEquals(1.0, engine.computeProbeScore(ProbeResult(site = "s", success = true, durationMs = 1L)))
+    }
+
+    @Test
+    fun `computeProbeScore returns 0_0 for null`() {
+        val engine = EvolutionEngine(
+            byeDpiEngine = AlwaysSucceedEngine(),
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(GenePool(seeds)),
+            pool = GenePool(seeds),
+            sites = listOf("s1"),
+        )
+        assertEquals(0.0, engine.computeProbeScore(null))
+    }
+
+    @Test
+    fun `computeProbeScore returns partial score for HTTP response without full content`() {
+        val engine = EvolutionEngine(
+            byeDpiEngine = AlwaysSucceedEngine(),
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(GenePool(seeds)),
+            pool = GenePool(seeds),
+            sites = listOf("s1"),
+        )
+        val headersOnly = engine.computeProbeScore(
+            ProbeResult(site = "s", success = false, durationMs = 1L, responseCode = 200, actualLength = 0L),
+        )
+        val withContent = engine.computeProbeScore(
+            ProbeResult(site = "s", success = false, durationMs = 1L, responseCode = 200, actualLength = 512L),
+        )
+        val noResponse = engine.computeProbeScore(
+            ProbeResult(site = "s", success = false, durationMs = 1L),
+        )
+        assertTrue(headersOnly > 0.0, "HTTP headers bypassed DPI — partial credit")
+        assertTrue(withContent > headersOnly, "partial content scores higher than headers only")
+        assertEquals(0.0, noResponse, "no HTTP response = fully blocked")
+    }
+
+    @Test
+    fun `computeProbeScore treats all 1xx-5xx response codes as DPI bypass`() {
+        val engine = EvolutionEngine(
+            byeDpiEngine = AlwaysSucceedEngine(),
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(GenePool(seeds)),
+            pool = GenePool(seeds),
+            sites = listOf("s1"),
+        )
+        for (code in listOf(100, 200, 301, 403, 500, 599)) {
+            val score = engine.computeProbeScore(
+                ProbeResult(site = "s", success = false, durationMs = 1L, responseCode = code),
+            )
+            assertTrue(score > 0.0, "responseCode=$code should be > 0 (DPI bypassed)")
+        }
+        assertEquals(
+            0.0,
+            engine.computeProbeScore(ProbeResult(site = "s", success = false, durationMs = 1L, responseCode = -1)),
+            "responseCode=-1 means no HTTP response = DPI blocked",
+        )
+    }
+
+    @Test
+    fun `granular fitness produces non-zero score for HTTP-only probes`() = runTest {
+        val httpOnlyProbe = object : SocksProbeClient {
+            override suspend fun probe(site: String) = ProbeResult(
+                site = site,
+                success = false,
+                durationMs = 100L,
+                responseCode = 200,
+                actualLength = 512L,
+            )
+        }
+        val pool = GenePool(seeds)
+        val evolutionEngine = EvolutionEngine(
+            byeDpiEngine = AlwaysSucceedEngine(),
+            probeFactory = { _, _ -> httpOnlyProbe },
+            evolver = StrategyEvolver(pool),
+            pool = pool,
+            sites = listOf("s1.com", "s2.com"),
+            settings = EvolutionEngine.EvolutionSettings(
+                populationSize = 2,
+                maxGenerations = 1,
+                targetFitness = 0.0,
+            ),
+        )
+        var capturedResult: EvolutionEngine.GenerationResult? = null
+        evolutionEngine.evolve(seedStrategies = seeds, onGeneration = { capturedResult = it })
+        val result = capturedResult!!
+        assertTrue(result.bestFitness > 0.0, "HTTP-only probes must produce non-zero fitness (granular scoring)")
+        assertEquals(0.0, result.bestSuccessRate, "successRate = 0 since no probe was fully successful")
+    }
+
+    @Test
+    fun `no mutation rate boost on stagnation — constant mutationRate`() {
+        val source = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+        ).resolve("src/main/java/ru/ozero/enginebyedpi/strategy/EvolutionEngine.kt").readText()
+        assertTrue(
+            !source.contains("stagnationCount * 0.5f") && !source.contains("stagnationCount * 0.5"),
+            "Mutation rate boost on stagnation is a костыль removed in favour of granular fitness. " +
+                "Do not re-introduce it.",
+        )
+    }
+
+    @Test
     fun `default targetFitness is below 1_0 to be reachable`() {
         val settings = EvolutionEngine.EvolutionSettings()
         assertTrue(settings.targetFitness < 1.0, "targetFitness ${settings.targetFitness} unreachable — must be < 1.0")
