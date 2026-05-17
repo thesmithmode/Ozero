@@ -14,8 +14,21 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
-    fun `start() guard already running`() {
-        assertTrue(source.contains("running.get()") && source.contains("already running"))
+    fun `start() guard already running возвращает Success — идемпотентен для RelayCoordinator`() {
+        val guardBlock = source.substringAfter("if (running.get())").substringBefore("startJobRef.set")
+        assertTrue(
+            source.contains("running.get()"),
+            "start() обязан проверять running.get() при двойном вызове",
+        )
+        assertTrue(
+            guardBlock.contains("StartResult.Success"),
+            "start() при already running обязан возвращать Success (идемпотентность для RelayCoordinator) — " +
+                "возврат Failed блокирует relay когда URnetwork-движок уже запущен bridge.",
+        )
+        assertTrue(
+            !guardBlock.contains("StartResult.Failed"),
+            "start() при already running НЕ должен возвращать Failed — relay coordinator не сможет запустить relay.",
+        )
     }
 
     @Test

@@ -17,6 +17,7 @@ import ru.ozero.app.logging.BootDiagnostics
 import ru.ozero.app.logging.BootFileLogger
 import ru.ozero.app.logging.LogBuffer
 import ru.ozero.app.proxy.TelegramProxyCoordinator
+import ru.ozero.app.relay.UrnetworkRelayCoordinator
 import ru.ozero.app.ui.onboarding.FirstRunBootstrap
 import ru.ozero.app.ui.splittunnel.AppListProvider
 import javax.inject.Inject
@@ -33,6 +34,8 @@ class OzeroApp : Application(), Configuration.Provider {
     @Inject lateinit var appListProvider: AppListProvider
 
     @Inject lateinit var telegramProxyCoordinator: TelegramProxyCoordinator
+
+    @Inject lateinit var urnetworkRelayCoordinator: UrnetworkRelayCoordinator
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -82,6 +85,8 @@ class OzeroApp : Application(), Configuration.Provider {
         }
         runCatching { telegramProxyCoordinator.start() }
             .onFailure { BootFileLogger.warn(TAG, "telegramProxyCoordinator.start failed", it) }
+        runCatching { urnetworkRelayCoordinator.start() }
+            .onFailure { BootFileLogger.warn(TAG, "urnetworkRelayCoordinator.start failed", it) }
     }
 
     private fun isEngineWarpProcess(): Boolean {

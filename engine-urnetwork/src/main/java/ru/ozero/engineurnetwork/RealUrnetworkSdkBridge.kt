@@ -75,8 +75,8 @@ class RealUrnetworkSdkBridge(
             ?: return UrnetworkSdkBridge.StartResult.Failed("start called outside coroutine context")
         return lifecycleMutex.withLock {
             if (running.get()) {
-                PersistentLoggers.warn(TAG, "start called while already running")
-                return@withLock UrnetworkSdkBridge.StartResult.Failed("already running")
+                Log.i(TAG, "start: already running — idempotent success")
+                return@withLock UrnetworkSdkBridge.StartResult.Success
             }
             startJobRef.set(myJob)
             try {

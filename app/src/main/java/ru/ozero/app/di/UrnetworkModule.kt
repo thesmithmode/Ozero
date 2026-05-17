@@ -15,6 +15,8 @@ import dagger.multibindings.IntoSet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import ru.ozero.app.relay.UrnetworkRelayCoordinator
+import ru.ozero.commonvpn.TunnelController
 import ru.ozero.engineurnetwork.DataStoreUrnetworkConfigStore
 import ru.ozero.engineurnetwork.EngineUrnetwork
 import ru.ozero.engineurnetwork.RealUrnetworkSdkBridge
@@ -74,4 +76,12 @@ object UrnetworkModule {
     fun provideUrnetworkAuthService(
         @ApplicationContext context: Context,
     ): UrnetworkAuthService = RealUrnetworkAuthService(context.applicationContext as Application)
+
+    @Provides
+    @Singleton
+    fun provideUrnetworkRelayCoordinator(
+        bridge: UrnetworkSdkBridge,
+        configStore: UrnetworkConfigStore,
+        tunnelController: TunnelController,
+    ): UrnetworkRelayCoordinator = UrnetworkRelayCoordinator(bridge, configStore, tunnelController)
 }
