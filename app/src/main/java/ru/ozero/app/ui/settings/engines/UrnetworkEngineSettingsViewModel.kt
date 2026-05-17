@@ -52,6 +52,8 @@ sealed interface UrnetworkSettingsUiState {
     data object NotConnected : UrnetworkSettingsUiState
     data class Ready(
         val countries: List<UrnetworkLocationItem>,
+        val regions: List<UrnetworkLocationItem>,
+        val cities: List<UrnetworkLocationItem>,
         val selectedLocation: UrnetworkSdkBridge.LocationToken?,
         val providePaused: Boolean,
     ) : UrnetworkSettingsUiState
@@ -67,7 +69,13 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val isUrnetworkActive: StateFlow<Boolean> = tunnelController.state
-        .map { s -> s is TunnelState.Connected && s.engineId == EngineId.URNETWORK }
+        .map { s ->
+            when (s) {
+                is TunnelState.Connecting -> s.engineId == EngineId.URNETWORK
+                is TunnelState.Connected -> s.engineId == EngineId.URNETWORK
+                else -> false
+            }
+        }
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
@@ -164,6 +172,8 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     @Volatile private var locationsVc: LocationsViewController? = null
     private var switchingJob: Job? = null
     private var allCountries: List<UrnetworkLocationItem> = emptyList()
+    private var allRegions: List<UrnetworkLocationItem> = emptyList()
+    private var allCities: List<UrnetworkLocationItem> = emptyList()
 
     init {
         viewModelScope.launch {
@@ -180,6 +190,8 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
                 } else {
                     teardownLocationsVc()
                     allCountries = emptyList()
+                    allRegions = emptyList()
+                    allCities = emptyList()
                     _uiState.value = UrnetworkSettingsUiState.NotConnected
                 }
             }
@@ -291,8 +303,15 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
 
     private fun updateLocations(filtered: FilteredLocations?) {
         if (filtered == null) return
-        allCountries = buildList {
-            val list = filtered.countries ?: return@buildList
+        allCountries = buildLocationList(filtered.countries)
+        allRegions = buildLocationList(filtered.regions)
+        allCities = buildLocationList(filtered.cities)
+        applyFilter(searchQuery.value)
+    }
+
+    private fun buildLocationList(list: com.bringyour.sdk.ConnectLocationList?): List<UrnetworkLocationItem> =
+        buildList {
+            if (list == null) return@buildList
             for (i in 0 until list.len()) {
                 val loc = list.get(i) ?: continue
                 val code = loc.countryCode ?: ""
@@ -312,20 +331,17 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
                 )
             }
         }
-        applyFilter(searchQuery.value)
-    }
 
     private fun applyFilter(query: String) {
         val q = query.trim().lowercase()
-        val filtered = if (q.isEmpty()) {
-            allCountries
-        } else {
-            allCountries.filter { item ->
-                item.name.lowercase().contains(q) ||
-                    item.nameRu.lowercase().contains(q) ||
-                    item.countryCode.lowercase().contains(q)
-            }
+        fun List<UrnetworkLocationItem>.applyQuery() = if (q.isEmpty()) this else filter { item ->
+            item.name.lowercase().contains(q) ||
+                item.nameRu.lowercase().contains(q) ||
+                item.countryCode.lowercase().contains(q)
         }
+        val filteredCountries = allCountries.applyQuery()
+        val filteredRegions = allRegions.applyQuery()
+        val filteredCities = allCities.applyQuery()
         _uiState.update { current ->
             val selectedLocation = if (current is UrnetworkSettingsUiState.Ready) {
                 current.selectedLocation
@@ -342,7 +358,9 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
                 false
             }
             UrnetworkSettingsUiState.Ready(
-                countries = filtered,
+                countries = filteredCountries,
+                regions = filteredRegions,
+                cities = filteredCities,
                 selectedLocation = selectedLocation,
                 providePaused = providePaused,
             )

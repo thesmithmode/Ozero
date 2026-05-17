@@ -38,6 +38,8 @@ import kotlin.coroutines.resume
 
 class SdkLocationToken(val sdk: ConnectLocation) : UrnetworkSdkBridge.LocationToken {
     override val countryCode: String? = runCatching { sdk.countryCode }.getOrNull()
+    override val region: String? = runCatching { sdk.region.takeIf { it.isNotEmpty() } }.getOrNull()
+    override val city: String? = runCatching { sdk.city.takeIf { it.isNotEmpty() } }.getOrNull()
 }
 
 @Suppress("TooManyFunctions")

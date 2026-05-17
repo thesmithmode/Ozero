@@ -253,6 +253,8 @@
     <string name="urnetwork_location_best_available">Лучший доступный</string>
     <string name="urnetwork_auto_select">Автовыбор</string>
     <string name="urnetwork_location_connect_first">Подключитесь к URnetwork чтобы увидеть доступные регионы</string>
+    <string name="urnetwork_location_regions">Регионы</string>
+    <string name="urnetwork_location_cities">Города</string>
     <string name="urnetwork_provide_title">Раздача трафика</string>
     <string name="urnetwork_provide_subtitle">Делиться пропускной способностью с сетью URnetwork</string>
     <string name="urnetwork_provide_mode_never">Никогда</string>

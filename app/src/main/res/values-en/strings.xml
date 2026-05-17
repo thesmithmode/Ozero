@@ -249,6 +249,8 @@
     <string name="urnetwork_location_best_available">Best available</string>
     <string name="urnetwork_auto_select">Auto select</string>
     <string name="urnetwork_location_connect_first">Connect to URnetwork to view available regions</string>
+    <string name="urnetwork_location_regions">Regions</string>
+    <string name="urnetwork_location_cities">Cities</string>
     <string name="urnetwork_provide_title">Share bandwidth</string>
     <string name="urnetwork_provide_subtitle">Share bandwidth with the URnetwork mesh</string>
     <string name="urnetwork_provide_mode_never">Never</string>

@@ -306,6 +306,8 @@
     <string name="urnetwork_location_title">Región de salida</string>
     <string name="urnetwork_location_best_available">Mejor disponible</string>
     <string name="urnetwork_location_connect_first">Conéctate a URnetwork para ver las regiones disponibles</string>
+    <string name="urnetwork_location_regions">Regiones</string>
+    <string name="urnetwork_location_cities">Ciudades</string>
     <string name="urnetwork_provide_title">Compartir ancho de banda</string>
     <string name="urnetwork_provide_subtitle">Comparte ancho de banda con la malla URnetwork</string>
     <string name="urnetwork_country_switching">Cambiando país…</string>

@@ -330,6 +330,40 @@ class UrnetworkEngineSettingsViewModelTest {
     }
 
     @Test
+    fun `sentinel — updateLocations читает regions и cities из FilteredLocations`() {
+        val source = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/ui/settings/engines/UrnetworkEngineSettingsViewModel.kt",
+        ).readText()
+        val updateBody = source.substringAfter("private fun updateLocations(").substringBefore("private fun buildLocationList")
+        kotlin.test.assertTrue(
+            updateBody.contains("filtered.regions"),
+            "updateLocations обязан читать filtered.regions — иначе регионы никогда не загружаются",
+        )
+        kotlin.test.assertTrue(
+            updateBody.contains("filtered.cities"),
+            "updateLocations обязан читать filtered.cities — иначе города никогда не загружаются",
+        )
+    }
+
+    @Test
+    fun `sentinel — UrnetworkSettingsUiState_Ready содержит поля regions и cities`() {
+        val source = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/ui/settings/engines/UrnetworkEngineSettingsViewModel.kt",
+        ).readText()
+        val readyBlock = source.substringAfter("data class Ready(").substringBefore(") : UrnetworkSettingsUiState")
+        kotlin.test.assertTrue(
+            readyBlock.contains("regions"),
+            "UrnetworkSettingsUiState.Ready обязан иметь поле regions",
+        )
+        kotlin.test.assertTrue(
+            readyBlock.contains("cities"),
+            "UrnetworkSettingsUiState.Ready обязан иметь поле cities",
+        )
+    }
+
+    @Test
     fun `peerCount остаётся 0 пока engine не активен`() = runTest {
         val bridge = FakeUrnetworkBridge()
         val vm = UrnetworkEngineSettingsViewModel(

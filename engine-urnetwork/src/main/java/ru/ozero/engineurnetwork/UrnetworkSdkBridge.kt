@@ -38,6 +38,10 @@ interface UrnetworkSdkBridge {
 
     interface LocationToken {
         val countryCode: String?
+        val region: String?
+            get() = null
+        val city: String?
+            get() = null
     }
 
     data class LocationInfo(
