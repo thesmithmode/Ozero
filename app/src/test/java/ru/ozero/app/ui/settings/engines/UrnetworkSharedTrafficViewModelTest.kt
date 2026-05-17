@@ -141,6 +141,19 @@ class UrnetworkSharedTrafficViewModelTest {
     }
 
     @Test
+    fun `sentinel — fetchSubscriptionBalance и fetchAccountPoints вызываются параллельно`() = runTest(dispatcher) {
+        val source = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/ui/settings/engines/UrnetworkSharedTrafficViewModel.kt",
+        ).readText()
+        val loadBody = source.substringAfter("private suspend fun load()").substringBefore("\n    fun ")
+        kotlin.test.assertTrue(
+            loadBody.contains("async") && loadBody.contains("await"),
+            "load() обязан использовать async/await для параллельных вызовов — иначе задержка 20s",
+        )
+    }
+
+    @Test
     fun `accountPoints null если bridge возвращает null`() = runTest(dispatcher) {
         bridge.accountPointsResult = null
         vm = UrnetworkSharedTrafficViewModel(bridge)

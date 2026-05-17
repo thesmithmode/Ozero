@@ -6,6 +6,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -47,10 +49,14 @@ class UrnetworkSharedTrafficViewModel @Inject constructor(
         _isLoading.value = true
         runCatching { bridge.fetchTransferStats() }
         _unpaidBytes.value = runCatching { bridge.unpaidByteCount() }.getOrDefault(0L)
-        val balance = runCatching { bridge.fetchSubscriptionBalance() }.getOrNull()
-        _plan.value = balance?.plan
-        _balanceBytes.value = balance?.balanceBytes ?: 0L
-        _accountPoints.value = runCatching { bridge.fetchAccountPoints() }.getOrNull()
+        coroutineScope {
+            val balanceDeferred = async { runCatching { bridge.fetchSubscriptionBalance() }.getOrNull() }
+            val pointsDeferred = async { runCatching { bridge.fetchAccountPoints() }.getOrNull() }
+            val balance = balanceDeferred.await()
+            _plan.value = balance?.plan
+            _balanceBytes.value = balance?.balanceBytes ?: 0L
+            _accountPoints.value = pointsDeferred.await()
+        }
         _isLoading.value = false
     }
 }
