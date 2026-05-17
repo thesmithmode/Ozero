@@ -23,6 +23,9 @@ class UrnetworkSharedTrafficViewModel @Inject constructor(
     private val _plan = MutableStateFlow<String?>(null)
     val plan: StateFlow<String?> = _plan.asStateFlow()
 
+    private val _balanceBytes = MutableStateFlow(0L)
+    val balanceBytes: StateFlow<Long> = _balanceBytes.asStateFlow()
+
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
@@ -40,7 +43,9 @@ class UrnetworkSharedTrafficViewModel @Inject constructor(
         _isLoading.value = true
         runCatching { bridge.fetchTransferStats() }
         _unpaidBytes.value = runCatching { bridge.unpaidByteCount() }.getOrDefault(0L)
-        _plan.value = runCatching { bridge.fetchSubscriptionBalance() }.getOrNull()?.plan
+        val balance = runCatching { bridge.fetchSubscriptionBalance() }.getOrNull()
+        _plan.value = balance?.plan
+        _balanceBytes.value = balance?.balanceBytes ?: 0L
         _isLoading.value = false
     }
 }

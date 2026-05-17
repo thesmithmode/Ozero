@@ -265,6 +265,7 @@
     <string name="urnetwork_shared_traffic_unavailable">Statistics unavailable. Make sure you are connected to URnetwork.</string>
     <string name="urnetwork_shared_traffic_provided">Provided</string>
     <string name="urnetwork_shared_traffic_plan">Plan</string>
+    <string name="urnetwork_shared_traffic_balance">Balance</string>
     <string name="urnetwork_peers_connected">Connected to %1$d peers</string>
     <string name="urnetwork_peers_searching">Searching peers…</string>
     <string name="urnetwork_country_switching">Switching country…</string>

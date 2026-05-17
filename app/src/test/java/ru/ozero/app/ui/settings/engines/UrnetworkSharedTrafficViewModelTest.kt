@@ -74,6 +74,22 @@ class UrnetworkSharedTrafficViewModelTest {
     }
 
     @Test
+    fun `после init показывает balanceBytes из subscriptionBalance`() = runTest(dispatcher) {
+        bridge.plan = "free"
+        bridge.balanceBytes = 1_000_000_000L
+        vm = UrnetworkSharedTrafficViewModel(bridge)
+        advanceUntilIdle()
+        assertEquals(1_000_000_000L, vm.balanceBytes.value)
+    }
+
+    @Test
+    fun `balanceBytes равен 0 если fetchSubscriptionBalance возвращает null`() = runTest(dispatcher) {
+        vm = UrnetworkSharedTrafficViewModel(bridge)
+        advanceUntilIdle()
+        assertEquals(0L, vm.balanceBytes.value)
+    }
+
+    @Test
     fun `unpaidBytes показывает ПРЕДОСТАВЛЕННЫЙ трафик а не потреблённый из subscriptionBalance`() =
         runTest(dispatcher) {
             bridge.unpaidBytes = 50_000_000L
@@ -91,14 +107,15 @@ class UrnetworkSharedTrafficViewModelTest {
     private class FakeBridge : UrnetworkSdkBridge {
         var unpaidBytes = 0L
         var plan: String? = null
+        var balanceBytes = 0L
         var balanceResult: UrnetworkSdkBridge.SubscriptionBalanceSnapshot? = null
-            get() = if (plan != null) {
+            get() = if (plan != null || field != null) {
                 UrnetworkSdkBridge.SubscriptionBalanceSnapshot(
-                    balanceBytes = 0L, pendingBytes = 0L, startBalanceBytes = 0L,
+                    balanceBytes = balanceBytes, pendingBytes = 0L, startBalanceBytes = 0L,
                     usedBytes = 0L, plan = plan, store = null,
                 )
             } else {
-                field
+                null
             }
         var fetchTransferStatsCalls = 0
 

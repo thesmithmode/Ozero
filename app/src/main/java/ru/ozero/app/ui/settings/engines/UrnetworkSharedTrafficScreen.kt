@@ -39,6 +39,7 @@ fun UrnetworkSharedTrafficScreen(
 ) {
     val unpaidBytes by viewModel.unpaidBytes.collectAsStateWithLifecycle()
     val plan by viewModel.plan.collectAsStateWithLifecycle()
+    val balanceBytes by viewModel.balanceBytes.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     Scaffold(
         topBar = {
@@ -68,14 +69,14 @@ fun UrnetworkSharedTrafficScreen(
                     CircularProgressIndicator()
                 }
             } else {
-                ProvidedTrafficCard(unpaidBytes = unpaidBytes, plan = plan)
+                ProvidedTrafficCard(unpaidBytes = unpaidBytes, plan = plan, balanceBytes = balanceBytes)
             }
         }
     }
 }
 
 @Composable
-private fun ProvidedTrafficCard(unpaidBytes: Long, plan: String?) {
+private fun ProvidedTrafficCard(unpaidBytes: Long, plan: String?, balanceBytes: Long) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = OzeroPalette.Bg1),
@@ -85,6 +86,16 @@ private fun ProvidedTrafficCard(unpaidBytes: Long, plan: String?) {
                 label = stringResource(R.string.urnetwork_shared_traffic_provided),
                 value = formatBytes(unpaidBytes),
             )
+            if (balanceBytes > 0L) {
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 10.dp),
+                    color = OzeroPalette.Line,
+                )
+                TrafficRow(
+                    label = stringResource(R.string.urnetwork_shared_traffic_balance),
+                    value = formatBytes(balanceBytes),
+                )
+            }
             if (plan != null) {
                 HorizontalDivider(
                     modifier = Modifier.padding(vertical = 10.dp),
