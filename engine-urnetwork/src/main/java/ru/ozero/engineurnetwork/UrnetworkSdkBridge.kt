@@ -2,6 +2,7 @@ package ru.ozero.engineurnetwork
 
 import com.bringyour.sdk.LocationsViewController
 
+@Suppress("TooManyFunctions")
 interface UrnetworkSdkBridge {
     suspend fun start(
         walletAddress: String,
