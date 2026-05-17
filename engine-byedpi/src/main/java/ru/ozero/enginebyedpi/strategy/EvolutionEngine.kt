@@ -141,8 +141,11 @@ class EvolutionEngine(
 
         val memoryHasData = memory != null && memory.hasData()
         val memoryPart = List(memoryQuota + seedDeficit) {
-            if (memoryHasData) pool.weightedRandomChromosome(memory!!, random = random)
-            else pool.randomChromosome(random = random)
+            if (memoryHasData) {
+                pool.weightedRandomChromosome(memory!!, random = random)
+            } else {
+                pool.randomChromosome(random = random)
+            }
         }
         val randomPart = List(randomQuota) { pool.randomChromosome(random = random) }
         return seedPart + memoryPart + randomPart
