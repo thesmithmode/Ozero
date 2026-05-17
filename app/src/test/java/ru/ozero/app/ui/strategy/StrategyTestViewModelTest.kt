@@ -1,6 +1,8 @@
 package ru.ozero.app.ui.strategy
 
+import android.content.Context
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -81,13 +83,19 @@ class StrategyTestViewModelTest {
 
     private fun defaultSites() = listOf("a.example", "b.example")
 
-    private fun newVm(sites: List<String> = defaultSites()): StrategyTestViewModel {
+    private fun newVm(sites: List<String> = defaultSites()): StrategyTestViewModel =
+        newVmWithContext(mockk(relaxed = true), sites)
+
+    private fun newVmWithContext(
+        context: Context,
+        sites: List<String> = defaultSites(),
+    ): StrategyTestViewModel {
         val builtIns = listOf(
             DomainList(id = "test", name = "Test", domains = sites, isActive = true, isBuiltIn = true),
         )
         val manager = DomainListManager(domainStore, builtIns)
         return StrategyTestViewModel(
-            context = mockk(relaxed = true),
+            context = context,
             repository = repo,
             assetSource = assets,
             resultsStore = store,
@@ -569,6 +577,46 @@ class StrategyTestViewModelTest {
         assertEquals(1, usageStore.recorded.size)
         assertEquals("-Ku -An", usageStore.recorded[0].first)
     }
+
+    @Test
+    fun `onStart triggers startForegroundService — FGS keeps scan alive when app backgrounded`() =
+        runTest(dispatcher) {
+            val context = mockk<Context>(relaxed = true)
+            probe.delayMs = 10_000L
+            val vm = newVmWithContext(context)
+            advanceUntilIdle()
+            vm.onStart()
+            runCurrent()
+            verify { context.startForegroundService(any()) }
+            vm.onStop()
+            advanceUntilIdle()
+        }
+
+    @Test
+    fun `onStop triggers stopService — FGS released when user cancels scan`() = runTest(dispatcher) {
+        val context = mockk<Context>(relaxed = true)
+        probe.delayMs = 10_000L
+        val vm = newVmWithContext(context)
+        advanceUntilIdle()
+        vm.onStart()
+        runCurrent()
+        vm.onStop()
+        advanceUntilIdle()
+        verify { context.stopService(any()) }
+    }
+
+    @Test
+    fun `runLoop completion triggers stopService — FGS released after natural finish`() =
+        runTest(dispatcher) {
+            val context = mockk<Context>(relaxed = true)
+            assets = FakeAssetSource(strategies = listOf("-cmd1"), sites = listOf("a"))
+            val vm = newVmWithContext(context, sites = listOf("a"))
+            advanceUntilIdle()
+            vm.onStart()
+            advanceUntilIdle()
+            assertFalse(vm.isRunning.value)
+            verify { context.stopService(any()) }
+        }
 
     @Test
     fun `onApply records saved name in usage history when available`() = runTest(dispatcher) {
