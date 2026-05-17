@@ -151,7 +151,9 @@ class UrnetworkRelayCoordinatorTest {
             return UrnetworkSdkBridge.StartResult.Success
         }
 
-        override suspend fun stop() { stopCalls++ }
+        override suspend fun stop() {
+            stopCalls++
+        }
         override fun isRunning() = running
         override suspend fun attachTun(tunFd: Int) = UrnetworkSdkBridge.AttachResult.Success
         override fun connectTo(location: UrnetworkSdkBridge.LocationToken) = Unit
