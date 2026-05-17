@@ -366,6 +366,29 @@ class UrnetworkEngineSettingsViewModelTest {
     }
 
     @Test
+    fun `sentinel — CheckIpRow открывает ur_io_ip через LocalUriHandler`() {
+        val source = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/ui/settings/engines/UrnetworkEngineSettingsScreen.kt",
+        ).readText()
+        val checkIpBlock = source
+            .substringAfter("private fun CheckIpRow()")
+            .substringBefore("\nprivate fun ")
+        kotlin.test.assertTrue(
+            checkIpBlock.contains("openUri"),
+            "CheckIpRow обязан вызывать openUri — иначе клик не откроет браузер",
+        )
+        kotlin.test.assertTrue(
+            checkIpBlock.contains("https://ur.io/ip"),
+            "CheckIpRow обязан передавать https://ur.io/ip в openUri",
+        )
+        kotlin.test.assertTrue(
+            checkIpBlock.contains("LocalUriHandler"),
+            "CheckIpRow обязан использовать LocalUriHandler",
+        )
+    }
+
+    @Test
     fun `peerCount остаётся 0 пока engine не активен`() = runTest {
         val bridge = FakeUrnetworkBridge()
         val vm = UrnetworkEngineSettingsViewModel(

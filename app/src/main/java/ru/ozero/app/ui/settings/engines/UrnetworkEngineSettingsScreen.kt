@@ -36,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -356,6 +357,8 @@ private fun SettingsCard(
                 onSelect = onSelectWindowType,
                 onToggleFixedIp = onToggleFixedIp,
             )
+            SectionDivider()
+            CheckIpRow()
         }
     }
 }
@@ -556,6 +559,26 @@ private fun StatusRow(peerCount: Int, switchingCountry: Boolean = false) {
             style = MaterialTheme.typography.bodySmall,
             color = OzeroPalette.Text2,
         )
+    }
+}
+
+@Composable
+private fun CheckIpRow() {
+    val uriHandler = LocalUriHandler.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { uriHandler.openUri("https://ur.io/ip") }
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(R.string.urnetwork_check_ip),
+            style = MaterialTheme.typography.bodyMedium,
+            color = OzeroPalette.Text,
+        )
+        Text(text = "›", style = MaterialTheme.typography.bodyLarge, color = OzeroPalette.Text3)
     }
 }
 
