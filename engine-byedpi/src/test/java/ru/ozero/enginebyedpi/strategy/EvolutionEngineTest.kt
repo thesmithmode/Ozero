@@ -312,6 +312,89 @@ class EvolutionEngineTest {
     }
 
     @Test
+    fun `default settings reflect v2 parameters`() {
+        val s = EvolutionEngine.EvolutionSettings()
+        assertEquals(30, s.populationSize, "v2 default populationSize must be 30")
+        assertEquals(20, s.maxGenerations, "v2 default maxGenerations must be 20")
+        assertEquals(3, s.eliteCount, "v2 default eliteCount must be 3")
+        assertEquals(0.85, s.targetFitness, "v2 default targetFitness must be 0.85")
+        assertEquals(0.4, s.initialSeedRatio, "v2 seed quota = 40%")
+        assertEquals(0.3, s.initialMemoryRatio, "v2 memory quota = 30%")
+        assertEquals(3_000.0, s.latencyClampMs, "v2 latency clamp = 3000ms")
+        assertEquals(1.5, s.successRateExponent, "v2 successRate exponent = 1.5")
+    }
+
+    @Test
+    fun `computeFitness clamps latency above ceiling to zero score`() {
+        val engine = EvolutionEngine(
+            byeDpiEngine = AlwaysSucceedEngine(),
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(GenePool(seeds)),
+            pool = GenePool(seeds),
+            sites = listOf("s1"),
+        )
+        val above = engine.computeFitness(successRate = 1.0, avgLatencyMs = 5_000.0)
+        val atCeiling = engine.computeFitness(successRate = 1.0, avgLatencyMs = 3_000.0)
+        val below = engine.computeFitness(successRate = 1.0, avgLatencyMs = 100.0)
+        assertEquals(0.0, above, "5000ms must clamp to ceiling → fitness 0")
+        assertEquals(0.0, atCeiling, "3000ms (ceiling) → fitness 0")
+        assertTrue(below > 0.9, "100ms latency → near-1 fitness, got $below")
+    }
+
+    @Test
+    fun `computeFitness exponentially penalises partial success rate`() {
+        val engine = EvolutionEngine(
+            byeDpiEngine = AlwaysSucceedEngine(),
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(GenePool(seeds)),
+            pool = GenePool(seeds),
+            sites = listOf("s1"),
+        )
+        val full = engine.computeFitness(successRate = 1.0, avgLatencyMs = 100.0)
+        val half = engine.computeFitness(successRate = 0.5, avgLatencyMs = 100.0)
+        assertTrue(full > 0.0 && half > 0.0)
+        assertTrue(half / full < 0.5, "exponent 1.5 must penalise 50% rate harder than linear: ratio=${half / full}")
+    }
+
+    @Test
+    fun `computeFitness returns zero for zero success regardless of latency`() {
+        val engine = EvolutionEngine(
+            byeDpiEngine = AlwaysSucceedEngine(),
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(GenePool(seeds)),
+            pool = GenePool(seeds),
+            sites = listOf("s1"),
+        )
+        assertEquals(0.0, engine.computeFitness(0.0, 50.0))
+        assertEquals(0.0, engine.computeFitness(0.0, 0.0))
+    }
+
+    @Test
+    fun `initial population mixes seed memory random per v2 ratios`() = runTest {
+        val abundantSeeds = List(100) { "-seed$it" }
+        val engine = EvolutionEngine(
+            byeDpiEngine = AlwaysSucceedEngine(),
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(GenePool(abundantSeeds)),
+            pool = GenePool(abundantSeeds),
+            sites = listOf("s1"),
+            settings = EvolutionEngine.EvolutionSettings(
+                populationSize = 10,
+                maxGenerations = 1,
+                targetFitness = 0.0,
+            ),
+            random = Random(0),
+        )
+        val commands = mutableSetOf<String>()
+        engine.evolve(
+            seedStrategies = abundantSeeds,
+            onGeneration = {},
+            onChromosomeEval = { _, _, cmd -> commands.add(cmd) },
+        )
+        assertTrue(commands.size >= 5, "v2 mix must produce diverse population, distinct=${commands.size}")
+    }
+
+    @Test
     fun `start failure result not cached in persistent fitness cache`() = runTest {
         val engine = AlwaysFailEngine()
         val pool = GenePool(seeds)
