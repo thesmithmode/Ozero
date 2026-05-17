@@ -402,6 +402,10 @@
     <string name="byedpi_using_override">Personalización guardada activa</string>
     <string name="byedpi_save">Guardar</string>
     <string name="byedpi_reset">Restablecer</string>
+    <string name="byedpi_dns_label">Servidores DNS</string>
+    <string name="byedpi_dns_description">Anular el DNS para el túnel VPN. Se usa el DNS del sistema por defecto.</string>
+    <string name="byedpi_dns_auto">Auto</string>
+    <string name="byedpi_dns_field_label">Direcciones DNS (separadas por coma)</string>
     <string name="settings_byedpi_title">Args de ByeDPI</string>
     <string name="settings_byedpi_summary">Configuración de omisión DPI</string>
     <string name="settings_manual_server_title">Agregar servidor manualmente</string>
