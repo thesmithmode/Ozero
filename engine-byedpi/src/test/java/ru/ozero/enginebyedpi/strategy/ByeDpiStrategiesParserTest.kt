@@ -64,7 +64,7 @@ class ByeDpiStrategiesParserTest {
     }
 
     @Test
-    fun `parse 75 строк из embedded asset content`() {
+    fun `parse 78 строк из embedded asset content`() {
         val asset = ByeDpiStrategiesParserTest::class.java.classLoader!!
             .getResourceAsStream("byedpi_strategies.list")
         if (asset == null) {
@@ -96,7 +96,7 @@ class ByeDpiStrategiesParserTest {
     @Test
     fun `default constants`() {
         assertEquals("google.com", ByeDpiStrategiesParser.DEFAULT_SNI)
-        assertEquals(75, ByeDpiStrategiesParser.EXPECTED_COUNT)
+        assertEquals(78, ByeDpiStrategiesParser.EXPECTED_COUNT)
     }
 
     @Test
