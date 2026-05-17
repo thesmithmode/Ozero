@@ -43,6 +43,46 @@ private val DNS_PRESETS: List<Pair<String, List<String>>> = listOf(
     "Quad9" to listOf("9.9.9.9", "149.112.112.112"),
 )
 
+@Composable
+private fun DnsSection(
+    dnsText: String,
+    onPreset: (List<String>) -> Unit,
+    onDnsChange: (String) -> Unit,
+) {
+    Text(
+        text = stringResource(R.string.byedpi_dns_label),
+        style = MaterialTheme.typography.titleSmall,
+    )
+    Text(
+        text = stringResource(R.string.byedpi_dns_description),
+        style = MaterialTheme.typography.bodySmall,
+    )
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        item {
+            FilterChip(
+                selected = dnsText.isBlank(),
+                onClick = { onPreset(emptyList()) },
+                label = { Text(stringResource(R.string.byedpi_dns_auto)) },
+                modifier = Modifier.testTag("byedpi_dns_preset_auto"),
+            )
+        }
+        items(DNS_PRESETS) { (label, servers) ->
+            FilterChip(
+                selected = dnsText.trim() == servers.joinToString(", "),
+                onClick = { onPreset(servers) },
+                label = { Text(label) },
+            )
+        }
+    }
+    OutlinedTextField(
+        value = dnsText,
+        onValueChange = onDnsChange,
+        label = { Text(stringResource(R.string.byedpi_dns_field_label)) },
+        modifier = Modifier.fillMaxWidth().testTag("byedpi_dns_field"),
+        singleLine = true,
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ByeDpiEngineSettingsScreen(
@@ -125,37 +165,10 @@ fun ByeDpiEngineSettingsScreen(
 
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
-                    Text(
-                        text = stringResource(R.string.byedpi_dns_label),
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                    Text(
-                        text = stringResource(R.string.byedpi_dns_description),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        item {
-                            FilterChip(
-                                selected = s.dnsText.isBlank(),
-                                onClick = { viewModel.onDnsPreset(emptyList()) },
-                                label = { Text(stringResource(R.string.byedpi_dns_auto)) },
-                                modifier = Modifier.testTag("byedpi_dns_preset_auto"),
-                            )
-                        }
-                        items(DNS_PRESETS) { (label, servers) ->
-                            FilterChip(
-                                selected = s.dnsText.trim() == servers.joinToString(", "),
-                                onClick = { viewModel.onDnsPreset(servers) },
-                                label = { Text(label) },
-                            )
-                        }
-                    }
-                    OutlinedTextField(
-                        value = s.dnsText,
-                        onValueChange = viewModel::onDnsChange,
-                        label = { Text(stringResource(R.string.byedpi_dns_field_label)) },
-                        modifier = Modifier.fillMaxWidth().testTag("byedpi_dns_field"),
-                        singleLine = true,
+                    DnsSection(
+                        dnsText = s.dnsText,
+                        onPreset = viewModel::onDnsPreset,
+                        onDnsChange = viewModel::onDnsChange,
                     )
 
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
