@@ -6,13 +6,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
-import ru.ozero.engineurnetwork.UrnetworkSdkBridge.AccountPointsSnapshot
 import javax.inject.Inject
 
 @HiltViewModel
@@ -22,15 +19,6 @@ class UrnetworkSharedTrafficViewModel @Inject constructor(
 
     private val _unpaidBytes = MutableStateFlow(0L)
     val unpaidBytes: StateFlow<Long> = _unpaidBytes.asStateFlow()
-
-    private val _plan = MutableStateFlow<String?>(null)
-    val plan: StateFlow<String?> = _plan.asStateFlow()
-
-    private val _balanceBytes = MutableStateFlow(0L)
-    val balanceBytes: StateFlow<Long> = _balanceBytes.asStateFlow()
-
-    private val _accountPoints = MutableStateFlow<AccountPointsSnapshot?>(null)
-    val accountPoints: StateFlow<AccountPointsSnapshot?> = _accountPoints.asStateFlow()
 
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -49,14 +37,6 @@ class UrnetworkSharedTrafficViewModel @Inject constructor(
         _isLoading.value = true
         runCatching { bridge.fetchTransferStats() }
         _unpaidBytes.value = runCatching { bridge.unpaidByteCount() }.getOrDefault(0L)
-        coroutineScope {
-            val balanceDeferred = async { runCatching { bridge.fetchSubscriptionBalance() }.getOrNull() }
-            val pointsDeferred = async { runCatching { bridge.fetchAccountPoints() }.getOrNull() }
-            val balance = balanceDeferred.await()
-            _plan.value = balance?.plan
-            _balanceBytes.value = balance?.balanceBytes ?: 0L
-            _accountPoints.value = pointsDeferred.await()
-        }
         _isLoading.value = false
     }
 }

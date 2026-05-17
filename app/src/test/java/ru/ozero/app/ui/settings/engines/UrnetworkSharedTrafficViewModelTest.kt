@@ -12,7 +12,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class UrnetworkSharedTrafficViewModelTest {
@@ -41,22 +40,6 @@ class UrnetworkSharedTrafficViewModelTest {
     }
 
     @Test
-    fun `после init показывает plan из subscriptionBalance`() = runTest(dispatcher) {
-        bridge.plan = "pro"
-        vm = UrnetworkSharedTrafficViewModel(bridge)
-        advanceUntilIdle()
-        assertEquals("pro", vm.plan.value)
-    }
-
-    @Test
-    fun `plan null если fetchSubscriptionBalance возвращает null`() = runTest(dispatcher) {
-        bridge.balanceResult = null
-        vm = UrnetworkSharedTrafficViewModel(bridge)
-        advanceUntilIdle()
-        assertNull(vm.plan.value)
-    }
-
-    @Test
     fun `isLoading false после загрузки`() = runTest(dispatcher) {
         vm = UrnetworkSharedTrafficViewModel(bridge)
         advanceUntilIdle()
@@ -74,49 +57,26 @@ class UrnetworkSharedTrafficViewModelTest {
     }
 
     @Test
-    fun `после init показывает balanceBytes из subscriptionBalance`() = runTest(dispatcher) {
-        bridge.plan = "free"
-        bridge.balanceBytes = 1_000_000_000L
+    fun `unpaidBytes 0 при старте`() = runTest(dispatcher) {
+        bridge.unpaidBytes = 0L
         vm = UrnetworkSharedTrafficViewModel(bridge)
         advanceUntilIdle()
-        assertEquals(1_000_000_000L, vm.balanceBytes.value)
+        assertEquals(0L, vm.unpaidBytes.value)
     }
 
     @Test
-    fun `balanceBytes равен 0 если fetchSubscriptionBalance возвращает null`() = runTest(dispatcher) {
+    fun `unpaidBytes обновляется после refresh`() = runTest(dispatcher) {
+        bridge.unpaidBytes = 1_000_000L
         vm = UrnetworkSharedTrafficViewModel(bridge)
         advanceUntilIdle()
-        assertEquals(0L, vm.balanceBytes.value)
+        bridge.unpaidBytes = 2_000_000L
+        vm.refresh()
+        advanceUntilIdle()
+        assertEquals(2_000_000L, vm.unpaidBytes.value)
     }
-
-    @Test
-    fun `unpaidBytes показывает ПРЕДОСТАВЛЕННЫЙ трафик а не потреблённый из subscriptionBalance`() =
-        runTest(dispatcher) {
-            bridge.unpaidBytes = 50_000_000L
-            bridge.plan = "free"
-            vm = UrnetworkSharedTrafficViewModel(bridge)
-            advanceUntilIdle()
-            assertEquals(
-                50_000_000L,
-                vm.unpaidBytes.value,
-                "Расшаренный трафик = unpaidByteCount (предоставлено другим), " +
-                    "не usedBytes из subscriptionBalance (это потребление).",
-            )
-        }
 
     private class FakeBridge : UrnetworkSdkBridge {
         var unpaidBytes = 0L
-        var plan: String? = null
-        var balanceBytes = 0L
-        var balanceResult: UrnetworkSdkBridge.SubscriptionBalanceSnapshot? = null
-            get() = if (plan != null || field != null) {
-                UrnetworkSdkBridge.SubscriptionBalanceSnapshot(
-                    balanceBytes = balanceBytes, pendingBytes = 0L, startBalanceBytes = 0L,
-                    usedBytes = 0L, plan = plan, store = null,
-                )
-            } else {
-                null
-            }
         var fetchTransferStatsCalls = 0
 
         override suspend fun start(walletAddress: String, apiUrl: String, connectUrl: String, byClientJwt: String) =
@@ -135,45 +95,6 @@ class UrnetworkSharedTrafficViewModelTest {
         override fun fetchTransferStats() {
             fetchTransferStatsCalls++
         }
-        override suspend fun fetchSubscriptionBalance() = balanceResult
-        var accountPointsResult: UrnetworkSdkBridge.AccountPointsSnapshot? = null
-        override suspend fun fetchAccountPoints() = accountPointsResult
-    }
-
-    @Test
-    fun `sentinel — fetchSubscriptionBalance и fetchAccountPoints вызываются параллельно`() = runTest(dispatcher) {
-        val source = java.io.File(
-            System.getProperty("user.dir") ?: ".",
-            "src/main/java/ru/ozero/app/ui/settings/engines/UrnetworkSharedTrafficViewModel.kt",
-        ).readText()
-        val loadBody = source.substringAfter("private suspend fun load()").substringBefore("\n    fun ")
-        kotlin.test.assertTrue(
-            loadBody.contains("async") && loadBody.contains("await"),
-            "load() обязан использовать async/await для параллельных вызовов — иначе задержка 20s",
-        )
-    }
-
-    @Test
-    fun `accountPoints null если bridge возвращает null`() = runTest(dispatcher) {
-        bridge.accountPointsResult = null
-        vm = UrnetworkSharedTrafficViewModel(bridge)
-        advanceUntilIdle()
-        assertNull(vm.accountPoints.value)
-    }
-
-    @Test
-    fun `accountPoints заполняется из bridge`() = runTest(dispatcher) {
-        bridge.accountPointsResult = UrnetworkSdkBridge.AccountPointsSnapshot(
-            totalPoints = 1500.0,
-            payoutPoints = 1000.0,
-            referralPoints = 200.0,
-            reliabilityPoints = 300.0,
-            multiplierPoints = 0.0,
-        )
-        vm = UrnetworkSharedTrafficViewModel(bridge)
-        advanceUntilIdle()
-        val pts = vm.accountPoints.value
-        assertEquals(1500.0, pts?.totalPoints)
-        assertEquals(1000.0, pts?.payoutPoints)
+        override suspend fun fetchSubscriptionBalance() = null
     }
 }
