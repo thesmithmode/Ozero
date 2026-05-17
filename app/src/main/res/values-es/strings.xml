@@ -219,6 +219,7 @@
     <string name="urnetwork_shared_traffic_unavailable">Estadísticas no disponibles. Asegúrese de estar conectado a URnetwork.</string>
     <string name="urnetwork_shared_traffic_provided">Proporcionado</string>
     <string name="urnetwork_shared_traffic_plan">Plan</string>
+    <string name="urnetwork_shared_traffic_balance">Saldo</string>
 
     <!-- Tabs missing -->
     <string name="tab_stats">Estadísticas</string>
