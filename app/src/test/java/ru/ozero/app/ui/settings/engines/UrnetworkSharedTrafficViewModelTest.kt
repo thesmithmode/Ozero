@@ -136,5 +136,31 @@ class UrnetworkSharedTrafficViewModelTest {
             fetchTransferStatsCalls++
         }
         override suspend fun fetchSubscriptionBalance() = balanceResult
+        var accountPointsResult: UrnetworkSdkBridge.AccountPointsSnapshot? = null
+        override suspend fun fetchAccountPoints() = accountPointsResult
+    }
+
+    @Test
+    fun `accountPoints null если bridge возвращает null`() = runTest(dispatcher) {
+        bridge.accountPointsResult = null
+        vm = UrnetworkSharedTrafficViewModel(bridge)
+        advanceUntilIdle()
+        assertNull(vm.accountPoints.value)
+    }
+
+    @Test
+    fun `accountPoints заполняется из bridge`() = runTest(dispatcher) {
+        bridge.accountPointsResult = UrnetworkSdkBridge.AccountPointsSnapshot(
+            totalPoints = 1500.0,
+            payoutPoints = 1000.0,
+            referralPoints = 200.0,
+            reliabilityPoints = 300.0,
+            multiplierPoints = 0.0,
+        )
+        vm = UrnetworkSharedTrafficViewModel(bridge)
+        advanceUntilIdle()
+        val pts = vm.accountPoints.value
+        assertEquals(1500.0, pts?.totalPoints)
+        assertEquals(1000.0, pts?.payoutPoints)
     }
 }

@@ -406,6 +406,61 @@ class RealUrnetworkSdkBridge(
         }
     }
 
+    override suspend fun fetchAccountPoints(): UrnetworkSdkBridge.AccountPointsSnapshot? {
+        if (!running.get()) return null
+        val device = deviceRef.get() ?: return null
+        val api = runCatching { device.api }.getOrNull() ?: run {
+            PersistentLoggers.warn(TAG, "device.api is null — cannot fetch account points")
+            return null
+        }
+        return withTimeoutOrNull(SUBSCRIPTION_BALANCE_TIMEOUT_MS) {
+            suspendCancellableCoroutine { cont ->
+                val resumed = AtomicBoolean(false)
+                runCatching {
+                    api.getAccountPoints { result, err ->
+                        if (!resumed.compareAndSet(false, true)) return@getAccountPoints
+                        if (err != null || result == null) {
+                            PersistentLoggers.warn(TAG, "getAccountPoints err=${err?.message}")
+                            cont.resume(null)
+                            return@getAccountPoints
+                        }
+                        val n = runCatching { result.accountPoints?.len() ?: 0L }.getOrDefault(0L)
+                        var total = 0.0
+                        var payout = 0.0
+                        var referral = 0.0
+                        var reliability = 0.0
+                        var multiplier = 0.0
+                        for (i in 0 until n) {
+                            val point = runCatching { result.accountPoints.get(i) }.getOrNull() ?: continue
+                            val value = runCatching { Sdk.nanoPointsToPoints(point.pointValue) }.getOrDefault(0.0)
+                            total += value
+                            when (runCatching { point.event }.getOrNull()?.uppercase()) {
+                                "PAYOUT" -> payout += value
+                                "PAYOUT_LINKED_ACCOUNT" -> referral += value
+                                "PAYOUT_RELIABILITY" -> reliability += value
+                                "PAYOUT_MULTIPLIER" -> multiplier += value
+                            }
+                        }
+                        cont.resume(
+                            UrnetworkSdkBridge.AccountPointsSnapshot(
+                                totalPoints = total,
+                                payoutPoints = payout,
+                                referralPoints = referral,
+                                reliabilityPoints = reliability,
+                                multiplierPoints = multiplier,
+                            ),
+                        )
+                    }
+                }.onFailure { t ->
+                    if (resumed.compareAndSet(false, true)) {
+                        PersistentLoggers.warn(TAG, "getAccountPoints threw: ${t.message}")
+                        cont.resume(null)
+                    }
+                }
+            }
+        }
+    }
+
     override suspend fun attachTun(tunFd: Int): UrnetworkSdkBridge.AttachResult {
         if (tunFd < 0) {
             return UrnetworkSdkBridge.AttachResult.Failed("invalid fd=$tunFd")

@@ -30,6 +30,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
 import ru.ozero.app.ui.theme.OzeroPalette
 import ru.ozero.app.ui.utils.formatBytes
+import ru.ozero.engineurnetwork.UrnetworkSdkBridge.AccountPointsSnapshot
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,6 +41,7 @@ fun UrnetworkSharedTrafficScreen(
     val unpaidBytes by viewModel.unpaidBytes.collectAsStateWithLifecycle()
     val plan by viewModel.plan.collectAsStateWithLifecycle()
     val balanceBytes by viewModel.balanceBytes.collectAsStateWithLifecycle()
+    val accountPoints by viewModel.accountPoints.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     Scaffold(
         topBar = {
@@ -70,6 +72,9 @@ fun UrnetworkSharedTrafficScreen(
                 }
             } else {
                 ProvidedTrafficCard(unpaidBytes = unpaidBytes, plan = plan, balanceBytes = balanceBytes)
+                if (accountPoints != null) {
+                    AccountPointsCard(points = accountPoints)
+                }
             }
         }
     }
@@ -128,5 +133,52 @@ private fun TrafficRow(label: String, value: String) {
             style = MaterialTheme.typography.bodyMedium,
             color = OzeroPalette.Text,
         )
+    }
+}
+
+@Composable
+private fun AccountPointsCard(points: AccountPointsSnapshot) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = OzeroPalette.Bg1),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = stringResource(R.string.urnetwork_points_title).uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                color = OzeroPalette.Text3,
+            )
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = OzeroPalette.Line)
+            TrafficRow(
+                label = stringResource(R.string.urnetwork_points_payout),
+                value = "%.0f".format(points.payoutPoints),
+            )
+            if (points.referralPoints > 0.0) {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp), color = OzeroPalette.Line)
+                TrafficRow(
+                    label = stringResource(R.string.urnetwork_points_referral),
+                    value = "%.0f".format(points.referralPoints),
+                )
+            }
+            if (points.reliabilityPoints > 0.0) {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp), color = OzeroPalette.Line)
+                TrafficRow(
+                    label = stringResource(R.string.urnetwork_points_reliability),
+                    value = "%.0f".format(points.reliabilityPoints),
+                )
+            }
+            if (points.multiplierPoints > 0.0) {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp), color = OzeroPalette.Line)
+                TrafficRow(
+                    label = stringResource(R.string.urnetwork_points_multiplier),
+                    value = "+%.0f".format(points.multiplierPoints),
+                )
+            }
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = OzeroPalette.Line)
+            TrafficRow(
+                label = stringResource(R.string.urnetwork_points_total),
+                value = "%.0f".format(points.totalPoints),
+            )
+        }
     }
 }

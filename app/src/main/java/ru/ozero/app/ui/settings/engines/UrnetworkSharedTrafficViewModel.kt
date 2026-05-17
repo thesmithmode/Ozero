@@ -10,6 +10,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
+import ru.ozero.engineurnetwork.UrnetworkSdkBridge.AccountPointsSnapshot
 import javax.inject.Inject
 
 @HiltViewModel
@@ -25,6 +26,9 @@ class UrnetworkSharedTrafficViewModel @Inject constructor(
 
     private val _balanceBytes = MutableStateFlow(0L)
     val balanceBytes: StateFlow<Long> = _balanceBytes.asStateFlow()
+
+    private val _accountPoints = MutableStateFlow<AccountPointsSnapshot?>(null)
+    val accountPoints: StateFlow<AccountPointsSnapshot?> = _accountPoints.asStateFlow()
 
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -46,6 +50,7 @@ class UrnetworkSharedTrafficViewModel @Inject constructor(
         val balance = runCatching { bridge.fetchSubscriptionBalance() }.getOrNull()
         _plan.value = balance?.plan
         _balanceBytes.value = balance?.balanceBytes ?: 0L
+        _accountPoints.value = runCatching { bridge.fetchAccountPoints() }.getOrNull()
         _isLoading.value = false
     }
 }

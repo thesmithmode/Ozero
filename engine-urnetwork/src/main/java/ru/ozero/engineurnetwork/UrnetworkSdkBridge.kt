@@ -36,6 +36,8 @@ interface UrnetworkSdkBridge {
 
     suspend fun fetchSubscriptionBalance(): SubscriptionBalanceSnapshot?
 
+    suspend fun fetchAccountPoints(): AccountPointsSnapshot? = null
+
     interface LocationToken {
         val countryCode: String?
         val region: String?
@@ -48,6 +50,14 @@ interface UrnetworkSdkBridge {
         val country: String?,
         val countryCode: String?,
         val name: String?,
+    )
+
+    data class AccountPointsSnapshot(
+        val totalPoints: Double,
+        val payoutPoints: Double,
+        val referralPoints: Double,
+        val reliabilityPoints: Double,
+        val multiplierPoints: Double,
     )
 
     data class SubscriptionBalanceSnapshot(

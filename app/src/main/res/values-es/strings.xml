@@ -220,6 +220,12 @@
     <string name="urnetwork_shared_traffic_provided">Proporcionado</string>
     <string name="urnetwork_shared_traffic_plan">Plan</string>
     <string name="urnetwork_shared_traffic_balance">Saldo</string>
+    <string name="urnetwork_points_title">Puntos</string>
+    <string name="urnetwork_points_payout">Pagos</string>
+    <string name="urnetwork_points_referral">Referencias</string>
+    <string name="urnetwork_points_reliability">Fiabilidad</string>
+    <string name="urnetwork_points_multiplier">Multiplicador</string>
+    <string name="urnetwork_points_total">Puntos totales</string>
 
     <!-- Tabs missing -->
     <string name="tab_stats">Estadísticas</string>

@@ -273,6 +273,12 @@
     <string name="urnetwork_shared_traffic_provided">Предоставлено</string>
     <string name="urnetwork_shared_traffic_plan">Тариф</string>
     <string name="urnetwork_shared_traffic_balance">Остаток</string>
+    <string name="urnetwork_points_title">Очки</string>
+    <string name="urnetwork_points_payout">Выплаты</string>
+    <string name="urnetwork_points_referral">Рефералы</string>
+    <string name="urnetwork_points_reliability">Надёжность</string>
+    <string name="urnetwork_points_multiplier">Множитель</string>
+    <string name="urnetwork_points_total">Итого очков</string>
     <string name="urnetwork_peers_connected">Подключено к %1$d peer-ам</string>
     <string name="urnetwork_peers_searching">Поиск peer-ов…</string>
     <string name="urnetwork_country_switching">Переключение страны…</string>
