@@ -405,6 +405,10 @@
     <string name="byedpi_using_override">Saved override is active</string>
     <string name="byedpi_save">Save</string>
     <string name="byedpi_reset">Reset</string>
+    <string name="byedpi_dns_label">DNS servers</string>
+    <string name="byedpi_dns_description">Override DNS for the VPN tunnel. System DNS is used by default.</string>
+    <string name="byedpi_dns_auto">Auto</string>
+    <string name="byedpi_dns_field_label">DNS addresses (comma-separated)</string>
 
     <!-- Telegram MTProxy settings -->
     <string name="telegram_proxy_title">Telegram MTProxy</string>

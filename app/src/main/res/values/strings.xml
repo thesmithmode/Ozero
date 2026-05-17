@@ -409,6 +409,10 @@
     <string name="byedpi_using_override">Сохранённый override активен</string>
     <string name="byedpi_save">Сохранить</string>
     <string name="byedpi_reset">Сброс</string>
+    <string name="byedpi_dns_label">DNS-серверы</string>
+    <string name="byedpi_dns_description">Переопределить DNS для VPN-туннеля. По умолчанию используется системный DNS.</string>
+    <string name="byedpi_dns_auto">Авто</string>
+    <string name="byedpi_dns_field_label">DNS-адреса (через запятую)</string>
 
     <!-- Telegram MTProxy settings -->
     <string name="telegram_proxy_title">Telegram MTProxy</string>

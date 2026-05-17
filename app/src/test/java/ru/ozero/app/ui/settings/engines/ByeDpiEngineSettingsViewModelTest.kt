@@ -19,6 +19,7 @@ import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.SplitTunnelMode
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
+import kotlin.test.assertFalse
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
@@ -135,12 +136,109 @@ class ByeDpiEngineSettingsViewModelTest {
         assertEquals(EngineConfig.ByeDpi().args, state.args)
     }
 
+    @Test
+    fun `после init dnsText пустой если customDnsServers пустой`() = runTest(dispatcher) {
+        advanceUntilIdle()
+        val state = vm.uiState.value as ByeDpiSettingsUiState.Content
+        assertEquals("", state.dnsText)
+        assertEquals("", state.savedDnsText)
+    }
+
+    @Test
+    fun `после init dnsText заполнен если customDnsServers не пустой`() = runTest(dispatcher) {
+        repo.emit(SettingsModel.DEFAULT.copy(customDnsServers = listOf("8.8.8.8", "1.1.1.1")))
+        vm = ByeDpiEngineSettingsViewModel(repo)
+        advanceUntilIdle()
+        val state = vm.uiState.value as ByeDpiSettingsUiState.Content
+        assertEquals("8.8.8.8, 1.1.1.1", state.dnsText)
+        assertEquals("8.8.8.8, 1.1.1.1", state.savedDnsText)
+    }
+
+    @Test
+    fun `onDnsChange меняет dnsText в state`() = runTest(dispatcher) {
+        advanceUntilIdle()
+        vm.onDnsChange("9.9.9.9, 149.112.112.112")
+        val state = vm.uiState.value as ByeDpiSettingsUiState.Content
+        assertEquals("9.9.9.9, 149.112.112.112", state.dnsText)
+    }
+
+    @Test
+    fun `dirty=true если только dnsText изменился`() = runTest(dispatcher) {
+        advanceUntilIdle()
+        vm.onDnsChange("1.1.1.1")
+        val state = vm.uiState.value as ByeDpiSettingsUiState.Content
+        assertTrue(state.dirty)
+    }
+
+    @Test
+    fun `dirty=false если dnsText совпадает с savedDnsText и args не изменён`() = runTest(dispatcher) {
+        repo.emit(SettingsModel.DEFAULT.copy(customDnsServers = listOf("8.8.8.8")))
+        vm = ByeDpiEngineSettingsViewModel(repo)
+        advanceUntilIdle()
+        val state = vm.uiState.value as ByeDpiSettingsUiState.Content
+        assertFalse(state.dirty)
+    }
+
+    @Test
+    fun `onDnsPreset устанавливает форматированный dnsText`() = runTest(dispatcher) {
+        advanceUntilIdle()
+        vm.onDnsPreset(listOf("1.1.1.1", "1.0.0.1"))
+        val state = vm.uiState.value as ByeDpiSettingsUiState.Content
+        assertEquals("1.1.1.1, 1.0.0.1", state.dnsText)
+    }
+
+    @Test
+    fun `onDnsPreset с пустым списком очищает dnsText`() = runTest(dispatcher) {
+        advanceUntilIdle()
+        vm.onDnsChange("8.8.8.8")
+        vm.onDnsPreset(emptyList())
+        val state = vm.uiState.value as ByeDpiSettingsUiState.Content
+        assertEquals("", state.dnsText)
+    }
+
+    @Test
+    fun `onSave сохраняет DNS серверы разбитые запятой`() = runTest(dispatcher) {
+        advanceUntilIdle()
+        vm.onDnsChange("8.8.8.8, 1.1.1.1")
+        vm.onSave()
+        advanceUntilIdle()
+        assertEquals(listOf(listOf("8.8.8.8", "1.1.1.1")), repo.dnsUpdates)
+    }
+
+    @Test
+    fun `onSave с пустым dnsText сохраняет пустой список`() = runTest(dispatcher) {
+        advanceUntilIdle()
+        vm.onSave()
+        advanceUntilIdle()
+        assertEquals(listOf(emptyList<String>()), repo.dnsUpdates)
+    }
+
+    @Test
+    fun `при обновлении модели dnsText не сбрасывается если есть несохранённые изменения`() = runTest(dispatcher) {
+        advanceUntilIdle()
+        vm.onDnsChange("9.9.9.9")
+        repo.emit(SettingsModel.DEFAULT.copy(customDnsServers = listOf("8.8.8.8")))
+        advanceUntilIdle()
+        val state = vm.uiState.value as ByeDpiSettingsUiState.Content
+        assertEquals("9.9.9.9", state.dnsText)
+    }
+
+    @Test
+    fun `при обновлении модели dnsText обновляется если изменений нет`() = runTest(dispatcher) {
+        advanceUntilIdle()
+        repo.emit(SettingsModel.DEFAULT.copy(customDnsServers = listOf("8.8.8.8")))
+        advanceUntilIdle()
+        val state = vm.uiState.value as ByeDpiSettingsUiState.Content
+        assertEquals("8.8.8.8", state.dnsText)
+    }
+
     private class FakeSettingsRepository : SettingsRepository {
         private val state = MutableStateFlow(SettingsModel.DEFAULT)
         override val settings: Flow<SettingsModel> = state.asStateFlow()
 
         val byedpiUpdates = mutableListOf<String?>()
         val defaultAcceptedUpdates = mutableListOf<Boolean>()
+        val dnsUpdates = mutableListOf<List<String>>()
 
         fun emit(model: SettingsModel) {
             state.value = model
@@ -153,7 +251,10 @@ class ByeDpiEngineSettingsViewModelTest {
         override suspend fun setUrnetworkEnabled(enabled: Boolean) = Unit
         override suspend fun setUrnetworkJwt(jwt: String?) = Unit
         override suspend fun setUrnetworkCountryCode(code: String?) = Unit
-        override suspend fun setCustomDnsServers(servers: List<String>) = Unit
+        override suspend fun setCustomDnsServers(servers: List<String>) {
+            dnsUpdates += servers
+            state.value = state.value.copy(customDnsServers = servers)
+        }
         override suspend fun setHostsMode(mode: ru.ozero.enginescore.settings.HostsMode) = Unit
         override suspend fun setHosts(hosts: List<String>) = Unit
         override suspend fun setUiLocaleTag(tag: String?) = Unit

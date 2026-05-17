@@ -21,8 +21,11 @@ sealed interface ByeDpiSettingsUiState {
         val savedArgs: String?,
         val defaultArgs: String,
         val defaultAccepted: Boolean,
+        val dnsText: String,
+        val savedDnsText: String,
     ) : ByeDpiSettingsUiState {
-        val dirty: Boolean get() = args != (savedArgs ?: defaultArgs)
+        val dirty: Boolean get() =
+            args != (savedArgs ?: defaultArgs) || dnsText != savedDnsText
         val usingDefault: Boolean get() = savedArgs.isNullOrBlank()
     }
 }
@@ -47,11 +50,19 @@ class ByeDpiEngineSettingsViewModel @Inject constructor(
                     previous.args != (previous.savedArgs ?: previous.defaultArgs) -> previous.args
                     else -> saved ?: defaultArgs
                 }
+                val savedDns = model.customDnsServers.joinToString(", ")
+                val nextDns = when {
+                    previous == null -> savedDns
+                    previous.dnsText != previous.savedDnsText -> previous.dnsText
+                    else -> savedDns
+                }
                 _uiState.value = ByeDpiSettingsUiState.Content(
                     args = nextArgs,
                     savedArgs = saved,
                     defaultArgs = defaultArgs,
                     defaultAccepted = model.byedpiDefaultAccepted,
+                    dnsText = nextDns,
+                    savedDnsText = savedDns,
                 )
             }
             .launchIn(viewModelScope)
@@ -62,14 +73,24 @@ class ByeDpiEngineSettingsViewModel @Inject constructor(
         _uiState.value = state.copy(args = text)
     }
 
+    fun onDnsChange(text: String) {
+        val state = _uiState.value as? ByeDpiSettingsUiState.Content ?: return
+        _uiState.value = state.copy(dnsText = text)
+    }
+
+    fun onDnsPreset(servers: List<String>) {
+        val state = _uiState.value as? ByeDpiSettingsUiState.Content ?: return
+        _uiState.value = state.copy(dnsText = servers.joinToString(", "))
+    }
+
     fun onSave() {
         val state = _uiState.value as? ByeDpiSettingsUiState.Content ?: return
         viewModelScope.launch {
             val toSave = state.args.takeIf { it.isNotBlank() && it != defaultArgs }
             repository.setByedpiWinningArgs(toSave)
-            if (toSave == null) {
-                repository.setByedpiDefaultAccepted(true)
-            }
+            if (toSave == null) repository.setByedpiDefaultAccepted(true)
+            val dns = state.dnsText.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+            repository.setCustomDnsServers(dns)
         }
     }
 
