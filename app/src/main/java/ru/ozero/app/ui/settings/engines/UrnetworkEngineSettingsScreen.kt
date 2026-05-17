@@ -161,7 +161,7 @@ fun UrnetworkEngineSettingsScreen(
     }
 }
 
-@Suppress("LongParameterList")
+@Suppress("LongParameterList", "LongMethod")
 @Composable
 private fun LocationListContent(
     modifier: Modifier,

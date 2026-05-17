@@ -334,10 +334,14 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
 
     private fun applyFilter(query: String) {
         val q = query.trim().lowercase()
-        fun List<UrnetworkLocationItem>.applyQuery() = if (q.isEmpty()) this else filter { item ->
-            item.name.lowercase().contains(q) ||
-                item.nameRu.lowercase().contains(q) ||
-                item.countryCode.lowercase().contains(q)
+        fun List<UrnetworkLocationItem>.applyQuery() = if (q.isEmpty()) {
+            this
+        } else {
+            filter { item ->
+                item.name.lowercase().contains(q) ||
+                    item.nameRu.lowercase().contains(q) ||
+                    item.countryCode.lowercase().contains(q)
+            }
         }
         val filteredCountries = allCountries.applyQuery()
         val filteredRegions = allRegions.applyQuery()

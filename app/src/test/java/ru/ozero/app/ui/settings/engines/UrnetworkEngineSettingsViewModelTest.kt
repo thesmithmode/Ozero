@@ -335,7 +335,9 @@ class UrnetworkEngineSettingsViewModelTest {
             System.getProperty("user.dir") ?: ".",
             "src/main/java/ru/ozero/app/ui/settings/engines/UrnetworkEngineSettingsViewModel.kt",
         ).readText()
-        val updateBody = source.substringAfter("private fun updateLocations(").substringBefore("private fun buildLocationList")
+        val updateBody = source
+            .substringAfter("private fun updateLocations(")
+            .substringBefore("private fun buildLocationList")
         kotlin.test.assertTrue(
             updateBody.contains("filtered.regions"),
             "updateLocations обязан читать filtered.regions — иначе регионы никогда не загружаются",
