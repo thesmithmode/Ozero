@@ -1,5 +1,12 @@
 # Build Log
 
+## [2026-05-19T05:00:00+03:00] compile | Daily Log 2026-05-18 (incremental pass 4 — walletAuth)
+- Source: daily/2026-05-18.md
+- Articles created: [[concepts/urnetwork-walletauth-per-device-registration]] (per-device Ed25519 auto-registration, AES-GCM keypair storage, server protocol, migration flow, 40 tests)
+- Articles updated: [[concepts/urnetwork-guest-mode-relay-blocker]] (Resolution Options: Option 2 implemented, commit 0ef16e3a), [[concepts/urnetwork-relay-always]] (walletAuth resolution section + related concepts)
+- Index updated: 1 new row, total 137
+- Sessions covered (incremental): 18:25 (walletAuth research), 18:52 (protocol details), 19:07 (review fixes + memory), 19:30 (full implementation — Base58, DeviceIdentity, AuthService, migration, 40 tests, commit 0ef16e3a)
+
 ## [2026-05-19T04:15:00+03:00] compile | Daily Log 2026-05-18 (incremental pass 3)
 - Source: daily/2026-05-18.md
 - Articles created: [[concepts/extension-function-import-migration-trap]] (interface→extension breaks consumers without import), [[concepts/poll-flow-resilience-pattern]] (runCatching + last-value fallback for poll flows)

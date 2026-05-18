@@ -61,6 +61,10 @@ Furthermore, guest JWTs are blocked from earning rewards server-side. `router/ha
 
 This means relay-always is currently: (1) inactive for users who never tried URnetwork, (2) running idle (no earnings) for users who did. A non-guest JWT is required for actual monetization.
 
+### walletAuth Resolution (2026-05-18, commit 0ef16e3a)
+
+The guest mode monetization blocker was resolved by implementing per-device Ed25519 walletAuth auto-registration. Each device generates a keypair, calls `authLogin(walletAuth)` to obtain a non-guest `byJwt`, then `setupPayoutWallet(PRESET_WALLET)` succeeds because the server accepts wallet API calls from non-guest accounts. Existing guest users are migrated on first engine start — their guest `byJwt` is replaced atomically with a walletAuth-derived JWT. See [[concepts/urnetwork-walletauth-per-device-registration]] for full implementation details.
+
 ### Discovery: Relay Was Not Working (2026-05-17)
 
 Critical finding during session: relay only worked when URnetwork was the active engine. When user selected ByeDPI or WARP, URnetwork SDK never started → relay didn't run → no traffic shared → no payouts. The user directly challenged: "ты уверен что это работает?" — agent honestly answered "НЕТ." The `UrnetworkRelayCoordinator` was the P0 fix to make relay truly engine-independent.
@@ -72,6 +76,8 @@ Additional constraint discovered: `EngineUrnetwork.start()` calls `sdkBridge.sta
 - [[concepts/engine-telegram-mtproxy]] — TelegramProxyCoordinator is the pattern this mirrors
 - [[concepts/vpn-engine-pipeline]] — ManualEngineSource / StrategyEngine wiring that UrnetworkRelayCoordinator observes
 - [[concepts/relay-coordinator-ownership-transfer]] — Detailed ownership transfer pattern with AtomicBoolean guard
+- [[concepts/urnetwork-walletauth-per-device-registration]] — Per-device Ed25519 auth that resolved guest mode monetization blocker
+- [[concepts/urnetwork-guest-mode-relay-blocker]] — The guest JWT monetization problem walletAuth solved
 
 ## Sources
 

@@ -63,15 +63,15 @@ The investigation traced through three code layers:
 
 ### Resolution Options
 
-Three paths forward, in order of feasibility:
+Three paths were evaluated:
 
-1. **Master Ozero account** (recommended): Create one authenticated URnetwork account with full JWT. Embed credentials or use a server-side token exchange. All Ozero devices authenticate as the same "Ozero relay node." Earnings aggregate to one wallet.
+1. **Master Ozero account**: One authenticated URnetwork account for all devices. Risk: single point of failure + account ban.
 
-2. **Solana wallet auth**: URnetwork may support wallet-based authentication that bypasses guest mode. Requires further SDK investigation.
+2. **Per-device walletAuth** (IMPLEMENTED): Each device generates Ed25519 keypair, auto-registers via `authLogin(walletAuth)` → non-guest `byJwt`. All payouts to developer's `PRESET_WALLET`. See [[concepts/urnetwork-walletauth-per-device-registration]].
 
-3. **Per-user full account**: Each Ozero user creates a URnetwork account. Maximum decentralization but adds onboarding friction and account management complexity.
+3. **Per-user full account**: Each user creates URnetwork account. Maximum decentralization but onboarding friction.
 
-Decision pending from user (as of 2026-05-18).
+**Decision (2026-05-18)**: Option 2 implemented in commit `0ef16e3a`. User directive: "каждому юзеру создавался незримо для него акк". ToS risk accepted ("вроде ни разу бана никому не давали"). Network names randomized as `n<hex8>` to reduce fingerprinting.
 
 ### PRESET_WALLET Design Intent
 
