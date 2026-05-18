@@ -788,7 +788,6 @@ private fun LiveTrafficChart(
     }
 }
 
-
 private fun chartTimeAgo(seconds: Int): String = when {
     seconds >= 3_600 -> "-${seconds / 3_600}h"
     seconds >= 60 -> "-${seconds / 60}m"
@@ -905,4 +904,3 @@ internal fun bucketize(history: List<Pair<Float, Float>>, buckets: Int): List<Pa
         avgRx to avgTx
     }
 }
-
