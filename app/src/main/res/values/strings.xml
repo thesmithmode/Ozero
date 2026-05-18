@@ -10,6 +10,7 @@
     <string name="main_status_probing">Поиск маршрута…</string>
     <string name="main_status_probing_warp">Подключение к WARP…</string>
     <string name="main_status_connecting">Подключение…</string>
+    <string name="main_status_reconnecting">Переподключение…</string>
     <string name="main_status_connected">Подключено</string>
     <string name="main_status_switching">Переключение…</string>
     <string name="main_status_disconnecting">Отключение…</string>

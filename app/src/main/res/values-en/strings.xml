@@ -10,6 +10,7 @@
     <string name="main_status_probing">Searching route…</string>
     <string name="main_status_probing_warp">Connecting to WARP…</string>
     <string name="main_status_connecting">Connecting…</string>
+    <string name="main_status_reconnecting">Reconnecting…</string>
     <string name="main_status_connected">Connected</string>
     <string name="main_status_switching">Switching…</string>
     <string name="main_status_disconnecting">Disconnecting…</string>

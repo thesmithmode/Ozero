@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ru.ozero.commonnet.IpInfo
@@ -86,6 +87,26 @@ class MainViewModel @Inject constructor(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
             initialValue = null,
+        )
+
+    val isReconnecting: StateFlow<Boolean> = tunnelController.state
+        .runningFold<TunnelState, Pair<Boolean, TunnelState>>(false to TunnelState.Idle) { acc, cur ->
+            val (reconn, prev) = acc
+            val next = when (cur) {
+                is TunnelState.Idle,
+                is TunnelState.Disconnecting,
+                is TunnelState.Connected,
+                -> false
+                else -> prev is TunnelState.Connected || reconn
+            }
+            next to cur
+        }
+        .map { it.first }
+        .distinctUntilChanged()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = false,
         )
 
     val healthStatus: StateFlow<HealthMonitor.Status> =

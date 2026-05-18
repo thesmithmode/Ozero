@@ -559,6 +559,72 @@ class MainViewModelTest {
         assertEquals(1, ipInfoProvider.calls)
     }
 
+    @Test
+    fun isReconnectingFalseInitially() = runTest {
+        advanceUntilIdle()
+        assertEquals(false, viewModel.isReconnecting.value)
+    }
+
+    @Test
+    fun isReconnectingFalseOnFirstConnect() = runTest {
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        advanceUntilIdle()
+        assertEquals(false, viewModel.isReconnecting.value)
+    }
+
+    @Test
+    fun isReconnectingTrueAfterConnectedFailed() = runTest {
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
+        advanceUntilIdle()
+        tunnelController.onEngineDied(EngineId.BYEDPI, "network loss")
+        advanceUntilIdle()
+        assertEquals(true, viewModel.isReconnecting.value)
+    }
+
+    @Test
+    fun isReconnectingStaysTrueOnFailedThenProbingThenConnecting() = runTest {
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
+        advanceUntilIdle()
+        tunnelController.onEngineDied(EngineId.BYEDPI, "lost")
+        advanceUntilIdle()
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        advanceUntilIdle()
+        assertEquals(true, viewModel.isReconnecting.value)
+    }
+
+    @Test
+    fun isReconnectingClearsOnReconnectSuccess() = runTest {
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
+        advanceUntilIdle()
+        tunnelController.onEngineDied(EngineId.BYEDPI, "lost")
+        advanceUntilIdle()
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
+        advanceUntilIdle()
+        assertEquals(false, viewModel.isReconnecting.value)
+    }
+
+    @Test
+    fun isReconnectingFalseAfterUserDisconnect() = runTest {
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
+        advanceUntilIdle()
+        tunnelController.onDisconnecting()
+        tunnelController.reset()
+        advanceUntilIdle()
+        assertEquals(false, viewModel.isReconnecting.value)
+    }
+
     private class FakeSettingsRepository : SettingsRepository {
         private val state = MutableStateFlow(SettingsModel.DEFAULT)
         override val settings: Flow<SettingsModel> = state.asStateFlow()

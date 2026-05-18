@@ -89,6 +89,7 @@ fun MainScreen(
     val ipInfo by viewModel.ipInfo.collectAsStateWithLifecycle()
     val killswitchActive by viewModel.killswitchActive.collectAsStateWithLifecycle()
     val switching by viewModel.switching.collectAsStateWithLifecycle()
+    val isReconnecting by viewModel.isReconnecting.collectAsStateWithLifecycle()
 
     val powerState = computePowerDiscState(state, switching, urnetworkPeerCount)
     val backgroundState = powerState.toBackgroundState()
@@ -110,6 +111,7 @@ fun MainScreen(
                         manualEngine = manualEngine,
                         urnetworkPeerCount = urnetworkPeerCount,
                         urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
+                        isReconnecting = isReconnecting,
                     ),
                     callbacks = SimpleMainCallbacks(
                         onConnectClick = onConnectClick,
@@ -132,6 +134,7 @@ fun MainScreen(
                         urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
                         ipInfo = ipInfo,
                         killswitchActive = killswitchActive,
+                        isReconnecting = isReconnecting,
                     ),
                     callbacks = ExpertMainCallbacks(
                         onConnectClick = onConnectClick,
@@ -155,6 +158,7 @@ data class SimpleMainState(
     val manualEngine: EngineId?,
     val urnetworkPeerCount: Int,
     val urnetworkPeerSearchSeconds: Int,
+    val isReconnecting: Boolean = false,
 )
 
 data class SimpleMainCallbacks(
@@ -175,6 +179,7 @@ private fun SimpleMainContent(
     val manualEngine = state.manualEngine
     val urnetworkPeerCount = state.urnetworkPeerCount
     val urnetworkPeerSearchSeconds = state.urnetworkPeerSearchSeconds
+    val isReconnecting = state.isReconnecting
     val onConnectClick = callbacks.onConnectClick
     val onOpenSplitTunnel = callbacks.onOpenSplitTunnel
     val onOpenSettings = callbacks.onOpenSettings
@@ -188,7 +193,7 @@ private fun SimpleMainContent(
         Spacer(modifier = Modifier.height(20.dp))
 
         AnimatedContent(targetState = switching to tunnelState, label = "status") { (sw, s) ->
-            StatusLabel(s, sw, urnetworkPeerCount)
+            StatusLabel(s, sw, urnetworkPeerCount, isReconnecting)
         }
 
         Box(
@@ -266,6 +271,7 @@ data class ExpertMainState(
     val urnetworkPeerSearchSeconds: Int,
     val ipInfo: IpInfoState,
     val killswitchActive: Boolean,
+    val isReconnecting: Boolean = false,
 )
 
 data class ExpertMainCallbacks(
@@ -295,6 +301,7 @@ private fun ExpertMainContent(
     val urnetworkPeerSearchSeconds = state.urnetworkPeerSearchSeconds
     val ipInfo = state.ipInfo
     val killswitchActive = state.killswitchActive
+    val isReconnecting = state.isReconnecting
     val onConnectClick = callbacks.onConnectClick
     val onManualEngineSelect = callbacks.onManualEngineSelect
     val onRefreshIpInfo = callbacks.onRefreshIpInfo
@@ -309,7 +316,7 @@ private fun ExpertMainContent(
         Spacer(modifier = Modifier.height(16.dp))
 
         AnimatedContent(targetState = switching to tunnelState, label = "status") { (sw, s) ->
-            StatusLabel(s, sw, urnetworkPeerCount)
+            StatusLabel(s, sw, urnetworkPeerCount, isReconnecting)
         }
 
         Box(
@@ -766,6 +773,7 @@ private fun StatusLabel(
     state: TunnelState,
     switching: SwitchingTransition? = null,
     urnetworkPeerCount: Int = 0,
+    isReconnecting: Boolean = false,
 ) {
     val labelRes = when {
         switching != null -> R.string.main_status_switching
@@ -776,10 +784,12 @@ private fun StatusLabel(
             is TunnelState.Idle -> R.string.main_status_disconnected
             is TunnelState.Probing -> when (state.engineId) {
                 ru.ozero.enginescore.EngineId.WARP -> R.string.main_status_probing_warp
-                ru.ozero.enginescore.EngineId.BYEDPI -> R.string.main_status_connecting
+                ru.ozero.enginescore.EngineId.BYEDPI ->
+                    if (isReconnecting) R.string.main_status_reconnecting else R.string.main_status_connecting
                 else -> R.string.main_status_probing
             }
-            is TunnelState.Connecting -> R.string.main_status_connecting
+            is TunnelState.Connecting ->
+                if (isReconnecting) R.string.main_status_reconnecting else R.string.main_status_connecting
             is TunnelState.Connected -> R.string.main_status_connected
             is TunnelState.Failed -> R.string.main_status_failed
             is TunnelState.Disconnecting -> R.string.main_status_disconnecting
