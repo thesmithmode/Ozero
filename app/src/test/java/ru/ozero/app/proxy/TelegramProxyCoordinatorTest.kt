@@ -35,6 +35,7 @@ class TelegramProxyCoordinatorTest {
 
     private lateinit var tunnelStateFlow: MutableStateFlow<TunnelState>
     private lateinit var configFlow: MutableStateFlow<TelegramProxyConfig>
+    private lateinit var proxyStateFlow: MutableStateFlow<TelegramProxyState>
     private lateinit var mockProxy: TelegramProxyService
     private lateinit var mockTunnelController: TunnelController
     private lateinit var fakeConfigStore: TelegramConfigStore
@@ -49,6 +50,7 @@ class TelegramProxyCoordinatorTest {
     fun setUp() {
         tunnelStateFlow = MutableStateFlow(TunnelState.Idle)
         configFlow = MutableStateFlow(TelegramProxyConfig())
+        proxyStateFlow = MutableStateFlow<TelegramProxyState>(TelegramProxyState.Idle)
 
         val appInfo = ApplicationInfo()
         appInfo.nativeLibraryDir = System.getProperty("java.io.tmpdir") ?: "/tmp"
@@ -56,7 +58,7 @@ class TelegramProxyCoordinatorTest {
         every { context.applicationInfo } returns appInfo
 
         mockProxy = mockk(relaxed = true)
-        every { mockProxy.state } returns MutableStateFlow(TelegramProxyState.Idle)
+        every { mockProxy.state } returns proxyStateFlow
 
         mockTunnelController = mockk()
         every { mockTunnelController.state } returns tunnelStateFlow
@@ -69,7 +71,12 @@ class TelegramProxyCoordinatorTest {
             override suspend fun setSecret(value: String) {}
         }
 
-        coordinator = TelegramProxyCoordinator(mockProxy, mockTunnelController, fakeConfigStore, coordinatorScope)
+        coordinator = TelegramProxyCoordinator(
+            mockProxy,
+            mockTunnelController,
+            fakeConfigStore,
+            coordinatorScope,
+        )
     }
 
     @Test
@@ -135,6 +142,86 @@ class TelegramProxyCoordinatorTest {
         }
 
     @Test
+    fun `Error state при tunnel Connected → restart proxy с тем же config`() = testScope.runTest {
+        val config = TelegramProxyConfig(enabled = true, secret = "abc")
+        coordinator.start()
+        configFlow.value = config
+        tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
+
+        proxyStateFlow.value = TelegramProxyState.Error("mtg exited unexpectedly")
+
+        verify(atLeast = 2) {
+            mockProxy.start(config, Upstream.Socks5("127.0.0.1", 1080))
+        }
+    }
+
+    @Test
+    fun `restart attempts ограничены maxRestarts — после лимита start не вызывается`() =
+        testScope.runTest {
+            val coord = TelegramProxyCoordinator(
+                proxyService = mockProxy,
+                tunnelController = mockTunnelController,
+                configStore = fakeConfigStore,
+                scope = coordinatorScope,
+                maxRestarts = 2,
+            )
+            val config = TelegramProxyConfig(enabled = true, secret = "abc")
+            coord.start()
+            configFlow.value = config
+            tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
+
+            proxyStateFlow.value = TelegramProxyState.Error("mtg crash 1")
+            proxyStateFlow.value = TelegramProxyState.Error("mtg crash 2")
+            proxyStateFlow.value = TelegramProxyState.Error("mtg crash 3")
+            proxyStateFlow.value = TelegramProxyState.Error("mtg crash 4")
+
+            verify(atLeast = 1, atMost = 3) {
+                mockProxy.start(config, Upstream.Socks5("127.0.0.1", 1080))
+            }
+
+            coord.stop()
+        }
+
+    @Test
+    fun `Running state сбрасывает restart counter — последующий crash снова получает retry`() =
+        testScope.runTest {
+            val coord = TelegramProxyCoordinator(
+                proxyService = mockProxy,
+                tunnelController = mockTunnelController,
+                configStore = fakeConfigStore,
+                scope = coordinatorScope,
+                maxRestarts = 1,
+            )
+            val config = TelegramProxyConfig(enabled = true, secret = "abc")
+            coord.start()
+            configFlow.value = config
+            tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
+
+            proxyStateFlow.value = TelegramProxyState.Error("crash1")
+            proxyStateFlow.value = TelegramProxyState.Running(443, "secret")
+            proxyStateFlow.value = TelegramProxyState.Error("crash2")
+
+            verify(atLeast = 3) {
+                mockProxy.start(config, Upstream.Socks5("127.0.0.1", 1080))
+            }
+
+            coord.stop()
+        }
+
+    @Test
+    fun `Error при tunnel Idle не вызывает restart — killswitch domain а не Telegram`() =
+        testScope.runTest {
+            val config = TelegramProxyConfig(enabled = true, secret = "abc")
+            coordinator.start()
+            configFlow.value = config
+            tunnelStateFlow.value = TunnelState.Idle
+
+            proxyStateFlow.value = TelegramProxyState.Error("mtg crash while tunnel down")
+
+            verify(atLeast = 1) { mockProxy.stop() }
+        }
+
+    @Test
     fun `job hold через AtomicReference — concurrency race fix`() {
         val src = java.io.File(
             System.getProperty("user.dir") ?: ".",
@@ -151,6 +238,40 @@ class TelegramProxyCoordinatorTest {
         assertTrue(
             src.contains("jobRef.getAndSet("),
             "start/stop обязан использовать getAndSet для атомарной замены и cancel предыдущего.",
+        )
+    }
+
+    @Test
+    fun `coordinator подписан на proxyService state — обязательно для crash detection`() {
+        val src = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/proxy/TelegramProxyCoordinator.kt",
+        ).readText()
+        assertTrue(
+            src.contains("proxyService.state"),
+            "Coordinator обязан подписаться на proxyService.state — иначе mtg crash остаётся " +
+                "незамеченным до следующего изменения tunnel/config (subprocess не перезапускается).",
+        )
+        assertTrue(
+            src.contains("TelegramProxyState.Error"),
+            "Coordinator обязан реагировать на Error для auto-restart subprocess.",
+        )
+    }
+
+    @Test
+    fun `restart counter ограничен maxRestarts — иначе бесконечный crash loop`() {
+        val src = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/proxy/TelegramProxyCoordinator.kt",
+        ).readText()
+        assertTrue(
+            src.contains("AtomicInteger") || src.contains("restartCount"),
+            "Coordinator обязан хранить счётчик попыток restart — без лимита crash loop " +
+                "буде дёргать proxyService.start бесконечно при persistent mtg crash.",
+        )
+        assertTrue(
+            src.contains("maxRestarts"),
+            "Coordinator обязан принимать maxRestarts параметром для тестируемости.",
         )
     }
 }
