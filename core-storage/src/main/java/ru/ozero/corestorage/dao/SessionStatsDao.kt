@@ -39,6 +39,24 @@ interface SessionStatsDao {
     )
     fun observeRecent(limit: Int = 30): Flow<List<SessionStatsEntity>>
 
+    @Query(
+        """
+        SELECT * FROM session_stats
+        WHERE endedAt IS NOT NULL AND startedAt >= :since
+        ORDER BY startedAt ASC
+        """,
+    )
+    fun observeFrom(since: Long): Flow<List<SessionStatsEntity>>
+
+    @Query(
+        """
+        SELECT * FROM session_stats
+        WHERE endedAt IS NOT NULL
+        ORDER BY startedAt ASC
+        """,
+    )
+    fun observeAll(): Flow<List<SessionStatsEntity>>
+
     @Query("DELETE FROM session_stats WHERE startedAt < :olderThan")
     suspend fun deleteOlderThan(olderThan: Long): Int
 }

@@ -279,6 +279,11 @@
     <string name="urnetwork_balance_plan_unknown">Free</string>
     <string name="urnetwork_balance_error">Failed to fetch balance: %1$s</string>
     <string name="urnetwork_balance_empty">Balance unavailable. Connect to URnetwork.</string>
+    <string name="urnetwork_daily_allocation">Daily allocation</string>
+    <string name="urnetwork_reliability_label">Reliability: %.0f%%</string>
+    <string name="urnetwork_reliability_bonus">+%.0f%% bonus</string>
+    <string name="urnetwork_referrals_label">Referrals: %d</string>
+    <string name="urnetwork_referral_bonus">+%d GB</string>
     <string name="urnetwork_points_title">Points</string>
     <string name="urnetwork_points_payout">Payouts</string>
     <string name="urnetwork_points_referral">Referrals</string>
@@ -349,7 +354,16 @@
     <string name="onboarding_mode_title">Choose a mode</string>
     <string name="onboarding_mode_body">You can change this any time in Settings.</string>
 
-    <!-- Stats history -->
+    <!-- Traffic stats -->
+    <string name="stats_traffic_title">Traffic statistics</string>
+    <string name="stats_tf_day">1d</string>
+    <string name="stats_tf_week">7d</string>
+    <string name="stats_tf_month">30d</string>
+    <string name="stats_tf_year">1y</string>
+    <string name="stats_tf_all">All</string>
+    <string name="stats_traffic_sessions">sessions</string>
+    <string name="stats_traffic_all_engines">All</string>
+    <!-- Stats history (session list drill-down) -->
     <string name="stats_history_title">Session history</string>
     <string name="stats_history_summary">Saved VPN sessions with traffic stats</string>
     <string name="stats_history_empty">No saved sessions</string>

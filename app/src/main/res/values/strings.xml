@@ -283,6 +283,11 @@
     <string name="urnetwork_balance_plan_unknown">Free</string>
     <string name="urnetwork_balance_error">Не удалось получить баланс: %1$s</string>
     <string name="urnetwork_balance_empty">Баланс недоступен. Подключитесь к URnetwork.</string>
+    <string name="urnetwork_daily_allocation">Ежедневный лимит</string>
+    <string name="urnetwork_reliability_label">Надёжность: %.0f%%</string>
+    <string name="urnetwork_reliability_bonus">+%.0f%% бонус</string>
+    <string name="urnetwork_referrals_label">Рефералов: %d</string>
+    <string name="urnetwork_referral_bonus">+%d ГБ</string>
     <string name="urnetwork_insufficient_balance_title">Недостаточно баллов</string>
     <string name="urnetwork_insufficient_balance_body">Баланс URnetwork исчерпан — VPN автоматически отключён. Пополните аккаунт или поделитесь трафиком, чтобы продолжить.</string>
     <string name="urnetwork_points_title">Очки</string>
@@ -355,7 +360,16 @@
     <string name="onboarding_mode_title">Выберите режим</string>
     <string name="onboarding_mode_body">Можно изменить в любой момент в Настройках.</string>
 
-    <!-- Stats history -->
+    <!-- Traffic stats -->
+    <string name="stats_traffic_title">Статистика трафика</string>
+    <string name="stats_tf_day">1д</string>
+    <string name="stats_tf_week">7д</string>
+    <string name="stats_tf_month">30д</string>
+    <string name="stats_tf_year">1г</string>
+    <string name="stats_tf_all">Всё</string>
+    <string name="stats_traffic_sessions">сессий</string>
+    <string name="stats_traffic_all_engines">Все</string>
+    <!-- Stats history (session list drill-down) -->
     <string name="stats_history_title">История сессий</string>
     <string name="stats_history_summary">Сохранённые VPN-сессии со статистикой трафика</string>
     <string name="stats_history_empty">Нет сохранённых сессий</string>
