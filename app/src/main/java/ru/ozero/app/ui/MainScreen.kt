@@ -715,12 +715,12 @@ private fun TrafficStatsCard(
     val txTotal = BytesFormatter.humanReadable(stats?.txBytes ?: 0L)
     val uptime = BytesFormatter.durationHms(sessionMs)
 
-    var selectedTf by remember { mutableStateOf(TimeframeOption.S30) }
+    var selectedTf by remember { mutableStateOf(TimeframeOption.M1) }
     val displayHistory = remember(speedHistory, selectedTf) {
         val n = selectedTf.points
         val slice = speedHistory.takeLast(n)
         val padded = if (slice.size < n) List(n - slice.size) { 0f to 0f } + slice else slice
-        downsample(padded, CHART_MAX_RENDER_POINTS)
+        bucketize(padded, selectedTf.buckets)
     }
 
     Card(
@@ -969,19 +969,25 @@ private const val DOCK_TAB_SERVERS = "servers"
 private const val DOCK_TAB_SPLIT_TUNNEL = "split_tunnel"
 private const val DOCK_TAB_SETTINGS = "settings"
 
-internal const val CHART_MAX_RENDER_POINTS = 300
-
-private enum class TimeframeOption(val labelRes: Int, val points: Int) {
-    S30(R.string.chart_tf_30s, 30),
-    M5(R.string.chart_tf_5min, 300),
-    M30(R.string.chart_tf_30min, 1_800),
-    H1(R.string.chart_tf_1h, 3_600),
+private enum class TimeframeOption(val labelRes: Int, val points: Int, val buckets: Int) {
+    M1(R.string.chart_tf_1min, 60, 60),
+    M5(R.string.chart_tf_5min, 300, 30),
+    M30(R.string.chart_tf_30min, 1_800, 30),
+    H1(R.string.chart_tf_1h, 3_600, 60),
 }
 
-internal fun downsample(history: List<Pair<Float, Float>>, maxPoints: Int): List<Pair<Float, Float>> {
-    if (history.size <= maxPoints) return history
-    val step = history.size.toDouble() / maxPoints
-    return List(maxPoints) { i -> history[(i * step).toInt()] }
+internal fun bucketize(history: List<Pair<Float, Float>>, buckets: Int): List<Pair<Float, Float>> {
+    if (buckets <= 0 || history.isEmpty()) return emptyList()
+    if (history.size <= buckets) return history
+    val bucketSize = history.size.toDouble() / buckets
+    return List(buckets) { i ->
+        val from = (i * bucketSize).toInt()
+        val to = ((i + 1) * bucketSize).toInt().coerceAtLeast(from + 1).coerceAtMost(history.size)
+        val sub = history.subList(from, to)
+        val avgRx = sub.sumOf { it.first.toDouble() }.toFloat() / sub.size
+        val avgTx = sub.sumOf { it.second.toDouble() }.toFloat() / sub.size
+        avgRx to avgTx
+    }
 }
 
 private fun Path.addSmooth(values: List<Float>, step: Float, height: Float, safeMax: Float) {

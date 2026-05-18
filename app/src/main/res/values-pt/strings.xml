@@ -282,7 +282,7 @@
     <string name="main_status_probing_warp">Conectando ao WARP…</string>
 
     <!-- Chart timeframe -->
-    <string name="chart_tf_30s">30s</string>
+    <string name="chart_tf_1min">1m</string>
     <string name="chart_tf_5min">5m</string>
     <string name="chart_tf_30min">30m</string>
     <string name="chart_tf_1h">1h</string>

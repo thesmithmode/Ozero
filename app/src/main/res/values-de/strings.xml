@@ -354,7 +354,7 @@
     <string name="settings_always_on_banner_title">Strengthen protection</string>
     <string name="settings_always_on_banner_body">Enable Always-on VPN in Android settings to prevent leaks on reboot</string>
     <string name="settings_always_on_banner_configure">Configure</string>
-    <string name="chart_tf_30s">30s</string>
+    <string name="chart_tf_1min">1m</string>
     <string name="chart_tf_5min">5m</string>
     <string name="chart_tf_30min">30m</string>
     <string name="chart_tf_1h">1h</string>

@@ -19,8 +19,6 @@ class MainScreenChartTest {
         f.readText()
     }
 
-    // ── Sentinel: константы ──────────────────────────────────────────────────
-
     @Test
     fun `MAX_SPEED_HISTORY_POINTS не меньше 3600 — держит 1ч при 1 тике в секунду`() {
         val regex = Regex("MAX_SPEED_HISTORY_POINTS\\s*=\\s*(\\d[\\d_]*)L?")
@@ -30,45 +28,53 @@ class MainScreenChartTest {
     }
 
     @Test
-    fun `CHART_MAX_RENDER_POINTS определён и не больше 1000 — ограничивает Canvas-рендеринг`() {
-        val regex = Regex("CHART_MAX_RENDER_POINTS\\s*=\\s*(\\d[\\d_]*)")
-        val m = regex.find(screenSource) ?: error("CHART_MAX_RENDER_POINTS не найден")
-        val value = m.groupValues[1].replace("_", "").toInt()
-        assertTrue(value in 50..1_000, "Ожидалось 50..1000, fact=$value")
-    }
-
-    @Test
-    fun `TimeframeOption содержит четыре варианта S30 M5 M30 H1`() {
-        for (label in listOf("S30", "M5", "M30", "H1")) {
+    fun `TimeframeOption содержит четыре варианта M1 M5 M30 H1`() {
+        for (label in listOf("M1", "M5", "M30", "H1")) {
             assertTrue(screenSource.contains(label), "TimeframeOption.$label не найден")
         }
-        for (removed in listOf("S5", "H6", "H24")) {
+        for (removed in listOf("S5", "S30", "H6", "H24")) {
             assertTrue(!screenSource.contains("$removed("), "TimeframeOption.$removed должен быть удалён")
         }
     }
 
     @Test
-    fun `TimeframeOption_M5 имеет 300 точек`() {
-        val regex = Regex("M5\\s*\\([^,]+,\\s*(\\d[\\d_]*)\\s*\\)")
+    fun `TimeframeOption_M1 имеет 60 точек и 60 buckets — 1 минута 1с шаг`() {
+        val regex = Regex("M1\\s*\\([^,]+,\\s*(\\d[\\d_]*)\\s*,\\s*(\\d[\\d_]*)\\s*\\)")
+        val m = regex.find(screenSource) ?: error("M1 entry не найден")
+        val points = m.groupValues[1].replace("_", "").toInt()
+        val buckets = m.groupValues[2].replace("_", "").toInt()
+        assertEquals(60, points, "M1 обязан иметь 60 точек")
+        assertEquals(60, buckets, "M1 обязан иметь 60 buckets (1с гранулярность)")
+    }
+
+    @Test
+    fun `TimeframeOption_M5 имеет 300 точек и 30 buckets — 5 минут 10с шаг`() {
+        val regex = Regex("M5\\s*\\([^,]+,\\s*(\\d[\\d_]*)\\s*,\\s*(\\d[\\d_]*)\\s*\\)")
         val m = regex.find(screenSource) ?: error("M5 entry не найден")
         val points = m.groupValues[1].replace("_", "").toInt()
+        val buckets = m.groupValues[2].replace("_", "").toInt()
         assertEquals(300, points, "M5 обязан иметь 300 точек")
+        assertEquals(30, buckets, "M5 обязан иметь 30 buckets")
     }
 
     @Test
-    fun `TimeframeOption_M30 имеет 1800 точек`() {
-        val regex = Regex("M30\\s*\\([^,]+,\\s*(\\d[\\d_]*)\\s*\\)")
+    fun `TimeframeOption_M30 имеет 1800 точек и 30 buckets — каждый bucket = 60с`() {
+        val regex = Regex("M30\\s*\\([^,]+,\\s*(\\d[\\d_]*)\\s*,\\s*(\\d[\\d_]*)\\s*\\)")
         val m = regex.find(screenSource) ?: error("M30 entry не найден")
         val points = m.groupValues[1].replace("_", "").toInt()
+        val buckets = m.groupValues[2].replace("_", "").toInt()
         assertEquals(1_800, points, "M30 обязан иметь 1800 точек")
+        assertEquals(30, buckets, "M30: 30 buckets × 60с — точно как просил юзер")
     }
 
     @Test
-    fun `TimeframeOption_H1 имеет 3600 точек`() {
-        val regex = Regex("H1\\s*\\([^,]+,\\s*(\\d[\\d_]*)\\s*\\)")
+    fun `TimeframeOption_H1 имеет 3600 точек и 60 buckets — каждый bucket = 60с`() {
+        val regex = Regex("H1\\s*\\([^,]+,\\s*(\\d[\\d_]*)\\s*,\\s*(\\d[\\d_]*)\\s*\\)")
         val m = regex.find(screenSource) ?: error("H1 entry не найден")
         val points = m.groupValues[1].replace("_", "").toInt()
+        val buckets = m.groupValues[2].replace("_", "").toInt()
         assertEquals(3_600, points, "H1 обязан иметь 3600 точек")
+        assertEquals(60, buckets, "H1: 60 buckets × 60с")
     }
 
     @Test
@@ -78,6 +84,10 @@ class MainScreenChartTest {
         assertTrue(
             paddingBlock.contains("List(n - slice.size)") || paddingBlock.contains("List(n -"),
             "displayHistory обязан паддить нулями слева до полного окна selectedTf.points",
+        )
+        assertTrue(
+            paddingBlock.contains("bucketize"),
+            "displayHistory обязан вызывать bucketize для агрегации в фиксированное число buckets",
         )
     }
 
@@ -129,59 +139,57 @@ class MainScreenChartTest {
         assertTrue(value >= 1_000L, "Ожидалось >= 1000, fact=$value")
     }
 
-    // ── Поведение: downsample ────────────────────────────────────────────────
-
     @Test
-    fun `downsample пустой список возвращает пустой список`() {
-        assertEquals(emptyList(), downsample(emptyList(), 10))
+    fun `bucketize пустой список возвращает пустой список`() {
+        assertEquals(emptyList(), bucketize(emptyList(), 10))
     }
 
     @Test
-    fun `downsample список меньше maxPoints возвращает оригинал`() {
-        val data = listOf(1f to 2f, 3f to 4f, 5f to 6f)
-        assertEquals(data, downsample(data, 10))
+    fun `bucketize buckets ноль возвращает пустой список`() {
+        val data = listOf(1f to 2f, 3f to 4f)
+        assertEquals(emptyList(), bucketize(data, 0))
     }
 
     @Test
-    fun `downsample список равный maxPoints возвращает оригинал`() {
+    fun `bucketize buckets больше или равно размеру возвращает оригинал`() {
         val data = List(5) { i -> i.toFloat() to i.toFloat() }
-        assertEquals(data, downsample(data, 5))
+        assertEquals(data, bucketize(data, 10))
+        assertEquals(data, bucketize(data, 5))
     }
 
     @Test
-    fun `downsample список больше maxPoints возвращает maxPoints элементов`() {
+    fun `bucketize 60 элементов в 30 buckets — каждый bucket усредняет 2 элемента`() {
+        val data = List(60) { i -> i.toFloat() to (i * 2f) }
+        val result = bucketize(data, 30)
+        assertEquals(30, result.size)
+        assertEquals((0f + 1f) / 2f, result[0].first)
+        assertEquals((0f + 2f) / 2f, result[0].second)
+        assertEquals((58f + 59f) / 2f, result[29].first)
+    }
+
+    @Test
+    fun `bucketize 1800 элементов в 30 buckets — каждый bucket усредняет 60 секунд`() {
+        val data = List(1800) { i -> i.toFloat() to 0f }
+        val result = bucketize(data, 30)
+        assertEquals(30, result.size, "30 buckets как в TF M30")
+        val firstBucketExpected = (0 until 60).sumOf { it.toDouble() }.toFloat() / 60
+        assertEquals(firstBucketExpected, result[0].first, "первый bucket = avg 60 секунд")
+    }
+
+    @Test
+    fun `bucketize всегда возвращает ровно buckets элементов когда данных больше`() {
         val data = List(100) { i -> i.toFloat() to 0f }
-        val result = downsample(data, 10)
-        assertEquals(10, result.size, "Ожидалось ровно 10 элементов после downsample")
+        for (b in listOf(1, 2, 5, 10, 30, 60)) {
+            assertEquals(b, bucketize(data, b).size, "buckets=$b — должно быть ровно $b элементов")
+        }
     }
 
     @Test
-    fun `downsample сохраняет первый и последний элемент при чётном шаге`() {
-        val data = List(100) { i -> i.toFloat() to 0f }
-        val result = downsample(data, 10)
-        assertEquals(data[0], result[0], "Первый элемент должен совпадать с оригиналом")
-    }
-
-    @Test
-    fun `downsample не выбрасывает исключения при maxPoints=1`() {
-        val data = List(50) { i -> i.toFloat() to 0f }
-        val result = downsample(data, 1)
+    fun `bucketize устойчив к маленьким buckets — buckets=1 средний всего диапазона`() {
+        val data = List(10) { it.toFloat() to it.toFloat() }
+        val result = bucketize(data, 1)
         assertEquals(1, result.size)
-    }
-
-    @Test
-    fun `downsample равномерно распределяет точки`() {
-        val data = List(100) { i -> i.toFloat() to 0f }
-        val result = downsample(data, 5)
-        assertEquals(5, result.size)
-        val firstIdx = data.indexOf(result[0])
-        assertTrue(firstIdx >= 0, "Все элементы должны быть из оригинального списка")
-    }
-
-    @Test
-    fun `downsample с maxPoints больше исходного не кидает IndexOutOfBounds`() {
-        val data = List(3) { i -> i.toFloat() to 0f }
-        val result = downsample(data, 1000)
-        assertEquals(data, result)
+        val expected = (0..9).sumOf { it.toDouble() }.toFloat() / 10
+        assertEquals(expected, result[0].first)
     }
 }
