@@ -768,6 +768,47 @@ private fun chartTimeAgo(seconds: Int): String = when {
     else -> "-${seconds}s"
 }
 
+private fun pickStatusLabelRes(
+    state: TunnelState,
+    switching: SwitchingTransition?,
+    urnetworkPeerCount: Int,
+    isReconnecting: Boolean,
+): Int {
+    if (switching != null) return R.string.main_status_switching
+    if (state is TunnelState.Connected &&
+        state.engineId == EngineId.URNETWORK &&
+        urnetworkPeerCount == 0
+    ) {
+        return R.string.main_status_urnetwork_searching
+    }
+    return when (state) {
+        is TunnelState.Idle -> R.string.main_status_disconnected
+        is TunnelState.Probing -> probingLabelRes(state.engineId, isReconnecting)
+        is TunnelState.Connecting ->
+            if (isReconnecting) R.string.main_status_reconnecting else R.string.main_status_connecting
+        is TunnelState.Connected -> R.string.main_status_connected
+        is TunnelState.Failed -> R.string.main_status_failed
+        is TunnelState.Disconnecting -> R.string.main_status_disconnecting
+    }
+}
+
+private fun probingLabelRes(engineId: EngineId, isReconnecting: Boolean): Int = when (engineId) {
+    EngineId.WARP -> R.string.main_status_probing_warp
+    EngineId.BYEDPI ->
+        if (isReconnecting) R.string.main_status_reconnecting else R.string.main_status_connecting
+    else -> R.string.main_status_probing
+}
+
+private fun pickStatusEngine(state: TunnelState, switching: SwitchingTransition?): String? {
+    if (switching != null) return switching.from?.name
+    return when (state) {
+        is TunnelState.Connecting -> state.engineId.name
+        is TunnelState.Connected -> state.engineId.name
+        is TunnelState.Failed -> state.engineId.name
+        else -> null
+    }
+}
+
 @Composable
 private fun StatusLabel(
     state: TunnelState,
@@ -775,35 +816,8 @@ private fun StatusLabel(
     urnetworkPeerCount: Int = 0,
     isReconnecting: Boolean = false,
 ) {
-    val labelRes = when {
-        switching != null -> R.string.main_status_switching
-        state is TunnelState.Connected &&
-            state.engineId == EngineId.URNETWORK &&
-            urnetworkPeerCount == 0 -> R.string.main_status_urnetwork_searching
-        else -> when (state) {
-            is TunnelState.Idle -> R.string.main_status_disconnected
-            is TunnelState.Probing -> when (state.engineId) {
-                ru.ozero.enginescore.EngineId.WARP -> R.string.main_status_probing_warp
-                ru.ozero.enginescore.EngineId.BYEDPI ->
-                    if (isReconnecting) R.string.main_status_reconnecting else R.string.main_status_connecting
-                else -> R.string.main_status_probing
-            }
-            is TunnelState.Connecting ->
-                if (isReconnecting) R.string.main_status_reconnecting else R.string.main_status_connecting
-            is TunnelState.Connected -> R.string.main_status_connected
-            is TunnelState.Failed -> R.string.main_status_failed
-            is TunnelState.Disconnecting -> R.string.main_status_disconnecting
-        }
-    }
-    val engine = when {
-        switching != null -> switching.from?.name
-        else -> when (state) {
-            is TunnelState.Connecting -> state.engineId.name
-            is TunnelState.Connected -> state.engineId.name
-            is TunnelState.Failed -> state.engineId.name
-            else -> null
-        }
-    }
+    val labelRes = pickStatusLabelRes(state, switching, urnetworkPeerCount, isReconnecting)
+    val engine = pickStatusEngine(state, switching)
     val failedReason = if (switching != null) null else (state as? TunnelState.Failed)?.reason
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
