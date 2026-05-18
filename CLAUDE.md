@@ -85,6 +85,13 @@
 
 - Каждый engine (текущие модули: byedpi, telegram, urnetwork, warp) обязан иметь settings screen в `app/src/main/java/.../ui/settings/engines/` для пользовательского override config (subscription URL, server picker, args, bridges, и т.д.). При добавлении нового `engine-*` модуля — добавить сюда.
 
+## Reference impls движков (источники для портирования фич)
+
+- **URnetwork** (официальный Android source): `C:\Soft\Projects\Ozero\.claude\Контекст\android\`. При любой доработке `engine-urnetwork`/UI URnetwork — grep по этому каталогу. Знает locations (country/region/city), provideMode/enhanced anonymization, dedicated/sticky IP, connect VC.
+- **WARP (AmneziaWG)** актуальная: `.claude/Контекст/PORTAL_WG_v1.4.3`. Историческая: `.claude/Контекст/CYBERPORTAL_X-v1.0.2`.
+- **ByeDPI**: `.claude/Контекст/ByeByeDPI-v.1.7.4`.
+- Прочие: см. `ls .claude/Контекст/` — каждая папка decompiled APK / source-mirror.
+
 ## MTProxy / Subprocess-proxy паттерн
 
 - `engine-telegram` — не VPN routing engine, а side-car proxy subprocess. Не реализует `Engine` интерфейс, не регистрируется через `@IntoSet`.
