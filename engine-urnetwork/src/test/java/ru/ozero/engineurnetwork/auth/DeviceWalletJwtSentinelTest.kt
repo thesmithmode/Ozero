@@ -76,7 +76,7 @@ class DeviceWalletJwtSentinelTest {
             "Log.v(TAG, seed",
             "Log.w(TAG, seed",
             "Log.e(TAG, seed",
-            "Log.i(TAG, \"$seed",
+            "Log.i(TAG, \"\$seed",
             "Log.i(TAG, \"\${seed",
         )
         for (pattern in forbiddenLogPatterns) {
