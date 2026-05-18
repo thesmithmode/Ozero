@@ -246,6 +246,46 @@ class OzeroVpnServiceLockdownKillswitchTest {
     }
 
     @Test
+    fun `setUnderlyingNetworks вызывается ТОЛЬКО с null — иначе WiFi→Mobile разрывает TUN (P37)`() {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val allSources = moduleRoot.walkTopDown()
+            .filter { it.isFile && it.extension == "kt" }
+            .filter { it.path.contains("${File.separator}src${File.separator}main${File.separator}") }
+            .filter { !it.path.contains("${File.separator}build${File.separator}") }
+            .toList()
+        val callsAll = allSources.flatMap { file ->
+            Regex("setUnderlyingNetworks\\s*\\(([^)]*)\\)")
+                .findAll(file.readText())
+                .map { file.name to it.groupValues[1].trim() }
+                .toList()
+        }
+        assertTrue(callsAll.isNotEmpty(), "Не найдено ни одного setUnderlyingNetworks call — anchor сломан.")
+        val nonNullCalls = callsAll.filter { (_, arg) -> arg != "null" }
+        assertTrue(
+            nonNullCalls.isEmpty(),
+            "ВСЕ setUnderlyingNetworks() обязаны быть с аргументом null — иначе при WiFi→Mobile " +
+                "транзиции Android освобождает старый underlying network и TUN теряет route → " +
+                "lockdown breaks. Found non-null: $nonNullCalls",
+        )
+    }
+
+    @Test
+    fun `OzeroVpnService не регистрирует NetworkCallback который мог бы close TUN (P37)`() {
+        val forbidden = listOf(
+            "registerDefaultNetworkCallback",
+            "registerNetworkCallback",
+        )
+        forbidden.forEach { api ->
+            assertTrue(
+                !serviceSource.contains(api),
+                "OzeroVpnService НЕ должен регистрировать $api — VPNService не должен реагировать " +
+                    "на network transitions сам. Lockdown держится через setUnderlyingNetworks(null), " +
+                    "не через manual fd close в onLost.",
+            )
+        }
+    }
+
+    @Test
     fun `lockdownStartupFdRef очищается в stopVpn`() {
         val body = shutdownSource
             .substringAfter("fun stopVpn(")
