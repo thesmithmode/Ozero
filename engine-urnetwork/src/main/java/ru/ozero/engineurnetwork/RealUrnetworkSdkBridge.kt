@@ -218,10 +218,33 @@ class RealUrnetworkSdkBridge(
         if (completed == null) {
             PersistentLoggers.warn(TAG, "stop timed out after ${STOP_TIMEOUT_MS}ms — refs cleared")
         }
-        runCatching {
+        val releaseOutcome = runCatching {
             withTimeoutOrNull(RUNTIME_RELEASE_TIMEOUT_MS) { UrnetworkRuntime.release() }
-        }.onFailure { PersistentLoggers.warn(TAG, "runtime release threw: ${it.message}") }
-        Log.i(TAG, "stop complete — runtime released")
+        }
+        val released = when {
+            releaseOutcome.isFailure -> {
+                PersistentLoggers.warn(
+                    TAG,
+                    "runtime release threw: ${releaseOutcome.exceptionOrNull()?.message} — " +
+                        "Go-runtime может удерживать UDP/file handles, URnetwork-app может крашиться",
+                )
+                false
+            }
+            releaseOutcome.getOrNull() == null -> {
+                PersistentLoggers.warn(
+                    TAG,
+                    "runtime release timed out after ${RUNTIME_RELEASE_TIMEOUT_MS}ms — " +
+                        "Sdk.freeMemory завис, ресурсы Go-runtime могут утечь",
+                )
+                false
+            }
+            else -> true
+        }
+        if (released) {
+            Log.i(TAG, "stop complete — runtime released")
+        } else {
+            PersistentLoggers.warn(TAG, "stop complete — runtime release НЕ подтверждён")
+        }
     }
 
     private fun closeDevice(device: DeviceLocal) {

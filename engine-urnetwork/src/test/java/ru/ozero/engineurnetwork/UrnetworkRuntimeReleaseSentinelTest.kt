@@ -98,6 +98,28 @@ class UrnetworkRuntimeReleaseSentinelTest {
     }
 
     @Test
+    fun `release warns если manager null но space non-null — anomaly не молчит`() {
+        val body = runtimeSource.substringAfter("suspend fun release()").substringBefore("}\n}")
+        assertTrue(
+            body.contains("invariant violated"),
+            "release обязан логировать warn если detected mgr==null && space!=null. " +
+                "Без warn anomaly молчит и стало невозможно диагностировать корень.",
+        )
+    }
+
+    @Test
+    fun `bridge stop отличает timeout release от success — silent swallow запрещён`() {
+        val stopBlock = bridgeSource.substringAfter("private suspend fun stopUnderLock()")
+            .substringBefore("private fun closeDevice")
+        assertTrue(
+            stopBlock.contains("runtime release НЕ подтверждён") ||
+                stopBlock.contains("runtime release timed out"),
+            "stopUnderLock обязан явно различать success/timeout/throw release и логировать warn. " +
+                "Silent withTimeoutOrNull без обработки null = «stop complete» врёт когда Sdk.freeMemory завис.",
+        )
+    }
+
+    @Test
     fun `bridge stop release runtime обёрнут в timeout — не блокирует stop пайплайн при зависании Sdk`() {
         val stopBlock = bridgeSource.substringAfter("private suspend fun stopUnderLock()")
             .substringBefore("private fun closeDevice")
