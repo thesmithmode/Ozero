@@ -218,7 +218,10 @@ class RealUrnetworkSdkBridge(
         if (completed == null) {
             PersistentLoggers.warn(TAG, "stop timed out after ${STOP_TIMEOUT_MS}ms — refs cleared")
         }
-        Log.i(TAG, "stop complete")
+        runCatching {
+            withTimeoutOrNull(RUNTIME_RELEASE_TIMEOUT_MS) { UrnetworkRuntime.release() }
+        }.onFailure { PersistentLoggers.warn(TAG, "runtime release threw: ${it.message}") }
+        Log.i(TAG, "stop complete — runtime released")
     }
 
     private fun closeDevice(device: DeviceLocal) {
@@ -547,6 +550,7 @@ class RealUrnetworkSdkBridge(
         const val SDK_INIT_TIMEOUT_MS = 30_000L
         const val SUBSCRIPTION_BALANCE_TIMEOUT_MS = 10_000L
         const val STOP_TIMEOUT_MS = 3_000L
+        const val RUNTIME_RELEASE_TIMEOUT_MS = 2_000L
         const val DEFAULT_APP_VERSION = "0.0.2"
         const val WINDOW_SIZE_MAX_EXPERIMENTAL = 6L
     }
