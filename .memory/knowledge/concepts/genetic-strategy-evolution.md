@@ -7,8 +7,9 @@ sources:
   - "daily/2026-05-13.md"
   - "daily/2026-05-14.md"
   - "daily/2026-05-17.md"
+  - "daily/2026-05-18.md"
 created: 2026-05-12
-updated: 2026-05-17
+updated: 2026-05-18
 ---
 
 # Genetic Algorithm for ByeDPI Strategy Optimization
@@ -138,6 +139,16 @@ Binary fitness (0/1 success rate) caused GA stagnation at generation 3-5: all fa
 
 Fix: `computeProbeScore(result: ProbeResult): Float` provides a gradient through connection stages: NetworkError→0.0, Timeout→0.1, HTTP 4xx→0.4, HTTP 5xx→0.3, partial body→0.8, full success→1.0. The GA now has a fitness landscape to climb rather than a binary cliff. The mutation rate boost was removed with a sentinel test forbidding its return. See [[concepts/granular-probe-fitness-scoring]] for full details.
 
+### Stale server_fd as Root Cause of 0% Fitness (2026-05-18)
+
+User-reported bug "подбор стратегий возвращает 0%" was traced to stale `server_fd` in the ByeDPI native layer. The evolution engine runs 600+ start/stop cycles. `jniStopProxy` performs only `shutdown()` without `close()`/reset — accumulated stale fds cause every `jniStartProxy` to return -1. All `EvalResult.startFailed=true` → fitness 0 for all chromosomes → GA returns meaningless 0%.
+
+Root cause fix: unconditional `forceClose()` in both `stop()` and `start()` failure paths — not gated on `proxyJob.isActive`. See [[concepts/byedpi-stale-serverfd-unconditional-forceclose]].
+
+Additionally, the `@Singleton ByeDpiEngine` is shared between VPN service and strategy testing ViewModel, creating state leakage. See [[concepts/byedpi-singleton-strategy-testing-isolation]].
+
+Auto-save best chromosome to `savedStrategyStore` was also identified as polluting the favorites list — `onApply` should NOT write to favorites. Fixed by removing `savedStrategyStore.add` calls from `onApply` and `runEvolution` paths.
+
 ### Strategy Count Update: 75→78 (2026-05-17)
 
 `ByeDpiKnownSeeds` updated from 75 to 78 strategies following ByeByeDPI v1.7.5 upstream update. All three files synchronized: `byedpi_strategies.list`, `ByeDpiKnownSeeds.kt`, and `ByeDpiAutoStrategyTest EXPECTED_COUNT=78`.
@@ -156,3 +167,4 @@ Fix: `computeProbeScore(result: ProbeResult): Float` provides a gradient through
 - [[daily/2026-05-13.md]] - Chromosome fitness cache, hyperbolic latency fitness formula (linear form dead code), ByeDpiKnownSeeds 75 upstream seeds with pinned priority, population size 25, stagnationThreshold coerceAtLeast(3) CI fix, persistent StrategyFitnessCache TTL 24h, SavedStrategy.lastVerifiedAtMs staleness 7-day threshold + StalenessLabel, auto-save best chromosome, targetFitness 0.85, per-network GeneMemory + StrategyFitnessCache via NetworkProfileDetector + EvolutionResourcesProvider
 - [[daily/2026-05-14.md]] - GA v2: popSize 30, maxGen 20, eliteCount 3, targetFitness 0.85, fitness=successRate^1.5*(1-clamp(lat)/3000), initial pop 40/30/30, cache poisoning 0.0 skip, min chromosome length 5, 5 sentinel tests
 - [[daily/2026-05-17.md]] - GA v3 fitness: binary→granular computeProbeScore (gradient through connection stages); stagnation boost removed + sentinel; strategies 75→78 (v1.7.5); feat/ga-byedpi-v2 squash→dev
+- [[daily/2026-05-18.md]] - Session 11:38/12:06: 0% fitness traced to stale server_fd (600 start/stop cycles); unconditional forceClose fix; singleton sharing between VPN and testing identified; auto-save polluting favorites removed

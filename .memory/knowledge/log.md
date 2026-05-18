@@ -1,5 +1,19 @@
 # Build Log
 
+## [2026-05-19T03:30:00+03:00] compile | Daily Log 2026-05-18 (incremental pass 2)
+- Source: daily/2026-05-18.md
+- Articles created: [[concepts/urnetwork-runtime-release-lifecycle]] (Go-runtime singleton release after stop; cross-app conflict with URnetwork-app)
+- Articles updated: [[concepts/chart-nice-max-dynamic-scaling]] (M1 60s baseline + bucket aggregation for M5/M30/H1), [[connections/go-runtime-conflict-resolution-evolution]] (added phase 4: explicit URnetwork runtime release)
+- Index updated: 1 new row, 1 row updated, total 134
+- Sessions covered (incremental): 18:52 (URnetwork runtime release + chart timeframes + walletAuth research)
+
+## [2026-05-18T22:50:00+03:00] compile | Daily Log 2026-05-18
+- Source: daily/2026-05-18.md
+- Articles created: [[concepts/byedpi-stale-serverfd-unconditional-forceclose]], [[concepts/urnetwork-guest-mode-relay-blocker]], [[concepts/killswitch-binder-death-detection]], [[concepts/urnetwork-fixed-ip-enhanced-anonymization]], [[concepts/byedpi-singleton-strategy-testing-isolation]]
+- Articles updated: [[concepts/urnetwork-relay-always]] (JWT bootstrap requirement + guest mode monetization blocker), [[concepts/genetic-strategy-evolution]] (stale server_fd as root cause of 0% fitness + singleton sharing + favorites pollution)
+- Index updated: 5 new rows, 2 rows updated, total 133
+- Sessions covered: 10:41 (release sentinel ABI fix), 11:38-12:06 (ByeDPI stale fd + 0% fitness + favorites pollution), 13:08-13:26 (URnetwork feature parity + CI fixes), 13:41 (balance card + anonymization toggle), 14:21-14:45 (killswitch audit P30-P37), 15:02-15:52 (URnetwork locations + reconnect indicator), 16:09-16:30 (Fixed IP + Enhanced Anonymization), 16:59 (5-agent code review), 18:25 (guest mode monetization investigation), 18:55-19:55 (autonomous fix cycle + toggles completion)
+
 ## [2026-05-19T01:30:00+03:00] compile | Daily Log 2026-05-17
 - Source: daily/2026-05-17.md
 - Articles created: [[concepts/sentinel-refactor-batch-audit]], [[concepts/stateflow-waitfor-zero-test-race]], [[concepts/granular-probe-fitness-scoring]], [[concepts/relay-coordinator-ownership-transfer]]

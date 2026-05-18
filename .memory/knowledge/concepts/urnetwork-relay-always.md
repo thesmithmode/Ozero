@@ -5,8 +5,9 @@ tags: [urnetwork, relay, architecture, coordinator-pattern]
 sources:
   - "daily/2026-05-14.md"
   - "daily/2026-05-17.md"
+  - "daily/2026-05-18.md"
 created: 2026-05-14
-updated: 2026-05-17
+updated: 2026-05-18
 ---
 
 # URnetwork Relay-Always Architecture
@@ -52,6 +53,14 @@ URnetwork SDK decouples TUN-routing (`tunnelStarted`) from relay contribution (`
 
 See [[concepts/relay-coordinator-ownership-transfer]] for the full ownership transfer pattern.
 
+### JWT Bootstrap Requirement and Guest Mode Limitation (2026-05-18)
+
+Critical operational discovery: `UrnetworkRelayCoordinator` requires `byClientJwt` in DataStore to start the bridge. JWT is saved only on first URnetwork engine connection (via `acquireGuestJwt()`). A new user who has never selected URnetwork as the active engine has no JWT → relay never starts → no bandwidth contribution.
+
+Furthermore, guest JWTs are blocked from earning rewards server-side. `router/handler_utils.go` returns 401 for all wallet endpoints when `guestMode=true`. The relay shares bandwidth but receives no USDC payouts. See [[concepts/urnetwork-guest-mode-relay-blocker]] for full analysis.
+
+This means relay-always is currently: (1) inactive for users who never tried URnetwork, (2) running idle (no earnings) for users who did. A non-guest JWT is required for actual monetization.
+
 ### Discovery: Relay Was Not Working (2026-05-17)
 
 Critical finding during session: relay only worked when URnetwork was the active engine. When user selected ByeDPI or WARP, URnetwork SDK never started → relay didn't run → no traffic shared → no payouts. The user directly challenged: "ты уверен что это работает?" — agent honestly answered "НЕТ." The `UrnetworkRelayCoordinator` was the P0 fix to make relay truly engine-independent.
@@ -68,3 +77,4 @@ Additional constraint discovered: `EngineUrnetwork.start()` calls `sdkBridge.sta
 
 - [[daily/2026-05-14.md]] — Session 20:30: architectural discussion of relay-always, SDK `tunnelStarted` vs `providePaused` decoupling, monetization constraints; Session 21:29: `setupPayoutWallet` implementation + contract tests
 - [[daily/2026-05-17.md]] — Session 14:41+: relay NOT working for non-URnetwork engines discovered; P0 #111 UrnetworkRelayCoordinator implemented (commit 194d7701); relayOwned AtomicBoolean ownership; bridge.start() made idempotent; SharedTrafficScreen simplified
+- [[daily/2026-05-18.md]] — Session 17:51: relay requires byClientJwt (saved on first URnetwork connect only); Session 18:25: guest JWT blocked from wallet API server-side → relay runs idle, no USDC payouts

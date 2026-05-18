@@ -1,11 +1,12 @@
 ---
 title: "Chart Y-Axis Dynamic Scaling with 1-2-5 Steps"
-aliases: [chart-nice-max, speed-chart-scaling, dynamic-y-axis]
+aliases: [chart-nice-max, speed-chart-scaling, dynamic-y-axis, chart-timeframes]
 tags: [ui, compose, chart, pattern]
 sources:
   - "daily/2026-05-12.md"
+  - "daily/2026-05-18.md"
 created: 2026-05-12
-updated: 2026-05-12
+updated: 2026-05-18
 ---
 
 # Chart Y-Axis Dynamic Scaling with 1-2-5 Steps
@@ -41,6 +42,23 @@ Without throttling, the EWMA-smoothed speed (α=0.4, see [[concepts/libhev-tunne
 
 The fix gates sample collection in `MainViewModel`: a new speed value is only appended to `speedHistory` if at least `SPEED_SAMPLE_INTERVAL_MS` (1000ms) has elapsed since the last sample. This produces a clean 1-point-per-second history that renders as a smooth chart line.
 
+### Timeframe Architecture: M1 Baseline + Bucket Aggregation (2026-05-18)
+
+The original 30-second baseline was too short to show meaningful speed trends — the chart appeared noisy and the user could not distinguish sustained throughput from burst patterns. The refactored timeframe system uses M1 (60 seconds) as the base timeframe with 60 data points (1 point/second), and higher timeframes (M5, M30, H1) use bucket aggregation rather than simple downsampling.
+
+**Timeframes:**
+
+| Timeframe | Duration | Points | Method |
+|-----------|----------|--------|--------|
+| M1 | 60s | 60 | Raw 1s samples |
+| M5 | 5min | 60 | 5s bucket average |
+| M30 | 30min | 60 | 30s bucket average |
+| H1 | 1hr | 60 | 60s bucket average |
+
+All timeframes produce exactly 60 data points for consistent chart rendering. M1 uses raw samples from the 1s throttle. Higher timeframes divide the history into equal-duration buckets and compute the arithmetic mean of samples within each bucket. This preserves the shape of throughput trends better than taking every Nth sample (which may hit peaks or valleys by chance).
+
+**Why bucket aggregation over downsampling:** Simple downsampling (take every 5th point for M5) loses information about what happened between sampled points. A 4-second spike followed by 1 second of silence appears as either full-spike or zero depending on which sample is picked. Bucket averaging captures the true average throughput across each 5-second window — a spike shows as elevated average, silence shows as reduced average.
+
 ## Related Concepts
 
 - [[concepts/libhev-tunnel-stats]] - EWMA α=0.4 smoothing feeds into the chart; throttling is a second-layer smoothing on top of EWMA
@@ -49,3 +67,4 @@ The fix gates sample collection in `MainViewModel`: a new speed value is only ap
 ## Sources
 
 - [[daily/2026-05-12.md]] - Session 11:59: chartNiceMax 17 thresholds (1-2-5 step), SPEED_SAMPLE_INTERVAL_MS=1000 throttle, sentinel tests in MainScreenChartTest.kt; user demanded planning-first before implementation
+- [[daily/2026-05-18.md]] - Session 18:52: 30s baseline → M1 (60s); M5/M30/H1 use bucket aggregation instead of downsample; all timeframes output 60 data points
