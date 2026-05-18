@@ -13,6 +13,8 @@ data class UrnetworkConfig(
     val walletOverride: String? = null,
     val byJwt: String? = null,
     val byClientJwt: String? = null,
+    val devicePubkey: String? = null,
+    val deviceNetworkName: String? = null,
     val windowType: UrnetworkWindowType = UrnetworkWindowType.AUTO,
     val fixedIpSize: Boolean = false,
     val allowDirect: Boolean = true,
@@ -70,6 +72,20 @@ fun UrnetworkConfigStore.byClientJwt(): Flow<String?> =
 
 suspend fun UrnetworkConfigStore.setByClientJwt(value: String?) {
     update { it.copy(byClientJwt = value?.takeIf { v -> v.isNotBlank() }) }
+}
+
+fun UrnetworkConfigStore.devicePubkey(): Flow<String?> =
+    config().map { it.devicePubkey?.takeIf { v -> v.isNotBlank() } }
+
+suspend fun UrnetworkConfigStore.setDevicePubkey(value: String?) {
+    update { it.copy(devicePubkey = value?.takeIf { v -> v.isNotBlank() }) }
+}
+
+fun UrnetworkConfigStore.deviceNetworkName(): Flow<String?> =
+    config().map { it.deviceNetworkName?.takeIf { v -> v.isNotBlank() } }
+
+suspend fun UrnetworkConfigStore.setDeviceNetworkName(value: String?) {
+    update { it.copy(deviceNetworkName = value?.takeIf { v -> v.isNotBlank() }) }
 }
 
 fun UrnetworkConfigStore.windowType(): Flow<UrnetworkWindowType> = config().map { it.windowType }

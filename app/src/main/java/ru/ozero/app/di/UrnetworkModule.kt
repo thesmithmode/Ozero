@@ -26,7 +26,9 @@ import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkContractStatusObserver
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.auth.RealUrnetworkAuthService
+import ru.ozero.engineurnetwork.auth.RealUrnetworkDeviceIdentity
 import ru.ozero.engineurnetwork.auth.UrnetworkAuthService
+import ru.ozero.engineurnetwork.auth.UrnetworkDeviceIdentity
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
 import javax.inject.Qualifier
@@ -77,13 +79,25 @@ object UrnetworkModule {
         store: UrnetworkConfigStore,
         bridge: UrnetworkSdkBridge,
         authService: UrnetworkAuthService,
-    ): EnginePlugin = EngineUrnetwork(store, bridge, authService)
+        deviceIdentity: UrnetworkDeviceIdentity,
+    ): EnginePlugin = EngineUrnetwork(
+        configStore = store,
+        sdkBridge = bridge,
+        authService = authService,
+        deviceIdentity = deviceIdentity,
+    )
 
     @Provides
     @Singleton
     fun provideUrnetworkAuthService(
         @ApplicationContext context: Context,
     ): UrnetworkAuthService = RealUrnetworkAuthService(context.applicationContext as Application)
+
+    @Provides
+    @Singleton
+    fun provideUrnetworkDeviceIdentity(
+        @ApplicationContext context: Context,
+    ): UrnetworkDeviceIdentity = RealUrnetworkDeviceIdentity(context.applicationContext as Application)
 
     @Provides
     @Singleton

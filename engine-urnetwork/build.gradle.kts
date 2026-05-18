@@ -13,6 +13,7 @@ dependencies {
 
     implementation(libs.hilt.android)
     implementation(libs.datastore.preferences)
+    implementation(libs.bouncycastle.prov)
 
     // AGP 4.1+ запрещает упаковку local AAR в bundleReleaseLocalLintAar/AAR
     // библиотеки (Direct local .aar file dependencies are not supported when

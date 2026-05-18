@@ -105,6 +105,60 @@ class UrnetworkConfigStoreTest {
     }
 
     @Test
+    fun `devicePubkey по умолчанию null`() = runTest {
+        val (store, _) = newStore()
+        assertNull(store.devicePubkey().first())
+    }
+
+    @Test
+    fun `setDevicePubkey persist и devicePubkey возвращает значение`() = runTest {
+        val (store, _) = newStore()
+        val pk = "27wAThHKVpd8c4r4GXNzMAev8byGUozA6RVayeZ7vHMM"
+        store.setDevicePubkey(pk)
+        assertEquals(pk, store.devicePubkey().first())
+    }
+
+    @Test
+    fun `setDevicePubkey(null) очищает`() = runTest {
+        val (store, _) = newStore()
+        store.setDevicePubkey("abc")
+        store.setDevicePubkey(null)
+        assertNull(store.devicePubkey().first())
+    }
+
+    @Test
+    fun `setDevicePubkey пустая строка трактуется как null`() = runTest {
+        val (store, _) = newStore()
+        store.setDevicePubkey("abc")
+        store.setDevicePubkey("")
+        assertNull(store.devicePubkey().first())
+    }
+
+    @Test
+    fun `deviceNetworkName по умолчанию null`() = runTest {
+        val (store, _) = newStore()
+        assertNull(store.deviceNetworkName().first())
+    }
+
+    @Test
+    fun `setDeviceNetworkName persist и returns`() = runTest {
+        val (store, _) = newStore()
+        store.setDeviceNetworkName("n-abc")
+        assertEquals("n-abc", store.deviceNetworkName().first())
+    }
+
+    @Test
+    fun `devicePubkey и deviceNetworkName хранятся независимо от byJwt`() = runTest {
+        val (store, _) = newStore()
+        store.setByJwt("j")
+        store.setDevicePubkey("p")
+        store.setDeviceNetworkName("n")
+        assertEquals("j", store.byJwt().first())
+        assertEquals("p", store.devicePubkey().first())
+        assertEquals("n", store.deviceNetworkName().first())
+    }
+
+    @Test
     fun `provideEnabled по умолчанию true`() = runTest {
         val (store, _) = newStore()
         assertEquals(true, store.provideEnabled().first())
