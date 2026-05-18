@@ -342,7 +342,7 @@ class TrafficStatsViewModelTest {
     }
 
     @Nested
-    inner class SessionSort {
+    inner class SessionSortTests {
 
         @Test
         fun `default sort is TIME_DESC`() = runTest {
