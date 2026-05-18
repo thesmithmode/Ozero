@@ -108,6 +108,59 @@ class EngineWatchdogCoordinatorContractTest {
     }
 
     @Test
+    fun `killswitch=false branch вызывает onEngineDied + stopVpnRequest, не enterKillswitchMode (P33)`() {
+        val body = source.substringAfter("fun handleEngineFailure(")
+            .substringBefore("private fun enterKillswitchMode")
+        val elseBlock = body.substringAfter("else {").substringBefore("}")
+        assertTrue(
+            elseBlock.contains("tunnelController.onEngineDied(engineId"),
+            "false-branch (killswitch=off ИЛИ fdAlive=false) обязан вызвать " +
+                "tunnelController.onEngineDied — иначе UI не знает что движок умер. Body:\n$elseBlock",
+        )
+        assertTrue(
+            elseBlock.contains("stopVpnRequest()"),
+            "false-branch обязан звать stopVpnRequest — graceful shutdown VPN, не lockdown. Body:\n$elseBlock",
+        )
+        assertTrue(
+            !elseBlock.contains("enterKillswitchMode"),
+            "false-branch НЕ должен звать enterKillswitchMode — killswitch=off значит " +
+                "не блокируем трафик, а штатно останавливаем VPN. Body:\n$elseBlock",
+        )
+    }
+
+    @Test
+    fun `health watcher killswitch=false branch не вызывает enterKillswitchMode (P33)`() {
+        val body = source.substringAfter("fun startHealthKillswitchWatcher(")
+            .substringBefore("fun startPeerWatchdog")
+        val elseBlock = body.substringAfter("} else {").substringBefore("}")
+        assertTrue(
+            !elseBlock.contains("enterKillswitchMode"),
+            "В health watcher else-ветке (killswitch=off ИЛИ fd=null ИЛИ stopping) " +
+                "НЕ должен вызываться enterKillswitchMode — иначе lockdown триггерится без согласия юзера. " +
+                "Body:\n$elseBlock",
+        )
+        assertTrue(
+            elseBlock.contains("PersistentLoggers"),
+            "false-branch обязан логировать факт degraded+killswitch-off — diagnostic visibility. " +
+                "Body:\n$elseBlock",
+        )
+    }
+
+    @Test
+    fun `handleEngineFailure fdAlive=false ведёт к stopVpnRequest, не lockdown (P33)`() {
+        val body = source.substringAfter("fun handleEngineFailure(")
+            .substringBefore("private fun enterKillswitchMode")
+        assertTrue(
+            body.contains("killswitchProvider() && fdAlive") ||
+                body.contains("killswitchProvider() && tunFdRef.get() != null") ||
+                body.contains("fdAlive && killswitchProvider()") ||
+                body.contains("tunFdRef.get() != null && killswitchProvider()"),
+            "True-branch обязан требовать ОБА: killswitch=on И fdAlive — иначе " +
+                "lockdown триггерится при уже мёртвом TUN (no-op + state inconsistency). Body:\n$body",
+        )
+    }
+
+    @Test
     fun `CancellationException пробрасывается, не глотается в watcher`() {
         val healthBody = source.substringAfter("fun startHealthKillswitchWatcher(")
             .substringBefore("fun startPeerWatchdog")
