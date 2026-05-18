@@ -768,7 +768,7 @@ private fun chartTimeAgo(seconds: Int): String = when {
     else -> "-${seconds}s"
 }
 
-private fun pickStatusLabelRes(
+internal fun pickStatusLabelRes(
     state: TunnelState,
     switching: SwitchingTransition?,
     urnetworkPeerCount: Int,
@@ -792,7 +792,7 @@ private fun pickStatusLabelRes(
     }
 }
 
-private fun probingLabelRes(engineId: EngineId, isReconnecting: Boolean): Int = when (engineId) {
+internal fun probingLabelRes(engineId: EngineId?, isReconnecting: Boolean): Int = when (engineId) {
     EngineId.WARP -> R.string.main_status_probing_warp
     EngineId.BYEDPI ->
         if (isReconnecting) R.string.main_status_reconnecting else R.string.main_status_connecting
