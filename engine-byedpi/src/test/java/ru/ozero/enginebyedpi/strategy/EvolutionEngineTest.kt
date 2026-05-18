@@ -542,6 +542,82 @@ class EvolutionEngineTest {
             ru.ozero.enginescore.ProbeResult.Success(latencyMs = 0)
     }
 
+    private class PortRecordingEngine : EnginePlugin {
+        val ports = mutableListOf<Int>()
+        override val id = EngineId.BYEDPI
+        override val capabilities = EngineCapabilities(
+            supportsTcp = true, supportsUdp = false, supportsDoH = false,
+            localOnly = true, requiresServer = false, supportsUpstreamSocks = false,
+        )
+        override fun stats(): Flow<EngineStats> = MutableStateFlow(EngineStats())
+        override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
+            val byedpi = config as EngineConfig.ByeDpi
+            ports += byedpi.socksPort
+            return StartResult.Success(socksPort = byedpi.socksPort)
+        }
+        override suspend fun stop() = Unit
+        override suspend fun probe(): ru.ozero.enginescore.ProbeResult =
+            ru.ozero.enginescore.ProbeResult.Success(latencyMs = 0)
+    }
+
+    @Test
+    fun `evaluate использует уникальный rotated port каждый старт — байпасс TIME_WAIT`() = runTest {
+        val engine = PortRecordingEngine()
+        val pool = GenePool(seeds)
+        val evolver = StrategyEvolver(pool)
+        val evolutionEngine = EvolutionEngine(
+            byeDpiEngine = engine,
+            probeFactory = { _, _ -> AlwaysFailProbe() },
+            evolver = evolver,
+            pool = pool,
+            sites = listOf("s1.com"),
+            settings = EvolutionEngine.EvolutionSettings(
+                populationSize = 30,
+                maxGenerations = 1,
+                portRotationBase = 49_152,
+                portRotationRange = 256,
+            ),
+        )
+        evolutionEngine.evolve(seedStrategies = seeds, onGeneration = {})
+        assertTrue(engine.ports.isNotEmpty(), "ожидалось ≥1 evaluate.start")
+        engine.ports.forEach { p ->
+            assertTrue(p in 49_152..49_407, "port $p out of rotation range")
+        }
+        val unique = engine.ports.toSet()
+        assertEquals(
+            engine.ports.size,
+            unique.size,
+            "каждый evaluate должен получить уникальный port — TIME_WAIT байпасс. " +
+                "Дубль port → bind на тот же port что в TIME_WAIT → main() byedpi возвращает -1 серией",
+        )
+    }
+
+    @Test
+    fun `port rotation возвращается к base после исчерпания range`() = runTest {
+        val engine = PortRecordingEngine()
+        val pool = GenePool(seeds)
+        val evolver = StrategyEvolver(pool)
+        val evolutionEngine = EvolutionEngine(
+            byeDpiEngine = engine,
+            probeFactory = { _, _ -> AlwaysFailProbe() },
+            evolver = evolver,
+            pool = pool,
+            sites = listOf("s1.com"),
+            settings = EvolutionEngine.EvolutionSettings(
+                populationSize = 5,
+                maxGenerations = 1,
+                portRotationBase = 50_000,
+                portRotationRange = 3,
+            ),
+        )
+        evolutionEngine.evolve(seedStrategies = seeds, onGeneration = {})
+        val expectedSet = setOf(50_000, 50_001, 50_002)
+        assertTrue(
+            engine.ports.toSet().all { it in expectedSet },
+            "ports должны быть в range 50000..50002, got=${engine.ports}",
+        )
+    }
+
     private class AlwaysSucceedEngine : EnginePlugin {
         override val id = EngineId.BYEDPI
         override val capabilities = EngineCapabilities(

@@ -10,6 +10,7 @@ import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.pow
 import kotlin.random.Random
 
@@ -20,7 +21,6 @@ class EvolutionEngine(
     private val pool: GenePool,
     private val sites: List<String>,
     private val settings: EvolutionSettings = EvolutionSettings(),
-    private val socksPort: Int = 1080,
     private val memory: GeneMemory? = null,
     private val fitnessCachePersistent: StrategyFitnessCache? = null,
     private val random: Random = Random.Default,
@@ -38,6 +38,8 @@ class EvolutionEngine(
         val initialMemoryRatio: Double = 0.3,
         val latencyClampMs: Double = 3_000.0,
         val successRateExponent: Double = 1.5,
+        val portRotationBase: Int = 49_152,
+        val portRotationRange: Int = 256,
     )
 
     data class GenerationResult(
@@ -54,6 +56,13 @@ class EvolutionEngine(
         val successRate: Double,
         val startFailed: Boolean = false,
     )
+
+    private val portCounter = AtomicInteger(0)
+
+    private fun nextRotatedSocksPort(): Int {
+        val range = settings.portRotationRange.coerceAtLeast(1)
+        return settings.portRotationBase + (portCounter.getAndIncrement() % range)
+    }
 
     suspend fun evolve(
         seedStrategies: List<String>,
@@ -250,15 +259,16 @@ class EvolutionEngine(
     private suspend fun evaluate(chromosome: Chromosome): EvalResult {
         if (sites.isEmpty() || chromosome.isEmpty()) return EvalResult(0.0, 0.0)
         val command = chromosome.toCommand()
+        val port = nextRotatedSocksPort()
         val started = byeDpiEngine.start(
-            config = EngineConfig.ByeDpi(args = command, socksPort = socksPort),
+            config = EngineConfig.ByeDpi(args = command, socksPort = port),
             upstream = Upstream.None,
         )
         if (started !is StartResult.Success) {
             return EvalResult(0.0, 0.0, startFailed = true)
         }
         return try {
-            val probe = probeFactory(socksPort, settings.timeoutMs)
+            val probe = probeFactory(port, settings.timeoutMs)
             val semaphore = Semaphore(settings.concurrentProbes.coerceAtLeast(1))
             val probeResults = coroutineScope {
                 sites.map { site ->
