@@ -228,7 +228,7 @@ class OzeroVpnServiceLockdownKillswitchTest {
     }
 
     @Test
-    fun `killswitch=on lockdownStartupTun.establish выполняется ДО pickAutoCandidate (P35)`() {
+    fun `killswitch=on lockdownStartupTun establish выполняется ДО pickAutoCandidate (P35)`() {
         val lockdownEstablishIdx = runBody.indexOf("lockdownStartupFdRef.set")
         val pickIdx = runBody.indexOf("pickAutoCandidateWithPreflight")
         val manualIdx = runBody.indexOf("settings?.manualEngine")

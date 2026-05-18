@@ -122,7 +122,9 @@ class RemoteAwgRuntimeContractTest {
     fun `DeathRecipient вызывает onProcessDied и unbind`() {
         val onConnected = source.substringAfter("override fun onServiceConnected")
             .substringBefore("override fun onServiceDisconnected")
-        val recipientBody = onConnected.substringAfter("DeathRecipient {").substringBefore("}\n")
+        val recipientBody = onConnected
+            .substringAfter("DeathRecipient {")
+            .substringBefore("deathRecipient = recipient")
         assertTrue(
             recipientBody.contains("onProcessDied()"),
             "DeathRecipient обязан вызвать onProcessDied() — иначе TunnelController не уведомляется " +

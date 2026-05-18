@@ -10,8 +10,9 @@ import com.bringyour.sdk.IoLoopDoneCallback
 import com.bringyour.sdk.LocationsViewController
 import com.bringyour.sdk.PerformanceProfile
 import com.bringyour.sdk.Sdk
-import com.bringyour.sdk.WindowSizeSettings
 import com.bringyour.sdk.SubscriptionBalanceCallback
+import com.bringyour.sdk.WalletViewController
+import com.bringyour.sdk.WindowSizeSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
