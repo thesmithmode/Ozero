@@ -128,7 +128,9 @@ suspend fun UrnetworkConfigStore.setSelectedLocation(value: UrnetworkLocationSel
 class InMemoryUrnetworkConfigStore(initial: UrnetworkConfig = UrnetworkConfig()) : UrnetworkConfigStore {
     private val state = MutableStateFlow(initial)
     val snapshot: UrnetworkConfig get() = state.value
-    fun inject(transform: (UrnetworkConfig) -> UrnetworkConfig) { state.value = transform(state.value) }
+    fun inject(transform: (UrnetworkConfig) -> UrnetworkConfig) {
+        state.value = transform(state.value)
+    }
     override fun config(): Flow<UrnetworkConfig> = state
     override suspend fun update(transform: (UrnetworkConfig) -> UrnetworkConfig) {
         state.value = transform(state.value)
