@@ -774,10 +774,10 @@ private fun StatusLabel(
             urnetworkPeerCount == 0 -> R.string.main_status_urnetwork_searching
         else -> when (state) {
             is TunnelState.Idle -> R.string.main_status_disconnected
-            is TunnelState.Probing -> if (state.engineId == ru.ozero.enginescore.EngineId.WARP) {
-                R.string.main_status_probing_warp
-            } else {
-                R.string.main_status_probing
+            is TunnelState.Probing -> when (state.engineId) {
+                ru.ozero.enginescore.EngineId.WARP -> R.string.main_status_probing_warp
+                ru.ozero.enginescore.EngineId.BYEDPI -> R.string.main_status_connecting
+                else -> R.string.main_status_probing
             }
             is TunnelState.Connecting -> R.string.main_status_connecting
             is TunnelState.Connected -> R.string.main_status_connected
