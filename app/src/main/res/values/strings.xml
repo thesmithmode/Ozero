@@ -29,7 +29,7 @@
     <string name="tab_settings">Настройки</string>
     <string name="tab_diagnostics">Диагностика</string>
     <string name="tab_servers">Параметры</string>
-    <string name="tab_split_tunnel">Раздельное туннелирование</string>
+    <string name="tab_split_tunnel">Раздельное</string>
     <string name="tab_stats">Статистика</string>
     <string name="tab_subs">Подписка</string>
     <string name="tab_engine">Движок</string>
