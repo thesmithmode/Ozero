@@ -42,9 +42,10 @@ class AppBackupManager(
             appMode = prefs[SettingsKeys.APP_MODE],
         )
 
+        val urnetworkCfg = urnetworkStore.config().first()
         val urnetwork = BackupUrnetwork(
-            walletOverride = urnetworkStore.walletOverride().first(),
-            byJwt = urnetworkStore.byJwt().first(),
+            walletOverride = urnetworkCfg.walletOverride?.takeIf { it.isNotBlank() },
+            byJwt = urnetworkCfg.byJwt?.takeIf { it.isNotBlank() },
         )
 
         val warpSlots = warpSlotStore.slots().first().map { it.toBackup() }
@@ -82,8 +83,12 @@ class AppBackupManager(
             s.appMode?.let { prefs[SettingsKeys.APP_MODE] = it }
         }
 
-        data.urnetwork.walletOverride?.let { urnetworkStore.setWalletOverride(it) }
-        data.urnetwork.byJwt?.let { urnetworkStore.setByJwt(it) }
+        data.urnetwork.walletOverride?.let { v ->
+            urnetworkStore.update { it.copy(walletOverride = v.takeIf { it.isNotBlank() }) }
+        }
+        data.urnetwork.byJwt?.let { v ->
+            urnetworkStore.update { it.copy(byJwt = v.takeIf { it.isNotBlank() }) }
+        }
 
         if (data.warpSlots.isNotEmpty()) {
             warpSlotStore.replaceAll(data.warpSlots.map { it.toSlot() })
