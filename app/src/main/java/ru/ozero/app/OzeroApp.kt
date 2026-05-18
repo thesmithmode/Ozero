@@ -37,6 +37,8 @@ class OzeroApp : Application(), Configuration.Provider {
 
     @Inject lateinit var urnetworkRelayCoordinator: UrnetworkRelayCoordinator
 
+    @Inject lateinit var urnetworkContractStatusObserver: ru.ozero.engineurnetwork.UrnetworkContractStatusObserver
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override val workManagerConfiguration: Configuration
@@ -87,6 +89,8 @@ class OzeroApp : Application(), Configuration.Provider {
             .onFailure { BootFileLogger.warn(TAG, "telegramProxyCoordinator.start failed", it) }
         runCatching { urnetworkRelayCoordinator.start() }
             .onFailure { BootFileLogger.warn(TAG, "urnetworkRelayCoordinator.start failed", it) }
+        runCatching { urnetworkContractStatusObserver.start() }
+            .onFailure { BootFileLogger.warn(TAG, "urnetworkContractStatusObserver.start failed", it) }
     }
 
     private fun isEngineWarpProcess(): Boolean {

@@ -1,6 +1,12 @@
 package ru.ozero.engineurnetwork
 
 import com.bringyour.sdk.LocationsViewController
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
+private val UNKNOWN_CONTRACT_STATUS_FLOW: StateFlow<UrnetworkSdkBridge.ContractStatusSnapshot> =
+    MutableStateFlow(UrnetworkSdkBridge.ContractStatusSnapshot.UNKNOWN).asStateFlow()
 
 @Suppress("TooManyFunctions")
 interface UrnetworkSdkBridge {
@@ -38,6 +44,22 @@ interface UrnetworkSdkBridge {
     suspend fun fetchSubscriptionBalance(): SubscriptionBalanceSnapshot?
 
     suspend fun fetchAccountPoints(): AccountPointsSnapshot? = null
+
+    fun contractStatus(): StateFlow<ContractStatusSnapshot> = UNKNOWN_CONTRACT_STATUS_FLOW
+
+    data class ContractStatusSnapshot(
+        val insufficientBalance: Boolean,
+        val noPermission: Boolean,
+        val premium: Boolean,
+    ) {
+        companion object {
+            val UNKNOWN = ContractStatusSnapshot(
+                insufficientBalance = false,
+                noPermission = false,
+                premium = false,
+            )
+        }
+    }
 
     interface LocationToken {
         val countryCode: String?

@@ -3,9 +3,7 @@ package ru.ozero.engineurnetwork
 import android.app.Application
 import android.util.Log
 import com.bringyour.sdk.ConnectLocation
-import com.bringyour.sdk.ConnectLocationList
 import com.bringyour.sdk.ConnectViewController
-import com.bringyour.sdk.FilteredLocations
 import com.bringyour.sdk.DeviceLocal
 import com.bringyour.sdk.IoLoop
 import com.bringyour.sdk.IoLoopDoneCallback
@@ -14,19 +12,13 @@ import com.bringyour.sdk.PerformanceProfile
 import com.bringyour.sdk.Sdk
 import com.bringyour.sdk.WindowSizeSettings
 import com.bringyour.sdk.SubscriptionBalanceCallback
-import com.bringyour.sdk.AccountWalletsListener
-import com.bringyour.sdk.Id
-import com.bringyour.sdk.Sub
-import com.bringyour.sdk.WalletViewController
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelChildren
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -61,6 +53,9 @@ class RealUrnetworkSdkBridge(
     private val running = AtomicBoolean(false)
     private val preferredLocationRef = AtomicReference<UrnetworkLocationSelection?>(null)
     private val bridgeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val contractStatusListener = UrnetworkContractStatusListener()
+    private val payoutWalletSetup = UrnetworkPayoutWalletSetup()
+    private val preferredLocationConnector = UrnetworkPreferredLocationConnector(bridgeScope)
     private val lifecycleMutex = Mutex()
     private val startJobRef = AtomicReference<Job?>(null)
     private val attachJobRef = AtomicReference<Job?>(null)
@@ -166,8 +161,9 @@ class RealUrnetworkSdkBridge(
             PersistentLoggers.warn(TAG, "WalletViewController init threw: ${it.message}")
         }.getOrNull()
         if (walletVcStarted != null) {
-            setupPayoutWallet(walletVcStarted, walletAddress)
+            payoutWalletSetup.configure(walletVcStarted, walletAddress)
         }
+        contractStatusListener.attach(device)
         running.set(true)
         PersistentLoggers.info(TAG, "device created — awaiting attachTun(fd) before tunnelStarted")
         return UrnetworkSdkBridge.StartResult.Success
@@ -194,6 +190,7 @@ class RealUrnetworkSdkBridge(
 
     private suspend fun stopUnderLock() {
         runCatching { bridgeScope.coroutineContext.cancelChildren() }
+        contractStatusListener.detach()
         val completed = withTimeoutOrNull(STOP_TIMEOUT_MS) {
             withContext(Dispatchers.Main.immediate) {
                 walletVcRef.getAndSet(null)?.also { vc ->
@@ -273,6 +270,9 @@ class RealUrnetworkSdkBridge(
         preferredLocationRef.set(cleaned)
         Log.i(TAG, "preferredLocation set to ${cleaned?.summary() ?: "<auto>"}")
     }
+
+    override fun contractStatus(): StateFlow<UrnetworkSdkBridge.ContractStatusSnapshot> =
+        contractStatusListener.status
 
     override fun openLocationsViewController(): LocationsViewController? {
         if (!running.get()) return null
@@ -511,7 +511,7 @@ class RealUrnetworkSdkBridge(
                     val preferred = preferredLocationRef.get()
                     if (preferred != null) {
                         Log.i(TAG, "IoLoop fd=$tunFd tunnelStarted preferredLocation=${preferred.summary()}")
-                        connectByPreferredLocation(preferred, cv)
+                        preferredLocationConnector.connect(preferred, capturedDevice, cv)
                     } else {
                         runCatching { cv.connectBestAvailable() }
                             .onFailure { PersistentLoggers.warn(TAG, "connectBestAvailable threw: ${it.message}") }
@@ -528,165 +528,8 @@ class RealUrnetworkSdkBridge(
         }
     }
 
-    private fun connectByPreferredLocation(selection: UrnetworkLocationSelection, cv: ConnectViewController) {
-        val device = deviceRef.get() ?: run {
-            runCatching { cv.connectBestAvailable() }
-            return
-        }
-        val locVc = runCatching { device.openLocationsViewController() }.getOrNull()
-        if (locVc == null) {
-            PersistentLoggers.warn(TAG, "openLocationsViewController null — fallback connectBestAvailable")
-            runCatching { cv.connectBestAvailable() }
-            return
-        }
-        val attached = AtomicBoolean(false)
-        val timeoutJob = bridgeScope.launch {
-            delay(PREFERRED_COUNTRY_TIMEOUT_MS)
-            if (attached.compareAndSet(false, true)) {
-                runCatching { cv.connectBestAvailable() }
-                runCatching { locVc.stop() }
-                runCatching { locVc.close() }
-                PersistentLoggers.warn(
-                    TAG,
-                    "preferred ${selection.summary()} timeout (${PREFERRED_COUNTRY_TIMEOUT_MS}ms) → fallback connectBestAvailable",
-                )
-            }
-        }
-        runCatching {
-            locVc.addFilteredLocationsListener { filtered, _ ->
-                if (filtered == null) return@addFilteredLocationsListener
-                val match = findBestMatch(filtered, selection) ?: return@addFilteredLocationsListener
-                if (attached.compareAndSet(false, true)) {
-                    timeoutJob.cancel()
-                    runCatching { cv.connect(match) }
-                        .onFailure { PersistentLoggers.warn(TAG, "connect(match) threw: ${it.message}") }
-                    Log.i(TAG, "preferred ${selection.summary()} matched → connected")
-                    runCatching { locVc.stop() }
-                    runCatching { locVc.close() }
-                }
-            }
-            locVc.start()
-            locVc.filterLocations("")
-        }.onFailure { t ->
-            if (attached.compareAndSet(false, true)) {
-                timeoutJob.cancel()
-                PersistentLoggers.warn(TAG, "locVc setup failed: ${t.message} → fallback connectBestAvailable")
-                runCatching { cv.connectBestAvailable() }
-                runCatching { locVc.stop() }
-                runCatching { locVc.close() }
-            }
-        }
-    }
-
-    private suspend fun setupPayoutWallet(walletVc: WalletViewController, walletAddress: String) {
-        if (walletAddress.isBlank()) {
-            Log.i(TAG, "setupPayoutWallet skipped — empty walletAddress")
-            return
-        }
-        runCatching {
-            val existing = awaitWalletsChanged(walletVc, WALLET_FETCH_TIMEOUT_MS) {
-                walletVc.fetchAccountWallets()
-            }
-            var walletId: Id? = findWalletIdByAddress(walletVc, walletAddress)
-            if (walletId == null && existing != null) {
-                val added = awaitWalletsChanged(walletVc, WALLET_ADD_TIMEOUT_MS) {
-                    walletVc.addExternalWallet(walletAddress, WALLET_BLOCKCHAIN_SOLANA)
-                }
-                if (added != null) {
-                    walletId = findWalletIdByAddress(walletVc, walletAddress)
-                }
-            }
-            if (walletId != null) {
-                walletVc.updatePayoutWallet(walletId)
-                Log.i(TAG, "payout wallet set: ${walletAddress.take(WALLET_LOG_PREFIX)}…")
-            } else {
-                PersistentLoggers.warn(
-                    TAG,
-                    "payout wallet setup: walletId not found for ${walletAddress.take(WALLET_LOG_PREFIX)}…",
-                )
-            }
-        }.onFailure {
-            PersistentLoggers.warn(TAG, "setupPayoutWallet threw: ${it.message}")
-        }
-    }
-
-    private suspend fun awaitWalletsChanged(
-        walletVc: WalletViewController,
-        timeoutMs: Long,
-        trigger: () -> Unit,
-    ): Unit? {
-        val deferred = CompletableDeferred<Unit>()
-        var sub: Sub? = null
-        sub = walletVc.addAccountWalletsListener(
-            AccountWalletsListener {
-                runCatching { sub?.close() }
-                deferred.complete(Unit)
-            },
-        )
-        return withTimeoutOrNull(timeoutMs) {
-            runCatching { trigger() }
-                .onFailure { PersistentLoggers.warn(TAG, "wallets trigger threw: ${it.message}") }
-            deferred.await()
-        }.also {
-            if (it == null) runCatching { sub?.close() }
-        }
-    }
-
-    private fun findWalletIdByAddress(walletVc: WalletViewController, address: String): Id? {
-        val list = runCatching { walletVc.wallets }.getOrNull() ?: return null
-        val count = runCatching { list.len() }.getOrDefault(0L)
-        for (i in 0 until count) {
-            val w = runCatching { list.get(i) }.getOrNull() ?: continue
-            val addr = runCatching { w.walletAddress }.getOrNull()
-            if (addr == address) {
-                return runCatching { w.walletId }.getOrNull()
-            }
-        }
-        return null
-    }
-
     private fun cleanupOnFailure() {
         deviceRef.getAndSet(null)?.also { runCatching { it.close() } }
-    }
-
-    private fun findBestMatch(
-        filtered: FilteredLocations,
-        selection: UrnetworkLocationSelection,
-    ): ConnectLocation? {
-        val cc = selection.countryCode?.uppercase()
-        if (!selection.city.isNullOrBlank()) {
-            findIn(filtered.cities, cc) { loc ->
-                runCatching { loc.name }.getOrNull()?.equals(selection.city, ignoreCase = true) == true
-            }?.let { return it }
-        }
-        if (!selection.region.isNullOrBlank()) {
-            findIn(filtered.regions, cc) { loc ->
-                runCatching { loc.name }.getOrNull()?.equals(selection.region, ignoreCase = true) == true
-            }?.let { return it }
-        }
-        if (cc != null) {
-            findIn(filtered.countries, cc) { true }?.let { return it }
-        }
-        return null
-    }
-
-    private inline fun findIn(
-        list: ConnectLocationList?,
-        countryCode: String?,
-        predicate: (ConnectLocation) -> Boolean,
-    ): ConnectLocation? {
-        if (list == null) return null
-        val n = list.len()
-        for (i in 0 until n) {
-            val loc = list.get(i) ?: continue
-            if (countryCode != null &&
-                runCatching { loc.countryCode }.getOrNull()?.uppercase() != countryCode
-            ) {
-                continue
-            }
-            if (predicate(loc)) return loc
-        }
-        return null
     }
 
     private companion object {
@@ -696,10 +539,5 @@ class RealUrnetworkSdkBridge(
         const val STOP_TIMEOUT_MS = 3_000L
         const val DEFAULT_APP_VERSION = "0.0.2"
         const val WINDOW_SIZE_MAX_EXPERIMENTAL = 6L
-        const val PREFERRED_COUNTRY_TIMEOUT_MS = 8_000L
-        const val WALLET_FETCH_TIMEOUT_MS = 5_000L
-        const val WALLET_ADD_TIMEOUT_MS = 10_000L
-        const val WALLET_LOG_PREFIX = 8
-        const val WALLET_BLOCKCHAIN_SOLANA = "solana"
     }
 }

@@ -23,6 +23,7 @@ import ru.ozero.engineurnetwork.DataStoreUrnetworkConfigStore
 import ru.ozero.engineurnetwork.EngineUrnetwork
 import ru.ozero.engineurnetwork.RealUrnetworkSdkBridge
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
+import ru.ozero.engineurnetwork.UrnetworkContractStatusObserver
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.auth.RealUrnetworkAuthService
 import ru.ozero.engineurnetwork.auth.UrnetworkAuthService
@@ -97,4 +98,25 @@ object UrnetworkModule {
     fun provideUrnetworkBalanceRepository(
         bridge: UrnetworkSdkBridge,
     ): UrnetworkBalanceRepository = RealUrnetworkBalanceRepository(bridge = bridge)
+
+    @Provides
+    @Singleton
+    fun provideUrnetworkContractStatusObserver(
+        @ApplicationContext context: Context,
+        bridge: UrnetworkSdkBridge,
+        tunnelController: TunnelController,
+    ): UrnetworkContractStatusObserver = UrnetworkContractStatusObserver(
+        bridge = bridge,
+        tunnelController = tunnelController,
+        requestStopVpn = { reason ->
+            val intent = android.content.Intent(
+                context,
+                ru.ozero.commonvpn.OzeroVpnService::class.java,
+            ).apply {
+                action = ru.ozero.commonvpn.OzeroVpnService.ACTION_STOP
+                putExtra("stop_reason", reason)
+            }
+            androidx.core.content.ContextCompat.startForegroundService(context, intent)
+        },
+    )
 }
