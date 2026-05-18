@@ -180,7 +180,9 @@ class UrnetworkEngineSettingsViewModelTest {
     fun `allowDirect StateFlow отражает значение из configStore`() = runTest {
         val store = fakeUrnetworkConfigStore()
         store.setAllowDirect(false)
-        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(), FakeSettingsRepo(), store, idleTunnel(), fakeBalanceRepo())
+        val vm = UrnetworkEngineSettingsViewModel(
+            FakeUrnetworkBridge(), FakeSettingsRepo(), store, idleTunnel(), fakeBalanceRepo(),
+        )
         advanceUntilIdle()
         assertEquals(false, vm.allowDirect.value)
     }
@@ -243,7 +245,9 @@ class UrnetworkEngineSettingsViewModelTest {
     @Test
     fun `windowType StateFlow отражает начальное значение из configStore`() = runTest {
         val store = fakeUrnetworkConfigStore()
-        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(), FakeSettingsRepo(), store, idleTunnel(), fakeBalanceRepo())
+        val vm = UrnetworkEngineSettingsViewModel(
+            FakeUrnetworkBridge(), FakeSettingsRepo(), store, idleTunnel(), fakeBalanceRepo(),
+        )
         advanceUntilIdle()
         assertEquals(UrnetworkWindowType.AUTO, vm.windowType.value)
     }
@@ -690,7 +694,9 @@ private class FakeBalanceRepository(
     private val _state = MutableStateFlow(initial)
     override val state: StateFlow<UrnetworkBalanceState> = _state.asStateFlow()
     val refreshCallCount = AtomicInteger(0)
-    override suspend fun refresh() { refreshCallCount.incrementAndGet() }
+    override suspend fun refresh() {
+        refreshCallCount.incrementAndGet()
+    }
 }
 
 private fun fakeBalanceRepo() = FakeBalanceRepository()
