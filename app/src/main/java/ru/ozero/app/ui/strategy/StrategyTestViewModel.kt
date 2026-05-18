@@ -286,9 +286,7 @@ class StrategyTestViewModel @Inject constructor(
             runCatching { repository.setByedpiWinningArgs(command) }
                 .onFailure { PersistentLoggers.warn(TAG, "onApply failed: ${it.message}") }
             withContext(ioDispatcher) {
-                val updated = runCatching { savedStrategyStore.add(command) }.getOrElse { savedStrategyStore.load() }
-                _savedStrategies.value = updated
-                val savedName = updated.find { it.command == command }?.name
+                val savedName = _savedStrategies.value.find { it.command == command }?.name
                 val newHistory = runCatching { usageHistoryStore.record(command, savedName) }
                     .onFailure { PersistentLoggers.warn(TAG, "history record failed: ${it.message}") }
                     .getOrNull()
@@ -333,7 +331,6 @@ class StrategyTestViewModel @Inject constructor(
             isInitializing = true,
         )
         var lastBestFitness = 0.0
-        var lastBestCommand: String? = null
         val best = evolutionEngine.evolve(
             seedStrategies = seedCommands,
             onGeneration = { result ->
@@ -358,14 +355,6 @@ class StrategyTestViewModel @Inject constructor(
                 _runSummary.value = "Gen ${result.generation}/$maxGen · доступность $successPct%"
                 if (result.bestFitness > lastBestFitness) {
                     lastBestFitness = result.bestFitness
-                    val cmd = result.best.toCommand()
-                    if (cmd.isNotBlank() && cmd != lastBestCommand) {
-                        lastBestCommand = cmd
-                        viewModelScope.launch(ioDispatcher) {
-                            runCatching { savedStrategyStore.add(cmd) }
-                                .onSuccess { _savedStrategies.value = it }
-                        }
-                    }
                 }
             },
             onChromosomeEval = { index, total, command ->
@@ -379,12 +368,6 @@ class StrategyTestViewModel @Inject constructor(
             },
         )
         val finalCmd = best.toCommand()
-        if (finalCmd.isNotBlank() && lastBestFitness > 0.0) {
-            withContext(ioDispatcher) {
-                runCatching { savedStrategyStore.add(finalCmd) }
-                    .onSuccess { _savedStrategies.value = it }
-            }
-        }
         withContext(ioDispatcher) {
             runCatching { savedStrategyStore.markVerified(seedCommands.toSet(), System.currentTimeMillis()) }
                 .onSuccess { _savedStrategies.value = it }
