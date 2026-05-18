@@ -22,10 +22,16 @@ interface UrnetworkConfigStore {
     fun provideNetworkMode(): Flow<UrnetworkProvideNetworkMode> = flowOf(UrnetworkProvideNetworkMode.WIFI)
     suspend fun setProvideNetworkMode(value: UrnetworkProvideNetworkMode) = Unit
 
-    fun selectedCountryCode(): Flow<String?> = flowOf(null)
-    suspend fun setSelectedCountryCode(value: String?) = Unit
-    fun selectedRegion(): Flow<String?> = flowOf(null)
-    suspend fun setSelectedRegion(value: String?) = Unit
-    fun selectedCity(): Flow<String?> = flowOf(null)
-    suspend fun setSelectedCity(value: String?) = Unit
+    fun selectedLocation(): Flow<UrnetworkLocationSelection> = flowOf(UrnetworkLocationSelection.EMPTY)
+    suspend fun setSelectedLocation(value: UrnetworkLocationSelection) = Unit
+}
+
+data class UrnetworkLocationSelection(
+    val countryCode: String?,
+    val region: String?,
+    val city: String?,
+) {
+    companion object {
+        val EMPTY = UrnetworkLocationSelection(null, null, null)
+    }
 }

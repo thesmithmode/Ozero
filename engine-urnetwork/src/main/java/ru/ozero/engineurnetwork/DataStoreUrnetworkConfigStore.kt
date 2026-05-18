@@ -1,6 +1,7 @@
 package ru.ozero.engineurnetwork
 
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -98,36 +99,19 @@ class DataStoreUrnetworkConfigStore(
         dataStore.edit { prefs -> prefs[KEY_PROVIDE_NETWORK_MODE] = value.rawValue }
     }
 
-    override fun selectedCountryCode(): Flow<String?> = dataStore.data.map { prefs ->
-        prefs[KEY_SELECTED_COUNTRY_CODE]?.takeIf { it.isNotBlank() }
+    override fun selectedLocation(): Flow<UrnetworkLocationSelection> = dataStore.data.map { prefs ->
+        UrnetworkLocationSelection(
+            countryCode = prefs[KEY_SELECTED_COUNTRY_CODE]?.takeIf { it.isNotBlank() },
+            region = prefs[KEY_SELECTED_REGION]?.takeIf { it.isNotBlank() },
+            city = prefs[KEY_SELECTED_CITY]?.takeIf { it.isNotBlank() },
+        )
     }
 
-    override suspend fun setSelectedCountryCode(value: String?) {
+    override suspend fun setSelectedLocation(value: UrnetworkLocationSelection) {
         dataStore.edit { prefs ->
-            if (value.isNullOrBlank()) prefs.remove(KEY_SELECTED_COUNTRY_CODE)
-            else prefs[KEY_SELECTED_COUNTRY_CODE] = value.trim().uppercase()
-        }
-    }
-
-    override fun selectedRegion(): Flow<String?> = dataStore.data.map { prefs ->
-        prefs[KEY_SELECTED_REGION]?.takeIf { it.isNotBlank() }
-    }
-
-    override suspend fun setSelectedRegion(value: String?) {
-        dataStore.edit { prefs ->
-            if (value.isNullOrBlank()) prefs.remove(KEY_SELECTED_REGION)
-            else prefs[KEY_SELECTED_REGION] = value.trim()
-        }
-    }
-
-    override fun selectedCity(): Flow<String?> = dataStore.data.map { prefs ->
-        prefs[KEY_SELECTED_CITY]?.takeIf { it.isNotBlank() }
-    }
-
-    override suspend fun setSelectedCity(value: String?) {
-        dataStore.edit { prefs ->
-            if (value.isNullOrBlank()) prefs.remove(KEY_SELECTED_CITY)
-            else prefs[KEY_SELECTED_CITY] = value.trim()
+            prefs.writeOrRemove(KEY_SELECTED_COUNTRY_CODE, value.countryCode?.trim()?.uppercase())
+            prefs.writeOrRemove(KEY_SELECTED_REGION, value.region?.trim())
+            prefs.writeOrRemove(KEY_SELECTED_CITY, value.city?.trim())
         }
     }
 
@@ -144,4 +128,8 @@ class DataStoreUrnetworkConfigStore(
         val KEY_SELECTED_REGION = stringPreferencesKey("urnetwork_selected_region")
         val KEY_SELECTED_CITY = stringPreferencesKey("urnetwork_selected_city")
     }
+}
+
+private fun MutablePreferences.writeOrRemove(key: Preferences.Key<String>, value: String?) {
+    value?.takeIf { it.isNotBlank() }?.let { this[key] = it } ?: remove(key)
 }

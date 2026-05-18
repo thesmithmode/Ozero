@@ -126,89 +126,83 @@ class UrnetworkConfigStoreTest {
     }
 
     @Test
-    fun `selectedCountryCode по умолчанию null`() = runTest {
+    fun `selectedLocation по умолчанию EMPTY`() = runTest {
         val (store, _) = newStore()
-        assertNull(store.selectedCountryCode().first())
+        assertEquals(UrnetworkLocationSelection.EMPTY, store.selectedLocation().first())
     }
 
     @Test
-    fun `setSelectedCountryCode сохраняет код в uppercase trimmed`() = runTest {
+    fun `setSelectedLocation сохраняет country uppercase trimmed`() = runTest {
         val (store, _) = newStore()
-        store.setSelectedCountryCode("  de  ")
-        assertEquals("DE", store.selectedCountryCode().first())
+        store.setSelectedLocation(UrnetworkLocationSelection("  de  ", null, null))
+        assertEquals("DE", store.selectedLocation().first().countryCode)
     }
 
     @Test
-    fun `setSelectedCountryCode(null) очищает выбор`() = runTest {
+    fun `setSelectedLocation country=null очищает country`() = runTest {
         val (store, _) = newStore()
-        store.setSelectedCountryCode("US")
-        store.setSelectedCountryCode(null)
-        assertNull(store.selectedCountryCode().first())
+        store.setSelectedLocation(UrnetworkLocationSelection("US", null, null))
+        store.setSelectedLocation(UrnetworkLocationSelection(null, null, null))
+        assertNull(store.selectedLocation().first().countryCode)
     }
 
     @Test
-    fun `setSelectedCountryCode пустую строку трактует как null`() = runTest {
+    fun `setSelectedLocation пустая country трактуется как null`() = runTest {
         val (store, _) = newStore()
-        store.setSelectedCountryCode("US")
-        store.setSelectedCountryCode("   ")
-        assertNull(store.selectedCountryCode().first())
+        store.setSelectedLocation(UrnetworkLocationSelection("US", null, null))
+        store.setSelectedLocation(UrnetworkLocationSelection("   ", null, null))
+        assertNull(store.selectedLocation().first().countryCode)
     }
 
     @Test
-    fun `selectedRegion по умолчанию null`() = runTest {
+    fun `setSelectedLocation сохраняет region trimmed`() = runTest {
         val (store, _) = newStore()
-        assertNull(store.selectedRegion().first())
+        store.setSelectedLocation(UrnetworkLocationSelection(null, "  Bavaria  ", null))
+        assertEquals("Bavaria", store.selectedLocation().first().region)
     }
 
     @Test
-    fun `setSelectedRegion сохраняет trimmed`() = runTest {
+    fun `setSelectedLocation region=null очищает`() = runTest {
         val (store, _) = newStore()
-        store.setSelectedRegion("  Bavaria  ")
-        assertEquals("Bavaria", store.selectedRegion().first())
+        store.setSelectedLocation(UrnetworkLocationSelection(null, "Bavaria", null))
+        store.setSelectedLocation(UrnetworkLocationSelection(null, null, null))
+        assertNull(store.selectedLocation().first().region)
     }
 
     @Test
-    fun `setSelectedRegion(null) очищает`() = runTest {
+    fun `setSelectedLocation сохраняет city trimmed`() = runTest {
         val (store, _) = newStore()
-        store.setSelectedRegion("Bavaria")
-        store.setSelectedRegion(null)
-        assertNull(store.selectedRegion().first())
+        store.setSelectedLocation(UrnetworkLocationSelection(null, null, "  Munich  "))
+        assertEquals("Munich", store.selectedLocation().first().city)
     }
 
     @Test
-    fun `selectedCity по умолчанию null`() = runTest {
+    fun `setSelectedLocation city=null очищает`() = runTest {
         val (store, _) = newStore()
-        assertNull(store.selectedCity().first())
+        store.setSelectedLocation(UrnetworkLocationSelection(null, null, "Munich"))
+        store.setSelectedLocation(UrnetworkLocationSelection(null, null, null))
+        assertNull(store.selectedLocation().first().city)
     }
 
     @Test
-    fun `setSelectedCity сохраняет trimmed`() = runTest {
+    fun `country region city персистятся атомарно`() = runTest {
         val (store, _) = newStore()
-        store.setSelectedCity("  Munich  ")
-        assertEquals("Munich", store.selectedCity().first())
+        store.setSelectedLocation(UrnetworkLocationSelection("DE", "Bavaria", "Munich"))
+        val snap = store.selectedLocation().first()
+        assertEquals("DE", snap.countryCode)
+        assertEquals("Bavaria", snap.region)
+        assertEquals("Munich", snap.city)
     }
 
     @Test
-    fun `setSelectedCity(null) очищает`() = runTest {
+    fun `setSelectedLocation частичное обновление сбрасывает остальные`() = runTest {
         val (store, _) = newStore()
-        store.setSelectedCity("Munich")
-        store.setSelectedCity(null)
-        assertNull(store.selectedCity().first())
-    }
-
-    @Test
-    fun `country region city хранятся независимо`() = runTest {
-        val (store, _) = newStore()
-        store.setSelectedCountryCode("DE")
-        store.setSelectedRegion("Bavaria")
-        store.setSelectedCity("Munich")
-        assertEquals("DE", store.selectedCountryCode().first())
-        assertEquals("Bavaria", store.selectedRegion().first())
-        assertEquals("Munich", store.selectedCity().first())
-        store.setSelectedRegion(null)
-        assertEquals("DE", store.selectedCountryCode().first())
-        assertNull(store.selectedRegion().first())
-        assertEquals("Munich", store.selectedCity().first())
+        store.setSelectedLocation(UrnetworkLocationSelection("DE", "Bavaria", "Munich"))
+        store.setSelectedLocation(UrnetworkLocationSelection("DE", null, "Munich"))
+        val snap = store.selectedLocation().first()
+        assertEquals("DE", snap.countryCode)
+        assertNull(snap.region)
+        assertEquals("Munich", snap.city)
     }
 
     private class FakePreferencesDataStore : DataStore<Preferences> {
