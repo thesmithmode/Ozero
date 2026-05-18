@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
@@ -159,7 +160,6 @@ fun StrategyTestScreen(
     StrategyTestScaffold(
         isRunning = isRunning,
         strategies = strategies,
-        domainLists = domainLists,
         savedStrategies = savedStrategies,
         evolutionState = evolutionState,
         runSummary = runSummary,
@@ -172,7 +172,6 @@ fun StrategyTestScreen(
                 SheetTarget.DomainLists -> showDomainLists = true
             }
         },
-        onToggleDomainList = viewModel::onToggleDomainList,
         onModeChange = { deep ->
             if (!isRunning) viewModel.onSettingsChange(settings.copy(evolutionMode = deep))
         },
@@ -189,14 +188,12 @@ private enum class SheetTarget { Saved, Settings, DomainLists }
 private fun StrategyTestScaffold(
     isRunning: Boolean,
     strategies: List<StrategyResult>,
-    domainLists: List<DomainList>,
     savedStrategies: List<SavedStrategy>,
     evolutionState: EvolutionUiState?,
     runSummary: String,
     settings: StrategyTestSettings,
     onBack: () -> Unit,
     onShowSheet: (SheetTarget) -> Unit,
-    onToggleDomainList: (String) -> Unit,
     onModeChange: (deep: Boolean) -> Unit,
     onRunToggle: () -> Unit,
     onApply: (String) -> Unit,
@@ -218,6 +215,15 @@ private fun StrategyTestScaffold(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = { onShowSheet(SheetTarget.DomainLists) },
+                        modifier = Modifier.testTag("domain_lists_btn"),
+                    ) {
+                        Icon(
+                            Icons.Filled.List,
+                            contentDescription = stringResource(R.string.domain_lists_title),
+                        )
+                    }
                     IconButton(
                         onClick = { onShowSheet(SheetTarget.Saved) },
                         modifier = Modifier.testTag("saved_strategies_btn"),
@@ -249,12 +255,6 @@ private fun StrategyTestScaffold(
                         enabled = !isRunning,
                         onModeChange = onModeChange,
                     )
-                    DomainListsHeader(
-                        lists = domainLists,
-                        onToggle = onToggleDomainList,
-                        onManageClick = { onShowSheet(SheetTarget.DomainLists) },
-                        enabled = !isRunning,
-                    )
                     Button(
                         onClick = onRunToggle,
                         modifier = Modifier
@@ -267,6 +267,13 @@ private fun StrategyTestScaffold(
                             stringResource(
                                 if (isRunning) R.string.strategy_test_stop else R.string.strategy_test_start,
                             ),
+                        )
+                    }
+                    if (isRunning && !isDeepMode && strategies.isEmpty()) {
+                        LinearProgressIndicator(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("strategy_test_running_progress"),
                         )
                     }
                     if (runSummary.isNotBlank()) {
@@ -341,59 +348,6 @@ private fun ScanModeSelector(
             modifier = Modifier.testTag("scan_mode_deep"),
         ) {
             Text(stringResource(R.string.scan_mode_deep))
-        }
-    }
-}
-
-@Composable
-private fun DomainListsHeader(
-    lists: List<DomainList>,
-    onToggle: (String) -> Unit,
-    onManageClick: () -> Unit,
-    enabled: Boolean,
-) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        modifier = Modifier.fillMaxWidth().testTag("domain_lists_header"),
-    ) {
-        Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    text = stringResource(R.string.domain_lists_title),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                TextButton(
-                    onClick = onManageClick,
-                    modifier = Modifier.testTag("domain_lists_manage_btn"),
-                ) {
-                    Text(stringResource(R.string.domain_lists_manage))
-                }
-            }
-            lists.forEach { list ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("domain_list_row_${list.id}"),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Checkbox(
-                        checked = list.isActive,
-                        onCheckedChange = { if (enabled) onToggle(list.id) },
-                        enabled = enabled,
-                        modifier = Modifier.testTag("domain_list_check_${list.id}"),
-                    )
-                    Text(
-                        text = "${list.name} (${list.domains.size})",
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
         }
     }
 }
