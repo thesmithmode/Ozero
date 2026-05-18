@@ -248,6 +248,89 @@ class UrnetworkEngineSettingsViewModelTest {
     }
 
     @Test
+    fun `accountPoints null когда engine не активен — не дёргает fetch`() = runTest {
+        val bridge = FakeUrnetworkBridge(connected = false)
+        bridge.accountPointsResult = UrnetworkSdkBridge.AccountPointsSnapshot(
+            totalPoints = 42.0,
+            payoutPoints = 30.0,
+            referralPoints = 5.0,
+            reliabilityPoints = 4.0,
+            multiplierPoints = 3.0,
+        )
+        val vm = UrnetworkEngineSettingsViewModel(
+            bridge,
+            FakeSettingsRepo(),
+            FakeUrnetworkConfigStore(),
+            idleTunnel(),
+        )
+        val collector = backgroundScope.launch { vm.accountPoints.collect { } }
+        advanceTimeBy(50L)
+        runCurrent()
+        assertNull(vm.accountPoints.value, "engine не активен → accountPoints null")
+        assertEquals(
+            0,
+            bridge.fetchAccountPointsCallCount.get(),
+            "fetchAccountPoints не должен дёргаться когда engine не активен",
+        )
+        collector.cancel()
+    }
+
+    @Test
+    fun `accountPoints poll-flow эмитит snapshot когда engine активен`() = runTest {
+        val snapshot = UrnetworkSdkBridge.AccountPointsSnapshot(
+            totalPoints = 123.45,
+            payoutPoints = 100.0,
+            referralPoints = 10.0,
+            reliabilityPoints = 8.45,
+            multiplierPoints = 5.0,
+        )
+        val bridge = FakeUrnetworkBridge(connected = true)
+        bridge.accountPointsResult = snapshot
+        val vm = UrnetworkEngineSettingsViewModel(
+            bridge,
+            FakeSettingsRepo(),
+            FakeUrnetworkConfigStore(),
+            activeTunnel(),
+        )
+        val collector = backgroundScope.launch { vm.accountPoints.collect { } }
+        advanceTimeBy(100L)
+        runCurrent()
+        assertEquals(snapshot, vm.accountPoints.value)
+        assertEquals(1, bridge.fetchAccountPointsCallCount.get(), "первый poll сразу при active")
+        collector.cancel()
+    }
+
+    @Test
+    fun `accountPoints poll повторяется через 30s — sentinel auto-refresh`() = runTest {
+        val bridge = FakeUrnetworkBridge(connected = true)
+        bridge.accountPointsResult = UrnetworkSdkBridge.AccountPointsSnapshot(
+            totalPoints = 1.0,
+            payoutPoints = 1.0,
+            referralPoints = 0.0,
+            reliabilityPoints = 0.0,
+            multiplierPoints = 0.0,
+        )
+        val vm = UrnetworkEngineSettingsViewModel(
+            bridge,
+            FakeSettingsRepo(),
+            FakeUrnetworkConfigStore(),
+            activeTunnel(),
+        )
+        val collector = backgroundScope.launch { vm.accountPoints.collect { } }
+        advanceTimeBy(100L)
+        runCurrent()
+        val initialCount = bridge.fetchAccountPointsCallCount.get()
+        advanceTimeBy(30_000L)
+        runCurrent()
+        kotlin.test.assertTrue(
+            bridge.fetchAccountPointsCallCount.get() > initialCount,
+            "после 30s интервала должен быть второй poll. initial=$initialCount " +
+                "current=${bridge.fetchAccountPointsCallCount.get()}",
+        )
+        collector.cancel()
+    }
+
+    @Test
     fun `sentinel — init использует collectLatest а не collect`() {
         val source = java.io.File(
             System.getProperty("user.dir") ?: ".",
@@ -515,4 +598,11 @@ private class FakeUrnetworkBridge(
     override fun unpaidByteCount(): Long = 0L
     override fun fetchTransferStats() = Unit
     override suspend fun fetchSubscriptionBalance(): UrnetworkSdkBridge.SubscriptionBalanceSnapshot? = null
+
+    var accountPointsResult: UrnetworkSdkBridge.AccountPointsSnapshot? = null
+    val fetchAccountPointsCallCount = AtomicInteger(0)
+    override suspend fun fetchAccountPoints(): UrnetworkSdkBridge.AccountPointsSnapshot? {
+        fetchAccountPointsCallCount.incrementAndGet()
+        return accountPointsResult
+    }
 }

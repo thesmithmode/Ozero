@@ -138,6 +138,7 @@ fun UrnetworkEngineSettingsScreen(
                 val provideControlMode by viewModel.provideControlMode.collectAsStateWithLifecycle()
                 val provideNetworkMode by viewModel.provideNetworkMode.collectAsStateWithLifecycle()
                 val sharedTrafficBytes by viewModel.sharedTrafficBytes.collectAsStateWithLifecycle()
+                val accountPoints by viewModel.accountPoints.collectAsStateWithLifecycle()
                 LocationListContent(
                     modifier = Modifier.padding(padding),
                     countries = current.countries,
@@ -153,6 +154,7 @@ fun UrnetworkEngineSettingsScreen(
                     provideControlMode = provideControlMode,
                     provideNetworkMode = provideNetworkMode,
                     sharedTrafficBytes = sharedTrafficBytes,
+                    accountPoints = accountPoints,
                     insufficientBalance = insufficientBalance,
                     onSearchQueryChange = viewModel::setSearchQuery,
                     onSelect = viewModel::selectLocation,
@@ -185,6 +187,7 @@ private fun LocationListContent(
     provideControlMode: UrnetworkProvideControlMode,
     provideNetworkMode: UrnetworkProvideNetworkMode,
     sharedTrafficBytes: Long,
+    accountPoints: UrnetworkSdkBridge.AccountPointsSnapshot?,
     insufficientBalance: Boolean,
     onSearchQueryChange: (String) -> Unit,
     onSelect: (UrnetworkSdkBridge.LocationToken?) -> Unit,
@@ -203,6 +206,14 @@ private fun LocationListContent(
         if (insufficientBalance) {
             item {
                 InsufficientBalanceBanner(modifier = Modifier.padding(top = 12.dp))
+            }
+        }
+        if (accountPoints != null) {
+            item {
+                AccountPointsCard(
+                    points = accountPoints,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
             }
         }
         item {
@@ -618,6 +629,64 @@ private fun SharedTrafficSection(sharedTrafficBytes: Long, onClick: () -> Unit) 
         }
         Text(text = "›", style = MaterialTheme.typography.bodyLarge, color = OzeroPalette.Text3)
     }
+}
+
+@Composable
+private fun AccountPointsCard(
+    points: UrnetworkSdkBridge.AccountPointsSnapshot,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth().testTag("urnetwork_points_card"),
+        colors = CardDefaults.cardColors(containerColor = OzeroPalette.Bg1),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = stringResource(R.string.urnetwork_points_title),
+                style = MaterialTheme.typography.titleSmall,
+                color = OzeroPalette.Text2,
+            )
+            Text(
+                text = formatPoints(points.totalPoints),
+                style = MaterialTheme.typography.headlineSmall,
+                color = OzeroPalette.Text,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            PointsRow(stringResource(R.string.urnetwork_points_payout), points.payoutPoints)
+            PointsRow(stringResource(R.string.urnetwork_points_referral), points.referralPoints)
+            PointsRow(stringResource(R.string.urnetwork_points_reliability), points.reliabilityPoints)
+            PointsRow(stringResource(R.string.urnetwork_points_multiplier), points.multiplierPoints)
+        }
+    }
+}
+
+@Composable
+private fun PointsRow(label: String, value: Double) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = OzeroPalette.Text3,
+        )
+        Text(
+            text = formatPoints(value),
+            style = MaterialTheme.typography.bodyMedium,
+            color = OzeroPalette.Text2,
+        )
+    }
+}
+
+private fun formatPoints(value: Double): String {
+    if (value <= 0.0) return "0"
+    if (value < 100.0) return "%.2f".format(value)
+    if (value < 10_000.0) return "%.1f".format(value)
+    return value.toLong().toString()
 }
 
 @Composable
