@@ -136,12 +136,6 @@ Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniForceClose(__attribute__((unused)) JNI
     }
     int rc = close(server_fd);
     server_fd = -1;
-    /* Guard g_proxy_running НЕ сбрасываем здесь — отпустит jniStartProxy после
-     * возврата main(). Premature release провоцировал race: вторая jniStartProxy
-     * проходила CAS пока старая main() ещё в cleanup → concurrent main() с
-     * shared upstream globals (server_fd, params) = memory corruption.
-     * Recovery от wedged main() — через jniEmergencyReset, вызываемый Kotlin'ом
-     * ТОЛЬКО после code == JNI_GUARD_BUSY (т.е. после полного cleanup sequence). */
     return rc;
 }
 

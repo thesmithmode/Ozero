@@ -276,7 +276,7 @@ class ByeDpiEngineTest {
     }
 
     @Test
-    fun startFailureNoStopProxyWhenProxyReturnedErrorImmediately() = runTest {
+    fun `start failure with main returning -1 must forceClose to reset upstream server_fd`() = runTest {
         val failEngine = ByeDpiEngine(
             proxy,
             socksProbe = { _, _, _ -> throw IOException("refused") },
@@ -286,7 +286,37 @@ class ByeDpiEngineTest {
         val result = failEngine.start(EngineConfig.ByeDpi(socksPort = 19001))
         assertIs<StartResult.Failure>(result)
         coVerify(exactly = 0) { proxy.stopProxy() }
-        coVerify(exactly = 0) { proxy.forceClose() }
+        coVerify(atLeast = 1) { proxy.forceClose() }
+    }
+
+    @Test
+    fun `start failure clears upstream server_fd so next start can bind same port`() = runTest {
+        var callCount = 0
+        val recProxy = mockk<ByeDpiProxy>(relaxed = true)
+        every { recProxy.startProxy(any()) } answers {
+            if (callCount++ == 0) -1 else 0
+        }
+        val recEngine = ByeDpiEngine(
+            recProxy,
+            socksProbe = { _, _, _ ->
+                if (callCount == 1) throw IOException("refused") else 1L
+            },
+            readyTotalTimeoutMs = 300,
+        )
+        val first = recEngine.start(EngineConfig.ByeDpi(socksPort = 1080))
+        assertIs<StartResult.Failure>(first)
+        coVerify(atLeast = 1) { recProxy.forceClose() }
+        val second = recEngine.start(EngineConfig.ByeDpi(socksPort = 1080))
+        assertIs<StartResult.Success>(second)
+    }
+
+    @Test
+    fun `stop always forceClose after join — server_fd reset guarantees clean next start`() = runTest {
+        every { proxy.startProxy(any()) } returns 0
+        engine.start(EngineConfig.ByeDpi(socksPort = 1080))
+        engine.stop()
+        coVerify(atLeast = 1) { proxy.stopProxy() }
+        coVerify(atLeast = 1) { proxy.forceClose() }
     }
 
     @Test

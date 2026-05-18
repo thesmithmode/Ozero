@@ -115,13 +115,10 @@ class ByeDpiEngine(
                 runCatching { proxy.stopProxy() }
                     .onFailure { PersistentLoggers.warn(TAG, "jniStopProxy on failure: ${it.message}") }
                 withTimeoutOrNull(STOP_GRACE_MS) { proxyJob.join() }
-                if (proxyJob.isActive) {
-                    PersistentLoggers.warn(TAG, "proxyJob всё ещё активен — jniForceClose в failure path")
-                    runCatching { proxy.forceClose() }
-                        .onFailure { PersistentLoggers.warn(TAG, "jniForceClose on failure: ${it.message}") }
-                }
             }
-            proxyJob.cancel()
+            runCatching { proxy.forceClose() }
+                .onFailure { PersistentLoggers.warn(TAG, "jniForceClose on failure: ${it.message}") }
+            if (proxyJob.isActive) proxyJob.cancel()
             proxyJobRef.compareAndSet(proxyJob, null)
             StartResult.Failure(reason = "byedpi не открыл socks порт ${config.socksPort}")
         }
@@ -190,12 +187,12 @@ class ByeDpiEngine(
                     true
                 }
                 if (completed == null) {
-                    PersistentLoggers.warn(TAG, "proxyJob не завершился за ${STOP_GRACE_MS}ms — jniForceClose")
-                    runCatching { proxy.forceClose() }
-                        .onFailure { PersistentLoggers.warn(TAG, "jniForceClose исключение: ${it.message}") }
+                    PersistentLoggers.warn(TAG, "proxyJob не завершился за ${STOP_GRACE_MS}ms")
                     job.cancel()
                 }
             }
+            runCatching { proxy.forceClose() }
+                .onFailure { PersistentLoggers.warn(TAG, "jniForceClose исключение: ${it.message}") }
             activeSocksPort = 0
         }
     }
