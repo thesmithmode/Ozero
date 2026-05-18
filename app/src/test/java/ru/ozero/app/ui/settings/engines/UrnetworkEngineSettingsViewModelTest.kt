@@ -22,9 +22,11 @@ import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
 import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.UrnetworkWindowType
+import ru.ozero.engineurnetwork.allowDirect
 import ru.ozero.engineurnetwork.fixedIpSize
 import ru.ozero.engineurnetwork.provideControlMode
 import ru.ozero.engineurnetwork.provideNetworkMode
+import ru.ozero.engineurnetwork.setAllowDirect
 import ru.ozero.engineurnetwork.setFixedIpSize
 import ru.ozero.engineurnetwork.windowType
 import java.util.concurrent.atomic.AtomicInteger
@@ -131,6 +133,49 @@ class UrnetworkEngineSettingsViewModelTest {
         advanceUntilIdle()
         assertEquals(true, store.fixedIpSize().first())
         assertEquals(true, bridge.lastAppliedFixedIp)
+    }
+
+    @Test
+    fun `toggleAllowDirect false сохраняет в configStore и применяет profile`() = runTest {
+        val bridge = FakeUrnetworkBridge()
+        val store = fakeUrnetworkConfigStore()
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel())
+        vm.toggleAllowDirect(false)
+        advanceUntilIdle()
+        assertEquals(false, store.allowDirect().first())
+        assertEquals(false, bridge.lastAppliedAllowDirect)
+    }
+
+    @Test
+    fun `toggleAllowDirect true возвращает direct connections`() = runTest {
+        val bridge = FakeUrnetworkBridge()
+        val store = fakeUrnetworkConfigStore()
+        store.setAllowDirect(false)
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel())
+        vm.toggleAllowDirect(true)
+        advanceUntilIdle()
+        assertEquals(true, store.allowDirect().first())
+        assertEquals(true, bridge.lastAppliedAllowDirect)
+    }
+
+    @Test
+    fun `toggleAllowDirect не вызывает bridge при idle engine`() = runTest {
+        val bridge = FakeUrnetworkBridge()
+        val store = fakeUrnetworkConfigStore()
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, idleTunnel())
+        vm.toggleAllowDirect(false)
+        advanceUntilIdle()
+        assertEquals(false, store.allowDirect().first())
+        assertEquals(null, bridge.lastAppliedAllowDirect, "bridge не должен трогаться при idle engine")
+    }
+
+    @Test
+    fun `allowDirect StateFlow отражает значение из configStore`() = runTest {
+        val store = fakeUrnetworkConfigStore()
+        store.setAllowDirect(false)
+        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(), FakeSettingsRepo(), store, idleTunnel())
+        advanceUntilIdle()
+        assertEquals(false, vm.allowDirect.value)
     }
 
     @Test

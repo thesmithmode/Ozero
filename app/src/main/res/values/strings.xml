@@ -16,10 +16,6 @@
     <string name="main_status_disconnecting">Отключение…</string>
     <string name="main_status_failed">Ошибка</string>
     <string name="main_status_urnetwork_searching">Поиск пиров…</string>
-    <string name="main_toggle_fixed_ip">Фиксированный IP</string>
-    <string name="main_toggle_fixed_ip_hint">Один peer вместо нескольких — IP стабильнее, скорость ниже</string>
-    <string name="main_toggle_enhanced_anonymization">Усиленная анонимизация</string>
-    <string name="main_toggle_enhanced_anonymization_hint">Запретить прямые соединения — весь трафик через relay</string>
     <string name="main_active_engine">Активный движок: %1$s</string>
     <string name="stats_session">Сессия: ↓ %1$s ↑ %2$s</string>
     <string name="stats_uptime">Время: %1$s</string>
@@ -305,6 +301,7 @@
     <string name="urnetwork_mode_hint">Веб — низкая задержка для браузинга. Стриминг — большая ширина для видео.</string>
     <string name="urnetwork_fixed_ip_size">Фиксированный exit-IP</string>
     <string name="urnetwork_fixed_ip_size_hint">Один peer вместо пула — стабильный IP сессии</string>
+    <string name="urnetwork_enhanced_anonymization">Усиленная анонимизация</string>
     <string name="urnetwork_about_title">Что такое URnetwork</string>
     <string name="urnetwork_about_body">URnetwork — самая локальная и приватная сеть в мире. Запатентованный протокол держит участников в безопасности. Сейчас в сети больше 30 000 провайдеров, известных инцидентов — ноль.</string>
     <string name="settings_urnetwork_title">URnetwork</string>

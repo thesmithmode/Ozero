@@ -285,6 +285,7 @@
     <string name="urnetwork_mode_hint">Web — low latency for browsing. Streaming — high bandwidth for video.</string>
     <string name="urnetwork_fixed_ip_size">Fixed exit IP</string>
     <string name="urnetwork_fixed_ip_size_hint">Single peer instead of pool — stable session IP</string>
+    <string name="urnetwork_enhanced_anonymization">Enhanced anonymization</string>
     <string name="urnetwork_about_title">About URnetwork</string>
     <string name="urnetwork_about_body">URnetwork is the most local and most private network on the planet. A patented protocol keeps participants safe. The mesh has more than 30,000 providers today and zero known incidents.</string>
     <string name="settings_urnetwork_title">URnetwork</string>

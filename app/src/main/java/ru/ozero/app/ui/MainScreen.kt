@@ -26,7 +26,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -91,9 +90,6 @@ fun MainScreen(
     val killswitchActive by viewModel.killswitchActive.collectAsStateWithLifecycle()
     val switching by viewModel.switching.collectAsStateWithLifecycle()
     val isReconnecting by viewModel.isReconnecting.collectAsStateWithLifecycle()
-    val urnetworkFixedIp by viewModel.urnetworkFixedIp.collectAsStateWithLifecycle()
-    val urnetworkEnhancedAnonymization by viewModel.urnetworkEnhancedAnonymization.collectAsStateWithLifecycle()
-
     val powerState = computePowerDiscState(state, switching, urnetworkPeerCount)
     val backgroundState = powerState.toBackgroundState()
     val isConnected = state is TunnelState.Connected
@@ -115,15 +111,11 @@ fun MainScreen(
                         urnetworkPeerCount = urnetworkPeerCount,
                         urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
                         isReconnecting = isReconnecting,
-                        urnetworkFixedIp = urnetworkFixedIp,
-                        urnetworkEnhancedAnonymization = urnetworkEnhancedAnonymization,
                     ),
                     callbacks = SimpleMainCallbacks(
                         onConnectClick = onConnectClick,
                         onOpenSplitTunnel = onOpenSplitTunnel,
                         onOpenSettings = onOpenSettings,
-                        onUrnetworkFixedIpChange = viewModel::setUrnetworkFixedIp,
-                        onUrnetworkEnhancedAnonymizationChange = viewModel::setUrnetworkEnhancedAnonymization,
                     ),
                 )
                 AppMode.EXPERT -> ExpertMainContent(
@@ -142,8 +134,6 @@ fun MainScreen(
                         ipInfo = ipInfo,
                         killswitchActive = killswitchActive,
                         isReconnecting = isReconnecting,
-                        urnetworkFixedIp = urnetworkFixedIp,
-                        urnetworkEnhancedAnonymization = urnetworkEnhancedAnonymization,
                     ),
                     callbacks = ExpertMainCallbacks(
                         onConnectClick = onConnectClick,
@@ -152,8 +142,6 @@ fun MainScreen(
                         onOpenEngineParams = onOpenEngineParams,
                         onOpenSplitTunnel = onOpenSplitTunnel,
                         onOpenSettings = onOpenSettings,
-                        onUrnetworkFixedIpChange = viewModel::setUrnetworkFixedIp,
-                        onUrnetworkEnhancedAnonymizationChange = viewModel::setUrnetworkEnhancedAnonymization,
                     ),
                 )
             }
@@ -170,16 +158,12 @@ data class SimpleMainState(
     val urnetworkPeerCount: Int,
     val urnetworkPeerSearchSeconds: Int,
     val isReconnecting: Boolean = false,
-    val urnetworkFixedIp: Boolean = false,
-    val urnetworkEnhancedAnonymization: Boolean = false,
 )
 
 data class SimpleMainCallbacks(
     val onConnectClick: () -> Unit,
     val onOpenSplitTunnel: () -> Unit,
     val onOpenSettings: () -> Unit,
-    val onUrnetworkFixedIpChange: (Boolean) -> Unit = {},
-    val onUrnetworkEnhancedAnonymizationChange: (Boolean) -> Unit = {},
 )
 
 @Composable
@@ -229,15 +213,6 @@ private fun SimpleMainContent(
             UrnetworkPeerBadge(
                 count = urnetworkPeerCount,
                 searchSeconds = urnetworkPeerSearchSeconds,
-            )
-        }
-
-        if (isUrnetworkVisibleInMain(tunnelState, manualEngine)) {
-            UrnetworkMainToggleSection(
-                fixedIp = state.urnetworkFixedIp,
-                enhancedAnonymization = state.urnetworkEnhancedAnonymization,
-                onFixedIpChange = callbacks.onUrnetworkFixedIpChange,
-                onEnhancedAnonymizationChange = callbacks.onUrnetworkEnhancedAnonymizationChange,
             )
         }
 
@@ -296,8 +271,6 @@ data class ExpertMainState(
     val ipInfo: IpInfoState,
     val killswitchActive: Boolean,
     val isReconnecting: Boolean = false,
-    val urnetworkFixedIp: Boolean = false,
-    val urnetworkEnhancedAnonymization: Boolean = false,
 )
 
 data class ExpertMainCallbacks(
@@ -307,8 +280,6 @@ data class ExpertMainCallbacks(
     val onOpenEngineParams: (EngineId?) -> Unit,
     val onOpenSplitTunnel: () -> Unit,
     val onOpenSettings: () -> Unit,
-    val onUrnetworkFixedIpChange: (Boolean) -> Unit = {},
-    val onUrnetworkEnhancedAnonymizationChange: (Boolean) -> Unit = {},
 )
 
 @Composable
@@ -380,15 +351,6 @@ private fun ExpertMainContent(
                 onRefreshIpInfo = onRefreshIpInfo,
             )
 
-            if (isUrnetworkVisibleInMain(tunnelState, manualEngine)) {
-                UrnetworkMainToggleSection(
-                    fixedIp = state.urnetworkFixedIp,
-                    enhancedAnonymization = state.urnetworkEnhancedAnonymization,
-                    onFixedIpChange = callbacks.onUrnetworkFixedIpChange,
-                    onEnhancedAnonymizationChange = callbacks.onUrnetworkEnhancedAnonymizationChange,
-                )
-            }
-
             EngineChipsRow(
                 selectedEngine = manualEngine,
                 onSelect = onManualEngineSelect,
@@ -437,16 +399,12 @@ private fun ExpertStatusBadges(
             modifier = Modifier.testTag(MainScreenTestTags.KILLSWITCH_BADGE),
         )
     }
-    if (visualConnected && manualEngine == EngineId.URNETWORK) {
-        UrnetworkPeerBadge(
-            count = urnetworkPeerCount,
-            searchSeconds = urnetworkPeerSearchSeconds,
-        )
-    }
     if (visualConnected) {
         IpInfoCard(
             state = ipInfo,
             onRefresh = onRefreshIpInfo,
+            urnetworkPeerCount = if (manualEngine == EngineId.URNETWORK) urnetworkPeerCount else null,
+            urnetworkSearchSeconds = if (manualEngine == EngineId.URNETWORK) urnetworkPeerSearchSeconds else null,
             modifier = Modifier.padding(horizontal = 16.dp),
         )
     }
@@ -491,65 +449,21 @@ internal fun isUrnetworkVisibleInMain(state: TunnelState, manualEngine: EngineId
 }
 
 @Composable
-private fun UrnetworkMainToggleSection(
-    fixedIp: Boolean,
-    enhancedAnonymization: Boolean,
-    onFixedIpChange: (Boolean) -> Unit,
-    onEnhancedAnonymizationChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .testTag(MainScreenTestTags.URNETWORK_TOGGLES)
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        UrnetworkMainToggleRow(
-            label = stringResource(R.string.main_toggle_fixed_ip),
-            hint = stringResource(R.string.main_toggle_fixed_ip_hint),
-            checked = fixedIp,
-            onCheckedChange = onFixedIpChange,
-            testTag = MainScreenTestTags.URNETWORK_TOGGLE_FIXED_IP,
+private fun IpCardPeerSuffix(count: Int?, searchSeconds: Int?) {
+    when {
+        count != null && count > 0 -> Text(
+            text = stringResource(R.string.urnetwork_peer_count_label, count),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.testTag(MainScreenTestTags.URNETWORK_PEER_COUNT),
         )
-        UrnetworkMainToggleRow(
-            label = stringResource(R.string.main_toggle_enhanced_anonymization),
-            hint = stringResource(R.string.main_toggle_enhanced_anonymization_hint),
-            checked = enhancedAnonymization,
-            onCheckedChange = onEnhancedAnonymizationChange,
-            testTag = MainScreenTestTags.URNETWORK_TOGGLE_ANONYMIZATION,
+        searchSeconds != null && searchSeconds >= URNETWORK_PEER_SEARCH_VISIBLE_THRESHOLD_S -> Text(
+            text = stringResource(R.string.urnetwork_peer_searching, searchSeconds),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.tertiary,
+            modifier = Modifier.testTag(MainScreenTestTags.URNETWORK_PEER_SEARCHING),
         )
-    }
-}
-
-@Composable
-private fun UrnetworkMainToggleRow(
-    label: String,
-    hint: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    testTag: String,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag(testTag),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                color = OzeroPalette.Text,
-            )
-            Text(
-                text = hint,
-                style = MaterialTheme.typography.bodySmall,
-                color = OzeroPalette.Text3,
-            )
-        }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        else -> Unit
     }
 }
 
@@ -608,6 +522,8 @@ private fun IpInfoCard(
     state: IpInfoState,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
+    urnetworkPeerCount: Int? = null,
+    urnetworkSearchSeconds: Int? = null,
 ) {
     Card(
         modifier = modifier
@@ -622,11 +538,21 @@ private fun IpInfoCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            Text(
-                text = stringResource(R.string.ip_card_title),
-                style = MaterialTheme.typography.bodySmall,
-                color = OzeroPalette.Text3,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = stringResource(R.string.ip_card_title),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OzeroPalette.Text3,
+                )
+                IpCardPeerSuffix(
+                    count = urnetworkPeerCount,
+                    searchSeconds = urnetworkSearchSeconds,
+                )
+            }
             when (state) {
                 is IpInfoState.Idle, is IpInfoState.Loading -> Text(
                     text = stringResource(R.string.ip_card_loading),

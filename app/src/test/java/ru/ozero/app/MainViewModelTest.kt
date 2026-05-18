@@ -40,8 +40,6 @@ import ru.ozero.enginescore.settings.HostsMode
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginescore.settings.SplitTunnelMode
-import ru.ozero.engineurnetwork.UrnetworkConfig
-import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.UrnetworkWindowType
 import kotlin.test.assertEquals
@@ -58,7 +56,6 @@ class MainViewModelTest {
     private lateinit var byedpiPlugin: FakeEnginePlugin
     private lateinit var warpPlugin: FakeEnginePlugin
     private lateinit var urnetworkPlugin: FakeEnginePlugin
-    private lateinit var urnetworkConfigStore: FakeUrnetworkConfigStore
     private lateinit var urnetworkBridge: FakeUrnetworkBridge
     private lateinit var viewModel: MainViewModel
 
@@ -78,14 +75,12 @@ class MainViewModelTest {
         urnetworkPlugin = FakeEnginePlugin(EngineId.URNETWORK) {
             IpProbeRoute.Unavailable("URnetwork location pending")
         }
-        urnetworkConfigStore = FakeUrnetworkConfigStore()
         urnetworkBridge = FakeUrnetworkBridge()
         viewModel = MainViewModel(
             tunnelController,
             healthMonitor,
             settingsRepository,
             urnetworkBridge,
-            urnetworkConfigStore,
             ipInfoProvider,
             setOf(byedpiPlugin, warpPlugin, urnetworkPlugin),
         )
@@ -94,13 +89,11 @@ class MainViewModelTest {
     private fun newViewModel(
         bridge: UrnetworkSdkBridge = urnetworkBridge,
         plugins: Set<EnginePlugin> = setOf(byedpiPlugin, warpPlugin, urnetworkPlugin),
-        configStore: UrnetworkConfigStore = urnetworkConfigStore,
     ): MainViewModel = MainViewModel(
         tunnelController,
         healthMonitor,
         settingsRepository,
         bridge,
-        configStore,
         ipInfoProvider,
         plugins,
     )
@@ -204,27 +197,6 @@ class MainViewModelTest {
             lastWindowType = windowType
             lastFixedIp = fixedIpSize
             lastAllowDirect = allowDirect
-        }
-    }
-
-    private class FakeUrnetworkConfigStore : UrnetworkConfigStore {
-        val state = MutableStateFlow(UrnetworkConfig())
-        var setFixedIpCalls: Int = 0
-        var setAllowDirectCalls: Int = 0
-        val snapshot: UrnetworkConfig get() = state.value
-
-        fun inject(transform: (UrnetworkConfig) -> UrnetworkConfig) {
-            state.value = transform(state.value)
-        }
-
-        override fun config(): Flow<UrnetworkConfig> = state
-
-        override suspend fun update(transform: (UrnetworkConfig) -> UrnetworkConfig) {
-            val prev = state.value
-            val next = transform(prev)
-            if (next.fixedIpSize != prev.fixedIpSize) setFixedIpCalls += 1
-            if (next.allowDirect != prev.allowDirect) setAllowDirectCalls += 1
-            state.value = next
         }
     }
 
@@ -669,133 +641,6 @@ class MainViewModelTest {
         tunnelController.reset()
         advanceUntilIdle()
         assertEquals(false, viewModel.isReconnecting.value)
-    }
-
-    @Test
-    fun urnetworkFixedIpMirrorsStore() = runTest {
-        urnetworkConfigStore.inject { it.copy(fixedIpSize = true) }
-        advanceUntilIdle()
-        assertEquals(true, viewModel.urnetworkFixedIp.value)
-    }
-
-    @Test
-    fun urnetworkFixedIpDefaultFalse() = runTest {
-        advanceUntilIdle()
-        assertEquals(false, viewModel.urnetworkFixedIp.value)
-    }
-
-    @Test
-    fun urnetworkEnhancedAnonymizationInvertsAllowDirect() = runTest {
-        urnetworkConfigStore.inject { it.copy(allowDirect = false) }
-        advanceUntilIdle()
-        assertEquals(
-            true,
-            viewModel.urnetworkEnhancedAnonymization.value,
-            "enhancedAnonymization == !allowDirect — зеркало bringyour ConnectActions.kt:251",
-        )
-    }
-
-    @Test
-    fun urnetworkEnhancedAnonymizationDefaultFalseWhenAllowDirectTrue() = runTest {
-        urnetworkConfigStore.inject { it.copy(allowDirect = true) }
-        advanceUntilIdle()
-        assertEquals(false, viewModel.urnetworkEnhancedAnonymization.value)
-    }
-
-    @Test
-    fun setUrnetworkFixedIpWritesStore() = runTest {
-        viewModel.setUrnetworkFixedIp(true)
-        advanceUntilIdle()
-        assertEquals(1, urnetworkConfigStore.setFixedIpCalls)
-        assertEquals(true, urnetworkConfigStore.snapshot.fixedIpSize)
-    }
-
-    @Test
-    fun setUrnetworkFixedIpSkipsBridgeWhenInactive() = runTest {
-        viewModel.setUrnetworkFixedIp(true)
-        advanceUntilIdle()
-        assertEquals(
-            0,
-            urnetworkBridge.applyCalls,
-            "engine не active → bridge.applyPerformanceProfile НЕ должен вызываться — sentinel",
-        )
-    }
-
-    @Test
-    fun setUrnetworkFixedIpAppliesBridgeWhenUrnetworkActive() = runTest {
-        tunnelController.onProbing()
-        tunnelController.onConnecting(EngineId.URNETWORK)
-        tunnelController.onEngineStarted(EngineId.URNETWORK, 0)
-        advanceUntilIdle()
-        viewModel.setUrnetworkFixedIp(true)
-        advanceUntilIdle()
-        assertEquals(1, urnetworkBridge.applyCalls)
-        assertEquals(true, urnetworkBridge.lastFixedIp)
-        assertEquals(
-            true,
-            urnetworkBridge.lastAllowDirect,
-            "allowDirect берётся из текущего configStore (по умолчанию true) — anonymization OFF",
-        )
-    }
-
-    @Test
-    fun setUrnetworkFixedIpDoesNotApplyWhenOtherEngineActive() = runTest {
-        tunnelController.onProbing()
-        tunnelController.onConnecting(EngineId.BYEDPI)
-        tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
-        advanceUntilIdle()
-        viewModel.setUrnetworkFixedIp(true)
-        advanceUntilIdle()
-        assertEquals(
-            0,
-            urnetworkBridge.applyCalls,
-            "BYEDPI active → URnetwork bridge.applyPerformanceProfile не вызывается",
-        )
-    }
-
-    @Test
-    fun setUrnetworkEnhancedAnonymizationWritesAllowDirectInverted() = runTest {
-        viewModel.setUrnetworkEnhancedAnonymization(true)
-        advanceUntilIdle()
-        assertEquals(1, urnetworkConfigStore.setAllowDirectCalls)
-        assertEquals(
-            false,
-            urnetworkConfigStore.snapshot.allowDirect,
-            "enhancedAnonymization=true → allowDirect=false — bringyour mapping",
-        )
-    }
-
-    @Test
-    fun setUrnetworkEnhancedAnonymizationAppliesBridgeWhenActive() = runTest {
-        tunnelController.onProbing()
-        tunnelController.onConnecting(EngineId.URNETWORK)
-        tunnelController.onEngineStarted(EngineId.URNETWORK, 0)
-        advanceUntilIdle()
-        viewModel.setUrnetworkEnhancedAnonymization(true)
-        advanceUntilIdle()
-        assertEquals(1, urnetworkBridge.applyCalls)
-        assertEquals(false, urnetworkBridge.lastAllowDirect)
-    }
-
-    @Test
-    fun setUrnetworkEnhancedAnonymizationOff_setsAllowDirectTrue() = runTest {
-        urnetworkConfigStore.inject { it.copy(allowDirect = false) }
-        advanceUntilIdle()
-        viewModel.setUrnetworkEnhancedAnonymization(false)
-        advanceUntilIdle()
-        assertEquals(true, urnetworkConfigStore.snapshot.allowDirect)
-    }
-
-    @Test
-    fun setUrnetworkFixedIpUsesCurrentWindowType() = runTest {
-        urnetworkConfigStore.inject { it.copy(windowType = UrnetworkWindowType.SPEED) }
-        tunnelController.onProbing()
-        tunnelController.onConnecting(EngineId.URNETWORK)
-        tunnelController.onEngineStarted(EngineId.URNETWORK, 0)
-        advanceUntilIdle()
-        viewModel.setUrnetworkFixedIp(true)
-        advanceUntilIdle()
-        assertEquals(UrnetworkWindowType.SPEED, urnetworkBridge.lastWindowType)
     }
 
     private class FakeSettingsRepository : SettingsRepository {

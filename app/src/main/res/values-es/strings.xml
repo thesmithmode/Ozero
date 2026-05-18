@@ -325,6 +325,7 @@
     <string name="urnetwork_mode_hint">Web — baja latencia para navegar. Streaming — alto ancho de banda para vídeo.</string>
     <string name="urnetwork_fixed_ip_size">IP de salida fija</string>
     <string name="urnetwork_fixed_ip_size_hint">Un par en lugar de grupo — IP de sesión estable</string>
+    <string name="urnetwork_enhanced_anonymization">Anonimización mejorada</string>
     <string name="urnetwork_about_title">Acerca de URnetwork</string>
     <string name="urnetwork_about_body">URnetwork es la red más local y más privada del planeta. Un protocolo patentado mantiene seguros a los participantes. La malla tiene más de 30.000 proveedores y cero incidentes conocidos.</string>
     <string name="urnetwork_peers_connected">Conectado a %1$d pares</string>

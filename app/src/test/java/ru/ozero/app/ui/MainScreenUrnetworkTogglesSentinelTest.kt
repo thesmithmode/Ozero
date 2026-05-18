@@ -4,17 +4,17 @@ import org.junit.jupiter.api.Test
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginescore.EngineId
 import java.io.File
-import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class MainScreenUrnetworkTogglesSentinelTest {
 
-    private val source: String by lazy { locateMainScreen().readText() }
+    private val mainScreenSource: String by lazy { locateFile(MAIN_SCREEN).readText() }
+    private val engineSettingsSource: String by lazy { locateFile(ENGINE_SETTINGS).readText() }
+    private val stringsSource: String by lazy { locateFile(STRINGS_RU).readText() }
 
     @Test
     fun `isUrnetworkVisibleInMain true для manualEngine=URNETWORK независимо от tunnelState`() {
-        assertTrue(isUrnetworkVisibleInMain(TunnelState.Idle, EngineId.URNETWORK))
         assertTrue(isUrnetworkVisibleInMain(TunnelState.Idle, EngineId.URNETWORK))
     }
 
@@ -43,109 +43,94 @@ class MainScreenUrnetworkTogglesSentinelTest {
                 manualEngine = null,
             ),
         )
+    }
+
+    @Test
+    fun `MainScreen НЕ содержит UrnetworkMainToggleSection`() {
+        val occurrences = Regex("""UrnetworkMainToggleSection""").findAll(mainScreenSource).count()
+        assertTrue(
+            occurrences == 0,
+            "MainScreen не должен рендерить отдельную секцию тумблеров — тумблеры живут в engine settings",
+        )
+    }
+
+    @Test
+    fun `MainScreen НЕ ссылается на main_toggle_fixed_ip или main_toggle_enhanced_anonymization`() {
         assertFalse(
-            isUrnetworkVisibleInMain(
-                TunnelState.Connected(EngineId.WARP, socksPort = 0),
-                manualEngine = null,
-            ),
+            mainScreenSource.contains("main_toggle_fixed_ip"),
+            "MainScreen не должен использовать main_toggle_fixed_ip — string удалён",
+        )
+        assertFalse(
+            mainScreenSource.contains("main_toggle_enhanced_anonymization"),
+            "MainScreen не должен использовать main_toggle_enhanced_anonymization — string удалён",
         )
     }
 
     @Test
-    fun `isUrnetworkVisibleInMain true для Connecting URnetwork`() {
-        assertTrue(isUrnetworkVisibleInMain(TunnelState.Connecting(EngineId.URNETWORK), null))
+    fun `strings xml НЕ содержит main_toggle_ строк`() {
+        assertFalse(
+            stringsSource.contains("\"main_toggle_fixed_ip\""),
+            "main_toggle_fixed_ip удалён из strings.xml",
+        )
+        assertFalse(
+            stringsSource.contains("\"main_toggle_enhanced_anonymization\""),
+            "main_toggle_enhanced_anonymization удалён из strings.xml",
+        )
     }
 
     @Test
-    fun `isUrnetworkVisibleInMain true для Probing URnetwork`() {
-        assertTrue(isUrnetworkVisibleInMain(TunnelState.Probing(EngineId.URNETWORK), null))
-    }
-
-    @Test
-    fun `isUrnetworkVisibleInMain true для Probing null engineId с manualEngine URnetwork`() {
-        assertTrue(isUrnetworkVisibleInMain(TunnelState.Probing(engineId = null), EngineId.URNETWORK))
-    }
-
-    @Test
-    fun `isUrnetworkVisibleInMain false для Disconnecting без manualEngine`() {
-        assertFalse(isUrnetworkVisibleInMain(TunnelState.Disconnecting, null))
-    }
-
-    @Test
-    fun `MainScreen вызывает UrnetworkMainToggleSection хотя бы дважды — Simple+Expert`() {
-        val occurrences = Regex("""UrnetworkMainToggleSection\s*\(""").findAll(source).count()
+    fun `IpInfoCard принимает urnetworkPeerCount параметр`() {
         assertTrue(
-            occurrences >= 2,
-            "MainScreen должен рендерить UrnetworkMainToggleSection в обоих режимах (Simple+Expert) — " +
-                "найдено $occurrences вызовов",
-        )
-    }
-
-    @Test
-    fun `MainScreen render UrnetworkMainToggleSection защищён isUrnetworkVisibleInMain`() {
-        val regex = Regex(
-            """if\s*\(isUrnetworkVisibleInMain\([^)]+\)\)\s*\{\s*UrnetworkMainToggleSection""",
+            mainScreenSource.contains("urnetworkPeerCount: Int? = null"),
+            "IpInfoCard обязан принимать urnetworkPeerCount — peer count встроен в выходной узел",
         )
         assertTrue(
-            regex.containsMatchIn(source),
-            "UrnetworkMainToggleSection обязан рендериться внутри if (isUrnetworkVisibleInMain(...)) — " +
-                "иначе toggle виден для других движков",
+            mainScreenSource.contains("urnetworkSearchSeconds: Int? = null"),
+            "IpInfoCard обязан принимать urnetworkSearchSeconds — для индикатора поиска",
         )
     }
 
     @Test
-    fun `UrnetworkMainToggleSection использует main_toggle_fixed_ip и main_toggle_enhanced_anonymization строки`() {
-        val body = extractFunBody(source, "UrnetworkMainToggleSection")
+    fun `IpInfoCard рендерит IpCardPeerSuffix внутри header Row`() {
         assertTrue(
-            body.contains("R.string.main_toggle_fixed_ip"),
-            "UrnetworkMainToggleSection должен использовать main_toggle_fixed_ip string resource",
-        )
-        assertTrue(
-            body.contains("R.string.main_toggle_enhanced_anonymization"),
-            "UrnetworkMainToggleSection должен использовать main_toggle_enhanced_anonymization string resource",
+            mainScreenSource.contains("IpCardPeerSuffix("),
+            "IpInfoCard обязан рендерить IpCardPeerSuffix рядом с заголовком",
         )
     }
 
     @Test
-    fun `UrnetworkMainToggleSection помечен testTag URNETWORK_TOGGLES`() {
-        val body = extractFunBody(source, "UrnetworkMainToggleSection")
+    fun `UrnetworkEngineSettingsScreen имеет toggle усиленной анонимизации`() {
         assertTrue(
-            body.contains("URNETWORK_TOGGLES"),
-            "UrnetworkMainToggleSection обязан помечать корневой Column testTag URNETWORK_TOGGLES",
+            engineSettingsSource.contains("urnetwork_enhanced_anonymization"),
+            "UrnetworkEngineSettingsScreen обязан использовать строку urnetwork_enhanced_anonymization",
+        )
+        assertTrue(
+            engineSettingsSource.contains("onToggleAllowDirect"),
+            "UrnetworkEngineSettingsScreen обязан прокидывать onToggleAllowDirect callback",
         )
     }
 
     @Test
-    fun `MainScreenTestTags содержит URNETWORK_TOGGLE константы`() {
-        assertEquals("main_urnetwork_toggles", MainScreenTestTags.URNETWORK_TOGGLES)
-        assertEquals("main_urnetwork_toggle_fixed_ip", MainScreenTestTags.URNETWORK_TOGGLE_FIXED_IP)
-        assertEquals("main_urnetwork_toggle_anonymization", MainScreenTestTags.URNETWORK_TOGGLE_ANONYMIZATION)
+    fun `MainScreenTestTags НЕ содержит URNETWORK_TOGGLE_ констант`() {
+        val tagsSource = locateFile("app/src/main/java/ru/ozero/app/ui/MainScreenTestTags.kt").readText()
+        assertFalse(
+            tagsSource.contains("URNETWORK_TOGGLE_FIXED_IP"),
+            "URNETWORK_TOGGLE_FIXED_IP удалён — тумблер не на main",
+        )
+        assertFalse(
+            tagsSource.contains("URNETWORK_TOGGLE_ANONYMIZATION"),
+            "URNETWORK_TOGGLE_ANONYMIZATION удалён — тумблер не на main",
+        )
+        assertFalse(
+            tagsSource.contains("URNETWORK_TOGGLES"),
+            "URNETWORK_TOGGLES удалён — секция не на main",
+        )
     }
 
-    private fun extractFunBody(source: String, funName: String): String {
-        val pattern = Regex("""fun\s+$funName\s*\(""")
-        val match = pattern.find(source) ?: error("$funName не найдена в MainScreen.kt")
-        val start = match.range.first
-        var depth = 0
-        var i = source.indexOf('{', start)
-        val open = i
-        while (i < source.length) {
-            when (source[i]) {
-                '{' -> depth++
-                '}' -> {
-                    depth--
-                    if (depth == 0) return source.substring(open, i + 1)
-                }
-            }
-            i++
-        }
-        error("закрывающая } для $funName не найдена")
-    }
-
-    private fun locateMainScreen(): File {
+    private fun locateFile(relative: String): File {
         val repoRoot = locateRepoRoot()
-        val file = File(repoRoot, "app/src/main/java/ru/ozero/app/ui/MainScreen.kt")
-        check(file.isFile) { "MainScreen.kt не найден: ${file.absolutePath}" }
+        val file = File(repoRoot, relative)
+        check(file.isFile) { "$relative не найден: ${file.absolutePath}" }
         return file
     }
 
@@ -156,5 +141,12 @@ class MainScreenUrnetworkTogglesSentinelTest {
             dir = dir.parentFile ?: return@repeat
         }
         error("repo root (settings.gradle.kts) не найден")
+    }
+
+    private companion object {
+        const val MAIN_SCREEN = "app/src/main/java/ru/ozero/app/ui/MainScreen.kt"
+        const val ENGINE_SETTINGS =
+            "app/src/main/java/ru/ozero/app/ui/settings/engines/UrnetworkEngineSettingsScreen.kt"
+        const val STRINGS_RU = "app/src/main/res/values/strings.xml"
     }
 }

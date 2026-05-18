@@ -16,10 +16,6 @@
     <string name="main_status_disconnecting">Disconnecting…</string>
     <string name="main_status_failed">Error</string>
     <string name="main_status_urnetwork_searching">Searching peers…</string>
-    <string name="main_toggle_fixed_ip">Fixed IP</string>
-    <string name="main_toggle_fixed_ip_hint">Single peer instead of multiple — IP is stable, speed is lower</string>
-    <string name="main_toggle_enhanced_anonymization">Enhanced anonymization</string>
-    <string name="main_toggle_enhanced_anonymization_hint">Disallow direct connections — all traffic through relay</string>
     <string name="main_active_engine">Active engine: %1$s</string>
     <string name="stats_session">Session: ↓ %1$s ↑ %2$s</string>
     <string name="stats_uptime">Uptime: %1$s</string>
@@ -299,6 +295,7 @@
     <string name="urnetwork_mode_hint">Web — low latency for browsing. Streaming — high bandwidth for video.</string>
     <string name="urnetwork_fixed_ip_size">Fixed exit IP</string>
     <string name="urnetwork_fixed_ip_size_hint">Single peer instead of pool — stable session IP</string>
+    <string name="urnetwork_enhanced_anonymization">Enhanced anonymization</string>
     <string name="urnetwork_about_title">About URnetwork</string>
     <string name="urnetwork_about_body">URnetwork is the most local and most private network on the planet. A patented protocol keeps participants safe. The mesh has more than 30,000 providers today and zero known incidents.</string>
     <string name="settings_urnetwork_title">URnetwork</string>

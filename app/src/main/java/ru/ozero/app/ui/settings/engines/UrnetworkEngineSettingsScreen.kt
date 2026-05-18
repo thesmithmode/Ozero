@@ -89,6 +89,7 @@ fun UrnetworkEngineSettingsScreen(
             UrnetworkSettingsUiState.NotConnected -> {
                 val windowType by viewModel.windowType.collectAsStateWithLifecycle()
                 val fixedIp by viewModel.fixedIpSize.collectAsStateWithLifecycle()
+                val allowDirect by viewModel.allowDirect.collectAsStateWithLifecycle()
                 val provideControlMode by viewModel.provideControlMode.collectAsStateWithLifecycle()
                 val provideNetworkMode by viewModel.provideNetworkMode.collectAsStateWithLifecycle()
                 Column(
@@ -116,6 +117,7 @@ fun UrnetworkEngineSettingsScreen(
                         providePaused = true,
                         windowType = windowType,
                         fixedIp = fixedIp,
+                        allowDirect = allowDirect,
                         provideControlMode = provideControlMode,
                         provideNetworkMode = provideNetworkMode,
                         sharedTrafficBytes = 0L,
@@ -123,6 +125,7 @@ fun UrnetworkEngineSettingsScreen(
                         onSetProvidePaused = {},
                         onSelectWindowType = viewModel::selectWindowType,
                         onToggleFixedIp = viewModel::toggleFixedIpSize,
+                        onToggleAllowDirect = viewModel::toggleAllowDirect,
                         onSelectProvideControlMode = viewModel::selectProvideControlMode,
                         onSelectProvideNetworkMode = viewModel::selectProvideNetworkMode,
                         onOpenSharedTraffic = onOpenSharedTraffic,
@@ -135,6 +138,7 @@ fun UrnetworkEngineSettingsScreen(
                 val switchingCountry by viewModel.switchingCountry.collectAsStateWithLifecycle()
                 val windowType by viewModel.windowType.collectAsStateWithLifecycle()
                 val fixedIp by viewModel.fixedIpSize.collectAsStateWithLifecycle()
+                val allowDirect by viewModel.allowDirect.collectAsStateWithLifecycle()
                 val provideControlMode by viewModel.provideControlMode.collectAsStateWithLifecycle()
                 val provideNetworkMode by viewModel.provideNetworkMode.collectAsStateWithLifecycle()
                 val sharedTrafficBytes by viewModel.sharedTrafficBytes.collectAsStateWithLifecycle()
@@ -151,6 +155,7 @@ fun UrnetworkEngineSettingsScreen(
                     searchQuery = searchQuery,
                     windowType = windowType,
                     fixedIp = fixedIp,
+                    allowDirect = allowDirect,
                     provideControlMode = provideControlMode,
                     provideNetworkMode = provideNetworkMode,
                     sharedTrafficBytes = sharedTrafficBytes,
@@ -161,6 +166,7 @@ fun UrnetworkEngineSettingsScreen(
                     onSetProvidePaused = viewModel::setProvidePaused,
                     onSelectWindowType = viewModel::selectWindowType,
                     onToggleFixedIp = viewModel::toggleFixedIpSize,
+                    onToggleAllowDirect = viewModel::toggleAllowDirect,
                     onSelectProvideControlMode = viewModel::selectProvideControlMode,
                     onSelectProvideNetworkMode = viewModel::selectProvideNetworkMode,
                     onOpenSharedTraffic = onOpenSharedTraffic,
@@ -184,6 +190,7 @@ private fun LocationListContent(
     searchQuery: String,
     windowType: UrnetworkWindowType,
     fixedIp: Boolean,
+    allowDirect: Boolean,
     provideControlMode: UrnetworkProvideControlMode,
     provideNetworkMode: UrnetworkProvideNetworkMode,
     sharedTrafficBytes: Long,
@@ -194,6 +201,7 @@ private fun LocationListContent(
     onSetProvidePaused: (Boolean) -> Unit,
     onSelectWindowType: (UrnetworkWindowType) -> Unit,
     onToggleFixedIp: (Boolean) -> Unit,
+    onToggleAllowDirect: (Boolean) -> Unit,
     onSelectProvideControlMode: (UrnetworkProvideControlMode) -> Unit,
     onSelectProvideNetworkMode: (UrnetworkProvideNetworkMode) -> Unit,
     onOpenSharedTraffic: () -> Unit,
@@ -223,6 +231,7 @@ private fun LocationListContent(
                     providePaused = providePaused,
                     windowType = windowType,
                     fixedIp = fixedIp,
+                    allowDirect = allowDirect,
                     provideControlMode = provideControlMode,
                     provideNetworkMode = provideNetworkMode,
                     sharedTrafficBytes = sharedTrafficBytes,
@@ -230,6 +239,7 @@ private fun LocationListContent(
                     onSetProvidePaused = onSetProvidePaused,
                     onSelectWindowType = onSelectWindowType,
                     onToggleFixedIp = onToggleFixedIp,
+                    onToggleAllowDirect = onToggleAllowDirect,
                     onSelectProvideControlMode = onSelectProvideControlMode,
                     onSelectProvideNetworkMode = onSelectProvideNetworkMode,
                     onOpenSharedTraffic = onOpenSharedTraffic,
@@ -341,6 +351,7 @@ private fun SettingsCard(
     providePaused: Boolean,
     windowType: UrnetworkWindowType,
     fixedIp: Boolean,
+    allowDirect: Boolean,
     provideControlMode: UrnetworkProvideControlMode,
     provideNetworkMode: UrnetworkProvideNetworkMode,
     sharedTrafficBytes: Long,
@@ -348,6 +359,7 @@ private fun SettingsCard(
     onSetProvidePaused: (Boolean) -> Unit,
     onSelectWindowType: (UrnetworkWindowType) -> Unit,
     onToggleFixedIp: (Boolean) -> Unit,
+    onToggleAllowDirect: (Boolean) -> Unit,
     onSelectProvideControlMode: (UrnetworkProvideControlMode) -> Unit,
     onSelectProvideNetworkMode: (UrnetworkProvideNetworkMode) -> Unit,
     onOpenSharedTraffic: () -> Unit,
@@ -377,8 +389,10 @@ private fun SettingsCard(
             ModeSection(
                 selected = windowType,
                 fixedIp = fixedIp,
+                allowDirect = allowDirect,
                 onSelect = onSelectWindowType,
                 onToggleFixedIp = onToggleFixedIp,
+                onToggleAllowDirect = onToggleAllowDirect,
             )
             SectionDivider()
             CheckIpRow()
@@ -495,8 +509,10 @@ private fun ProvideNetworkModeSection(
 private fun ModeSection(
     selected: UrnetworkWindowType,
     fixedIp: Boolean,
+    allowDirect: Boolean,
     onSelect: (UrnetworkWindowType) -> Unit,
     onToggleFixedIp: (Boolean) -> Unit,
+    onToggleAllowDirect: (Boolean) -> Unit,
 ) {
     val modes = listOf(
         UrnetworkWindowType.AUTO to R.string.urnetwork_mode_auto,
@@ -526,27 +542,43 @@ private fun ModeSection(
         modifier = Modifier.padding(top = 6.dp),
     )
     if (selected != UrnetworkWindowType.AUTO) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                Text(
-                    text = stringResource(R.string.urnetwork_fixed_ip_size),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = OzeroPalette.Text,
-                )
-                Text(
-                    text = stringResource(R.string.urnetwork_fixed_ip_size_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = OzeroPalette.Text3,
-                )
-            }
-            Switch(checked = fixedIp, onCheckedChange = onToggleFixedIp)
-        }
+        CompactToggleRow(
+            label = stringResource(R.string.urnetwork_fixed_ip_size),
+            checked = fixedIp,
+            onCheckedChange = onToggleFixedIp,
+            testTag = "urnetwork_toggle_fixed_ip",
+        )
+    }
+    CompactToggleRow(
+        label = stringResource(R.string.urnetwork_enhanced_anonymization),
+        checked = !allowDirect,
+        onCheckedChange = { onToggleAllowDirect(!it) },
+        testTag = "urnetwork_toggle_enhanced_anonymization",
+    )
+}
+
+@Composable
+private fun CompactToggleRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    testTag: String,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp)
+            .testTag(testTag),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = OzeroPalette.Text,
+            modifier = Modifier.weight(1f).padding(end = 12.dp),
+        )
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
