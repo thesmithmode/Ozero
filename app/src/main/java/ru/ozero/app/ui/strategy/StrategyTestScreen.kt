@@ -214,32 +214,7 @@ private fun StrategyTestScaffold(
                         )
                     }
                 },
-                actions = {
-                    IconButton(
-                        onClick = { onShowSheet(SheetTarget.DomainLists) },
-                        modifier = Modifier.testTag("domain_lists_btn"),
-                    ) {
-                        Icon(
-                            Icons.Filled.List,
-                            contentDescription = stringResource(R.string.domain_lists_title),
-                        )
-                    }
-                    IconButton(
-                        onClick = { onShowSheet(SheetTarget.Saved) },
-                        modifier = Modifier.testTag("saved_strategies_btn"),
-                    ) {
-                        Icon(
-                            Icons.Filled.Star,
-                            contentDescription = stringResource(R.string.saved_strategies_title),
-                        )
-                    }
-                    IconButton(
-                        onClick = { onShowSheet(SheetTarget.Settings) },
-                        modifier = Modifier.testTag("strategy_settings_btn"),
-                    ) {
-                        Icon(Icons.Filled.Settings, contentDescription = null)
-                    }
-                },
+                actions = { StrategyTopBarActions(onShowSheet) },
             )
         },
     ) { padding ->
@@ -320,6 +295,28 @@ private fun StrategyTestScaffold(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun StrategyTopBarActions(onShowSheet: (SheetTarget) -> Unit) {
+    IconButton(
+        onClick = { onShowSheet(SheetTarget.DomainLists) },
+        modifier = Modifier.testTag("domain_lists_btn"),
+    ) {
+        Icon(Icons.Filled.List, contentDescription = stringResource(R.string.domain_lists_title))
+    }
+    IconButton(
+        onClick = { onShowSheet(SheetTarget.Saved) },
+        modifier = Modifier.testTag("saved_strategies_btn"),
+    ) {
+        Icon(Icons.Filled.Star, contentDescription = stringResource(R.string.saved_strategies_title))
+    }
+    IconButton(
+        onClick = { onShowSheet(SheetTarget.Settings) },
+        modifier = Modifier.testTag("strategy_settings_btn"),
+    ) {
+        Icon(Icons.Filled.Settings, contentDescription = null)
     }
 }
 
