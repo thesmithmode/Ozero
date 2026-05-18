@@ -891,4 +891,3 @@ private enum class TimeframeOption(val labelRes: Int, val points: Int, val bucke
     M30(R.string.chart_tf_30min, 1_800, 30),
     H1(R.string.chart_tf_1h, 3_600, 60),
 }
-
