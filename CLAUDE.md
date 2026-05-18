@@ -51,7 +51,7 @@
 ## Билд
 
 - Один универсальный APK (`assembleRelease`), без dynamic features.
-- abiFilters: arm64-v8a, armeabi-v7a, x86_64.
+- abiFilters в APK: только arm64-v8a (`app/build.gradle.kts`). libhev/libam-go/libbyedpi/libmtg существуют только под arm64-v8a — расширение ABI без перестройки native = рантайм-краш. Sentinel'ы в release.yml тоже arm64-v8a-only.
 - R8 minify+shrink включены, но Log.* НЕ стрипаются (см. proguard-rules.pro).
 
 ## Native libs
