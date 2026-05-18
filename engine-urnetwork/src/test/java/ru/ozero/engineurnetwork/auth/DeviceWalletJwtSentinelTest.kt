@@ -44,10 +44,10 @@ class DeviceWalletJwtSentinelTest {
 
     @Test
     fun `authLogin вызывается перед networkCreate - returning user получает существующий byJwt`() {
-        val loginIdx = authSource.indexOf("api.authLogin")
-        val createIdx = authSource.indexOf("api.networkCreate(args, callback)")
-        assertTrue(loginIdx > 0, "api.authLogin отсутствует — flow не реализован")
-        assertTrue(createIdx > loginIdx, "networkCreate обязан идти ПОСЛЕ authLogin")
+        val loginIdx = authSource.indexOf("authLoginWithWallet(api, walletAuth)")
+        val createIdx = authSource.indexOf("networkCreateWithWallet(api, walletAuth, networkName)")
+        assertTrue(loginIdx > 0, "authLoginWithWallet не вызывается — flow не реализован")
+        assertTrue(createIdx > loginIdx, "networkCreateWithWallet обязан идти ПОСЛЕ authLoginWithWallet в orchestrator")
     }
 
     @Test
