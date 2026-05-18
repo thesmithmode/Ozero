@@ -23,6 +23,7 @@ class MaterialIconsCoreSentinelTest {
         "androidx.compose.material.icons.filled.Share",
         "androidx.compose.material.icons.filled.Star",
         "androidx.compose.material.icons.automirrored.filled.ArrowBack",
+        "androidx.compose.material.icons.automirrored.filled.List",
     )
 
     private val moduleRoot = File(System.getProperty("user.dir") ?: ".")

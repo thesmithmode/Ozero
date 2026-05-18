@@ -15,9 +15,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
@@ -304,7 +304,7 @@ private fun StrategyTopBarActions(onShowSheet: (SheetTarget) -> Unit) {
         onClick = { onShowSheet(SheetTarget.DomainLists) },
         modifier = Modifier.testTag("domain_lists_btn"),
     ) {
-        Icon(Icons.Filled.List, contentDescription = stringResource(R.string.domain_lists_title))
+        Icon(Icons.AutoMirrored.Filled.List, contentDescription = stringResource(R.string.domain_lists_title))
     }
     IconButton(
         onClick = { onShowSheet(SheetTarget.Saved) },
