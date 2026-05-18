@@ -36,7 +36,7 @@ class ByeDpiEngine(
     private val socksProbe: suspend (String, Int, Int) -> Long = Socks5HandshakeProbe::probe,
     private val readyProbeTimeoutMs: Int = READY_PROBE_TIMEOUT_MS,
     private val readyTotalTimeoutMs: Long = READY_TIMEOUT_MS,
-    proxyDispatcher: CoroutineDispatcher? = null,
+    testDispatcherOverride: CoroutineDispatcher? = null,
 ) : EnginePlugin {
 
     override val id = EngineId.BYEDPI
@@ -54,9 +54,8 @@ class ByeDpiEngine(
     private val _stats = MutableStateFlow(EngineStats())
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val effectiveDispatcher: CoroutineDispatcher =
-        proxyDispatcher ?: Dispatchers.IO.limitedParallelism(1)
-    private val proxyScope = CoroutineScope(SupervisorJob() + effectiveDispatcher)
+    private val proxyDispatcher = Dispatchers.IO.limitedParallelism(1)
+    private val proxyScope = CoroutineScope(SupervisorJob() + (testDispatcherOverride ?: proxyDispatcher))
     private val proxyJobRef = AtomicReference<Job?>(null)
 
     override fun buildManualConfig(settings: SettingsModel?): EngineConfig = EngineConfig.ByeDpi(
