@@ -8,8 +8,8 @@ import io.mockk.verify
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
@@ -30,8 +30,7 @@ import kotlin.test.assertTrue
 class TelegramProxyCoordinatorTest {
 
     private val dispatcher = UnconfinedTestDispatcher()
-    private val testScope = TestScope(dispatcher)
-    private val coordinatorScope = CoroutineScope(dispatcher + SupervisorJob())
+    private lateinit var coordinatorScope: CoroutineScope
 
     private lateinit var tunnelStateFlow: MutableStateFlow<TunnelState>
     private lateinit var configFlow: MutableStateFlow<TelegramProxyConfig>
@@ -44,10 +43,12 @@ class TelegramProxyCoordinatorTest {
     @AfterEach
     fun tearDown() {
         coordinator.stop()
+        coordinatorScope.cancel()
     }
 
     @BeforeEach
     fun setUp() {
+        coordinatorScope = CoroutineScope(dispatcher + SupervisorJob())
         tunnelStateFlow = MutableStateFlow(TunnelState.Idle)
         configFlow = MutableStateFlow(TelegramProxyConfig())
         proxyStateFlow = MutableStateFlow<TelegramProxyState>(TelegramProxyState.Idle)
@@ -80,7 +81,7 @@ class TelegramProxyCoordinatorTest {
     }
 
     @Test
-    fun `should stop proxy when config disabled`() = testScope.runTest {
+    fun `should stop proxy when config disabled`() = runTest(dispatcher) {
         coordinator.start()
         configFlow.value = TelegramProxyConfig(enabled = false, secret = "abc")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
@@ -88,7 +89,7 @@ class TelegramProxyCoordinatorTest {
     }
 
     @Test
-    fun `should stop proxy when secret blank`() = testScope.runTest {
+    fun `should stop proxy when secret blank`() = runTest(dispatcher) {
         coordinator.start()
         configFlow.value = TelegramProxyConfig(enabled = true, secret = "")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
@@ -96,7 +97,7 @@ class TelegramProxyCoordinatorTest {
     }
 
     @Test
-    fun `should start with Socks5 upstream when socksPort positive`() = testScope.runTest {
+    fun `should start with Socks5 upstream when socksPort positive`() = runTest(dispatcher) {
         coordinator.start()
         configFlow.value = TelegramProxyConfig(enabled = true, secret = "abc")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
@@ -104,7 +105,7 @@ class TelegramProxyCoordinatorTest {
     }
 
     @Test
-    fun `should start with None upstream when WARP socksPort zero`() = testScope.runTest {
+    fun `should start with None upstream when WARP socksPort zero`() = runTest(dispatcher) {
         coordinator.start()
         configFlow.value = TelegramProxyConfig(enabled = true, secret = "abc")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.WARP, socksPort = 0)
@@ -112,7 +113,7 @@ class TelegramProxyCoordinatorTest {
     }
 
     @Test
-    fun `should stop proxy when tunnel Idle`() = testScope.runTest {
+    fun `should stop proxy when tunnel Idle`() = runTest(dispatcher) {
         coordinator.start()
         configFlow.value = TelegramProxyConfig(enabled = true, secret = "abc")
         tunnelStateFlow.value = TunnelState.Idle
@@ -120,7 +121,7 @@ class TelegramProxyCoordinatorTest {
     }
 
     @Test
-    fun `should start proxy with correct config object`() = testScope.runTest {
+    fun `should start proxy with correct config object`() = runTest(dispatcher) {
         val config = TelegramProxyConfig(enabled = true, secret = "mysecret", port = 4567)
         coordinator.start()
         configFlow.value = config
@@ -130,7 +131,7 @@ class TelegramProxyCoordinatorTest {
 
     @Test
     fun `coordinator stop() обязан остановить proxyService — иначе зомби mtg-процесс`() =
-        testScope.runTest {
+        runTest(dispatcher) {
             val config = TelegramProxyConfig(enabled = true, secret = "abc")
             coordinator.start()
             configFlow.value = config
@@ -142,7 +143,7 @@ class TelegramProxyCoordinatorTest {
         }
 
     @Test
-    fun `Error state при tunnel Connected → restart proxy с тем же config`() = testScope.runTest {
+    fun `Error state при tunnel Connected → restart proxy с тем же config`() = runTest(dispatcher) {
         val config = TelegramProxyConfig(enabled = true, secret = "abc")
         coordinator.start()
         configFlow.value = config
@@ -157,7 +158,7 @@ class TelegramProxyCoordinatorTest {
 
     @Test
     fun `restart attempts ограничены maxRestarts — после лимита start не вызывается`() =
-        testScope.runTest {
+        runTest(dispatcher) {
             val coord = TelegramProxyCoordinator(
                 proxyService = mockProxy,
                 tunnelController = mockTunnelController,
@@ -184,7 +185,7 @@ class TelegramProxyCoordinatorTest {
 
     @Test
     fun `Running state сбрасывает restart counter — последующий crash снова получает retry`() =
-        testScope.runTest {
+        runTest(dispatcher) {
             val coord = TelegramProxyCoordinator(
                 proxyService = mockProxy,
                 tunnelController = mockTunnelController,
@@ -210,7 +211,7 @@ class TelegramProxyCoordinatorTest {
 
     @Test
     fun `Error при tunnel Idle не вызывает restart — killswitch domain а не Telegram`() =
-        testScope.runTest {
+        runTest(dispatcher) {
             val config = TelegramProxyConfig(enabled = true, secret = "abc")
             coordinator.start()
             configFlow.value = config

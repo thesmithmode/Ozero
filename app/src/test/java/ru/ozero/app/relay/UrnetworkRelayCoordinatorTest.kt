@@ -5,9 +5,11 @@ import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.commonvpn.TunnelController
@@ -22,7 +24,7 @@ import kotlin.test.assertEquals
 class UrnetworkRelayCoordinatorTest {
 
     private val dispatcher = UnconfinedTestDispatcher()
-    private val coordinatorScope = CoroutineScope(dispatcher + SupervisorJob())
+    private lateinit var coordinatorScope: CoroutineScope
 
     private lateinit var tunnelStateFlow: MutableStateFlow<TunnelState>
     private lateinit var configStore: InMemoryUrnetworkConfigStore
@@ -31,6 +33,7 @@ class UrnetworkRelayCoordinatorTest {
 
     @BeforeEach
     fun setUp() {
+        coordinatorScope = CoroutineScope(dispatcher + SupervisorJob())
         tunnelStateFlow = MutableStateFlow(TunnelState.Idle)
         configStore = InMemoryUrnetworkConfigStore(UrnetworkConfig(walletOverride = "test-wallet"))
         bridge = FakeBridge()
@@ -40,6 +43,12 @@ class UrnetworkRelayCoordinatorTest {
 
         coordinator = UrnetworkRelayCoordinator(bridge, configStore, tunnelController, coordinatorScope)
         coordinator.start()
+    }
+
+    @AfterEach
+    fun tearDown() {
+        coordinator.stop()
+        coordinatorScope.cancel()
     }
 
     private fun setByClientJwt(value: String?) {
