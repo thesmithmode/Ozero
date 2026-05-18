@@ -442,7 +442,12 @@ class EngineUrnetworkPerformanceProfileTest {
     @Test
     fun `start применяет windowType QUALITY из configStore к bridge`() = runTest {
         val store = InMemoryUrnetworkConfigStore(
-            UrnetworkConfig(byJwt = "j", byClientJwt = "cj", windowType = UrnetworkWindowType.QUALITY, fixedIpSize = false),
+            UrnetworkConfig(
+                byJwt = "j",
+                byClientJwt = "cj",
+                windowType = UrnetworkWindowType.QUALITY,
+                fixedIpSize = false,
+            ),
         )
         val bridge = FakeProfileBridge()
         val engine = EngineUrnetwork(store, bridge, FakeProfileAuthService())
@@ -454,7 +459,12 @@ class EngineUrnetworkPerformanceProfileTest {
     @Test
     fun `start применяет windowType SPEED с fixedIp true из configStore к bridge`() = runTest {
         val store = InMemoryUrnetworkConfigStore(
-            UrnetworkConfig(byJwt = "j", byClientJwt = "cj", windowType = UrnetworkWindowType.SPEED, fixedIpSize = true),
+            UrnetworkConfig(
+                byJwt = "j",
+                byClientJwt = "cj",
+                windowType = UrnetworkWindowType.SPEED,
+                fixedIpSize = true,
+            ),
         )
         val bridge = FakeProfileBridge()
         val engine = EngineUrnetwork(store, bridge, FakeProfileAuthService())
@@ -466,7 +476,12 @@ class EngineUrnetworkPerformanceProfileTest {
     @Test
     fun `start применяет AUTO windowType из configStore (AUTO не skipped на уровне engine)`() = runTest {
         val store = InMemoryUrnetworkConfigStore(
-            UrnetworkConfig(byJwt = "j", byClientJwt = "cj", windowType = UrnetworkWindowType.AUTO, fixedIpSize = false),
+            UrnetworkConfig(
+                byJwt = "j",
+                byClientJwt = "cj",
+                windowType = UrnetworkWindowType.AUTO,
+                fixedIpSize = false,
+            ),
         )
         val bridge = FakeProfileBridge()
         val engine = EngineUrnetwork(store, bridge, FakeProfileAuthService())

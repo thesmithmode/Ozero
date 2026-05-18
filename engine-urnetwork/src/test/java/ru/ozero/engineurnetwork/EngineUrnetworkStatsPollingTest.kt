@@ -28,7 +28,7 @@ class EngineUrnetworkStatsPollingTest {
         val scope = CoroutineScope(SupervisorJob() + dispatcher)
         val bridge = FakeBridge(initialPeerCount = 5)
         val engine = EngineUrnetwork(
-            configStore = FakeStore(byJwt = "j", byClientJwt = "cj"),
+            configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
             authService = FakeAuth(),
             pluginScope = scope,
@@ -47,7 +47,7 @@ class EngineUrnetworkStatsPollingTest {
         val scope = CoroutineScope(SupervisorJob() + dispatcher)
         val bridge = FakeBridge(initialPeerCount = 2)
         val engine = EngineUrnetwork(
-            configStore = FakeStore(byJwt = "j", byClientJwt = "cj"),
+            configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
             authService = FakeAuth(),
             pluginScope = scope,
@@ -71,7 +71,7 @@ class EngineUrnetworkStatsPollingTest {
         val scope = CoroutineScope(SupervisorJob() + dispatcher)
         val bridge = FakeBridge(initialPeerCount = 3)
         val engine = EngineUrnetwork(
-            configStore = FakeStore(byJwt = "j", byClientJwt = "cj"),
+            configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
             authService = FakeAuth(),
             pluginScope = scope,
@@ -91,7 +91,7 @@ class EngineUrnetworkStatsPollingTest {
         val scope = CoroutineScope(SupervisorJob() + dispatcher)
         val bridge = FakeBridge(initialPeerCount = 0)
         val engine = EngineUrnetwork(
-            configStore = FakeStore(byJwt = "j", byClientJwt = "cj"),
+            configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
             authService = FakeAuth(),
             pluginScope = scope,
@@ -109,7 +109,7 @@ class EngineUrnetworkStatsPollingTest {
         val scope = CoroutineScope(SupervisorJob() + dispatcher)
         val bridge = FakeBridge(initialPeerCount = 0, throwOnPeerCount = true)
         val engine = EngineUrnetwork(
-            configStore = FakeStore(byJwt = "j", byClientJwt = "cj"),
+            configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
             authService = FakeAuth(),
             pluginScope = scope,
@@ -168,7 +168,10 @@ class EngineUrnetworkStatsPollingTest {
         override suspend fun fetchSubscriptionBalance(): UrnetworkSdkBridge.SubscriptionBalanceSnapshot? = null
     }
 
-    private fun FakeStore(byJwt: String? = null, byClientJwt: String? = null): UrnetworkConfigStore =
+    private fun fakeStore(
+        byJwt: String? = null,
+        byClientJwt: String? = null,
+    ): UrnetworkConfigStore =
         InMemoryUrnetworkConfigStore(UrnetworkConfig(byJwt = byJwt, byClientJwt = byClientJwt))
 
     private class FakeAuth : UrnetworkAuthService {

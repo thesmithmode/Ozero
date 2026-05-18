@@ -58,7 +58,7 @@ class UrnetworkEngineSettingsViewModelTest {
         val vm = UrnetworkEngineSettingsViewModel(
             FakeUrnetworkBridge(),
             FakeSettingsRepo(),
-            FakeUrnetworkConfigStore(),
+            fakeUrnetworkConfigStore(),
             idleTunnel(),
         )
         assertSame(UrnetworkSettingsUiState.Loading, vm.uiState.value)
@@ -69,7 +69,7 @@ class UrnetworkEngineSettingsViewModelTest {
         val vm = UrnetworkEngineSettingsViewModel(
             FakeUrnetworkBridge(connected = false),
             FakeSettingsRepo(),
-            FakeUrnetworkConfigStore(),
+            fakeUrnetworkConfigStore(),
             idleTunnel(),
         )
         advanceUntilIdle()
@@ -98,7 +98,7 @@ class UrnetworkEngineSettingsViewModelTest {
     @Test
     fun `selectWindowType сохраняет в configStore и применяет profile через bridge`() = runTest {
         val bridge = FakeUrnetworkBridge()
-        val store = FakeUrnetworkConfigStore()
+        val store = fakeUrnetworkConfigStore()
         val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel())
         vm.selectWindowType(UrnetworkWindowType.SPEED)
         advanceUntilIdle()
@@ -109,7 +109,7 @@ class UrnetworkEngineSettingsViewModelTest {
     @Test
     fun `selectWindowType AUTO сбрасывает fixedIpSize`() = runTest {
         val bridge = FakeUrnetworkBridge()
-        val store = FakeUrnetworkConfigStore()
+        val store = fakeUrnetworkConfigStore()
         store.setFixedIpSize(true)
         val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel())
         vm.selectWindowType(UrnetworkWindowType.AUTO)
@@ -120,7 +120,7 @@ class UrnetworkEngineSettingsViewModelTest {
     @Test
     fun `toggleFixedIpSize сохраняет в configStore и применяет profile`() = runTest {
         val bridge = FakeUrnetworkBridge()
-        val store = FakeUrnetworkConfigStore()
+        val store = fakeUrnetworkConfigStore()
         val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel())
         vm.toggleFixedIpSize(true)
         advanceUntilIdle()
@@ -131,7 +131,7 @@ class UrnetworkEngineSettingsViewModelTest {
     @Test
     fun `selectProvideControlMode сохраняет в configStore и применяет к bridge при active engine`() = runTest {
         val bridge = FakeUrnetworkBridge()
-        val store = FakeUrnetworkConfigStore()
+        val store = fakeUrnetworkConfigStore()
         val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel())
         vm.selectProvideControlMode(UrnetworkProvideControlMode.AUTO)
         advanceUntilIdle()
@@ -142,7 +142,7 @@ class UrnetworkEngineSettingsViewModelTest {
     @Test
     fun `selectProvideControlMode не вызывает bridge при idle engine — только persist в store`() = runTest {
         val bridge = FakeUrnetworkBridge()
-        val store = FakeUrnetworkConfigStore()
+        val store = fakeUrnetworkConfigStore()
         val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, idleTunnel())
         vm.selectProvideControlMode(UrnetworkProvideControlMode.AUTO)
         advanceUntilIdle()
@@ -153,7 +153,7 @@ class UrnetworkEngineSettingsViewModelTest {
     @Test
     fun `selectProvideNetworkMode сохраняет в configStore и применяет к bridge при active engine`() = runTest {
         val bridge = FakeUrnetworkBridge()
-        val store = FakeUrnetworkConfigStore()
+        val store = fakeUrnetworkConfigStore()
         val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel())
         vm.selectProvideNetworkMode(UrnetworkProvideNetworkMode.ALL)
         advanceUntilIdle()
@@ -164,7 +164,7 @@ class UrnetworkEngineSettingsViewModelTest {
     @Test
     fun `selectProvideNetworkMode не вызывает bridge при idle engine — только persist в store`() = runTest {
         val bridge = FakeUrnetworkBridge()
-        val store = FakeUrnetworkConfigStore()
+        val store = fakeUrnetworkConfigStore()
         val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, idleTunnel())
         vm.selectProvideNetworkMode(UrnetworkProvideNetworkMode.ALL)
         advanceUntilIdle()
@@ -175,7 +175,7 @@ class UrnetworkEngineSettingsViewModelTest {
     @Test
     fun `selectWindowType не вызывает bridge applyPerformanceProfile когда engine не активен`() = runTest {
         val bridge = FakeUrnetworkBridge()
-        val store = FakeUrnetworkConfigStore()
+        val store = fakeUrnetworkConfigStore()
         val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, idleTunnel())
         vm.selectWindowType(UrnetworkWindowType.SPEED)
         advanceUntilIdle()
@@ -185,7 +185,7 @@ class UrnetworkEngineSettingsViewModelTest {
 
     @Test
     fun `windowType StateFlow отражает начальное значение из configStore`() = runTest {
-        val store = FakeUrnetworkConfigStore()
+        val store = fakeUrnetworkConfigStore()
         val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(), FakeSettingsRepo(), store, idleTunnel())
         advanceUntilIdle()
         assertEquals(UrnetworkWindowType.AUTO, vm.windowType.value)
@@ -196,7 +196,7 @@ class UrnetworkEngineSettingsViewModelTest {
         val vm = UrnetworkEngineSettingsViewModel(
             FakeUrnetworkBridge(),
             FakeSettingsRepo(),
-            FakeUrnetworkConfigStore(),
+            fakeUrnetworkConfigStore(),
             idleTunnel(),
         )
         assertEquals(false, vm.switchingCountry.value)
@@ -214,7 +214,7 @@ class UrnetworkEngineSettingsViewModelTest {
         val vm = UrnetworkEngineSettingsViewModel(
             bridge,
             FakeSettingsRepo(),
-            FakeUrnetworkConfigStore(),
+            fakeUrnetworkConfigStore(),
             activeTunnel(),
         )
         runCurrent()
@@ -235,7 +235,7 @@ class UrnetworkEngineSettingsViewModelTest {
         val vm = UrnetworkEngineSettingsViewModel(
             bridge,
             FakeSettingsRepo(),
-            FakeUrnetworkConfigStore(),
+            fakeUrnetworkConfigStore(),
             activeTunnel(),
         )
         runCurrent()
@@ -260,7 +260,7 @@ class UrnetworkEngineSettingsViewModelTest {
         val vm = UrnetworkEngineSettingsViewModel(
             bridge,
             FakeSettingsRepo(),
-            FakeUrnetworkConfigStore(),
+            fakeUrnetworkConfigStore(),
             idleTunnel(),
         )
         val collector = backgroundScope.launch { vm.accountPoints.collect { } }
@@ -289,7 +289,7 @@ class UrnetworkEngineSettingsViewModelTest {
         val vm = UrnetworkEngineSettingsViewModel(
             bridge,
             FakeSettingsRepo(),
-            FakeUrnetworkConfigStore(),
+            fakeUrnetworkConfigStore(),
             activeTunnel(),
         )
         val collector = backgroundScope.launch { vm.accountPoints.collect { } }
@@ -313,7 +313,7 @@ class UrnetworkEngineSettingsViewModelTest {
         val vm = UrnetworkEngineSettingsViewModel(
             bridge,
             FakeSettingsRepo(),
-            FakeUrnetworkConfigStore(),
+            fakeUrnetworkConfigStore(),
             activeTunnel(),
         )
         val collector = backgroundScope.launch { vm.accountPoints.collect { } }
@@ -395,7 +395,7 @@ class UrnetworkEngineSettingsViewModelTest {
         val vm = UrnetworkEngineSettingsViewModel(
             bridge,
             FakeSettingsRepo(),
-            FakeUrnetworkConfigStore(),
+            fakeUrnetworkConfigStore(),
             activeTunnel(),
         )
         advanceUntilIdle()
@@ -477,7 +477,7 @@ class UrnetworkEngineSettingsViewModelTest {
         val vm = UrnetworkEngineSettingsViewModel(
             bridge,
             FakeSettingsRepo(),
-            FakeUrnetworkConfigStore(),
+            fakeUrnetworkConfigStore(),
             idleTunnel(),
         )
         val collector = backgroundScope.launch { vm.peerCount.collect {} }
@@ -494,7 +494,7 @@ class UrnetworkEngineSettingsViewModelTest {
         val vm = UrnetworkEngineSettingsViewModel(
             bridge,
             FakeSettingsRepo(),
-            FakeUrnetworkConfigStore(),
+            fakeUrnetworkConfigStore(),
             activeTunnel(),
         )
         advanceUntilIdle()
@@ -520,7 +520,7 @@ class UrnetworkEngineSettingsViewModelTest {
         val vm = UrnetworkEngineSettingsViewModel(
             bridge,
             FakeSettingsRepo(),
-            FakeUrnetworkConfigStore(),
+            fakeUrnetworkConfigStore(),
             activeTunnel(),
         )
         advanceUntilIdle()
@@ -544,7 +544,7 @@ class UrnetworkEngineSettingsViewModelTest {
         val vm = UrnetworkEngineSettingsViewModel(
             bridge,
             FakeSettingsRepo(),
-            FakeUrnetworkConfigStore(),
+            fakeUrnetworkConfigStore(),
             idleTunnel(),
         )
         advanceUntilIdle()
@@ -588,7 +588,7 @@ private class FakeSettingsRepo : ru.ozero.enginescore.settings.SettingsRepositor
     override suspend fun setAlwaysOnBannerDismissed(dismissed: Boolean) = Unit
 }
 
-private fun FakeUrnetworkConfigStore(): UrnetworkConfigStore =
+private fun fakeUrnetworkConfigStore(): UrnetworkConfigStore =
     ru.ozero.engineurnetwork.InMemoryUrnetworkConfigStore(
         ru.ozero.engineurnetwork.UrnetworkConfig(walletOverride = "0xWALLET"),
     )

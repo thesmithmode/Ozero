@@ -25,7 +25,7 @@ class EngineUrnetworkAwaitReadyTest {
         peerReadyTimeoutMs: Long = 500L,
         peerReadyPollMs: Long = 50L,
     ) = EngineUrnetwork(
-        configStore = MinimalConfigStore,
+        configStore = minimalConfigStore,
         sdkBridge = bridge,
         authService = ImmediateAuthService,
         pluginScope = scope,
@@ -106,7 +106,7 @@ class EngineUrnetworkAwaitReadyTest {
         )
     }
 
-    private val MinimalConfigStore = InMemoryUrnetworkConfigStore(
+    private val minimalConfigStore = InMemoryUrnetworkConfigStore(
         UrnetworkConfig(byJwt = "j", byClientJwt = "cj"),
     )
 

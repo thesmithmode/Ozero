@@ -392,8 +392,9 @@ class AppBackupManagerTest {
                 delegate.inject { it.copy(byClientJwt = value) }
             }
         override fun config() = delegate.config()
-        override suspend fun update(transform: (ru.ozero.engineurnetwork.UrnetworkConfig) -> ru.ozero.engineurnetwork.UrnetworkConfig) =
-            delegate.update(transform)
+        override suspend fun update(
+            transform: (ru.ozero.engineurnetwork.UrnetworkConfig) -> ru.ozero.engineurnetwork.UrnetworkConfig,
+        ) = delegate.update(transform)
     }
 
     private class FakeSplitRuleDao : AppSplitRuleDao {

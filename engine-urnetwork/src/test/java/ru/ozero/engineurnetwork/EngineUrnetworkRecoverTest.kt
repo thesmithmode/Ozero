@@ -30,7 +30,7 @@ class EngineUrnetworkRecoverTest {
         val scope = CoroutineScope(SupervisorJob() + dispatcher)
         val bridge = FakeRecoverBridge(running = false)
         val engine = EngineUrnetwork(
-            configStore = FakeStore(byJwt = "j", byClientJwt = "cj"),
+            configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
             authService = FakeAuth(),
             pluginScope = scope,
@@ -46,7 +46,7 @@ class EngineUrnetworkRecoverTest {
         val scope = CoroutineScope(SupervisorJob() + dispatcher)
         val bridge = FakeRecoverBridge(running = true, location = null)
         val engine = EngineUrnetwork(
-            configStore = FakeStore(byJwt = "j", byClientJwt = "cj"),
+            configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
             authService = FakeAuth(),
             pluginScope = scope,
@@ -67,7 +67,7 @@ class EngineUrnetworkRecoverTest {
         val fakeLocation = FakeLocation()
         val bridge = FakeRecoverBridge(running = true, location = fakeLocation)
         val engine = EngineUrnetwork(
-            configStore = FakeStore(byJwt = "j", byClientJwt = "cj"),
+            configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
             authService = FakeAuth(),
             pluginScope = scope,
@@ -92,7 +92,7 @@ class EngineUrnetworkRecoverTest {
             throwOnConnect = CancellationException("upstream cancel"),
         )
         val engine = EngineUrnetwork(
-            configStore = FakeStore(byJwt = "j", byClientJwt = "cj"),
+            configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
             authService = FakeAuth(),
             pluginScope = scope,
@@ -115,7 +115,7 @@ class EngineUrnetworkRecoverTest {
             throwOnConnect = RuntimeException("sdk transient"),
         )
         val engine = EngineUrnetwork(
-            configStore = FakeStore(byJwt = "j", byClientJwt = "cj"),
+            configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
             authService = FakeAuth(),
             pluginScope = scope,
@@ -185,7 +185,10 @@ class EngineUrnetworkRecoverTest {
         override suspend fun fetchSubscriptionBalance(): UrnetworkSdkBridge.SubscriptionBalanceSnapshot? = null
     }
 
-    private fun FakeStore(byJwt: String? = null, byClientJwt: String? = null): UrnetworkConfigStore =
+    private fun fakeStore(
+        byJwt: String? = null,
+        byClientJwt: String? = null,
+    ): UrnetworkConfigStore =
         InMemoryUrnetworkConfigStore(UrnetworkConfig(byJwt = byJwt, byClientJwt = byClientJwt))
 
     private class FakeAuth : UrnetworkAuthService {

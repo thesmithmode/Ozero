@@ -17,7 +17,7 @@ class UrnetworkConsentSentinelTest {
     fun `EngineUrnetwork_start без JWT auto-acquire guest+client и стартует bridge`() = runTest {
         val bridge = SpyBridge()
         val auth = SpyAuthService()
-        val store = SpyStore()
+        val store = spyStore()
         val engine = EngineUrnetwork(store, bridge, auth)
 
         engine.start(EngineConfig.Urnetwork(jwtToken = ""), Upstream.None)
@@ -31,7 +31,7 @@ class UrnetworkConsentSentinelTest {
     fun `EngineUrnetwork_start с существующими jwt не повторяет acquire`() = runTest {
         val bridge = SpyBridge()
         val auth = SpyAuthService()
-        val store = SpyStore(existingJwt = "existing.jwt", existingClientJwt = "existing.cjwt")
+        val store = spyStore(existingJwt = "existing.jwt", existingClientJwt = "existing.cjwt")
         val engine = EngineUrnetwork(store, bridge, auth)
 
         val result = engine.start(EngineConfig.Urnetwork(jwtToken = ""), Upstream.None)
@@ -55,7 +55,10 @@ class UrnetworkConsentSentinelTest {
         }
     }
 
-    private fun SpyStore(existingJwt: String? = null, existingClientJwt: String? = null): UrnetworkConfigStore =
+    private fun spyStore(
+        existingJwt: String? = null,
+        existingClientJwt: String? = null,
+    ): UrnetworkConfigStore =
         InMemoryUrnetworkConfigStore(UrnetworkConfig(byJwt = existingJwt, byClientJwt = existingClientJwt))
 
     private class SpyBridge : UrnetworkSdkBridge {
