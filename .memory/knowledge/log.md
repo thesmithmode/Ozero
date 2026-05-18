@@ -1,5 +1,12 @@
 # Build Log
 
+## [2026-05-19T04:15:00+03:00] compile | Daily Log 2026-05-18 (incremental pass 3)
+- Source: daily/2026-05-18.md
+- Articles created: [[concepts/extension-function-import-migration-trap]] (interface→extension breaks consumers without import), [[concepts/poll-flow-resilience-pattern]] (runCatching + last-value fallback for poll flows)
+- Articles updated: [[connections/self-review-insufficient-code-reviewer-required]] (added 2026-05-18 evidence: 5-reviewer autonomous fix cycle, ~25 findings, 4 commits)
+- Index updated: 2 new rows, 1 row updated, total 136
+- Sessions covered (incremental): 16:59 (5-agent code review details), 17:51 (extension import trap), 19:55 (autonomous fix cycle with poll-flow resilience)
+
 ## [2026-05-19T03:30:00+03:00] compile | Daily Log 2026-05-18 (incremental pass 2)
 - Source: daily/2026-05-18.md
 - Articles created: [[concepts/urnetwork-runtime-release-lifecycle]] (Go-runtime singleton release after stop; cross-app conflict with URnetwork-app)
