@@ -46,7 +46,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
 import ru.ozero.app.ui.theme.OzeroPalette
+import ru.ozero.app.ui.urnetwork.UrnetworkBalanceCard
 import ru.ozero.app.ui.utils.formatBytes
+import ru.ozero.app.urnetwork.UrnetworkBalanceState
 import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
@@ -134,15 +136,13 @@ fun UrnetworkEngineSettingsScreen(
             }
             is UrnetworkSettingsUiState.Ready -> {
                 val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
-                val peerCount by viewModel.peerCount.collectAsStateWithLifecycle()
-                val switchingCountry by viewModel.switchingCountry.collectAsStateWithLifecycle()
                 val windowType by viewModel.windowType.collectAsStateWithLifecycle()
                 val fixedIp by viewModel.fixedIpSize.collectAsStateWithLifecycle()
                 val allowDirect by viewModel.allowDirect.collectAsStateWithLifecycle()
                 val provideControlMode by viewModel.provideControlMode.collectAsStateWithLifecycle()
                 val provideNetworkMode by viewModel.provideNetworkMode.collectAsStateWithLifecycle()
                 val sharedTrafficBytes by viewModel.sharedTrafficBytes.collectAsStateWithLifecycle()
-                val accountPoints by viewModel.accountPoints.collectAsStateWithLifecycle()
+                val balanceState by viewModel.balanceState.collectAsStateWithLifecycle()
                 LocationListContent(
                     modifier = Modifier.padding(padding),
                     countries = current.countries,
@@ -150,8 +150,6 @@ fun UrnetworkEngineSettingsScreen(
                     cities = current.cities,
                     selectedLocation = current.selectedLocation,
                     providePaused = current.providePaused,
-                    peerCount = peerCount,
-                    switchingCountry = switchingCountry,
                     searchQuery = searchQuery,
                     windowType = windowType,
                     fixedIp = fixedIp,
@@ -159,7 +157,7 @@ fun UrnetworkEngineSettingsScreen(
                     provideControlMode = provideControlMode,
                     provideNetworkMode = provideNetworkMode,
                     sharedTrafficBytes = sharedTrafficBytes,
-                    accountPoints = accountPoints,
+                    balanceState = balanceState,
                     insufficientBalance = insufficientBalance,
                     onSearchQueryChange = viewModel::setSearchQuery,
                     onSelect = viewModel::selectLocation,
@@ -185,8 +183,6 @@ private fun LocationListContent(
     cities: List<UrnetworkLocationItem>,
     selectedLocation: UrnetworkSdkBridge.LocationToken?,
     providePaused: Boolean,
-    peerCount: Int,
-    switchingCountry: Boolean,
     searchQuery: String,
     windowType: UrnetworkWindowType,
     fixedIp: Boolean,
@@ -194,7 +190,7 @@ private fun LocationListContent(
     provideControlMode: UrnetworkProvideControlMode,
     provideNetworkMode: UrnetworkProvideNetworkMode,
     sharedTrafficBytes: Long,
-    accountPoints: UrnetworkSdkBridge.AccountPointsSnapshot?,
+    balanceState: UrnetworkBalanceState,
     insufficientBalance: Boolean,
     onSearchQueryChange: (String) -> Unit,
     onSelect: (UrnetworkSdkBridge.LocationToken?) -> Unit,
@@ -216,17 +212,14 @@ private fun LocationListContent(
                 InsufficientBalanceBanner(modifier = Modifier.padding(top = 12.dp))
             }
         }
-        if (accountPoints != null) {
-            item {
-                AccountPointsCard(
-                    points = accountPoints,
-                    modifier = Modifier.padding(top = 12.dp),
-                )
-            }
+        item {
+            UrnetworkBalanceCard(
+                state = balanceState,
+                modifier = Modifier.padding(top = 12.dp),
+            )
         }
         item {
             Column(modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)) {
-                StatusRow(peerCount = peerCount, switchingCountry = switchingCountry)
                 SettingsCard(
                     providePaused = providePaused,
                     windowType = windowType,
@@ -583,41 +576,6 @@ private fun CompactToggleRow(
 }
 
 @Composable
-private fun StatusRow(peerCount: Int, switchingCountry: Boolean = false) {
-    val (dot, label, dotColor) = when {
-        switchingCountry -> Triple(
-            "●",
-            stringResource(R.string.urnetwork_country_switching),
-            OzeroPalette.StateConnecting,
-        )
-        peerCount > 0 -> Triple(
-            "●",
-            stringResource(R.string.urnetwork_peers_connected, peerCount),
-            OzeroPalette.StateConnected,
-        )
-        else -> Triple(
-            "●",
-            stringResource(R.string.urnetwork_peers_searching),
-            OzeroPalette.StateConnecting,
-        )
-    }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Text(text = dot, color = dotColor, style = MaterialTheme.typography.bodySmall)
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = OzeroPalette.Text2,
-        )
-    }
-}
-
-@Composable
 private fun CheckIpRow() {
     val uriHandler = LocalUriHandler.current
     Row(
@@ -661,64 +619,6 @@ private fun SharedTrafficSection(sharedTrafficBytes: Long, onClick: () -> Unit) 
         }
         Text(text = "›", style = MaterialTheme.typography.bodyLarge, color = OzeroPalette.Text3)
     }
-}
-
-@Composable
-private fun AccountPointsCard(
-    points: UrnetworkSdkBridge.AccountPointsSnapshot,
-    modifier: Modifier = Modifier,
-) {
-    Card(
-        modifier = modifier.fillMaxWidth().testTag("urnetwork_points_card"),
-        colors = CardDefaults.cardColors(containerColor = OzeroPalette.Bg1),
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = stringResource(R.string.urnetwork_points_title),
-                style = MaterialTheme.typography.titleSmall,
-                color = OzeroPalette.Text2,
-            )
-            Text(
-                text = formatPoints(points.totalPoints),
-                style = MaterialTheme.typography.headlineSmall,
-                color = OzeroPalette.Text,
-                modifier = Modifier.padding(top = 4.dp),
-            )
-            PointsRow(stringResource(R.string.urnetwork_points_payout), points.payoutPoints)
-            PointsRow(stringResource(R.string.urnetwork_points_referral), points.referralPoints)
-            PointsRow(stringResource(R.string.urnetwork_points_reliability), points.reliabilityPoints)
-            PointsRow(stringResource(R.string.urnetwork_points_multiplier), points.multiplierPoints)
-        }
-    }
-}
-
-@Composable
-private fun PointsRow(label: String, value: Double) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = OzeroPalette.Text3,
-        )
-        Text(
-            text = formatPoints(value),
-            style = MaterialTheme.typography.bodyMedium,
-            color = OzeroPalette.Text2,
-        )
-    }
-}
-
-private fun formatPoints(value: Double): String {
-    if (value <= 0.0) return "0"
-    if (value < 100.0) return "%.2f".format(value)
-    if (value < 10_000.0) return "%.1f".format(value)
-    return value.toLong().toString()
 }
 
 @Composable

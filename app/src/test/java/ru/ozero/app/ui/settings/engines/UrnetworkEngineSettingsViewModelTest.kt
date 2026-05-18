@@ -15,6 +15,11 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import ru.ozero.app.urnetwork.UrnetworkBalanceRepository
+import ru.ozero.app.urnetwork.UrnetworkBalanceState
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.enginescore.EngineId
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
@@ -67,6 +72,7 @@ class UrnetworkEngineSettingsViewModelTest {
             FakeSettingsRepo(),
             fakeUrnetworkConfigStore(),
             idleTunnel(),
+            fakeBalanceRepo(),
         )
         assertSame(UrnetworkSettingsUiState.Loading, vm.uiState.value)
     }
@@ -78,6 +84,7 @@ class UrnetworkEngineSettingsViewModelTest {
             FakeSettingsRepo(),
             fakeUrnetworkConfigStore(),
             idleTunnel(),
+            fakeBalanceRepo(),
         )
         advanceUntilIdle()
         assertIs<UrnetworkSettingsUiState.NotConnected>(vm.uiState.value)
@@ -106,7 +113,7 @@ class UrnetworkEngineSettingsViewModelTest {
     fun `selectWindowType сохраняет в configStore и применяет profile через bridge`() = runTest {
         val bridge = FakeUrnetworkBridge()
         val store = fakeUrnetworkConfigStore()
-        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel())
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel(), fakeBalanceRepo())
         vm.selectWindowType(UrnetworkWindowType.SPEED)
         advanceUntilIdle()
         assertEquals(UrnetworkWindowType.SPEED, store.windowType().first())
@@ -118,7 +125,7 @@ class UrnetworkEngineSettingsViewModelTest {
         val bridge = FakeUrnetworkBridge()
         val store = fakeUrnetworkConfigStore()
         store.setFixedIpSize(true)
-        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel())
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel(), fakeBalanceRepo())
         vm.selectWindowType(UrnetworkWindowType.AUTO)
         advanceUntilIdle()
         assertEquals(false, store.fixedIpSize().first())
@@ -128,7 +135,7 @@ class UrnetworkEngineSettingsViewModelTest {
     fun `toggleFixedIpSize сохраняет в configStore и применяет profile`() = runTest {
         val bridge = FakeUrnetworkBridge()
         val store = fakeUrnetworkConfigStore()
-        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel())
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel(), fakeBalanceRepo())
         vm.toggleFixedIpSize(true)
         advanceUntilIdle()
         assertEquals(true, store.fixedIpSize().first())
@@ -139,7 +146,7 @@ class UrnetworkEngineSettingsViewModelTest {
     fun `toggleAllowDirect false сохраняет в configStore и применяет profile`() = runTest {
         val bridge = FakeUrnetworkBridge()
         val store = fakeUrnetworkConfigStore()
-        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel())
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel(), fakeBalanceRepo())
         vm.toggleAllowDirect(false)
         advanceUntilIdle()
         assertEquals(false, store.allowDirect().first())
@@ -151,7 +158,7 @@ class UrnetworkEngineSettingsViewModelTest {
         val bridge = FakeUrnetworkBridge()
         val store = fakeUrnetworkConfigStore()
         store.setAllowDirect(false)
-        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel())
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel(), fakeBalanceRepo())
         vm.toggleAllowDirect(true)
         advanceUntilIdle()
         assertEquals(true, store.allowDirect().first())
@@ -162,7 +169,7 @@ class UrnetworkEngineSettingsViewModelTest {
     fun `toggleAllowDirect не вызывает bridge при idle engine`() = runTest {
         val bridge = FakeUrnetworkBridge()
         val store = fakeUrnetworkConfigStore()
-        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, idleTunnel())
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, idleTunnel(), fakeBalanceRepo())
         vm.toggleAllowDirect(false)
         advanceUntilIdle()
         assertEquals(false, store.allowDirect().first())
@@ -173,7 +180,7 @@ class UrnetworkEngineSettingsViewModelTest {
     fun `allowDirect StateFlow отражает значение из configStore`() = runTest {
         val store = fakeUrnetworkConfigStore()
         store.setAllowDirect(false)
-        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(), FakeSettingsRepo(), store, idleTunnel())
+        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(), FakeSettingsRepo(), store, idleTunnel(), fakeBalanceRepo())
         advanceUntilIdle()
         assertEquals(false, vm.allowDirect.value)
     }
@@ -182,7 +189,7 @@ class UrnetworkEngineSettingsViewModelTest {
     fun `selectProvideControlMode сохраняет в configStore и применяет к bridge при active engine`() = runTest {
         val bridge = FakeUrnetworkBridge()
         val store = fakeUrnetworkConfigStore()
-        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel())
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel(), fakeBalanceRepo())
         vm.selectProvideControlMode(UrnetworkProvideControlMode.AUTO)
         advanceUntilIdle()
         assertEquals(UrnetworkProvideControlMode.AUTO, store.provideControlMode().first())
@@ -193,7 +200,7 @@ class UrnetworkEngineSettingsViewModelTest {
     fun `selectProvideControlMode не вызывает bridge при idle engine — только persist в store`() = runTest {
         val bridge = FakeUrnetworkBridge()
         val store = fakeUrnetworkConfigStore()
-        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, idleTunnel())
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, idleTunnel(), fakeBalanceRepo())
         vm.selectProvideControlMode(UrnetworkProvideControlMode.AUTO)
         advanceUntilIdle()
         assertEquals(UrnetworkProvideControlMode.AUTO, store.provideControlMode().first())
@@ -204,7 +211,7 @@ class UrnetworkEngineSettingsViewModelTest {
     fun `selectProvideNetworkMode сохраняет в configStore и применяет к bridge при active engine`() = runTest {
         val bridge = FakeUrnetworkBridge()
         val store = fakeUrnetworkConfigStore()
-        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel())
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel(), fakeBalanceRepo())
         vm.selectProvideNetworkMode(UrnetworkProvideNetworkMode.ALL)
         advanceUntilIdle()
         assertEquals(UrnetworkProvideNetworkMode.ALL, store.provideNetworkMode().first())
@@ -215,7 +222,7 @@ class UrnetworkEngineSettingsViewModelTest {
     fun `selectProvideNetworkMode не вызывает bridge при idle engine — только persist в store`() = runTest {
         val bridge = FakeUrnetworkBridge()
         val store = fakeUrnetworkConfigStore()
-        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, idleTunnel())
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, idleTunnel(), fakeBalanceRepo())
         vm.selectProvideNetworkMode(UrnetworkProvideNetworkMode.ALL)
         advanceUntilIdle()
         assertEquals(UrnetworkProvideNetworkMode.ALL, store.provideNetworkMode().first())
@@ -226,7 +233,7 @@ class UrnetworkEngineSettingsViewModelTest {
     fun `selectWindowType не вызывает bridge applyPerformanceProfile когда engine не активен`() = runTest {
         val bridge = FakeUrnetworkBridge()
         val store = fakeUrnetworkConfigStore()
-        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, idleTunnel())
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, idleTunnel(), fakeBalanceRepo())
         vm.selectWindowType(UrnetworkWindowType.SPEED)
         advanceUntilIdle()
         assertEquals(UrnetworkWindowType.SPEED, store.windowType().first())
@@ -236,7 +243,7 @@ class UrnetworkEngineSettingsViewModelTest {
     @Test
     fun `windowType StateFlow отражает начальное значение из configStore`() = runTest {
         val store = fakeUrnetworkConfigStore()
-        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(), FakeSettingsRepo(), store, idleTunnel())
+        val vm = UrnetworkEngineSettingsViewModel(FakeUrnetworkBridge(), FakeSettingsRepo(), store, idleTunnel(), fakeBalanceRepo())
         advanceUntilIdle()
         assertEquals(UrnetworkWindowType.AUTO, vm.windowType.value)
     }
@@ -248,6 +255,7 @@ class UrnetworkEngineSettingsViewModelTest {
             FakeSettingsRepo(),
             fakeUrnetworkConfigStore(),
             idleTunnel(),
+            fakeBalanceRepo(),
         )
         assertEquals(false, vm.switchingCountry.value)
     }
@@ -266,6 +274,7 @@ class UrnetworkEngineSettingsViewModelTest {
             FakeSettingsRepo(),
             fakeUrnetworkConfigStore(),
             activeTunnel(),
+            fakeBalanceRepo(),
         )
         runCurrent()
         vm.selectLocation(locB)
@@ -287,6 +296,7 @@ class UrnetworkEngineSettingsViewModelTest {
             FakeSettingsRepo(),
             fakeUrnetworkConfigStore(),
             activeTunnel(),
+            fakeBalanceRepo(),
         )
         runCurrent()
         vm.selectLocation(locB)
@@ -295,89 +305,6 @@ class UrnetworkEngineSettingsViewModelTest {
         advanceTimeBy(20_000L)
         runCurrent()
         assertEquals(false, vm.switchingCountry.value)
-    }
-
-    @Test
-    fun `accountPoints null когда engine не активен — не дёргает fetch`() = runTest {
-        val bridge = FakeUrnetworkBridge(connected = false)
-        bridge.accountPointsResult = UrnetworkSdkBridge.AccountPointsSnapshot(
-            totalPoints = 42.0,
-            payoutPoints = 30.0,
-            referralPoints = 5.0,
-            reliabilityPoints = 4.0,
-            multiplierPoints = 3.0,
-        )
-        val vm = UrnetworkEngineSettingsViewModel(
-            bridge,
-            FakeSettingsRepo(),
-            fakeUrnetworkConfigStore(),
-            idleTunnel(),
-        )
-        val collector = backgroundScope.launch { vm.accountPoints.collect { } }
-        advanceTimeBy(50L)
-        runCurrent()
-        assertNull(vm.accountPoints.value, "engine не активен → accountPoints null")
-        assertEquals(
-            0,
-            bridge.fetchAccountPointsCallCount.get(),
-            "fetchAccountPoints не должен дёргаться когда engine не активен",
-        )
-        collector.cancel()
-    }
-
-    @Test
-    fun `accountPoints poll-flow эмитит snapshot когда engine активен`() = runTest {
-        val snapshot = UrnetworkSdkBridge.AccountPointsSnapshot(
-            totalPoints = 123.45,
-            payoutPoints = 100.0,
-            referralPoints = 10.0,
-            reliabilityPoints = 8.45,
-            multiplierPoints = 5.0,
-        )
-        val bridge = FakeUrnetworkBridge(connected = true)
-        bridge.accountPointsResult = snapshot
-        val vm = UrnetworkEngineSettingsViewModel(
-            bridge,
-            FakeSettingsRepo(),
-            fakeUrnetworkConfigStore(),
-            activeTunnel(),
-        )
-        val collector = backgroundScope.launch { vm.accountPoints.collect { } }
-        advanceTimeBy(100L)
-        runCurrent()
-        assertEquals(snapshot, vm.accountPoints.value)
-        assertEquals(1, bridge.fetchAccountPointsCallCount.get(), "первый poll сразу при active")
-        collector.cancel()
-    }
-
-    @Test
-    fun `accountPoints poll повторяется через 30s — sentinel auto-refresh`() = runTest {
-        val bridge = FakeUrnetworkBridge(connected = true)
-        bridge.accountPointsResult = UrnetworkSdkBridge.AccountPointsSnapshot(
-            totalPoints = 1.0,
-            payoutPoints = 1.0,
-            referralPoints = 0.0,
-            reliabilityPoints = 0.0,
-            multiplierPoints = 0.0,
-        )
-        val vm = UrnetworkEngineSettingsViewModel(
-            bridge,
-            FakeSettingsRepo(),
-            fakeUrnetworkConfigStore(),
-            activeTunnel(),
-        )
-        val collector = backgroundScope.launch { vm.accountPoints.collect { } }
-        advanceTimeBy(100L)
-        runCurrent()
-        val initialCount = bridge.fetchAccountPointsCallCount.get()
-        advanceTimeBy(30_000L)
-        runCurrent()
-        kotlin.test.assertTrue(
-            bridge.fetchAccountPointsCallCount.get() > initialCount,
-            "после 30s интервала должен быть второй poll. initial=$initialCount " +
-                "current=${bridge.fetchAccountPointsCallCount.get()}",
-        )
-        collector.cancel()
     }
 
     @Test
@@ -447,6 +374,7 @@ class UrnetworkEngineSettingsViewModelTest {
             FakeSettingsRepo(),
             fakeUrnetworkConfigStore(),
             activeTunnel(),
+            fakeBalanceRepo(),
         )
         advanceUntilIdle()
         vm.refresh()
@@ -522,23 +450,6 @@ class UrnetworkEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `peerCount остаётся 0 пока engine не активен`() = runTest {
-        val bridge = FakeUrnetworkBridge()
-        val vm = UrnetworkEngineSettingsViewModel(
-            bridge,
-            FakeSettingsRepo(),
-            fakeUrnetworkConfigStore(),
-            idleTunnel(),
-        )
-        val collector = backgroundScope.launch { vm.peerCount.collect {} }
-        advanceTimeBy(10_000L)
-        runCurrent()
-        collector.cancel()
-        assertEquals(0, vm.peerCount.value)
-        assertEquals(0, bridge.peerCountCallCount.get())
-    }
-
-    @Test
     fun `setProvidePaused true когда engine активен — вызывает bridge и обновляет Ready providePaused`() = runTest {
         val bridge = FakeUrnetworkBridge(connected = true)
         val vm = UrnetworkEngineSettingsViewModel(
@@ -546,6 +457,7 @@ class UrnetworkEngineSettingsViewModelTest {
             FakeSettingsRepo(),
             fakeUrnetworkConfigStore(),
             activeTunnel(),
+            fakeBalanceRepo(),
         )
         advanceUntilIdle()
         vm.refresh()
@@ -572,6 +484,7 @@ class UrnetworkEngineSettingsViewModelTest {
             FakeSettingsRepo(),
             fakeUrnetworkConfigStore(),
             activeTunnel(),
+            fakeBalanceRepo(),
         )
         advanceUntilIdle()
         vm.refresh()
@@ -596,6 +509,7 @@ class UrnetworkEngineSettingsViewModelTest {
             FakeSettingsRepo(),
             fakeUrnetworkConfigStore(),
             idleTunnel(),
+            fakeBalanceRepo(),
         )
         advanceUntilIdle()
 
@@ -609,6 +523,73 @@ class UrnetworkEngineSettingsViewModelTest {
                 "иначе SDK CGo crash на null context",
         )
         assertEquals(null, bridge.lastPausedValue, "lastPausedValue остаётся null")
+    }
+
+    @Test
+    fun `balanceState стартует с INITIAL`() = runTest {
+        val vm = UrnetworkEngineSettingsViewModel(
+            FakeUrnetworkBridge(),
+            FakeSettingsRepo(),
+            fakeUrnetworkConfigStore(),
+            idleTunnel(),
+            fakeBalanceRepo(),
+        )
+        val collector = backgroundScope.launch { vm.balanceState.collect { } }
+        advanceTimeBy(50L)
+        runCurrent()
+        assertEquals(UrnetworkBalanceState.INITIAL, vm.balanceState.value)
+        collector.cancel()
+    }
+
+    @Test
+    fun `balanceState отражает значение из balanceRepository`() = runTest {
+        val snapshot = UrnetworkSdkBridge.SubscriptionBalanceSnapshot(
+            balanceBytes = 1_000_000L,
+            usedBytes = 200_000L,
+            pendingBytes = 0L,
+            startBalanceBytes = 1_000_000L,
+            plan = "free",
+            store = null,
+        )
+        val repo = FakeBalanceRepository(
+            UrnetworkBalanceState(snapshot = snapshot, isLoading = false, lastError = null),
+        )
+        val vm = UrnetworkEngineSettingsViewModel(
+            FakeUrnetworkBridge(),
+            FakeSettingsRepo(),
+            fakeUrnetworkConfigStore(),
+            idleTunnel(),
+            repo,
+        )
+        val collector = backgroundScope.launch { vm.balanceState.collect { } }
+        advanceTimeBy(50L)
+        runCurrent()
+        assertEquals(snapshot, vm.balanceState.value.snapshot)
+        collector.cancel()
+    }
+
+    @Test
+    fun `balanceState вызывает refresh через 30s — sentinel auto-poll`() = runTest {
+        val repo = FakeBalanceRepository()
+        val vm = UrnetworkEngineSettingsViewModel(
+            FakeUrnetworkBridge(),
+            FakeSettingsRepo(),
+            fakeUrnetworkConfigStore(),
+            idleTunnel(),
+            repo,
+        )
+        val collector = backgroundScope.launch { vm.balanceState.collect { } }
+        advanceTimeBy(100L)
+        runCurrent()
+        val initialRefreshes = repo.refreshCallCount.get()
+        advanceTimeBy(30_000L)
+        runCurrent()
+        kotlin.test.assertTrue(
+            repo.refreshCallCount.get() > initialRefreshes,
+            "через 30s должен быть повторный refresh. initial=$initialRefreshes " +
+                "current=${repo.refreshCallCount.get()}",
+        )
+        collector.cancel()
     }
 }
 
@@ -700,11 +681,16 @@ private class FakeUrnetworkBridge(
     override fun unpaidByteCount(): Long = 0L
     override fun fetchTransferStats() = Unit
     override suspend fun fetchSubscriptionBalance(): UrnetworkSdkBridge.SubscriptionBalanceSnapshot? = null
-
-    var accountPointsResult: UrnetworkSdkBridge.AccountPointsSnapshot? = null
-    val fetchAccountPointsCallCount = AtomicInteger(0)
-    override suspend fun fetchAccountPoints(): UrnetworkSdkBridge.AccountPointsSnapshot? {
-        fetchAccountPointsCallCount.incrementAndGet()
-        return accountPointsResult
-    }
+    override suspend fun fetchAccountPoints(): UrnetworkSdkBridge.AccountPointsSnapshot? = null
 }
+
+private class FakeBalanceRepository(
+    initial: UrnetworkBalanceState = UrnetworkBalanceState.INITIAL,
+) : UrnetworkBalanceRepository {
+    private val _state = MutableStateFlow(initial)
+    override val state: StateFlow<UrnetworkBalanceState> = _state.asStateFlow()
+    val refreshCallCount = AtomicInteger(0)
+    override suspend fun refresh() { refreshCallCount.incrementAndGet() }
+}
+
+private fun fakeBalanceRepo() = FakeBalanceRepository()

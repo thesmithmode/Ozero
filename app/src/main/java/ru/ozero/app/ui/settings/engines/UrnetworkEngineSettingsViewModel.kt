@@ -10,21 +10,27 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import ru.ozero.app.urnetwork.UrnetworkBalanceRepository
+import ru.ozero.app.urnetwork.UrnetworkBalanceState
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginescore.EngineId
@@ -77,6 +83,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val configStore: UrnetworkConfigStore,
     private val tunnelController: TunnelController,
+    private val balanceRepository: UrnetworkBalanceRepository,
 ) : ViewModel() {
 
     private val isUrnetworkActive: StateFlow<Boolean> = tunnelController.state
@@ -171,21 +178,6 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
 
     val searchQuery = MutableStateFlow("")
 
-    val peerCount: StateFlow<Int> = isUrnetworkActive.flatMapLatest { active ->
-        if (active) {
-            flow {
-                var last = 0
-                while (true) {
-                    last = runCatching { bridge.peerCount() }.getOrDefault(last)
-                    emit(last)
-                    delay(PEER_COUNT_POLL_MS)
-                }
-            }
-        } else {
-            flowOf(0)
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(POLLER_KEEP_ALIVE_MS), 0)
-
     val sharedTrafficBytes: StateFlow<Long> = isUrnetworkActive.flatMapLatest { active ->
         if (active) {
             flow {
@@ -201,21 +193,23 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(POLLER_KEEP_ALIVE_MS), 0L)
 
-    val accountPoints: StateFlow<UrnetworkSdkBridge.AccountPointsSnapshot?> =
-        isUrnetworkActive.flatMapLatest { active ->
-            if (active) {
-                flow {
-                    var last: UrnetworkSdkBridge.AccountPointsSnapshot? = null
-                    while (true) {
-                        last = runCatching { bridge.fetchAccountPoints() }.getOrDefault(last)
-                        emit(last)
-                        delay(ACCOUNT_POINTS_POLL_MS)
-                    }
-                }.distinctUntilChanged()
-            } else {
-                flowOf(null)
-            }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(POLLER_KEEP_ALIVE_MS), null)
+    private val balancePollTicker = flow {
+        while (currentCoroutineContext().isActive) {
+            emit(Unit)
+            delay(BALANCE_POLL_INTERVAL_MS)
+        }
+    }.onEach { runCatching { balanceRepository.refresh() } }
+
+    val balanceState: StateFlow<UrnetworkBalanceState> = combine(
+        balanceRepository.state,
+        balancePollTicker,
+    ) { state, _ -> state }
+        .distinctUntilChanged()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(POLLER_KEEP_ALIVE_MS),
+            initialValue = UrnetworkBalanceState.INITIAL,
+        )
 
     @Volatile private var locationsVc: LocationsViewController? = null
     private var switchingJob: Job? = null
@@ -442,7 +436,6 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
 
     companion object {
         private const val TAG = "UrnetworkSettingsVM"
-        private const val PEER_COUNT_POLL_MS = 2_000L
         private const val POLLER_KEEP_ALIVE_MS = 5_000L
         private const val REFRESH_RETRY_ATTEMPTS = 15
         private const val REFRESH_RETRY_DELAY_MS = 2_000L
@@ -450,7 +443,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         private const val SWITCHING_INDICATOR_MAX_MS = 15_000L
         private const val SWITCHING_INDICATOR_SETTLE_MS = 1_500L
         private const val SHARED_TRAFFIC_POLL_MS = 10_000L
-        private const val ACCOUNT_POINTS_POLL_MS = 30_000L
+        private const val BALANCE_POLL_INTERVAL_MS = 30_000L
 
         fun countryCodeToFlag(code: String): String {
             if (code.length != 2) return ""
