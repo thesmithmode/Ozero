@@ -313,13 +313,17 @@ class RealUrnetworkSdkBridge(
             Log.i(TAG, "setProvideNetworkMode mode=${mode.rawValue} OK")
         }
 
-    override fun applyPerformanceProfile(windowType: UrnetworkWindowType, fixedIpSize: Boolean) {
+    override fun applyPerformanceProfile(
+        windowType: UrnetworkWindowType,
+        fixedIpSize: Boolean,
+        allowDirect: Boolean,
+    ) {
         if (!running.get()) {
             PersistentLoggers.warn(TAG, "applyPerformanceProfile skipped — bridge not running")
             return
         }
-        if (windowType == UrnetworkWindowType.AUTO) {
-            Log.i(TAG, "applyPerformanceProfile skip — AUTO uses SDK defaults")
+        if (windowType == UrnetworkWindowType.AUTO && allowDirect) {
+            Log.i(TAG, "applyPerformanceProfile skip — AUTO+allowDirect uses SDK defaults")
             return
         }
         val device = deviceRef.get() ?: return
@@ -334,8 +338,13 @@ class RealUrnetworkSdkBridge(
             sizes.windowSizeMin = if (fixedIpSize) 1 else 2
             sizes.windowSizeMax = if (fixedIpSize) 1L else WINDOW_SIZE_MAX_EXPERIMENTAL
             profile.windowSize = sizes
+            profile.allowDirect = allowDirect
             device.performanceProfile = profile
-            Log.i(TAG, "applyPerformanceProfile windowType=${windowType.rawValue} fixedIp=$fixedIpSize OK")
+            Log.i(
+                TAG,
+                "applyPerformanceProfile windowType=${windowType.rawValue} fixedIp=$fixedIpSize " +
+                    "allowDirect=$allowDirect OK",
+            )
         }.onFailure {
             PersistentLoggers.warn(TAG, "applyPerformanceProfile threw: ${it.message}")
         }

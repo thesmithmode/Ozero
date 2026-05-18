@@ -459,9 +459,15 @@ class EngineUrnetworkContractTest {
         override suspend fun fetchSubscriptionBalance(): UrnetworkSdkBridge.SubscriptionBalanceSnapshot? = null
         var lastAppliedWindowType: UrnetworkWindowType? = null
         var lastAppliedFixedIp: Boolean? = null
-        override fun applyPerformanceProfile(windowType: UrnetworkWindowType, fixedIpSize: Boolean) {
+        var lastAppliedAllowDirect: Boolean? = null
+        override fun applyPerformanceProfile(
+            windowType: UrnetworkWindowType,
+            fixedIpSize: Boolean,
+            allowDirect: Boolean,
+        ) {
             lastAppliedWindowType = windowType
             lastAppliedFixedIp = fixedIpSize
+            lastAppliedAllowDirect = allowDirect
         }
         var lastPreferredLocation: UrnetworkLocationSelection? = null
         var preferredLocationCalls: Int = 0
@@ -505,9 +511,53 @@ class EngineUrnetworkPerformanceProfileTest {
         assertEquals(UrnetworkWindowType.AUTO, bridge.lastAppliedWindowType)
     }
 
+    @Test
+    fun `start пробрасывает allowDirect=true в bridge — anonymization OFF по умолчанию`() = runTest {
+        val store = FakeProfileConfigStore(
+            windowType = UrnetworkWindowType.QUALITY,
+            fixedIp = false,
+            allowDirect = true,
+        )
+        val bridge = FakeProfileBridge()
+        val engine = EngineUrnetwork(store, bridge, FakeProfileAuthService())
+        engine.start(baseConfig, Upstream.None)
+        assertEquals(true, bridge.lastAppliedAllowDirect)
+    }
+
+    @Test
+    fun `start пробрасывает allowDirect=false в bridge при AUTO — anonymization ON применяется к AUTO профилю`() =
+        runTest {
+            val store = FakeProfileConfigStore(
+                windowType = UrnetworkWindowType.AUTO,
+                fixedIp = false,
+                allowDirect = false,
+            )
+            val bridge = FakeProfileBridge()
+            val engine = EngineUrnetwork(store, bridge, FakeProfileAuthService())
+            engine.start(baseConfig, Upstream.None)
+            assertEquals(UrnetworkWindowType.AUTO, bridge.lastAppliedWindowType)
+            assertEquals(false, bridge.lastAppliedAllowDirect)
+        }
+
+    @Test
+    fun `start пробрасывает allowDirect=false с QUALITY windowType — комбинация anonymization+quality`() = runTest {
+        val store = FakeProfileConfigStore(
+            windowType = UrnetworkWindowType.QUALITY,
+            fixedIp = true,
+            allowDirect = false,
+        )
+        val bridge = FakeProfileBridge()
+        val engine = EngineUrnetwork(store, bridge, FakeProfileAuthService())
+        engine.start(baseConfig, Upstream.None)
+        assertEquals(UrnetworkWindowType.QUALITY, bridge.lastAppliedWindowType)
+        assertEquals(true, bridge.lastAppliedFixedIp)
+        assertEquals(false, bridge.lastAppliedAllowDirect)
+    }
+
     private class FakeProfileConfigStore(
         private val windowType: UrnetworkWindowType,
         private val fixedIp: Boolean,
+        private val allowDirect: Boolean = true,
     ) : UrnetworkConfigStore {
         override fun walletAddress(): kotlinx.coroutines.flow.Flow<String> =
             kotlinx.coroutines.flow.flowOf(UrnetworkDefaults.PRESET_WALLET)
@@ -526,14 +576,23 @@ class EngineUrnetworkPerformanceProfileTest {
         override fun fixedIpSize(): kotlinx.coroutines.flow.Flow<Boolean> =
             kotlinx.coroutines.flow.flowOf(fixedIp)
         override suspend fun setFixedIpSize(value: Boolean) = Unit
+        override fun allowDirect(): kotlinx.coroutines.flow.Flow<Boolean> =
+            kotlinx.coroutines.flow.flowOf(allowDirect)
+        override suspend fun setAllowDirect(value: Boolean) = Unit
     }
 
     private class FakeProfileBridge : UrnetworkSdkBridge {
         var lastAppliedWindowType: UrnetworkWindowType? = null
         var lastAppliedFixedIp: Boolean? = null
-        override fun applyPerformanceProfile(windowType: UrnetworkWindowType, fixedIpSize: Boolean) {
+        var lastAppliedAllowDirect: Boolean? = null
+        override fun applyPerformanceProfile(
+            windowType: UrnetworkWindowType,
+            fixedIpSize: Boolean,
+            allowDirect: Boolean,
+        ) {
             lastAppliedWindowType = windowType
             lastAppliedFixedIp = fixedIpSize
+            lastAppliedAllowDirect = allowDirect
         }
         override suspend fun start(walletAddress: String, apiUrl: String, connectUrl: String, byClientJwt: String) =
             UrnetworkSdkBridge.StartResult.Success

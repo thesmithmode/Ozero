@@ -26,6 +26,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -90,6 +91,8 @@ fun MainScreen(
     val killswitchActive by viewModel.killswitchActive.collectAsStateWithLifecycle()
     val switching by viewModel.switching.collectAsStateWithLifecycle()
     val isReconnecting by viewModel.isReconnecting.collectAsStateWithLifecycle()
+    val urnetworkFixedIp by viewModel.urnetworkFixedIp.collectAsStateWithLifecycle()
+    val urnetworkEnhancedAnonymization by viewModel.urnetworkEnhancedAnonymization.collectAsStateWithLifecycle()
 
     val powerState = computePowerDiscState(state, switching, urnetworkPeerCount)
     val backgroundState = powerState.toBackgroundState()
@@ -112,11 +115,15 @@ fun MainScreen(
                         urnetworkPeerCount = urnetworkPeerCount,
                         urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
                         isReconnecting = isReconnecting,
+                        urnetworkFixedIp = urnetworkFixedIp,
+                        urnetworkEnhancedAnonymization = urnetworkEnhancedAnonymization,
                     ),
                     callbacks = SimpleMainCallbacks(
                         onConnectClick = onConnectClick,
                         onOpenSplitTunnel = onOpenSplitTunnel,
                         onOpenSettings = onOpenSettings,
+                        onUrnetworkFixedIpChange = viewModel::setUrnetworkFixedIp,
+                        onUrnetworkEnhancedAnonymizationChange = viewModel::setUrnetworkEnhancedAnonymization,
                     ),
                 )
                 AppMode.EXPERT -> ExpertMainContent(
@@ -135,6 +142,8 @@ fun MainScreen(
                         ipInfo = ipInfo,
                         killswitchActive = killswitchActive,
                         isReconnecting = isReconnecting,
+                        urnetworkFixedIp = urnetworkFixedIp,
+                        urnetworkEnhancedAnonymization = urnetworkEnhancedAnonymization,
                     ),
                     callbacks = ExpertMainCallbacks(
                         onConnectClick = onConnectClick,
@@ -143,6 +152,8 @@ fun MainScreen(
                         onOpenEngineParams = onOpenEngineParams,
                         onOpenSplitTunnel = onOpenSplitTunnel,
                         onOpenSettings = onOpenSettings,
+                        onUrnetworkFixedIpChange = viewModel::setUrnetworkFixedIp,
+                        onUrnetworkEnhancedAnonymizationChange = viewModel::setUrnetworkEnhancedAnonymization,
                     ),
                 )
             }
@@ -159,12 +170,16 @@ data class SimpleMainState(
     val urnetworkPeerCount: Int,
     val urnetworkPeerSearchSeconds: Int,
     val isReconnecting: Boolean = false,
+    val urnetworkFixedIp: Boolean = false,
+    val urnetworkEnhancedAnonymization: Boolean = false,
 )
 
 data class SimpleMainCallbacks(
     val onConnectClick: () -> Unit,
     val onOpenSplitTunnel: () -> Unit,
     val onOpenSettings: () -> Unit,
+    val onUrnetworkFixedIpChange: (Boolean) -> Unit = {},
+    val onUrnetworkEnhancedAnonymizationChange: (Boolean) -> Unit = {},
 )
 
 @Composable
@@ -214,6 +229,15 @@ private fun SimpleMainContent(
             UrnetworkPeerBadge(
                 count = urnetworkPeerCount,
                 searchSeconds = urnetworkPeerSearchSeconds,
+            )
+        }
+
+        if (isUrnetworkVisibleInMain(tunnelState, manualEngine)) {
+            UrnetworkMainToggleSection(
+                fixedIp = state.urnetworkFixedIp,
+                enhancedAnonymization = state.urnetworkEnhancedAnonymization,
+                onFixedIpChange = callbacks.onUrnetworkFixedIpChange,
+                onEnhancedAnonymizationChange = callbacks.onUrnetworkEnhancedAnonymizationChange,
             )
         }
 
@@ -272,6 +296,8 @@ data class ExpertMainState(
     val ipInfo: IpInfoState,
     val killswitchActive: Boolean,
     val isReconnecting: Boolean = false,
+    val urnetworkFixedIp: Boolean = false,
+    val urnetworkEnhancedAnonymization: Boolean = false,
 )
 
 data class ExpertMainCallbacks(
@@ -281,6 +307,8 @@ data class ExpertMainCallbacks(
     val onOpenEngineParams: (EngineId?) -> Unit,
     val onOpenSplitTunnel: () -> Unit,
     val onOpenSettings: () -> Unit,
+    val onUrnetworkFixedIpChange: (Boolean) -> Unit = {},
+    val onUrnetworkEnhancedAnonymizationChange: (Boolean) -> Unit = {},
 )
 
 @Composable
@@ -351,6 +379,15 @@ private fun ExpertMainContent(
                 healthStatus = healthStatus,
                 onRefreshIpInfo = onRefreshIpInfo,
             )
+
+            if (isUrnetworkVisibleInMain(tunnelState, manualEngine)) {
+                UrnetworkMainToggleSection(
+                    fixedIp = state.urnetworkFixedIp,
+                    enhancedAnonymization = state.urnetworkEnhancedAnonymization,
+                    onFixedIpChange = callbacks.onUrnetworkFixedIpChange,
+                    onEnhancedAnonymizationChange = callbacks.onUrnetworkEnhancedAnonymizationChange,
+                )
+            }
 
             EngineChipsRow(
                 selectedEngine = manualEngine,
@@ -439,6 +476,80 @@ private fun ExpertStatusBadges(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+internal fun isUrnetworkVisibleInMain(state: TunnelState, manualEngine: EngineId?): Boolean {
+    if (manualEngine == EngineId.URNETWORK) return true
+    return when (state) {
+        is TunnelState.Probing -> state.engineId == EngineId.URNETWORK
+        is TunnelState.Connecting -> state.engineId == EngineId.URNETWORK
+        is TunnelState.Connected -> state.engineId == EngineId.URNETWORK
+        is TunnelState.Failed -> state.engineId == EngineId.URNETWORK
+        else -> false
+    }
+}
+
+@Composable
+private fun UrnetworkMainToggleSection(
+    fixedIp: Boolean,
+    enhancedAnonymization: Boolean,
+    onFixedIpChange: (Boolean) -> Unit,
+    onEnhancedAnonymizationChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag(MainScreenTestTags.URNETWORK_TOGGLES)
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        UrnetworkMainToggleRow(
+            label = stringResource(R.string.main_toggle_fixed_ip),
+            hint = stringResource(R.string.main_toggle_fixed_ip_hint),
+            checked = fixedIp,
+            onCheckedChange = onFixedIpChange,
+            testTag = MainScreenTestTags.URNETWORK_TOGGLE_FIXED_IP,
+        )
+        UrnetworkMainToggleRow(
+            label = stringResource(R.string.main_toggle_enhanced_anonymization),
+            hint = stringResource(R.string.main_toggle_enhanced_anonymization_hint),
+            checked = enhancedAnonymization,
+            onCheckedChange = onEnhancedAnonymizationChange,
+            testTag = MainScreenTestTags.URNETWORK_TOGGLE_ANONYMIZATION,
+        )
+    }
+}
+
+@Composable
+private fun UrnetworkMainToggleRow(
+    label: String,
+    hint: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    testTag: String,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(testTag),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = OzeroPalette.Text,
+            )
+            Text(
+                text = hint,
+                style = MaterialTheme.typography.bodySmall,
+                color = OzeroPalette.Text3,
+            )
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 

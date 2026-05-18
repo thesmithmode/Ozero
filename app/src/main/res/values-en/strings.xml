@@ -16,6 +16,10 @@
     <string name="main_status_disconnecting">Disconnecting…</string>
     <string name="main_status_failed">Error</string>
     <string name="main_status_urnetwork_searching">Searching peers…</string>
+    <string name="main_toggle_fixed_ip">Fixed IP</string>
+    <string name="main_toggle_fixed_ip_hint">Single peer instead of multiple — IP is stable, speed is lower</string>
+    <string name="main_toggle_enhanced_anonymization">Enhanced anonymization</string>
+    <string name="main_toggle_enhanced_anonymization_hint">Disallow direct connections — all traffic through relay</string>
     <string name="main_active_engine">Active engine: %1$s</string>
     <string name="stats_session">Session: ↓ %1$s ↑ %2$s</string>
     <string name="stats_uptime">Uptime: %1$s</string>

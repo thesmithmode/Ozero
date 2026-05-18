@@ -107,7 +107,8 @@ class EngineUrnetwork(
                     .onFailure { PersistentLoggers.warn(TAG, "setPreferredLocation threw: ${it.message}") }
                 val windowType = configStore.windowType().first()
                 val fixedIp = configStore.fixedIpSize().first()
-                runCatching { sdkBridge.applyPerformanceProfile(windowType, fixedIp) }
+                val allowDirect = configStore.allowDirect().first()
+                runCatching { sdkBridge.applyPerformanceProfile(windowType, fixedIp, allowDirect) }
                     .onFailure { PersistentLoggers.warn(TAG, "applyPerformanceProfile threw: ${it.message}") }
                 val provideEnabled = configStore.provideEnabled().first()
                 runCatching { sdkBridge.setProvidePaused(!provideEnabled) }
@@ -121,7 +122,7 @@ class EngineUrnetwork(
                 Log.i(
                     TAG,
                     "started OK preferred=${merged.summary()} " +
-                        "windowType=${windowType.rawValue} fixedIp=$fixedIp",
+                        "windowType=${windowType.rawValue} fixedIp=$fixedIp allowDirect=$allowDirect",
                 )
                 startStatsPolling()
                 StartResult.Success(socksPort = 0)

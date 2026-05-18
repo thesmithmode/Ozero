@@ -31,7 +31,11 @@ interface UrnetworkSdkBridge {
     fun setProvidePaused(paused: Boolean)
     fun isProvidePaused(): Boolean
 
-    fun applyPerformanceProfile(windowType: UrnetworkWindowType, fixedIpSize: Boolean) {}
+    fun applyPerformanceProfile(
+        windowType: UrnetworkWindowType,
+        fixedIpSize: Boolean,
+        allowDirect: Boolean = true,
+    ) {}
 
     fun setProvideControlMode(mode: UrnetworkProvideControlMode) {}
     fun setProvideNetworkMode(mode: UrnetworkProvideNetworkMode) {}

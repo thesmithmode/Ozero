@@ -75,6 +75,14 @@ class DataStoreUrnetworkConfigStore(
         dataStore.edit { prefs -> prefs[KEY_FIXED_IP_SIZE] = value }
     }
 
+    override fun allowDirect(): Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[KEY_ALLOW_DIRECT] != false
+    }
+
+    override suspend fun setAllowDirect(value: Boolean) {
+        dataStore.edit { prefs -> prefs[KEY_ALLOW_DIRECT] = value }
+    }
+
     override fun provideEnabled(): Flow<Boolean> = dataStore.data.map { prefs ->
         prefs[KEY_PROVIDE_ENABLED] != false
     }
@@ -121,6 +129,7 @@ class DataStoreUrnetworkConfigStore(
         val KEY_BY_CLIENT_JWT = stringPreferencesKey("urnetwork_by_client_jwt")
         val KEY_WINDOW_TYPE = stringPreferencesKey("urnetwork_window_type")
         val KEY_FIXED_IP_SIZE = booleanPreferencesKey("urnetwork_fixed_ip_size")
+        val KEY_ALLOW_DIRECT = booleanPreferencesKey("urnetwork_allow_direct")
         val KEY_PROVIDE_ENABLED = booleanPreferencesKey("urnetwork_provide_enabled")
         val KEY_PROVIDE_CONTROL_MODE = stringPreferencesKey("urnetwork_provide_control_mode")
         val KEY_PROVIDE_NETWORK_MODE = stringPreferencesKey("urnetwork_provide_network_mode")

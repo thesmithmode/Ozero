@@ -33,6 +33,7 @@ import ru.ozero.enginescore.IpProbeRoute
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.SettingsRepository
+import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import javax.inject.Inject
 
@@ -50,6 +51,7 @@ class MainViewModel @Inject constructor(
     private val healthMonitor: HealthMonitor,
     private val settingsRepository: SettingsRepository,
     private val urnetworkBridge: UrnetworkSdkBridge,
+    private val urnetworkConfigStore: UrnetworkConfigStore,
     private val ipInfoProvider: IpInfoProvider,
     private val enginePlugins: Set<@JvmSuppressWildcards EnginePlugin>,
 ) : ViewModel() {
@@ -345,6 +347,62 @@ class MainViewModel @Inject constructor(
             tunnelController.onSwitchingStarted(from = current.engineId, to = engine)
         }
         viewModelScope.launch { settingsRepository.setManualEngine(engine) }
+    }
+
+    val urnetworkFixedIp: StateFlow<Boolean> = urnetworkConfigStore.fixedIpSize()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    val urnetworkEnhancedAnonymization: StateFlow<Boolean> = urnetworkConfigStore.allowDirect()
+        .map { !it }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    private val urnetworkWindowType =
+        urnetworkConfigStore.windowType()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.Eagerly,
+                initialValue = ru.ozero.engineurnetwork.UrnetworkWindowType.AUTO,
+            )
+
+    fun setUrnetworkFixedIp(value: Boolean) {
+        viewModelScope.launch {
+            urnetworkConfigStore.setFixedIpSize(value)
+            if (isUrnetworkActiveNow()) {
+                runCatching {
+                    urnetworkBridge.applyPerformanceProfile(
+                        windowType = urnetworkWindowType.value,
+                        fixedIpSize = value,
+                        allowDirect = !urnetworkEnhancedAnonymization.value,
+                    )
+                }
+            }
+        }
+    }
+
+    fun setUrnetworkEnhancedAnonymization(value: Boolean) {
+        viewModelScope.launch {
+            urnetworkConfigStore.setAllowDirect(!value)
+            if (isUrnetworkActiveNow()) {
+                runCatching {
+                    urnetworkBridge.applyPerformanceProfile(
+                        windowType = urnetworkWindowType.value,
+                        fixedIpSize = urnetworkFixedIp.value,
+                        allowDirect = !value,
+                    )
+                }
+            }
+        }
+    }
+
+    private fun isUrnetworkActiveNow(): Boolean {
+        val s = tunnelController.state.value
+        val active = when (s) {
+            is TunnelState.Connecting -> s.engineId == EngineId.URNETWORK
+            is TunnelState.Connected -> s.engineId == EngineId.URNETWORK
+            else -> false
+        }
+        return active && runCatching { urnetworkBridge.isRunning() }.getOrDefault(false)
     }
 
     private companion object {

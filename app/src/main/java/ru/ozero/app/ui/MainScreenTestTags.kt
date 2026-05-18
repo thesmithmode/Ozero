@@ -12,4 +12,7 @@ object MainScreenTestTags {
     const val URNETWORK_PEER_SEARCHING = "main_urnetwork_peer_searching"
     const val IP_CARD = "main_ip_card"
     const val KILLSWITCH_BADGE = "main_killswitch_badge"
+    const val URNETWORK_TOGGLES = "main_urnetwork_toggles"
+    const val URNETWORK_TOGGLE_FIXED_IP = "main_urnetwork_toggle_fixed_ip"
+    const val URNETWORK_TOGGLE_ANONYMIZATION = "main_urnetwork_toggle_anonymization"
 }

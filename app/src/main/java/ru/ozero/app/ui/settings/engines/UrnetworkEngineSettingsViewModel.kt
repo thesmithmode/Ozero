@@ -85,6 +85,9 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     val fixedIpSize: StateFlow<Boolean> = configStore.fixedIpSize()
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    val allowDirect: StateFlow<Boolean> = configStore.allowDirect()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
     val provideControlMode: StateFlow<UrnetworkProvideControlMode> = configStore.provideControlMode()
         .stateIn(viewModelScope, SharingStarted.Eagerly, UrnetworkProvideControlMode.ALWAYS)
 
@@ -121,7 +124,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
                 configStore.setFixedIpSize(false)
             }
             if (isUrnetworkActive.value) {
-                runCatching { bridge.applyPerformanceProfile(value, fixedIpSize.value) }
+                runCatching { bridge.applyPerformanceProfile(value, fixedIpSize.value, allowDirect.value) }
             }
         }
     }
@@ -130,7 +133,16 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             configStore.setFixedIpSize(value)
             if (isUrnetworkActive.value) {
-                runCatching { bridge.applyPerformanceProfile(windowType.value, value) }
+                runCatching { bridge.applyPerformanceProfile(windowType.value, value, allowDirect.value) }
+            }
+        }
+    }
+
+    fun toggleAllowDirect(value: Boolean) {
+        viewModelScope.launch {
+            configStore.setAllowDirect(value)
+            if (isUrnetworkActive.value) {
+                runCatching { bridge.applyPerformanceProfile(windowType.value, fixedIpSize.value, value) }
             }
         }
     }

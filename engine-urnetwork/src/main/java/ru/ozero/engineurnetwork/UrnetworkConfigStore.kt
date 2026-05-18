@@ -15,6 +15,8 @@ interface UrnetworkConfigStore {
     suspend fun setWindowType(value: UrnetworkWindowType) = Unit
     fun fixedIpSize(): Flow<Boolean> = flowOf(false)
     suspend fun setFixedIpSize(value: Boolean) = Unit
+    fun allowDirect(): Flow<Boolean> = flowOf(true)
+    suspend fun setAllowDirect(value: Boolean) = Unit
     fun provideEnabled(): Flow<Boolean> = flowOf(true)
     suspend fun setProvideEnabled(value: Boolean) = Unit
     fun provideControlMode(): Flow<UrnetworkProvideControlMode> = flowOf(UrnetworkProvideControlMode.ALWAYS)

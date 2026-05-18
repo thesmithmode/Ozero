@@ -16,6 +16,10 @@
     <string name="main_status_disconnecting">Отключение…</string>
     <string name="main_status_failed">Ошибка</string>
     <string name="main_status_urnetwork_searching">Поиск пиров…</string>
+    <string name="main_toggle_fixed_ip">Фиксированный IP</string>
+    <string name="main_toggle_fixed_ip_hint">Один peer вместо нескольких — IP стабильнее, скорость ниже</string>
+    <string name="main_toggle_enhanced_anonymization">Усиленная анонимизация</string>
+    <string name="main_toggle_enhanced_anonymization_hint">Запретить прямые соединения — весь трафик через relay</string>
     <string name="main_active_engine">Активный движок: %1$s</string>
     <string name="stats_session">Сессия: ↓ %1$s ↑ %2$s</string>
     <string name="stats_uptime">Время: %1$s</string>

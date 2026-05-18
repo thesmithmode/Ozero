@@ -649,9 +649,15 @@ private class FakeUrnetworkBridge(
     override fun openLocationsViewController(): LocationsViewController? = null
     var lastAppliedWindowType: UrnetworkWindowType? = null
     var lastAppliedFixedIp: Boolean? = null
-    override fun applyPerformanceProfile(windowType: UrnetworkWindowType, fixedIpSize: Boolean) {
+    var lastAppliedAllowDirect: Boolean? = null
+    override fun applyPerformanceProfile(
+        windowType: UrnetworkWindowType,
+        fixedIpSize: Boolean,
+        allowDirect: Boolean,
+    ) {
         lastAppliedWindowType = windowType
         lastAppliedFixedIp = fixedIpSize
+        lastAppliedAllowDirect = allowDirect
     }
     var lastProvideControlMode: UrnetworkProvideControlMode? = null
     override fun setProvideControlMode(mode: UrnetworkProvideControlMode) {
