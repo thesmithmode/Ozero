@@ -3,9 +3,11 @@ package ru.ozero.app.ui.settings.engines
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -32,7 +34,12 @@ class UrnetworkSharedTrafficViewModel @Inject constructor(
 
     init {
         viewModelScope.launch { load() }
-        balanceRepository.startPolling()
+        viewModelScope.launch {
+            while (isActive) {
+                balanceRepository.refresh()
+                delay(BALANCE_POLL_INTERVAL_MS)
+            }
+        }
     }
 
     fun refresh() {
@@ -40,15 +47,14 @@ class UrnetworkSharedTrafficViewModel @Inject constructor(
         viewModelScope.launch { balanceRepository.refresh() }
     }
 
-    override fun onCleared() {
-        balanceRepository.stopPolling()
-        super.onCleared()
-    }
-
     private suspend fun load() = loadMutex.withLock {
         _isLoading.value = true
         runCatching { bridge.fetchTransferStats() }
         _unpaidBytes.value = runCatching { bridge.unpaidByteCount() }.getOrDefault(0L)
         _isLoading.value = false
+    }
+
+    companion object {
+        private const val BALANCE_POLL_INTERVAL_MS = 30_000L
     }
 }

@@ -5,10 +5,6 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.advanceTimeBy
-import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
@@ -17,21 +13,20 @@ import ru.ozero.engineurnetwork.UrnetworkSdkBridge.SubscriptionBalanceSnapshot
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class UrnetworkBalanceRepositoryTest {
 
     @Test
     fun `state INITIAL до refresh`() = runTest {
-        val repo = newRepo(this)
+        val repo = RealUrnetworkBalanceRepository(FakeBridge(snapshot = sample()))
         assertEquals(UrnetworkBalanceState.INITIAL, repo.state.value)
     }
 
     @Test
     fun `refresh успех обновляет snapshot и сбрасывает isLoading`() = runTest {
         val bridge = FakeBridge(snapshot = sample(balance = 1_000L, used = 200L))
-        val repo = newRepo(this, bridge = bridge)
+        val repo = RealUrnetworkBalanceRepository(bridge)
         repo.refresh()
         val s = repo.state.value
         assertEquals(1_000L, s.snapshot?.balanceBytes)
@@ -43,7 +38,7 @@ class UrnetworkBalanceRepositoryTest {
     @Test
     fun `refresh ошибка записывает lastError и не теряет previous snapshot`() = runTest {
         val bridge = FakeBridge(snapshot = sample(balance = 500L))
-        val repo = newRepo(this, bridge = bridge)
+        val repo = RealUrnetworkBalanceRepository(bridge)
         repo.refresh()
         bridge.throwOnNext = RuntimeException("boom")
         repo.refresh()
@@ -54,9 +49,18 @@ class UrnetworkBalanceRepositoryTest {
     }
 
     @Test
+    fun `refresh ошибка без message использует имя класса`() = runTest {
+        val bridge = FakeBridge(snapshot = sample())
+        bridge.throwOnNext = object : RuntimeException() {}
+        val repo = RealUrnetworkBalanceRepository(bridge)
+        repo.refresh()
+        assertNotNull(repo.state.value.lastError)
+    }
+
+    @Test
     fun `refresh null snapshot сохраняется как null без error`() = runTest {
         val bridge = FakeBridge(snapshot = null)
-        val repo = newRepo(this, bridge = bridge)
+        val repo = RealUrnetworkBalanceRepository(bridge)
         repo.refresh()
         val s = repo.state.value
         assertNull(s.snapshot)
@@ -104,7 +108,7 @@ class UrnetworkBalanceRepositoryTest {
                 return snapshot
             }
         }
-        val repo = newRepo(this, bridge = bridge)
+        val repo = RealUrnetworkBalanceRepository(bridge)
         val j1 = launch { repo.refresh() }
         val j2 = launch { repo.refresh() }
         runCurrent()
@@ -116,89 +120,6 @@ class UrnetworkBalanceRepositoryTest {
     }
 
     @Test
-    fun `startPolling вызывает refresh периодически`() = runTest {
-        val bridge = FakeBridge(snapshot = sample(balance = 10L))
-        val dispatcher = StandardTestDispatcher(testScheduler)
-        val repo = RealUrnetworkBalanceRepository(
-            bridge = bridge,
-            scope = this,
-            pollIntervalMs = 1_000L,
-            dispatcher = dispatcher,
-        )
-        repo.startPolling()
-        advanceUntilIdle()
-        val before = bridge.callCount
-        advanceTimeBy(1_500L)
-        advanceUntilIdle()
-        assertTrue(bridge.callCount >= before + 1)
-        repo.stopPolling()
-    }
-
-    @Test
-    fun `startPolling идемпотентен — повторный вызов не создаёт второй job`() = runTest {
-        val bridge = FakeBridge(snapshot = sample())
-        val dispatcher = StandardTestDispatcher(testScheduler)
-        val repo = RealUrnetworkBalanceRepository(
-            bridge = bridge,
-            scope = this,
-            pollIntervalMs = 10_000L,
-            dispatcher = dispatcher,
-        )
-        repo.startPolling()
-        repo.startPolling()
-        repo.startPolling()
-        advanceUntilIdle()
-        assertEquals(1, bridge.callCount)
-        repo.stopPolling()
-    }
-
-    @Test
-    fun `stopPolling отменяет job и refresh перестают идти`() = runTest {
-        val bridge = FakeBridge(snapshot = sample())
-        val dispatcher = StandardTestDispatcher(testScheduler)
-        val repo = RealUrnetworkBalanceRepository(
-            bridge = bridge,
-            scope = this,
-            pollIntervalMs = 1_000L,
-            dispatcher = dispatcher,
-        )
-        repo.startPolling()
-        advanceUntilIdle()
-        repo.stopPolling()
-        val callsAfterStop = bridge.callCount
-        advanceTimeBy(5_000L)
-        advanceUntilIdle()
-        assertEquals(callsAfterStop, bridge.callCount)
-    }
-
-    @Test
-    fun `stopPolling без startPolling безопасен`() = runTest {
-        val repo = newRepo(this)
-        repo.stopPolling()
-        repo.stopPolling()
-    }
-
-    @Test
-    fun `startPolling после stopPolling возобновляет`() = runTest {
-        val bridge = FakeBridge(snapshot = sample())
-        val dispatcher = StandardTestDispatcher(testScheduler)
-        val repo = RealUrnetworkBalanceRepository(
-            bridge = bridge,
-            scope = this,
-            pollIntervalMs = 1_000L,
-            dispatcher = dispatcher,
-        )
-        repo.startPolling()
-        advanceUntilIdle()
-        repo.stopPolling()
-        val countAfterFirst = bridge.callCount
-        repo.startPolling()
-        advanceUntilIdle()
-        assertTrue(bridge.callCount > countAfterFirst)
-        repo.stopPolling()
-    }
-
-    @Test
     fun `refresh выставляет isLoading true в процессе fetch`() = runTest {
         val gate = CompletableDeferred<Unit>()
         val bridge = object : FakeBridge(snapshot = sample()) {
@@ -207,7 +128,7 @@ class UrnetworkBalanceRepositoryTest {
                 return snapshot
             }
         }
-        val repo = newRepo(this, bridge = bridge)
+        val repo = RealUrnetworkBalanceRepository(bridge)
         val deferred = async { repo.refresh() }
         runCurrent()
         assertEquals(true, repo.state.value.isLoading)
@@ -220,23 +141,13 @@ class UrnetworkBalanceRepositoryTest {
     fun `lastError очищается на следующем успешном refresh`() = runTest {
         val bridge = FakeBridge(snapshot = sample())
         bridge.throwOnNext = RuntimeException("first-fail")
-        val repo = newRepo(this, bridge = bridge)
+        val repo = RealUrnetworkBalanceRepository(bridge)
         repo.refresh()
         assertEquals("first-fail", repo.state.value.lastError)
         repo.refresh()
         assertNull(repo.state.value.lastError)
         assertNotNull(repo.state.value.snapshot)
     }
-
-    private fun newRepo(
-        scope: TestScope,
-        bridge: UrnetworkSdkBridge = FakeBridge(snapshot = sample()),
-    ): RealUrnetworkBalanceRepository = RealUrnetworkBalanceRepository(
-        bridge = bridge,
-        scope = scope,
-        pollIntervalMs = 1_000L,
-        dispatcher = StandardTestDispatcher(scope.testScheduler),
-    )
 
     private fun sample(
         balance: Long = 1_000_000L,

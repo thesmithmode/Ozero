@@ -5,6 +5,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -16,6 +17,7 @@ import ru.ozero.app.urnetwork.UrnetworkBalanceRepository
 import ru.ozero.app.urnetwork.UrnetworkBalanceState
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class UrnetworkSharedTrafficViewModelTest {
@@ -82,10 +84,20 @@ class UrnetworkSharedTrafficViewModelTest {
     }
 
     @Test
-    fun `init запускает balance polling`() = runTest(dispatcher) {
+    fun `init вызывает balance refresh сразу`() = runTest(dispatcher) {
         vm = UrnetworkSharedTrafficViewModel(bridge, balanceRepo)
         advanceUntilIdle()
-        assertEquals(1, balanceRepo.startPollingCalls)
+        assertTrue(balanceRepo.refreshCalls >= 1)
+    }
+
+    @Test
+    fun `balance refresh периодически вызывается через polling`() = runTest(dispatcher) {
+        vm = UrnetworkSharedTrafficViewModel(bridge, balanceRepo)
+        advanceUntilIdle()
+        val initial = balanceRepo.refreshCalls
+        advanceTimeBy(35_000L)
+        advanceUntilIdle()
+        assertTrue(balanceRepo.refreshCalls > initial)
     }
 
     @Test
@@ -95,7 +107,7 @@ class UrnetworkSharedTrafficViewModelTest {
         val before = balanceRepo.refreshCalls
         vm.refresh()
         advanceUntilIdle()
-        assertEquals(before + 1, balanceRepo.refreshCalls)
+        assertTrue(balanceRepo.refreshCalls > before)
     }
 
     @Test
@@ -109,16 +121,8 @@ class UrnetworkSharedTrafficViewModelTest {
         private val _state = MutableStateFlow(UrnetworkBalanceState.INITIAL)
         override val state: StateFlow<UrnetworkBalanceState> = _state
         var refreshCalls = 0
-        var startPollingCalls = 0
-        var stopPollingCalls = 0
         override suspend fun refresh() {
             refreshCalls++
-        }
-        override fun startPolling() {
-            startPollingCalls++
-        }
-        override fun stopPolling() {
-            stopPollingCalls++
         }
     }
 

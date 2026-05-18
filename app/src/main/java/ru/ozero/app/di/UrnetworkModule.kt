@@ -91,8 +91,5 @@ object UrnetworkModule {
     @Singleton
     fun provideUrnetworkBalanceRepository(
         bridge: UrnetworkSdkBridge,
-    ): UrnetworkBalanceRepository = RealUrnetworkBalanceRepository(
-        bridge = bridge,
-        scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
-    )
+    ): UrnetworkBalanceRepository = RealUrnetworkBalanceRepository(bridge = bridge)
 }
