@@ -2,6 +2,7 @@ package ru.ozero.enginebyedpi
 
 import android.util.Log
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -35,6 +36,7 @@ class ByeDpiEngine(
     private val socksProbe: suspend (String, Int, Int) -> Long = Socks5HandshakeProbe::probe,
     private val readyProbeTimeoutMs: Int = READY_PROBE_TIMEOUT_MS,
     private val readyTotalTimeoutMs: Long = READY_TIMEOUT_MS,
+    proxyDispatcher: CoroutineDispatcher? = null,
 ) : EnginePlugin {
 
     override val id = EngineId.BYEDPI
@@ -52,8 +54,9 @@ class ByeDpiEngine(
     private val _stats = MutableStateFlow(EngineStats())
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val proxyDispatcher = Dispatchers.IO.limitedParallelism(1)
-    private val proxyScope = CoroutineScope(SupervisorJob() + proxyDispatcher)
+    private val effectiveDispatcher: CoroutineDispatcher =
+        proxyDispatcher ?: Dispatchers.IO.limitedParallelism(1)
+    private val proxyScope = CoroutineScope(SupervisorJob() + effectiveDispatcher)
     private val proxyJobRef = AtomicReference<Job?>(null)
 
     override fun buildManualConfig(settings: SettingsModel?): EngineConfig = EngineConfig.ByeDpi(

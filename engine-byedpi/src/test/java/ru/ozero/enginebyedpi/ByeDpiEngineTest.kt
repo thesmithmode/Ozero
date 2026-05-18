@@ -7,6 +7,8 @@ import io.mockk.mockkObject
 import io.mockk.runs
 import io.mockk.unmockkObject
 import io.mockk.verify
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -275,12 +277,14 @@ class ByeDpiEngineTest {
         assertIs<IpProbeRoute.Default>(route)
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun `start failure with main returning -1 must forceClose to reset upstream server_fd`() = runTest {
         val failEngine = ByeDpiEngine(
             proxy,
             socksProbe = { _, _, _ -> throw IOException("refused") },
             readyTotalTimeoutMs = 200,
+            proxyDispatcher = UnconfinedTestDispatcher(testScheduler),
         )
         every { proxy.startProxy(any()) } returns -1
         val result = failEngine.start(EngineConfig.ByeDpi(socksPort = 19001))
@@ -289,6 +293,7 @@ class ByeDpiEngineTest {
         coVerify(atLeast = 1) { proxy.forceClose() }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun `start failure clears upstream server_fd so next start can bind same port`() = runTest {
         var callCount = 0
@@ -302,6 +307,7 @@ class ByeDpiEngineTest {
                 if (callCount == 1) throw IOException("refused") else 1L
             },
             readyTotalTimeoutMs = 300,
+            proxyDispatcher = UnconfinedTestDispatcher(testScheduler),
         )
         val first = recEngine.start(EngineConfig.ByeDpi(socksPort = 1080))
         assertIs<StartResult.Failure>(first)
