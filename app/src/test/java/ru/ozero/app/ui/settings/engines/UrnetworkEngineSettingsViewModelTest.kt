@@ -588,42 +588,10 @@ private class FakeSettingsRepo : ru.ozero.enginescore.settings.SettingsRepositor
     override suspend fun setAlwaysOnBannerDismissed(dismissed: Boolean) = Unit
 }
 
-private class FakeUrnetworkConfigStore : UrnetworkConfigStore {
-    private val wallet = kotlinx.coroutines.flow.MutableStateFlow("0xWALLET")
-    private val byJwt = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
-    private val byClientJwt = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
-    private val winType = kotlinx.coroutines.flow.MutableStateFlow(UrnetworkWindowType.AUTO)
-    private val fixedIp = kotlinx.coroutines.flow.MutableStateFlow(false)
-    override fun walletAddress(): kotlinx.coroutines.flow.Flow<String> = wallet
-    override fun walletOverride(): kotlinx.coroutines.flow.Flow<String?> = kotlinx.coroutines.flow.flowOf(null)
-    override suspend fun setWalletOverride(value: String?) = Unit
-    override fun byJwt(): kotlinx.coroutines.flow.Flow<String?> = byJwt
-    override suspend fun setByJwt(value: String?) {
-        byJwt.value = value
-    }
-    override fun byClientJwt(): kotlinx.coroutines.flow.Flow<String?> = byClientJwt
-    override suspend fun setByClientJwt(value: String?) {
-        byClientJwt.value = value
-    }
-    override fun windowType(): kotlinx.coroutines.flow.Flow<UrnetworkWindowType> = winType
-    override suspend fun setWindowType(value: UrnetworkWindowType) {
-        winType.value = value
-    }
-    override fun fixedIpSize(): kotlinx.coroutines.flow.Flow<Boolean> = fixedIp
-    override suspend fun setFixedIpSize(value: Boolean) {
-        fixedIp.value = value
-    }
-    private val provideControl = kotlinx.coroutines.flow.MutableStateFlow(UrnetworkProvideControlMode.ALWAYS)
-    private val provideNetwork = kotlinx.coroutines.flow.MutableStateFlow(UrnetworkProvideNetworkMode.WIFI)
-    override fun provideControlMode(): kotlinx.coroutines.flow.Flow<UrnetworkProvideControlMode> = provideControl
-    override suspend fun setProvideControlMode(value: UrnetworkProvideControlMode) {
-        provideControl.value = value
-    }
-    override fun provideNetworkMode(): kotlinx.coroutines.flow.Flow<UrnetworkProvideNetworkMode> = provideNetwork
-    override suspend fun setProvideNetworkMode(value: UrnetworkProvideNetworkMode) {
-        provideNetwork.value = value
-    }
-}
+private fun FakeUrnetworkConfigStore(): UrnetworkConfigStore =
+    ru.ozero.engineurnetwork.InMemoryUrnetworkConfigStore(
+        ru.ozero.engineurnetwork.UrnetworkConfig(walletOverride = "0xWALLET"),
+    )
 
 private data class FakeLocationToken(override val countryCode: String?) : UrnetworkSdkBridge.LocationToken
 

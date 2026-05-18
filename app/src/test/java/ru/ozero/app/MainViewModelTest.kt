@@ -40,10 +40,8 @@ import ru.ozero.enginescore.settings.HostsMode
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginescore.settings.SplitTunnelMode
+import ru.ozero.engineurnetwork.UrnetworkConfig
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
-import ru.ozero.engineurnetwork.UrnetworkLocationSelection
-import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
-import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.UrnetworkWindowType
 import kotlin.test.assertEquals
@@ -210,63 +208,23 @@ class MainViewModelTest {
     }
 
     private class FakeUrnetworkConfigStore : UrnetworkConfigStore {
-        val walletAddressFlow = MutableStateFlow("preset.wallet")
-        val walletOverrideFlow = MutableStateFlow<String?>(null)
-        val byJwtFlow = MutableStateFlow<String?>(null)
-        val byClientJwtFlow = MutableStateFlow<String?>(null)
-        val windowTypeFlow = MutableStateFlow(UrnetworkWindowType.AUTO)
-        val fixedIpFlow = MutableStateFlow(false)
-        val allowDirectFlow = MutableStateFlow(true)
-        val provideEnabledFlow = MutableStateFlow(true)
-        val provideControlModeFlow = MutableStateFlow(UrnetworkProvideControlMode.ALWAYS)
-        val provideNetworkModeFlow = MutableStateFlow(UrnetworkProvideNetworkMode.WIFI)
-        val selectedLocationFlow = MutableStateFlow(UrnetworkLocationSelection.EMPTY)
-
+        val state = MutableStateFlow(UrnetworkConfig())
         var setFixedIpCalls: Int = 0
         var setAllowDirectCalls: Int = 0
+        val snapshot: UrnetworkConfig get() = state.value
 
-        override fun walletAddress(): Flow<String> = walletAddressFlow.asStateFlow()
-        override fun walletOverride(): Flow<String?> = walletOverrideFlow.asStateFlow()
-        override suspend fun setWalletOverride(value: String?) {
-            walletOverrideFlow.value = value
+        fun inject(transform: (UrnetworkConfig) -> UrnetworkConfig) {
+            state.value = transform(state.value)
         }
-        override fun byJwt(): Flow<String?> = byJwtFlow.asStateFlow()
-        override suspend fun setByJwt(value: String?) {
-            byJwtFlow.value = value
-        }
-        override fun byClientJwt(): Flow<String?> = byClientJwtFlow.asStateFlow()
-        override suspend fun setByClientJwt(value: String?) {
-            byClientJwtFlow.value = value
-        }
-        override fun windowType(): Flow<UrnetworkWindowType> = windowTypeFlow.asStateFlow()
-        override suspend fun setWindowType(value: UrnetworkWindowType) {
-            windowTypeFlow.value = value
-        }
-        override fun fixedIpSize(): Flow<Boolean> = fixedIpFlow.asStateFlow()
-        override suspend fun setFixedIpSize(value: Boolean) {
-            setFixedIpCalls += 1
-            fixedIpFlow.value = value
-        }
-        override fun allowDirect(): Flow<Boolean> = allowDirectFlow.asStateFlow()
-        override suspend fun setAllowDirect(value: Boolean) {
-            setAllowDirectCalls += 1
-            allowDirectFlow.value = value
-        }
-        override fun provideEnabled(): Flow<Boolean> = provideEnabledFlow.asStateFlow()
-        override suspend fun setProvideEnabled(value: Boolean) {
-            provideEnabledFlow.value = value
-        }
-        override fun provideControlMode(): Flow<UrnetworkProvideControlMode> = provideControlModeFlow.asStateFlow()
-        override suspend fun setProvideControlMode(value: UrnetworkProvideControlMode) {
-            provideControlModeFlow.value = value
-        }
-        override fun provideNetworkMode(): Flow<UrnetworkProvideNetworkMode> = provideNetworkModeFlow.asStateFlow()
-        override suspend fun setProvideNetworkMode(value: UrnetworkProvideNetworkMode) {
-            provideNetworkModeFlow.value = value
-        }
-        override fun selectedLocation(): Flow<UrnetworkLocationSelection> = selectedLocationFlow.asStateFlow()
-        override suspend fun setSelectedLocation(value: UrnetworkLocationSelection) {
-            selectedLocationFlow.value = value
+
+        override fun config(): Flow<UrnetworkConfig> = state
+
+        override suspend fun update(transform: (UrnetworkConfig) -> UrnetworkConfig) {
+            val prev = state.value
+            val next = transform(prev)
+            if (next.fixedIpSize != prev.fixedIpSize) setFixedIpCalls += 1
+            if (next.allowDirect != prev.allowDirect) setAllowDirectCalls += 1
+            state.value = next
         }
     }
 
@@ -715,7 +673,7 @@ class MainViewModelTest {
 
     @Test
     fun urnetworkFixedIpMirrorsStore() = runTest {
-        urnetworkConfigStore.fixedIpFlow.value = true
+        urnetworkConfigStore.inject { it.copy(fixedIpSize = true) }
         advanceUntilIdle()
         assertEquals(true, viewModel.urnetworkFixedIp.value)
     }
@@ -728,7 +686,7 @@ class MainViewModelTest {
 
     @Test
     fun urnetworkEnhancedAnonymizationInvertsAllowDirect() = runTest {
-        urnetworkConfigStore.allowDirectFlow.value = false
+        urnetworkConfigStore.inject { it.copy(allowDirect = false) }
         advanceUntilIdle()
         assertEquals(
             true,
@@ -739,7 +697,7 @@ class MainViewModelTest {
 
     @Test
     fun urnetworkEnhancedAnonymizationDefaultFalseWhenAllowDirectTrue() = runTest {
-        urnetworkConfigStore.allowDirectFlow.value = true
+        urnetworkConfigStore.inject { it.copy(allowDirect = true) }
         advanceUntilIdle()
         assertEquals(false, viewModel.urnetworkEnhancedAnonymization.value)
     }
@@ -749,7 +707,7 @@ class MainViewModelTest {
         viewModel.setUrnetworkFixedIp(true)
         advanceUntilIdle()
         assertEquals(1, urnetworkConfigStore.setFixedIpCalls)
-        assertEquals(true, urnetworkConfigStore.fixedIpFlow.value)
+        assertEquals(true, urnetworkConfigStore.snapshot.fixedIpSize)
     }
 
     @Test
@@ -802,7 +760,7 @@ class MainViewModelTest {
         assertEquals(1, urnetworkConfigStore.setAllowDirectCalls)
         assertEquals(
             false,
-            urnetworkConfigStore.allowDirectFlow.value,
+            urnetworkConfigStore.snapshot.allowDirect,
             "enhancedAnonymization=true → allowDirect=false — bringyour mapping",
         )
     }
@@ -821,16 +779,16 @@ class MainViewModelTest {
 
     @Test
     fun setUrnetworkEnhancedAnonymizationOff_setsAllowDirectTrue() = runTest {
-        urnetworkConfigStore.allowDirectFlow.value = false
+        urnetworkConfigStore.inject { it.copy(allowDirect = false) }
         advanceUntilIdle()
         viewModel.setUrnetworkEnhancedAnonymization(false)
         advanceUntilIdle()
-        assertEquals(true, urnetworkConfigStore.allowDirectFlow.value)
+        assertEquals(true, urnetworkConfigStore.snapshot.allowDirect)
     }
 
     @Test
     fun setUrnetworkFixedIpUsesCurrentWindowType() = runTest {
-        urnetworkConfigStore.windowTypeFlow.value = UrnetworkWindowType.SPEED
+        urnetworkConfigStore.inject { it.copy(windowType = UrnetworkWindowType.SPEED) }
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.URNETWORK)
         tunnelController.onEngineStarted(EngineId.URNETWORK, 0)

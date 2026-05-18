@@ -1,8 +1,6 @@
 package ru.ozero.engineurnetwork
 
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import ru.ozero.engineurnetwork.auth.ClientJwtResult
@@ -108,19 +106,9 @@ class EngineUrnetworkAwaitReadyTest {
         )
     }
 
-    private object MinimalConfigStore : UrnetworkConfigStore {
-        override fun walletAddress(): Flow<String> = flowOf(UrnetworkDefaults.PRESET_WALLET)
-        override fun walletOverride(): Flow<String?> = flowOf(null)
-        override suspend fun setWalletOverride(value: String?) = Unit
-        override fun byJwt(): Flow<String?> = flowOf("j")
-        override suspend fun setByJwt(value: String?) = Unit
-        override fun byClientJwt(): Flow<String?> = flowOf("cj")
-        override suspend fun setByClientJwt(value: String?) = Unit
-        override fun windowType(): Flow<UrnetworkWindowType> = flowOf(UrnetworkWindowType.AUTO)
-        override suspend fun setWindowType(value: UrnetworkWindowType) = Unit
-        override fun fixedIpSize(): Flow<Boolean> = flowOf(false)
-        override suspend fun setFixedIpSize(value: Boolean) = Unit
-    }
+    private val MinimalConfigStore = InMemoryUrnetworkConfigStore(
+        UrnetworkConfig(byJwt = "j", byClientJwt = "cj"),
+    )
 
     private object ImmediateAuthService : UrnetworkAuthService {
         override suspend fun acquireGuestJwt() = GuestJwtResult.Success("j")

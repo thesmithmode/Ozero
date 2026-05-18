@@ -1,7 +1,5 @@
 package ru.ozero.engineurnetwork
 
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import ru.ozero.engineurnetwork.auth.ClientJwtResult
@@ -57,24 +55,8 @@ class UrnetworkConsentSentinelTest {
         }
     }
 
-    private class SpyStore(
-        existingJwt: String? = null,
-        existingClientJwt: String? = null,
-    ) : UrnetworkConfigStore {
-        private val jwtFlow = MutableStateFlow(existingJwt)
-        private val cJwtFlow = MutableStateFlow(existingClientJwt)
-        override fun walletAddress(): Flow<String> = MutableStateFlow(UrnetworkDefaults.PRESET_WALLET)
-        override fun walletOverride(): Flow<String?> = MutableStateFlow(null)
-        override suspend fun setWalletOverride(value: String?) = Unit
-        override fun byJwt(): Flow<String?> = jwtFlow
-        override suspend fun setByJwt(value: String?) {
-            jwtFlow.value = value
-        }
-        override fun byClientJwt(): Flow<String?> = cJwtFlow
-        override suspend fun setByClientJwt(value: String?) {
-            cJwtFlow.value = value
-        }
-    }
+    private fun SpyStore(existingJwt: String? = null, existingClientJwt: String? = null): UrnetworkConfigStore =
+        InMemoryUrnetworkConfigStore(UrnetworkConfig(byJwt = existingJwt, byClientJwt = existingClientJwt))
 
     private class SpyBridge : UrnetworkSdkBridge {
         var startCalls: Int = 0

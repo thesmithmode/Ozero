@@ -5,7 +5,6 @@ import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -13,7 +12,8 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
-import ru.ozero.engineurnetwork.UrnetworkConfigStore
+import ru.ozero.engineurnetwork.InMemoryUrnetworkConfigStore
+import ru.ozero.engineurnetwork.UrnetworkConfig
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.enginescore.EngineId
 import kotlin.test.assertEquals
@@ -25,38 +25,30 @@ class UrnetworkRelayCoordinatorTest {
     private val coordinatorScope = CoroutineScope(dispatcher + SupervisorJob())
 
     private lateinit var tunnelStateFlow: MutableStateFlow<TunnelState>
-    private lateinit var byClientJwtFlow: MutableStateFlow<String?>
-    private lateinit var walletAddressFlow: MutableStateFlow<String>
+    private lateinit var configStore: InMemoryUrnetworkConfigStore
     private lateinit var bridge: FakeBridge
     private lateinit var coordinator: UrnetworkRelayCoordinator
 
     @BeforeEach
     fun setUp() {
         tunnelStateFlow = MutableStateFlow(TunnelState.Idle)
-        byClientJwtFlow = MutableStateFlow(null)
-        walletAddressFlow = MutableStateFlow("test-wallet")
+        configStore = InMemoryUrnetworkConfigStore(UrnetworkConfig(walletOverride = "test-wallet"))
         bridge = FakeBridge()
 
         val tunnelController = mockk<TunnelController>()
         every { tunnelController.state } returns tunnelStateFlow
 
-        val configStore = object : UrnetworkConfigStore {
-            override fun walletAddress() = walletAddressFlow
-            override fun walletOverride(): Flow<String?> = MutableStateFlow(null)
-            override suspend fun setWalletOverride(value: String?) = Unit
-            override fun byJwt(): Flow<String?> = MutableStateFlow(null)
-            override suspend fun setByJwt(value: String?) = Unit
-            override fun byClientJwt() = byClientJwtFlow
-            override suspend fun setByClientJwt(value: String?) = Unit
-        }
-
         coordinator = UrnetworkRelayCoordinator(bridge, configStore, tunnelController, coordinatorScope)
         coordinator.start()
     }
 
+    private fun setByClientJwt(value: String?) {
+        configStore.inject { it.copy(byClientJwt = value) }
+    }
+
     @Test
     fun `relay запускается для ByeDPI когда JWT есть`() = runTest(dispatcher) {
-        byClientJwtFlow.value = "test-jwt"
+        setByClientJwt("test-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
         assertEquals(1, bridge.startCalls)
@@ -65,7 +57,7 @@ class UrnetworkRelayCoordinatorTest {
 
     @Test
     fun `relay запускается для WARP когда JWT есть`() = runTest(dispatcher) {
-        byClientJwtFlow.value = "test-jwt"
+        setByClientJwt("test-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.WARP, socksPort = 0)
 
         assertEquals(1, bridge.startCalls)
@@ -74,7 +66,7 @@ class UrnetworkRelayCoordinatorTest {
 
     @Test
     fun `relay не запускает bridge для URnetwork движка — только setProvidePaused`() = runTest(dispatcher) {
-        byClientJwtFlow.value = "test-jwt"
+        setByClientJwt("test-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.URNETWORK, socksPort = 0)
 
         assertEquals(0, bridge.startCalls)
@@ -84,7 +76,7 @@ class UrnetworkRelayCoordinatorTest {
 
     @Test
     fun `relay не запускается если JWT null`() = runTest(dispatcher) {
-        byClientJwtFlow.value = null
+        setByClientJwt(null)
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
         assertEquals(0, bridge.startCalls)
@@ -93,7 +85,7 @@ class UrnetworkRelayCoordinatorTest {
 
     @Test
     fun `relay останавливает bridge при Idle если был owned`() = runTest(dispatcher) {
-        byClientJwtFlow.value = "test-jwt"
+        setByClientJwt("test-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
         assertEquals(1, bridge.startCalls)
 
@@ -112,7 +104,7 @@ class UrnetworkRelayCoordinatorTest {
 
     @Test
     fun `relay ownership сбрасывается когда URnetwork становится активным`() = runTest(dispatcher) {
-        byClientJwtFlow.value = "test-jwt"
+        setByClientJwt("test-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
         assertEquals(1, bridge.startCalls)
 
@@ -124,7 +116,7 @@ class UrnetworkRelayCoordinatorTest {
 
     @Test
     fun `relay перезапускается при смене с URnetwork на ByeDPI`() = runTest(dispatcher) {
-        byClientJwtFlow.value = "test-jwt"
+        setByClientJwt("test-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.URNETWORK, socksPort = 0)
         assertEquals(0, bridge.startCalls)
 

@@ -1,31 +1,28 @@
 package ru.ozero.engineurnetwork
 
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 
 interface UrnetworkConfigStore {
-    fun walletAddress(): Flow<String>
-    fun walletOverride(): Flow<String?>
-    suspend fun setWalletOverride(value: String?)
-    fun byJwt(): Flow<String?>
-    suspend fun setByJwt(value: String?)
-    fun byClientJwt(): Flow<String?>
-    suspend fun setByClientJwt(value: String?)
-    fun windowType(): Flow<UrnetworkWindowType> = flowOf(UrnetworkWindowType.AUTO)
-    suspend fun setWindowType(value: UrnetworkWindowType) = Unit
-    fun fixedIpSize(): Flow<Boolean> = flowOf(false)
-    suspend fun setFixedIpSize(value: Boolean) = Unit
-    fun allowDirect(): Flow<Boolean> = flowOf(true)
-    suspend fun setAllowDirect(value: Boolean) = Unit
-    fun provideEnabled(): Flow<Boolean> = flowOf(true)
-    suspend fun setProvideEnabled(value: Boolean) = Unit
-    fun provideControlMode(): Flow<UrnetworkProvideControlMode> = flowOf(UrnetworkProvideControlMode.ALWAYS)
-    suspend fun setProvideControlMode(value: UrnetworkProvideControlMode) = Unit
-    fun provideNetworkMode(): Flow<UrnetworkProvideNetworkMode> = flowOf(UrnetworkProvideNetworkMode.WIFI)
-    suspend fun setProvideNetworkMode(value: UrnetworkProvideNetworkMode) = Unit
+    fun config(): Flow<UrnetworkConfig>
+    suspend fun update(transform: (UrnetworkConfig) -> UrnetworkConfig)
+}
 
-    fun selectedLocation(): Flow<UrnetworkLocationSelection> = flowOf(UrnetworkLocationSelection.EMPTY)
-    suspend fun setSelectedLocation(value: UrnetworkLocationSelection) = Unit
+data class UrnetworkConfig(
+    val walletOverride: String? = null,
+    val byJwt: String? = null,
+    val byClientJwt: String? = null,
+    val windowType: UrnetworkWindowType = UrnetworkWindowType.AUTO,
+    val fixedIpSize: Boolean = false,
+    val allowDirect: Boolean = true,
+    val provideEnabled: Boolean = true,
+    val provideControlMode: UrnetworkProvideControlMode = UrnetworkProvideControlMode.ALWAYS,
+    val provideNetworkMode: UrnetworkProvideNetworkMode = UrnetworkProvideNetworkMode.WIFI,
+    val selectedLocation: UrnetworkLocationSelection = UrnetworkLocationSelection.EMPTY,
+) {
+    val walletAddress: String
+        get() = walletOverride?.takeIf { it.isNotBlank() } ?: UrnetworkDefaults.PRESET_WALLET
 }
 
 data class UrnetworkLocationSelection(
@@ -49,5 +46,89 @@ data class UrnetworkLocationSelection(
 
     companion object {
         val EMPTY = UrnetworkLocationSelection(null, null, null)
+    }
+}
+
+fun UrnetworkConfigStore.walletAddress(): Flow<String> = config().map { it.walletAddress }
+
+fun UrnetworkConfigStore.walletOverride(): Flow<String?> =
+    config().map { it.walletOverride?.takeIf { v -> v.isNotBlank() } }
+
+suspend fun UrnetworkConfigStore.setWalletOverride(value: String?) {
+    update { it.copy(walletOverride = value?.takeIf { v -> v.isNotBlank() }) }
+}
+
+fun UrnetworkConfigStore.byJwt(): Flow<String?> =
+    config().map { it.byJwt?.takeIf { v -> v.isNotBlank() } }
+
+suspend fun UrnetworkConfigStore.setByJwt(value: String?) {
+    update { it.copy(byJwt = value?.takeIf { v -> v.isNotBlank() }) }
+}
+
+fun UrnetworkConfigStore.byClientJwt(): Flow<String?> =
+    config().map { it.byClientJwt?.takeIf { v -> v.isNotBlank() } }
+
+suspend fun UrnetworkConfigStore.setByClientJwt(value: String?) {
+    update { it.copy(byClientJwt = value?.takeIf { v -> v.isNotBlank() }) }
+}
+
+fun UrnetworkConfigStore.windowType(): Flow<UrnetworkWindowType> = config().map { it.windowType }
+
+suspend fun UrnetworkConfigStore.setWindowType(value: UrnetworkWindowType) {
+    update { it.copy(windowType = value) }
+}
+
+fun UrnetworkConfigStore.fixedIpSize(): Flow<Boolean> = config().map { it.fixedIpSize }
+
+suspend fun UrnetworkConfigStore.setFixedIpSize(value: Boolean) {
+    update { it.copy(fixedIpSize = value) }
+}
+
+fun UrnetworkConfigStore.allowDirect(): Flow<Boolean> = config().map { it.allowDirect }
+
+suspend fun UrnetworkConfigStore.setAllowDirect(value: Boolean) {
+    update { it.copy(allowDirect = value) }
+}
+
+fun UrnetworkConfigStore.provideEnabled(): Flow<Boolean> = config().map { it.provideEnabled }
+
+suspend fun UrnetworkConfigStore.setProvideEnabled(value: Boolean) {
+    update { it.copy(provideEnabled = value) }
+}
+
+fun UrnetworkConfigStore.provideControlMode(): Flow<UrnetworkProvideControlMode> =
+    config().map { it.provideControlMode }
+
+suspend fun UrnetworkConfigStore.setProvideControlMode(value: UrnetworkProvideControlMode) {
+    update { it.copy(provideControlMode = value) }
+}
+
+fun UrnetworkConfigStore.provideNetworkMode(): Flow<UrnetworkProvideNetworkMode> =
+    config().map { it.provideNetworkMode }
+
+suspend fun UrnetworkConfigStore.setProvideNetworkMode(value: UrnetworkProvideNetworkMode) {
+    update { it.copy(provideNetworkMode = value) }
+}
+
+fun UrnetworkConfigStore.selectedLocation(): Flow<UrnetworkLocationSelection> =
+    config().map { it.selectedLocation }
+
+suspend fun UrnetworkConfigStore.setSelectedLocation(value: UrnetworkLocationSelection) {
+    update { current ->
+        current.copy(
+            selectedLocation = UrnetworkLocationSelection(
+                countryCode = value.countryCode?.trim()?.uppercase()?.takeIf { it.isNotEmpty() },
+                region = value.region?.trim()?.takeIf { it.isNotEmpty() },
+                city = value.city?.trim()?.takeIf { it.isNotEmpty() },
+            ),
+        )
+    }
+}
+
+class InMemoryUrnetworkConfigStore(initial: UrnetworkConfig = UrnetworkConfig()) : UrnetworkConfigStore {
+    private val state = MutableStateFlow(initial)
+    override fun config(): Flow<UrnetworkConfig> = state
+    override suspend fun update(transform: (UrnetworkConfig) -> UrnetworkConfig) {
+        state.value = transform(state.value)
     }
 }

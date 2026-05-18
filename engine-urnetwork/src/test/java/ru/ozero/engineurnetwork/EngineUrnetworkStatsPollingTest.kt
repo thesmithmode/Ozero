@@ -3,10 +3,7 @@ package ru.ozero.engineurnetwork
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -171,28 +168,8 @@ class EngineUrnetworkStatsPollingTest {
         override suspend fun fetchSubscriptionBalance(): UrnetworkSdkBridge.SubscriptionBalanceSnapshot? = null
     }
 
-    private class FakeStore(
-        val byJwt: String? = null,
-        val byClientJwt: String? = null,
-    ) : UrnetworkConfigStore {
-        private val overrideFlow = MutableStateFlow<String?>(null)
-        private val byJwtFlow = MutableStateFlow(byJwt)
-        private val byClientJwtFlow = MutableStateFlow(byClientJwt)
-        override fun walletOverride(): Flow<String?> = overrideFlow
-        override fun walletAddress(): Flow<String> =
-            overrideFlow.map { it ?: UrnetworkDefaults.PRESET_WALLET }
-        override suspend fun setWalletOverride(value: String?) {
-            overrideFlow.value = value
-        }
-        override fun byJwt(): Flow<String?> = byJwtFlow
-        override suspend fun setByJwt(value: String?) {
-            byJwtFlow.value = value
-        }
-        override fun byClientJwt(): Flow<String?> = byClientJwtFlow
-        override suspend fun setByClientJwt(value: String?) {
-            byClientJwtFlow.value = value
-        }
-    }
+    private fun FakeStore(byJwt: String? = null, byClientJwt: String? = null): UrnetworkConfigStore =
+        InMemoryUrnetworkConfigStore(UrnetworkConfig(byJwt = byJwt, byClientJwt = byClientJwt))
 
     private class FakeAuth : UrnetworkAuthService {
         override suspend fun acquireGuestJwt(): GuestJwtResult = GuestJwtResult.Success("g")

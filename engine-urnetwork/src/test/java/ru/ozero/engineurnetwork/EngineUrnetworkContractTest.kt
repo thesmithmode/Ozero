@@ -1,9 +1,6 @@
 package ru.ozero.engineurnetwork
 
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import ru.ozero.engineurnetwork.auth.ClientJwtResult
@@ -30,12 +27,14 @@ class EngineUrnetworkContractTest {
         provideEnabled: Boolean = true,
         bridge: FakeUrnetworkSdkBridge = FakeUrnetworkSdkBridge(),
         authService: FakeAuthService = FakeAuthService(),
-    ): Triple<EngineUrnetwork, FakeUrnetworkSdkBridge, FakeUrnetworkConfigStore> {
-        val store = FakeUrnetworkConfigStore(
-            override = override,
-            byJwt = byJwt,
-            byClientJwt = byClientJwt,
-            initialProvideEnabled = provideEnabled,
+    ): Triple<EngineUrnetwork, FakeUrnetworkSdkBridge, InMemoryUrnetworkConfigStore> {
+        val store = InMemoryUrnetworkConfigStore(
+            UrnetworkConfig(
+                walletOverride = override,
+                byJwt = byJwt,
+                byClientJwt = byClientJwt,
+                provideEnabled = provideEnabled,
+            ),
         )
         return Triple(EngineUrnetwork(store, bridge, authService), bridge, store)
     }
@@ -100,8 +99,8 @@ class EngineUrnetworkContractTest {
         assertIs<StartResult.Success>(r)
         assertEquals(1, auth.acquireGuestCalls)
         assertEquals(1, auth.acquireClientCalls)
-        assertEquals("guest.tok.42", store.byJwtFlow.value)
-        assertEquals("client.tok.42", store.byClientJwtFlow.value)
+        assertEquals("guest.tok.42", store.snapshot.byJwt)
+        assertEquals("client.tok.42", store.snapshot.byClientJwt)
         assertEquals("client.tok.42", bridge.lastByClientJwt)
         assertEquals("guest.tok.42", auth.acquireClientByJwt)
         assertEquals(1, bridge.startCalls)
@@ -116,8 +115,8 @@ class EngineUrnetworkContractTest {
         assertTrue(f.reason.contains("guest", ignoreCase = true))
         assertEquals(0, bridge.startCalls)
         assertEquals(0, auth.acquireClientCalls)
-        assertNull(store.byJwtFlow.value)
-        assertNull(store.byClientJwtFlow.value)
+        assertNull(store.snapshot.byJwt)
+        assertNull(store.snapshot.byClientJwt)
     }
 
     @Test
@@ -128,8 +127,8 @@ class EngineUrnetworkContractTest {
         val f = assertIs<StartResult.Failure>(r)
         assertTrue(f.reason.contains("client", ignoreCase = true))
         assertEquals(0, bridge.startCalls)
-        assertNotNull(store.byJwtFlow.value)
-        assertNull(store.byClientJwtFlow.value)
+        assertNotNull(store.snapshot.byJwt)
+        assertNull(store.snapshot.byClientJwt)
     }
 
     @Test
@@ -292,11 +291,16 @@ class EngineUrnetworkContractTest {
     @Test
     fun `start с заполненным selectedLocation игнорирует config_region — store wins`() = runTest {
         val bridge = FakeUrnetworkSdkBridge()
-        val store = FakeUrnetworkConfigStore(override = null, byJwt = "j", byClientJwt = "cj")
-        store.selectedLocationFlow.value = UrnetworkLocationSelection(
-            countryCode = "DE",
-            region = "Bavaria",
-            city = "Munich",
+        val store = InMemoryUrnetworkConfigStore(
+            UrnetworkConfig(
+                byJwt = "j",
+                byClientJwt = "cj",
+                selectedLocation = UrnetworkLocationSelection(
+                    countryCode = "DE",
+                    region = "Bavaria",
+                    city = "Munich",
+                ),
+            ),
         )
         val engine = EngineUrnetwork(store, bridge, FakeAuthService())
         engine.start(EngineConfig.Urnetwork(jwtToken = "", region = "us"), Upstream.None)
@@ -330,53 +334,6 @@ class EngineUrnetworkContractTest {
         val (e, _, _) = engine(byJwt = "j", byClientJwt = "cj", provideEnabled = false, bridge = bridge)
         e.start(baseConfig, Upstream.None)
         assertEquals(true, bridge.lastProvidePaused)
-    }
-
-    private class FakeUrnetworkConfigStore(
-        override: String?,
-        byJwt: String? = null,
-        byClientJwt: String? = null,
-        initialWindowType: UrnetworkWindowType = UrnetworkWindowType.AUTO,
-        initialFixedIp: Boolean = false,
-        initialProvideEnabled: Boolean = true,
-    ) : UrnetworkConfigStore {
-        private val overrideFlow = MutableStateFlow(override)
-        val byJwtFlow = MutableStateFlow(byJwt)
-        val byClientJwtFlow = MutableStateFlow(byClientJwt)
-        private val windowTypeFlow = MutableStateFlow(initialWindowType)
-        private val fixedIpFlow = MutableStateFlow(initialFixedIp)
-        private val provideEnabledFlow = MutableStateFlow(initialProvideEnabled)
-        override fun walletAddress(): Flow<String> =
-            overrideFlow.map { it ?: UrnetworkDefaults.PRESET_WALLET }
-        override fun walletOverride(): Flow<String?> = overrideFlow
-        override suspend fun setWalletOverride(value: String?) {
-            overrideFlow.value = value
-        }
-        override fun byJwt(): Flow<String?> = byJwtFlow
-        override suspend fun setByJwt(value: String?) {
-            byJwtFlow.value = value
-        }
-        override fun byClientJwt(): Flow<String?> = byClientJwtFlow
-        override suspend fun setByClientJwt(value: String?) {
-            byClientJwtFlow.value = value
-        }
-        override fun windowType(): Flow<UrnetworkWindowType> = windowTypeFlow
-        override suspend fun setWindowType(value: UrnetworkWindowType) {
-            windowTypeFlow.value = value
-        }
-        override fun fixedIpSize(): Flow<Boolean> = fixedIpFlow
-        override suspend fun setFixedIpSize(value: Boolean) {
-            fixedIpFlow.value = value
-        }
-        override fun provideEnabled(): Flow<Boolean> = provideEnabledFlow
-        override suspend fun setProvideEnabled(value: Boolean) {
-            provideEnabledFlow.value = value
-        }
-        val selectedLocationFlow = MutableStateFlow(UrnetworkLocationSelection.EMPTY)
-        override fun selectedLocation(): Flow<UrnetworkLocationSelection> = selectedLocationFlow
-        override suspend fun setSelectedLocation(value: UrnetworkLocationSelection) {
-            selectedLocationFlow.value = value
-        }
     }
 
     private class FakeAuthService(
@@ -484,7 +441,9 @@ class EngineUrnetworkPerformanceProfileTest {
 
     @Test
     fun `start применяет windowType QUALITY из configStore к bridge`() = runTest {
-        val store = FakeProfileConfigStore(windowType = UrnetworkWindowType.QUALITY, fixedIp = false)
+        val store = InMemoryUrnetworkConfigStore(
+            UrnetworkConfig(byJwt = "j", byClientJwt = "cj", windowType = UrnetworkWindowType.QUALITY, fixedIpSize = false),
+        )
         val bridge = FakeProfileBridge()
         val engine = EngineUrnetwork(store, bridge, FakeProfileAuthService())
         engine.start(baseConfig, Upstream.None)
@@ -494,7 +453,9 @@ class EngineUrnetworkPerformanceProfileTest {
 
     @Test
     fun `start применяет windowType SPEED с fixedIp true из configStore к bridge`() = runTest {
-        val store = FakeProfileConfigStore(windowType = UrnetworkWindowType.SPEED, fixedIp = true)
+        val store = InMemoryUrnetworkConfigStore(
+            UrnetworkConfig(byJwt = "j", byClientJwt = "cj", windowType = UrnetworkWindowType.SPEED, fixedIpSize = true),
+        )
         val bridge = FakeProfileBridge()
         val engine = EngineUrnetwork(store, bridge, FakeProfileAuthService())
         engine.start(baseConfig, Upstream.None)
@@ -504,7 +465,9 @@ class EngineUrnetworkPerformanceProfileTest {
 
     @Test
     fun `start применяет AUTO windowType из configStore (AUTO не skipped на уровне engine)`() = runTest {
-        val store = FakeProfileConfigStore(windowType = UrnetworkWindowType.AUTO, fixedIp = false)
+        val store = InMemoryUrnetworkConfigStore(
+            UrnetworkConfig(byJwt = "j", byClientJwt = "cj", windowType = UrnetworkWindowType.AUTO, fixedIpSize = false),
+        )
         val bridge = FakeProfileBridge()
         val engine = EngineUrnetwork(store, bridge, FakeProfileAuthService())
         engine.start(baseConfig, Upstream.None)
@@ -513,10 +476,14 @@ class EngineUrnetworkPerformanceProfileTest {
 
     @Test
     fun `start пробрасывает allowDirect=true в bridge — anonymization OFF по умолчанию`() = runTest {
-        val store = FakeProfileConfigStore(
-            windowType = UrnetworkWindowType.QUALITY,
-            fixedIp = false,
-            allowDirect = true,
+        val store = InMemoryUrnetworkConfigStore(
+            UrnetworkConfig(
+                byJwt = "j",
+                byClientJwt = "cj",
+                windowType = UrnetworkWindowType.QUALITY,
+                fixedIpSize = false,
+                allowDirect = true,
+            ),
         )
         val bridge = FakeProfileBridge()
         val engine = EngineUrnetwork(store, bridge, FakeProfileAuthService())
@@ -527,10 +494,14 @@ class EngineUrnetworkPerformanceProfileTest {
     @Test
     fun `start пробрасывает allowDirect=false в bridge при AUTO — anonymization ON применяется к AUTO профилю`() =
         runTest {
-            val store = FakeProfileConfigStore(
-                windowType = UrnetworkWindowType.AUTO,
-                fixedIp = false,
-                allowDirect = false,
+            val store = InMemoryUrnetworkConfigStore(
+                UrnetworkConfig(
+                    byJwt = "j",
+                    byClientJwt = "cj",
+                    windowType = UrnetworkWindowType.AUTO,
+                    fixedIpSize = false,
+                    allowDirect = false,
+                ),
             )
             val bridge = FakeProfileBridge()
             val engine = EngineUrnetwork(store, bridge, FakeProfileAuthService())
@@ -541,10 +512,14 @@ class EngineUrnetworkPerformanceProfileTest {
 
     @Test
     fun `start пробрасывает allowDirect=false с QUALITY windowType — комбинация anonymization+quality`() = runTest {
-        val store = FakeProfileConfigStore(
-            windowType = UrnetworkWindowType.QUALITY,
-            fixedIp = true,
-            allowDirect = false,
+        val store = InMemoryUrnetworkConfigStore(
+            UrnetworkConfig(
+                byJwt = "j",
+                byClientJwt = "cj",
+                windowType = UrnetworkWindowType.QUALITY,
+                fixedIpSize = true,
+                allowDirect = false,
+            ),
         )
         val bridge = FakeProfileBridge()
         val engine = EngineUrnetwork(store, bridge, FakeProfileAuthService())
@@ -552,33 +527,6 @@ class EngineUrnetworkPerformanceProfileTest {
         assertEquals(UrnetworkWindowType.QUALITY, bridge.lastAppliedWindowType)
         assertEquals(true, bridge.lastAppliedFixedIp)
         assertEquals(false, bridge.lastAppliedAllowDirect)
-    }
-
-    private class FakeProfileConfigStore(
-        private val windowType: UrnetworkWindowType,
-        private val fixedIp: Boolean,
-        private val allowDirect: Boolean = true,
-    ) : UrnetworkConfigStore {
-        override fun walletAddress(): kotlinx.coroutines.flow.Flow<String> =
-            kotlinx.coroutines.flow.flowOf(UrnetworkDefaults.PRESET_WALLET)
-        override fun walletOverride(): kotlinx.coroutines.flow.Flow<String?> =
-            kotlinx.coroutines.flow.flowOf(null)
-        override suspend fun setWalletOverride(value: String?) = Unit
-        override fun byJwt(): kotlinx.coroutines.flow.Flow<String?> =
-            kotlinx.coroutines.flow.flowOf("j")
-        override suspend fun setByJwt(value: String?) = Unit
-        override fun byClientJwt(): kotlinx.coroutines.flow.Flow<String?> =
-            kotlinx.coroutines.flow.flowOf("cj")
-        override suspend fun setByClientJwt(value: String?) = Unit
-        override fun windowType(): kotlinx.coroutines.flow.Flow<UrnetworkWindowType> =
-            kotlinx.coroutines.flow.flowOf(windowType)
-        override suspend fun setWindowType(value: UrnetworkWindowType) = Unit
-        override fun fixedIpSize(): kotlinx.coroutines.flow.Flow<Boolean> =
-            kotlinx.coroutines.flow.flowOf(fixedIp)
-        override suspend fun setFixedIpSize(value: Boolean) = Unit
-        override fun allowDirect(): kotlinx.coroutines.flow.Flow<Boolean> =
-            kotlinx.coroutines.flow.flowOf(allowDirect)
-        override suspend fun setAllowDirect(value: Boolean) = Unit
     }
 
     private class FakeProfileBridge : UrnetworkSdkBridge {
