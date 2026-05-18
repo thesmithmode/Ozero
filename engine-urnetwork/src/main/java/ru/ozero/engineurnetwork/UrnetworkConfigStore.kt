@@ -21,4 +21,11 @@ interface UrnetworkConfigStore {
     suspend fun setProvideControlMode(value: UrnetworkProvideControlMode) = Unit
     fun provideNetworkMode(): Flow<UrnetworkProvideNetworkMode> = flowOf(UrnetworkProvideNetworkMode.WIFI)
     suspend fun setProvideNetworkMode(value: UrnetworkProvideNetworkMode) = Unit
+
+    fun selectedCountryCode(): Flow<String?> = flowOf(null)
+    suspend fun setSelectedCountryCode(value: String?) = Unit
+    fun selectedRegion(): Flow<String?> = flowOf(null)
+    suspend fun setSelectedRegion(value: String?) = Unit
+    fun selectedCity(): Flow<String?> = flowOf(null)
+    suspend fun setSelectedCity(value: String?) = Unit
 }

@@ -98,6 +98,39 @@ class DataStoreUrnetworkConfigStore(
         dataStore.edit { prefs -> prefs[KEY_PROVIDE_NETWORK_MODE] = value.rawValue }
     }
 
+    override fun selectedCountryCode(): Flow<String?> = dataStore.data.map { prefs ->
+        prefs[KEY_SELECTED_COUNTRY_CODE]?.takeIf { it.isNotBlank() }
+    }
+
+    override suspend fun setSelectedCountryCode(value: String?) {
+        dataStore.edit { prefs ->
+            if (value.isNullOrBlank()) prefs.remove(KEY_SELECTED_COUNTRY_CODE)
+            else prefs[KEY_SELECTED_COUNTRY_CODE] = value.trim().uppercase()
+        }
+    }
+
+    override fun selectedRegion(): Flow<String?> = dataStore.data.map { prefs ->
+        prefs[KEY_SELECTED_REGION]?.takeIf { it.isNotBlank() }
+    }
+
+    override suspend fun setSelectedRegion(value: String?) {
+        dataStore.edit { prefs ->
+            if (value.isNullOrBlank()) prefs.remove(KEY_SELECTED_REGION)
+            else prefs[KEY_SELECTED_REGION] = value.trim()
+        }
+    }
+
+    override fun selectedCity(): Flow<String?> = dataStore.data.map { prefs ->
+        prefs[KEY_SELECTED_CITY]?.takeIf { it.isNotBlank() }
+    }
+
+    override suspend fun setSelectedCity(value: String?) {
+        dataStore.edit { prefs ->
+            if (value.isNullOrBlank()) prefs.remove(KEY_SELECTED_CITY)
+            else prefs[KEY_SELECTED_CITY] = value.trim()
+        }
+    }
+
     private companion object {
         val KEY_WALLET_OVERRIDE = stringPreferencesKey("urnetwork_wallet_override")
         val KEY_BY_JWT = stringPreferencesKey("urnetwork_by_jwt")
@@ -107,5 +140,8 @@ class DataStoreUrnetworkConfigStore(
         val KEY_PROVIDE_ENABLED = booleanPreferencesKey("urnetwork_provide_enabled")
         val KEY_PROVIDE_CONTROL_MODE = stringPreferencesKey("urnetwork_provide_control_mode")
         val KEY_PROVIDE_NETWORK_MODE = stringPreferencesKey("urnetwork_provide_network_mode")
+        val KEY_SELECTED_COUNTRY_CODE = stringPreferencesKey("urnetwork_selected_country_code")
+        val KEY_SELECTED_REGION = stringPreferencesKey("urnetwork_selected_region")
+        val KEY_SELECTED_CITY = stringPreferencesKey("urnetwork_selected_city")
     }
 }
