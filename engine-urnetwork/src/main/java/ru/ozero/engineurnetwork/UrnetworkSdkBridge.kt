@@ -26,6 +26,9 @@ interface UrnetworkSdkBridge {
     fun selectedLocationInfo(): LocationInfo? = null
     fun openLocationsViewController(): LocationsViewController?
 
+    suspend fun initDeviceForLocations(byClientJwt: String, walletAddress: String): Boolean = false
+    fun isDeviceAvailable(): Boolean = false
+
     fun setPreferredLocation(selection: UrnetworkLocationSelection?) {}
 
     fun setProvidePaused(paused: Boolean)

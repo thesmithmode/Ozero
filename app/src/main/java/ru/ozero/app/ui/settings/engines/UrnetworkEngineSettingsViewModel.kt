@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
@@ -41,6 +42,8 @@ import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
 import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.UrnetworkWindowType
+import ru.ozero.engineurnetwork.byClientJwt
+import ru.ozero.engineurnetwork.walletAddress
 import ru.ozero.engineurnetwork.allowDirect
 import ru.ozero.engineurnetwork.fixedIpSize
 import ru.ozero.engineurnetwork.provideControlMode
@@ -86,7 +89,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     private val balanceRepository: UrnetworkBalanceRepository,
 ) : ViewModel() {
 
-    private val isUrnetworkActive: StateFlow<Boolean> = tunnelController.state
+    val isUrnetworkActive: StateFlow<Boolean> = tunnelController.state
         .map { s ->
             when (s) {
                 is TunnelState.Connecting -> s.engineId == EngineId.URNETWORK
@@ -165,11 +168,6 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         }
     }
 
-    private val userSelectedCountryCode: StateFlow<String?> = settingsRepository.settings
-        .map { it.urnetworkCountryCode }
-        .distinctUntilChanged()
-        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
-
     private val _uiState = MutableStateFlow<UrnetworkSettingsUiState>(UrnetworkSettingsUiState.Loading)
     val uiState: StateFlow<UrnetworkSettingsUiState> = _uiState.asStateFlow()
 
@@ -219,6 +217,16 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
+            val byClientJwt = configStore.byClientJwt().first()
+            val wallet = configStore.walletAddress().first()
+            if (!byClientJwt.isNullOrBlank()) {
+                val ready = bridge.initDeviceForLocations(byClientJwt, wallet)
+                if (ready && _uiState.value !is UrnetworkSettingsUiState.Ready) {
+                    refreshOnce()
+                }
+            }
+        }
+        viewModelScope.launch {
             isUrnetworkActive.collectLatest { active ->
                 if (active) {
                     var attempt = 0
@@ -230,18 +238,26 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
                         if (attempt < REFRESH_RETRY_ATTEMPTS) delay(REFRESH_RETRY_DELAY_MS)
                     }
                 } else {
-                    teardownLocationsVc()
-                    allCountries = emptyList()
-                    allRegions = emptyList()
-                    allCities = emptyList()
-                    _uiState.value = UrnetworkSettingsUiState.NotConnected
+                    if (bridge.isDeviceAvailable()) {
+                        _uiState.update { current ->
+                            if (current is UrnetworkSettingsUiState.Ready) {
+                                current.copy(providePaused = true)
+                            } else current
+                        }
+                    } else {
+                        teardownLocationsVc()
+                        allCountries = emptyList()
+                        allRegions = emptyList()
+                        allCities = emptyList()
+                        _uiState.value = UrnetworkSettingsUiState.NotConnected
+                    }
                 }
             }
         }
     }
 
     fun refresh() {
-        if (!isUrnetworkActive.value) {
+        if (!bridge.isDeviceAvailable()) {
             _uiState.value = UrnetworkSettingsUiState.NotConnected
             return
         }
@@ -249,7 +265,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     }
 
     private suspend fun refreshOnce() {
-        if (!isUrnetworkActive.value) {
+        if (!bridge.isDeviceAvailable()) {
             _uiState.value = UrnetworkSettingsUiState.NotConnected
             return
         }
@@ -399,7 +415,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         _uiState.update { current ->
             val selectedLocation = if (current is UrnetworkSettingsUiState.Ready) {
                 current.selectedLocation
-            } else if (isUrnetworkActive.value && userSelectedCountryCode.value != null) {
+            } else if (bridge.isDeviceAvailable()) {
                 bridge.selectedLocation()
             } else {
                 null

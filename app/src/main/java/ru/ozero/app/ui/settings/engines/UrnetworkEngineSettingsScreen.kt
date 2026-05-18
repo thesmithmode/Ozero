@@ -143,6 +143,7 @@ fun UrnetworkEngineSettingsScreen(
                 val provideNetworkMode by viewModel.provideNetworkMode.collectAsStateWithLifecycle()
                 val sharedTrafficBytes by viewModel.sharedTrafficBytes.collectAsStateWithLifecycle()
                 val balanceState by viewModel.balanceState.collectAsStateWithLifecycle()
+                val isVpnActive by viewModel.isUrnetworkActive.collectAsStateWithLifecycle()
                 LocationListContent(
                     modifier = Modifier.padding(padding),
                     countries = current.countries,
@@ -159,6 +160,7 @@ fun UrnetworkEngineSettingsScreen(
                     sharedTrafficBytes = sharedTrafficBytes,
                     balanceState = balanceState,
                     insufficientBalance = insufficientBalance,
+                    isVpnActive = isVpnActive,
                     onSearchQueryChange = viewModel::setSearchQuery,
                     onSelect = viewModel::selectLocation,
                     onSetProvidePaused = viewModel::setProvidePaused,
@@ -192,6 +194,7 @@ private fun LocationListContent(
     sharedTrafficBytes: Long,
     balanceState: UrnetworkBalanceState,
     insufficientBalance: Boolean,
+    isVpnActive: Boolean,
     onSearchQueryChange: (String) -> Unit,
     onSelect: (UrnetworkSdkBridge.LocationToken?) -> Unit,
     onSetProvidePaused: (Boolean) -> Unit,
@@ -228,7 +231,7 @@ private fun LocationListContent(
                     provideControlMode = provideControlMode,
                     provideNetworkMode = provideNetworkMode,
                     sharedTrafficBytes = sharedTrafficBytes,
-                    showProvide = true,
+                    showProvide = isVpnActive,
                     onSetProvidePaused = onSetProvidePaused,
                     onSelectWindowType = onSelectWindowType,
                     onToggleFixedIp = onToggleFixedIp,

@@ -98,45 +98,51 @@ class RealUrnetworkSdkBridge(
         byClientJwt: String,
         walletAddress: String,
     ): UrnetworkSdkBridge.StartResult {
-        val space = try {
-            UrnetworkRuntime.ensure(app)
-        } catch (t: Throwable) {
-            PersistentLoggers.error(TAG, "runtime ensure failed: ${t.message}")
-            cleanupOnFailure()
-            return UrnetworkSdkBridge.StartResult.Failed("runtime ensure failed: ${t.message}")
+        val existingDevice = deviceRef.get()
+        val device: DeviceLocal = if (existingDevice != null) {
+            Log.i(TAG, "start: reusing device from initDeviceForLocations")
+            existingDevice
+        } else {
+            val space = try {
+                UrnetworkRuntime.ensure(app)
+            } catch (t: Throwable) {
+                PersistentLoggers.error(TAG, "runtime ensure failed: ${t.message}")
+                cleanupOnFailure()
+                return UrnetworkSdkBridge.StartResult.Failed("runtime ensure failed: ${t.message}")
+            }
+            val localState = space.asyncLocalState?.localState
+            if (localState == null) {
+                PersistentLoggers.error(TAG, "asyncLocalState.localState is null — runtime not ready")
+                cleanupOnFailure()
+                return UrnetworkSdkBridge.StartResult.Failed("URnetwork localState not ready")
+            }
+            runCatching { localState.byClientJwt = byClientJwt }
+                .onFailure { PersistentLoggers.warn(TAG, "set localState.byClientJwt threw: ${it.message}") }
+            val instanceId = runCatching { localState.instanceId }.getOrNull()
+            val d = try {
+                Sdk.newDeviceLocalWithDefaults(
+                    space,
+                    byClientJwt,
+                    UrnetworkDefaults.DEVICE_DESCRIPTION,
+                    UrnetworkDefaults.DEVICE_SPEC,
+                    appVersion,
+                    instanceId,
+                    false,
+                )
+            } catch (t: Throwable) {
+                PersistentLoggers.error(TAG, "newDeviceLocalWithDefaults threw: ${t.message}")
+                cleanupOnFailure()
+                return UrnetworkSdkBridge.StartResult.Failed("DeviceLocal init failed: ${t.message}")
+            }
+            runCatching {
+                val keys = localState.provideSecretKeys
+                if (keys != null) d.loadProvideSecretKeys(keys) else d.initProvideSecretKeys()
+            }.onFailure { PersistentLoggers.warn(TAG, "provideSecretKeys init threw: ${it.message}") }
+            runCatching { d.providePaused = true }
+                .onFailure { PersistentLoggers.warn(TAG, "providePaused threw: ${it.message}") }
+            deviceRef.set(d)
+            d
         }
-
-        val localState = space.asyncLocalState?.localState
-        if (localState == null) {
-            PersistentLoggers.error(TAG, "asyncLocalState.localState is null — runtime not ready")
-            cleanupOnFailure()
-            return UrnetworkSdkBridge.StartResult.Failed("URnetwork localState not ready")
-        }
-        runCatching { localState.byClientJwt = byClientJwt }
-            .onFailure { PersistentLoggers.warn(TAG, "set localState.byClientJwt threw: ${it.message}") }
-        val instanceId = runCatching { localState.instanceId }.getOrNull()
-
-        val device: DeviceLocal = try {
-            Sdk.newDeviceLocalWithDefaults(
-                space,
-                byClientJwt,
-                UrnetworkDefaults.DEVICE_DESCRIPTION,
-                UrnetworkDefaults.DEVICE_SPEC,
-                appVersion,
-                instanceId,
-                false,
-            )
-        } catch (t: Throwable) {
-            PersistentLoggers.error(TAG, "newDeviceLocalWithDefaults threw: ${t.message}")
-            cleanupOnFailure()
-            return UrnetworkSdkBridge.StartResult.Failed("DeviceLocal init failed: ${t.message}")
-        }
-        runCatching {
-            val keys = localState.provideSecretKeys
-            if (keys != null) device.loadProvideSecretKeys(keys) else device.initProvideSecretKeys()
-        }.onFailure { PersistentLoggers.warn(TAG, "provideSecretKeys init threw: ${it.message}") }
-        runCatching { device.providePaused = true }
-            .onFailure { PersistentLoggers.warn(TAG, "providePaused threw: ${it.message}") }
 
         val cv = runCatching { device.openConnectViewController() }.getOrElse {
             PersistentLoggers.warn(TAG, "openConnectViewController threw: ${it.message}")
@@ -149,7 +155,6 @@ class RealUrnetworkSdkBridge(
             PersistentLoggers.error(TAG, "ConnectViewController is null — P2P connection unavailable")
         }
 
-        deviceRef.set(device)
         val walletVcStarted = runCatching {
             val walletVc = device.openWalletViewController()
             walletVcRef.set(walletVc)
@@ -302,11 +307,59 @@ class RealUrnetworkSdkBridge(
         contractStatusListener.status
 
     override fun openLocationsViewController(): LocationsViewController? {
-        if (!running.get()) return null
+        if (deviceRef.get() == null) return null
         return runCatching { deviceRef.get()?.openLocationsViewController() }.getOrElse {
             PersistentLoggers.warn(TAG, "openLocationsViewController threw: ${it.message}")
             null
         }
+    }
+
+    override fun isDeviceAvailable(): Boolean = deviceRef.get() != null
+
+    override suspend fun initDeviceForLocations(byClientJwt: String, walletAddress: String): Boolean {
+        if (byClientJwt.isBlank()) return false
+        if (deviceRef.get() != null) return true
+        return lifecycleMutex.withLock {
+            if (deviceRef.get() != null) return@withLock true
+            withContext(Dispatchers.Main.immediate) {
+                ensureDeviceOnMain(byClientJwt, walletAddress)
+            }
+        }
+    }
+
+    private fun ensureDeviceOnMain(byClientJwt: String, walletAddress: String): Boolean {
+        val space = runCatching { UrnetworkRuntime.ensure(app) }.getOrNull() ?: run {
+            PersistentLoggers.warn(TAG, "initDeviceForLocations: runtime ensure failed")
+            return false
+        }
+        val localState = space.asyncLocalState?.localState ?: run {
+            PersistentLoggers.warn(TAG, "initDeviceForLocations: localState null")
+            return false
+        }
+        runCatching { localState.byClientJwt = byClientJwt }
+        val instanceId = runCatching { localState.instanceId }.getOrNull()
+        val device = runCatching {
+            Sdk.newDeviceLocalWithDefaults(
+                space,
+                byClientJwt,
+                UrnetworkDefaults.DEVICE_DESCRIPTION,
+                UrnetworkDefaults.DEVICE_SPEC,
+                appVersion,
+                instanceId,
+                false,
+            )
+        }.getOrNull() ?: run {
+            PersistentLoggers.warn(TAG, "initDeviceForLocations: newDeviceLocalWithDefaults returned null")
+            return false
+        }
+        runCatching {
+            val keys = localState.provideSecretKeys
+            if (keys != null) device.loadProvideSecretKeys(keys) else device.initProvideSecretKeys()
+        }
+        runCatching { device.providePaused = true }
+        deviceRef.set(device)
+        Log.i(TAG, "initDeviceForLocations: device ready for location browse")
+        return true
     }
 
     private inline fun guardedRun(label: String, block: () -> Unit) {
