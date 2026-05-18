@@ -68,19 +68,19 @@ class UrnetworkBalanceRepositoryTest {
     }
 
     @Test
-    fun `availableBytes balance минус pending минус used`() {
+    fun `availableBytes равно balanceBytes`() {
         val state = UrnetworkBalanceState(
             snapshot = sample(balance = 1_000L, pending = 100L, used = 200L),
             isLoading = false,
             lastError = null,
         )
-        assertEquals(700L, state.availableBytes)
+        assertEquals(1_000L, state.availableBytes)
     }
 
     @Test
-    fun `availableBytes отрицательное coerced в 0`() {
+    fun `availableBytes 0 если balanceBytes отрицательный`() {
         val state = UrnetworkBalanceState(
-            snapshot = sample(balance = 100L, pending = 50L, used = 100L),
+            snapshot = sample(balance = -50L),
             isLoading = false,
             lastError = null,
         )
@@ -90,6 +90,59 @@ class UrnetworkBalanceRepositoryTest {
     @Test
     fun `availableBytes null snapshot вернёт 0`() {
         assertEquals(0L, UrnetworkBalanceState.INITIAL.availableBytes)
+    }
+
+    @Test
+    fun `refresh успех сохраняет meanReliabilityWeight из bridge`() = runTest {
+        val bridge = FakeBridge(snapshot = sample(), reliability = 0.75)
+        val repo = RealUrnetworkBalanceRepository(bridge)
+        repo.refresh()
+        assertEquals(0.75, repo.state.value.meanReliabilityWeight)
+    }
+
+    @Test
+    fun `refresh успех сохраняет totalReferrals из bridge`() = runTest {
+        val bridge = FakeBridge(snapshot = sample(), referrals = 3L)
+        val repo = RealUrnetworkBalanceRepository(bridge)
+        repo.refresh()
+        assertEquals(3L, repo.state.value.totalReferrals)
+    }
+
+    @Test
+    fun `reliability null при refresh сохраняет предыдущее значение`() = runTest {
+        val bridge = FakeBridge(snapshot = sample(), reliability = 0.5)
+        val repo = RealUrnetworkBalanceRepository(bridge)
+        repo.refresh()
+        assertEquals(0.5, repo.state.value.meanReliabilityWeight)
+        bridge.reliability = null
+        repo.refresh()
+        assertEquals(0.5, repo.state.value.meanReliabilityWeight)
+    }
+
+    @Test
+    fun `referrals null при refresh сохраняет предыдущее значение`() = runTest {
+        val bridge = FakeBridge(snapshot = sample(), referrals = 2L)
+        val repo = RealUrnetworkBalanceRepository(bridge)
+        repo.refresh()
+        assertEquals(2L, repo.state.value.totalReferrals)
+        bridge.referrals = null
+        repo.refresh()
+        assertEquals(2L, repo.state.value.totalReferrals)
+    }
+
+    @Test
+    fun `refresh ошибка balance сохраняет reliability и referrals`() = runTest {
+        val bridge = FakeBridge(snapshot = sample(), reliability = 0.8, referrals = 5L)
+        val repo = RealUrnetworkBalanceRepository(bridge)
+        repo.refresh()
+        bridge.throwOnNext = RuntimeException("fail")
+        bridge.reliability = 0.9
+        bridge.referrals = 6L
+        repo.refresh()
+        val s = repo.state.value
+        assertNotNull(s.lastError)
+        assertEquals(0.9, s.meanReliabilityWeight)
+        assertEquals(6L, s.totalReferrals)
     }
 
     @Test
@@ -165,12 +218,21 @@ class UrnetworkBalanceRepositoryTest {
         store = store,
     )
 
-    private open class FakeBridge(var snapshot: SubscriptionBalanceSnapshot?) : UrnetworkSdkBridge {
+    private open class FakeBridge(
+        var snapshot: SubscriptionBalanceSnapshot?,
+        var reliability: Double? = null,
+        var referrals: Long? = null,
+    ) : UrnetworkSdkBridge {
         var callCount = 0
         var throwOnNext: Throwable? = null
 
-        override suspend fun start(walletAddress: String, apiUrl: String, connectUrl: String, byClientJwt: String) =
-            UrnetworkSdkBridge.StartResult.Success
+        override suspend fun start(
+            walletAddress: String,
+            apiUrl: String,
+            connectUrl: String,
+            byClientJwt: String,
+        ) = UrnetworkSdkBridge.StartResult.Success
+
         override suspend fun stop() = Unit
         override fun isRunning() = false
         override suspend fun attachTun(tunFd: Int) = UrnetworkSdkBridge.AttachResult.Success
@@ -190,5 +252,9 @@ class UrnetworkBalanceRepositoryTest {
             err?.let { throw it }
             return snapshot
         }
+
+        override suspend fun fetchNetworkReliability(): Double? = reliability
+
+        override suspend fun fetchReferralCount(): Long? = referrals
     }
 }
