@@ -55,7 +55,7 @@ In Ozero's case, the decision was to revert to OkHttp 4.12.0 (stable and compati
 
 - [[concepts/gradle-force-vs-catalog]] - The recovery from this issue required careful dependency management
 - [[concepts/ci-workflow-discipline]] - CI failure mechanisms and the importance of checking full error output
-- [[concepts/dependency-bumps-require-ci-verification]] - General pattern from memory that bumps need verification
+- [[concepts/dependabot-dev-workflow-mismatch]] - Dependency bumps require CI verification before merge
 
 ## Sources
 

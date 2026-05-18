@@ -1,5 +1,13 @@
 # Build Log
 
+## [2026-05-19T09:00:00+03:00] compile | Daily Log 2026-05-18 (pass 5 — gap fill)
+- Source: daily/2026-05-18.md
+- Articles created: [[concepts/urnetwork-location-hierarchy-migration]] (setPreferredCountry→setPreferredLocation migration, findBestMatch city-by-countryCode guard, UrnetworkLocationSelection data class consolidation)
+- Articles updated: (none)
+- Index updated: 1 new row, total 138
+- Sessions covered (incremental): 13:08 (6 selectedCountry/Region/City → data class), 15:02 (Bridge API migration, findBestMatch helper), 16:59 (code review finding: city-by-name without countryCode), 19:55 (fix commit ff7f5044)
+- Note: All other sessions already covered by passes 1-4. This pass closes the last content gap: location hierarchy migration was referenced in multiple sessions but had no standalone article.
+
 ## [2026-05-19T05:00:00+03:00] compile | Daily Log 2026-05-18 (incremental pass 4 — walletAuth)
 - Source: daily/2026-05-18.md
 - Articles created: [[concepts/urnetwork-walletauth-per-device-registration]] (per-device Ed25519 auto-registration, AES-GCM keypair storage, server protocol, migration flow, 40 tests)
