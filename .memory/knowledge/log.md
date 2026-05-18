@@ -1,5 +1,13 @@
 # Build Log
 
+## [2026-05-18T23:30:00+03:00] compile | Daily Log 2026-05-18 (pass 7 — late sessions)
+- Source: daily/2026-05-18.md
+- Articles created: (none)
+- Articles updated: [[concepts/urnetwork-fixed-ip-enhanced-anonymization]] (relocate from MainScreen to EngineSettings: dual-VM ownership eliminated, peer count → IpInfoCard, 11 tests removed + 4 added, sentinel inverted, commit 87ff2d47)
+- Index updated: 1 row summary updated, total 138
+- Sessions covered (incremental): 21:25 (memory push discipline — feedback memory only), ~22:00 (URnetwork toggles relocate: MainScreen→EngineSettings, single source of truth, +205/−430), 22:36 (CI watcher)
+- Note: Sessions 21:25 and ~22:00 were after pass 6 verification cutoff
+
 ## [2026-05-19T10:00:00+03:00] compile | Daily Log 2026-05-18 (pass 6 — verification)
 - Source: daily/2026-05-18.md
 - Articles created: (none)
