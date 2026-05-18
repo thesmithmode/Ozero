@@ -232,10 +232,10 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
             isUrnetworkActive.collectLatest { active ->
                 if (active) {
                     var attempt = 0
-                    while (attempt < REFRESH_RETRY_ATTEMPTS && _uiState.value !is UrnetworkSettingsUiState.Ready) {
+                    while (attempt < REFRESH_RETRY_ATTEMPTS && !isReadyWithLocations()) {
                         if (!isUrnetworkActive.value) break
                         refreshOnce()
-                        if (_uiState.value is UrnetworkSettingsUiState.Ready) break
+                        if (isReadyWithLocations()) break
                         attempt++
                         if (attempt < REFRESH_RETRY_ATTEMPTS) delay(REFRESH_RETRY_DELAY_MS)
                     }
@@ -261,7 +261,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     }
 
     fun refresh() {
-        if (!bridge.isDeviceAvailable()) {
+        if (!bridge.isDeviceAvailable() && !bridge.isRunning()) {
             _uiState.value = UrnetworkSettingsUiState.NotConnected
             return
         }
@@ -269,7 +269,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     }
 
     private suspend fun refreshOnce() {
-        if (!bridge.isDeviceAvailable()) {
+        if (!bridge.isDeviceAvailable() && !bridge.isRunning()) {
             _uiState.value = UrnetworkSettingsUiState.NotConnected
             return
         }
@@ -284,9 +284,9 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         if (vc == null) {
             PersistentLoggers.warn(
                 TAG,
-                "refresh: openLocationsViewController вернул null — bridge не подключён или SDK не готов → NotConnected",
+                "refresh: openLocationsViewController вернул null — bridge не подключён или SDK не готов",
             )
-            _uiState.value = UrnetworkSettingsUiState.NotConnected
+            handleNullVcFallback()
             return
         }
         teardownLocationsVc()
@@ -442,6 +442,30 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
             )
         }
     }
+
+    private fun isReadyWithLocations(): Boolean {
+        val s = _uiState.value
+        return s is UrnetworkSettingsUiState.Ready && s.countries.isNotEmpty()
+    }
+
+    private fun handleNullVcFallback() {
+        if (!bridge.isDeviceAvailable() && !bridge.isRunning()) {
+            _uiState.value = UrnetworkSettingsUiState.NotConnected
+            return
+        }
+        _uiState.update { current ->
+            if (current is UrnetworkSettingsUiState.Ready) current else buildEmptyReady()
+        }
+    }
+
+    private fun buildEmptyReady(): UrnetworkSettingsUiState.Ready =
+        UrnetworkSettingsUiState.Ready(
+            countries = emptyList(),
+            regions = emptyList(),
+            cities = emptyList(),
+            selectedLocation = bridge.selectedLocation(),
+            providePaused = if (isUrnetworkActive.value) bridge.isProvidePaused() else false,
+        )
 
     private fun teardownLocationsVc() {
         locationsVc?.also {

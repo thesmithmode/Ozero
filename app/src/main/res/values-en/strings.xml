@@ -490,4 +490,6 @@
     <string name="strategy_time_min_ago_fmt">%1$d min ago</string>
     <string name="strategy_time_hour_ago_fmt">%1$d h ago</string>
     <string name="strategy_time_day_ago_fmt">%1$d d ago</string>
+    <string name="urnetwork_insufficient_balance_title">Insufficient points</string>
+    <string name="urnetwork_insufficient_balance_body">URnetwork balance is exhausted — VPN was disconnected automatically. Top up your account or share traffic to continue.</string>
 </resources>
