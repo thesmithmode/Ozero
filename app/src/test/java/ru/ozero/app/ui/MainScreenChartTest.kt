@@ -78,16 +78,21 @@ class MainScreenChartTest {
     }
 
     @Test
-    fun `displayHistory паддится нулями до полного окна таймфрейма`() {
-        val paddingBlock = screenSource.substringAfter("var selectedTf by remember")
+    fun `displayHistory вызывает bucketizeTimeAligned без position-based padding`() {
+        val block = screenSource.substringAfter("var selectedTf by remember")
             .substringBefore("Card(")
         assertTrue(
-            paddingBlock.contains("List(n - slice.size)") || paddingBlock.contains("List(n -"),
-            "displayHistory обязан паддить нулями слева до полного окна selectedTf.points",
+            block.contains("bucketizeTimeAligned"),
+            "displayHistory обязан вызывать bucketizeTimeAligned — time-anchored buckets " +
+                "избавляют от деформации формы при сдвиге окна",
         )
         assertTrue(
-            paddingBlock.contains("bucketize"),
-            "displayHistory обязан вызывать bucketize для агрегации в фиксированное число buckets",
+            !block.contains("List(n - slice.size)"),
+            "position-based padding нулями запрещён — bucketizeTimeAligned сам заполняет пустые buckets",
+        )
+        assertTrue(
+            !block.contains(".takeLast("),
+            "takeLast по индексу запрещён — bucketizeTimeAligned фильтрует по timestamp",
         )
     }
 
@@ -140,56 +145,109 @@ class MainScreenChartTest {
     }
 
     @Test
-    fun `bucketize пустой список возвращает пустой список`() {
-        assertEquals(emptyList(), bucketize(emptyList(), 10))
+    fun `bucketizeTimeAligned — пустой список возвращает N пустых buckets`() {
+        val result = bucketizeTimeAligned(emptyList(), windowMs = 10_000L, bucketCount = 10)
+        assertEquals(10, result.size)
+        for (i in 0..9) assertEquals(0f to 0f, result[i])
     }
 
     @Test
-    fun `bucketize buckets ноль возвращает пустой список`() {
-        val data = listOf(1f to 2f, 3f to 4f)
-        assertEquals(emptyList(), bucketize(data, 0))
+    fun `bucketizeTimeAligned — bucketCount=0 возвращает пустой список`() {
+        val s = listOf(SpeedSample(1_000L, 1f, 1f))
+        assertEquals(emptyList(), bucketizeTimeAligned(s, windowMs = 10_000L, bucketCount = 0))
     }
 
     @Test
-    fun `bucketize buckets больше или равно размеру возвращает оригинал`() {
-        val data = List(5) { i -> i.toFloat() to i.toFloat() }
-        assertEquals(data, bucketize(data, 10))
-        assertEquals(data, bucketize(data, 5))
+    fun `bucketizeTimeAligned — bucketMs ноль (window меньше bucketCount) возвращает пустой список`() {
+        val s = listOf(SpeedSample(1_000L, 1f, 1f))
+        assertEquals(emptyList(), bucketizeTimeAligned(s, windowMs = 5L, bucketCount = 10))
     }
 
     @Test
-    fun `bucketize 60 элементов в 30 buckets — каждый bucket усредняет 2 элемента`() {
-        val data = List(60) { i -> i.toFloat() to (i * 2f) }
-        val result = bucketize(data, 30)
+    fun `bucketizeTimeAligned — все samples в одном bucket дают среднее`() {
+        val bucketMs = 10_000L
+        val grid = (1_700_000_000_000L / bucketMs) * bucketMs
+        val samples = (0..9).map { i -> SpeedSample(grid + i * 1_000L, i.toFloat(), 0f) }
+        val result = bucketizeTimeAligned(samples, windowMs = 10_000L, bucketCount = 1)
+        assertEquals(1, result.size)
+        val expected = (0..9).sumOf { it.toDouble() }.toFloat() / 10
+        assertEquals(expected, result[0].first)
+    }
+
+    @Test
+    fun `bucketizeTimeAligned — 300 секундных samples в 30 buckets по 10s — корректные средние`() {
+        val bucketMs = 10_000L
+        val grid = (1_700_000_000_000L / bucketMs) * bucketMs
+        val samples = (0..299).map { i -> SpeedSample(grid + i * 1_000L, i.toFloat(), 0f) }
+        val result = bucketizeTimeAligned(samples, windowMs = 300_000L, bucketCount = 30)
         assertEquals(30, result.size)
-        assertEquals((0f + 1f) / 2f, result[0].first)
-        assertEquals((0f + 2f) / 2f, result[0].second)
-        assertEquals((58f + 59f) / 2f, result[29].first)
+        val firstBucketAvg = (0..9).sumOf { it.toDouble() }.toFloat() / 10
+        assertEquals(firstBucketAvg, result[0].first, "bucket[0] = avg первых 10 секунд")
+        val lastBucketAvg = (290..299).sumOf { it.toDouble() }.toFloat() / 10
+        assertEquals(lastBucketAvg, result[29].first, "bucket[29] = avg последних 10 секунд")
     }
 
     @Test
-    fun `bucketize 1800 элементов в 30 buckets — каждый bucket усредняет 60 секунд`() {
-        val data = List(1800) { i -> i.toFloat() to 0f }
-        val result = bucketize(data, 30)
-        assertEquals(30, result.size, "30 buckets как в TF M30")
-        val firstBucketExpected = (0 until 60).sumOf { it.toDouble() }.toFloat() / 60
-        assertEquals(firstBucketExpected, result[0].first, "первый bucket = avg 60 секунд")
-    }
-
-    @Test
-    fun `bucketize всегда возвращает ровно buckets элементов когда данных больше`() {
-        val data = List(100) { i -> i.toFloat() to 0f }
-        for (b in listOf(1, 2, 5, 10, 30, 60)) {
-            assertEquals(b, bucketize(data, b).size, "buckets=$b — должно быть ровно $b элементов")
+    fun `bucketizeTimeAligned — sentinel — история неизменна при sample внутри текущего bucket`() {
+        val bucketMs = 10_000L
+        val grid = (1_700_000_000_000L / bucketMs) * bucketMs
+        val samples0 = (0..299).map { i -> SpeedSample(grid + i * 1_000L, i.toFloat(), 0f) }
+        val tf0 = bucketizeTimeAligned(samples0, windowMs = 300_000L, bucketCount = 30)
+        val sampleInsideLastBucket = SpeedSample(grid + 299_500L, 999f, 0f)
+        val tf1 = bucketizeTimeAligned(samples0 + sampleInsideLastBucket, windowMs = 300_000L, bucketCount = 30)
+        for (i in 0..28) {
+            assertEquals(
+                tf0[i],
+                tf1[i],
+                "bucket $i деформировался — buckets обязаны быть anchored к wall clock, " +
+                    "новый sample внутри текущего bucket не должен менять историю",
+            )
         }
     }
 
     @Test
-    fun `bucketize устойчив к маленьким buckets — buckets=1 средний всего диапазона`() {
-        val data = List(10) { it.toFloat() to it.toFloat() }
-        val result = bucketize(data, 1)
-        assertEquals(1, result.size)
-        val expected = (0..9).sumOf { it.toDouble() }.toFloat() / 10
-        assertEquals(expected, result[0].first)
+    fun `bucketizeTimeAligned — sentinel — grid сдвигается на 1 bucket при пересечении границы`() {
+        val bucketMs = 10_000L
+        val grid = (1_700_000_000_000L / bucketMs) * bucketMs
+        val samplesA = (0..299).map { i -> SpeedSample(grid + i * 1_000L, i.toFloat(), 0f) }
+        val tfA = bucketizeTimeAligned(samplesA, windowMs = 300_000L, bucketCount = 30)
+        val newBucketSample = SpeedSample(grid + 300_000L, 999f, 0f)
+        val tfB = bucketizeTimeAligned(samplesA + newBucketSample, windowMs = 300_000L, bucketCount = 30)
+        for (i in 0..28) {
+            assertEquals(
+                tfA[i + 1],
+                tfB[i],
+                "bucket B[$i] обязан равняться A[${i + 1}] — окно сдвинулось ровно на 1 bucket",
+            )
+        }
+    }
+
+    @Test
+    fun `bucketizeTimeAligned — sentinel — M1 (60 buckets, 1s each) сдвигается каждую секунду`() {
+        val bucketMs = 1_000L
+        val grid = (1_700_000_000_000L / bucketMs) * bucketMs
+        val samplesA = (0..59).map { i -> SpeedSample(grid + i * 1_000L, i.toFloat(), 0f) }
+        val tfA = bucketizeTimeAligned(samplesA, windowMs = 60_000L, bucketCount = 60)
+        val newSample = SpeedSample(grid + 60_000L, 999f, 0f)
+        val tfB = bucketizeTimeAligned(samplesA + newSample, windowMs = 60_000L, bucketCount = 60)
+        for (i in 0..58) {
+            assertEquals(tfA[i + 1], tfB[i], "M1 bucket[$i] обязан сдвигаться каждую секунду")
+        }
+        assertEquals(999f, tfB[59].first, "rightmost bucket — новый sample")
+    }
+
+    @Test
+    fun `bucketizeTimeAligned — старые samples вне окна игнорируются`() {
+        val bucketMs = 10_000L
+        val grid = (1_700_000_000_000L / bucketMs) * bucketMs
+        val samples = listOf(
+            SpeedSample(grid - 500_000L, 100f, 0f),
+            SpeedSample(grid + 0L, 1f, 0f),
+            SpeedSample(grid + 290_000L, 2f, 0f),
+        )
+        val result = bucketizeTimeAligned(samples, windowMs = 300_000L, bucketCount = 30)
+        assertEquals(30, result.size)
+        assertEquals(1f, result[0].first)
+        assertEquals(2f, result[29].first)
     }
 }

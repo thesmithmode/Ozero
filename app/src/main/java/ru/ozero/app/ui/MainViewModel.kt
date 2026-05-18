@@ -134,8 +134,8 @@ class MainViewModel @Inject constructor(
                 initialValue = null,
             )
 
-    private val _speedHistory = MutableStateFlow<List<Pair<Float, Float>>>(emptyList())
-    val speedHistory: StateFlow<List<Pair<Float, Float>>> = _speedHistory.asStateFlow()
+    private val _speedHistory = MutableStateFlow<List<SpeedSample>>(emptyList())
+    val speedHistory: StateFlow<List<SpeedSample>> = _speedHistory.asStateFlow()
 
     private val _ipInfo = MutableStateFlow<IpInfoState>(IpInfoState.Idle)
 
@@ -228,7 +228,7 @@ class MainViewModel @Inject constructor(
                     if (now - lastRecordMs >= SPEED_SAMPLE_INTERVAL_MS) {
                         lastRecordMs = now
                         val prev = _speedHistory.value
-                        _speedHistory.value = (prev + Pair(s.bpsIn.toFloat(), s.bpsOut.toFloat()))
+                        _speedHistory.value = (prev + SpeedSample(now, s.bpsIn.toFloat(), s.bpsOut.toFloat()))
                             .takeLast(MAX_SPEED_HISTORY_POINTS)
                     }
                 } else {

@@ -262,7 +262,7 @@ data class ExpertMainState(
     val tunnelState: TunnelState,
     val switching: SwitchingTransition?,
     val stats: TunnelStats?,
-    val speedHistory: List<Pair<Float, Float>>,
+    val speedHistory: List<SpeedSample>,
     val stagnant: Boolean,
     val healthStatus: HealthMonitor.Status,
     val powerState: PowerDiscState,
@@ -388,7 +388,7 @@ private fun ExpertStatusBadges(
     urnetworkPeerSearchSeconds: Int,
     ipInfo: IpInfoState,
     stats: TunnelStats?,
-    speedHistory: List<Pair<Float, Float>>,
+    speedHistory: List<SpeedSample>,
     stagnant: Boolean,
     healthStatus: HealthMonitor.Status,
     onRefreshIpInfo: () -> Unit,
@@ -624,7 +624,7 @@ private fun IpInfoCard(
 @Composable
 private fun TrafficStatsCard(
     stats: TunnelStats?,
-    speedHistory: List<Pair<Float, Float>> = emptyList(),
+    speedHistory: List<SpeedSample> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
     val sessionStartMs = stats?.sessionStartMs ?: 0L
@@ -645,10 +645,11 @@ private fun TrafficStatsCard(
 
     var selectedTf by remember { mutableStateOf(TimeframeOption.M1) }
     val displayHistory = remember(speedHistory, selectedTf) {
-        val n = selectedTf.points
-        val slice = speedHistory.takeLast(n)
-        val padded = if (slice.size < n) List(n - slice.size) { 0f to 0f } + slice else slice
-        bucketize(padded, selectedTf.buckets)
+        bucketizeTimeAligned(
+            samples = speedHistory,
+            windowMs = selectedTf.points * 1_000L,
+            bucketCount = selectedTf.buckets,
+        )
     }
 
     Card(
@@ -891,16 +892,3 @@ private enum class TimeframeOption(val labelRes: Int, val points: Int, val bucke
     H1(R.string.chart_tf_1h, 3_600, 60),
 }
 
-internal fun bucketize(history: List<Pair<Float, Float>>, buckets: Int): List<Pair<Float, Float>> {
-    if (buckets <= 0 || history.isEmpty()) return emptyList()
-    if (history.size <= buckets) return history
-    val bucketSize = history.size.toDouble() / buckets
-    return List(buckets) { i ->
-        val from = (i * bucketSize).toInt()
-        val to = ((i + 1) * bucketSize).toInt().coerceAtLeast(from + 1).coerceAtMost(history.size)
-        val sub = history.subList(from, to)
-        val avgRx = sub.sumOf { it.first.toDouble() }.toFloat() / sub.size
-        val avgTx = sub.sumOf { it.second.toDouble() }.toFloat() / sub.size
-        avgRx to avgTx
-    }
-}
