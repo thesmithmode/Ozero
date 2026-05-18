@@ -261,7 +261,15 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { settingsRepository.setUrnetworkCountryCode(targetCountry) }
         }
-        runCatching { bridge.setPreferredCountry(targetCountry) }
+        runCatching {
+            bridge.setPreferredLocation(
+                ru.ozero.engineurnetwork.UrnetworkLocationSelection(
+                    countryCode = targetCountry,
+                    region = location?.region,
+                    city = location?.city,
+                ).normalized(),
+            )
+        }
         _uiState.update { current ->
             if (current is UrnetworkSettingsUiState.Ready) current.copy(selectedLocation = location) else current
         }

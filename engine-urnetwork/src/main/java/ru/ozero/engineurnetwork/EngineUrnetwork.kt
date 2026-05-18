@@ -97,8 +97,14 @@ class EngineUrnetwork(
         )
         return when (bridgeResult) {
             UrnetworkSdkBridge.StartResult.Success -> {
-                runCatching { sdkBridge.setPreferredCountry(config.region) }
-                    .onFailure { PersistentLoggers.warn(TAG, "setPreferredCountry threw: ${it.message}") }
+                val stored = runCatching { configStore.selectedLocation().first() }.getOrNull()
+                val merged = UrnetworkLocationSelection(
+                    countryCode = stored?.countryCode ?: config.region,
+                    region = stored?.region,
+                    city = stored?.city,
+                )
+                runCatching { sdkBridge.setPreferredLocation(merged.normalized()) }
+                    .onFailure { PersistentLoggers.warn(TAG, "setPreferredLocation threw: ${it.message}") }
                 val windowType = configStore.windowType().first()
                 val fixedIp = configStore.fixedIpSize().first()
                 runCatching { sdkBridge.applyPerformanceProfile(windowType, fixedIp) }
@@ -114,7 +120,7 @@ class EngineUrnetwork(
                     .onFailure { PersistentLoggers.warn(TAG, "setProvideNetworkMode threw: ${it.message}") }
                 Log.i(
                     TAG,
-                    "started OK preferredCountry=${config.region ?: "<auto>"} " +
+                    "started OK preferred=${merged.summary()} " +
                         "windowType=${windowType.rawValue} fixedIp=$fixedIp",
                 )
                 startStatsPolling()

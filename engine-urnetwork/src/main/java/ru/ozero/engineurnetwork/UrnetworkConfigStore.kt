@@ -31,6 +31,20 @@ data class UrnetworkLocationSelection(
     val region: String?,
     val city: String?,
 ) {
+    fun normalized(): UrnetworkLocationSelection? {
+        val cc = countryCode?.trim()?.uppercase()?.takeIf { it.length == 2 && it.all { ch -> ch.isLetter() } }
+        val r = region?.trim()?.takeIf { it.isNotEmpty() }
+        val c = city?.trim()?.takeIf { it.isNotEmpty() }
+        if (cc == null && r == null && c == null) return null
+        return UrnetworkLocationSelection(cc, r, c)
+    }
+
+    fun summary(): String = buildString {
+        append(countryCode ?: "??")
+        if (!region.isNullOrBlank()) append('/').append(region)
+        if (!city.isNullOrBlank()) append('/').append(city)
+    }
+
     companion object {
         val EMPTY = UrnetworkLocationSelection(null, null, null)
     }

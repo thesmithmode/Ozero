@@ -364,6 +364,57 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
+    fun `setPreferredLocation сохраняет UrnetworkLocationSelection через normalized`() {
+        assertTrue(
+            source.contains("override fun setPreferredLocation(selection: UrnetworkLocationSelection?)"),
+            "Bridge обязан принимать UrnetworkLocationSelection (country+region+city), не код страны — " +
+                "иначе region/city не передаются в SDK.",
+        )
+        val body = source.substringAfter("override fun setPreferredLocation(selection: UrnetworkLocationSelection?)")
+            .substringBefore("override fun openLocationsViewController")
+        assertTrue(
+            body.contains("preferredLocationRef.set"),
+            "setPreferredLocation обязан сохранять selection в preferredLocationRef для использования " +
+                "в connectByPreferredLocation после attachTun.",
+        )
+        assertTrue(
+            body.contains("normalized()"),
+            "setPreferredLocation обязан вызывать selection.normalized() — иначе пустые/невалидные " +
+                "country codes попадут в connect matching и сорвут поиск.",
+        )
+    }
+
+    @Test
+    fun `connectByPreferredLocation иерархический matcher city — region — country`() {
+        assertTrue(
+            source.contains("private fun connectByPreferredLocation("),
+            "Bridge обязан иметь connectByPreferredLocation с UrnetworkLocationSelection — " +
+                "country-only matcher ломает region/city user choice.",
+        )
+        val findBlock = source.substringAfter("private fun findBestMatch(")
+            .substringBefore("private inline fun findIn(")
+        val cityIdx = findBlock.indexOf("filtered.cities")
+        val regionIdx = findBlock.indexOf("filtered.regions")
+        val countryIdx = findBlock.indexOf("filtered.countries")
+        assertTrue(
+            cityIdx in 0 until regionIdx && regionIdx in 0 until countryIdx,
+            "findBestMatch обязан искать в порядке city → region → country — иначе menu пользователя " +
+                "не отражает реально подключённую локацию. cityIdx=$cityIdx regionIdx=$regionIdx countryIdx=$countryIdx",
+        )
+    }
+
+    @Test
+    fun `findIn matchиет countryCode case-insensitive через uppercase`() {
+        val findInBlock = source.substringAfter("private inline fun findIn(")
+            .substringBefore("private companion object")
+        assertTrue(
+            findInBlock.contains(".uppercase()"),
+            "findIn обязан сравнивать countryCode через uppercase — SDK может вернуть lowercase/mixed, " +
+                "иначе match всегда fail для US/us/Us.",
+        )
+    }
+
+    @Test
     fun `cleanupOnFailure закрывает device без throw`() {
         val cleanupBlock = source.substringAfter("private fun cleanupOnFailure")
             .substringBefore("private companion object")

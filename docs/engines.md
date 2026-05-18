@@ -54,7 +54,7 @@ TUN-режим: не создаёт SOCKS-интерфейс, TUN fd перед�
 | Source | urnetwork/sdk (MPL-2.0) |
 | Capabilities | TCP=true UDP=true localOnly=false requiresServer=true supportsUpstreamSocks=false |
 
-Аутентификация: guest JWT → client JWT (persisted в `UrnetworkConfigStore`). Регион выбирается через `setPreferredCountry`. Performance profile — через `applyPerformanceProfile(windowType, fixedIp)`.
+Аутентификация: guest JWT → client JWT (persisted в `UrnetworkConfigStore`). Локация выбирается через `setPreferredLocation(UrnetworkLocationSelection)` с приоритетом city > region > country. Performance profile — через `applyPerformanceProfile(windowType, fixedIp)`.
 
 TUN fd передаётся через `attachTun`. SDK excludeSelf из своего TUN — self-трафик обходит туннель (нет routing loop). IP определяется через `selectedLocationInfo()` (country+countryCode из SDK без внешнего запроса).
 

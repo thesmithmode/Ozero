@@ -278,6 +278,45 @@ class EngineUrnetworkContractTest {
     }
 
     @Test
+    fun `start с пустым selectedLocation fallback на config_region в setPreferredLocation`() = runTest {
+        val bridge = FakeUrnetworkSdkBridge()
+        val (e, _, _) = engine(byJwt = "j", byClientJwt = "cj", bridge = bridge)
+        e.start(EngineConfig.Urnetwork(jwtToken = "", region = "us"), Upstream.None)
+        val pref = bridge.lastPreferredLocation
+        assertNotNull(pref, "setPreferredLocation должен быть вызван с не-null selection — config.region передан")
+        assertEquals("US", pref.countryCode)
+        assertNull(pref.region)
+        assertNull(pref.city)
+    }
+
+    @Test
+    fun `start с заполненным selectedLocation игнорирует config_region — store wins`() = runTest {
+        val bridge = FakeUrnetworkSdkBridge()
+        val store = FakeUrnetworkConfigStore(override = null, byJwt = "j", byClientJwt = "cj")
+        store.selectedLocationFlow.value = UrnetworkLocationSelection(
+            countryCode = "DE",
+            region = "Bavaria",
+            city = "Munich",
+        )
+        val engine = EngineUrnetwork(store, bridge, FakeAuthService())
+        engine.start(EngineConfig.Urnetwork(jwtToken = "", region = "us"), Upstream.None)
+        val pref = bridge.lastPreferredLocation
+        assertNotNull(pref)
+        assertEquals("DE", pref.countryCode)
+        assertEquals("Bavaria", pref.region)
+        assertEquals("Munich", pref.city)
+    }
+
+    @Test
+    fun `start с пустым selectedLocation И пустым config_region передаёт null в setPreferredLocation`() = runTest {
+        val bridge = FakeUrnetworkSdkBridge()
+        val (e, _, _) = engine(byJwt = "j", byClientJwt = "cj", bridge = bridge)
+        e.start(EngineConfig.Urnetwork(jwtToken = "", region = null), Upstream.None)
+        assertEquals(1, bridge.preferredLocationCalls)
+        assertNull(bridge.lastPreferredLocation, "Пустая selection → normalized() → null → auto-best")
+    }
+
+    @Test
     fun `start с provideEnabled=true вызывает setProvidePaused(false) на bridge`() = runTest {
         val bridge = FakeUrnetworkSdkBridge()
         val (e, _, _) = engine(byJwt = "j", byClientJwt = "cj", provideEnabled = true, bridge = bridge)
@@ -332,6 +371,11 @@ class EngineUrnetworkContractTest {
         override fun provideEnabled(): Flow<Boolean> = provideEnabledFlow
         override suspend fun setProvideEnabled(value: Boolean) {
             provideEnabledFlow.value = value
+        }
+        val selectedLocationFlow = MutableStateFlow(UrnetworkLocationSelection.EMPTY)
+        override fun selectedLocation(): Flow<UrnetworkLocationSelection> = selectedLocationFlow
+        override suspend fun setSelectedLocation(value: UrnetworkLocationSelection) {
+            selectedLocationFlow.value = value
         }
     }
 
@@ -418,6 +462,12 @@ class EngineUrnetworkContractTest {
         override fun applyPerformanceProfile(windowType: UrnetworkWindowType, fixedIpSize: Boolean) {
             lastAppliedWindowType = windowType
             lastAppliedFixedIp = fixedIpSize
+        }
+        var lastPreferredLocation: UrnetworkLocationSelection? = null
+        var preferredLocationCalls: Int = 0
+        override fun setPreferredLocation(selection: UrnetworkLocationSelection?) {
+            preferredLocationCalls++
+            lastPreferredLocation = selection
         }
     }
 }

@@ -37,14 +37,18 @@ class UrnetworkCountryPersistenceTest {
     }
 
     @Test
-    fun `selectLocation также пингует bridge setPreferredCountry`() {
+    fun `selectLocation также пингует bridge setPreferredLocation`() {
         val body = viewModelSource
             .substringAfter("fun selectLocation(location: UrnetworkSdkBridge.LocationToken?)")
             .substringBefore("fun setSearchQuery")
         assertTrue(
-            body.contains("bridge.setPreferredCountry("),
-            "selectLocation обязан установить preferredCountry в bridge — для restore при " +
-                "следующем VPN start.",
+            body.contains("bridge.setPreferredLocation("),
+            "selectLocation обязан установить preferredLocation в bridge — для restore при " +
+                "следующем VPN start с учётом country/region/city.",
+        )
+        assertTrue(
+            body.contains("UrnetworkLocationSelection("),
+            "selectLocation обязан строить UrnetworkLocationSelection из выбранного location.",
         )
     }
 }

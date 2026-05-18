@@ -3,7 +3,9 @@ package ru.ozero.engineurnetwork
 import android.app.Application
 import android.util.Log
 import com.bringyour.sdk.ConnectLocation
+import com.bringyour.sdk.ConnectLocationList
 import com.bringyour.sdk.ConnectViewController
+import com.bringyour.sdk.FilteredLocations
 import com.bringyour.sdk.DeviceLocal
 import com.bringyour.sdk.IoLoop
 import com.bringyour.sdk.IoLoopDoneCallback
@@ -57,7 +59,7 @@ class RealUrnetworkSdkBridge(
     private val subscriptionBalanceRef =
         AtomicReference<UrnetworkSdkBridge.SubscriptionBalanceSnapshot?>(null)
     private val running = AtomicBoolean(false)
-    private val preferredCountryRef = AtomicReference<String?>(null)
+    private val preferredLocationRef = AtomicReference<UrnetworkLocationSelection?>(null)
     private val bridgeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lifecycleMutex = Mutex()
     private val startJobRef = AtomicReference<Job?>(null)
@@ -266,10 +268,10 @@ class RealUrnetworkSdkBridge(
         return UrnetworkSdkBridge.LocationInfo(country = country, countryCode = code, name = name)
     }
 
-    override fun setPreferredCountry(code: String?) {
-        val cleaned = code?.trim()?.uppercase()?.takeIf { it.length == 2 && it.all { it.isLetter() } }
-        preferredCountryRef.set(cleaned)
-        Log.i(TAG, "preferredCountry set to ${cleaned ?: "<auto>"}")
+    override fun setPreferredLocation(selection: UrnetworkLocationSelection?) {
+        val cleaned = selection?.normalized()
+        preferredLocationRef.set(cleaned)
+        Log.i(TAG, "preferredLocation set to ${cleaned?.summary() ?: "<auto>"}")
     }
 
     override fun openLocationsViewController(): LocationsViewController? {
@@ -506,10 +508,10 @@ class RealUrnetworkSdkBridge(
                     .onFailure { PersistentLoggers.warn(TAG, "setTunnelStarted(true) threw: ${it.message}") }
                 val cv = connectVcRef.get()
                 if (cv != null) {
-                    val preferredCountry = preferredCountryRef.get()
-                    if (preferredCountry != null) {
-                        Log.i(TAG, "IoLoop fd=$tunFd tunnelStarted preferredCountry=$preferredCountry")
-                        connectByPreferredCountry(preferredCountry, cv)
+                    val preferred = preferredLocationRef.get()
+                    if (preferred != null) {
+                        Log.i(TAG, "IoLoop fd=$tunFd tunnelStarted preferredLocation=${preferred.summary()}")
+                        connectByPreferredLocation(preferred, cv)
                     } else {
                         runCatching { cv.connectBestAvailable() }
                             .onFailure { PersistentLoggers.warn(TAG, "connectBestAvailable threw: ${it.message}") }
@@ -526,7 +528,7 @@ class RealUrnetworkSdkBridge(
         }
     }
 
-    private fun connectByPreferredCountry(countryCode: String, cv: ConnectViewController) {
+    private fun connectByPreferredLocation(selection: UrnetworkLocationSelection, cv: ConnectViewController) {
         val device = deviceRef.get() ?: run {
             runCatching { cv.connectBestAvailable() }
             return
@@ -546,35 +548,19 @@ class RealUrnetworkSdkBridge(
                 runCatching { locVc.close() }
                 PersistentLoggers.warn(
                     TAG,
-                    "preferred country $countryCode timeout (${PREFERRED_COUNTRY_TIMEOUT_MS}ms) → fallback connectBestAvailable",
+                    "preferred ${selection.summary()} timeout (${PREFERRED_COUNTRY_TIMEOUT_MS}ms) → fallback connectBestAvailable",
                 )
             }
         }
         runCatching {
             locVc.addFilteredLocationsListener { filtered, _ ->
-                val list = filtered?.countries ?: return@addFilteredLocationsListener
-                if (list.len() == 0L) return@addFilteredLocationsListener
-                var match: ConnectLocation? = null
-                for (i in 0 until list.len()) {
-                    val loc = list.get(i) ?: continue
-                    if (loc.countryCode?.uppercase() == countryCode) {
-                        match = loc
-                        break
-                    }
-                }
+                if (filtered == null) return@addFilteredLocationsListener
+                val match = findBestMatch(filtered, selection) ?: return@addFilteredLocationsListener
                 if (attached.compareAndSet(false, true)) {
                     timeoutJob.cancel()
-                    if (match != null) {
-                        runCatching { cv.connect(match) }
-                            .onFailure { PersistentLoggers.warn(TAG, "connect(match) threw: ${it.message}") }
-                        Log.i(TAG, "preferred country $countryCode matched → connected")
-                    } else {
-                        runCatching { cv.connectBestAvailable() }
-                        PersistentLoggers.warn(
-                            TAG,
-                            "preferred country $countryCode not in locations → fallback connectBestAvailable",
-                        )
-                    }
+                    runCatching { cv.connect(match) }
+                        .onFailure { PersistentLoggers.warn(TAG, "connect(match) threw: ${it.message}") }
+                    Log.i(TAG, "preferred ${selection.summary()} matched → connected")
                     runCatching { locVc.stop() }
                     runCatching { locVc.close() }
                 }
@@ -661,6 +647,46 @@ class RealUrnetworkSdkBridge(
 
     private fun cleanupOnFailure() {
         deviceRef.getAndSet(null)?.also { runCatching { it.close() } }
+    }
+
+    private fun findBestMatch(
+        filtered: FilteredLocations,
+        selection: UrnetworkLocationSelection,
+    ): ConnectLocation? {
+        val cc = selection.countryCode?.uppercase()
+        if (!selection.city.isNullOrBlank()) {
+            findIn(filtered.cities, cc) { loc ->
+                runCatching { loc.name }.getOrNull()?.equals(selection.city, ignoreCase = true) == true
+            }?.let { return it }
+        }
+        if (!selection.region.isNullOrBlank()) {
+            findIn(filtered.regions, cc) { loc ->
+                runCatching { loc.name }.getOrNull()?.equals(selection.region, ignoreCase = true) == true
+            }?.let { return it }
+        }
+        if (cc != null) {
+            findIn(filtered.countries, cc) { true }?.let { return it }
+        }
+        return null
+    }
+
+    private inline fun findIn(
+        list: ConnectLocationList?,
+        countryCode: String?,
+        predicate: (ConnectLocation) -> Boolean,
+    ): ConnectLocation? {
+        if (list == null) return null
+        val n = list.len()
+        for (i in 0 until n) {
+            val loc = list.get(i) ?: continue
+            if (countryCode != null &&
+                runCatching { loc.countryCode }.getOrNull()?.uppercase() != countryCode
+            ) {
+                continue
+            }
+            if (predicate(loc)) return loc
+        }
+        return null
     }
 
     private companion object {
