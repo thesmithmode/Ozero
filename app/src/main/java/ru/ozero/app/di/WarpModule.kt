@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.app.warp.WarpEngineService
+import ru.ozero.commonvpn.TunnelController
+import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
@@ -98,10 +100,14 @@ object WarpModule {
     @Singleton
     fun provideWarpSdkBridge(
         @ApplicationContext context: Context,
+        tunnelController: TunnelController,
     ): WarpSdkBridge = RealWarpSdkBridge(
         RemoteAwgRuntime(
-            context,
-            ComponentName(context, WarpEngineService::class.java),
+            context = context,
+            serviceComponent = ComponentName(context, WarpEngineService::class.java),
+            onProcessDied = {
+                tunnelController.onEngineDied(EngineId.WARP, "remote-binder-died")
+            },
         ),
     )
 

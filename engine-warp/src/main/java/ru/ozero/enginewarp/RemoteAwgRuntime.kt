@@ -14,12 +14,17 @@ import java.util.concurrent.TimeUnit
 class RemoteAwgRuntime(
     private val context: Context,
     private val serviceComponent: ComponentName,
+    private val onProcessDied: () -> Unit = {},
 ) : AwgRuntime {
 
     @Volatile
     private var engine: IWarpEngineProcess? = null
 
     @Volatile private var serviceConnection: ServiceConnection? = null
+
+    @Volatile private var deathRecipient: IBinder.DeathRecipient? = null
+
+    @Volatile private var engineBinder: IBinder? = null
     private val bindLock = Any()
 
     private fun ensureConnected(): IWarpEngineProcess {
@@ -30,10 +35,32 @@ class RemoteAwgRuntime(
                 runCatching { context.unbindService(stale) }
                 serviceConnection = null
             }
+            unlinkDeathRecipient()
             val latch = CountDownLatch(1)
             val conn = object : ServiceConnection {
                 override fun onServiceConnected(name: ComponentName, binder: IBinder) {
                     engine = IWarpEngineProcess.Stub.asInterface(binder)
+                    engineBinder = binder
+                    val recipient = IBinder.DeathRecipient {
+                        engine = null
+                        engineBinder = null
+                        val ref = serviceConnection
+                        serviceConnection = null
+                        if (ref != null) runCatching { context.unbindService(ref) }
+                        PersistentLoggers.warn(
+                            TAG,
+                            "WarpEngineService binder died — Go runtime crash в :engine_warp",
+                        )
+                        runCatching { onProcessDied() }
+                    }
+                    deathRecipient = recipient
+                    runCatching { binder.linkToDeath(recipient, 0) }
+                        .onFailure {
+                            PersistentLoggers.warn(
+                                TAG,
+                                "linkToDeath failed: ${it.javaClass.simpleName}: ${it.message}",
+                            )
+                        }
                     latch.countDown()
                     Log.i(TAG, "WarpEngineService connected process=$name")
                 }
@@ -43,10 +70,13 @@ class RemoteAwgRuntime(
                 }
                 override fun onBindingDied(name: ComponentName?) {
                     engine = null
+                    engineBinder = null
+                    unlinkDeathRecipient()
                     val ref = serviceConnection
                     serviceConnection = null
                     if (ref != null) runCatching { context.unbindService(ref) }
                     PersistentLoggers.warn(TAG, "WarpEngineService binding died process=$name — connection unbound")
+                    runCatching { onProcessDied() }
                 }
             }
             val intent = Intent().setComponent(serviceComponent)
@@ -69,8 +99,19 @@ class RemoteAwgRuntime(
         }
     }
 
+    private fun unlinkDeathRecipient() {
+        val binder = engineBinder
+        val recipient = deathRecipient
+        if (binder != null && recipient != null) {
+            runCatching { binder.unlinkToDeath(recipient, 0) }
+        }
+        engineBinder = null
+        deathRecipient = null
+    }
+
     fun close() {
         synchronized(bindLock) {
+            unlinkDeathRecipient()
             engine = null
             serviceConnection?.let { conn ->
                 runCatching { context.unbindService(conn) }

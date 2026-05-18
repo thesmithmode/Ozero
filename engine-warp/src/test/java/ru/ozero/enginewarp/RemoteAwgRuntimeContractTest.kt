@@ -93,4 +93,60 @@ class RemoteAwgRuntimeContractTest {
                 "после close ведёт к double-bind ошибке от системы.",
         )
     }
+
+    @Test
+    fun `onProcessDied callback присутствует в конструкторе`() {
+        assertTrue(
+            source.contains("private val onProcessDied: () -> Unit"),
+            "RemoteAwgRuntime обязан принимать onProcessDied callback — иначе main process не узнаёт " +
+                "о крашe Go runtime в :engine_warp до next AIDL timeout (P31 audit).",
+        )
+    }
+
+    @Test
+    fun `binder linkToDeath вызывается в onServiceConnected`() {
+        val onConnected = source.substringAfter("override fun onServiceConnected")
+            .substringBefore("override fun onServiceDisconnected")
+        assertTrue(
+            onConnected.contains("binder.linkToDeath"),
+            "onServiceConnected обязан вешать DeathRecipient через binder.linkToDeath — " +
+                "иначе SIGSEGV/SIGABRT в Go runtime внутри :engine_warp не обнаруживается до next AIDL call.",
+        )
+        assertTrue(
+            onConnected.contains("DeathRecipient"),
+            "onServiceConnected обязан создавать IBinder.DeathRecipient inline.",
+        )
+    }
+
+    @Test
+    fun `DeathRecipient вызывает onProcessDied и unbind`() {
+        val onConnected = source.substringAfter("override fun onServiceConnected")
+            .substringBefore("override fun onServiceDisconnected")
+        val recipientBody = onConnected.substringAfter("DeathRecipient {").substringBefore("}\n")
+        assertTrue(
+            recipientBody.contains("onProcessDied()"),
+            "DeathRecipient обязан вызвать onProcessDied() — иначе TunnelController не уведомляется " +
+                "о death и killswitch не engaged. Body=$recipientBody",
+        )
+        assertTrue(
+            recipientBody.contains("context.unbindService"),
+            "DeathRecipient обязан unbindService — иначе orphan ServiceConnection leak " +
+                "в ServiceManager. Body=$recipientBody",
+        )
+        assertTrue(
+            recipientBody.contains("engine = null"),
+            "DeathRecipient обязан обнулить engine — иначе stale IWarpEngineProcess вызывает " +
+                "DeadObjectException на next AIDL call. Body=$recipientBody",
+        )
+    }
+
+    @Test
+    fun `close unlink DeathRecipient`() {
+        val closeBlock = source.substringAfter("fun close()").substringBefore("private companion object")
+        assertTrue(
+            closeBlock.contains("unlinkDeathRecipient") || closeBlock.contains("unlinkToDeath"),
+            "close() обязан отвязывать DeathRecipient — иначе при explicit teardown остаётся " +
+                "ссылка на recipient, мешая GC binder reference.",
+        )
+    }
 }
