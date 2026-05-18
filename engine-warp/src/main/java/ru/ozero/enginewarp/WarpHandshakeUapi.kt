@@ -14,7 +14,7 @@ internal object WarpHandshakeUapi {
                 socket.connect(
                     LocalSocketAddress(sockFile.absolutePath, LocalSocketAddress.Namespace.FILESYSTEM),
                 )
-                socket.soTimeout = 500
+                socket.soTimeout = 50
                 socket.outputStream.write("get=1\n\n".toByteArray(Charsets.UTF_8))
                 socket.outputStream.flush()
                 socket.inputStream.bufferedReader(Charsets.UTF_8)

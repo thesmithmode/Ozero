@@ -64,9 +64,15 @@ class EngineWarp(
         require(upstream is Upstream.None) {
             "EngineWarp не принимает upstream — supportsUpstreamSocks=false"
         }
-        val resolved = resolveActive() ?: return StartResult.Failure(
-            reason = "WARP config resolve failed (auto-register не сработал)",
-        )
+        val cached = resolvedConfig
+        val cachedIni = resolvedIni
+        val resolved = if (cached != null && cachedIni != null) {
+            ResolvedWarp(cached, cachedIni, "cached")
+        } else {
+            resolveActive() ?: return StartResult.Failure(
+                reason = "WARP config resolve failed (auto-register не сработал)",
+            )
+        }
         resolvedConfig = resolved.config
         resolvedIni = resolved.ini
         Log.i(TAG, "resolved config: ${resolved.config} (iniSource=${resolved.iniSource})")
@@ -296,6 +302,6 @@ class EngineWarp(
         const val DOH_CONNECT_TIMEOUT_MS = 3_000
         const val DOH_READ_TIMEOUT_MS = 3_000
         const val WARP_READY_TIMEOUT_MS = 10_000L
-        const val WARP_READY_POLL_MS = 300L
+        const val WARP_READY_POLL_MS = 100L
     }
 }

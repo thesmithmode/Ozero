@@ -92,6 +92,19 @@ class EngineWarpContractTest {
     }
 
     @Test
+    fun `start после tunSpec не вызывает resolveActive повторно — register не более 1 раза`() = runTest {
+        val (e, auto, _) = engine(activeConfig = null)
+        e.tunSpec()
+        val registerAfterTunSpec = auto.registerCalls
+        e.start(EngineConfig.Warp, Upstream.None)
+        assertEquals(
+            registerAfterTunSpec,
+            auto.registerCalls,
+            "start() не должен повторно вызывать resolveActive если tunSpec уже установил config",
+        )
+    }
+
+    @Test
     fun `register failure → StartResult Failure`() = runTest {
         val (e, _, _) = engine(
             activeConfig = null,
