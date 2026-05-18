@@ -124,11 +124,41 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
-    fun `attachTun регистрирует IoLoopDoneCallback который сбрасывает running`() {
+    fun `attachTun регистрирует IoLoopDoneCallback который сбрасывает running через compareAndSet`() {
         val attachBlock = source.substringAfter("override suspend fun attachTun")
             .substringBefore("private fun cleanupOnFailure")
         assertTrue(attachBlock.contains("IoLoopDoneCallback"))
-        assertTrue(attachBlock.contains("running.set(false)"))
+        assertTrue(
+            attachBlock.contains("running.compareAndSet(true, false)"),
+            "IoLoopDoneCallback обязан использовать compareAndSet чтобы отличить graceful stop " +
+                "(running уже false) от crash (running всё ещё true). Без этого нельзя различить " +
+                "ожидаемое завершение и SDK runtime crash (P32 audit).",
+        )
+    }
+
+    @Test
+    fun `onIoLoopDied callback присутствует в конструкторе`() {
+        assertTrue(
+            source.contains("private val onIoLoopDied: (String) -> Unit"),
+            "RealUrnetworkSdkBridge обязан принимать onIoLoopDied callback — иначе TunnelController " +
+                "не узнаёт о crash SDK runtime до тех пор пока peer watchdog не сработает (30s leak window).",
+        )
+    }
+
+    @Test
+    fun `IoLoopDoneCallback вызывает onIoLoopDied только при wasRunning`() {
+        val attachBlock = source.substringAfter("override suspend fun attachTun")
+            .substringBefore("private fun cleanupOnFailure")
+        val callbackBody = attachBlock.substringAfter("IoLoopDoneCallback {").substringBefore("}\n")
+        assertTrue(
+            callbackBody.contains("if (wasRunning)"),
+            "IoLoopDoneCallback обязан вызывать onIoLoopDied ТОЛЬКО если compareAndSet вернул true — " +
+                "иначе graceful stop (running уже false) ложно триггерит killswitch. Body=$callbackBody",
+        )
+        assertTrue(
+            callbackBody.contains("onIoLoopDied("),
+            "Callback обязан вызвать onIoLoopDied при detected crash. Body=$callbackBody",
+        )
     }
 
     @Test

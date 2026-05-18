@@ -26,6 +26,7 @@ import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.auth.RealUrnetworkAuthService
 import ru.ozero.engineurnetwork.auth.UrnetworkAuthService
+import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
 import javax.inject.Qualifier
 import javax.inject.Singleton
@@ -59,9 +60,13 @@ object UrnetworkModule {
     @Singleton
     fun provideUrnetworkSdkBridge(
         @ApplicationContext context: Context,
+        tunnelController: TunnelController,
     ): UrnetworkSdkBridge = RealUrnetworkSdkBridge(
         app = context.applicationContext as Application,
         appVersion = ru.ozero.app.BuildConfig.VERSION_NAME,
+        onIoLoopDied = { reason ->
+            tunnelController.onEngineDied(EngineId.URNETWORK, reason)
+        },
     )
 
     @Provides

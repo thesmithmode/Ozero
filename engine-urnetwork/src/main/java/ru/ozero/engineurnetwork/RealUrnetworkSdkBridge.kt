@@ -46,6 +46,7 @@ class SdkLocationToken(val sdk: ConnectLocation) : UrnetworkSdkBridge.LocationTo
 class RealUrnetworkSdkBridge(
     private val app: Application,
     private val appVersion: String = DEFAULT_APP_VERSION,
+    private val onIoLoopDied: (String) -> Unit = {},
 ) : UrnetworkSdkBridge {
 
     private val deviceRef = AtomicReference<DeviceLocal?>(null)
@@ -489,8 +490,15 @@ class RealUrnetworkSdkBridge(
                 val capturedDevice = device
                 val callback = IoLoopDoneCallback {
                     PersistentLoggers.info(TAG, "IoLoop done — tunnel ended")
-                    running.set(false)
+                    val wasRunning = running.compareAndSet(true, false)
                     closeDevice(capturedDevice)
+                    if (wasRunning) {
+                        PersistentLoggers.error(
+                            TAG,
+                            "IoLoop ended unexpectedly — Go runtime crash в URnetwork SDK",
+                        )
+                        runCatching { onIoLoopDied("io-loop-ended") }
+                    }
                 }
                 val loop = Sdk.newIoLoop(capturedDevice, tunFd, callback)
                 ioLoopRef.set(loop)
