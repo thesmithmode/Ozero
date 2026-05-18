@@ -323,7 +323,7 @@ class RealUrnetworkSdkBridge(
         }
     }
 
-    private fun ensureDeviceOnMain(byClientJwt: String): Boolean {
+    private suspend fun ensureDeviceOnMain(byClientJwt: String): Boolean {
         val space = runCatching { UrnetworkRuntime.ensure(app) }.getOrNull() ?: run {
             PersistentLoggers.warn(TAG, "initDeviceForLocations: runtime ensure failed")
             return false
