@@ -191,6 +191,61 @@ class OzeroVpnServiceLockdownKillswitchTest {
     }
 
     @Test
+    fun `establishTun выполняется ДО startChain в run — applyLockdown активен раньше engine start (P35)`() {
+        val establishCustomIdx = runBody.indexOf("establishTunForEngine(activeEngineId")
+        val establishRegularIdx = runBody.indexOf("establishTun(\n")
+        val anyEstablishIdx = listOf(establishCustomIdx, establishRegularIdx)
+            .filter { it >= 0 }
+            .minOrNull() ?: -1
+        val startChainIdx = runBody.indexOf("startChain(activeEngineId")
+        assertTrue(
+            anyEstablishIdx >= 0,
+            "establishTun/establishTunForEngine не найден в run — anchor сломан. Body:\n$runBody",
+        )
+        assertTrue(
+            startChainIdx >= 0,
+            "startChain(activeEngineId не найден в run — anchor сломан. Body:\n$runBody",
+        )
+        assertTrue(
+            anyEstablishIdx < startChainIdx,
+            "establishTun (с applyLockdown внутри builder) обязан выполниться ДО startChain — " +
+                "иначе chainOrchestrator.start запускает engine native loops при отсутствии TUN " +
+                "с setUnderlyingNetworks(null) → трафик может выйти мимо туннеля в startup gap. " +
+                "establishIdx=$anyEstablishIdx startChainIdx=$startChainIdx",
+        )
+    }
+
+    @Test
+    fun `routeTrafficForEngine вызывается ПОСЛЕ startChain — корректный порядок lockdown→engine→route (P35)`() {
+        val startChainIdx = runBody.indexOf("startChain(activeEngineId")
+        val routeIdx = runBody.indexOf("routeTrafficForEngine(")
+        assertTrue(startChainIdx >= 0 && routeIdx >= 0, "anchors сломаны: $runBody")
+        assertTrue(
+            startChainIdx < routeIdx,
+            "startChain (engine.start) обязан быть ДО routeTrafficForEngine (attachTun/hev) — " +
+                "engine должен быть готов принять fd. startChainIdx=$startChainIdx routeIdx=$routeIdx",
+        )
+    }
+
+    @Test
+    fun `killswitch=on lockdownStartupTun.establish выполняется ДО pickAutoCandidate (P35)`() {
+        val lockdownEstablishIdx = runBody.indexOf("lockdownStartupFdRef.set")
+        val pickIdx = runBody.indexOf("pickAutoCandidateWithPreflight")
+        val manualIdx = runBody.indexOf("settings?.manualEngine")
+        val anyPickIdx = listOf(pickIdx, manualIdx).filter { it >= 0 }.minOrNull() ?: -1
+        assertTrue(
+            lockdownEstablishIdx >= 0 && anyPickIdx >= 0,
+            "anchors сломаны: lockdown=$lockdownEstablishIdx pick=$anyPickIdx",
+        )
+        assertTrue(
+            lockdownEstablishIdx < anyPickIdx,
+            "lockdownStartupFdRef.set (instant lockdown TUN) обязан случаться ДО выбора движка — " +
+                "иначе preflight probe (network call) при killswitch=on проходит без активного TUN " +
+                "и трафик утекает на этапе probe. lockdownIdx=$lockdownEstablishIdx pickIdx=$anyPickIdx",
+        )
+    }
+
+    @Test
     fun `lockdownStartupFdRef очищается в stopVpn`() {
         val body = shutdownSource
             .substringAfter("fun stopVpn(")
