@@ -100,6 +100,39 @@ class RouteTrafficForEngineContractTest {
     }
 
     @Test
+    fun `attachTun throws path ловится catch и эскалируется через handleEngineFailure (P34)`() {
+        val acceptorBranch = routeBody.substringAfter("TunFdAcceptor").substringBefore("startNativeTunnel")
+        val tryBlock = acceptorBranch.substringAfter("try {").substringBefore("} catch")
+        assertTrue(
+            tryBlock.contains("engine.attachTun"),
+            "Try-block обязан содержать engine.attachTun — без try-catch async throw " +
+                "выбрасывается в coroutine scope и теряется молча. Body:\n$tryBlock",
+        )
+        val catchBlock = acceptorBranch.substringAfter("} catch (t: Throwable) {").substringBefore("return when")
+        assertTrue(
+            catchBlock.contains("handleEngineFailure(engineId"),
+            "Throw-catch обязан звать handleEngineFailure(engineId, reason) — иначе " +
+                "WarpSdkBridge.attachTun crash (DeadObjectException, IllegalStateException, " +
+                "RuntimeException из AIDL) → VPN остаётся в Connected state и killswitch не engaged. " +
+                "Body:\n$catchBlock",
+        )
+        assertTrue(
+            catchBlock.contains("chainOrchestrator.stop()"),
+            "Throw-catch обязан остановить chain — иначе engine.start не откатывается. Body:\n$catchBlock",
+        )
+        assertTrue(
+            catchBlock.contains("ParcelFileDescriptor.adoptFd(rawDupFd)"),
+            "Throw-catch обязан close rawDupFd через adoptFd — иначе kernel fd leak " +
+                "на каждый failed attachTun. Body:\n$catchBlock",
+        )
+        assertTrue(
+            catchBlock.contains("attachTun threw"),
+            "Reason обязан содержать 'attachTun threw' маркер — diagnostic visibility " +
+                "в TunnelController.onEngineDied. Body:\n$catchBlock",
+        )
+    }
+
+    @Test
     fun `rawDupFd закрывается через adoptFd на failure paths attachTun`() {
         val acceptorBranch = routeBody.substringAfter("TunFdAcceptor").substringBefore("startNativeTunnel")
         val adoptCount = acceptorBranch.split("ParcelFileDescriptor.adoptFd(rawDupFd)").size - 1
