@@ -47,12 +47,16 @@ internal object WarpUapi {
         var peers = 0
         reader.lineSequence()
             .takeWhile { it.isNotEmpty() }
-            .forEach { line -> applyLine(line) { key, v -> when (key) {
-                "public_key" -> peers++
-                "rx_bytes" -> rx += v
-                "tx_bytes" -> tx += v
-                "last_handshake_time_sec" -> if (v > 0L) lastHsSec = v
-            } } }
+            .forEach { line ->
+                applyLine(line) { key, v ->
+                    when (key) {
+                        "public_key" -> peers++
+                        "rx_bytes" -> rx += v
+                        "tx_bytes" -> tx += v
+                        "last_handshake_time_sec" -> if (v > 0L) lastHsSec = v
+                    }
+                }
+            }
         val age = lastHsSec?.let { (nowSec - it).coerceAtLeast(0L) }
         return WarpUapiState(handshakeAgeSeconds = age, rxBytes = rx, txBytes = tx, peersSeen = peers)
     }
