@@ -65,6 +65,8 @@ data class UrnetworkLocationItem(
     val countryCode: String,
     val flag: String,
     val providerCount: Int,
+    val isStable: Boolean = true,
+    val isStrongPrivacy: Boolean = false,
 )
 
 sealed interface UrnetworkSettingsUiState {
@@ -395,6 +397,8 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
                         countryCode = code,
                         flag = countryCodeToFlag(code),
                         providerCount = loc.providerCount,
+                        isStable = runCatching { loc.stable }.getOrDefault(true),
+                        isStrongPrivacy = runCatching { loc.strongPrivacy }.getOrDefault(false),
                     ),
                 )
             }
