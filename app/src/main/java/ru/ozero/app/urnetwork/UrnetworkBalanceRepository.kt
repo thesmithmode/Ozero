@@ -1,6 +1,8 @@
 package ru.ozero.app.urnetwork
 
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,9 +21,11 @@ data class UrnetworkBalanceState(
     val snapshot: SubscriptionBalanceSnapshot?,
     val isLoading: Boolean,
     val lastError: String?,
+    val meanReliabilityWeight: Double = 0.0,
+    val totalReferrals: Long = 0L,
 ) {
     val availableBytes: Long
-        get() = snapshot?.let { (it.balanceBytes - it.pendingBytes - it.usedBytes).coerceAtLeast(0L) } ?: 0L
+        get() = snapshot?.balanceBytes?.coerceAtLeast(0L) ?: 0L
 
     companion object {
         val INITIAL = UrnetworkBalanceState(snapshot = null, isLoading = false, lastError = null)
@@ -40,21 +44,45 @@ class RealUrnetworkBalanceRepository(
 
     override suspend fun refresh() = refreshMutex.withLock {
         _state.value = _state.value.copy(isLoading = true)
-        val result = runCatching {
-            withTimeout(fetchTimeoutMs) { bridge.fetchSubscriptionBalance() }
+        coroutineScope {
+            val balanceDeferred = async {
+                runCatching { withTimeout(fetchTimeoutMs) { bridge.fetchSubscriptionBalance() } }
+            }
+            val reliabilityDeferred = async {
+                runCatching { withTimeout(fetchTimeoutMs) { bridge.fetchNetworkReliability() } }
+            }
+            val referralDeferred = async {
+                runCatching { withTimeout(fetchTimeoutMs) { bridge.fetchReferralCount() } }
+            }
+            val balanceResult = balanceDeferred.await()
+            val newReliability = reliabilityDeferred.await().getOrNull()
+                ?: _state.value.meanReliabilityWeight
+            val newReferrals = referralDeferred.await().getOrNull()
+                ?: _state.value.totalReferrals
+            _state.value = balanceResult.fold(
+                onSuccess = { snap ->
+                    _state.value.copy(
+                        snapshot = snap,
+                        isLoading = false,
+                        lastError = null,
+                        meanReliabilityWeight = newReliability,
+                        totalReferrals = newReferrals,
+                    )
+                },
+                onFailure = { err ->
+                    val msg = when (err) {
+                        is TimeoutCancellationException -> "balance fetch timeout (${fetchTimeoutMs}ms)"
+                        else -> err.message ?: err.javaClass.simpleName
+                    }
+                    _state.value.copy(
+                        isLoading = false,
+                        lastError = msg,
+                        meanReliabilityWeight = newReliability,
+                        totalReferrals = newReferrals,
+                    )
+                },
+            )
         }
-        _state.value = result.fold(
-            onSuccess = { snap ->
-                _state.value.copy(snapshot = snap, isLoading = false, lastError = null)
-            },
-            onFailure = { err ->
-                val msg = when (err) {
-                    is TimeoutCancellationException -> "balance fetch timeout (${fetchTimeoutMs}ms)"
-                    else -> err.message ?: err.javaClass.simpleName
-                }
-                _state.value.copy(isLoading = false, lastError = msg)
-            },
-        )
     }
 
     private companion object {

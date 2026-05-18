@@ -500,6 +500,66 @@ class RealUrnetworkSdkBridge(
         }
     }
 
+    override suspend fun fetchNetworkReliability(): Double? {
+        if (!running.get()) return null
+        val device = deviceRef.get() ?: return null
+        val api = runCatching { device.api }.getOrNull() ?: run {
+            PersistentLoggers.warn(TAG, "device.api is null — cannot fetch network reliability")
+            return null
+        }
+        return withTimeoutOrNull(SUBSCRIPTION_BALANCE_TIMEOUT_MS) {
+            suspendCancellableCoroutine { cont ->
+                val resumed = AtomicBoolean(false)
+                runCatching {
+                    api.getNetworkReliability { result, err ->
+                        if (!resumed.compareAndSet(false, true)) return@getNetworkReliability
+                        if (err != null || result == null) {
+                            PersistentLoggers.warn(TAG, "getNetworkReliability err=${err?.message}")
+                            cont.resume(null)
+                            return@getNetworkReliability
+                        }
+                        cont.resume(runCatching { result.reliabilityWindow?.meanReliabilityWeight }.getOrNull())
+                    }
+                }.onFailure { t ->
+                    if (resumed.compareAndSet(false, true)) {
+                        PersistentLoggers.warn(TAG, "getNetworkReliability threw: ${t.message}")
+                        cont.resume(null)
+                    }
+                }
+            }
+        }
+    }
+
+    override suspend fun fetchReferralCount(): Long? {
+        if (!running.get()) return null
+        val device = deviceRef.get() ?: return null
+        val api = runCatching { device.api }.getOrNull() ?: run {
+            PersistentLoggers.warn(TAG, "device.api is null — cannot fetch referral count")
+            return null
+        }
+        return withTimeoutOrNull(SUBSCRIPTION_BALANCE_TIMEOUT_MS) {
+            suspendCancellableCoroutine { cont ->
+                val resumed = AtomicBoolean(false)
+                runCatching {
+                    api.getNetworkReferralCode { result, err ->
+                        if (!resumed.compareAndSet(false, true)) return@getNetworkReferralCode
+                        if (err != null || result == null) {
+                            PersistentLoggers.warn(TAG, "getNetworkReferralCode err=${err?.message}")
+                            cont.resume(null)
+                            return@getNetworkReferralCode
+                        }
+                        cont.resume(runCatching { result.totalReferrals }.getOrNull())
+                    }
+                }.onFailure { t ->
+                    if (resumed.compareAndSet(false, true)) {
+                        PersistentLoggers.warn(TAG, "getNetworkReferralCode threw: ${t.message}")
+                        cont.resume(null)
+                    }
+                }
+            }
+        }
+    }
+
     override suspend fun attachTun(tunFd: Int): UrnetworkSdkBridge.AttachResult {
         if (tunFd < 0) {
             return UrnetworkSdkBridge.AttachResult.Failed("invalid fd=$tunFd")

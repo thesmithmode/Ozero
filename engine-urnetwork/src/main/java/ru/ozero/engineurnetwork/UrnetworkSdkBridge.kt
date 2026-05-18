@@ -49,6 +49,10 @@ interface UrnetworkSdkBridge {
 
     suspend fun fetchAccountPoints(): AccountPointsSnapshot? = null
 
+    suspend fun fetchNetworkReliability(): Double? = null
+
+    suspend fun fetchReferralCount(): Long? = null
+
     fun contractStatus(): StateFlow<ContractStatusSnapshot> = UNKNOWN_CONTRACT_STATUS_FLOW
 
     data class ContractStatusSnapshot(
