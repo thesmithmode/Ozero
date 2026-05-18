@@ -90,7 +90,9 @@ object UrnetworkRuntime {
                 )
             } else {
                 runCatching { mgr.setActiveNetworkSpace(null) }
-                    .onFailure { PersistentLoggers.warn(TAG, "release setActiveNetworkSpace(null) threw: ${it.message}") }
+                    .onFailure {
+                        PersistentLoggers.warn(TAG, "release setActiveNetworkSpace(null) threw: ${it.message}")
+                    }
             }
             space = null
             manager = null

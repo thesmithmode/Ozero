@@ -85,7 +85,7 @@ class UrnetworkRuntimeReleaseSentinelTest {
     }
 
     @Test
-    fun `bridge stop вызывает UrnetworkRuntime release — без этого симметричный конфликт с URnetwork-app сохраняется`() {
+    fun `bridge stop вызывает UrnetworkRuntime release — иначе симметричный конфликт`() {
         val stopBlock = bridgeSource.substringAfter("private suspend fun stopUnderLock()")
             .substringBefore("private fun closeDevice")
         assertTrue(
