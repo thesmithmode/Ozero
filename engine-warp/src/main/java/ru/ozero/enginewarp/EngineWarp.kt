@@ -1,14 +1,20 @@
 package ru.ozero.enginewarp
 
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.atomic.AtomicReference
 import ru.ozero.enginescore.EngineCapabilities
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
@@ -34,9 +40,18 @@ class EngineWarp(
     private val socketProtector: VpnSocketProtector = VpnSocketProtectorHolder,
     private val ipv6EnabledProvider: () -> Boolean = { false },
     private val handshakeChecker: (uapiPath: String, tunnelName: String) -> Boolean = WarpHandshakeUapi::check,
+    private val uapiStateReader: (uapiPath: String, tunnelName: String) -> WarpUapiState? = WarpUapi::readState,
     private val warpReadyTimeoutMs: Long = WARP_READY_TIMEOUT_MS,
     private val warpReadyPollMs: Long = WARP_READY_POLL_MS,
+    private val statsPollIntervalMs: Long = STATS_POLL_INTERVAL_MS,
+    private val handshakeStaleThresholdSec: Long = HANDSHAKE_STALE_THRESHOLD_SEC,
+    pluginScope: CoroutineScope? = null,
 ) : EnginePlugin, TunFdAcceptor {
+
+    private val ownedScope: CoroutineScope =
+        pluginScope ?: CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val statsJobRef = AtomicReference<Job?>(null)
+    private val connectedSinceRef = AtomicReference<Long>(0L)
 
     override val id = EngineId.WARP
 
@@ -81,9 +96,30 @@ class EngineWarp(
 
     override suspend fun stop() {
         Log.i(TAG, "stop — detaching tun")
+        statsJobRef.getAndSet(null)?.cancel()
+        connectedSinceRef.set(0L)
+        _stats.value = EngineStats()
         sdkBridge.detachTun()
         resolvedConfig = null
         resolvedIni = null
+    }
+
+    override suspend fun recover(): EnginePlugin.RecoverResult {
+        val uapiPath = uapiPathProvider()
+        val state = uapiStateReader(uapiPath, TUNNEL_NAME)
+            ?: return EnginePlugin.RecoverResult.Failed("UAPI недоступен — handshake state не читается")
+        val ageS = state.handshakeAgeSeconds
+        return if (ageS != null && ageS < handshakeStaleThresholdSec) {
+            PersistentLoggers.info(TAG, "recover: handshake age=${ageS}s — OK, без действий")
+            EnginePlugin.RecoverResult.Success
+        } else {
+            PersistentLoggers.warn(
+                TAG,
+                "recover: handshake stale (age=$ageS, threshold=${handshakeStaleThresholdSec}s) — " +
+                    "NotSupported → запросим reconnect",
+            )
+            EnginePlugin.RecoverResult.NotSupported
+        }
     }
 
     override suspend fun awaitReady(): EnginePlugin.ReadyResult {
@@ -163,13 +199,48 @@ class EngineWarp(
         val uapiPath = uapiPathProvider()
         Log.i(TAG, "attachTun fd=$tunFd uapi=$uapiPath/$TUNNEL_NAME.sock")
         return when (val r = sdkBridge.attachTun(TUNNEL_NAME, tunFd, ini, uapiPath, socketProtector)) {
-            WarpSdkBridge.AttachResult.Success -> TunAttachResult.Success
+            WarpSdkBridge.AttachResult.Success -> {
+                startStatsPoll(uapiPath)
+                TunAttachResult.Success
+            }
             is WarpSdkBridge.AttachResult.Failed -> {
                 val maskedIni = ini.replace(Regex("(?m)^(PrivateKey\\s*=\\s*)(.+)$"), "$1<masked>")
                 PersistentLoggers.error(TAG, "attachTun failed: ${r.reason}\nini:\n$maskedIni")
                 TunAttachResult.Failure(r.reason)
             }
         }
+    }
+
+    private fun startStatsPoll(uapiPath: String) {
+        statsJobRef.getAndSet(null)?.cancel()
+        val job = ownedScope.launch {
+            try {
+                while (isActive) {
+                    val state = uapiStateReader(uapiPath, TUNNEL_NAME)
+                    if (state != null) {
+                        val ageS = state.handshakeAgeSeconds
+                        val handshakeRecent = ageS != null && ageS < handshakeStaleThresholdSec
+                        if (handshakeRecent && connectedSinceRef.get() == 0L) {
+                            connectedSinceRef.set(System.currentTimeMillis())
+                        } else if (!handshakeRecent) {
+                            connectedSinceRef.set(0L)
+                        }
+                        _stats.value = EngineStats(
+                            bytesIn = state.rxBytes,
+                            bytesOut = state.txBytes,
+                            connectedSince = connectedSinceRef.get(),
+                            activeConnections = if (handshakeRecent) 1 else 0,
+                        )
+                    }
+                    delay(statsPollIntervalMs)
+                }
+            } catch (_: kotlinx.coroutines.CancellationException) {
+                throw kotlinx.coroutines.CancellationException("stats poll cancelled")
+            } catch (t: Throwable) {
+                PersistentLoggers.warn(TAG, "stats poll threw: ${t.message}")
+            }
+        }
+        statsJobRef.set(job)
     }
 
     private data class ResolvedWarp(val config: WarpConfig, val ini: String, val iniSource: String)
@@ -303,5 +374,7 @@ class EngineWarp(
         const val DOH_READ_TIMEOUT_MS = 3_000
         const val WARP_READY_TIMEOUT_MS = 10_000L
         const val WARP_READY_POLL_MS = 100L
+        const val STATS_POLL_INTERVAL_MS = 5_000L
+        const val HANDSHAKE_STALE_THRESHOLD_SEC = 180L
     }
 }
