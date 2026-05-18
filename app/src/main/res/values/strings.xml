@@ -273,6 +273,15 @@
     <string name="urnetwork_shared_traffic_provided">Предоставлено</string>
     <string name="urnetwork_shared_traffic_plan">Тариф</string>
     <string name="urnetwork_shared_traffic_balance">Остаток</string>
+    <string name="urnetwork_balance_title">Доступный трафик URnetwork</string>
+    <string name="urnetwork_balance_available">Доступно</string>
+    <string name="urnetwork_balance_used">Использовано</string>
+    <string name="urnetwork_balance_total">Всего по тарифу</string>
+    <string name="urnetwork_balance_pending">В обработке</string>
+    <string name="urnetwork_balance_plan_label">Тариф: %1$s</string>
+    <string name="urnetwork_balance_plan_unknown">Free</string>
+    <string name="urnetwork_balance_error">Не удалось получить баланс: %1$s</string>
+    <string name="urnetwork_balance_empty">Баланс недоступен. Подключитесь к URnetwork.</string>
     <string name="urnetwork_points_title">Очки</string>
     <string name="urnetwork_points_payout">Выплаты</string>
     <string name="urnetwork_points_referral">Рефералы</string>

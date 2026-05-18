@@ -269,6 +269,15 @@
     <string name="urnetwork_shared_traffic_provided">Provided</string>
     <string name="urnetwork_shared_traffic_plan">Plan</string>
     <string name="urnetwork_shared_traffic_balance">Balance</string>
+    <string name="urnetwork_balance_title">URnetwork remaining traffic</string>
+    <string name="urnetwork_balance_available">Available</string>
+    <string name="urnetwork_balance_used">Used</string>
+    <string name="urnetwork_balance_total">Plan total</string>
+    <string name="urnetwork_balance_pending">Pending</string>
+    <string name="urnetwork_balance_plan_label">Plan: %1$s</string>
+    <string name="urnetwork_balance_plan_unknown">Free</string>
+    <string name="urnetwork_balance_error">Failed to fetch balance: %1$s</string>
+    <string name="urnetwork_balance_empty">Balance unavailable. Connect to URnetwork.</string>
     <string name="urnetwork_points_title">Points</string>
     <string name="urnetwork_points_payout">Payouts</string>
     <string name="urnetwork_points_referral">Referrals</string>

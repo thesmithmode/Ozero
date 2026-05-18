@@ -16,6 +16,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import ru.ozero.app.relay.UrnetworkRelayCoordinator
+import ru.ozero.app.urnetwork.RealUrnetworkBalanceRepository
+import ru.ozero.app.urnetwork.UrnetworkBalanceRepository
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.engineurnetwork.DataStoreUrnetworkConfigStore
 import ru.ozero.engineurnetwork.EngineUrnetwork
@@ -84,4 +86,13 @@ object UrnetworkModule {
         configStore: UrnetworkConfigStore,
         tunnelController: TunnelController,
     ): UrnetworkRelayCoordinator = UrnetworkRelayCoordinator(bridge, configStore, tunnelController)
+
+    @Provides
+    @Singleton
+    fun provideUrnetworkBalanceRepository(
+        bridge: UrnetworkSdkBridge,
+    ): UrnetworkBalanceRepository = RealUrnetworkBalanceRepository(
+        bridge = bridge,
+        scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    )
 }
