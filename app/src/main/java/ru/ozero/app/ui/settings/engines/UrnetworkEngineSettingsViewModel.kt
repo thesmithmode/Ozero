@@ -242,7 +242,9 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
                         _uiState.update { current ->
                             if (current is UrnetworkSettingsUiState.Ready) {
                                 current.copy(providePaused = true)
-                            } else current
+                            } else {
+                                current
+                            }
                         }
                     } else {
                         teardownLocationsVc()
