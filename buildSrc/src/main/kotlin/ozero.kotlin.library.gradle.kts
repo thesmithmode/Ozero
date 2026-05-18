@@ -41,4 +41,13 @@ extensions.configure<org.jlleitschuh.gradle.ktlint.KtlintExtension> {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
+    setForkEvery(100)
+    timeout.set(java.time.Duration.ofMinutes(15))
+    systemProperty("junit.jupiter.execution.timeout.default", "120s")
+    systemProperty("junit.jupiter.execution.timeout.testable.method.default", "120s")
+    testLogging {
+        events("passed", "failed", "skipped")
+        showStandardStreams = false
+    }
 }
