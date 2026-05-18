@@ -37,6 +37,7 @@ import ru.ozero.engineurnetwork.windowType
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 
@@ -88,6 +89,36 @@ class UrnetworkEngineSettingsViewModelTest {
         )
         advanceUntilIdle()
         assertIs<UrnetworkSettingsUiState.NotConnected>(vm.uiState.value)
+    }
+
+    @Test
+    fun `initDeviceForLocations вызывается если byClientJwt задан в configStore`() = runTest {
+        val bridge = FakeUrnetworkBridge(deviceAvailable = false)
+        val store = fakeUrnetworkConfigStoreWithJwt()
+        UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, idleTunnel(), fakeBalanceRepo())
+        advanceUntilIdle()
+        assertTrue(bridge.initDeviceCallCount.get() > 0, "initDeviceForLocations должен вызываться при byClientJwt != null")
+    }
+
+    @Test
+    fun `uiState переходит в Ready без VPN если initDeviceForLocations успешен`() = runTest {
+        val bridge = FakeUrnetworkBridge(deviceAvailable = true)
+        val store = fakeUrnetworkConfigStoreWithJwt()
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, idleTunnel(), fakeBalanceRepo())
+        advanceUntilIdle()
+        assertIs<UrnetworkSettingsUiState.Ready>(vm.uiState.value)
+    }
+
+    @Test
+    fun `uiState остаётся Ready при остановке VPN если isDeviceAvailable true`() = runTest {
+        val bridge = FakeUrnetworkBridge(connected = true, deviceAvailable = true)
+        val store = fakeUrnetworkConfigStoreWithJwt()
+        val tc = activeTunnel()
+        val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, tc, fakeBalanceRepo())
+        advanceUntilIdle()
+        tc.onDisconnecting()
+        advanceUntilIdle()
+        assertIs<UrnetworkSettingsUiState.Ready>(vm.uiState.value)
     }
 
     @Test
@@ -628,13 +659,25 @@ private fun fakeUrnetworkConfigStore(): UrnetworkConfigStore =
         ru.ozero.engineurnetwork.UrnetworkConfig(walletOverride = "0xWALLET"),
     )
 
+private fun fakeUrnetworkConfigStoreWithJwt(jwt: String = "test-jwt"): UrnetworkConfigStore =
+    ru.ozero.engineurnetwork.InMemoryUrnetworkConfigStore(
+        ru.ozero.engineurnetwork.UrnetworkConfig(walletOverride = "0xWALLET", byClientJwt = jwt),
+    )
+
 private data class FakeLocationToken(override val countryCode: String?) : UrnetworkSdkBridge.LocationToken
 
 private class FakeUrnetworkBridge(
     private val connected: Boolean = false,
     private val initialLocation: UrnetworkSdkBridge.LocationToken? = null,
     private val peerCountValue: Int = 0,
+    private val deviceAvailable: Boolean = false,
 ) : UrnetworkSdkBridge {
+    val initDeviceCallCount = AtomicInteger(0)
+    override suspend fun initDeviceForLocations(byClientJwt: String, walletAddress: String): Boolean {
+        initDeviceCallCount.incrementAndGet()
+        return deviceAvailable
+    }
+    override fun isDeviceAvailable(): Boolean = deviceAvailable
     override suspend fun start(
         walletAddress: String,
         apiUrl: String,
