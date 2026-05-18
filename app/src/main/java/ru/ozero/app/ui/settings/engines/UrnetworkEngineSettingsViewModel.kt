@@ -91,6 +91,11 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     val provideNetworkMode: StateFlow<UrnetworkProvideNetworkMode> = configStore.provideNetworkMode()
         .stateIn(viewModelScope, SharingStarted.Eagerly, UrnetworkProvideNetworkMode.WIFI)
 
+    val insufficientBalance: StateFlow<Boolean> = bridge.contractStatus()
+        .map { it.insufficientBalance && !it.premium }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     fun selectProvideControlMode(value: UrnetworkProvideControlMode) {
         viewModelScope.launch {
             configStore.setProvideControlMode(value)

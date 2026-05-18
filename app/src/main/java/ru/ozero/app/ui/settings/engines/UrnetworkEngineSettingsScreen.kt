@@ -1,6 +1,7 @@
 package ru.ozero.app.ui.settings.engines
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -60,6 +61,7 @@ fun UrnetworkEngineSettingsScreen(
 ) {
     BackHandler(onBack = onBack)
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val insufficientBalance by viewModel.insufficientBalance.collectAsStateWithLifecycle()
     Scaffold(
         modifier = Modifier.testTag("urnetwork_settings"),
         topBar = {
@@ -96,6 +98,9 @@ fun UrnetworkEngineSettingsScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    if (insufficientBalance) {
+                        InsufficientBalanceBanner()
+                    }
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = OzeroPalette.Bg1),
@@ -148,6 +153,7 @@ fun UrnetworkEngineSettingsScreen(
                     provideControlMode = provideControlMode,
                     provideNetworkMode = provideNetworkMode,
                     sharedTrafficBytes = sharedTrafficBytes,
+                    insufficientBalance = insufficientBalance,
                     onSearchQueryChange = viewModel::setSearchQuery,
                     onSelect = viewModel::selectLocation,
                     onSetProvidePaused = viewModel::setProvidePaused,
@@ -179,6 +185,7 @@ private fun LocationListContent(
     provideControlMode: UrnetworkProvideControlMode,
     provideNetworkMode: UrnetworkProvideNetworkMode,
     sharedTrafficBytes: Long,
+    insufficientBalance: Boolean,
     onSearchQueryChange: (String) -> Unit,
     onSelect: (UrnetworkSdkBridge.LocationToken?) -> Unit,
     onSetProvidePaused: (Boolean) -> Unit,
@@ -193,6 +200,11 @@ private fun LocationListContent(
         modifier = modifier.fillMaxSize().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
+        if (insufficientBalance) {
+            item {
+                InsufficientBalanceBanner(modifier = Modifier.padding(top = 12.dp))
+            }
+        }
         item {
             Column(modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)) {
                 StatusRow(peerCount = peerCount, switchingCountry = switchingCountry)
@@ -605,6 +617,31 @@ private fun SharedTrafficSection(sharedTrafficBytes: Long, onClick: () -> Unit) 
             )
         }
         Text(text = "›", style = MaterialTheme.typography.bodyLarge, color = OzeroPalette.Text3)
+    }
+}
+
+@Composable
+private fun InsufficientBalanceBanner(modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("urnetwork_insufficient_balance_banner"),
+        colors = CardDefaults.cardColors(containerColor = OzeroPalette.Bg1),
+        border = BorderStroke(1.dp, OzeroPalette.StateDanger),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = stringResource(R.string.urnetwork_insufficient_balance_title),
+                style = MaterialTheme.typography.titleSmall,
+                color = OzeroPalette.StateDanger,
+            )
+            Text(
+                text = stringResource(R.string.urnetwork_insufficient_balance_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = OzeroPalette.Text2,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
     }
 }
 

@@ -310,56 +310,17 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
-    fun `setupPayoutWallet вызывается после walletVc start с walletAddress`() {
+    fun `payoutWalletSetup configure вызывается после walletVc start с walletAddress`() {
         val startBlock = source.substringAfter("private suspend fun runStartOnMain")
             .substringBefore("override suspend fun stop")
         assertTrue(
-            startBlock.contains("setupPayoutWallet("),
-            "runStartOnMain обязан вызвать setupPayoutWallet после walletVc.start()",
+            startBlock.contains("payoutWalletSetup.configure("),
+            "runStartOnMain обязан вызвать payoutWalletSetup.configure(...) после walletVc.start()",
         )
         assertTrue(
-            source.contains("private suspend fun setupPayoutWallet"),
-            "setupPayoutWallet должен быть private suspend fun",
-        )
-    }
-
-    @Test
-    fun `setupPayoutWallet вызывает addExternalWallet и updatePayoutWallet`() {
-        val block = source.substringAfter("private suspend fun setupPayoutWallet")
-            .substringBefore("private fun cleanupOnFailure")
-        assertTrue(block.contains("addExternalWallet("), "должен вызвать addExternalWallet")
-        assertTrue(block.contains("updatePayoutWallet("), "должен вызвать updatePayoutWallet")
-        assertTrue(
-            block.contains("walletAddress.isBlank()"),
-            "пустой walletAddress — ранний возврат, JNI не дёргать",
-        )
-    }
-
-    @Test
-    fun `setupPayoutWallet оборачивает SDK-вызовы в runCatching — не валит старт движка`() {
-        val block = source.substringAfter("private suspend fun setupPayoutWallet")
-            .substringBefore("private fun cleanupOnFailure")
-        assertTrue(
-            block.contains("runCatching"),
-            "setupPayoutWallet обязан runCatching — иначе SDK throw валит старт engine",
-        )
-    }
-
-    @Test
-    fun `setupPayoutWallet success логирует через Log_i не PersistentLoggers_warn`() {
-        val block = source.substringAfter("private suspend fun setupPayoutWallet")
-            .substringBefore("private fun cleanupOnFailure")
-        val successFragment = block.substringAfter("updatePayoutWallet(walletId)")
-            .substringBefore("} else {")
-        assertTrue(
-            successFragment.contains("Log.i") && successFragment.contains("payout wallet set"),
-            "Success-event 'payout wallet set' обязан логироваться через Log.i, не PersistentLoggers.warn — " +
-                "warn-level на success = ложный шум в boot.log + alerting noise. " +
-                "PersistentLoggers.warn остаётся только для аномалий (walletId not found, threw).",
-        )
-        assertTrue(
-            !successFragment.contains("PersistentLoggers.warn"),
-            "Success-event не должен использовать PersistentLoggers.warn — это ошибка severity для нормального пути.",
+            source.contains("private val payoutWalletSetup = UrnetworkPayoutWalletSetup()"),
+            "Bridge обязан держать UrnetworkPayoutWalletSetup helper — иначе single-source-of-truth " +
+                "для payout wallet setup ломается (детали в UrnetworkPayoutWalletSetup.kt).",
         )
     }
 
@@ -385,32 +346,54 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
-    fun `connectByPreferredLocation иерархический matcher city — region — country`() {
+    fun `preferredLocationConnector connect вызывается в attachTun под running guard`() {
+        val helperField =
+            "private val preferredLocationConnector = UrnetworkPreferredLocationConnector(bridgeScope)"
         assertTrue(
-            source.contains("private fun connectByPreferredLocation("),
-            "Bridge обязан иметь connectByPreferredLocation с UrnetworkLocationSelection — " +
-                "country-only matcher ломает region/city user choice.",
+            source.contains(helperField),
+            "Bridge обязан держать UrnetworkPreferredLocationConnector helper — иначе single-source-of-truth " +
+                "для preferred-location matcher ломается (детали в UrnetworkPreferredLocationConnector.kt).",
         )
-        val findBlock = source.substringAfter("private fun findBestMatch(")
-            .substringBefore("private inline fun findIn(")
-        val cityIdx = findBlock.indexOf("filtered.cities")
-        val regionIdx = findBlock.indexOf("filtered.regions")
-        val countryIdx = findBlock.indexOf("filtered.countries")
         assertTrue(
-            cityIdx in 0 until regionIdx && regionIdx in 0 until countryIdx,
-            "findBestMatch обязан искать в порядке city → region → country — иначе menu пользователя " +
-                "не отражает реально подключённую локацию. cityIdx=$cityIdx regionIdx=$regionIdx countryIdx=$countryIdx",
+            source.contains("preferredLocationConnector.connect("),
+            "Bridge обязан вызывать preferredLocationConnector.connect(...) для user-selected region/city " +
+                "после attachTun — иначе hierarchical matcher не активируется.",
         )
     }
 
     @Test
-    fun `findIn matchиет countryCode case-insensitive через uppercase`() {
-        val findInBlock = source.substringAfter("private inline fun findIn(")
-            .substringBefore("private companion object")
+    fun `contractStatusListener attach в start path и detach в stopUnderLock`() {
         assertTrue(
-            findInBlock.contains(".uppercase()"),
-            "findIn обязан сравнивать countryCode через uppercase — SDK может вернуть lowercase/mixed, " +
-                "иначе match всегда fail для US/us/Us.",
+            source.contains("private val contractStatusListener = UrnetworkContractStatusListener()"),
+            "Bridge обязан держать UrnetworkContractStatusListener — иначе contractStatus flow всегда UNKNOWN, " +
+                "UrnetworkContractStatusObserver не сможет ловить insufficient balance.",
+        )
+        val startBlock = source.substringAfter("private suspend fun runStartOnMain")
+            .substringBefore("override suspend fun stop")
+        assertTrue(
+            startBlock.contains("contractStatusListener.attach("),
+            "runStartOnMain обязан вызывать contractStatusListener.attach(device) после device init — " +
+                "иначе listener никогда не подпишется и insufficientBalance событие не дойдёт до Observer.",
+        )
+        val stopBlock = source.substringAfter("private suspend fun stopUnderLock")
+            .substringBefore("private fun cleanupOnFailure")
+        assertTrue(
+            stopBlock.contains("contractStatusListener.detach()"),
+            "stopUnderLock обязан вызывать contractStatusListener.detach() — иначе listener " +
+                "remains attached → memory leak + ghost callbacks после teardown.",
+        )
+    }
+
+    @Test
+    fun `contractStatus override возвращает contractStatusListener_status`() {
+        val regex = Regex(
+            "override fun contractStatus\\(\\)[^=]*=\\s*contractStatusListener\\.status",
+            RegexOption.DOT_MATCHES_ALL,
+        )
+        assertTrue(
+            regex.containsMatchIn(source),
+            "contractStatus() обязан возвращать contractStatusListener.status — отдельный StateFlow создаст " +
+                "разлив truth: UI читает один flow, listener эмитит в другой, signal теряется.",
         )
     }
 
