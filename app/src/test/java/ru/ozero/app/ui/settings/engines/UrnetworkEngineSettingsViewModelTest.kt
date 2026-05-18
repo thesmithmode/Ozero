@@ -97,7 +97,10 @@ class UrnetworkEngineSettingsViewModelTest {
         val store = fakeUrnetworkConfigStoreWithJwt()
         UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, idleTunnel(), fakeBalanceRepo())
         advanceUntilIdle()
-        assertTrue(bridge.initDeviceCallCount.get() > 0, "initDeviceForLocations должен вызываться при byClientJwt != null")
+        assertTrue(
+            bridge.initDeviceCallCount.get() > 0,
+            "initDeviceForLocations должен вызываться при byClientJwt != null",
+        )
     }
 
     @Test
