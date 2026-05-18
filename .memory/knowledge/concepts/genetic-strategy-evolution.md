@@ -6,8 +6,9 @@ sources:
   - "daily/2026-05-12.md"
   - "daily/2026-05-13.md"
   - "daily/2026-05-14.md"
+  - "daily/2026-05-17.md"
 created: 2026-05-12
-updated: 2026-05-14
+updated: 2026-05-17
 ---
 
 # Genetic Algorithm for ByeDPI Strategy Optimization
@@ -131,15 +132,27 @@ Migration from old fitness formula to new one leaves stale `0.0` scores in `Stra
 
 Raised from 3→5 to prevent degenerate configurations (e.g., just `--ip 0.0.0.0 --port 1080`) that technically parse but produce no DPI bypass effect.
 
+### Granular Probe Fitness Scoring v3 (2026-05-17)
+
+Binary fitness (0/1 success rate) caused GA stagnation at generation 3-5: all failing strategies scored 0, providing no selection pressure toward "almost working" strategies. The `stagnationCount * 0.5f` mutation rate boost was a workaround — the user called it "костыль" (crutch).
+
+Fix: `computeProbeScore(result: ProbeResult): Float` provides a gradient through connection stages: NetworkError→0.0, Timeout→0.1, HTTP 4xx→0.4, HTTP 5xx→0.3, partial body→0.8, full success→1.0. The GA now has a fitness landscape to climb rather than a binary cliff. The mutation rate boost was removed with a sentinel test forbidding its return. See [[concepts/granular-probe-fitness-scoring]] for full details.
+
+### Strategy Count Update: 75→78 (2026-05-17)
+
+`ByeDpiKnownSeeds` updated from 75 to 78 strategies following ByeByeDPI v1.7.5 upstream update. All three files synchronized: `byedpi_strategies.list`, `ByeDpiKnownSeeds.kt`, and `ByeDpiAutoStrategyTest EXPECTED_COUNT=78`.
+
 ## Related Concepts
 
 - [[concepts/byedpi-auto-strategy-testing]] - The fixed-list strategy testing that this genetic algorithm extends
 - [[concepts/byedpi-args-parsing]] - Strategy genes encode ByeDPI CLI args; same argv[0] and -K traps apply
 - [[concepts/gene-memory-concurrency-traps]] - Concurrency bugs found in GeneMemory and SavedStrategyStore during audit
 - [[concepts/byedpi-strategy-runtime-disconnect]] - Winning args static at start; auto-save mitigates but runtime hot-reload still absent
+- [[concepts/granular-probe-fitness-scoring]] - Fitness formula v3: gradient scoring replacing binary 0/1
 
 ## Sources
 
 - [[daily/2026-05-12.md]] - Session 14:05: Sprint 5 implementation (StrategyGene + GenePool + EvolutionEngine + GeneMemory); Session 15:08: code review found sequential evaluation requirement, dead settings, SNI→GenePool vocabulary; Session 18:34: audit found GeneMemory race condition, SavedStrategyStore atomicity, importRawJson validation order
 - [[daily/2026-05-13.md]] - Chromosome fitness cache, hyperbolic latency fitness formula (linear form dead code), ByeDpiKnownSeeds 75 upstream seeds with pinned priority, population size 25, stagnationThreshold coerceAtLeast(3) CI fix, persistent StrategyFitnessCache TTL 24h, SavedStrategy.lastVerifiedAtMs staleness 7-day threshold + StalenessLabel, auto-save best chromosome, targetFitness 0.85, per-network GeneMemory + StrategyFitnessCache via NetworkProfileDetector + EvolutionResourcesProvider
 - [[daily/2026-05-14.md]] - GA v2: popSize 30, maxGen 20, eliteCount 3, targetFitness 0.85, fitness=successRate^1.5*(1-clamp(lat)/3000), initial pop 40/30/30, cache poisoning 0.0 skip, min chromosome length 5, 5 sentinel tests
+- [[daily/2026-05-17.md]] - GA v3 fitness: binary→granular computeProbeScore (gradient through connection stages); stagnation boost removed + sentinel; strategies 75→78 (v1.7.5); feat/ga-byedpi-v2 squash→dev

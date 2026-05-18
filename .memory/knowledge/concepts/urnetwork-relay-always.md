@@ -4,8 +4,9 @@ aliases: [relay-always, urnetwork-relay-coordinator, urnetwork-provide]
 tags: [urnetwork, relay, architecture, coordinator-pattern]
 sources:
   - "daily/2026-05-14.md"
+  - "daily/2026-05-17.md"
 created: 2026-05-14
-updated: 2026-05-15
+updated: 2026-05-17
 ---
 
 # URnetwork Relay-Always Architecture
@@ -39,11 +40,31 @@ URnetwork SDK decouples TUN-routing (`tunnelStarted`) from relay contribution (`
 - One possible approach: embed single guest JWT so all devices share one "large node" → earnings to one wallet. Risk: ToS violation + account ban
 - Decision (2026-05-14): relay-always without developer monetization; users earn independently
 
+### Implementation Details (2026-05-17)
+
+`UrnetworkRelayCoordinator` was implemented in commit `194d7701` with the following design:
+
+- **`relayOwned: AtomicBoolean`** — tracks whether the coordinator started the bridge (vs engine owning it). Coordinator stops bridge only if `relayOwned.get() == true`, preventing double-stop with engine teardown.
+- **`bridge.start()` idempotent** — returns `Success` if already running instead of `Failed("already running")`. Required because coordinator calls `start()` without knowing if engine already started it.
+- **Ownership transfer**: when active engine changes to URnetwork, coordinator sets `relayOwned = false` (engine takes over); when changing away from URnetwork, coordinator starts bridge fresh (`relayOwned = true`).
+- **JWT gating**: coordinator observes `byClientJwt` flow; skips bridge start when JWT is null (no authentication = no relay).
+- SharedTrafficScreen simplified to single `unpaidBytes` field (commit d3c32b9f).
+
+See [[concepts/relay-coordinator-ownership-transfer]] for the full ownership transfer pattern.
+
+### Discovery: Relay Was Not Working (2026-05-17)
+
+Critical finding during session: relay only worked when URnetwork was the active engine. When user selected ByeDPI or WARP, URnetwork SDK never started → relay didn't run → no traffic shared → no payouts. The user directly challenged: "ты уверен что это работает?" — agent honestly answered "НЕТ." The `UrnetworkRelayCoordinator` was the P0 fix to make relay truly engine-independent.
+
+Additional constraint discovered: `EngineUrnetwork.start()` calls `sdkBridge.start()` without `isRunning()` check → `Failed("already running")` if bridge was already started by relay coordinator. Idempotent `start()` was the structural fix.
+
 ## Related Concepts
 
 - [[concepts/engine-telegram-mtproxy]] — TelegramProxyCoordinator is the pattern this mirrors
 - [[concepts/vpn-engine-pipeline]] — ManualEngineSource / StrategyEngine wiring that UrnetworkRelayCoordinator observes
+- [[concepts/relay-coordinator-ownership-transfer]] — Detailed ownership transfer pattern with AtomicBoolean guard
 
 ## Sources
 
 - [[daily/2026-05-14.md]] — Session 20:30: architectural discussion of relay-always, SDK `tunnelStarted` vs `providePaused` decoupling, monetization constraints; Session 21:29: `setupPayoutWallet` implementation + contract tests
+- [[daily/2026-05-17.md]] — Session 14:41+: relay NOT working for non-URnetwork engines discovered; P0 #111 UrnetworkRelayCoordinator implemented (commit 194d7701); relayOwned AtomicBoolean ownership; bridge.start() made idempotent; SharedTrafficScreen simplified

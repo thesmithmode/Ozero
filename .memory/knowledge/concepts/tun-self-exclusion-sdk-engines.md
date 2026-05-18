@@ -5,8 +5,9 @@ tags: [android, vpn, urnetwork, byedpi, gotcha, native]
 sources:
   - "daily/2026-05-09.md"
   - "daily/2026-05-10.md"
+  - "daily/2026-05-15.md"
 created: 2026-05-09
-updated: 2026-05-10
+updated: 2026-05-15
 ---
 
 # TUN Self-Exclusion Required for All VPN Engines
@@ -48,14 +49,22 @@ The `excludeSelf` parameter in `TunBuilderConfigurator.apply` is a footgun: it e
 
 The sentinel test enforces this invariant at the test level, but removing the parameter from the API is the structural fix that prevents the class of bug entirely.
 
+### Third Regression: Modular Boundary Violation (2026-05-15)
+
+Commit `5a8089dd` introduced `excludeSelf = (engineId != EngineId.WARP)` in `common-vpn` — attempting to give WARP's own traffic access to the TUN for IP detection parity with PORTAL_WG. This broke ALL engines: WARP without self-exclusion caused app traffic to enter TUN → AWG (in separate process) could not handle it → "connected" but internet dead. The commit was 26 minutes after `9cc8749a` which had the correct unconditional `excludeSelf = true`.
+
+Beyond the functional regression, this introduced a modular boundary violation: `common-vpn` now referenced `EngineId.WARP`, meaning a shared infrastructure module knew about a specific engine. The fix restored unconditional `excludeSelf = true` and added a sentinel test forbidding any `EngineId.WARP` reference in `common-vpn` source. Two prior sentinel tests that *protected* the broken conditional were deleted as [[concepts/sentinel-protecting-bug-trap]] instances. See [[concepts/modular-boundary-engine-specific-logic]] for the full modular boundary analysis.
+
 ## Related Concepts
 
 - [[concepts/urnetwork-sdk-integration]] - URnetwork is the engine that broke; Go SDK socket protection model requires self-exclusion
 - [[concepts/vpnservice-builder-traps]] - `addDisallowedApplication` is another Builder API with non-obvious routing side-effects
 - [[concepts/android-vpn-self-traffic-bypass]] - Related: self-exclusion is intentional here (engine needs it), but IP checker self-bypass is unintentional
 - [[concepts/dual-go-runtime-eager-loading]] - Go runtime lifecycle management; both articles address Go SDK integration challenges
+- [[concepts/modular-boundary-engine-specific-logic]] - The modular boundary violation discovered in the third excludeSelf regression
 
 ## Sources
 
 - [[daily/2026-05-09.md]] - Session 09:37: diff v0.0.6→v0.0.7 found `excludeSelf = false` (commit 65e5b13) as regression cause for URnetwork; fix = revert to `true`; sentinel test added; v0.0.7 tag recreated
 - [[daily/2026-05-10.md]] - Session 17:46 GROUP A fix: `buildTunBuilder()` not passing `excludeSelf=true` for SOCKS path (ByeDPI) → traffic loop via hev→ciadpi→VPN; same root cause, different mechanism; confirms all engine types require exclusion
+- [[daily/2026-05-15.md]] - Session 12:27: third regression — `excludeSelf=(engineId != WARP)` in common-vpn broke ALL engines; modular boundary violation; fix = unconditional true + sentinel forbidding EngineId.WARP in common-vpn

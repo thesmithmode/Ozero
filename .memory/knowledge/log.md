@@ -1,5 +1,23 @@
 # Build Log
 
+## [2026-05-19T01:30:00+03:00] compile | Daily Log 2026-05-17
+- Source: daily/2026-05-17.md
+- Articles created: [[concepts/sentinel-refactor-batch-audit]], [[concepts/stateflow-waitfor-zero-test-race]], [[concepts/granular-probe-fitness-scoring]], [[concepts/relay-coordinator-ownership-transfer]]
+- Articles updated: [[concepts/urnetwork-relay-always]] (implementation: relayOwned ownership, bridge idempotency, relay not working discovery), [[concepts/genetic-strategy-evolution]] (GA v3 granular scoring, strategies 75→78, stagnation boost removed)
+- Index updated: 4 new rows, 2 rows updated, total 128
+
+## [2026-05-18T22:15:00+03:00] compile | Daily Log 2026-05-16
+- Source: daily/2026-05-16.md
+- Articles created: [[concepts/yaml-biginteger-parsing-trap]], [[concepts/filechannel-lock-posix-per-process]], [[concepts/vpnservice-god-object-decomposition]], [[concepts/sentinel-anchor-substringafter-trap]], [[concepts/collect-vs-collectlatest-restart-semantics]], [[concepts/kotlin-lazy-cross-reference-type-inference]], [[connections/sentinel-trap-family]]
+- Articles updated: [[concepts/suppress-annotation-decomposition]] (ExpertMainContent badges extraction example)
+- Index updated: 7 new rows, 1 row updated, total 124
+
+## [2026-05-18T18:26:57+03:00] compile | Daily Log 2026-05-15
+- Source: daily/2026-05-15.md
+- Articles created: [[concepts/extract-native-libs-legacy-packaging]], [[concepts/byedpi-jni-guard-hardening]], [[concepts/modular-boundary-engine-specific-logic]], [[connections/self-review-insufficient-code-reviewer-required]]
+- Articles updated: [[concepts/tun-self-exclusion-sdk-engines]] (third regression: modular boundary violation from excludeSelf conditional), [[concepts/sentinel-protecting-bug-trap]] (new example: excludeSelf sentinels guarding broken behavior)
+- Index updated: 4 new rows, 2 rows updated, total 117
+
 ## [2026-05-15T03:00:00] compile | Daily Log 2026-05-14 (pass 7 — final)
 - Source: daily/2026-05-14.md
 - Articles updated: [[concepts/urnetwork-relay-always]] (Session 21:29: setupPayoutWallet auto-bind implementation + 3 contract tests, replaced PRESET_WALLET dead code note)
