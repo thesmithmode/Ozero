@@ -487,6 +487,79 @@ class UrnetworkEngineSettingsViewModelTest {
         assertEquals(0, vm.peerCount.value)
         assertEquals(0, bridge.peerCountCallCount.get())
     }
+
+    @Test
+    fun `setProvidePaused true когда engine активен — вызывает bridge и обновляет Ready providePaused`() = runTest {
+        val bridge = FakeUrnetworkBridge(connected = true)
+        val vm = UrnetworkEngineSettingsViewModel(
+            bridge,
+            FakeSettingsRepo(),
+            FakeUrnetworkConfigStore(),
+            activeTunnel(),
+        )
+        advanceUntilIdle()
+        vm.refresh()
+        advanceUntilIdle()
+        val before = vm.uiState.value
+        assertIs<UrnetworkSettingsUiState.Ready>(before)
+        assertEquals(false, before.providePaused, "до toggle providePaused=false по умолчанию")
+
+        vm.setProvidePaused(true)
+        advanceUntilIdle()
+
+        assertEquals(1, bridge.setProvidePausedCallCount.get(), "bridge.setProvidePaused обязан вызваться 1 раз")
+        assertEquals(true, bridge.lastPausedValue, "bridge получает paused=true")
+        val after = vm.uiState.value
+        assertIs<UrnetworkSettingsUiState.Ready>(after)
+        assertEquals(true, after.providePaused, "Ready.providePaused обязан обновиться на true")
+    }
+
+    @Test
+    fun `setProvidePaused false когда engine активен — снимает паузу и обновляет state`() = runTest {
+        val bridge = FakeUrnetworkBridge(connected = true)
+        val vm = UrnetworkEngineSettingsViewModel(
+            bridge,
+            FakeSettingsRepo(),
+            FakeUrnetworkConfigStore(),
+            activeTunnel(),
+        )
+        advanceUntilIdle()
+        vm.refresh()
+        advanceUntilIdle()
+        vm.setProvidePaused(true)
+        advanceUntilIdle()
+        vm.setProvidePaused(false)
+        advanceUntilIdle()
+
+        assertEquals(2, bridge.setProvidePausedCallCount.get(), "bridge вызван дважды — пауза+снятие")
+        assertEquals(false, bridge.lastPausedValue, "финальное значение bridge — false")
+        val after = vm.uiState.value
+        assertIs<UrnetworkSettingsUiState.Ready>(after)
+        assertEquals(false, after.providePaused, "Ready.providePaused вернулся в false")
+    }
+
+    @Test
+    fun `setProvidePaused когда engine не активен — НЕ дёргает bridge`() = runTest {
+        val bridge = FakeUrnetworkBridge(connected = false)
+        val vm = UrnetworkEngineSettingsViewModel(
+            bridge,
+            FakeSettingsRepo(),
+            FakeUrnetworkConfigStore(),
+            idleTunnel(),
+        )
+        advanceUntilIdle()
+
+        vm.setProvidePaused(true)
+        advanceUntilIdle()
+
+        assertEquals(
+            0,
+            bridge.setProvidePausedCallCount.get(),
+            "bridge.setProvidePaused не должен вызываться когда isUrnetworkActive=false — " +
+                "иначе SDK CGo crash на null context",
+        )
+        assertEquals(null, bridge.lastPausedValue, "lastPausedValue остаётся null")
+    }
 }
 
 private class FakeSettingsRepo : ru.ozero.enginescore.settings.SettingsRepository {
@@ -588,7 +661,12 @@ private class FakeUrnetworkBridge(
     override fun setProvideNetworkMode(mode: UrnetworkProvideNetworkMode) {
         lastProvideNetworkMode = mode
     }
-    override fun setProvidePaused(paused: Boolean) = Unit
+    var lastPausedValue: Boolean? = null
+    val setProvidePausedCallCount = AtomicInteger(0)
+    override fun setProvidePaused(paused: Boolean) {
+        lastPausedValue = paused
+        setProvidePausedCallCount.incrementAndGet()
+    }
     override fun isProvidePaused(): Boolean = true
     val peerCountCallCount = AtomicInteger(0)
     override fun peerCount(): Int {
