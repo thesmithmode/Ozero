@@ -101,7 +101,10 @@ class UrnetworkSharedTrafficViewModelTest {
         val afterFirst = balanceRepo.refreshCalls
         advanceTimeBy(30_001L)
         advanceUntilIdle()
-        assertTrue(balanceRepo.refreshCalls > afterFirst, "ожидался второй refresh после 30s, got=${balanceRepo.refreshCalls}, was=$afterFirst")
+        assertTrue(
+            balanceRepo.refreshCalls > afterFirst,
+            "ожидался второй refresh после 30s, got=${balanceRepo.refreshCalls}, was=$afterFirst",
+        )
         advanceTimeBy(30_001L)
         advanceUntilIdle()
         assertTrue(balanceRepo.refreshCalls >= afterFirst + 2)
@@ -129,7 +132,12 @@ class UrnetworkSharedTrafficViewModelTest {
         val afterKeepalive = balanceRepo.refreshCalls
         advanceTimeBy(60_000L)
         advanceUntilIdle()
-        assertEquals(afterKeepalive, balanceRepo.refreshCalls, "polling должен остановиться после keepalive, was=$whileSubscribed afterKA=$afterKeepalive final=${balanceRepo.refreshCalls}")
+        assertEquals(
+            afterKeepalive,
+            balanceRepo.refreshCalls,
+            "polling должен остановиться после keepalive, " +
+                "was=$whileSubscribed afterKA=$afterKeepalive final=${balanceRepo.refreshCalls}",
+        )
     }
 
     @Test
@@ -158,7 +166,10 @@ class UrnetworkSharedTrafficViewModelTest {
         val first = balanceRepo.refreshCalls
         advanceTimeBy(30_001L)
         advanceUntilIdle()
-        assertTrue(balanceRepo.refreshCalls > first, "ticker должен продолжать polling после исключения, got=${balanceRepo.refreshCalls}")
+        assertTrue(
+            balanceRepo.refreshCalls > first,
+            "ticker должен продолжать polling после исключения, got=${balanceRepo.refreshCalls}",
+        )
         collectJob.cancel()
     }
 
@@ -169,7 +180,7 @@ class UrnetworkSharedTrafficViewModelTest {
         var throwOnRefresh = false
         override suspend fun refresh() {
             refreshCalls++
-            if (throwOnRefresh) throw RuntimeException("test-fail")
+            if (throwOnRefresh) error("test-fail")
         }
     }
 
