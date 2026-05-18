@@ -163,8 +163,10 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     val peerCount: StateFlow<Int> = isUrnetworkActive.flatMapLatest { active ->
         if (active) {
             flow {
+                var last = 0
                 while (true) {
-                    emit(bridge.peerCount())
+                    last = runCatching { bridge.peerCount() }.getOrDefault(last)
+                    emit(last)
                     delay(PEER_COUNT_POLL_MS)
                 }
             }
@@ -176,8 +178,10 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     val sharedTrafficBytes: StateFlow<Long> = isUrnetworkActive.flatMapLatest { active ->
         if (active) {
             flow {
+                var last = 0L
                 while (true) {
-                    emit(bridge.unpaidByteCount())
+                    last = runCatching { bridge.unpaidByteCount() }.getOrDefault(last)
+                    emit(last)
                     delay(SHARED_TRAFFIC_POLL_MS)
                 }
             }.distinctUntilChanged()
@@ -190,8 +194,10 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         isUrnetworkActive.flatMapLatest { active ->
             if (active) {
                 flow {
+                    var last: UrnetworkSdkBridge.AccountPointsSnapshot? = null
                     while (true) {
-                        emit(bridge.fetchAccountPoints())
+                        last = runCatching { bridge.fetchAccountPoints() }.getOrDefault(last)
+                        emit(last)
                         delay(ACCOUNT_POINTS_POLL_MS)
                     }
                 }.distinctUntilChanged()
