@@ -36,7 +36,7 @@ class EngineUrnetworkContractTest {
                 provideEnabled = provideEnabled,
             ),
         )
-        return Triple(EngineUrnetwork(store, bridge, authService), bridge, store)
+        return Triple(EngineUrnetwork(store, bridge, authService, null), bridge, store)
     }
 
     @Test
@@ -302,7 +302,7 @@ class EngineUrnetworkContractTest {
                 ),
             ),
         )
-        val engine = EngineUrnetwork(store, bridge, FakeAuthService())
+        val engine = EngineUrnetwork(store, bridge, FakeAuthService(), null)
         engine.start(EngineConfig.Urnetwork(jwtToken = "", region = "us"), Upstream.None)
         val pref = bridge.lastPreferredLocation
         assertNotNull(pref)
@@ -450,7 +450,7 @@ class EngineUrnetworkPerformanceProfileTest {
             ),
         )
         val bridge = FakeProfileBridge()
-        val engine = EngineUrnetwork(store, bridge, FakeProfileAuthService())
+        val engine = EngineUrnetwork(store, bridge, FakeProfileAuthService(), null)
         engine.start(baseConfig, Upstream.None)
         assertEquals(UrnetworkWindowType.QUALITY, bridge.lastAppliedWindowType)
         assertEquals(false, bridge.lastAppliedFixedIp)
@@ -467,7 +467,7 @@ class EngineUrnetworkPerformanceProfileTest {
             ),
         )
         val bridge = FakeProfileBridge()
-        val engine = EngineUrnetwork(store, bridge, FakeProfileAuthService())
+        val engine = EngineUrnetwork(store, bridge, FakeProfileAuthService(), null)
         engine.start(baseConfig, Upstream.None)
         assertEquals(UrnetworkWindowType.SPEED, bridge.lastAppliedWindowType)
         assertEquals(true, bridge.lastAppliedFixedIp)
@@ -484,7 +484,7 @@ class EngineUrnetworkPerformanceProfileTest {
             ),
         )
         val bridge = FakeProfileBridge()
-        val engine = EngineUrnetwork(store, bridge, FakeProfileAuthService())
+        val engine = EngineUrnetwork(store, bridge, FakeProfileAuthService(), null)
         engine.start(baseConfig, Upstream.None)
         assertEquals(UrnetworkWindowType.AUTO, bridge.lastAppliedWindowType)
     }
@@ -501,7 +501,7 @@ class EngineUrnetworkPerformanceProfileTest {
             ),
         )
         val bridge = FakeProfileBridge()
-        val engine = EngineUrnetwork(store, bridge, FakeProfileAuthService())
+        val engine = EngineUrnetwork(store, bridge, FakeProfileAuthService(), null)
         engine.start(baseConfig, Upstream.None)
         assertEquals(true, bridge.lastAppliedAllowDirect)
     }
@@ -519,7 +519,7 @@ class EngineUrnetworkPerformanceProfileTest {
                 ),
             )
             val bridge = FakeProfileBridge()
-            val engine = EngineUrnetwork(store, bridge, FakeProfileAuthService())
+            val engine = EngineUrnetwork(store, bridge, FakeProfileAuthService(), null)
             engine.start(baseConfig, Upstream.None)
             assertEquals(UrnetworkWindowType.AUTO, bridge.lastAppliedWindowType)
             assertEquals(false, bridge.lastAppliedAllowDirect)
@@ -537,7 +537,7 @@ class EngineUrnetworkPerformanceProfileTest {
             ),
         )
         val bridge = FakeProfileBridge()
-        val engine = EngineUrnetwork(store, bridge, FakeProfileAuthService())
+        val engine = EngineUrnetwork(store, bridge, FakeProfileAuthService(), null)
         engine.start(baseConfig, Upstream.None)
         assertEquals(UrnetworkWindowType.QUALITY, bridge.lastAppliedWindowType)
         assertEquals(true, bridge.lastAppliedFixedIp)

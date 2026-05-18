@@ -8,7 +8,7 @@ class InMemoryUrnetworkDeviceIdentity(seed: ByteArray? = null) : UrnetworkDevice
     private val sk: Ed25519PrivateKeyParameters
 
     init {
-        val src = seed ?: ByteArray(SEED_LEN).also { SecureRandom().nextBytes(it) }
+        val src = (seed ?: ByteArray(SEED_LEN).also { SecureRandom().nextBytes(it) }).copyOf()
         require(src.size == SEED_LEN) { "seed must be $SEED_LEN bytes" }
         sk = Ed25519PrivateKeyParameters(src, 0)
     }

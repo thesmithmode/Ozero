@@ -28,6 +28,7 @@ class EngineUrnetworkAwaitReadyTest {
         configStore = minimalConfigStore,
         sdkBridge = bridge,
         authService = ImmediateAuthService,
+        deviceIdentity = null,
         pluginScope = scope,
         statsPollIntervalMs = 10_000L,
         peerReadyTimeoutMs = peerReadyTimeoutMs,

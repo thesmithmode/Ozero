@@ -39,9 +39,13 @@ class EnginePluginRegistrationTest {
                 "packet pump не подключится → пакеты не пойдут).",
         )
         assertTrue(
-            src.contains("EngineUrnetwork(store, bridge, authService)"),
-            "Provider обязан вызывать EngineUrnetwork(store, bridge, authService) — три аргумента, " +
-                "иначе compile error при добавлении authService dependency.",
+            src.contains("configStore = store") &&
+                src.contains("sdkBridge = bridge") &&
+                src.contains("authService = authService") &&
+                src.contains("deviceIdentity = deviceIdentity"),
+            "Provider обязан вызывать EngineUrnetwork с четырьмя named-args (configStore, sdkBridge, " +
+                "authService, deviceIdentity) — иначе walletAuth не подключён к DI graph и per-device " +
+                "регистрация выпадет в guest fallback.",
         )
     }
 

@@ -31,6 +31,7 @@ class EngineUrnetworkStatsPollingTest {
             configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
             authService = FakeAuth(),
+            deviceIdentity = null,
             pluginScope = scope,
             statsPollIntervalMs = pollIntervalMs,
         )
@@ -50,6 +51,7 @@ class EngineUrnetworkStatsPollingTest {
             configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
             authService = FakeAuth(),
+            deviceIdentity = null,
             pluginScope = scope,
             statsPollIntervalMs = pollIntervalMs,
         )
@@ -74,6 +76,7 @@ class EngineUrnetworkStatsPollingTest {
             configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
             authService = FakeAuth(),
+            deviceIdentity = null,
             pluginScope = scope,
             statsPollIntervalMs = pollIntervalMs,
         )
@@ -94,6 +97,7 @@ class EngineUrnetworkStatsPollingTest {
             configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
             authService = FakeAuth(),
+            deviceIdentity = null,
             pluginScope = scope,
             statsPollIntervalMs = pollIntervalMs,
         )
@@ -112,6 +116,7 @@ class EngineUrnetworkStatsPollingTest {
             configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
             authService = FakeAuth(),
+            deviceIdentity = null,
             pluginScope = scope,
             statsPollIntervalMs = pollIntervalMs,
         )

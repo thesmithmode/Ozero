@@ -37,7 +37,7 @@ class EngineUrnetwork(
     private val configStore: UrnetworkConfigStore,
     private val sdkBridge: UrnetworkSdkBridge,
     private val authService: UrnetworkAuthService,
-    private val deviceIdentity: UrnetworkDeviceIdentity? = null,
+    private val deviceIdentity: UrnetworkDeviceIdentity?,
     private val networkNameGenerator: () -> String = { defaultNetworkName() },
     private val pluginScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
     private val statsPollIntervalMs: Long = STATS_POLL_INTERVAL_MS,

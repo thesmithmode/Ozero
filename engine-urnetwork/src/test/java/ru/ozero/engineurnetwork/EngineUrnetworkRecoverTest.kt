@@ -33,6 +33,7 @@ class EngineUrnetworkRecoverTest {
             configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
             authService = FakeAuth(),
+            deviceIdentity = null,
             pluginScope = scope,
         )
         val result = engine.recover()
@@ -49,6 +50,7 @@ class EngineUrnetworkRecoverTest {
             configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
             authService = FakeAuth(),
+            deviceIdentity = null,
             pluginScope = scope,
         )
         engine.start(baseConfig, Upstream.None)
@@ -70,6 +72,7 @@ class EngineUrnetworkRecoverTest {
             configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
             authService = FakeAuth(),
+            deviceIdentity = null,
             pluginScope = scope,
         )
         engine.start(baseConfig, Upstream.None)
@@ -95,6 +98,7 @@ class EngineUrnetworkRecoverTest {
             configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
             authService = FakeAuth(),
+            deviceIdentity = null,
             pluginScope = scope,
         )
         engine.start(baseConfig, Upstream.None)
@@ -118,6 +122,7 @@ class EngineUrnetworkRecoverTest {
             configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
             authService = FakeAuth(),
+            deviceIdentity = null,
             pluginScope = scope,
         )
         engine.start(baseConfig, Upstream.None)

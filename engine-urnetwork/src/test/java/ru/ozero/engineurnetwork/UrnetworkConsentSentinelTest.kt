@@ -18,7 +18,7 @@ class UrnetworkConsentSentinelTest {
         val bridge = SpyBridge()
         val auth = SpyAuthService()
         val store = spyStore()
-        val engine = EngineUrnetwork(store, bridge, auth)
+        val engine = EngineUrnetwork(store, bridge, auth, null)
 
         engine.start(EngineConfig.Urnetwork(jwtToken = ""), Upstream.None)
 
@@ -32,7 +32,7 @@ class UrnetworkConsentSentinelTest {
         val bridge = SpyBridge()
         val auth = SpyAuthService()
         val store = spyStore(existingJwt = "existing.jwt", existingClientJwt = "existing.cjwt")
-        val engine = EngineUrnetwork(store, bridge, auth)
+        val engine = EngineUrnetwork(store, bridge, auth, null)
 
         val result = engine.start(EngineConfig.Urnetwork(jwtToken = ""), Upstream.None)
 

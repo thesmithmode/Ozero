@@ -62,4 +62,21 @@ class InMemoryDeviceIdentityTest {
             assertTrue(c !in forbidden, "Base58 не должен содержать $c в $pk")
         }
     }
+
+    @Test
+    fun `external seed mutation после ctor не влияет на pubkey - defensive copy ownership`() = runTest {
+        val seed = ByteArray(32) { (it + 5).toByte() }
+        val identity = InMemoryUrnetworkDeviceIdentity(seed)
+        val pubkeyBefore = identity.pubkeyBase58()
+        for (i in seed.indices) {
+            seed[i] = 0xff.toByte()
+        }
+        val pubkeyAfter = identity.pubkeyBase58()
+        assertEquals(
+            pubkeyBefore,
+            pubkeyAfter,
+            "InMemoryUrnetworkDeviceIdentity обязан брать defensive copy seed — иначе caller мутирует " +
+                "и identity ломается. seed.copyOf() в init().",
+        )
+    }
 }

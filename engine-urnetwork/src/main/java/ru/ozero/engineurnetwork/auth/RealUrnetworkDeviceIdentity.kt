@@ -73,6 +73,7 @@ class RealUrnetworkDeviceIdentity(
             init(Cipher.ENCRYPT_MODE, key)
         }
         val iv = cipher.iv
+        if (iv.size !in MIN_IV_LEN..MAX_IV_LEN) error("AndroidKeyStore IV size ${iv.size} out of bounds")
         val ct = cipher.doFinal(seed)
         val tmp = File(file.parentFile, "${file.name}.tmp")
         tmp.outputStream().use { out ->
@@ -88,16 +89,19 @@ class RealUrnetworkDeviceIdentity(
 
     private fun readEncrypted(file: File): ByteArray {
         val bytes = file.readBytes()
-        if (bytes.size < MIN_FILE_BYTES) error("file too short")
+        if (bytes.size < MIN_FILE_BYTES) error("file too short: ${bytes.size} < $MIN_FILE_BYTES")
         val ivLen = bytes[0].toInt() and 0xff
-        if (ivLen <= 0 || ivLen > MAX_IV_LEN) error("bad iv len=$ivLen")
+        if (ivLen !in MIN_IV_LEN..MAX_IV_LEN) error("bad iv len=$ivLen")
+        if (bytes.size < 1 + ivLen + GCM_TAG_BYTES) error("ct shorter than GCM tag")
         val iv = bytes.copyOfRange(1, 1 + ivLen)
         val ct = bytes.copyOfRange(1 + ivLen, bytes.size)
         val key = getOrCreateAesKey()
         val cipher = Cipher.getInstance(CIPHER_ALG).apply {
             init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(GCM_TAG_BITS, iv))
         }
-        return cipher.doFinal(ct)
+        val seed = cipher.doFinal(ct)
+        if (seed.size != ED25519_SEED_LEN) error("decrypted seed size ${seed.size} != $ED25519_SEED_LEN")
+        return seed
     }
 
     private fun getOrCreateAesKey(): SecretKey {
@@ -126,8 +130,10 @@ class RealUrnetworkDeviceIdentity(
         const val CIPHER_ALG = "AES/GCM/NoPadding"
         const val ED25519_SEED_LEN = 32
         const val GCM_TAG_BITS = 128
+        const val GCM_TAG_BYTES = GCM_TAG_BITS / 8
+        const val MIN_IV_LEN = 12
         const val MAX_IV_LEN = 16
-        const val MIN_FILE_BYTES = 14
+        const val MIN_FILE_BYTES = 1 + MIN_IV_LEN + ED25519_SEED_LEN + GCM_TAG_BYTES
         const val AES_KEY_BITS = 256
     }
 }
