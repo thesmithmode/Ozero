@@ -19,6 +19,15 @@ class MainScreenChartTest {
         f.readText()
     }
 
+    private val chartUtilsSource by lazy {
+        val f = File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/ui/components/ChartUtils.kt",
+        )
+        assertTrue(f.exists(), "ChartUtils.kt не найден: $f")
+        f.readText()
+    }
+
     @Test
     fun `MAX_SPEED_HISTORY_POINTS не меньше 3600 — держит 1ч при 1 тике в секунду`() {
         val regex = Regex("MAX_SPEED_HISTORY_POINTS\\s*=\\s*(\\d[\\d_]*)L?")
@@ -119,18 +128,18 @@ class MainScreenChartTest {
     }
 
     @Test
-    fun `addSmooth использует quadraticBezierTo`() {
-        val smoothBody = screenSource.substringAfter("fun Path.addSmooth")
+    fun `addSmooth использует quadratic bezier`() {
+        val smoothBody = chartUtilsSource.substringAfter("fun Path.addSmooth")
         assertTrue(
-            smoothBody.contains("quadraticBezierTo"),
-            "addSmooth обязан использовать quadraticBezierTo для сглаженных кривых",
+            smoothBody.contains("quadraticBezierTo") || smoothBody.contains("quadraticTo"),
+            "addSmooth обязан использовать quadratic bezier (quadraticBezierTo / quadraticTo) " +
+                "для сглаженных кривых",
         )
     }
 
     @Test
     fun `chartNiceMax содержит 1-2-5 гранулярные уровни`() {
-        val body = screenSource.substringAfter("private fun chartNiceMax")
-            .substringBefore("private fun chartTimeAgo")
+        val body = chartUtilsSource.substringAfter("fun chartNiceMax")
         assertTrue(body.contains("2_048") || body.contains("2048"), "2KB/s уровень отсутствует")
         assertTrue(body.contains("20_480") || body.contains("20480"), "20KB/s уровень отсутствует")
         assertTrue(body.contains("51_200") || body.contains("51200"), "50KB/s уровень отсутствует")

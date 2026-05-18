@@ -22,7 +22,7 @@ internal fun bucketizeTimeAligned(
     val sumsTx = FloatArray(bucketCount)
     val counts = IntArray(bucketCount)
     for (s in samples) {
-        val idx = ((s.tsMs - firstBucketStart) / bucketMs).toInt()
+        val idx = Math.floorDiv(s.tsMs - firstBucketStart, bucketMs).toInt()
         if (idx in 0 until bucketCount) {
             sumsRx[idx] += s.rxBps
             sumsTx[idx] += s.txBps
