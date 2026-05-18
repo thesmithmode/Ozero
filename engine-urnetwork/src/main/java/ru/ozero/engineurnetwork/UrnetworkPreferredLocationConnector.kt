@@ -71,6 +71,14 @@ internal class UrnetworkPreferredLocationConnector(
         selection: UrnetworkLocationSelection,
     ): ConnectLocation? {
         val cc = selection.countryCode?.uppercase()
+        if (cc == null) {
+            PersistentLoggers.warn(
+                TAG,
+                "findBestMatch: city/region match без countryCode запрещён — " +
+                    "иначе wrong-country connect (одинаковые имена городов в разных странах)",
+            )
+            return null
+        }
         if (!selection.city.isNullOrBlank()) {
             findIn(filtered.cities, cc) { loc ->
                 runCatching { loc.name }.getOrNull()?.equals(selection.city, ignoreCase = true) == true
@@ -81,10 +89,7 @@ internal class UrnetworkPreferredLocationConnector(
                 runCatching { loc.name }.getOrNull()?.equals(selection.region, ignoreCase = true) == true
             }?.let { return it }
         }
-        if (cc != null) {
-            findIn(filtered.countries, cc) { true }?.let { return it }
-        }
-        return null
+        return findIn(filtered.countries, cc) { true }
     }
 
     private inline fun findIn(

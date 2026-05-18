@@ -898,16 +898,20 @@ internal fun pickStatusLabelRes(
         is TunnelState.Connecting ->
             if (isReconnecting) R.string.main_status_reconnecting else R.string.main_status_connecting
         is TunnelState.Connected -> R.string.main_status_connected
-        is TunnelState.Failed -> R.string.main_status_failed
+        is TunnelState.Failed ->
+            if (isReconnecting) R.string.main_status_reconnecting else R.string.main_status_failed
         is TunnelState.Disconnecting -> R.string.main_status_disconnecting
     }
 }
 
-internal fun probingLabelRes(engineId: EngineId?, isReconnecting: Boolean): Int = when (engineId) {
-    EngineId.WARP -> R.string.main_status_probing_warp
-    EngineId.BYEDPI ->
-        if (isReconnecting) R.string.main_status_reconnecting else R.string.main_status_connecting
-    else -> R.string.main_status_probing
+internal fun probingLabelRes(engineId: EngineId?, isReconnecting: Boolean): Int {
+    if (isReconnecting) return R.string.main_status_reconnecting
+    return when (engineId) {
+        EngineId.WARP -> R.string.main_status_probing_warp
+        EngineId.BYEDPI -> R.string.main_status_connecting
+        EngineId.URNETWORK -> R.string.main_status_probing
+        null -> R.string.main_status_probing
+    }
 }
 
 private fun pickStatusEngine(state: TunnelState, switching: SwitchingTransition?): String? {

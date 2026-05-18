@@ -23,6 +23,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -90,6 +94,10 @@ private fun DockButton(
             .clip(RoundedCornerShape(DOCK_BUTTON_RADIUS_DP.dp))
             .background(background)
             .clickable(onClick = onClick)
+            .semantics {
+                role = Role.Tab
+                selected = isActive
+            }
             .padding(vertical = DOCK_BUTTON_VERTICAL_PADDING_DP.dp, horizontal = 4.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -99,7 +107,7 @@ private fun DockButton(
         ) {
             Icon(
                 imageVector = tab.icon,
-                contentDescription = tab.label,
+                contentDescription = null,
                 tint = tint,
                 modifier = Modifier.size(DOCK_ICON_SIZE_DP.dp),
             )

@@ -97,7 +97,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     val insufficientBalance: StateFlow<Boolean> = bridge.contractStatus()
         .map { it.insufficientBalance && !it.premium }
         .distinctUntilChanged()
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(POLLER_KEEP_ALIVE_MS), false)
 
     fun selectProvideControlMode(value: UrnetworkProvideControlMode) {
         viewModelScope.launch {
