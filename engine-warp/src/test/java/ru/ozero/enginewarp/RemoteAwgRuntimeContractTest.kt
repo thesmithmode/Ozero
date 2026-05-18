@@ -143,6 +143,28 @@ class RemoteAwgRuntimeContractTest {
     }
 
     @Test
+    fun `onServiceDisconnected вызывает onProcessDied и unbind`() {
+        val onDisconnected = source.substringAfter("override fun onServiceDisconnected")
+            .substringBefore("override fun onBindingDied")
+        assertTrue(
+            onDisconnected.contains("onProcessDied()"),
+            "onServiceDisconnected обязан вызвать onProcessDied() — system unbind " +
+                "(OOM kill процесса :engine_warp) минует binder.died → killswitch не engaging без явного fire. " +
+                "Body=$onDisconnected",
+        )
+        assertTrue(
+            onDisconnected.contains("context.unbindService"),
+            "onServiceDisconnected обязан unbindService — иначе orphan ServiceConnection после system unbind. " +
+                "Body=$onDisconnected",
+        )
+        assertTrue(
+            onDisconnected.contains("engine = null"),
+            "onServiceDisconnected обязан обнулить engine — stale IWarpEngineProcess после disconnect. " +
+                "Body=$onDisconnected",
+        )
+    }
+
+    @Test
     fun `close unlink DeathRecipient`() {
         val closeBlock = source.substringAfter("fun close()").substringBefore("private companion object")
         assertTrue(

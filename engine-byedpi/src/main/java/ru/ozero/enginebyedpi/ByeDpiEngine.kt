@@ -78,14 +78,16 @@ class ByeDpiEngine(
         }
         Log.i(TAG, "start socksPort=${config.socksPort} args=${config.args}")
         val oldJob = proxyJobRef.getAndSet(null)
-        if (oldJob != null && oldJob.isActive) {
-            PersistentLoggers.warn(TAG, "start: предыдущий прокси ещё активен — останавливаю")
-            runCatching { proxy.stopProxy() }
-                .onFailure { PersistentLoggers.warn(TAG, "oldProxy jniStopProxy: ${it.message}") }
-            withTimeoutOrNull(STOP_GRACE_MS) { oldJob.join() }
+        if (oldJob != null) {
             if (oldJob.isActive) {
-                runCatching { proxy.forceClose() }
-                    .onFailure { PersistentLoggers.warn(TAG, "oldProxy jniForceClose: ${it.message}") }
+                PersistentLoggers.warn(TAG, "start: предыдущий прокси ещё активен — останавливаю")
+                runCatching { proxy.stopProxy() }
+                    .onFailure { PersistentLoggers.warn(TAG, "oldProxy jniStopProxy: ${it.message}") }
+                withTimeoutOrNull(STOP_GRACE_MS) { oldJob.join() }
+            }
+            runCatching { proxy.forceClose() }
+                .onFailure { PersistentLoggers.warn(TAG, "oldProxy jniForceClose: ${it.message}") }
+            if (oldJob.isActive) {
                 withTimeoutOrNull(STOP_GRACE_MS) { oldJob.join() }
                 if (oldJob.isActive) oldJob.cancel()
             }

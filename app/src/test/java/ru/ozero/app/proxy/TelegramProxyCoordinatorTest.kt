@@ -150,7 +150,7 @@ class TelegramProxyCoordinatorTest {
 
         proxyStateFlow.value = TelegramProxyState.Error("mtg exited unexpectedly")
 
-        verify(atLeast = 2) {
+        verify(exactly = 2) {
             mockProxy.start(config, Upstream.Socks5("127.0.0.1", 1080))
         }
     }
@@ -175,7 +175,7 @@ class TelegramProxyCoordinatorTest {
             proxyStateFlow.value = TelegramProxyState.Error("mtg crash 3")
             proxyStateFlow.value = TelegramProxyState.Error("mtg crash 4")
 
-            verify(atLeast = 1, atMost = 3) {
+            verify(exactly = 3) {
                 mockProxy.start(config, Upstream.Socks5("127.0.0.1", 1080))
             }
 
@@ -201,7 +201,7 @@ class TelegramProxyCoordinatorTest {
             proxyStateFlow.value = TelegramProxyState.Running(443, "secret")
             proxyStateFlow.value = TelegramProxyState.Error("crash2")
 
-            verify(atLeast = 3) {
+            verify(exactly = 3) {
                 mockProxy.start(config, Upstream.Socks5("127.0.0.1", 1080))
             }
 
@@ -219,6 +219,7 @@ class TelegramProxyCoordinatorTest {
             proxyStateFlow.value = TelegramProxyState.Error("mtg crash while tunnel down")
 
             verify(atLeast = 1) { mockProxy.stop() }
+            verify(exactly = 0) { mockProxy.start(any(), any()) }
         }
 
     @Test
