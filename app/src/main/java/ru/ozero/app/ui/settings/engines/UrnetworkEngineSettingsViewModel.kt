@@ -35,6 +35,17 @@ import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
 import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.UrnetworkWindowType
+import ru.ozero.engineurnetwork.allowDirect
+import ru.ozero.engineurnetwork.fixedIpSize
+import ru.ozero.engineurnetwork.provideControlMode
+import ru.ozero.engineurnetwork.provideNetworkMode
+import ru.ozero.engineurnetwork.setAllowDirect
+import ru.ozero.engineurnetwork.setFixedIpSize
+import ru.ozero.engineurnetwork.setProvideControlMode
+import ru.ozero.engineurnetwork.setProvideEnabled
+import ru.ozero.engineurnetwork.setProvideNetworkMode
+import ru.ozero.engineurnetwork.setWindowType
+import ru.ozero.engineurnetwork.windowType
 import java.util.Locale
 import javax.inject.Inject
 

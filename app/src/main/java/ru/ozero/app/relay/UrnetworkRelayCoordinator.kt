@@ -13,6 +13,8 @@ import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkDefaults
+import ru.ozero.engineurnetwork.byClientJwt
+import ru.ozero.engineurnetwork.walletAddress
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.PersistentLoggers

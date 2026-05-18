@@ -910,7 +910,13 @@ internal fun probingLabelRes(engineId: EngineId?, isReconnecting: Boolean): Int 
         EngineId.WARP -> R.string.main_status_probing_warp
         EngineId.BYEDPI -> R.string.main_status_connecting
         EngineId.URNETWORK -> R.string.main_status_probing
-        null -> R.string.main_status_probing
+        EngineId.XRAY,
+        EngineId.AMNEZIA,
+        EngineId.HYSTERIA2,
+        EngineId.NAIVE,
+        EngineId.TOR,
+        EngineId.FPTN,
+        null -> R.string.main_status_connecting
     }
 }
 
