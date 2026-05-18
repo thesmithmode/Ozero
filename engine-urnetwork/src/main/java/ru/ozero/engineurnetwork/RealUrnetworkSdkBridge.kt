@@ -10,6 +10,7 @@ import com.bringyour.sdk.IoLoopDoneCallback
 import com.bringyour.sdk.LocationsViewController
 import com.bringyour.sdk.PerformanceProfile
 import com.bringyour.sdk.Sdk
+import com.bringyour.sdk.SubscriptionBalanceCallback
 import com.bringyour.sdk.WalletViewController
 import com.bringyour.sdk.WindowSizeSettings
 import kotlinx.coroutines.CoroutineScope
@@ -19,6 +20,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -27,6 +29,7 @@ import ru.ozero.enginescore.PersistentLoggers
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.coroutineContext
+import kotlin.coroutines.resume
 
 class SdkLocationToken(val sdk: ConnectLocation) : UrnetworkSdkBridge.LocationToken {
     override val countryCode: String? = runCatching { sdk.countryCode }.getOrNull()
@@ -34,7 +37,7 @@ class SdkLocationToken(val sdk: ConnectLocation) : UrnetworkSdkBridge.LocationTo
     override val city: String? = runCatching { sdk.city.takeIf { it.isNotEmpty() } }.getOrNull()
 }
 
-@Suppress("TooManyFunctions")
+@Suppress("TooManyFunctions", "LargeClass")
 class RealUrnetworkSdkBridge(
     private val app: Application,
     private val appVersion: String = DEFAULT_APP_VERSION,
@@ -53,6 +56,8 @@ class RealUrnetworkSdkBridge(
     private val payoutWalletSetup = UrnetworkPayoutWalletSetup()
     private val preferredLocationConnector = UrnetworkPreferredLocationConnector(bridgeScope)
     private val apiHelper = UrnetworkApiHelper(deviceRef, running)
+    private val subscriptionBalanceRef =
+        AtomicReference<UrnetworkSdkBridge.SubscriptionBalanceSnapshot?>(null)
     private val lifecycleMutex = Mutex()
     private val startJobRef = AtomicReference<Job?>(null)
     private val attachJobRef = AtomicReference<Job?>(null)
@@ -303,7 +308,7 @@ class RealUrnetworkSdkBridge(
         contractStatusListener.status
 
     override fun openLocationsViewController(): LocationsViewController? {
-        if (deviceRef.get() == null) return null
+        if (!running.get() && deviceRef.get() == null) return null
         return runCatching { deviceRef.get()?.openLocationsViewController() }.getOrElse {
             PersistentLoggers.warn(TAG, "openLocationsViewController threw: ${it.message}")
             null
@@ -438,7 +443,62 @@ class RealUrnetworkSdkBridge(
             .onFailure { PersistentLoggers.warn(TAG, "fetchTransferStats threw: ${it.message}") }
     }
 
-    override suspend fun fetchSubscriptionBalance() = apiHelper.fetchSubscriptionBalance()
+    @Suppress("LongMethod", "ReturnCount")
+    override suspend fun fetchSubscriptionBalance(): UrnetworkSdkBridge.SubscriptionBalanceSnapshot? {
+        if (!running.get()) return subscriptionBalanceRef.get()
+        val device = deviceRef.get() ?: return null
+        val api = runCatching { device.api }.getOrNull() ?: run {
+            PersistentLoggers.warn(TAG, "device.api is null — cannot fetch subscription balance")
+            return null
+        }
+        val cached = subscriptionBalanceRef.get()
+        val snapshot = withTimeoutOrNull(SUBSCRIPTION_BALANCE_TIMEOUT_MS) {
+            suspendCancellableCoroutine<UrnetworkSdkBridge.SubscriptionBalanceSnapshot?> { cont ->
+                val resumed = AtomicBoolean(false)
+                val callback = SubscriptionBalanceCallback { result, err ->
+                    if (!resumed.compareAndSet(false, true)) return@SubscriptionBalanceCallback
+                    if (err != null || result == null) {
+                        PersistentLoggers.warn(TAG, "subscriptionBalance err=${err?.message}")
+                        cont.resume(null)
+                        return@SubscriptionBalanceCallback
+                    }
+                    val balance = runCatching { result.balanceByteCount }.getOrDefault(0L)
+                    val pending = runCatching { result.openTransferByteCount }.getOrDefault(0L)
+                    val startBalance = runCatching { result.startBalanceByteCount }.getOrDefault(0L)
+                    val sub = runCatching { result.currentSubscription }.getOrNull()
+                    val plan = runCatching { sub?.plan }.getOrNull()
+                    val store = runCatching { sub?.store }.getOrNull()
+                    val used = startBalance - balance - pending
+                    cont.resume(
+                        UrnetworkSdkBridge.SubscriptionBalanceSnapshot(
+                            balanceBytes = balance,
+                            pendingBytes = pending,
+                            startBalanceBytes = startBalance,
+                            usedBytes = used,
+                            plan = plan,
+                            store = store,
+                        ),
+                    )
+                }
+                runCatching { api.subscriptionBalance(callback) }.onFailure { t ->
+                    if (resumed.compareAndSet(false, true)) {
+                        PersistentLoggers.warn(TAG, "subscriptionBalance threw: ${t.message}")
+                        cont.resume(null)
+                    }
+                }
+            }
+        }
+        return when {
+            snapshot != null -> {
+                subscriptionBalanceRef.set(snapshot)
+                snapshot
+            }
+            else -> {
+                PersistentLoggers.warn(TAG, "subscriptionBalance timeout/null — using cached=${cached != null}")
+                cached
+            }
+        }
+    }
     override suspend fun fetchAccountPoints() = apiHelper.fetchAccountPoints()
     override suspend fun fetchNetworkReliability() = apiHelper.fetchNetworkReliability()
     override suspend fun fetchReferralCount() = apiHelper.fetchReferralCount()
@@ -516,6 +576,7 @@ class RealUrnetworkSdkBridge(
         const val SDK_INIT_TIMEOUT_MS = 30_000L
         const val STOP_TIMEOUT_MS = 3_000L
         const val RUNTIME_RELEASE_TIMEOUT_MS = 2_000L
+        const val SUBSCRIPTION_BALANCE_TIMEOUT_MS = 10_000L
         const val DEFAULT_APP_VERSION = "0.0.2"
         const val WINDOW_SIZE_MAX_EXPERIMENTAL = 6L
     }
