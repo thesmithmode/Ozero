@@ -131,7 +131,10 @@ class GeneMemoryTest {
         mem.record(listOf("-rare"), fitness = 0.5)
         val popularVariance = varianceSamples(mem, "-popular", SEED_DEFAULT)
         val rareVariance = varianceSamples(mem, "-rare", SEED_DEFAULT)
-        assertTrue(rareVariance > popularVariance, "rare token must have wider posterior: rare=$rareVariance popular=$popularVariance")
+        assertTrue(
+            rareVariance > popularVariance,
+            "rare token must have wider posterior: rare=$rareVariance popular=$popularVariance",
+        )
     }
 
     @Test
@@ -190,7 +193,10 @@ class GeneMemoryTest {
         val mean = meanSamples(mem, "-strong", SEED_DEFAULT)
         val variance = varianceSamples(mem, "-strong", SEED_DEFAULT)
         assertTrue(mean > CONCENTRATION_MEAN_FLOOR, "100x fitness=1 token must concentrate near 1.0, got mean=$mean")
-        assertTrue(variance < CONCENTRATION_VARIANCE_CEILING, "concentrated posterior must have small variance, got $variance")
+        assertTrue(
+            variance < CONCENTRATION_VARIANCE_CEILING,
+            "concentrated posterior must have small variance, got $variance",
+        )
     }
 
     @Test
