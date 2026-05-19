@@ -487,6 +487,9 @@
     <string name="byedpi_mode_ui">Modo UI</string>
     <string name="byedpi_mode_ui_hint">Configuração por interruptores — recomendado para iniciantes</string>
     <string name="byedpi_mode_cmd_hint">Modo CMD: argumentos e estratégias manuais</string>
+    <string name="byedpi_mode_segment_ui">Simples</string>
+    <string name="byedpi_mode_segment_cmd">Linha de comando</string>
+    <string name="byedpi_mode_title">Modo de configuração</string>
     <string name="byedpi_ui_desync_method">Método de desync</string>
     <string name="byedpi_ui_current_method_fmt">Atual: %1$s</string>
     <string name="byedpi_ui_split_position">Posição de corte</string>

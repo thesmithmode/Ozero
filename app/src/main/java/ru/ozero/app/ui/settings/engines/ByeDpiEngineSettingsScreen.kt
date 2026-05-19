@@ -24,7 +24,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -126,20 +128,29 @@ fun ByeDpiEngineSettingsScreen(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                    Text(
+                        text = stringResource(R.string.byedpi_mode_title),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    SingleChoiceSegmentedButtonRow(
+                        modifier = Modifier.fillMaxWidth().testTag("byedpi_mode_segmented"),
                     ) {
-                        Text(
-                            text = stringResource(R.string.byedpi_mode_ui),
-                            style = MaterialTheme.typography.titleSmall,
-                        )
-                        Switch(
-                            checked = s.useUiMode,
-                            onCheckedChange = viewModel::onToggleUiMode,
-                            modifier = Modifier.testTag("byedpi_mode_switch"),
-                        )
+                        SegmentedButton(
+                            selected = s.useUiMode,
+                            onClick = { viewModel.onToggleUiMode(true) },
+                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                            modifier = Modifier.testTag("byedpi_mode_ui_segment"),
+                        ) {
+                            Text(stringResource(R.string.byedpi_mode_segment_ui))
+                        }
+                        SegmentedButton(
+                            selected = !s.useUiMode,
+                            onClick = { viewModel.onToggleUiMode(false) },
+                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                            modifier = Modifier.testTag("byedpi_mode_cmd_segment"),
+                        ) {
+                            Text(stringResource(R.string.byedpi_mode_segment_cmd))
+                        }
                     }
                     Text(
                         text = if (s.useUiMode) {
