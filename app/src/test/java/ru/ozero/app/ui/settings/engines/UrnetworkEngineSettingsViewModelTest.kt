@@ -125,6 +125,22 @@ class UrnetworkEngineSettingsViewModelTest {
     }
 
     @Test
+    fun `refresh не переходит в NotConnected если isRunning true даже когда isDeviceAvailable false`() = runTest {
+        val bridge = FakeUrnetworkBridge(connected = true, deviceAvailable = false)
+        val vm = UrnetworkEngineSettingsViewModel(
+            bridge,
+            FakeSettingsRepo(),
+            fakeUrnetworkConfigStore(),
+            activeTunnel(),
+            fakeBalanceRepo(),
+        )
+        advanceUntilIdle()
+        vm.refresh()
+        advanceUntilIdle()
+        assertIs<UrnetworkSettingsUiState.Ready>(vm.uiState.value)
+    }
+
+    @Test
     fun `init обязан retry refresh пока bridge не готов — sentinel против stuck NotConnected`() {
         val source = java.io.File(
             System.getProperty("user.dir") ?: ".",
@@ -718,11 +734,13 @@ private class FakeUrnetworkBridge(
     }
     var lastPausedValue: Boolean? = null
     val setProvidePausedCallCount = AtomicInteger(0)
+    private var _isProvidePaused: Boolean = false
     override fun setProvidePaused(paused: Boolean) {
         lastPausedValue = paused
+        _isProvidePaused = paused
         setProvidePausedCallCount.incrementAndGet()
     }
-    override fun isProvidePaused(): Boolean = true
+    override fun isProvidePaused(): Boolean = _isProvidePaused
     val peerCountCallCount = AtomicInteger(0)
     override fun peerCount(): Int {
         peerCountCallCount.incrementAndGet()
