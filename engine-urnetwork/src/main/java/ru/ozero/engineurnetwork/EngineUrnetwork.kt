@@ -208,12 +208,21 @@ class EngineUrnetwork(
     )
 
     override suspend fun awaitReady(): EnginePlugin.ReadyResult {
+        var polls = 0
         val reached = withTimeoutOrNull(peerReadyTimeoutMs) {
             while (true) {
                 val peers = runCatching { sdkBridge.peerCount() }.getOrDefault(0)
                 if (peers > 0) {
-                    Log.i(TAG, "awaitReady: peers=$peers — engine ready")
+                    Log.i(TAG, "awaitReady: peers=$peers — engine ready (after ${polls * peerReadyPollMs}ms)")
                     return@withTimeoutOrNull Unit
+                }
+                polls += 1
+                if (polls % PEER_PROGRESS_LOG_EVERY == 0) {
+                    PersistentLoggers.info(
+                        TAG,
+                        "awaitReady progress: peers=0 elapsed≈${polls * peerReadyPollMs}ms " +
+                            "deadline=${peerReadyTimeoutMs}ms",
+                    )
                 }
                 delay(peerReadyPollMs)
             }
@@ -329,8 +338,9 @@ class EngineUrnetwork(
         const val NETWORK_NAME_RANDOM_BYTES = 8
 
         const val URN_STOP_TIMEOUT_MS = 8_000L
-        const val PEER_READY_TIMEOUT_MS = 15_000L
+        const val PEER_READY_TIMEOUT_MS = 45_000L
         const val PEER_READY_POLL_MS = 200L
+        const val PEER_PROGRESS_LOG_EVERY = 15
 
         private fun defaultNetworkName(): String {
             val rnd = java.security.SecureRandom()

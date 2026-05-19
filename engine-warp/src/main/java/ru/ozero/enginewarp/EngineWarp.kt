@@ -222,6 +222,9 @@ class EngineWarp(
     private fun startStatsPoll(uapiPath: String) {
         statsJobRef.getAndSet(null)?.cancel()
         val job = ownedScope.launch {
+            var prevRx = 0L
+            var prevTx = 0L
+            var tick = 0
             try {
                 while (isActive) {
                     val state = uapiStateReader(uapiPath, TUNNEL_NAME)
@@ -239,6 +242,27 @@ class EngineWarp(
                             connectedSince = connectedSinceRef.get(),
                             activeConnections = if (handshakeRecent) 1 else 0,
                         )
+                        tick += 1
+                        if (tick % STATS_LOG_EVERY == 0) {
+                            val dRx = state.rxBytes - prevRx
+                            val dTx = state.txBytes - prevTx
+                            PersistentLoggers.info(
+                                TAG,
+                                "warp stats tx=${state.txBytes}B rx=${state.rxBytes}B " +
+                                    "Δtx=${dTx}B Δrx=${dRx}B hsAge=${ageS ?: "never"}s",
+                            )
+                            prevRx = state.rxBytes
+                            prevTx = state.txBytes
+                        }
+                    } else {
+                        tick += 1
+                        if (tick % STATS_LOG_EVERY == 0) {
+                            PersistentLoggers.warn(
+                                TAG,
+                                "warp stats unavailable — UAPI socket read returned null " +
+                                    "(uapi=$uapiPath/$TUNNEL_NAME) — handle invalid или socket путь не найден",
+                            )
+                        }
                     }
                     delay(statsPollIntervalMs)
                 }
@@ -384,5 +408,6 @@ class EngineWarp(
         const val WARP_READY_POLL_MS = 100L
         const val STATS_POLL_INTERVAL_MS = 5_000L
         const val HANDSHAKE_STALE_THRESHOLD_SEC = 180L
+        const val STATS_LOG_EVERY = 5
     }
 }

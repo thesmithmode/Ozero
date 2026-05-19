@@ -106,6 +106,10 @@ class ByeDpiEngine(
         }
 
         val args = buildArgs(resolvedConfig)
+        PersistentLoggers.info(
+            TAG,
+            "jniStartProxy argv=[${args.joinToString(" ")}] (native префиксует argv[0]=\"byedpi\")",
+        )
         val proxyJob = proxyScope.launch {
             val code = startProxyWithRecovery(args)
             when {

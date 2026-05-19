@@ -100,7 +100,7 @@
 Маппинг папка → движок:
 - `Контекст/android/` → **URnetwork** (официальный Android source `bringyour/network-android`). Эталон для `engine-urnetwork`. См. `URNETWORK_INIT_ANALYSIS.md`. Покрывает locations, provideMode, enhanced anonymization, dedicated/sticky IP, ConnectGrid.
 - `Контекст/PORTAL_WG_v1.4.3/` + `Контекст/CYBERPORTAL_X-v1.0.2/` → **WARP** (AmneziaWG stack). Эталон для `engine-warp`. См. `PORTAL_WG_ANALYSIS.md`. Покрывает `awgTurnOn` 4-arg сигнатуру, uapiPath=`getDataDir()`, ReLinker для `libam-go`, mirror-контракт Cloudflare WARP API.
-- `Контекст/ByeByeDPI-v.1.7.4/` → **ByeDPI** (полный source ByeByeDPI 1.7.4, single-engine app). Эталон для `engine-byedpi` + hev pipeline. Сравнивать args, hev YAML, init order.
+- `Контекст/ByeByeDPI-v.1.7.5/` → **ByeDPI** (полный source ByeByeDPI 1.7.5, single-engine app). Эталон для `engine-byedpi` + hev pipeline. Сравнивать args, hev YAML, init order. byedpi submodule pin: `ba532298` (main HEAD 2026-03-26, 38 коммитов вперёд v0.17.3).
 - `Контекст/karing/`, `Контекст/Invizible_Pro*/`, `Контекст/КИБЕРЩИТ*/`, `Контекст/ResultV/`, `Контекст/PortalConnect*/`, `Контекст/amnezia-{client,vpn}/` — дополнительные источники (decompiled APK / source-mirror). Использовать как secondary references при поиске специфичных фич.
 - `Контекст/Architect.md`, `AUDIT.md`, `PRD.md`, `SPEC.md`, `ПЛАН.md` — проектные документы, не reference.
 

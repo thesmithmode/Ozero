@@ -22,6 +22,47 @@ class EngineWarpSourceSentinelTest {
     }
 
     @Test
+    fun `sentinel WarpUapi readState использует findUapiSocket — паритет с sockets-subdir migration`() {
+        val uapiFile = File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/enginewarp/WarpUapi.kt",
+        )
+        assertTrue(uapiFile.exists(), "WarpUapi.kt не найден: $uapiFile")
+        val uapiSrc = uapiFile.readText()
+        val readStateBody = uapiSrc.substringAfter("fun readState(")
+            .substringBefore("private fun querySocket")
+        assertTrue(
+            readStateBody.contains("findUapiSocket"),
+            "WarpUapi.readState обязан использовать findUapiSocket — иначе legacy путь " +
+                "\$uapiPath/\$tunnelName.sock не существует после amneziawg-go sockets/ migration (v0.1.8)",
+        )
+        assertFalse(
+            readStateBody.contains("File(uapiPath, \"\$tunnelName.sock\")"),
+            "WarpUapi.readState больше НЕ строит legacy путь напрямую — это путь to sockets/ migration regression " +
+                "(stats null → false DEGRADED в HealthMonitor)",
+        )
+    }
+
+    @Test
+    fun `sentinel startStatsPoll пишет periodic WARP stats в boot log`() {
+        assertTrue(
+            source.contains("STATS_LOG_EVERY"),
+            "startStatsPoll обязан логировать periodic stats — без этого не отследить " +
+                "медленность/прерывистость WARP в boot.log",
+        )
+        val body = source.substringAfter("private fun startStatsPoll(")
+            .substringBefore("private data class ResolvedWarp")
+        assertTrue(
+            body.contains("PersistentLoggers.info") && body.contains("warp stats"),
+            "stats poll обязан вызывать PersistentLoggers.info с \"warp stats\" prefix — boot.log readable",
+        )
+        assertTrue(
+            body.contains("Δtx") && body.contains("Δrx"),
+            "stats log обязан содержать дельту (Δtx/Δrx) для outage diagnostics, не только absolute",
+        )
+    }
+
+    @Test
     fun `awaitReady timeout логирует dirListing — диагностика UAPI socket path`() {
         assertTrue(
             source.contains("WarpSocketDiagnostics.listSocketCandidates(uapiPath)"),

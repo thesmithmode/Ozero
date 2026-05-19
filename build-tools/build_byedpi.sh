@@ -2,6 +2,8 @@
 # build_byedpi.sh — собирает libbyedpi.so для 4 ABI через NDK CMake.
 # Запуск: внутри Docker контейнера build-tools/Dockerfile.
 # Источник: hufrea/byedpi (git submodule в engine-byedpi/src/main/cpp/byedpi).
+# Pinned commit: ba532298de7b28cfe854aea83d061369d13ca290 (main HEAD 2026-03-26,
+# паритет с romanvht/ByeByeDPI v1.7.4/v1.7.5; обновление от v0.17.3 = 38 коммитов).
 # Output: $OUT_DIR/libbyedpi-<abi>.so + $OUT_DIR/manifest.txt
 
 set -euo pipefail
