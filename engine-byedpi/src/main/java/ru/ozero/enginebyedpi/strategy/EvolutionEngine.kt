@@ -48,6 +48,7 @@ class EvolutionEngine(
         val bestFitness: Double,
         val bestSuccessRate: Double,
         val population: List<Pair<Chromosome, Double>>,
+        val populationSuccessRates: List<Pair<Chromosome, Double>> = emptyList(),
         val stagnationCount: Int = 0,
     )
 
@@ -84,6 +85,7 @@ class EvolutionEngine(
 
             val scored = evaluatePopulation(population, onChromosomeEval, evalCache)
             val fitnessPairs = scored.map { (ch, er) -> ch to er.fitness }
+            val successRatePairs = scored.map { (ch, er) -> ch to er.successRate }
             val genBest = scored.maxByOrNull { it.second.fitness }
             if (genBest != null && genBest.second.fitness > bestFitness) {
                 bestFitness = genBest.second.fitness
@@ -100,6 +102,7 @@ class EvolutionEngine(
                     bestFitness = bestFitness,
                     bestSuccessRate = bestSuccessRate,
                     population = fitnessPairs,
+                    populationSuccessRates = successRatePairs,
                     stagnationCount = stagnationCount,
                 ),
             )

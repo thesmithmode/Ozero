@@ -5,12 +5,14 @@ tags: [kotlin, testing, coroutines, viewmodel, gotcha]
 sources:
   - "daily/2026-05-10.md"
 created: 2026-05-10
-updated: 2026-05-10
+updated: 2026-05-19
 ---
 
 # ViewModel Polling Loop Breaks advanceUntilIdle in runTest
 
 A `while(true) + delay(N)` polling coroutine launched in `viewModelScope` (or any scope under `TestCoroutineScheduler`) causes `advanceUntilIdle()` to hang indefinitely in `runTest`. The coroutine never finishes — it is not "idle" — so the test scheduler cannot exhaust the work queue. The fix is to replace `advanceUntilIdle()` with `advanceTimeBy(N * steps)` + `runCurrent()` to advance virtual time by a specific amount and process scheduled work without waiting for all coroutines to complete.
+
+**Extended rule (2026-05-19):** ANY `advanceUntilIdle()` call in a `runTest` block that has an active `collectJob` (backgroundScope subscriber, `launchIn(scope)`, or any coroutine collecting a StateFlow) = deadlock. The while(true) loop is not required — a subscriber coroutine alone is sufficient to prevent `advanceUntilIdle()` from returning. Replace with `runCurrent()`. Import required: `import kotlinx.coroutines.test.runCurrent`.
 
 ## Key Points
 
@@ -74,6 +76,7 @@ Tests that previously used `advanceUntilIdle()` to wait for the ViewModel to set
 |--------------|-----|
 | ViewModel launches finite work (fetch, one-shot init) | `advanceUntilIdle()` |
 | ViewModel has infinite polling loop | `advanceTimeBy(POLL_MS * N) + runCurrent()` |
+| Any active collectJob / backgroundScope subscriber | `runCurrent()` (never `advanceUntilIdle()`) |
 | Need to test after exactly K poll cycles | `advanceTimeBy(POLL_MS * K) + runCurrent()` |
 | Need to test that polling stops on cancellation | `vm.onCleared()` then `advanceUntilIdle()` |
 
@@ -93,6 +96,16 @@ Both approaches are valid — choose based on whether the data source is natural
 - [[concepts/byedpi-mock-server-ci-fragility]] - The `System.currentTimeMillis()` vs virtual clock issue is a parallel gotcha; outer loop time vs inner delay time
 - [[concepts/urnetwork-sdk-integration]] - URnetwork location polling was the context where this trap was discovered
 
+### Diagnostic Pattern
+
+Grep for any test file containing both an active subscriber and `advanceUntilIdle()`:
+```
+backgroundScope.launch { .*.collect
+advanceUntilIdle()
+```
+Any test with both patterns (without explicit cancel between them) is a potential deadlock.
+
 ## Sources
 
 - [[daily/2026-05-10.md]] - Session 17:46 GROUP B: `while(true) + delay(URNETWORK_LOCATION_POLL_MS)` in MainViewModel → `advanceUntilIdle()` eternal loop in tests; fix = `advanceTimeBy(URNETWORK_LOCATION_POLL_MS + 1)` + `runCurrent()`
+- [[daily/2026-05-19.md]] - Session 13:53: extended rule — ANY `advanceUntilIdle()` with active `collectJob` = deadlock, not just when preceded by `advanceTimeBy()`; pattern is `backgroundScope.launch { flow.collect }` + `advanceUntilIdle()` before cancel; fix = `runCurrent()`; `import kotlinx.coroutines.test.runCurrent` required explicitly

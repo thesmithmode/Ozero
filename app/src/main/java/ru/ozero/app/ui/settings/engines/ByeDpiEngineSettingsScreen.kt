@@ -24,6 +24,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -85,6 +88,7 @@ private fun DnsSection(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("LongMethod")
 fun ByeDpiEngineSettingsScreen(
     onBack: () -> Unit,
     onOpenStrategyTest: () -> Unit = {},
@@ -125,24 +129,64 @@ fun ByeDpiEngineSettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Text(
-                        text = stringResource(R.string.byedpi_args_description),
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = stringResource(R.string.byedpi_mode_title),
+                        style = MaterialTheme.typography.titleSmall,
                     )
-                    OutlinedTextField(
-                        value = s.args,
-                        onValueChange = viewModel::onArgsChange,
-                        label = { Text("ByeDPI args") },
-                        modifier = Modifier.fillMaxWidth().testTag("byedpi_args_field"),
-                        minLines = 2,
-                    )
+                    SingleChoiceSegmentedButtonRow(
+                        modifier = Modifier.fillMaxWidth().testTag("byedpi_mode_segmented"),
+                    ) {
+                        SegmentedButton(
+                            selected = s.useUiMode,
+                            onClick = { viewModel.onToggleUiMode(true) },
+                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                            modifier = Modifier.testTag("byedpi_mode_ui_segment"),
+                        ) {
+                            Text(stringResource(R.string.byedpi_mode_segment_ui))
+                        }
+                        SegmentedButton(
+                            selected = !s.useUiMode,
+                            onClick = { viewModel.onToggleUiMode(false) },
+                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                            modifier = Modifier.testTag("byedpi_mode_cmd_segment"),
+                        ) {
+                            Text(stringResource(R.string.byedpi_mode_segment_cmd))
+                        }
+                    }
                     Text(
-                        text = if (s.usingDefault) {
-                            stringResource(R.string.byedpi_using_default_fmt, s.defaultArgs)
+                        text = if (s.useUiMode) {
+                            stringResource(R.string.byedpi_mode_ui_hint)
                         } else {
-                            stringResource(R.string.byedpi_using_override)
+                            stringResource(R.string.byedpi_mode_cmd_hint)
                         },
                         style = MaterialTheme.typography.bodySmall,
                     )
+
+                    if (s.useUiMode) {
+                        ByeDpiUiModeSection(
+                            settings = s.uiSettings,
+                            onChange = viewModel::onUiSettingsChange,
+                        )
+                    } else {
+                        Text(
+                            text = stringResource(R.string.byedpi_args_description),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        OutlinedTextField(
+                            value = s.args,
+                            onValueChange = viewModel::onArgsChange,
+                            label = { Text("ByeDPI args") },
+                            modifier = Modifier.fillMaxWidth().testTag("byedpi_args_field"),
+                            minLines = 2,
+                        )
+                        Text(
+                            text = if (s.usingDefault) {
+                                stringResource(R.string.byedpi_using_default_fmt, s.defaultArgs)
+                            } else {
+                                stringResource(R.string.byedpi_using_override)
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),

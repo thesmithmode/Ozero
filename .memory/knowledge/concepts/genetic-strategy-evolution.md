@@ -8,8 +8,9 @@ sources:
   - "daily/2026-05-14.md"
   - "daily/2026-05-17.md"
   - "daily/2026-05-18.md"
+  - "daily/2026-05-19.md"
 created: 2026-05-12
-updated: 2026-05-18
+updated: 2026-05-19
 ---
 
 # Genetic Algorithm for ByeDPI Strategy Optimization
@@ -31,6 +32,7 @@ Ozero Sprint 5 introduced a genetic algorithm layer on top of ByeDPI's auto-stra
 - Auto-save best chromosome to `SavedStrategyStore` after each evolution run
 - `SavedStrategy.lastVerifiedAtMs` tracks staleness; `markVerified` called after successful evolve; `StalenessLabel` composable shows warning after 7-day threshold
 - Per-network `GeneMemory` + `StrategyFitnessCache` via `NetworkProfileDetector` + `EvolutionResourcesProvider` — replaces global singleton with per-network instances
+- **Thompson Sampling** (v0.1.5) replaces UCB (Upper Confidence Bound) for strategy exploration; `ucbScore` function deleted; `GeneMemoryTest` rewritten; sentinel added to verify UCB is gone
 
 ## Details
 
@@ -168,3 +170,4 @@ Auto-save best chromosome to `savedStrategyStore` was also identified as polluti
 - [[daily/2026-05-14.md]] - GA v2: popSize 30, maxGen 20, eliteCount 3, targetFitness 0.85, fitness=successRate^1.5*(1-clamp(lat)/3000), initial pop 40/30/30, cache poisoning 0.0 skip, min chromosome length 5, 5 sentinel tests
 - [[daily/2026-05-17.md]] - GA v3 fitness: binary→granular computeProbeScore (gradient through connection stages); stagnation boost removed + sentinel; strategies 75→78 (v1.7.5); feat/ga-byedpi-v2 squash→dev
 - [[daily/2026-05-18.md]] - Session 11:38/12:06: 0% fitness traced to stale server_fd (600 start/stop cycles); unconditional forceClose fix; singleton sharing between VPN and testing identified; auto-save polluting favorites removed
+- [[daily/2026-05-19.md]] - Session 12:46: Thompson Sampling replaces UCB for strategy exploration; `ucbScore` deleted; `GeneMemoryTest` rewritten; sentinel added; `EvolutionEngineTest` decomposed into `EvolutionEngineSentinelTest` + shared helper to fix detekt LargeClass

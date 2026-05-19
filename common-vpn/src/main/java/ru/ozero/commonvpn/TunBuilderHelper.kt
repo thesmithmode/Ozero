@@ -66,10 +66,9 @@ class TunBuilderHelper(private val service: VpnService) {
         if (ipv6Enabled) {
             builder.addAddress(TUN_ADDRESS_V6, TUN_PREFIX_LENGTH_V6)
             builder.addRoute("::", 0)
-        } else {
-            blackholeIpv6(builder, "buildTunBuilder")
         }
-        val dnsServers = if (customDnsServers.isNotEmpty()) customDnsServers else TUN_DNS_SERVERS
+        // Ровно один DNS — паритет с upstream ByeByeDPI. Множественные DNS дублируют lookup через TUN и тормозят resolve.
+        val dnsServers = (if (customDnsServers.isNotEmpty()) customDnsServers else TUN_DNS_SERVERS).take(1)
         dnsServers.forEach { dns ->
             runCatching { builder.addDnsServer(dns) }
                 .onFailure { PersistentLoggers.warn(TAG, "addDnsServer rejected '$dns': ${it.message}") }

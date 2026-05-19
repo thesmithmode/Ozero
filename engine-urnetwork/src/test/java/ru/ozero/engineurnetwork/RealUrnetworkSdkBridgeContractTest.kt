@@ -80,6 +80,35 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
+    fun `ensureDeviceOnMain применяет 12 device-полей из localState — паритет с upstream DeviceManager`() {
+        val block = source.substringAfter("private suspend fun ensureDeviceOnMain")
+            .substringBefore("private inline fun guardedRun")
+        val requiredFields = listOf(
+            "providePaused",
+            "routeLocal",
+            "provideMode",
+            "connectLocation",
+            "defaultLocation",
+            "canShowRatingDialog",
+            "provideControlMode",
+            "vpnInterfaceWhileOffline",
+            "canRefer",
+            "allowForeground",
+            "provideNetworkMode",
+            "canPromptIntroFunnel",
+            "performanceProfile",
+        )
+        requiredFields.forEach { field ->
+            assertTrue(
+                block.contains("device.$field ="),
+                "ensureDeviceOnMain обязан выставлять device.$field из localState — " +
+                    "паритет с upstream DeviceManager.kt:132-144. Без этого SDK возвращает только " +
+                    "страны без городов/регионов в LocationsViewController.",
+            )
+        }
+    }
+
+    @Test
     fun `bridge использует UrnetworkRuntime ensure (один manager на процесс)`() {
         assertTrue(
             source.contains("UrnetworkRuntime.ensure(app)"),

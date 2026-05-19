@@ -40,7 +40,9 @@ class UrnetworkSharedTrafficViewModel @Inject constructor(
             emit(Unit)
             delay(BALANCE_POLL_INTERVAL_MS)
         }
-    }.onEach { runCatching { balanceRepository.refresh() } }
+    }.onEach {
+        viewModelScope.launch { runCatching { balanceRepository.refresh() } }
+    }
 
     val balanceState: StateFlow<UrnetworkBalanceState> = combine(
         balanceRepository.state,
@@ -50,7 +52,7 @@ class UrnetworkSharedTrafficViewModel @Inject constructor(
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(BALANCE_KEEPALIVE_MS),
-            initialValue = UrnetworkBalanceState.INITIAL,
+            initialValue = balanceRepository.state.value,
         )
 
     private val loadMutex = Mutex()

@@ -20,6 +20,8 @@ object SettingsKeys {
     val BYDPI_WINNING_ARGS = stringPreferencesKey("bydpi_winning_args")
     val BYDPI_LAST_PROBE_AT = longPreferencesKey("bydpi_last_probe_at")
     val BYDPI_DEFAULT_ACCEPTED = booleanPreferencesKey("bydpi_default_accepted")
+    val BYDPI_USE_UI_MODE = booleanPreferencesKey("bydpi_use_ui_mode")
+    val BYDPI_UI_SETTINGS_JSON = stringPreferencesKey("bydpi_ui_settings_json")
 
     val URNETWORK_ENABLED = booleanPreferencesKey("urnetwork_enabled")
     val URNETWORK_JWT = stringPreferencesKey("urnetwork_jwt")

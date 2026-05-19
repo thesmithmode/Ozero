@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.map
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.AutoStartGateway
+import ru.ozero.enginescore.settings.ByeDpiUiSettings
 import ru.ozero.enginescore.settings.HostsMode
 import ru.ozero.enginescore.settings.SettingsKeys
 import ru.ozero.enginescore.settings.SettingsModel
@@ -97,6 +98,14 @@ class SettingsRepositoryImpl @Inject constructor(
         dataStore.edit { it[SettingsKeys.BYDPI_DEFAULT_ACCEPTED] = accepted }
     }
 
+    override suspend fun setByedpiUseUiMode(enabled: Boolean) {
+        dataStore.edit { it[SettingsKeys.BYDPI_USE_UI_MODE] = enabled }
+    }
+
+    override suspend fun setByedpiUiSettings(settings: ByeDpiUiSettings) {
+        dataStore.edit { it[SettingsKeys.BYDPI_UI_SETTINGS_JSON] = settings.toJson() }
+    }
+
     override suspend fun setCustomDnsServers(servers: List<String>) {
         dataStore.edit { prefs ->
             val cleaned = servers
@@ -162,6 +171,9 @@ class SettingsRepositoryImpl @Inject constructor(
         byedpiWinningArgs = this[SettingsKeys.BYDPI_WINNING_ARGS],
         byedpiDefaultAccepted = this[SettingsKeys.BYDPI_DEFAULT_ACCEPTED]
             ?: SettingsModel.DEFAULT_BYEDPI_DEFAULT_ACCEPTED,
+        byedpiUseUiMode = this[SettingsKeys.BYDPI_USE_UI_MODE]
+            ?: SettingsModel.DEFAULT_BYEDPI_USE_UI_MODE,
+        byedpiUiSettings = ByeDpiUiSettings.fromJson(this[SettingsKeys.BYDPI_UI_SETTINGS_JSON]),
         customDnsServers = readCustomDnsServers(),
         hostsMode = readHostsMode(),
         hosts = readHosts(),

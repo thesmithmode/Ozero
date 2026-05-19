@@ -6,7 +6,7 @@ sealed class EngineConfig {
     abstract val engineId: EngineId
 
     data class ByeDpi(
-        val args: String = "-Ku -a1 -An -o1 -At,r,s -d1",
+        val args: String = "-Kt,h -o1 -e97 -An -Ku -a1 -An",
         val socksPort: Int = 1080,
         val hostsMode: HostsMode = HostsMode.DISABLED,
         val hosts: List<String> = emptyList(),

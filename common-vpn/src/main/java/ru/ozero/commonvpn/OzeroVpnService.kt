@@ -163,6 +163,7 @@ class OzeroVpnService : android.net.VpnService() {
         private const val TAG = "OzeroVpnService"
         private const val SHUTDOWN_JOIN_TIMEOUT_MS = 7_000L
         private const val ON_DESTROY_SHUTDOWN_TIMEOUT_MS = 5_000L
+        internal const val REVOKE_KILL_DELAY_MS = 2_500L
     }
 
     override fun onCreate() {
@@ -239,6 +240,7 @@ class OzeroVpnService : android.net.VpnService() {
         if (!starting.compareAndSet(false, true)) return
         stopSignal.set(false)
         PersistentLoggers.info(TAG, "startVpn entry")
+        logActiveExternalVpn()
         runCatching { tunFdRef.getAndSet(null)?.close() }
             .onFailure { PersistentLoggers.warn(TAG, "startVpn: stale tunFd close threw: ${it.message}") }
         tunnelController.onKillswitchReleased()
@@ -286,10 +288,37 @@ class OzeroVpnService : android.net.VpnService() {
 
     private fun stopVpn() = shutdownCoord.stopVpn()
 
+    private fun logActiveExternalVpn() {
+        runCatching {
+            val cm = getSystemService(android.content.Context.CONNECTIVITY_SERVICE)
+                as? android.net.ConnectivityManager ?: return@runCatching
+            val networks = cm.allNetworks
+            for (n in networks) {
+                val caps = cm.getNetworkCapabilities(n) ?: continue
+                if (!caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)) continue
+                PersistentLoggers.warn(
+                    TAG,
+                    "external VPN active at start — caps=${caps.toString().take(120)}",
+                )
+            }
+        }
+    }
+
     override fun onRevoke() {
-        PersistentLoggers.warn(TAG, "onRevoke — VPN permission revoked")
+        PersistentLoggers.warn(
+            TAG,
+            "onRevoke — VPN permission revoked, will kill own process after " +
+                "${REVOKE_KILL_DELAY_MS}ms to release Android VPN slot for other VPN apps",
+        )
         stopVpn()
         super.onRevoke()
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(
+            {
+                PersistentLoggers.warn(TAG, "onRevoke kill pid=${android.os.Process.myPid()} — slot release")
+                processKiller.kill(android.os.Process.myPid())
+            },
+            REVOKE_KILL_DELAY_MS,
+        )
     }
 
     override fun onDestroy() {

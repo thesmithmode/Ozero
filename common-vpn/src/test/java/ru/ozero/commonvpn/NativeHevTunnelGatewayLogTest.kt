@@ -71,6 +71,33 @@ class NativeHevTunnelGatewayLogTest {
     }
 
     @Test
+    fun `start запускает stats poller для discriminating tx_rx логов`() {
+        assertTrue(
+            source.contains("startStatsPoller()"),
+            "после успешного nativeStart должен запускаться stats poller — " +
+                "это discriminating-лог для диагностики мёртвого TUN→hev→byedpi pipeline",
+        )
+        assertTrue(
+            source.contains("nativeStats"),
+            "nativeStats должен быть injectable lambda — нужно для unit-тестов",
+        )
+        assertTrue(
+            source.contains("hev stats IDLE") || source.contains("hev stats tx="),
+            "stats poller обязан логировать tx/rx bytes — иначе нельзя отличить " +
+                "'TUN пустой' от 'трафик идёт, но peer не отвечает'",
+        )
+    }
+
+    @Test
+    fun `stop останавливает stats poller`() {
+        val stopBody = funBody(source, "stop")
+        assertTrue(
+            stopBody.contains("statsPoller.getAndSet(null)?.interrupt()"),
+            "stop обязан interrupt() stats poller — иначе daemon thread утечёт после tunnel teardown",
+        )
+    }
+
+    @Test
     fun `start больше не делает dup — raw tunPfd_fd передаётся в native`() {
         assertTrue(
             !startBody.contains(".dup()"),

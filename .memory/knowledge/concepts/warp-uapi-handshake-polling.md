@@ -4,17 +4,20 @@ aliases: [uapi-handshake, warp-handshake-uapi, local-socket-uapi]
 tags: [warp, amneziawg, native, architecture]
 sources:
   - "daily/2026-05-14.md"
+  - "daily/2026-05-20.md"
 created: 2026-05-14
-updated: 2026-05-14
+updated: 2026-05-20
 ---
 
 # WARP UAPI Handshake Polling via LocalSocket
 
-`WarpHandshakeUapi.kt` reads `last_handshake_time_sec > 0` from the AmneziaWG UAPI socket at `$dataDir/ozero-warp.sock` using `android.net.LocalSocket`. This is the safe way to verify WireGuard handshake completion. The alternative — `awgGetConfig()` JNI call — causes SIGSEGV when called on a partial-handshake handle.
+`WarpHandshakeUapi.kt` reads `last_handshake_time_sec > 0` from the AmneziaWG UAPI socket at `$dataDir/sockets/<kernel-tun-name>.sock` using `android.net.LocalSocket`. This is the safe way to verify WireGuard handshake completion. The alternative — `awgGetConfig()` JNI call — causes SIGSEGV when called on a partial-handshake handle.
 
 ## Key Points
 
-- UAPI socket path: `$dataDir/ozero-warp.sock` (created by `awgTurnOn` with the `uapiPath` parameter)
+- UAPI socket path: amneziawg-go fork в `ipc/uapi_unix.go` делает `filepath.Join(rootdir, "sockets")` → реальный путь `$dataDir/sockets/<kernel-присвоенное-tun-name>.sock` (НЕ `$dataDir/<our-tunnel-name>.sock`). До v0.1.8 был баг: искали в корне → файла нет → awaitReady timeout → false-failed
+- `findUapiSocket()` (v0.1.8+) cascade: 1) preferred `sockets/<tunnelName>.sock`, 2) первый `.sock` через `listFiles` в `sockets/`, 3) legacy `<uapiPath>/<tunnelName>.sock`
+- WarpSocketDiagnostics листит ОБА `sockets/` И `wireguard/` (исторический путь некоторых fork-ов) для дифдиагностики
 - Signal: `last_handshake_time_sec > 0` in the UAPI config dump = handshake completed
 - Polling: every 300ms, timeout 10s via `withTimeoutOrNull` + `delay`
 - `awgGetConfig(handle)` JNI is unsafe during partial handshake — Go runtime may access incomplete state → SIGSEGV

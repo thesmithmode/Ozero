@@ -256,11 +256,17 @@ class ByeDpiEngineTest {
     }
 
     @Test
-    fun buildArgs_noProgramNameInArray_cCodeAddsOwn() {
+    fun buildArgs_doesNotPrependProgramName_nativeLayerAlreadyInsertsByedpiArgv0() {
         val args = engine.buildArgs(EngineConfig.ByeDpi(socksPort = 1080)).toList()
         assertTrue(
+            args.firstOrNull() == "--ip",
+            "buildArgs НЕ должен prepend'ить 'ciadpi'/'byedpi' — native-lib.c уже ставит argv[0]='byedpi'. " +
+                "Double-prepend → getopt парсит 'ciadpi' как positional, первый реальный флаг (--ip) " +
+                "теряется, SOCKS слушает на чужом адресе → traffic IDLE. Fact: $args",
+        )
+        assertTrue(
             args.none { it == "ciadpi" || it == "byedpi" },
-            "C-код сам добавляет argv[0]=byedpi — программное имя в Java-массиве дублирует его и ломает getopt: $args",
+            "argv не должен содержать program-name строк — native слой их вставит сам. Fact: $args",
         )
         assertTrue(args.contains("--ip"), "buildArgs должен передавать --ip bind-address: $args")
     }

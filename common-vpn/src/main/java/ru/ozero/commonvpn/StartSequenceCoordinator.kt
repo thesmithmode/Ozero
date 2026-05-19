@@ -85,13 +85,13 @@ class StartSequenceCoordinator(
         }
         if (pick == null) {
             val mode = if (manualEngine == null) "auto" else "manual"
-            val targetForUi = resolveTargetForUi(manualEngine, settings) ?: run {
+            val targetForUi = resolveTargetForUi(manualEngine, settings)
+            if (targetForUi == null) {
                 PersistentLoggers.error(TAG, "no plugins registered — отказ старта")
-                stopVpnRequest()
-                return
+            } else {
+                PersistentLoggers.error(TAG, "no engine reachable ($mode mode) — отказ старта")
+                deps.tunnelController.onEngineDied(targetForUi, "no engine reachable ($mode mode)")
             }
-            PersistentLoggers.error(TAG, "no engine reachable ($mode mode) — отказ старта")
-            deps.tunnelController.onEngineDied(targetForUi, "no engine reachable ($mode mode)")
             stopVpnRequest()
             return
         }
@@ -118,7 +118,14 @@ class StartSequenceCoordinator(
         val chainResult = startChain(activeEngineId, activeConfig) ?: return
         if (!routeTrafficForEngine(activeEngineId, fd, chainResult.finalSocksPort)) return
 
-        awaitEngineReady(activeEngineId)
+        if (!awaitEngineReady(activeEngineId)) {
+            runCatching { deps.chainOrchestrator.stop() }
+            deps.engineWatchdog.handleEngineFailure(
+                activeEngineId,
+                "awaitReady fail — handshake/probe не подтверждён",
+            )
+            return
+        }
 
         deps.tunnelController.onEngineStarted(activeEngineId, chainResult.finalSocksPort)
         val nowMs = System.currentTimeMillis()
@@ -165,14 +172,17 @@ class StartSequenceCoordinator(
         return SplitTunnelConfig(mode = mode, allowlist = allowlist, blocklist = blocklist)
     }
 
-    private suspend fun awaitEngineReady(engineId: EngineId) {
-        val plugin = deps.enginePlugins.firstOrNull { it.id == engineId } ?: return
-        val result = plugin.awaitReady()
-        if (result is EnginePlugin.ReadyResult.Timeout) {
-            PersistentLoggers.warn(
-                TAG,
-                "awaitReady timeout for $engineId: ${result.reason} — watchdog will catch",
-            )
+    private suspend fun awaitEngineReady(engineId: EngineId): Boolean {
+        val plugin = deps.enginePlugins.firstOrNull { it.id == engineId } ?: return true
+        return when (val result = plugin.awaitReady()) {
+            EnginePlugin.ReadyResult.Ready -> true
+            is EnginePlugin.ReadyResult.Timeout -> {
+                PersistentLoggers.warn(
+                    TAG,
+                    "awaitReady timeout for $engineId: ${result.reason} → engineFailure (fast-fail)",
+                )
+                false
+            }
         }
     }
 
@@ -241,11 +251,16 @@ class StartSequenceCoordinator(
             builder.establish()
         } catch (t: Throwable) {
             PersistentLoggers.error(TAG, "engine TUN establish threw: ${t.message}")
+            deps.tunnelController.onEngineDied(engineId, "VPN slot занят — выключите другой VPN")
             stopVpnRequest()
             return null
         }
         if (pfd == null) {
-            PersistentLoggers.error(TAG, "engine TUN establish returned null — permission revoked?")
+            PersistentLoggers.error(
+                TAG,
+                "engine TUN establish returned null — VPN slot занят другим приложением",
+            )
+            deps.tunnelController.onEngineDied(engineId, "VPN slot занят — выключите другой VPN")
             stopVpnRequest()
             return null
         }
@@ -283,7 +298,10 @@ class StartSequenceCoordinator(
             return null
         }
         if (fd == null) {
-            PersistentLoggers.error(TAG, "establish returned null — permission revoked?")
+            PersistentLoggers.error(
+                TAG,
+                "establish returned null — VPN slot занят другим приложением (другой VPN active)",
+            )
             stopVpnRequest()
             return null
         }

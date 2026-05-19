@@ -341,7 +341,7 @@ class StrategyTestViewModel @Inject constructor(
                         maxGenerations = maxGen,
                         bestFitness = result.bestFitness,
                         bestSuccessRate = result.bestSuccessRate,
-                        topChromosomes = result.population
+                        topChromosomes = result.populationSuccessRates
                             .sortedByDescending { it.second }
                             .take(5)
                             .map { it.first.toCommand() to it.second },
@@ -379,6 +379,7 @@ class StrategyTestViewModel @Inject constructor(
                     .onSuccess { _savedStrategies.value = it }
             }
         }
+        _evolutionState.update { it?.copy(stagnationCount = 0) }
     }
 
     private suspend fun runLoop(sites: List<String>) = coroutineScope {

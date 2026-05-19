@@ -1,5 +1,20 @@
 # Build Log
 
+## [2026-05-19T20:00:00+03:00] compile | Daily Log 2026-05-19 (pass 2 — gap fill)
+- Source: daily/2026-05-19.md
+- Articles created: [[concepts/speed-chart-bucket-alignment]] (time-aligned bucket IDs prevent sliding-window drift; SpeedSample typed wrapper), [[concepts/vpn-slot-coexistence-crash]] (establish() null = external VPN holds slot; Failed state + logActiveExternalVpn), [[concepts/urnetwork-filter-locations-trigger]] (filterLocations("") required after vc.start()), [[concepts/hilt-viewmodel-split-too-many-functions]] (hiltViewModel() decomp for TooManyFunctions; shared internal fakes)
+- Note: urnetwork-balance-optimistic-cache + hiltviewmodel-toomanyfunctions-decomposition + vpn-slot-conflict-detection + urnetwork-filterlocations-trigger already existed from pass 1; new files are extended/renamed variants — index refs pass-1 canonical names
+- Articles updated: [[concepts/chart-nice-max-dynamic-scaling]] (bucket alignment fix + SpeedSample + speed-chart-bucket-alignment cross-ref), [[concepts/byedpi-jni-guard-hardening]] (__android_log_print checkpoints; cold-start 5s+ vs 14ms warm; hang root cause pending)
+- Index updated: 1 row added (speed-chart-bucket-alignment), total 143
+
+## [2026-05-19T19:00:00+03:00] compile | Daily Log 2026-05-19 (pass 1)
+- Source: daily/2026-05-19.md
+- Articles created: [[concepts/hiltviewmodel-toomanyfunctions-decomposition]], [[concepts/vpn-slot-conflict-detection]], [[concepts/urnetwork-filterlocations-trigger]], [[concepts/urnetwork-balance-optimistic-cache]]
+- Articles updated: [[concepts/viewmodel-polling-runtest-trap]] (extended rule: ANY advanceUntilIdle + active collectJob = deadlock, not just while-true; diagnostic grep pattern added), [[concepts/warp-false-connected-no-handshake]] (WARP_READY 10s→5s, SWITCHING 12s→6s; awaitEngineReady Boolean; timeout→handleEngineFailure), [[concepts/genetic-strategy-evolution]] (Thompson Sampling replaces UCB; EvolutionEngineTest decomposed)
+- Index updated: 4 rows added, 3 rows updated, total 142
+- Sessions covered: 00:06 (icons research — Material Icons in URnetwork APK confirmed), 00:51 (CI fix + chart bucketize), 10:30/10:56 (v0.1.3 bugs list), CI refactor (VM split), 12:46 (Thompson Sampling + EvolutionEngineTest decomp), 13:53 (advanceUntilIdle deadlock extended rule + probingLabelRes fix + v0.1.4 tag), v0.1.5 WARP/switch speedup + ByeDPI native diag, 15:13/16:23 (URnetwork traffic/cache/filterLocations/coexistence), 17:40/17:47 (open bugs + KB consultation)
+- Open bugs (not yet fixed): ByeDPI not passing real traffic, traffic 2× overcount, traffic badge missing at VPN start, WARP device verification pending, expert mode status bar symmetric layout
+
 ## [2026-05-18T23:30:00+03:00] compile | Daily Log 2026-05-18 (pass 7 — late sessions)
 - Source: daily/2026-05-18.md
 - Articles created: (none)

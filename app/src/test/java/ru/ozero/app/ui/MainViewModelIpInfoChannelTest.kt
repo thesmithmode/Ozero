@@ -15,14 +15,15 @@ class MainViewModelIpInfoChannelTest {
     }
 
     @Test
-    fun `IP_INFO_WARMUP_MS от 2 секунд — даёт туннелю стабилизироваться перед IP-resolve`() {
+    fun `IP_INFO_WARMUP_MS короткий — IP-карточка показывается быстро после старта VPN (T5 fix)`() {
         val regex = Regex("IP_INFO_WARMUP_MS\\s*=\\s*(\\d[\\d_]*)L")
         val m = regex.find(source) ?: error("IP_INFO_WARMUP_MS не найден")
         val warmupMs = m.groupValues[1].replace("_", "").toLong()
         assertTrue(
-            warmupMs >= 2_000L,
-            "IP_INFO_WARMUP_MS обязан быть >= 2000ms — туннелю нужно время стабилизироваться. " +
-                "URnetwork location реактивно обновляется через URNETWORK_LOCATION_POLL_MS polling. " +
+            warmupMs in 100L..1_000L,
+            "IP_INFO_WARMUP_MS должен быть в диапазоне [100..1000]ms — T5 fix: плашка обязана появиться " +
+                "сразу после старта VPN, не через 2-3 секунды. URnetwork location reактивно обновляется " +
+                "через URNETWORK_LOCATION_POLL_MS polling, поэтому первый fetch может быть стартовым stub. " +
                 "Fact=$warmupMs",
         )
     }

@@ -24,6 +24,9 @@
     <string name="main_health_degraded_hint">Проба маршрута не отвечает 3 раза подряд. Попробуйте сменить движок.</string>
     <string name="urnetwork_peer_count_label">Пиры: %1$d</string>
     <string name="urnetwork_peer_searching">Пиры недоступны, продолжаю попытки подключения %1$d с</string>
+    <string name="engine_status_peers_title">Пиры:</string>
+    <string name="engine_status_peers_searching_value">Поиск %1$d с</string>
+    <string name="engine_status_peers_unavailable">—</string>
 
     <!-- Tabs -->
     <string name="tab_main">Главная</string>
@@ -498,4 +501,35 @@
     <string name="strategy_time_min_ago_fmt">%1$d мин назад</string>
     <string name="strategy_time_hour_ago_fmt">%1$d ч назад</string>
     <string name="strategy_time_day_ago_fmt">%1$d д назад</string>
+    <string name="byedpi_mode_ui">Режим интерфейса</string>
+    <string name="byedpi_mode_ui_hint">Настройка через переключатели — рекомендуется новичкам</string>
+    <string name="byedpi_mode_cmd_hint">CMD-режим: ручной ввод аргументов и стратегий</string>
+    <string name="byedpi_mode_segment_ui">Простой</string>
+    <string name="byedpi_mode_segment_cmd">Командная строка</string>
+    <string name="byedpi_mode_title">Режим настройки</string>
+    <string name="byedpi_ui_desync_method">Метод обхода</string>
+    <string name="byedpi_ui_current_method_fmt">Текущий: %1$s</string>
+    <string name="byedpi_ui_split_position">Позиция разреза</string>
+    <string name="byedpi_ui_split_at_host">Разрез по host</string>
+    <string name="byedpi_ui_fake_ttl">Fake TTL</string>
+    <string name="byedpi_ui_fake_sni">Fake SNI</string>
+    <string name="byedpi_ui_fake_offset">Fake смещение</string>
+    <string name="byedpi_ui_oob_char">OOB символ</string>
+    <string name="byedpi_ui_protocols">Протоколы</string>
+    <string name="byedpi_ui_desync_https">Десинк HTTPS</string>
+    <string name="byedpi_ui_desync_http">Десинк HTTP</string>
+    <string name="byedpi_ui_desync_udp">Десинк UDP (QUIC)</string>
+    <string name="byedpi_ui_http_mod">Мод HTTP-заголовков</string>
+    <string name="byedpi_ui_host_mixed">Host: смешанный регистр</string>
+    <string name="byedpi_ui_domain_mixed">Домен: смешанный регистр</string>
+    <string name="byedpi_ui_host_remove_spaces">Убрать пробелы вокруг Host</string>
+    <string name="byedpi_ui_tls_record">TLS Record split</string>
+    <string name="byedpi_ui_tls_record_split">Включить TLS Record split</string>
+    <string name="byedpi_ui_tls_record_position">Позиция TLS-разреза</string>
+    <string name="byedpi_ui_tls_record_at_sni">Резать у SNI</string>
+    <string name="byedpi_ui_advanced">Дополнительно</string>
+    <string name="byedpi_ui_tcp_fast_open">TCP Fast Open</string>
+    <string name="byedpi_ui_drop_sack">Сбрасывать SACK</string>
+    <string name="byedpi_ui_no_domain">Игнорировать домен</string>
+    <string name="byedpi_ui_default_ttl">TTL по умолчанию</string>
 </resources>

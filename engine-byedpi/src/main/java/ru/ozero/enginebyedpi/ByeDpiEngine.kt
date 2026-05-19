@@ -60,13 +60,20 @@ class ByeDpiEngine(
     private val proxyScope = CoroutineScope(SupervisorJob() + (testDispatcherOverride ?: proxyDispatcher))
     private val proxyJobRef = AtomicReference<Job?>(null)
 
-    override fun buildManualConfig(settings: SettingsModel?): EngineConfig = EngineConfig.ByeDpi(
-        args = settings?.byedpiWinningArgs?.takeIf { it.isNotBlank() }
-            ?: EngineConfig.ByeDpi().args,
-        socksPort = AUTO_ROTATE_PORT,
-        hostsMode = settings?.hostsMode ?: HostsMode.DISABLED,
-        hosts = settings?.hosts.orEmpty(),
-    )
+    override fun buildManualConfig(settings: SettingsModel?): EngineConfig {
+        val args = when {
+            settings?.byedpiUseUiMode == true ->
+                ByeDpiUiArgsBuilder.buildArgsOnly(settings.byedpiUiSettings).joinToString(" ")
+            !settings?.byedpiWinningArgs.isNullOrBlank() -> settings.byedpiWinningArgs!!
+            else -> EngineConfig.ByeDpi().args
+        }
+        return EngineConfig.ByeDpi(
+            args = args,
+            socksPort = AUTO_ROTATE_PORT,
+            hostsMode = settings?.hostsMode ?: HostsMode.DISABLED,
+            hosts = settings?.hosts.orEmpty(),
+        )
+    }
 
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
         require(config is EngineConfig.ByeDpi) { "ByeDpiEngine требует EngineConfig.ByeDpi" }

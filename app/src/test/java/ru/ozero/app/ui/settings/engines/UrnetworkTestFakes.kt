@@ -3,6 +3,7 @@ package ru.ozero.app.ui.settings.engines
 import com.bringyour.sdk.LocationsViewController
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.settings.ByeDpiUiSettings
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
 import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
@@ -115,6 +116,8 @@ internal class FakeSettingsRepo : ru.ozero.enginescore.settings.SettingsReposito
     }
     override suspend fun setByedpiWinningArgs(args: String?) = Unit
     override suspend fun setByedpiDefaultAccepted(accepted: Boolean) = Unit
+    override suspend fun setByedpiUseUiMode(enabled: Boolean) = Unit
+    override suspend fun setByedpiUiSettings(settings: ByeDpiUiSettings) = Unit
     override suspend fun setCustomDnsServers(servers: List<String>) = Unit
     override suspend fun setHostsMode(mode: ru.ozero.enginescore.settings.HostsMode) = Unit
     override suspend fun setHosts(hosts: List<String>) = Unit

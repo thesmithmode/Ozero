@@ -60,7 +60,11 @@ class WarpEngineService : Service() {
             val rawFd = tunFd.detachFd()
             Log.i(TAG, "awgTurnOn(combined) name=$name fd=$rawFd iniLen=${iniConfig.length}")
             val handle = GoBackend.awgTurnOn(name, rawFd, iniConfig, uapiPath)
-            if (handle < 0) return WarpTurnOnResult(handle, null, null)
+            // amnezia AWG: errors → -1, 0 = валидный первый tunnel slot. Не менять на `<= 0` (ломает чистый старт).
+            if (handle < 0) {
+                Log.w(TAG, "awgTurnOn returned handle=$handle (<0 = SDK error) — skip socket fetch")
+                return WarpTurnOnResult(handle, null, null)
+            }
             val v4Pfd = runCatching {
                 val v4Fd = GoBackend.awgGetSocketV4(handle)
                 if (v4Fd > 0) ParcelFileDescriptor.fromFd(v4Fd) else null

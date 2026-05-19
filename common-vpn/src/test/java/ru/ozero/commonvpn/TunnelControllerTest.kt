@@ -29,6 +29,16 @@ class TunnelControllerTest {
     }
 
     @Test
+    fun `sentinel SWITCHING_TIMEOUT_MS = 12s — допускает медленный handshake v0_1_5_1`() {
+        assertEquals(
+            12_000L,
+            TunnelController.SWITCHING_TIMEOUT_MS,
+            "6s рвал переключение когда движок поднимался дольше (WARP handshake до 10s + chain assembly). " +
+                "12s — достаточно для legitimate ready, не блокирует UX надолго при действительно мёртвом движке.",
+        )
+    }
+
+    @Test
     fun fullHappyPath_idleProbingConnectingConnectedDisconnectingIdle() {
         controller.onProbing()
         assertIs<TunnelState.Probing>(controller.state.value)

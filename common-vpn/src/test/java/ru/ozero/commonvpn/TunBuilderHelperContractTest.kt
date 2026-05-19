@@ -91,6 +91,22 @@ class TunBuilderHelperContractTest {
             body.contains("if (customDnsServers.isNotEmpty()) customDnsServers else TUN_DNS_SERVERS"),
             "custom DNS должен иметь приоритет, fallback к TUN_DNS_SERVERS",
         )
+        assertTrue(
+            body.contains(".take(1)"),
+            "ByeDPI pipeline parity: ровно один DNS — upstream ByeByeDPI добавляет 1, " +
+                "лишние DNS дублируют lookup и тормозят resolve через TUN",
+        )
+    }
+
+    @Test
+    fun `buildTunBuilder НЕ ставит setMtu — TUN link MTU независим от lwIP YAML mtu`() {
+        val body = source.substringAfter("fun buildTunBuilder(").substringBefore("private fun applyLockdown")
+        assertTrue(
+            !body.contains(".setMtu("),
+            "buildTunBuilder обязан НЕ вызывать setMtu — ByeByeDPI 1.7.4 reference этого не делает. " +
+                "Android default ~1500 link MTU. lwIP YAML mtu=8500 = internal buffer cap, " +
+                "никак не связан с TUN link MTU. Регрессия 89a6ecf3 (v0.1.6) откачена в v0.1.8.",
+        )
     }
 
     @Test

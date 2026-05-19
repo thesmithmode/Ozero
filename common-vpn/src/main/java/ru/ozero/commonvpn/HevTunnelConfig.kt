@@ -29,19 +29,16 @@ data class HevTunnelConfig(
         """
         tunnel:
           mtu: $tunMtu
-          ipv4: $tunIpv4
-          ipv6: '$tunIpv6'
         misc:
           task-stack-size: 81920
-          log-level: $hevLogLevel
         socks5:
           address: $socksAddress
           port: $socksPort
-          udp: '$udpMode'
+          udp: $udpMode
         """.trimIndent() + "\n"
 
-    private companion object {
-        private const val DEFAULT_TUN_MTU: Int = 8500
+    companion object {
+        const val DEFAULT_TUN_MTU: Int = 8500
 
         private const val DEFAULT_TUN_IPV4: String = "10.10.10.10"
         private const val DEFAULT_TUN_IPV6: String = "fd00::1"

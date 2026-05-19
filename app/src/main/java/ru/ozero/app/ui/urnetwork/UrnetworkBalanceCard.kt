@@ -98,13 +98,6 @@ private fun BalanceDetails(state: UrnetworkBalanceState) {
         label = stringResource(R.string.urnetwork_daily_allocation),
         value = formatBytes(snapshot.startBalanceBytes),
     )
-    val planLabel = snapshot.plan?.takeIf { it.isNotBlank() }
-        ?: stringResource(R.string.urnetwork_balance_plan_unknown)
-    Text(
-        text = stringResource(R.string.urnetwork_balance_plan_label, planLabel),
-        style = MaterialTheme.typography.bodySmall,
-        color = OzeroPalette.Text2,
-    )
     if (state.meanReliabilityWeight > 0.0 || state.totalReferrals > 0L) {
         HorizontalDivider(color = OzeroPalette.Line)
         if (state.meanReliabilityWeight > 0.0) {
