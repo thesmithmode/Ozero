@@ -2,9 +2,11 @@ package ru.ozero.enginebyedpi
 
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineConfig
+import ru.ozero.enginescore.settings.ByeDpiUiSettings
 import ru.ozero.enginescore.settings.HostsMode
 import ru.ozero.enginescore.settings.SettingsModel
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class ByeDpiBuildManualConfigTest {
 
@@ -19,16 +21,47 @@ class ByeDpiBuildManualConfigTest {
     }
 
     @Test
-    fun `winningArgs из SettingsModel override`() {
+    fun `CMD mode winningArgs override`() {
         val custom = "-Y -Ar -s5"
-        val cfg = engine.buildManualConfig(SettingsModel(byedpiWinningArgs = custom)) as EngineConfig.ByeDpi
+        val cfg = engine.buildManualConfig(
+            SettingsModel(byedpiUseUiMode = false, byedpiWinningArgs = custom),
+        ) as EngineConfig.ByeDpi
         assertEquals(custom, cfg.args)
     }
 
     @Test
-    fun `blank winningArgs → fallback default args`() {
-        val cfg = engine.buildManualConfig(SettingsModel(byedpiWinningArgs = "   ")) as EngineConfig.ByeDpi
+    fun `CMD mode blank winningArgs → fallback default args`() {
+        val cfg = engine.buildManualConfig(
+            SettingsModel(byedpiUseUiMode = false, byedpiWinningArgs = "   "),
+        ) as EngineConfig.ByeDpi
         assertEquals(EngineConfig.ByeDpi().args, cfg.args)
+    }
+
+    @Test
+    fun `UI mode игнорирует winningArgs и собирает args из ByeDpiUiSettings`() {
+        val cfg = engine.buildManualConfig(
+            SettingsModel(
+                byedpiUseUiMode = true,
+                byedpiWinningArgs = "-Y -Ar -s5",
+                byedpiUiSettings = ByeDpiUiSettings.DEFAULT,
+            ),
+        ) as EngineConfig.ByeDpi
+        assertTrue("-Ku" in cfg.args, "UI mode defaults включают desyncUdp -Ku, got '${cfg.args}'")
+        assertTrue("-Y -Ar -s5" !in cfg.args)
+    }
+
+    @Test
+    fun `UI mode передаёт desyncMethod из настроек`() {
+        val cfg = engine.buildManualConfig(
+            SettingsModel(
+                byedpiUseUiMode = true,
+                byedpiUiSettings = ByeDpiUiSettings.DEFAULT.copy(
+                    desyncMethod = ByeDpiUiSettings.DesyncMethod.SPLIT,
+                    splitPosition = 7,
+                ),
+            ),
+        ) as EngineConfig.ByeDpi
+        assertTrue("-s7" in cfg.args)
     }
 
     @Test
