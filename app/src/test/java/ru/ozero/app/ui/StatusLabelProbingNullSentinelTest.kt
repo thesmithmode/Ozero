@@ -33,7 +33,11 @@ class StatusLabelProbingNullSentinelTest {
     @Test
     fun `probingLabelRes — null engineId fallback на main_status_probing`() {
         assertEquals(R.string.main_status_probing, probingLabelRes(null, isReconnecting = false))
-        assertEquals(R.string.main_status_probing, probingLabelRes(null, isReconnecting = true))
+    }
+
+    @Test
+    fun `probingLabelRes — null engineId reconnecting возвращает main_status_reconnecting`() {
+        assertEquals(R.string.main_status_reconnecting, probingLabelRes(null, isReconnecting = true))
     }
 
     @Test
