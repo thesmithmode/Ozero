@@ -406,6 +406,42 @@ class EvolutionEngineTest {
     }
 
     @Test
+    fun `persistent fitness cache write-only during evolve - stale fitness not read`() = runTest {
+        val countingEngine = CountingEngine()
+        val pool = GenePool(seeds)
+        val cacheFile = java.io.File.createTempFile("fit", ".json").also { it.deleteOnExit() }
+        val fitnessCache = StrategyFitnessCache(cacheFile)
+        seeds.forEach { seed -> fitnessCache.put(seed, 0.99) }
+        assertEquals(seeds.size, fitnessCache.size(), "precondition: all seeds in cache")
+        val evolutionEngine = EvolutionEngine(
+            byeDpiEngine = countingEngine,
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(pool),
+            pool = pool,
+            sites = listOf("s1.com"),
+            settings = EvolutionEngine.EvolutionSettings(populationSize = 4, maxGenerations = 1),
+            fitnessCachePersistent = fitnessCache,
+        )
+        evolutionEngine.evolve(seedStrategies = seeds, onGeneration = {})
+        assertTrue(
+            countingEngine.startCount > 0,
+            "persistent cache must not be read during evolve — stale fitness bypassed, engine.startCount=${countingEngine.startCount}",
+        )
+    }
+
+    @Test
+    fun `survivor count scales with populationSize as diversity floor`() {
+        val source = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+        ).resolve("src/main/java/ru/ozero/enginebyedpi/strategy/EvolutionEngine.kt").readText()
+        assertTrue(
+            source.contains("populationSize / 4"),
+            "Tournament survivors must scale with population: (populationSize/4).coerceAtLeast(eliteCount). " +
+                "Fixed eliteCount=3 collapses diversity by gen 2.",
+        )
+    }
+
+    @Test
     fun `no mutation rate boost on stagnation — constant mutationRate`() {
         val source = java.io.File(
             System.getProperty("user.dir") ?: ".",

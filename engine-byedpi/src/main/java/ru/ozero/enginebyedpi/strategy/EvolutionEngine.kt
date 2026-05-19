@@ -108,7 +108,8 @@ class EvolutionEngine(
             if (bestFitness >= settings.targetFitness) break
             if (stagnationCount >= exitThreshold) break
 
-            val survivors = evolver.tournament(fitnessPairs, settings.eliteCount, random = random)
+            val survivorCount = (settings.populationSize / 4).coerceAtLeast(settings.eliteCount)
+            val survivors = evolver.tournament(fitnessPairs, survivorCount, random = random)
             population = when {
                 stagnationCount >= injectThreshold ->
                     buildSeedInjection(survivors, seedStrategies, settings.mutationRate)
@@ -237,16 +238,11 @@ class EvolutionEngine(
             onChromosomeEval(index, population.size, chromosome.toCommand())
             val evalResult = evalCache.getOrPut(chromosome) {
                 val command = chromosome.toCommand()
-                val persistedFitness = fitnessCachePersistent?.get(command)
-                if (persistedFitness != null) {
-                    EvalResult(fitness = persistedFitness, successRate = persistedFitness)
-                } else {
-                    val computed = evaluate(chromosome)
-                    if (command.isNotBlank() && !computed.startFailed) {
-                        fitnessCachePersistent?.put(command, computed.fitness)
-                    }
-                    computed
+                val computed = evaluate(chromosome)
+                if (command.isNotBlank() && !computed.startFailed) {
+                    fitnessCachePersistent?.put(command, computed.fitness)
                 }
+                computed
             }
             chromosome to evalResult
         }
