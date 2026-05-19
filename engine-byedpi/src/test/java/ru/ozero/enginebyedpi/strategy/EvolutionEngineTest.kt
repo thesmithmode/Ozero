@@ -430,6 +430,70 @@ class EvolutionEngineTest {
     }
 
     @Test
+    fun `adaptive memory ratio reduces seed proportion when memory is rich`() = runTest {
+        val manySeeds = (1..15).map { "-S$it" }
+
+        val poorFile = java.io.File.createTempFile("poor", ".json").also { it.deleteOnExit() }
+        val poorMem = GeneMemory(poorFile)
+
+        val richFile = java.io.File.createTempFile("rich", ".json").also { it.deleteOnExit() }
+        val richMem = GeneMemory(richFile)
+        repeat(60) { richMem.record(listOf("-mA", "-mB"), fitness = 0.8) }
+        assertTrue(richMem.isRich(), "precondition: 60 records must trigger isRich")
+
+        val poorCmds = collectGenerationOneCommands(poorMem, manySeeds)
+        val richCmds = collectGenerationOneCommands(richMem, manySeeds)
+
+        val seedSet = manySeeds.toSet()
+        val poorSeedCount = poorCmds.count { it in seedSet }
+        val richSeedCount = richCmds.count { it in seedSet }
+
+        assertTrue(
+            richSeedCount < poorSeedCount,
+            "rich memory must reduce seed-derived chromosomes in initial population: rich=$richSeedCount poor=$poorSeedCount",
+        )
+    }
+
+    private suspend fun collectGenerationOneCommands(memory: GeneMemory, seedList: List<String>): List<String> {
+        val pool = GenePool(seedList)
+        val captured = mutableListOf<String>()
+        EvolutionEngine(
+            byeDpiEngine = AlwaysSucceedEngine(),
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(pool),
+            pool = pool,
+            sites = listOf("s1.com"),
+            settings = EvolutionEngine.EvolutionSettings(
+                populationSize = 30,
+                maxGenerations = 1,
+                targetFitness = 0.0,
+            ),
+            memory = memory,
+            random = Random(42),
+        ).evolve(
+            seedStrategies = seedList,
+            onGeneration = {},
+            onChromosomeEval = { _, _, cmd -> captured.add(cmd) },
+        )
+        return captured.take(30)
+    }
+
+    @Test
+    fun `EvolutionEngine uses adaptive memory ratio for rich memory`() {
+        val source = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+        ).resolve("src/main/java/ru/ozero/enginebyedpi/strategy/EvolutionEngine.kt").readText()
+        assertTrue(
+            source.contains("ADAPTIVE_SEED_RATIO") && source.contains("ADAPTIVE_MEMORY_RATIO"),
+            "EvolutionEngine must define adaptive ratios for rich memory",
+        )
+        assertTrue(
+            source.contains("memory.isRich()") || source.contains("memoryRich"),
+            "EvolutionEngine must switch ratios based on memory.isRich()",
+        )
+    }
+
+    @Test
     fun `survivor count scales with populationSize as diversity floor`() {
         val source = java.io.File(
             System.getProperty("user.dir") ?: ".",

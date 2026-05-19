@@ -145,8 +145,11 @@ class EvolutionEngine(
 
     private fun buildInitialPopulation(seedStrategies: List<String>): List<Chromosome> {
         val total = settings.populationSize.coerceAtLeast(1)
-        val seedQuota = (total * settings.initialSeedRatio).toInt().coerceAtLeast(1).coerceAtMost(total)
-        val memoryQuota = (total * settings.initialMemoryRatio).toInt().coerceAtMost(total - seedQuota)
+        val memoryRich = memory != null && memory.isRich()
+        val seedRatio = if (memoryRich) ADAPTIVE_SEED_RATIO else settings.initialSeedRatio
+        val memoryRatio = if (memoryRich) ADAPTIVE_MEMORY_RATIO else settings.initialMemoryRatio
+        val seedQuota = (total * seedRatio).toInt().coerceAtLeast(1).coerceAtMost(total)
+        val memoryQuota = (total * memoryRatio).toInt().coerceAtMost(total - seedQuota)
         val randomQuota = (total - seedQuota - memoryQuota).coerceAtLeast(0)
 
         val seedPart = seedStrategies.shuffled(random).take(seedQuota).map(::parseChromosome)
@@ -294,5 +297,7 @@ class EvolutionEngine(
     private companion object {
         const val SCORE_HTTP_PARTIAL = 0.6
         const val SCORE_HTTP_HEADERS = 0.3
+        const val ADAPTIVE_SEED_RATIO = 0.2
+        const val ADAPTIVE_MEMORY_RATIO = 0.5
     }
 }
