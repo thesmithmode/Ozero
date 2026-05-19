@@ -34,10 +34,21 @@ data class UrnetworkBalanceState(
 
 class RealUrnetworkBalanceRepository(
     private val bridge: UrnetworkSdkBridge,
+    private val cache: UrnetworkBalanceCache? = null,
     private val fetchTimeoutMs: Long = DEFAULT_FETCH_TIMEOUT_MS,
 ) : UrnetworkBalanceRepository {
 
-    private val _state = MutableStateFlow(UrnetworkBalanceState.INITIAL)
+    private val _state = MutableStateFlow(
+        cache?.load()?.let {
+            UrnetworkBalanceState(
+                snapshot = it.snapshot,
+                isLoading = false,
+                lastError = null,
+                meanReliabilityWeight = it.meanReliabilityWeight,
+                totalReferrals = it.totalReferrals,
+            )
+        } ?: UrnetworkBalanceState.INITIAL,
+    )
     override val state: StateFlow<UrnetworkBalanceState> = _state.asStateFlow()
 
     private val refreshMutex = Mutex()
@@ -61,8 +72,11 @@ class RealUrnetworkBalanceRepository(
                 ?: _state.value.totalReferrals
             _state.value = balanceResult.fold(
                 onSuccess = { snap ->
+                    if (snap != null) {
+                        runCatching { cache?.save(snap, newReliability, newReferrals) }
+                    }
                     _state.value.copy(
-                        snapshot = snap,
+                        snapshot = snap ?: _state.value.snapshot,
                         isLoading = false,
                         lastError = null,
                         meanReliabilityWeight = newReliability,

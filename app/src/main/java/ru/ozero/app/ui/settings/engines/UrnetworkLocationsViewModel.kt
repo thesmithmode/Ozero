@@ -176,7 +176,8 @@ class UrnetworkLocationsViewModel @Inject constructor(
                     }
                 }
                 vc.start()
-                Log.i(TAG, "refresh: locationsVc started, listener attached")
+                vc.filterLocations("")
+                Log.i(TAG, "refresh: locationsVc started, listener attached, initial filterLocations(\"\") triggered")
             }.onFailure {
                 PersistentLoggers.warn(TAG, "refresh: locationsVc setup threw: ${it.message}")
                 _uiState.value = UrnetworkSettingsUiState.NotConnected
@@ -235,6 +236,13 @@ class UrnetworkLocationsViewModel @Inject constructor(
     fun setSearchQuery(query: String) {
         searchQuery.value = query
         applyFilter(query)
+        val vc = locationsVc
+        if (vc != null) {
+            viewModelScope.launch(Dispatchers.Main.immediate) {
+                runCatching { vc.filterLocations(query) }
+                    .onFailure { PersistentLoggers.warn(TAG, "filterLocations($query) threw: ${it.message}") }
+            }
+        }
     }
 
     fun setProvidePaused(paused: Boolean) {

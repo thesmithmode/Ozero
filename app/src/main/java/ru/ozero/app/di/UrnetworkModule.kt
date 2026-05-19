@@ -109,9 +109,17 @@ object UrnetworkModule {
 
     @Provides
     @Singleton
+    fun provideUrnetworkBalanceCache(
+        @ApplicationContext context: Context,
+    ): ru.ozero.app.urnetwork.UrnetworkBalanceCache =
+        ru.ozero.app.urnetwork.RealUrnetworkBalanceCache(context)
+
+    @Provides
+    @Singleton
     fun provideUrnetworkBalanceRepository(
         bridge: UrnetworkSdkBridge,
-    ): UrnetworkBalanceRepository = RealUrnetworkBalanceRepository(bridge = bridge)
+        cache: ru.ozero.app.urnetwork.UrnetworkBalanceCache,
+    ): UrnetworkBalanceRepository = RealUrnetworkBalanceRepository(bridge = bridge, cache = cache)
 
     @Provides
     @Singleton
