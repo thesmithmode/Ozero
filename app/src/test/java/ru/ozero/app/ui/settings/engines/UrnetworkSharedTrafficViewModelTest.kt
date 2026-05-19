@@ -89,7 +89,7 @@ class UrnetworkSharedTrafficViewModelTest {
     fun `подписка на balanceState запускает первый refresh`() = runTest(dispatcher) {
         vm = UrnetworkSharedTrafficViewModel(bridge, balanceRepo)
         val collectJob = backgroundScope.launch { vm.balanceState.collect {} }
-        advanceUntilIdle()
+        runCurrent()
         assertTrue(balanceRepo.refreshCalls >= 1)
         collectJob.cancel()
     }
@@ -98,7 +98,7 @@ class UrnetworkSharedTrafficViewModelTest {
     fun `balance refresh периодически через poll interval пока подписаны`() = runTest(dispatcher) {
         vm = UrnetworkSharedTrafficViewModel(bridge, balanceRepo)
         val collectJob = backgroundScope.launch { vm.balanceState.collect {} }
-        advanceUntilIdle()
+        runCurrent()
         val afterFirst = balanceRepo.refreshCalls
         advanceTimeBy(30_001L)
         runCurrent()
@@ -125,7 +125,7 @@ class UrnetworkSharedTrafficViewModelTest {
     fun `отмена подписки останавливает polling через keepalive`() = runTest(dispatcher) {
         vm = UrnetworkSharedTrafficViewModel(bridge, balanceRepo)
         val collectJob = backgroundScope.launch { vm.balanceState.collect {} }
-        advanceUntilIdle()
+        runCurrent()
         val whileSubscribed = balanceRepo.refreshCalls
         collectJob.cancel()
         advanceTimeBy(6_000L)
@@ -163,7 +163,7 @@ class UrnetworkSharedTrafficViewModelTest {
         balanceRepo.throwOnRefresh = true
         vm = UrnetworkSharedTrafficViewModel(bridge, balanceRepo)
         val collectJob = backgroundScope.launch { vm.balanceState.collect {} }
-        advanceUntilIdle()
+        runCurrent()
         val first = balanceRepo.refreshCalls
         advanceTimeBy(30_001L)
         runCurrent()
