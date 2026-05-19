@@ -85,12 +85,16 @@
 
 - Каждый engine (текущие модули: byedpi, telegram, urnetwork, warp) обязан иметь settings screen в `app/src/main/java/.../ui/settings/engines/` для пользовательского override config (subscription URL, server picker, args, bridges, и т.д.). При добавлении нового `engine-*` модуля — добавить сюда.
 
-## Reference impls движков (источники для портирования фич)
+## Reference impls движков (`.claude/Контекст/` — обязательно читать ПЕРЕД любой работой по движку)
 
-- **URnetwork** (официальный Android source): `C:\Soft\Projects\Ozero\.claude\Контекст\android\`. При любой доработке `engine-urnetwork`/UI URnetwork — grep по этому каталогу. Знает locations (country/region/city), provideMode/enhanced anonymization, dedicated/sticky IP, connect VC.
-- **WARP (AmneziaWG)** актуальная: `.claude/Контекст/PORTAL_WG_v1.4.3`. Историческая: `.claude/Контекст/CYBERPORTAL_X-v1.0.2`.
-- **ByeDPI**: `.claude/Контекст/ByeByeDPI-v.1.7.4`.
-- Прочие: см. `ls .claude/Контекст/` — каждая папка decompiled APK / source-mirror.
+В папке `.claude/Контекст/` собраны рабочие образцы кода (decompiled APK / official source) — это эталоны. Любая правка движка начинается с `ls .claude/Контекст/` и чтения соответствующего analysis-md.
+
+Маппинг папка → движок:
+- `Контекст/android/` → **URnetwork** (официальный Android source `bringyour/network-android`). Эталон для `engine-urnetwork`. См. `URNETWORK_INIT_ANALYSIS.md`. Покрывает locations, provideMode, enhanced anonymization, dedicated/sticky IP, ConnectGrid.
+- `Контекст/PORTAL_WG_v1.4.3/` + `Контекст/CYBERPORTAL_X-v1.0.2/` → **WARP** (AmneziaWG stack). Эталон для `engine-warp`. См. `PORTAL_WG_ANALYSIS.md`. Покрывает `awgTurnOn` 4-arg сигнатуру, uapiPath=`getDataDir()`, ReLinker для `libam-go`, mirror-контракт Cloudflare WARP API.
+- `Контекст/ByeByeDPI-v.1.7.4/` → **ByeDPI** (полный source ByeByeDPI 1.7.4, single-engine app). Эталон для `engine-byedpi` + hev pipeline. Сравнивать args, hev YAML, init order.
+- `Контекст/karing/`, `Контекст/Invizible_Pro*/`, `Контекст/КИБЕРЩИТ*/`, `Контекст/ResultV/`, `Контекст/PortalConnect*/`, `Контекст/amnezia-{client,vpn}/` — дополнительные источники (decompiled APK / source-mirror). Использовать как secondary references при поиске специфичных фич.
+- `Контекст/Architect.md`, `AUDIT.md`, `PRD.md`, `SPEC.md`, `ПЛАН.md` — проектные документы, не reference.
 
 ## MTProxy / Subprocess-proxy паттерн
 
