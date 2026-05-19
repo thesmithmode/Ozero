@@ -4,8 +4,9 @@ aliases: [byedpi-guard-hardening, jni-guard-busy, g-proxy-running-hardening, eme
 tags: [byedpi, native, jni, concurrency, architecture]
 sources:
   - "daily/2026-05-15.md"
+  - "daily/2026-05-19.md"
 created: 2026-05-15
-updated: 2026-05-15
+updated: 2026-05-19
 ---
 
 # ByeDPI JNI Guard Hardening: Ownership, Return Codes, Emergency Reset
@@ -93,6 +94,19 @@ Sentinel test regex `[^}]*` was used to match multi-line patterns in native-lib.
 - [[concepts/engine-switch-chain-cascading-failures]] - Rapid engine switching that triggers the guard contention; emergency reset is the recovery for wedge state
 - [[concepts/test-io-thread-zombie-trap]] - Thread leak from `Executors.newSingleThreadExecutor` that `limitedParallelism(1)` eliminates
 
+### Native Diagnostic Logging (2026-05-19)
+
+`__android_log_print` checkpoints added to `native-lib.c` before/after `main(argc, argv)`, `jniStopProxy`, and `jniForceClose` to diagnose cold-start hangs visible from ozero.log analysis. Context: cold-start took 5+ seconds on first call vs 14ms on warm starts (L12-58 vs L5642-5649). The JVM-level `jniStartProxy(-1)` return is the only signal available before this fix — no way to distinguish "native main() hasn't started" from "main() started and hung internally".
+
+With `__android_log_print` checkpoints, logcat (and consequently ozero.log) now shows:
+- `[byedpi] jniStartProxy enter` — JNI call received
+- `[byedpi] main() calling` — about to enter C main()
+- `[byedpi] main() returned N` — C main() exited with code N
+- Similar for `jniStopProxy` and `jniForceClose`
+
+This enables post-mortem diagnosis of where in the native call chain a hang occurred, without requiring a debugger attach. The root cause of the cold-start hang is not yet resolved — native diagnostic logging is the observability addition for the next investigation session.
+
 ## Sources
 
 - [[daily/2026-05-15.md]] - Session 13:30: T-19 argv NULL-check, T-21 jniForceClose guard ownership, T-20 server_fd race documented (upstream fork required); Session 15:30: code reviewer found P0-1 spin blocking, P0-2 indistinguishable return codes, P1-1 wedge; ba2f74b5 rework removed C retry, added JNI_GUARD_BUSY=-2, limitedParallelism(1); 9de61de3 added jniEmergencyReset + startProxyWithRecovery
+- [[daily/2026-05-19.md]] - v0.1.5 session: `__android_log_print` checkpoints added before/after main()/jniStopProxy/jniForceClose; cold-start 5s+ vs 14ms warm start identified from ozero.log L12-58 vs L5642-5649; hang root cause not yet resolved

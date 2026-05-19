@@ -6,7 +6,7 @@ sources:
   - "daily/2026-05-07.md"
   - "daily/2026-05-14.md"
 created: 2026-05-07
-updated: 2026-05-14
+updated: 2026-05-19
 ---
 
 # WARP False Connected State: awgTurnOn OK Without Handshake
@@ -95,7 +95,25 @@ See [[concepts/warp-uapi-handshake-polling]] for full implementation details and
 - [[concepts/warp-uapi-handshake-polling]] - Implementation: UAPI socket polling for handshake verification (not JNI)
 - [[concepts/engine-await-ready-pattern]] - Cross-engine readiness gate architecture that uses handshake polling as WARP's signal
 
+### Timeout Reduction and Failure Propagation (2026-05-19)
+
+In v0.1.5, the WARP ready timeout was reduced from 10s to 5s (`EngineWarp.WARP_READY_TIMEOUT_MS`) and `TunnelController.SWITCHING_TIMEOUT_MS` from 12s to 6s. More importantly, the timeout behavior was changed: previously timeout → `Connected(WARP)` (false-connected, 0 b/s). Now: timeout → `engineWatchdog.handleEngineFailure` + `chainOrchestrator.stop` + return. No more false-Connected on WARP handshake timeout.
+
+`awaitEngineReady` in `StartSequenceCoordinator` now returns `Boolean`: `true` = ready, `false` = timeout/failure. The false return triggers failure propagation rather than proceeding to `onEngineStarted`.
+
+```kotlin
+// Before (wrong): timeout → state = Connected(WARP) → 0 b/s, user confused
+// After (correct): timeout → handleEngineFailure → UI shows Failed → user can retry
+val ready = startSequenceCoordinator.awaitEngineReady(engineId, timeout)
+if (!ready) {
+    engineWatchdog.handleEngineFailure(engineId)
+    chainOrchestrator.stop()
+    return
+}
+```
+
 ## Sources
 
 - [[daily/2026-05-07.md]] - Session 15:11: `awgTurnOn OK` + state=Connected does not mean real handshake; need polling `last_handshake_time_sec` from `awgGetConfig`; handshake polling identified as required follow-up; mirror DNS suspicion (176.99.11.77, 80.78.247.254 — not Cloudflare)
 - [[daily/2026-05-14.md]] - Session 16:41: handshake polling implemented via WarpHandshakeUapi.kt + LocalSocket (not awgGetConfig JNI — SIGSEGV risk); 300ms/10s; integrated into EngineWarp.awaitReady()
+- [[daily/2026-05-19.md]] - v0.1.5 session: `WARP_READY_TIMEOUT_MS` 10s→5s; `SWITCHING_TIMEOUT_MS` 12s→6s; `awaitEngineReady` returns Boolean; timeout → `handleEngineFailure` + `chainOrchestrator.stop` (no more false-Connected on handshake timeout); ozero.log confirmed awaitReady never got handshake in any WARP session

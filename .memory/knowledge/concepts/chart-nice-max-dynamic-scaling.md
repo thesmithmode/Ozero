@@ -5,8 +5,9 @@ tags: [ui, compose, chart, pattern]
 sources:
   - "daily/2026-05-12.md"
   - "daily/2026-05-18.md"
+  - "daily/2026-05-19.md"
 created: 2026-05-12
-updated: 2026-05-18
+updated: 2026-05-19
 ---
 
 # Chart Y-Axis Dynamic Scaling with 1-2-5 Steps
@@ -59,12 +60,24 @@ All timeframes produce exactly 60 data points for consistent chart rendering. M1
 
 **Why bucket aggregation over downsampling:** Simple downsampling (take every 5th point for M5) loses information about what happened between sampled points. A 4-second spike followed by 1 second of silence appears as either full-spike or zero depending on which sample is picked. Bucket averaging captures the true average throughput across each 5-second window — a spike shows as elevated average, silence shows as reduced average.
 
+### Bucket Alignment Correctness Fix (2026-05-19)
+
+The M5/M30/H1 bucket aggregation introduced in 2026-05-18 had a subtle correctness bug: `bucketize(samples, windowMs, bucketCount)` grouped samples by index position within the sliding window. As the window advanced (new sample appended, oldest dropped), sample indices shifted — a sample at index 45 moved to index 44, potentially changing its bucket assignment. This produced "drift" in the historical portion of the chart: past averages changed even when the underlying data did not. User-visible symptom: "букву M колбасит".
+
+Fix: `bucketizeTimeAligned(samples, bucketSec)` uses wall-clock bucket IDs (`(sample.timestampMs / 1000L) / bucketSec`). A sample's bucket ID is derived from its absolute timestamp, not its position — stable regardless of window shift.
+
+`SpeedSample(timestampMs: Long, bytesPerSec: Float)` typed data class replaces bare `Pair<Long, Float>` to carry the timestamp required for time-aligned bucketing. `speedHistory` is now `List<SpeedSample>`.
+
+See [[concepts/speed-chart-bucket-alignment]] for the full drift mechanism and fix details.
+
 ## Related Concepts
 
 - [[concepts/libhev-tunnel-stats]] - EWMA α=0.4 smoothing feeds into the chart; throttling is a second-layer smoothing on top of EWMA
 - [[concepts/per-engine-ui]] - MainScreen chart is part of the main UI, not per-engine settings
+- [[concepts/speed-chart-bucket-alignment]] - The drift bug and time-aligned fix for M5/M30/H1 bucket aggregation
 
 ## Sources
 
 - [[daily/2026-05-12.md]] - Session 11:59: chartNiceMax 17 thresholds (1-2-5 step), SPEED_SAMPLE_INTERVAL_MS=1000 throttle, sentinel tests in MainScreenChartTest.kt; user demanded planning-first before implementation
 - [[daily/2026-05-18.md]] - Session 18:52: 30s baseline → M1 (60s); M5/M30/H1 use bucket aggregation instead of downsample; all timeframes output 60 data points
+- [[daily/2026-05-19.md]] - Session 00:51: "букву M колбасит" — index-based bucketing causes drift; `bucketizeTimeAligned` with epoch-anchored bucket IDs; `SpeedSample` typed wrapper replaces `Pair<Long, Float>`
