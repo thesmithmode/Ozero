@@ -7,7 +7,7 @@ internal object ByeDpiUiArgsBuilder {
 
     @Suppress("LongMethod", "ComplexMethod", "NestedBlockDepth")
     fun build(settings: ByeDpiUiSettings, socksPort: Int): Array<String> {
-        val prefix = listOf("ciadpi", "--ip", "127.0.0.1", "-p", socksPort.toString())
+        val prefix = listOf("--ip", "127.0.0.1", "-p", socksPort.toString())
         return (prefix + buildArgsOnly(settings)).toTypedArray()
     }
 

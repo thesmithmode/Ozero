@@ -13,7 +13,7 @@ class ByeDpiUiArgsBuilderTest {
         val args = ByeDpiUiArgsBuilder.build(ByeDpiUiSettings.DEFAULT, socksPort = 1080).toList()
 
         val expected = listOf(
-            "ciadpi", "--ip", "127.0.0.1", "-p", "1080",
+            "--ip", "127.0.0.1", "-p", "1080",
             "-c512", "-b16384",
             "-Kt,h",
             "-o1",

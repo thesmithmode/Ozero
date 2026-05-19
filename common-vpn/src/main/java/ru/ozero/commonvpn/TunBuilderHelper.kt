@@ -61,8 +61,6 @@ class TunBuilderHelper(private val service: VpnService) {
     ): VpnService.Builder {
         val builder = service.Builder()
             .addAddress(TUN_ADDRESS, TUN_PREFIX_LENGTH)
-            // TUN MTU обязан совпадать с hev YAML tunnel.mtu — рассинхрон → фрагментация → payload-loss (ByeDPI v0.1.6 regression).
-            .setMtu(HevTunnelConfig.DEFAULT_TUN_MTU)
             .setSession(SESSION_NAME)
         applyLockdown(builder, "buildTunBuilder")
         if (ipv6Enabled) {

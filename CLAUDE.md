@@ -85,6 +85,14 @@
 
 - Каждый engine (текущие модули: byedpi, telegram, urnetwork, warp) обязан иметь settings screen в `app/src/main/java/.../ui/settings/engines/` для пользовательского override config (subscription URL, server picker, args, bridges, и т.д.). При добавлении нового `engine-*` модуля — добавить сюда.
 
+## Расследование — порядок (закон)
+
+ПЕРЕД спавном субагента / advisor / гипотезой / Read большого файла:
+1. `wiki-find <тема>` — выжимки в `.memory/knowledge/` уже компилированы из daily логов. Большая часть прошлых корней (URnetwork init, hev YAML, awgTurnOn, sigsegv причины, MTU, sock paths, handle invariants) уже разобрана.
+2. `ls .claude/Контекст/` + читать `*_ANALYSIS.md` соответствующего движка — рабочий reference-код.
+3. Только если шаги 1-2 не дали ответ — спавнить субагента / делать новые гипотезы.
+Цель: не ходить кругами, не повторять найденные ранее корни, не делать ложные revert (handle=0, MTU=8500). Memory ведём не зря.
+
 ## Reference impls движков (`.claude/Контекст/` — обязательно читать ПЕРЕД любой работой по движку)
 
 В папке `.claude/Контекст/` собраны рабочие образцы кода (decompiled APK / official source) — это эталоны. Любая правка движка начинается с `ls .claude/Контекст/` и чтения соответствующего analysis-md.

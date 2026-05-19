@@ -249,7 +249,7 @@ class ByeDpiEngine(
                 ?.split("\\s+".toRegex())
                 .orEmpty()
         val hostsArgs = buildHostsArgs(config)
-        return (listOf("ciadpi", "--ip", "127.0.0.1", "-p", config.socksPort.toString()) + extra + hostsArgs)
+        return (listOf("--ip", "127.0.0.1", "-p", config.socksPort.toString()) + extra + hostsArgs)
             .toTypedArray()
     }
 
