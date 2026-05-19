@@ -256,11 +256,13 @@ class ByeDpiEngineTest {
     }
 
     @Test
-    fun buildArgs_noProgramNameInArray_cCodeAddsOwn() {
+    fun buildArgs_includesCiadpiArgv0_upstreamGetoptContract() {
         val args = engine.buildArgs(EngineConfig.ByeDpi(socksPort = 1080)).toList()
         assertTrue(
-            args.none { it == "ciadpi" || it == "byedpi" },
-            "C-код сам добавляет argv[0]=byedpi — программное имя в Java-массиве дублирует его и ломает getopt: $args",
+            args.firstOrNull() == "ciadpi",
+            "buildArgs обязан начинать argv с 'ciadpi' — upstream byedpi main() через getopt съедает " +
+                "argv[0] как program name; без префикса первый реальный флаг (`--ip`) теряется, bind-address " +
+                "падает в дефолт, SOCKS вообще не поднимается. Fact: $args",
         )
         assertTrue(args.contains("--ip"), "buildArgs должен передавать --ip bind-address: $args")
     }
