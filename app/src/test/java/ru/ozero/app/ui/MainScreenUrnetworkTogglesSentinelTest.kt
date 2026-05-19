@@ -107,6 +107,23 @@ class MainScreenUrnetworkTogglesSentinelTest {
     }
 
     @Test
+    fun `IpInfoCard call-site использует isUrnetworkVisibleInMain — peer column виден и в auto-mode`() {
+        val regex = Regex(
+            """IpInfoCard\([\s\S]*?urnetworkPeerCount\s*=\s*if\s*\(urnetworkActive\)""",
+        )
+        assertTrue(
+            regex.containsMatchIn(mainScreenSource),
+            "IpInfoCard call-site обязан гейтить peer column по isUrnetworkVisibleInMain(tunnelState, manualEngine), " +
+                "не по `manualEngine == EngineId.URNETWORK` — auto-mode иначе теряет правую колонку.",
+        )
+        assertTrue(
+            mainScreenSource.contains("val urnetworkActive = isUrnetworkVisibleInMain("),
+            "MainScreen обязан вычислять urnetworkActive через isUrnetworkVisibleInMain " +
+                "(см. предыдущий тест `isUrnetworkVisibleInMain true для Connected URnetwork без manualEngine`).",
+        )
+    }
+
+    @Test
     fun `UrnetworkEngineSettingsScreen имеет toggle усиленной анонимизации`() {
         assertTrue(
             engineSettingsSource.contains("urnetwork_enhanced_anonymization"),

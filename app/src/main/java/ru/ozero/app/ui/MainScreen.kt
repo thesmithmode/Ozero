@@ -346,6 +346,7 @@ private fun ExpertMainContent(
                 visualConnected = visualConnected,
                 killswitchActive = killswitchActive,
                 manualEngine = manualEngine,
+                tunnelState = tunnelState,
                 urnetworkPeerCount = urnetworkPeerCount,
                 urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
                 ipInfo = ipInfo,
@@ -387,6 +388,7 @@ private fun ExpertStatusBadges(
     visualConnected: Boolean,
     killswitchActive: Boolean,
     manualEngine: EngineId?,
+    tunnelState: TunnelState,
     urnetworkPeerCount: Int,
     urnetworkPeerSearchSeconds: Int,
     ipInfo: IpInfoState,
@@ -405,11 +407,12 @@ private fun ExpertStatusBadges(
         )
     }
     if (visualConnected) {
+        val urnetworkActive = isUrnetworkVisibleInMain(tunnelState, manualEngine)
         IpInfoCard(
             state = ipInfo,
             onRefresh = onRefreshIpInfo,
-            urnetworkPeerCount = if (manualEngine == EngineId.URNETWORK) urnetworkPeerCount else null,
-            urnetworkSearchSeconds = if (manualEngine == EngineId.URNETWORK) urnetworkPeerSearchSeconds else null,
+            urnetworkPeerCount = if (urnetworkActive) urnetworkPeerCount else null,
+            urnetworkSearchSeconds = if (urnetworkActive) urnetworkPeerSearchSeconds else null,
             modifier = Modifier.padding(horizontal = 16.dp),
         )
     }
