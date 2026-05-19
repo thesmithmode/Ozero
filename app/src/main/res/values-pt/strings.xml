@@ -254,6 +254,11 @@
     <string name="ip_card_error">Falha ao obter IP: %1$s</string>
     <string name="ip_card_refresh">Atualizar</string>
     <string name="ip_card_country_unknown">País desconhecido</string>
+    <string name="entry_node_title">Nó de entrada</string>
+    <string name="entry_node_protected_via">Protegido via %1$s</string>
+    <string name="entry_node_protected_generic">Protegido</string>
+    <string name="entry_node_direct">Conexão direta</string>
+    <string name="entry_node_your_device">Seu dispositivo</string>
 
     <!-- Kill switch -->
     <string name="settings_killswitch_title">Kill switch</string>

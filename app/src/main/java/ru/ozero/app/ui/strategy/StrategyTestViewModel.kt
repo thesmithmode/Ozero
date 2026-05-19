@@ -391,7 +391,7 @@ class StrategyTestViewModel @Inject constructor(
             _runSummary.value = "Testing ${loopIdx + 1}/${commands.size}: $command"
             val started = withTimeoutOrNull(startTimeoutMs) {
                 byeDpiEngine.start(
-                    config = EngineConfig.ByeDpi(args = command, socksPort = SOCKS_PORT),
+                    config = EngineConfig.ByeDpi(args = command, socksPort = AUTO_ROTATE_PORT),
                     upstream = Upstream.None,
                 )
             }
@@ -400,7 +400,8 @@ class StrategyTestViewModel @Inject constructor(
                 applyEngineStartFailure(command, sites, started)
                 continue
             }
-            val probe: SocksProbeClient = probeFactory.create(SOCKS_PORT, startTimeoutMs.toInt())
+            val realPort = started.socksPort
+            val probe: SocksProbeClient = probeFactory.create(realPort, startTimeoutMs.toInt())
             val semaphore = Semaphore(concurrentLimit)
             try {
                 coroutineScope {
@@ -476,5 +477,6 @@ class StrategyTestViewModel @Inject constructor(
     private companion object {
         const val TAG: String = "StrategyTestVM"
         const val SOCKS_PORT: Int = 1080
+        const val AUTO_ROTATE_PORT: Int = 0
     }
 }

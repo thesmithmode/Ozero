@@ -155,14 +155,14 @@ class UrnetworkEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `selectWindowType AUTO сбрасывает fixedIpSize`() = runTest {
+    fun `selectWindowType AUTO сохраняет fixedIpSize — пользователь сам решает`() = runTest {
         val bridge = FakeUrnetworkBridge()
         val store = fakeUrnetworkConfigStore()
         store.setFixedIpSize(true)
         val vm = UrnetworkEngineSettingsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel(), fakeBalanceRepo())
         vm.selectWindowType(UrnetworkWindowType.AUTO)
         advanceUntilIdle()
-        assertEquals(false, store.fixedIpSize().first())
+        assertEquals(true, store.fixedIpSize().first())
     }
 
     @Test

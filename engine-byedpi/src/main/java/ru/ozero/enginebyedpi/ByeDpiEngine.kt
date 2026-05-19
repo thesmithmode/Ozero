@@ -1,6 +1,5 @@
 package ru.ozero.enginebyedpi
 
-import android.util.Log
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -29,6 +28,7 @@ import ru.ozero.enginescore.IpProbeRoute
 import ru.ozero.enginescore.probe.Socks5HandshakeProbe
 import ru.ozero.enginescore.settings.HostsMode
 import ru.ozero.enginescore.settings.SettingsModel
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
 class ByeDpiEngine(
@@ -51,6 +51,7 @@ class ByeDpiEngine(
     )
 
     @Volatile private var activeSocksPort: Int = 0
+    private val portCounter = AtomicInteger(0)
     private val _stats = MutableStateFlow(EngineStats())
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -61,6 +62,7 @@ class ByeDpiEngine(
     override fun buildManualConfig(settings: SettingsModel?): EngineConfig = EngineConfig.ByeDpi(
         args = settings?.byedpiWinningArgs?.takeIf { it.isNotBlank() }
             ?: EngineConfig.ByeDpi().args,
+        socksPort = AUTO_ROTATE_PORT,
         hostsMode = settings?.hostsMode ?: HostsMode.DISABLED,
         hosts = settings?.hosts.orEmpty(),
     )
@@ -76,7 +78,9 @@ class ByeDpiEngine(
             PersistentLoggers.error(TAG, "native lib не загружена — устройство не поддерживает или stripped APK")
             return StartResult.Failure(reason = "byedpi native library не загружена: ${ByeDpiProxy.loadError}")
         }
-        Log.i(TAG, "start socksPort=${config.socksPort} args=${config.args}")
+        val resolvedPort = if (config.socksPort > 0) config.socksPort else nextRotatedPort()
+        val resolvedConfig = if (config.socksPort > 0) config else config.copy(socksPort = resolvedPort)
+        PersistentLoggers.info(TAG, "start socksPort=$resolvedPort args=${resolvedConfig.args}")
         val oldJob = proxyJobRef.getAndSet(null)
         if (oldJob != null) {
             if (oldJob.isActive) {
@@ -93,7 +97,7 @@ class ByeDpiEngine(
             }
         }
 
-        val args = buildArgs(config)
+        val args = buildArgs(resolvedConfig)
         val proxyJob = proxyScope.launch {
             val code = startProxyWithRecovery(args)
             when {
@@ -108,13 +112,13 @@ class ByeDpiEngine(
         }
         proxyJobRef.set(proxyJob)
 
-        val readyAt = waitSocksReady(config.socksPort, proxyJob)
+        val readyAt = waitSocksReady(resolvedPort, proxyJob)
         return if (readyAt >= 0) {
-            activeSocksPort = config.socksPort
-            Log.i(TAG, "started socksPort=${config.socksPort} readyMs=$readyAt")
-            StartResult.Success(socksPort = config.socksPort)
+            activeSocksPort = resolvedPort
+            PersistentLoggers.info(TAG, "started socksPort=$resolvedPort readyMs=$readyAt")
+            StartResult.Success(socksPort = resolvedPort)
         } else {
-            PersistentLoggers.error(TAG, "byedpi не вышел на порт ${config.socksPort} за ${READY_TIMEOUT_MS}ms")
+            PersistentLoggers.error(TAG, "byedpi не вышел на порт $resolvedPort за ${READY_TIMEOUT_MS}ms")
             if (proxyJob.isActive) {
                 runCatching { proxy.stopProxy() }
                     .onFailure { PersistentLoggers.warn(TAG, "jniStopProxy on failure: ${it.message}") }
@@ -124,9 +128,12 @@ class ByeDpiEngine(
                 .onFailure { PersistentLoggers.warn(TAG, "jniForceClose on failure: ${it.message}") }
             if (proxyJob.isActive) proxyJob.cancel()
             proxyJobRef.compareAndSet(proxyJob, null)
-            StartResult.Failure(reason = "byedpi не открыл socks порт ${config.socksPort}")
+            StartResult.Failure(reason = "byedpi не открыл socks порт $resolvedPort")
         }
     }
+
+    private fun nextRotatedPort(): Int =
+        PORT_ROTATION_BASE + (portCounter.getAndIncrement() and (PORT_ROTATION_RANGE - 1))
 
     private fun startProxyWithRecovery(args: Array<String>): Int {
         val code = safeJniCall(fallback = -1, tag = "jniStartProxy threw") {
@@ -180,7 +187,7 @@ class ByeDpiEngine(
     }
 
     override suspend fun stop() {
-        Log.i(TAG, "stop")
+        PersistentLoggers.info(TAG, "stop")
         withContext(Dispatchers.IO) {
             runCatching { proxy.stopProxy() }
                 .onFailure { PersistentLoggers.warn(TAG, "jniStopProxy исключение: ${it.message}") }
@@ -257,5 +264,8 @@ class ByeDpiEngine(
         const val READY_PROBE_TIMEOUT_MS = 500
         const val READY_RETRY_MS = 100L
         const val STOP_GRACE_MS = 1_500L
+        const val AUTO_ROTATE_PORT = 0
+        const val PORT_ROTATION_BASE = 49_152
+        const val PORT_ROTATION_RANGE = 256
     }
 }

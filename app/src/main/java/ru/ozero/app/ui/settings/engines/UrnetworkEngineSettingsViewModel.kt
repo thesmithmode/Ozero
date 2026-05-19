@@ -143,9 +143,6 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     fun selectWindowType(value: UrnetworkWindowType) {
         viewModelScope.launch {
             configStore.setWindowType(value)
-            if (value == UrnetworkWindowType.AUTO) {
-                configStore.setFixedIpSize(false)
-            }
             if (isUrnetworkActive.value) {
                 runCatching { bridge.applyPerformanceProfile(value, fixedIpSize.value, allowDirect.value) }
             }
@@ -299,7 +296,6 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
                     }
                 }
                 vc.start()
-                vc.filterLocations("")
                 Log.i(TAG, "refresh: locationsVc started, listener attached")
             }.onFailure {
                 PersistentLoggers.warn(TAG, "refresh: locationsVc setup threw: ${it.message}")

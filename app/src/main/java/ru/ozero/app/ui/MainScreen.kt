@@ -409,6 +409,10 @@ private fun ExpertStatusBadges(
             urnetworkSearchSeconds = if (manualEngine == EngineId.URNETWORK) urnetworkPeerSearchSeconds else null,
             modifier = Modifier.padding(horizontal = 16.dp),
         )
+        EntryNodeCard(
+            manualEngine = manualEngine,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
     }
     TrafficStatsCard(
         stats = stats,
@@ -456,16 +460,62 @@ private fun IpCardPeerSuffix(count: Int?, searchSeconds: Int?) {
         count != null && count > 0 -> Text(
             text = stringResource(R.string.urnetwork_peer_count_label, count),
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.primary,
+            color = OzeroPalette.Text3,
             modifier = Modifier.testTag(MainScreenTestTags.URNETWORK_PEER_COUNT),
         )
         searchSeconds != null && searchSeconds >= URNETWORK_PEER_SEARCH_VISIBLE_THRESHOLD_S -> Text(
             text = stringResource(R.string.urnetwork_peer_searching, searchSeconds),
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.tertiary,
+            color = OzeroPalette.Text3,
             modifier = Modifier.testTag(MainScreenTestTags.URNETWORK_PEER_SEARCHING),
         )
         else -> Unit
+    }
+}
+
+@Composable
+private fun EntryNodeCard(
+    manualEngine: EngineId?,
+    modifier: Modifier = Modifier,
+) {
+    val body = when (manualEngine) {
+        null -> stringResource(R.string.entry_node_protected_generic)
+        else -> stringResource(R.string.entry_node_protected_via, manualEngine.name)
+    }
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag(MainScreenTestTags.ENTRY_CARD),
+        colors = CardDefaults.cardColors(containerColor = OzeroPalette.GlassFill),
+        shape = RoundedCornerShape(20.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = stringResource(R.string.entry_node_title),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OzeroPalette.Text3,
+                )
+                Text(
+                    text = stringResource(R.string.entry_node_your_device),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OzeroPalette.Text3,
+                )
+            }
+            Text(
+                text = body,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = OzeroPalette.Text,
+            )
+        }
     }
 }
 

@@ -16,7 +16,6 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
@@ -48,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
+import ru.ozero.app.ui.icons.OzeroIcons
 import ru.ozero.app.ui.theme.OzeroPalette
 import ru.ozero.app.ui.urnetwork.UrnetworkBalanceCard
 import ru.ozero.app.ui.utils.formatBytes
@@ -546,14 +546,12 @@ private fun ModeSection(
         color = OzeroPalette.Text3,
         modifier = Modifier.padding(top = 6.dp),
     )
-    if (selected != UrnetworkWindowType.AUTO) {
-        CompactToggleRow(
-            label = stringResource(R.string.urnetwork_fixed_ip_size),
-            checked = fixedIp,
-            onCheckedChange = onToggleFixedIp,
-            testTag = "urnetwork_toggle_fixed_ip",
-        )
-    }
+    CompactToggleRow(
+        label = stringResource(R.string.urnetwork_fixed_ip_size),
+        checked = fixedIp,
+        onCheckedChange = onToggleFixedIp,
+        testTag = "urnetwork_toggle_fixed_ip",
+    )
     CompactToggleRow(
         label = stringResource(R.string.urnetwork_enhanced_anonymization),
         checked = !allowDirect,
@@ -709,7 +707,7 @@ private fun LocationRow(
         }
         if (isStrongPrivacy) {
             Icon(
-                imageVector = Icons.Filled.Lock,
+                imageVector = OzeroIcons.Glasses,
                 contentDescription = null,
                 tint = OzeroPalette.StateConnected,
                 modifier = Modifier

@@ -404,6 +404,11 @@
     <string name="ip_card_error">Не удалось получить IP: %1$s</string>
     <string name="ip_card_refresh">Обновить</string>
     <string name="ip_card_country_unknown">Страна неизвестна</string>
+    <string name="entry_node_title">Входной узел</string>
+    <string name="entry_node_protected_via">Защищено через %1$s</string>
+    <string name="entry_node_protected_generic">Защищено</string>
+    <string name="entry_node_direct">Прямое соединение</string>
+    <string name="entry_node_your_device">Ваше устройство</string>
     <!-- Killswitch -->
     <string name="settings_killswitch_title">Killswitch</string>
     <string name="settings_killswitch_summary">Блокировать весь трафик при падении тоннеля до восстановления</string>
