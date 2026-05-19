@@ -258,7 +258,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     }
 
     fun refresh() {
-        if (!bridge.isDeviceAvailable() && !bridge.isRunning()) {
+        if (isDeviceUnavailable()) {
             _uiState.value = UrnetworkSettingsUiState.NotConnected
             return
         }
@@ -266,7 +266,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     }
 
     private suspend fun refreshOnce() {
-        if (!bridge.isDeviceAvailable() && !bridge.isRunning()) {
+        if (isDeviceUnavailable()) {
             _uiState.value = UrnetworkSettingsUiState.NotConnected
             return
         }
@@ -444,8 +444,10 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         return s is UrnetworkSettingsUiState.Ready && s.countries.isNotEmpty()
     }
 
+    private fun isDeviceUnavailable(): Boolean = !bridge.isDeviceAvailable() && !bridge.isRunning()
+
     private fun handleNullVcFallback() {
-        if (!bridge.isDeviceAvailable() && !bridge.isRunning()) {
+        if (isDeviceUnavailable()) {
             _uiState.value = UrnetworkSettingsUiState.NotConnected
             return
         }

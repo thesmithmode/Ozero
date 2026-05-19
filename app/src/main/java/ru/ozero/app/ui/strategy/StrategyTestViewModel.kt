@@ -26,6 +26,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
+import ru.ozero.enginebyedpi.ByeDpiEngine
 import ru.ozero.enginebyedpi.strategy.ByeDpiKnownSeeds
 import ru.ozero.enginebyedpi.strategy.EvolutionEngine
 import ru.ozero.enginebyedpi.strategy.EvolutionResourcesProvider
@@ -391,7 +392,7 @@ class StrategyTestViewModel @Inject constructor(
             _runSummary.value = "Testing ${loopIdx + 1}/${commands.size}: $command"
             val started = withTimeoutOrNull(startTimeoutMs) {
                 byeDpiEngine.start(
-                    config = EngineConfig.ByeDpi(args = command, socksPort = AUTO_ROTATE_PORT),
+                    config = EngineConfig.ByeDpi(args = command, socksPort = ByeDpiEngine.AUTO_ROTATE_PORT),
                     upstream = Upstream.None,
                 )
             }
@@ -477,6 +478,5 @@ class StrategyTestViewModel @Inject constructor(
     private companion object {
         const val TAG: String = "StrategyTestVM"
         const val SOCKS_PORT: Int = 1080
-        const val AUTO_ROTATE_PORT: Int = 0
     }
 }

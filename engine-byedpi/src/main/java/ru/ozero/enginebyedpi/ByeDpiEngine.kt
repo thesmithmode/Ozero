@@ -1,5 +1,6 @@
 package ru.ozero.enginebyedpi
 
+import android.util.Log
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -80,7 +81,7 @@ class ByeDpiEngine(
         }
         val resolvedPort = if (config.socksPort > 0) config.socksPort else nextRotatedPort()
         val resolvedConfig = if (config.socksPort > 0) config else config.copy(socksPort = resolvedPort)
-        PersistentLoggers.info(TAG, "start socksPort=$resolvedPort args=${resolvedConfig.args}")
+        Log.i(TAG, "start socksPort=$resolvedPort args=${resolvedConfig.args}")
         val oldJob = proxyJobRef.getAndSet(null)
         if (oldJob != null) {
             if (oldJob.isActive) {
@@ -115,7 +116,7 @@ class ByeDpiEngine(
         val readyAt = waitSocksReady(resolvedPort, proxyJob)
         return if (readyAt >= 0) {
             activeSocksPort = resolvedPort
-            PersistentLoggers.info(TAG, "started socksPort=$resolvedPort readyMs=$readyAt")
+            Log.i(TAG, "started socksPort=$resolvedPort readyMs=$readyAt")
             StartResult.Success(socksPort = resolvedPort)
         } else {
             PersistentLoggers.error(TAG, "byedpi не вышел на порт $resolvedPort за ${READY_TIMEOUT_MS}ms")
@@ -187,7 +188,7 @@ class ByeDpiEngine(
     }
 
     override suspend fun stop() {
-        PersistentLoggers.info(TAG, "stop")
+        Log.i(TAG, "stop")
         withContext(Dispatchers.IO) {
             runCatching { proxy.stopProxy() }
                 .onFailure { PersistentLoggers.warn(TAG, "jniStopProxy исключение: ${it.message}") }
