@@ -59,11 +59,12 @@ import ru.ozero.engineurnetwork.UrnetworkWindowType
 fun UrnetworkEngineSettingsScreen(
     onBack: () -> Unit,
     onOpenSharedTraffic: () -> Unit,
-    viewModel: UrnetworkEngineSettingsViewModel = hiltViewModel(),
+    settingsVm: UrnetworkEngineSettingsViewModel = hiltViewModel(),
+    locationsVm: UrnetworkLocationsViewModel = hiltViewModel(),
 ) {
     BackHandler(onBack = onBack)
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val insufficientBalance by viewModel.insufficientBalance.collectAsStateWithLifecycle()
+    val state by locationsVm.uiState.collectAsStateWithLifecycle()
+    val insufficientBalance by settingsVm.insufficientBalance.collectAsStateWithLifecycle()
     Scaffold(
         modifier = Modifier.testTag("urnetwork_settings"),
         topBar = {
@@ -89,11 +90,11 @@ fun UrnetworkEngineSettingsScreen(
                 }
             }
             UrnetworkSettingsUiState.NotConnected -> {
-                val windowType by viewModel.windowType.collectAsStateWithLifecycle()
-                val fixedIp by viewModel.fixedIpSize.collectAsStateWithLifecycle()
-                val allowDirect by viewModel.allowDirect.collectAsStateWithLifecycle()
-                val provideControlMode by viewModel.provideControlMode.collectAsStateWithLifecycle()
-                val provideNetworkMode by viewModel.provideNetworkMode.collectAsStateWithLifecycle()
+                val windowType by settingsVm.windowType.collectAsStateWithLifecycle()
+                val fixedIp by settingsVm.fixedIpSize.collectAsStateWithLifecycle()
+                val allowDirect by settingsVm.allowDirect.collectAsStateWithLifecycle()
+                val provideControlMode by settingsVm.provideControlMode.collectAsStateWithLifecycle()
+                val provideNetworkMode by settingsVm.provideNetworkMode.collectAsStateWithLifecycle()
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -125,25 +126,25 @@ fun UrnetworkEngineSettingsScreen(
                         sharedTrafficBytes = 0L,
                         showProvide = false,
                         onSetProvidePaused = {},
-                        onSelectWindowType = viewModel::selectWindowType,
-                        onToggleFixedIp = viewModel::toggleFixedIpSize,
-                        onToggleAllowDirect = viewModel::toggleAllowDirect,
-                        onSelectProvideControlMode = viewModel::selectProvideControlMode,
-                        onSelectProvideNetworkMode = viewModel::selectProvideNetworkMode,
+                        onSelectWindowType = settingsVm::selectWindowType,
+                        onToggleFixedIp = settingsVm::toggleFixedIpSize,
+                        onToggleAllowDirect = settingsVm::toggleAllowDirect,
+                        onSelectProvideControlMode = settingsVm::selectProvideControlMode,
+                        onSelectProvideNetworkMode = settingsVm::selectProvideNetworkMode,
                         onOpenSharedTraffic = onOpenSharedTraffic,
                     )
                 }
             }
             is UrnetworkSettingsUiState.Ready -> {
-                val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
-                val windowType by viewModel.windowType.collectAsStateWithLifecycle()
-                val fixedIp by viewModel.fixedIpSize.collectAsStateWithLifecycle()
-                val allowDirect by viewModel.allowDirect.collectAsStateWithLifecycle()
-                val provideControlMode by viewModel.provideControlMode.collectAsStateWithLifecycle()
-                val provideNetworkMode by viewModel.provideNetworkMode.collectAsStateWithLifecycle()
-                val sharedTrafficBytes by viewModel.sharedTrafficBytes.collectAsStateWithLifecycle()
-                val balanceState by viewModel.balanceState.collectAsStateWithLifecycle()
-                val isVpnActive by viewModel.isUrnetworkActive.collectAsStateWithLifecycle()
+                val searchQuery by locationsVm.searchQuery.collectAsStateWithLifecycle()
+                val windowType by settingsVm.windowType.collectAsStateWithLifecycle()
+                val fixedIp by settingsVm.fixedIpSize.collectAsStateWithLifecycle()
+                val allowDirect by settingsVm.allowDirect.collectAsStateWithLifecycle()
+                val provideControlMode by settingsVm.provideControlMode.collectAsStateWithLifecycle()
+                val provideNetworkMode by settingsVm.provideNetworkMode.collectAsStateWithLifecycle()
+                val sharedTrafficBytes by settingsVm.sharedTrafficBytes.collectAsStateWithLifecycle()
+                val balanceState by settingsVm.balanceState.collectAsStateWithLifecycle()
+                val isVpnActive by settingsVm.isUrnetworkActive.collectAsStateWithLifecycle()
                 LocationListContent(
                     modifier = Modifier.padding(padding),
                     countries = current.countries,
@@ -161,14 +162,14 @@ fun UrnetworkEngineSettingsScreen(
                     balanceState = balanceState,
                     insufficientBalance = insufficientBalance,
                     isVpnActive = isVpnActive,
-                    onSearchQueryChange = viewModel::setSearchQuery,
-                    onSelect = viewModel::selectLocation,
-                    onSetProvidePaused = viewModel::setProvidePaused,
-                    onSelectWindowType = viewModel::selectWindowType,
-                    onToggleFixedIp = viewModel::toggleFixedIpSize,
-                    onToggleAllowDirect = viewModel::toggleAllowDirect,
-                    onSelectProvideControlMode = viewModel::selectProvideControlMode,
-                    onSelectProvideNetworkMode = viewModel::selectProvideNetworkMode,
+                    onSearchQueryChange = locationsVm::setSearchQuery,
+                    onSelect = locationsVm::selectLocation,
+                    onSetProvidePaused = locationsVm::setProvidePaused,
+                    onSelectWindowType = settingsVm::selectWindowType,
+                    onToggleFixedIp = settingsVm::toggleFixedIpSize,
+                    onToggleAllowDirect = settingsVm::toggleAllowDirect,
+                    onSelectProvideControlMode = settingsVm::selectProvideControlMode,
+                    onSelectProvideNetworkMode = settingsVm::selectProvideNetworkMode,
                     onOpenSharedTraffic = onOpenSharedTraffic,
                 )
             }

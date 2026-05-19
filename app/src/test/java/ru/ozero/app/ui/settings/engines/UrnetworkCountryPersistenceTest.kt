@@ -10,17 +10,17 @@ class UrnetworkCountryPersistenceTest {
         val moduleRoot = File(System.getProperty("user.dir") ?: ".")
         val f = File(
             moduleRoot,
-            "src/main/java/ru/ozero/app/ui/settings/engines/UrnetworkEngineSettingsViewModel.kt",
+            "src/main/java/ru/ozero/app/ui/settings/engines/UrnetworkLocationsViewModel.kt",
         )
-        assertTrue(f.exists(), "UrnetworkEngineSettingsViewModel.kt не найден: $f")
+        assertTrue(f.exists(), "UrnetworkLocationsViewModel.kt не найден: $f")
         f.readText()
     }
 
     @Test
-    fun `UrnetworkEngineSettingsViewModel инжектит SettingsRepository`() {
+    fun `UrnetworkLocationsViewModel инжектит SettingsRepository`() {
         assertTrue(
             viewModelSource.contains("settingsRepository: SettingsRepository"),
-            "ViewModel обязан инжектить SettingsRepository — иначе выбранная страна не сохраняется в DataStore.",
+            "UrnetworkLocationsViewModel обязан инжектить SettingsRepository — иначе выбранная страна не сохраняется в DataStore.",
         )
     }
 
