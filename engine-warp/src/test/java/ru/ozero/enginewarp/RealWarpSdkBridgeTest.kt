@@ -164,17 +164,17 @@ class RealWarpSdkBridgeTest {
     }
 
     @Test
-    fun `attachTun handle=0 от runtime → Failed (sentinel v0_1_5)`() = runTest {
-        val rt = FakeAwgRuntime(returnHandle = 0)
+    fun `attachTun handle=0 валидный первый slot — Success (revert sentinel v0_1_5_1)`() = runTest {
+        val rt = FakeAwgRuntime(returnHandle = 0, socketV4 = 100)
         val (b, _) = bridgeWith(rt)
         val r = b.attachTun("n", tunFd = 5, iniConfig = validIni, uapiPath = "/x", protector = noopProtector)
-        val f = assertIs<WarpSdkBridge.AttachResult.Failed>(r)
+        assertIs<WarpSdkBridge.AttachResult.Success>(r)
         assertTrue(
-            f.reason.contains("handle=0"),
-            "handle=0 НЕ валидный (AWG SDK по конвенции отдаёт ≥1). " +
-                "Раньше handle=0 проходил guard `handle < 0` → tunnel считался запущенным → handshake никогда не приходил (юзер-репорт 2026-05-19, 17:23/17:24 'WARP completely broken')",
+            b.isRunning(),
+            "handle=0 = валидный первый tunnel slot (amnezia api.go:123-135: 'for i = 0; i < MaxInt32 " +
+                "{ if !exists return i }', errors → return -1). Guard `handle <= 0` в v0.1.5.1 ломал каждый " +
+                "чистый WARP старт. Корректный guard — handle < 0.",
         )
-        assertFalse(b.isRunning(), "tunnelHandle.set(0) НЕ должен помечать isRunning=true")
     }
 
     @Test
