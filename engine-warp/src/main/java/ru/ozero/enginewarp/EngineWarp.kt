@@ -137,7 +137,14 @@ class EngineWarp(
         return if (reached != null) {
             EnginePlugin.ReadyResult.Ready
         } else {
-            val reason = "WARP: WireGuard handshake timeout ${warpReadyTimeoutMs}ms"
+            val state = runCatching { uapiStateReader(uapiPath, TUNNEL_NAME) }.getOrNull()
+            val diag = if (state != null) {
+                "rx=${state.rxBytes} tx=${state.txBytes} peers=${state.peersSeen} " +
+                    "lastHsAge=${state.handshakeAgeSeconds ?: "never"}"
+            } else {
+                "uapi unreachable — tunnel handle invalid or socket missing"
+            }
+            val reason = "WARP: WireGuard handshake timeout ${warpReadyTimeoutMs}ms ($diag)"
             PersistentLoggers.warn(TAG, "awaitReady timeout — $reason — proceeding")
             EnginePlugin.ReadyResult.Timeout(reason)
         }

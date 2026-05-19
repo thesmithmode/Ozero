@@ -62,8 +62,10 @@ class RealWarpSdkBridge(
                 TAG,
                 "awgTurnOn JNI exit handle=$handle v4=${combined.socketV4Fd} v6=${combined.socketV6Fd} dt=${dt}ms thread=$threadName",
             )
-            if (handle < 0) {
-                return@withContext WarpSdkBridge.AttachResult.Failed("awgTurnOn handle=$handle")
+            if (handle <= 0) {
+                return@withContext WarpSdkBridge.AttachResult.Failed(
+                    "awgTurnOn handle=$handle (валидный handle ≥ 1, 0 = AWG SDK reported failure)",
+                )
             }
             tunnelHandle.set(handle)
             val protectOk = protectSockets(combined.socketV4Fd, combined.socketV6Fd, protector)
@@ -221,7 +223,7 @@ interface AwgRuntime {
 
     fun turnOnAndGetSockets(name: String, tunFd: Int, ini: String, uapiPath: String): AwgTurnOnResult {
         val handle = turnOn(name, tunFd, ini, uapiPath)
-        if (handle < 0) return AwgTurnOnResult(handle, -1, -1)
+        if (handle <= 0) return AwgTurnOnResult(handle, -1, -1)
         val v4 = runCatching { getSocketV4(handle) }.getOrDefault(-1)
         val v6 = runCatching { getSocketV6(handle) }.getOrDefault(-1)
         return AwgTurnOnResult(handle, v4, v6)
