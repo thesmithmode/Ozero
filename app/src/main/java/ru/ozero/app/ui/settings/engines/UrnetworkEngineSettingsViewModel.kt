@@ -375,31 +375,6 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         applyFilter(searchQuery.value)
     }
 
-    private fun buildLocationList(list: com.bringyour.sdk.ConnectLocationList?): List<UrnetworkLocationItem> =
-        buildList {
-            if (list == null) return@buildList
-            for (i in 0 until list.len()) {
-                val loc = list.get(i) ?: continue
-                val code = loc.countryCode ?: ""
-                add(
-                    UrnetworkLocationItem(
-                        location = SdkLocationToken(loc),
-                        name = loc.name ?: loc.country ?: "Unknown",
-                        nameRu = if (code.length == 2) {
-                            Locale("", code).getDisplayCountry(Locale("ru"))
-                        } else {
-                            ""
-                        },
-                        countryCode = code,
-                        flag = countryCodeToFlag(code),
-                        providerCount = loc.providerCount,
-                        isStable = runCatching { loc.stable }.getOrDefault(true),
-                        isStrongPrivacy = runCatching { loc.strongPrivacy }.getOrDefault(false),
-                    ),
-                )
-            }
-        }
-
     private fun applyFilter(query: String) {
         val q = query.trim().lowercase()
         fun List<UrnetworkLocationItem>.applyQuery() = if (q.isEmpty()) {
@@ -497,3 +472,28 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         }
     }
 }
+
+private fun buildLocationList(list: com.bringyour.sdk.ConnectLocationList?): List<UrnetworkLocationItem> =
+    buildList {
+        if (list == null) return@buildList
+        for (i in 0 until list.len()) {
+            val loc = list.get(i) ?: continue
+            val code = loc.countryCode ?: ""
+            add(
+                UrnetworkLocationItem(
+                    location = SdkLocationToken(loc),
+                    name = loc.name ?: loc.country ?: "Unknown",
+                    nameRu = if (code.length == 2) {
+                        Locale("", code).getDisplayCountry(Locale("ru"))
+                    } else {
+                        ""
+                    },
+                    countryCode = code,
+                    flag = UrnetworkEngineSettingsViewModel.countryCodeToFlag(code),
+                    providerCount = loc.providerCount,
+                    isStable = runCatching { loc.stable }.getOrDefault(true),
+                    isStrongPrivacy = runCatching { loc.strongPrivacy }.getOrDefault(false),
+                ),
+            )
+        }
+    }
