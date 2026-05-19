@@ -62,6 +62,7 @@ class RealWarpSdkBridge(
                 TAG,
                 "awgTurnOn JNI exit handle=$handle v4=${combined.socketV4Fd} v6=${combined.socketV6Fd} dt=${dt}ms thread=$threadName",
             )
+            // amnezia api.go: errors → -1, success → first free slot (0,1,2,...). PORTAL_WG g.java:106 тоже `< 0`. Не менять на `<= 0`.
             if (handle < 0) {
                 return@withContext WarpSdkBridge.AttachResult.Failed(
                     "awgTurnOn handle=$handle (<0 = AWG SDK ошибка; 0 = валидный первый tunnel slot)",
@@ -223,6 +224,7 @@ interface AwgRuntime {
 
     fun turnOnAndGetSockets(name: String, tunFd: Int, ini: String, uapiPath: String): AwgTurnOnResult {
         val handle = turnOn(name, tunFd, ini, uapiPath)
+        // amnezia AWG: errors → -1, 0 = валидный первый slot. Не менять на `<= 0`.
         if (handle < 0) return AwgTurnOnResult(handle, -1, -1)
         val v4 = runCatching { getSocketV4(handle) }.getOrDefault(-1)
         val v6 = runCatching { getSocketV6(handle) }.getOrDefault(-1)
