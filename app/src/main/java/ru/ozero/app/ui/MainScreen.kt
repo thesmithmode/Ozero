@@ -469,7 +469,6 @@ private fun IpCardPeerSuffix(count: Int?, searchSeconds: Int?) {
     }
 }
 
-
 @Composable
 private fun simpleDockTabs(): List<DockTab> {
     val labelHome = stringResource(R.string.tab_main)
