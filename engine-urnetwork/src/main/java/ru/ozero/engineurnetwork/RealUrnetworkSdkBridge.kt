@@ -469,6 +469,10 @@ class RealUrnetworkSdkBridge(
                     val plan = runCatching { sub?.plan }.getOrNull()
                     val store = runCatching { sub?.store }.getOrNull()
                     val used = startBalance - balance - pending
+                    Log.i(
+                        TAG,
+                        "subscriptionBalance SDK raw: start=$startBalance balance=$balance pending=$pending used=$used plan=$plan",
+                    )
                     cont.resume(
                         UrnetworkSdkBridge.SubscriptionBalanceSnapshot(
                             balanceBytes = balance,
