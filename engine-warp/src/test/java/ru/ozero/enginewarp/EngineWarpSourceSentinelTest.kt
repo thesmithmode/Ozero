@@ -24,16 +24,25 @@ class EngineWarpSourceSentinelTest {
     @Test
     fun `awaitReady timeout логирует dirListing — диагностика UAPI socket path`() {
         assertTrue(
-            source.contains("listSocketCandidates(uapiPath)"),
+            source.contains("WarpSocketDiagnostics.listSocketCandidates(uapiPath)"),
             "awaitReady timeout обязан логировать содержимое uapiPath и подпапки wireguard/ — " +
                 "иначе нельзя различить 'am-go не создал socket' vs 'socket в неожиданном пути'",
         )
-        assertTrue(
-            source.contains("private fun listSocketCandidates"),
-            "listSocketCandidates обязан быть private fun — discriminating diagnostic helper",
+        val diagFile = File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/enginewarp/WarpSocketDiagnostics.kt",
         )
         assertTrue(
-            source.contains("wireguard"),
+            diagFile.exists(),
+            "WarpSocketDiagnostics вынесен в отдельный файл — иначе EngineWarp превышает TooManyFunctions=20",
+        )
+        val diagSrc = diagFile.readText()
+        assertTrue(
+            diagSrc.contains("fun listSocketCandidates"),
+            "listSocketCandidates должен жить в WarpSocketDiagnostics — discriminating helper",
+        )
+        assertTrue(
+            diagSrc.contains("wireguard"),
             "listSocketCandidates обязан проверять подпапку wireguard/ — возможный путь am-go default",
         )
     }
