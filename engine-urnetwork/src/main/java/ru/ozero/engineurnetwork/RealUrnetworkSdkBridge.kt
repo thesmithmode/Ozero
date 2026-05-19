@@ -484,12 +484,26 @@ class RealUrnetworkSdkBridge(
                     val clientId = runCatching { device.clientId?.toString() }.getOrNull()
                     val activeLocation = runCatching { device.connectLocation?.name }.getOrNull()
                     val providePaused = runCatching { device.providePaused }.getOrNull()
+                    val balanceGb = balance / 1_000_000_000.0
+                    val startGb = startBalance / 1_000_000_000.0
+                    val ratio = if (startBalance > 0) balance.toDouble() / startBalance else 0.0
                     Log.i(
                         TAG,
-                        "subscriptionBalance SDK raw: start=$startBalance balance=$balance pending=$pending " +
-                            "used=$used plan=$plan store=$store clientId=$clientId loc=$activeLocation " +
-                            "providePaused=$providePaused",
+                        "subscriptionBalance SDK raw: start=$startBalance(${"%.1f".format(startGb)}GB) " +
+                            "balance=$balance(${"%.1f".format(balanceGb)}GB) pending=$pending used=$used " +
+                            "plan=$plan store=$store clientId=$clientId loc=$activeLocation " +
+                            "providePaused=$providePaused balance/start=${"%.2f".format(ratio)}",
                     )
+                    if (startBalance > DOUBLE_QUOTA_THRESHOLD_BYTES) {
+                        PersistentLoggers.warn(
+                            TAG,
+                            "subscriptionBalance startBalance=${"%.1f".format(startGb)}GB > " +
+                                "${DOUBLE_QUOTA_THRESHOLD_BYTES / 1_000_000_000L}GB — подозрение на " +
+                                "duplicate networkCreate (legacy guest + walletAuth migration) " +
+                                "или backend накопил квоту по тому же networkId. " +
+                                "clientId=$clientId — нужен tombstone+sentinel для root cause.",
+                        )
+                    }
                     cont.resume(
                         UrnetworkSdkBridge.SubscriptionBalanceSnapshot(
                             balanceBytes = balance,
@@ -600,5 +614,6 @@ class RealUrnetworkSdkBridge(
         const val SUBSCRIPTION_BALANCE_TIMEOUT_MS = 10_000L
         const val DEFAULT_APP_VERSION = "0.0.2"
         const val WINDOW_SIZE_MAX_EXPERIMENTAL = 6L
+        const val DOUBLE_QUOTA_THRESHOLD_BYTES = 50_000_000_000L
     }
 }

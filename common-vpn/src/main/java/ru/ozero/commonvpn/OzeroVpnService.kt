@@ -163,6 +163,7 @@ class OzeroVpnService : android.net.VpnService() {
         private const val TAG = "OzeroVpnService"
         private const val SHUTDOWN_JOIN_TIMEOUT_MS = 7_000L
         private const val ON_DESTROY_SHUTDOWN_TIMEOUT_MS = 5_000L
+        internal const val REVOKE_KILL_DELAY_MS = 2_500L
     }
 
     override fun onCreate() {
@@ -304,9 +305,20 @@ class OzeroVpnService : android.net.VpnService() {
     }
 
     override fun onRevoke() {
-        PersistentLoggers.warn(TAG, "onRevoke — VPN permission revoked")
+        PersistentLoggers.warn(
+            TAG,
+            "onRevoke — VPN permission revoked, will kill own process after " +
+                "${REVOKE_KILL_DELAY_MS}ms to release Android VPN slot for other VPN apps",
+        )
         stopVpn()
         super.onRevoke()
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(
+            {
+                PersistentLoggers.warn(TAG, "onRevoke kill pid=${android.os.Process.myPid()} — slot release")
+                processKiller.kill(android.os.Process.myPid())
+            },
+            REVOKE_KILL_DELAY_MS,
+        )
     }
 
     override fun onDestroy() {
