@@ -7,7 +7,6 @@ import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge.SubscriptionBalanceSnapshot
 import com.bringyour.sdk.LocationsViewController
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class UrnetworkBalanceCacheTest {
@@ -64,7 +63,9 @@ class UrnetworkBalanceCacheTest {
         ) {
             cached = CachedBalance(snapshot, meanReliabilityWeight, totalReferrals)
         }
-        override fun clear() { cached = null }
+        override fun clear() {
+            cached = null
+        }
     }
 
     private class FakeBridge(val snapshot: SubscriptionBalanceSnapshot?) : UrnetworkSdkBridge {
