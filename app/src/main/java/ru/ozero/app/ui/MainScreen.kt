@@ -409,10 +409,6 @@ private fun ExpertStatusBadges(
             urnetworkSearchSeconds = if (manualEngine == EngineId.URNETWORK) urnetworkPeerSearchSeconds else null,
             modifier = Modifier.padding(horizontal = 16.dp),
         )
-        EntryNodeCard(
-            manualEngine = manualEngine,
-            modifier = Modifier.padding(horizontal = 16.dp),
-        )
     }
     TrafficStatsCard(
         stats = stats,
@@ -473,51 +469,6 @@ private fun IpCardPeerSuffix(count: Int?, searchSeconds: Int?) {
     }
 }
 
-@Composable
-private fun EntryNodeCard(
-    manualEngine: EngineId?,
-    modifier: Modifier = Modifier,
-) {
-    val body = when (manualEngine) {
-        null -> stringResource(R.string.entry_node_protected_generic)
-        else -> stringResource(R.string.entry_node_protected_via, manualEngine.name)
-    }
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .testTag(MainScreenTestTags.ENTRY_CARD),
-        colors = CardDefaults.cardColors(containerColor = OzeroPalette.GlassFill),
-        shape = RoundedCornerShape(20.dp),
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    text = stringResource(R.string.entry_node_title),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = OzeroPalette.Text3,
-                )
-                Text(
-                    text = stringResource(R.string.entry_node_your_device),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = OzeroPalette.Text3,
-                )
-            }
-            Text(
-                text = body,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = OzeroPalette.Text,
-            )
-        }
-    }
-}
 
 @Composable
 private fun simpleDockTabs(): List<DockTab> {
