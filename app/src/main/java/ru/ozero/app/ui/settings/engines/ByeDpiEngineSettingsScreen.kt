@@ -86,6 +86,7 @@ private fun DnsSection(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("LongMethod")
 fun ByeDpiEngineSettingsScreen(
     onBack: () -> Unit,
     onOpenStrategyTest: () -> Unit = {},

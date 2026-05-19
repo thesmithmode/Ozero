@@ -6,11 +6,12 @@ import ru.ozero.enginescore.settings.ByeDpiUiSettings.DesyncMethod
 internal object ByeDpiUiArgsBuilder {
 
     @Suppress("LongMethod", "ComplexMethod", "NestedBlockDepth")
-    fun build(settings: ByeDpiUiSettings, socksPort: Int): Array<String> =
-        (listOf("ciadpi", "--ip", "127.0.0.1", "-p", socksPort.toString()) +
-            buildArgsOnly(settings)).toTypedArray()
+    fun build(settings: ByeDpiUiSettings, socksPort: Int): Array<String> {
+        val prefix = listOf("ciadpi", "--ip", "127.0.0.1", "-p", socksPort.toString())
+        return (prefix + buildArgsOnly(settings)).toTypedArray()
+    }
 
-    @Suppress("LongMethod", "ComplexMethod", "NestedBlockDepth")
+    @Suppress("LongMethod", "ComplexMethod", "NestedBlockDepth", "CognitiveComplexMethod")
     fun buildArgsOnly(settings: ByeDpiUiSettings): List<String> {
         val args = mutableListOf<String>()
 
@@ -83,6 +84,6 @@ internal object ByeDpiUiArgsBuilder {
             args.add("-An")
         }
 
-        return args.toTypedArray()
+        return args
     }
 }

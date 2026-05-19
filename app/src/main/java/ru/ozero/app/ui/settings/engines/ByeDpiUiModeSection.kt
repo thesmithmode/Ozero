@@ -24,6 +24,7 @@ import ru.ozero.enginescore.settings.ByeDpiUiSettings
 import ru.ozero.enginescore.settings.ByeDpiUiSettings.DesyncMethod
 
 @Composable
+@Suppress("LongMethod")
 fun ByeDpiUiModeSection(
     settings: ByeDpiUiSettings,
     onChange: (ByeDpiUiSettings) -> Unit,

@@ -338,8 +338,10 @@ private fun ExpertMainContent(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            val visualConnected = isConnected || switching != null ||
-                tunnelState is TunnelState.Probing || tunnelState is TunnelState.Connecting
+            val visualConnected = isConnected ||
+                switching != null ||
+                tunnelState is TunnelState.Probing ||
+                tunnelState is TunnelState.Connecting
             ExpertStatusBadges(
                 visualConnected = visualConnected,
                 killswitchActive = killswitchActive,
