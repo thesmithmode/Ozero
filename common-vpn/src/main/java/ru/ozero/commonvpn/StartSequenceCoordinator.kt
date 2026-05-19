@@ -118,7 +118,14 @@ class StartSequenceCoordinator(
         val chainResult = startChain(activeEngineId, activeConfig) ?: return
         if (!routeTrafficForEngine(activeEngineId, fd, chainResult.finalSocksPort)) return
 
-        awaitEngineReady(activeEngineId)
+        if (!awaitEngineReady(activeEngineId)) {
+            runCatching { deps.chainOrchestrator.stop() }
+            deps.engineWatchdog.handleEngineFailure(
+                activeEngineId,
+                "awaitReady fail — handshake/probe не подтверждён",
+            )
+            return
+        }
 
         deps.tunnelController.onEngineStarted(activeEngineId, chainResult.finalSocksPort)
         val nowMs = System.currentTimeMillis()
@@ -165,14 +172,17 @@ class StartSequenceCoordinator(
         return SplitTunnelConfig(mode = mode, allowlist = allowlist, blocklist = blocklist)
     }
 
-    private suspend fun awaitEngineReady(engineId: EngineId) {
-        val plugin = deps.enginePlugins.firstOrNull { it.id == engineId } ?: return
-        val result = plugin.awaitReady()
-        if (result is EnginePlugin.ReadyResult.Timeout) {
-            PersistentLoggers.warn(
-                TAG,
-                "awaitReady timeout for $engineId: ${result.reason} — watchdog will catch",
-            )
+    private suspend fun awaitEngineReady(engineId: EngineId): Boolean {
+        val plugin = deps.enginePlugins.firstOrNull { it.id == engineId } ?: return true
+        return when (val result = plugin.awaitReady()) {
+            EnginePlugin.ReadyResult.Ready -> true
+            is EnginePlugin.ReadyResult.Timeout -> {
+                PersistentLoggers.warn(
+                    TAG,
+                    "awaitReady timeout for $engineId: ${result.reason} → engineFailure (fast-fail)",
+                )
+                false
+            }
         }
     }
 

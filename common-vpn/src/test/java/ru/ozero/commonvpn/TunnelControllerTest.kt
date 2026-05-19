@@ -29,6 +29,16 @@ class TunnelControllerTest {
     }
 
     @Test
+    fun `sentinel SWITCHING_TIMEOUT_MS = 6s — visual switch fast-fail (v0.1.5 fix)`() {
+        assertEquals(
+            6_000L,
+            TunnelController.SWITCHING_TIMEOUT_MS,
+            "watchdog timeout управляет максимум времени UI-перехода 'switching'. " +
+                "Возврат к 12_000L → юзер видит долгий switch при failed engine.",
+        )
+    }
+
+    @Test
     fun fullHappyPath_idleProbingConnectingConnectedDisconnectingIdle() {
         controller.onProbing()
         assertIs<TunnelState.Probing>(controller.state.value)

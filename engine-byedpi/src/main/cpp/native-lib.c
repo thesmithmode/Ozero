@@ -6,9 +6,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdatomic.h>
+#include <android/log.h>
 
 #include "byedpi/error.h"
 #include "main.h"
+
+#define BYEDPI_LOG_TAG "ByeDpiNative"
+#define BYEDPI_LOGW(...) __android_log_print(ANDROID_LOG_WARN, BYEDPI_LOG_TAG, __VA_ARGS__)
 
 /* Known limitation: server_fd объявлен в upstream byedpi как обычный int (не _Atomic).
  * Race window между jniStopProxy и jniForceClose: оба читают server_fd без синхронизации;
@@ -114,7 +118,9 @@ Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniStartProxy(JNIEnv *env, __attribute__(
     reset_params();
     optind = 1;
 
+    BYEDPI_LOGW("jniStartProxy → main() entry argc=%d server_fd=%d", argc, server_fd);
     int result = main(argc, argv);
+    BYEDPI_LOGW("jniStartProxy ← main() exit code=%d server_fd=%d", result, server_fd);
 
     free_argv(argv, argc);
     atomic_store(&g_proxy_running, 0);
@@ -124,18 +130,26 @@ Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniStartProxy(JNIEnv *env, __attribute__(
 
 JNIEXPORT jint JNICALL
 Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniStopProxy(__attribute__((unused)) JNIEnv *env, __attribute__((unused)) jobject thiz) {
-    if (!atomic_load(&g_proxy_running)) return -1;
-    if (server_fd < 0) return -1;
-    return shutdown(server_fd, SHUT_RDWR);
+    int running = atomic_load(&g_proxy_running);
+    int fd_snapshot = server_fd;
+    BYEDPI_LOGW("jniStopProxy entry running=%d server_fd=%d", running, fd_snapshot);
+    if (!running) return -1;
+    if (fd_snapshot < 0) return -1;
+    int rc = shutdown(fd_snapshot, SHUT_RDWR);
+    BYEDPI_LOGW("jniStopProxy exit shutdown rc=%d", rc);
+    return rc;
 }
 
 JNIEXPORT jint JNICALL
 Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniForceClose(__attribute__((unused)) JNIEnv *env, __attribute__((unused)) jobject thiz) {
-    if (server_fd < 0) {
+    int fd_snapshot = server_fd;
+    BYEDPI_LOGW("jniForceClose entry server_fd=%d", fd_snapshot);
+    if (fd_snapshot < 0) {
         return -1;
     }
-    int rc = close(server_fd);
+    int rc = close(fd_snapshot);
     server_fd = -1;
+    BYEDPI_LOGW("jniForceClose exit close rc=%d server_fd=-1", rc);
     return rc;
 }
 

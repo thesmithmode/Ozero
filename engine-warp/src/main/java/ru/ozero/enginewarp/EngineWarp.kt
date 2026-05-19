@@ -366,13 +366,13 @@ class EngineWarp(
         return host.all { it.isDigit() || it == '.' }
     }
 
-    private companion object {
+    internal companion object {
         const val TAG = "EngineWarp"
         const val WARP_NO_SOCKS_PORT = 0
         const val TUNNEL_NAME = "ozero-warp"
         const val DOH_CONNECT_TIMEOUT_MS = 3_000
         const val DOH_READ_TIMEOUT_MS = 3_000
-        const val WARP_READY_TIMEOUT_MS = 10_000L
+        const val WARP_READY_TIMEOUT_MS = 5_000L
         const val WARP_READY_POLL_MS = 100L
         const val STATS_POLL_INTERVAL_MS = 5_000L
         const val HANDSHAKE_STALE_THRESHOLD_SEC = 180L
