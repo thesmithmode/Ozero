@@ -201,7 +201,6 @@
     <string name="saved_strategy_unpin">Desfixar</string>
     <string name="saved_strategy_rename_hint">Nome (opcional)</string>
     <string name="evolution_mode_toggle">Modo evolução</string>
-    <string name="evolution_generation_label">Geração %1$d/%2$d</string>
     <string name="evolution_fitness_label">Melhor resultado: %1$d%%</string>
     <string name="evolution_population_label">População</string>
     <string name="urnetwork_provide_mode_never">Nunca</string>
@@ -254,6 +253,11 @@
     <string name="ip_card_error">Falha ao obter IP: %1$s</string>
     <string name="ip_card_refresh">Atualizar</string>
     <string name="ip_card_country_unknown">País desconhecido</string>
+    <string name="entry_node_title">Nó de entrada</string>
+    <string name="entry_node_protected_via">Protegido via %1$s</string>
+    <string name="entry_node_protected_generic">Protegido</string>
+    <string name="entry_node_direct">Conexão direta</string>
+    <string name="entry_node_your_device">Seu dispositivo</string>
 
     <!-- Kill switch -->
     <string name="settings_killswitch_title">Kill switch</string>
@@ -282,7 +286,7 @@
     <string name="main_status_probing_warp">Conectando ao WARP…</string>
 
     <!-- Chart timeframe -->
-    <string name="chart_tf_30s">30s</string>
+    <string name="chart_tf_1min">1m</string>
     <string name="chart_tf_5min">5m</string>
     <string name="chart_tf_30min">30m</string>
     <string name="chart_tf_1h">1h</string>
@@ -325,6 +329,7 @@
     <string name="urnetwork_mode_hint">Web — baixa latência para navegação. Streaming — alto volume para vídeo.</string>
     <string name="urnetwork_fixed_ip_size">IP de saída fixo</string>
     <string name="urnetwork_fixed_ip_size_hint">Um par em vez de pool — IP de sessão estável</string>
+    <string name="urnetwork_enhanced_anonymization">Anonimização aprimorada</string>
     <string name="urnetwork_about_title">Sobre URnetwork</string>
     <string name="urnetwork_about_body">URnetwork é a rede mais local e mais privada do planeta. Um protocolo patenteado mantém os participantes seguros. A malha tem mais de 30.000 provedores e zero incidentes conhecidos.</string>
     <string name="urnetwork_peers_connected">Conectado a %1$d pares</string>
@@ -378,9 +383,7 @@
     <string name="scan_mode_deep_desc">Busca genética — encontra novas combinações</string>
     <string name="strategy_settings_save">Salvar</string>
     <string name="strategy_settings_field_empty">O campo não pode estar vazio</string>
-    <string name="evolution_access_label">Disponibilidade: %1$d%%</string>
     <string name="evolution_initializing">Preparando população…</string>
-    <string name="evolution_evaluating_label">Testando %1$d/%2$d</string>
     <string name="evolution_stagnating">Estagnado — buscando outras opções…</string>
     <string name="saved_strategy_rename_title">Renomear</string>
     <string name="usage_history_title">Histórico de uso</string>
@@ -453,4 +456,29 @@
     <string name="strategy_time_min_ago_fmt">há %1$d min</string>
     <string name="strategy_time_hour_ago_fmt">há %1$d h</string>
     <string name="strategy_time_day_ago_fmt">há %1$d d</string>
+    <string name="main_status_reconnecting">Reconectando…</string>
+    <string name="stats_tf_all">Tudo</string>
+    <string name="stats_tf_day">1d</string>
+    <string name="stats_tf_week">7d</string>
+    <string name="stats_tf_month">30d</string>
+    <string name="stats_tf_year">1a</string>
+    <string name="stats_traffic_all_engines">Todos</string>
+    <string name="stats_traffic_sessions">sessões</string>
+    <string name="stats_traffic_title">Estatísticas de tráfego</string>
+    <string name="urnetwork_balance_available">Disponível</string>
+    <string name="urnetwork_balance_empty">Saldo indisponível. Conecte-se ao URnetwork.</string>
+    <string name="urnetwork_balance_error">Falha ao obter saldo: %1$s</string>
+    <string name="urnetwork_balance_pending">Em processamento</string>
+    <string name="urnetwork_balance_plan_label">Plano: %1$s</string>
+    <string name="urnetwork_balance_plan_unknown">Free</string>
+    <string name="urnetwork_balance_title">Tráfego disponível do URnetwork</string>
+    <string name="urnetwork_balance_total">Total do plano</string>
+    <string name="urnetwork_balance_used">Usado</string>
+    <string name="urnetwork_daily_allocation">Limite diário</string>
+    <string name="urnetwork_insufficient_balance_title">Pontos insuficientes</string>
+    <string name="urnetwork_insufficient_balance_body">O saldo do URnetwork esgotou — VPN foi desconectado automaticamente. Recarregue sua conta ou compartilhe tráfego para continuar.</string>
+    <string name="urnetwork_referral_bonus">+%d GB</string>
+    <string name="urnetwork_referrals_label">Referidos: %d</string>
+    <string name="urnetwork_reliability_bonus">+%.0f%% bônus</string>
+    <string name="urnetwork_reliability_label">Confiabilidade: %.0f%%</string>
 </resources>

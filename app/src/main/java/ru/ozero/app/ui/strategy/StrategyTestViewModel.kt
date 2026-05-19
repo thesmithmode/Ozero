@@ -26,6 +26,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
+import ru.ozero.enginebyedpi.ByeDpiEngine
 import ru.ozero.enginebyedpi.strategy.ByeDpiKnownSeeds
 import ru.ozero.enginebyedpi.strategy.EvolutionEngine
 import ru.ozero.enginebyedpi.strategy.EvolutionResourcesProvider
@@ -286,9 +287,7 @@ class StrategyTestViewModel @Inject constructor(
             runCatching { repository.setByedpiWinningArgs(command) }
                 .onFailure { PersistentLoggers.warn(TAG, "onApply failed: ${it.message}") }
             withContext(ioDispatcher) {
-                val updated = runCatching { savedStrategyStore.add(command) }.getOrElse { savedStrategyStore.load() }
-                _savedStrategies.value = updated
-                val savedName = updated.find { it.command == command }?.name
+                val savedName = _savedStrategies.value.find { it.command == command }?.name
                 val newHistory = runCatching { usageHistoryStore.record(command, savedName) }
                     .onFailure { PersistentLoggers.warn(TAG, "history record failed: ${it.message}") }
                     .getOrNull()
@@ -333,7 +332,6 @@ class StrategyTestViewModel @Inject constructor(
             isInitializing = true,
         )
         var lastBestFitness = 0.0
-        var lastBestCommand: String? = null
         val best = evolutionEngine.evolve(
             seedStrategies = seedCommands,
             onGeneration = { result ->
@@ -358,14 +356,6 @@ class StrategyTestViewModel @Inject constructor(
                 _runSummary.value = "Gen ${result.generation}/$maxGen · доступность $successPct%"
                 if (result.bestFitness > lastBestFitness) {
                     lastBestFitness = result.bestFitness
-                    val cmd = result.best.toCommand()
-                    if (cmd.isNotBlank() && cmd != lastBestCommand) {
-                        lastBestCommand = cmd
-                        viewModelScope.launch(ioDispatcher) {
-                            runCatching { savedStrategyStore.add(cmd) }
-                                .onSuccess { _savedStrategies.value = it }
-                        }
-                    }
                 }
             },
             onChromosomeEval = { index, total, command ->
@@ -379,12 +369,6 @@ class StrategyTestViewModel @Inject constructor(
             },
         )
         val finalCmd = best.toCommand()
-        if (finalCmd.isNotBlank() && lastBestFitness > 0.0) {
-            withContext(ioDispatcher) {
-                runCatching { savedStrategyStore.add(finalCmd) }
-                    .onSuccess { _savedStrategies.value = it }
-            }
-        }
         withContext(ioDispatcher) {
             runCatching { savedStrategyStore.markVerified(seedCommands.toSet(), System.currentTimeMillis()) }
                 .onSuccess { _savedStrategies.value = it }
@@ -408,7 +392,7 @@ class StrategyTestViewModel @Inject constructor(
             _runSummary.value = "Testing ${loopIdx + 1}/${commands.size}: $command"
             val started = withTimeoutOrNull(startTimeoutMs) {
                 byeDpiEngine.start(
-                    config = EngineConfig.ByeDpi(args = command, socksPort = SOCKS_PORT),
+                    config = EngineConfig.ByeDpi(args = command, socksPort = ByeDpiEngine.AUTO_ROTATE_PORT),
                     upstream = Upstream.None,
                 )
             }
@@ -417,7 +401,8 @@ class StrategyTestViewModel @Inject constructor(
                 applyEngineStartFailure(command, sites, started)
                 continue
             }
-            val probe: SocksProbeClient = probeFactory.create(SOCKS_PORT, startTimeoutMs.toInt())
+            val realPort = started.socksPort
+            val probe: SocksProbeClient = probeFactory.create(realPort, startTimeoutMs.toInt())
             val semaphore = Semaphore(concurrentLimit)
             try {
                 coroutineScope {

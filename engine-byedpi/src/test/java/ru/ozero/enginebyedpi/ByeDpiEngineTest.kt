@@ -7,6 +7,8 @@ import io.mockk.mockkObject
 import io.mockk.runs
 import io.mockk.unmockkObject
 import io.mockk.verify
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -18,7 +20,9 @@ import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.settings.HostsMode
+import io.mockk.clearMocks
 import io.mockk.coVerify
+import io.mockk.coVerifyOrder
 import java.io.IOException
 import java.util.concurrent.CountDownLatch
 import kotlin.test.assertEquals
@@ -275,18 +279,74 @@ class ByeDpiEngineTest {
         assertIs<IpProbeRoute.Default>(route)
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun startFailureNoStopProxyWhenProxyReturnedErrorImmediately() = runTest {
+    fun `start failure with main returning -1 must forceClose to reset upstream server_fd`() = runTest {
         val failEngine = ByeDpiEngine(
             proxy,
             socksProbe = { _, _, _ -> throw IOException("refused") },
             readyTotalTimeoutMs = 200,
+            testDispatcherOverride = UnconfinedTestDispatcher(testScheduler),
         )
         every { proxy.startProxy(any()) } returns -1
         val result = failEngine.start(EngineConfig.ByeDpi(socksPort = 19001))
         assertIs<StartResult.Failure>(result)
         coVerify(exactly = 0) { proxy.stopProxy() }
-        coVerify(exactly = 0) { proxy.forceClose() }
+        coVerify(atLeast = 1) { proxy.forceClose() }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `start failure clears upstream server_fd so next start can bind same port`() = runTest {
+        var callCount = 0
+        val recProxy = mockk<ByeDpiProxy>(relaxed = true)
+        every { recProxy.startProxy(any()) } answers {
+            if (callCount++ == 0) -1 else 0
+        }
+        val recEngine = ByeDpiEngine(
+            recProxy,
+            socksProbe = { _, _, _ ->
+                if (callCount == 1) throw IOException("refused") else 1L
+            },
+            readyTotalTimeoutMs = 300,
+            testDispatcherOverride = UnconfinedTestDispatcher(testScheduler),
+        )
+        val first = recEngine.start(EngineConfig.ByeDpi(socksPort = 1080))
+        assertIs<StartResult.Failure>(first)
+        coVerify(atLeast = 1) { recProxy.forceClose() }
+        val second = recEngine.start(EngineConfig.ByeDpi(socksPort = 1080))
+        assertIs<StartResult.Success>(second)
+    }
+
+    @Test
+    fun `stop always forceClose after join — server_fd reset guarantees clean next start`() = runTest {
+        every { proxy.startProxy(any()) } returns 0
+        engine.start(EngineConfig.ByeDpi(socksPort = 1080))
+        engine.stop()
+        coVerifyOrder {
+            proxy.stopProxy()
+            proxy.forceClose()
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `start pre-flight forceClose runs even when previous job already completed`() = runTest {
+        val recProxy = mockk<ByeDpiProxy>(relaxed = true)
+        every { recProxy.startProxy(any()) } returns -1
+        val recEngine = ByeDpiEngine(
+            recProxy,
+            socksProbe = { _, _, _ -> throw IOException("refused") },
+            readyTotalTimeoutMs = 100,
+            testDispatcherOverride = UnconfinedTestDispatcher(testScheduler),
+        )
+        val first = recEngine.start(EngineConfig.ByeDpi(socksPort = 1080))
+        assertIs<StartResult.Failure>(first)
+        clearMocks(recProxy, answers = false)
+        every { recProxy.startProxy(any()) } returns -1
+        val second = recEngine.start(EngineConfig.ByeDpi(socksPort = 1080))
+        assertIs<StartResult.Failure>(second)
+        coVerify(atLeast = 1) { recProxy.forceClose() }
     }
 
     @Test

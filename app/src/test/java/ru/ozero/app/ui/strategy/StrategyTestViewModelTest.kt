@@ -415,13 +415,14 @@ class StrategyTestViewModelTest {
     }
 
     @Test
-    fun `onApply also saves command to saved store`() = runTest(dispatcher) {
-        val vm = newVm()
-        advanceUntilIdle()
-        vm.onApply("-applied-cmd")
-        advanceUntilIdle()
-        assertTrue(vm.savedStrategies.value.any { it.command == "-applied-cmd" })
-    }
+    fun `onApply does not add command to saved store — favorites are separate list from history`() =
+        runTest(dispatcher) {
+            val vm = newVm()
+            advanceUntilIdle()
+            vm.onApply("-applied-cmd")
+            advanceUntilIdle()
+            assertTrue(vm.savedStrategies.value.none { it.command == "-applied-cmd" })
+        }
 
     @Test
     fun `onDeleteSaved removes entry from savedStrategies`() = runTest(dispatcher) {
@@ -487,6 +488,21 @@ class StrategyTestViewModelTest {
         advanceUntilIdle()
         assertFalse(vm.isRunning.value)
     }
+
+    @Test
+    fun `evolution does not add chromosomes to saved store — favorites stay user-curated`() =
+        runTest(dispatcher) {
+            settingsStore.stored = StrategyTestSettings(
+                evolutionMode = true, evolutionMaxGenerations = 2, evolutionPopulationSize = 2,
+            )
+            assets = FakeAssetSource(strategies = listOf("-cmd1"), sites = listOf("s1"))
+            val vm = newVm(sites = listOf("s1"))
+            advanceUntilIdle()
+            val before = vm.savedStrategies.value.size
+            vm.onStart()
+            advanceUntilIdle()
+            assertEquals(before, vm.savedStrategies.value.size)
+        }
 
     @Test
     fun `runLoop uses requestsPerDomain retry until first success`() = runTest(dispatcher) {

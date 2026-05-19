@@ -16,14 +16,20 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import ru.ozero.app.relay.UrnetworkRelayCoordinator
+import ru.ozero.app.urnetwork.RealUrnetworkBalanceRepository
+import ru.ozero.app.urnetwork.UrnetworkBalanceRepository
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.engineurnetwork.DataStoreUrnetworkConfigStore
 import ru.ozero.engineurnetwork.EngineUrnetwork
 import ru.ozero.engineurnetwork.RealUrnetworkSdkBridge
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
+import ru.ozero.engineurnetwork.UrnetworkContractStatusObserver
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.auth.RealUrnetworkAuthService
+import ru.ozero.engineurnetwork.auth.RealUrnetworkDeviceIdentity
 import ru.ozero.engineurnetwork.auth.UrnetworkAuthService
+import ru.ozero.engineurnetwork.auth.UrnetworkDeviceIdentity
+import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
 import javax.inject.Qualifier
 import javax.inject.Singleton
@@ -57,9 +63,13 @@ object UrnetworkModule {
     @Singleton
     fun provideUrnetworkSdkBridge(
         @ApplicationContext context: Context,
+        tunnelController: TunnelController,
     ): UrnetworkSdkBridge = RealUrnetworkSdkBridge(
         app = context.applicationContext as Application,
         appVersion = ru.ozero.app.BuildConfig.VERSION_NAME,
+        onIoLoopDied = { reason ->
+            tunnelController.onEngineDied(EngineId.URNETWORK, reason)
+        },
     )
 
     @Provides
@@ -69,7 +79,13 @@ object UrnetworkModule {
         store: UrnetworkConfigStore,
         bridge: UrnetworkSdkBridge,
         authService: UrnetworkAuthService,
-    ): EnginePlugin = EngineUrnetwork(store, bridge, authService)
+        deviceIdentity: UrnetworkDeviceIdentity,
+    ): EnginePlugin = EngineUrnetwork(
+        configStore = store,
+        sdkBridge = bridge,
+        authService = authService,
+        deviceIdentity = deviceIdentity,
+    )
 
     @Provides
     @Singleton
@@ -79,9 +95,42 @@ object UrnetworkModule {
 
     @Provides
     @Singleton
+    fun provideUrnetworkDeviceIdentity(
+        @ApplicationContext context: Context,
+    ): UrnetworkDeviceIdentity = RealUrnetworkDeviceIdentity(context.applicationContext as Application)
+
+    @Provides
+    @Singleton
     fun provideUrnetworkRelayCoordinator(
         bridge: UrnetworkSdkBridge,
         configStore: UrnetworkConfigStore,
         tunnelController: TunnelController,
     ): UrnetworkRelayCoordinator = UrnetworkRelayCoordinator(bridge, configStore, tunnelController)
+
+    @Provides
+    @Singleton
+    fun provideUrnetworkBalanceRepository(
+        bridge: UrnetworkSdkBridge,
+    ): UrnetworkBalanceRepository = RealUrnetworkBalanceRepository(bridge = bridge)
+
+    @Provides
+    @Singleton
+    fun provideUrnetworkContractStatusObserver(
+        @ApplicationContext context: Context,
+        bridge: UrnetworkSdkBridge,
+        tunnelController: TunnelController,
+    ): UrnetworkContractStatusObserver = UrnetworkContractStatusObserver(
+        bridge = bridge,
+        tunnelController = tunnelController,
+        requestStopVpn = { reason ->
+            val intent = android.content.Intent(
+                context,
+                ru.ozero.commonvpn.OzeroVpnService::class.java,
+            ).apply {
+                action = ru.ozero.commonvpn.OzeroVpnService.ACTION_STOP
+                putExtra("stop_reason", reason)
+            }
+            androidx.core.content.ContextCompat.startForegroundService(context, intent)
+        },
+    )
 }

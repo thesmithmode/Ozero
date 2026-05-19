@@ -10,6 +10,7 @@
     <string name="main_status_probing">Поиск маршрута…</string>
     <string name="main_status_probing_warp">Подключение к WARP…</string>
     <string name="main_status_connecting">Подключение…</string>
+    <string name="main_status_reconnecting">Переподключение…</string>
     <string name="main_status_connected">Подключено</string>
     <string name="main_status_switching">Переключение…</string>
     <string name="main_status_disconnecting">Отключение…</string>
@@ -29,7 +30,7 @@
     <string name="tab_settings">Настройки</string>
     <string name="tab_diagnostics">Диагностика</string>
     <string name="tab_servers">Параметры</string>
-    <string name="tab_split_tunnel">Раздельное туннелирование</string>
+    <string name="tab_split_tunnel">Раздельное</string>
     <string name="tab_stats">Статистика</string>
     <string name="tab_subs">Подписка</string>
     <string name="tab_engine">Движок</string>
@@ -230,12 +231,9 @@
     <string name="strategy_settings_save">Сохранить</string>
     <string name="strategy_settings_field_empty">Поле не может быть пустым</string>
     <string name="evolution_mode_toggle">Режим эволюции</string>
-    <string name="evolution_generation_label">Поколение %1$d/%2$d</string>
     <string name="evolution_fitness_label">Лучший результат: %1$d%%</string>
-    <string name="evolution_access_label">Доступность: %1$d%%</string>
     <string name="evolution_population_label">Лучшие стратегии</string>
     <string name="evolution_initializing">Подготовка популяции…</string>
-    <string name="evolution_evaluating_label">Тестируется %1$d/%2$d</string>
     <string name="evolution_stagnating">Топчусь на месте — ищу другие варианты…</string>
     <string name="saved_strategy_rename_title">Переименовать</string>
     <string name="usage_history_title">История применений</string>
@@ -273,6 +271,22 @@
     <string name="urnetwork_shared_traffic_provided">Предоставлено</string>
     <string name="urnetwork_shared_traffic_plan">Тариф</string>
     <string name="urnetwork_shared_traffic_balance">Остаток</string>
+    <string name="urnetwork_balance_title">Доступный трафик URnetwork</string>
+    <string name="urnetwork_balance_available">Доступно</string>
+    <string name="urnetwork_balance_used">Использовано</string>
+    <string name="urnetwork_balance_total">Всего по тарифу</string>
+    <string name="urnetwork_balance_pending">В обработке</string>
+    <string name="urnetwork_balance_plan_label">Тариф: %1$s</string>
+    <string name="urnetwork_balance_plan_unknown">Free</string>
+    <string name="urnetwork_balance_error">Не удалось получить баланс: %1$s</string>
+    <string name="urnetwork_balance_empty">Баланс недоступен. Подключитесь к URnetwork.</string>
+    <string name="urnetwork_daily_allocation">Ежедневный лимит</string>
+    <string name="urnetwork_reliability_label">Надёжность: %.0f%%</string>
+    <string name="urnetwork_reliability_bonus">+%.0f%% бонус</string>
+    <string name="urnetwork_referrals_label">Рефералов: %d</string>
+    <string name="urnetwork_referral_bonus">+%d ГБ</string>
+    <string name="urnetwork_insufficient_balance_title">Недостаточно баллов</string>
+    <string name="urnetwork_insufficient_balance_body">Баланс URnetwork исчерпан — VPN автоматически отключён. Пополните аккаунт или поделитесь трафиком, чтобы продолжить.</string>
     <string name="urnetwork_points_title">Очки</string>
     <string name="urnetwork_points_payout">Выплаты</string>
     <string name="urnetwork_points_referral">Рефералы</string>
@@ -289,6 +303,7 @@
     <string name="urnetwork_mode_hint">Веб — низкая задержка для браузинга. Стриминг — большая ширина для видео.</string>
     <string name="urnetwork_fixed_ip_size">Фиксированный exit-IP</string>
     <string name="urnetwork_fixed_ip_size_hint">Один peer вместо пула — стабильный IP сессии</string>
+    <string name="urnetwork_enhanced_anonymization">Усиленная анонимизация</string>
     <string name="urnetwork_about_title">Что такое URnetwork</string>
     <string name="urnetwork_about_body">URnetwork — самая локальная и приватная сеть в мире. Запатентованный протокол держит участников в безопасности. Сейчас в сети больше 30 000 провайдеров, известных инцидентов — ноль.</string>
     <string name="settings_urnetwork_title">URnetwork</string>
@@ -342,7 +357,16 @@
     <string name="onboarding_mode_title">Выберите режим</string>
     <string name="onboarding_mode_body">Можно изменить в любой момент в Настройках.</string>
 
-    <!-- Stats history -->
+    <!-- Traffic stats -->
+    <string name="stats_traffic_title">Статистика трафика</string>
+    <string name="stats_tf_day">1д</string>
+    <string name="stats_tf_week">7д</string>
+    <string name="stats_tf_month">30д</string>
+    <string name="stats_tf_year">1г</string>
+    <string name="stats_tf_all">Всё</string>
+    <string name="stats_traffic_sessions">сессий</string>
+    <string name="stats_traffic_all_engines">Все</string>
+    <!-- Stats history (session list drill-down) -->
     <string name="stats_history_title">История сессий</string>
     <string name="stats_history_summary">Сохранённые VPN-сессии со статистикой трафика</string>
     <string name="stats_history_empty">Нет сохранённых сессий</string>
@@ -377,6 +401,11 @@
     <string name="ip_card_error">Не удалось получить IP: %1$s</string>
     <string name="ip_card_refresh">Обновить</string>
     <string name="ip_card_country_unknown">Страна неизвестна</string>
+    <string name="entry_node_title">Входной узел</string>
+    <string name="entry_node_protected_via">Защищено через %1$s</string>
+    <string name="entry_node_protected_generic">Защищено</string>
+    <string name="entry_node_direct">Прямое соединение</string>
+    <string name="entry_node_your_device">Ваше устройство</string>
     <!-- Killswitch -->
     <string name="settings_killswitch_title">Killswitch</string>
     <string name="settings_killswitch_summary">Блокировать весь трафик при падении тоннеля до восстановления</string>
@@ -385,7 +414,7 @@
     <string name="settings_always_on_banner_body">Включите «Всегда включён» в настройках VPN Android для защиты от утечек при перезагрузке</string>
     <string name="settings_always_on_banner_configure">Настроить</string>
     <!-- Chart timeframe -->
-    <string name="chart_tf_30s">30с</string>
+    <string name="chart_tf_1min">1м</string>
     <string name="chart_tf_5min">5м</string>
     <string name="chart_tf_30min">30м</string>
     <string name="chart_tf_1h">1ч</string>

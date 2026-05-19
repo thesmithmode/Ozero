@@ -73,4 +73,32 @@ object UrnetworkRuntime {
 
     fun manager(): NetworkSpaceManager? = manager
     fun space(): NetworkSpace? = space
+
+    suspend fun release() = withContext(Dispatchers.Main.immediate) {
+        mutex.withLock {
+            val mgr = manager
+            val sp = space
+            if (mgr == null && sp == null) {
+                Log.i(TAG, "release skipped — runtime not initialised")
+                return@withLock
+            }
+            if (mgr == null) {
+                PersistentLoggers.warn(
+                    TAG,
+                    "release: manager == null but space != null — invariant violated, " +
+                        "setActiveNetworkSpace пропущен, Go-runtime может удерживать активную сессию",
+                )
+            } else {
+                runCatching { mgr.setActiveNetworkSpace(null) }
+                    .onFailure {
+                        PersistentLoggers.warn(TAG, "release setActiveNetworkSpace(null) threw: ${it.message}")
+                    }
+            }
+            space = null
+            manager = null
+            runCatching { Sdk.freeMemory() }
+                .onFailure { PersistentLoggers.warn(TAG, "Sdk.freeMemory threw: ${it.message}") }
+            Log.i(TAG, "runtime released — UDP sockets, file handles, Go heap freed")
+        }
+    }
 }

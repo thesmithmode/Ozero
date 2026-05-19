@@ -1,12 +1,18 @@
 package ru.ozero.engineurnetwork.auth
 
 import android.app.Application
+import android.util.Base64
+import com.bringyour.sdk.Api
+import com.bringyour.sdk.AuthLoginArgs
+import com.bringyour.sdk.AuthLoginCallback
+import com.bringyour.sdk.AuthLoginResult
 import com.bringyour.sdk.AuthNetworkClientArgs
 import com.bringyour.sdk.AuthNetworkClientCallback
 import com.bringyour.sdk.AuthNetworkClientResult
 import com.bringyour.sdk.NetworkCreateArgs
 import com.bringyour.sdk.NetworkCreateCallback
 import com.bringyour.sdk.NetworkCreateResult
+import com.bringyour.sdk.WalletAuthArgs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -95,7 +101,123 @@ class RealUrnetworkAuthService(
         }
     }
 
+    override suspend fun acquireDeviceWalletJwt(
+        identity: UrnetworkDeviceIdentity,
+        networkName: String,
+    ): DeviceWalletJwtResult = withContext(Dispatchers.Main.immediate) {
+        val space = runCatching { UrnetworkRuntime.ensure(app) }
+            .getOrElse {
+                return@withContext DeviceWalletJwtResult.Error("runtime init failed: ${it.message}")
+            }
+        val api = space.api
+            ?: return@withContext DeviceWalletJwtResult.Error("api null after runtime init")
+        val walletAuth = buildWalletAuth(identity)
+            ?: return@withContext DeviceWalletJwtResult.Error("identity sign failed")
+        when (val r = authLoginWithWallet(api, walletAuth)) {
+            is LoginOutcome.Existing -> DeviceWalletJwtResult.Success(r.byJwt, isNewNetwork = false)
+            is LoginOutcome.NeedCreate -> networkCreateWithWallet(api, walletAuth, networkName)
+            is LoginOutcome.Error -> DeviceWalletJwtResult.Error("authLogin: ${r.message}")
+        }
+    }
+
+    private suspend fun buildWalletAuth(identity: UrnetworkDeviceIdentity): WalletAuthArgs? {
+        val pubkey = runCatching { identity.pubkeyBase58() }
+            .getOrElse {
+                PersistentLoggers.warn(TAG, "identity.pubkeyBase58 threw: ${it.message}")
+                return null
+            }
+        val message = WALLET_MESSAGE_PREFIX + pubkey
+        val signature = runCatching {
+            val raw = identity.sign(message.toByteArray(Charsets.UTF_8))
+            Base64.encodeToString(raw, Base64.NO_WRAP)
+        }.getOrElse {
+            PersistentLoggers.warn(TAG, "identity.sign threw: ${it.message}")
+            return null
+        }
+        return WalletAuthArgs().apply {
+            publicKey = pubkey
+            this.message = message
+            this.signature = signature
+            blockchain = WALLET_BLOCKCHAIN_SOLANA
+        }
+    }
+
+    private suspend fun authLoginWithWallet(api: Api, walletAuth: WalletAuthArgs): LoginOutcome =
+        suspendCancellableCoroutine { cont ->
+            val args = AuthLoginArgs().apply { this.walletAuth = walletAuth }
+            val callback = AuthLoginCallback { result: AuthLoginResult?, err: Exception? ->
+                cont.resume(mapLoginOutcome(result, err))
+            }
+            try {
+                api.authLogin(args, callback)
+            } catch (t: Throwable) {
+                PersistentLoggers.error(TAG, "authLogin threw: ${t.message}")
+                cont.resume(LoginOutcome.Error(t.message ?: "API call failed"))
+            }
+        }
+
+    private fun mapLoginOutcome(result: AuthLoginResult?, err: Exception?): LoginOutcome = when {
+        err != null -> LoginOutcome.Error(err.message ?: "authLogin failed")
+        result == null -> LoginOutcome.Error("empty authLogin response")
+        result.error != null -> LoginOutcome.Error(result.error?.message ?: "authLogin error")
+        else -> {
+            val byJwt = runCatching { result.network?.byJwt }.getOrNull()
+            val echoed = runCatching { result.walletAuth }.getOrNull()
+            when {
+                !byJwt.isNullOrBlank() -> LoginOutcome.Existing(byJwt)
+                echoed != null -> LoginOutcome.NeedCreate
+                else -> LoginOutcome.Error("unrecognized authLogin response")
+            }
+        }
+    }
+
+    private suspend fun networkCreateWithWallet(
+        api: Api,
+        walletAuth: WalletAuthArgs,
+        networkName: String,
+    ): DeviceWalletJwtResult = suspendCancellableCoroutine { cont ->
+        val args = NetworkCreateArgs().apply {
+            userName = ""
+            this.networkName = networkName
+            terms = true
+            this.walletAuth = walletAuth
+        }
+        val callback = NetworkCreateCallback { result: NetworkCreateResult?, err: Exception? ->
+            cont.resume(mapCreateOutcome(result, err))
+        }
+        try {
+            api.networkCreate(args, callback)
+        } catch (t: Throwable) {
+            PersistentLoggers.error(TAG, "networkCreate(wallet) threw: ${t.message}")
+            cont.resume(DeviceWalletJwtResult.Error(t.message ?: "API call failed"))
+        }
+    }
+
+    private fun mapCreateOutcome(result: NetworkCreateResult?, err: Exception?): DeviceWalletJwtResult =
+        when {
+            err != null -> DeviceWalletJwtResult.Error(err.message ?: "networkCreate failed")
+            result == null -> DeviceWalletJwtResult.Error("empty networkCreate response")
+            result.error != null ->
+                DeviceWalletJwtResult.Error(result.error?.message ?: "networkCreate error")
+            else -> {
+                val jwt = runCatching { result.network?.byJwt }.getOrNull()
+                if (jwt.isNullOrBlank()) {
+                    DeviceWalletJwtResult.Error("networkCreate returned empty jwt")
+                } else {
+                    DeviceWalletJwtResult.Success(byJwt = jwt, isNewNetwork = true)
+                }
+            }
+        }
+
+    private sealed class LoginOutcome {
+        data class Existing(val byJwt: String) : LoginOutcome()
+        object NeedCreate : LoginOutcome()
+        data class Error(val message: String) : LoginOutcome()
+    }
+
     private companion object {
         const val TAG = "RealUrnetworkAuthService"
+        const val WALLET_BLOCKCHAIN_SOLANA = "solana"
+        const val WALLET_MESSAGE_PREFIX = "ozero-auth-v1:"
     }
 }

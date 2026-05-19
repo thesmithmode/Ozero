@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
+import ru.ozero.app.ui.urnetwork.UrnetworkBalanceCard
 import ru.ozero.app.ui.utils.formatBytes
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Card
@@ -39,6 +40,7 @@ fun UrnetworkSharedTrafficScreen(
 ) {
     val unpaidBytes by viewModel.unpaidBytes.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val balanceState by viewModel.balanceState.collectAsStateWithLifecycle()
     Scaffold(
         topBar = {
             TopAppBar(
@@ -58,6 +60,7 @@ fun UrnetworkSharedTrafficScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            UrnetworkBalanceCard(state = balanceState)
             if (isLoading) {
                 Column(
                     modifier = Modifier.fillMaxSize(),

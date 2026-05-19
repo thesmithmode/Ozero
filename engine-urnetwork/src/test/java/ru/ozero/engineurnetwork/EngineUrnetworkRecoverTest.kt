@@ -5,9 +5,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -33,9 +30,10 @@ class EngineUrnetworkRecoverTest {
         val scope = CoroutineScope(SupervisorJob() + dispatcher)
         val bridge = FakeRecoverBridge(running = false)
         val engine = EngineUrnetwork(
-            configStore = FakeStore(byJwt = "j", byClientJwt = "cj"),
+            configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
             authService = FakeAuth(),
+            deviceIdentity = null,
             pluginScope = scope,
         )
         val result = engine.recover()
@@ -49,9 +47,10 @@ class EngineUrnetworkRecoverTest {
         val scope = CoroutineScope(SupervisorJob() + dispatcher)
         val bridge = FakeRecoverBridge(running = true, location = null)
         val engine = EngineUrnetwork(
-            configStore = FakeStore(byJwt = "j", byClientJwt = "cj"),
+            configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
             authService = FakeAuth(),
+            deviceIdentity = null,
             pluginScope = scope,
         )
         engine.start(baseConfig, Upstream.None)
@@ -70,9 +69,10 @@ class EngineUrnetworkRecoverTest {
         val fakeLocation = FakeLocation()
         val bridge = FakeRecoverBridge(running = true, location = fakeLocation)
         val engine = EngineUrnetwork(
-            configStore = FakeStore(byJwt = "j", byClientJwt = "cj"),
+            configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
             authService = FakeAuth(),
+            deviceIdentity = null,
             pluginScope = scope,
         )
         engine.start(baseConfig, Upstream.None)
@@ -95,9 +95,10 @@ class EngineUrnetworkRecoverTest {
             throwOnConnect = CancellationException("upstream cancel"),
         )
         val engine = EngineUrnetwork(
-            configStore = FakeStore(byJwt = "j", byClientJwt = "cj"),
+            configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
             authService = FakeAuth(),
+            deviceIdentity = null,
             pluginScope = scope,
         )
         engine.start(baseConfig, Upstream.None)
@@ -118,9 +119,10 @@ class EngineUrnetworkRecoverTest {
             throwOnConnect = RuntimeException("sdk transient"),
         )
         val engine = EngineUrnetwork(
-            configStore = FakeStore(byJwt = "j", byClientJwt = "cj"),
+            configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
             authService = FakeAuth(),
+            deviceIdentity = null,
             pluginScope = scope,
         )
         engine.start(baseConfig, Upstream.None)
@@ -188,35 +190,11 @@ class EngineUrnetworkRecoverTest {
         override suspend fun fetchSubscriptionBalance(): UrnetworkSdkBridge.SubscriptionBalanceSnapshot? = null
     }
 
-    private class FakeStore(
-        val byJwt: String? = null,
-        val byClientJwt: String? = null,
-    ) : UrnetworkConfigStore {
-        private val overrideFlow = MutableStateFlow<String?>(null)
-        private val byJwtFlow = MutableStateFlow(byJwt)
-        private val byClientJwtFlow = MutableStateFlow(byClientJwt)
-
-        override fun walletOverride(): Flow<String?> = overrideFlow
-
-        override fun walletAddress(): Flow<String> =
-            overrideFlow.map { it ?: UrnetworkDefaults.PRESET_WALLET }
-
-        override suspend fun setWalletOverride(value: String?) {
-            overrideFlow.value = value
-        }
-
-        override fun byJwt(): Flow<String?> = byJwtFlow
-
-        override suspend fun setByJwt(value: String?) {
-            byJwtFlow.value = value
-        }
-
-        override fun byClientJwt(): Flow<String?> = byClientJwtFlow
-
-        override suspend fun setByClientJwt(value: String?) {
-            byClientJwtFlow.value = value
-        }
-    }
+    private fun fakeStore(
+        byJwt: String? = null,
+        byClientJwt: String? = null,
+    ): UrnetworkConfigStore =
+        InMemoryUrnetworkConfigStore(UrnetworkConfig(byJwt = byJwt, byClientJwt = byClientJwt))
 
     private class FakeAuth : UrnetworkAuthService {
         override suspend fun acquireGuestJwt(): GuestJwtResult = GuestJwtResult.Success("g")

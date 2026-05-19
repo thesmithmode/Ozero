@@ -10,6 +10,7 @@
     <string name="main_status_probing">Searching route…</string>
     <string name="main_status_probing_warp">Connecting to WARP…</string>
     <string name="main_status_connecting">Connecting…</string>
+    <string name="main_status_reconnecting">Reconnecting…</string>
     <string name="main_status_connected">Connected</string>
     <string name="main_status_switching">Switching…</string>
     <string name="main_status_disconnecting">Disconnecting…</string>
@@ -226,12 +227,9 @@
     <string name="strategy_settings_save">Save</string>
     <string name="strategy_settings_field_empty">Field cannot be empty</string>
     <string name="evolution_mode_toggle">Evolution mode</string>
-    <string name="evolution_generation_label">Generation %1$d/%2$d</string>
     <string name="evolution_fitness_label">Best fitness: %1$d%%</string>
-    <string name="evolution_access_label">Availability: %1$d%%</string>
     <string name="evolution_population_label">Best strategies</string>
     <string name="evolution_initializing">Preparing population…</string>
-    <string name="evolution_evaluating_label">Testing %1$d/%2$d</string>
     <string name="evolution_stagnating">Stuck — exploring new variants…</string>
     <string name="saved_strategy_rename_title">Rename</string>
     <string name="usage_history_title">Usage history</string>
@@ -269,6 +267,20 @@
     <string name="urnetwork_shared_traffic_provided">Provided</string>
     <string name="urnetwork_shared_traffic_plan">Plan</string>
     <string name="urnetwork_shared_traffic_balance">Balance</string>
+    <string name="urnetwork_balance_title">URnetwork remaining traffic</string>
+    <string name="urnetwork_balance_available">Available</string>
+    <string name="urnetwork_balance_used">Used</string>
+    <string name="urnetwork_balance_total">Plan total</string>
+    <string name="urnetwork_balance_pending">Pending</string>
+    <string name="urnetwork_balance_plan_label">Plan: %1$s</string>
+    <string name="urnetwork_balance_plan_unknown">Free</string>
+    <string name="urnetwork_balance_error">Failed to fetch balance: %1$s</string>
+    <string name="urnetwork_balance_empty">Balance unavailable. Connect to URnetwork.</string>
+    <string name="urnetwork_daily_allocation">Daily allocation</string>
+    <string name="urnetwork_reliability_label">Reliability: %.0f%%</string>
+    <string name="urnetwork_reliability_bonus">+%.0f%% bonus</string>
+    <string name="urnetwork_referrals_label">Referrals: %d</string>
+    <string name="urnetwork_referral_bonus">+%d GB</string>
     <string name="urnetwork_points_title">Points</string>
     <string name="urnetwork_points_payout">Payouts</string>
     <string name="urnetwork_points_referral">Referrals</string>
@@ -285,6 +297,7 @@
     <string name="urnetwork_mode_hint">Web — low latency for browsing. Streaming — high bandwidth for video.</string>
     <string name="urnetwork_fixed_ip_size">Fixed exit IP</string>
     <string name="urnetwork_fixed_ip_size_hint">Single peer instead of pool — stable session IP</string>
+    <string name="urnetwork_enhanced_anonymization">Enhanced anonymization</string>
     <string name="urnetwork_about_title">About URnetwork</string>
     <string name="urnetwork_about_body">URnetwork is the most local and most private network on the planet. A patented protocol keeps participants safe. The mesh has more than 30,000 providers today and zero known incidents.</string>
     <string name="settings_urnetwork_title">URnetwork</string>
@@ -338,7 +351,16 @@
     <string name="onboarding_mode_title">Choose a mode</string>
     <string name="onboarding_mode_body">You can change this any time in Settings.</string>
 
-    <!-- Stats history -->
+    <!-- Traffic stats -->
+    <string name="stats_traffic_title">Traffic statistics</string>
+    <string name="stats_tf_day">1d</string>
+    <string name="stats_tf_week">7d</string>
+    <string name="stats_tf_month">30d</string>
+    <string name="stats_tf_year">1y</string>
+    <string name="stats_tf_all">All</string>
+    <string name="stats_traffic_sessions">sessions</string>
+    <string name="stats_traffic_all_engines">All</string>
+    <!-- Stats history (session list drill-down) -->
     <string name="stats_history_title">Session history</string>
     <string name="stats_history_summary">Saved VPN sessions with traffic stats</string>
     <string name="stats_history_empty">No saved sessions</string>
@@ -374,6 +396,11 @@
     <string name="ip_card_error">Failed to fetch IP: %1$s</string>
     <string name="ip_card_refresh">Refresh</string>
     <string name="ip_card_country_unknown">Unknown country</string>
+    <string name="entry_node_title">Entry node</string>
+    <string name="entry_node_protected_via">Protected via %1$s</string>
+    <string name="entry_node_protected_generic">Protected</string>
+    <string name="entry_node_direct">Direct connection</string>
+    <string name="entry_node_your_device">Your device</string>
     <string name="settings_killswitch_title">Kill switch</string>
     <string name="settings_killswitch_summary">Block all traffic when tunnel drops, until reconnect</string>
     <string name="killswitch_active_badge">Kill switch active — traffic blocked</string>
@@ -381,7 +408,7 @@
     <string name="settings_always_on_banner_body">Enable Always-on VPN in Android settings to prevent leaks on reboot</string>
     <string name="settings_always_on_banner_configure">Configure</string>
     <!-- Chart timeframe -->
-    <string name="chart_tf_30s">30s</string>
+    <string name="chart_tf_1min">1m</string>
     <string name="chart_tf_5min">5m</string>
     <string name="chart_tf_30min">30m</string>
     <string name="chart_tf_1h">1h</string>
@@ -465,4 +492,6 @@
     <string name="strategy_time_min_ago_fmt">%1$d min ago</string>
     <string name="strategy_time_hour_ago_fmt">%1$d h ago</string>
     <string name="strategy_time_day_ago_fmt">%1$d d ago</string>
+    <string name="urnetwork_insufficient_balance_title">Insufficient points</string>
+    <string name="urnetwork_insufficient_balance_body">URnetwork balance is exhausted — VPN was disconnected automatically. Top up your account or share traffic to continue.</string>
 </resources>

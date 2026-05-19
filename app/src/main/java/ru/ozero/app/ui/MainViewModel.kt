@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ru.ozero.commonnet.IpInfo
@@ -88,6 +89,26 @@ class MainViewModel @Inject constructor(
             initialValue = null,
         )
 
+    val isReconnecting: StateFlow<Boolean> = tunnelController.state
+        .runningFold<TunnelState, Pair<Boolean, TunnelState>>(false to TunnelState.Idle) { acc, cur ->
+            val (reconn, prev) = acc
+            val next = when (cur) {
+                is TunnelState.Idle,
+                is TunnelState.Disconnecting,
+                is TunnelState.Connected,
+                -> false
+                else -> prev is TunnelState.Connected || reconn
+            }
+            next to cur
+        }
+        .map { it.first }
+        .distinctUntilChanged()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = false,
+        )
+
     val healthStatus: StateFlow<HealthMonitor.Status> =
         healthMonitor.status.stateIn(
             scope = viewModelScope,
@@ -113,8 +134,8 @@ class MainViewModel @Inject constructor(
                 initialValue = null,
             )
 
-    private val _speedHistory = MutableStateFlow<List<Pair<Float, Float>>>(emptyList())
-    val speedHistory: StateFlow<List<Pair<Float, Float>>> = _speedHistory.asStateFlow()
+    private val _speedHistory = MutableStateFlow<List<SpeedSample>>(emptyList())
+    val speedHistory: StateFlow<List<SpeedSample>> = _speedHistory.asStateFlow()
 
     private val _ipInfo = MutableStateFlow<IpInfoState>(IpInfoState.Idle)
 
@@ -207,7 +228,7 @@ class MainViewModel @Inject constructor(
                     if (now - lastRecordMs >= SPEED_SAMPLE_INTERVAL_MS) {
                         lastRecordMs = now
                         val prev = _speedHistory.value
-                        _speedHistory.value = (prev + Pair(s.bpsIn.toFloat(), s.bpsOut.toFloat()))
+                        _speedHistory.value = (prev + SpeedSample(now, s.bpsIn.toFloat(), s.bpsOut.toFloat()))
                             .takeLast(MAX_SPEED_HISTORY_POINTS)
                     }
                 } else {

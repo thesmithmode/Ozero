@@ -18,7 +18,7 @@ class GenePool(seedStrategies: List<String>) {
         vocabulary[random.nextInt(vocabulary.size)]
 
     fun weightedRandomGene(memory: GeneMemory, random: Random = Random.Default): StrategyGene {
-        val weights = vocabulary.map { gene -> memory.ucbScore(gene.token).coerceAtLeast(0.01) }
+        val weights = vocabulary.map { gene -> memory.sampleScore(gene.token, random).coerceAtLeast(0.01) }
         val total = weights.sum()
         var cursor = random.nextDouble() * total
         for (i in weights.indices) {

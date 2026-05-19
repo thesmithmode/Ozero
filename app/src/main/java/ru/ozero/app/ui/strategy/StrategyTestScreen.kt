@@ -15,6 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Settings
@@ -38,6 +39,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -159,7 +161,6 @@ fun StrategyTestScreen(
     StrategyTestScaffold(
         isRunning = isRunning,
         strategies = strategies,
-        domainLists = domainLists,
         savedStrategies = savedStrategies,
         evolutionState = evolutionState,
         runSummary = runSummary,
@@ -172,7 +173,6 @@ fun StrategyTestScreen(
                 SheetTarget.DomainLists -> showDomainLists = true
             }
         },
-        onToggleDomainList = viewModel::onToggleDomainList,
         onModeChange = { deep ->
             if (!isRunning) viewModel.onSettingsChange(settings.copy(evolutionMode = deep))
         },
@@ -189,14 +189,12 @@ private enum class SheetTarget { Saved, Settings, DomainLists }
 private fun StrategyTestScaffold(
     isRunning: Boolean,
     strategies: List<StrategyResult>,
-    domainLists: List<DomainList>,
     savedStrategies: List<SavedStrategy>,
     evolutionState: EvolutionUiState?,
     runSummary: String,
     settings: StrategyTestSettings,
     onBack: () -> Unit,
     onShowSheet: (SheetTarget) -> Unit,
-    onToggleDomainList: (String) -> Unit,
     onModeChange: (deep: Boolean) -> Unit,
     onRunToggle: () -> Unit,
     onApply: (String) -> Unit,
@@ -217,23 +215,7 @@ private fun StrategyTestScaffold(
                         )
                     }
                 },
-                actions = {
-                    IconButton(
-                        onClick = { onShowSheet(SheetTarget.Saved) },
-                        modifier = Modifier.testTag("saved_strategies_btn"),
-                    ) {
-                        Icon(
-                            Icons.Filled.Star,
-                            contentDescription = stringResource(R.string.saved_strategies_title),
-                        )
-                    }
-                    IconButton(
-                        onClick = { onShowSheet(SheetTarget.Settings) },
-                        modifier = Modifier.testTag("strategy_settings_btn"),
-                    ) {
-                        Icon(Icons.Filled.Settings, contentDescription = null)
-                    }
-                },
+                actions = { StrategyTopBarActions(onShowSheet) },
             )
         },
     ) { padding ->
@@ -249,12 +231,6 @@ private fun StrategyTestScaffold(
                         enabled = !isRunning,
                         onModeChange = onModeChange,
                     )
-                    DomainListsHeader(
-                        lists = domainLists,
-                        onToggle = onToggleDomainList,
-                        onManageClick = { onShowSheet(SheetTarget.DomainLists) },
-                        enabled = !isRunning,
-                    )
                     Button(
                         onClick = onRunToggle,
                         modifier = Modifier
@@ -267,6 +243,13 @@ private fun StrategyTestScaffold(
                             stringResource(
                                 if (isRunning) R.string.strategy_test_stop else R.string.strategy_test_start,
                             ),
+                        )
+                    }
+                    if (isRunning && !isDeepMode && strategies.isEmpty()) {
+                        LinearProgressIndicator(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("strategy_test_running_progress"),
                         )
                     }
                     if (runSummary.isNotBlank()) {
@@ -316,6 +299,28 @@ private fun StrategyTestScaffold(
     }
 }
 
+@Composable
+private fun StrategyTopBarActions(onShowSheet: (SheetTarget) -> Unit) {
+    IconButton(
+        onClick = { onShowSheet(SheetTarget.DomainLists) },
+        modifier = Modifier.testTag("domain_lists_btn"),
+    ) {
+        Icon(Icons.AutoMirrored.Filled.List, contentDescription = stringResource(R.string.domain_lists_title))
+    }
+    IconButton(
+        onClick = { onShowSheet(SheetTarget.Saved) },
+        modifier = Modifier.testTag("saved_strategies_btn"),
+    ) {
+        Icon(Icons.Filled.Star, contentDescription = stringResource(R.string.saved_strategies_title))
+    }
+    IconButton(
+        onClick = { onShowSheet(SheetTarget.Settings) },
+        modifier = Modifier.testTag("strategy_settings_btn"),
+    ) {
+        Icon(Icons.Filled.Settings, contentDescription = null)
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ScanModeSelector(
@@ -341,59 +346,6 @@ private fun ScanModeSelector(
             modifier = Modifier.testTag("scan_mode_deep"),
         ) {
             Text(stringResource(R.string.scan_mode_deep))
-        }
-    }
-}
-
-@Composable
-private fun DomainListsHeader(
-    lists: List<DomainList>,
-    onToggle: (String) -> Unit,
-    onManageClick: () -> Unit,
-    enabled: Boolean,
-) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        modifier = Modifier.fillMaxWidth().testTag("domain_lists_header"),
-    ) {
-        Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    text = stringResource(R.string.domain_lists_title),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                TextButton(
-                    onClick = onManageClick,
-                    modifier = Modifier.testTag("domain_lists_manage_btn"),
-                ) {
-                    Text(stringResource(R.string.domain_lists_manage))
-                }
-            }
-            lists.forEach { list ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("domain_list_row_${list.id}"),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Checkbox(
-                        checked = list.isActive,
-                        onCheckedChange = { if (enabled) onToggle(list.id) },
-                        enabled = enabled,
-                        modifier = Modifier.testTag("domain_list_check_${list.id}"),
-                    )
-                    Text(
-                        text = "${list.name} (${list.domains.size})",
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
         }
     }
 }
@@ -554,7 +506,7 @@ private fun EvolutionStateCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth().testTag("evolution_state_card"),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             if (state.isInitializing) {
@@ -564,22 +516,6 @@ private fun EvolutionStateCard(
                 )
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             } else {
-                Text(
-                    text = stringResource(R.string.evolution_generation_label, state.generation, state.maxGenerations),
-                    style = MaterialTheme.typography.labelMedium,
-                )
-                LinearProgressIndicator(
-                    progress = {
-                        if (state.maxGenerations > 0) state.generation.toFloat() / state.maxGenerations else 0f
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                if (state.bestSuccessRate > 0.0) {
-                    Text(
-                        text = stringResource(R.string.evolution_access_label, (state.bestSuccessRate * 100).toInt()),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
                 if (state.stagnationCount >= 2) {
                     Text(
                         text = stringResource(R.string.evolution_stagnating),
@@ -590,15 +526,6 @@ private fun EvolutionStateCard(
             }
             if (state.evaluatingCommand != null) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        text = stringResource(
-                            R.string.evolution_evaluating_label,
-                            state.evaluatingIndex,
-                            state.evaluatingTotal,
-                        ),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
                     LinearProgressIndicator(
                         progress = {
                             if (state.evaluatingTotal > 0) {
@@ -613,9 +540,9 @@ private fun EvolutionStateCard(
                         text = state.evaluatingCommand,
                         style = MaterialTheme.typography.bodySmall,
                         fontFamily = FontFamily.Monospace,
-                        maxLines = 2,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -638,11 +565,11 @@ private fun EvolutionTopChromosomes(
     onToggleSave: (String) -> Unit,
     onApply: (String) -> Unit,
 ) {
-    HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f))
+    HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
     Text(
         text = stringResource(R.string.evolution_population_label),
         style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onPrimaryContainer,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     chromosomes.forEachIndexed { idx, (cmd, fitness) ->
         val isSaved = savedStrategies.any { it.command == cmd }
@@ -652,15 +579,26 @@ private fun EvolutionTopChromosomes(
                 .testTag("evolution_top_$idx"),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Surface(
+                shape = MaterialTheme.shapes.extraSmall,
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                modifier = Modifier.padding(end = 6.dp),
+            ) {
                 Text(
-                    text = "${(fitness * 100).toInt()}% — $cmd",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+                    text = "${(fitness * 100).toInt()}%",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                 )
             }
+            Text(
+                text = cmd,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
             IconButton(
                 onClick = { onToggleSave(cmd) },
                 modifier = Modifier.testTag("evolution_save_$idx"),

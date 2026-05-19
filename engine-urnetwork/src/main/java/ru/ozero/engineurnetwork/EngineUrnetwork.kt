@@ -14,8 +14,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import ru.ozero.engineurnetwork.auth.ClientJwtResult
+import ru.ozero.engineurnetwork.auth.DeviceWalletJwtResult
 import ru.ozero.engineurnetwork.auth.GuestJwtResult
 import ru.ozero.engineurnetwork.auth.UrnetworkAuthService
+import ru.ozero.engineurnetwork.auth.UrnetworkDeviceIdentity
 import ru.ozero.enginescore.EngineCapabilities
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
@@ -35,6 +37,8 @@ class EngineUrnetwork(
     private val configStore: UrnetworkConfigStore,
     private val sdkBridge: UrnetworkSdkBridge,
     private val authService: UrnetworkAuthService,
+    private val deviceIdentity: UrnetworkDeviceIdentity?,
+    private val networkNameGenerator: () -> String = { defaultNetworkName() },
     private val pluginScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
     private val statsPollIntervalMs: Long = STATS_POLL_INTERVAL_MS,
     private val peerReadyTimeoutMs: Long = PEER_READY_TIMEOUT_MS,
@@ -97,11 +101,18 @@ class EngineUrnetwork(
         )
         return when (bridgeResult) {
             UrnetworkSdkBridge.StartResult.Success -> {
-                runCatching { sdkBridge.setPreferredCountry(config.region) }
-                    .onFailure { PersistentLoggers.warn(TAG, "setPreferredCountry threw: ${it.message}") }
+                val stored = runCatching { configStore.selectedLocation().first() }.getOrNull()
+                val merged = UrnetworkLocationSelection(
+                    countryCode = stored?.countryCode ?: config.region,
+                    region = stored?.region,
+                    city = stored?.city,
+                )
+                runCatching { sdkBridge.setPreferredLocation(merged.normalized()) }
+                    .onFailure { PersistentLoggers.warn(TAG, "setPreferredLocation threw: ${it.message}") }
                 val windowType = configStore.windowType().first()
                 val fixedIp = configStore.fixedIpSize().first()
-                runCatching { sdkBridge.applyPerformanceProfile(windowType, fixedIp) }
+                val allowDirect = configStore.allowDirect().first()
+                runCatching { sdkBridge.applyPerformanceProfile(windowType, fixedIp, allowDirect) }
                     .onFailure { PersistentLoggers.warn(TAG, "applyPerformanceProfile threw: ${it.message}") }
                 val provideEnabled = configStore.provideEnabled().first()
                 runCatching { sdkBridge.setProvidePaused(!provideEnabled) }
@@ -114,8 +125,8 @@ class EngineUrnetwork(
                     .onFailure { PersistentLoggers.warn(TAG, "setProvideNetworkMode threw: ${it.message}") }
                 Log.i(
                     TAG,
-                    "started OK preferredCountry=${config.region ?: "<auto>"} " +
-                        "windowType=${windowType.rawValue} fixedIp=$fixedIp",
+                    "started OK preferred=${merged.summary()} " +
+                        "windowType=${windowType.rawValue} fixedIp=$fixedIp allowDirect=$allowDirect",
                 )
                 startStatsPolling()
                 StartResult.Success(socksPort = 0)
@@ -226,8 +237,15 @@ class EngineUrnetwork(
 
     private suspend fun ensureGuestJwt(): String? {
         val existing = configStore.byJwt().first()
-        if (existing != null) return existing
-        PersistentLoggers.info(TAG, "no byJwt in store — auto-creating guest network")
+        val pubkey = configStore.devicePubkey().first()
+        if (existing != null && !pubkey.isNullOrBlank()) return existing
+        val deviceJwt = tryAcquireDeviceJwt(legacyMigration = existing != null)
+        if (deviceJwt != null) return deviceJwt
+        if (existing != null) {
+            PersistentLoggers.info(TAG, "device walletAuth unavailable — keeping legacy guest byJwt")
+            return existing
+        }
+        PersistentLoggers.info(TAG, "device walletAuth unavailable — fallback to guest network")
         return when (val r = authService.acquireGuestJwt()) {
             is GuestJwtResult.Success -> {
                 configStore.setByJwt(r.byJwt)
@@ -236,6 +254,44 @@ class EngineUrnetwork(
             }
             is GuestJwtResult.Error -> {
                 PersistentLoggers.error(TAG, "acquireGuestJwt failed: ${r.message}")
+                null
+            }
+        }
+    }
+
+    private suspend fun tryAcquireDeviceJwt(legacyMigration: Boolean): String? {
+        val identity = deviceIdentity ?: return null
+        val storedName = configStore.deviceNetworkName().first()
+        val networkName = storedName?.takeIf { it.isNotBlank() } ?: networkNameGenerator()
+        PersistentLoggers.info(
+            TAG,
+            if (legacyMigration) {
+                "device walletAuth — migrating legacy guest byJwt to per-device keypair"
+            } else {
+                "device walletAuth — acquiring jwt via per-device keypair"
+            },
+        )
+        return when (val r = authService.acquireDeviceWalletJwt(identity, networkName)) {
+            is DeviceWalletJwtResult.Success -> {
+                val pubkey = runCatching { identity.pubkeyBase58() }.getOrNull()
+                configStore.update { cfg ->
+                    cfg.copy(
+                        byJwt = r.byJwt,
+                        byClientJwt = if (legacyMigration) null else cfg.byClientJwt,
+                        devicePubkey = pubkey ?: cfg.devicePubkey,
+                        deviceNetworkName = networkName,
+                    )
+                }
+                Log.i(
+                    TAG,
+                    "device walletAuth jwt acquired isNew=${r.isNewNetwork} " +
+                        "migration=$legacyMigration " +
+                        "pubkey=${pubkey?.take(PUBKEY_LOG_PREFIX_LEN) ?: "?"}…",
+                )
+                r.byJwt
+            }
+            is DeviceWalletJwtResult.Error -> {
+                PersistentLoggers.warn(TAG, "device walletAuth failed: ${r.message}")
                 null
             }
         }
@@ -261,12 +317,21 @@ class EngineUrnetwork(
     private companion object {
         const val TAG = "EngineUrnetwork"
         const val WALLET_LOG_PREFIX_LEN = 6
+        const val PUBKEY_LOG_PREFIX_LEN = 8
         const val TUN_MTU = 1440
         const val TUN_PREFIX = 32
         const val STATS_POLL_INTERVAL_MS = 2_000L
+        const val NETWORK_NAME_RANDOM_BYTES = 8
 
-        const val URN_STOP_TIMEOUT_MS = 5_000L
+        const val URN_STOP_TIMEOUT_MS = 8_000L
         const val PEER_READY_TIMEOUT_MS = 15_000L
         const val PEER_READY_POLL_MS = 200L
+
+        private fun defaultNetworkName(): String {
+            val rnd = java.security.SecureRandom()
+            val bytes = ByteArray(NETWORK_NAME_RANDOM_BYTES).also { rnd.nextBytes(it) }
+            val hex = bytes.joinToString(separator = "") { "%02x".format(it.toInt() and 0xff) }
+            return "n$hex"
+        }
     }
 }

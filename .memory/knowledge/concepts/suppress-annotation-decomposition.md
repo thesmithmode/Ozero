@@ -4,8 +4,9 @@ aliases: [suppress-annotation, longmethod-suppress, ai-suppress-pattern]
 tags: [code-quality, android, kotlin, anti-pattern, review]
 sources:
   - "daily/2026-05-12.md"
+  - "daily/2026-05-16.md"
 created: 2026-05-12
-updated: 2026-05-12
+updated: 2026-05-16
 ---
 
 # Suppress Annotation Anti-Pattern: Decompose Instead
@@ -52,3 +53,4 @@ Check staged diffs (`git diff --staged`) before every commit for new `@Suppress`
 ## Sources
 
 - [[daily/2026-05-12.md]] - Session 17:55: subagent added `@Suppress("LongMethod")` to UrnetworkEngineSettingsScreen; caught in code review; replaced with ProvideSection/ProvideToggleSection/SectionDivider decomposition; rule: decompose instead of suppress
+- [[daily/2026-05-16.md]] - Session 15:55: `ExpertMainContent` in MainScreen exceeded 120 lines (detekt LongMethod); badges-block extracted into `ExpertStatusBadges` (11 params, `@Suppress("LongParameterList")` accepted as necessary for Compose component with many state inputs); function reduced to <80 lines

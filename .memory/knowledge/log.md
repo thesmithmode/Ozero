@@ -1,5 +1,73 @@
 # Build Log
 
+## [2026-05-18T23:30:00+03:00] compile | Daily Log 2026-05-18 (pass 7 — late sessions)
+- Source: daily/2026-05-18.md
+- Articles created: (none)
+- Articles updated: [[concepts/urnetwork-fixed-ip-enhanced-anonymization]] (relocate from MainScreen to EngineSettings: dual-VM ownership eliminated, peer count → IpInfoCard, 11 tests removed + 4 added, sentinel inverted, commit 87ff2d47)
+- Index updated: 1 row summary updated, total 138
+- Sessions covered (incremental): 21:25 (memory push discipline — feedback memory only), ~22:00 (URnetwork toggles relocate: MainScreen→EngineSettings, single source of truth, +205/−430), 22:36 (CI watcher)
+- Note: Sessions 21:25 and ~22:00 were after pass 6 verification cutoff
+
+## [2026-05-19T10:00:00+03:00] compile | Daily Log 2026-05-18 (pass 6 — verification)
+- Source: daily/2026-05-18.md
+- Articles created: (none)
+- Articles updated: (none)
+- Verification: all 15 articles referencing daily/2026-05-18.md confirmed present and complete across 5 prior compile passes. 138 index entries. All sessions covered: 10:41 (release sentinel ABI), 11:38-12:06 (ByeDPI stale fd + 0% fitness), 13:08-13:41 (URnetwork features + CI), 14:21-14:45 (killswitch audit), 15:02-15:52 (locations + reconnect), 16:09-18:55 (Fixed IP + Enhanced Anonymization), 16:59 (5-reviewer code review), 17:51 (changelog + relay JWT), 18:25-19:07 (walletAuth research), 19:30 (walletAuth implementation), 19:55 (autonomous fix cycle). No remaining gaps.
+
+## [2026-05-19T09:00:00+03:00] compile | Daily Log 2026-05-18 (pass 5 — gap fill)
+- Source: daily/2026-05-18.md
+- Articles created: [[concepts/urnetwork-location-hierarchy-migration]] (setPreferredCountry→setPreferredLocation migration, findBestMatch city-by-countryCode guard, UrnetworkLocationSelection data class consolidation)
+- Articles updated: (none)
+- Index updated: 1 new row, total 138
+- Sessions covered (incremental): 13:08 (6 selectedCountry/Region/City → data class), 15:02 (Bridge API migration, findBestMatch helper), 16:59 (code review finding: city-by-name without countryCode), 19:55 (fix commit ff7f5044)
+- Note: All other sessions already covered by passes 1-4. This pass closes the last content gap: location hierarchy migration was referenced in multiple sessions but had no standalone article.
+
+## [2026-05-19T05:00:00+03:00] compile | Daily Log 2026-05-18 (incremental pass 4 — walletAuth)
+- Source: daily/2026-05-18.md
+- Articles created: [[concepts/urnetwork-walletauth-per-device-registration]] (per-device Ed25519 auto-registration, AES-GCM keypair storage, server protocol, migration flow, 40 tests)
+- Articles updated: [[concepts/urnetwork-guest-mode-relay-blocker]] (Resolution Options: Option 2 implemented, commit 0ef16e3a), [[concepts/urnetwork-relay-always]] (walletAuth resolution section + related concepts)
+- Index updated: 1 new row, total 137
+- Sessions covered (incremental): 18:25 (walletAuth research), 18:52 (protocol details), 19:07 (review fixes + memory), 19:30 (full implementation — Base58, DeviceIdentity, AuthService, migration, 40 tests, commit 0ef16e3a)
+
+## [2026-05-19T04:15:00+03:00] compile | Daily Log 2026-05-18 (incremental pass 3)
+- Source: daily/2026-05-18.md
+- Articles created: [[concepts/extension-function-import-migration-trap]] (interface→extension breaks consumers without import), [[concepts/poll-flow-resilience-pattern]] (runCatching + last-value fallback for poll flows)
+- Articles updated: [[connections/self-review-insufficient-code-reviewer-required]] (added 2026-05-18 evidence: 5-reviewer autonomous fix cycle, ~25 findings, 4 commits)
+- Index updated: 2 new rows, 1 row updated, total 136
+- Sessions covered (incremental): 16:59 (5-agent code review details), 17:51 (extension import trap), 19:55 (autonomous fix cycle with poll-flow resilience)
+
+## [2026-05-19T03:30:00+03:00] compile | Daily Log 2026-05-18 (incremental pass 2)
+- Source: daily/2026-05-18.md
+- Articles created: [[concepts/urnetwork-runtime-release-lifecycle]] (Go-runtime singleton release after stop; cross-app conflict with URnetwork-app)
+- Articles updated: [[concepts/chart-nice-max-dynamic-scaling]] (M1 60s baseline + bucket aggregation for M5/M30/H1), [[connections/go-runtime-conflict-resolution-evolution]] (added phase 4: explicit URnetwork runtime release)
+- Index updated: 1 new row, 1 row updated, total 134
+- Sessions covered (incremental): 18:52 (URnetwork runtime release + chart timeframes + walletAuth research)
+
+## [2026-05-18T22:50:00+03:00] compile | Daily Log 2026-05-18
+- Source: daily/2026-05-18.md
+- Articles created: [[concepts/byedpi-stale-serverfd-unconditional-forceclose]], [[concepts/urnetwork-guest-mode-relay-blocker]], [[concepts/killswitch-binder-death-detection]], [[concepts/urnetwork-fixed-ip-enhanced-anonymization]], [[concepts/byedpi-singleton-strategy-testing-isolation]]
+- Articles updated: [[concepts/urnetwork-relay-always]] (JWT bootstrap requirement + guest mode monetization blocker), [[concepts/genetic-strategy-evolution]] (stale server_fd as root cause of 0% fitness + singleton sharing + favorites pollution)
+- Index updated: 5 new rows, 2 rows updated, total 133
+- Sessions covered: 10:41 (release sentinel ABI fix), 11:38-12:06 (ByeDPI stale fd + 0% fitness + favorites pollution), 13:08-13:26 (URnetwork feature parity + CI fixes), 13:41 (balance card + anonymization toggle), 14:21-14:45 (killswitch audit P30-P37), 15:02-15:52 (URnetwork locations + reconnect indicator), 16:09-16:30 (Fixed IP + Enhanced Anonymization), 16:59 (5-agent code review), 18:25 (guest mode monetization investigation), 18:55-19:55 (autonomous fix cycle + toggles completion)
+
+## [2026-05-19T01:30:00+03:00] compile | Daily Log 2026-05-17
+- Source: daily/2026-05-17.md
+- Articles created: [[concepts/sentinel-refactor-batch-audit]], [[concepts/stateflow-waitfor-zero-test-race]], [[concepts/granular-probe-fitness-scoring]], [[concepts/relay-coordinator-ownership-transfer]]
+- Articles updated: [[concepts/urnetwork-relay-always]] (implementation: relayOwned ownership, bridge idempotency, relay not working discovery), [[concepts/genetic-strategy-evolution]] (GA v3 granular scoring, strategies 75→78, stagnation boost removed)
+- Index updated: 4 new rows, 2 rows updated, total 128
+
+## [2026-05-18T22:15:00+03:00] compile | Daily Log 2026-05-16
+- Source: daily/2026-05-16.md
+- Articles created: [[concepts/yaml-biginteger-parsing-trap]], [[concepts/filechannel-lock-posix-per-process]], [[concepts/vpnservice-god-object-decomposition]], [[concepts/sentinel-anchor-substringafter-trap]], [[concepts/collect-vs-collectlatest-restart-semantics]], [[concepts/kotlin-lazy-cross-reference-type-inference]], [[connections/sentinel-trap-family]]
+- Articles updated: [[concepts/suppress-annotation-decomposition]] (ExpertMainContent badges extraction example)
+- Index updated: 7 new rows, 1 row updated, total 124
+
+## [2026-05-18T18:26:57+03:00] compile | Daily Log 2026-05-15
+- Source: daily/2026-05-15.md
+- Articles created: [[concepts/extract-native-libs-legacy-packaging]], [[concepts/byedpi-jni-guard-hardening]], [[concepts/modular-boundary-engine-specific-logic]], [[connections/self-review-insufficient-code-reviewer-required]]
+- Articles updated: [[concepts/tun-self-exclusion-sdk-engines]] (third regression: modular boundary violation from excludeSelf conditional), [[concepts/sentinel-protecting-bug-trap]] (new example: excludeSelf sentinels guarding broken behavior)
+- Index updated: 4 new rows, 2 rows updated, total 117
+
 ## [2026-05-15T03:00:00] compile | Daily Log 2026-05-14 (pass 7 — final)
 - Source: daily/2026-05-14.md
 - Articles updated: [[concepts/urnetwork-relay-always]] (Session 21:29: setupPayoutWallet auto-bind implementation + 3 contract tests, replaced PRESET_WALLET dead code note)

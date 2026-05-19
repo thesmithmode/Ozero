@@ -41,6 +41,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.Stroke
+import ru.ozero.app.ui.components.addSmooth
+import ru.ozero.app.ui.components.chartNiceMax
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -89,7 +91,7 @@ fun MainScreen(
     val ipInfo by viewModel.ipInfo.collectAsStateWithLifecycle()
     val killswitchActive by viewModel.killswitchActive.collectAsStateWithLifecycle()
     val switching by viewModel.switching.collectAsStateWithLifecycle()
-
+    val isReconnecting by viewModel.isReconnecting.collectAsStateWithLifecycle()
     val powerState = computePowerDiscState(state, switching, urnetworkPeerCount)
     val backgroundState = powerState.toBackgroundState()
     val isConnected = state is TunnelState.Connected
@@ -110,6 +112,7 @@ fun MainScreen(
                         manualEngine = manualEngine,
                         urnetworkPeerCount = urnetworkPeerCount,
                         urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
+                        isReconnecting = isReconnecting,
                     ),
                     callbacks = SimpleMainCallbacks(
                         onConnectClick = onConnectClick,
@@ -132,6 +135,7 @@ fun MainScreen(
                         urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
                         ipInfo = ipInfo,
                         killswitchActive = killswitchActive,
+                        isReconnecting = isReconnecting,
                     ),
                     callbacks = ExpertMainCallbacks(
                         onConnectClick = onConnectClick,
@@ -155,6 +159,7 @@ data class SimpleMainState(
     val manualEngine: EngineId?,
     val urnetworkPeerCount: Int,
     val urnetworkPeerSearchSeconds: Int,
+    val isReconnecting: Boolean = false,
 )
 
 data class SimpleMainCallbacks(
@@ -175,6 +180,7 @@ private fun SimpleMainContent(
     val manualEngine = state.manualEngine
     val urnetworkPeerCount = state.urnetworkPeerCount
     val urnetworkPeerSearchSeconds = state.urnetworkPeerSearchSeconds
+    val isReconnecting = state.isReconnecting
     val onConnectClick = callbacks.onConnectClick
     val onOpenSplitTunnel = callbacks.onOpenSplitTunnel
     val onOpenSettings = callbacks.onOpenSettings
@@ -188,7 +194,7 @@ private fun SimpleMainContent(
         Spacer(modifier = Modifier.height(20.dp))
 
         AnimatedContent(targetState = switching to tunnelState, label = "status") { (sw, s) ->
-            StatusLabel(s, sw, urnetworkPeerCount)
+            StatusLabel(s, sw, urnetworkPeerCount, isReconnecting)
         }
 
         Box(
@@ -256,7 +262,7 @@ data class ExpertMainState(
     val tunnelState: TunnelState,
     val switching: SwitchingTransition?,
     val stats: TunnelStats?,
-    val speedHistory: List<Pair<Float, Float>>,
+    val speedHistory: List<SpeedSample>,
     val stagnant: Boolean,
     val healthStatus: HealthMonitor.Status,
     val powerState: PowerDiscState,
@@ -266,6 +272,7 @@ data class ExpertMainState(
     val urnetworkPeerSearchSeconds: Int,
     val ipInfo: IpInfoState,
     val killswitchActive: Boolean,
+    val isReconnecting: Boolean = false,
 )
 
 data class ExpertMainCallbacks(
@@ -295,6 +302,7 @@ private fun ExpertMainContent(
     val urnetworkPeerSearchSeconds = state.urnetworkPeerSearchSeconds
     val ipInfo = state.ipInfo
     val killswitchActive = state.killswitchActive
+    val isReconnecting = state.isReconnecting
     val onConnectClick = callbacks.onConnectClick
     val onManualEngineSelect = callbacks.onManualEngineSelect
     val onRefreshIpInfo = callbacks.onRefreshIpInfo
@@ -309,7 +317,7 @@ private fun ExpertMainContent(
         Spacer(modifier = Modifier.height(16.dp))
 
         AnimatedContent(targetState = switching to tunnelState, label = "status") { (sw, s) ->
-            StatusLabel(s, sw, urnetworkPeerCount)
+            StatusLabel(s, sw, urnetworkPeerCount, isReconnecting)
         }
 
         Box(
@@ -380,7 +388,7 @@ private fun ExpertStatusBadges(
     urnetworkPeerSearchSeconds: Int,
     ipInfo: IpInfoState,
     stats: TunnelStats?,
-    speedHistory: List<Pair<Float, Float>>,
+    speedHistory: List<SpeedSample>,
     stagnant: Boolean,
     healthStatus: HealthMonitor.Status,
     onRefreshIpInfo: () -> Unit,
@@ -393,16 +401,16 @@ private fun ExpertStatusBadges(
             modifier = Modifier.testTag(MainScreenTestTags.KILLSWITCH_BADGE),
         )
     }
-    if (visualConnected && manualEngine == EngineId.URNETWORK) {
-        UrnetworkPeerBadge(
-            count = urnetworkPeerCount,
-            searchSeconds = urnetworkPeerSearchSeconds,
-        )
-    }
     if (visualConnected) {
         IpInfoCard(
             state = ipInfo,
             onRefresh = onRefreshIpInfo,
+            urnetworkPeerCount = if (manualEngine == EngineId.URNETWORK) urnetworkPeerCount else null,
+            urnetworkSearchSeconds = if (manualEngine == EngineId.URNETWORK) urnetworkPeerSearchSeconds else null,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+        EntryNodeCard(
+            manualEngine = manualEngine,
             modifier = Modifier.padding(horizontal = 16.dp),
         )
     }
@@ -430,6 +438,82 @@ private fun ExpertStatusBadges(
                 text = stringResource(R.string.main_health_degraded_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+internal fun isUrnetworkVisibleInMain(state: TunnelState, manualEngine: EngineId?): Boolean {
+    if (manualEngine == EngineId.URNETWORK) return true
+    return when (state) {
+        is TunnelState.Probing -> state.engineId == EngineId.URNETWORK
+        is TunnelState.Connecting -> state.engineId == EngineId.URNETWORK
+        is TunnelState.Connected -> state.engineId == EngineId.URNETWORK
+        is TunnelState.Failed -> state.engineId == EngineId.URNETWORK
+        else -> false
+    }
+}
+
+@Composable
+private fun IpCardPeerSuffix(count: Int?, searchSeconds: Int?) {
+    when {
+        count != null && count > 0 -> Text(
+            text = stringResource(R.string.urnetwork_peer_count_label, count),
+            style = MaterialTheme.typography.bodySmall,
+            color = OzeroPalette.Text3,
+            modifier = Modifier.testTag(MainScreenTestTags.URNETWORK_PEER_COUNT),
+        )
+        searchSeconds != null && searchSeconds >= URNETWORK_PEER_SEARCH_VISIBLE_THRESHOLD_S -> Text(
+            text = stringResource(R.string.urnetwork_peer_searching, searchSeconds),
+            style = MaterialTheme.typography.bodySmall,
+            color = OzeroPalette.Text3,
+            modifier = Modifier.testTag(MainScreenTestTags.URNETWORK_PEER_SEARCHING),
+        )
+        else -> Unit
+    }
+}
+
+@Composable
+private fun EntryNodeCard(
+    manualEngine: EngineId?,
+    modifier: Modifier = Modifier,
+) {
+    val body = when (manualEngine) {
+        null -> stringResource(R.string.entry_node_protected_generic)
+        else -> stringResource(R.string.entry_node_protected_via, manualEngine.name)
+    }
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag(MainScreenTestTags.ENTRY_CARD),
+        colors = CardDefaults.cardColors(containerColor = OzeroPalette.GlassFill),
+        shape = RoundedCornerShape(20.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = stringResource(R.string.entry_node_title),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OzeroPalette.Text3,
+                )
+                Text(
+                    text = stringResource(R.string.entry_node_your_device),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OzeroPalette.Text3,
+                )
+            }
+            Text(
+                text = body,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = OzeroPalette.Text,
             )
         }
     }
@@ -490,6 +574,8 @@ private fun IpInfoCard(
     state: IpInfoState,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
+    urnetworkPeerCount: Int? = null,
+    urnetworkSearchSeconds: Int? = null,
 ) {
     Card(
         modifier = modifier
@@ -504,11 +590,21 @@ private fun IpInfoCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            Text(
-                text = stringResource(R.string.ip_card_title),
-                style = MaterialTheme.typography.bodySmall,
-                color = OzeroPalette.Text3,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = stringResource(R.string.ip_card_title),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OzeroPalette.Text3,
+                )
+                IpCardPeerSuffix(
+                    count = urnetworkPeerCount,
+                    searchSeconds = urnetworkSearchSeconds,
+                )
+            }
             when (state) {
                 is IpInfoState.Idle, is IpInfoState.Loading -> Text(
                     text = stringResource(R.string.ip_card_loading),
@@ -578,7 +674,7 @@ private fun IpInfoCard(
 @Composable
 private fun TrafficStatsCard(
     stats: TunnelStats?,
-    speedHistory: List<Pair<Float, Float>> = emptyList(),
+    speedHistory: List<SpeedSample> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
     val sessionStartMs = stats?.sessionStartMs ?: 0L
@@ -597,12 +693,13 @@ private fun TrafficStatsCard(
     val txTotal = BytesFormatter.humanReadable(stats?.txBytes ?: 0L)
     val uptime = BytesFormatter.durationHms(sessionMs)
 
-    var selectedTf by remember { mutableStateOf(TimeframeOption.S30) }
+    var selectedTf by remember { mutableStateOf(TimeframeOption.M1) }
     val displayHistory = remember(speedHistory, selectedTf) {
-        val n = selectedTf.points
-        val slice = speedHistory.takeLast(n)
-        val padded = if (slice.size < n) List(n - slice.size) { 0f to 0f } + slice else slice
-        downsample(padded, CHART_MAX_RENDER_POINTS)
+        bucketizeTimeAligned(
+            samples = speedHistory,
+            windowMs = selectedTf.points * 1_000L,
+            bucketCount = selectedTf.buckets,
+        )
     }
 
     Card(
@@ -742,23 +839,61 @@ private fun LiveTrafficChart(
     }
 }
 
-private fun chartNiceMax(bps: Float): Float {
-    if (bps <= 0f) return 10_240f
-    val levels = floatArrayOf(
-        1_024f, 2_048f, 5_120f,
-        10_240f, 20_480f, 51_200f,
-        102_400f, 204_800f, 512_000f,
-        1_048_576f, 2_097_152f, 5_242_880f,
-        10_485_760f, 20_971_520f, 52_428_800f,
-        104_857_600f, 209_715_200f,
-    )
-    return levels.firstOrNull { it > bps * 1.1f } ?: (bps * 2f)
-}
-
 private fun chartTimeAgo(seconds: Int): String = when {
     seconds >= 3_600 -> "-${seconds / 3_600}h"
     seconds >= 60 -> "-${seconds / 60}m"
     else -> "-${seconds}s"
+}
+
+internal fun pickStatusLabelRes(
+    state: TunnelState,
+    switching: SwitchingTransition?,
+    urnetworkPeerCount: Int,
+    isReconnecting: Boolean,
+): Int {
+    if (switching != null) return R.string.main_status_switching
+    if (state is TunnelState.Connected &&
+        state.engineId == EngineId.URNETWORK &&
+        urnetworkPeerCount == 0
+    ) {
+        return R.string.main_status_urnetwork_searching
+    }
+    return when (state) {
+        is TunnelState.Idle -> R.string.main_status_disconnected
+        is TunnelState.Probing -> probingLabelRes(state.engineId, isReconnecting)
+        is TunnelState.Connecting ->
+            if (isReconnecting) R.string.main_status_reconnecting else R.string.main_status_connecting
+        is TunnelState.Connected -> R.string.main_status_connected
+        is TunnelState.Failed ->
+            if (isReconnecting) R.string.main_status_reconnecting else R.string.main_status_failed
+        is TunnelState.Disconnecting -> R.string.main_status_disconnecting
+    }
+}
+
+internal fun probingLabelRes(engineId: EngineId?, isReconnecting: Boolean): Int {
+    if (isReconnecting) return R.string.main_status_reconnecting
+    if (engineId == null) return R.string.main_status_probing
+    return when (engineId) {
+        EngineId.WARP -> R.string.main_status_probing_warp
+        EngineId.BYEDPI -> R.string.main_status_connecting
+        EngineId.URNETWORK -> R.string.main_status_probing
+        EngineId.XRAY,
+        EngineId.AMNEZIA,
+        EngineId.HYSTERIA2,
+        EngineId.NAIVE,
+        EngineId.TOR,
+        EngineId.FPTN -> R.string.main_status_connecting
+    }
+}
+
+private fun pickStatusEngine(state: TunnelState, switching: SwitchingTransition?): String? {
+    if (switching != null) return switching.from?.name
+    return when (state) {
+        is TunnelState.Connecting -> state.engineId.name
+        is TunnelState.Connected -> state.engineId.name
+        is TunnelState.Failed -> state.engineId.name
+        else -> null
+    }
 }
 
 @Composable
@@ -766,34 +901,10 @@ private fun StatusLabel(
     state: TunnelState,
     switching: SwitchingTransition? = null,
     urnetworkPeerCount: Int = 0,
+    isReconnecting: Boolean = false,
 ) {
-    val labelRes = when {
-        switching != null -> R.string.main_status_switching
-        state is TunnelState.Connected &&
-            state.engineId == EngineId.URNETWORK &&
-            urnetworkPeerCount == 0 -> R.string.main_status_urnetwork_searching
-        else -> when (state) {
-            is TunnelState.Idle -> R.string.main_status_disconnected
-            is TunnelState.Probing -> if (state.engineId == ru.ozero.enginescore.EngineId.WARP) {
-                R.string.main_status_probing_warp
-            } else {
-                R.string.main_status_probing
-            }
-            is TunnelState.Connecting -> R.string.main_status_connecting
-            is TunnelState.Connected -> R.string.main_status_connected
-            is TunnelState.Failed -> R.string.main_status_failed
-            is TunnelState.Disconnecting -> R.string.main_status_disconnecting
-        }
-    }
-    val engine = when {
-        switching != null -> switching.from?.name
-        else -> when (state) {
-            is TunnelState.Connecting -> state.engineId.name
-            is TunnelState.Connected -> state.engineId.name
-            is TunnelState.Failed -> state.engineId.name
-            else -> null
-        }
-    }
+    val labelRes = pickStatusLabelRes(state, switching, urnetworkPeerCount, isReconnecting)
+    val engine = pickStatusEngine(state, switching)
     val failedReason = if (switching != null) null else (state as? TunnelState.Failed)?.reason
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
@@ -824,34 +935,9 @@ private const val DOCK_TAB_SERVERS = "servers"
 private const val DOCK_TAB_SPLIT_TUNNEL = "split_tunnel"
 private const val DOCK_TAB_SETTINGS = "settings"
 
-internal const val CHART_MAX_RENDER_POINTS = 300
-
-private enum class TimeframeOption(val labelRes: Int, val points: Int) {
-    S30(R.string.chart_tf_30s, 30),
-    M5(R.string.chart_tf_5min, 300),
-    M30(R.string.chart_tf_30min, 1_800),
-    H1(R.string.chart_tf_1h, 3_600),
-}
-
-internal fun downsample(history: List<Pair<Float, Float>>, maxPoints: Int): List<Pair<Float, Float>> {
-    if (history.size <= maxPoints) return history
-    val step = history.size.toDouble() / maxPoints
-    return List(maxPoints) { i -> history[(i * step).toInt()] }
-}
-
-private fun Path.addSmooth(values: List<Float>, step: Float, height: Float, safeMax: Float) {
-    if (values.size < 2) {
-        if (values.size == 1) moveTo(0f, height - (values[0] / safeMax) * height)
-        return
-    }
-    val xs = List(values.size) { i -> i * step }
-    val ys = values.map { height - (it / safeMax) * height }
-    moveTo(xs[0], ys[0])
-    val midXs = List(values.size - 1) { i -> (xs[i] + xs[i + 1]) / 2f }
-    val midYs = List(values.size - 1) { i -> (ys[i] + ys[i + 1]) / 2f }
-    lineTo(midXs[0], midYs[0])
-    for (i in 1 until values.size - 1) {
-        quadraticBezierTo(xs[i], ys[i], midXs[i], midYs[i])
-    }
-    lineTo(xs.last(), ys.last())
+private enum class TimeframeOption(val labelRes: Int, val points: Int, val buckets: Int) {
+    M1(R.string.chart_tf_1min, 60, 60),
+    M5(R.string.chart_tf_5min, 300, 30),
+    M30(R.string.chart_tf_30min, 1_800, 30),
+    H1(R.string.chart_tf_1h, 3_600, 60),
 }

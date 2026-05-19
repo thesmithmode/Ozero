@@ -6,10 +6,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,7 +23,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ru.ozero.app.ui.theme.OzeroPalette
@@ -85,31 +89,39 @@ private fun DockButton(
 ) {
     val tint = if (isActive) MaterialTheme.colorScheme.onSurface else OzeroPalette.Text2
     val background = if (isActive) Color.White.copy(alpha = 0.10f) else Color.Transparent
-    Column(
+    Box(
         modifier = modifier
             .clip(RoundedCornerShape(DOCK_BUTTON_RADIUS_DP.dp))
             .background(background)
             .clickable(onClick = onClick)
+            .semantics {
+                role = Role.Tab
+                selected = isActive
+            }
             .padding(vertical = DOCK_BUTTON_VERTICAL_PADDING_DP.dp, horizontal = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+        contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            imageVector = tab.icon,
-            contentDescription = tab.label,
-            tint = tint,
-            modifier = Modifier.size(DOCK_ICON_SIZE_DP.dp),
-        )
-        Spacer(modifier = Modifier.height(3.dp))
-        Text(
-            text = tab.label,
-            style = MaterialTheme.typography.labelSmall.copy(
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 10.5.sp,
-            ),
-            color = tint,
-            maxLines = 1,
-        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Icon(
+                imageVector = tab.icon,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(DOCK_ICON_SIZE_DP.dp),
+            )
+            Text(
+                text = tab.label,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 10.5.sp,
+                ),
+                color = tint,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 

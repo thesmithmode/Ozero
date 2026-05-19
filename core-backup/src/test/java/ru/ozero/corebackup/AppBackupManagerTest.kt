@@ -375,23 +375,26 @@ class AppBackupManagerTest {
     }
 
     private class FakeUrnetworkStore : UrnetworkConfigStore {
-        var walletOverride: String? = null
-        var byJwt: String? = null
-
-        override fun walletAddress(): Flow<String> = MutableStateFlow(walletOverride ?: "default")
-        override fun walletOverride(): Flow<String?> = MutableStateFlow(walletOverride)
-        override suspend fun setWalletOverride(value: String?) {
-            walletOverride = value
-        }
-        override fun byJwt(): Flow<String?> = MutableStateFlow(byJwt)
-        override suspend fun setByJwt(value: String?) {
-            byJwt = value
-        }
-        var byClientJwt: String? = null
-        override fun byClientJwt(): Flow<String?> = MutableStateFlow(byClientJwt)
-        override suspend fun setByClientJwt(value: String?) {
-            byClientJwt = value
-        }
+        private val delegate = ru.ozero.engineurnetwork.InMemoryUrnetworkConfigStore()
+        var walletOverride: String?
+            get() = delegate.snapshot.walletOverride
+            set(value) {
+                delegate.inject { it.copy(walletOverride = value) }
+            }
+        var byJwt: String?
+            get() = delegate.snapshot.byJwt
+            set(value) {
+                delegate.inject { it.copy(byJwt = value) }
+            }
+        var byClientJwt: String?
+            get() = delegate.snapshot.byClientJwt
+            set(value) {
+                delegate.inject { it.copy(byClientJwt = value) }
+            }
+        override fun config() = delegate.config()
+        override suspend fun update(
+            transform: (ru.ozero.engineurnetwork.UrnetworkConfig) -> ru.ozero.engineurnetwork.UrnetworkConfig,
+        ) = delegate.update(transform)
     }
 
     private class FakeSplitRuleDao : AppSplitRuleDao {

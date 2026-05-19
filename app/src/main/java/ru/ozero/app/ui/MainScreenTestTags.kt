@@ -11,5 +11,6 @@ object MainScreenTestTags {
     const val URNETWORK_PEER_COUNT = "main_urnetwork_peer_count"
     const val URNETWORK_PEER_SEARCHING = "main_urnetwork_peer_searching"
     const val IP_CARD = "main_ip_card"
+    const val ENTRY_CARD = "main_entry_card"
     const val KILLSWITCH_BADGE = "main_killswitch_badge"
 }

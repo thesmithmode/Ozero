@@ -1,6 +1,7 @@
 package ru.ozero.app.ui.settings.engines
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -45,7 +46,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
 import ru.ozero.app.ui.theme.OzeroPalette
+import ru.ozero.app.ui.urnetwork.UrnetworkBalanceCard
 import ru.ozero.app.ui.utils.formatBytes
+import ru.ozero.app.urnetwork.UrnetworkBalanceState
 import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
@@ -56,10 +59,12 @@ import ru.ozero.engineurnetwork.UrnetworkWindowType
 fun UrnetworkEngineSettingsScreen(
     onBack: () -> Unit,
     onOpenSharedTraffic: () -> Unit,
-    viewModel: UrnetworkEngineSettingsViewModel = hiltViewModel(),
+    settingsVm: UrnetworkEngineSettingsViewModel = hiltViewModel(),
+    locationsVm: UrnetworkLocationsViewModel = hiltViewModel(),
 ) {
     BackHandler(onBack = onBack)
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val state by locationsVm.uiState.collectAsStateWithLifecycle()
+    val insufficientBalance by settingsVm.insufficientBalance.collectAsStateWithLifecycle()
     Scaffold(
         modifier = Modifier.testTag("urnetwork_settings"),
         topBar = {
@@ -85,10 +90,11 @@ fun UrnetworkEngineSettingsScreen(
                 }
             }
             UrnetworkSettingsUiState.NotConnected -> {
-                val windowType by viewModel.windowType.collectAsStateWithLifecycle()
-                val fixedIp by viewModel.fixedIpSize.collectAsStateWithLifecycle()
-                val provideControlMode by viewModel.provideControlMode.collectAsStateWithLifecycle()
-                val provideNetworkMode by viewModel.provideNetworkMode.collectAsStateWithLifecycle()
+                val windowType by settingsVm.windowType.collectAsStateWithLifecycle()
+                val fixedIp by settingsVm.fixedIpSize.collectAsStateWithLifecycle()
+                val allowDirect by settingsVm.allowDirect.collectAsStateWithLifecycle()
+                val provideControlMode by settingsVm.provideControlMode.collectAsStateWithLifecycle()
+                val provideNetworkMode by settingsVm.provideNetworkMode.collectAsStateWithLifecycle()
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -96,6 +102,9 @@ fun UrnetworkEngineSettingsScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    if (insufficientBalance) {
+                        InsufficientBalanceBanner()
+                    }
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = OzeroPalette.Bg1),
@@ -111,28 +120,31 @@ fun UrnetworkEngineSettingsScreen(
                         providePaused = true,
                         windowType = windowType,
                         fixedIp = fixedIp,
+                        allowDirect = allowDirect,
                         provideControlMode = provideControlMode,
                         provideNetworkMode = provideNetworkMode,
                         sharedTrafficBytes = 0L,
                         showProvide = false,
                         onSetProvidePaused = {},
-                        onSelectWindowType = viewModel::selectWindowType,
-                        onToggleFixedIp = viewModel::toggleFixedIpSize,
-                        onSelectProvideControlMode = viewModel::selectProvideControlMode,
-                        onSelectProvideNetworkMode = viewModel::selectProvideNetworkMode,
+                        onSelectWindowType = settingsVm::selectWindowType,
+                        onToggleFixedIp = settingsVm::toggleFixedIpSize,
+                        onToggleAllowDirect = settingsVm::toggleAllowDirect,
+                        onSelectProvideControlMode = settingsVm::selectProvideControlMode,
+                        onSelectProvideNetworkMode = settingsVm::selectProvideNetworkMode,
                         onOpenSharedTraffic = onOpenSharedTraffic,
                     )
                 }
             }
             is UrnetworkSettingsUiState.Ready -> {
-                val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
-                val peerCount by viewModel.peerCount.collectAsStateWithLifecycle()
-                val switchingCountry by viewModel.switchingCountry.collectAsStateWithLifecycle()
-                val windowType by viewModel.windowType.collectAsStateWithLifecycle()
-                val fixedIp by viewModel.fixedIpSize.collectAsStateWithLifecycle()
-                val provideControlMode by viewModel.provideControlMode.collectAsStateWithLifecycle()
-                val provideNetworkMode by viewModel.provideNetworkMode.collectAsStateWithLifecycle()
-                val sharedTrafficBytes by viewModel.sharedTrafficBytes.collectAsStateWithLifecycle()
+                val searchQuery by locationsVm.searchQuery.collectAsStateWithLifecycle()
+                val windowType by settingsVm.windowType.collectAsStateWithLifecycle()
+                val fixedIp by settingsVm.fixedIpSize.collectAsStateWithLifecycle()
+                val allowDirect by settingsVm.allowDirect.collectAsStateWithLifecycle()
+                val provideControlMode by settingsVm.provideControlMode.collectAsStateWithLifecycle()
+                val provideNetworkMode by settingsVm.provideNetworkMode.collectAsStateWithLifecycle()
+                val sharedTrafficBytes by settingsVm.sharedTrafficBytes.collectAsStateWithLifecycle()
+                val balanceState by settingsVm.balanceState.collectAsStateWithLifecycle()
+                val isVpnActive by settingsVm.isUrnetworkActive.collectAsStateWithLifecycle()
                 LocationListContent(
                     modifier = Modifier.padding(padding),
                     countries = current.countries,
@@ -140,21 +152,24 @@ fun UrnetworkEngineSettingsScreen(
                     cities = current.cities,
                     selectedLocation = current.selectedLocation,
                     providePaused = current.providePaused,
-                    peerCount = peerCount,
-                    switchingCountry = switchingCountry,
                     searchQuery = searchQuery,
                     windowType = windowType,
                     fixedIp = fixedIp,
+                    allowDirect = allowDirect,
                     provideControlMode = provideControlMode,
                     provideNetworkMode = provideNetworkMode,
                     sharedTrafficBytes = sharedTrafficBytes,
-                    onSearchQueryChange = viewModel::setSearchQuery,
-                    onSelect = viewModel::selectLocation,
-                    onSetProvidePaused = viewModel::setProvidePaused,
-                    onSelectWindowType = viewModel::selectWindowType,
-                    onToggleFixedIp = viewModel::toggleFixedIpSize,
-                    onSelectProvideControlMode = viewModel::selectProvideControlMode,
-                    onSelectProvideNetworkMode = viewModel::selectProvideNetworkMode,
+                    balanceState = balanceState,
+                    insufficientBalance = insufficientBalance,
+                    isVpnActive = isVpnActive,
+                    onSearchQueryChange = locationsVm::setSearchQuery,
+                    onSelect = locationsVm::selectLocation,
+                    onSetProvidePaused = locationsVm::setProvidePaused,
+                    onSelectWindowType = settingsVm::selectWindowType,
+                    onToggleFixedIp = settingsVm::toggleFixedIpSize,
+                    onToggleAllowDirect = settingsVm::toggleAllowDirect,
+                    onSelectProvideControlMode = settingsVm::selectProvideControlMode,
+                    onSelectProvideNetworkMode = settingsVm::selectProvideNetworkMode,
                     onOpenSharedTraffic = onOpenSharedTraffic,
                 )
             }
@@ -171,19 +186,22 @@ private fun LocationListContent(
     cities: List<UrnetworkLocationItem>,
     selectedLocation: UrnetworkSdkBridge.LocationToken?,
     providePaused: Boolean,
-    peerCount: Int,
-    switchingCountry: Boolean,
     searchQuery: String,
     windowType: UrnetworkWindowType,
     fixedIp: Boolean,
+    allowDirect: Boolean,
     provideControlMode: UrnetworkProvideControlMode,
     provideNetworkMode: UrnetworkProvideNetworkMode,
     sharedTrafficBytes: Long,
+    balanceState: UrnetworkBalanceState,
+    insufficientBalance: Boolean,
+    isVpnActive: Boolean,
     onSearchQueryChange: (String) -> Unit,
     onSelect: (UrnetworkSdkBridge.LocationToken?) -> Unit,
     onSetProvidePaused: (Boolean) -> Unit,
     onSelectWindowType: (UrnetworkWindowType) -> Unit,
     onToggleFixedIp: (Boolean) -> Unit,
+    onToggleAllowDirect: (Boolean) -> Unit,
     onSelectProvideControlMode: (UrnetworkProvideControlMode) -> Unit,
     onSelectProvideNetworkMode: (UrnetworkProvideNetworkMode) -> Unit,
     onOpenSharedTraffic: () -> Unit,
@@ -193,20 +211,32 @@ private fun LocationListContent(
         modifier = modifier.fillMaxSize().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
+        if (insufficientBalance) {
+            item {
+                InsufficientBalanceBanner(modifier = Modifier.padding(top = 12.dp))
+            }
+        }
+        item {
+            UrnetworkBalanceCard(
+                state = balanceState,
+                modifier = Modifier.padding(top = 12.dp),
+            )
+        }
         item {
             Column(modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)) {
-                StatusRow(peerCount = peerCount, switchingCountry = switchingCountry)
                 SettingsCard(
                     providePaused = providePaused,
                     windowType = windowType,
                     fixedIp = fixedIp,
+                    allowDirect = allowDirect,
                     provideControlMode = provideControlMode,
                     provideNetworkMode = provideNetworkMode,
                     sharedTrafficBytes = sharedTrafficBytes,
-                    showProvide = true,
+                    showProvide = isVpnActive,
                     onSetProvidePaused = onSetProvidePaused,
                     onSelectWindowType = onSelectWindowType,
                     onToggleFixedIp = onToggleFixedIp,
+                    onToggleAllowDirect = onToggleAllowDirect,
                     onSelectProvideControlMode = onSelectProvideControlMode,
                     onSelectProvideNetworkMode = onSelectProvideNetworkMode,
                     onOpenSharedTraffic = onOpenSharedTraffic,
@@ -257,6 +287,8 @@ private fun LocationListContent(
                     flag = item.flag,
                     providerCount = item.providerCount,
                     selected = selected,
+                    isStable = item.isStable,
+                    isStrongPrivacy = item.isStrongPrivacy,
                     onClick = { onSelect(item.location) },
                 )
                 HorizontalDivider(color = OzeroPalette.Line)
@@ -281,6 +313,8 @@ private fun LocationListContent(
                     flag = item.flag,
                     providerCount = item.providerCount,
                     selected = selected,
+                    isStable = item.isStable,
+                    isStrongPrivacy = item.isStrongPrivacy,
                     onClick = { onSelect(item.location) },
                 )
                 HorizontalDivider(color = OzeroPalette.Line)
@@ -304,6 +338,8 @@ private fun LocationListContent(
                     flag = item.flag,
                     providerCount = item.providerCount,
                     selected = selected,
+                    isStable = item.isStable,
+                    isStrongPrivacy = item.isStrongPrivacy,
                     onClick = { onSelect(item.location) },
                 )
                 HorizontalDivider(color = OzeroPalette.Line)
@@ -318,6 +354,7 @@ private fun SettingsCard(
     providePaused: Boolean,
     windowType: UrnetworkWindowType,
     fixedIp: Boolean,
+    allowDirect: Boolean,
     provideControlMode: UrnetworkProvideControlMode,
     provideNetworkMode: UrnetworkProvideNetworkMode,
     sharedTrafficBytes: Long,
@@ -325,6 +362,7 @@ private fun SettingsCard(
     onSetProvidePaused: (Boolean) -> Unit,
     onSelectWindowType: (UrnetworkWindowType) -> Unit,
     onToggleFixedIp: (Boolean) -> Unit,
+    onToggleAllowDirect: (Boolean) -> Unit,
     onSelectProvideControlMode: (UrnetworkProvideControlMode) -> Unit,
     onSelectProvideNetworkMode: (UrnetworkProvideNetworkMode) -> Unit,
     onOpenSharedTraffic: () -> Unit,
@@ -354,8 +392,10 @@ private fun SettingsCard(
             ModeSection(
                 selected = windowType,
                 fixedIp = fixedIp,
+                allowDirect = allowDirect,
                 onSelect = onSelectWindowType,
                 onToggleFixedIp = onToggleFixedIp,
+                onToggleAllowDirect = onToggleAllowDirect,
             )
             SectionDivider()
             CheckIpRow()
@@ -472,8 +512,10 @@ private fun ProvideNetworkModeSection(
 private fun ModeSection(
     selected: UrnetworkWindowType,
     fixedIp: Boolean,
+    allowDirect: Boolean,
     onSelect: (UrnetworkWindowType) -> Unit,
     onToggleFixedIp: (Boolean) -> Unit,
+    onToggleAllowDirect: (Boolean) -> Unit,
 ) {
     val modes = listOf(
         UrnetworkWindowType.AUTO to R.string.urnetwork_mode_auto,
@@ -502,63 +544,42 @@ private fun ModeSection(
         color = OzeroPalette.Text3,
         modifier = Modifier.padding(top = 6.dp),
     )
-    if (selected != UrnetworkWindowType.AUTO) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                Text(
-                    text = stringResource(R.string.urnetwork_fixed_ip_size),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = OzeroPalette.Text,
-                )
-                Text(
-                    text = stringResource(R.string.urnetwork_fixed_ip_size_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = OzeroPalette.Text3,
-                )
-            }
-            Switch(checked = fixedIp, onCheckedChange = onToggleFixedIp)
-        }
-    }
+    CompactToggleRow(
+        label = stringResource(R.string.urnetwork_fixed_ip_size),
+        checked = fixedIp,
+        onCheckedChange = onToggleFixedIp,
+        testTag = "urnetwork_toggle_fixed_ip",
+    )
+    CompactToggleRow(
+        label = stringResource(R.string.urnetwork_enhanced_anonymization),
+        checked = !allowDirect,
+        onCheckedChange = { onToggleAllowDirect(!it) },
+        testTag = "urnetwork_toggle_enhanced_anonymization",
+    )
 }
 
 @Composable
-private fun StatusRow(peerCount: Int, switchingCountry: Boolean = false) {
-    val (dot, label, dotColor) = when {
-        switchingCountry -> Triple(
-            "●",
-            stringResource(R.string.urnetwork_country_switching),
-            OzeroPalette.StateConnecting,
-        )
-        peerCount > 0 -> Triple(
-            "●",
-            stringResource(R.string.urnetwork_peers_connected, peerCount),
-            OzeroPalette.StateConnected,
-        )
-        else -> Triple(
-            "●",
-            stringResource(R.string.urnetwork_peers_searching),
-            OzeroPalette.StateConnecting,
-        )
-    }
+private fun CompactToggleRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    testTag: String,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 8.dp),
+            .padding(top = 8.dp)
+            .testTag(testTag),
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Text(text = dot, color = dotColor, style = MaterialTheme.typography.bodySmall)
         Text(
             text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = OzeroPalette.Text2,
+            style = MaterialTheme.typography.bodyMedium,
+            color = OzeroPalette.Text,
+            modifier = Modifier.weight(1f).padding(end = 12.dp),
         )
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
@@ -609,6 +630,31 @@ private fun SharedTrafficSection(sharedTrafficBytes: Long, onClick: () -> Unit) 
 }
 
 @Composable
+private fun InsufficientBalanceBanner(modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("urnetwork_insufficient_balance_banner"),
+        colors = CardDefaults.cardColors(containerColor = OzeroPalette.Bg1),
+        border = BorderStroke(1.dp, OzeroPalette.StateDanger),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = stringResource(R.string.urnetwork_insufficient_balance_title),
+                style = MaterialTheme.typography.titleSmall,
+                color = OzeroPalette.StateDanger,
+            )
+            Text(
+                text = stringResource(R.string.urnetwork_insufficient_balance_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = OzeroPalette.Text2,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
+    }
+}
+
+@Composable
 private fun SectionLabel(text: String) {
     Text(
         text = text.uppercase(),
@@ -623,6 +669,8 @@ private fun LocationRow(
     flag: String,
     providerCount: Int,
     selected: Boolean,
+    isStable: Boolean = true,
+    isStrongPrivacy: Boolean = false,
     onClick: () -> Unit,
 ) {
     Row(
@@ -645,11 +693,26 @@ private fun LocationRow(
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.weight(1f),
         )
+        if (!isStable) {
+            Text(
+                text = "☁️",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(start = 4.dp),
+            )
+        }
+        if (isStrongPrivacy) {
+            Text(
+                text = "🕶️",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(start = 4.dp),
+            )
+        }
         if (providerCount > 0) {
             Text(
                 text = "$providerCount",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 4.dp),
             )
         }
     }

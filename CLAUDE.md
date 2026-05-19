@@ -51,7 +51,7 @@
 ## Билд
 
 - Один универсальный APK (`assembleRelease`), без dynamic features.
-- abiFilters: arm64-v8a, armeabi-v7a, x86_64.
+- abiFilters в APK: только arm64-v8a (`app/build.gradle.kts`). libhev/libam-go/libbyedpi/libmtg существуют только под arm64-v8a — расширение ABI без перестройки native = рантайм-краш. Sentinel'ы в release.yml тоже arm64-v8a-only.
 - R8 minify+shrink включены, но Log.* НЕ стрипаются (см. proguard-rules.pro).
 
 ## Native libs
@@ -61,6 +61,7 @@
 - `libhev-socks5-tunnel.so` собирать с `APP_CFLAGS=-DPKGNAME=hev` (release.yml + ci.yml). Upstream `src/hev-jni.c` defaults `PKGNAME=hev/htproxy`, без override → `FindClass("hev/htproxy/TProxyService")` = NULL → `RegisterNatives(NULL,...)` → ART `JniAbort` при первом старте VPN (v1.0.2 краш). Защищено `JniContractTest` + step `Assert PKGNAME=hev зашит`.
 - `hev.TProxyService` обязан объявлять **все три** `external fun`: `TProxyStartService(String, Int)`, `TProxyStopService()`, `TProxyGetStats(): LongArray`. Upstream `hev-jni.c` регистрирует ровно эти 3 метода через `RegisterNatives`. Отсутствие любого → `NoSuchMethodError` из `Runtime.nativeLoad` → `libhev` не грузится → tunnel не поднимается (v1.0.2 follow-up). Защищено `JniContractTest`.
 - `loadOnce()` обязан иметь `catch (e: Throwable)` после специфичных catch-блоков. `Runtime.nativeLoad` может бросить `NoSuchMethodError`, `LinkageError`, `ClassNotFoundException` — все вне `UnsatisfiedLinkError`/`SecurityException`. Без generic catch `loadError` остаётся `null`, диагностика теряется. Защищено `TProxyServiceLogTest`.
+- ByeDPI: `ByeDpiEngine.stop()` и `start()` failure path **всегда** вызывают `proxy.forceClose()` после `job.join()`, не conditional на `isActive`. Причина: `jniStopProxy` делает только `shutdown(server_fd, SHUT_RDWR)` без `close()`/`reset`. Upstream byedpi `main()` хранит `server_fd` глобально и при next start видит stale fd → возвращает -1. Регрессия проявляется как серия 10+ `jniStartProxy завершился с кодом -1` подряд (видно в 2026-05-15 01:33–01:40 продовом логе), recovery только после случайного `proxyJob не завершился за 1500ms — jniForceClose`. Sentinel — `start failure clears upstream server_fd so next start can bind same port` + `stop always forceClose after join` в `ByeDpiEngineTest`. Также проявляется как 0% результат в `EvolutionEngine` (600 start/stop циклов = накопление stale fd → все `EvalResult.startFailed=true` → fitness 0).
 
 ## Logging
 
@@ -83,6 +84,13 @@
 ## Per-engine UI
 
 - Каждый engine (текущие модули: byedpi, telegram, urnetwork, warp) обязан иметь settings screen в `app/src/main/java/.../ui/settings/engines/` для пользовательского override config (subscription URL, server picker, args, bridges, и т.д.). При добавлении нового `engine-*` модуля — добавить сюда.
+
+## Reference impls движков (источники для портирования фич)
+
+- **URnetwork** (официальный Android source): `C:\Soft\Projects\Ozero\.claude\Контекст\android\`. При любой доработке `engine-urnetwork`/UI URnetwork — grep по этому каталогу. Знает locations (country/region/city), provideMode/enhanced anonymization, dedicated/sticky IP, connect VC.
+- **WARP (AmneziaWG)** актуальная: `.claude/Контекст/PORTAL_WG_v1.4.3`. Историческая: `.claude/Контекст/CYBERPORTAL_X-v1.0.2`.
+- **ByeDPI**: `.claude/Контекст/ByeByeDPI-v.1.7.4`.
+- Прочие: см. `ls .claude/Контекст/` — каждая папка decompiled APK / source-mirror.
 
 ## MTProxy / Subprocess-proxy паттерн
 

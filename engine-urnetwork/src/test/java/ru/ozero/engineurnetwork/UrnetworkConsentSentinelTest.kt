@@ -1,7 +1,5 @@
 package ru.ozero.engineurnetwork
 
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import ru.ozero.engineurnetwork.auth.ClientJwtResult
@@ -19,8 +17,8 @@ class UrnetworkConsentSentinelTest {
     fun `EngineUrnetwork_start без JWT auto-acquire guest+client и стартует bridge`() = runTest {
         val bridge = SpyBridge()
         val auth = SpyAuthService()
-        val store = SpyStore()
-        val engine = EngineUrnetwork(store, bridge, auth)
+        val store = spyStore()
+        val engine = EngineUrnetwork(store, bridge, auth, null)
 
         engine.start(EngineConfig.Urnetwork(jwtToken = ""), Upstream.None)
 
@@ -33,8 +31,8 @@ class UrnetworkConsentSentinelTest {
     fun `EngineUrnetwork_start с существующими jwt не повторяет acquire`() = runTest {
         val bridge = SpyBridge()
         val auth = SpyAuthService()
-        val store = SpyStore(existingJwt = "existing.jwt", existingClientJwt = "existing.cjwt")
-        val engine = EngineUrnetwork(store, bridge, auth)
+        val store = spyStore(existingJwt = "existing.jwt", existingClientJwt = "existing.cjwt")
+        val engine = EngineUrnetwork(store, bridge, auth, null)
 
         val result = engine.start(EngineConfig.Urnetwork(jwtToken = ""), Upstream.None)
 
@@ -57,24 +55,11 @@ class UrnetworkConsentSentinelTest {
         }
     }
 
-    private class SpyStore(
+    private fun spyStore(
         existingJwt: String? = null,
         existingClientJwt: String? = null,
-    ) : UrnetworkConfigStore {
-        private val jwtFlow = MutableStateFlow(existingJwt)
-        private val cJwtFlow = MutableStateFlow(existingClientJwt)
-        override fun walletAddress(): Flow<String> = MutableStateFlow(UrnetworkDefaults.PRESET_WALLET)
-        override fun walletOverride(): Flow<String?> = MutableStateFlow(null)
-        override suspend fun setWalletOverride(value: String?) = Unit
-        override fun byJwt(): Flow<String?> = jwtFlow
-        override suspend fun setByJwt(value: String?) {
-            jwtFlow.value = value
-        }
-        override fun byClientJwt(): Flow<String?> = cJwtFlow
-        override suspend fun setByClientJwt(value: String?) {
-            cJwtFlow.value = value
-        }
-    }
+    ): UrnetworkConfigStore =
+        InMemoryUrnetworkConfigStore(UrnetworkConfig(byJwt = existingJwt, byClientJwt = existingClientJwt))
 
     private class SpyBridge : UrnetworkSdkBridge {
         var startCalls: Int = 0

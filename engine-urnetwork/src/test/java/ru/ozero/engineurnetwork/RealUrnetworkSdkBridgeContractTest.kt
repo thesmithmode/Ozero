@@ -124,11 +124,41 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
-    fun `attachTun регистрирует IoLoopDoneCallback который сбрасывает running`() {
+    fun `attachTun регистрирует IoLoopDoneCallback который сбрасывает running через compareAndSet`() {
         val attachBlock = source.substringAfter("override suspend fun attachTun")
             .substringBefore("private fun cleanupOnFailure")
         assertTrue(attachBlock.contains("IoLoopDoneCallback"))
-        assertTrue(attachBlock.contains("running.set(false)"))
+        assertTrue(
+            attachBlock.contains("running.compareAndSet(true, false)"),
+            "IoLoopDoneCallback обязан использовать compareAndSet чтобы отличить graceful stop " +
+                "(running уже false) от crash (running всё ещё true). Без этого нельзя различить " +
+                "ожидаемое завершение и SDK runtime crash (P32 audit).",
+        )
+    }
+
+    @Test
+    fun `onIoLoopDied callback присутствует в конструкторе`() {
+        assertTrue(
+            source.contains("private val onIoLoopDied: (String) -> Unit"),
+            "RealUrnetworkSdkBridge обязан принимать onIoLoopDied callback — иначе TunnelController " +
+                "не узнаёт о crash SDK runtime до тех пор пока peer watchdog не сработает (30s leak window).",
+        )
+    }
+
+    @Test
+    fun `IoLoopDoneCallback вызывает onIoLoopDied только при wasRunning`() {
+        val attachBlock = source.substringAfter("override suspend fun attachTun")
+            .substringBefore("private fun cleanupOnFailure")
+        val callbackBody = attachBlock.substringAfter("IoLoopDoneCallback {").substringBefore("}\n")
+        assertTrue(
+            callbackBody.contains("if (wasRunning)"),
+            "IoLoopDoneCallback обязан вызывать onIoLoopDied ТОЛЬКО если compareAndSet вернул true — " +
+                "иначе graceful stop (running уже false) ложно триггерит killswitch. Body=$callbackBody",
+        )
+        assertTrue(
+            callbackBody.contains("onIoLoopDied("),
+            "Callback обязан вызвать onIoLoopDied при detected crash. Body=$callbackBody",
+        )
     }
 
     @Test
@@ -280,56 +310,90 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
-    fun `setupPayoutWallet вызывается после walletVc start с walletAddress`() {
+    fun `payoutWalletSetup configure вызывается после walletVc start с walletAddress`() {
         val startBlock = source.substringAfter("private suspend fun runStartOnMain")
             .substringBefore("override suspend fun stop")
         assertTrue(
-            startBlock.contains("setupPayoutWallet("),
-            "runStartOnMain обязан вызвать setupPayoutWallet после walletVc.start()",
+            startBlock.contains("payoutWalletSetup.configure("),
+            "runStartOnMain обязан вызвать payoutWalletSetup.configure(...) после walletVc.start()",
         )
         assertTrue(
-            source.contains("private suspend fun setupPayoutWallet"),
-            "setupPayoutWallet должен быть private suspend fun",
-        )
-    }
-
-    @Test
-    fun `setupPayoutWallet вызывает addExternalWallet и updatePayoutWallet`() {
-        val block = source.substringAfter("private suspend fun setupPayoutWallet")
-            .substringBefore("private fun cleanupOnFailure")
-        assertTrue(block.contains("addExternalWallet("), "должен вызвать addExternalWallet")
-        assertTrue(block.contains("updatePayoutWallet("), "должен вызвать updatePayoutWallet")
-        assertTrue(
-            block.contains("walletAddress.isBlank()"),
-            "пустой walletAddress — ранний возврат, JNI не дёргать",
+            source.contains("private val payoutWalletSetup = UrnetworkPayoutWalletSetup()"),
+            "Bridge обязан держать UrnetworkPayoutWalletSetup helper — иначе single-source-of-truth " +
+                "для payout wallet setup ломается (детали в UrnetworkPayoutWalletSetup.kt).",
         )
     }
 
     @Test
-    fun `setupPayoutWallet оборачивает SDK-вызовы в runCatching — не валит старт движка`() {
-        val block = source.substringAfter("private suspend fun setupPayoutWallet")
-            .substringBefore("private fun cleanupOnFailure")
+    fun `setPreferredLocation сохраняет UrnetworkLocationSelection через normalized`() {
         assertTrue(
-            block.contains("runCatching"),
-            "setupPayoutWallet обязан runCatching — иначе SDK throw валит старт engine",
+            source.contains("override fun setPreferredLocation(selection: UrnetworkLocationSelection?)"),
+            "Bridge обязан принимать UrnetworkLocationSelection (country+region+city), не код страны — " +
+                "иначе region/city не передаются в SDK.",
+        )
+        val body = source.substringAfter("override fun setPreferredLocation(selection: UrnetworkLocationSelection?)")
+            .substringBefore("override fun openLocationsViewController")
+        assertTrue(
+            body.contains("preferredLocationRef.set"),
+            "setPreferredLocation обязан сохранять selection в preferredLocationRef для использования " +
+                "в connectByPreferredLocation после attachTun.",
+        )
+        assertTrue(
+            body.contains("normalized()"),
+            "setPreferredLocation обязан вызывать selection.normalized() — иначе пустые/невалидные " +
+                "country codes попадут в connect matching и сорвут поиск.",
         )
     }
 
     @Test
-    fun `setupPayoutWallet success логирует через Log_i не PersistentLoggers_warn`() {
-        val block = source.substringAfter("private suspend fun setupPayoutWallet")
-            .substringBefore("private fun cleanupOnFailure")
-        val successFragment = block.substringAfter("updatePayoutWallet(walletId)")
-            .substringBefore("} else {")
+    fun `preferredLocationConnector connect вызывается в attachTun под running guard`() {
+        val helperField =
+            "private val preferredLocationConnector = UrnetworkPreferredLocationConnector(bridgeScope)"
         assertTrue(
-            successFragment.contains("Log.i") && successFragment.contains("payout wallet set"),
-            "Success-event 'payout wallet set' обязан логироваться через Log.i, не PersistentLoggers.warn — " +
-                "warn-level на success = ложный шум в boot.log + alerting noise. " +
-                "PersistentLoggers.warn остаётся только для аномалий (walletId not found, threw).",
+            source.contains(helperField),
+            "Bridge обязан держать UrnetworkPreferredLocationConnector helper — иначе single-source-of-truth " +
+                "для preferred-location matcher ломается (детали в UrnetworkPreferredLocationConnector.kt).",
         )
         assertTrue(
-            !successFragment.contains("PersistentLoggers.warn"),
-            "Success-event не должен использовать PersistentLoggers.warn — это ошибка severity для нормального пути.",
+            source.contains("preferredLocationConnector.connect("),
+            "Bridge обязан вызывать preferredLocationConnector.connect(...) для user-selected region/city " +
+                "после attachTun — иначе hierarchical matcher не активируется.",
+        )
+    }
+
+    @Test
+    fun `contractStatusListener attach в start path и detach в stopUnderLock`() {
+        assertTrue(
+            source.contains("private val contractStatusListener = UrnetworkContractStatusListener()"),
+            "Bridge обязан держать UrnetworkContractStatusListener — иначе contractStatus flow всегда UNKNOWN, " +
+                "UrnetworkContractStatusObserver не сможет ловить insufficient balance.",
+        )
+        val startBlock = source.substringAfter("private suspend fun runStartOnMain")
+            .substringBefore("override suspend fun stop")
+        assertTrue(
+            startBlock.contains("contractStatusListener.attach("),
+            "runStartOnMain обязан вызывать contractStatusListener.attach(device) после device init — " +
+                "иначе listener никогда не подпишется и insufficientBalance событие не дойдёт до Observer.",
+        )
+        val stopBlock = source.substringAfter("private suspend fun stopUnderLock")
+            .substringBefore("private fun cleanupOnFailure")
+        assertTrue(
+            stopBlock.contains("contractStatusListener.detach()"),
+            "stopUnderLock обязан вызывать contractStatusListener.detach() — иначе listener " +
+                "remains attached → memory leak + ghost callbacks после teardown.",
+        )
+    }
+
+    @Test
+    fun `contractStatus override возвращает contractStatusListener_status`() {
+        val regex = Regex(
+            "override fun contractStatus\\(\\)[^=]*=\\s*contractStatusListener\\.status",
+            RegexOption.DOT_MATCHES_ALL,
+        )
+        assertTrue(
+            regex.containsMatchIn(source),
+            "contractStatus() обязан возвращать contractStatusListener.status — отдельный StateFlow создаст " +
+                "разлив truth: UI читает один flow, listener эмитит в другой, signal теряется.",
         )
     }
 

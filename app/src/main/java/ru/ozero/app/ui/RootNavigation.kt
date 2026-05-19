@@ -24,7 +24,7 @@ import ru.ozero.app.ui.settings.engines.UrnetworkEngineSettingsScreen
 import ru.ozero.app.ui.settings.engines.UrnetworkSharedTrafficScreen
 import ru.ozero.app.ui.settings.engines.WarpEngineSettingsScreen
 import ru.ozero.app.ui.splittunnel.SplitTunnelScreen
-import ru.ozero.app.ui.stats.StatsHistoryScreen
+import ru.ozero.app.ui.stats.TrafficStatsScreen
 import ru.ozero.app.ui.strategy.StrategyTestScreen
 
 private fun engineParamsTarget(engineId: EngineId?): TopScreen = when (engineId) {
@@ -93,7 +93,7 @@ fun RootNavigation(
             TopScreen.TelegramProxySettings -> TelegramProxySettingsScreen(onBack = { back() })
             TopScreen.StrategyTest -> StrategyTestScreen(onBack = { back() })
             TopScreen.ManualServer -> ManualServerScreen(onBack = { back() })
-            TopScreen.StatsHistory -> StatsHistoryScreen(onBack = { back() })
+            TopScreen.StatsHistory -> TrafficStatsScreen(onBack = { back() })
             TopScreen.Main ->
                 MainScreen(
                     viewModel = viewModel,

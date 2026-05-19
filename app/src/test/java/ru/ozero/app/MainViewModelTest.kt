@@ -41,6 +41,7 @@ import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginescore.settings.SplitTunnelMode
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
+import ru.ozero.engineurnetwork.UrnetworkWindowType
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
@@ -55,6 +56,7 @@ class MainViewModelTest {
     private lateinit var byedpiPlugin: FakeEnginePlugin
     private lateinit var warpPlugin: FakeEnginePlugin
     private lateinit var urnetworkPlugin: FakeEnginePlugin
+    private lateinit var urnetworkBridge: FakeUrnetworkBridge
     private lateinit var viewModel: MainViewModel
 
     @BeforeEach
@@ -73,18 +75,19 @@ class MainViewModelTest {
         urnetworkPlugin = FakeEnginePlugin(EngineId.URNETWORK) {
             IpProbeRoute.Unavailable("URnetwork location pending")
         }
+        urnetworkBridge = FakeUrnetworkBridge()
         viewModel = MainViewModel(
             tunnelController,
             healthMonitor,
             settingsRepository,
-            FakeUrnetworkBridge(),
+            urnetworkBridge,
             ipInfoProvider,
             setOf(byedpiPlugin, warpPlugin, urnetworkPlugin),
         )
     }
 
     private fun newViewModel(
-        bridge: UrnetworkSdkBridge = FakeUrnetworkBridge(),
+        bridge: UrnetworkSdkBridge = urnetworkBridge,
         plugins: Set<EnginePlugin> = setOf(byedpiPlugin, warpPlugin, urnetworkPlugin),
     ): MainViewModel = MainViewModel(
         tunnelController,
@@ -160,6 +163,11 @@ class MainViewModelTest {
     }
 
     private class FakeUrnetworkBridge(var peers: Int = 0, var running: Boolean = true) : UrnetworkSdkBridge {
+        var applyCalls: Int = 0
+        var lastWindowType: UrnetworkWindowType? = null
+        var lastFixedIp: Boolean? = null
+        var lastAllowDirect: Boolean? = null
+
         override suspend fun start(
             walletAddress: String,
             apiUrl: String,
@@ -180,6 +188,16 @@ class MainViewModelTest {
         override fun unpaidByteCount(): Long = 0L
         override fun fetchTransferStats() = Unit
         override suspend fun fetchSubscriptionBalance(): UrnetworkSdkBridge.SubscriptionBalanceSnapshot? = null
+        override fun applyPerformanceProfile(
+            windowType: UrnetworkWindowType,
+            fixedIpSize: Boolean,
+            allowDirect: Boolean,
+        ) {
+            applyCalls += 1
+            lastWindowType = windowType
+            lastFixedIp = fixedIpSize
+            lastAllowDirect = allowDirect
+        }
     }
 
     @AfterEach
@@ -557,6 +575,72 @@ class MainViewModelTest {
         val s = viewModel.ipInfo.value
         assertIs<IpInfoState.Loaded>(s)
         assertEquals(1, ipInfoProvider.calls)
+    }
+
+    @Test
+    fun isReconnectingFalseInitially() = runTest {
+        advanceUntilIdle()
+        assertEquals(false, viewModel.isReconnecting.value)
+    }
+
+    @Test
+    fun isReconnectingFalseOnFirstConnect() = runTest {
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        advanceUntilIdle()
+        assertEquals(false, viewModel.isReconnecting.value)
+    }
+
+    @Test
+    fun isReconnectingTrueAfterConnectedFailed() = runTest {
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
+        advanceUntilIdle()
+        tunnelController.onEngineDied(EngineId.BYEDPI, "network loss")
+        advanceUntilIdle()
+        assertEquals(true, viewModel.isReconnecting.value)
+    }
+
+    @Test
+    fun isReconnectingStaysTrueOnFailedThenProbingThenConnecting() = runTest {
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
+        advanceUntilIdle()
+        tunnelController.onEngineDied(EngineId.BYEDPI, "lost")
+        advanceUntilIdle()
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        advanceUntilIdle()
+        assertEquals(true, viewModel.isReconnecting.value)
+    }
+
+    @Test
+    fun isReconnectingClearsOnReconnectSuccess() = runTest {
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
+        advanceUntilIdle()
+        tunnelController.onEngineDied(EngineId.BYEDPI, "lost")
+        advanceUntilIdle()
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
+        advanceUntilIdle()
+        assertEquals(false, viewModel.isReconnecting.value)
+    }
+
+    @Test
+    fun isReconnectingFalseAfterUserDisconnect() = runTest {
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
+        advanceUntilIdle()
+        tunnelController.onDisconnecting()
+        tunnelController.reset()
+        advanceUntilIdle()
+        assertEquals(false, viewModel.isReconnecting.value)
     }
 
     private class FakeSettingsRepository : SettingsRepository {

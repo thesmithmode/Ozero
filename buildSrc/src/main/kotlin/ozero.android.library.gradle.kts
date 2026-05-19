@@ -1,5 +1,6 @@
 import com.android.build.gradle.LibraryExtension
 import org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension
+import java.time.Duration
 
 plugins {
     id("com.android.library")
@@ -37,8 +38,12 @@ extensions.configure<LibraryExtension> {
                 it.useJUnitPlatform()
                 it.maxParallelForks =
                     (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
+                it.forkEvery = 100
+                it.timeout.set(Duration.ofMinutes(15))
+                it.systemProperty("junit.jupiter.execution.timeout.default", "120s")
+                it.systemProperty("junit.jupiter.execution.timeout.testable.method.default", "120s")
                 it.testLogging {
-                    events("started", "passed", "failed", "skipped")
+                    events("passed", "failed", "skipped")
                     showStandardStreams = false
                 }
             }

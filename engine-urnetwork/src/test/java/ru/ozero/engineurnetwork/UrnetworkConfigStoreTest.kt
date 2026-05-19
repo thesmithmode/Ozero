@@ -105,6 +105,60 @@ class UrnetworkConfigStoreTest {
     }
 
     @Test
+    fun `devicePubkey по умолчанию null`() = runTest {
+        val (store, _) = newStore()
+        assertNull(store.devicePubkey().first())
+    }
+
+    @Test
+    fun `setDevicePubkey persist и devicePubkey возвращает значение`() = runTest {
+        val (store, _) = newStore()
+        val pk = "27wAThHKVpd8c4r4GXNzMAev8byGUozA6RVayeZ7vHMM"
+        store.setDevicePubkey(pk)
+        assertEquals(pk, store.devicePubkey().first())
+    }
+
+    @Test
+    fun `setDevicePubkey(null) очищает`() = runTest {
+        val (store, _) = newStore()
+        store.setDevicePubkey("abc")
+        store.setDevicePubkey(null)
+        assertNull(store.devicePubkey().first())
+    }
+
+    @Test
+    fun `setDevicePubkey пустая строка трактуется как null`() = runTest {
+        val (store, _) = newStore()
+        store.setDevicePubkey("abc")
+        store.setDevicePubkey("")
+        assertNull(store.devicePubkey().first())
+    }
+
+    @Test
+    fun `deviceNetworkName по умолчанию null`() = runTest {
+        val (store, _) = newStore()
+        assertNull(store.deviceNetworkName().first())
+    }
+
+    @Test
+    fun `setDeviceNetworkName persist и returns`() = runTest {
+        val (store, _) = newStore()
+        store.setDeviceNetworkName("n-abc")
+        assertEquals("n-abc", store.deviceNetworkName().first())
+    }
+
+    @Test
+    fun `devicePubkey и deviceNetworkName хранятся независимо от byJwt`() = runTest {
+        val (store, _) = newStore()
+        store.setByJwt("j")
+        store.setDevicePubkey("p")
+        store.setDeviceNetworkName("n")
+        assertEquals("j", store.byJwt().first())
+        assertEquals("p", store.devicePubkey().first())
+        assertEquals("n", store.deviceNetworkName().first())
+    }
+
+    @Test
     fun `provideEnabled по умолчанию true`() = runTest {
         val (store, _) = newStore()
         assertEquals(true, store.provideEnabled().first())
@@ -123,6 +177,86 @@ class UrnetworkConfigStoreTest {
         store.setProvideEnabled(false)
         store.setProvideEnabled(true)
         assertEquals(true, store.provideEnabled().first())
+    }
+
+    @Test
+    fun `selectedLocation по умолчанию EMPTY`() = runTest {
+        val (store, _) = newStore()
+        assertEquals(UrnetworkLocationSelection.EMPTY, store.selectedLocation().first())
+    }
+
+    @Test
+    fun `setSelectedLocation сохраняет country uppercase trimmed`() = runTest {
+        val (store, _) = newStore()
+        store.setSelectedLocation(UrnetworkLocationSelection("  de  ", null, null))
+        assertEquals("DE", store.selectedLocation().first().countryCode)
+    }
+
+    @Test
+    fun `setSelectedLocation country=null очищает country`() = runTest {
+        val (store, _) = newStore()
+        store.setSelectedLocation(UrnetworkLocationSelection("US", null, null))
+        store.setSelectedLocation(UrnetworkLocationSelection(null, null, null))
+        assertNull(store.selectedLocation().first().countryCode)
+    }
+
+    @Test
+    fun `setSelectedLocation пустая country трактуется как null`() = runTest {
+        val (store, _) = newStore()
+        store.setSelectedLocation(UrnetworkLocationSelection("US", null, null))
+        store.setSelectedLocation(UrnetworkLocationSelection("   ", null, null))
+        assertNull(store.selectedLocation().first().countryCode)
+    }
+
+    @Test
+    fun `setSelectedLocation сохраняет region trimmed`() = runTest {
+        val (store, _) = newStore()
+        store.setSelectedLocation(UrnetworkLocationSelection(null, "  Bavaria  ", null))
+        assertEquals("Bavaria", store.selectedLocation().first().region)
+    }
+
+    @Test
+    fun `setSelectedLocation region=null очищает`() = runTest {
+        val (store, _) = newStore()
+        store.setSelectedLocation(UrnetworkLocationSelection(null, "Bavaria", null))
+        store.setSelectedLocation(UrnetworkLocationSelection(null, null, null))
+        assertNull(store.selectedLocation().first().region)
+    }
+
+    @Test
+    fun `setSelectedLocation сохраняет city trimmed`() = runTest {
+        val (store, _) = newStore()
+        store.setSelectedLocation(UrnetworkLocationSelection(null, null, "  Munich  "))
+        assertEquals("Munich", store.selectedLocation().first().city)
+    }
+
+    @Test
+    fun `setSelectedLocation city=null очищает`() = runTest {
+        val (store, _) = newStore()
+        store.setSelectedLocation(UrnetworkLocationSelection(null, null, "Munich"))
+        store.setSelectedLocation(UrnetworkLocationSelection(null, null, null))
+        assertNull(store.selectedLocation().first().city)
+    }
+
+    @Test
+    fun `country region city персистятся атомарно`() = runTest {
+        val (store, _) = newStore()
+        store.setSelectedLocation(UrnetworkLocationSelection("DE", "Bavaria", "Munich"))
+        val snap = store.selectedLocation().first()
+        assertEquals("DE", snap.countryCode)
+        assertEquals("Bavaria", snap.region)
+        assertEquals("Munich", snap.city)
+    }
+
+    @Test
+    fun `setSelectedLocation частичное обновление сбрасывает остальные`() = runTest {
+        val (store, _) = newStore()
+        store.setSelectedLocation(UrnetworkLocationSelection("DE", "Bavaria", "Munich"))
+        store.setSelectedLocation(UrnetworkLocationSelection("DE", null, "Munich"))
+        val snap = store.selectedLocation().first()
+        assertEquals("DE", snap.countryCode)
+        assertNull(snap.region)
+        assertEquals("Munich", snap.city)
     }
 
     private class FakePreferencesDataStore : DataStore<Preferences> {
