@@ -33,6 +33,7 @@ import ru.ozero.enginescore.EngineStats
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.settings.AppMode
+import ru.ozero.enginescore.settings.ByeDpiUiSettings
 import ru.ozero.enginescore.settings.HostsMode
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
@@ -779,6 +780,14 @@ class StrategyTestViewModelTest {
 
         override suspend fun setByedpiDefaultAccepted(accepted: Boolean) {
             state.value = state.value.copy(byedpiDefaultAccepted = accepted)
+        }
+
+        override suspend fun setByedpiUseUiMode(enabled: Boolean) {
+            state.value = state.value.copy(byedpiUseUiMode = enabled)
+        }
+
+        override suspend fun setByedpiUiSettings(settings: ByeDpiUiSettings) {
+            state.value = state.value.copy(byedpiUiSettings = settings)
         }
     }
 }

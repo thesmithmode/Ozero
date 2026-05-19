@@ -36,6 +36,7 @@ import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.settings.AppMode
+import ru.ozero.enginescore.settings.ByeDpiUiSettings
 import ru.ozero.enginescore.settings.HostsMode
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
@@ -664,6 +665,8 @@ class MainViewModelTest {
         override suspend fun setUrnetworkCountryCode(code: String?) = Unit
         override suspend fun setByedpiWinningArgs(args: String?) = Unit
         override suspend fun setByedpiDefaultAccepted(accepted: Boolean) = Unit
+        override suspend fun setByedpiUseUiMode(enabled: Boolean) = Unit
+        override suspend fun setByedpiUiSettings(settings: ByeDpiUiSettings) = Unit
         override suspend fun setCustomDnsServers(servers: List<String>) = Unit
         override suspend fun setHostsMode(mode: HostsMode) = Unit
         override suspend fun setHosts(hosts: List<String>) = Unit

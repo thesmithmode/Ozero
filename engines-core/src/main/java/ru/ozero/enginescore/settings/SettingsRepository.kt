@@ -27,6 +27,10 @@ interface SettingsRepository {
 
     suspend fun setByedpiDefaultAccepted(accepted: Boolean)
 
+    suspend fun setByedpiUseUiMode(enabled: Boolean)
+
+    suspend fun setByedpiUiSettings(settings: ByeDpiUiSettings)
+
     suspend fun setCustomDnsServers(servers: List<String>)
 
     suspend fun setHostsMode(mode: HostsMode)

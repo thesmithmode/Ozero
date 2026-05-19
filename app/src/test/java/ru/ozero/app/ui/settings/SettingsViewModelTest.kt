@@ -16,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.settings.AppMode
+import ru.ozero.enginescore.settings.ByeDpiUiSettings
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginescore.settings.SplitTunnelMode
@@ -225,6 +226,8 @@ class SettingsViewModelTest {
         override suspend fun setUrnetworkCountryCode(code: String?) = Unit
         override suspend fun setByedpiWinningArgs(args: String?) = Unit
         override suspend fun setByedpiDefaultAccepted(accepted: Boolean) = Unit
+        override suspend fun setByedpiUseUiMode(enabled: Boolean) = Unit
+        override suspend fun setByedpiUiSettings(settings: ByeDpiUiSettings) = Unit
         override suspend fun setCustomDnsServers(servers: List<String>) = Unit
         override suspend fun setHostsMode(mode: ru.ozero.enginescore.settings.HostsMode) = Unit
         override suspend fun setHosts(hosts: List<String>) = Unit

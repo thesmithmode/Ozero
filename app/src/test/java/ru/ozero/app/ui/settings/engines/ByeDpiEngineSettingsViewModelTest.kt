@@ -13,6 +13,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import ru.ozero.enginescore.settings.ByeDpiUiSettings
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginescore.settings.AppMode
@@ -270,6 +271,14 @@ class ByeDpiEngineSettingsViewModelTest {
         override suspend fun setByedpiDefaultAccepted(accepted: Boolean) {
             defaultAcceptedUpdates += accepted
             state.value = state.value.copy(byedpiDefaultAccepted = accepted)
+        }
+
+        override suspend fun setByedpiUseUiMode(enabled: Boolean) {
+            state.value = state.value.copy(byedpiUseUiMode = enabled)
+        }
+
+        override suspend fun setByedpiUiSettings(settings: ByeDpiUiSettings) {
+            state.value = state.value.copy(byedpiUiSettings = settings)
         }
     }
 }
