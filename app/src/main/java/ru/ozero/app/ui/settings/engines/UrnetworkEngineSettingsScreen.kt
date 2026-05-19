@@ -47,7 +47,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
-import ru.ozero.app.ui.icons.OzeroIcons
 import ru.ozero.app.ui.theme.OzeroPalette
 import ru.ozero.app.ui.urnetwork.UrnetworkBalanceCard
 import ru.ozero.app.ui.utils.formatBytes
@@ -706,13 +705,10 @@ private fun LocationRow(
             )
         }
         if (isStrongPrivacy) {
-            Icon(
-                imageVector = OzeroIcons.Glasses,
-                contentDescription = null,
-                tint = OzeroPalette.StateConnected,
-                modifier = Modifier
-                    .padding(start = 4.dp)
-                    .size(16.dp),
+            Text(
+                text = "🕶️",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(start = 4.dp),
             )
         }
         if (providerCount > 0) {
