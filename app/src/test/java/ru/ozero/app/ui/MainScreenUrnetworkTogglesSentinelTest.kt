@@ -91,10 +91,18 @@ class MainScreenUrnetworkTogglesSentinelTest {
     }
 
     @Test
-    fun `IpInfoCard рендерит IpCardPeerSuffix внутри header Row`() {
+    fun `IpInfoCard разделён на две колонки — выходной узел слева, пиры справа`() {
         assertTrue(
-            mainScreenSource.contains("IpCardPeerSuffix("),
-            "IpInfoCard обязан рендерить IpCardPeerSuffix рядом с заголовком",
+            mainScreenSource.contains("IpCardExitNodeValue("),
+            "IpInfoCard обязан рендерить выходной узел через IpCardExitNodeValue в левой колонке",
+        )
+        assertTrue(
+            mainScreenSource.contains("IpCardPeerValue("),
+            "IpInfoCard обязан рендерить число пиров через IpCardPeerValue в правой колонке",
+        )
+        assertTrue(
+            mainScreenSource.contains("engine_status_peers_title"),
+            "Правая колонка обязана использовать заголовок engine_status_peers_title",
         )
     }
 

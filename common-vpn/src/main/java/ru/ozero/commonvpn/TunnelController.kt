@@ -208,6 +208,6 @@ class TunnelController(
     internal companion object {
         const val TAG = "TunnelController"
         const val EWMA_ALPHA = 0.4
-        const val SWITCHING_TIMEOUT_MS = 6_000L
+        const val SWITCHING_TIMEOUT_MS = 12_000L
     }
 }

@@ -24,6 +24,9 @@
     <string name="main_health_degraded_hint">Проба маршрута не отвечает 3 раза подряд. Попробуйте сменить движок.</string>
     <string name="urnetwork_peer_count_label">Пиры: %1$d</string>
     <string name="urnetwork_peer_searching">Пиры недоступны, продолжаю попытки подключения %1$d с</string>
+    <string name="engine_status_peers_title">Пиры:</string>
+    <string name="engine_status_peers_searching_value">Поиск %1$d с</string>
+    <string name="engine_status_peers_unavailable">—</string>
 
     <!-- Tabs -->
     <string name="tab_main">Главная</string>

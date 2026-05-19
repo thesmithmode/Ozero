@@ -29,12 +29,12 @@ class TunnelControllerTest {
     }
 
     @Test
-    fun `sentinel SWITCHING_TIMEOUT_MS = 6s — visual switch fast-fail (v0_1_5 fix)`() {
+    fun `sentinel SWITCHING_TIMEOUT_MS = 12s — допускает медленный handshake v0_1_5_1`() {
         assertEquals(
-            6_000L,
+            12_000L,
             TunnelController.SWITCHING_TIMEOUT_MS,
-            "watchdog timeout управляет максимум времени UI-перехода 'switching'. " +
-                "Возврат к 12_000L → юзер видит долгий switch при failed engine.",
+            "6s рвал переключение когда движок поднимался дольше (WARP handshake до 10s + chain assembly). " +
+                "12s — достаточно для legitimate ready, не блокирует UX надолго при действительно мёртвом движке.",
         )
     }
 

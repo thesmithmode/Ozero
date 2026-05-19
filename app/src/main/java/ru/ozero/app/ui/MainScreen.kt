@@ -451,22 +451,23 @@ internal fun isUrnetworkVisibleInMain(state: TunnelState, manualEngine: EngineId
 }
 
 @Composable
-private fun IpCardPeerSuffix(count: Int?, searchSeconds: Int?) {
-    when {
-        count != null && count > 0 -> Text(
-            text = stringResource(R.string.urnetwork_peer_count_label, count),
-            style = MaterialTheme.typography.bodySmall,
-            color = OzeroPalette.Text3,
-            modifier = Modifier.testTag(MainScreenTestTags.URNETWORK_PEER_COUNT),
-        )
-        searchSeconds != null && searchSeconds >= URNETWORK_PEER_SEARCH_VISIBLE_THRESHOLD_S -> Text(
-            text = stringResource(R.string.urnetwork_peer_searching, searchSeconds),
-            style = MaterialTheme.typography.bodySmall,
-            color = OzeroPalette.Text3,
-            modifier = Modifier.testTag(MainScreenTestTags.URNETWORK_PEER_SEARCHING),
-        )
-        else -> Unit
+private fun IpCardPeerValue(count: Int?, searchSeconds: Int?) {
+    val (label, tag) = when {
+        count != null && count > 0 ->
+            count.toString() to MainScreenTestTags.URNETWORK_PEER_COUNT
+        searchSeconds != null && searchSeconds >= URNETWORK_PEER_SEARCH_VISIBLE_THRESHOLD_S ->
+            stringResource(R.string.engine_status_peers_searching_value, searchSeconds) to
+                MainScreenTestTags.URNETWORK_PEER_SEARCHING
+        else ->
+            stringResource(R.string.engine_status_peers_unavailable) to
+                MainScreenTestTags.URNETWORK_PEER_COUNT
     }
+    Text(
+        text = label,
+        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+        color = OzeroPalette.Text,
+        modifier = Modifier.testTag(tag),
+    )
 }
 
 @Composable
@@ -527,6 +528,7 @@ private fun IpInfoCard(
     urnetworkPeerCount: Int? = null,
     urnetworkSearchSeconds: Int? = null,
 ) {
+    val showPeerColumn = urnetworkPeerCount != null || urnetworkSearchSeconds != null
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -535,88 +537,109 @@ private fun IpInfoCard(
         colors = CardDefaults.cardColors(containerColor = OzeroPalette.GlassFill),
         shape = RoundedCornerShape(20.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
                     text = stringResource(R.string.ip_card_title),
                     style = MaterialTheme.typography.bodySmall,
                     color = OzeroPalette.Text3,
                 )
-                IpCardPeerSuffix(
-                    count = urnetworkPeerCount,
-                    searchSeconds = urnetworkSearchSeconds,
-                )
+                IpCardExitNodeValue(state = state)
             }
-            when (state) {
-                is IpInfoState.Idle, is IpInfoState.Loading -> Text(
-                    text = stringResource(R.string.ip_card_loading),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = OzeroPalette.Text,
-                )
-                is IpInfoState.AutoSelected -> Text(
-                    text = stringResource(R.string.urnetwork_auto_select),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = OzeroPalette.Text,
-                )
-                is IpInfoState.Loaded -> {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        val hasFlag = state.info.countryCode?.length == 2
-                        if (hasFlag) {
-                            Text(
-                                text = CountryFlag.emoji(state.info.countryCode),
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                        }
-                        if (state.info.ip.isNotBlank()) {
-                            Text(
-                                text = state.info.ip,
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                                color = OzeroPalette.Text,
-                            )
-                        } else {
-                            Text(
-                                text = state.info.country?.takeIf { it.isNotBlank() }
-                                    ?: stringResource(R.string.ip_card_country_unknown),
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                                color = OzeroPalette.Text,
-                            )
-                        }
-                    }
-                    if (state.info.ip.isNotBlank()) {
-                        val country = state.info.country
-                            ?: stringResource(R.string.ip_card_country_unknown)
-                        val location = listOfNotNull(state.info.city, country).joinToString(", ")
-                        Text(
-                            text = location,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = OzeroPalette.Text3,
-                        )
-                    }
-                }
-                is IpInfoState.Error -> {
+            if (showPeerColumn) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
                     Text(
-                        text = stringResource(R.string.ip_card_error, state.message),
+                        text = stringResource(R.string.engine_status_peers_title),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
+                        color = OzeroPalette.Text3,
                     )
+                    IpCardPeerValue(
+                        count = urnetworkPeerCount,
+                        searchSeconds = urnetworkSearchSeconds,
+                    )
+                }
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun IpCardExitNodeValue(state: IpInfoState) {
+    when (state) {
+        is IpInfoState.Idle, is IpInfoState.Loading -> Text(
+            text = stringResource(R.string.ip_card_loading),
+            style = MaterialTheme.typography.titleMedium,
+            color = OzeroPalette.Text,
+        )
+        is IpInfoState.AutoSelected -> Text(
+            text = stringResource(R.string.urnetwork_auto_select),
+            style = MaterialTheme.typography.titleMedium,
+            color = OzeroPalette.Text,
+        )
+        is IpInfoState.Loaded -> {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                val hasFlag = state.info.countryCode?.length == 2
+                if (hasFlag) {
                     Text(
-                        text = stringResource(R.string.ip_card_refresh),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = OzeroPalette.Aqua,
+                        text = CountryFlag.emoji(state.info.countryCode),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+                if (state.info.ip.isNotBlank()) {
+                    Text(
+                        text = state.info.ip,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = OzeroPalette.Text,
+                    )
+                } else {
+                    Text(
+                        text = state.info.country?.takeIf { it.isNotBlank() }
+                            ?: stringResource(R.string.ip_card_country_unknown),
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = OzeroPalette.Text,
                     )
                 }
             }
+            if (state.info.ip.isNotBlank()) {
+                val country = state.info.country
+                    ?: stringResource(R.string.ip_card_country_unknown)
+                val location = listOfNotNull(state.info.city, country).joinToString(", ")
+                Text(
+                    text = location,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OzeroPalette.Text3,
+                )
+            }
+        }
+        is IpInfoState.Error -> {
+            Text(
+                text = stringResource(R.string.ip_card_error, state.message),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+            Text(
+                text = stringResource(R.string.ip_card_refresh),
+                style = MaterialTheme.typography.bodySmall,
+                color = OzeroPalette.Aqua,
+            )
         }
     }
 }
