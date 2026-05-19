@@ -259,6 +259,11 @@ class EngineUrnetwork(
         }
     }
 
+    // walletAuth migration критична: каждый Ozero-юзер должен иметь свою URnetwork-network
+    // (per-device Ed25519 identity), payout = PRESET_WALLET общий. БЕЗ migration legacy guest
+    // юзеры остаются на shared guest network → НЕ становятся per-user providers → выплаты не идут.
+    // Side-effect: backend race в RefreshFreeTransferBalance может выдать 2 окна на одной networkId
+    // = 68 GiB вместо 34. Не fixable client-side (нет API expire). Принято как штатное.
     private suspend fun tryAcquireDeviceJwt(legacyMigration: Boolean): String? {
         val identity = deviceIdentity ?: return null
         val storedName = configStore.deviceNetworkName().first()

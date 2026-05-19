@@ -21,6 +21,9 @@ import ru.ozero.enginescore.PersistentLoggers
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
+// Relay coordinator шарит URnetwork provider трафик ТОЛЬКО когда tunnel.Connected (любой engine).
+// VPN off → bridge.stop → relay не работает. Это намеренно: always-on provider в фоне без VPN
+// прожирал бы батарею + дата-план юзера без явного opt-in. Не "TODO" — design constraint.
 class UrnetworkRelayCoordinator(
     private val bridge: UrnetworkSdkBridge,
     private val configStore: UrnetworkConfigStore,
