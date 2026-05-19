@@ -123,6 +123,13 @@ object UrnetworkModule {
 
     @Provides
     @Singleton
+    fun provideUrnetworkSharedTrafficHistory(
+        @ApplicationContext context: Context,
+    ): ru.ozero.app.urnetwork.UrnetworkSharedTrafficHistory =
+        ru.ozero.app.urnetwork.RealUrnetworkSharedTrafficHistory(context)
+
+    @Provides
+    @Singleton
     fun provideUrnetworkContractStatusObserver(
         @ApplicationContext context: Context,
         bridge: UrnetworkSdkBridge,

@@ -568,4 +568,7 @@
     <string name="byedpi_ui_udp_desync_hint">Обход для UDP-трафика (QUIC). Влияет на YouTube/Google.</string>
     <string name="byedpi_ui_udp_fake_count">Количество fake UDP-пакетов</string>
     <string name="byedpi_ui_udp_fake_count_hint">Сколько подменных UDP-пакетов послать перед настоящим. 0 — отключено.</string>
+    <string name="urnetwork_shared_traffic_chart_title">График за 30 дней</string>
+    <string name="urnetwork_shared_traffic_chart_empty">Пока нет данных — поработайте провайдером, и здесь появится статистика.</string>
+    <string name="urnetwork_shared_traffic_chart_peak">Пиковый день: %1$s</string>
 </resources>

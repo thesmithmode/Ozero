@@ -564,4 +564,7 @@
     <string name="byedpi_ui_udp_desync_hint">Bypass for UDP traffic (QUIC). Affects YouTube/Google.</string>
     <string name="byedpi_ui_udp_fake_count">Fake UDP packet count</string>
     <string name="byedpi_ui_udp_fake_count_hint">How many fake UDP packets to send before the real one. 0 — disabled.</string>
+    <string name="urnetwork_shared_traffic_chart_title">30-day chart</string>
+    <string name="urnetwork_shared_traffic_chart_empty">No data yet — provide some traffic and stats will show up here.</string>
+    <string name="urnetwork_shared_traffic_chart_peak">Peak day: %1$s</string>
 </resources>

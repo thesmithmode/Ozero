@@ -551,4 +551,7 @@
     <string name="byedpi_ui_udp_desync_hint">Evasión para tráfico UDP (QUIC). Afecta a YouTube/Google.</string>
     <string name="byedpi_ui_udp_fake_count">Cantidad de paquetes UDP falsos</string>
     <string name="byedpi_ui_udp_fake_count_hint">Cuántos paquetes UDP falsos enviar antes del real. 0 — desactivado.</string>
+    <string name="urnetwork_shared_traffic_chart_title">Gráfico de 30 días</string>
+    <string name="urnetwork_shared_traffic_chart_empty">Aún no hay datos — comparte tráfico como proveedor y verás estadísticas aquí.</string>
+    <string name="urnetwork_shared_traffic_chart_peak">Día máximo: %1$s</string>
 </resources>
