@@ -251,11 +251,16 @@ class StartSequenceCoordinator(
             builder.establish()
         } catch (t: Throwable) {
             PersistentLoggers.error(TAG, "engine TUN establish threw: ${t.message}")
+            deps.tunnelController.onEngineDied(engineId, "VPN slot занят — выключите другой VPN")
             stopVpnRequest()
             return null
         }
         if (pfd == null) {
-            PersistentLoggers.error(TAG, "engine TUN establish returned null — permission revoked?")
+            PersistentLoggers.error(
+                TAG,
+                "engine TUN establish returned null — VPN slot занят другим приложением",
+            )
+            deps.tunnelController.onEngineDied(engineId, "VPN slot занят — выключите другой VPN")
             stopVpnRequest()
             return null
         }
@@ -293,7 +298,10 @@ class StartSequenceCoordinator(
             return null
         }
         if (fd == null) {
-            PersistentLoggers.error(TAG, "establish returned null — permission revoked?")
+            PersistentLoggers.error(
+                TAG,
+                "establish returned null — VPN slot занят другим приложением (другой VPN active)",
+            )
             stopVpnRequest()
             return null
         }
