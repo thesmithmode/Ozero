@@ -29,7 +29,7 @@ class TunnelControllerTest {
     }
 
     @Test
-    fun `sentinel SWITCHING_TIMEOUT_MS = 6s — visual switch fast-fail (v0.1.5 fix)`() {
+    fun `sentinel SWITCHING_TIMEOUT_MS = 6s — visual switch fast-fail (v0_1_5 fix)`() {
         assertEquals(
             6_000L,
             TunnelController.SWITCHING_TIMEOUT_MS,

@@ -205,7 +205,7 @@ class TunnelController(
         is TunnelState.Disconnecting -> "Disconnecting"
     }
 
-    private companion object {
+    internal companion object {
         const val TAG = "TunnelController"
         const val EWMA_ALPHA = 0.4
         const val SWITCHING_TIMEOUT_MS = 6_000L
