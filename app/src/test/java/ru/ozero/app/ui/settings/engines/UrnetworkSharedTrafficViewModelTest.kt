@@ -100,13 +100,13 @@ class UrnetworkSharedTrafficViewModelTest {
         advanceUntilIdle()
         val afterFirst = balanceRepo.refreshCalls
         advanceTimeBy(30_001L)
-        advanceUntilIdle()
+        runCurrent()
         assertTrue(
             balanceRepo.refreshCalls > afterFirst,
             "ожидался второй refresh после 30s, got=${balanceRepo.refreshCalls}, was=$afterFirst",
         )
         advanceTimeBy(30_001L)
-        advanceUntilIdle()
+        runCurrent()
         assertTrue(balanceRepo.refreshCalls >= afterFirst + 2)
         collectJob.cancel()
     }
@@ -165,7 +165,7 @@ class UrnetworkSharedTrafficViewModelTest {
         advanceUntilIdle()
         val first = balanceRepo.refreshCalls
         advanceTimeBy(30_001L)
-        advanceUntilIdle()
+        runCurrent()
         assertTrue(
             balanceRepo.refreshCalls > first,
             "ticker должен продолжать polling после исключения, got=${balanceRepo.refreshCalls}",

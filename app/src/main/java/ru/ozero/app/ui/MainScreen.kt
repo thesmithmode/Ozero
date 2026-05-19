@@ -871,8 +871,8 @@ internal fun pickStatusLabelRes(
 }
 
 internal fun probingLabelRes(engineId: EngineId?, isReconnecting: Boolean): Int {
-    if (isReconnecting) return R.string.main_status_reconnecting
     if (engineId == null) return R.string.main_status_probing
+    if (isReconnecting) return R.string.main_status_reconnecting
     return when (engineId) {
         EngineId.WARP -> R.string.main_status_probing_warp
         EngineId.BYEDPI -> R.string.main_status_connecting
