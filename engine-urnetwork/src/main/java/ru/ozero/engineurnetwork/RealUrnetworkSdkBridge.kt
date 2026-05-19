@@ -358,8 +358,20 @@ class RealUrnetworkSdkBridge(
             if (keys != null) device.loadProvideSecretKeys(keys) else device.initProvideSecretKeys()
         }
         runCatching { device.providePaused = true }
+        runCatching { device.routeLocal = localState.routeLocal }
+        runCatching { device.provideMode = localState.provideMode }
+        runCatching { device.connectLocation = localState.connectLocation }
+        runCatching { device.defaultLocation = localState.defaultLocation }
+        runCatching { device.canShowRatingDialog = localState.canShowRatingDialog }
+        runCatching { device.provideControlMode = localState.provideControlMode }
+        runCatching { device.vpnInterfaceWhileOffline = localState.vpnInterfaceWhileOffline }
+        runCatching { device.canRefer = localState.canRefer }
+        runCatching { device.allowForeground = localState.allowForeground }
+        runCatching { device.provideNetworkMode = localState.provideNetworkMode }
+        runCatching { device.canPromptIntroFunnel = localState.canPromptIntroFunnel }
+        runCatching { device.performanceProfile = localState.performanceProfile }
         deviceRef.set(device)
-        Log.i(TAG, "initDeviceForLocations: device ready for location browse")
+        Log.i(TAG, "initDeviceForLocations: device ready for location browse — 12 fields applied")
         return true
     }
 
