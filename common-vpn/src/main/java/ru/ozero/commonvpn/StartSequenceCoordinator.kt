@@ -85,13 +85,13 @@ class StartSequenceCoordinator(
         }
         if (pick == null) {
             val mode = if (manualEngine == null) "auto" else "manual"
-            val targetForUi = resolveTargetForUi(manualEngine, settings) ?: run {
+            val targetForUi = resolveTargetForUi(manualEngine, settings)
+            if (targetForUi == null) {
                 PersistentLoggers.error(TAG, "no plugins registered — отказ старта")
-                stopVpnRequest()
-                return
+            } else {
+                PersistentLoggers.error(TAG, "no engine reachable ($mode mode) — отказ старта")
+                deps.tunnelController.onEngineDied(targetForUi, "no engine reachable ($mode mode)")
             }
-            PersistentLoggers.error(TAG, "no engine reachable ($mode mode) — отказ старта")
-            deps.tunnelController.onEngineDied(targetForUi, "no engine reachable ($mode mode)")
             stopVpnRequest()
             return
         }
