@@ -39,6 +39,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -505,7 +506,7 @@ private fun EvolutionStateCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth().testTag("evolution_state_card"),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             if (state.isInitializing) {
@@ -515,22 +516,6 @@ private fun EvolutionStateCard(
                 )
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             } else {
-                Text(
-                    text = stringResource(R.string.evolution_generation_label, state.generation, state.maxGenerations),
-                    style = MaterialTheme.typography.labelMedium,
-                )
-                LinearProgressIndicator(
-                    progress = {
-                        if (state.maxGenerations > 0) state.generation.toFloat() / state.maxGenerations else 0f
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                if (state.bestSuccessRate > 0.0) {
-                    Text(
-                        text = stringResource(R.string.evolution_access_label, (state.bestSuccessRate * 100).toInt()),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
                 if (state.stagnationCount >= 2) {
                     Text(
                         text = stringResource(R.string.evolution_stagnating),
@@ -541,15 +526,6 @@ private fun EvolutionStateCard(
             }
             if (state.evaluatingCommand != null) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        text = stringResource(
-                            R.string.evolution_evaluating_label,
-                            state.evaluatingIndex,
-                            state.evaluatingTotal,
-                        ),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
                     LinearProgressIndicator(
                         progress = {
                             if (state.evaluatingTotal > 0) {
@@ -564,9 +540,9 @@ private fun EvolutionStateCard(
                         text = state.evaluatingCommand,
                         style = MaterialTheme.typography.bodySmall,
                         fontFamily = FontFamily.Monospace,
-                        maxLines = 2,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -589,11 +565,11 @@ private fun EvolutionTopChromosomes(
     onToggleSave: (String) -> Unit,
     onApply: (String) -> Unit,
 ) {
-    HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f))
+    HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
     Text(
         text = stringResource(R.string.evolution_population_label),
         style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onPrimaryContainer,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     chromosomes.forEachIndexed { idx, (cmd, fitness) ->
         val isSaved = savedStrategies.any { it.command == cmd }
@@ -603,15 +579,26 @@ private fun EvolutionTopChromosomes(
                 .testTag("evolution_top_$idx"),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Surface(
+                shape = MaterialTheme.shapes.extraSmall,
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                modifier = Modifier.padding(end = 6.dp),
+            ) {
                 Text(
-                    text = "${(fitness * 100).toInt()}% — $cmd",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+                    text = "${(fitness * 100).toInt()}%",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                 )
             }
+            Text(
+                text = cmd,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
             IconButton(
                 onClick = { onToggleSave(cmd) },
                 modifier = Modifier.testTag("evolution_save_$idx"),

@@ -201,7 +201,6 @@
     <string name="saved_strategy_unpin">Desfixar</string>
     <string name="saved_strategy_rename_hint">Nome (opcional)</string>
     <string name="evolution_mode_toggle">Modo evolução</string>
-    <string name="evolution_generation_label">Geração %1$d/%2$d</string>
     <string name="evolution_fitness_label">Melhor resultado: %1$d%%</string>
     <string name="evolution_population_label">População</string>
     <string name="urnetwork_provide_mode_never">Nunca</string>
@@ -384,9 +383,7 @@
     <string name="scan_mode_deep_desc">Busca genética — encontra novas combinações</string>
     <string name="strategy_settings_save">Salvar</string>
     <string name="strategy_settings_field_empty">O campo não pode estar vazio</string>
-    <string name="evolution_access_label">Disponibilidade: %1$d%%</string>
     <string name="evolution_initializing">Preparando população…</string>
-    <string name="evolution_evaluating_label">Testando %1$d/%2$d</string>
     <string name="evolution_stagnating">Estagnado — buscando outras opções…</string>
     <string name="saved_strategy_rename_title">Renomear</string>
     <string name="usage_history_title">Histórico de uso</string>

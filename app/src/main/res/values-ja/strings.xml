@@ -228,12 +228,9 @@
     <string name="strategy_settings_save">Save</string>
     <string name="strategy_settings_field_empty">Field cannot be empty</string>
     <string name="evolution_mode_toggle">Evolution mode</string>
-    <string name="evolution_generation_label">Generation %1$d/%2$d</string>
     <string name="evolution_fitness_label">Best fitness: %1$d%%</string>
-    <string name="evolution_access_label">Availability: %1$d%%</string>
     <string name="evolution_population_label">Best strategies</string>
     <string name="evolution_initializing">Preparing population…</string>
-    <string name="evolution_evaluating_label">Testing %1$d/%2$d</string>
     <string name="evolution_stagnating">Stuck — exploring new variants…</string>
     <string name="saved_strategy_rename_title">Rename</string>
     <string name="usage_history_title">Usage history</string>
