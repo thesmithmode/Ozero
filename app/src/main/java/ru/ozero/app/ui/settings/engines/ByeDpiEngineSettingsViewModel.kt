@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import ru.ozero.enginescore.EngineConfig
+import ru.ozero.enginescore.settings.ByeDpiUiSettings
 import ru.ozero.enginescore.settings.SettingsRepository
 import javax.inject.Inject
 
@@ -23,9 +24,16 @@ sealed interface ByeDpiSettingsUiState {
         val defaultAccepted: Boolean,
         val dnsText: String,
         val savedDnsText: String,
+        val useUiMode: Boolean,
+        val savedUseUiMode: Boolean,
+        val uiSettings: ByeDpiUiSettings,
+        val savedUiSettings: ByeDpiUiSettings,
     ) : ByeDpiSettingsUiState {
         val dirty: Boolean get() =
-            args != (savedArgs ?: defaultArgs) || dnsText != savedDnsText
+            args != (savedArgs ?: defaultArgs) ||
+                dnsText != savedDnsText ||
+                useUiMode != savedUseUiMode ||
+                uiSettings != savedUiSettings
         val usingDefault: Boolean get() = savedArgs.isNullOrBlank()
     }
 }
@@ -56,6 +64,16 @@ class ByeDpiEngineSettingsViewModel @Inject constructor(
                     previous.dnsText != previous.savedDnsText -> previous.dnsText
                     else -> savedDns
                 }
+                val nextUseUi = when {
+                    previous == null -> model.byedpiUseUiMode
+                    previous.useUiMode != previous.savedUseUiMode -> previous.useUiMode
+                    else -> model.byedpiUseUiMode
+                }
+                val nextUiSettings = when {
+                    previous == null -> model.byedpiUiSettings
+                    previous.uiSettings != previous.savedUiSettings -> previous.uiSettings
+                    else -> model.byedpiUiSettings
+                }
                 _uiState.value = ByeDpiSettingsUiState.Content(
                     args = nextArgs,
                     savedArgs = saved,
@@ -63,6 +81,10 @@ class ByeDpiEngineSettingsViewModel @Inject constructor(
                     defaultAccepted = model.byedpiDefaultAccepted,
                     dnsText = nextDns,
                     savedDnsText = savedDns,
+                    useUiMode = nextUseUi,
+                    savedUseUiMode = model.byedpiUseUiMode,
+                    uiSettings = nextUiSettings,
+                    savedUiSettings = model.byedpiUiSettings,
                 )
             }
             .launchIn(viewModelScope)
@@ -83,6 +105,16 @@ class ByeDpiEngineSettingsViewModel @Inject constructor(
         _uiState.value = state.copy(dnsText = servers.joinToString(", "))
     }
 
+    fun onToggleUiMode(enabled: Boolean) {
+        val state = _uiState.value as? ByeDpiSettingsUiState.Content ?: return
+        _uiState.value = state.copy(useUiMode = enabled)
+    }
+
+    fun onUiSettingsChange(next: ByeDpiUiSettings) {
+        val state = _uiState.value as? ByeDpiSettingsUiState.Content ?: return
+        _uiState.value = state.copy(uiSettings = next)
+    }
+
     fun onSave() {
         val state = _uiState.value as? ByeDpiSettingsUiState.Content ?: return
         viewModelScope.launch {
@@ -91,6 +123,8 @@ class ByeDpiEngineSettingsViewModel @Inject constructor(
             if (toSave == null) repository.setByedpiDefaultAccepted(true)
             val dns = state.dnsText.split(",").map { it.trim() }.filter { it.isNotEmpty() }
             repository.setCustomDnsServers(dns)
+            repository.setByedpiUseUiMode(state.useUiMode)
+            repository.setByedpiUiSettings(state.uiSettings)
         }
     }
 
@@ -98,9 +132,10 @@ class ByeDpiEngineSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             repository.setByedpiWinningArgs(null)
             repository.setByedpiDefaultAccepted(true)
+            repository.setByedpiUiSettings(ByeDpiUiSettings.DEFAULT)
             val state = _uiState.value as? ByeDpiSettingsUiState.Content
             if (state != null) {
-                _uiState.value = state.copy(args = defaultArgs)
+                _uiState.value = state.copy(args = defaultArgs, uiSettings = ByeDpiUiSettings.DEFAULT)
             }
         }
     }

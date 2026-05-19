@@ -24,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -124,25 +125,56 @@ fun ByeDpiEngineSettingsScreen(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.byedpi_mode_ui),
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                        Switch(
+                            checked = s.useUiMode,
+                            onCheckedChange = viewModel::onToggleUiMode,
+                            modifier = Modifier.testTag("byedpi_mode_switch"),
+                        )
+                    }
                     Text(
-                        text = stringResource(R.string.byedpi_args_description),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    OutlinedTextField(
-                        value = s.args,
-                        onValueChange = viewModel::onArgsChange,
-                        label = { Text("ByeDPI args") },
-                        modifier = Modifier.fillMaxWidth().testTag("byedpi_args_field"),
-                        minLines = 2,
-                    )
-                    Text(
-                        text = if (s.usingDefault) {
-                            stringResource(R.string.byedpi_using_default_fmt, s.defaultArgs)
+                        text = if (s.useUiMode) {
+                            stringResource(R.string.byedpi_mode_ui_hint)
                         } else {
-                            stringResource(R.string.byedpi_using_override)
+                            stringResource(R.string.byedpi_mode_cmd_hint)
                         },
                         style = MaterialTheme.typography.bodySmall,
                     )
+
+                    if (s.useUiMode) {
+                        ByeDpiUiModeSection(
+                            settings = s.uiSettings,
+                            onChange = viewModel::onUiSettingsChange,
+                        )
+                    } else {
+                        Text(
+                            text = stringResource(R.string.byedpi_args_description),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        OutlinedTextField(
+                            value = s.args,
+                            onValueChange = viewModel::onArgsChange,
+                            label = { Text("ByeDPI args") },
+                            modifier = Modifier.fillMaxWidth().testTag("byedpi_args_field"),
+                            minLines = 2,
+                        )
+                        Text(
+                            text = if (s.usingDefault) {
+                                stringResource(R.string.byedpi_using_default_fmt, s.defaultArgs)
+                            } else {
+                                stringResource(R.string.byedpi_using_override)
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
