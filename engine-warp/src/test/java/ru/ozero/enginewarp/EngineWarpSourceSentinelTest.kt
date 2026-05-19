@@ -22,6 +22,23 @@ class EngineWarpSourceSentinelTest {
     }
 
     @Test
+    fun `awaitReady timeout логирует dirListing — диагностика UAPI socket path`() {
+        assertTrue(
+            source.contains("listSocketCandidates(uapiPath)"),
+            "awaitReady timeout обязан логировать содержимое uapiPath и подпапки wireguard/ — " +
+                "иначе нельзя различить 'am-go не создал socket' vs 'socket в неожиданном пути'",
+        )
+        assertTrue(
+            source.contains("private fun listSocketCandidates"),
+            "listSocketCandidates обязан быть private fun — discriminating diagnostic helper",
+        )
+        assertTrue(
+            source.contains("wireguard"),
+            "listSocketCandidates обязан проверять подпапку wireguard/ — возможный путь am-go default",
+        )
+    }
+
+    @Test
     fun `anchors — все функции-границы существуют в источнике`() {
         listOf(
             "private suspend fun resolveEndpointHost",

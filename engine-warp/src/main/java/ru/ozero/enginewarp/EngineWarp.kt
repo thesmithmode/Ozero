@@ -142,12 +142,23 @@ class EngineWarp(
                 "rx=${state.rxBytes} tx=${state.txBytes} peers=${state.peersSeen} " +
                     "lastHsAge=${state.handshakeAgeSeconds ?: "never"}"
             } else {
-                "uapi unreachable — tunnel handle invalid or socket missing"
+                "uapi unreachable — tunnel handle invalid or socket missing; " +
+                    "dirListing=${listSocketCandidates(uapiPath)}"
             }
             val reason = "WARP: WireGuard handshake timeout ${warpReadyTimeoutMs}ms ($diag)"
             PersistentLoggers.warn(TAG, "awaitReady timeout — $reason — proceeding")
             EnginePlugin.ReadyResult.Timeout(reason)
         }
+    }
+
+    private fun listSocketCandidates(uapiPath: String): String {
+        return runCatching {
+            val root = java.io.File(uapiPath)
+            val rootList = root.listFiles()?.joinToString(",") { it.name } ?: "null"
+            val wg = java.io.File(root, "wireguard")
+            val wgList = if (wg.exists()) wg.listFiles()?.joinToString(",") { it.name } ?: "empty" else "absent"
+            "[$uapiPath]={$rootList}; [wireguard/]={$wgList}"
+        }.getOrElse { "dirListing failed: ${it.message}" }
     }
 
     override suspend fun probe(): ProbeResult =

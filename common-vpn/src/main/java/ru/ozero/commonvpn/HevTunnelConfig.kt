@@ -37,8 +37,8 @@ data class HevTunnelConfig(
           udp: $udpMode
         """.trimIndent() + "\n"
 
-    private companion object {
-        private const val DEFAULT_TUN_MTU: Int = 8500
+    companion object {
+        const val DEFAULT_TUN_MTU: Int = 8500
 
         private const val DEFAULT_TUN_IPV4: String = "10.10.10.10"
         private const val DEFAULT_TUN_IPV6: String = "fd00::1"

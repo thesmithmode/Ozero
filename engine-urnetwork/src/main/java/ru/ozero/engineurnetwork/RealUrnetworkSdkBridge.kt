@@ -469,9 +469,14 @@ class RealUrnetworkSdkBridge(
                     val plan = runCatching { sub?.plan }.getOrNull()
                     val store = runCatching { sub?.store }.getOrNull()
                     val used = startBalance - balance - pending
+                    val clientId = runCatching { device.clientId?.toString() }.getOrNull()
+                    val activeLocation = runCatching { device.connectLocation?.name }.getOrNull()
+                    val providePaused = runCatching { device.providePaused }.getOrNull()
                     Log.i(
                         TAG,
-                        "subscriptionBalance SDK raw: start=$startBalance balance=$balance pending=$pending used=$used plan=$plan",
+                        "subscriptionBalance SDK raw: start=$startBalance balance=$balance pending=$pending " +
+                            "used=$used plan=$plan store=$store clientId=$clientId loc=$activeLocation " +
+                            "providePaused=$providePaused",
                     )
                     cont.resume(
                         UrnetworkSdkBridge.SubscriptionBalanceSnapshot(

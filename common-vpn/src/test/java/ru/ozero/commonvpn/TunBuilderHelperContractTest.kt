@@ -91,6 +91,20 @@ class TunBuilderHelperContractTest {
             body.contains("if (customDnsServers.isNotEmpty()) customDnsServers else TUN_DNS_SERVERS"),
             "custom DNS должен иметь приоритет, fallback к TUN_DNS_SERVERS",
         )
+        assertTrue(
+            body.contains(".take(1)"),
+            "ByeDPI pipeline parity: ровно один DNS — upstream ByeByeDPI добавляет 1, " +
+                "лишние DNS дублируют lookup и тормозят resolve через TUN",
+        )
+    }
+
+    @Test
+    fun `buildTunBuilder ставит MTU 8500 — паритет с hev YAML tunnel mtu`() {
+        val body = source.substringAfter("fun buildTunBuilder(").substringBefore("private fun applyLockdown")
+        assertTrue(
+            body.contains("setMtu(HevTunnelConfig.DEFAULT_TUN_MTU)"),
+            "TUN MTU обязан совпадать с hev YAML mtu (8500) — иначе фрагментация payload и потеря пакетов",
+        )
     }
 
     @Test
