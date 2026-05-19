@@ -258,7 +258,7 @@ class ByeDpiEngine(
         }
     }
 
-    private companion object {
+    companion object {
         const val TAG = "ByeDpiEngine"
         const val READY_TIMEOUT_MS = 5_000L
         const val JNI_GUARD_BUSY = -2
