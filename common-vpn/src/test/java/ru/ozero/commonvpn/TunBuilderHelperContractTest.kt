@@ -99,11 +99,13 @@ class TunBuilderHelperContractTest {
     }
 
     @Test
-    fun `buildTunBuilder ставит MTU 8500 — паритет с hev YAML tunnel mtu`() {
+    fun `buildTunBuilder НЕ ставит setMtu — TUN link MTU независим от lwIP YAML mtu`() {
         val body = source.substringAfter("fun buildTunBuilder(").substringBefore("private fun applyLockdown")
         assertTrue(
-            body.contains("setMtu(HevTunnelConfig.DEFAULT_TUN_MTU)"),
-            "TUN MTU обязан совпадать с hev YAML mtu (8500) — иначе фрагментация payload и потеря пакетов",
+            !body.contains(".setMtu("),
+            "buildTunBuilder обязан НЕ вызывать setMtu — ByeByeDPI 1.7.4 reference этого не делает. " +
+                "Android default ~1500 link MTU. lwIP YAML mtu=8500 = internal buffer cap, " +
+                "никак не связан с TUN link MTU. Регрессия 89a6ecf3 (v0.1.6) откачена в v0.1.8.",
         )
     }
 
