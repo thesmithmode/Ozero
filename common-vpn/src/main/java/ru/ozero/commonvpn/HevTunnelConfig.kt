@@ -29,15 +29,12 @@ data class HevTunnelConfig(
         """
         tunnel:
           mtu: $tunMtu
-          ipv4: $tunIpv4
-          ipv6: '$tunIpv6'
         misc:
           task-stack-size: 81920
-          log-level: $hevLogLevel
         socks5:
           address: $socksAddress
           port: $socksPort
-          udp: '$udpMode'
+          udp: $udpMode
         """.trimIndent() + "\n"
 
     private companion object {

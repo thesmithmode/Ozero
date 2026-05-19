@@ -28,29 +28,30 @@ class HevTunnelConfigTest {
     }
 
     @Test
-    fun `toYaml содержит IPv4 и IPv6 для tunnel секции`() {
+    fun `toYaml НЕ содержит tunnel ipv4 ipv6 — upstream parity`() {
         val yaml = base().toYaml()
-        assertTrue(yaml.contains("ipv4: 10.10.10.10"))
-        assertTrue(yaml.contains("ipv6: 'fd00::1'"))
+        assertFalse(yaml.contains("ipv4:"), "tunnel.ipv4 отсутствует у upstream — fd передаёт адрес")
+        assertFalse(yaml.contains("ipv6:"), "tunnel.ipv6 отсутствует у upstream")
+    }
+
+    @Test
+    fun `toYaml НЕ содержит log-level — upstream parity`() {
+        val yaml = base().toYaml()
+        assertFalse(yaml.contains("log-level:"), "misc.log-level отсутствует у upstream")
+    }
+
+    @Test
+    fun `toYaml содержит udp mode без кавычек upstream parity`() {
+        val yaml = base().toYaml()
+        assertTrue(yaml.contains("udp: udp"))
+        assertFalse(yaml.contains("udp: 'udp'"), "upstream без кавычек")
     }
 
     @Test
     fun `toYaml НЕ содержит несуществующих в upstream полей`() {
         val yaml = base().toYaml()
         assertFalse(yaml.contains("fd:"), "tunnel.fd не существует в upstream — fd передаётся JNI-параметром")
-        assertFalse(yaml.contains("dns:"), "секции dns нет в upstream conf — DNS resolve делает socks5 server")
-    }
-
-    @Test
-    fun `toYaml содержит udp mode`() {
-        val yaml = base().toYaml()
-        assertTrue(yaml.contains("udp: 'udp'"))
-    }
-
-    @Test
-    fun `default IPv6 в одинарных кавычках для libyaml`() {
-        val yaml = base().toYaml()
-        assertTrue(yaml.contains("ipv6: 'fd00"))
+        assertFalse(yaml.contains("dns:"), "секции dns нет в upstream conf")
     }
 
     @Test
@@ -137,24 +138,7 @@ class HevTunnelConfigTest {
     @Test
     fun `accepts tcp udpMode`() {
         val cfg = HevTunnelConfig(tunPfd = pfd(5), socksAddress = "127.0.0.1", socksPort = 1080, udpMode = "tcp")
-        assertTrue(cfg.toYaml().contains("udp: 'tcp'"))
-    }
-
-    @Test
-    fun `default toYaml содержит log-level warn`() {
-        val yaml = base().toYaml()
-        assertTrue(yaml.contains("log-level: warn"), "default log-level=warn снижает native spam")
-    }
-
-    @Test
-    fun `custom hevLogLevel прописывается в misc`() {
-        val cfg = HevTunnelConfig(
-            tunPfd = pfd(5),
-            socksAddress = "127.0.0.1",
-            socksPort = 1080,
-            hevLogLevel = "info",
-        )
-        assertTrue(cfg.toYaml().contains("log-level: info"))
+        assertTrue(cfg.toYaml().contains("udp: tcp"))
     }
 
     @Test

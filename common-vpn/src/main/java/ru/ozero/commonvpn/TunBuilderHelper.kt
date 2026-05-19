@@ -66,8 +66,6 @@ class TunBuilderHelper(private val service: VpnService) {
         if (ipv6Enabled) {
             builder.addAddress(TUN_ADDRESS_V6, TUN_PREFIX_LENGTH_V6)
             builder.addRoute("::", 0)
-        } else {
-            blackholeIpv6(builder, "buildTunBuilder")
         }
         val dnsServers = if (customDnsServers.isNotEmpty()) customDnsServers else TUN_DNS_SERVERS
         dnsServers.forEach { dns ->
