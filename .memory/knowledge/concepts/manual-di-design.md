@@ -155,9 +155,19 @@ Cледует распарсить W2.2 на:
 
 Каждый шаг atomic, isolated commit. Device verify нужен после W2.2.3 (manual smoke test connect).
 
+## Соотношение с robolectric-hilt-eager-init-trap
+
+Кажется противоречием: эта статья предписывает **eager** init в `OzeroApp.onCreate` через `VpnServiceLocator.init` (для production crash visibility), а [[concepts/robolectric-hilt-eager-init-trap]] предписывает **lazy** init в `@Inject` service fields (для Robolectric NPE robustness). Это разные слои:
+
+- **manual-di-design** — VPN service init pipeline (production crash visibility). Eager init в `OzeroApp.onCreate` обеспечивает что `BootFileLogger.error` пишется на диск ДО любого user-visible action.
+- **robolectric-hilt-eager-init-trap** — `@Inject` field init внутри `@HiltAndroidApp` graph. `by lazy` нужен на `@Inject` полях service-классов, потому что Robolectric не заполняет `applicationInfo.nativeLibraryDir` → NPE при field init.
+
+`VpnServiceLocator.init` в `OzeroApp.onCreate` НЕ касается `@Inject` полей — он создаёт factory-instances вручную. Lazy field initialization внутри `@Inject` services продолжает применяться (Robolectric isolation).
+
 ## References
 
 - AUDIT.md P2: `chainOrchestrator not injected` was fixed как guard в onStartCommand.
 - AUDIT.md P5 reject: shutdown шаблон фиксирован тестом, не трогать.
-- `concepts/hilt-di-native-library-failure` — описание исходной проблемы.
-- `concepts/compose-launchedeffect-crash-invisibility` — параллельная invisibility category.
+- [[concepts/hilt-di-native-library-failure]] — описание исходной проблемы.
+- [[concepts/compose-launchedeffect-crash-invisibility]] — параллельная invisibility category.
+- [[concepts/robolectric-hilt-eager-init-trap]] — комплементарная стратегия для testing layer.

@@ -150,6 +150,7 @@ fun UrnetworkEngineSettingsScreen(
                     countries = current.countries,
                     regions = current.regions,
                     cities = current.cities,
+                    bestMatches = current.bestMatches,
                     selectedLocation = current.selectedLocation,
                     providePaused = current.providePaused,
                     searchQuery = searchQuery,
@@ -184,6 +185,7 @@ private fun LocationListContent(
     countries: List<UrnetworkLocationItem>,
     regions: List<UrnetworkLocationItem>,
     cities: List<UrnetworkLocationItem>,
+    bestMatches: List<UrnetworkLocationItem>,
     selectedLocation: UrnetworkSdkBridge.LocationToken?,
     providePaused: Boolean,
     searchQuery: String,
@@ -272,6 +274,32 @@ private fun LocationListContent(
                     providerCount = 0,
                     selected = isBestAvailable,
                     onClick = { onSelect(null) },
+                )
+                HorizontalDivider(color = OzeroPalette.Line)
+            }
+        }
+        if (bestMatches.isNotEmpty()) {
+            item {
+                Text(
+                    text = stringResource(R.string.urnetwork_location_best_matches),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = OzeroPalette.Text2,
+                    modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
+                )
+            }
+            items(bestMatches, key = { "bm/${it.countryCode}/${it.name}" }) { item ->
+                val selected = !isBestAvailable &&
+                    selectedLocation?.countryCode == item.location.countryCode &&
+                    selectedLocation?.region == item.location.region &&
+                    selectedLocation?.city == item.location.city
+                LocationRow(
+                    name = item.name,
+                    flag = item.flag,
+                    providerCount = item.providerCount,
+                    selected = selected,
+                    isStable = item.isStable,
+                    isStrongPrivacy = item.isStrongPrivacy,
+                    onClick = { onSelect(item.location) },
                 )
                 HorizontalDivider(color = OzeroPalette.Line)
             }

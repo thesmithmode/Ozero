@@ -1,8 +1,121 @@
 # Build Log
 
+## [2026-05-20T22:00:00+03:00] compile | Daily Log 2026-05-20 (pass 10 — session 19:52 peerWatchdog wall clock + chip race file)
+- Source: daily/2026-05-20.md
+- Articles created: [[concepts/engine-chip-race-observer]] — file was missing despite pass 9 log entry; created: Connected-only gate drops Probing/Connecting engine changes; Probing(null) guard; sentinel inversions
+- Articles updated:
+  - [[concepts/viewmodel-polling-runtest-trap]] — wall clock in production coroutine trap: System.currentTimeMillis() in EngineWatchdogCoordinator not synced with virtual dispatcher → elapsed always near zero → watchdog never fires in CI; fix: zeroPeersPolls poll counter; sentinel; sources updated
+  - [[concepts/urnetwork-peer-watchdog-recovery]] — poll counter fix documented; sentinel in OzeroVpnServicePeerWatchdogTest; sources updated
+- Index: 2 rows updated (viewmodel-polling-runtest-trap, urnetwork-peer-watchdog-recovery dates + summaries)
+- Sessions covered: 19:52 (ByeDPI YouTube QUIC investigation, peerWatchdog wall clock CI fix, DNS presets NextDNS/AdGuard/ControlD); 19:07 chip race (file materialisation)
+- Note: DNS presets (NextDNS/AdGuard/ControlD chips) and YouTube QUIC investigation are UI/UX additions without new architectural patterns; not breaking out into separate articles
+
+## [2026-05-20T21:00:00+03:00] compile | Daily Log 2026-05-20 (pass 9 — session 19:07 chip race)
+- Source: daily/2026-05-20.md
+- Articles created: [[concepts/engine-chip-race-observer]] — EngineSettingsRestartObserver Connected-only gate drops engine changes during Probing/Connecting; fix: restart from Probing/Connecting when engine ≠ manualEngine; Probing(null) guard; 3 sentinel inversions for removed behavior; debounce interaction
+- Articles updated: (none)
+- Index: 1 row added (engine-chip-race-observer)
+- Sessions covered: 19:07 (chip race fix — previously uncaptured by passes 1-8)
+
+## [2026-05-20T20:30:00+03:00] compile | Daily Log 2026-05-20 (pass 8 — lint.py overflow fix + contradiction resolution)
+- Source: daily/2026-05-20.md
+- Articles created: (none)
+- Articles updated:
+  - [[concepts/wiki-knowledge-base]] — session 18:53 captured: lint.py check_contradictions() SDK overflow fix (path-list + allowed_tools=[Read,Glob,Grep] + max_turns=30, identical to compile.py fix commit 38770996); 3-round iterative contradiction resolution (9→3→3→1→0); duplicate `urnetwork-filter-locations-trigger.md` deleted; transient `exit 1` re-run rule documented; 441 missing-backlinks intentionally skipped
+- Index: (none — wiki-knowledge-base row already updated)
+- Sessions covered: 18:53 (lint.py overflow fix, iterative contradiction audit, duplicate cleanup)
+- Note: All 8 sessions from daily/2026-05-20.md now fully compiled across passes 1-8
+
+## [2026-05-20T19:00:00+03:00] compile | Daily Log 2026-05-20 (pass 7 — wiki-knowledge-base Sources gap)
+- Source: daily/2026-05-20.md
+- Articles created: (none)
+- Articles updated:
+  - [[concepts/wiki-knowledge-base]] — Sources section was missing daily/2026-05-20.md entry despite frontmatter having the date; added flush error root cause (truncated JSONL) + contradiction audit reference
+- Index: (none — index row already updated in pass 2)
+- Sessions covered: gap fix only — wiki-knowledge-base.md body Sources vs frontmatter discrepancy
+
+## [2026-05-20T18:47:26+03:00] compile | Daily Log 2026-05-20 (pass 6 — KB audit article updates)
+- Source: daily/2026-05-20.md
+- Articles created: (none)
+- Articles updated:
+  - [[concepts/android-vpn-self-traffic-bypass]] — 2026-05-20 source added; KB audit (18:43) confirmed self-exclusion removal deprecated; canonical = ipProbeRoute() + excludeSelf=true; three regressions confirmed removing self-exclusion breaks engines
+  - [[concepts/release-process]] — 2026-05-20 source added; index summary clarified: arm64-v8a only (not multi-ABI); "universal" means single APK for all users not multi-ABI
+- Index: 2 rows updated (android-vpn-self-traffic-bypass summary + date; release-process summary + date)
+- Sessions covered: KB audit 18:43 (android-vpn-self-traffic-bypass deprecation; release-process ABI claim)
+
+## [2026-05-20T24:00:00+03:00] compile | Daily Log 2026-05-20 (pass 5 — audit sessions + MTU refactor regression)
+- Source: daily/2026-05-20.md
+- Articles created: (none)
+- Articles updated:
+  - [[concepts/tun-mtu-dual-layer]] — v0.1.6 refactor regression: TunBuilderHelper.buildTunBuilder() added setMtu(8500) not present in reference; bisected + removed v0.1.8; rule: refactor must not introduce new parameters not in reference
+  - [[concepts/byedpi-jni-guard-hardening]] — added daily/2026-05-20 source; KB audit 18:37 confirmed jniStopProxy=shutdown(fd,SHUT_RDWR) vs jniForceClose=close(fd); neither touches g_proxy_running externally — already correctly documented
+- Index: 1 row updated (tun-mtu-dual-layer source + summary)
+- Sessions covered: audit sessions 18:15 (duplicate), 18:27/18:37/18:43 (contradiction findings), setMtu(8500) regression from 00:00 session
+
+## [2026-05-20T23:62:00+03:00] compile | Daily Log 2026-05-20 (pass 4 — ByeDPI pin upgrade)
+- Source: daily/2026-05-20.md
+- Articles created: (none)
+- Articles updated:
+  - [[concepts/native-binary-auto-update-pipeline]] — manual pin upgrade case study: ByeDPI v0.17.3→ba532298 (38 commits, YouTube QUIC/ECH fix); fix procedure documented
+- Index: 1 row updated (native-binary-auto-update-pipeline summary + source)
+- Sessions covered: v0.1.9 prep (02:25) — ByeDPI commit pin upgrade previously uncaptured
+
+## [2026-05-20T23:59:00+03:00] compile | Daily Log 2026-05-20 (pass 3 — v0.1.9 prep session gap)
+- Source: daily/2026-05-20.md
+- Articles created: [[concepts/urnetwork-shared-traffic-history]] — SDK cumulative-only → local delta map; 30-day bar chart; payout reset guard
+- Articles updated:
+  - [[concepts/engine-await-ready-pattern]] — URnetwork timeout 15s→45s (slow P2P discovery); WARP poll 300ms→100ms; path ozero-warp.sock→sockets/ cascade
+  - [[concepts/urnetwork-balance-optimistic-cache]] — ViewModel stateIn(initialValue=INITIAL) bug masked cache; fix initialValue=balanceRepository.state.value
+- Index: 1 row added, 2 rows updated (total 152)
+- Sessions covered: post-compact v0.1.9 prep (02:25) — previously not compiled; timeout bump, shared traffic history, balanceState fix
+
+## [2026-05-20T23:30:00+03:00] compile | Daily Log 2026-05-20 (pass 2 — remaining sessions)
+- Source: daily/2026-05-20.md
+- Articles created: (none new)
+- Articles updated:
+  - [[concepts/vpn-slot-conflict-detection]] — onRevoke → postDelayed Process.killProcess(2500ms) liberates Go runtime + VPN slot; only onRevoke not stopVpn/onDestroy
+  - [[concepts/wiki-knowledge-base]] — 2026-05-20 flush failure pattern (13+ FLUSH_ERROR); contradiction audit session findings (9 issues: 4 direct contradictions, 5 inconsistencies)
+  - [[connections/self-review-insufficient-code-reviewer-required]] — inverse pattern: backup refactor reviewer P1 false positives (walletOverride BC, warpSlots skip) were intentional design; human verification required before applying findings
+- Index: 3 rows updated
+- Sessions covered: VPN slot onRevoke kill (post-compact), backup refactor false positives (15:37), contradiction audit (18:27)
+
+## [2026-05-20T20:00:00+03:00] compile | Daily Log 2026-05-20
+- Source: daily/2026-05-20.md
+- Articles created:
+  - [[concepts/urnetwork-filteredlocations-bestmatches]] — FilteredLocations 5-list structure; bestMatches field was ignored → empty search results; fix: allBestMatches VM + "Лучшие совпадения" section
+  - [[concepts/urnetwork-balance-accumulation-mechanism]] — server INSERT not UPDATE; 30h duration vs 24h cron → 6h overlap → 68-102 GiB sum; not client bug; UX fix: cap at 34 GiB
+  - [[concepts/prod-log-infra-redaction]] — three boot.log leak categories: WARP mirror URLs, Solana wallet prefix, dev-language instructions; all three redacted
+- Articles updated:
+  - [[concepts/byedpi-args-parsing]] — commit 7cc2348f regression: Kotlin prepended "ciadpi" without checking native-lib.c:85 already sets argv[0]="byedpi"; result: IDLE state; sentinel rule added
+  - [[concepts/warp-uapi-handshake-polling]] — legacy socket path bug: WarpUapi.readState used ozero-warp.sock → null stats → false DEGRADED; fix: findUapiSocket() cascade through sockets/ subdir + listFiles; WarpSocketDiagnostics added
+  - [[concepts/urnetwork-sdk-integration]] — runStartOnMain symmetry fix: both paths must apply all 12 device fields; previous fix only covered ensureDeviceOnMain (settings path); engine.start() path stayed at 1 field → SDK hid cities/regions
+- Index: 3 rows added, 3 rows updated, total 150
+- Sessions covered: 13:00 (FilteredLocations bestMatches, balance 102GiB server source), 15:59 (boot.log security audit), post-compact (ByeDPI argv[0] regression 7cc2348f, WARP sockets/ path bug), 00:48/v0.1.9 (URnetwork runStartOnMain symmetry)
+
+## [2026-05-20T17:30:00+03:00] compile | Daily Log 2026-05-19
+- Source: daily/2026-05-19.md
+- Articles created:
+  - [[concepts/warp-awg-handle-zero-valid]] — AWG handle=0 valid first slot; handle<0 correct guard; handle<=0 misdiagnosis reverted
+  - [[concepts/byedpi-hev-pipeline-upstream-parity]] — HevTunnelConfig YAML extra fields + IPv6 blackhole removal for ByeDPI upstream parity
+  - [[concepts/engine-status-bar-symmetric-columns]] — IpInfoCard 50/50 split; isUrnetworkVisibleInMain auto-mode fix; i18n keys
+- Articles updated:
+  - [[concepts/warp-false-connected-no-handshake]] — added 5s→10s timeout revert + handle=0 misdiagnosis context
+  - [[concepts/urnetwork-location-stability-privacy-icons]] — APK investigation confirmed Material Icons are correct reference
+- Index: 4 rows added, 1 row updated, total 148
+
+## [2026-05-20T12:00:00+03:00] compile | Daily Log 2026-05-18 (pass 8 — uncovered late sessions 23:41 and 23:57)
+- Source: daily/2026-05-18.md
+- Articles created:
+  - [[concepts/urnetwork-location-stability-privacy-icons]] — ConnectLocation.stable/strongPrivacy fields; Warning/Lock icons; OzeroPalette mapping; inner class name shadowing trap; ktlint in test files
+- Articles updated:
+  - [[concepts/warp-uapi-handshake-polling]] — soTimeout 500ms→50ms (correctness), WARP_READY_POLL_MS 300ms→100ms (optimization); detection lag max 800ms→150ms; sources updated
+- Index: 1 row added (urnetwork-location-stability-privacy-icons), 1 row updated (warp-uapi-handshake-polling), total 144
+- Sessions covered (incremental over pass 7): 23:41 (WARP UAPI detection latency optimization), 23:57 (URnetwork location picker stable/strongPrivacy icons + inner class shadowing + ktlint in tests)
+- Excluded: wiki-query session (read-only, no new knowledge), memory flush errors (infra noise), CI run IDs (ephemeral)
+
 ## [2026-05-19T20:00:00+03:00] compile | Daily Log 2026-05-19 (pass 2 — gap fill)
 - Source: daily/2026-05-19.md
-- Articles created: [[concepts/speed-chart-bucket-alignment]] (time-aligned bucket IDs prevent sliding-window drift; SpeedSample typed wrapper), [[concepts/vpn-slot-coexistence-crash]] (establish() null = external VPN holds slot; Failed state + logActiveExternalVpn), [[concepts/urnetwork-filter-locations-trigger]] (filterLocations("") required after vc.start()), [[concepts/hilt-viewmodel-split-too-many-functions]] (hiltViewModel() decomp for TooManyFunctions; shared internal fakes)
+- Articles created: [[concepts/speed-chart-bucket-alignment]] (time-aligned bucket IDs prevent sliding-window drift; SpeedSample typed wrapper), [[concepts/vpn-slot-coexistence-crash]] (establish() null = external VPN holds slot; Failed state + logActiveExternalVpn), [[concepts/urnetwork-filterlocations-trigger]] (filterLocations("") required after vc.start()), [[concepts/hilt-viewmodel-split-too-many-functions]] (hiltViewModel() decomp for TooManyFunctions; shared internal fakes)
 - Note: urnetwork-balance-optimistic-cache + hiltviewmodel-toomanyfunctions-decomposition + vpn-slot-conflict-detection + urnetwork-filterlocations-trigger already existed from pass 1; new files are extended/renamed variants — index refs pass-1 canonical names
 - Articles updated: [[concepts/chart-nice-max-dynamic-scaling]] (bucket alignment fix + SpeedSample + speed-chart-bucket-alignment cross-ref), [[concepts/byedpi-jni-guard-hardening]] (__android_log_print checkpoints; cold-start 5s+ vs 14ms warm; hang root cause pending)
 - Index updated: 1 row added (speed-chart-bucket-alignment), total 143

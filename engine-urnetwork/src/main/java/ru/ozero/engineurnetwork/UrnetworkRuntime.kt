@@ -98,12 +98,7 @@ object UrnetworkRuntime {
             manager = null
             runCatching { Sdk.freeMemory() }
                 .onFailure { PersistentLoggers.warn(TAG, "Sdk.freeMemory threw: ${it.message}") }
-            PersistentLoggers.warn(
-                TAG,
-                "runtime released — pid=${android.os.Process.myPid()}; libgojni НЕ выгружен " +
-                    "(Android limitation, .so остаётся в process до его смерти). При краше " +
-                    "URnetwork-app собрать tombstone и проверить state.json/keys в obb sandbox.",
-            )
+            PersistentLoggers.warn(TAG, "runtime released pid=${android.os.Process.myPid()}")
         }
     }
 }

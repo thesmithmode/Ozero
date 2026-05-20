@@ -55,6 +55,7 @@ sealed interface UrnetworkSettingsUiState {
         val countries: List<UrnetworkLocationItem>,
         val regions: List<UrnetworkLocationItem>,
         val cities: List<UrnetworkLocationItem>,
+        val bestMatches: List<UrnetworkLocationItem>,
         val selectedLocation: UrnetworkSdkBridge.LocationToken?,
         val providePaused: Boolean,
     ) : UrnetworkSettingsUiState
@@ -93,6 +94,7 @@ class UrnetworkLocationsViewModel @Inject constructor(
     private var allCountries: List<UrnetworkLocationItem> = emptyList()
     private var allRegions: List<UrnetworkLocationItem> = emptyList()
     private var allCities: List<UrnetworkLocationItem> = emptyList()
+    private var allBestMatches: List<UrnetworkLocationItem> = emptyList()
 
     init {
         viewModelScope.launch {
@@ -130,6 +132,7 @@ class UrnetworkLocationsViewModel @Inject constructor(
                         allCountries = emptyList()
                         allRegions = emptyList()
                         allCities = emptyList()
+                        allBestMatches = emptyList()
                         _uiState.value = UrnetworkSettingsUiState.NotConnected
                     }
                 }
@@ -260,6 +263,7 @@ class UrnetworkLocationsViewModel @Inject constructor(
         allCountries = buildLocationList(filtered.countries)
         allRegions = buildLocationList(filtered.regions)
         allCities = buildLocationList(filtered.cities)
+        allBestMatches = buildLocationList(filtered.bestMatches)
         applyFilter(searchQuery.value)
     }
 
@@ -302,6 +306,7 @@ class UrnetworkLocationsViewModel @Inject constructor(
         val filteredCountries = allCountries.applyQuery()
         val filteredRegions = allRegions.applyQuery()
         val filteredCities = allCities.applyQuery()
+        val filteredBestMatches = if (q.isEmpty()) emptyList() else allBestMatches.applyQuery()
         _uiState.update { current ->
             val selectedLocation = if (current is UrnetworkSettingsUiState.Ready) {
                 current.selectedLocation
@@ -321,6 +326,7 @@ class UrnetworkLocationsViewModel @Inject constructor(
                 countries = filteredCountries,
                 regions = filteredRegions,
                 cities = filteredCities,
+                bestMatches = filteredBestMatches,
                 selectedLocation = selectedLocation,
                 providePaused = providePaused,
             )
@@ -349,6 +355,7 @@ class UrnetworkLocationsViewModel @Inject constructor(
             countries = emptyList(),
             regions = emptyList(),
             cities = emptyList(),
+            bestMatches = emptyList(),
             selectedLocation = bridge.selectedLocation(),
             providePaused = if (isUrnetworkActive.value) bridge.isProvidePaused() else false,
         )

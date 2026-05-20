@@ -5,8 +5,9 @@ tags: [byedpi, native, parsing, gotcha]
 sources:
   - "daily/2026-04-30.md"
   - "daily/2026-05-13.md"
+  - "daily/2026-05-20.md"
 created: 2026-04-30
-updated: 2026-05-13
+updated: 2026-05-20
 ---
 
 # ByeDPI Args Parsing Traps
@@ -21,6 +22,7 @@ ByeDPI (`hufrea/byedpi`) parses command-line arguments via `getopt_long` in C (`
 - Multi-strategy chains use repeated `-a1` boundaries: each `-a1` starts a new strategy group, ByeDPI tries them sequentially on failure
 - `-A` group trigger flags: `t`=torst, `r`=redirect, `s`=ssl_err, `n`=none (fallthrough), `c`=conn
 - Double argv[0] trap: if C `native-lib.c` already inserts `"byedpi"` as `argv[0]`, Kotlin `buildArgs` must NOT also prepend `"ciadpi"` — double prefix silently drops the first real flag
+- Sentinel rule: Kotlin argv array must NOT contain `"ciadpi"` or `"byedpi"` — both are set by native-lib.c; Kotlin prepending either = double-argv[0] regression
 
 ## Details
 
@@ -52,9 +54,15 @@ ByeDPIAndroid's UI mode defaults to approximately `-Kt,h -d1` (disorder at posit
 
 ### Double argv[0] Registration Trap
 
-Commit `f0e9f206` added `"byedpi"` as `argv[0]` directly in `native-lib.c` (C layer). The Kotlin `buildArgs` function was not updated and still prepended `"ciadpi"` as `argv[0]`. The resulting array was `["ciadpi", "byedpi", ...real flags...]`. `getopt_long` skips `argv[0]` by convention (program name), so it starts parsing at index 1 — but index 1 is now the second program name string `"byedpi"`, which is not a valid flag and is silently discarded as a non-option argument. The first real flag (e.g. `-p 1080`) sits at index 2 but `getopt` treats it as argv[1] in the options parse, effectively shifting every flag one position and causing the first real option to be silently lost.
+Commit `f0e9f206` added `"byedpi"` as `argv[0]` directly in `native-lib.c:85` (C layer, sets `argv[0]=strdup("byedpi")`). The Kotlin `buildArgs` function was not updated and still prepended `"ciadpi"` as `argv[0]`. The resulting array was `["ciadpi", "byedpi", ...real flags...]`. `getopt_long` skips `argv[0]` by convention (program name), so it starts parsing at index 1 — but index 1 is now the second program name string `"byedpi"`, which is not a valid flag and is silently discarded as a non-option argument. The first real flag (e.g. `-p 1080`) sits at index 2 but `getopt` treats it as argv[1] in the options parse, effectively shifting every flag one position and causing the first real option to be silently lost.
 
 The symptom is identical to the original missing-argv[0] bug: the tunnel starts but the first flag value is wrong or missing. Diagnosis: add logging of the full argv array before passing to `byedpiMain`. Fix: remove the Kotlin-side `"ciadpi"` prepend when the C layer already inserts its own argv[0].
+
+### Regression from Commit 7cc2348f
+
+Commit `7cc2348f` (titled "FIX: ByeDPI ciadpi argv[0]") attempted to add `argv[0]` support but added a Kotlin-side prepend of `"ciadpi"` without checking that `native-lib.c:85` already sets `argv[0]="byedpi"`. The resulting argv `["byedpi","ciadpi","--ip",...]` caused `getopt` to read `"ciadpi"` as the first positional, losing `--ip`. Without `--ip 127.0.0.1`, SOCKS bound to the default address, hev could not write to it, and the tunnel entered IDLE state.
+
+Fix: remove `"ciadpi"` from `ByeDpiEngine.kt:252` and `ByeDpiUiArgsBuilder.kt:10`. The C layer exclusively owns argv[0]. This bug was documented in `.memory/knowledge` since 2026-05-13 — the regression occurred because the knowledge base was not consulted before the fix commit.
 
 ## Related Concepts
 
@@ -65,3 +73,4 @@ The symptom is identical to the original missing-argv[0] bug: the tunnel starts 
 
 - [[daily/2026-04-30.md]] - 5-subagent research session reading byedpi C source; argv[0] and `-Ku` identified as root causes of DPI bypass failure
 - [[daily/2026-05-13.md]] - Double argv[0] registration: C native-lib.c adds "byedpi", Kotlin buildArgs still prepends "ciadpi" → first real flag silently dropped (commit f0e9f206)
+- [[daily/2026-05-20.md]] - Regression from commit 7cc2348f: Kotlin prepended "ciadpi" without checking native-lib.c:85; argv["byedpi","ciadpi","--ip",...] → getopt lost --ip → SOCKS default addr → hev IDLE; fix: remove "ciadpi" from ByeDpiEngine.kt:252 and ByeDpiUiArgsBuilder.kt:10; sentinel: Kotlin argv must not contain ciadpi or byedpi

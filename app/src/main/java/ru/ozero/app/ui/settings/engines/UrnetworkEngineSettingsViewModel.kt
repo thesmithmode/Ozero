@@ -110,7 +110,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(POLLER_KEEP_ALIVE_MS),
-            initialValue = UrnetworkBalanceState.INITIAL,
+            initialValue = balanceRepository.state.value,
         )
 
     fun selectProvideControlMode(value: UrnetworkProvideControlMode) {

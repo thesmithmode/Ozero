@@ -97,14 +97,18 @@ jobs:
       # ---------------------------------------------------------------------
       # byedpi build (CMake + NDK only)
       # ---------------------------------------------------------------------
-      - name: Clone byedpi (pinned)
+      - name: Clone byedpi (pinned commit)
         if: env.ARTIFACT == 'byedpi'
         env:
-          BYEDPI_VERSION: v0.17.3
+          # main HEAD на 2026-03-26 — паритет с romanvht/ByeByeDPI v1.7.4/v1.7.5
+          # (38 коммитов вперёд v0.17.3 — YouTube ECH/TLS extension reordering fixes)
+          BYEDPI_COMMIT: ba532298de7b28cfe854aea83d061369d13ca290
         run: |
-          git clone --depth 1 --branch "$BYEDPI_VERSION" \
-            https://github.com/hufrea/byedpi.git \
+          git clone https://github.com/hufrea/byedpi.git \
             engine-byedpi/src/main/cpp/byedpi
+          cd engine-byedpi/src/main/cpp/byedpi
+          git checkout "$BYEDPI_COMMIT"
+          cd -
 
       - name: Build byedpi Docker image
         if: env.ARTIFACT == 'byedpi'

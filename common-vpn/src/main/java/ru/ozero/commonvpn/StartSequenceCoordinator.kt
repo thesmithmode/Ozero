@@ -66,7 +66,14 @@ class StartSequenceCoordinator(
         if (killswitch) {
             val startupIpv6 = settings?.ipv6Enabled ?: false
             val startupDns = settings?.customDnsServers.orEmpty()
-            runCatching { deps.tunBuilderHelper.buildTunBuilder(splitConfig, startupIpv6, startupDns).establish() }
+            runCatching {
+                deps.tunBuilderHelper.buildTunBuilder(
+                    splitConfig = splitConfig,
+                    ipv6Enabled = startupIpv6,
+                    customDnsServers = startupDns,
+                    applyUnderlying = true,
+                ).establish()
+            }
                 .onSuccess { fd ->
                     if (fd != null) {
                         state.lockdownStartupFdRef.set(fd)

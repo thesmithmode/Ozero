@@ -87,11 +87,7 @@ class EngineUrnetwork(
         )
 
         val wallet = configStore.walletAddress().first()
-        val isPreset = wallet == UrnetworkDefaults.PRESET_WALLET
-        Log.i(
-            TAG,
-            "start wallet=${wallet.take(WALLET_LOG_PREFIX_LEN)}… isPreset=$isPreset hasClientJwt=true",
-        )
+        Log.i(TAG, "start hasClientJwt=true")
 
         val bridgeResult = sdkBridge.start(
             walletAddress = wallet,
@@ -208,12 +204,21 @@ class EngineUrnetwork(
     )
 
     override suspend fun awaitReady(): EnginePlugin.ReadyResult {
+        var polls = 0
         val reached = withTimeoutOrNull(peerReadyTimeoutMs) {
             while (true) {
                 val peers = runCatching { sdkBridge.peerCount() }.getOrDefault(0)
                 if (peers > 0) {
-                    Log.i(TAG, "awaitReady: peers=$peers — engine ready")
+                    Log.i(TAG, "awaitReady: peers=$peers — engine ready (after ${polls * peerReadyPollMs}ms)")
                     return@withTimeoutOrNull Unit
+                }
+                polls += 1
+                if (polls % PEER_PROGRESS_LOG_EVERY == 0) {
+                    PersistentLoggers.info(
+                        TAG,
+                        "awaitReady progress: peers=0 elapsed≈${polls * peerReadyPollMs}ms " +
+                            "deadline=${peerReadyTimeoutMs}ms",
+                    )
                 }
                 delay(peerReadyPollMs)
             }
@@ -259,6 +264,15 @@ class EngineUrnetwork(
         }
     }
 
+    // walletAuth migration критична: каждый Ozero-юзер должен иметь свою URnetwork-network
+    // (per-device Ed25519 identity), payout = PRESET_WALLET общий. БЕЗ migration legacy guest
+    // юзеры остаются на shared guest network → НЕ становятся per-user providers → выплаты не идут.
+    //
+    // Заметка о startBalance > 34 GiB: НЕ баг клиента. Бэкенд добавляет строку в transfer_balance
+    // при каждом ежедневном кроне (RefreshTransferBalanceDuration=30ч, крон=каждые 24ч). SubscriptionBalance
+    // суммирует ВСЕ активные строки. При создании сети незадолго до полуночи UTC → 3 строки могут
+    // быть активны одновременно (overlap window ~5ч) → startBalance = 3×34 = 102 GiB. Само падает.
+    // UX fix: кэпировать отображение на 34 GiB (free tier) в UrnetworkBalanceCard.
     private suspend fun tryAcquireDeviceJwt(legacyMigration: Boolean): String? {
         val identity = deviceIdentity ?: return null
         val storedName = configStore.deviceNetworkName().first()
@@ -316,7 +330,6 @@ class EngineUrnetwork(
 
     private companion object {
         const val TAG = "EngineUrnetwork"
-        const val WALLET_LOG_PREFIX_LEN = 6
         const val PUBKEY_LOG_PREFIX_LEN = 8
         const val TUN_MTU = 1440
         const val TUN_PREFIX = 32
@@ -324,8 +337,9 @@ class EngineUrnetwork(
         const val NETWORK_NAME_RANDOM_BYTES = 8
 
         const val URN_STOP_TIMEOUT_MS = 8_000L
-        const val PEER_READY_TIMEOUT_MS = 15_000L
+        const val PEER_READY_TIMEOUT_MS = 45_000L
         const val PEER_READY_POLL_MS = 200L
+        const val PEER_PROGRESS_LOG_EVERY = 15
 
         private fun defaultNetworkName(): String {
             val rnd = java.security.SecureRandom()

@@ -4,8 +4,9 @@ aliases: [balance-cache, urnetwork-balance-persistence, optimistic-hydration]
 tags: [urnetwork, architecture, cache, ux]
 sources:
   - "daily/2026-05-19.md"
+  - "daily/2026-05-20.md"
 created: 2026-05-19
-updated: 2026-05-19
+updated: 2026-05-20
 ---
 
 # URnetwork Balance Optimistic Cache (SharedPreferences)
@@ -57,6 +58,22 @@ Related to this task: `usedBytes = startBalanceByteCount - balanceByteCount - op
 
 `urnetwork_balance_plan_label` row removed from `UrnetworkBalanceCard.BalanceDetails`. The tariff plan name added noise without user value; balance limits and usage are sufficient.
 
+### ViewModel initialValue Fix (v0.1.9, 2026-05-20)
+
+`UrnetworkEngineSettingsViewModel.balanceState` was declared as:
+
+```kotlin
+val balanceState = combine(/* ... */).stateIn(
+    scope = viewModelScope,
+    started = SharingStarted.WhileSubscribed(5000),
+    initialValue = UrnetworkBalanceState.INITIAL  // ← bug
+)
+```
+
+The `RealUrnetworkBalanceRepository._state` was correctly hydrated from cache in its constructor. But the ViewModel's `stateIn(initialValue = INITIAL)` meant that the UI observer saw the `INITIAL` sentinel until the `combine` flow emitted — which required at least one upstream event. Result: opening the balance screen showed a loading spinner even though cached data was already available in the repository.
+
+Fix: `initialValue = balanceRepository.state.value` — reads the already-hydrated value at ViewModel construction time. Cache hydration now visible to the UI immediately on screen open without any async round-trip.
+
 ## Related Concepts
 
 - [[concepts/urnetwork-sdk-integration]] — full URnetwork SDK integration context
@@ -66,3 +83,4 @@ Related to this task: `usedBytes = startBalanceByteCount - balanceByteCount - op
 ## Sources
 
 - [[daily/2026-05-19.md]] — Session v0.1.5: `UrnetworkBalanceCache` (SharedPreferences) injected into `RealUrnetworkBalanceRepository`; `_state` hydrates from cache on init; successful refresh writes snapshot; plan label removed; traffic formula confirmed correct vs upstream
+- [[daily/2026-05-20.md]] — v0.1.9 prep: ViewModel `stateIn(initialValue = INITIAL)` masked cache hydration; fix: `initialValue = balanceRepository.state.value` to expose cache immediately at screen open

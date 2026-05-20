@@ -4,8 +4,9 @@ aliases: [peer-watchdog, urnetwork-peer-loss, peer-discovery-recovery]
 tags: [urnetwork, vpn, engine, reliability, pattern]
 sources:
   - "daily/2026-05-12.md"
+  - "daily/2026-05-20.md"
 created: 2026-05-12
-updated: 2026-05-12
+updated: 2026-05-20
 ---
 
 # URnetwork Peer Watchdog Auto-Recovery Pattern
@@ -68,13 +69,30 @@ The watchdog pattern does not generalize to all engines:
 
 WARP and ByeDPI failures are typically configuration or binary issues that cannot be resolved by a soft recovery. URnetwork's peer loss is a transient network condition that the SDK can address through re-discovery.
 
+### Poll Counter Fix for CI (2026-05-20)
+
+The watchdog duration check originally used `System.currentTimeMillis()`:
+
+```kotlin
+if (zeroPeersSince == 0L) zeroPeersSince = System.currentTimeMillis()
+if (System.currentTimeMillis() - zeroPeersSince >= ZERO_PEERS_TIMEOUT_MS) triggerWatchdog()
+```
+
+In CI tests running with `runTest` virtual dispatcher, wall clock does not advance with virtual time. `advanceTimeBy(PEER_POLL_MS * N)` moves virtual time but not `currentTimeMillis()`. The elapsed duration computed from real wall clock was always near zero (microseconds between test iterations), so the watchdog never triggered in tests, causing `EngineWatchdogInfiniteRetryTest` to fail.
+
+Fix: replace wall clock with a deterministic poll counter (`zeroPeersPolls: Int`). The counter increments on every poll loop iteration where peer count is zero. Threshold check becomes `zeroPeersPolls >= ZERO_PEERS_POLL_THRESHOLD`. This is fully deterministic with virtual time: `advanceTimeBy(PEER_POLL_MS * N)` guarantees exactly N poll iterations.
+
+Sentinel in `OzeroVpnServicePeerWatchdogTest` asserts `EngineWatchdogCoordinator` does not reference `System.currentTimeMillis` or `Instant.now()`.
+
 ## Related Concepts
 
 - [[concepts/health-monitor-p2p-mismatch]] - HealthMonitor false DEGRADED for P2P engines; watchdog provides actual recovery where HealthMonitor only reports
 - [[concepts/urnetwork-sdk-integration]] - Parent integration article; peer watchdog is the latest addition to the integration
 - [[concepts/engine-ownership-boundary]] - VpnService owns recovery decision; VM observes state only
 - [[concepts/engine-switch-chain-cascading-failures]] - Watchdog avoids full restart, reducing cascading failure risk from rapid stop/start
+- [[concepts/viewmodel-polling-runtest-trap]] - Wall clock vs virtual dispatcher trap; peer watchdog is the production-code instance of this pattern
 
 ## Sources
 
 - [[daily/2026-05-12.md]] - Session 21:19: URnetwork peer discovery lost after 4-5 min; recover() added to OzeroVpnService before Failed transition; country switch UX with switchingCountry flag; Solana/URx/wallet UI removed
+- [[daily/2026-05-20.md]] - Session 19:52: `System.currentTimeMillis()` in EngineWatchdogCoordinator not synced with virtual test dispatcher → watchdog never triggered in CI; fix: zeroPeersPolls poll counter; sentinel added to OzeroVpnServicePeerWatchdogTest

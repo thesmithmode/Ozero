@@ -100,17 +100,18 @@ class ProxyWarpAutoConfig(
     private fun CoroutineScope.spawnMirror(url: String): Deferred<Result<RegisteredWarpConfig>> =
         async {
             try {
+                val tag = mirrorTag(url)
                 val httpResult = withTimeoutOrNull(PER_MIRROR_TIMEOUT_MS) {
                     httpClient.postJson(url, REQUEST_BODY, userAgent)
                 } ?: run {
                     ranker.recordFailure(url)
-                    return@async Result.failure(IOException("mirror timeout: $url"))
+                    return@async Result.failure(IOException("mirror timeout [$tag]"))
                 }
                 if (httpResult.isFailure) {
                     ranker.recordFailure(url)
                     return@async Result.failure(
                         httpResult.exceptionOrNull()
-                            ?: IOException("HTTP failure on $url"),
+                            ?: IOException("HTTP failure [$tag]"),
                     )
                 }
                 val body = httpResult.getOrThrow()
@@ -121,7 +122,7 @@ class ProxyWarpAutoConfig(
                     ranker.recordFailure(url)
                     PersistentLoggers.warn(
                         TAG,
-                        "mirror parse failed on $url: ${parsed.exceptionOrNull()?.message}",
+                        "mirror parse failed [$tag]: ${parsed.exceptionOrNull()?.message}",
                     )
                 }
                 parsed
@@ -134,6 +135,8 @@ class ProxyWarpAutoConfig(
         }
 
     private data class ExtractedIni(val text: String, val source: String)
+
+    private fun mirrorTag(url: String): String = "m%08x".format(url.hashCode())
 
     private fun parseProxyResponse(body: String): Result<RegisteredWarpConfig> {
         val extracted = extractIniFromBody(body)

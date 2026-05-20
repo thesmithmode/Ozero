@@ -9,6 +9,7 @@ import ru.ozero.engineurnetwork.auth.UrnetworkAuthService
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.Upstream
+import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -104,6 +105,35 @@ class EngineUrnetworkAwaitReadyTest {
         assertIs<EnginePlugin.ReadyResult.Timeout>(
             result,
             "bridge throw → 0 peers → Timeout (root fix #59)",
+        )
+    }
+
+    @Test
+    fun `sentinel PEER_READY_TIMEOUT_MS не ниже 30s — initial P2P discovery медленно на плохих сетях`() {
+        val source = File("src/main/java/ru/ozero/engineurnetwork/EngineUrnetwork.kt").readText()
+        val match = Regex("PEER_READY_TIMEOUT_MS\\s*=\\s*(\\d+)_?(\\d*)L")
+            .find(source) ?: fail("PEER_READY_TIMEOUT_MS не найден в EngineUrnetwork.kt")
+        val raw = (match.groupValues[1] + match.groupValues[2])
+        val ms = raw.toLong()
+        assertTrue(
+            ms >= 30_000L,
+            "PEER_READY_TIMEOUT_MS=$ms ниже 30000 — initial P2P peer discovery " +
+                "требует запаса. Регрессия 15s — было слишком жёстко.",
+        )
+    }
+
+    @Test
+    fun `sentinel awaitReady пишет progress в boot log при долгом peer discovery`() {
+        val source = File("src/main/java/ru/ozero/engineurnetwork/EngineUrnetwork.kt").readText()
+        val body = source.substringAfter("override suspend fun awaitReady(): EnginePlugin.ReadyResult")
+            .substringBefore("override suspend fun attachTun")
+        assertTrue(
+            body.contains("PEER_PROGRESS_LOG_EVERY"),
+            "awaitReady обязан логировать progress через PEER_PROGRESS_LOG_EVERY для видимости в boot.log",
+        )
+        assertTrue(
+            body.contains("PersistentLoggers.info"),
+            "progress log обязан идти через PersistentLoggers.info (boot.log persistent), не Log.i",
         )
     }
 

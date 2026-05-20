@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="masterdns_engine_name">MasterDNS</string>
+    <string name="masterdns_warning_slow">DNS-туннель — экстренный режим. Ожидайте 1–3 Мбит/с. Используйте только при тотальной блокировке других VPN.</string>
+    <string name="masterdns_config_toml">Конфигурация client_config.toml</string>
+    <string name="masterdns_resolvers">DNS-резолверы (по одному на строку)</string>
+    <string name="masterdns_enabled">Включить MasterDNS</string>
+    <string name="masterdns_setup_guide_hint">Нужен свой сервер. См. docs/masterdns-server-setup.md в репозитории Ozero.</string>
+    <string name="settings_masterdns_title">MasterDNS</string>
+    <string name="settings_masterdns_summary">DNS-туннель для экстренного обхода полной блокировки VPN.</string>
+</resources>

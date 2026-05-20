@@ -4,8 +4,9 @@ aliases: [vpn-self-check-bypass, ip-checker-vpn-bypass, vpn-self-exemption]
 tags: [android, vpn, networking, debugging, gotcha]
 sources:
   - "daily/2026-05-08.md"
+  - "daily/2026-05-20.md"
 created: 2026-05-08
-updated: 2026-05-08
+updated: 2026-05-20
 ---
 
 # Android VPN App Self-Traffic Bypass
@@ -18,7 +19,7 @@ HTTP/HTTPS requests made by an Android VPN app itself (e.g., to check the curren
 - `VpnService.protect(socket)` marks a socket to bypass the TUN; if the HTTP client used for IP checking opens protected sockets, it also bypasses the tunnel
 - Symptom: in-app IP checker shows the device's real geolocation (e.g., the user's city on their ISP); browser-based external checker shows the correct VPN endpoint location
 - The asymmetry (in-app vs external) is the diagnostic signal — if both show wrong IP, the tunnel itself is broken; if only in-app shows wrong, self-bypass is the cause
-- Fix: verify app package is NOT in `addDisallowedApplication`; verify HTTP client used for IP check does NOT call `VpnService.protect()` on its sockets
+- **Fix evolved over time** — this article's original advice ("verify app package is NOT in `addDisallowedApplication`") was **superseded**. Later work (2026-05-09 → 2026-05-15) established that `addDisallowedApplication(packageName)` (i.e. `excludeSelf = true`) is **required unconditionally** for all engines (Go SDK and SOCKS) to prevent routing loops — see [[concepts/tun-self-exclusion-sdk-engines]]. Three regressions confirmed that removing self-exclusion breaks the engines. The correct IP-check fix is therefore **NOT** to remove self-exclusion but to add an explicit `ipProbeRoute()` that routes only the IP-checker socket through the TUN while keeping the rest of the app self-excluded — see [[concepts/ip-probe-route-architecture]]. The HTTP-client `protect()`-leak point below remains valid.
 
 ## Details
 
@@ -43,14 +44,15 @@ The investigation identified two candidates: `addDisallowedApplication` in `Ozer
 1. While VPN is active, note the IP shown by the in-app IP checker
 2. Access an external IP checker (whoer.net, ipinfo.io) via the device browser
 3. If they differ → self-bypass confirmed; if both show wrong IP → tunnel routing broken
-4. Search codebase for `addDisallowedApplication` calls — verify app's own package is not listed
+4. `addDisallowedApplication(packageName)` is **expected** (required by [[concepts/tun-self-exclusion-sdk-engines]]). Verify instead that the IP-checker socket goes through `ipProbeRoute()` per [[concepts/ip-probe-route-architecture]] — without it, every self-issued probe sees the real ISP IP by design
 5. Search for `VpnService.protect()` calls — trace which HTTP clients are passed protected sockets
 6. Verify IP check is not initiated before `VpnService.Builder.establish()` returns
 
 ### Correct IP Checker Pattern
 
-The IP checker for VPN status verification should:
-- Use a plain HTTP client with no socket factory customization
+The IP checker for VPN status verification should (as superseded by [[concepts/ip-probe-route-architecture]]):
+- Route only the IP-checker socket through the TUN via `ipProbeRoute()` — leave self-exclusion intact for the rest of the app
+- Use a plain HTTP client with no socket factory customization for this probe
 - Be invoked only after `VpnService.Builder.establish()` succeeds (TUN fd obtained)
 - NOT reuse any HTTP client instance that has called `VpnService.protect()` on its sockets
 
@@ -66,3 +68,4 @@ If the VPN app has an HTTP client for reaching its own backend (e.g., WARP confi
 ## Sources
 
 - [[daily/2026-05-08.md]] - Session 18:27: IP checker showed "Leninogorsk" (real ISP city) while browser whoer.net confirmed correct VPN IP; diagnosed as addDisallowedApplication or protect()-aware HTTP client in IP checker path; investigation pending
+- [[daily/2026-05-20.md]] - KB audit (18:43): confirmed self-exclusion removal approach as deprecated/wrong; canonical pattern is ipProbeRoute() + always excludeSelf=true (three regressions confirmed removing self-exclusion breaks engines); `addDisallowedApplication(packageName)` expected not suspect

@@ -88,24 +88,27 @@ class OzeroVpnServiceLockdownKillswitchTest {
     }
 
     @Test
-    fun `applyLockdown существует и вызывает setUnderlyingNetworks null`() {
+    fun `applyLockdown существует и вызывает setUnderlyingNetworks null условно`() {
         assertTrue(
             helperSource.contains("private fun applyLockdown"),
-            "TunBuilderHelper обязан иметь private fun applyLockdown — Amnezia/PORTAL_WG pattern: " +
-                "setUnderlyingNetworks(null) запрещает OS использовать underlying network вне TUN. " +
-                "Без него VPN не enforces lockdown — трафик утекает мимо туннеля при degraded engine.",
+            "TunBuilderHelper обязан иметь private fun applyLockdown — Amnezia/PORTAL_WG pattern.",
         )
         val body = helperSource
             .substringAfter("private fun applyLockdown")
             .substringBefore("private fun blackholeIpv6")
         assertTrue(
             body.contains("setUnderlyingNetworks(null)"),
-            "applyLockdown обязан вызывать setUnderlyingNetworks(null). Body:\n$body",
+            "applyLockdown обязан вызывать setUnderlyingNetworks(null) когда applyUnderlying=true. Body:\n$body",
+        )
+        assertTrue(
+            body.contains("if (!applyUnderlying) return"),
+            "applyLockdown обязан early-return при applyUnderlying=false — ByeDPI upstream " +
+                "parity, иначе ломает QUIC routing (2026-05-20 investigation). Body:\n$body",
         )
     }
 
     @Test
-    fun `applyEngineTunSpec вызывает applyLockdown`() {
+    fun `applyEngineTunSpec вызывает applyLockdown с applyUnderlying=true`() {
         val body = helperSource
             .substringAfter("fun applyEngineTunSpec(")
             .substringBefore("fun buildTunBuilder(")
@@ -114,16 +117,35 @@ class OzeroVpnServiceLockdownKillswitchTest {
             "applyEngineTunSpec обязан вызывать applyLockdown — иначе TUN строится без " +
                 "setUnderlyingNetworks(null) и не enforces lockdown. Body:\n$body",
         )
+        assertTrue(
+            body.contains("applyUnderlying = true"),
+            "applyEngineTunSpec (WARP/URnetwork) обязан applyUnderlying=true — killswitch " +
+                "invariant P37 (WiFi→Mobile transition). Body:\n$body",
+        )
     }
 
     @Test
-    fun `buildTunBuilder вызывает applyLockdown`() {
+    fun `buildTunBuilder default applyUnderlying=false — ByeDPI upstream parity`() {
         val body = helperSource
             .substringAfter("fun buildTunBuilder(")
             .substringBefore("private fun applyLockdown")
         assertTrue(
             body.contains("applyLockdown(builder"),
-            "buildTunBuilder обязан вызывать applyLockdown — для ByeDPI/non-customTun engines.",
+            "buildTunBuilder обязан вызывать applyLockdown — для ByeDPI/legacy engines.",
+        )
+        assertTrue(
+            body.contains("applyUnderlying: Boolean = false"),
+            "buildTunBuilder сигнатура обязана иметь default applyUnderlying=false — ByeDPI engine " +
+                "path через default-вызов получает upstream ByeByeDPI 1.7.5 parity. " +
+                "setUnderlyingNetworks(null) ломает QUIC: outgoing UDP socket в byedpi process " +
+                "теряет authoritative underlying network → kernel routes через wrong interface → " +
+                "YouTube QUIC fail на ~10-15с после connect. См. byedpi-vpn-pipeline-upstream-divergence. " +
+                "Body:\n$body",
+        )
+        assertTrue(
+            body.contains("applyUnderlying = applyUnderlying"),
+            "buildTunBuilder обязан пробрасывать applyUnderlying в applyLockdown — иначе " +
+                "killswitch startup path не может выставить true для P37 invariant. Body:\n$body",
         )
     }
 
@@ -152,6 +174,22 @@ class OzeroVpnServiceLockdownKillswitchTest {
         assertTrue(
             body.contains("killswitchProvider()"),
             "watcher обязан проверять killswitchProvider() перед fire. Body:\n$body",
+        )
+    }
+
+    @Test
+    fun `killswitch startup TUN использует buildTunBuilder с applyUnderlying=true — P37 lockdown invariant`() {
+        val block = runBody.substringAfter("if (killswitch)").substringBefore("val manualEngine")
+        assertTrue(
+            block.contains("buildTunBuilder"),
+            "killswitch startup path обязан вызывать buildTunBuilder. Block:\n$block",
+        )
+        assertTrue(
+            block.contains("applyUnderlying = true"),
+            "killswitch startup TUN обязан applyUnderlying=true — без него startup gap (5+ сек до " +
+                "engine pick) не enforces lockdown через setUnderlyingNetworks(null) → " +
+                "при WiFi→Mobile транзиции lockdown breaks (P37). ByeDPI engine path использует " +
+                "default applyUnderlying=false (upstream parity для QUIC). Block:\n$block",
         )
     }
 

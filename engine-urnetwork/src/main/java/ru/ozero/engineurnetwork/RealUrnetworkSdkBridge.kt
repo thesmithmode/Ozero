@@ -141,6 +141,19 @@ class RealUrnetworkSdkBridge(
             }.onFailure { PersistentLoggers.warn(TAG, "provideSecretKeys init threw: ${it.message}") }
             runCatching { d.providePaused = true }
                 .onFailure { PersistentLoggers.warn(TAG, "providePaused threw: ${it.message}") }
+            runCatching { d.routeLocal = localState.routeLocal }
+            runCatching { d.provideMode = localState.provideMode }
+            runCatching { d.connectLocation = localState.connectLocation }
+            runCatching { d.defaultLocation = localState.defaultLocation }
+            runCatching { d.canShowRatingDialog = localState.canShowRatingDialog }
+            runCatching { d.provideControlMode = localState.provideControlMode }
+            runCatching { d.vpnInterfaceWhileOffline = localState.vpnInterfaceWhileOffline }
+            runCatching { d.canRefer = localState.canRefer }
+            runCatching { d.allowForeground = localState.allowForeground }
+            runCatching { d.provideNetworkMode = localState.provideNetworkMode }
+            runCatching { d.canPromptIntroFunnel = localState.canPromptIntroFunnel }
+            runCatching { d.performanceProfile = localState.performanceProfile }
+            Log.i(TAG, "runStartOnMain: device created — 12 fields applied (паритет с initDeviceForLocations)")
             deviceRef.set(d)
             d
         }
@@ -498,10 +511,7 @@ class RealUrnetworkSdkBridge(
                         PersistentLoggers.warn(
                             TAG,
                             "subscriptionBalance startBalance=${"%.1f".format(startGb)}GB > " +
-                                "${DOUBLE_QUOTA_THRESHOLD_BYTES / 1_000_000_000L}GB — подозрение на " +
-                                "duplicate networkCreate (legacy guest + walletAuth migration) " +
-                                "или backend накопил квоту по тому же networkId. " +
-                                "clientId=$clientId — нужен tombstone+sentinel для root cause.",
+                                "${DOUBLE_QUOTA_THRESHOLD_BYTES / 1_000_000_000L}GB",
                         )
                     }
                     cont.resume(

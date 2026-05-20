@@ -6,7 +6,7 @@ sources:
   - "daily/2026-05-07.md"
   - "daily/2026-05-14.md"
 created: 2026-05-07
-updated: 2026-05-19
+updated: 2026-05-20
 ---
 
 # WARP False Connected State: awgTurnOn OK Without Handshake
@@ -112,8 +112,18 @@ if (!ready) {
 }
 ```
 
+**5s timeout revert (v0.1.5-4):** The 5s timeout was too aggressive — Cloudflare WARP handshake on slow/congested networks requires up to 10s. Users on slow connections saw every WARP start immediately fail with the honest-failure path. Reverted to `WARP_READY_TIMEOUT_MS=10s` and `SWITCHING_TIMEOUT_MS=12s`. The honest failure propagation is preserved; only the timeout duration was relaxed.
+
+### handle=0 Misdiagnosis and Revert (2026-05-19)
+
+Log showed `awgTurnOn JNI exit handle=0`. A session incorrectly concluded that `handle=0` was invalid and changed the error guard from `handle < 0` to `handle <= 0` (commit 3a2ba785, v0.1.5.1). This immediately broke all WARP starts: handle=0 is the *valid* first tunnel slot per Go bridge convention (`tunnelHandles` map starts at index 0; `-1` is the only error sentinel). Every clean WARP start was rejected, producing a false-negative `Failed` state.
+
+Reverted in v0.1.5-4 by reading primary source `.claude/Контекст/amnezia-client/client/macos/gobridge/api.go:123-135`. See [[concepts/warp-awg-handle-zero-valid]] for the full analysis.
+
+The actual false-connected root (handshake not arriving) was already addressed by `awaitReady()` returning `false` on timeout → `handleEngineFailure`. No relationship to the handle value.
+
 ## Sources
 
 - [[daily/2026-05-07.md]] - Session 15:11: `awgTurnOn OK` + state=Connected does not mean real handshake; need polling `last_handshake_time_sec` from `awgGetConfig`; handshake polling identified as required follow-up; mirror DNS suspicion (176.99.11.77, 80.78.247.254 — not Cloudflare)
 - [[daily/2026-05-14.md]] - Session 16:41: handshake polling implemented via WarpHandshakeUapi.kt + LocalSocket (not awgGetConfig JNI — SIGSEGV risk); 300ms/10s; integrated into EngineWarp.awaitReady()
-- [[daily/2026-05-19.md]] - v0.1.5 session: `WARP_READY_TIMEOUT_MS` 10s→5s; `SWITCHING_TIMEOUT_MS` 12s→6s; `awaitEngineReady` returns Boolean; timeout → `handleEngineFailure` + `chainOrchestrator.stop` (no more false-Connected on handshake timeout); ozero.log confirmed awaitReady never got handshake in any WARP session
+- [[daily/2026-05-19.md]] - v0.1.5 session: `WARP_READY_TIMEOUT_MS` 10s→5s; `SWITCHING_TIMEOUT_MS` 12s→6s; `awaitEngineReady` returns Boolean; timeout → `handleEngineFailure` + `chainOrchestrator.stop` (no more false-Connected on handshake timeout); ozero.log confirmed awaitReady never got handshake in any WARP session; v0.1.5-4: 5s timeout reverted to 10s (too aggressive for slow networks); handle<=0 misdiagnosis found and reverted to handle<0

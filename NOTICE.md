@@ -1,8 +1,8 @@
 # Third-party notices
 
-## ByeByeDPI v1.7.4 (GPL-3.0)
+## ByeByeDPI v1.7.5 (GPL-3.0)
 
-Asset files copied verbatim from [romanvht/ByeByeDPI](https://github.com/romanvht/ByeByeDPI) v1.7.4 under GPL-3.0:
+Asset files copied verbatim from [romanvht/ByeByeDPI](https://github.com/romanvht/ByeByeDPI) v1.7.5 under GPL-3.0:
 
 - `engine-byedpi/src/main/assets/byedpi_strategies.list` — source: `app/src/main/assets/proxytest_strategies.list`
 - `engine-byedpi/src/main/assets/byedpi_test_sites.list` — source: `app/src/main/assets/proxytest_general.sites`

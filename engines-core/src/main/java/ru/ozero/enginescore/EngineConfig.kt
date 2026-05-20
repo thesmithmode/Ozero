@@ -65,6 +65,16 @@ sealed class EngineConfig {
         override val engineId = EngineId.WARP
     }
 
+    data class MasterDns(
+        val configToml: String,
+        val resolvers: List<String>,
+        val socksPort: Int = 18000,
+    ) : EngineConfig() {
+        override val engineId = EngineId.MASTERDNS
+        override fun toString(): String =
+            "MasterDns(configToml=***, resolvers=${resolvers.size} entries, socksPort=$socksPort)"
+    }
+
     data object Fptn : EngineConfig() {
         override val engineId = EngineId.FPTN
     }

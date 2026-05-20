@@ -49,18 +49,17 @@ async def compile_daily_log(log_path: Path, state: dict) -> float:
     schema = AGENTS_FILE.read_text(encoding="utf-8")
     wiki_index = read_wiki_index()
 
-    # Read existing articles for context
-    existing_articles_context = ""
-    existing = {}
-    for article_path in list_wiki_articles():
-        rel = article_path.relative_to(KNOWLEDGE_DIR)
-        existing[str(rel)] = article_path.read_text(encoding="utf-8")
-
-    if existing:
-        parts = []
-        for rel_path, content in existing.items():
-            parts.append(f"### {rel_path}\n```markdown\n{content}\n```")
-        existing_articles_context = "\n\n".join(parts)
+    article_paths = sorted(
+        str(p.relative_to(KNOWLEDGE_DIR)) for p in list_wiki_articles()
+    )
+    if article_paths:
+        existing_articles_context = (
+            "The following articles already exist. Read any of them on demand "
+            "with the Read tool before updating; do not duplicate.\n\n"
+            + "\n".join(f"- knowledge/{p}" for p in article_paths)
+        )
+    else:
+        existing_articles_context = ""
 
     timestamp = now_iso()
 
@@ -75,7 +74,7 @@ and extract knowledge into structured wiki articles.
 
 {wiki_index}
 
-## Existing Wiki Articles
+## Existing Wiki Articles (paths only — Read on demand)
 
 {existing_articles_context if existing_articles_context else "(No existing articles yet)"}
 
@@ -137,6 +136,8 @@ Read the daily log above and compile it into wiki articles following the schema 
                 allowed_tools=["Read", "Write", "Edit", "Glob", "Grep"],
                 permission_mode="acceptEdits",
                 max_turns=30,
+                setting_sources=[],
+                plugins=[],
             ),
         ):
             if isinstance(message, AssistantMessage):

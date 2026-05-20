@@ -43,6 +43,7 @@ Adding any `@Inject` field to `Application` that transitively accesses Robolectr
 
 - [[concepts/hilt-di-native-library-failure]] - Related: Hilt DI graph breaks when System.loadLibrary fails; both are Hilt initialization traps
 - [[concepts/amneziawg-relinker-loading-trap]] - AbstractBackend ctor loads native lib; similar eager-init-in-constructor issue
+- [[concepts/manual-di-design]] - Complementary at a different layer: eager init in `OzeroApp.onCreate` via `VpnServiceLocator` for production crash visibility. That is service-locator init, NOT `@Inject` field init — the lazy pattern documented here applies to fields inside `@Inject` services.
 
 ## Sources
 

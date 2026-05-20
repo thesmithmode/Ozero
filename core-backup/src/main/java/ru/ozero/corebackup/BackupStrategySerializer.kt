@@ -34,11 +34,6 @@ internal object BackupStrategySerializer {
         }
         stratObj.put("savedStrategies", ssArr)
 
-        strat.evolutionMemory?.let { raw ->
-            if (runCatching { JSONObject(raw) }.isSuccess) {
-                stratObj.put("evolutionMemory", raw)
-            }
-        }
         return stratObj
     }
 
@@ -74,8 +69,6 @@ internal object BackupStrategySerializer {
             settings = settings,
             domainLists = domainLists,
             savedStrategies = savedStrategies,
-            evolutionMemory = stratObj.optString("evolutionMemory").takeIf { it.isNotEmpty() }
-                ?: stratObj.optJSONObject("evolutionMemory")?.toString(),
         )
     }
 
@@ -92,6 +85,7 @@ internal object BackupStrategySerializer {
         ss.evolutionMaxGenerations?.let { sObj.put("evolutionMaxGenerations", it) }
         ss.evolutionMutationRate?.let { sObj.put("evolutionMutationRate", it) }
         ss.evolutionEliteCount?.let { sObj.put("evolutionEliteCount", it) }
+        ss.evolutionTargetFitness?.let { sObj.put("evolutionTargetFitness", it) }
         return sObj
     }
 
@@ -108,5 +102,6 @@ internal object BackupStrategySerializer {
             evolutionMaxGenerations = ss.intOrNull("evolutionMaxGenerations"),
             evolutionMutationRate = ss.floatOrNull("evolutionMutationRate"),
             evolutionEliteCount = ss.intOrNull("evolutionEliteCount"),
+            evolutionTargetFitness = ss.floatOrNull("evolutionTargetFitness"),
         )
 }

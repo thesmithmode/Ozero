@@ -15,8 +15,7 @@ data class WarpUapiState(
 internal object WarpUapi {
 
     fun readState(uapiPath: String, tunnelName: String): WarpUapiState? {
-        val sockFile = File(uapiPath, "$tunnelName.sock")
-        if (!sockFile.exists()) return null
+        val sockFile = WarpHandshakeUapi.findUapiSocket(uapiPath, tunnelName) ?: return null
         return try {
             querySocket(sockFile)
         } catch (_: Exception) {

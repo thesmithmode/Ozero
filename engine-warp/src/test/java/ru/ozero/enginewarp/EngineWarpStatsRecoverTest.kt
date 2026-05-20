@@ -47,6 +47,25 @@ class EngineWarpStatsRecoverTest {
     }
 
     @Test
+    fun `null UAPI обнуляет activeConnections — peer watchdog видит провал`() = runTest {
+        val reader = WarpUapiStateReader { _, _ -> null }
+        val e = newEngine(bridge = FakeBridge(), reader = reader, scope = backgroundScope, pollMs = 50L)
+        e.start(EngineConfig.Warp, Upstream.None)
+        e.attachTun(tunFd = 11)
+        runCurrent()
+        advanceTimeBy(300L)
+        runCurrent()
+        val s = e.stats().first()
+        assertEquals(
+            0,
+            s.activeConnections,
+            "при null UAPI activeConnections обязан стать 0. Регрессия 2026-05-20: оставалось 1, " +
+                "peer watchdog не видел провал, юзер ночью висел Connected без интернета.",
+        )
+        assertEquals(0L, s.connectedSince, "connectedSince сброшен при null UAPI")
+    }
+
+    @Test
     fun `stale handshake → activeConnections=0 — peer watchdog узнает`() = runTest {
         val bridge = FakeBridge()
         val reader = FixedReader(
@@ -106,30 +125,52 @@ class EngineWarpStatsRecoverTest {
     }
 
     @Test
-    fun `recover NotSupported при stale handshake — VPN перезапустится через handleEngineFailure`() = runTest {
+    fun `recover Failed при stale handshake — watchdog продолжает retry, VPN не убивается`() = runTest {
         val reader = FixedReader(
             WarpUapiState(handshakeAgeSeconds = 999L, rxBytes = 0L, txBytes = 0L, peersSeen = 1),
         )
         val e = newEngine(bridge = FakeBridge(), reader = reader, scope = backgroundScope)
         val r = e.recover()
-        assertIs<EnginePlugin.RecoverResult.NotSupported>(
+        assertIs<EnginePlugin.RecoverResult.Failed>(
             r,
-            "stale handshake → NotSupported. Watchdog зовёт handleEngineFailure → stopVpn → " +
-                "переподключение. Регрессия: возврат к Failed маскирует мёртвый туннель.",
+            "stale handshake → Failed. Watchdog НЕ должен вызывать handleEngineFailure — " +
+                "amneziawg-go ретраит handshake в фоне, мы просто ждём. Регрессия 2026-05-20: " +
+                "NotSupported убивал VPN, юзер видел красную кнопку и должен был дёргать заново — " +
+                "вместо бесконечного retry с жёлтым indicator.",
         )
     }
 
     @Test
-    fun `recover NotSupported когда last_handshake_time_sec=0 (handshake ни разу не происходил)`() = runTest {
+    fun `recover Failed когда last_handshake_time_sec=0 (handshake ни разу не происходил)`() = runTest {
         val reader = FixedReader(
             WarpUapiState(handshakeAgeSeconds = null, rxBytes = 0L, txBytes = 0L, peersSeen = 1),
         )
         val e = newEngine(bridge = FakeBridge(), reader = reader, scope = backgroundScope)
         val r = e.recover()
-        assertIs<EnginePlugin.RecoverResult.NotSupported>(
+        assertIs<EnginePlugin.RecoverResult.Failed>(
             r,
-            "handshake age=null (никогда не было handshake) → NotSupported",
+            "handshake age=null (никогда не было handshake) → Failed — retry бесконечный",
         )
+    }
+
+    @Test
+    fun `recover никогда не возвращает NotSupported — sentinel против регрессии`() = runTest {
+        val cases = listOf(
+            WarpUapiState(handshakeAgeSeconds = 5L, rxBytes = 0L, txBytes = 0L, peersSeen = 1),
+            WarpUapiState(handshakeAgeSeconds = 999L, rxBytes = 0L, txBytes = 0L, peersSeen = 1),
+            WarpUapiState(handshakeAgeSeconds = null, rxBytes = 0L, txBytes = 0L, peersSeen = 1),
+            null,
+        )
+        cases.forEachIndexed { idx, state ->
+            val reader = FixedReader(state)
+            val e = newEngine(bridge = FakeBridge(), reader = reader, scope = backgroundScope)
+            val r = e.recover()
+            assertTrue(
+                r !is EnginePlugin.RecoverResult.NotSupported,
+                "case[$idx]=$state: recover вернул NotSupported. NotSupported → watchdog stop VPN → " +
+                    "красная кнопка. Юзер хочет бесконечный retry с жёлтым indicator. Got: $r",
+            )
+        }
     }
 
     @Test

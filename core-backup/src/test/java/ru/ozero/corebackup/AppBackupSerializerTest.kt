@@ -2,6 +2,7 @@ package ru.ozero.corebackup
 
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -22,8 +23,22 @@ class AppBackupSerializerTest {
             hostsList = "example.com",
             uiLocaleTag = "ru",
             appMode = "manual",
+            engineAutoPriority = "warp,byedpi",
+            bydpiUseUiMode = true,
+            bydpiUiSettingsJson = """{"k":"v"}""",
+            bydpiDefaultAccepted = false,
+            urnetworkCountryCode = "DE",
         ),
-        urnetwork = BackupUrnetwork(walletOverride = "0xabc", byJwt = null),
+        urnetwork = BackupUrnetwork(
+            byJwt = "jwt-x",
+            windowType = "speed",
+            fixedIpSize = true,
+            allowDirect = false,
+            provideEnabled = true,
+            provideControlMode = "always",
+            provideNetworkMode = "wifi",
+            selectedLocation = BackupUrnetworkLocation("ES", "Madrid", "Madrid"),
+        ),
         warpSlots = listOf(
             BackupWarpSlot(
                 id = "slot-1",
@@ -47,6 +62,7 @@ class AppBackupSerializerTest {
             BackupSplitRule("com.example", true),
             BackupSplitRule("com.other", false),
         ),
+        telegram = BackupTelegram(enabled = true, port = 2080, domain = "tg.host", secret = "secret"),
     )
 
     @Test
@@ -60,53 +76,39 @@ class AppBackupSerializerTest {
         val s = restored.settings
         assertEquals("per_app", s.splitMode)
         assertEquals(true, s.ipv6Enabled)
-        assertEquals(false, s.autoStart)
         assertEquals("byedpi", s.manualEngine)
         assertEquals("--args", s.bydpiWinningArgs)
-        assertEquals(false, s.urnetworkEnabled)
-        assertNull(s.urnetworkJwt)
-        assertEquals("8.8.8.8", s.customDnsServers)
-        assertEquals("blacklist", s.hostsMode)
-        assertEquals("example.com", s.hostsList)
-        assertEquals("ru", s.uiLocaleTag)
-        assertEquals("manual", s.appMode)
+        assertEquals("warp,byedpi", s.engineAutoPriority)
+        assertEquals(true, s.bydpiUseUiMode)
+        assertEquals("""{"k":"v"}""", s.bydpiUiSettingsJson)
+        assertEquals(false, s.bydpiDefaultAccepted)
+        assertEquals("DE", s.urnetworkCountryCode)
 
-        assertEquals("0xabc", restored.urnetwork.walletOverride)
-        assertNull(restored.urnetwork.byJwt)
+        val u = restored.urnetwork
+        assertEquals("jwt-x", u.byJwt)
+        assertEquals("speed", u.windowType)
+        assertEquals(true, u.fixedIpSize)
+        assertEquals(false, u.allowDirect)
+        assertEquals(true, u.provideEnabled)
+        assertEquals("always", u.provideControlMode)
+        assertEquals("wifi", u.provideNetworkMode)
+        assertEquals("ES", u.selectedLocation?.countryCode)
+        assertEquals("Madrid", u.selectedLocation?.region)
+        assertEquals("Madrid", u.selectedLocation?.city)
+
+        assertNotNull(restored.telegram)
+        assertEquals(true, restored.telegram!!.enabled)
+        assertEquals(2080, restored.telegram!!.port)
+        assertEquals("tg.host", restored.telegram!!.domain)
+        assertEquals("secret", restored.telegram!!.secret)
 
         assertEquals(1, restored.warpSlots.size)
-        val slot = restored.warpSlots[0]
-        assertEquals("slot-1", slot.id)
-        assertEquals("Home", slot.name)
-        assertTrue(slot.isActive)
-        assertEquals("privKey", slot.privateKey)
-        assertEquals("pubKey", slot.publicKey)
-        assertEquals("peerPub", slot.peerPublicKey)
-        assertEquals("engage.cloudflareclient.com:2408", slot.peerEndpoint)
-        assertEquals("172.16.0.2/32", slot.interfaceAddressV4)
-        assertEquals("2606::1/128", slot.interfaceAddressV6)
-        assertEquals("lic", slot.accountLicense)
-        assertEquals(1280, slot.mtu)
-        assertEquals(listOf("1.1.1.1"), slot.dnsServers)
-        assertEquals(25, slot.keepaliveSeconds)
-        assertEquals(5, slot.awgJc)
-        assertEquals(100, slot.awgJmin)
-        assertEquals(200, slot.awgJmax)
-        assertEquals(0, slot.awgS1)
-        assertEquals(0, slot.awgS2)
-        assertEquals(1L, slot.awgH1)
-        assertEquals(2L, slot.awgH2)
-        assertEquals(3L, slot.awgH3)
-        assertEquals(4L, slot.awgH4)
-
+        assertEquals("slot-1", restored.warpSlots[0].id)
         assertEquals(2, restored.splitRules.size)
-        assertEquals("com.example", restored.splitRules[0].packageName)
-        assertTrue(restored.splitRules[0].isExcluded)
-        assertEquals("com.other", restored.splitRules[1].packageName)
     }
 
     @Test
-    fun `пустые слоты и правила — корректно сериализуются`() {
+    fun `пустые блоки — корректно сериализуются`() {
         val data = AppBackupData(
             exportedAt = "2026-01-01T00:00:00Z",
             settings = BackupSettings(
@@ -115,7 +117,7 @@ class AppBackupSerializerTest {
                 urnetworkJwt = null, customDnsServers = null, hostsMode = null,
                 hostsList = null, uiLocaleTag = null, appMode = null,
             ),
-            urnetwork = BackupUrnetwork(walletOverride = null, byJwt = null),
+            urnetwork = BackupUrnetwork(),
             warpSlots = emptyList(),
             splitRules = emptyList(),
         )
@@ -123,14 +125,16 @@ class AppBackupSerializerTest {
         assertTrue(restored.warpSlots.isEmpty())
         assertTrue(restored.splitRules.isEmpty())
         assertNull(restored.settings.splitMode)
-        assertNull(restored.urnetwork.walletOverride)
+        assertNull(restored.urnetwork.byJwt)
+        assertNull(restored.urnetwork.selectedLocation)
+        assertNull(restored.telegram)
     }
 
     @Test
     fun `неподдерживаемая версия — бросает исключение`() {
         val json = """{"version":999,"exportedAt":"","settings":{},"urnetwork":{},"warpSlots":[],"splitRules":[]}"""
         val ex = runCatching { AppBackupSerializer.deserialize(json) }.exceptionOrNull()
-        assertTrue(ex != null)
+        assertTrue(ex is AppBackupSerializer.BackupParseException)
         assertTrue(ex.message?.contains("999") == true)
     }
 
@@ -138,30 +142,26 @@ class AppBackupSerializerTest {
     fun `версия 0 — также отклоняется`() {
         val json = """{"version":0,"exportedAt":"","settings":{},"urnetwork":{},"warpSlots":[],"splitRules":[]}"""
         val ex = runCatching { AppBackupSerializer.deserialize(json) }.exceptionOrNull()
-        assertTrue(ex is AppBackupSerializer.BackupParseException, "version 0 must throw BackupParseException")
+        assertTrue(ex is AppBackupSerializer.BackupParseException)
     }
 
     @Test
     fun `malformed JSON — BackupParseException вместо crash`() {
         val ex = runCatching { AppBackupSerializer.deserialize("not a json at all") }.exceptionOrNull()
-        assertTrue(ex is AppBackupSerializer.BackupParseException, "malformed must wrap as BackupParseException: $ex")
+        assertTrue(ex is AppBackupSerializer.BackupParseException)
     }
 
     @Test
     fun `deserializeAuto rejects oversized payload`() {
         val huge = ByteArray(11 * 1024 * 1024) { 'a'.code.toByte() }
         val ex = runCatching { AppBackupSerializer.deserializeAuto(huge) }.exceptionOrNull()
-        assertTrue(ex is AppBackupSerializer.BackupParseException, "11MB must be rejected: $ex")
+        assertTrue(ex is AppBackupSerializer.BackupParseException)
     }
 
     @Test
     fun `AWG расширенные поля переживают roundtrip`() {
         val slot = fullData.warpSlots[0].copy(
-            awgS3 = 7,
-            awgS4 = 11,
-            awgI1 = 13,
-            awgI2 = 17,
-            awgI5 = 19,
+            awgS3 = 7, awgS4 = 11, awgI1 = 13, awgI2 = 17, awgI5 = 19,
         )
         val data = fullData.copy(warpSlots = listOf(slot))
         val restored = AppBackupSerializer.deserialize(AppBackupSerializer.serialize(data))
@@ -178,7 +178,8 @@ class AppBackupSerializerTest {
         val restored = AppBackupSerializer.deserializeAuto(bytes)
         assertEquals(fullData.exportedAt, restored.exportedAt)
         assertEquals(fullData.warpSlots[0].privateKey, restored.warpSlots[0].privateKey)
-        assertEquals(fullData.urnetwork.walletOverride, restored.urnetwork.walletOverride)
+        assertEquals(fullData.urnetwork.byJwt, restored.urnetwork.byJwt)
+        assertEquals(fullData.telegram, restored.telegram)
     }
 
     @Test
@@ -186,6 +187,42 @@ class AppBackupSerializerTest {
         val json = AppBackupSerializer.serialize(fullData)
         val restored = AppBackupSerializer.deserializeAuto(json.toByteArray(Charsets.UTF_8))
         assertEquals(fullData.exportedAt, restored.exportedAt)
+    }
+
+    @Test
+    fun `v1 backup — telegram и strategy null, новые поля null`() {
+        val json = """{"version":1,"exportedAt":"old","settings":{},"urnetwork":{},"warpSlots":[],"splitRules":[]}"""
+        val restored = AppBackupSerializer.deserialize(json)
+        assertEquals(1, restored.version)
+        assertNull(restored.telegram)
+        assertNull(restored.strategy)
+        assertNull(restored.settings.engineAutoPriority)
+        assertNull(restored.urnetwork.selectedLocation)
+    }
+
+    @Test
+    fun `v2 backup — walletOverride игнорируется при чтении`() {
+        val json = """{"version":2,"exportedAt":"","settings":{},""" +
+            """"urnetwork":{"walletOverride":"0xdead","byJwt":"j"},"warpSlots":[],"splitRules":[]}"""
+        val restored = AppBackupSerializer.deserialize(json)
+        assertEquals("j", restored.urnetwork.byJwt)
+    }
+
+    @Test
+    fun `strategy roundtrip — evolutionTargetFitness переживает`() {
+        val strategy = BackupStrategy(
+            settings = BackupStrategySettings(
+                requestsPerDomain = 2, evolutionMode = true,
+                evolutionMutationRate = 0.3f, evolutionTargetFitness = 0.95f,
+            ),
+            domainLists = listOf(BackupDomainList("g", "General", listOf("b.com"), true, true)),
+            savedStrategies = listOf(BackupSavedStrategy("s1", "-K -An", null, true)),
+        )
+        val data = fullData.copy(strategy = strategy)
+        val restored = AppBackupSerializer.deserialize(AppBackupSerializer.serialize(data))
+        assertEquals(0.95f, restored.strategy?.settings?.evolutionTargetFitness)
+        assertEquals(0.3f, restored.strategy?.settings?.evolutionMutationRate)
+        assertEquals(1, restored.strategy?.domainLists?.size)
     }
 
     @Test

@@ -8,17 +8,24 @@ data class AppBackupData(
     val warpSlots: List<BackupWarpSlot>,
     val splitRules: List<BackupSplitRule>,
     val strategy: BackupStrategy? = null,
+    val telegram: BackupTelegram? = null,
 ) {
     companion object {
-        const val CURRENT_VERSION = 2
+        const val CURRENT_VERSION = 3
     }
 }
+
+data class BackupTelegram(
+    val enabled: Boolean? = null,
+    val port: Int? = null,
+    val domain: String? = null,
+    val secret: String? = null,
+)
 
 data class BackupStrategy(
     val settings: BackupStrategySettings? = null,
     val domainLists: List<BackupDomainList> = emptyList(),
     val savedStrategies: List<BackupSavedStrategy> = emptyList(),
-    val evolutionMemory: String? = null,
 )
 
 data class BackupStrategySettings(
@@ -33,6 +40,7 @@ data class BackupStrategySettings(
     val evolutionMaxGenerations: Int? = null,
     val evolutionMutationRate: Float? = null,
     val evolutionEliteCount: Int? = null,
+    val evolutionTargetFitness: Float? = null,
 )
 
 data class BackupDomainList(
@@ -63,11 +71,28 @@ data class BackupSettings(
     val hostsList: String?,
     val uiLocaleTag: String?,
     val appMode: String?,
+    val engineAutoPriority: String? = null,
+    val bydpiUseUiMode: Boolean? = null,
+    val bydpiUiSettingsJson: String? = null,
+    val bydpiDefaultAccepted: Boolean? = null,
+    val urnetworkCountryCode: String? = null,
 )
 
 data class BackupUrnetwork(
-    val walletOverride: String?,
-    val byJwt: String?,
+    val byJwt: String? = null,
+    val windowType: String? = null,
+    val fixedIpSize: Boolean? = null,
+    val allowDirect: Boolean? = null,
+    val provideEnabled: Boolean? = null,
+    val provideControlMode: String? = null,
+    val provideNetworkMode: String? = null,
+    val selectedLocation: BackupUrnetworkLocation? = null,
+)
+
+data class BackupUrnetworkLocation(
+    val countryCode: String? = null,
+    val region: String? = null,
+    val city: String? = null,
 )
 
 data class BackupWarpSlot(

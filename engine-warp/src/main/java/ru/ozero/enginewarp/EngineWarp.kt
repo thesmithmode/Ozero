@@ -116,9 +116,9 @@ class EngineWarp(
             PersistentLoggers.warn(
                 TAG,
                 "recover: handshake stale (age=$ageS, threshold=${handshakeStaleThresholdSec}s) — " +
-                    "NotSupported → запросим reconnect",
+                    "Failed — amneziawg-go ретраит handshake в фоне, watchdog продолжит ждать",
             )
-            EnginePlugin.RecoverResult.NotSupported
+            EnginePlugin.RecoverResult.Failed("handshake stale age=${ageS ?: "never"}s")
         }
     }
 
@@ -222,10 +222,15 @@ class EngineWarp(
     private fun startStatsPoll(uapiPath: String) {
         statsJobRef.getAndSet(null)?.cancel()
         val job = ownedScope.launch {
+            var prevRx = 0L
+            var prevTx = 0L
+            var tick = 0
+            var consecutiveNullReads = 0
             try {
                 while (isActive) {
                     val state = uapiStateReader(uapiPath, TUNNEL_NAME)
                     if (state != null) {
+                        consecutiveNullReads = 0
                         val ageS = state.handshakeAgeSeconds
                         val handshakeRecent = ageS != null && ageS < handshakeStaleThresholdSec
                         if (handshakeRecent && connectedSinceRef.get() == 0L) {
@@ -239,6 +244,40 @@ class EngineWarp(
                             connectedSince = connectedSinceRef.get(),
                             activeConnections = if (handshakeRecent) 1 else 0,
                         )
+                        tick += 1
+                        if (tick % STATS_LOG_EVERY == 0) {
+                            val dRx = state.rxBytes - prevRx
+                            val dTx = state.txBytes - prevTx
+                            PersistentLoggers.info(
+                                TAG,
+                                "warp stats tx=${state.txBytes}B rx=${state.rxBytes}B " +
+                                    "Δtx=${dTx}B Δrx=${dRx}B hsAge=${ageS ?: "never"}s",
+                            )
+                            prevRx = state.rxBytes
+                            prevTx = state.txBytes
+                        }
+                    } else {
+                        consecutiveNullReads += 1
+                        connectedSinceRef.set(0L)
+                        _stats.value = _stats.value.copy(
+                            connectedSince = 0L,
+                            activeConnections = 0,
+                        )
+                        tick += 1
+                        if (consecutiveNullReads == UAPI_NULL_DEGRADED_THRESHOLD) {
+                            PersistentLoggers.warn(
+                                TAG,
+                                "warp UAPI null x$consecutiveNullReads — пометили activeConnections=0 " +
+                                    "(peer watchdog подберёт через ${PEER_WATCHDOG_HINT_S}s)",
+                            )
+                        }
+                        if (tick % STATS_LOG_EVERY == 0) {
+                            PersistentLoggers.warn(
+                                TAG,
+                                "warp stats unavailable — UAPI socket read returned null " +
+                                    "(uapi=$uapiPath/$TUNNEL_NAME) — handle invalid или socket путь не найден",
+                            )
+                        }
                     }
                     delay(statsPollIntervalMs)
                 }
@@ -368,13 +407,13 @@ class EngineWarp(
             }
         }
 
-    private fun isLikelyIpAddress(host: String): Boolean {
-        if (host.isEmpty()) return false
-        if (host.startsWith('[') || host.contains(':')) return true
-        return host.all { it.isDigit() || it == '.' }
-    }
-
     internal companion object {
+        fun isLikelyIpAddress(host: String): Boolean {
+            if (host.isEmpty()) return false
+            if (host.startsWith('[') || host.contains(':')) return true
+            return host.all { it.isDigit() || it == '.' }
+        }
+
         const val TAG = "EngineWarp"
         const val WARP_NO_SOCKS_PORT = 0
         const val TUNNEL_NAME = "ozero-warp"
@@ -384,5 +423,8 @@ class EngineWarp(
         const val WARP_READY_POLL_MS = 100L
         const val STATS_POLL_INTERVAL_MS = 5_000L
         const val HANDSHAKE_STALE_THRESHOLD_SEC = 180L
+        const val STATS_LOG_EVERY = 5
+        const val UAPI_NULL_DEGRADED_THRESHOLD = 3
+        const val PEER_WATCHDOG_HINT_S = 30
     }
 }

@@ -4,8 +4,9 @@ aliases: [release-workflow, apk-release, version-tagging]
 tags: [release, ci, workflow]
 sources:
   - "daily/2026-04-29.md"
+  - "daily/2026-05-20.md"
 created: 2026-04-29
-updated: 2026-04-29
+updated: 2026-05-20
 ---
 
 # Release Process
@@ -17,8 +18,8 @@ Ozero releases are triggered by pushing a version tag (`v*.*.*`) to the `dev` br
 - Release tags follow semantic versioning: `v*.*.*` (e.g., `v1.0.5`)
 - Tags are created on `dev`, not `main` — `main` is only updated by explicit user command
 - `release.yml` in GitHub Actions builds the APK when a version tag is pushed
-- The APK is a single universal build covering arm64-v8a, armeabi-v7a, and x86_64
-- R8 minification and shrinking are enabled in the release build
+- The APK is a single universal build for **arm64-v8a only** — `abiFilters = ["arm64-v8a"]` in `app/build.gradle.kts`. Other ABIs (armeabi-v7a, x86_64) are intentionally excluded because the native libraries `libhev-socks5-tunnel`, `libam-go`, `libbyedpi`, `libmtg` are built only for arm64-v8a; widening ABIs without rebuilding native = runtime crash. Sentinel tests in `release.yml` are also arm64-v8a-only.
+- R8 minification and shrinking are enabled in the release build (Log.* statements are NOT stripped — see `proguard-rules.pro`)
 
 ## Details
 
@@ -36,3 +37,4 @@ The release process has a notable constraint: `main` is never touched without ex
 ## Sources
 
 - [[daily/2026-04-29.md]] - v1.0.5 tag created after third CI run; release watcher killed before APK build confirmed
+- [[daily/2026-05-20.md]] - KB audit (18:43): arm64-v8a only constraint confirmed; "universal APK" in old summary was misleading — universal means single APK for all users, not multi-ABI; other ABIs excluded because libhev/libam-go/libbyedpi/libmtg are arm64-v8a only

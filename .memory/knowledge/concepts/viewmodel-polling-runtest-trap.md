@@ -4,8 +4,10 @@ aliases: [polling-viewmodel-runtest, whiletrue-delay-runtest, advanceuntilidle-d
 tags: [kotlin, testing, coroutines, viewmodel, gotcha]
 sources:
   - "daily/2026-05-10.md"
+  - "daily/2026-05-19.md"
+  - "daily/2026-05-20.md"
 created: 2026-05-10
-updated: 2026-05-19
+updated: 2026-05-20
 ---
 
 # ViewModel Polling Loop Breaks advanceUntilIdle in runTest
@@ -90,11 +92,61 @@ The `stateIn(WhileSubscribed(stopTimeoutMillis))` pattern from `feedback_runtest
 
 Both approaches are valid — choose based on whether the data source is naturally a `Flow` (use `stateIn`) or a suspend function called repeatedly (use `while(true) + delay` with `advanceTimeBy` in tests).
 
+### Production Coroutine Wall Clock Trap (2026-05-20)
+
+A complementary trap: using `System.currentTimeMillis()` in production coroutine code (not mock servers) to track duration between events.
+
+```kotlin
+// BROKEN: wall clock in EngineWatchdogCoordinator
+private var zeroPeersSince: Long = 0L
+
+while (true) {
+    val peers = sdkBridge.peerCount()
+    if (peers == 0) {
+        if (zeroPeersSince == 0L) zeroPeersSince = System.currentTimeMillis()
+        val elapsed = System.currentTimeMillis() - zeroPeersSince
+        if (elapsed >= ZERO_PEERS_TIMEOUT_MS) triggerWatchdog()
+    } else {
+        zeroPeersSince = 0L
+    }
+    delay(PEER_POLL_MS)
+}
+```
+
+In `runTest` with virtual dispatcher:
+- `System.currentTimeMillis()` returns the **real wall clock**, not virtual time
+- `advanceTimeBy()` / `delay()` advance virtual time but NOT `currentTimeMillis()`
+- `elapsed` computed from wall clock is always tiny (microseconds between loop iterations in CI)
+- `elapsed >= ZERO_PEERS_TIMEOUT_MS` never becomes true → watchdog never triggers → test asserts fail
+
+Fix: replace wall clock with a poll counter that increments deterministically:
+
+```kotlin
+// CORRECT: poll counter
+private var zeroPeersPolls: Int = 0
+
+while (true) {
+    val peers = sdkBridge.peerCount()
+    if (peers == 0) {
+        zeroPeersPolls++
+        if (zeroPeersPolls >= ZERO_PEERS_POLL_THRESHOLD) triggerWatchdog()
+    } else {
+        zeroPeersPolls = 0
+    }
+    delay(PEER_POLL_MS)
+}
+```
+
+Poll count is deterministic in tests: `advanceTimeBy(PEER_POLL_MS * N)` + `runCurrent()` produces exactly N poll iterations. Sentinel: `EngineWatchdogCoordinator` must not use `System.currentTimeMillis()` — checked by `OzeroVpnServicePeerWatchdogTest`.
+
+The underlying rule: **never use wall clock (`System.currentTimeMillis`, `Instant.now()`) inside a coroutine that will be tested with virtual dispatcher.** Use virtual-clock-compatible primitives: `delay()`, counter increments, or `TestCoroutineScheduler.currentTime`.
+
 ## Related Concepts
 
 - [[concepts/viewmodel-stateflow-test-race]] - Related ViewModel test ordering issue: VM created before state setup; both are about coroutine lifecycle in test contexts
-- [[concepts/byedpi-mock-server-ci-fragility]] - The `System.currentTimeMillis()` vs virtual clock issue is a parallel gotcha; outer loop time vs inner delay time
-- [[concepts/urnetwork-sdk-integration]] - URnetwork location polling was the context where this trap was discovered
+- [[concepts/byedpi-mock-server-ci-fragility]] - `System.currentTimeMillis()` in mock server context (parallel trap in test code, not production code)
+- [[concepts/urnetwork-peer-watchdog-recovery]] - The peer watchdog where the wall clock trap was discovered; fixed with poll counter
+- [[concepts/urnetwork-sdk-integration]] - URnetwork location polling was the context where the original delay-loop deadlock was discovered
 
 ### Diagnostic Pattern
 
@@ -109,3 +161,4 @@ Any test with both patterns (without explicit cancel between them) is a potentia
 
 - [[daily/2026-05-10.md]] - Session 17:46 GROUP B: `while(true) + delay(URNETWORK_LOCATION_POLL_MS)` in MainViewModel → `advanceUntilIdle()` eternal loop in tests; fix = `advanceTimeBy(URNETWORK_LOCATION_POLL_MS + 1)` + `runCurrent()`
 - [[daily/2026-05-19.md]] - Session 13:53: extended rule — ANY `advanceUntilIdle()` with active `collectJob` = deadlock, not just when preceded by `advanceTimeBy()`; pattern is `backgroundScope.launch { flow.collect }` + `advanceUntilIdle()` before cancel; fix = `runCurrent()`; `import kotlinx.coroutines.test.runCurrent` required explicitly
+- [[daily/2026-05-20.md]] - Session 19:52: production coroutine wall clock trap — `EngineWatchdogCoordinator` used `System.currentTimeMillis()` for peer-loss duration; virtual dispatcher doesn't advance wall clock → elapsed always near zero → watchdog never fires in CI; fix: `zeroPeersPolls` poll counter replacing wall clock; sentinel added to `OzeroVpnServicePeerWatchdogTest`

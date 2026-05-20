@@ -9,8 +9,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import ru.ozero.corebackup.AppBackupData
 import ru.ozero.corebackup.AppBackupManager
 import ru.ozero.corebackup.AppBackupSerializer
+import ru.ozero.corebackup.BackupCategory
 import ru.ozero.enginescore.PersistentLoggers
 import java.io.IOException
 import javax.inject.Inject
@@ -23,11 +25,13 @@ class BackupViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<BackupUiState>(BackupUiState.Idle)
     val uiState: StateFlow<BackupUiState> = _uiState.asStateFlow()
 
-    fun export(context: Context, uri: Uri) {
+    private var pendingImport: AppBackupData? = null
+
+    fun export(context: Context, uri: Uri, categories: Set<BackupCategory>) {
         viewModelScope.launch {
             _uiState.value = BackupUiState.InProgress
             runCatching {
-                val data = backupManager.export()
+                val data = backupManager.export(categories)
                 val bytes = AppBackupSerializer.serializeEncrypted(data)
                 context.contentResolver.openOutputStream(uri)?.use { stream ->
                     stream.write(bytes)
@@ -42,22 +46,49 @@ class BackupViewModel @Inject constructor(
         }
     }
 
-    fun import(context: Context, uri: Uri) {
+    fun beginImport(context: Context, uri: Uri) {
         viewModelScope.launch {
             _uiState.value = BackupUiState.InProgress
             runCatching {
                 val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                     ?: throw IOException("Cannot open input stream for $uri")
-                val data = AppBackupSerializer.deserializeAuto(bytes)
-                backupManager.import(data)
+                AppBackupSerializer.deserializeAuto(bytes)
             }.fold(
-                onSuccess = { _uiState.value = BackupUiState.ImportSuccess },
+                onSuccess = { data ->
+                    pendingImport = data
+                    _uiState.value = BackupUiState.PendingImport(BackupCategory.availableIn(data))
+                },
                 onFailure = { e ->
-                    PersistentLoggers.error(TAG, "import failed: ${e.message}")
+                    PersistentLoggers.error(TAG, "import parse failed: ${e.message}")
                     _uiState.value = BackupUiState.Error(e.message ?: "Unknown error")
                 },
             )
         }
+    }
+
+    fun confirmImport(categories: Set<BackupCategory>) {
+        val data = pendingImport ?: return
+        viewModelScope.launch {
+            _uiState.value = BackupUiState.InProgress
+            runCatching {
+                backupManager.import(data, categories)
+            }.fold(
+                onSuccess = {
+                    pendingImport = null
+                    _uiState.value = BackupUiState.ImportSuccess
+                },
+                onFailure = { e ->
+                    PersistentLoggers.error(TAG, "import failed: ${e.message}")
+                    pendingImport = null
+                    _uiState.value = BackupUiState.Error(e.message ?: "Unknown error")
+                },
+            )
+        }
+    }
+
+    fun cancelImport() {
+        pendingImport = null
+        _uiState.value = BackupUiState.Idle
     }
 
     fun dismissResult() {
@@ -74,5 +105,6 @@ sealed interface BackupUiState {
     data object InProgress : BackupUiState
     data object ExportSuccess : BackupUiState
     data object ImportSuccess : BackupUiState
+    data class PendingImport(val availableCategories: Set<BackupCategory>) : BackupUiState
     data class Error(val message: String) : BackupUiState
 }

@@ -80,6 +80,35 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
+    fun `runStartOnMain применяет 12 device-полей при создании нового device — паритет с ensureDeviceOnMain`() {
+        val block = source.substringAfter("private suspend fun runStartOnMain")
+            .substringBefore("private suspend fun stop")
+        val requiredFields = listOf(
+            "providePaused",
+            "routeLocal",
+            "provideMode",
+            "connectLocation",
+            "defaultLocation",
+            "canShowRatingDialog",
+            "provideControlMode",
+            "vpnInterfaceWhileOffline",
+            "canRefer",
+            "allowForeground",
+            "provideNetworkMode",
+            "canPromptIntroFunnel",
+            "performanceProfile",
+        )
+        requiredFields.forEach { field ->
+            assertTrue(
+                block.contains("d.$field ="),
+                "runStartOnMain обязан выставлять d.$field из localState при создании нового device — " +
+                    "иначе engine.start() даёт SDK устройство без contextual state, и LocationsViewController " +
+                    "не отдаёт regions/cities (та же причина, что в ensureDeviceOnMain).",
+            )
+        }
+    }
+
+    @Test
     fun `ensureDeviceOnMain применяет 12 device-полей из localState — паритет с upstream DeviceManager`() {
         val block = source.substringAfter("private suspend fun ensureDeviceOnMain")
             .substringBefore("private inline fun guardedRun")

@@ -40,10 +40,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
 
-private val DNS_PRESETS: List<Pair<String, List<String>>> = listOf(
+internal val BYEDPI_DNS_PRESETS: List<Pair<String, List<String>>> = listOf(
     "Google" to listOf("8.8.8.8", "8.8.4.4"),
     "Cloudflare" to listOf("1.1.1.1", "1.0.0.1"),
     "Quad9" to listOf("9.9.9.9", "149.112.112.112"),
+    "NextDNS" to listOf("45.90.28.168", "45.90.30.168"),
+    "AdGuard" to listOf("94.140.14.14", "94.140.15.15"),
+    "ControlD" to listOf("76.76.2.0", "76.76.10.0"),
 )
 
 @Composable
@@ -69,7 +72,7 @@ private fun DnsSection(
                 modifier = Modifier.testTag("byedpi_dns_preset_auto"),
             )
         }
-        items(DNS_PRESETS) { (label, servers) ->
+        items(BYEDPI_DNS_PRESETS) { (label, servers) ->
             FilterChip(
                 selected = dnsText.trim() == servers.joinToString(", "),
                 onClick = { onPreset(servers) },

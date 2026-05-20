@@ -246,6 +246,18 @@
     <string name="backup_error">Erro: %1$s</string>
     <string name="backup_in_progress">Processando…</string>
     <string name="backup_filename">ozero_backup.ozb</string>
+    <string name="backup_select_export_title">O que fazer backup?</string>
+    <string name="backup_select_import_title">O que restaurar?</string>
+    <string name="backup_confirm">Continuar</string>
+    <string name="backup_cancel">Cancelar</string>
+    <string name="backup_category_general">Ajustes gerais</string>
+    <string name="backup_category_dns_hosts">DNS e hosts</string>
+    <string name="backup_category_byedpi">ByeDPI</string>
+    <string name="backup_category_warp">Contas WARP</string>
+    <string name="backup_category_urnetwork">URnetwork</string>
+    <string name="backup_category_telegram">Telegram MTProxy</string>
+    <string name="backup_category_strategy">Estratégias e listas de domínios</string>
+    <string name="backup_category_split_tunnel">Túnel dividido</string>
 
     <!-- IP card -->
     <string name="ip_card_title">Nó de saída</string>
@@ -318,6 +330,7 @@
     <string name="urnetwork_location_connect_first">Conecte-se ao URnetwork para ver as regiões disponíveis</string>
     <string name="urnetwork_location_regions">Regiões</string>
     <string name="urnetwork_location_cities">Cidades</string>
+    <string name="urnetwork_location_best_matches">Melhores resultados</string>
     <string name="urnetwork_check_ip">Verificar endereço IP</string>
     <string name="urnetwork_provide_title">Compartilhar largura de banda</string>
     <string name="urnetwork_provide_subtitle">Compartilhe largura de banda com a malha URnetwork</string>
@@ -515,4 +528,43 @@
     <string name="byedpi_ui_drop_sack">Descartar SACK</string>
     <string name="byedpi_ui_no_domain">Ignorar domínio</string>
     <string name="byedpi_ui_default_ttl">TTL padrão</string>
+    <string name="byedpi_ui_cat_proxy">Proxy</string>
+    <string name="byedpi_ui_cat_desync">Dessincronização TCP</string>
+    <string name="byedpi_ui_cat_protocols">Protocolos</string>
+    <string name="byedpi_ui_cat_http_desync">Modificação de cabeçalhos HTTP</string>
+    <string name="byedpi_ui_cat_https_desync">Divisão de TLS Record (HTTPS)</string>
+    <string name="byedpi_ui_cat_udp_desync">Dessincronização UDP (QUIC)</string>
+    <string name="byedpi_ui_max_connections">Máx. de conexões</string>
+    <string name="byedpi_ui_max_connections_hint">Sessões TCP simultâneas processadas. Mais = mais carga, menos = gargalo com muitas abas.</string>
+    <string name="byedpi_ui_buffer_size">Tamanho do buffer (bytes)</string>
+    <string name="byedpi_ui_buffer_size_hint">Buffer interno de leitura/escrita. Padrão 16384. Altere só se souber o que faz.</string>
+    <string name="byedpi_ui_no_domain_hint">Não analisar SNI/Host do tráfego. Útil para protocolos personalizados, quebra a maioria das estratégias.</string>
+    <string name="byedpi_ui_tcp_fast_open_hint">Habilitar TFO para sessões TCP de saída. Acelera a conexão, não é suportado em todo lugar.</string>
+    <string name="byedpi_ui_desync_method_hint">Quebrar a impressão digital DPI: SPLIT corta o pacote, DISORDER reordena, FAKE injeta lixo, OOB/DISOOB envia um byte fora de banda.</string>
+    <string name="byedpi_ui_default_ttl_hint">TTL para os pacotes enviados. 0 — o sistema decide.</string>
+    <string name="byedpi_ui_split_position_hint">Posição de corte do pacote TCP (byte). Positivo — do início, negativo — do fim.</string>
+    <string name="byedpi_ui_split_at_host_hint">Cortar o pacote logo antes de Host/SNI em vez de posição fixa.</string>
+    <string name="byedpi_ui_drop_sack_hint">Descartar a opção TCP SACK. Ajuda a contornar DPI que reagem a reorder.</string>
+    <string name="byedpi_ui_fake_ttl_hint">TTL dos pacotes falsos. Deve ser menor que o TTL real até o servidor.</string>
+    <string name="byedpi_ui_fake_sni_hint">SNI para o pacote falso (ex. google.com). Vazio = bytes aleatórios.</string>
+    <string name="byedpi_ui_fake_offset_hint">Deslocamento dos dados falsos dentro do pacote.</string>
+    <string name="byedpi_ui_oob_char_hint">Caractere para OOB/DISOOB. Um byte.</string>
+    <string name="byedpi_ui_protocols_hint">Quais protocolos passar pela dessincronização. Se desativado, o tráfego segue sem modificação.</string>
+    <string name="byedpi_ui_desync_http_hint">Aplicar evasão a HTTP simples (porta 80).</string>
+    <string name="byedpi_ui_desync_https_hint">Aplicar evasão a TLS/HTTPS (porta 443). Canal principal para YouTube/Instagram.</string>
+    <string name="byedpi_ui_desync_udp_hint">Aplicar evasão a QUIC/UDP (portas 443, 853). Necessário para YouTube/Google via QUIC.</string>
+    <string name="byedpi_ui_http_desync_hint">Manipulações do cabeçalho Host de HTTP. Não afetam HTTPS.</string>
+    <string name="byedpi_ui_host_mixed_hint">Alternar maiúsculas/minúsculas no nome Host (hOsT). Quebra assinaturas DPI simples.</string>
+    <string name="byedpi_ui_domain_mixed_hint">Alternar maiúsculas/minúsculas no próprio nome de domínio.</string>
+    <string name="byedpi_ui_host_remove_spaces_hint">Remover espaços ao redor dos dois pontos em Host:.</string>
+    <string name="byedpi_ui_https_desync_hint">Fragmentação do TLS Record. Muitos DPI analisam só o primeiro segmento.</string>
+    <string name="byedpi_ui_tls_record_split_hint">Dividir TLS ClientHello em dois TLS Records.</string>
+    <string name="byedpi_ui_tls_record_position_hint">Posição do corte dentro do ClientHello (byte).</string>
+    <string name="byedpi_ui_tls_record_at_sni_hint">Cortar TLS Record exatamente no campo SNI.</string>
+    <string name="byedpi_ui_udp_desync_hint">Evasão para tráfego UDP (QUIC). Afeta YouTube/Google.</string>
+    <string name="byedpi_ui_udp_fake_count">Quantidade de pacotes UDP falsos</string>
+    <string name="byedpi_ui_udp_fake_count_hint">Quantos pacotes UDP falsos enviar antes do real. 0 — desativado.</string>
+    <string name="urnetwork_shared_traffic_chart_title">Gráfico de 30 dias</string>
+    <string name="urnetwork_shared_traffic_chart_empty">Ainda não há dados — compartilhe tráfego como provedor e as estatísticas aparecerão aqui.</string>
+    <string name="urnetwork_shared_traffic_chart_peak">Dia de pico: %1$s</string>
 </resources>

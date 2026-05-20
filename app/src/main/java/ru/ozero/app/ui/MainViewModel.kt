@@ -173,6 +173,23 @@ class MainViewModel @Inject constructor(
             initialValue = IpInfoState.Idle,
         )
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val currentEngineDegraded: StateFlow<Boolean> = tunnelController.state
+        .flatMapLatest { s ->
+            if (s is TunnelState.Connected && s.engineId in DEGRADATION_TRACKED_ENGINES) {
+                val plugin = enginePlugins.firstOrNull { it.id == s.engineId }
+                plugin?.stats()?.map { it.activeConnections == 0 } ?: flowOf(false)
+            } else {
+                flowOf(false)
+            }
+        }
+        .distinctUntilChanged()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = false,
+        )
+
     val urnetworkPeerCount: StateFlow<Int> = flow {
         while (true) {
             val s = tunnelController.state.value
@@ -341,8 +358,14 @@ class MainViewModel @Inject constructor(
 
     fun onManualEngineSelect(engine: EngineId?) {
         val current = tunnelController.state.value
-        if (current is TunnelState.Connected && current.engineId != engine) {
-            tunnelController.onSwitchingStarted(from = current.engineId, to = engine)
+        val runningEngine = when (current) {
+            is TunnelState.Connected -> current.engineId
+            is TunnelState.Connecting -> current.engineId
+            is TunnelState.Probing -> current.engineId
+            else -> null
+        }
+        if (runningEngine != null && runningEngine != engine) {
+            tunnelController.onSwitchingStarted(from = runningEngine, to = engine)
         }
         viewModelScope.launch { settingsRepository.setManualEngine(engine) }
     }
@@ -359,5 +382,6 @@ class MainViewModel @Inject constructor(
         const val IP_INFO_RETRY_ATTEMPTS = 3
         const val IP_INFO_RETRY_DELAY_MS = 1_500L
         const val URNETWORK_LOCATION_POLL_MS = 4_000L
+        val DEGRADATION_TRACKED_ENGINES = setOf(EngineId.WARP, EngineId.URNETWORK)
     }
 }

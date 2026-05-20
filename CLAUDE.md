@@ -83,7 +83,7 @@
 
 ## Per-engine UI
 
-- Каждый engine (текущие модули: byedpi, telegram, urnetwork, warp) обязан иметь settings screen в `app/src/main/java/.../ui/settings/engines/` для пользовательского override config (subscription URL, server picker, args, bridges, и т.д.). При добавлении нового `engine-*` модуля — добавить сюда.
+- Каждый engine (текущие модули: byedpi, telegram, urnetwork, warp, masterdns) обязан иметь settings screen в `app/src/main/java/.../ui/settings/engines/` для пользовательского override config (subscription URL, server picker, args, bridges, и т.д.). При добавлении нового `engine-*` модуля — добавить сюда.
 
 ## Расследование — порядок (закон)
 
@@ -100,13 +100,14 @@
 Маппинг папка → движок:
 - `Контекст/android/` → **URnetwork** (официальный Android source `bringyour/network-android`). Эталон для `engine-urnetwork`. См. `URNETWORK_INIT_ANALYSIS.md`. Покрывает locations, provideMode, enhanced anonymization, dedicated/sticky IP, ConnectGrid.
 - `Контекст/PORTAL_WG_v1.4.3/` + `Контекст/CYBERPORTAL_X-v1.0.2/` → **WARP** (AmneziaWG stack). Эталон для `engine-warp`. См. `PORTAL_WG_ANALYSIS.md`. Покрывает `awgTurnOn` 4-arg сигнатуру, uapiPath=`getDataDir()`, ReLinker для `libam-go`, mirror-контракт Cloudflare WARP API.
-- `Контекст/ByeByeDPI-v.1.7.4/` → **ByeDPI** (полный source ByeByeDPI 1.7.4, single-engine app). Эталон для `engine-byedpi` + hev pipeline. Сравнивать args, hev YAML, init order.
+- `Контекст/ByeByeDPI-v.1.7.5/` → **ByeDPI** (полный source ByeByeDPI 1.7.5, single-engine app). Эталон для `engine-byedpi` + hev pipeline. Сравнивать args, hev YAML, init order. byedpi submodule pin: `ba532298` (main HEAD 2026-03-26, 38 коммитов вперёд v0.17.3).
 - `Контекст/karing/`, `Контекст/Invizible_Pro*/`, `Контекст/КИБЕРЩИТ*/`, `Контекст/ResultV/`, `Контекст/PortalConnect*/`, `Контекст/amnezia-{client,vpn}/` — дополнительные источники (decompiled APK / source-mirror). Использовать как secondary references при поиске специфичных фич.
 - `Контекст/Architect.md`, `AUDIT.md`, `PRD.md`, `SPEC.md`, `ПЛАН.md` — проектные документы, не reference.
 
 ## MTProxy / Subprocess-proxy паттерн
 
 - `engine-telegram` — не VPN routing engine, а side-car proxy subprocess. Не реализует `Engine` интерфейс, не регистрируется через `@IntoSet`.
+- `engine-masterdns` — subprocess-pattern по образцу `engine-telegram`, но **полноценный** `EnginePlugin` (регистрируется `@IntoSet` через `MasterDnsModule`). Go-бинарь `libmdnsvpn.so` в `jniLibs/arm64-v8a/`, запуск через `ProcessBuilder`, **не** `System.loadLibrary`. Конфиг: TOML + resolvers.txt пишутся в `filesDir/masterdns/` (writer перезатирает `LISTEN_IP/LISTEN_PORT/LOCAL_DNS_ENABLED`). Локальный SOCKS5 берёт `MasterDnsPortAllocator` из диапазона `18000..18999`. Свой Go-рантайм изолирован subprocess'ом → не конфликтует с `libgojni`/`libam-go`. Бинарь поставляется через `binaries.lock.yaml` после ручного workflow `build-masterdns.yml` (release-тег `masterdns-<short>`); до публикации lock-entry отсутствует, модуль собирается без артефакта.
 - Subprocess запускается через `ProcessBuilder` из `nativeLibraryDir`. Бинарь (`libmtg.so`) — prebuilt Go binary, помещается прямо в `jniLibs/<abi>/`. **Не** грузить через `System.loadLibrary` — бинарь запускается как отдельный процесс, не как .so.
 - Routing через VPN: при WARP (`socksPort == 0`) subprocess наследует UID → трафик через TUN автоматически (`excludeSelf=false`). При SOCKS-engine — передать `--socks5-proxy-url socks5://127.0.0.1:<port>` (loopback минует TUN).
 - `TelegramProxyCoordinator` — единственная точка связи VPN state и proxy: наблюдает `TunnelController.state` + `configStore.config()` через `combine`, выбирает upstream, вызывает `start/stop`. Инициализируется в `OzeroApp.onCreate` через Hilt inject + `runCatching`.
@@ -122,7 +123,7 @@
 Подтянуто скиллом `/rules`. Из 16 правил в репо — оставлено 5 релевантных Android/Kotlin/Compose проекту. Остальные (Next.js, Python, Postgres jobs, OAuth, billing, web-i18n, web-analytics, payments) **намеренно не скачаны** — для Ozero они дезориентируют. Re-run `/rules` обновит снапшот, но фильтр придётся применить заново вручную.
 
 - [`context7.md`](C:/Soft/Projects/Ozero/.claude/rules/context7.md) — **Закон.** Всегда использовать `context7` MCP при работе с любой библиотекой/SDK: установка, импорты, конфиг, обновления, дебаг. Применять для AndroidX, Compose, Hilt, Kotlin coroutines, Gradle plugins, и т.д.
-- [`tests.md`](C:/Soft/Projects/Ozero/.claude/rules/tests.md) — **Закон с поправкой.** AAA-паттерн, exhaustive edge-cases (null/empty/boundary/invalid types/race/auth/pagination). Coverage порог в Ozero **≥95%** (`feedback_tdd_coverage_logs`), target 100%. Чек-лист "что тестировать" применять полностью.
+- [`tests.md`](C:/Soft/Projects/Ozero/.claude/rules/tests.md) — **Закон с поправкой.** AAA-паттерн, exhaustive edge-cases (null/empty/boundary/invalid types/race/auth/pagination). Coverage порог в Ozero **≥95%**, target 100%. Чек-лист "что тестировать" применять полностью.
 - [`folders.md`](C:/Soft/Projects/Ozero/.claude/rules/folders.md) — **Дух применим, буква нет.** Принцип "разделение по сервисам" в Ozero реализован через 9 gradle-модулей (`app`, `engines-core`, `core-storage`, `common-{vpn,dns,crypto}`, `engine-{byedpi,urnetwork,warp}`). Новый движок = новый `engine-*` модуль, не файлы в `app/`. Текст правила про `frontend/backend/worker/` — игнорить, у нас Android single-APK.
 - [`git.md`](C:/Soft/Projects/Ozero/.claude/rules/git.md) — **Только reference, НЕ закон.** В правиле: `develop` default + PR `develop→main`. У Ozero: `dev` default, ветки `feat/`/`fix/` от `dev`, **squash-merge без PR** (см. global `feedback_no_pull_requests`), main только по явной команде. При конфликте — побеждают глобальные/проектные правила.
 - [`translate.md`](C:/Soft/Projects/Ozero/.claude/rules/translate.md) — **Только baseline-локали.** Из правила берём список обязательных локалей: `ru`, `en`, `es`, `pt`. Архитектура (Next.js URL-locales, namespaced JSON) **не применима** — у Ozero Android `values-{en,es,pt}/strings.xml`. Сейчас активны только `ru`+`en` (W9.1), расширение до `es`+`pt` в W9.2.

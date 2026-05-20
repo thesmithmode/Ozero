@@ -5,8 +5,9 @@ tags: [byedpi, native, jni, concurrency, architecture]
 sources:
   - "daily/2026-05-15.md"
   - "daily/2026-05-19.md"
+  - "daily/2026-05-20.md"
 created: 2026-05-15
-updated: 2026-05-19
+updated: 2026-05-20
 ---
 
 # ByeDPI JNI Guard Hardening: Ownership, Return Codes, Emergency Reset
@@ -34,7 +35,7 @@ Before T-21, `jniForceClose` released `g_proxy_running` (set to 0) as part of cl
 4. Engine A: `main()` finally exits → sets `g_proxy_running = 0` (premature release!)
 5. Engine B: running but guard is 0 → next CAS sees 0, allows concurrent `main()`
 
-The fix: `jniForceClose` sends the shutdown signal (`shutdown(server_fd, SHUT_RDWR)`) but does NOT touch `g_proxy_running`. Only the natural exit path of `main()` inside `jniStartProxy` releases the guard. This serializes access correctly even under rapid engine switching.
+The fix: `jniForceClose` performs hard cleanup (`close(server_fd)` + reset the global to -1) but does NOT touch `g_proxy_running`. Note the split with `jniStopProxy`: `jniStopProxy` calls only `shutdown(server_fd, SHUT_RDWR)` (graceful — fd stays open, kernel-recycle blocked), while `jniForceClose` calls `close(server_fd)` (hard — fd freed, server_fd global reset). See [[concepts/byedpi-stale-serverfd-unconditional-forceclose]] for why `forceClose` (the close-path) must run after every `stop()` and every start-failure. Only the natural exit path of `main()` inside `jniStartProxy` releases the `g_proxy_running` guard. This serializes access correctly even under rapid engine switching.
 
 Upstream ByeByeDPI 1.7.4 has the same race bug — the `Stop` and `ForceClose` JNI methods both reset the guard. Ozero's fix is objectively better than upstream.
 
@@ -110,3 +111,4 @@ This enables post-mortem diagnosis of where in the native call chain a hang occu
 
 - [[daily/2026-05-15.md]] - Session 13:30: T-19 argv NULL-check, T-21 jniForceClose guard ownership, T-20 server_fd race documented (upstream fork required); Session 15:30: code reviewer found P0-1 spin blocking, P0-2 indistinguishable return codes, P1-1 wedge; ba2f74b5 rework removed C retry, added JNI_GUARD_BUSY=-2, limitedParallelism(1); 9de61de3 added jniEmergencyReset + startProxyWithRecovery
 - [[daily/2026-05-19.md]] - v0.1.5 session: `__android_log_print` checkpoints added before/after main()/jniStopProxy/jniForceClose; cold-start 5s+ vs 14ms warm start identified from ozero.log L12-58 vs L5642-5649; hang root cause not yet resolved
+- [[daily/2026-05-20.md]] - KB contradiction audit (18:37): `jniStopProxy`=`shutdown(server_fd, SHUT_RDWR)` (graceful, fd stays open), `jniForceClose`=`close(server_fd)` (hard, fd freed + global reset), neither touches `g_proxy_running` from outside — distinction confirmed as already correctly documented in this article; cross-reference with [[concepts/byedpi-stale-serverfd-unconditional-forceclose]] for stale-fd side of the same invariant

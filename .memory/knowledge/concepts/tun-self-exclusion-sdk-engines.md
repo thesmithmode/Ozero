@@ -55,6 +55,10 @@ Commit `5a8089dd` introduced `excludeSelf = (engineId != EngineId.WARP)` in `com
 
 Beyond the functional regression, this introduced a modular boundary violation: `common-vpn` now referenced `EngineId.WARP`, meaning a shared infrastructure module knew about a specific engine. The fix restored unconditional `excludeSelf = true` and added a sentinel test forbidding any `EngineId.WARP` reference in `common-vpn` source. Two prior sentinel tests that *protected* the broken conditional were deleted as [[concepts/sentinel-protecting-bug-trap]] instances. See [[concepts/modular-boundary-engine-specific-logic]] for the full modular boundary analysis.
 
+### Current Invariant (Reaffirmed)
+
+Despite three regressions across v0.0.7, v0.0.9, and 2026-05-15 attempting non-default values, the invariant remains: `excludeSelf = true` is the **only** correct value for all engines (Go SDK, SOCKS, AWG). The historical attempts above (`false` for WARP/AWG IP-detection parity, conditional by engine) all broke other engines. The hardcoded-true conclusion is the survived synthesis of three failed alternatives, not a default that bypassed examination.
+
 ## Related Concepts
 
 - [[concepts/urnetwork-sdk-integration]] - URnetwork is the engine that broke; Go SDK socket protection model requires self-exclusion
