@@ -271,8 +271,12 @@ class EngineUrnetwork(
     // walletAuth migration критична: каждый Ozero-юзер должен иметь свою URnetwork-network
     // (per-device Ed25519 identity), payout = PRESET_WALLET общий. БЕЗ migration legacy guest
     // юзеры остаются на shared guest network → НЕ становятся per-user providers → выплаты не идут.
-    // Side-effect: backend race в RefreshFreeTransferBalance может выдать 2 окна на одной networkId
-    // = 68 GiB вместо 34. Не fixable client-side (нет API expire). Принято как штатное.
+    //
+    // Заметка о startBalance > 34 GiB: НЕ баг клиента. Бэкенд добавляет строку в transfer_balance
+    // при каждом ежедневном кроне (RefreshTransferBalanceDuration=30ч, крон=каждые 24ч). SubscriptionBalance
+    // суммирует ВСЕ активные строки. При создании сети незадолго до полуночи UTC → 3 строки могут
+    // быть активны одновременно (overlap window ~5ч) → startBalance = 3×34 = 102 GiB. Само падает.
+    // UX fix: кэпировать отображение на 34 GiB (free tier) в UrnetworkBalanceCard.
     private suspend fun tryAcquireDeviceJwt(legacyMigration: Boolean): String? {
         val identity = deviceIdentity ?: return null
         val storedName = configStore.deviceNetworkName().first()
