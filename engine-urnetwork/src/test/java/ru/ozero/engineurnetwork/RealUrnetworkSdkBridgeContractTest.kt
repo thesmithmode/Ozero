@@ -80,37 +80,8 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
-    fun `runStartOnMain применяет 12 device-полей при создании нового device — паритет с ensureDeviceOnMain`() {
-        val block = source.substringAfter("private suspend fun runStartOnMain")
-            .substringBefore("private suspend fun stop")
-        val requiredFields = listOf(
-            "providePaused",
-            "routeLocal",
-            "provideMode",
-            "connectLocation",
-            "defaultLocation",
-            "canShowRatingDialog",
-            "provideControlMode",
-            "vpnInterfaceWhileOffline",
-            "canRefer",
-            "allowForeground",
-            "provideNetworkMode",
-            "canPromptIntroFunnel",
-            "performanceProfile",
-        )
-        requiredFields.forEach { field ->
-            assertTrue(
-                block.contains("d.$field ="),
-                "runStartOnMain обязан выставлять d.$field из localState при создании нового device — " +
-                    "иначе engine.start() даёт SDK устройство без contextual state, и LocationsViewController " +
-                    "не отдаёт regions/cities (та же причина, что в ensureDeviceOnMain).",
-            )
-        }
-    }
-
-    @Test
-    fun `ensureDeviceOnMain применяет 12 device-полей из localState — паритет с upstream DeviceManager`() {
-        val block = source.substringAfter("private suspend fun ensureDeviceOnMain")
+    fun `applyDeviceFields helper применяет 13 device-полей — единый источник правды`() {
+        val block = source.substringAfter("private fun applyDeviceFields(")
             .substringBefore("private inline fun guardedRun")
         val requiredFields = listOf(
             "providePaused",
@@ -130,11 +101,54 @@ class RealUrnetworkSdkBridgeContractTest {
         requiredFields.forEach { field ->
             assertTrue(
                 block.contains("device.$field ="),
-                "ensureDeviceOnMain обязан выставлять device.$field из localState — " +
+                "applyDeviceFields обязан выставлять device.$field — " +
                     "паритет с upstream DeviceManager.kt:132-144. Без этого SDK возвращает только " +
                     "страны без городов/регионов в LocationsViewController.",
             )
         }
+    }
+
+    @Test
+    fun `runStartOnMain и ensureDeviceOnMain делегируют в applyDeviceFields — single source of truth`() {
+        val startBlock = source.substringAfter("private suspend fun runStartOnMain")
+            .substringBefore("private suspend fun stop")
+        val ensureBlock = source.substringAfter("private suspend fun ensureDeviceOnMain")
+            .substringBefore("private fun applyDeviceFields")
+        assertTrue(
+            startBlock.contains("applyDeviceFields(d, localState)"),
+            "runStartOnMain обязан делегировать применение 13 device-полей в applyDeviceFields — " +
+                "иначе разъезжается с ensureDeviceOnMain (как в v0.1.7) → SDK скрывает regions/cities " +
+                "при engine.start без открытия settings.",
+        )
+        assertTrue(
+            ensureBlock.contains("applyDeviceFields(device, localState)"),
+            "ensureDeviceOnMain обязан делегировать в applyDeviceFields — " +
+                "иначе разъезжается с runStartOnMain.",
+        )
+    }
+
+    @Test
+    fun `applyDeviceFields override на ProvideModePublic при ALWAYS — root cause regions cities скрытых`() {
+        val block = source.substringAfter("private fun applyDeviceFields(")
+            .substringBefore("private inline fun guardedRun")
+        assertTrue(
+            block.contains("Sdk.ProvideModePublic"),
+            "applyDeviceFields обязан override provideMode на Sdk.ProvideModePublic когда " +
+                "provideControlMode == ALWAYS — паритет с upstream DeviceManager.kt:105. " +
+                "Без override свежий юзер имеет localState.provideMode = ProvideModeNone (0), " +
+                "и SDK скрывает regions/cities в LocationsViewController (только countries).",
+        )
+        assertTrue(
+            block.contains("UrnetworkProvideControlMode.fromRaw"),
+            "applyDeviceFields обязан нормализовать provideControlMode через fromRaw — " +
+                "raw localState.provideControlMode может быть '' или невалидный, SDK тогда " +
+                "не активирует location hierarchy.",
+        )
+        assertTrue(
+            block.contains("UrnetworkProvideControlMode.ALWAYS.rawValue"),
+            "Override branch обязан сравнивать с UrnetworkProvideControlMode.ALWAYS.rawValue — " +
+                "иначе магическая строка \"always\" разъедется с enum при rename.",
+        )
     }
 
     @Test

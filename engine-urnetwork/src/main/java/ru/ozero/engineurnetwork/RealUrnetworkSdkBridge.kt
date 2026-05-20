@@ -7,6 +7,7 @@ import com.bringyour.sdk.ConnectViewController
 import com.bringyour.sdk.DeviceLocal
 import com.bringyour.sdk.IoLoop
 import com.bringyour.sdk.IoLoopDoneCallback
+import com.bringyour.sdk.LocalState
 import com.bringyour.sdk.LocationsViewController
 import com.bringyour.sdk.PerformanceProfile
 import com.bringyour.sdk.Sdk
@@ -139,20 +140,7 @@ class RealUrnetworkSdkBridge(
                 val keys = localState.provideSecretKeys
                 if (keys != null) d.loadProvideSecretKeys(keys) else d.initProvideSecretKeys()
             }.onFailure { PersistentLoggers.warn(TAG, "provideSecretKeys init threw: ${it.message}") }
-            runCatching { d.providePaused = true }
-                .onFailure { PersistentLoggers.warn(TAG, "providePaused threw: ${it.message}") }
-            runCatching { d.routeLocal = localState.routeLocal }
-            runCatching { d.provideMode = localState.provideMode }
-            runCatching { d.connectLocation = localState.connectLocation }
-            runCatching { d.defaultLocation = localState.defaultLocation }
-            runCatching { d.canShowRatingDialog = localState.canShowRatingDialog }
-            runCatching { d.provideControlMode = localState.provideControlMode }
-            runCatching { d.vpnInterfaceWhileOffline = localState.vpnInterfaceWhileOffline }
-            runCatching { d.canRefer = localState.canRefer }
-            runCatching { d.allowForeground = localState.allowForeground }
-            runCatching { d.provideNetworkMode = localState.provideNetworkMode }
-            runCatching { d.canPromptIntroFunnel = localState.canPromptIntroFunnel }
-            runCatching { d.performanceProfile = localState.performanceProfile }
+            applyDeviceFields(d, localState)
             Log.i(TAG, "runStartOnMain: device created — 12 fields applied (паритет с initDeviceForLocations)")
             deviceRef.set(d)
             d
@@ -370,22 +358,35 @@ class RealUrnetworkSdkBridge(
             val keys = localState.provideSecretKeys
             if (keys != null) device.loadProvideSecretKeys(keys) else device.initProvideSecretKeys()
         }
+        applyDeviceFields(device, localState)
+        deviceRef.set(device)
+        Log.i(TAG, "initDeviceForLocations: device ready for location browse — 12 fields applied")
+        return true
+    }
+
+    private fun applyDeviceFields(device: DeviceLocal, localState: LocalState) {
+        val rawControlMode = runCatching { localState.provideControlMode }.getOrNull().orEmpty()
+        val normalizedControlMode = UrnetworkProvideControlMode.fromRaw(rawControlMode).rawValue
+        val rawProvideMode = runCatching { localState.provideMode }.getOrDefault(Sdk.ProvideModeNone)
+        val effectiveProvideMode = if (normalizedControlMode == UrnetworkProvideControlMode.ALWAYS.rawValue) {
+            Sdk.ProvideModePublic
+        } else {
+            rawProvideMode
+        }
         runCatching { device.providePaused = true }
+            .onFailure { PersistentLoggers.warn(TAG, "providePaused threw: ${it.message}") }
         runCatching { device.routeLocal = localState.routeLocal }
-        runCatching { device.provideMode = localState.provideMode }
+        runCatching { device.provideMode = effectiveProvideMode }
         runCatching { device.connectLocation = localState.connectLocation }
         runCatching { device.defaultLocation = localState.defaultLocation }
         runCatching { device.canShowRatingDialog = localState.canShowRatingDialog }
-        runCatching { device.provideControlMode = localState.provideControlMode }
+        runCatching { device.provideControlMode = normalizedControlMode }
         runCatching { device.vpnInterfaceWhileOffline = localState.vpnInterfaceWhileOffline }
         runCatching { device.canRefer = localState.canRefer }
         runCatching { device.allowForeground = localState.allowForeground }
         runCatching { device.provideNetworkMode = localState.provideNetworkMode }
         runCatching { device.canPromptIntroFunnel = localState.canPromptIntroFunnel }
         runCatching { device.performanceProfile = localState.performanceProfile }
-        deviceRef.set(device)
-        Log.i(TAG, "initDeviceForLocations: device ready for location browse — 12 fields applied")
-        return true
     }
 
     private inline fun guardedRun(label: String, block: () -> Unit) {
