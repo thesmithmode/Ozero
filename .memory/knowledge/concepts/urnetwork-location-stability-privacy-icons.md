@@ -4,8 +4,9 @@ aliases: [location-stability-icons, connectedlocation-stable-strongprivacy, loca
 tags: [urnetwork, sdk, ui, compose, locations]
 sources:
   - "daily/2026-05-18.md"
+  - "daily/2026-05-19.md"
 created: 2026-05-18
-updated: 2026-05-18
+updated: 2026-05-20
 ---
 
 # URnetwork Location Stability and Privacy Icons
@@ -87,6 +88,11 @@ During this feature, a CI failure surfaced that `ktlint` enforces the 120-charac
 - [[concepts/urnetwork-location-hierarchy-migration]] — setPreferredLocation(ConnectLocation?) migration; the same ConnectLocation type carries stable/strongPrivacy
 - [[concepts/per-engine-ui]] — location picker lives in URnetwork engine settings screen; icons are part of that dedicated UI
 
+### APK Investigation Confirms Standard Material Icons (2026-05-19)
+
+During a session to verify icon sources, the original URnetwork APK was decompiled via PowerShell ZipFile + jadx. Obfuscation renamed raw resources to short identifiers (`j7.png`, `2n.png`). Jadx restored `res/drawable/ic_unstable.xml` — a standard Material warning_amber VectorDrawable (24px, FILL=1, wght=400, filled triangle), exactly matching `Icons.Filled.Warning` from Compose Material Icons. No custom privacy_glasses asset was found. The conclusion: URnetwork upstream uses standard Material Icons, not custom drawables. Ozero's current `Icons.Filled.Warning` and `Icons.Filled.Lock` already match the reference implementation.
+
 ## Sources
 
 - [[daily/2026-05-18.md]] — Session 23:57: SDK stable/strongPrivacy fields discovered; UrnetworkLocationItem extended; LocationRow icons added with StateConnecting/StateConnected palette mapping; ktlint >120 chars in test files caught in CI; inner class ConnectLocation name shadowing production type → renamed immediately
+- [[daily/2026-05-19.md]] — Session 00:06: APK decompile via jadx confirmed ic_unstable.xml = Material warning_amber (FILL=1) = Icons.Filled.Warning; no custom privacy_glasses asset; current Lock+Warning icon choice validated against upstream

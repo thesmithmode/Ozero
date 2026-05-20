@@ -1,5 +1,29 @@
 # Build Log
 
+## [2026-05-20T20:00:00+03:00] compile | Daily Log 2026-05-20
+- Source: daily/2026-05-20.md
+- Articles created:
+  - [[concepts/urnetwork-filteredlocations-bestmatches]] — FilteredLocations 5-list structure; bestMatches field was ignored → empty search results; fix: allBestMatches VM + "Лучшие совпадения" section
+  - [[concepts/urnetwork-balance-accumulation-mechanism]] — server INSERT not UPDATE; 30h duration vs 24h cron → 6h overlap → 68-102 GiB sum; not client bug; UX fix: cap at 34 GiB
+  - [[concepts/prod-log-infra-redaction]] — three boot.log leak categories: WARP mirror URLs, Solana wallet prefix, dev-language instructions; all three redacted
+- Articles updated:
+  - [[concepts/byedpi-args-parsing]] — commit 7cc2348f regression: Kotlin prepended "ciadpi" without checking native-lib.c:85 already sets argv[0]="byedpi"; result: IDLE state; sentinel rule added
+  - [[concepts/warp-uapi-handshake-polling]] — legacy socket path bug: WarpUapi.readState used ozero-warp.sock → null stats → false DEGRADED; fix: findUapiSocket() cascade through sockets/ subdir + listFiles; WarpSocketDiagnostics added
+  - [[concepts/urnetwork-sdk-integration]] — runStartOnMain symmetry fix: both paths must apply all 12 device fields; previous fix only covered ensureDeviceOnMain (settings path); engine.start() path stayed at 1 field → SDK hid cities/regions
+- Index: 3 rows added, 3 rows updated, total 150
+- Sessions covered: 13:00 (FilteredLocations bestMatches, balance 102GiB server source), 15:59 (boot.log security audit), post-compact (ByeDPI argv[0] regression 7cc2348f, WARP sockets/ path bug), 00:48/v0.1.9 (URnetwork runStartOnMain symmetry)
+
+## [2026-05-20T17:30:00+03:00] compile | Daily Log 2026-05-19
+- Source: daily/2026-05-19.md
+- Articles created:
+  - [[concepts/warp-awg-handle-zero-valid]] — AWG handle=0 valid first slot; handle<0 correct guard; handle<=0 misdiagnosis reverted
+  - [[concepts/byedpi-hev-pipeline-upstream-parity]] — HevTunnelConfig YAML extra fields + IPv6 blackhole removal for ByeDPI upstream parity
+  - [[concepts/engine-status-bar-symmetric-columns]] — IpInfoCard 50/50 split; isUrnetworkVisibleInMain auto-mode fix; i18n keys
+- Articles updated:
+  - [[concepts/warp-false-connected-no-handshake]] — added 5s→10s timeout revert + handle=0 misdiagnosis context
+  - [[concepts/urnetwork-location-stability-privacy-icons]] — APK investigation confirmed Material Icons are correct reference
+- Index: 4 rows added, 1 row updated, total 148
+
 ## [2026-05-20T12:00:00+03:00] compile | Daily Log 2026-05-18 (pass 8 — uncovered late sessions 23:41 and 23:57)
 - Source: daily/2026-05-18.md
 - Articles created:

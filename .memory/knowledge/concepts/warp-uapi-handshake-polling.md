@@ -65,6 +65,17 @@ withTimeoutOrNull(10_000) {
 
 If 10 seconds pass without handshake, the engine transitions to `Failed("No WG handshake after 10s")`.
 
+### Legacy Socket Path Bug (v0.1.9, 2026-05-20)
+
+`WarpUapi.readState` was reading from the legacy path `$dataDir/ozero-warp.sock` (or similar fixed filename). The amneziawg-go fork actually writes the UAPI socket to `$dataDir/sockets/<kernel-tun-name>.sock` — the kernel assigns the tun interface name, which may differ from our chosen tunnel name. With the legacy path, `LocalSocket.connect()` failed silently (file not found), `readState` returned null stats, and the health monitor classified the tunnel as DEGRADED. This triggered spurious recover cycles even when the WireGuard handshake had completed successfully.
+
+Fix: `WarpHandshakeUapi.findUapiSocket()` with cascade discovery:
+1. Try `sockets/<tunnelName>.sock` (preferred, matches kernel-assigned name when names align)
+2. Try first `.sock` file found via `listFiles("sockets/")` (handles kernel-assigned names that differ)
+3. Fall back to legacy `<uapiPath>/<tunnelName>.sock` for backward compatibility
+
+`WarpSocketDiagnostics` was also added to enumerate and log both `sockets/` and `wireguard/` subdirectories for diagnostic purposes during tunnel startup.
+
 ### Detection Latency Optimization (v0.1.8, 2026-05-18 session 23:41)
 
 The original polling parameters introduced an unnecessary detection lag:
@@ -89,3 +100,4 @@ The `soTimeout` reduction is a correctness fix, not an optimization: a 500ms blo
 - [[daily/2026-05-14.md]] - Session 16:41: UAPI socket polling for last_handshake_time_sec, NOT awgGetConfig (SIGSEGV on partial-handshake); WarpHandshakeUapi.kt via LocalSocket; 300ms poll, 10s timeout
 - [[daily/2026-05-14.md]] - Session 16:33: awgTurnOn ≠ handshake; TSPU blocks vanilla WG; polling pattern documented
 - [[daily/2026-05-18.md]] - Session 23:41: `soTimeout` 500ms→50ms (correctness, unix socket <1ms), `WARP_READY_POLL_MS` 300ms→100ms (optimization, peer engine analogy); detection lag max 800ms→150ms
+- [[daily/2026-05-20.md]] - WarpUapi.readState using legacy `ozero-warp.sock` path → null stats → false DEGRADED → spurious recovers; fix: findUapiSocket() cascade through sockets/ subdir + listFiles discovery; WarpSocketDiagnostics added

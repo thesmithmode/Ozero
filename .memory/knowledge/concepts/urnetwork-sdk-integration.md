@@ -7,8 +7,9 @@ sources:
   - "daily/2026-05-02.md"
   - "daily/2026-05-05.md"
   - "daily/2026-05-12.md"
+  - "daily/2026-05-20.md"
 created: 2026-05-01
-updated: 2026-05-12
+updated: 2026-05-20
 ---
 
 # URnetwork SDK Integration
@@ -68,6 +69,12 @@ Production log analysis (6-subagent diagnostic session) revealed that URnetwork 
 
 Solana, URx token, wallet address, and balance UI elements removed from URnetwork settings and strings.xml. VM pollers for `unpaidBytes` and `subscriptionBalance` retained (bridge methods exist) but UI no longer displays them. Ozero uses URnetwork as a pure P2P VPN engine without the cryptocurrency/payment layer.
 
+### runStartOnMain Symmetry Fix (2026-05-20, v0.1.9)
+
+The SDK device configuration must be applied symmetrically in both code paths that call `ensureDeviceOnMain` and `runStartOnMain`. Previously, the fix to apply all 12 device fields (`routeLocal`, `provideMode`, `providePaused`, `locationId`, `locationName`, `locationCountry`, etc.) from `localState` was only applied in `ensureDeviceOnMain` — the path called when the user opens the settings screen. The `runStartOnMain` path (called when `engine.start()` is invoked without the settings screen being open) still applied only `providePaused=true` (1 field). The SDK saw a device missing the other 11 fields and hid cities and regions from the location picker.
+
+Fix: apply all 12 fields in `runStartOnMain` as well, or extract the field-application into a shared function called from both paths. Sentinel: a test that verifies symmetric 12-field application in both code paths.
+
 ### Country Switch UX (2026-05-12)
 
 `switchingCountry` flag added to URnetwork ViewModel. When user selects a different exit country, StatusRow shows "Переключение страны…" and the engine performs soft peer re-discovery targeting the new country's relay nodes. Uses the watchdog `recover()` mechanism for non-destructive mesh refresh.
@@ -91,3 +98,4 @@ Solana, URx token, wallet address, and balance UI elements removed from URnetwor
 - [[daily/2026-05-01.md]] - URnetwork SDK 4-iteration build, userwireguard.aar success, Dockerfile SHA env trap, remaining integration tasks identified
 - [[daily/2026-05-02.md]] - Consent system removed, stop() leak fixed, NetworkSpace init flow discovered via bytecode introspection, RealBridge implemented
 - [[daily/2026-05-12.md]] - Session 21:19: peer discovery loss after 4-5 min diagnosed; recover() watchdog added; Solana/URx/wallet UI removed; country switch UX with switchingCountry flag
+- [[daily/2026-05-20.md]] - runStartOnMain symmetry fix: both runStartOnMain AND ensureDeviceOnMain must apply all 12 device fields; previous fix only covered ensureDeviceOnMain (settings path); engine.start() path stayed at 1 field → SDK hid cities/regions
