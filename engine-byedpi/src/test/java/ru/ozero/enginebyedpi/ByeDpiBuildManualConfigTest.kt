@@ -21,22 +21,31 @@ class ByeDpiBuildManualConfigTest {
     }
 
     @Test
-    fun `CMD mode winningArgs override сохраняет custom + дописывает -Ku если отсутствует`() {
+    fun `CMD mode winningArgs передаются verbatim — никаких авто-suffix`() {
+        val custom = "-s1 -q1 -a1 -Y -At -a1 -S -f-1 -r1+s -a1 -As -d1+s -O1 -s29+s -a1"
+        val cfg = engine.buildManualConfig(
+            SettingsModel(byedpiUseUiMode = false, byedpiWinningArgs = custom),
+        ) as EngineConfig.ByeDpi
+        assertEquals(custom, cfg.args, "CMD args обязаны идти в byedpi байт-в-байт, got '${cfg.args}'")
+    }
+
+    @Test
+    fun `CMD mode без -Ku не получает UDP desync auto-suffix — user explicit control`() {
         val custom = "-Y -Ar -s5"
         val cfg = engine.buildManualConfig(
             SettingsModel(byedpiUseUiMode = false, byedpiWinningArgs = custom),
         ) as EngineConfig.ByeDpi
-        assertTrue(custom in cfg.args, "custom args обязаны быть сохранены, got '${cfg.args}'")
-        assertTrue("-Ku" in cfg.args, "winning args без -Ku обязаны получить UDP desync, got '${cfg.args}'")
+        assertEquals(custom, cfg.args, "CMD без -Ku не должен авто-добавлять -Ku -a1 -An, got '${cfg.args}'")
+        assertTrue("-Ku" !in cfg.args, "-Ku не должен быть автоматически добавлен в CMD режиме")
+        assertTrue("-An" !in cfg.args.removePrefix(custom), "hosts -An не должен appear-иться, got '${cfg.args}'")
     }
 
     @Test
-    fun `CMD mode winningArgs c уже существующим -Ku не дублирует UDP desync`() {
-        val custom = "-Y -Ku -a2 -s5"
+    fun `CMD mode winningArgs с пробелами на краях trim`() {
         val cfg = engine.buildManualConfig(
-            SettingsModel(byedpiUseUiMode = false, byedpiWinningArgs = custom),
+            SettingsModel(byedpiUseUiMode = false, byedpiWinningArgs = "  -Y -Ar -s5  "),
         ) as EngineConfig.ByeDpi
-        assertEquals(custom, cfg.args, "winning args с уже -Ku не должны меняться, got '${cfg.args}'")
+        assertEquals("-Y -Ar -s5", cfg.args)
     }
 
     @Test
