@@ -275,6 +275,8 @@ class WarpEngineSettingsViewModel @Inject constructor(
         val h2 = draft.h2.toLongOrNull() ?: AwgParams.DEFAULT_H2
         val h3 = draft.h3.toLongOrNull() ?: AwgParams.DEFAULT_H3
         val h4 = draft.h4.toLongOrNull() ?: AwgParams.DEFAULT_H4
+        val existingSlot = _uiState.value.slots.firstOrNull { it.id == draft.slotId }
+        val basAwg = existingSlot?.config?.awgParams ?: AwgParams()
         val config = WarpConfig(
             privateKey = draft.privateKey.trim(),
             publicKey = draft.publicKey.trim(),
@@ -285,7 +287,7 @@ class WarpEngineSettingsViewModel @Inject constructor(
             mtu = mtu,
             dnsServers = dns,
             keepaliveSeconds = keepalive,
-            awgParams = AwgParams(
+            awgParams = basAwg.copy(
                 junkPacketCount = jc,
                 junkPacketMinSize = minOf(jmin, jmax),
                 junkPacketMaxSize = maxOf(jmin, jmax),
