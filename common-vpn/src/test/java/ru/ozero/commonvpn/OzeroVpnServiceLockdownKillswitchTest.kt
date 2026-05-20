@@ -172,6 +172,22 @@ class OzeroVpnServiceLockdownKillswitchTest {
     }
 
     @Test
+    fun `killswitch startup TUN использует buildTunBuilder с applyUnderlying=true — P37 lockdown invariant`() {
+        val block = runBody.substringAfter("if (killswitch)").substringBefore("val manualEngine")
+        assertTrue(
+            block.contains("buildTunBuilder"),
+            "killswitch startup path обязан вызывать buildTunBuilder. Block:\n$block",
+        )
+        assertTrue(
+            block.contains("applyUnderlying = true"),
+            "killswitch startup TUN обязан applyUnderlying=true — без него startup gap (5+ сек до " +
+                "engine pick) не enforces lockdown через setUnderlyingNetworks(null) → " +
+                "при WiFi→Mobile транзиции lockdown breaks (P37). ByeDPI engine path использует " +
+                "default applyUnderlying=false (upstream parity для QUIC). Block:\n$block",
+        )
+    }
+
+    @Test
     fun `lockdownStartupFdRef объявлен в сервисе`() {
         assertTrue(
             serviceSource.contains("lockdownStartupFdRef"),

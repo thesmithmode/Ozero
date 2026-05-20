@@ -72,11 +72,12 @@ class TunBuilderHelper(private val service: VpnService) {
         splitConfig: SplitTunnelConfig = SplitTunnelConfig(),
         ipv6Enabled: Boolean = false,
         customDnsServers: List<String> = emptyList(),
+        applyUnderlying: Boolean = false,
     ): VpnService.Builder {
         val builder = service.Builder()
             .addAddress(TUN_ADDRESS, TUN_PREFIX_LENGTH)
             .setSession(SESSION_NAME)
-        applyLockdown(builder, "buildTunBuilder", applyUnderlying = false)
+        applyLockdown(builder, "buildTunBuilder", applyUnderlying = applyUnderlying)
         if (ipv6Enabled) {
             builder.addAddress(TUN_ADDRESS_V6, TUN_PREFIX_LENGTH_V6)
             builder.addRoute("::", 0)
