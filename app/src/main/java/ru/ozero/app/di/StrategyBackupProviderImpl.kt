@@ -35,10 +35,10 @@ class StrategyBackupProviderImpl(
                 evolutionMaxGenerations = s.evolutionMaxGenerations,
                 evolutionMutationRate = s.evolutionMutationRate,
                 evolutionEliteCount = s.evolutionEliteCount,
+                evolutionTargetFitness = s.evolutionTargetFitness,
             ),
             domainLists = domainLists.map { it.toBackup() },
             savedStrategies = savedStrategies.map { it.toBackup() },
-            evolutionMemory = null,
         )
     }
 
@@ -58,6 +58,7 @@ class StrategyBackupProviderImpl(
                     evolutionMaxGenerations = ss.evolutionMaxGenerations ?: current.evolutionMaxGenerations,
                     evolutionMutationRate = ss.evolutionMutationRate ?: current.evolutionMutationRate,
                     evolutionEliteCount = ss.evolutionEliteCount ?: current.evolutionEliteCount,
+                    evolutionTargetFitness = ss.evolutionTargetFitness ?: current.evolutionTargetFitness,
                 ),
             )
         }

@@ -5,14 +5,19 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -23,11 +28,15 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -36,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
+import ru.ozero.corebackup.BackupCategory
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,16 +62,21 @@ fun BackupScreen(
     val errorPrefix = stringResource(R.string.backup_error, "")
     val filename = stringResource(R.string.backup_filename)
 
+    var showExportDialog by rememberSaveable { mutableStateOf(false) }
+    var pendingExportCategories by remember { mutableStateOf<Set<BackupCategory>>(emptySet()) }
+
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream"),
     ) { uri: Uri? ->
-        if (uri != null) viewModel.export(context, uri)
+        val cats = pendingExportCategories
+        pendingExportCategories = emptySet()
+        if (uri != null && cats.isNotEmpty()) viewModel.export(context, uri, cats)
     }
 
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri: Uri? ->
-        if (uri != null) viewModel.import(context, uri)
+        if (uri != null) viewModel.beginImport(context, uri)
     }
 
     LaunchedEffect(state) {
@@ -117,7 +132,7 @@ fun BackupScreen(
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
             } else {
                 Button(
-                    onClick = { exportLauncher.launch(filename) },
+                    onClick = { showExportDialog = true },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = state == BackupUiState.Idle,
                 ) {
@@ -134,4 +149,101 @@ fun BackupScreen(
             }
         }
     }
+
+    if (showExportDialog) {
+        CategoryPickerDialog(
+            title = stringResource(R.string.backup_select_export_title),
+            available = BackupCategory.ALL,
+            initiallySelected = BackupCategory.ALL,
+            onConfirm = { selected ->
+                showExportDialog = false
+                if (selected.isNotEmpty()) {
+                    pendingExportCategories = selected
+                    exportLauncher.launch(filename)
+                }
+            },
+            onDismiss = { showExportDialog = false },
+        )
+    }
+
+    (state as? BackupUiState.PendingImport)?.let { pending ->
+        CategoryPickerDialog(
+            title = stringResource(R.string.backup_select_import_title),
+            available = pending.availableCategories,
+            initiallySelected = pending.availableCategories,
+            onConfirm = { selected -> viewModel.confirmImport(selected) },
+            onDismiss = { viewModel.cancelImport() },
+        )
+    }
+}
+
+@Composable
+private fun CategoryPickerDialog(
+    title: String,
+    available: Set<BackupCategory>,
+    initiallySelected: Set<BackupCategory>,
+    onConfirm: (Set<BackupCategory>) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var selected by remember { mutableStateOf(initiallySelected) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                BackupCategory.ALL.forEach { category ->
+                    val enabled = category in available
+                    val checked = enabled && category in selected
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(
+                            checked = checked,
+                            enabled = enabled,
+                            onCheckedChange = { isChecked ->
+                                selected = if (isChecked) selected + category else selected - category
+                            },
+                        )
+                        Spacer(Modifier.padding(end = 8.dp))
+                        Text(
+                            text = stringResource(category.labelRes()),
+                            color = if (enabled) {
+                                MaterialTheme.colorScheme.onSurface
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(selected.intersect(available)) },
+                enabled = selected.intersect(available).isNotEmpty(),
+            ) {
+                Text(stringResource(R.string.backup_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.backup_cancel))
+            }
+        },
+    )
+}
+
+private fun BackupCategory.labelRes(): Int = when (this) {
+    BackupCategory.GENERAL_SETTINGS -> R.string.backup_category_general
+    BackupCategory.DNS_HOSTS -> R.string.backup_category_dns_hosts
+    BackupCategory.BYEDPI -> R.string.backup_category_byedpi
+    BackupCategory.WARP -> R.string.backup_category_warp
+    BackupCategory.URNETWORK -> R.string.backup_category_urnetwork
+    BackupCategory.TELEGRAM -> R.string.backup_category_telegram
+    BackupCategory.STRATEGY -> R.string.backup_category_strategy
+    BackupCategory.SPLIT_TUNNEL -> R.string.backup_category_split_tunnel
 }

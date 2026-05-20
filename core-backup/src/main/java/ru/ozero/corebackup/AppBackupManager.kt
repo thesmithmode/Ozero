@@ -7,7 +7,12 @@ import kotlinx.coroutines.flow.first
 import ru.ozero.corestorage.dao.AppSplitRuleDao
 import ru.ozero.corestorage.entity.AppSplitRule
 import ru.ozero.enginescore.settings.SettingsKeys
+import ru.ozero.enginetelegram.TelegramConfigStore
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
+import ru.ozero.engineurnetwork.UrnetworkLocationSelection
+import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
+import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
+import ru.ozero.engineurnetwork.UrnetworkWindowType
 import ru.ozero.enginewarp.AwgParams
 import ru.ozero.enginewarp.WarpConfig
 import ru.ozero.enginewarp.WarpConfigSlot
@@ -21,40 +26,86 @@ class AppBackupManager(
     private val warpSlotStore: WarpConfigSlotStore,
     private val urnetworkStore: UrnetworkConfigStore,
     private val splitRuleDao: AppSplitRuleDao,
+    private val telegramStore: TelegramConfigStore,
     private val strategyProvider: StrategyBackupProvider? = null,
 ) {
 
-    suspend fun export(): AppBackupData {
+    suspend fun export(categories: Set<BackupCategory> = BackupCategory.ALL): AppBackupData {
         val prefs = ozeroSettings.data.first()
 
         val settings = BackupSettings(
-            splitMode = prefs[SettingsKeys.SPLIT_MODE],
-            ipv6Enabled = prefs[SettingsKeys.IPV6_ENABLED],
-            autoStart = prefs[SettingsKeys.AUTO_START],
-            manualEngine = prefs[SettingsKeys.MANUAL_ENGINE],
-            bydpiWinningArgs = prefs[SettingsKeys.BYDPI_WINNING_ARGS],
-            urnetworkEnabled = prefs[SettingsKeys.URNETWORK_ENABLED],
-            urnetworkJwt = prefs[SettingsKeys.URNETWORK_JWT],
-            customDnsServers = prefs[SettingsKeys.CUSTOM_DNS_SERVERS],
-            hostsMode = prefs[SettingsKeys.HOSTS_MODE],
-            hostsList = prefs[SettingsKeys.HOSTS_LIST],
-            uiLocaleTag = prefs[SettingsKeys.UI_LOCALE_TAG],
-            appMode = prefs[SettingsKeys.APP_MODE],
+            splitMode = ifIn(categories, BackupCategory.GENERAL_SETTINGS) { prefs[SettingsKeys.SPLIT_MODE] },
+            ipv6Enabled = ifIn(categories, BackupCategory.GENERAL_SETTINGS) { prefs[SettingsKeys.IPV6_ENABLED] },
+            autoStart = ifIn(categories, BackupCategory.GENERAL_SETTINGS) { prefs[SettingsKeys.AUTO_START] },
+            manualEngine = ifIn(categories, BackupCategory.GENERAL_SETTINGS) { prefs[SettingsKeys.MANUAL_ENGINE] },
+            bydpiWinningArgs = ifIn(categories, BackupCategory.BYEDPI) { prefs[SettingsKeys.BYDPI_WINNING_ARGS] },
+            urnetworkEnabled = ifIn(categories, BackupCategory.URNETWORK) { prefs[SettingsKeys.URNETWORK_ENABLED] },
+            urnetworkJwt = ifIn(categories, BackupCategory.URNETWORK) { prefs[SettingsKeys.URNETWORK_JWT] },
+            customDnsServers = ifIn(categories, BackupCategory.DNS_HOSTS) { prefs[SettingsKeys.CUSTOM_DNS_SERVERS] },
+            hostsMode = ifIn(categories, BackupCategory.DNS_HOSTS) { prefs[SettingsKeys.HOSTS_MODE] },
+            hostsList = ifIn(categories, BackupCategory.DNS_HOSTS) { prefs[SettingsKeys.HOSTS_LIST] },
+            uiLocaleTag = ifIn(categories, BackupCategory.GENERAL_SETTINGS) { prefs[SettingsKeys.UI_LOCALE_TAG] },
+            appMode = ifIn(categories, BackupCategory.GENERAL_SETTINGS) { prefs[SettingsKeys.APP_MODE] },
+            engineAutoPriority = ifIn(categories, BackupCategory.GENERAL_SETTINGS) {
+                prefs[SettingsKeys.ENGINE_AUTO_PRIORITY]
+            },
+            bydpiUseUiMode = ifIn(categories, BackupCategory.BYEDPI) { prefs[SettingsKeys.BYDPI_USE_UI_MODE] },
+            bydpiUiSettingsJson = ifIn(categories, BackupCategory.BYEDPI) {
+                prefs[SettingsKeys.BYDPI_UI_SETTINGS_JSON]
+            },
+            bydpiDefaultAccepted = ifIn(categories, BackupCategory.BYEDPI) {
+                prefs[SettingsKeys.BYDPI_DEFAULT_ACCEPTED]
+            },
+            urnetworkCountryCode = ifIn(categories, BackupCategory.URNETWORK) {
+                prefs[SettingsKeys.URNETWORK_COUNTRY_CODE]
+            },
         )
 
-        val urnetworkCfg = urnetworkStore.config().first()
-        val urnetwork = BackupUrnetwork(
-            walletOverride = urnetworkCfg.walletOverride?.takeIf { it.isNotBlank() },
-            byJwt = urnetworkCfg.byJwt?.takeIf { it.isNotBlank() },
-        )
-
-        val warpSlots = warpSlotStore.slots().first().map { it.toBackup() }
-
-        val splitRules = splitRuleDao.observeAll().first().map { rule ->
-            BackupSplitRule(packageName = rule.packageName, isExcluded = rule.isExcluded)
+        val urnetwork = if (BackupCategory.URNETWORK in categories) {
+            val cfg = urnetworkStore.config().first()
+            BackupUrnetwork(
+                byJwt = cfg.byJwt?.takeIf { it.isNotBlank() },
+                windowType = cfg.windowType.rawValue,
+                fixedIpSize = cfg.fixedIpSize,
+                allowDirect = cfg.allowDirect,
+                provideEnabled = cfg.provideEnabled,
+                provideControlMode = cfg.provideControlMode.rawValue,
+                provideNetworkMode = cfg.provideNetworkMode.rawValue,
+                selectedLocation = cfg.selectedLocation.normalized()?.let {
+                    BackupUrnetworkLocation(countryCode = it.countryCode, region = it.region, city = it.city)
+                },
+            )
+        } else {
+            BackupUrnetwork()
         }
 
-        val strategy = strategyProvider?.export()
+        val warpSlots = if (BackupCategory.WARP in categories) {
+            warpSlotStore.slots().first().map { it.toBackup() }
+        } else {
+            emptyList()
+        }
+
+        val splitRules = if (BackupCategory.SPLIT_TUNNEL in categories) {
+            splitRuleDao.observeAll().first().map { rule ->
+                BackupSplitRule(packageName = rule.packageName, isExcluded = rule.isExcluded)
+            }
+        } else {
+            emptyList()
+        }
+
+        val strategy = if (BackupCategory.STRATEGY in categories) strategyProvider?.export() else null
+
+        val telegram = if (BackupCategory.TELEGRAM in categories) {
+            val tg = telegramStore.config().first()
+            BackupTelegram(
+                enabled = tg.enabled,
+                port = tg.port,
+                domain = tg.domain.takeIf { it.isNotBlank() },
+                secret = tg.secret.takeIf { it.isNotBlank() },
+            )
+        } else {
+            null
+        }
 
         return AppBackupData(
             exportedAt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).format(Date()),
@@ -63,40 +114,82 @@ class AppBackupManager(
             warpSlots = warpSlots,
             splitRules = splitRules,
             strategy = strategy,
+            telegram = telegram,
         )
     }
 
-    suspend fun import(data: AppBackupData) {
+    suspend fun import(data: AppBackupData, categories: Set<BackupCategory> = BackupCategory.ALL) {
         ozeroSettings.edit { prefs ->
             val s = data.settings
-            s.splitMode?.let { prefs[SettingsKeys.SPLIT_MODE] = it }
-            s.ipv6Enabled?.let { prefs[SettingsKeys.IPV6_ENABLED] = it }
-            s.autoStart?.let { prefs[SettingsKeys.AUTO_START] = it }
-            s.manualEngine?.let { prefs[SettingsKeys.MANUAL_ENGINE] = it }
-            s.bydpiWinningArgs?.let { prefs[SettingsKeys.BYDPI_WINNING_ARGS] = it }
-            s.urnetworkEnabled?.let { prefs[SettingsKeys.URNETWORK_ENABLED] = it }
-            s.urnetworkJwt?.let { prefs[SettingsKeys.URNETWORK_JWT] = it }
-            s.customDnsServers?.let { prefs[SettingsKeys.CUSTOM_DNS_SERVERS] = it }
-            s.hostsMode?.let { prefs[SettingsKeys.HOSTS_MODE] = it }
-            s.hostsList?.let { prefs[SettingsKeys.HOSTS_LIST] = it }
-            s.uiLocaleTag?.let { prefs[SettingsKeys.UI_LOCALE_TAG] = it }
-            s.appMode?.let { prefs[SettingsKeys.APP_MODE] = it }
+            if (BackupCategory.GENERAL_SETTINGS in categories) {
+                s.splitMode?.let { prefs[SettingsKeys.SPLIT_MODE] = it }
+                s.ipv6Enabled?.let { prefs[SettingsKeys.IPV6_ENABLED] = it }
+                s.autoStart?.let { prefs[SettingsKeys.AUTO_START] = it }
+                s.manualEngine?.let { prefs[SettingsKeys.MANUAL_ENGINE] = it }
+                s.uiLocaleTag?.let { prefs[SettingsKeys.UI_LOCALE_TAG] = it }
+                s.appMode?.let { prefs[SettingsKeys.APP_MODE] = it }
+                s.engineAutoPriority?.let { prefs[SettingsKeys.ENGINE_AUTO_PRIORITY] = it }
+            }
+            if (BackupCategory.BYEDPI in categories) {
+                s.bydpiWinningArgs?.let { prefs[SettingsKeys.BYDPI_WINNING_ARGS] = it }
+                s.bydpiUseUiMode?.let { prefs[SettingsKeys.BYDPI_USE_UI_MODE] = it }
+                s.bydpiUiSettingsJson?.let { prefs[SettingsKeys.BYDPI_UI_SETTINGS_JSON] = it }
+                s.bydpiDefaultAccepted?.let { prefs[SettingsKeys.BYDPI_DEFAULT_ACCEPTED] = it }
+            }
+            if (BackupCategory.URNETWORK in categories) {
+                s.urnetworkEnabled?.let { prefs[SettingsKeys.URNETWORK_ENABLED] = it }
+                s.urnetworkJwt?.let { prefs[SettingsKeys.URNETWORK_JWT] = it }
+                s.urnetworkCountryCode?.let { prefs[SettingsKeys.URNETWORK_COUNTRY_CODE] = it }
+            }
+            if (BackupCategory.DNS_HOSTS in categories) {
+                s.customDnsServers?.let { prefs[SettingsKeys.CUSTOM_DNS_SERVERS] = it }
+                s.hostsMode?.let { prefs[SettingsKeys.HOSTS_MODE] = it }
+                s.hostsList?.let { prefs[SettingsKeys.HOSTS_LIST] = it }
+            }
         }
 
-        data.urnetwork.walletOverride?.let { v ->
-            urnetworkStore.update { it.copy(walletOverride = v.takeIf { it.isNotBlank() }) }
-        }
-        data.urnetwork.byJwt?.let { v ->
-            urnetworkStore.update { it.copy(byJwt = v.takeIf { it.isNotBlank() }) }
+        if (BackupCategory.URNETWORK in categories) {
+            val u = data.urnetwork
+            urnetworkStore.update { current ->
+                current.copy(
+                    byJwt = u.byJwt?.takeIf { it.isNotBlank() } ?: current.byJwt,
+                    windowType = u.windowType?.let { UrnetworkWindowType.fromRaw(it) } ?: current.windowType,
+                    fixedIpSize = u.fixedIpSize ?: current.fixedIpSize,
+                    allowDirect = u.allowDirect ?: current.allowDirect,
+                    provideEnabled = u.provideEnabled ?: current.provideEnabled,
+                    provideControlMode = u.provideControlMode?.let { UrnetworkProvideControlMode.fromRaw(it) }
+                        ?: current.provideControlMode,
+                    provideNetworkMode = u.provideNetworkMode?.let { UrnetworkProvideNetworkMode.fromRaw(it) }
+                        ?: current.provideNetworkMode,
+                    selectedLocation = u.selectedLocation?.let {
+                        UrnetworkLocationSelection(
+                            countryCode = it.countryCode,
+                            region = it.region,
+                            city = it.city,
+                        )
+                    } ?: current.selectedLocation,
+                )
+            }
         }
 
-        if (data.warpSlots.isNotEmpty()) {
+        if (BackupCategory.WARP in categories && data.warpSlots.isNotEmpty()) {
             warpSlotStore.replaceAll(data.warpSlots.map { it.toSlot() })
         }
 
-        data.strategy?.let { strategyProvider?.import(it) }
+        if (BackupCategory.STRATEGY in categories) {
+            data.strategy?.let { strategyProvider?.import(it) }
+        }
 
-        if (data.splitRules.isNotEmpty()) {
+        if (BackupCategory.TELEGRAM in categories) {
+            data.telegram?.let { tg ->
+                tg.enabled?.let { telegramStore.setEnabled(it) }
+                tg.port?.let { telegramStore.setPort(it) }
+                tg.domain?.let { telegramStore.setDomain(it) }
+                tg.secret?.let { telegramStore.setSecret(it) }
+            }
+        }
+
+        if (BackupCategory.SPLIT_TUNNEL in categories && data.splitRules.isNotEmpty()) {
             val existingRules = splitRuleDao.observeAll().first()
             val backupPackages = data.splitRules.map { it.packageName }.toSet()
             for (existing in existingRules) {
@@ -109,6 +202,9 @@ class AppBackupManager(
             }
         }
     }
+
+    private inline fun <T> ifIn(categories: Set<BackupCategory>, cat: BackupCategory, block: () -> T?): T? =
+        if (cat in categories) block() else null
 
     private fun WarpConfigSlot.toBackup(): BackupWarpSlot {
         val awg = config.awgParams

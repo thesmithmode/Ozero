@@ -399,6 +399,18 @@
     <string name="backup_error">Ошибка: %1$s</string>
     <string name="backup_in_progress">Выполняется…</string>
     <string name="backup_filename">ozero_backup.ozb</string>
+    <string name="backup_select_export_title">Что бэкапить?</string>
+    <string name="backup_select_import_title">Что восстановить?</string>
+    <string name="backup_confirm">Продолжить</string>
+    <string name="backup_cancel">Отмена</string>
+    <string name="backup_category_general">Общие настройки</string>
+    <string name="backup_category_dns_hosts">DNS и hosts</string>
+    <string name="backup_category_byedpi">ByeDPI</string>
+    <string name="backup_category_warp">WARP-аккаунты</string>
+    <string name="backup_category_urnetwork">URnetwork</string>
+    <string name="backup_category_telegram">Telegram MTProxy</string>
+    <string name="backup_category_strategy">Стратегии и доменные списки</string>
+    <string name="backup_category_split_tunnel">Split-туннель</string>
     <!-- IP display -->
     <string name="ip_card_title">Выходной узел</string>
     <string name="ip_card_loading">Определяем IP…</string>

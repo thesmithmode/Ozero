@@ -16,8 +16,20 @@ object AppBackupSerializer {
         root.put("settings", BackupSettingsSerializer.serialize(data.settings))
 
         val urn = JSONObject()
-        data.urnetwork.walletOverride?.let { urn.put("walletOverride", it) }
         data.urnetwork.byJwt?.let { urn.put("byJwt", it) }
+        data.urnetwork.windowType?.let { urn.put("windowType", it) }
+        data.urnetwork.fixedIpSize?.let { urn.put("fixedIpSize", it) }
+        data.urnetwork.allowDirect?.let { urn.put("allowDirect", it) }
+        data.urnetwork.provideEnabled?.let { urn.put("provideEnabled", it) }
+        data.urnetwork.provideControlMode?.let { urn.put("provideControlMode", it) }
+        data.urnetwork.provideNetworkMode?.let { urn.put("provideNetworkMode", it) }
+        data.urnetwork.selectedLocation?.let { loc ->
+            val locObj = JSONObject()
+            loc.countryCode?.let { locObj.put("countryCode", it) }
+            loc.region?.let { locObj.put("region", it) }
+            loc.city?.let { locObj.put("city", it) }
+            urn.put("selectedLocation", locObj)
+        }
         root.put("urnetwork", urn)
 
         val slotsArr = JSONArray()
@@ -34,6 +46,15 @@ object AppBackupSerializer {
         root.put("splitRules", rulesArr)
 
         data.strategy?.let { root.put("strategy", BackupStrategySerializer.serialize(it)) }
+
+        data.telegram?.let { tg ->
+            val tgObj = JSONObject()
+            tg.enabled?.let { tgObj.put("enabled", it) }
+            tg.port?.let { tgObj.put("port", it) }
+            tg.domain?.let { tgObj.put("domain", it) }
+            tg.secret?.let { tgObj.put("secret", it) }
+            root.put("telegram", tgObj)
+        }
 
         return root.toString(2)
     }
@@ -68,8 +89,20 @@ object AppBackupSerializer {
 
         val u = root.optJSONObject("urnetwork") ?: JSONObject()
         val urnetwork = BackupUrnetwork(
-            walletOverride = u.optString("walletOverride").takeIf { it.isNotEmpty() },
             byJwt = u.optString("byJwt").takeIf { it.isNotEmpty() },
+            windowType = u.optString("windowType").takeIf { it.isNotEmpty() },
+            fixedIpSize = u.booleanOrNull("fixedIpSize"),
+            allowDirect = u.booleanOrNull("allowDirect"),
+            provideEnabled = u.booleanOrNull("provideEnabled"),
+            provideControlMode = u.optString("provideControlMode").takeIf { it.isNotEmpty() },
+            provideNetworkMode = u.optString("provideNetworkMode").takeIf { it.isNotEmpty() },
+            selectedLocation = u.optJSONObject("selectedLocation")?.let { loc ->
+                BackupUrnetworkLocation(
+                    countryCode = loc.optString("countryCode").takeIf { it.isNotEmpty() },
+                    region = loc.optString("region").takeIf { it.isNotEmpty() },
+                    city = loc.optString("city").takeIf { it.isNotEmpty() },
+                )
+            },
         )
 
         val slotsArr = root.optJSONArray("warpSlots") ?: JSONArray()
@@ -92,6 +125,15 @@ object AppBackupSerializer {
             null
         }
 
+        val telegram = root.optJSONObject("telegram")?.let { tg ->
+            BackupTelegram(
+                enabled = tg.booleanOrNull("enabled"),
+                port = tg.intOrNull("port"),
+                domain = tg.optString("domain").takeIf { it.isNotEmpty() },
+                secret = tg.optString("secret").takeIf { it.isNotEmpty() },
+            )
+        }
+
         AppBackupData(
             version = version,
             exportedAt = exportedAt,
@@ -100,6 +142,7 @@ object AppBackupSerializer {
             warpSlots = warpSlots,
             splitRules = splitRules,
             strategy = strategy,
+            telegram = telegram,
         )
     }.getOrElse { e ->
         if (e is BackupParseException) throw e

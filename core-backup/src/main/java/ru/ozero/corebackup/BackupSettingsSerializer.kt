@@ -18,6 +18,11 @@ internal object BackupSettingsSerializer {
         s.hostsList?.let { obj.put("hostsList", it) }
         s.uiLocaleTag?.let { obj.put("uiLocaleTag", it) }
         s.appMode?.let { obj.put("appMode", it) }
+        s.engineAutoPriority?.let { obj.put("engineAutoPriority", it) }
+        s.bydpiUseUiMode?.let { obj.put("bydpiUseUiMode", it) }
+        s.bydpiUiSettingsJson?.let { obj.put("bydpiUiSettingsJson", it) }
+        s.bydpiDefaultAccepted?.let { obj.put("bydpiDefaultAccepted", it) }
+        s.urnetworkCountryCode?.let { obj.put("urnetworkCountryCode", it) }
         return obj
     }
 
@@ -35,5 +40,10 @@ internal object BackupSettingsSerializer {
             hostsList = s.optString("hostsList").takeIf { it.isNotEmpty() },
             uiLocaleTag = s.optString("uiLocaleTag").takeIf { it.isNotEmpty() },
             appMode = s.optString("appMode").takeIf { it.isNotEmpty() },
+            engineAutoPriority = s.optString("engineAutoPriority").takeIf { it.isNotEmpty() },
+            bydpiUseUiMode = s.booleanOrNull("bydpiUseUiMode"),
+            bydpiUiSettingsJson = s.optString("bydpiUiSettingsJson").takeIf { it.isNotEmpty() },
+            bydpiDefaultAccepted = s.booleanOrNull("bydpiDefaultAccepted"),
+            urnetworkCountryCode = s.optString("urnetworkCountryCode").takeIf { it.isNotEmpty() },
         )
 }

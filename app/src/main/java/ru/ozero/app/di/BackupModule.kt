@@ -12,6 +12,7 @@ import ru.ozero.app.ui.strategy.StrategyTestSettingsStore
 import ru.ozero.corebackup.AppBackupManager
 import ru.ozero.corebackup.StrategyBackupProvider
 import ru.ozero.corestorage.dao.AppSplitRuleDao
+import ru.ozero.enginetelegram.TelegramConfigStore
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.enginewarp.WarpConfigSlotStore
 import javax.inject.Singleton
@@ -37,6 +38,14 @@ object BackupModule {
         warpSlotStore: WarpConfigSlotStore,
         urnetworkStore: UrnetworkConfigStore,
         splitRuleDao: AppSplitRuleDao,
+        telegramStore: TelegramConfigStore,
         strategyProvider: StrategyBackupProvider,
-    ): AppBackupManager = AppBackupManager(ozeroSettings, warpSlotStore, urnetworkStore, splitRuleDao, strategyProvider)
+    ): AppBackupManager = AppBackupManager(
+        ozeroSettings = ozeroSettings,
+        warpSlotStore = warpSlotStore,
+        urnetworkStore = urnetworkStore,
+        splitRuleDao = splitRuleDao,
+        telegramStore = telegramStore,
+        strategyProvider = strategyProvider,
+    )
 }

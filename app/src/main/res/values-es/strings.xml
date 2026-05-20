@@ -246,6 +246,18 @@
     <string name="backup_error">Error: %1$s</string>
     <string name="backup_in_progress">Procesando…</string>
     <string name="backup_filename">ozero_backup.ozb</string>
+    <string name="backup_select_export_title">¿Qué respaldar?</string>
+    <string name="backup_select_import_title">¿Qué restaurar?</string>
+    <string name="backup_confirm">Continuar</string>
+    <string name="backup_cancel">Cancelar</string>
+    <string name="backup_category_general">Ajustes generales</string>
+    <string name="backup_category_dns_hosts">DNS y hosts</string>
+    <string name="backup_category_byedpi">ByeDPI</string>
+    <string name="backup_category_warp">Cuentas WARP</string>
+    <string name="backup_category_urnetwork">URnetwork</string>
+    <string name="backup_category_telegram">Telegram MTProxy</string>
+    <string name="backup_category_strategy">Estrategias y listas de dominios</string>
+    <string name="backup_category_split_tunnel">Túnel dividido</string>
 
     <!-- IP card -->
     <string name="ip_card_title">Nodo de salida</string>
