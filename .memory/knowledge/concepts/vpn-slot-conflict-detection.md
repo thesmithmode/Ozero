@@ -59,14 +59,16 @@ The `onEngineDied` call triggers `Failed` state in `TunnelController`, which the
 
 ### Diagnostic Helper
 
+`logActiveExternalVpn()` writes via `PersistentLoggers.warn` because the slot-conflict event is a one-shot pre-failure diagnostic that must survive into `boot.log` for post-mortem (see [[concepts/vpn-slot-coexistence-crash]] for the canonical implementation and [[concepts/persistent-logger-accumulation-trap]] for the PersistentLoggers usage rule — one-shot critical events qualify):
+
 ```kotlin
 private fun logActiveExternalVpn() {
     val cm = getSystemService(ConnectivityManager::class.java) ?: return
     val vpnNetworks = cm.allNetworks.filter { 
         cm.getNetworkCapabilities(it)?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true 
     }
-    vpnNetworks.forEach { net ->
-        Log.w(TAG, "Active VPN network: $net caps=${cm.getNetworkCapabilities(net)}")
+    if (vpnNetworks.isNotEmpty()) {
+        PersistentLoggers.warn(TAG, "Active VPN networks: ${vpnNetworks.map { cm.getLinkProperties(it) }}")
     }
 }
 ```

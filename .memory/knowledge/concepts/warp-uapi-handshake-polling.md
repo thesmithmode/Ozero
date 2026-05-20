@@ -58,7 +58,7 @@ rx_bytes=...
 withTimeoutOrNull(10_000) {
     while (true) {
         if (WarpHandshakeUapi.isHandshakeComplete(uapiSocketPath)) return@withTimeoutOrNull
-        delay(300)
+        delay(100) // v0.1.8+: reduced from 300ms (peer-engine analogy)
     }
 }
 ```

@@ -4,8 +4,9 @@ aliases: [binaries-auto-update, native-binary-ci-commit, auto-merge-binaries]
 tags: [ci, github-actions, native, architecture, automation]
 sources:
   - "daily/2026-05-13.md"
+  - "daily/2026-05-20.md"
 created: 2026-05-13
-updated: 2026-05-13
+updated: 2026-05-20
 ---
 
 # Native Binary Auto-Update Pipeline via GitHub Actions
@@ -68,6 +69,23 @@ If upstream ByeDPI adds or renames a JNI function, this test catches the contrac
 - [[concepts/ci-workflow-discipline]] - CI on dev is the gate for all merges including auto-merged binary updates
 - [[concepts/byedpi-args-parsing]] - ByeDPI binary changes may affect arg parsing contracts caught by tests
 
+### Manual Pin Upgrade: ByeDPI ba532298 (2026-05-20)
+
+The auto-update pipeline handles patch/minor bumps automatically, but upstream commit pin upgrades require manual intervention when the library is pinned to a specific commit hash rather than a semantic version tag.
+
+**Case study: ByeDPI YouTube fix (v0.1.9)**
+
+The ByeDPI native library was pinned at `v0.17.3` tag (commit `7efde1b1`, 2025-09-19). ByeByeDPI 1.7.5 (the reference implementation Ozero follows for parity) had advanced to commit `ba532298` (2026-03-26) — 38 commits ahead. Those 38 commits included upstream fixes for YouTube QUIC/ECH/TLS-extension reordering, which are required to bypass Russian ISP filtering on video platforms. Ozero was blocking YouTube even though the same strategies worked in ByeByeDPI 1.7.5, because the native binary was 6 months stale.
+
+**Fix procedure:**
+1. Update `build_byedpi.sh` header comment with new commit hash (forces binaries.yml to regenerate)
+2. Update `binaries.yml` to clone by commit hash `ba532298` instead of tag `v0.17.3`
+3. Run `binaries.yml` workflow_dispatch manually → new artifact `byedpi-e4e9f53e`
+4. Commit updated `binaries.lock.yaml` with new SHA256
+
+**Lesson:** Tags are a lagging indicator of upstream progress. Commit-pinned libraries can fall significantly behind on bug fixes. The symptom (YouTube works in reference app but not in Ozero with same args) is the signal to bisect the upstream commit history and identify the divergence point.
+
 ## Sources
 
 - [[daily/2026-05-13.md]] - Session 11:12: design decision — patch/minor bumps auto-merge via workflow_run trigger, major → Issue; ByeDpiJniContractTest written as gate; coverage ≥95% required before automerge
+- [[daily/2026-05-20.md]] - v0.1.9 prep: ByeDPI pin v0.17.3 (7efde1b1, 2025-09-19) → ba532298 (2026-03-26, 38 commits, YouTube QUIC/ECH fix); build_byedpi.sh header comment bump + binaries.yml clone-by-commit; new artifact byedpi-e4e9f53e

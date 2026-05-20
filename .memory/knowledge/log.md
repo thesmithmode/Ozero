@@ -1,5 +1,40 @@
 # Build Log
 
+## [2026-05-20T18:47:26+03:00] compile | Daily Log 2026-05-20 (pass 6 — KB audit article updates)
+- Source: daily/2026-05-20.md
+- Articles created: (none)
+- Articles updated:
+  - [[concepts/android-vpn-self-traffic-bypass]] — 2026-05-20 source added; KB audit (18:43) confirmed self-exclusion removal deprecated; canonical = ipProbeRoute() + excludeSelf=true; three regressions confirmed removing self-exclusion breaks engines
+  - [[concepts/release-process]] — 2026-05-20 source added; index summary clarified: arm64-v8a only (not multi-ABI); "universal" means single APK for all users not multi-ABI
+- Index: 2 rows updated (android-vpn-self-traffic-bypass summary + date; release-process summary + date)
+- Sessions covered: KB audit 18:43 (android-vpn-self-traffic-bypass deprecation; release-process ABI claim)
+
+## [2026-05-20T24:00:00+03:00] compile | Daily Log 2026-05-20 (pass 5 — audit sessions + MTU refactor regression)
+- Source: daily/2026-05-20.md
+- Articles created: (none)
+- Articles updated:
+  - [[concepts/tun-mtu-dual-layer]] — v0.1.6 refactor regression: TunBuilderHelper.buildTunBuilder() added setMtu(8500) not present in reference; bisected + removed v0.1.8; rule: refactor must not introduce new parameters not in reference
+  - [[concepts/byedpi-jni-guard-hardening]] — added daily/2026-05-20 source; KB audit 18:37 confirmed jniStopProxy=shutdown(fd,SHUT_RDWR) vs jniForceClose=close(fd); neither touches g_proxy_running externally — already correctly documented
+- Index: 1 row updated (tun-mtu-dual-layer source + summary)
+- Sessions covered: audit sessions 18:15 (duplicate), 18:27/18:37/18:43 (contradiction findings), setMtu(8500) regression from 00:00 session
+
+## [2026-05-20T23:62:00+03:00] compile | Daily Log 2026-05-20 (pass 4 — ByeDPI pin upgrade)
+- Source: daily/2026-05-20.md
+- Articles created: (none)
+- Articles updated:
+  - [[concepts/native-binary-auto-update-pipeline]] — manual pin upgrade case study: ByeDPI v0.17.3→ba532298 (38 commits, YouTube QUIC/ECH fix); fix procedure documented
+- Index: 1 row updated (native-binary-auto-update-pipeline summary + source)
+- Sessions covered: v0.1.9 prep (02:25) — ByeDPI commit pin upgrade previously uncaptured
+
+## [2026-05-20T23:59:00+03:00] compile | Daily Log 2026-05-20 (pass 3 — v0.1.9 prep session gap)
+- Source: daily/2026-05-20.md
+- Articles created: [[concepts/urnetwork-shared-traffic-history]] — SDK cumulative-only → local delta map; 30-day bar chart; payout reset guard
+- Articles updated:
+  - [[concepts/engine-await-ready-pattern]] — URnetwork timeout 15s→45s (slow P2P discovery); WARP poll 300ms→100ms; path ozero-warp.sock→sockets/ cascade
+  - [[concepts/urnetwork-balance-optimistic-cache]] — ViewModel stateIn(initialValue=INITIAL) bug masked cache; fix initialValue=balanceRepository.state.value
+- Index: 1 row added, 2 rows updated (total 152)
+- Sessions covered: post-compact v0.1.9 prep (02:25) — previously not compiled; timeout bump, shared traffic history, balanceState fix
+
 ## [2026-05-20T23:30:00+03:00] compile | Daily Log 2026-05-20 (pass 2 — remaining sessions)
 - Source: daily/2026-05-20.md
 - Articles created: (none new)
@@ -46,7 +81,7 @@
 
 ## [2026-05-19T20:00:00+03:00] compile | Daily Log 2026-05-19 (pass 2 — gap fill)
 - Source: daily/2026-05-19.md
-- Articles created: [[concepts/speed-chart-bucket-alignment]] (time-aligned bucket IDs prevent sliding-window drift; SpeedSample typed wrapper), [[concepts/vpn-slot-coexistence-crash]] (establish() null = external VPN holds slot; Failed state + logActiveExternalVpn), [[concepts/urnetwork-filter-locations-trigger]] (filterLocations("") required after vc.start()), [[concepts/hilt-viewmodel-split-too-many-functions]] (hiltViewModel() decomp for TooManyFunctions; shared internal fakes)
+- Articles created: [[concepts/speed-chart-bucket-alignment]] (time-aligned bucket IDs prevent sliding-window drift; SpeedSample typed wrapper), [[concepts/vpn-slot-coexistence-crash]] (establish() null = external VPN holds slot; Failed state + logActiveExternalVpn), [[concepts/urnetwork-filterlocations-trigger]] (filterLocations("") required after vc.start()), [[concepts/hilt-viewmodel-split-too-many-functions]] (hiltViewModel() decomp for TooManyFunctions; shared internal fakes)
 - Note: urnetwork-balance-optimistic-cache + hiltviewmodel-toomanyfunctions-decomposition + vpn-slot-conflict-detection + urnetwork-filterlocations-trigger already existed from pass 1; new files are extended/renamed variants — index refs pass-1 canonical names
 - Articles updated: [[concepts/chart-nice-max-dynamic-scaling]] (bucket alignment fix + SpeedSample + speed-chart-bucket-alignment cross-ref), [[concepts/byedpi-jni-guard-hardening]] (__android_log_print checkpoints; cold-start 5s+ vs 14ms warm; hang root cause pending)
 - Index updated: 1 row added (speed-chart-bucket-alignment), total 143
