@@ -540,6 +540,43 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
+    fun `REVOKE_KILL_DELAY_MS не больше 1500ms — другой VPN не должен долго ждать освобождения slot`() {
+        val regex = Regex("REVOKE_KILL_DELAY_MS\\s*=\\s*(\\d[\\d_]*)L")
+        val m = regex.find(source) ?: error("REVOKE_KILL_DELAY_MS не найден")
+        val ms = m.groupValues[1].replace("_", "").toLong()
+        assertTrue(
+            ms in 500L..1_500L,
+            "REVOKE_KILL_DELAY_MS должен быть [500..1500]ms: меньше — shutdown не успеет, " +
+                "больше — другой VPN (URnetwork и т.п.) ждёт слишком долго после revoke → " +
+                "пользователь видит «зависание». Fact=$ms",
+        )
+    }
+
+    @Test
+    fun `startVpn использует EXTERNAL_VPN_RELEASE_DELAY_MS при детекции внешнего VPN`() {
+        assertTrue(
+            source.contains("EXTERNAL_VPN_RELEASE_DELAY_MS"),
+            "OzeroVpnService обязан иметь EXTERNAL_VPN_RELEASE_DELAY_MS константу: " +
+                "при запуске Ozero ПОСЛЕ другого VPN (URnetwork и т.п.) Android revoke'ает " +
+                "тот VPN, но его TUN ещё закрывается — establish() Ozero ловит race. " +
+                "Задержка перед establish() даёт ОС время полностью отпустить slot.",
+        )
+        assertTrue(
+            source.contains("logActiveExternalVpn()"),
+            "startVpn должен вызывать logActiveExternalVpn() и использовать результат " +
+                "для условной задержки.",
+        )
+        val regex = Regex("EXTERNAL_VPN_RELEASE_DELAY_MS\\s*=\\s*(\\d[\\d_]*)L")
+        val m = regex.find(source) ?: error("EXTERNAL_VPN_RELEASE_DELAY_MS не найден")
+        val ms = m.groupValues[1].replace("_", "").toLong()
+        assertTrue(
+            ms in 200L..1_500L,
+            "EXTERNAL_VPN_RELEASE_DELAY_MS должен быть [200..1500]ms — короче ловим race, " +
+                "длиннее юзер замечает paused старт. Fact=$ms",
+        )
+    }
+
+    @Test
     fun `onTaskRemoved переопределён и вызывает stopVpn — снимает индикатор ключа при swipe-close`() {
         assertTrue(
             source.contains("override fun onTaskRemoved("),

@@ -163,7 +163,8 @@ class OzeroVpnService : android.net.VpnService() {
         private const val TAG = "OzeroVpnService"
         private const val SHUTDOWN_JOIN_TIMEOUT_MS = 7_000L
         private const val ON_DESTROY_SHUTDOWN_TIMEOUT_MS = 5_000L
-        internal const val REVOKE_KILL_DELAY_MS = 2_500L
+        internal const val REVOKE_KILL_DELAY_MS = 1_000L
+        internal const val EXTERNAL_VPN_RELEASE_DELAY_MS = 750L
     }
 
     override fun onCreate() {
@@ -240,7 +241,7 @@ class OzeroVpnService : android.net.VpnService() {
         if (!starting.compareAndSet(false, true)) return
         stopSignal.set(false)
         PersistentLoggers.info(TAG, "startVpn entry")
-        logActiveExternalVpn()
+        val externalVpnActive = logActiveExternalVpn()
         runCatching { tunFdRef.getAndSet(null)?.close() }
             .onFailure { PersistentLoggers.warn(TAG, "startVpn: stale tunFd close threw: ${it.message}") }
         tunnelController.onKillswitchReleased()
@@ -265,6 +266,16 @@ class OzeroVpnService : android.net.VpnService() {
                     PersistentLoggers.warn(TAG, "startVpn: stopping всё ещё активен после join — отказ старта")
                     return@launch
                 }
+                if (externalVpnActive) {
+                    PersistentLoggers.warn(
+                        TAG,
+                        "external VPN был активен — даём ОС ${EXTERNAL_VPN_RELEASE_DELAY_MS}ms " +
+                            "на освобождение VPN slot до establish() (избегаем race с onRevoke того VPN)",
+                    )
+                    runCatching {
+                        kotlinx.coroutines.delay(EXTERNAL_VPN_RELEASE_DELAY_MS)
+                    }
+                }
                 startSequence.run()
             } finally {
                 starting.set(false)
@@ -288,20 +299,23 @@ class OzeroVpnService : android.net.VpnService() {
 
     private fun stopVpn() = shutdownCoord.stopVpn()
 
-    private fun logActiveExternalVpn() {
-        runCatching {
+    private fun logActiveExternalVpn(): Boolean {
+        return runCatching {
             val cm = getSystemService(android.content.Context.CONNECTIVITY_SERVICE)
-                as? android.net.ConnectivityManager ?: return@runCatching
+                as? android.net.ConnectivityManager ?: return@runCatching false
             val networks = cm.allNetworks
+            var detected = false
             for (n in networks) {
                 val caps = cm.getNetworkCapabilities(n) ?: continue
                 if (!caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)) continue
+                detected = true
                 PersistentLoggers.warn(
                     TAG,
                     "external VPN active at start — caps=${caps.toString().take(120)}",
                 )
             }
-        }
+            detected
+        }.getOrDefault(false)
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
