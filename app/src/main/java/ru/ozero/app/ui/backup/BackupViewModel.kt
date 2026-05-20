@@ -28,7 +28,6 @@ class BackupViewModel @Inject constructor(
     private var pendingImport: AppBackupData? = null
 
     fun export(context: Context, uri: Uri, categories: Set<BackupCategory>) {
-        if (categories.isEmpty()) return
         viewModelScope.launch {
             _uiState.value = BackupUiState.InProgress
             runCatching {
@@ -57,7 +56,7 @@ class BackupViewModel @Inject constructor(
             }.fold(
                 onSuccess = { data ->
                     pendingImport = data
-                    _uiState.value = BackupUiState.PendingImport(detectAvailable(data))
+                    _uiState.value = BackupUiState.PendingImport(BackupCategory.availableIn(data))
                 },
                 onFailure = { e ->
                     PersistentLoggers.error(TAG, "import parse failed: ${e.message}")
@@ -69,11 +68,6 @@ class BackupViewModel @Inject constructor(
 
     fun confirmImport(categories: Set<BackupCategory>) {
         val data = pendingImport ?: return
-        if (categories.isEmpty()) {
-            pendingImport = null
-            _uiState.value = BackupUiState.Idle
-            return
-        }
         viewModelScope.launch {
             _uiState.value = BackupUiState.InProgress
             runCatching {
@@ -99,39 +93,6 @@ class BackupViewModel @Inject constructor(
 
     fun dismissResult() {
         _uiState.value = BackupUiState.Idle
-    }
-
-    private fun detectAvailable(data: AppBackupData): Set<BackupCategory> {
-        val s = data.settings
-        val available = mutableSetOf<BackupCategory>()
-        if (s.splitMode != null || s.ipv6Enabled != null || s.autoStart != null ||
-            s.manualEngine != null || s.engineAutoPriority != null ||
-            s.uiLocaleTag != null || s.appMode != null
-        ) {
-            available += BackupCategory.GENERAL_SETTINGS
-        }
-        if (s.customDnsServers != null || s.hostsMode != null || s.hostsList != null) {
-            available += BackupCategory.DNS_HOSTS
-        }
-        if (s.bydpiWinningArgs != null || s.bydpiUseUiMode != null ||
-            s.bydpiUiSettingsJson != null || s.bydpiDefaultAccepted != null
-        ) {
-            available += BackupCategory.BYEDPI
-        }
-        if (data.warpSlots.isNotEmpty()) available += BackupCategory.WARP
-        val u = data.urnetwork
-        if (s.urnetworkEnabled != null || s.urnetworkJwt != null || s.urnetworkCountryCode != null ||
-            u.byJwt != null || u.windowType != null || u.fixedIpSize != null ||
-            u.allowDirect != null || u.provideEnabled != null ||
-            u.provideControlMode != null || u.provideNetworkMode != null ||
-            u.selectedLocation != null
-        ) {
-            available += BackupCategory.URNETWORK
-        }
-        if (data.telegram != null) available += BackupCategory.TELEGRAM
-        if (data.strategy != null) available += BackupCategory.STRATEGY
-        if (data.splitRules.isNotEmpty()) available += BackupCategory.SPLIT_TUNNEL
-        return available
     }
 
     private companion object {

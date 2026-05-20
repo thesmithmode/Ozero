@@ -1,6 +1,7 @@
 package ru.ozero.corebackup
 
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import kotlinx.coroutines.flow.first
@@ -32,33 +33,29 @@ class AppBackupManager(
 
     suspend fun export(categories: Set<BackupCategory> = BackupCategory.ALL): AppBackupData {
         val prefs = ozeroSettings.data.first()
+        val inGeneral = BackupCategory.GENERAL_SETTINGS in categories
+        val inByedpi = BackupCategory.BYEDPI in categories
+        val inUrn = BackupCategory.URNETWORK in categories
+        val inDns = BackupCategory.DNS_HOSTS in categories
 
         val settings = BackupSettings(
-            splitMode = ifIn(categories, BackupCategory.GENERAL_SETTINGS) { prefs[SettingsKeys.SPLIT_MODE] },
-            ipv6Enabled = ifIn(categories, BackupCategory.GENERAL_SETTINGS) { prefs[SettingsKeys.IPV6_ENABLED] },
-            autoStart = ifIn(categories, BackupCategory.GENERAL_SETTINGS) { prefs[SettingsKeys.AUTO_START] },
-            manualEngine = ifIn(categories, BackupCategory.GENERAL_SETTINGS) { prefs[SettingsKeys.MANUAL_ENGINE] },
-            bydpiWinningArgs = ifIn(categories, BackupCategory.BYEDPI) { prefs[SettingsKeys.BYDPI_WINNING_ARGS] },
-            urnetworkEnabled = ifIn(categories, BackupCategory.URNETWORK) { prefs[SettingsKeys.URNETWORK_ENABLED] },
-            urnetworkJwt = ifIn(categories, BackupCategory.URNETWORK) { prefs[SettingsKeys.URNETWORK_JWT] },
-            customDnsServers = ifIn(categories, BackupCategory.DNS_HOSTS) { prefs[SettingsKeys.CUSTOM_DNS_SERVERS] },
-            hostsMode = ifIn(categories, BackupCategory.DNS_HOSTS) { prefs[SettingsKeys.HOSTS_MODE] },
-            hostsList = ifIn(categories, BackupCategory.DNS_HOSTS) { prefs[SettingsKeys.HOSTS_LIST] },
-            uiLocaleTag = ifIn(categories, BackupCategory.GENERAL_SETTINGS) { prefs[SettingsKeys.UI_LOCALE_TAG] },
-            appMode = ifIn(categories, BackupCategory.GENERAL_SETTINGS) { prefs[SettingsKeys.APP_MODE] },
-            engineAutoPriority = ifIn(categories, BackupCategory.GENERAL_SETTINGS) {
-                prefs[SettingsKeys.ENGINE_AUTO_PRIORITY]
-            },
-            bydpiUseUiMode = ifIn(categories, BackupCategory.BYEDPI) { prefs[SettingsKeys.BYDPI_USE_UI_MODE] },
-            bydpiUiSettingsJson = ifIn(categories, BackupCategory.BYEDPI) {
-                prefs[SettingsKeys.BYDPI_UI_SETTINGS_JSON]
-            },
-            bydpiDefaultAccepted = ifIn(categories, BackupCategory.BYEDPI) {
-                prefs[SettingsKeys.BYDPI_DEFAULT_ACCEPTED]
-            },
-            urnetworkCountryCode = ifIn(categories, BackupCategory.URNETWORK) {
-                prefs[SettingsKeys.URNETWORK_COUNTRY_CODE]
-            },
+            splitMode = if (inGeneral) prefs[SettingsKeys.SPLIT_MODE] else null,
+            ipv6Enabled = if (inGeneral) prefs[SettingsKeys.IPV6_ENABLED] else null,
+            autoStart = if (inGeneral) prefs[SettingsKeys.AUTO_START] else null,
+            manualEngine = if (inGeneral) prefs[SettingsKeys.MANUAL_ENGINE] else null,
+            bydpiWinningArgs = if (inByedpi) prefs[SettingsKeys.BYDPI_WINNING_ARGS] else null,
+            urnetworkEnabled = if (inUrn) prefs[SettingsKeys.URNETWORK_ENABLED] else null,
+            urnetworkJwt = if (inUrn) prefs[SettingsKeys.URNETWORK_JWT] else null,
+            customDnsServers = if (inDns) prefs[SettingsKeys.CUSTOM_DNS_SERVERS] else null,
+            hostsMode = if (inDns) prefs[SettingsKeys.HOSTS_MODE] else null,
+            hostsList = if (inDns) prefs[SettingsKeys.HOSTS_LIST] else null,
+            uiLocaleTag = if (inGeneral) prefs[SettingsKeys.UI_LOCALE_TAG] else null,
+            appMode = if (inGeneral) prefs[SettingsKeys.APP_MODE] else null,
+            engineAutoPriority = if (inGeneral) prefs[SettingsKeys.ENGINE_AUTO_PRIORITY] else null,
+            bydpiUseUiMode = if (inByedpi) prefs[SettingsKeys.BYDPI_USE_UI_MODE] else null,
+            bydpiUiSettingsJson = if (inByedpi) prefs[SettingsKeys.BYDPI_UI_SETTINGS_JSON] else null,
+            bydpiDefaultAccepted = if (inByedpi) prefs[SettingsKeys.BYDPI_DEFAULT_ACCEPTED] else null,
+            urnetworkCountryCode = if (inUrn) prefs[SettingsKeys.URNETWORK_COUNTRY_CODE] else null,
         )
 
         val urnetwork = if (BackupCategory.URNETWORK in categories) {
@@ -121,90 +118,85 @@ class AppBackupManager(
     suspend fun import(data: AppBackupData, categories: Set<BackupCategory> = BackupCategory.ALL) {
         ozeroSettings.edit { prefs ->
             val s = data.settings
-            if (BackupCategory.GENERAL_SETTINGS in categories) {
-                s.splitMode?.let { prefs[SettingsKeys.SPLIT_MODE] = it }
-                s.ipv6Enabled?.let { prefs[SettingsKeys.IPV6_ENABLED] = it }
-                s.autoStart?.let { prefs[SettingsKeys.AUTO_START] = it }
-                s.manualEngine?.let { prefs[SettingsKeys.MANUAL_ENGINE] = it }
-                s.uiLocaleTag?.let { prefs[SettingsKeys.UI_LOCALE_TAG] = it }
-                s.appMode?.let { prefs[SettingsKeys.APP_MODE] = it }
-                s.engineAutoPriority?.let { prefs[SettingsKeys.ENGINE_AUTO_PRIORITY] = it }
-            }
-            if (BackupCategory.BYEDPI in categories) {
-                s.bydpiWinningArgs?.let { prefs[SettingsKeys.BYDPI_WINNING_ARGS] = it }
-                s.bydpiUseUiMode?.let { prefs[SettingsKeys.BYDPI_USE_UI_MODE] = it }
-                s.bydpiUiSettingsJson?.let { prefs[SettingsKeys.BYDPI_UI_SETTINGS_JSON] = it }
-                s.bydpiDefaultAccepted?.let { prefs[SettingsKeys.BYDPI_DEFAULT_ACCEPTED] = it }
-            }
-            if (BackupCategory.URNETWORK in categories) {
-                s.urnetworkEnabled?.let { prefs[SettingsKeys.URNETWORK_ENABLED] = it }
-                s.urnetworkJwt?.let { prefs[SettingsKeys.URNETWORK_JWT] = it }
-                s.urnetworkCountryCode?.let { prefs[SettingsKeys.URNETWORK_COUNTRY_CODE] = it }
-            }
-            if (BackupCategory.DNS_HOSTS in categories) {
-                s.customDnsServers?.let { prefs[SettingsKeys.CUSTOM_DNS_SERVERS] = it }
-                s.hostsMode?.let { prefs[SettingsKeys.HOSTS_MODE] = it }
-                s.hostsList?.let { prefs[SettingsKeys.HOSTS_LIST] = it }
-            }
+            if (BackupCategory.GENERAL_SETTINGS in categories) importGeneral(prefs, s)
+            if (BackupCategory.BYEDPI in categories) importByedpi(prefs, s)
+            if (BackupCategory.URNETWORK in categories) importUrnPrefs(prefs, s)
+            if (BackupCategory.DNS_HOSTS in categories) importDns(prefs, s)
         }
-
-        if (BackupCategory.URNETWORK in categories) {
-            val u = data.urnetwork
-            urnetworkStore.update { current ->
-                current.copy(
-                    byJwt = u.byJwt?.takeIf { it.isNotBlank() } ?: current.byJwt,
-                    windowType = u.windowType?.let { UrnetworkWindowType.fromRaw(it) } ?: current.windowType,
-                    fixedIpSize = u.fixedIpSize ?: current.fixedIpSize,
-                    allowDirect = u.allowDirect ?: current.allowDirect,
-                    provideEnabled = u.provideEnabled ?: current.provideEnabled,
-                    provideControlMode = u.provideControlMode?.let { UrnetworkProvideControlMode.fromRaw(it) }
-                        ?: current.provideControlMode,
-                    provideNetworkMode = u.provideNetworkMode?.let { UrnetworkProvideNetworkMode.fromRaw(it) }
-                        ?: current.provideNetworkMode,
-                    selectedLocation = u.selectedLocation?.let {
-                        UrnetworkLocationSelection(
-                            countryCode = it.countryCode,
-                            region = it.region,
-                            city = it.city,
-                        )
-                    } ?: current.selectedLocation,
-                )
-            }
-        }
-
+        if (BackupCategory.URNETWORK in categories) importUrnConfig(data.urnetwork)
         if (BackupCategory.WARP in categories && data.warpSlots.isNotEmpty()) {
             warpSlotStore.replaceAll(data.warpSlots.map { it.toSlot() })
         }
+        if (BackupCategory.STRATEGY in categories) data.strategy?.let { strategyProvider?.import(it) }
+        if (BackupCategory.TELEGRAM in categories) data.telegram?.let { importTelegram(it) }
+        if (BackupCategory.SPLIT_TUNNEL in categories && data.splitRules.isNotEmpty()) importSplit(data.splitRules)
+    }
 
-        if (BackupCategory.STRATEGY in categories) {
-            data.strategy?.let { strategyProvider?.import(it) }
-        }
+    private fun importGeneral(prefs: MutablePreferences, s: BackupSettings) {
+        s.splitMode?.let { prefs[SettingsKeys.SPLIT_MODE] = it }
+        s.ipv6Enabled?.let { prefs[SettingsKeys.IPV6_ENABLED] = it }
+        s.autoStart?.let { prefs[SettingsKeys.AUTO_START] = it }
+        s.manualEngine?.let { prefs[SettingsKeys.MANUAL_ENGINE] = it }
+        s.uiLocaleTag?.let { prefs[SettingsKeys.UI_LOCALE_TAG] = it }
+        s.appMode?.let { prefs[SettingsKeys.APP_MODE] = it }
+        s.engineAutoPriority?.let { prefs[SettingsKeys.ENGINE_AUTO_PRIORITY] = it }
+    }
 
-        if (BackupCategory.TELEGRAM in categories) {
-            data.telegram?.let { tg ->
-                tg.enabled?.let { telegramStore.setEnabled(it) }
-                tg.port?.let { telegramStore.setPort(it) }
-                tg.domain?.let { telegramStore.setDomain(it) }
-                tg.secret?.let { telegramStore.setSecret(it) }
-            }
-        }
+    private fun importByedpi(prefs: MutablePreferences, s: BackupSettings) {
+        s.bydpiWinningArgs?.let { prefs[SettingsKeys.BYDPI_WINNING_ARGS] = it }
+        s.bydpiUseUiMode?.let { prefs[SettingsKeys.BYDPI_USE_UI_MODE] = it }
+        s.bydpiUiSettingsJson?.let { prefs[SettingsKeys.BYDPI_UI_SETTINGS_JSON] = it }
+        s.bydpiDefaultAccepted?.let { prefs[SettingsKeys.BYDPI_DEFAULT_ACCEPTED] = it }
+    }
 
-        if (BackupCategory.SPLIT_TUNNEL in categories && data.splitRules.isNotEmpty()) {
-            val existingRules = splitRuleDao.observeAll().first()
-            val backupPackages = data.splitRules.map { it.packageName }.toSet()
-            for (existing in existingRules) {
-                if (existing.packageName !in backupPackages) {
-                    splitRuleDao.delete(existing.packageName)
-                }
-            }
-            for (rule in data.splitRules) {
-                splitRuleDao.upsert(AppSplitRule(packageName = rule.packageName, isExcluded = rule.isExcluded))
-            }
+    private fun importUrnPrefs(prefs: MutablePreferences, s: BackupSettings) {
+        s.urnetworkEnabled?.let { prefs[SettingsKeys.URNETWORK_ENABLED] = it }
+        s.urnetworkJwt?.let { prefs[SettingsKeys.URNETWORK_JWT] = it }
+        s.urnetworkCountryCode?.let { prefs[SettingsKeys.URNETWORK_COUNTRY_CODE] = it }
+    }
+
+    private fun importDns(prefs: MutablePreferences, s: BackupSettings) {
+        s.customDnsServers?.let { prefs[SettingsKeys.CUSTOM_DNS_SERVERS] = it }
+        s.hostsMode?.let { prefs[SettingsKeys.HOSTS_MODE] = it }
+        s.hostsList?.let { prefs[SettingsKeys.HOSTS_LIST] = it }
+    }
+
+    private suspend fun importUrnConfig(u: BackupUrnetwork) {
+        urnetworkStore.update { current ->
+            current.copy(
+                byJwt = u.byJwt ?: current.byJwt,
+                windowType = u.windowType?.let { UrnetworkWindowType.fromRaw(it) } ?: current.windowType,
+                fixedIpSize = u.fixedIpSize ?: current.fixedIpSize,
+                allowDirect = u.allowDirect ?: current.allowDirect,
+                provideEnabled = u.provideEnabled ?: current.provideEnabled,
+                provideControlMode = u.provideControlMode?.let { UrnetworkProvideControlMode.fromRaw(it) }
+                    ?: current.provideControlMode,
+                provideNetworkMode = u.provideNetworkMode?.let { UrnetworkProvideNetworkMode.fromRaw(it) }
+                    ?: current.provideNetworkMode,
+                selectedLocation = u.selectedLocation?.let {
+                    UrnetworkLocationSelection(countryCode = it.countryCode, region = it.region, city = it.city)
+                } ?: current.selectedLocation,
+            )
         }
     }
 
-    private inline fun <T> ifIn(categories: Set<BackupCategory>, cat: BackupCategory, block: () -> T?): T? =
-        if (cat in categories) block() else null
+    private suspend fun importTelegram(tg: BackupTelegram) {
+        tg.enabled?.let { telegramStore.setEnabled(it) }
+        tg.port?.let { telegramStore.setPort(it) }
+        tg.domain?.let { telegramStore.setDomain(it) }
+        tg.secret?.let { telegramStore.setSecret(it) }
+    }
+
+    private suspend fun importSplit(rules: List<BackupSplitRule>) {
+        val existingRules = splitRuleDao.observeAll().first()
+        val backupPackages = rules.map { it.packageName }.toSet()
+        for (existing in existingRules) {
+            if (existing.packageName !in backupPackages) splitRuleDao.delete(existing.packageName)
+        }
+        for (rule in rules) {
+            splitRuleDao.upsert(AppSplitRule(packageName = rule.packageName, isExcluded = rule.isExcluded))
+        }
+    }
 
     private fun WarpConfigSlot.toBackup(): BackupWarpSlot {
         val awg = config.awgParams
