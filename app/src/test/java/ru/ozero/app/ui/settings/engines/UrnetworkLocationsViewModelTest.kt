@@ -202,7 +202,11 @@ class UrnetworkLocationsViewModelTest {
         val readyBlock = source.substringAfter("data class Ready(").substringBefore(") : UrnetworkSettingsUiState")
         assertTrue(readyBlock.contains("regions"), "UrnetworkSettingsUiState.Ready обязан иметь поле regions")
         assertTrue(readyBlock.contains("cities"), "UrnetworkSettingsUiState.Ready обязан иметь поле cities")
-        assertTrue(readyBlock.contains("bestMatches"), "UrnetworkSettingsUiState.Ready обязан иметь поле bestMatches — иначе SDK best matches не попадут в UI (Москва пустая при поиске Mos)")
+        assertTrue(
+            readyBlock.contains("bestMatches"),
+            "UrnetworkSettingsUiState.Ready обязан иметь поле bestMatches — " +
+                "иначе SDK best matches не попадут в UI (Москва пустая при поиске Mos)",
+        )
     }
 
     @Test
