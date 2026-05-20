@@ -319,6 +319,7 @@
     <string name="warp_info_title">Сайты-генераторы WARP</string>
     <string name="warp_info_intro">Если автогенерация не работает — попробуйте получить конфиг с одного из сайтов и импортируйте .conf файл.</string>
     <string name="warp_info_close">Закрыть</string>
+    <string name="warp_register_error_hint">Не удалось получить конфиг автоматически — все источники недоступны. Нажмите ⓘ вверху, перейдите на один из сайтов-генераторов, скачайте .conf и импортируйте.</string>
     <string name="settings_warp_title">WARP</string>
     <string name="settings_warp_summary">Cloudflare WARP — авто-конфиг</string>
     <string name="warp_no_config">Конфиг не сгенерирован</string>

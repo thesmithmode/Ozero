@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ru.ozero.app.R
+import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginewarp.AwgParams
 import ru.ozero.enginewarp.DoHProvider
 import ru.ozero.enginewarp.WarpAutoConfig
@@ -159,10 +160,11 @@ class WarpEngineSettingsViewModel @Inject constructor(
                         )
                     },
                     onFailure = { t ->
+                        PersistentLoggers.warn(TAG, "register all mirrors failed: ${t.message}")
                         _uiState.value = _uiState.value.copy(
                             isRegistering = false,
-                            errorMessage = t.message ?: "register failed",
-                            errorMessageRes = null,
+                            errorMessage = null,
+                            errorMessageRes = R.string.warp_register_error_hint,
                             progressMirror = null,
                         )
                     },
@@ -326,5 +328,6 @@ class WarpEngineSettingsViewModel @Inject constructor(
 
     private companion object {
         const val COOLDOWN_POLL_INTERVAL_MS = 1_000L
+        const val TAG = "WarpSettingsVM"
     }
 }

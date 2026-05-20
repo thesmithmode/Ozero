@@ -571,4 +571,5 @@
     <string name="warp_info_title">Sites geradores do WARP</string>
     <string name="warp_info_intro">Se a geração automática falhar, tente obter uma configuração em um destes sites e importe o arquivo .conf.</string>
     <string name="warp_info_close">Fechar</string>
+    <string name="warp_register_error_hint">Não foi possível obter uma configuração automaticamente — todas as fontes estão indisponíveis. Toque em ⓘ acima, abra um dos sites geradores, baixe um .conf e importe-o.</string>
 </resources>

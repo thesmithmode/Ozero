@@ -310,6 +310,7 @@
     <string name="warp_info_title">WARP config generator sites</string>
     <string name="warp_info_intro">If auto-generation fails, try getting a config from one of these sites and import the .conf file.</string>
     <string name="warp_info_close">Close</string>
+    <string name="warp_register_error_hint">Failed to fetch a config automatically — all sources are unreachable. Tap ⓘ above, open one of the generator sites, download a .conf and import it.</string>
     <string name="settings_warp_title">WARP</string>
     <string name="settings_warp_summary">Cloudflare WARP — auto-config</string>
     <string name="warp_no_config">Config not generated</string>
