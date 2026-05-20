@@ -370,6 +370,39 @@ class AppBackupManagerTest {
     }
 
     @Test
+    fun `export — killswitchEnabled НЕ попадает в backup (намеренно per-device)`() = runTest {
+        ozeroDs.edit { it[SettingsKeys.KILLSWITCH_ENABLED] = true }
+        val data = manager.export()
+        val json = AppBackupSerializer.serialize(data)
+        assertFalse(
+            json.contains("killswitch", ignoreCase = true),
+            "killswitchEnabled — per-device kill switch, намеренно не сериализуется в backup " +
+                "(project_killswitch_no_backup). Регрессия = restore включает kill switch на другом устройстве",
+        )
+    }
+
+    @Test
+    fun `import — killswitchEnabled в DataStore не перетирается backup'ом`() = runTest {
+        ozeroDs.edit { it[SettingsKeys.KILLSWITCH_ENABLED] = true }
+        manager.import(makeMinimalBackup())
+        assertEquals(
+            true,
+            ozeroDs.data.first()[SettingsKeys.KILLSWITCH_ENABLED],
+            "import не должен трогать KILLSWITCH_ENABLED — он намеренно вне backup-контракта",
+        )
+    }
+
+    @Test
+    fun `BackupCategory ALL покрывает все enum значения — sentinel против забытой категории`() {
+        assertEquals(
+            BackupCategory.values().toSet(),
+            BackupCategory.ALL,
+            "BackupCategory.ALL обязан содержать все enum значения — иначе новая категория " +
+                "не попадёт в default export/import и приведёт к молчаливой потере настроек",
+        )
+    }
+
+    @Test
     fun `v2 backup — walletOverride игнорируется при чтении`() = runTest {
         val v2Json = """{"version":2,"exportedAt":"","settings":{},""" +
             """"urnetwork":{"walletOverride":"0xdead","byJwt":"j"},"warpSlots":[],"splitRules":[]}"""
