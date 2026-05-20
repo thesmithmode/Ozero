@@ -133,19 +133,21 @@ class OzeroVpnServicePeerWatchdogTest {
     }
 
     @Test
-    fun `peerWatchdog вызывает handleEngineFailure после таймаута`() {
+    fun `peerWatchdog НЕ вызывает handleEngineFailure при Failed — бесконечный retry`() {
         val body = watchdogSource
             .substringAfter("fun startPeerWatchdog")
             .substringBefore("fun cancelWatchers")
         assertTrue(
-            body.contains("handleEngineFailure"),
-            "startPeerWatchdog обязан вызывать handleEngineFailure при sustained 0 peers — " +
-                "это входная точка в killswitch/stopVpn логику. Body:\n$body",
-        )
-        assertTrue(
             body.contains("PEER_WATCHDOG_TIMEOUT_MS"),
             "startPeerWatchdog обязан использовать PEER_WATCHDOG_TIMEOUT_MS константу — " +
                 "не хардкодить таймаут. Body:\n$body",
+        )
+        assertTrue(
+            !body.contains("handleEngineFailure"),
+            "startPeerWatchdog body НЕ должен вызывать handleEngineFailure — юзер хочет бесконечный " +
+                "retry с жёлтой кнопкой. Регрессия 2026-05-20 (da4e2cda): handleEngineFailure → красная " +
+                "кнопка вместо жёлтой. handleEngineFailure живёт только в enterKillswitchMode/health-watcher. " +
+                "Body:\n$body",
         )
     }
 
@@ -201,16 +203,22 @@ class OzeroVpnServicePeerWatchdogTest {
     }
 
     @Test
-    fun `peerWatchdog при NotSupported делает handleEngineFailure без retry`() {
+    fun `peerWatchdog при NotSupported останавливает watchdog но НЕ убивает VPN`() {
         val body = watchdogSource
             .substringAfter("fun startPeerWatchdog")
             .substringBefore("fun cancelWatchers")
         val notSupportedBlock = body.substringAfter("RecoverResult.NotSupported")
             .substringBefore("RecoverResult.Failed")
         assertTrue(
-            notSupportedBlock.contains("handleEngineFailure") && notSupportedBlock.contains("return@launch"),
-            "NotSupported = recover не предусмотрен → сразу fail-fast handleEngineFailure + return@launch. " +
+            !notSupportedBlock.contains("handleEngineFailure"),
+            "NotSupported → НЕ handleEngineFailure. NotSupported = 'engine не поддерживает recover', " +
+                "не 'engine сломан' — VPN продолжает работать. Регрессия 2026-05-20 (da4e2cda): " +
+                "handleEngineFailure → юзер видел красную кнопку и должен дёргать заново. " +
                 "Block:\n$notSupportedBlock",
+        )
+        assertTrue(
+            notSupportedBlock.contains("return@launch"),
+            "NotSupported → return@launch — watchdog stop, дальше VPN сам. Block:\n$notSupportedBlock",
         )
     }
 

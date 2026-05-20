@@ -7,8 +7,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.ChainOrchestrator
@@ -84,61 +84,69 @@ class EngineWatchdogInfiniteRetryTest {
     }
 
     @Test
-    fun `Failed recover не вызывает stopVpn — бесконечный retry, юзер видит жёлтый`() =
-        runTest(UnconfinedTestDispatcher()) {
-            val plugin = FakeFailingPlugin {
-                EnginePlugin.RecoverResult.Failed("UAPI недоступен")
-            }
-            val stopVpnCount = AtomicReference(0)
-            val (watchdog, _) = buildWatchdog(plugin, this, stopVpnCount)
-
-            plugin.statsFlow.value = EngineStats(activeConnections = 1)
-            watchdog.startPeerWatchdog(EngineId.WARP)
-            advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_POLL_MS + 50L)
-            plugin.statsFlow.value = EngineStats(activeConnections = 0)
-
-            repeat(10) {
-                advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_TIMEOUT_MS + 2_000L)
-                advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_RECOVER_GRACE_MS + 1_000L)
-            }
-
-            assertTrue(
-                plugin.recoverCalls.get() >= 5,
-                "recover должен вызываться многократно. Got: ${plugin.recoverCalls.get()}",
-            )
-            assertEquals(
-                0,
-                stopVpnCount.get(),
-                "stopVpnRequest НИ РАЗУ не должен вызываться при Failed recover — " +
-                    "юзер хочет бесконечный retry. Регрессия 2026-05-20 (da4e2cda): " +
-                    "consecutiveRecoverFailures>=3 → hardRestart → handleEngineFailure → stop VPN.",
-            )
-            watchdog.cancelWatchers()
+    fun `Failed recover не вызывает stopVpn — бесконечный retry, юзер видит жёлтый`() = runTest {
+        val plugin = FakeFailingPlugin {
+            EnginePlugin.RecoverResult.Failed("UAPI недоступен")
         }
+        val stopVpnCount = AtomicReference(0)
+        val (watchdog, _) = buildWatchdog(plugin, backgroundScope, stopVpnCount)
+
+        plugin.statsFlow.value = EngineStats(activeConnections = 1)
+        watchdog.startPeerWatchdog(EngineId.WARP)
+        runCurrent()
+        advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_POLL_MS + 100L)
+        runCurrent()
+        plugin.statsFlow.value = EngineStats(activeConnections = 0)
+        runCurrent()
+
+        val cycleMs = EngineWatchdogCoordinator.PEER_WATCHDOG_TIMEOUT_MS +
+            EngineWatchdogCoordinator.PEER_WATCHDOG_RECOVER_GRACE_MS +
+            5_000L
+        repeat(5) {
+            advanceTimeBy(cycleMs)
+            runCurrent()
+        }
+
+        assertTrue(
+            plugin.recoverCalls.get() >= 3,
+            "recover должен вызываться многократно. Got: ${plugin.recoverCalls.get()}",
+        )
+        assertEquals(
+            0,
+            stopVpnCount.get(),
+            "stopVpnRequest НИ РАЗУ не должен вызываться при Failed recover — " +
+                "юзер хочет бесконечный retry. Регрессия 2026-05-20 (da4e2cda): " +
+                "consecutiveRecoverFailures>=3 → hardRestart → handleEngineFailure → stop VPN.",
+        )
+        watchdog.cancelWatchers()
+    }
 
     @Test
-    fun `NotSupported не вызывает stopVpn — VPN продолжает работать, watchdog только останавливается`() =
-        runTest(UnconfinedTestDispatcher()) {
-            val plugin = FakeFailingPlugin {
-                EnginePlugin.RecoverResult.NotSupported
-            }
-            val stopVpnCount = AtomicReference(0)
-            val (watchdog, _) = buildWatchdog(plugin, this, stopVpnCount)
-
-            plugin.statsFlow.value = EngineStats(activeConnections = 1)
-            watchdog.startPeerWatchdog(EngineId.WARP)
-            advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_POLL_MS + 50L)
-            plugin.statsFlow.value = EngineStats(activeConnections = 0)
-
-            advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_TIMEOUT_MS + 5_000L)
-
-            assertEquals(
-                0,
-                stopVpnCount.get(),
-                "NotSupported НЕ должен убивать VPN — это значит 'engine не поддерживает recover', " +
-                    "не 'engine сломан'. UI покажет degraded indicator. " +
-                    "Защита от регрессии: вернуть handleEngineFailure на NotSupported → юзер увидит красную кнопку.",
-            )
-            watchdog.cancelWatchers()
+    fun `NotSupported не вызывает stopVpn — VPN продолжает работать, watchdog только останавливается`() = runTest {
+        val plugin = FakeFailingPlugin {
+            EnginePlugin.RecoverResult.NotSupported
         }
+        val stopVpnCount = AtomicReference(0)
+        val (watchdog, _) = buildWatchdog(plugin, backgroundScope, stopVpnCount)
+
+        plugin.statsFlow.value = EngineStats(activeConnections = 1)
+        watchdog.startPeerWatchdog(EngineId.WARP)
+        runCurrent()
+        advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_POLL_MS + 100L)
+        runCurrent()
+        plugin.statsFlow.value = EngineStats(activeConnections = 0)
+        runCurrent()
+
+        advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_TIMEOUT_MS + 10_000L)
+        runCurrent()
+
+        assertEquals(
+            0,
+            stopVpnCount.get(),
+            "NotSupported НЕ должен убивать VPN — это значит 'engine не поддерживает recover', " +
+                "не 'engine сломан'. UI покажет degraded indicator. " +
+                "Защита от регрессии: вернуть handleEngineFailure на NotSupported → юзер увидит красную кнопку.",
+        )
+        watchdog.cancelWatchers()
+    }
 }
