@@ -107,13 +107,13 @@ private fun BalanceDetails(state: UrnetworkBalanceState) {
     if (state.meanReliabilityWeight > 0.0 || state.totalReferrals > 0L) {
         HorizontalDivider(color = OzeroPalette.Line)
         if (state.meanReliabilityWeight > 0.0) {
-            val reliabilityPct = state.meanReliabilityWeight * 100.0
+            val bonusGib = min(state.meanReliabilityWeight * 100.0, 100.0)
             StatRow(
-                label = stringResource(R.string.urnetwork_reliability_label, reliabilityPct),
-                value = stringResource(
-                    R.string.urnetwork_reliability_bonus,
-                    min(reliabilityPct, 100.0),
+                label = stringResource(
+                    R.string.urnetwork_reliability_label,
+                    state.meanReliabilityWeight,
                 ),
+                value = stringResource(R.string.urnetwork_reliability_bonus, bonusGib),
             )
         }
         if (state.totalReferrals > 0L) {

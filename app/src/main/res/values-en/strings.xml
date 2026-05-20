@@ -278,8 +278,8 @@
     <string name="urnetwork_balance_error">Failed to fetch balance: %1$s</string>
     <string name="urnetwork_balance_empty">Balance unavailable. Connect to URnetwork.</string>
     <string name="urnetwork_daily_allocation">Daily allocation</string>
-    <string name="urnetwork_reliability_label">Reliability: %.0f%%</string>
-    <string name="urnetwork_reliability_bonus">+%.0f%% bonus</string>
+    <string name="urnetwork_reliability_label">Reliability: %.3f</string>
+    <string name="urnetwork_reliability_bonus">+%.3f GiB/day</string>
     <string name="urnetwork_referrals_label">Referrals: %d</string>
     <string name="urnetwork_referral_bonus">+%d GB</string>
     <string name="urnetwork_points_title">Points</string>
