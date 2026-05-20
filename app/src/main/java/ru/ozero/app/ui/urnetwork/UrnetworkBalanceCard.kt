@@ -30,6 +30,8 @@ import ru.ozero.app.ui.utils.formatBytes
 import ru.ozero.app.urnetwork.UrnetworkBalanceState
 import kotlin.math.min
 
+private const val FREE_TIER_CAP_BYTES = 34L * 1024L * 1024L * 1024L
+
 @Composable
 fun UrnetworkBalanceCard(
     state: UrnetworkBalanceState,
@@ -72,16 +74,21 @@ fun UrnetworkBalanceCard(
 @Composable
 private fun BalanceDetails(state: UrnetworkBalanceState) {
     val snapshot = state.snapshot ?: return
-    val total = snapshot.usedBytes + snapshot.pendingBytes + snapshot.balanceBytes
+    // Backend adds 34 GiB rows daily (30h TTL). In a ~5h overlap window multiple rows are
+    // simultaneously active → sum shows 68–102 GiB for free tier. Cap display at 34 GiB.
+    val isPro = snapshot.plan != null
+    val displayBalance = if (isPro) snapshot.balanceBytes else minOf(snapshot.balanceBytes, FREE_TIER_CAP_BYTES)
+    val displayStart = if (isPro) snapshot.startBalanceBytes else minOf(snapshot.startBalanceBytes, FREE_TIER_CAP_BYTES)
+    val total = snapshot.usedBytes + snapshot.pendingBytes + displayBalance
     TrafficProgressBar(
         usedBytes = snapshot.usedBytes,
         pendingBytes = snapshot.pendingBytes,
-        availableBytes = snapshot.balanceBytes,
+        availableBytes = displayBalance,
         totalBytes = total,
     )
     BalanceRow(
         label = stringResource(R.string.urnetwork_balance_available),
-        value = formatBytes(snapshot.balanceBytes),
+        value = formatBytes(displayBalance),
         highlight = true,
     )
     BalanceRow(
@@ -96,7 +103,7 @@ private fun BalanceDetails(state: UrnetworkBalanceState) {
     }
     BalanceRow(
         label = stringResource(R.string.urnetwork_daily_allocation),
-        value = formatBytes(snapshot.startBalanceBytes),
+        value = formatBytes(displayStart),
     )
     if (state.meanReliabilityWeight > 0.0 || state.totalReferrals > 0L) {
         HorizontalDivider(color = OzeroPalette.Line)
