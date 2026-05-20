@@ -1,0 +1,50 @@
+name: Build MasterDnsVPN binary
+
+on:
+  workflow_dispatch:
+    inputs:
+      masterdns_ref:
+        description: 'MasterDnsVPN git ref (commit/tag/branch)'
+        required: true
+        default: 'main'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Ozero
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.0'
+
+      - name: Build binaries
+        env:
+          MASTERDNS_REF: ${{ inputs.masterdns_ref }}
+        run: bash scripts/build-masterdns-binary.sh
+
+      - name: Read meta
+        id: meta
+        run: |
+          source build/masterdns-binaries/meta.txt
+          echo "commit_short=${commit_short}" >> "$GITHUB_OUTPUT"
+          echo "tag=masterdns-${commit_short}" >> "$GITHUB_OUTPUT"
+
+      - name: Print sha256sums
+        run: cat build/masterdns-binaries/sha256sums.txt
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: masterdns-${{ steps.meta.outputs.commit_short }}
+          files: |
+            build/masterdns-binaries/libmdnsvpn-arm64-v8a.so
+            build/masterdns-binaries/sha256sums.txt
+          generate_release_notes: false
+          fail_on_unmatched_files: true

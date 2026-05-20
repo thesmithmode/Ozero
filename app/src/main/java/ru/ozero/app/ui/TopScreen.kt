@@ -19,4 +19,5 @@ enum class TopScreen {
     Language,
     UrnetworkSharedTraffic,
     TelegramProxySettings,
+    MasterDnsSettings,
 }

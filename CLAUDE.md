@@ -83,7 +83,7 @@
 
 ## Per-engine UI
 
-- Каждый engine (текущие модули: byedpi, telegram, urnetwork, warp) обязан иметь settings screen в `app/src/main/java/.../ui/settings/engines/` для пользовательского override config (subscription URL, server picker, args, bridges, и т.д.). При добавлении нового `engine-*` модуля — добавить сюда.
+- Каждый engine (текущие модули: byedpi, telegram, urnetwork, warp, masterdns) обязан иметь settings screen в `app/src/main/java/.../ui/settings/engines/` для пользовательского override config (subscription URL, server picker, args, bridges, и т.д.). При добавлении нового `engine-*` модуля — добавить сюда.
 
 ## Расследование — порядок (закон)
 
@@ -107,6 +107,7 @@
 ## MTProxy / Subprocess-proxy паттерн
 
 - `engine-telegram` — не VPN routing engine, а side-car proxy subprocess. Не реализует `Engine` интерфейс, не регистрируется через `@IntoSet`.
+- `engine-masterdns` — subprocess-pattern по образцу `engine-telegram`, но **полноценный** `EnginePlugin` (регистрируется `@IntoSet` через `MasterDnsModule`). Go-бинарь `libmdnsvpn.so` в `jniLibs/arm64-v8a/`, запуск через `ProcessBuilder`, **не** `System.loadLibrary`. Конфиг: TOML + resolvers.txt пишутся в `filesDir/masterdns/` (writer перезатирает `LISTEN_IP/LISTEN_PORT/LOCAL_DNS_ENABLED`). Локальный SOCKS5 берёт `MasterDnsPortAllocator` из диапазона `18000..18999`. Свой Go-рантайм изолирован subprocess'ом → не конфликтует с `libgojni`/`libam-go`. Бинарь поставляется через `binaries.lock.yaml` после ручного workflow `build-masterdns.yml` (release-тег `masterdns-<short>`); до публикации lock-entry отсутствует, модуль собирается без артефакта.
 - Subprocess запускается через `ProcessBuilder` из `nativeLibraryDir`. Бинарь (`libmtg.so`) — prebuilt Go binary, помещается прямо в `jniLibs/<abi>/`. **Не** грузить через `System.loadLibrary` — бинарь запускается как отдельный процесс, не как .so.
 - Routing через VPN: при WARP (`socksPort == 0`) subprocess наследует UID → трафик через TUN автоматически (`excludeSelf=false`). При SOCKS-engine — передать `--socks5-proxy-url socks5://127.0.0.1:<port>` (loopback минует TUN).
 - `TelegramProxyCoordinator` — единственная точка связи VPN state и proxy: наблюдает `TunnelController.state` + `configStore.config()` через `combine`, выбирает upstream, вызывает `start/stop`. Инициализируется в `OzeroApp.onCreate` через Hilt inject + `runCatching`.
