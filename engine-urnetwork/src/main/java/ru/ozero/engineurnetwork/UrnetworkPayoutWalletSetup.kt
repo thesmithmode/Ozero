@@ -31,12 +31,9 @@ internal class UrnetworkPayoutWalletSetup {
             }
             if (walletId != null) {
                 walletVc.updatePayoutWallet(walletId)
-                Log.i(TAG, "payout wallet set: ${walletAddress.take(WALLET_LOG_PREFIX)}…")
+                Log.i(TAG, "payout wallet set")
             } else {
-                PersistentLoggers.warn(
-                    TAG,
-                    "payout wallet setup: walletId not found for ${walletAddress.take(WALLET_LOG_PREFIX)}…",
-                )
+                PersistentLoggers.warn(TAG, "payout wallet setup: walletId not found")
             }
         }.onFailure {
             PersistentLoggers.warn(TAG, "setupPayoutWallet threw: ${it.message}")
@@ -82,7 +79,6 @@ internal class UrnetworkPayoutWalletSetup {
         const val TAG = "UrnetworkPayoutWallet"
         const val WALLET_FETCH_TIMEOUT_MS = 5_000L
         const val WALLET_ADD_TIMEOUT_MS = 10_000L
-        const val WALLET_LOG_PREFIX = 8
         const val WALLET_BLOCKCHAIN_SOLANA = "solana"
     }
 }

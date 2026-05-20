@@ -87,11 +87,7 @@ class EngineUrnetwork(
         )
 
         val wallet = configStore.walletAddress().first()
-        val isPreset = wallet == UrnetworkDefaults.PRESET_WALLET
-        Log.i(
-            TAG,
-            "start wallet=${wallet.take(WALLET_LOG_PREFIX_LEN)}… isPreset=$isPreset hasClientJwt=true",
-        )
+        Log.i(TAG, "start hasClientJwt=true")
 
         val bridgeResult = sdkBridge.start(
             walletAddress = wallet,
@@ -334,7 +330,6 @@ class EngineUrnetwork(
 
     private companion object {
         const val TAG = "EngineUrnetwork"
-        const val WALLET_LOG_PREFIX_LEN = 6
         const val PUBKEY_LOG_PREFIX_LEN = 8
         const val TUN_MTU = 1440
         const val TUN_PREFIX = 32

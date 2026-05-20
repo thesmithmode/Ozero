@@ -511,10 +511,7 @@ class RealUrnetworkSdkBridge(
                         PersistentLoggers.warn(
                             TAG,
                             "subscriptionBalance startBalance=${"%.1f".format(startGb)}GB > " +
-                                "${DOUBLE_QUOTA_THRESHOLD_BYTES / 1_000_000_000L}GB — подозрение на " +
-                                "duplicate networkCreate (legacy guest + walletAuth migration) " +
-                                "или backend накопил квоту по тому же networkId. " +
-                                "clientId=$clientId — нужен tombstone+sentinel для root cause.",
+                                "${DOUBLE_QUOTA_THRESHOLD_BYTES / 1_000_000_000L}GB",
                         )
                     }
                     cont.resume(
