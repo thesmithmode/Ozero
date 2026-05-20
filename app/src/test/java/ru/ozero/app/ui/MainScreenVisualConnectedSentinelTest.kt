@@ -37,17 +37,28 @@ class MainScreenVisualConnectedSentinelTest {
     }
 
     @Test
-    fun `backgroundState для URnetwork с 0 peers — Connecting (без желтозелёного наложения)`() {
+    fun `backgroundState — единый источник истины из powerState`() {
         val source = locateMainScreen().readText()
         assertTrue(
             source.contains("val backgroundState = powerState.toBackgroundState()"),
             "backgroundState обязан выводиться из powerState.toBackgroundState() — единый источник истины, " +
                 "без дублирования логики между powerState и backgroundState",
         )
+    }
+
+    @Test
+    fun `computePowerDiscState — Connected плюс degraded даёт Switching (жёлтый)`() {
+        val source = locateMainScreen().readText()
         assertTrue(
-            source.contains("state.engineId == EngineId.URNETWORK && urnetworkPeerCount == 0"),
-            "computePowerDiscState обязан обрабатывать случай URnetwork + peers==0 → Connecting, " +
-                "иначе жёлтая кнопка отображается поверх зелёного фона при поиске пиров",
+            source.contains("state is TunnelState.Connected && currentEngineDegraded -> PowerDiscState.Switching"),
+            "computePowerDiscState обязан рисовать жёлтую кнопку (Switching) при Connected + currentEngineDegraded — " +
+                "это общий паттерн для WARP (UAPI null/handshake stale) и URnetwork (peers==0). " +
+                "Зелёная кнопка ⇔ реально трафик идёт. Регрессия 2026-05-20: WARP висел Connected зелёным без трафика.",
+        )
+        assertTrue(
+            source.contains("computePowerDiscState(state, switching, currentEngineDegraded)"),
+            "MainScreen обязан передавать currentEngineDegraded из MainViewModel в computePowerDiscState — " +
+                "иначе degraded флаг не доходит до UI",
         )
     }
 

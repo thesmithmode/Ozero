@@ -92,7 +92,8 @@ fun MainScreen(
     val killswitchActive by viewModel.killswitchActive.collectAsStateWithLifecycle()
     val switching by viewModel.switching.collectAsStateWithLifecycle()
     val isReconnecting by viewModel.isReconnecting.collectAsStateWithLifecycle()
-    val powerState = computePowerDiscState(state, switching, urnetworkPeerCount)
+    val currentEngineDegraded by viewModel.currentEngineDegraded.collectAsStateWithLifecycle()
+    val powerState = computePowerDiscState(state, switching, currentEngineDegraded)
     val backgroundState = powerState.toBackgroundState()
     val isConnected = state is TunnelState.Connected
 
@@ -509,11 +510,10 @@ private fun expertDockTabs(): List<DockTab> {
 private fun computePowerDiscState(
     state: TunnelState,
     switching: SwitchingTransition?,
-    urnetworkPeerCount: Int,
+    currentEngineDegraded: Boolean,
 ): PowerDiscState = when {
     switching != null -> PowerDiscState.Switching
-    state is TunnelState.Connected && state.engineId == EngineId.URNETWORK && urnetworkPeerCount == 0 ->
-        PowerDiscState.Switching
+    state is TunnelState.Connected && currentEngineDegraded -> PowerDiscState.Switching
     state is TunnelState.Connected -> PowerDiscState.Connected
     state is TunnelState.Probing || state is TunnelState.Connecting || state is TunnelState.Disconnecting ->
         PowerDiscState.Connecting

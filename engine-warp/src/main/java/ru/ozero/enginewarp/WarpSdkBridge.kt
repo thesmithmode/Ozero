@@ -15,8 +15,6 @@ interface WarpSdkBridge {
 
     fun isRunning(): Boolean
 
-    suspend fun forceProcessRestart(): Boolean = false
-
     sealed interface AttachResult {
         data object Success : AttachResult
         data class Failed(val reason: String) : AttachResult

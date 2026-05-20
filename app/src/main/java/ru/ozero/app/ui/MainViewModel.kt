@@ -173,6 +173,23 @@ class MainViewModel @Inject constructor(
             initialValue = IpInfoState.Idle,
         )
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val currentEngineDegraded: StateFlow<Boolean> = tunnelController.state
+        .flatMapLatest { s ->
+            if (s is TunnelState.Connected && s.engineId in DEGRADATION_TRACKED_ENGINES) {
+                val plugin = enginePlugins.firstOrNull { it.id == s.engineId }
+                plugin?.stats()?.map { it.activeConnections == 0 } ?: flowOf(false)
+            } else {
+                flowOf(false)
+            }
+        }
+        .distinctUntilChanged()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = false,
+        )
+
     val urnetworkPeerCount: StateFlow<Int> = flow {
         while (true) {
             val s = tunnelController.state.value
@@ -359,5 +376,6 @@ class MainViewModel @Inject constructor(
         const val IP_INFO_RETRY_ATTEMPTS = 3
         const val IP_INFO_RETRY_DELAY_MS = 1_500L
         const val URNETWORK_LOCATION_POLL_MS = 4_000L
+        val DEGRADATION_TRACKED_ENGINES = setOf(EngineId.WARP, EngineId.URNETWORK)
     }
 }

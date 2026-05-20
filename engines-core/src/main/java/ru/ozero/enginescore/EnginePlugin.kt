@@ -33,8 +33,6 @@ interface EnginePlugin {
 
     suspend fun recover(): RecoverResult = RecoverResult.NotSupported
 
-    suspend fun hardRestart(): RecoverResult = recover()
-
     sealed class RecoverResult {
         data object Success : RecoverResult()
         data class Failed(val reason: String) : RecoverResult()

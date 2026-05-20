@@ -104,24 +104,6 @@ class EngineWarp(
         resolvedIni = null
     }
 
-    override suspend fun hardRestart(): EnginePlugin.RecoverResult {
-        PersistentLoggers.warn(TAG, "hardRestart: killing :engine_warp process")
-        statsJobRef.getAndSet(null)?.cancel()
-        connectedSinceRef.set(0L)
-        _stats.value = EngineStats()
-        val killed = runCatching { sdkBridge.forceProcessRestart() }.getOrElse { t ->
-            PersistentLoggers.error(TAG, "hardRestart threw: ${t.message}")
-            return EnginePlugin.RecoverResult.Failed("hardRestart threw: ${t.message}")
-        }
-        return if (killed) {
-            EnginePlugin.RecoverResult.Failed(
-                "process killed — TunnelController.onEngineDied возьмёт recovery, watchdog escalation остановлен",
-            )
-        } else {
-            EnginePlugin.RecoverResult.Failed("process kill не удался — :engine_warp pid не найден")
-        }
-    }
-
     override suspend fun recover(): EnginePlugin.RecoverResult {
         val uapiPath = uapiPathProvider()
         val state = uapiStateReader(uapiPath, TUNNEL_NAME)
@@ -134,9 +116,9 @@ class EngineWarp(
             PersistentLoggers.warn(
                 TAG,
                 "recover: handshake stale (age=$ageS, threshold=${handshakeStaleThresholdSec}s) — " +
-                    "NotSupported → запросим reconnect",
+                    "Failed — amneziawg-go ретраит handshake в фоне, watchdog продолжит ждать",
             )
-            EnginePlugin.RecoverResult.NotSupported
+            EnginePlugin.RecoverResult.Failed("handshake stale age=${ageS ?: "never"}s")
         }
     }
 

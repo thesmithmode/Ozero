@@ -69,7 +69,6 @@ class EngineWatchdogCoordinator(
             try {
                 var zeroPeersSince = 0L
                 var hadPeers = false
-                var consecutiveRecoverFailures = 0
                 while (isActive) {
                     delay(PEER_WATCHDOG_POLL_MS)
                     val peers = plugin.stats().first().activeConnections
@@ -95,49 +94,18 @@ class EngineWatchdogCoordinator(
                     when (result) {
                         EnginePlugin.RecoverResult.Success -> {
                             zeroPeersSince = 0L
-                            consecutiveRecoverFailures = 0
                         }
                         EnginePlugin.RecoverResult.NotSupported -> {
-                            handleEngineFailure(
-                                engineId,
-                                "no URnetwork peers for ${PEER_WATCHDOG_TIMEOUT_MS / 1000}s " +
-                                    "(recover not supported)",
+                            PersistentLoggers.warn(
+                                TAG,
+                                "recover NotSupported engine=$engineId — watchdog остановлен, " +
+                                    "VPN продолжает работать (юзер увидит degraded indicator в UI и сам решит rebind)",
                             )
                             return@launch
                         }
                         is EnginePlugin.RecoverResult.Failed -> {
-                            consecutiveRecoverFailures += 1
-                            PersistentLoggers.warn(
-                                TAG,
-                                "recover failed ($consecutiveRecoverFailures/$RECOVER_FAILURE_ESCALATION_THRESHOLD): " +
-                                    result.reason,
-                            )
+                            PersistentLoggers.warn(TAG, "recover failed: ${result.reason} — продолжаем retry")
                             zeroPeersSince = 0L
-                            if (consecutiveRecoverFailures >= RECOVER_FAILURE_ESCALATION_THRESHOLD) {
-                                PersistentLoggers.warn(
-                                    TAG,
-                                    "recover failed $consecutiveRecoverFailures× подряд → hardRestart engine=$engineId",
-                                )
-                                val hardResult = runCatching { plugin.hardRestart() }.getOrElse { t ->
-                                    EnginePlugin.RecoverResult.Failed("hardRestart threw: ${t.message}")
-                                }
-                                consecutiveRecoverFailures = 0
-                                when (hardResult) {
-                                    EnginePlugin.RecoverResult.Success -> {
-                                        PersistentLoggers.warn(TAG, "hardRestart success engine=$engineId")
-                                    }
-                                    EnginePlugin.RecoverResult.NotSupported,
-                                    is EnginePlugin.RecoverResult.Failed -> {
-                                        val reason = (hardResult as? EnginePlugin.RecoverResult.Failed)?.reason
-                                            ?: "not supported"
-                                        handleEngineFailure(
-                                            engineId,
-                                            "hardRestart $hardResult ($reason) — VPN не подлежит auto-recovery",
-                                        )
-                                        return@launch
-                                    }
-                                }
-                            }
                         }
                     }
                     delay(PEER_WATCHDOG_RECOVER_GRACE_MS)
@@ -188,6 +156,5 @@ class EngineWatchdogCoordinator(
         const val PEER_WATCHDOG_POLL_MS = 5_000L
         const val PEER_WATCHDOG_TIMEOUT_MS = 30_000L
         const val PEER_WATCHDOG_RECOVER_GRACE_MS = 30_000L
-        const val RECOVER_FAILURE_ESCALATION_THRESHOLD = 3
     }
 }
