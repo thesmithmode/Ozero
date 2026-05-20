@@ -222,6 +222,11 @@ class AppBackupManager(
             awgI3 = awg.specialJunk3,
             awgI4 = awg.specialJunk4,
             awgI5 = awg.payloadPacketSizeCount3,
+            awgI1Hex = awg.payloadHexI1,
+            awgI2Hex = awg.payloadHexI2,
+            awgI3Hex = awg.payloadHexI3,
+            awgI4Hex = awg.payloadHexI4,
+            awgI5Hex = awg.payloadHexI5,
         )
     }
 
@@ -258,6 +263,11 @@ class AppBackupManager(
                     specialJunk3 = awgI3 ?: AwgParams.DEFAULT_I3,
                     specialJunk4 = awgI4 ?: AwgParams.DEFAULT_I4,
                     payloadPacketSizeCount3 = awgI5 ?: AwgParams.DEFAULT_I5,
+                    payloadHexI1 = awgI1Hex,
+                    payloadHexI2 = awgI2Hex,
+                    payloadHexI3 = awgI3Hex,
+                    payloadHexI4 = awgI4Hex,
+                    payloadHexI5 = awgI5Hex,
                 ),
             ),
         )

@@ -111,17 +111,22 @@ internal object WarpConfParser {
             responsePacketMagicHeader = iface["h2"]?.toLongOrNull() ?: AwgParams.DEFAULT_H2,
             cookieReplyMagicHeader = iface["h3"]?.toLongOrNull() ?: AwgParams.DEFAULT_H3,
             transportMagicHeader = iface["h4"]?.toLongOrNull() ?: AwgParams.DEFAULT_H4,
-            payloadPacketSizeCount1 = if (i1Hex != null) AwgParams.DEFAULT_I1 else iface["i1"]?.toIntOrNull() ?: AwgParams.DEFAULT_I1,
-            payloadPacketSizeCount2 = if (i2Hex != null) AwgParams.DEFAULT_I2 else iface["i2"]?.toIntOrNull() ?: AwgParams.DEFAULT_I2,
-            specialJunk3 = if (i3Hex != null) AwgParams.DEFAULT_I3 else iface["i3"]?.toIntOrNull() ?: AwgParams.DEFAULT_I3,
-            specialJunk4 = if (i4Hex != null) AwgParams.DEFAULT_I4 else iface["i4"]?.toIntOrNull() ?: AwgParams.DEFAULT_I4,
-            payloadPacketSizeCount3 = if (i5Hex != null) AwgParams.DEFAULT_I5 else iface["i5"]?.toIntOrNull() ?: AwgParams.DEFAULT_I5,
+            payloadPacketSizeCount1 = intOrDefault(i1Hex, iface["i1"], AwgParams.DEFAULT_I1),
+            payloadPacketSizeCount2 = intOrDefault(i2Hex, iface["i2"], AwgParams.DEFAULT_I2),
+            specialJunk3 = intOrDefault(i3Hex, iface["i3"], AwgParams.DEFAULT_I3),
+            specialJunk4 = intOrDefault(i4Hex, iface["i4"], AwgParams.DEFAULT_I4),
+            payloadPacketSizeCount3 = intOrDefault(i5Hex, iface["i5"], AwgParams.DEFAULT_I5),
             payloadHexI1 = i1Hex,
             payloadHexI2 = i2Hex,
             payloadHexI3 = i3Hex,
             payloadHexI4 = i4Hex,
             payloadHexI5 = i5Hex,
         )
+    }
+
+    private fun intOrDefault(hex: String?, raw: String?, default: Int): Int {
+        if (hex != null) return default
+        return raw?.toIntOrNull() ?: default
     }
 
     private fun extractHex(raw: String?): String? {
