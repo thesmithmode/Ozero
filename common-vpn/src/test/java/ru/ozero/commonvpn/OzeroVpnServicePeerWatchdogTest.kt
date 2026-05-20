@@ -172,7 +172,26 @@ class OzeroVpnServicePeerWatchdogTest {
             !body.contains("PEER_WATCHDOG_MAX_RECOVERS"),
             "startPeerWatchdog не должен иметь MAX_RECOVERS лимит — watchdog обязан бесконечно " +
                 "переподключаться пока RecoverResult != NotSupported. Пауза между попытками " +
-                "обеспечена zeroPeersSince=0L + PEER_WATCHDOG_TIMEOUT_MS. Body:\n$body",
+                "обеспечена zeroPeersPolls=0 + PEER_WATCHDOG_TIMEOUT_MS. Body:\n$body",
+        )
+    }
+
+    @Test
+    fun `peerWatchdog использует poll counter не System currentTimeMillis — virtual time совместимость`() {
+        val body = watchdogSource
+            .substringAfter("fun startPeerWatchdog")
+            .substringBefore("fun cancelWatchers")
+        assertTrue(
+            !body.contains("System.currentTimeMillis"),
+            "startPeerWatchdog НЕ должен использовать System.currentTimeMillis — wall clock " +
+                "несовместим с runTest virtual dispatcher (advanceTimeBy не двигает real time → " +
+                "wall-clock delta остаётся ~0 → recover никогда не triggers в тесте → " +
+                "EngineWatchdogInfiniteRetryTest падает). Использовать счётчик polls вместо. Body:\n$body",
+        )
+        assertTrue(
+            body.contains("zeroPeersPolls"),
+            "startPeerWatchdog обязан иметь zeroPeersPolls счётчик — количество подряд idle " +
+                "опросов. Триггер recover когда zeroPeersPolls * POLL_MS >= TIMEOUT_MS. Body:\n$body",
         )
     }
 
@@ -223,31 +242,32 @@ class OzeroVpnServicePeerWatchdogTest {
     }
 
     @Test
-    fun `peerWatchdog после Success сбрасывает zeroPeersSince в 0L`() {
+    fun `peerWatchdog после Success сбрасывает zeroPeersPolls в 0`() {
         val body = watchdogSource
             .substringAfter("fun startPeerWatchdog")
             .substringBefore("fun cancelWatchers")
         val successBlock = body.substringAfter("RecoverResult.Success ->")
             .substringBefore("RecoverResult.NotSupported")
         assertTrue(
-            successBlock.contains("zeroPeersSince = 0L"),
-            "После Success обязан zeroPeersSince=0L — без сброса следующая итерация после grace " +
-                "сработает мгновенно (now - zeroPeersSince > TIMEOUT) и watchdog зашпарит retry " +
+            successBlock.contains("zeroPeersPolls = 0"),
+            "После Success обязан zeroPeersPolls=0 — без сброса следующая итерация после grace " +
+                "сработает мгновенно (counter уже превысил TIMEOUT) и watchdog зашпарит retry " +
                 "без реальной паузы. Block:\n$successBlock",
         )
     }
 
     @Test
-    fun `peerWatchdog имеет zeroPeersSince сброс после Failed — обеспечивает паузу между retry`() {
+    fun `peerWatchdog имеет zeroPeersPolls сброс после Failed — обеспечивает паузу между retry`() {
         val body = watchdogSource
             .substringAfter("fun startPeerWatchdog")
             .substringBefore("fun cancelWatchers")
         val failedBlock = body.substringAfter("RecoverResult.Failed ->")
             .substringBefore("delay(PEER_WATCHDOG_RECOVER_GRACE_MS)")
         assertTrue(
-            failedBlock.contains("zeroPeersSince = 0L"),
-            "После Failed обязан zeroPeersSince=0L — без сброса следующий poll сразу снова " +
-                "trigger recover без ожидания PEER_WATCHDOG_TIMEOUT_MS. Block:\n$failedBlock",
+            failedBlock.contains("zeroPeersPolls = 0"),
+            "После Failed обязан zeroPeersPolls=0 — без сброса следующий poll сразу снова " +
+                "trigger recover без ожидания PEER_WATCHDOG_TIMEOUT_MS / PEER_WATCHDOG_POLL_MS polls. " +
+                "Block:\n$failedBlock",
         )
     }
 }

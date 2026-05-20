@@ -67,23 +67,19 @@ class EngineWatchdogCoordinator(
         val plugin = enginePlugins.firstOrNull { it.id == engineId } ?: return
         val job = scope.launch {
             try {
-                var zeroPeersSince = 0L
+                var zeroPeersPolls = 0
                 var hadPeers = false
                 while (isActive) {
                     delay(PEER_WATCHDOG_POLL_MS)
                     val peers = plugin.stats().first().activeConnections
                     if (peers > 0) {
                         hadPeers = true
-                        zeroPeersSince = 0L
+                        zeroPeersPolls = 0
                         continue
                     }
                     if (!hadPeers) continue
-                    val now = System.currentTimeMillis()
-                    if (zeroPeersSince == 0L) {
-                        zeroPeersSince = now
-                        continue
-                    }
-                    if (now - zeroPeersSince <= PEER_WATCHDOG_TIMEOUT_MS) continue
+                    zeroPeersPolls += 1
+                    if (zeroPeersPolls * PEER_WATCHDOG_POLL_MS < PEER_WATCHDOG_TIMEOUT_MS) continue
                     PersistentLoggers.warn(
                         TAG,
                         "peer watchdog: 0 peers ${PEER_WATCHDOG_TIMEOUT_MS / 1000}s → recover",
@@ -93,7 +89,7 @@ class EngineWatchdogCoordinator(
                     }
                     when (result) {
                         EnginePlugin.RecoverResult.Success -> {
-                            zeroPeersSince = 0L
+                            zeroPeersPolls = 0
                         }
                         EnginePlugin.RecoverResult.NotSupported -> {
                             PersistentLoggers.warn(
@@ -105,7 +101,7 @@ class EngineWatchdogCoordinator(
                         }
                         is EnginePlugin.RecoverResult.Failed -> {
                             PersistentLoggers.warn(TAG, "recover failed: ${result.reason} — продолжаем retry")
-                            zeroPeersSince = 0L
+                            zeroPeersPolls = 0
                         }
                     }
                     delay(PEER_WATCHDOG_RECOVER_GRACE_MS)
