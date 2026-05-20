@@ -141,7 +141,7 @@ class RealUrnetworkSdkBridge(
                 if (keys != null) d.loadProvideSecretKeys(keys) else d.initProvideSecretKeys()
             }.onFailure { PersistentLoggers.warn(TAG, "provideSecretKeys init threw: ${it.message}") }
             applyDeviceFields(d, localState)
-            Log.i(TAG, "runStartOnMain: device created — 12 fields applied (паритет с initDeviceForLocations)")
+            Log.i(TAG, "runStartOnMain: device created — applyDeviceFields done (паритет с initDeviceForLocations)")
             deviceRef.set(d)
             d
         }
@@ -360,7 +360,7 @@ class RealUrnetworkSdkBridge(
         }
         applyDeviceFields(device, localState)
         deviceRef.set(device)
-        Log.i(TAG, "initDeviceForLocations: device ready for location browse — 12 fields applied")
+        Log.i(TAG, "initDeviceForLocations: device ready for location browse — applyDeviceFields done")
         return true
     }
 
