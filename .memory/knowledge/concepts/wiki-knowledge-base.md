@@ -67,6 +67,16 @@ A systematic cross-article contradiction audit of ~140 articles found 9 issues (
 
 **Observation:** contradictions cluster around articles that document an *evolution* of approach (eager→process-isolation, guest→non-guest, bad→good practice). Later articles don't always update earlier ones, leaving conflicting claims. Resolution strategy: add `## Historical Note` sections to older articles rather than deleting — preserves the evolution context while making the current state unambiguous.
 
+### Contradiction Resolution and lint.py Overflow Fix (2026-05-20 18:53 session)
+
+`check_contradictions()` in `lint.py` had the same SDK overflow bug as `compile.py`: it dumped all 152 article contents inline in the prompt (~1.2MB) → Claude Agent SDK exited with code 1. Fix applied (commit `38770996`): identical to the compile.py fix — path-list-only prompt, `allowed_tools=[Read, Glob, Grep]`, `max_turns=30` so the LLM reads articles on demand.
+
+The 9 contradictions found in session 18:27 required **three iterative audit rounds** to fully resolve (9→3→3→1→0). Each round: run lint contradictions check → LLM reads flagged pairs → apply fixes → re-run. Contradictions cluster: fixing one article often exposes a previously-hidden inconsistency in a related article. Iterative re-runs until zero findings is the correct termination condition.
+
+`lint.py` transient `LLM check failed: exit 1` from earlier session was a prior-run artifact (unfixed overflow), not a new failure. Standalone re-run after the patch produced NO_ISSUES. Rule: always re-run on transient contradiction failures; a single `exit 1` without stderr content is likely overflow or an artifact from a previous broken run, not a structural issue in the articles themselves.
+
+Duplicate article `urnetwork-filter-locations-trigger.md` was deleted (duplicate of `urnetwork-filterlocations-trigger.md`). 441 missing-backlinks findings were intentionally skipped — back-linking all 152 articles is low-value maintenance work; the index provides the primary retrieval path.
+
 ## Related Concepts
 
 - [[concepts/ci-workflow-discipline]] - The CI workflow that the wiki documents and tracks
@@ -77,3 +87,4 @@ A systematic cross-article contradiction audit of ~140 articles found 9 issues (
 - [[daily/2026-04-29.md]] - `/wiki-init` executed, .memory/ + hooks + .gitignore configured
 - [[daily/2026-04-30.md]] - Auto-flush hook unreliability discovered; compact-before-clear ordering established; 14 failed flushes in productive session
 - [[daily/2026-05-01.md]] - Continued flush failures (3/3 failed: timeout + exit code 1); pattern confirmed across 3 consecutive days
+- [[daily/2026-05-20.md]] - 13+ FLUSH_ERROR (exit code 1) with no stderr detail; FLUSH_OK "nothing worth saving" from productive sessions; root cause: truncated JSONL transcript (tool results stripped) → Claude sees assistant-only messages; contradiction audit session 18:27 found 9 issues (4 direct contradictions, 5 inconsistencies) across ~140 articles; session 18:53: lint.py overflow fix (path-list+Read on demand), 3-round iterative resolution (9→3→3→1→0), duplicate article deleted, transient re-run rule

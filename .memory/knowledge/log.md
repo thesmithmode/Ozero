@@ -1,5 +1,22 @@
 # Build Log
 
+## [2026-05-20T20:30:00+03:00] compile | Daily Log 2026-05-20 (pass 8 — lint.py overflow fix + contradiction resolution)
+- Source: daily/2026-05-20.md
+- Articles created: (none)
+- Articles updated:
+  - [[concepts/wiki-knowledge-base]] — session 18:53 captured: lint.py check_contradictions() SDK overflow fix (path-list + allowed_tools=[Read,Glob,Grep] + max_turns=30, identical to compile.py fix commit 38770996); 3-round iterative contradiction resolution (9→3→3→1→0); duplicate `urnetwork-filter-locations-trigger.md` deleted; transient `exit 1` re-run rule documented; 441 missing-backlinks intentionally skipped
+- Index: (none — wiki-knowledge-base row already updated)
+- Sessions covered: 18:53 (lint.py overflow fix, iterative contradiction audit, duplicate cleanup)
+- Note: All 8 sessions from daily/2026-05-20.md now fully compiled across passes 1-8
+
+## [2026-05-20T19:00:00+03:00] compile | Daily Log 2026-05-20 (pass 7 — wiki-knowledge-base Sources gap)
+- Source: daily/2026-05-20.md
+- Articles created: (none)
+- Articles updated:
+  - [[concepts/wiki-knowledge-base]] — Sources section was missing daily/2026-05-20.md entry despite frontmatter having the date; added flush error root cause (truncated JSONL) + contradiction audit reference
+- Index: (none — index row already updated in pass 2)
+- Sessions covered: gap fix only — wiki-knowledge-base.md body Sources vs frontmatter discrepancy
+
 ## [2026-05-20T18:47:26+03:00] compile | Daily Log 2026-05-20 (pass 6 — KB audit article updates)
 - Source: daily/2026-05-20.md
 - Articles created: (none)
