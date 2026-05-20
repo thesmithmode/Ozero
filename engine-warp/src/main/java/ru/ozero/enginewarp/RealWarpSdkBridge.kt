@@ -147,6 +147,17 @@ class RealWarpSdkBridge(
 
     override fun isRunning(): Boolean = tunnelHandle.get() != INVALID_HANDLE
 
+    override suspend fun forceProcessRestart(): Boolean = withContext(Dispatchers.IO) {
+        val staleHandle = tunnelHandle.getAndSet(INVALID_HANDLE)
+        if (staleHandle != INVALID_HANDLE) {
+            runCatching { awgRuntime.turnOff(staleHandle) }
+                .onFailure { PersistentLoggers.warn(TAG, "forceProcessRestart turnOff failed: ${it.message}") }
+        }
+        val killed = runCatching { awgRuntime.killEngineProcess() }.getOrDefault(false)
+        PersistentLoggers.warn(TAG, "forceProcessRestart: killed=$killed handle=$staleHandle")
+        killed
+    }
+
     private companion object {
         const val TAG = "RealWarpSdkBridge"
         const val INVALID_HANDLE = -1
@@ -218,6 +229,8 @@ interface AwgRuntime {
     fun getSocketV6(handle: Int): Int
 
     fun version(): String = "unknown"
+
+    fun killEngineProcess(): Boolean = false
 
     @Deprecated("awgGetConfig causes SIGSEGV on partial-handshake handle, use only post-disconnect")
     fun getConfig(handle: Int): String? = null

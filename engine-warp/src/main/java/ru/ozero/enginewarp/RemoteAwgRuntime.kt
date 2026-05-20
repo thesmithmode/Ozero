@@ -1,11 +1,13 @@
 package ru.ozero.enginewarp
 
+import android.app.ActivityManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
+import android.os.Process
 import android.util.Log
 import ru.ozero.enginescore.PersistentLoggers
 import java.util.concurrent.CountDownLatch
@@ -169,8 +171,33 @@ class RemoteAwgRuntime(
     override fun version(): String =
         runCatching { engine?.version() ?: "disconnected" }.getOrDefault("error")
 
+    override fun killEngineProcess(): Boolean {
+        val pid = findEngineProcessPid()
+        if (pid <= 0) {
+            PersistentLoggers.warn(TAG, "killEngineProcess: $ENGINE_PROCESS_SUFFIX не найден в RunningAppProcesses")
+            return false
+        }
+        PersistentLoggers.warn(TAG, "killEngineProcess: Process.killProcess(pid=$pid) — force-restart :engine_warp")
+        runCatching { Process.killProcess(pid) }
+            .onFailure {
+                PersistentLoggers.warn(TAG, "killEngineProcess threw: ${it.javaClass.simpleName}: ${it.message}")
+                return false
+            }
+        return true
+    }
+
+    private fun findEngineProcessPid(): Int {
+        val am = runCatching {
+            context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+        }.getOrNull() ?: return -1
+        val processes = runCatching { am.runningAppProcesses }.getOrNull() ?: return -1
+        val expectedName = "${context.packageName}$ENGINE_PROCESS_SUFFIX"
+        return processes.firstOrNull { it.processName == expectedName }?.pid ?: -1
+    }
+
     private companion object {
         const val TAG = "RemoteAwgRuntime"
         const val CONNECT_TIMEOUT_S = 5L
+        const val ENGINE_PROCESS_SUFFIX = ":engine_warp"
     }
 }

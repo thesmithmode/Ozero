@@ -104,6 +104,24 @@ class EngineWarp(
         resolvedIni = null
     }
 
+    override suspend fun hardRestart(): EnginePlugin.RecoverResult {
+        PersistentLoggers.warn(TAG, "hardRestart: killing :engine_warp process")
+        statsJobRef.getAndSet(null)?.cancel()
+        connectedSinceRef.set(0L)
+        _stats.value = EngineStats()
+        val killed = runCatching { sdkBridge.forceProcessRestart() }.getOrElse { t ->
+            PersistentLoggers.error(TAG, "hardRestart threw: ${t.message}")
+            return EnginePlugin.RecoverResult.Failed("hardRestart threw: ${t.message}")
+        }
+        return if (killed) {
+            EnginePlugin.RecoverResult.Failed(
+                "process killed — TunnelController.onEngineDied возьмёт recovery, watchdog escalation остановлен",
+            )
+        } else {
+            EnginePlugin.RecoverResult.Failed("process kill не удался — :engine_warp pid не найден")
+        }
+    }
+
     override suspend fun recover(): EnginePlugin.RecoverResult {
         val uapiPath = uapiPathProvider()
         val state = uapiStateReader(uapiPath, TUNNEL_NAME)
@@ -225,10 +243,12 @@ class EngineWarp(
             var prevRx = 0L
             var prevTx = 0L
             var tick = 0
+            var consecutiveNullReads = 0
             try {
                 while (isActive) {
                     val state = uapiStateReader(uapiPath, TUNNEL_NAME)
                     if (state != null) {
+                        consecutiveNullReads = 0
                         val ageS = state.handshakeAgeSeconds
                         val handshakeRecent = ageS != null && ageS < handshakeStaleThresholdSec
                         if (handshakeRecent && connectedSinceRef.get() == 0L) {
@@ -255,7 +275,20 @@ class EngineWarp(
                             prevTx = state.txBytes
                         }
                     } else {
+                        consecutiveNullReads += 1
+                        connectedSinceRef.set(0L)
+                        _stats.value = _stats.value.copy(
+                            connectedSince = 0L,
+                            activeConnections = 0,
+                        )
                         tick += 1
+                        if (consecutiveNullReads == UAPI_NULL_DEGRADED_THRESHOLD) {
+                            PersistentLoggers.warn(
+                                TAG,
+                                "warp UAPI null x$consecutiveNullReads — пометили activeConnections=0 " +
+                                    "(peer watchdog подберёт через ${PEER_WATCHDOG_HINT_S}s)",
+                            )
+                        }
                         if (tick % STATS_LOG_EVERY == 0) {
                             PersistentLoggers.warn(
                                 TAG,
@@ -392,13 +425,13 @@ class EngineWarp(
             }
         }
 
-    private fun isLikelyIpAddress(host: String): Boolean {
-        if (host.isEmpty()) return false
-        if (host.startsWith('[') || host.contains(':')) return true
-        return host.all { it.isDigit() || it == '.' }
-    }
-
     internal companion object {
+        fun isLikelyIpAddress(host: String): Boolean {
+            if (host.isEmpty()) return false
+            if (host.startsWith('[') || host.contains(':')) return true
+            return host.all { it.isDigit() || it == '.' }
+        }
+
         const val TAG = "EngineWarp"
         const val WARP_NO_SOCKS_PORT = 0
         const val TUNNEL_NAME = "ozero-warp"
@@ -409,5 +442,7 @@ class EngineWarp(
         const val STATS_POLL_INTERVAL_MS = 5_000L
         const val HANDSHAKE_STALE_THRESHOLD_SEC = 180L
         const val STATS_LOG_EVERY = 5
+        const val UAPI_NULL_DEGRADED_THRESHOLD = 3
+        const val PEER_WATCHDOG_HINT_S = 30
     }
 }
