@@ -1,11 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="masterdns_engine_name">MasterDNS</string>
-    <string name="masterdns_warning_slow">DNS tunnel — emergency mode. Expect 1–3 Mbit/s. Use only when other VPNs are blocked.</string>
     <string name="masterdns_config_toml">client_config.toml content</string>
     <string name="masterdns_resolvers">DNS resolvers (one per line)</string>
     <string name="masterdns_enabled">Enable MasterDNS</string>
-    <string name="masterdns_setup_guide_hint">Requires your own server. See docs/masterdns-server-setup.md in the Ozero repo.</string>
+    <string name="masterdns_beta_badge">BETA</string>
+    <string name="masterdns_setup_title">Bring up your own server in 15 minutes</string>
+    <string name="masterdns_setup_prereq">Requires a VPS (1 vCPU, 512 MB RAM) and a domain you can delegate via NS records. All commands are one-tap copy.</string>
+    <string name="masterdns_setup_step1_title">Delegate a subdomain</string>
+    <string name="masterdns_setup_step1_body">In your domain DNS (replace example.com and IP):\nns1.example.com  A   server-IP\nv.example.com    NS  ns1.example.com</string>
+    <string name="masterdns_setup_step2_title">Install the server (Debian/Ubuntu)</string>
+    <string name="masterdns_setup_step3_title">Generate the encryption key (AES-256-GCM)</string>
+    <string name="masterdns_setup_step4_title">Edit /etc/masterdnsvpn/server_config.toml with your domain</string>
+    <string name="masterdns_setup_step4_body">DOMAIN = [\"v.example.com\"]\nPROTOCOL_TYPE = \"SOCKS5\"\nUDP_PORT = 53\nDATA_ENCRYPTION_METHOD = 5\nENCRYPTION_KEY_FILE = \"/etc/masterdnsvpn/encrypt_key.txt\"</string>
+    <string name="masterdns_setup_step5_title">Start the service and open UDP/53 to the internet</string>
+    <string name="masterdns_setup_step6_title">Paste the key into «client_config.toml» field below</string>
+    <string name="masterdns_setup_step6_body">DOMAINS = [\"v.example.com\"]\nDATA_ENCRYPTION_METHOD = 5\nENCRYPTION_KEY = \"<contents of encrypt_key.txt>\"\nPROTOCOL_TYPE = \"SOCKS5\"\nRESOLVER_BALANCING_STRATEGY = 3</string>
+    <string name="masterdns_copy_button">Copy</string>
+    <string name="masterdns_copied_toast">Copied</string>
     <string name="settings_masterdns_title">MasterDNS</string>
     <string name="settings_masterdns_summary">DNS tunnel — emergency bypass when all VPNs are blocked.</string>
 </resources>

@@ -1,11 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="masterdns_engine_name">MasterDNS</string>
-    <string name="masterdns_warning_slow">DNS-туннель — экстренный режим. Ожидайте 1–3 Мбит/с. Используйте только при тотальной блокировке других VPN.</string>
     <string name="masterdns_config_toml">Конфигурация client_config.toml</string>
     <string name="masterdns_resolvers">DNS-резолверы (по одному на строку)</string>
     <string name="masterdns_enabled">Включить MasterDNS</string>
-    <string name="masterdns_setup_guide_hint">Нужен свой сервер. См. docs/masterdns-server-setup.md в репозитории Ozero.</string>
+    <string name="masterdns_beta_badge">BETA</string>
+    <string name="masterdns_setup_title">Как поднять свой сервер за 15 минут</string>
+    <string name="masterdns_setup_prereq">Нужен VPS (1 vCPU, 512 МБ RAM) и домен с возможностью настроить NS-делегирование. Все команды копируются в один клик.</string>
+    <string name="masterdns_setup_step1_title">Делегировать поддомен</string>
+    <string name="masterdns_setup_step1_body">В DNS основного домена создать записи (заменить example.com и IP):\nns1.example.com  A   IP-сервера\nv.example.com    NS  ns1.example.com</string>
+    <string name="masterdns_setup_step2_title">Установить сервер (Debian/Ubuntu)</string>
+    <string name="masterdns_setup_step3_title">Сгенерировать ключ шифрования (AES-256-GCM)</string>
+    <string name="masterdns_setup_step4_title">Прописать домен в /etc/masterdnsvpn/server_config.toml</string>
+    <string name="masterdns_setup_step4_body">DOMAIN = [\"v.example.com\"]\nPROTOCOL_TYPE = \"SOCKS5\"\nUDP_PORT = 53\nDATA_ENCRYPTION_METHOD = 5\nENCRYPTION_KEY_FILE = \"/etc/masterdnsvpn/encrypt_key.txt\"</string>
+    <string name="masterdns_setup_step5_title">Запустить сервис и открыть UDP/53 наружу</string>
+    <string name="masterdns_setup_step6_title">Вставить ключ в поле «Конфигурация client_config.toml» ниже</string>
+    <string name="masterdns_setup_step6_body">DOMAINS = [\"v.example.com\"]\nDATA_ENCRYPTION_METHOD = 5\nENCRYPTION_KEY = \"<содержимое encrypt_key.txt>\"\nPROTOCOL_TYPE = \"SOCKS5\"\nRESOLVER_BALANCING_STRATEGY = 3</string>
+    <string name="masterdns_copy_button">Скопировать</string>
+    <string name="masterdns_copied_toast">Скопировано</string>
     <string name="settings_masterdns_title">MasterDNS</string>
     <string name="settings_masterdns_summary">DNS-туннель для экстренного обхода полной блокировки VPN.</string>
 </resources>
