@@ -21,12 +21,22 @@ class ByeDpiBuildManualConfigTest {
     }
 
     @Test
-    fun `CMD mode winningArgs override`() {
+    fun `CMD mode winningArgs override сохраняет custom + дописывает -Ku если отсутствует`() {
         val custom = "-Y -Ar -s5"
         val cfg = engine.buildManualConfig(
             SettingsModel(byedpiUseUiMode = false, byedpiWinningArgs = custom),
         ) as EngineConfig.ByeDpi
-        assertEquals(custom, cfg.args)
+        assertTrue(custom in cfg.args, "custom args обязаны быть сохранены, got '${cfg.args}'")
+        assertTrue("-Ku" in cfg.args, "winning args без -Ku обязаны получить UDP desync, got '${cfg.args}'")
+    }
+
+    @Test
+    fun `CMD mode winningArgs c уже существующим -Ku не дублирует UDP desync`() {
+        val custom = "-Y -Ku -a2 -s5"
+        val cfg = engine.buildManualConfig(
+            SettingsModel(byedpiUseUiMode = false, byedpiWinningArgs = custom),
+        ) as EngineConfig.ByeDpi
+        assertEquals(custom, cfg.args, "winning args с уже -Ku не должны меняться, got '${cfg.args}'")
     }
 
     @Test
