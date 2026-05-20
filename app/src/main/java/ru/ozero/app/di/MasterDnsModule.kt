@@ -14,9 +14,6 @@ import dagger.multibindings.IntoSet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.enginemasterdns.DataStoreMasterDnsConfigStore
 import ru.ozero.enginemasterdns.MasterDnsClientService
 import ru.ozero.enginemasterdns.MasterDnsClientWrapper
@@ -24,6 +21,7 @@ import ru.ozero.enginemasterdns.MasterDnsConfigStore
 import ru.ozero.enginemasterdns.MasterDnsConfigWriter
 import ru.ozero.enginemasterdns.MasterDnsEngine
 import ru.ozero.enginemasterdns.MasterDnsPortAllocator
+import ru.ozero.enginemasterdns.MasterDnsResolversCache
 import ru.ozero.enginescore.EnginePlugin
 import java.io.File
 import javax.inject.Qualifier
@@ -69,21 +67,22 @@ object MasterDnsModule {
 
     @Provides
     @Singleton
+    fun provideMasterDnsResolversCache(
+        configStore: MasterDnsConfigStore,
+    ): MasterDnsResolversCache = MasterDnsResolversCache(
+        config = configStore.config(),
+        scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    )
+
+    @Provides
+    @Singleton
     @IntoSet
     fun provideMasterDnsEngine(
         service: MasterDnsClientService,
-        configStore: MasterDnsConfigStore,
+        resolversCache: MasterDnsResolversCache,
     ): EnginePlugin = MasterDnsEngine(
         serviceFactory = { service },
         portAllocator = MasterDnsPortAllocator(),
-        resolversProvider = {
-            runBlocking {
-                withTimeoutOrNull(CONFIG_READ_TIMEOUT_MS) {
-                    runCatching { configStore.config().first().resolvers }.getOrNull()
-                }.orEmpty()
-            }
-        },
+        resolversProvider = { resolversCache.snapshot() },
     )
-
-    private const val CONFIG_READ_TIMEOUT_MS = 1_500L
 }

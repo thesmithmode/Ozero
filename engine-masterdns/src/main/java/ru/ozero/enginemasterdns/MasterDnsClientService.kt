@@ -84,7 +84,19 @@ class MasterDnsClientService(
                 scope.launch {
                     runCatching {
                         process.inputStream.bufferedReader().use { r ->
-                            r.forEachLine { Log.d(TAG, it) }
+                            var lineCount = 0
+                            r.forEachLine { line ->
+                                if (lineCount < MAX_LOG_LINES) {
+                                    Log.d(TAG, line)
+                                    lineCount++
+                                    if (lineCount == MAX_LOG_LINES) {
+                                        PersistentLoggers.warn(
+                                            TAG,
+                                            "masterdns stdout truncated after $MAX_LOG_LINES lines",
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 },
@@ -125,5 +137,6 @@ class MasterDnsClientService(
         const val TAG = "MasterDnsService"
         const val STARTUP_CHECK_MS = 500L
         const val LIVENESS_POLL_MS = 500L
+        const val MAX_LOG_LINES = 200
     }
 }

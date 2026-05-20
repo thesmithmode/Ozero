@@ -23,9 +23,10 @@ open class MasterDnsConfigWriter(private val workDir: File) {
     private fun buildToml(runtime: MasterDnsRuntimeConfig): String {
         val rewritten = runtime.configToml
             .lines()
-            .filterNot { it.trim().startsWith("LISTEN_IP") }
-            .filterNot { it.trim().startsWith("LISTEN_PORT") }
-            .filterNot { it.trim().startsWith("LOCAL_DNS_ENABLED") }
+            .filterNot { line ->
+                val trimmed = line.trim()
+                OVERRIDE_KEYS.any { trimmed.startsWith(it, ignoreCase = true) }
+            }
             .joinToString("\n")
             .trimEnd()
         return buildString {
@@ -35,5 +36,9 @@ open class MasterDnsConfigWriter(private val workDir: File) {
             append("LISTEN_PORT = ").append(runtime.socksPort).append("\n")
             append("LOCAL_DNS_ENABLED = false\n")
         }
+    }
+
+    private companion object {
+        val OVERRIDE_KEYS = listOf("LISTEN_IP", "LISTEN_PORT", "LOCAL_DNS_ENABLED")
     }
 }

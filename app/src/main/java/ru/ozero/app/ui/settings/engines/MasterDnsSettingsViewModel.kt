@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ru.ozero.enginemasterdns.MasterDnsConfigStore
+import ru.ozero.enginescore.PersistentLoggers
 import javax.inject.Inject
 
 data class MasterDnsSettingsState(
@@ -33,15 +34,28 @@ class MasterDnsSettingsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, MasterDnsSettingsState())
 
     fun onEnabledChange(enabled: Boolean) {
-        viewModelScope.launch { store.setEnabled(enabled) }
+        viewModelScope.launch {
+            runCatching { store.setEnabled(enabled) }
+                .onFailure { PersistentLoggers.error(TAG, "setEnabled failed: ${it.message}", it) }
+        }
     }
 
     fun onConfigTomlChange(toml: String) {
-        viewModelScope.launch { store.setConfigToml(toml) }
+        viewModelScope.launch {
+            runCatching { store.setConfigToml(toml) }
+                .onFailure { PersistentLoggers.error(TAG, "setConfigToml failed: ${it.message}", it) }
+        }
     }
 
     fun onResolversChange(text: String) {
         val list = text.split('\n').map { it.trim() }.filter { it.isNotEmpty() }
-        viewModelScope.launch { store.setResolvers(list) }
+        viewModelScope.launch {
+            runCatching { store.setResolvers(list) }
+                .onFailure { PersistentLoggers.error(TAG, "setResolvers failed: ${it.message}", it) }
+        }
+    }
+
+    private companion object {
+        const val TAG = "MasterDnsSettingsVM"
     }
 }

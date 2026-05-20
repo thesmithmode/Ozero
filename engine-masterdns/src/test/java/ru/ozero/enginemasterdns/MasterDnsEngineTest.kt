@@ -85,6 +85,20 @@ class MasterDnsEngineTest {
     }
 
     @Test
+    fun `start times out when service stuck in Starting`() = runTest {
+        val service = StuckStartingService()
+        val engine = MasterDnsEngine(
+            serviceFactory = { service },
+            portAllocator = StubAllocator(18000),
+            startTimeoutMs = 50,
+        )
+        val result = engine.start(masterDnsConfig(), Upstream.None)
+        assertTrue(result is StartResult.Failure) { "got=$result" }
+        assertTrue((result as StartResult.Failure).reason.contains("timeout"))
+        assertTrue(service.stopped, "engine обязан вызвать service.stop() при timeout")
+    }
+
+    @Test
     fun `probe returns Failure stub`() = runTest {
         val engine = makeEngine(service = FakeService())
         val r = engine.probe()
@@ -145,6 +159,19 @@ class MasterDnsEngineTest {
             } else {
                 MasterDnsClientState.Running(succeedWithPort)
             }
+        }
+        override fun stop() {
+            stopped = true
+            flow.value = MasterDnsClientState.Idle
+        }
+    }
+
+    private class StuckStartingService : MasterDnsClientServiceContract {
+        var stopped: Boolean = false
+        private val flow = MutableStateFlow<MasterDnsClientState>(MasterDnsClientState.Idle)
+        override val state: StateFlow<MasterDnsClientState> = flow.asStateFlow()
+        override fun start(runtime: MasterDnsRuntimeConfig) {
+            flow.value = MasterDnsClientState.Starting
         }
         override fun stop() {
             stopped = true

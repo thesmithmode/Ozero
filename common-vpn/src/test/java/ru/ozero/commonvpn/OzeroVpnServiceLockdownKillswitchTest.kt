@@ -125,7 +125,7 @@ class OzeroVpnServiceLockdownKillswitchTest {
     }
 
     @Test
-    fun `buildTunBuilder вызывает applyLockdown с applyUnderlying=false — ByeDPI upstream parity`() {
+    fun `buildTunBuilder default applyUnderlying=false — ByeDPI upstream parity`() {
         val body = helperSource
             .substringAfter("fun buildTunBuilder(")
             .substringBefore("private fun applyLockdown")
@@ -134,12 +134,18 @@ class OzeroVpnServiceLockdownKillswitchTest {
             "buildTunBuilder обязан вызывать applyLockdown — для ByeDPI/legacy engines.",
         )
         assertTrue(
-            body.contains("applyUnderlying = false"),
-            "buildTunBuilder (ByeDPI) обязан applyUnderlying=false — upstream ByeByeDPI 1.7.5 " +
-                "parity. setUnderlyingNetworks(null) ломает QUIC: outgoing UDP socket в byedpi " +
-                "process теряет authoritative underlying network → kernel routes через wrong " +
-                "interface → YouTube QUIC fail на ~10-15с после connect. См. concept article " +
-                "byedpi-vpn-pipeline-upstream-divergence. Body:\n$body",
+            body.contains("applyUnderlying: Boolean = false"),
+            "buildTunBuilder сигнатура обязана иметь default applyUnderlying=false — ByeDPI engine " +
+                "path через default-вызов получает upstream ByeByeDPI 1.7.5 parity. " +
+                "setUnderlyingNetworks(null) ломает QUIC: outgoing UDP socket в byedpi process " +
+                "теряет authoritative underlying network → kernel routes через wrong interface → " +
+                "YouTube QUIC fail на ~10-15с после connect. См. byedpi-vpn-pipeline-upstream-divergence. " +
+                "Body:\n$body",
+        )
+        assertTrue(
+            body.contains("applyUnderlying = applyUnderlying"),
+            "buildTunBuilder обязан пробрасывать applyUnderlying в applyLockdown — иначе " +
+                "killswitch startup path не может выставить true для P37 invariant. Body:\n$body",
         )
     }
 

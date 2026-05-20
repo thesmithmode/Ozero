@@ -81,4 +81,42 @@ class MasterDnsConfigWriterTest {
         val resolversText = File(files.resolversPath).readText()
         assertEquals("9.9.9.9\n", resolversText)
     }
+
+    @Test
+    fun `lowercase user keys overridden case-insensitively`(@TempDir tmp: Path) {
+        val writer = MasterDnsConfigWriter(File(tmp.toFile(), "masterdns"))
+        val runtime = MasterDnsRuntimeConfig(
+            configToml = "listen_port = 9999\n" +
+                "listen_ip = \"0.0.0.0\"\n" +
+                "local_dns_enabled = true\n",
+            resolvers = listOf("8.8.8.8"),
+            socksPort = 18733,
+        )
+
+        val files = writer.write(runtime)
+
+        val toml = File(files.configPath).readText()
+        assertTrue(toml.contains("LISTEN_PORT = 18733"))
+        assertTrue(toml.contains("LISTEN_IP = \"127.0.0.1\""))
+        assertTrue(toml.contains("LOCAL_DNS_ENABLED = false"))
+        assertFalse(toml.contains("listen_port = 9999"))
+        assertFalse(toml.contains("listen_ip = \"0.0.0.0\""))
+        assertFalse(toml.contains("local_dns_enabled = true"))
+    }
+
+    @Test
+    fun `mixed-case keys overridden`(@TempDir tmp: Path) {
+        val writer = MasterDnsConfigWriter(File(tmp.toFile(), "masterdns"))
+        val runtime = MasterDnsRuntimeConfig(
+            configToml = "Listen_Port = 7777\n",
+            resolvers = listOf("8.8.8.8"),
+            socksPort = 18800,
+        )
+
+        val files = writer.write(runtime)
+
+        val toml = File(files.configPath).readText()
+        assertTrue(toml.contains("LISTEN_PORT = 18800"))
+        assertFalse(toml.contains("Listen_Port = 7777"))
+    }
 }
