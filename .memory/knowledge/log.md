@@ -1,5 +1,15 @@
 # Build Log
 
+## [2026-05-20T22:00:00+03:00] compile | Daily Log 2026-05-20 (pass 10 — session 19:52 peerWatchdog wall clock + chip race file)
+- Source: daily/2026-05-20.md
+- Articles created: [[concepts/engine-chip-race-observer]] — file was missing despite pass 9 log entry; created: Connected-only gate drops Probing/Connecting engine changes; Probing(null) guard; sentinel inversions
+- Articles updated:
+  - [[concepts/viewmodel-polling-runtest-trap]] — wall clock in production coroutine trap: System.currentTimeMillis() in EngineWatchdogCoordinator not synced with virtual dispatcher → elapsed always near zero → watchdog never fires in CI; fix: zeroPeersPolls poll counter; sentinel; sources updated
+  - [[concepts/urnetwork-peer-watchdog-recovery]] — poll counter fix documented; sentinel in OzeroVpnServicePeerWatchdogTest; sources updated
+- Index: 2 rows updated (viewmodel-polling-runtest-trap, urnetwork-peer-watchdog-recovery dates + summaries)
+- Sessions covered: 19:52 (ByeDPI YouTube QUIC investigation, peerWatchdog wall clock CI fix, DNS presets NextDNS/AdGuard/ControlD); 19:07 chip race (file materialisation)
+- Note: DNS presets (NextDNS/AdGuard/ControlD chips) and YouTube QUIC investigation are UI/UX additions without new architectural patterns; not breaking out into separate articles
+
 ## [2026-05-20T21:00:00+03:00] compile | Daily Log 2026-05-20 (pass 9 — session 19:07 chip race)
 - Source: daily/2026-05-20.md
 - Articles created: [[concepts/engine-chip-race-observer]] — EngineSettingsRestartObserver Connected-only gate drops engine changes during Probing/Connecting; fix: restart from Probing/Connecting when engine ≠ manualEngine; Probing(null) guard; 3 sentinel inversions for removed behavior; debounce interaction
