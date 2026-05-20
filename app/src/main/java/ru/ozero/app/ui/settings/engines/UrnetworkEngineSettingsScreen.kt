@@ -287,7 +287,7 @@ private fun LocationListContent(
                     modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
                 )
             }
-            items(bestMatches, key = { "bm/${it.countryCode}/${it.name}" }) { item ->
+            items(bestMatches, key = { "bm/${System.identityHashCode(it.location)}" }) { item ->
                 val selected = !isBestAvailable &&
                     selectedLocation?.countryCode == item.location.countryCode &&
                     selectedLocation?.region == item.location.region &&
@@ -305,7 +305,7 @@ private fun LocationListContent(
             }
         }
         if (countries.isNotEmpty()) {
-            items(countries, key = { "c/${it.countryCode.ifEmpty { it.name }}" }) { item ->
+            items(countries, key = { "c/${System.identityHashCode(it.location)}" }) { item ->
                 val selected = !isBestAvailable &&
                     selectedLocation?.countryCode == item.location.countryCode &&
                     selectedLocation?.region == null &&
@@ -331,7 +331,7 @@ private fun LocationListContent(
                     modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
                 )
             }
-            items(regions, key = { "r/${it.countryCode}/${it.name}" }) { item ->
+            items(regions, key = { "r/${System.identityHashCode(it.location)}" }) { item ->
                 val selected = !isBestAvailable &&
                     selectedLocation?.countryCode == item.location.countryCode &&
                     selectedLocation?.region == item.location.region &&
@@ -357,7 +357,7 @@ private fun LocationListContent(
                     modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
                 )
             }
-            items(cities, key = { "ct/${it.countryCode}/${it.name}" }) { item ->
+            items(cities, key = { "ct/${System.identityHashCode(it.location)}" }) { item ->
                 val selected = !isBestAvailable &&
                     selectedLocation?.countryCode == item.location.countryCode &&
                     selectedLocation?.city == item.location.city

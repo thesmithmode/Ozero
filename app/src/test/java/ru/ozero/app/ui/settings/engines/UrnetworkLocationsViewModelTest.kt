@@ -210,6 +210,22 @@ class UrnetworkLocationsViewModelTest {
     }
 
     @Test
+    fun `sentinel — LazyColumn items в location picker используют identityHashCode для ключа`() {
+        val source = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/ui/settings/engines/UrnetworkEngineSettingsScreen.kt",
+        ).readText()
+        listOf("bestMatches", "countries", "regions", "cities").forEach { section ->
+            val itemsCall = source.substringAfter("items($section, key = ").substringBefore("\n")
+            assertTrue(
+                itemsCall.contains("System.identityHashCode(it.location)"),
+                "items($section) обязан использовать System.identityHashCode(it.location) — " +
+                    "name/countryCode не уникальны (две Moscow → duplicate key crash)",
+            )
+        }
+    }
+
+    @Test
     fun `switchingCountry стартует с false`() = runTest {
         assertEquals(false, vm().switchingCountry.value)
     }
