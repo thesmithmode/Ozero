@@ -1,5 +1,15 @@
 # Build Log
 
+## [2026-05-20T12:00:00+03:00] compile | Daily Log 2026-05-18 (pass 8 — uncovered late sessions 23:41 and 23:57)
+- Source: daily/2026-05-18.md
+- Articles created:
+  - [[concepts/urnetwork-location-stability-privacy-icons]] — ConnectLocation.stable/strongPrivacy fields; Warning/Lock icons; OzeroPalette mapping; inner class name shadowing trap; ktlint in test files
+- Articles updated:
+  - [[concepts/warp-uapi-handshake-polling]] — soTimeout 500ms→50ms (correctness), WARP_READY_POLL_MS 300ms→100ms (optimization); detection lag max 800ms→150ms; sources updated
+- Index: 1 row added (urnetwork-location-stability-privacy-icons), 1 row updated (warp-uapi-handshake-polling), total 144
+- Sessions covered (incremental over pass 7): 23:41 (WARP UAPI detection latency optimization), 23:57 (URnetwork location picker stable/strongPrivacy icons + inner class shadowing + ktlint in tests)
+- Excluded: wiki-query session (read-only, no new knowledge), memory flush errors (infra noise), CI run IDs (ephemeral)
+
 ## [2026-05-19T20:00:00+03:00] compile | Daily Log 2026-05-19 (pass 2 — gap fill)
 - Source: daily/2026-05-19.md
 - Articles created: [[concepts/speed-chart-bucket-alignment]] (time-aligned bucket IDs prevent sliding-window drift; SpeedSample typed wrapper), [[concepts/vpn-slot-coexistence-crash]] (establish() null = external VPN holds slot; Failed state + logActiveExternalVpn), [[concepts/urnetwork-filter-locations-trigger]] (filterLocations("") required after vc.start()), [[concepts/hilt-viewmodel-split-too-many-functions]] (hiltViewModel() decomp for TooManyFunctions; shared internal fakes)
