@@ -323,7 +323,16 @@ class MainViewModel @Inject constructor(
         return when (route) {
             IpProbeRoute.Default -> ipInfoProvider.fetch().toState()
             IpProbeRoute.AutoSelected -> IpInfoState.AutoSelected
-            is IpProbeRoute.Socks -> ipInfoProvider.fetchVia(route.host, route.port).toState()
+            is IpProbeRoute.Socks -> {
+                val viaSocks = ipInfoProvider.fetchVia(route.host, route.port)
+                if (viaSocks.isSuccess) {
+                    viaSocks.toState()
+                } else {
+                    val reason = viaSocks.exceptionOrNull()?.message ?: "socks fetch failed"
+                    Log.w(IP_TAG, "Socks probe ${route.host}:${route.port} failed ($reason) — fallback to direct fetch (real device IP)")
+                    ipInfoProvider.fetch().toState()
+                }
+            }
             is IpProbeRoute.StaticLocation -> IpInfoState.Loaded(
                 IpInfo(
                     ip = "",

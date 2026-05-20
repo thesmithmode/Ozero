@@ -128,6 +128,26 @@ class MainViewModelIpInfoChannelTest {
     }
 
     @Test
+    fun `resolveOnce Socks-route после fetchVia failure делает direct fetch — fallback на реальный IP, не Error`() {
+        val body = source.substringAfter("is IpProbeRoute.Socks ->")
+            .substringBefore("is IpProbeRoute.StaticLocation")
+        assertTrue(
+            body.contains("fetchVia("),
+            "Socks branch обязан вызвать fetchVia(host, port). Body:\n$body",
+        )
+        assertTrue(
+            body.contains("ipInfoProvider.fetch()"),
+            "Socks branch после fetchVia failure обязан вызвать ipInfoProvider.fetch() — " +
+                "fallback на direct fetch показывает реальный IP вместо Error при ECONNREFUSED. Body:\n$body",
+        )
+        assertTrue(
+            body.contains("isSuccess") || body.contains("fold("),
+            "Socks branch обязан явно проверять успех fetchVia (isSuccess/fold), " +
+                "иначе fallback не активируется. Body:\n$body",
+        )
+    }
+
+    @Test
     fun `resolveOnce не использует fetchViaSocketFactory — bindSocketToNetwork даёт EPERM на VPN net`() {
         val body = source.substringAfter("private suspend fun resolveOnce")
             .substringBefore("private fun Result<IpInfo>.toState")
