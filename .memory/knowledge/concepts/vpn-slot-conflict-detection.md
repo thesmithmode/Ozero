@@ -4,8 +4,9 @@ aliases: [vpn-slot-taken, establish-null, vpn-coexistence-crash]
 tags: [android, vpn, gotcha, architecture]
 sources:
   - "daily/2026-05-19.md"
+  - "daily/2026-05-20.md"
 created: 2026-05-19
-updated: 2026-05-19
+updated: 2026-05-20
 ---
 
 # VPN Slot Conflict: establish() Null Means Another App Owns the Slot
@@ -78,12 +79,37 @@ The fix added an extra return path to `StartSequenceCoordinator.awaitEngineReady
 
 Android allows only one active VPN at a time per device (not per user session). The `VpnService.prepare(ctx)` intent flow revokes any existing VPN and grants permission to the requesting app. However, if the user grants permission to app A but then immediately starts app B's VPN (which also called `prepare()`), app A's `onRevoke()` fires. When app A tries `establish()` next, null is returned because app B's VPN is active.
 
+### onRevoke Kill for Clean Slot Release (2026-05-20)
+
+`VpnService.onRevoke()` fires when the Android system revokes VPN permission — this happens when the user starts another VPN app. Ozero's VPN process holds the Android VPN slot AND a loaded `libgojni.so` Go runtime (which cannot be unloaded on Android). If the process stays alive after revoke, the slot is technically released by the system, but leftover JNI/Go state can interfere with the next VPN app startup.
+
+Fix: `OzeroVpnService.onRevoke()` calls `Handler.postDelayed({ Process.killProcess(Process.myPid()) }, REVOKE_KILL_DELAY_MS)` with `REVOKE_KILL_DELAY_MS = 2500L`. The 2.5s delay allows:
+- Active logging/boot.log flush to complete
+- Graceful teardown of active Go goroutines
+- Any in-flight AIDL shutdown sequence to finish
+
+This is exclusive to `onRevoke`. `stopVpn()` and `onDestroy()` do NOT kill the process — those paths mean the user manually stopped the VPN, and the process must stay alive for UI state updates, balance refresh, and reconnect logic. Only `onRevoke` signals "user explicitly chose another VPN and we are no longer needed."
+
+Sentinel: `OzeroVpnServiceLifecycleTest` verifies `onRevoke()` path contains `processKiller.kill` + `postDelayed` + `REVOKE_KILL_DELAY_MS >= 1500`.
+
+```kotlin
+override fun onRevoke() {
+    super.onRevoke()
+    Log.w(TAG, "VPN slot revoked — freeing process in ${REVOKE_KILL_DELAY_MS}ms")
+    Handler(Looper.getMainLooper()).postDelayed({
+        Process.killProcess(Process.myPid())
+    }, REVOKE_KILL_DELAY_MS)
+}
+```
+
 ## Related Concepts
 
 - [[concepts/vpnservice-builder-traps]] — related Builder API gotchas (setBlocking, IPv6 routes, etc.)
 - [[concepts/tun-self-exclusion-sdk-engines]] — the broader coexistence picture with SDK engines
 - [[concepts/engine-switch-chain-cascading-failures]] — multiple rapid VPN start attempts chain
+- [[concepts/dual-go-runtime-eager-loading]] — Go runtime cannot be unloaded; process kill is the only clean release mechanism
 
 ## Sources
 
 - [[daily/2026-05-19.md]] — Session 16:23: root cause in ozero.log L34381-34540 (external VPN captured slot → establish() null → silent Idle); fix: `onEngineDied("VPN slot занят")` before `stopVpnRequest`; `logActiveExternalVpn()` diagnostic; detekt ReturnCount CI fail resolved by merging null branches
+- [[daily/2026-05-20.md]] — Session (VPN slot onRevoke): `onRevoke()` → `postDelayed(Process.killProcess, 2500ms)` releases libgojni + VPN slot cleanly for next app; `stopVpn/onDestroy` do NOT kill — only revoke means "user chose another VPN"

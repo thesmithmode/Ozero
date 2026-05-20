@@ -1,5 +1,15 @@
 # Build Log
 
+## [2026-05-20T23:30:00+03:00] compile | Daily Log 2026-05-20 (pass 2 — remaining sessions)
+- Source: daily/2026-05-20.md
+- Articles created: (none new)
+- Articles updated:
+  - [[concepts/vpn-slot-conflict-detection]] — onRevoke → postDelayed Process.killProcess(2500ms) liberates Go runtime + VPN slot; only onRevoke not stopVpn/onDestroy
+  - [[concepts/wiki-knowledge-base]] — 2026-05-20 flush failure pattern (13+ FLUSH_ERROR); contradiction audit session findings (9 issues: 4 direct contradictions, 5 inconsistencies)
+  - [[connections/self-review-insufficient-code-reviewer-required]] — inverse pattern: backup refactor reviewer P1 false positives (walletOverride BC, warpSlots skip) were intentional design; human verification required before applying findings
+- Index: 3 rows updated
+- Sessions covered: VPN slot onRevoke kill (post-compact), backup refactor false positives (15:37), contradiction audit (18:27)
+
 ## [2026-05-20T20:00:00+03:00] compile | Daily Log 2026-05-20
 - Source: daily/2026-05-20.md
 - Articles created:

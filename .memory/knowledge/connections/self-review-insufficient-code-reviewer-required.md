@@ -9,8 +9,9 @@ connects:
 sources:
   - "daily/2026-05-15.md"
   - "daily/2026-05-18.md"
+  - "daily/2026-05-20.md"
 created: 2026-05-15
-updated: 2026-05-18
+updated: 2026-05-20
 ---
 
 # Connection: Self-Review Insufficient — Code Reviewer Subagent Required
@@ -48,6 +49,19 @@ Session 16:59 deployed 5 parallel reviewer agents across 5 commit clusters (URne
 
 Session 19:55 executed fixes autonomously in 4 sequential commits (`78d8a002`, `8981a799`, `ff7f5044`, `1764d4b3`), each addressing one severity tier. This confirms the pattern at scale: 5 reviewers in one session produce more actionable findings than weeks of self-review, and the findings span categories (killswitch gaps, race conditions, API misuse, resilience) that no single reviewer would cover.
 
+### 2026-05-20: Inverse Pattern — Reviewer False Positives on Intentional Design
+
+Session 15:37 (backup feature refactor) demonstrated the inverse: a code reviewer subagent flagged two findings as P1 severity that were actually intentional design choices:
+
+- **"P1": walletOverride backward compatibility broken** — reviewer flagged that old v1/v2 backup files couldn't deserialize the wallet field. In reality, `setWalletOverride` is dead code in prod; `PRESET_WALLET` is always used; the "custom wallet" path is never triggered. The reviewer had no way to know this without the project's deployment context.
+- **"P1": warpSlots silent skip** — reviewer flagged that a `warpSlots.isEmpty()` check caused silent skip without user feedback. This was intentional: an empty block in backup ≠ "delete all slots", it means "backup had no slot data, preserve existing". The UI dialog already communicates this to the user.
+
+**Lesson:** Reviewer subagents lack deployment context and intentional-design documentation. "P1 severity" from a reviewer is a hypothesis, not a verdict. All reviewer findings require human verification before applying — especially "BC compatibility broken" claims where the author knows what's actually deployed. The correct workflow: reviewer returns findings → author reads each → verifies against codebase + project memory → applies confirmed bugs only.
+
+Contrast with the 2026-05-15 and 2026-05-18 sessions where reviewer findings were mostly correct: in those cases the code was fresh with no intentional workarounds. The false-positive rate rises when the codebase contains deliberate design choices that look like bugs without business context.
+
+**Structural root cause:** reviewer agents don't have access to project memory (`.memory/knowledge/`) or deployment status. A future improvement: inject relevant `project_*.md` memory articles into the reviewer system prompt when spawning on domain-specific code.
+
 ## Related Concepts
 
 - [[concepts/byedpi-jni-guard-hardening]] - The specific code where regressions were found and fixed
@@ -61,3 +75,4 @@ Session 19:55 executed fixes autonomously in 4 sequential commits (`78d8a002`, `
 
 - [[daily/2026-05-15.md]] - Session 15:30: 7 findings (2×P0, 4×P1, 1×P2) from single code reviewer subagent
 - [[daily/2026-05-18.md]] - Session 16:59: 5 parallel reviewers, ~25 findings across 5 commit clusters; Session 19:55: autonomous 4-commit fix cycle
+- [[daily/2026-05-20.md]] - Session 15:37: backup feature refactor — reviewer P1 false positives: walletOverride BC (dead code in prod) and warpSlots silent skip (intentional empty=preserve); human verification mandatory before applying reviewer findings

@@ -17,7 +17,7 @@ The Ozero boot.log is accessible to users on-device (Settings → Boot log). Any
 - WARP mirror URLs must be hashed to `mXXXXXXXX` tag — full domain reveals infra for competitor enumeration/DDoS/reporting
 - Solana wallet address must never appear even as prefix — `take(6)` is sufficient for blockchain search to reveal the owner
 - Dev-language instructions (e.g. "нужен tombstone+sentinel", "собрать tombstone") must be stripped from prod log entries — reveals decompiling methodology to APK analysts
-- Rule: `PersistentLoggers` and `Log.*` calls must contain no raw URLs, addresses, or methodology strings
+- Rule: `PersistentLoggers` and `Log.*` calls must contain no raw URLs, addresses, or methodology strings — **redaction applies regardless of frequency category** (one-shot critical or periodic). The frequency rule from [[concepts/persistent-logger-accumulation-trap]] decides *which* logger to use (PersistentLoggers vs Log.*); the redaction rule here decides *what content* can appear in either. The two rules are orthogonal: a one-shot critical event containing a raw mirror URL must still be redacted.
 - Safe format for WARP mirror: log the hash tag only; safe format for wallet: log "payout wallet set" with no address
 
 ## Details

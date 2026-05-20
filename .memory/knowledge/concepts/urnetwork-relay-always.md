@@ -20,18 +20,20 @@ URnetwork SDK decouples TUN-routing (`tunnelStarted`) from relay contribution (`
 - `providePaused = false` (relay ON) works regardless of which engine is active — relay is IO-only, no TUN needed
 - When any VPN engine is running → `device.providePaused = false`
 - When URnetwork is the active engine → additionally `tunnelStarted = true`
-- Relay activates automatically whenever VPN is running; no user toggle
+- **Relay activation is JWT-gated, not automatic** — `byClientJwt` must be present in DataStore; coordinator skips bridge start when JWT is null. Pre-walletAuth (before 2026-05-18) this meant relay never started for users who had never selected URnetwork as active engine. Post-walletAuth (commit `0ef16e3a`) every device auto-registers an Ed25519 keypair on first engine start, producing a non-guest JWT → relay becomes effectively automatic for all users
+- No user toggle
 - Each user earns independently — no API to aggregate relay earnings across multiple users to one wallet
-- `URnetworkBridge.setupPayoutWallet(address)` auto-binds dev payout wallet to guest accounts on engine start. 3 contract tests in `URnetworkBridgeSetupPayoutWalletTest`
+- `URnetworkBridge.setupPayoutWallet(address)` auto-binds dev payout wallet to non-guest accounts on engine start (guest JWTs are blocked server-side, see [[concepts/urnetwork-guest-mode-relay-blocker]]). 3 contract tests in `URnetworkBridgeSetupPayoutWalletTest`
 
 ## Architecture
 
 `UrnetworkRelayCoordinator` follows the same pattern as `TelegramProxyCoordinator`:
-- Observes `TunnelController.state` via `combine(tunnelState, configStore.config())`
-- When VPN starts (any engine): sets `device.providePaused = false`
+- Observes `TunnelController.state` via `combine(tunnelState, configStore.config())` AND `byClientJwt` flow
+- When VPN starts (any engine) AND JWT is non-null: sets `device.providePaused = false`
 - When VPN stops: sets `device.providePaused = true`
 - When active engine changes to URnetwork: sets `tunnelStarted = true`
 - When active engine changes away from URnetwork: sets `tunnelStarted = false`
+- When JWT is null (no authentication): skips bridge start entirely — relay cannot activate without a JWT
 - Initialized in `OzeroApp.onCreate` via Hilt inject + `runCatching`
 
 ## Monetization Constraints

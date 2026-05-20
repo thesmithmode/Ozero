@@ -6,8 +6,9 @@ sources:
   - "daily/2026-04-29.md"
   - "daily/2026-04-30.md"
   - "daily/2026-05-01.md"
+  - "daily/2026-05-20.md"
 created: 2026-04-29
-updated: 2026-05-01
+updated: 2026-05-20
 ---
 
 # Wiki Knowledge Base Setup
@@ -42,6 +43,29 @@ Broken links in compile output are expected when a daily log references concepts
 ### Continued Flush Failures (2026-05-01)
 
 The flush hook unreliability continued on 2026-05-01. Three flush attempts across two productive sessions (pre-release fix wave + URnetwork SDK integration) all failed: one with "Control request timeout: initialize" and two with "Command failed with exit code 1." The pattern is now confirmed across three consecutive days of use — auto-flush hooks are structurally unreliable and daily logs must be maintained manually or via explicit `/wiki-compact` invocations. The error types vary (timeout, exit code 1, "nothing worth saving") suggesting multiple independent failure modes in the flush pipeline.
+
+### Flush Failures Pattern (2026-05-20)
+
+On 2026-05-20, `FLUSH_ERROR: exit code 1` occurred 13+ times across the day with no actionable error details in stderr. Interspersed `FLUSH_OK — Nothing worth saving` results from highly productive sessions confirm the hook's value-assessment is unreliable. The pattern: flush processes a truncated JSONL transcript (tool results stripped, no tool calls), Claude sees only assistant messages with no conversation context, concludes there is nothing to save. Sessions with heavy tool use (many file reads/edits) are most vulnerable — the conversation appears one-sided without the tool results.
+
+The operational fix remains the same as established 2026-04-30: treat hooks as unreliable background helpers, not the primary capture mechanism. Manual session notes in daily logs are the authoritative source.
+
+### Contradiction Audit (2026-05-20 18:27 session)
+
+A systematic cross-article contradiction audit of ~140 articles found 9 issues (4 direct contradictions, 5 inconsistencies):
+
+**Direct contradictions:**
+1. `dual-go-runtime-eager-loading` claims eager loading "allowed coexistence" but `go-runtime-process-isolation` documents process isolation as the fix — the earlier article implies the wrong conclusion
+2. `urnetwork-relay-always` has internal contradiction: relay described as automatic, but requires non-guest `byClientJwt`; conflicts with `urnetwork-guest-mode-relay-blocker`
+3. `manual-di-design` recommends eager init; `robolectric-hilt-eager-init-trap` recommends lazy init — opposite advice, no cross-reference
+4. `warp-false-connected-no-handshake` documents 5s→10s timeout revert; `warp-uapi-handshake-polling` silently shows 10s as the always-correct value — historical context lost
+
+**Inconsistencies:**
+5. `genetic-strategy-evolution` has v2 power-law fitness formula; `granular-probe-fitness-scoring` has gradient function — canonical current formula ambiguous
+6. `byedpi-stale-serverfd-unconditional-forceclose` presents guard ownership as always-true historical invariant, omitting earlier versions that released guard — misleading impression
+7–9. Minor cross-reference gaps and stale summaries
+
+**Observation:** contradictions cluster around articles that document an *evolution* of approach (eager→process-isolation, guest→non-guest, bad→good practice). Later articles don't always update earlier ones, leaving conflicting claims. Resolution strategy: add `## Historical Note` sections to older articles rather than deleting — preserves the evolution context while making the current state unambiguous.
 
 ## Related Concepts
 

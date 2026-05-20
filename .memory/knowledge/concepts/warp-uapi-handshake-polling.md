@@ -65,6 +65,10 @@ withTimeoutOrNull(10_000) {
 
 If 10 seconds pass without handshake, the engine transitions to `Failed("No WG handshake after 10s")`.
 
+### Timeout History (10s → 5s → 10s)
+
+The current `WARP_READY_TIMEOUT_MS = 10s` is the post-revert value. In v0.1.5 the timeout was tightened to 5s on the theory that slower waits were masking honest failures. In v0.1.5-4 it was reverted to 10s because Cloudflare WARP handshake on slow/congested Russian ISP networks legitimately requires up to 10s — under 5s every WARP start fired `handleEngineFailure` even when the handshake would have completed shortly. The 10s value is therefore NOT "always correct" — it is calibrated against observed Cloudflare handshake distributions. See [[concepts/warp-false-connected-no-handshake]] for the full timeout-revert sequence and the false-Connected→honest-failure propagation it preserves.
+
 ### Legacy Socket Path Bug (v0.1.9, 2026-05-20)
 
 `WarpUapi.readState` was reading from the legacy path `$dataDir/ozero-warp.sock` (or similar fixed filename). The amneziawg-go fork actually writes the UAPI socket to `$dataDir/sockets/<kernel-tun-name>.sock` — the kernel assigns the tun interface name, which may differ from our chosen tunnel name. With the legacy path, `LocalSocket.connect()` failed silently (file not found), `readState` returned null stats, and the health monitor classified the tunnel as DEGRADED. This triggered spurious recover cycles even when the WireGuard handshake had completed successfully.
