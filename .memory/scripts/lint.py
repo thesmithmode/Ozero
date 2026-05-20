@@ -155,14 +155,17 @@ async def check_contradictions() -> list[dict]:
         query,
     )
 
-    wiki_content = read_all_wiki_content()
+    article_paths = sorted(
+        str(p.relative_to(KNOWLEDGE_DIR)) for p in list_wiki_articles()
+    )
+    article_list = "\n".join(f"- knowledge/{p}" for p in article_paths)
 
     prompt = f"""Review this knowledge base for contradictions, inconsistencies, or
 conflicting claims across articles.
 
-## Knowledge Base
+## Knowledge Base (article paths — Read on demand with the Read tool)
 
-{wiki_content}
+{article_list}
 
 ## Instructions
 
@@ -185,8 +188,11 @@ Do NOT output anything else - no preamble, no explanation, just the formatted li
             prompt=prompt,
             options=ClaudeAgentOptions(
                 cwd=str(ROOT_DIR),
-                allowed_tools=[],
-                max_turns=2,
+                allowed_tools=["Read", "Glob", "Grep"],
+                permission_mode="acceptEdits",
+                max_turns=30,
+                setting_sources=[],
+                plugins=[],
             ),
         ):
             if isinstance(message, AssistantMessage):
