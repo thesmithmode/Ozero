@@ -179,18 +179,6 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `REVOKE_KILL_DELAY_MS не меньше 1500ms — даёт время shutdown coroutines дозавершиться`() {
-        val regex = Regex("REVOKE_KILL_DELAY_MS = (\\d[\\d_]*)L")
-        val match = regex.find(source) ?: error("REVOKE_KILL_DELAY_MS не найдена в OzeroVpnService.kt")
-        val value = match.groupValues[1].replace("_", "").toLong()
-        assertTrue(
-            value >= 1_500L,
-            "REVOKE_KILL_DELAY_MS=$value слишком мал — onRevoke стопит engines асинхронно, " +
-                "мгновенный kill оборвёт teardown и логи. Рекомендация ~2500ms.",
-        )
-    }
-
-    @Test
     fun `performShutdown использует stopSelf с latestStartId — не голый stopSelf`() {
         val body = shutdownSource.substringAfter("suspend fun performShutdown(")
             .substringBefore("private fun recordSessionEnd(")

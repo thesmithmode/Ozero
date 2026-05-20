@@ -15,7 +15,7 @@
     <string name="masterdns_setup_step4_body">DOMAIN = [\"v.example.com\"]\nPROTOCOL_TYPE = \"SOCKS5\"\nUDP_PORT = 53\nDATA_ENCRYPTION_METHOD = 5\nENCRYPTION_KEY_FILE = \"/etc/masterdnsvpn/encrypt_key.txt\"</string>
     <string name="masterdns_setup_step5_title">Start the service and open UDP/53 to the internet</string>
     <string name="masterdns_setup_step6_title">Paste the key into «client_config.toml» field below</string>
-    <string name="masterdns_setup_step6_body">DOMAINS = [\"v.example.com\"]\nDATA_ENCRYPTION_METHOD = 5\nENCRYPTION_KEY = \"<contents of encrypt_key.txt>\"\nPROTOCOL_TYPE = \"SOCKS5\"\nRESOLVER_BALANCING_STRATEGY = 3</string>
+    <string name="masterdns_setup_step6_body">DOMAINS = [\"v.example.com\"]\nDATA_ENCRYPTION_METHOD = 5\nENCRYPTION_KEY = \"&lt;contents of encrypt_key.txt&gt;\"\nPROTOCOL_TYPE = \"SOCKS5\"\nRESOLVER_BALANCING_STRATEGY = 3</string>
     <string name="masterdns_copy_button">Copy</string>
     <string name="masterdns_copied_toast">Copied</string>
     <string name="settings_masterdns_title">MasterDNS</string>
