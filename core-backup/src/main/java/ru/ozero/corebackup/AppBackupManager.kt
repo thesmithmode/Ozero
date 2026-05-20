@@ -33,12 +33,29 @@ class AppBackupManager(
 
     suspend fun export(categories: Set<BackupCategory> = BackupCategory.ALL): AppBackupData {
         val prefs = ozeroSettings.data.first()
+        val urnetwork = if (BackupCategory.URNETWORK in categories) exportUrnetwork() else BackupUrnetwork()
+        val warpSlots =
+            if (BackupCategory.WARP in categories) warpSlotStore.slots().first().map { it.toBackup() } else emptyList()
+        val splitRules = if (BackupCategory.SPLIT_TUNNEL in categories) exportSplit() else emptyList()
+        val strategy = if (BackupCategory.STRATEGY in categories) strategyProvider?.export() else null
+        val telegram = if (BackupCategory.TELEGRAM in categories) exportTelegram() else null
+        return AppBackupData(
+            exportedAt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).format(Date()),
+            settings = exportSettings(prefs, categories),
+            urnetwork = urnetwork,
+            warpSlots = warpSlots,
+            splitRules = splitRules,
+            strategy = strategy,
+            telegram = telegram,
+        )
+    }
+
+    private fun exportSettings(prefs: Preferences, categories: Set<BackupCategory>): BackupSettings {
         val inGeneral = BackupCategory.GENERAL_SETTINGS in categories
         val inByedpi = BackupCategory.BYEDPI in categories
         val inUrn = BackupCategory.URNETWORK in categories
         val inDns = BackupCategory.DNS_HOSTS in categories
-
-        val settings = BackupSettings(
+        return BackupSettings(
             splitMode = if (inGeneral) prefs[SettingsKeys.SPLIT_MODE] else null,
             ipv6Enabled = if (inGeneral) prefs[SettingsKeys.IPV6_ENABLED] else null,
             autoStart = if (inGeneral) prefs[SettingsKeys.AUTO_START] else null,
@@ -57,61 +74,36 @@ class AppBackupManager(
             bydpiDefaultAccepted = if (inByedpi) prefs[SettingsKeys.BYDPI_DEFAULT_ACCEPTED] else null,
             urnetworkCountryCode = if (inUrn) prefs[SettingsKeys.URNETWORK_COUNTRY_CODE] else null,
         )
+    }
 
-        val urnetwork = if (BackupCategory.URNETWORK in categories) {
-            val cfg = urnetworkStore.config().first()
-            BackupUrnetwork(
-                byJwt = cfg.byJwt?.takeIf { it.isNotBlank() },
-                windowType = cfg.windowType.rawValue,
-                fixedIpSize = cfg.fixedIpSize,
-                allowDirect = cfg.allowDirect,
-                provideEnabled = cfg.provideEnabled,
-                provideControlMode = cfg.provideControlMode.rawValue,
-                provideNetworkMode = cfg.provideNetworkMode.rawValue,
-                selectedLocation = cfg.selectedLocation.normalized()?.let {
-                    BackupUrnetworkLocation(countryCode = it.countryCode, region = it.region, city = it.city)
-                },
-            )
-        } else {
-            BackupUrnetwork()
+    private suspend fun exportUrnetwork(): BackupUrnetwork {
+        val cfg = urnetworkStore.config().first()
+        return BackupUrnetwork(
+            byJwt = cfg.byJwt?.takeIf { it.isNotBlank() },
+            windowType = cfg.windowType.rawValue,
+            fixedIpSize = cfg.fixedIpSize,
+            allowDirect = cfg.allowDirect,
+            provideEnabled = cfg.provideEnabled,
+            provideControlMode = cfg.provideControlMode.rawValue,
+            provideNetworkMode = cfg.provideNetworkMode.rawValue,
+            selectedLocation = cfg.selectedLocation.normalized()?.let {
+                BackupUrnetworkLocation(countryCode = it.countryCode, region = it.region, city = it.city)
+            },
+        )
+    }
+
+    private suspend fun exportSplit(): List<BackupSplitRule> =
+        splitRuleDao.observeAll().first().map {
+            BackupSplitRule(packageName = it.packageName, isExcluded = it.isExcluded)
         }
 
-        val warpSlots = if (BackupCategory.WARP in categories) {
-            warpSlotStore.slots().first().map { it.toBackup() }
-        } else {
-            emptyList()
-        }
-
-        val splitRules = if (BackupCategory.SPLIT_TUNNEL in categories) {
-            splitRuleDao.observeAll().first().map { rule ->
-                BackupSplitRule(packageName = rule.packageName, isExcluded = rule.isExcluded)
-            }
-        } else {
-            emptyList()
-        }
-
-        val strategy = if (BackupCategory.STRATEGY in categories) strategyProvider?.export() else null
-
-        val telegram = if (BackupCategory.TELEGRAM in categories) {
-            val tg = telegramStore.config().first()
-            BackupTelegram(
-                enabled = tg.enabled,
-                port = tg.port,
-                domain = tg.domain.takeIf { it.isNotBlank() },
-                secret = tg.secret.takeIf { it.isNotBlank() },
-            )
-        } else {
-            null
-        }
-
-        return AppBackupData(
-            exportedAt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).format(Date()),
-            settings = settings,
-            urnetwork = urnetwork,
-            warpSlots = warpSlots,
-            splitRules = splitRules,
-            strategy = strategy,
-            telegram = telegram,
+    private suspend fun exportTelegram(): BackupTelegram {
+        val tg = telegramStore.config().first()
+        return BackupTelegram(
+            enabled = tg.enabled,
+            port = tg.port,
+            domain = tg.domain.takeIf { it.isNotBlank() },
+            secret = tg.secret.takeIf { it.isNotBlank() },
         )
     }
 
