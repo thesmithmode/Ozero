@@ -15,6 +15,7 @@ class MaterialIconsCoreSentinelTest {
         "androidx.compose.material.icons.filled.Delete",
         "androidx.compose.material.icons.filled.Edit",
         "androidx.compose.material.icons.filled.Home",
+        "androidx.compose.material.icons.filled.Info",
         "androidx.compose.material.icons.filled.KeyboardArrowDown",
         "androidx.compose.material.icons.filled.KeyboardArrowUp",
         "androidx.compose.material.icons.filled.LocationOn",

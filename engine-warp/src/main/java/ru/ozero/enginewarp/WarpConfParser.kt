@@ -131,11 +131,10 @@ internal object WarpConfParser {
 
     private fun extractHex(raw: String?): String? {
         val v = raw?.trim() ?: return null
-        val inner = if (v.startsWith("<b ", ignoreCase = true) && v.endsWith(">")) {
-            v.substring(3, v.length - 1).trim()
-        } else {
-            v
-        }
+        val wrapped = v.startsWith("<b ", ignoreCase = true) && v.endsWith(">")
+        val zeroXPrefixed = v.startsWith("0x", ignoreCase = true)
+        if (!wrapped && !zeroXPrefixed) return null
+        val inner = if (wrapped) v.substring(3, v.length - 1).trim() else v
         val stripped = inner.removePrefix("0x").removePrefix("0X")
         if (stripped.length < 2 || stripped.length % 2 != 0) return null
         if (!stripped.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }) return null

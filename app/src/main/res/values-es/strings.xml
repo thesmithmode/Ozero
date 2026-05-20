@@ -567,4 +567,8 @@
     <string name="urnetwork_shared_traffic_chart_title">Gráfico de 30 días</string>
     <string name="urnetwork_shared_traffic_chart_empty">Aún no hay datos — comparte tráfico como proveedor y verás estadísticas aquí.</string>
     <string name="urnetwork_shared_traffic_chart_peak">Día máximo: %1$s</string>
+    <string name="warp_info_button">Generadores de configuración de referencia</string>
+    <string name="warp_info_title">Sitios generadores de WARP</string>
+    <string name="warp_info_intro">Si la generación automática falla, intenta obtener una configuración en uno de estos sitios e importa el archivo .conf.</string>
+    <string name="warp_info_close">Cerrar</string>
 </resources>
