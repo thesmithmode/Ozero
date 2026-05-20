@@ -91,6 +91,83 @@ class WarpConfParserAwgExtendedTest {
     }
 
     @Test
+    fun `парсер сохраняет I1 hex blob payload (AWG v2 special junk)`() {
+        val conf = """
+            [Interface]
+            PrivateKey = xmPeOeSIU2UTjYFCSzw5Gc+Ks1uxZhanU6iQZKAyFpQ=
+            Address = 172.16.0.2/32
+            S1 = 0
+            S2 = 0
+            Jc = 4
+            Jmin = 40
+            Jmax = 70
+            H1 = 1
+            H2 = 2
+            H3 = 3
+            H4 = 4
+            I1 = <b 0xc100abcdef>
+
+            [Peer]
+            PublicKey = bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=
+            AllowedIPs = 0.0.0.0/0, ::/0
+            Endpoint = 162.159.195.1:500
+        """.trimIndent()
+        val awg = WarpConfParser.parse(conf).getOrThrow().awgParams
+        assertEquals("c100abcdef", awg.payloadHexI1)
+        assertEquals(AwgParams.DEFAULT_I1, awg.payloadPacketSizeCount1, "Int fallback при hex blob")
+    }
+
+    @Test
+    fun `builder печатает I1 hex blob в формате b 0x при наличии payloadHexI1`() {
+        val cfg = WarpConfig(
+            privateKey = "x",
+            peerPublicKey = "y",
+            peerEndpoint = "1.2.3.4:500",
+            interfaceAddressV4 = "172.16.0.2/32",
+            interfaceAddressV6 = "",
+            awgParams = AwgParams(payloadHexI1 = "c100abcdef"),
+        )
+        val ini = WarpIniBuilder.build(cfg)
+        kotlin.test.assertTrue(ini.contains("I1 = <b 0xc100abcdef>"), "I1 hex должен идти как <b 0xHEX>")
+        kotlin.test.assertFalse(ini.contains("I1 = ${AwgParams.DEFAULT_I1}"), "Int fallback не должен дублироваться")
+    }
+
+    @Test
+    fun `round-trip hex blob — parse build parse сохраняет payloadHexI1`() {
+        val conf = """
+            [Interface]
+            PrivateKey = xmPeOeSIU2UTjYFCSzw5Gc+Ks1uxZhanU6iQZKAyFpQ=
+            Address = 172.16.0.2/32
+            I1 = <b 0xdeadbeef>
+
+            [Peer]
+            PublicKey = bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=
+            Endpoint = 1.2.3.4:500
+        """.trimIndent()
+        val first = WarpConfParser.parse(conf).getOrThrow()
+        val rebuilt = WarpIniBuilder.build(first)
+        val second = WarpConfParser.parse(rebuilt).getOrThrow()
+        assertEquals("deadbeef", second.awgParams.payloadHexI1)
+    }
+
+    @Test
+    fun `парсер отвергает мусорный hex (не четная длина или non-hex символы) и fallback на DEFAULT`() {
+        val conf = """
+            [Interface]
+            PrivateKey = xmPeOeSIU2UTjYFCSzw5Gc+Ks1uxZhanU6iQZKAyFpQ=
+            Address = 172.16.0.2/32
+            I1 = <b 0xZZZ>
+
+            [Peer]
+            PublicKey = bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=
+            Endpoint = 1.2.3.4:500
+        """.trimIndent()
+        val awg = WarpConfParser.parse(conf).getOrThrow().awgParams
+        kotlin.test.assertNull(awg.payloadHexI1, "невалидный hex → null")
+        assertEquals(AwgParams.DEFAULT_I1, awg.payloadPacketSizeCount1)
+    }
+
+    @Test
     fun `round-trip parse build parse сохраняет все AWG поля`() {
         val original = WarpConfParser.parse(baseConf).getOrThrow().awgParams
         val ini = WarpIniBuilder.build(WarpConfParser.parse(baseConf).getOrThrow())

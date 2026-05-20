@@ -315,6 +315,10 @@
 
     <!-- WARP -->
     <string name="warp_settings_title">WARP</string>
+    <string name="warp_info_button">Справочные сайты для генерации конфигов</string>
+    <string name="warp_info_title">Сайты-генераторы WARP</string>
+    <string name="warp_info_intro">Если автогенерация не работает — попробуйте получить конфиг с одного из сайтов и импортируйте .conf файл.</string>
+    <string name="warp_info_close">Закрыть</string>
     <string name="settings_warp_title">WARP</string>
     <string name="settings_warp_summary">Cloudflare WARP — авто-конфиг</string>
     <string name="warp_no_config">Конфиг не сгенерирован</string>
