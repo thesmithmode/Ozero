@@ -540,6 +540,23 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
+    fun `onTaskRemoved переопределён и вызывает stopVpn — снимает индикатор ключа при swipe-close`() {
+        assertTrue(
+            source.contains("override fun onTaskRemoved("),
+            "OzeroVpnService обязан переопределить onTaskRemoved: при свайпе приложения из recents " +
+                "Android по умолчанию НЕ останавливает foreground VpnService → TUN остаётся → " +
+                "system VPN-индикатор (значок ключа) держится на экране. " +
+                "Без override юзер не может отключить VPN без открытия приложения.",
+        )
+        val body = source.substringAfter("override fun onTaskRemoved(").substringBefore("override fun onRevoke(")
+        assertTrue(
+            body.contains("stopVpn()"),
+            "onTaskRemoved обязан вызвать stopVpn(): без shutdown TUN-интерфейс не закроется, " +
+                "VpnService слот не освободится, значок ключа останется. Body:\n$body",
+        )
+    }
+
+    @Test
     fun `establishTunForEngine excludeSelf true для всех движков без исключений`() {
         val body = startSequenceSource
             .substringAfter("private suspend fun establishTunForEngine(")

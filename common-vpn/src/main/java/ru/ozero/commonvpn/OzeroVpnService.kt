@@ -304,6 +304,16 @@ class OzeroVpnService : android.net.VpnService() {
         }
     }
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        PersistentLoggers.warn(
+            TAG,
+            "onTaskRemoved — пользователь свайпнул приложение, останавливаем VPN " +
+                "чтобы система убрала индикатор ключа",
+        )
+        runCatching { stopVpn() }
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onRevoke() {
         PersistentLoggers.warn(
             TAG,
