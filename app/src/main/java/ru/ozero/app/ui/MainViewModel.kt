@@ -329,7 +329,10 @@ class MainViewModel @Inject constructor(
                     viaSocks.toState()
                 } else {
                     val reason = viaSocks.exceptionOrNull()?.message ?: "socks fetch failed"
-                    Log.w(IP_TAG, "Socks probe ${route.host}:${route.port} failed ($reason) — fallback to direct fetch (real device IP)")
+                    PersistentLoggers.warn(
+                        IP_TAG,
+                        "Socks probe ${route.host}:${route.port} failed ($reason) — fallback to direct fetch",
+                    )
                     ipInfoProvider.fetch().toState()
                 }
             }
