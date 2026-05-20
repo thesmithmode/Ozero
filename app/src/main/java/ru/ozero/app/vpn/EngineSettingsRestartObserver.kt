@@ -39,9 +39,18 @@ class EngineSettingsRestartObserver(
         .debounce(RESTART_DEBOUNCE_MS)
 
     suspend fun handle(snapshot: Snapshot) {
-        if (vpnStateProvider() is TunnelState.Connected) {
+        val state = vpnStateProvider()
+        if (state is TunnelState.Connected) {
             onRestartConnected(snapshot)
+            return
         }
+        val currentEngine: EngineId = when (state) {
+            is TunnelState.Connecting -> state.engineId
+            is TunnelState.Probing -> state.engineId ?: return
+            else -> return
+        }
+        if (currentEngine == snapshot.manualEngine) return
+        onRestartConnected(snapshot)
     }
 
     private companion object {

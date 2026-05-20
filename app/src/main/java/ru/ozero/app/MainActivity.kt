@@ -90,9 +90,14 @@ class MainActivity : AppCompatActivity() {
 
     private suspend fun restartVpnIfConnected(reason: String) {
         val current = viewModel.state.value
-        if (current !is TunnelState.Connected) return
+        val fromEngine = when (current) {
+            is TunnelState.Connected -> current.engineId
+            is TunnelState.Connecting -> current.engineId
+            is TunnelState.Probing -> current.engineId
+            else -> return
+        }
         AppLogger.i(TAG, reason)
-        tunnelController.onSwitchingStarted(from = current.engineId, to = null)
+        tunnelController.onSwitchingStarted(from = fromEngine, to = null)
         try {
             vpnIntentLauncher.stop()
             withTimeoutOrNull(5_000L) {

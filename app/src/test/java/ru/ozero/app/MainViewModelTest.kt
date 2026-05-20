@@ -351,6 +351,50 @@ class MainViewModelTest {
     }
 
     @Test
+    fun onManualEngineSelectMarksSwitchingDuringConnecting() = runTest {
+        tunnelController.onProbing(EngineId.URNETWORK)
+        tunnelController.onConnecting(EngineId.URNETWORK)
+        advanceUntilIdle()
+
+        viewModel.onManualEngineSelect(EngineId.WARP)
+        advanceUntilIdle()
+
+        val sw = tunnelController.switching.value
+        assertEquals(
+            EngineId.URNETWORK,
+            sw?.from,
+            "tap chip WARP во время Connecting=URnetwork → switching from URnetwork. " +
+                "Регрессия 2026-05-20: chip переключался мгновенно, switching marker ставился только при " +
+                "Connected, поэтому при race (chip change во время Connecting) UI показывал chip=WARP " +
+                "но engine=URnetwork без жёлтой кнопки.",
+        )
+        assertEquals(EngineId.WARP, sw?.to, "switching.to=WARP — целевой engine")
+    }
+
+    @Test
+    fun onManualEngineSelectMarksSwitchingDuringProbing() = runTest {
+        tunnelController.onProbing(EngineId.URNETWORK)
+        advanceUntilIdle()
+
+        viewModel.onManualEngineSelect(EngineId.WARP)
+        advanceUntilIdle()
+
+        val sw = tunnelController.switching.value
+        assertEquals(EngineId.URNETWORK, sw?.from)
+        assertEquals(EngineId.WARP, sw?.to)
+    }
+
+    @Test
+    fun onManualEngineSelectNoSwitchingWhenIdle() = runTest {
+        viewModel.onManualEngineSelect(EngineId.WARP)
+        advanceUntilIdle()
+        assertNull(
+            tunnelController.switching.value,
+            "Idle → switching marker не должен ставиться: нечего переключать",
+        )
+    }
+
+    @Test
     fun urnetworkPeerSearchSecondsZeroWhenIdle() = runTest {
         backgroundScope.launch { viewModel.urnetworkPeerSearchSeconds.collect {} }
         runCurrent()

@@ -149,7 +149,7 @@ class EngineSettingsRestartObserverTest {
     }
 
     @Test
-    fun `handle invokes restart only when state is Connected`() = runTest(dispatcher) {
+    fun `handle restart engine mismatch in Probing Connecting — race fix`() = runTest(dispatcher) {
         val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
         val state = MutableStateFlow<TunnelState>(TunnelState.Idle)
         val restarts = mutableListOf<EngineSettingsRestartObserver.Snapshot>()
@@ -160,18 +160,91 @@ class EngineSettingsRestartObserverTest {
         )
 
         val snapshot = EngineSettingsRestartObserver.Snapshot(
-            manualEngine = EngineId.BYEDPI,
+            manualEngine = EngineId.WARP,
             byedpiWinningArgs = null,
             ipv6Enabled = false,
             customDnsServers = emptyList(),
             engineAutoPriority = null,
         )
-        observer.handle(snapshot)
-        assertTrue(restarts.isEmpty(), "no restart while Idle")
 
-        state.value = TunnelState.Connected(EngineId.BYEDPI, 1080)
         observer.handle(snapshot)
-        assertEquals(listOf(snapshot), restarts, "restart fires when Connected")
+        assertTrue(restarts.isEmpty(), "Idle: restart skip")
+
+        state.value = TunnelState.Disconnecting
+        observer.handle(snapshot)
+        assertTrue(restarts.isEmpty(), "Disconnecting: restart skip")
+
+        state.value = TunnelState.Failed(EngineId.BYEDPI, "x")
+        observer.handle(snapshot)
+        assertTrue(restarts.isEmpty(), "Failed: restart skip")
+
+        state.value = TunnelState.Probing(EngineId.URNETWORK)
+        observer.handle(snapshot)
+        assertEquals(
+            1,
+            restarts.size,
+            "Probing(URNETWORK) + snapshot=WARP → mismatch → restart обязан фаерить. " +
+                "Регрессия 2026-05-20: юзер тапает chip URNETWORK→WARP во время Probing/Connecting, " +
+                "debounce 4s проглатывает change пока state ≠ Connected, " +
+                "после Connected восстановления триггера нет → chip=WARP но engine=URNETWORK.",
+        )
+
+        state.value = TunnelState.Connecting(EngineId.URNETWORK)
+        observer.handle(snapshot)
+        assertEquals(2, restarts.size, "Connecting(URNETWORK) + snapshot=WARP → mismatch → restart")
+
+        state.value = TunnelState.Connected(EngineId.URNETWORK, 1080)
+        observer.handle(snapshot)
+        assertEquals(3, restarts.size, "Connected: restart всегда фаерит (backwards-compat)")
+    }
+
+    @Test
+    fun `handle skip — engine matches target во время Probing Connecting`() = runTest(dispatcher) {
+        val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
+        val state = MutableStateFlow<TunnelState>(TunnelState.Idle)
+        val restarts = mutableListOf<EngineSettingsRestartObserver.Snapshot>()
+        val observer = EngineSettingsRestartObserver(
+            settingsFlow = flow,
+            vpnStateProvider = { state.value },
+            onRestartConnected = { restarts += it },
+        )
+        val snapshot = EngineSettingsRestartObserver.Snapshot(
+            manualEngine = EngineId.WARP,
+            byedpiWinningArgs = null,
+            ipv6Enabled = false,
+            customDnsServers = emptyList(),
+            engineAutoPriority = null,
+        )
+
+        state.value = TunnelState.Probing(EngineId.WARP)
+        observer.handle(snapshot)
+        assertTrue(
+            restarts.isEmpty(),
+            "Probing(WARP) + snapshot=WARP → engine matches → skip. " +
+                "Нормальный flow 'тап chip → тап Connect': юзер выбрал WARP, VPN стартует WARP — " +
+                "ненужный restart лишних 5-8s replug.",
+        )
+
+        state.value = TunnelState.Connecting(EngineId.WARP)
+        observer.handle(snapshot)
+        assertTrue(restarts.isEmpty(), "Connecting(WARP) + snapshot=WARP → skip")
+
+        state.value = TunnelState.Probing(null)
+        observer.handle(snapshot)
+        assertTrue(
+            restarts.isEmpty(),
+            "Probing(null) — pre-permission, VPN service сам подхватит latest manualEngine при выходе. " +
+                "Здесь нечего рестартить.",
+        )
+
+        state.value = TunnelState.Connected(EngineId.WARP, 1080)
+        observer.handle(snapshot)
+        assertEquals(
+            1,
+            restarts.size,
+            "Connected(WARP) + snapshot=WARP → restart фаерит (backwards-compat: ipv6/dns/byedpi-args " +
+                "ещё могут отличаться, движок прочитает их at-start).",
+        )
     }
 
     @Test
