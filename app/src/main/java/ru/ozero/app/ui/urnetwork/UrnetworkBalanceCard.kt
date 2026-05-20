@@ -74,11 +74,10 @@ fun UrnetworkBalanceCard(
 @Composable
 private fun BalanceDetails(state: UrnetworkBalanceState) {
     val snapshot = state.snapshot ?: return
-    // Backend adds 34 GiB rows daily (30h TTL). In a ~5h overlap window multiple rows are
-    // simultaneously active → sum shows 68–102 GiB for free tier. Cap display at 34 GiB.
-    val isPro = snapshot.plan != null
-    val displayBalance = if (isPro) snapshot.balanceBytes else minOf(snapshot.balanceBytes, FREE_TIER_CAP_BYTES)
-    val displayStart = if (isPro) snapshot.startBalanceBytes else minOf(snapshot.startBalanceBytes, FREE_TIER_CAP_BYTES)
+    // Backend adds rows daily (30h TTL). In a ~5h overlap window multiple rows are
+    // simultaneously active → sum shows 68–102 GiB. Cap display at 34 GiB.
+    val displayBalance = minOf(snapshot.balanceBytes.coerceAtLeast(0L), FREE_TIER_CAP_BYTES)
+    val displayStart = minOf(snapshot.startBalanceBytes.coerceAtLeast(0L), FREE_TIER_CAP_BYTES)
     val total = snapshot.usedBytes + snapshot.pendingBytes + displayBalance
     TrafficProgressBar(
         usedBytes = snapshot.usedBytes,

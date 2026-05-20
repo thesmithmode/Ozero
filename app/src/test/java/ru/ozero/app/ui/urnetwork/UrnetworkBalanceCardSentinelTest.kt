@@ -23,22 +23,18 @@ class UrnetworkBalanceCardSentinelTest {
     }
 
     @Test
-    fun `BalanceDetails применяет FREE_TIER_CAP_BYTES для free tier — защита от регрессии overlap display`() {
+    fun `BalanceDetails применяет FREE_TIER_CAP_BYTES — защита от регрессии overlap display`() {
         val balanceDetailsBody = source
             .substringAfter("private fun BalanceDetails(")
             .substringBefore("private fun TrafficProgressBar(")
         assertTrue(
             balanceDetailsBody.contains("FREE_TIER_CAP_BYTES"),
             "BalanceDetails обязан применять FREE_TIER_CAP_BYTES — иначе overlap window (30h TTL + 24h крон) " +
-                "показывает 68-102 GiB вместо 34 GiB на free tier",
+                "показывает 68-102 GiB вместо 34 GiB",
         )
         assertTrue(
-            balanceDetailsBody.contains("isPro"),
-            "BalanceDetails обязан проверять isPro — pro-подписчики не должны кэпироваться на 34 GiB",
-        )
-        assertTrue(
-            balanceDetailsBody.contains("snapshot.plan"),
-            "isPro должен определяться по snapshot.plan — null = free tier, non-null = pro",
+            balanceDetailsBody.contains("minOf("),
+            "displayBalance и displayStart обязаны вычисляться через minOf — кэп не работает без min",
         )
     }
 }
