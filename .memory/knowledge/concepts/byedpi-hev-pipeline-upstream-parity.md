@@ -10,6 +10,8 @@ updated: 2026-05-20
 
 # ByeDPI HevTunnelConfig YAML and IPv6 Blackhole Upstream Parity
 
+> **SCOPE WARNING (2026-05-20):** Этот аудит покрывает ТОЛЬКО HEV YAML и IPv6 blackhole routes. НЕ покрывает VpnService.Builder vs upstream, init order, background pollers, killswitch infrastructure. Полный pipeline diff в [[concepts/byedpi-vpn-pipeline-upstream-divergence]] — там найден реальный root YouTube QUIC (`setUnderlyingNetworks(null)`). YAML parity ниже корректна но недостаточна.
+
 Two ByeDPI pipeline divergences from upstream ByeByeDPI v1.7.4 that caused traffic to not flow through the tunnel despite the engine showing "Connected". First: `HevTunnelConfig.toYaml()` emitted extra YAML fields not present in upstream, including `tunnel.ipv4`, `tunnel.ipv6`, `misc.log-level`, and single-quoted `udp: 'udp'`. Second: `TunBuilderHelper.buildTunBuilder` unconditionally added IPv6 blackhole routes for ByeDPI, causing IPv6 packets to enter hev's fd and be dropped at the SOCKS upstream (ByeDPI has no IPv6 support).
 
 ## Key Points
