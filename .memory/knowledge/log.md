@@ -1,5 +1,12 @@
 # Build Log
 
+## [2026-05-20T21:00:00+03:00] compile | Daily Log 2026-05-20 (pass 9 — session 19:07 chip race)
+- Source: daily/2026-05-20.md
+- Articles created: [[concepts/engine-chip-race-observer]] — EngineSettingsRestartObserver Connected-only gate drops engine changes during Probing/Connecting; fix: restart from Probing/Connecting when engine ≠ manualEngine; Probing(null) guard; 3 sentinel inversions for removed behavior; debounce interaction
+- Articles updated: (none)
+- Index: 1 row added (engine-chip-race-observer)
+- Sessions covered: 19:07 (chip race fix — previously uncaptured by passes 1-8)
+
 ## [2026-05-20T20:30:00+03:00] compile | Daily Log 2026-05-20 (pass 8 — lint.py overflow fix + contradiction resolution)
 - Source: daily/2026-05-20.md
 - Articles created: (none)
