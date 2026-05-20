@@ -171,7 +171,7 @@ class UrnetworkLocationsViewModelTest {
     }
 
     @Test
-    fun `sentinel — updateLocations читает regions и cities из FilteredLocations`() {
+    fun `sentinel — updateLocations читает regions, cities и bestMatches из FilteredLocations`() {
         val source = java.io.File(
             System.getProperty("user.dir") ?: ".",
             "src/main/java/ru/ozero/app/ui/settings/engines/UrnetworkLocationsViewModel.kt",
@@ -187,10 +187,14 @@ class UrnetworkLocationsViewModelTest {
             updateBody.contains("filtered.cities"),
             "updateLocations обязан читать filtered.cities — иначе города никогда не загружаются",
         )
+        assertTrue(
+            updateBody.contains("filtered.bestMatches"),
+            "updateLocations обязан читать filtered.bestMatches — иначе SDK top-matches не попадают в UI (Москва пустая при поиске)",
+        )
     }
 
     @Test
-    fun `sentinel — UrnetworkSettingsUiState_Ready содержит поля regions и cities`() {
+    fun `sentinel — UrnetworkSettingsUiState_Ready содержит поля regions, cities, bestMatches`() {
         val source = java.io.File(
             System.getProperty("user.dir") ?: ".",
             "src/main/java/ru/ozero/app/ui/settings/engines/UrnetworkLocationsViewModel.kt",
@@ -198,6 +202,7 @@ class UrnetworkLocationsViewModelTest {
         val readyBlock = source.substringAfter("data class Ready(").substringBefore(") : UrnetworkSettingsUiState")
         assertTrue(readyBlock.contains("regions"), "UrnetworkSettingsUiState.Ready обязан иметь поле regions")
         assertTrue(readyBlock.contains("cities"), "UrnetworkSettingsUiState.Ready обязан иметь поле cities")
+        assertTrue(readyBlock.contains("bestMatches"), "UrnetworkSettingsUiState.Ready обязан иметь поле bestMatches — иначе SDK best matches не попадут в UI (Москва пустая при поиске Mos)")
     }
 
     @Test

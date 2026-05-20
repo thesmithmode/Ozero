@@ -249,6 +249,7 @@
     <string name="urnetwork_location_connect_first">Connect to URnetwork to view available regions</string>
     <string name="urnetwork_location_regions">Regions</string>
     <string name="urnetwork_location_cities">Cities</string>
+    <string name="urnetwork_location_best_matches">Top matches</string>
     <string name="urnetwork_check_ip">Check IP address</string>
     <string name="urnetwork_provide_title">Share bandwidth</string>
     <string name="urnetwork_provide_subtitle">Share bandwidth with the URnetwork mesh</string>
