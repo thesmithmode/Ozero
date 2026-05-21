@@ -305,9 +305,11 @@ class OzeroVpnService : android.net.VpnService() {
                 as? android.net.ConnectivityManager ?: return@runCatching false
             val networks = cm.allNetworks
             var detected = false
+            val myUid = android.os.Process.myUid()
             for (n in networks) {
                 val caps = cm.getNetworkCapabilities(n) ?: continue
                 if (!caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)) continue
+                if (android.os.Build.VERSION.SDK_INT >= 29 && caps.ownerUid == myUid) continue
                 detected = true
                 PersistentLoggers.warn(
                     TAG,
