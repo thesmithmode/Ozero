@@ -506,6 +506,7 @@
     <!-- WARP engine settings -->
     <string name="warp_progress_mirror_fmt">Зеркало %1$s</string>
     <string name="warp_validation_required_fields">PrivateKey, Endpoint, PublicKey (Peer), Address обязательны</string>
+    <string name="warp_duplicate_hint">Эта конфигурация уже загружена</string>
     <string name="warp_doh_section_label">Протокол DNS (endpoint resolve)</string>
     <string name="warp_next_generation_in_fmt">Следующая генерация через %1$s</string>
 

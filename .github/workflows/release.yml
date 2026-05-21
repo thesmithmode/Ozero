@@ -315,10 +315,12 @@ jobs:
             echo "::error::No release APK produced"
             exit 1
           fi
-          for apk in "${apks[@]}"; do
-            base="$(basename "$apk" .apk)"
-            cp "$apk" "release-out/${base}-${TAG}.apk"
-          done
+          if [ ${#apks[@]} -gt 1 ]; then
+            echo "::error::ожидался ровно один APK (arm64-v8a-only), найдено ${#apks[@]}"
+            printf '  %s\n' "${apks[@]}"
+            exit 1
+          fi
+          cp "${apks[0]}" "release-out/Ozero-${TAG}.apk"
           cd release-out
           for apk in *.apk; do
             sha256sum "$apk" > "${apk}.sha256"

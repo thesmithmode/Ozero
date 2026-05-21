@@ -107,22 +107,35 @@ class StartSequenceCoordinator(
         deps.tunnelController.onProbing(activeEngineId)
         val usesCustomTun = engineNeedsCustomTun(activeEngineId)
         val ipv6Enabled = settings?.ipv6Enabled ?: false
-        val fd = if (usesCustomTun) {
-            establishTunForEngine(activeEngineId, splitConfig, ipv6Enabled) ?: return
+        val (fd, chainResult) = if (usesCustomTun) {
+            val tun = establishTunForEngine(activeEngineId, splitConfig, ipv6Enabled) ?: return
+            state.lockdownStartupFdRef.getAndSet(null)?.runCatching { close() }
+            if (state.stopping.get()) {
+                runCatching { tun.close() }
+                state.tunFdRef.compareAndSet(tun, null)
+                return
+            }
+            val chain = startChain(activeEngineId, activeConfig) ?: return
+            tun to chain
         } else {
-            establishTun(
+            val chain = startChain(activeEngineId, activeConfig) ?: return
+            val tun = establishTun(
                 splitConfig,
                 ipv6 = ipv6Enabled,
                 customDns = settings?.customDnsServers.orEmpty(),
-            ) ?: return
+            ) ?: run {
+                runCatching { deps.chainOrchestrator.stop() }
+                return
+            }
+            state.lockdownStartupFdRef.getAndSet(null)?.runCatching { close() }
+            if (state.stopping.get()) {
+                runCatching { tun.close() }
+                state.tunFdRef.compareAndSet(tun, null)
+                runCatching { deps.chainOrchestrator.stop() }
+                return
+            }
+            tun to chain
         }
-        state.lockdownStartupFdRef.getAndSet(null)?.runCatching { close() }
-        if (state.stopping.get()) {
-            runCatching { fd.close() }
-            state.tunFdRef.compareAndSet(fd, null)
-            return
-        }
-        val chainResult = startChain(activeEngineId, activeConfig) ?: return
         if (!routeTrafficForEngine(activeEngineId, fd, chainResult.finalSocksPort)) return
 
         if (!awaitEngineReady(activeEngineId)) {

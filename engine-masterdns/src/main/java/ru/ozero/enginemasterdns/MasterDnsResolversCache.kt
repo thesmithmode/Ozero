@@ -15,5 +15,11 @@ class MasterDnsResolversCache(
         .map { it.resolvers }
         .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
+    private val configToml = config
+        .map { it.configToml }
+        .stateIn(scope, SharingStarted.Eagerly, "")
+
     fun snapshot(): List<String> = resolvers.value
+
+    fun configTomlSnapshot(): String = configToml.value
 }

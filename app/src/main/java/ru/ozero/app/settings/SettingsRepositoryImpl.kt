@@ -218,7 +218,9 @@ class SettingsRepositoryImpl @Inject constructor(
             .mapNotNull { name -> runCatching { EngineId.valueOf(name.trim()) }.getOrNull() }
             .filter { !it.isStub }
             .distinct()
-        return parsed.ifEmpty { SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY }
+        if (parsed.isEmpty()) return SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY
+        val missing = EngineId.entries.filter { !it.isStub && it !in parsed }
+        return parsed + missing
     }
 
     private fun Preferences.readAppMode(): AppMode {

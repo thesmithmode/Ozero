@@ -458,6 +458,7 @@
     <string name="telegram_proxy_open_in_tg">Abrir no Telegram</string>
     <string name="warp_progress_mirror_fmt">Espelho %1$s</string>
     <string name="warp_validation_required_fields">PrivateKey, Endpoint, PublicKey (Par), Endereço são obrigatórios</string>
+    <string name="warp_duplicate_hint">Esta configuração já está carregada</string>
     <string name="warp_doh_section_label">Protocolo DNS (resolução do endpoint)</string>
     <string name="warp_next_generation_in_fmt">Próxima geração em %1$s</string>
     <string name="strategy_staleness_unverified">Não verificado</string>

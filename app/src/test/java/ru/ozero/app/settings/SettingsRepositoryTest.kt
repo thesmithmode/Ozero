@@ -139,25 +139,25 @@ class SettingsRepositoryTest {
     }
 
     @Test
-    fun `engineAutoPriority default содержит WARP URnetwork ByeDPI в этом порядке`() = runTest {
+    fun `engineAutoPriority default содержит все non-stub engines в этом порядке`() = runTest {
         val current = repository.settings.first()
         assertEquals(
-            listOf(EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI),
+            listOf(EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI, EngineId.MASTERDNS),
             current.engineAutoPriority,
         )
     }
 
     @Test
-    fun `setEngineAutoPriority сохраняет CSV и читается обратно`() = runTest {
+    fun `setEngineAutoPriority сохраняет CSV и читается обратно с reconcile`() = runTest {
         repository.setEngineAutoPriority(listOf(EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI))
         assertEquals(
-            listOf(EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI),
+            listOf(EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI, EngineId.MASTERDNS),
             repository.settings.first().engineAutoPriority,
         )
     }
 
     @Test
-    fun `setEngineAutoPriority дедуплицирует и фильтрует stub движки`() = runTest {
+    fun `setEngineAutoPriority дедуплицирует stub движки и reconcile добавляет недостающие`() = runTest {
         repository.setEngineAutoPriority(
             listOf(
                 EngineId.BYEDPI, EngineId.XRAY, EngineId.BYEDPI,
@@ -165,7 +165,7 @@ class SettingsRepositoryTest {
             ),
         )
         assertEquals(
-            listOf(EngineId.BYEDPI, EngineId.WARP),
+            listOf(EngineId.BYEDPI, EngineId.WARP, EngineId.URNETWORK, EngineId.MASTERDNS),
             repository.settings.first().engineAutoPriority,
         )
     }
@@ -191,12 +191,12 @@ class SettingsRepositoryTest {
     }
 
     @Test
-    fun `engineAutoPriority CSV с trim spaces`() = runTest {
+    fun `engineAutoPriority CSV с trim spaces и reconcile`() = runTest {
         dataStore.edit { prefs ->
             prefs[SettingsKeys.ENGINE_AUTO_PRIORITY] = " WARP , BYEDPI "
         }
         assertEquals(
-            listOf(EngineId.WARP, EngineId.BYEDPI),
+            listOf(EngineId.WARP, EngineId.BYEDPI, EngineId.URNETWORK, EngineId.MASTERDNS),
             repository.settings.first().engineAutoPriority,
         )
     }

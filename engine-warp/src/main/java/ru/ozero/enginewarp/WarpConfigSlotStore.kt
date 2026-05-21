@@ -2,6 +2,9 @@ package ru.ozero.enginewarp
 
 import kotlinx.coroutines.flow.Flow
 
+class WarpConfigDuplicateException(val existingSlotId: String, val existingSlotName: String) :
+    IllegalStateException("WARP config duplicate of slot '$existingSlotName'")
+
 interface WarpConfigSlotStore {
     fun slots(): Flow<List<WarpConfigSlot>>
     fun activeSlot(): Flow<WarpConfigSlot?>
@@ -15,3 +18,6 @@ interface WarpConfigSlotStore {
     suspend fun replaceAll(slots: List<WarpConfigSlot>)
     suspend fun migrateIfNeeded() {}
 }
+
+internal fun WarpConfig.dedupFingerprint(): String =
+    listOf(privateKey, peerPublicKey, peerEndpoint).joinToString("|")

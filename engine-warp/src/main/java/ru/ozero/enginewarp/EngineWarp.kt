@@ -303,7 +303,8 @@ class EngineWarp(
                 PersistentLoggers.error(TAG, "register failed: ${t.message}")
                 return null
             }
-            runCatching { configStore.addSlot("WARP Auto", fresh.config, fresh.rawIni) }
+            val host = fresh.config.peerEndpoint.substringBeforeLast(':').trim().ifBlank { "auto" }
+            runCatching { configStore.addSlot("WARP $host", fresh.config, fresh.rawIni) }
                 .onSuccess { Log.i(TAG, "auto-registered config saved as slot $it") }
                 .onFailure { PersistentLoggers.warn(TAG, "addSlot failed: ${it.message}") }
             buildResolved(fresh.config, fresh.rawIni, source = "auto")

@@ -500,6 +500,7 @@
     <!-- WARP engine settings -->
     <string name="warp_progress_mirror_fmt">Mirror %1$s</string>
     <string name="warp_validation_required_fields">PrivateKey, Endpoint, PublicKey (Peer), Address are required</string>
+    <string name="warp_duplicate_hint">This configuration is already loaded</string>
     <string name="warp_doh_section_label">DNS protocol (endpoint resolve)</string>
     <string name="warp_next_generation_in_fmt">Next generation in %1$s</string>
 

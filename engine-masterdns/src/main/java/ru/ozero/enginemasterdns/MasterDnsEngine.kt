@@ -13,11 +13,13 @@ import ru.ozero.enginescore.EngineStats
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
+import ru.ozero.enginescore.settings.SettingsModel
 
 class MasterDnsEngine(
     private val serviceFactory: () -> MasterDnsClientServiceContract,
     private val portAllocator: MasterDnsPortAllocator = MasterDnsPortAllocator(),
     private val resolversProvider: () -> List<String> = { emptyList() },
+    private val configTomlProvider: () -> String = { "" },
     private val startTimeoutMs: Long = START_TIMEOUT_MS,
 ) : EnginePlugin {
 
@@ -33,6 +35,15 @@ class MasterDnsEngine(
     )
 
     @Volatile private var service: MasterDnsClientServiceContract? = null
+
+    override fun buildManualConfig(settings: SettingsModel?): EngineConfig? {
+        val toml = configTomlProvider().trim()
+        if (toml.isEmpty()) return null
+        return EngineConfig.MasterDns(
+            configToml = toml,
+            resolvers = resolversProvider(),
+        )
+    }
 
     @Suppress("UNUSED_PARAMETER")
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {

@@ -16,10 +16,12 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import ru.ozero.app.R
 import ru.ozero.enginewarp.ImportedWarpConfig
 import ru.ozero.enginewarp.RegisteredWarpConfig
 import ru.ozero.enginewarp.WarpAutoConfig
 import ru.ozero.enginewarp.WarpConfig
+import ru.ozero.enginewarp.WarpConfigDuplicateException
 import ru.ozero.enginewarp.WarpConfigSlot
 import ru.ozero.enginewarp.DoHProvider
 import ru.ozero.enginewarp.WarpConfigSlotStore
@@ -238,13 +240,27 @@ class WarpEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `onImportFile успешный дважды — importSuccessCount равен двум`() = runTest {
+    fun `onImportFile успешный дважды разными конфигами — importSuccessCount равен двум`() = runTest {
+        importer.setConfig(SAMPLE)
+        vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
+        advanceUntilIdle()
+        importer.setConfig(SAMPLE.copy(privateKey = "second-private-key"))
+        vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
+        advanceUntilIdle()
+        assertEquals(2, vm.uiState.value.importSuccessCount)
+    }
+
+    @Test
+    fun `onImportFile дубликата возвращает errorMessageRes warp_duplicate_hint`() = runTest {
         importer.setConfig(SAMPLE)
         vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
         advanceUntilIdle()
         vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
         advanceUntilIdle()
-        assertEquals(2, vm.uiState.value.importSuccessCount)
+        assertEquals(1, store.slotCount(), "дубликат не должен добавляться")
+        assertEquals(1, vm.uiState.value.importSuccessCount)
+        assertEquals(R.string.warp_duplicate_hint, vm.uiState.value.errorMessageRes)
+        assertNull(vm.uiState.value.errorMessage)
     }
 
     @Test
@@ -481,6 +497,13 @@ class WarpEngineSettingsViewModelTest {
         var lastAddedRawIni: String? = null
 
         override suspend fun addSlot(name: String, config: WarpConfig, rawIni: String?): String {
+            val fingerprint = listOf(config.privateKey, config.peerPublicKey, config.peerEndpoint)
+            val duplicate = slotsFlow.value.firstOrNull {
+                listOf(it.config.privateKey, it.config.peerPublicKey, it.config.peerEndpoint) == fingerprint
+            }
+            if (duplicate != null) {
+                throw WarpConfigDuplicateException(duplicate.id, duplicate.name)
+            }
             val id = "fake-${idCounter++}"
             val makeActive = slotsFlow.value.isEmpty()
             lastAddedRawIni = rawIni
