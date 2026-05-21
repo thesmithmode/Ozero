@@ -158,7 +158,7 @@ class StartSequenceCoordinator(
         ipv6Enabled: Boolean,
         customDns: List<String>,
         usesCustomTun: Boolean,
-    ): Pair<ParcelFileDescriptor, ChainResult>? {
+    ): Pair<ParcelFileDescriptor, ChainResult.Success>? {
         if (usesCustomTun) {
             val tun = establishTunForEngine(activeEngineId, splitConfig, ipv6Enabled) ?: return null
             state.lockdownStartupFdRef.getAndSet(null)?.runCatching { close() }
