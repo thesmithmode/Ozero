@@ -492,8 +492,8 @@
     <string name="urnetwork_insufficient_balance_body">El saldo de URnetwork se agotó — VPN se desconectó automáticamente. Recarga tu cuenta o comparte tráfico para continuar.</string>
     <string name="urnetwork_referral_bonus">+%d GB</string>
     <string name="urnetwork_referrals_label">Referidos: %d</string>
-    <string name="urnetwork_reliability_bonus">+%.0f%% bono</string>
-    <string name="urnetwork_reliability_label">Fiabilidad: %.0f%%</string>
+    <string name="urnetwork_reliability_bonus">+%.3f GiB/día</string>
+    <string name="urnetwork_reliability_label">Fiabilidad: %.3f</string>
     <string name="engine_status_peers_title">Pares:</string>
     <string name="engine_status_peers_searching_value">Buscando %1$d s</string>
     <string name="engine_status_peers_unavailable">—</string>
@@ -567,4 +567,9 @@
     <string name="urnetwork_shared_traffic_chart_title">Gráfico de 30 días</string>
     <string name="urnetwork_shared_traffic_chart_empty">Aún no hay datos — comparte tráfico como proveedor y verás estadísticas aquí.</string>
     <string name="urnetwork_shared_traffic_chart_peak">Día máximo: %1$s</string>
+    <string name="warp_info_button">Generadores de configuración de referencia</string>
+    <string name="warp_info_title">Sitios generadores de WARP</string>
+    <string name="warp_info_intro">Si la generación automática falla, intenta obtener una configuración en uno de estos sitios e importa el archivo .conf.</string>
+    <string name="warp_info_close">Cerrar</string>
+    <string name="warp_register_error_hint">No se pudo obtener una configuración automáticamente — todas las fuentes no están disponibles. Toca ⓘ arriba, abre uno de los sitios generadores, descarga un .conf e impórtalo.</string>
 </resources>

@@ -93,22 +93,51 @@ internal object WarpConfParser {
         return servers.ifEmpty { WarpConfig.DEFAULT_DNS }
     }
 
-    private fun parseAwgParams(iface: Map<String, String>): AwgParams = AwgParams(
-        junkPacketCount = iface["jc"]?.toIntOrNull() ?: AwgParams.DEFAULT_JC,
-        junkPacketMinSize = iface["jmin"]?.toIntOrNull() ?: AwgParams.DEFAULT_JMIN,
-        junkPacketMaxSize = iface["jmax"]?.toIntOrNull() ?: AwgParams.DEFAULT_JMAX,
-        initPacketJunkSize = iface["s1"]?.toIntOrNull() ?: AwgParams.DEFAULT_S1,
-        responsePacketJunkSize = iface["s2"]?.toIntOrNull() ?: AwgParams.DEFAULT_S2,
-        underloadPacketJunkSize = iface["s3"]?.toIntOrNull() ?: AwgParams.DEFAULT_S3,
-        payloadPacketJunkSize = iface["s4"]?.toIntOrNull() ?: AwgParams.DEFAULT_S4,
-        initPacketMagicHeader = iface["h1"]?.toLongOrNull() ?: AwgParams.DEFAULT_H1,
-        responsePacketMagicHeader = iface["h2"]?.toLongOrNull() ?: AwgParams.DEFAULT_H2,
-        cookieReplyMagicHeader = iface["h3"]?.toLongOrNull() ?: AwgParams.DEFAULT_H3,
-        transportMagicHeader = iface["h4"]?.toLongOrNull() ?: AwgParams.DEFAULT_H4,
-        payloadPacketSizeCount1 = iface["i1"]?.toIntOrNull() ?: AwgParams.DEFAULT_I1,
-        payloadPacketSizeCount2 = iface["i2"]?.toIntOrNull() ?: AwgParams.DEFAULT_I2,
-        specialJunk3 = iface["i3"]?.toIntOrNull() ?: AwgParams.DEFAULT_I3,
-        specialJunk4 = iface["i4"]?.toIntOrNull() ?: AwgParams.DEFAULT_I4,
-        payloadPacketSizeCount3 = iface["i5"]?.toIntOrNull() ?: AwgParams.DEFAULT_I5,
-    )
+    private fun parseAwgParams(iface: Map<String, String>): AwgParams {
+        val i1Hex = extractHex(iface["i1"])
+        val i2Hex = extractHex(iface["i2"])
+        val i3Hex = extractHex(iface["i3"])
+        val i4Hex = extractHex(iface["i4"])
+        val i5Hex = extractHex(iface["i5"])
+        return AwgParams(
+            junkPacketCount = iface["jc"]?.toIntOrNull() ?: AwgParams.DEFAULT_JC,
+            junkPacketMinSize = iface["jmin"]?.toIntOrNull() ?: AwgParams.DEFAULT_JMIN,
+            junkPacketMaxSize = iface["jmax"]?.toIntOrNull() ?: AwgParams.DEFAULT_JMAX,
+            initPacketJunkSize = iface["s1"]?.toIntOrNull() ?: AwgParams.DEFAULT_S1,
+            responsePacketJunkSize = iface["s2"]?.toIntOrNull() ?: AwgParams.DEFAULT_S2,
+            underloadPacketJunkSize = iface["s3"]?.toIntOrNull() ?: AwgParams.DEFAULT_S3,
+            payloadPacketJunkSize = iface["s4"]?.toIntOrNull() ?: AwgParams.DEFAULT_S4,
+            initPacketMagicHeader = iface["h1"]?.toLongOrNull() ?: AwgParams.DEFAULT_H1,
+            responsePacketMagicHeader = iface["h2"]?.toLongOrNull() ?: AwgParams.DEFAULT_H2,
+            cookieReplyMagicHeader = iface["h3"]?.toLongOrNull() ?: AwgParams.DEFAULT_H3,
+            transportMagicHeader = iface["h4"]?.toLongOrNull() ?: AwgParams.DEFAULT_H4,
+            payloadPacketSizeCount1 = intOrDefault(i1Hex, iface["i1"], AwgParams.DEFAULT_I1),
+            payloadPacketSizeCount2 = intOrDefault(i2Hex, iface["i2"], AwgParams.DEFAULT_I2),
+            specialJunk3 = intOrDefault(i3Hex, iface["i3"], AwgParams.DEFAULT_I3),
+            specialJunk4 = intOrDefault(i4Hex, iface["i4"], AwgParams.DEFAULT_I4),
+            payloadPacketSizeCount3 = intOrDefault(i5Hex, iface["i5"], AwgParams.DEFAULT_I5),
+            payloadHexI1 = i1Hex,
+            payloadHexI2 = i2Hex,
+            payloadHexI3 = i3Hex,
+            payloadHexI4 = i4Hex,
+            payloadHexI5 = i5Hex,
+        )
+    }
+
+    private fun intOrDefault(hex: String?, raw: String?, default: Int): Int {
+        if (hex != null) return default
+        return raw?.toIntOrNull() ?: default
+    }
+
+    private fun extractHex(raw: String?): String? {
+        val v = raw?.trim() ?: return null
+        val wrapped = v.startsWith("<b ", ignoreCase = true) && v.endsWith(">")
+        val zeroXPrefixed = v.startsWith("0x", ignoreCase = true)
+        if (!wrapped && !zeroXPrefixed) return null
+        val inner = if (wrapped) v.substring(3, v.length - 1).trim() else v
+        val stripped = inner.removePrefix("0x").removePrefix("0X")
+        if (stripped.length < 2 || stripped.length % 2 != 0) return null
+        if (!stripped.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }) return null
+        return stripped.lowercase()
+    }
 }

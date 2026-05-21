@@ -38,6 +38,11 @@ internal object BackupWarpSerializer {
         slot.awgI3?.let { obj.put("awgI3", it) }
         slot.awgI4?.let { obj.put("awgI4", it) }
         slot.awgI5?.let { obj.put("awgI5", it) }
+        slot.awgI1Hex?.let { obj.put("awgI1Hex", it) }
+        slot.awgI2Hex?.let { obj.put("awgI2Hex", it) }
+        slot.awgI3Hex?.let { obj.put("awgI3Hex", it) }
+        slot.awgI4Hex?.let { obj.put("awgI4Hex", it) }
+        slot.awgI5Hex?.let { obj.put("awgI5Hex", it) }
         return obj
     }
 
@@ -78,6 +83,11 @@ internal object BackupWarpSerializer {
             awgI3 = if (obj.has("awgI3")) obj.optInt("awgI3", 0) else null,
             awgI4 = if (obj.has("awgI4")) obj.optInt("awgI4", 0) else null,
             awgI5 = if (obj.has("awgI5")) obj.optInt("awgI5", 0) else null,
+            awgI1Hex = obj.optString("awgI1Hex", "").takeIf { it.isNotEmpty() },
+            awgI2Hex = obj.optString("awgI2Hex", "").takeIf { it.isNotEmpty() },
+            awgI3Hex = obj.optString("awgI3Hex", "").takeIf { it.isNotEmpty() },
+            awgI4Hex = obj.optString("awgI4Hex", "").takeIf { it.isNotEmpty() },
+            awgI5Hex = obj.optString("awgI5Hex", "").takeIf { it.isNotEmpty() },
         )
     }
 }

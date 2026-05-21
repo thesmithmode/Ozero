@@ -173,6 +173,24 @@ class AppBackupSerializerTest {
     }
 
     @Test
+    fun `AWG v2 hex blob поля I1Hex-I5Hex переживают roundtrip`() {
+        val slot = fullData.warpSlots[0].copy(
+            awgI1Hex = "c100deadbeef",
+            awgI2Hex = "01ff",
+            awgI3Hex = "ab",
+            awgI4Hex = "cd",
+            awgI5Hex = "1234567890",
+        )
+        val data = fullData.copy(warpSlots = listOf(slot))
+        val restored = AppBackupSerializer.deserialize(AppBackupSerializer.serialize(data))
+        assertEquals("c100deadbeef", restored.warpSlots[0].awgI1Hex)
+        assertEquals("01ff", restored.warpSlots[0].awgI2Hex)
+        assertEquals("ab", restored.warpSlots[0].awgI3Hex)
+        assertEquals("cd", restored.warpSlots[0].awgI4Hex)
+        assertEquals("1234567890", restored.warpSlots[0].awgI5Hex)
+    }
+
+    @Test
     fun `serializeEncrypted и deserializeAuto roundtrip`() {
         val bytes = AppBackupSerializer.serializeEncrypted(fullData)
         val restored = AppBackupSerializer.deserializeAuto(bytes)

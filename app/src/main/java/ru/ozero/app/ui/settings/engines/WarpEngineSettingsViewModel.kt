@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ru.ozero.app.R
+import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginewarp.AwgParams
 import ru.ozero.enginewarp.DoHProvider
 import ru.ozero.enginewarp.WarpAutoConfig
@@ -159,10 +160,11 @@ class WarpEngineSettingsViewModel @Inject constructor(
                         )
                     },
                     onFailure = { t ->
+                        PersistentLoggers.warn(TAG, "register all mirrors failed: ${t.message}")
                         _uiState.value = _uiState.value.copy(
                             isRegistering = false,
-                            errorMessage = t.message ?: "register failed",
-                            errorMessageRes = null,
+                            errorMessage = null,
+                            errorMessageRes = R.string.warp_register_error_hint,
                             progressMirror = null,
                         )
                     },
@@ -275,6 +277,8 @@ class WarpEngineSettingsViewModel @Inject constructor(
         val h2 = draft.h2.toLongOrNull() ?: AwgParams.DEFAULT_H2
         val h3 = draft.h3.toLongOrNull() ?: AwgParams.DEFAULT_H3
         val h4 = draft.h4.toLongOrNull() ?: AwgParams.DEFAULT_H4
+        val existingSlot = _uiState.value.slots.firstOrNull { it.id == draft.slotId }
+        val basAwg = existingSlot?.config?.awgParams ?: AwgParams()
         val config = WarpConfig(
             privateKey = draft.privateKey.trim(),
             publicKey = draft.publicKey.trim(),
@@ -285,7 +289,7 @@ class WarpEngineSettingsViewModel @Inject constructor(
             mtu = mtu,
             dnsServers = dns,
             keepaliveSeconds = keepalive,
-            awgParams = AwgParams(
+            awgParams = basAwg.copy(
                 junkPacketCount = jc,
                 junkPacketMinSize = minOf(jmin, jmax),
                 junkPacketMaxSize = maxOf(jmin, jmax),
@@ -324,5 +328,6 @@ class WarpEngineSettingsViewModel @Inject constructor(
 
     private companion object {
         const val COOLDOWN_POLL_INTERVAL_MS = 1_000L
+        const val TAG = "WarpSettingsVM"
     }
 }

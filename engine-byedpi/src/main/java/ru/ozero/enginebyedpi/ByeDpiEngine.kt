@@ -65,7 +65,7 @@ class ByeDpiEngine(
             settings?.byedpiUseUiMode == true ->
                 ByeDpiUiArgsBuilder.buildArgsOnly(settings.byedpiUiSettings).joinToString(" ")
             !settings?.byedpiWinningArgs.isNullOrBlank() ->
-                ensureUdpDesync(settings.byedpiWinningArgs!!)
+                settings.byedpiWinningArgs!!.trim()
             else -> EngineConfig.ByeDpi().args
         }
         return EngineConfig.ByeDpi(
@@ -74,12 +74,6 @@ class ByeDpiEngine(
             hostsMode = settings?.hostsMode ?: HostsMode.DISABLED,
             hosts = settings?.hosts.orEmpty(),
         )
-    }
-
-    internal fun ensureUdpDesync(args: String): String {
-        val tokens = args.trim().split("\\s+".toRegex())
-        val hasUdpDesync = tokens.any { it.startsWith("-Ku") }
-        return if (hasUdpDesync) args else "$args $UDP_DESYNC_SUFFIX"
     }
 
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
@@ -286,6 +280,5 @@ class ByeDpiEngine(
         const val AUTO_ROTATE_PORT = 0
         const val PORT_ROTATION_BASE = 49_152
         const val PORT_ROTATION_RANGE = 256
-        const val UDP_DESYNC_SUFFIX = "-Ku -a1 -An"
     }
 }

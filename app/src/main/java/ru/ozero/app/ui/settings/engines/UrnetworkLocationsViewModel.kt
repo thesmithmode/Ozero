@@ -264,6 +264,11 @@ class UrnetworkLocationsViewModel @Inject constructor(
         allRegions = buildLocationList(filtered.regions)
         allCities = buildLocationList(filtered.cities)
         allBestMatches = buildLocationList(filtered.bestMatches)
+        Log.i(
+            TAG,
+            "updateLocations: countries=${allCountries.size} regions=${allRegions.size} " +
+                "cities=${allCities.size} bestMatches=${allBestMatches.size} query='${searchQuery.value}'",
+        )
         applyFilter(searchQuery.value)
     }
 

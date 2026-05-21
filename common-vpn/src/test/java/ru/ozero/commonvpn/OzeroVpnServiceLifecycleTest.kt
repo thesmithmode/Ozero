@@ -179,18 +179,6 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `REVOKE_KILL_DELAY_MS не меньше 1500ms — даёт время shutdown coroutines дозавершиться`() {
-        val regex = Regex("REVOKE_KILL_DELAY_MS = (\\d[\\d_]*)L")
-        val match = regex.find(source) ?: error("REVOKE_KILL_DELAY_MS не найдена в OzeroVpnService.kt")
-        val value = match.groupValues[1].replace("_", "").toLong()
-        assertTrue(
-            value >= 1_500L,
-            "REVOKE_KILL_DELAY_MS=$value слишком мал — onRevoke стопит engines асинхронно, " +
-                "мгновенный kill оборвёт teardown и логи. Рекомендация ~2500ms.",
-        )
-    }
-
-    @Test
     fun `performShutdown использует stopSelf с latestStartId — не голый stopSelf`() {
         val body = shutdownSource.substringAfter("suspend fun performShutdown(")
             .substringBefore("private fun recordSessionEnd(")
@@ -537,6 +525,58 @@ class OzeroVpnServiceLifecycleTest {
                 "Anchor потерян в TunBuilderHelper.kt: '$anchor'",
             )
         }
+    }
+
+    @Test
+    fun `REVOKE_KILL_DELAY_MS не больше 1500ms — другой VPN не должен долго ждать освобождения slot`() {
+        val regex = Regex("REVOKE_KILL_DELAY_MS\\s*=\\s*(\\d[\\d_]*)L")
+        val m = regex.find(source) ?: error("REVOKE_KILL_DELAY_MS не найден")
+        val ms = m.groupValues[1].replace("_", "").toLong()
+        assertTrue(
+            ms in 500L..1_500L,
+            "REVOKE_KILL_DELAY_MS должен быть [500..1500]ms: меньше — shutdown не успеет, " +
+                "больше — другой VPN (URnetwork и т.п.) ждёт слишком долго после revoke → " +
+                "пользователь видит «зависание». Fact=$ms",
+        )
+    }
+
+    @Test
+    fun `startVpn использует EXTERNAL_VPN_RELEASE_DELAY_MS при детекции внешнего VPN`() {
+        assertTrue(
+            source.contains("EXTERNAL_VPN_RELEASE_DELAY_MS"),
+            "OzeroVpnService обязан иметь EXTERNAL_VPN_RELEASE_DELAY_MS константу: " +
+                "при запуске Ozero ПОСЛЕ другого VPN (URnetwork и т.п.) Android revoke'ает " +
+                "тот VPN, но его TUN ещё закрывается — establish() Ozero ловит race. " +
+                "Задержка перед establish() даёт ОС время полностью отпустить slot.",
+        )
+        assertTrue(
+            source.contains("logActiveExternalVpn()"),
+            "startVpn должен вызывать logActiveExternalVpn() и использовать результат " +
+                "для условной задержки.",
+        )
+        val regex = Regex("EXTERNAL_VPN_RELEASE_DELAY_MS\\s*=\\s*(\\d[\\d_]*)L")
+        val m = regex.find(source) ?: error("EXTERNAL_VPN_RELEASE_DELAY_MS не найден")
+        val ms = m.groupValues[1].replace("_", "").toLong()
+        assertTrue(
+            ms in 200L..1_500L,
+            "EXTERNAL_VPN_RELEASE_DELAY_MS должен быть [200..1500]ms — короче ловим race, " +
+                "длиннее юзер замечает paused старт. Fact=$ms",
+        )
+    }
+
+    @Test
+    fun `onTaskRemoved НЕ переопределён — VPN обязан продолжать работу в фоне при swipe-close`() {
+        assertTrue(
+            !source.contains("override fun onTaskRemoved("),
+            "OzeroVpnService НЕ должен переопределять onTaskRemoved.\n" +
+                "Свайп приложения из recents = стандартное Android поведение: foreground VpnService " +
+                "продолжает работать, TUN держится, индикатор ключа остаётся. Это ключевая UX-инвариант " +
+                "VPN-приложений (WireGuard / AmneziaWG / ProtonVPN / OpenVPN — все так). " +
+                "Юзер выключает VPN явно через переключатель в апп или системную шторку, не свайпом.\n" +
+                "Регрессия: коммит d5284235 (откатан в feedback_swipe_close_vpn_must_persist) — " +
+                "override onTaskRemoved → stopVpn ломал фон-режим: VPN ВЫКЛЮЧАЛСЯ от свайпа. " +
+                "Никогда не возвращать.",
+        )
     }
 
     @Test

@@ -36,10 +36,19 @@ object WarpIniBuilder {
         appendLine("H2 = ${p.responsePacketMagicHeader}")
         appendLine("H3 = ${p.cookieReplyMagicHeader}")
         appendLine("H4 = ${p.transportMagicHeader}")
-        appendLine("I1 = ${p.payloadPacketSizeCount1}")
-        appendLine("I2 = ${p.payloadPacketSizeCount2}")
-        if (p.specialJunk3 != 0) appendLine("I3 = ${p.specialJunk3}")
-        if (p.specialJunk4 != 0) appendLine("I4 = ${p.specialJunk4}")
-        appendLine("I5 = ${p.payloadPacketSizeCount3}")
+        appendLine("I1 = ${formatI(p.payloadHexI1, p.payloadPacketSizeCount1)}")
+        appendLine("I2 = ${formatI(p.payloadHexI2, p.payloadPacketSizeCount2)}")
+        when {
+            p.payloadHexI3 != null -> appendLine("I3 = <b 0x${p.payloadHexI3}>")
+            p.specialJunk3 != 0 -> appendLine("I3 = ${p.specialJunk3}")
+        }
+        when {
+            p.payloadHexI4 != null -> appendLine("I4 = <b 0x${p.payloadHexI4}>")
+            p.specialJunk4 != 0 -> appendLine("I4 = ${p.specialJunk4}")
+        }
+        appendLine("I5 = ${formatI(p.payloadHexI5, p.payloadPacketSizeCount3)}")
     }
+
+    private fun formatI(hex: String?, intValue: Int): String =
+        if (hex != null) "<b 0x$hex>" else intValue.toString()
 }

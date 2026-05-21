@@ -285,8 +285,8 @@
     <string name="urnetwork_balance_error">Не удалось получить баланс: %1$s</string>
     <string name="urnetwork_balance_empty">Баланс недоступен. Подключитесь к URnetwork.</string>
     <string name="urnetwork_daily_allocation">Ежедневный лимит</string>
-    <string name="urnetwork_reliability_label">Надёжность: %.0f%%</string>
-    <string name="urnetwork_reliability_bonus">+%.0f%% бонус</string>
+    <string name="urnetwork_reliability_label">Надёжность: %.3f</string>
+    <string name="urnetwork_reliability_bonus">+%.3f ГиБ/день</string>
     <string name="urnetwork_referrals_label">Рефералов: %d</string>
     <string name="urnetwork_referral_bonus">+%d ГБ</string>
     <string name="urnetwork_insufficient_balance_title">Недостаточно баллов</string>
@@ -315,6 +315,11 @@
 
     <!-- WARP -->
     <string name="warp_settings_title">WARP</string>
+    <string name="warp_info_button">Справочные сайты для генерации конфигов</string>
+    <string name="warp_info_title">Сайты-генераторы WARP</string>
+    <string name="warp_info_intro">Если автогенерация не работает — попробуйте получить конфиг с одного из сайтов и импортируйте .conf файл.</string>
+    <string name="warp_info_close">Закрыть</string>
+    <string name="warp_register_error_hint">Не удалось получить конфиг автоматически — все источники недоступны. Нажмите ⓘ вверху, перейдите на один из сайтов-генераторов, скачайте .conf и импортируйте.</string>
     <string name="settings_warp_title">WARP</string>
     <string name="settings_warp_summary">Cloudflare WARP — авто-конфиг</string>
     <string name="warp_no_config">Конфиг не сгенерирован</string>

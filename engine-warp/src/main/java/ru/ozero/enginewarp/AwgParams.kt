@@ -17,6 +17,11 @@ data class AwgParams(
     val payloadPacketSizeCount3: Int = DEFAULT_I5,
     val specialJunk3: Int = DEFAULT_I3,
     val specialJunk4: Int = DEFAULT_I4,
+    val payloadHexI1: String? = null,
+    val payloadHexI2: String? = null,
+    val payloadHexI3: String? = null,
+    val payloadHexI4: String? = null,
+    val payloadHexI5: String? = null,
 ) {
     init {
         require(junkPacketMinSize <= junkPacketMaxSize) {

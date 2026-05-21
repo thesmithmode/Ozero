@@ -172,6 +172,11 @@ class DataStoreWarpConfigSlotStore(
             specialJunk3 = awgObj.optInt("i3", AwgParams.DEFAULT_I3),
             specialJunk4 = awgObj.optInt("i4", AwgParams.DEFAULT_I4),
             payloadPacketSizeCount3 = awgObj.optInt("i5", AwgParams.DEFAULT_I5),
+            payloadHexI1 = awgObj.optString("i1Hex", "").takeIf { it.isNotEmpty() },
+            payloadHexI2 = awgObj.optString("i2Hex", "").takeIf { it.isNotEmpty() },
+            payloadHexI3 = awgObj.optString("i3Hex", "").takeIf { it.isNotEmpty() },
+            payloadHexI4 = awgObj.optString("i4Hex", "").takeIf { it.isNotEmpty() },
+            payloadHexI5 = awgObj.optString("i5Hex", "").takeIf { it.isNotEmpty() },
         )
         val config = WarpConfig(
             privateKey = configObj.getString("priv"),
@@ -239,6 +244,11 @@ class DataStoreWarpConfigSlotStore(
             awgObj.put("i3", awg.specialJunk3)
             awgObj.put("i4", awg.specialJunk4)
             awgObj.put("i5", awg.payloadPacketSizeCount3)
+            awg.payloadHexI1?.let { awgObj.put("i1Hex", it) }
+            awg.payloadHexI2?.let { awgObj.put("i2Hex", it) }
+            awg.payloadHexI3?.let { awgObj.put("i3Hex", it) }
+            awg.payloadHexI4?.let { awgObj.put("i4Hex", it) }
+            awg.payloadHexI5?.let { awgObj.put("i5Hex", it) }
             configObj.put("awgParams", awgObj)
             configObj.put("doHProvider", cfg.doHProvider.name)
             obj.put("config", configObj)

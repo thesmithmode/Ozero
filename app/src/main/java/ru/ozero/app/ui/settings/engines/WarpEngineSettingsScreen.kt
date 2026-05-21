@@ -1,5 +1,7 @@
 package ru.ozero.app.ui.settings.engines
 
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -24,6 +26,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -89,6 +93,7 @@ fun WarpEngineSettingsScreen(
     }
 
     val context = LocalContext.current
+    var infoDialogVisible by remember { mutableStateOf(false) }
     var importOverlayVisible by remember { mutableStateOf(false) }
     LaunchedEffect(state.importSuccessCount) {
         if (state.importSuccessCount > 0) {
@@ -125,6 +130,14 @@ fun WarpEngineSettingsScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                     }
                 },
+                actions = {
+                    IconButton(
+                        onClick = { infoDialogVisible = true },
+                        modifier = Modifier.testTag("warp_info_button"),
+                    ) {
+                        Icon(Icons.Filled.Info, contentDescription = stringResource(R.string.warp_info_button))
+                    }
+                },
             )
         },
     ) { padding ->
@@ -147,7 +160,55 @@ fun WarpEngineSettingsScreen(
             }
         }
     }
+    if (infoDialogVisible) {
+        WarpInfoDialog(
+            onDismiss = { infoDialogVisible = false },
+            onLinkClick = { url ->
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                runCatching { context.startActivity(intent) }
+            },
+        )
+    }
 }
+
+@Composable
+private fun WarpInfoDialog(onDismiss: () -> Unit, onLinkClick: (String) -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.warp_info_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = stringResource(R.string.warp_info_intro),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                WARP_INFO_LINKS.forEach { url ->
+                    TextButton(
+                        onClick = { onLinkClick(url) },
+                        modifier = Modifier.fillMaxWidth().testTag("warp_info_link_$url"),
+                    ) {
+                        Text(
+                            text = url,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.warp_info_close))
+            }
+        },
+    )
+}
+
+private val WARP_INFO_LINKS = listOf(
+    "https://warp-generator.github.io/warp/",
+    "https://ptechgithub.github.io/wg/",
+    "https://warp-mirrors.vercel.app/",
+)
 
 @Composable
 private fun ImportSuccessOverlay(modifier: Modifier = Modifier) {
