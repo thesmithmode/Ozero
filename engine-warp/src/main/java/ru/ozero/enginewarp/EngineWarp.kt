@@ -306,7 +306,17 @@ class EngineWarp(
             val host = fresh.config.peerEndpoint.substringBeforeLast(':').trim().ifBlank { "auto" }
             runCatching { configStore.addSlot("WARP $host", fresh.config, fresh.rawIni) }
                 .onSuccess { Log.i(TAG, "auto-registered config saved as slot $it") }
-                .onFailure { PersistentLoggers.warn(TAG, "addSlot failed: ${it.message}") }
+                .onFailure { t ->
+                    if (t is WarpConfigDuplicateException) {
+                        runCatching { configStore.setActive(t.existingSlotId) }
+                            .onSuccess {
+                                Log.i(TAG, "auto-register duplicate — activated existing slot ${t.existingSlotId}")
+                            }
+                            .onFailure { e -> PersistentLoggers.warn(TAG, "setActive duplicate failed: ${e.message}") }
+                    } else {
+                        PersistentLoggers.warn(TAG, "addSlot failed: ${t.message}")
+                    }
+                }
             buildResolved(fresh.config, fresh.rawIni, source = "auto")
         }
     }

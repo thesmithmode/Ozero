@@ -173,6 +173,10 @@ class StartSequenceCoordinator(
         val chain = startChain(activeEngineId, activeConfig) ?: return null
         val tun = establishTun(splitConfig, ipv6 = ipv6Enabled, customDns = customDns) ?: run {
             runCatching { deps.chainOrchestrator.stop() }
+            deps.engineWatchdog.handleEngineFailure(
+                activeEngineId,
+                "establishTun fail после startChain — UI не должен застрять в Connecting",
+            )
             return null
         }
         state.lockdownStartupFdRef.getAndSet(null)?.runCatching { close() }
