@@ -130,6 +130,53 @@ class MasterDnsEngineTest {
         assertNotNull(plugin.stats())
     }
 
+    @Test
+    fun `buildManualConfig with non-empty toml returns MasterDns config with resolvers`() {
+        val engine = MasterDnsEngine(
+            serviceFactory = { FakeService() },
+            portAllocator = StubAllocator(18000),
+            resolversProvider = { listOf("1.1.1.1", "8.8.8.8") },
+            configTomlProvider = { "DOMAINS = [\"v.x\"]\n" },
+        )
+        val cfg = engine.buildManualConfig(null)
+        assertNotNull(cfg)
+        assertTrue(cfg is EngineConfig.MasterDns)
+        val md = cfg as EngineConfig.MasterDns
+        assertEquals("DOMAINS = [\"v.x\"]\n", md.configToml)
+        assertEquals(listOf("1.1.1.1", "8.8.8.8"), md.resolvers)
+    }
+
+    @Test
+    fun `buildManualConfig with empty toml returns null — manual mode kill-switch protection`() {
+        val engine = MasterDnsEngine(
+            serviceFactory = { FakeService() },
+            portAllocator = StubAllocator(18000),
+            resolversProvider = { listOf("1.1.1.1") },
+            configTomlProvider = { "" },
+        )
+        assertEquals(null, engine.buildManualConfig(null))
+    }
+
+    @Test
+    fun `buildManualConfig with whitespace-only toml returns null`() {
+        val engine = MasterDnsEngine(
+            serviceFactory = { FakeService() },
+            portAllocator = StubAllocator(18000),
+            resolversProvider = { emptyList() },
+            configTomlProvider = { "   \n  \t\n" },
+        )
+        assertEquals(null, engine.buildManualConfig(null))
+    }
+
+    @Test
+    fun `buildManualConfig default provider returns null — sentinel против silent breakage`() {
+        val engine = MasterDnsEngine(
+            serviceFactory = { FakeService() },
+            portAllocator = StubAllocator(18000),
+        )
+        assertEquals(null, engine.buildManualConfig(null))
+    }
+
     private fun makeEngine(service: MasterDnsClientServiceContract) = MasterDnsEngine(
         serviceFactory = { service },
         portAllocator = StubAllocator(18000),

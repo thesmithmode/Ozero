@@ -11,8 +11,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -328,6 +330,66 @@ class DataStoreWarpConfigSlotStoreTest {
         val slots = store.slots().first()
         assertTrue(slots[0].isActive)
         assertFalse(slots[1].isActive)
+    }
+
+    @Test
+    fun `addSlot duplicate fingerprint бросает WarpConfigDuplicateException и не добавляет слот`() = runTest {
+        val store = newStore()
+        val firstId = store.addSlot("First", sample)
+        val ex = assertThrows<WarpConfigDuplicateException> {
+            store.addSlot("Duplicate", sample)
+        }
+        assertEquals(firstId, ex.existingSlotId)
+        assertEquals("First", ex.existingSlotName)
+        val slots = store.slots().first()
+        assertEquals(1, slots.size, "duplicate не должен попасть в storage")
+        assertEquals("First", slots[0].name)
+    }
+
+    @Test
+    fun `addSlot duplicate с другим rawIni всё равно отклоняется — fingerprint = privKey+peerPub+endpoint`() = runTest {
+        val store = newStore()
+        store.addSlot("Imported", sample, rawIni = "[Interface]\nPrivateKey = priv\n[Peer]\n")
+        assertThrows<WarpConfigDuplicateException> {
+            store.addSlot("Imported2", sample, rawIni = "[Interface]\nPrivateKey = priv\nJc = 4\n[Peer]\n")
+        }
+        assertEquals(1, store.slots().first().size)
+    }
+
+    @Test
+    fun `addSlot с другим privateKey — не duplicate, оба слота сохраняются`() = runTest {
+        val store = newStore()
+        store.addSlot("First", sample)
+        val secondId = store.addSlot("Second", sample.copy(privateKey = "different-priv"))
+        val slots = store.slots().first()
+        assertEquals(2, slots.size)
+        assertNotEquals(secondId, slots[0].id)
+    }
+
+    @Test
+    fun `addSlot с другим peerEndpoint — не duplicate`() = runTest {
+        val store = newStore()
+        store.addSlot("First", sample)
+        store.addSlot("Second", sample.copy(peerEndpoint = "other.endpoint:2408"))
+        assertEquals(2, store.slots().first().size)
+    }
+
+    @Test
+    fun `addSlot с другим peerPublicKey — не duplicate`() = runTest {
+        val store = newStore()
+        store.addSlot("First", sample)
+        store.addSlot("Second", sample.copy(peerPublicKey = "different-peer-pub"))
+        assertEquals(2, store.slots().first().size)
+    }
+
+    @Test
+    fun `WarpConfigDuplicateException содержит existingSlotId и existingSlotName для UI hint`() = runTest {
+        val store = newStore()
+        val id = store.addSlot("Original Name", sample)
+        val ex = assertThrows<WarpConfigDuplicateException> { store.addSlot("Attempt", sample) }
+        assertEquals(id, ex.existingSlotId)
+        assertEquals("Original Name", ex.existingSlotName)
+        assertTrue(ex.message?.contains("Original Name") == true, "message обязан содержать имя оригинала")
     }
 
     private fun buildValidSlotJson(id: String, name: String): String {
