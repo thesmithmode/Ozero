@@ -299,7 +299,7 @@ class OzeroVpnServiceLockdownKillswitchTest {
     }
 
     @Test
-    fun `routeTrafficForEngine вызывается ПОСЛЕ establishTunAndChain — корректный порядок lockdown→engine→route (P35)`() {
+    fun `routeTrafficForEngine вызывается ПОСЛЕ establishTunAndChain — порядок lockdown→engine→route (P35)`() {
         val helperCallIdx = runBody.indexOf("establishTunAndChain(")
         val routeIdx = runBody.indexOf("routeTrafficForEngine(")
         assertTrue(helperCallIdx >= 0 && routeIdx >= 0, "anchors сломаны: $runBody")
