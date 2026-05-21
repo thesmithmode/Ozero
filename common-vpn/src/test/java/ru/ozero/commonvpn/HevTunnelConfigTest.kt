@@ -41,10 +41,17 @@ class HevTunnelConfigTest {
     }
 
     @Test
-    fun `toYaml содержит udp mode без кавычек upstream parity`() {
+    fun `default udpMode — tcp для быстрого QUIC fallback`() {
         val yaml = base().toYaml()
-        assertTrue(yaml.contains("udp: udp"))
-        assertFalse(yaml.contains("udp: 'udp'"), "upstream без кавычек")
+        assertTrue(
+            yaml.contains("udp: tcp"),
+            "udp:tcp туннелирует QUIC через TCP → сервер отклоняет TCP на UDP-порт → быстрый " +
+                "fallback на TCP/TLS → byedpi TCP desync работает. " +
+                "udp:udp без -Ku: byedpi принимает UDP ASSOCIATE (udp=1), DPI тихо дропает пакеты, " +
+                "byedpi не получает ошибку (UDP stateless), не шлёт res.rep 4 → QUIC висит вечно → " +
+                "thumbnails и video зависают (YouTube CMD mode regression, 2026-05-21).",
+        )
+        assertFalse(yaml.contains("udp: 'tcp'"), "без кавычек")
     }
 
     @Test
