@@ -207,18 +207,19 @@ class OzeroVpnServiceLockdownKillswitchTest {
     }
 
     @Test
-    fun `killswitch startup TUN использует buildTunBuilder с applyUnderlying=true — P37 lockdown invariant`() {
+    fun `killswitch startup TUN использует buildTunBuilder с applyUnderlying=false — QUIC parity`() {
         val block = runBody.substringAfter("if (killswitch)").substringBefore("val manualEngine")
         assertTrue(
             block.contains("buildTunBuilder"),
             "killswitch startup path обязан вызывать buildTunBuilder. Block:\n$block",
         )
         assertTrue(
-            block.contains("applyUnderlying = true"),
-            "killswitch startup TUN обязан applyUnderlying=true — без него startup gap (5+ сек до " +
-                "engine pick) не enforces lockdown через setUnderlyingNetworks(null) → " +
-                "при WiFi→Mobile транзиции lockdown breaks (P37). ByeDPI engine path использует " +
-                "default applyUnderlying=false (upstream parity для QUIC). Block:\n$block",
+            block.contains("applyUnderlying = false"),
+            "killswitch startup TUN обязан applyUnderlying=false — setUnderlyingNetworks(null) из " +
+                "startup TUN персистируется service-level и ломает QUIC-routing ByeDPI (UDP-сокеты " +
+                "byedpi-процесса теряют authoritative network context → YouTube падает). " +
+                "P37 (WiFi→Mobile) защищён WARP/URnetwork через applyEngineTunSpec(applyUnderlying=true) " +
+                "на их MAIN TUN — startup gap (~5 сек) слишком короток для транзиции сети. Block:\n$block",
         )
     }
 
