@@ -106,6 +106,7 @@ class StartSequenceCoordinator(
         val activeEngineId = pick.first
         val activeConfig = pick.second
         deps.tunnelController.onProbing(activeEngineId)
+        if (state.stopping.get()) return
         val usesCustomTun = engineNeedsCustomTun(activeEngineId)
         val ipv6Enabled = settings?.ipv6Enabled ?: false
         val established = establishTunAndChain(
