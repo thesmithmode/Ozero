@@ -143,22 +143,24 @@ class WarpEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `onGenerate failure ставит errorMessage и не добавляет слот`() = runTest {
+    fun `onGenerate failure ставит errorMessageRes-hint и не добавляет слот`() = runTest {
         auto.result = Result.failure<RegisteredWarpConfig>(IllegalStateException("network down"))
         vm.onGenerate()
         advanceUntilIdle()
         val s = vm.uiState.value
         assertFalse(s.isRegistering)
-        assertEquals("network down", s.errorMessage)
+        assertNull(s.errorMessage)
+        assertEquals(ru.ozero.app.R.string.warp_register_error_hint, s.errorMessageRes)
         assertEquals(0, store.slotCount())
     }
 
     @Test
-    fun `onGenerate failure без message — fallback register failed`() = runTest {
+    fun `onGenerate failure без message — тоже errorMessageRes-hint`() = runTest {
         auto.result = Result.failure<RegisteredWarpConfig>(RuntimeException())
         vm.onGenerate()
         advanceUntilIdle()
-        assertEquals("register failed", vm.uiState.value.errorMessage)
+        assertNull(vm.uiState.value.errorMessage)
+        assertEquals(ru.ozero.app.R.string.warp_register_error_hint, vm.uiState.value.errorMessageRes)
     }
 
     @Test
