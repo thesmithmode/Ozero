@@ -97,6 +97,7 @@ class StartSequenceCoordinator(
                 PersistentLoggers.error(TAG, "no plugins registered — отказ старта")
             } else {
                 PersistentLoggers.error(TAG, "no engine reachable ($mode mode) — отказ старта")
+                deps.tunnelController.onProbing(targetForUi)
                 deps.tunnelController.onEngineDied(targetForUi, "no engine reachable ($mode mode)")
             }
             stopVpnRequest()
