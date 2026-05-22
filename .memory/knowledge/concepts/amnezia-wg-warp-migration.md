@@ -6,8 +6,9 @@ sources:
   - "daily/2026-05-04.md"
   - "daily/2026-05-07.md"
   - "daily/2026-05-08.md"
+  - "daily/2026-05-22.md"
 created: 2026-05-04
-updated: 2026-05-08
+updated: 2026-05-22
 ---
 
 # AmneziaWG Integration for WARP Engine
@@ -86,8 +87,19 @@ Pre-JNI `PersistentLoggers.warn` checkpoints added before/after every `awgTurnOn
 - [[concepts/tun-mtu-dual-layer]] - AmneziaWG H-values provide another layer of MTU configuration
 - [[connections/dependency-override-masking]] - Dependency management for amneziawg-android
 
+### AWG Defaults Reset and DataStore Migration (2026-05-22)
+
+AWG S3/S4/I1/I2/I5 fields had incorrect hardcoded defaults inherited from PORTAL_WG reference values (S3=19, S4=20, I1=28, I2=29, I5=10). These values are unnecessary for standard Cloudflare WARP connections and caused confusion with the obfuscation parameter space.
+
+**New defaults**: all five fields → 0. `WarpIniBuilder` now skips writing zero-value fields to the INI output, keeping configs minimal.
+
+**One-shot DataStore migration**: `normalizeAwgParams` added inline in `slotFromJson`. The fingerprint detection checks all five fields simultaneously against the old defaults (S3==19 AND S4==20 AND I1==28 AND I2==29 AND I5==10) — this exact combination can only occur from the old default assignment, not from any user-configured value. On match, all five are reset to 0. This prevents false-positive migrations for users who had intentionally set any of these values.
+
+Commits: `796932cc` (AWG defaults reset), `78cb33f2` (DataStore migration fingerprint).
+
 ## Sources
 
 - [[daily/2026-05-04.md]] - Session 12:05: AWG WARP swap completed; WarpConfig expansion, DataStore schema 8→19 keys, AwgBackend abstraction, 49 new tests added; CI green on commit 1077a02
 - [[daily/2026-05-07.md]] - AWG obfuscation requirement confirmed for Russian ISPs (TSPU blocks vanilla WG); forceVanilla reverted; AwgParams() ≠ VANILLA confusion documented
 - [[daily/2026-05-08.md]] - Session 12:05/12:18: Maven libam-go.so sha256 mismatch discovered; Phase 2 migration to PORTAL_WG SO committed; Java glue added; SHA256 sentinel + release.yml assertion; WireguardKeyPairGenerator dead code deleted
+- [[daily/2026-05-22.md]] - Session 17:51: S3/S4/I1/I2/I5 defaults reset to 0; WarpIniBuilder skips zero fields; normalizeAwgParams fingerprint migration (5-field simultaneous match = 19/20/28/29/10) in slotFromJson; commits 796932cc + 78cb33f2

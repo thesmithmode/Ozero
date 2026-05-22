@@ -1,5 +1,11 @@
 # Build Log
 
+## [2026-05-22T21:00:00+03:00] compile | Daily Log 2026-05-22 (pass 3 — AWG defaults migration gap)
+- Source: daily/2026-05-22.md
+- Articles created: (none)
+- Articles updated:
+  - [[concepts/amnezia-wg-warp-migration]] — S3/S4/I1/I2/I5 defaults reset to 0; WarpIniBuilder skips zero fields; normalizeAwgParams fingerprint migration (5-field fingerprint 19/20/28/29/10 in slotFromJson); commits 796932cc + 78cb33f2
+
 ## [2026-05-22T20:00:00+03:00] compile | Daily Log 2026-05-22 (pass 2 — sentinel update + chip-switching article)
 - Source: daily/2026-05-22.md
 - Articles created:
