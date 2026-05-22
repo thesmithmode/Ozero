@@ -1,7 +1,7 @@
 ---
 title: "WARP Split Tunnel: allowFamily(AF_INET) Without AF_INET6 Breaks IPv6-Only Services"
 aliases: [warp-split-tunnel-allowfamily, allowfamily-ipv6-blocklist, split-tunnel-gemini-bug]
-tags: [warp, split-tunnel, vpn, android, gotcha, investigation]
+tags: [warp, split-tunnel, vpn, android, gotcha, fixed]
 sources:
   - "daily/2026-05-22.md"
 created: 2026-05-22
@@ -10,9 +10,9 @@ updated: 2026-05-22
 
 # WARP Split Tunnel: allowFamily(AF_INET) Without AF_INET6 Breaks IPv6-Only Services
 
-When split tunnel is enabled with at least one excluded application, IPv6-dependent services (e.g., Gemini) stop working through the WARP engine. Hypothesis: `applyEngineTunSpec` calls `allowFamily(AF_INET)` in BLOCKLIST mode without a corresponding `allowFamily(AF_INET6)`, causing Android to block all IPv6 traffic at the VPN routing layer.
+When split tunnel is enabled with at least one excluded application, IPv6-dependent services (e.g., Gemini) stop working through the WARP engine. Root cause: `applyEngineTunSpec` called `allowFamily(AF_INET)` conditionally on `spec.allowFamilyV4` without a corresponding `allowFamily(AF_INET6)` when `spec.allowFamilyV6=false` (default for WARP with `ipv6Enabled=false`), causing Android to set `allowIPv6=false`. In BLOCKLIST mode, non-excluded apps are routed via VPN; their IPv6 packets are blocked at the VPN layer (`allowIPv6=false`) and not allowed to bypass — packets die silently.
 
-> **Status (2026-05-22):** Bug reproduced by user; root cause hypothesis established; fix not yet applied — awaiting `ozero.log` confirmation before patching.
+> **Status (2026-05-22 23:50):** FIXED. `TunBuilderHelper.applyEngineTunSpec` теперь безусловно вызывает `allowFamily(AF_INET)` + `allowFamily(AF_INET6)`. Sentinel-тест `applyEngineTunSpec allowFamily AF_INET6 безусловный` зафиксирован в `TunBuilderHelperContractTest`. Released в v0.1.15.
 
 ## Key Points
 
@@ -48,9 +48,15 @@ Services that prefer IPv6 (Google's infrastructure, including Gemini, YouTube, e
 - Browser/client may retry via IPv4 → succeeds, but with latency penalty
 - Some services (Gemini's GRPC streaming) may not fall back to IPv4, causing complete failure
 
-### Proposed Fix
+### Applied Fix
 
-Remove `allowFamily(AF_INET)` (and any `allowFamily(AF_INET6)`) calls from `applyEngineTunSpec`. Traffic routing through the WARP TUN is controlled by `addRoute("0.0.0.0", 0)` (IPv4 default route) and `addRoute("::", 0)` (IPv6 default route). Per-app exclusions via `addDisallowedApplication` do not require `allowFamily` to function correctly. The `allowFamily` calls are defensive coding that inadvertently creates the IPv6 block.
+Call both `allowFamily(AF_INET)` AND `allowFamily(AF_INET6)` unconditionally in `applyEngineTunSpec`. This sets `allowIPv4=true` and `allowIPv6=true` at the VPN configuration. The actual IPv6 routing inside the tunnel still gates on `spec.allowFamilyV6 && v6 != null` (line 63), so:
+- `ipv6Enabled=false` (default): VPN admits IPv6 packets at the family layer, no IPv6 address/route added → packets fall through to system default network (= underlying network bypass, like PORTAL_WG behavior)
+- `ipv6Enabled=true`: VPN admits IPv6 and adds IPv6 address + `addRoute("::", 0)` → traffic enters the tunnel
+
+The earlier hypothesis "drop both allowFamily calls" was incorrect — `addAddress(v4)` already sets `allowIPv4=true`, so dropping both leaves `allowIPv6=false` and the bug persists. The fix must positively assert IPv6 family admission.
+
+Why this is architecturally correct: the intent "WARP tunnels IPv4, IPv6 bypasses" is now explicitly expressed via Android's VpnService API. The previous code accidentally declared "VPN only accepts IPv4", which has a subtle side-effect in BLOCKLIST mode where VPN-routed apps' IPv6 dies at the VPN layer.
 
 ### Reference: TunBuilderConfigurator
 

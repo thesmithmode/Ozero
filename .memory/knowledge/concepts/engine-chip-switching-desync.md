@@ -61,6 +61,10 @@ Test `switchingDoesNotClearOnConnectedOfDifferentEngine` (line 505-519) used `as
 - [[concepts/engine-chip-race-observer]] — separate but related: EngineSettingsRestartObserver only restarted from Connected state, missing Probing/Connecting transitions
 - [[concepts/debounce-split-heterogeneous-flow]] — debounce split also prevents ghost switches from debounced restart signals
 
+### Residual Gap: Watchdog Does Not Stop Running Engine (2026-05-22, session 23:11)
+
+A related but separate issue was identified and left incomplete at session end: the `TunnelController` switching watchdog fires on timeout and resets `_switching` to null, but does NOT call `stop()` on the currently running engine. Consequence: if switching from ByeDPI → WARP and ByeDPI's `chainOrchestrator.stop()` hangs (observed to take >4s), the watchdog clears the switching state (log: `warn: switching watchdog timeout`) but ByeDPI continues running. When WARP's start sequence fires in parallel, both engines are active → traffic conflict → no data flow. Fix not yet applied as of 2026-05-22 23:11.
+
 ## Sources
 
-- [[daily/2026-05-22.md]] — Session 11:59: chip shows WARP while tunnel connected to URnetwork; `Connected(X)` unconditional clear of switching → desync; fix: clear only if `sw.to == null || sw.to == X`; `restartVpnIfConnected` preserves `switching.to`; old test rewrote from bug-guard to correct-behavior sentinel
+- [[daily/2026-05-22.md]] — Session 11:59: chip shows WARP while tunnel connected to URnetwork; `Connected(X)` unconditional clear of switching → desync; fix: clear only if `sw.to == null || sw.to == X`; `restartVpnIfConnected` preserves `switching.to`; old test rewrote from bug-guard to correct-behavior sentinel. Session 23:11: watchdog resets `_switching` but doesn't stop engine → ByeDPI survives → WARP starts in parallel → conflict; fix pending

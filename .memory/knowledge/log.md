@@ -1,5 +1,22 @@
 # Build Log
 
+## [2026-05-22T23:11:00+03:00] compile | Daily Log 2026-05-22 (pass 21 — session 23:11 compiled)
+- Source: daily/2026-05-22.md
+- Articles created: (none)
+- Articles updated:
+  - [[concepts/fptn-engine-protocol]] — Kotlin fd-leak fixes (FileOutputStream on error path, FileInputStream .use{}, SupervisorJob accumulation from repeated attachTun without stop()); CI failure pattern: engine-telegram ci.yml refs left after module deletion; SettingsRepositoryTest reconcile broken by FPTN addition (must grep engine-enumeration tests when adding engine)
+  - [[concepts/engine-chip-switching-desync]] — Residual gap: switching watchdog resets _switching but does not stop running engine → ByeDPI survives watchdog timeout → WARP starts in parallel → traffic conflict; fix pending as of 23:11
+- Index updated: (no new rows — all articles pre-existing)
+
+## [2026-05-22T23:59:59+03:00] compile | Daily Log 2026-05-22 (pass 20 — new standalone articles)
+- Source: daily/2026-05-22.md
+- Articles created:
+  - [[concepts/jni-local-global-ref-lifecycle]] — general JNI ref management traps (GetStringUTFChars, NewGlobalRef return value, NewWeakGlobalRef lifecycle) extracted from FPTN C++ fix; applicable to all Android JNI
+  - [[concepts/android-brotliinputstream-hidden-api]] — android.util.BrotliInputStream not a public SDK API; discovered via FPTN fptnb: token parsing; use org.brotli:dec instead
+- Articles updated: (none — all prior content already compiled in passes 1-19)
+- Index updated: 2 new rows added
+- Note: previous 19 passes declared 100% complete; these two articles extract general-purpose traps that deserve independent discoverability beyond fptn-engine-protocol
+
 ## [2026-05-22T23:59:00+03:00] compile | Daily Log 2026-05-22 (pass 19 — schema-triggered verification)
 - Source: daily/2026-05-22.md
 - Articles created: (none — all created in passes 1-17)

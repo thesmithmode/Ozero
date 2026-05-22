@@ -105,6 +105,18 @@ A partial implementation ran through CI and uncovered several critical issues:
 
 JNI fixes are applied in C++ source but not verifiable in unit-test CI (the `.so` is only built during release/assembly steps, not during unit test runs).
 
+### Kotlin Fd-Leak Fixes (2026-05-22, session 23:11)
+
+Code review found three Kotlin-level resource leaks in `FptnEngine.kt`:
+
+1. **`FileOutputStream` not closed on error path** — `attachTun()` opened an output stream to write to the TUN fd but the `catch` block returned without closing it. Fixed via `use{}` wrapping.
+2. **`FileInputStream` without `.use{}`** — `fis` (TUN read loop) was opened without RAII; if an exception escaped the read loop before `pfd.close()`, the stream leaked. Fixed with `.use{}`.
+3. **`SupervisorJob` accumulation** — `attachTun()` created a new `tunScope` with `SupervisorJob()` on each call. Without a paired `stop()` between calls, repeated `attachTun()` invocations accumulated orphaned `SupervisorJob` instances. Fixed by ensuring `stop()` always cancels the previous scope before `attachTun()` creates a new one.
+
+Rule: every `FileInputStream`/`FileOutputStream` wrapping a VPN fd must use `.use{}` or equivalent RAII to guarantee closure even on exception paths.
+
+**CI failure from engine-telegram removal (session 23:11):** `ci.yml` contained job references to `engine-telegram` that were not removed when the module was deleted. Pattern: when deleting a Gradle module, audit `ci.yml`, `release.yml`, and `settings.gradle.kts` for all references. Similarly, adding FPTN as a non-stub `EnginePlugin` broke `SettingsRepositoryTest` because the auto-priority reconcile test enumerated expected engines and did not include FPTN. Lesson: **when adding a new engine, grep for reconcile/enumeration tests** that list all engines by name and update them before push.
+
 ## Related Concepts
 
 - [[concepts/vpn-engine-pipeline]] — EnginePlugin contract this must implement
@@ -116,4 +128,4 @@ JNI fixes are applied in C++ source but not verifiable in unit-test CI (the `.so
 
 ## Sources
 
-- [[daily/2026-05-22.md]] — Session 21:27: FPTN protocol analyzed (WebSocket+TLS+Protobuf, fptn: token format, auth endpoint); architecture decision: full EnginePlugin not subprocess; C++ native lib; JNI callbacks onOpenImpl/onMessageImpl/onFailureImpl; TUN-based fd integration; @fptn_bot UI; user stopped implementation to demand written plan first; MTG dropped; Clash deferred to SS/VMess future. Session 22:20+: CI implementation run — android.util.BrotliInputStream not public API (fptnb: unsupported); JNI memory leaks found and fixed (GetStringUTFChars without Release, NewWeakGlobalRef without Delete, NewGlobalRef return value leak); stop() race condition fixed (correct teardown order: nativeStop→pfd.close→scope.cancel→join→nativeDestroy); diagnostic logging added
+- [[daily/2026-05-22.md]] — Session 21:27: FPTN protocol analyzed (WebSocket+TLS+Protobuf, fptn: token format, auth endpoint); architecture decision: full EnginePlugin not subprocess; C++ native lib; JNI callbacks onOpenImpl/onMessageImpl/onFailureImpl; TUN-based fd integration; @fptn_bot UI; user stopped implementation to demand written plan first; MTG dropped; Clash deferred to SS/VMess future. Session 22:20+: CI implementation run — android.util.BrotliInputStream not public API (fptnb: unsupported); JNI memory leaks found and fixed (GetStringUTFChars without Release, NewWeakGlobalRef without Delete, NewGlobalRef return value leak); stop() race condition fixed (correct teardown order: nativeStop→pfd.close→scope.cancel→join→nativeDestroy); diagnostic logging added. Session 23:11: Kotlin fd-leak fixes (FileOutputStream error path, FileInputStream .use{}, SupervisorJob accumulation); CI failures from engine-telegram ci.yml references left behind; SettingsRepositoryTest reconcile broken by FPTN addition (must update engine-enumeration tests when adding new engine)
