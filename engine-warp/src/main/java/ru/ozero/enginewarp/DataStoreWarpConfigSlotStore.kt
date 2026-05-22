@@ -206,9 +206,25 @@ class DataStoreWarpConfigSlotStore(
         return WarpConfigSlot(
             id = obj.getString("id"),
             name = obj.getString("name"),
-            config = config,
+            config = config.copy(awgParams = migrateAwgParams(awg)),
             isActive = obj.optBoolean("isActive", false),
             rawIniOverride = rawIni,
+        )
+    }
+
+    private fun migrateAwgParams(awg: AwgParams): AwgParams {
+        val isOldInjected = awg.underloadPacketJunkSize == 19 &&
+            awg.payloadPacketJunkSize == 20 &&
+            awg.payloadPacketSizeCount1 == 28 && awg.payloadHexI1 == null &&
+            awg.payloadPacketSizeCount2 == 29 && awg.payloadHexI2 == null &&
+            awg.payloadPacketSizeCount3 == 10 && awg.payloadHexI5 == null
+        if (!isOldInjected) return awg
+        return awg.copy(
+            underloadPacketJunkSize = 0,
+            payloadPacketJunkSize = 0,
+            payloadPacketSizeCount1 = 0,
+            payloadPacketSizeCount2 = 0,
+            payloadPacketSizeCount3 = 0,
         )
     }
 

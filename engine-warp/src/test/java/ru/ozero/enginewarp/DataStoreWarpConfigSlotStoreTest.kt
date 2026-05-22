@@ -392,6 +392,39 @@ class DataStoreWarpConfigSlotStoreTest {
         assertTrue(ex.message?.contains("Original Name") == true, "message обязан содержать имя оригинала")
     }
 
+    @Test
+    fun `migrateAwgParams — старые DEFAULT S3=19 S4=20 I1=28 I2=29 I5=10 сбрасываются в 0 при чтении`() = runTest {
+        val store = newStore()
+        val oldDefaultAwg = AwgParams(
+            underloadPacketJunkSize = 19,
+            payloadPacketJunkSize = 20,
+            payloadPacketSizeCount1 = 28,
+            payloadPacketSizeCount2 = 29,
+            payloadPacketSizeCount3 = 10,
+        )
+        val id = store.addSlot("OldMirror", sample.copy(awgParams = oldDefaultAwg))
+        val saved = store.slots().first().first { it.id == id }
+        val awg = saved.config.awgParams
+        assertEquals(0, awg.underloadPacketJunkSize, "S3=19 (old DEFAULT) обязан мигрировать в 0")
+        assertEquals(0, awg.payloadPacketJunkSize, "S4=20 (old DEFAULT) обязан мигрировать в 0")
+        assertEquals(0, awg.payloadPacketSizeCount1, "I1=28 (old DEFAULT) обязан мигрировать в 0")
+        assertEquals(0, awg.payloadPacketSizeCount2, "I2=29 (old DEFAULT) обязан мигрировать в 0")
+        assertEquals(0, awg.payloadPacketSizeCount3, "I5=10 (old DEFAULT) обязан мигрировать в 0")
+    }
+
+    @Test
+    fun `migrateAwgParams — частичное совпадение не триггерит миграцию (защита от false positive)`() = runTest {
+        val store = newStore()
+        val intentional = AwgParams(
+            underloadPacketJunkSize = 19,
+            payloadPacketJunkSize = 5,
+        )
+        val id = store.addSlot("Manual", sample.copy(awgParams = intentional))
+        val saved = store.slots().first().first { it.id == id }
+        assertEquals(19, saved.config.awgParams.underloadPacketJunkSize, "S3=19 с другим S4 — намеренный, не трогать")
+        assertEquals(5, saved.config.awgParams.payloadPacketJunkSize)
+    }
+
     private fun buildValidSlotJson(id: String, name: String): String {
         val c = sample
         val cfg = """{"priv":"${c.privateKey}","pub":"${c.publicKey}","peerPub":"${c.peerPublicKey}",""" +
