@@ -31,6 +31,7 @@ import ru.ozero.engineurnetwork.UrnetworkWindowType
 import ru.ozero.engineurnetwork.allowDirect
 import ru.ozero.engineurnetwork.fixedIpSize
 import ru.ozero.engineurnetwork.provideControlMode
+import ru.ozero.engineurnetwork.provideEnabled
 import ru.ozero.engineurnetwork.provideNetworkMode
 import ru.ozero.engineurnetwork.setAllowDirect
 import ru.ozero.engineurnetwork.setFixedIpSize
@@ -74,6 +75,11 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
 
     val provideNetworkMode: StateFlow<UrnetworkProvideNetworkMode> = configStore.provideNetworkMode()
         .stateIn(viewModelScope, SharingStarted.Eagerly, UrnetworkProvideNetworkMode.WIFI)
+
+    val providePaused: StateFlow<Boolean> = configStore.provideEnabled()
+        .map { !it }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     val insufficientBalance: StateFlow<Boolean> = bridge.contractStatus()
         .map { it.insufficientBalance && !it.premium }

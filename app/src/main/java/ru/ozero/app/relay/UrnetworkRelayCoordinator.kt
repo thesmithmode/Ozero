@@ -7,6 +7,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import ru.ozero.commonvpn.TunnelController
@@ -14,6 +15,7 @@ import ru.ozero.commonvpn.TunnelState
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkDefaults
 import ru.ozero.engineurnetwork.byClientJwt
+import ru.ozero.engineurnetwork.provideEnabled
 import ru.ozero.engineurnetwork.walletAddress
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.enginescore.EngineId
@@ -64,8 +66,6 @@ class UrnetworkRelayCoordinator(
         }
         if (tunnelState.engineId == EngineId.URNETWORK) {
             relayOwned.set(false)
-            runCatching { bridge.setProvidePaused(false) }
-                .onFailure { PersistentLoggers.warn(TAG, "setProvidePaused(false) threw: ${it.message}") }
             return
         }
         val result = runCatching {
@@ -78,8 +78,9 @@ class UrnetworkRelayCoordinator(
         }.getOrNull()
         if (result is UrnetworkSdkBridge.StartResult.Success) {
             relayOwned.set(true)
-            runCatching { bridge.setProvidePaused(false) }
-                .onFailure { PersistentLoggers.warn(TAG, "setProvidePaused(false) threw: ${it.message}") }
+            val provideEnabled = runCatching { configStore.provideEnabled().first() }.getOrDefault(true)
+            runCatching { bridge.setProvidePaused(!provideEnabled) }
+                .onFailure { PersistentLoggers.warn(TAG, "setProvidePaused threw: ${it.message}") }
             Log.i(TAG, "relay started alongside ${tunnelState.engineId}")
         } else {
             PersistentLoggers.warn(TAG, "relay bridge.start failed: $result")

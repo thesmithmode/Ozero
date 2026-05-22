@@ -95,6 +95,8 @@ fun UrnetworkEngineSettingsScreen(
                 val allowDirect by settingsVm.allowDirect.collectAsStateWithLifecycle()
                 val provideControlMode by settingsVm.provideControlMode.collectAsStateWithLifecycle()
                 val provideNetworkMode by settingsVm.provideNetworkMode.collectAsStateWithLifecycle()
+                val providePaused by settingsVm.providePaused.collectAsStateWithLifecycle()
+                val balanceState by settingsVm.balanceState.collectAsStateWithLifecycle()
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -105,6 +107,7 @@ fun UrnetworkEngineSettingsScreen(
                     if (insufficientBalance) {
                         InsufficientBalanceBanner()
                     }
+                    UrnetworkBalanceCard(state = balanceState)
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = OzeroPalette.Bg1),
@@ -117,15 +120,14 @@ fun UrnetworkEngineSettingsScreen(
                         )
                     }
                     SettingsCard(
-                        providePaused = true,
+                        providePaused = providePaused,
                         windowType = windowType,
                         fixedIp = fixedIp,
                         allowDirect = allowDirect,
                         provideControlMode = provideControlMode,
                         provideNetworkMode = provideNetworkMode,
                         sharedTrafficBytes = 0L,
-                        showProvide = false,
-                        onSetProvidePaused = {},
+                        onSetProvidePaused = locationsVm::setProvidePaused,
                         onSelectWindowType = settingsVm::selectWindowType,
                         onToggleFixedIp = settingsVm::toggleFixedIpSize,
                         onToggleAllowDirect = settingsVm::toggleAllowDirect,
@@ -144,7 +146,6 @@ fun UrnetworkEngineSettingsScreen(
                 val provideNetworkMode by settingsVm.provideNetworkMode.collectAsStateWithLifecycle()
                 val sharedTrafficBytes by settingsVm.sharedTrafficBytes.collectAsStateWithLifecycle()
                 val balanceState by settingsVm.balanceState.collectAsStateWithLifecycle()
-                val isVpnActive by settingsVm.isUrnetworkActive.collectAsStateWithLifecycle()
                 LocationListContent(
                     modifier = Modifier.padding(padding),
                     countries = current.countries,
@@ -162,7 +163,6 @@ fun UrnetworkEngineSettingsScreen(
                     sharedTrafficBytes = sharedTrafficBytes,
                     balanceState = balanceState,
                     insufficientBalance = insufficientBalance,
-                    isVpnActive = isVpnActive,
                     onSearchQueryChange = locationsVm::setSearchQuery,
                     onSelect = locationsVm::selectLocation,
                     onSetProvidePaused = locationsVm::setProvidePaused,
@@ -197,7 +197,6 @@ private fun LocationListContent(
     sharedTrafficBytes: Long,
     balanceState: UrnetworkBalanceState,
     insufficientBalance: Boolean,
-    isVpnActive: Boolean,
     onSearchQueryChange: (String) -> Unit,
     onSelect: (UrnetworkSdkBridge.LocationToken?) -> Unit,
     onSetProvidePaused: (Boolean) -> Unit,
@@ -234,7 +233,6 @@ private fun LocationListContent(
                     provideControlMode = provideControlMode,
                     provideNetworkMode = provideNetworkMode,
                     sharedTrafficBytes = sharedTrafficBytes,
-                    showProvide = isVpnActive,
                     onSetProvidePaused = onSetProvidePaused,
                     onSelectWindowType = onSelectWindowType,
                     onToggleFixedIp = onToggleFixedIp,
@@ -386,7 +384,6 @@ private fun SettingsCard(
     provideControlMode: UrnetworkProvideControlMode,
     provideNetworkMode: UrnetworkProvideNetworkMode,
     sharedTrafficBytes: Long,
-    showProvide: Boolean,
     onSetProvidePaused: (Boolean) -> Unit,
     onSelectWindowType: (UrnetworkWindowType) -> Unit,
     onToggleFixedIp: (Boolean) -> Unit,
@@ -402,21 +399,19 @@ private fun SettingsCard(
         colors = CardDefaults.cardColors(containerColor = OzeroPalette.Bg1),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            if (showProvide) {
-                ProvideSection(
-                    providePaused = providePaused,
-                    provideControlMode = provideControlMode,
-                    provideNetworkMode = provideNetworkMode,
-                    onSetProvidePaused = onSetProvidePaused,
-                    onSelectProvideControlMode = onSelectProvideControlMode,
-                    onSelectProvideNetworkMode = onSelectProvideNetworkMode,
-                )
-                SharedTrafficSection(
-                    sharedTrafficBytes = sharedTrafficBytes,
-                    onClick = onOpenSharedTraffic,
-                )
-                SectionDivider()
-            }
+            ProvideSection(
+                providePaused = providePaused,
+                provideControlMode = provideControlMode,
+                provideNetworkMode = provideNetworkMode,
+                onSetProvidePaused = onSetProvidePaused,
+                onSelectProvideControlMode = onSelectProvideControlMode,
+                onSelectProvideNetworkMode = onSelectProvideNetworkMode,
+            )
+            SharedTrafficSection(
+                sharedTrafficBytes = sharedTrafficBytes,
+                onClick = onOpenSharedTraffic,
+            )
+            SectionDivider()
             ModeSection(
                 selected = windowType,
                 fixedIp = fixedIp,
