@@ -503,7 +503,7 @@ class TunnelControllerTest {
     }
 
     @Test
-    fun switchingDoesNotClearOnConnectedOfDifferentEngine() {
+    fun `switching persists when non-target engine connects — cleared only on target Connected`() {
         controller.onProbing()
         controller.onConnecting(EngineId.BYEDPI)
         controller.onEngineStarted(EngineId.BYEDPI, 1080)
@@ -513,9 +513,18 @@ class TunnelControllerTest {
         controller.onProbing()
         controller.onConnecting(EngineId.WARP)
         controller.onEngineStarted(EngineId.WARP, 1080)
+        assertNotNull(
+            controller.switching.value,
+            "Connected(WARP) при switching.to=URNETWORK не должен сбрасывать switching — иначе диск покажет Connected пока chip=URNETWORK и туннель=WARP (UI desync)",
+        )
+        controller.onDisconnecting()
+        controller.reset()
+        controller.onProbing()
+        controller.onConnecting(EngineId.URNETWORK)
+        controller.onEngineStarted(EngineId.URNETWORK, 1080)
         assertNull(
             controller.switching.value,
-            "Любой Connected target очищает switching: переход к не-target движку = смена закончилась",
+            "Connected(URNETWORK) = target — switching обязан быть сброшен",
         )
     }
 
