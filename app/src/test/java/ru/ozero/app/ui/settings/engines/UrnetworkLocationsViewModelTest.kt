@@ -375,6 +375,50 @@ class UrnetworkLocationsViewModelTest {
     }
 
     @Test
+    fun `selectLocation persists countryCode в settings когда engine не активен`() = runTest {
+        val locB = FakeLocationToken("DE")
+        val bridge = FakeUrnetworkBridge(deviceAvailable = true)
+        val settings = FakeSettingsRepo()
+        val v = UrnetworkLocationsViewModel(bridge, settings, fakeUrnetworkConfigStoreWithJwt(), idleTunnel())
+        advanceUntilIdle()
+        v.selectLocation(locB)
+        advanceUntilIdle()
+        assertTrue(
+            settings.countryCodeUpdates.contains("DE"),
+            "selectLocation обязан вызывать setUrnetworkCountryCode даже когда URnetwork не активен",
+        )
+    }
+
+    @Test
+    fun `selectLocation НЕ вызывает connectTo когда engine не активен`() = runTest {
+        val locB = FakeLocationToken("DE")
+        val bridge = FakeUrnetworkBridge(deviceAvailable = true)
+        val v = UrnetworkLocationsViewModel(bridge, FakeSettingsRepo(), fakeUrnetworkConfigStoreWithJwt(), idleTunnel())
+        advanceUntilIdle()
+        v.selectLocation(locB)
+        runCurrent()
+        assertEquals(
+            0,
+            bridge.connectToCallCount.get(),
+            "bridge.connectTo не должен вызываться пока URnetwork не активен",
+        )
+    }
+
+    @Test
+    fun `selectLocation обновляет selectedLocation в Ready state когда engine не активен`() = runTest {
+        val locB = FakeLocationToken("DE")
+        val bridge = FakeUrnetworkBridge(deviceAvailable = true)
+        val v = UrnetworkLocationsViewModel(bridge, FakeSettingsRepo(), fakeUrnetworkConfigStoreWithJwt(), idleTunnel())
+        advanceUntilIdle()
+        assertIs<UrnetworkSettingsUiState.Ready>(v.uiState.value)
+        v.selectLocation(locB)
+        runCurrent()
+        val after = v.uiState.value
+        assertIs<UrnetworkSettingsUiState.Ready>(after)
+        assertEquals(locB, after.selectedLocation)
+    }
+
+    @Test
     fun `sentinel — NotConnected branch содержит UrnetworkBalanceCard`() {
         val source = java.io.File(
             System.getProperty("user.dir") ?: ".",

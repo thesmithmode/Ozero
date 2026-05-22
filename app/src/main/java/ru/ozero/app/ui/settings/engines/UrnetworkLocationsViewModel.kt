@@ -192,16 +192,11 @@ class UrnetworkLocationsViewModel @Inject constructor(
     }
 
     fun selectLocation(location: UrnetworkSdkBridge.LocationToken?) {
-        if (!isUrnetworkActive.value) {
-            PersistentLoggers.warn(TAG, "selectLocation skipped — URnetwork engine not active")
-            return
-        }
-        val previousCountry = bridge.selectedLocation()?.countryCode
         val targetCountry = location?.countryCode
-        if (location == null) {
-            bridge.connectBestAvailable()
-        } else {
-            bridge.connectTo(location)
+        if (isUrnetworkActive.value) {
+            val previousCountry = bridge.selectedLocation()?.countryCode
+            if (location == null) bridge.connectBestAvailable() else bridge.connectTo(location)
+            if (previousCountry != targetCountry) startSwitchingIndicator()
         }
         viewModelScope.launch {
             runCatching { settingsRepository.setUrnetworkCountryCode(targetCountry) }
@@ -217,9 +212,6 @@ class UrnetworkLocationsViewModel @Inject constructor(
         }
         _uiState.update { current ->
             if (current is UrnetworkSettingsUiState.Ready) current.copy(selectedLocation = location) else current
-        }
-        if (previousCountry != targetCountry) {
-            startSwitchingIndicator()
         }
     }
 
