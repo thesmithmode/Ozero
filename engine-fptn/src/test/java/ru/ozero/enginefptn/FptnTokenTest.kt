@@ -134,8 +134,39 @@ class FptnTokenTest {
     }
 
     @Test
-    fun `should return null for fptnb prefix on any Android version in test`() {
-        assertNull(FptnToken.parse("fptnb:${encode("{}")}"))
+    fun `should return null for fptnb when base64 payload is not valid brotli`() {
+        val notBrotli = java.util.Base64.getEncoder().encodeToString("plain-text-not-brotli".toByteArray())
+        assertNull(FptnToken.parse("fptnb:$notBrotli"))
+    }
+
+    @Test
+    fun `should return null for fptnb when base64 itself is invalid`() {
+        assertNull(FptnToken.parse("fptnb:!!!not-base64!!!"))
+    }
+
+    @Test
+    fun `fptnb prefix must be parsed not unconditionally rejected`() {
+        val sourceFile = locateFptnTokenSource()
+        val source = sourceFile.readText(Charsets.UTF_8)
+        assertTrue(
+            !source.contains("""startsWith("fptnb:") -> return null"""),
+            "FptnToken.kt безусловно отвергает fptnb: префикс. " +
+                "User-feedback 2026-05-23: валидные fptnb: токены (brotli-compressed) " +
+                "должны парситься. Регрессия — добавь brotli decompression.",
+        )
+    }
+
+    private fun locateFptnTokenSource(): java.io.File {
+        var dir = java.io.File(System.getProperty("user.dir") ?: ".").absoluteFile
+        repeat(5) {
+            val candidate = java.io.File(
+                dir,
+                "engine-fptn/src/main/java/ru/ozero/enginefptn/FptnToken.kt",
+            )
+            if (candidate.isFile) return candidate
+            dir = dir.parentFile ?: return@repeat
+        }
+        error("FptnToken.kt не найден от ${System.getProperty("user.dir")}")
     }
 
     private fun encode(json: String): String =

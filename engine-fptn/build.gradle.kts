@@ -20,6 +20,7 @@ dependencies {
 
     implementation(libs.hilt.android)
     implementation(libs.datastore.preferences)
+    implementation(libs.brotli.dec)
 
     testImplementation(libs.bundles.junit5)
     testRuntimeOnly(libs.junit.jupiter.engine)

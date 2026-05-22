@@ -1,23 +1,29 @@
 package ru.ozero.enginefptn
 
 import android.util.Base64
+import org.brotli.dec.BrotliInputStream
 import org.json.JSONObject
+import java.io.ByteArrayInputStream
 
 object FptnToken {
 
     fun parse(raw: String): FptnTokenData? {
-        val encoded = when {
-            raw.startsWith("fptn:") -> raw.removePrefix("fptn:")
-            raw.startsWith("fptnb:") -> return null
+        val (encoded, brotliCompressed) = when {
+            raw.startsWith("fptn:") -> raw.removePrefix("fptn:") to false
+            raw.startsWith("fptnb:") -> raw.removePrefix("fptnb:") to true
             else -> return null
         }
         return try {
-            val bytes = Base64.decode(encoded.trim(), Base64.DEFAULT)
-            parseJson(bytes.toString(Charsets.UTF_8))
+            val base64Bytes = Base64.decode(encoded.trim(), Base64.DEFAULT)
+            val jsonBytes = if (brotliCompressed) brotliDecompress(base64Bytes) else base64Bytes
+            parseJson(jsonBytes.toString(Charsets.UTF_8))
         } catch (_: Exception) {
             null
         }
     }
+
+    private fun brotliDecompress(bytes: ByteArray): ByteArray =
+        BrotliInputStream(ByteArrayInputStream(bytes)).use { it.readBytes() }
 
     private fun parseJson(json: String): FptnTokenData? {
         return try {
