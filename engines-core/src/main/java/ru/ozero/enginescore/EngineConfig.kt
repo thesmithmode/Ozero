@@ -28,13 +28,6 @@ sealed class EngineConfig {
         override val engineId = EngineId.HYSTERIA2
     }
 
-    data class Amnezia(
-        val configJson: String,
-        val socksPort: Int = 10808,
-    ) : EngineConfig() {
-        override val engineId = EngineId.AMNEZIA
-    }
-
     data class Tor(
         val bridges: List<String> = emptyList(),
         val socksPort: Int = 9050,
