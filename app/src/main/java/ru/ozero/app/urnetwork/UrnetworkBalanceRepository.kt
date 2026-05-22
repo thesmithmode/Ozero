@@ -25,7 +25,7 @@ data class UrnetworkBalanceState(
     val totalReferrals: Long = 0L,
 ) {
     val baseBalanceBytes: Long
-        get() = ((snapshot?.balanceBytes ?: 0L).coerceAtLeast(0L) + (snapshot?.pendingBytes ?: 0L).coerceAtLeast(0L))
+        get() = (snapshot?.balanceBytes ?: 0L).coerceAtLeast(0L)
 
     val reliabilityBonusBytes: Long
         get() {

@@ -68,13 +68,28 @@ class UrnetworkBalanceRepositoryTest {
     }
 
     @Test
-    fun `availableBytes равно balanceBytes`() {
+    fun `availableBytes равно balanceBytes без pending`() {
         val state = UrnetworkBalanceState(
             snapshot = sample(balance = 1_000L, pending = 100L, used = 200L),
             isLoading = false,
             lastError = null,
         )
-        assertEquals(1_100L, state.availableBytes)
+        assertEquals(1_000L, state.availableBytes)
+    }
+
+    @Test
+    fun `sentinel availableBytes НЕ включает pendingBytes — regression против инициативы`() {
+        val state = UrnetworkBalanceState(
+            snapshot = sample(balance = 5_000_000_000L, pending = 9_999_999_999L, used = 0L),
+            isLoading = false,
+            lastError = null,
+        )
+        assertEquals(
+            5_000_000_000L,
+            state.availableBytes,
+            "availableBytes = balance + bonus, БЕЗ pending. Не путать общую ёмкость с лимитом.",
+        )
+        assertEquals(5_000_000_000L, state.baseBalanceBytes)
     }
 
     @Test

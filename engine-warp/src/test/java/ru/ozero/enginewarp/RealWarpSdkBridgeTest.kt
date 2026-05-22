@@ -212,10 +212,10 @@ class RealWarpSdkBridgeTest {
     }
 
     @Test
-    fun `attachTun — protect throws → Failed и turnOff rollback, не пробрасывает наружу (AttachResult contract)`() = runTest {
+    fun `attachTun protect throws — Failed и turnOff rollback (AttachResult contract)`() = runTest {
         val rt = FakeAwgRuntime(returnHandle = 5, socketV4 = 100, socketV6 = 0)
         val (b, _) = bridgeWith(rt)
-        val throwingProtector = VpnSocketProtector { throw RuntimeException("vpn-service-died") }
+        val throwingProtector = VpnSocketProtector { error("vpn-service-died") }
         val r = b.attachTun("n", 5, validIni, "/x", throwingProtector)
         val f = assertIs<WarpSdkBridge.AttachResult.Failed>(r)
         assertTrue(
