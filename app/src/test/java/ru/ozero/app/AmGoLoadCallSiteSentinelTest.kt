@@ -14,7 +14,6 @@ class AmGoLoadCallSiteSentinelTest {
     private val moduleRoots = listOf(
         "app/src/main",
         "engine-byedpi/src/main",
-        "engine-telegram/src/main",
         "engine-urnetwork/src/main",
     )
 

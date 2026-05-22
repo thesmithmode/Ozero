@@ -8,19 +8,11 @@ data class AppBackupData(
     val warpSlots: List<BackupWarpSlot>,
     val splitRules: List<BackupSplitRule>,
     val strategy: BackupStrategy? = null,
-    val telegram: BackupTelegram? = null,
 ) {
     companion object {
         const val CURRENT_VERSION = 3
     }
 }
-
-data class BackupTelegram(
-    val enabled: Boolean? = null,
-    val port: Int? = null,
-    val domain: String? = null,
-    val secret: String? = null,
-)
 
 data class BackupStrategy(
     val settings: BackupStrategySettings? = null,

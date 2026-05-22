@@ -243,7 +243,6 @@ private fun BackupCategory.labelRes(): Int = when (this) {
     BackupCategory.BYEDPI -> R.string.backup_category_byedpi
     BackupCategory.WARP -> R.string.backup_category_warp
     BackupCategory.URNETWORK -> R.string.backup_category_urnetwork
-    BackupCategory.TELEGRAM -> R.string.backup_category_telegram
     BackupCategory.STRATEGY -> R.string.backup_category_strategy
     BackupCategory.SPLIT_TUNNEL -> R.string.backup_category_split_tunnel
 }

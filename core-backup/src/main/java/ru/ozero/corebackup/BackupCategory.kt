@@ -6,7 +6,6 @@ enum class BackupCategory {
     BYEDPI,
     WARP,
     URNETWORK,
-    TELEGRAM,
     STRATEGY,
     SPLIT_TUNNEL,
     ;
@@ -17,7 +16,6 @@ enum class BackupCategory {
         BYEDPI -> data.settings.hasByedpi()
         WARP -> data.warpSlots.isNotEmpty()
         URNETWORK -> data.settings.hasUrnPrefs() || data.urnetwork.hasAny()
-        TELEGRAM -> data.telegram != null
         STRATEGY -> data.strategy != null
         SPLIT_TUNNEL -> data.splitRules.isNotEmpty()
     }

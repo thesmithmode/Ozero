@@ -23,8 +23,6 @@ class LoggingContractTest {
         "app/src/main/java/ru/ozero/app/warp/WarpEngineService.kt",
         "engines-core/src/main/java/ru/ozero/enginescore/PersistentLogger.kt",
         "engines-core/src/main/java/ru/ozero/enginescore/probe/Socks5HandshakeProbe.kt",
-        "engine-telegram/src/main/java/ru/ozero/enginetelegram/TelegramProxyService.kt",
-        "engine-telegram/src/main/java/ru/ozero/enginetelegram/MtgWrapper.kt",
     )
 
     private val rawLogPattern = Regex("""\bLog\.(e|w|wtf)\(""")

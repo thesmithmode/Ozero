@@ -47,15 +47,6 @@ object AppBackupSerializer {
 
         data.strategy?.let { root.put("strategy", BackupStrategySerializer.serialize(it)) }
 
-        data.telegram?.let { tg ->
-            val tgObj = JSONObject()
-            tg.enabled?.let { tgObj.put("enabled", it) }
-            tg.port?.let { tgObj.put("port", it) }
-            tg.domain?.let { tgObj.put("domain", it) }
-            tg.secret?.let { tgObj.put("secret", it) }
-            root.put("telegram", tgObj)
-        }
-
         return root.toString(2)
     }
 
@@ -125,15 +116,6 @@ object AppBackupSerializer {
             null
         }
 
-        val telegram = root.optJSONObject("telegram")?.let { tg ->
-            BackupTelegram(
-                enabled = tg.booleanOrNull("enabled"),
-                port = tg.intOrNull("port"),
-                domain = tg.optString("domain").takeIf { it.isNotEmpty() },
-                secret = tg.optString("secret").takeIf { it.isNotEmpty() },
-            )
-        }
-
         AppBackupData(
             version = version,
             exportedAt = exportedAt,
@@ -142,7 +124,6 @@ object AppBackupSerializer {
             warpSlots = warpSlots,
             splitRules = splitRules,
             strategy = strategy,
-            telegram = telegram,
         )
     }.getOrElse { e ->
         if (e is BackupParseException) throw e

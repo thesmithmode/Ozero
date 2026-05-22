@@ -62,7 +62,6 @@ class AppBackupSerializerTest {
             BackupSplitRule("com.example", true),
             BackupSplitRule("com.other", false),
         ),
-        telegram = BackupTelegram(enabled = true, port = 2080, domain = "tg.host", secret = "secret"),
     )
 
     @Test

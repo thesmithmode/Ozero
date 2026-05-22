@@ -254,7 +254,6 @@
     <string name="backup_category_byedpi">ByeDPI</string>
     <string name="backup_category_warp">Contas WARP</string>
     <string name="backup_category_urnetwork">URnetwork</string>
-    <string name="backup_category_telegram">Telegram MTProxy</string>
     <string name="backup_category_strategy">Estratégias e listas de domínios</string>
     <string name="backup_category_split_tunnel">Túnel dividido</string>
 
@@ -434,27 +433,7 @@
     <string name="settings_byedpi_summary">Configurações de bypass DPI</string>
     <string name="settings_manual_server_title">Adicionar servidor manualmente</string>
     <string name="settings_manual_server_summary">URI VLESS / Trojan / Hysteria2 / Shadowsocks</string>
-    <string name="settings_telegram_proxy_title">Telegram MTProxy</string>
-    <string name="settings_telegram_proxy_summary">MTProxy local para Telegram via VPN</string>
     <string name="settings_logs">Registros</string>
-    <string name="telegram_proxy_title">Telegram MTProxy</string>
-    <string name="telegram_proxy_description">Servidor MTProxy local para o Telegram. O tráfego passa pelo motor VPN ativo.</string>
-    <string name="telegram_proxy_enable">Ativar MTProxy</string>
-    <string name="telegram_proxy_state_idle">Desligado</string>
-    <string name="telegram_proxy_state_starting">Iniciando…</string>
-    <string name="telegram_proxy_state_running_fmt">Em execução na porta %1$d</string>
-    <string name="telegram_proxy_state_error_fmt">Erro: %1$s</string>
-    <string name="telegram_proxy_port_label">Porta</string>
-    <string name="telegram_proxy_save">Salvar</string>
-    <string name="telegram_proxy_domain_label">Domínio FakeTLS</string>
-    <string name="telegram_proxy_secret_missing">A chave não foi gerada. Toque no botão abaixo.</string>
-    <string name="telegram_proxy_secret_value_fmt">Chave: %1$s</string>
-    <string name="telegram_proxy_generate_secret">Gerar chave</string>
-    <string name="telegram_proxy_rotate_secret">Rotacionar chave</string>
-    <string name="telegram_proxy_generate_error">Falha ao gerar a chave. Verifique os registros.</string>
-    <string name="telegram_proxy_link_label">Link do Telegram:</string>
-    <string name="telegram_proxy_copy">Copiar</string>
-    <string name="telegram_proxy_open_in_tg">Abrir no Telegram</string>
     <string name="warp_progress_mirror_fmt">Espelho %1$s</string>
     <string name="warp_validation_required_fields">PrivateKey, Endpoint, PublicKey (Par), Endereço são obrigatórios</string>
     <string name="warp_duplicate_hint">Esta configuração já está carregada</string>

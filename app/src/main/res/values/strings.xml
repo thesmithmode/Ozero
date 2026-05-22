@@ -412,7 +412,6 @@
     <string name="backup_category_byedpi">ByeDPI</string>
     <string name="backup_category_warp">WARP-аккаунты</string>
     <string name="backup_category_urnetwork">URnetwork</string>
-    <string name="backup_category_telegram">Telegram MTProxy</string>
     <string name="backup_category_strategy">Стратегии и доменные списки</string>
     <string name="backup_category_split_tunnel">Split-туннель</string>
     <!-- IP display -->
@@ -473,33 +472,11 @@
     <string name="byedpi_dns_auto">Авто</string>
     <string name="byedpi_dns_field_label">DNS-адреса (через запятую)</string>
 
-    <!-- Telegram MTProxy settings -->
-    <string name="telegram_proxy_title">Telegram MTProxy</string>
-    <string name="telegram_proxy_description">Локальный MTProxy сервер для Telegram. Трафик идёт через активный VPN движок.</string>
-    <string name="telegram_proxy_enable">Включить MTProxy</string>
-    <string name="telegram_proxy_state_idle">Выключен</string>
-    <string name="telegram_proxy_state_starting">Запускается…</string>
-    <string name="telegram_proxy_state_running_fmt">Работает на порту %1$d</string>
-    <string name="telegram_proxy_state_error_fmt">Ошибка: %1$s</string>
-    <string name="telegram_proxy_port_label">Порт</string>
-    <string name="telegram_proxy_save">Сохранить</string>
-    <string name="telegram_proxy_domain_label">FakeTLS домен</string>
-    <string name="telegram_proxy_secret_missing">Secret не сгенерирован. Нажмите кнопку ниже.</string>
-    <string name="telegram_proxy_secret_value_fmt">Secret: %1$s</string>
-    <string name="telegram_proxy_generate_secret">Сгенерировать ключ</string>
-    <string name="telegram_proxy_rotate_secret">Сменить ключ</string>
-    <string name="telegram_proxy_generate_error">Ошибка генерации ключа. Проверьте логи.</string>
-    <string name="telegram_proxy_link_label">Ссылка для Telegram:</string>
-    <string name="telegram_proxy_copy">Копировать</string>
-    <string name="telegram_proxy_open_in_tg">Открыть в Telegram</string>
-
     <!-- Settings additional rows -->
     <string name="settings_byedpi_title">ByeDPI args</string>
     <string name="settings_byedpi_summary">Настройки обхода ТСПУ</string>
     <string name="settings_manual_server_title">Добавить сервер вручную</string>
     <string name="settings_manual_server_summary">VLESS / Trojan / Hysteria2 / Shadowsocks URI</string>
-    <string name="settings_telegram_proxy_title">Telegram MTProxy</string>
-    <string name="settings_telegram_proxy_summary">Локальный MTProxy для Telegram через VPN</string>
     <string name="settings_logs">Логи</string>
 
     <!-- WARP engine settings -->

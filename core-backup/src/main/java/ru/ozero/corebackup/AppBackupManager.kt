@@ -106,7 +106,6 @@ class AppBackupManager(
             warpSlotStore.replaceAll(data.warpSlots.map { it.toSlot() })
         }
         if (BackupCategory.STRATEGY in categories) data.strategy?.let { strategyProvider?.import(it) }
-        if (BackupCategory.TELEGRAM in categories) data.telegram?.let { importTelegram(it) }
         if (BackupCategory.SPLIT_TUNNEL in categories && data.splitRules.isNotEmpty()) importSplit(data.splitRules)
     }
 
@@ -156,13 +155,6 @@ class AppBackupManager(
                 } ?: current.selectedLocation,
             )
         }
-    }
-
-    private suspend fun importTelegram(tg: BackupTelegram) {
-        tg.enabled?.let { telegramStore.setEnabled(it) }
-        tg.port?.let { telegramStore.setPort(it) }
-        tg.domain?.let { telegramStore.setDomain(it) }
-        tg.secret?.let { telegramStore.setSecret(it) }
     }
 
     private suspend fun importSplit(rules: List<BackupSplitRule>) {
