@@ -61,13 +61,13 @@ data class AwgParams(
         val SIZE_RANGE = 0..1500
         val HEADER_RANGE = 1L..0xFFFFFFFFL
 
-        const val DEFAULT_S3 = 19
-        const val DEFAULT_S4 = 20
-        const val DEFAULT_I1 = 28
-        const val DEFAULT_I2 = 29
+        const val DEFAULT_S3 = 0
+        const val DEFAULT_S4 = 0
+        const val DEFAULT_I1 = 0
+        const val DEFAULT_I2 = 0
         const val DEFAULT_I3 = 0
         const val DEFAULT_I4 = 0
-        const val DEFAULT_I5 = 10
+        const val DEFAULT_I5 = 0
 
         val VANILLA = AwgParams(
             junkPacketCount = 0,

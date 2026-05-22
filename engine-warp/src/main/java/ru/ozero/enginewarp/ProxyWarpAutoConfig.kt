@@ -156,11 +156,19 @@ class ProxyWarpAutoConfig(
             )
         }
         val host = config.peerEndpoint.substringBeforeLast(":").trim().lowercase()
-        if (host != CLOUDFLARE_WARP_PEER_HOST) {
+        if (host != CLOUDFLARE_WARP_PEER_HOST && !isCloudflareWarpIp(host)) {
             throw IOException(
-                "mirror peer host mismatch: '$host' expected '$CLOUDFLARE_WARP_PEER_HOST' — supply chain risk",
+                "mirror peer host mismatch: '$host' " +
+                    "expected '$CLOUDFLARE_WARP_PEER_HOST' or Cloudflare WARP IP — supply chain risk",
             )
         }
+    }
+
+    private fun isCloudflareWarpIp(host: String): Boolean {
+        val parts = host.split(".").mapNotNull { it.toIntOrNull() }
+        if (parts.size != 4) return false
+        return (parts[0] == 162 && parts[1] == 159 && parts[2] in 192..195) ||
+            (parts[0] == 188 && parts[1] == 114 && parts[2] in 96..99)
     }
 
     private fun extractIniFromBody(body: String): ExtractedIni? {

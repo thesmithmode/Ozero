@@ -168,6 +168,35 @@ class WarpConfParserAwgExtendedTest {
     }
 
     @Test
+    fun `builder опускает S3 S4 I1 I2 I5 когда равны нулю — не инжектирует defaults в mirror конфиги`() {
+        val confNoS3S4 = """
+            [Interface]
+            PrivateKey = xmPeOeSIU2UTjYFCSzw5Gc+Ks1uxZhanU6iQZKAyFpQ=
+            Address = 172.16.0.2/32
+            Jc = 5
+            Jmin = 100
+            Jmax = 200
+            S1 = 0
+            S2 = 0
+            H1 = 1
+            H2 = 2
+            H3 = 3
+            H4 = 4
+
+            [Peer]
+            PublicKey = bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=
+            Endpoint = 162.159.195.1:500
+        """.trimIndent()
+        val cfg = WarpConfParser.parse(confNoS3S4).getOrThrow()
+        val ini = WarpIniBuilder.build(cfg)
+        kotlin.test.assertFalse(ini.contains("S3 = "), "S3=0 не должен записываться — amneziawg-go default=0 при отсутствии поля")
+        kotlin.test.assertFalse(ini.contains("S4 = "), "S4=0 не должен записываться — amneziawg-go default=0 при отсутствии поля")
+        kotlin.test.assertFalse(ini.contains("I1 = "), "I1=0 не должен записываться")
+        kotlin.test.assertFalse(ini.contains("I2 = "), "I2=0 не должен записываться")
+        kotlin.test.assertFalse(ini.contains("I5 = "), "I5=0 не должен записываться")
+    }
+
+    @Test
     fun `round-trip parse build parse сохраняет все AWG поля`() {
         val original = WarpConfParser.parse(baseConf).getOrThrow().awgParams
         val ini = WarpIniBuilder.build(WarpConfParser.parse(baseConf).getOrThrow())
