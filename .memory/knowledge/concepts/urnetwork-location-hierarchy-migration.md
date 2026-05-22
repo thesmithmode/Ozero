@@ -4,8 +4,9 @@ aliases: [urnetwork-location-migration, setPreferredLocation, findBestMatch, con
 tags: [urnetwork, sdk, architecture, refactoring, gotcha]
 sources:
   - "daily/2026-05-18.md"
+  - "daily/2026-05-22.md"
 created: 2026-05-18
-updated: 2026-05-18
+updated: 2026-05-22
 ---
 
 # URnetwork Location Hierarchy: Country to ConnectLocation Migration
@@ -80,9 +81,26 @@ The migration was prompted by the user's demand for feature parity with the URne
 - [[concepts/suppress-annotation-decomposition]] - TooManyFunctions fix via data class consolidation rather than @Suppress
 - [[connections/self-review-insufficient-code-reviewer-required]] - findBestMatch city ambiguity was a HIGH finding from 5-reviewer code review session
 
+### Offline Location Selection Fix (2026-05-22)
+
+`UrnetworkEngineSettingsViewModel.selectLocation()` had an early return:
+
+```kotlin
+fun selectLocation(location: ConnectLocation) {
+    if (!isUrnetworkActive) return  // ← blocked offline selection
+    bridge.setPreferredLocation(location)
+    settingsRepository.setUrnetworkCountryCode(location.country)
+}
+```
+
+This prevented users from pre-selecting a country while URnetwork was not the active engine. The early return was incorrect — `bridge.setPreferredLocation()` operates on an `AtomicReference` internally and does not require an active VPN connection to store the preference. `settingsRepository.setUrnetworkCountryCode` is a pure DataStore write.
+
+Fix: remove the guard entirely. Both calls are safe to invoke unconditionally. The SDK bridge will apply the stored location preference on the next `EngineUrnetwork.start()` call.
+
 ## Sources
 
 - [[daily/2026-05-18.md]] - Session 15:02: Bridge API migrated setPreferredCountry→setPreferredLocation(ConnectLocation?); findBestMatch helper; all call sites atomic migration; .memory files separated from feat commit
 - [[daily/2026-05-18.md]] - Session 13:08: hotfix 6c33c98f consolidated 6 selectedCountry/Region/City functions into UrnetworkLocationSelection data class (detekt TooManyFunctions 23>20)
 - [[daily/2026-05-18.md]] - Session 16:59: code reviewer found findBestMatch city-by-name without countryCode filter → wrong-country connect risk
 - [[daily/2026-05-18.md]] - Session 19:55: fix commit ff7f5044 — findBestMatch filters by countryCode, early return null on no match
+- [[daily/2026-05-22.md]] - Session 19:47: `selectLocation` early return `if (!isUrnetworkActive) return` blocked offline country selection; removed — `bridge.setPreferredLocation()` is AtomicReference-safe offline

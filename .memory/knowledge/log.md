@@ -1,5 +1,45 @@
 # Build Log
 
+## [2026-05-22T23:59:59+03:00] compile | Daily Log 2026-05-22 (pass 10 — final verification, all sessions captured)
+- Source: daily/2026-05-22.md
+- Articles created: (none — all 5 new articles confirmed complete: vpnservice-double-shutdown-guard, warp-allowedips-tun-routing, engine-chip-switching-desync, qs-tile-vpn-integration, fptn-engine-protocol)
+- Articles updated: (none — all 8 updates from passes 1-9 verified current)
+- Status: all sessions from 11:59 through 21:27 fully compiled across 9 prior passes; pass 10 is verification-only
+
+## [2026-05-22T22:00:00+03:00] compile | Daily Log 2026-05-22 (pass 9 — FPTN session 21:27 captured)
+- Source: daily/2026-05-22.md
+- Articles created: [[concepts/fptn-engine-protocol]]
+- Articles updated: [[knowledge/index.md]] (new row added)
+- Gap found: passes 7+8 completed at 21:00 / 21:27 but session 21:27 (FPTN engine planning) occurred AFTER those passes ran
+
+## [2026-05-22T21:27:15+03:00] compile | Daily Log 2026-05-22 (pass 8 — schema-triggered recompile, verified complete)
+- Source: daily/2026-05-22.md
+- Articles created: (none — all 4 already exist: vpnservice-double-shutdown-guard, warp-allowedips-tun-routing, engine-chip-switching-desync, qs-tile-vpn-integration)
+- Articles updated: (none — all 8 updates from passes 1-7 verified current)
+- Status: compilation fully complete as of pass 7; this pass confirmed no gaps
+
+## [2026-05-22T21:00:00+03:00] compile | Daily Log 2026-05-22 (pass 7 — final verification, no gaps)
+- Source: daily/2026-05-22.md
+- Articles created: (none)
+- Articles updated: (none)
+- Verification: all sessions cross-checked against log entries; session 13:30 (reviewer domain memory injection insight) confirmed already captured in connections/self-review-insufficient-code-reviewer-required.md from daily/2026-05-20.md; compilation complete
+
+## [2026-05-22T20:30:00+03:00] compile | Daily Log 2026-05-22 (full verification — 6-pass compilation complete)
+- Source: daily/2026-05-22.md
+- Articles created: [[concepts/vpnservice-double-shutdown-guard]], [[concepts/warp-allowedips-tun-routing]], [[concepts/engine-chip-switching-desync]], [[concepts/qs-tile-vpn-integration]]
+- Articles updated: [[concepts/engine-chip-race-observer]], [[concepts/urnetwork-relay-always]], [[concepts/byedpi-hev-pipeline-upstream-parity]], [[concepts/warp-config-generator-api]], [[concepts/amnezia-wg-warp-migration]], [[concepts/sentinel-protecting-bug-trap]], [[concepts/vpn-slot-conflict-detection]], [[concepts/urnetwork-location-hierarchy-migration]]
+- Index updated: 4 new rows + 8 updated rows
+- Sessions covered: 11:59 (chip switching desync fix), 13:00 (YouTube/QUIC revert), 13:40+ (double-shutdown root cause, log analysis), 16:02+ (URnetwork relay coordinator hardcode bug + UI fixes), 17:51 (WARP AWG defaults/migration/AllowedIPs routing), 19:25 (QS tile), 19:32 (Ruslan ownerUid false positive), 19:47 (selectLocation offline fix)
+- Verification: all passes confirmed against daily log — no gaps found
+
+## [2026-05-22T23:59:00+03:00] compile | Daily Log 2026-05-22 (pass 6 — selectLocation offline fix, session 19:47)
+- Source: daily/2026-05-22.md
+- Articles created: (none)
+- Articles updated:
+  - [[concepts/urnetwork-location-hierarchy-migration]] — `selectLocation` early return `if (!isUrnetworkActive) return` blocked offline country selection; fix: remove guard — `bridge.setPreferredLocation()` is AtomicReference-safe, no active VPN required
+- Index updated: 1 row (urnetwork-location-hierarchy-migration summary + date + source)
+- Sessions covered: 19:47 (selectLocation offline fix; Clash-module deferred to future; ktlint `&&` start-of-line + line>120 + UnusedParameter CI patterns)
+
 ## [2026-05-22T23:30:00+03:00] compile | Daily Log 2026-05-22 (pass 5 — isExternalVpnActive ownerUid false positive)
 - Source: daily/2026-05-22.md
 - Articles created: (none)
