@@ -339,7 +339,7 @@ class EngineWarpContractTest {
     }
 
     @Test
-    fun `attachTun — конфиг с IPv6 при ipv6Enabled=false → ::/0 stripped из INI`() = runTest {
+    fun `attachTun — конфиг с IPv6 при ipv6Enabled=false → ipv6 route stripped из INI`() = runTest {
         val raw = """
             [Interface]
             PrivateKey = abc
