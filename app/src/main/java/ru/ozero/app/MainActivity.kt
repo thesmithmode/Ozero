@@ -97,7 +97,8 @@ class MainActivity : AppCompatActivity() {
             else -> return
         }
         AppLogger.i(TAG, reason)
-        tunnelController.onSwitchingStarted(from = fromEngine, to = null)
+        val pendingTarget = tunnelController.switching.value?.to
+        tunnelController.onSwitchingStarted(from = fromEngine, to = pendingTarget)
         try {
             vpnIntentLauncher.stop()
             withTimeoutOrNull(5_000L) {

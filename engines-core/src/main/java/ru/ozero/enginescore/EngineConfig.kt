@@ -28,13 +28,6 @@ sealed class EngineConfig {
         override val engineId = EngineId.HYSTERIA2
     }
 
-    data class Amnezia(
-        val configJson: String,
-        val socksPort: Int = 10808,
-    ) : EngineConfig() {
-        override val engineId = EngineId.AMNEZIA
-    }
-
     data class Tor(
         val bridges: List<String> = emptyList(),
         val socksPort: Int = 9050,
@@ -75,7 +68,23 @@ sealed class EngineConfig {
             "MasterDns(configToml=***, resolvers=${resolvers.size} entries, socksPort=$socksPort)"
     }
 
-    data object Fptn : EngineConfig() {
+    data class Fptn(
+        val token: String = "",
+        val selectedServerName: String? = null,
+        val bypassMethod: String = DEFAULT_BYPASS_METHOD,
+        val autoSelect: Boolean = true,
+        val reconnectOnNetworkChange: Boolean = true,
+        val reconnectOnIpChange: Boolean = false,
+        val maxReconnectAttempts: Int = 5,
+        val reconnectPauseSeconds: Int = 2,
+        val resetServerOnDisconnect: Boolean = true,
+    ) : EngineConfig() {
         override val engineId = EngineId.FPTN
+        override fun toString(): String =
+            "Fptn(token=***, server=$selectedServerName, method=$bypassMethod)"
+
+        companion object {
+            const val DEFAULT_BYPASS_METHOD: String = "SNI-REALITY-YANDEX-25"
+        }
     }
 }

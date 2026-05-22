@@ -1,0 +1,32 @@
+#pragma once
+
+#include <jni.h>
+
+#include "fptn-protocol-lib/https/api_client/api_client.h"
+
+namespace fptn::wrapper {
+
+using fptn::protocol::https::ApiClient;
+using fptn::protocol::https::Response;
+
+class WrapperHttpsClient {
+ public:
+  WrapperHttpsClient(JNIEnv* env,
+      jobject wrapper,
+      std::string host,
+      int port,
+      std::string sni,
+      std::string md5_fingerprint,
+      fptn::protocol::https::CensorshipStrategy censorship_strategy);
+
+  Response Get(const std::string& handle, int timeout = 10);
+
+  Response Post(
+      const std::string& handle, const std::string& request, int timeout = 10);
+
+ private:
+  const JNIEnv* env_;
+  const jobject wrapper_;
+  ApiClient https_client_;
+};
+}  // namespace fptn::wrapper

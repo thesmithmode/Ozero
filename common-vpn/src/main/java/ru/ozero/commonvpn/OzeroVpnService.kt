@@ -305,9 +305,11 @@ class OzeroVpnService : android.net.VpnService() {
                 as? android.net.ConnectivityManager ?: return@runCatching false
             val networks = cm.allNetworks
             var detected = false
+            val myUid = android.os.Process.myUid()
             for (n in networks) {
                 val caps = cm.getNetworkCapabilities(n) ?: continue
                 if (!caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)) continue
+                if (android.os.Build.VERSION.SDK_INT >= 29 && caps.ownerUid == myUid) continue
                 detected = true
                 PersistentLoggers.warn(
                     TAG,
@@ -337,17 +339,20 @@ class OzeroVpnService : android.net.VpnService() {
 
     override fun onDestroy() {
         PersistentLoggers.info(TAG, "onDestroy entry")
-        if (stopping.compareAndSet(false, true)) {
-            runBlocking(Dispatchers.IO) {
-                val ok = withTimeoutOrNull(ON_DESTROY_SHUTDOWN_TIMEOUT_MS) {
+        runBlocking(Dispatchers.IO) {
+            val ok = withTimeoutOrNull(ON_DESTROY_SHUTDOWN_TIMEOUT_MS) {
+                val inFlight = shutdownJobRef.get()
+                if (inFlight != null) {
+                    inFlight.join()
+                } else if (stopping.compareAndSet(false, true)) {
                     shutdownCoord.performShutdown(callStopSelf = false)
                 }
-                if (ok == null) {
-                    PersistentLoggers.warn(
-                        TAG,
-                        "onDestroy shutdown timeout > ${ON_DESTROY_SHUTDOWN_TIMEOUT_MS}ms — abandon",
-                    )
-                }
+            }
+            if (ok == null) {
+                PersistentLoggers.warn(
+                    TAG,
+                    "onDestroy shutdown timeout > ${ON_DESTROY_SHUTDOWN_TIMEOUT_MS}ms — abandon",
+                )
             }
         }
         socketProtector?.let { ru.ozero.enginescore.VpnSocketProtectorHolder.unbind(it) }

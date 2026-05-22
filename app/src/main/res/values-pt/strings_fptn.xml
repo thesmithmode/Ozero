@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="settings_fptn_title">FPTN</string>
+    <string name="settings_fptn_summary">Túnel SNI Reality — contorna bloqueios DPI</string>
+    <string name="fptn_settings_title">FPTN</string>
+    <string name="fptn_section_token">Token</string>
+    <string name="fptn_token_hint">fptn:… ou fptnb:…</string>
+    <string name="fptn_token_save">Salvar</string>
+    <string name="fptn_token_invalid">Formato de token inválido</string>
+    <string name="fptn_bot_hint">Obtenha seu token com @fptn_bot no Telegram</string>
+    <string name="fptn_section_servers">Servidores</string>
+    <string name="fptn_server_auto">Auto (seleção automática)</string>
+    <string name="fptn_no_token">Insira um token para ver a lista de servidores</string>
+    <string name="fptn_section_bypass">Método de bypass</string>
+    <string name="fptn_experimental_button">Configurações experimentais</string>
+    <string name="fptn_experimental_title">Configurações experimentais</string>
+    <string name="fptn_reconnect_network">Reconectar ao trocar de rede</string>
+    <string name="fptn_reconnect_ip">Reconectar ao trocar de IP</string>
+    <string name="fptn_max_attempts">Máx. tentativas de reconexão: <xliff:g id="count" example="5">%d</xliff:g></string>
+    <string name="fptn_pause_seconds">Pausa entre tentativas: <xliff:g id="seconds" example="2">%d</xliff:g> s</string>
+    <string name="fptn_reset_server">Reiniciar servidor ao desconectar</string>
+    <string name="fptn_close">Fechar</string>
+</resources>

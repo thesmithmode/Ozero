@@ -6,8 +6,9 @@ sources:
   - "daily/2026-05-14.md"
   - "daily/2026-05-17.md"
   - "daily/2026-05-18.md"
+  - "daily/2026-05-22.md"
 created: 2026-05-14
-updated: 2026-05-18
+updated: 2026-05-22
 ---
 
 # URnetwork Relay-Always Architecture
@@ -81,8 +82,27 @@ Additional constraint discovered: `EngineUrnetwork.start()` calls `sdkBridge.sta
 - [[concepts/urnetwork-walletauth-per-device-registration]] — Per-device Ed25519 auth that resolved guest mode monetization blocker
 - [[concepts/urnetwork-guest-mode-relay-blocker]] — The guest JWT monetization problem walletAuth solved
 
+### RelayCoordinator Hardcode Bug (2026-05-22, commit e0d53ca4)
+
+Critical bug present since commit `194d7701`: lines 67 and 81 in `UrnetworkRelayCoordinator` always called `bridge.setProvidePaused(false)` regardless of `configStore.provideEnabled()`. When `EngineUrnetwork.start()` applied the correct `providePaused` state from configStore, the coordinator's observer fired immediately after and overwrote it with `false` (always-on relay regardless of user preference).
+
+Fix: two-branch logic in the coordinator:
+- **URNETWORK engine branch**: do NOT call `setProvidePaused` at all — `EngineUrnetwork.start()` already applied configStore state; coordinator must not override it
+- **Relay-only branch** (non-URnetwork VPN running): read `configStore.provideEnabled()` and call `setProvidePaused(!enabled)`
+
+The bug was invisible until the UI gained a toggle for `provideEnabled` in the settings screen, which users could change while in `NotConnected` state. Before that, the hardcoded `false` happened to match the expected relay-on behavior.
+
+### UI Visibility Fixes (2026-05-22)
+
+`UrnetworkEngineSettingsScreen` had two visibility bugs fixed in the same commit:
+- `BalanceCard` was rendered only in the `Ready` (Connected) branch — invisible when `NotConnected`. Fixed: moved to both branches.
+- `ProvideSection` was gated behind `showProvide` flag tied to `tunnelState == URNETWORK` — disappeared when user switched to another engine. Fixed: always visible, controlled by `providePaused: StateFlow` from configStore.
+
+`UrnetworkLocationsViewModel.init` had two concurrent `launch` blocks without synchronization — a NotConnected UI flash occurred on screen open when `bootstrapJob` had not yet completed. Fix: `bootstrapJob.join()` before the active/inactive branch decision.
+
 ## Sources
 
 - [[daily/2026-05-14.md]] — Session 20:30: architectural discussion of relay-always, SDK `tunnelStarted` vs `providePaused` decoupling, monetization constraints; Session 21:29: `setupPayoutWallet` implementation + contract tests
 - [[daily/2026-05-17.md]] — Session 14:41+: relay NOT working for non-URnetwork engines discovered; P0 #111 UrnetworkRelayCoordinator implemented (commit 194d7701); relayOwned AtomicBoolean ownership; bridge.start() made idempotent; SharedTrafficScreen simplified
 - [[daily/2026-05-18.md]] — Session 17:51: relay requires byClientJwt (saved on first URnetwork connect only); Session 18:25: guest JWT blocked from wallet API server-side → relay runs idle, no USDC payouts
+- [[daily/2026-05-22.md]] — Session 16:02+: hardcode bug (lines 67+81 always setProvidePaused(false) ignoring configStore); fix: URNETWORK branch = no override, relay branch = read configStore.provideEnabled(); BalanceCard/ProvideSection visibility fixes; bootstrapJob.join() race fix

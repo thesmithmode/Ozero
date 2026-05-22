@@ -13,8 +13,6 @@ import org.junit.jupiter.api.Test
 import ru.ozero.corestorage.dao.AppSplitRuleDao
 import ru.ozero.corestorage.entity.AppSplitRule
 import ru.ozero.enginescore.settings.SettingsKeys
-import ru.ozero.enginetelegram.TelegramConfigStore
-import ru.ozero.enginetelegram.TelegramProxyConfig
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkLocationSelection
 import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
@@ -26,7 +24,6 @@ import ru.ozero.enginewarp.WarpConfigSlot
 import ru.ozero.enginewarp.WarpConfigSlotStore
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -36,9 +33,8 @@ class AppBackupManagerTest {
     private val warpStore = FakeWarpSlotStore()
     private val urnStore = FakeUrnetworkStore()
     private val splitDao = FakeSplitRuleDao()
-    private val telegramStore = FakeTelegramStore()
 
-    private val manager = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao, telegramStore)
+    private val manager = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao)
 
     private val sampleWarpSlot = WarpConfigSlot(
         id = "warp-id-1",
@@ -130,17 +126,6 @@ class AppBackupManagerTest {
     }
 
     @Test
-    fun `export — Telegram MTProxy config`() = runTest {
-        telegramStore.set(TelegramProxyConfig(enabled = true, port = 2080, domain = "tg.example", secret = "deadbeef"))
-        val data = manager.export()
-        assertNotNull(data.telegram)
-        assertEquals(true, data.telegram!!.enabled)
-        assertEquals(2080, data.telegram!!.port)
-        assertEquals("tg.example", data.telegram!!.domain)
-        assertEquals("deadbeef", data.telegram!!.secret)
-    }
-
-    @Test
     fun `export — split rules из DAO`() = runTest {
         splitDao.rules.value = listOf(AppSplitRule("com.a", true), AppSplitRule("com.b", false))
         val data = manager.export()
@@ -153,7 +138,6 @@ class AppBackupManagerTest {
         ozeroDs.edit { it[SettingsKeys.SPLIT_MODE] = "per_app" }
         warpStore.slots.value = listOf(sampleWarpSlot)
         urnStore.inject { it.copy(byJwt = "jwt") }
-        telegramStore.set(TelegramProxyConfig(enabled = true, port = 123, domain = "x", secret = "s"))
         splitDao.rules.value = listOf(AppSplitRule("com.x", true))
 
         val data = manager.export(setOf(BackupCategory.WARP))
@@ -161,20 +145,8 @@ class AppBackupManagerTest {
         assertEquals(1, data.warpSlots.size)
         assertNull(data.settings.splitMode)
         assertNull(data.urnetwork.byJwt)
-        assertNull(data.telegram)
         assertTrue(data.splitRules.isEmpty())
         assertNull(data.strategy)
-    }
-
-    @Test
-    fun `export categories — только TELEGRAM — WARP пустой`() = runTest {
-        warpStore.slots.value = listOf(sampleWarpSlot)
-        telegramStore.set(TelegramProxyConfig(enabled = true, port = 9999, domain = "d", secret = "s"))
-
-        val data = manager.export(setOf(BackupCategory.TELEGRAM))
-
-        assertTrue(data.warpSlots.isEmpty())
-        assertEquals(9999, data.telegram?.port)
     }
 
     @Test
@@ -242,19 +214,6 @@ class AppBackupManagerTest {
     }
 
     @Test
-    fun `import — Telegram config применяется через setters`() = runTest {
-        val data = makeMinimalBackup().copy(
-            telegram = BackupTelegram(enabled = true, port = 4242, domain = "tg.local", secret = "abc"),
-        )
-        manager.import(data)
-        val cfg = telegramStore.config().first()
-        assertEquals(true, cfg.enabled)
-        assertEquals(4242, cfg.port)
-        assertEquals("tg.local", cfg.domain)
-        assertEquals("abc", cfg.secret)
-    }
-
-    @Test
     fun `import categories — только URNETWORK — WARP не трогает`() = runTest {
         warpStore.slots.value = listOf(sampleWarpSlot)
         val data = makeMinimalBackup().copy(
@@ -265,16 +224,6 @@ class AppBackupManagerTest {
 
         assertEquals(listOf(sampleWarpSlot), warpStore.slots.value)
         assertEquals("new-jwt", urnStore.config().first().byJwt)
-    }
-
-    @Test
-    fun `import categories — TELEGRAM не вызывается если категория не выбрана`() = runTest {
-        val data = makeMinimalBackup().copy(
-            telegram = BackupTelegram(enabled = true, port = 1, domain = "x", secret = "y"),
-        )
-        manager.import(data, setOf(BackupCategory.WARP))
-        val cfg = telegramStore.config().first()
-        assertEquals(false, cfg.enabled)
     }
 
     @Test
@@ -306,7 +255,6 @@ class AppBackupManagerTest {
         }
         warpStore.slots.value = listOf(sampleWarpSlot)
         urnStore.inject { it.copy(byJwt = "jwt", selectedLocation = UrnetworkLocationSelection("RU", null, null)) }
-        telegramStore.set(TelegramProxyConfig(enabled = true, port = 8080, domain = "tg", secret = "secret"))
         splitDao.rules.value = listOf(AppSplitRule("com.example", true))
 
         val exported = manager.export()
@@ -316,8 +264,7 @@ class AppBackupManagerTest {
         val freshWarp = FakeWarpSlotStore()
         val freshUrn = FakeUrnetworkStore()
         val freshDao = FakeSplitRuleDao()
-        val freshTg = FakeTelegramStore()
-        val freshManager = AppBackupManager(freshDs, freshWarp, freshUrn, freshDao, freshTg)
+        val freshManager = AppBackupManager(freshDs, freshWarp, freshUrn, freshDao)
 
         freshManager.import(AppBackupSerializer.deserialize(jsonString))
 
@@ -327,7 +274,6 @@ class AppBackupManagerTest {
         assertEquals(1, freshWarp.slots.value.size)
         assertEquals("jwt", freshUrn.config().first().byJwt)
         assertEquals("RU", freshUrn.config().first().selectedLocation.countryCode)
-        assertEquals("tg", freshTg.config().first().domain)
         assertEquals(1, freshDao.rules.value.size)
     }
 
@@ -337,7 +283,7 @@ class AppBackupManagerTest {
         provider.exported = BackupStrategy(
             settings = BackupStrategySettings(requestsPerDomain = 3, evolutionTargetFitness = 0.95f),
         )
-        val mgr = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao, telegramStore, provider)
+        val mgr = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao, provider)
         val data = mgr.export()
         assertEquals(provider.exported, data.strategy)
     }
@@ -345,7 +291,7 @@ class AppBackupManagerTest {
     @Test
     fun `import strategy — provider получает данные`() = runTest {
         val provider = FakeStrategyBackupProvider()
-        val mgr = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao, telegramStore, provider)
+        val mgr = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao, provider)
         val strategy = BackupStrategy(settings = BackupStrategySettings(evolutionTargetFitness = 0.88f))
         mgr.import(makeMinimalBackup().copy(strategy = strategy))
         assertEquals(strategy, provider.imported)
@@ -354,19 +300,18 @@ class AppBackupManagerTest {
     @Test
     fun `import strategy null — provider не вызывается`() = runTest {
         val provider = FakeStrategyBackupProvider()
-        val mgr = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao, telegramStore, provider)
+        val mgr = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao, provider)
         mgr.import(makeMinimalBackup())
         assertNull(provider.imported)
     }
 
     @Test
-    fun `v1 backup import — strategy и telegram null`() = runTest {
+    fun `v1 backup import — strategy null в v1 формате`() = runTest {
         val v1Json = """{"version":1,"exportedAt":"2025-01-01T00:00:00Z",""" +
             """"settings":{},"urnetwork":{},"warpSlots":[],"splitRules":[]}"""
         val data = AppBackupSerializer.deserialize(v1Json)
         assertEquals(1, data.version)
         assertNull(data.strategy)
-        assertNull(data.telegram)
     }
 
     @Test
@@ -473,26 +418,6 @@ class AppBackupManagerTest {
         override fun observeAll(): Flow<List<AppSplitRule>> = rules
         override suspend fun delete(packageName: String) {
             rules.value = rules.value.filter { it.packageName != packageName }
-        }
-    }
-
-    private class FakeTelegramStore : TelegramConfigStore {
-        private val state = MutableStateFlow(TelegramProxyConfig())
-        fun set(cfg: TelegramProxyConfig) {
-            state.value = cfg
-        }
-        override fun config(): Flow<TelegramProxyConfig> = state
-        override suspend fun setEnabled(value: Boolean) {
-            state.value = state.value.copy(enabled = value)
-        }
-        override suspend fun setPort(value: Int) {
-            state.value = state.value.copy(port = value)
-        }
-        override suspend fun setDomain(value: String) {
-            state.value = state.value.copy(domain = value)
-        }
-        override suspend fun setSecret(value: String) {
-            state.value = state.value.copy(secret = value)
         }
     }
 

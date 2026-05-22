@@ -19,8 +19,8 @@ import ru.ozero.app.ui.settings.AutoModeSettingsScreen
 import ru.ozero.app.ui.settings.LanguageScreen
 import ru.ozero.app.ui.settings.SettingsScreen
 import ru.ozero.app.ui.settings.engines.ByeDpiEngineSettingsScreen
+import ru.ozero.app.ui.settings.engines.FptnEngineSettingsScreen
 import ru.ozero.app.ui.settings.engines.MasterDnsSettingsScreen
-import ru.ozero.app.ui.settings.engines.TelegramProxySettingsScreen
 import ru.ozero.app.ui.settings.engines.UrnetworkEngineSettingsScreen
 import ru.ozero.app.ui.settings.engines.UrnetworkSharedTrafficScreen
 import ru.ozero.app.ui.settings.engines.WarpEngineSettingsScreen
@@ -34,6 +34,7 @@ private fun engineParamsTarget(engineId: EngineId?): TopScreen = when (engineId)
     EngineId.URNETWORK -> TopScreen.UrnetworkEngineSettings
     EngineId.BYEDPI -> TopScreen.ByeDpiEngineSettings
     EngineId.MASTERDNS -> TopScreen.MasterDnsSettings
+    EngineId.FPTN -> TopScreen.FptnSettings
     else -> TopScreen.Servers
 }
 
@@ -65,8 +66,8 @@ fun RootNavigation(
                     onOpenByeDpiEngineSettings = { navigate(TopScreen.ByeDpiEngineSettings) },
                     onOpenUrnetworkSettings = { navigate(TopScreen.UrnetworkEngineSettings) },
                     onOpenWarpSettings = { navigate(TopScreen.WarpEngineSettings) },
-                    onOpenTelegramProxySettings = { navigate(TopScreen.TelegramProxySettings) },
                     onOpenMasterDnsSettings = { navigate(TopScreen.MasterDnsSettings) },
+                    onOpenFptnSettings = { navigate(TopScreen.FptnSettings) },
                     onOpenManualServer = { navigate(TopScreen.ManualServer) },
                     onOpenStatsHistory = { navigate(TopScreen.StatsHistory) },
                     onOpenDiagnostics = { navigate(TopScreen.Diagnostics) },
@@ -93,8 +94,8 @@ fun RootNavigation(
             )
             TopScreen.UrnetworkSharedTraffic -> UrnetworkSharedTrafficScreen(onBack = { back() })
             TopScreen.WarpEngineSettings -> WarpEngineSettingsScreen(onBack = { back() })
-            TopScreen.TelegramProxySettings -> TelegramProxySettingsScreen(onBack = { back() })
             TopScreen.MasterDnsSettings -> MasterDnsSettingsScreen(onBack = { back() })
+            TopScreen.FptnSettings -> FptnEngineSettingsScreen(onBack = { back() })
             TopScreen.StrategyTest -> StrategyTestScreen(onBack = { back() })
             TopScreen.ManualServer -> ManualServerScreen(onBack = { back() })
             TopScreen.StatsHistory -> TrafficStatsScreen(onBack = { back() })

@@ -183,7 +183,6 @@
     <!-- about -->
     <string name="about_title">О приложении</string>
     <string name="about_version">Версия %1$s</string>
-    <string name="about_description">Ozero — агрегатор VPN и anti-DPI движков в одном приложении. Внутри несколько проверенных решений для обхода блокировок: ByeDPI, AmneziaWG (WARP), URnetwork P2P и другие. Можно выбрать конкретный движок вручную или собрать каскад из нескольких — каждое звено решает свою задачу.</string>
 
     <!-- crash log export -->
     <string name="diag_export_crashes">Экспорт crash log</string>
@@ -285,8 +284,8 @@
     <string name="urnetwork_balance_error">Не удалось получить баланс: %1$s</string>
     <string name="urnetwork_balance_empty">Баланс недоступен. Подключитесь к URnetwork.</string>
     <string name="urnetwork_daily_allocation">Ежедневный лимит</string>
-    <string name="urnetwork_reliability_label">Надёжность: %.3f</string>
-    <string name="urnetwork_reliability_bonus">+%.3f ГиБ/день</string>
+    <string name="urnetwork_reliability_label">Надёжность: %.1f%%</string>
+    <string name="urnetwork_reliability_bonus">+%.1f ГиБ/день</string>
     <string name="urnetwork_referrals_label">Рефералов: %d</string>
     <string name="urnetwork_referral_bonus">+%d ГБ</string>
     <string name="urnetwork_insufficient_balance_title">Недостаточно баллов</string>
@@ -413,7 +412,6 @@
     <string name="backup_category_byedpi">ByeDPI</string>
     <string name="backup_category_warp">WARP-аккаунты</string>
     <string name="backup_category_urnetwork">URnetwork</string>
-    <string name="backup_category_telegram">Telegram MTProxy</string>
     <string name="backup_category_strategy">Стратегии и доменные списки</string>
     <string name="backup_category_split_tunnel">Split-туннель</string>
     <!-- IP display -->
@@ -474,38 +472,17 @@
     <string name="byedpi_dns_auto">Авто</string>
     <string name="byedpi_dns_field_label">DNS-адреса (через запятую)</string>
 
-    <!-- Telegram MTProxy settings -->
-    <string name="telegram_proxy_title">Telegram MTProxy</string>
-    <string name="telegram_proxy_description">Локальный MTProxy сервер для Telegram. Трафик идёт через активный VPN движок.</string>
-    <string name="telegram_proxy_enable">Включить MTProxy</string>
-    <string name="telegram_proxy_state_idle">Выключен</string>
-    <string name="telegram_proxy_state_starting">Запускается…</string>
-    <string name="telegram_proxy_state_running_fmt">Работает на порту %1$d</string>
-    <string name="telegram_proxy_state_error_fmt">Ошибка: %1$s</string>
-    <string name="telegram_proxy_port_label">Порт</string>
-    <string name="telegram_proxy_save">Сохранить</string>
-    <string name="telegram_proxy_domain_label">FakeTLS домен</string>
-    <string name="telegram_proxy_secret_missing">Secret не сгенерирован. Нажмите кнопку ниже.</string>
-    <string name="telegram_proxy_secret_value_fmt">Secret: %1$s</string>
-    <string name="telegram_proxy_generate_secret">Сгенерировать ключ</string>
-    <string name="telegram_proxy_rotate_secret">Сменить ключ</string>
-    <string name="telegram_proxy_generate_error">Ошибка генерации ключа. Проверьте логи.</string>
-    <string name="telegram_proxy_link_label">Ссылка для Telegram:</string>
-    <string name="telegram_proxy_copy">Копировать</string>
-    <string name="telegram_proxy_open_in_tg">Открыть в Telegram</string>
-
     <!-- Settings additional rows -->
     <string name="settings_byedpi_title">ByeDPI args</string>
     <string name="settings_byedpi_summary">Настройки обхода ТСПУ</string>
     <string name="settings_manual_server_title">Добавить сервер вручную</string>
     <string name="settings_manual_server_summary">VLESS / Trojan / Hysteria2 / Shadowsocks URI</string>
-    <string name="settings_telegram_proxy_title">Telegram MTProxy</string>
-    <string name="settings_telegram_proxy_summary">Локальный MTProxy для Telegram через VPN</string>
     <string name="settings_logs">Логи</string>
 
     <!-- WARP engine settings -->
     <string name="warp_progress_mirror_fmt">Зеркало %1$s</string>
     <string name="warp_validation_required_fields">PrivateKey, Endpoint, PublicKey (Peer), Address обязательны</string>
+    <string name="warp_duplicate_hint">Эта конфигурация уже загружена</string>
     <string name="warp_doh_section_label">Протокол DNS (endpoint resolve)</string>
     <string name="warp_next_generation_in_fmt">Следующая генерация через %1$s</string>
 

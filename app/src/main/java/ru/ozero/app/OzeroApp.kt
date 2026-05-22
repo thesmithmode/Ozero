@@ -16,7 +16,6 @@ import ru.ozero.app.logging.AppLogger
 import ru.ozero.app.logging.BootDiagnostics
 import ru.ozero.app.logging.BootFileLogger
 import ru.ozero.app.logging.LogBuffer
-import ru.ozero.app.proxy.TelegramProxyCoordinator
 import ru.ozero.app.relay.UrnetworkRelayCoordinator
 import ru.ozero.app.ui.onboarding.FirstRunBootstrap
 import ru.ozero.app.ui.splittunnel.AppListProvider
@@ -32,8 +31,6 @@ class OzeroApp : Application(), Configuration.Provider {
     @Inject lateinit var firstRunBootstrap: FirstRunBootstrap
 
     @Inject lateinit var appListProvider: AppListProvider
-
-    @Inject lateinit var telegramProxyCoordinator: TelegramProxyCoordinator
 
     @Inject lateinit var urnetworkRelayCoordinator: UrnetworkRelayCoordinator
 
@@ -85,8 +82,6 @@ class OzeroApp : Application(), Configuration.Provider {
             runCatching { appListProvider.loadApps() }
                 .onFailure { BootFileLogger.warn(TAG, "appListProvider prewarm failed", it) }
         }
-        runCatching { telegramProxyCoordinator.start() }
-            .onFailure { BootFileLogger.warn(TAG, "telegramProxyCoordinator.start failed", it) }
         runCatching { urnetworkRelayCoordinator.start() }
             .onFailure { BootFileLogger.warn(TAG, "urnetworkRelayCoordinator.start failed", it) }
         runCatching { urnetworkContractStatusObserver.start() }

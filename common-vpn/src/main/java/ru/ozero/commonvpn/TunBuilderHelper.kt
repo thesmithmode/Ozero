@@ -24,6 +24,7 @@ import ru.ozero.enginescore.TunSpec
  */
 class TunBuilderHelper(private val service: VpnService) {
 
+    @Suppress("UnusedParameter")
     fun applyEngineTunSpec(spec: TunSpec, ipv6Enabled: Boolean): VpnService.Builder {
         val builder = service.Builder()
             .setSession(spec.sessionName)
@@ -35,8 +36,8 @@ class TunBuilderHelper(private val service: VpnService) {
             runCatching { builder.addDnsServer(dns) }
                 .onFailure { PersistentLoggers.warn(TAG, "spec addDnsServer rejected '$dns': ${it.message}") }
         }
-        if (spec.allowFamilyV4) builder.allowFamily(android.system.OsConstants.AF_INET)
-        if (spec.allowFamilyV6) builder.allowFamily(android.system.OsConstants.AF_INET6)
+        builder.allowFamily(android.system.OsConstants.AF_INET)
+        builder.allowFamily(android.system.OsConstants.AF_INET6)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             runCatching { builder.setMetered(false) }
         }
@@ -59,11 +60,9 @@ class TunBuilderHelper(private val service: VpnService) {
             }
         }
         val v6 = spec.ipv6Address
-        if (ipv6Enabled && spec.allowFamilyV6 && v6 != null) {
+        if (spec.allowFamilyV6 && v6 != null) {
             builder.addAddress(v6, spec.ipv6PrefixLength)
             if (spec.routeAllV6) builder.addRoute("::", 0)
-        } else {
-            blackholeIpv6(builder, "applyEngineTunSpec")
         }
         return builder
     }
@@ -121,6 +120,7 @@ class TunBuilderHelper(private val service: VpnService) {
         }
     }
 
+    @Suppress("UnusedPrivateMember")
     private fun blackholeIpv6(builder: VpnService.Builder, callerTag: String) {
         runCatching {
             builder.addAddress(TUN_ADDRESS_V6, TUN_PREFIX_LENGTH_V6)

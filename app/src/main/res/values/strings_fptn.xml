@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="settings_fptn_title">FPTN</string>
+    <string name="settings_fptn_summary">SNI Reality туннель — обходит DPI-блокировки</string>
+    <string name="fptn_settings_title">FPTN</string>
+    <string name="fptn_section_token">Токен</string>
+    <string name="fptn_token_hint">fptn:… или fptnb:…</string>
+    <string name="fptn_token_save">Сохранить</string>
+    <string name="fptn_token_invalid">Неверный формат токена</string>
+    <string name="fptn_bot_hint">Токен можно получить у бота @fptn_bot в Telegram</string>
+    <string name="fptn_section_servers">Серверы</string>
+    <string name="fptn_server_auto">Auto (автовыбор)</string>
+    <string name="fptn_no_token">Введите токен, чтобы увидеть список серверов</string>
+    <string name="fptn_section_bypass">Метод обфускации</string>
+    <string name="fptn_experimental_button">Экспериментальные настройки</string>
+    <string name="fptn_experimental_title">Экспериментальные настройки</string>
+    <string name="fptn_reconnect_network">Переподключаться при смене сети</string>
+    <string name="fptn_reconnect_ip">Переподключаться при смене IP</string>
+    <string name="fptn_max_attempts">Попыток переподключения: <xliff:g id="count" example="5">%d</xliff:g></string>
+    <string name="fptn_pause_seconds">Пауза между попытками: <xliff:g id="seconds" example="2">%d</xliff:g> с</string>
+    <string name="fptn_reset_server">Сбрасывать сервер при разрыве</string>
+    <string name="fptn_close">Закрыть</string>
+</resources>

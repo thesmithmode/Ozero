@@ -160,7 +160,7 @@ class TunnelController(
             val sw = _switching.value
             if (sw != null) {
                 val terminal = when (target) {
-                    is TunnelState.Connected -> true
+                    is TunnelState.Connected -> sw.to == null || sw.to == target.engineId
                     is TunnelState.Failed -> true
                     else -> false
                 }

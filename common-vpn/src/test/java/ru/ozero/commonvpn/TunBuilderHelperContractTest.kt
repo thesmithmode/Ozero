@@ -124,11 +124,51 @@ class TunBuilderHelperContractTest {
         val body = source.substringAfter("fun applyEngineTunSpec(").substringBefore("fun buildTunBuilder(")
         assertTrue(
             body.contains("TIRAMISU && spec.excludeRfc1918"),
-            "RFC1918 exclude требует TIRAMISU API (33+) И spec.excludeRfc1918=true — иначе fallback на полную 0.0.0.0/0",
+            "RFC1918 exclude требует TIRAMISU API (33+) И spec.excludeRfc1918=true — " +
+                "иначе fallback на полную 0.0.0.0/0",
         )
         assertTrue(body.contains("\"10.0.0.0\""), "должен включать 10.0.0.0/8")
         assertTrue(body.contains("\"172.16.0.0\""), "должен включать 172.16.0.0/12")
         assertTrue(body.contains("\"192.168.0.0\""), "должен включать 192.168.0.0/16")
+    }
+
+    @Test
+    fun `applyEngineTunSpec IPv6 routing по spec_allowFamilyV6 не ipv6Enabled — regression sentinel`() {
+        val body = source.substringAfter("fun applyEngineTunSpec(").substringBefore("fun buildTunBuilder(")
+        assertTrue(
+            body.contains("if (spec.allowFamilyV6 && v6 != null)"),
+            "IPv6 routing обязан базироваться на spec.allowFamilyV6 (из конфига), " +
+                "а не на ipv6Enabled — иначе WARP blackhole-ит IPv6 по умолчанию и часть сервисов недоступна",
+        )
+        assertTrue(
+            !body.contains("ipv6Enabled && spec.allowFamilyV6"),
+            "ipv6Enabled НЕ должен стоять перед spec.allowFamilyV6 — это регрессия",
+        )
+    }
+
+    @Test
+    fun `applyEngineTunSpec allowFamily AF_INET6 безусловный — BLOCKLIST split tunnel sentinel`() {
+        val body = source.substringAfter("fun applyEngineTunSpec(").substringBefore("fun buildTunBuilder(")
+        assertTrue(
+            body.contains("builder.allowFamily(android.system.OsConstants.AF_INET)"),
+            "allowFamily(AF_INET) обязан вызываться безусловно — VPN admits IPv4",
+        )
+        assertTrue(
+            body.contains("builder.allowFamily(android.system.OsConstants.AF_INET6)"),
+            "allowFamily(AF_INET6) обязан вызываться безусловно. " +
+                "Без этого в BLOCKLIST режиме (addDisallowedApplication) Android помечает " +
+                "non-excluded apps как VPN-routed, и их IPv6 трафик блокируется на VPN-слое " +
+                "(allowIPv6=false). Симптом: Gemini и другие IPv6-preferring сервисы перестают работать " +
+                "как только в blocklist добавляется любое приложение.",
+        )
+        assertTrue(
+            !body.contains("if (spec.allowFamilyV4) builder.allowFamily"),
+            "Условный allowFamily(AF_INET) запрещён — может быть рассинхронизирован с allowFamily(AF_INET6)",
+        )
+        assertTrue(
+            !body.contains("if (spec.allowFamilyV6) builder.allowFamily"),
+            "Условный allowFamily(AF_INET6) запрещён — корень бага split tunnel + Gemini",
+        )
     }
 
     @Test

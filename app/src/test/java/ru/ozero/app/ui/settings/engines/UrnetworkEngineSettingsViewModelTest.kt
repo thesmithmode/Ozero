@@ -29,6 +29,7 @@ import ru.ozero.engineurnetwork.provideControlMode
 import ru.ozero.engineurnetwork.provideNetworkMode
 import ru.ozero.engineurnetwork.setAllowDirect
 import ru.ozero.engineurnetwork.setFixedIpSize
+import ru.ozero.engineurnetwork.setProvideEnabled
 import ru.ozero.engineurnetwork.windowType
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
@@ -193,6 +194,24 @@ class UrnetworkEngineSettingsViewModelTest {
         val v = vm()
         advanceUntilIdle()
         assertEquals(UrnetworkWindowType.AUTO, v.windowType.value)
+    }
+
+    @Test
+    fun `providePaused отражает инверсию provideEnabled из configStore`() = runTest {
+        val store = fakeUrnetworkConfigStore()
+        store.setProvideEnabled(false)
+        val v = vm(store = store)
+        advanceUntilIdle()
+        assertEquals(true, v.providePaused.value)
+    }
+
+    @Test
+    fun `providePaused false когда provideEnabled true`() = runTest {
+        val store = fakeUrnetworkConfigStore()
+        store.setProvideEnabled(true)
+        val v = vm(store = store)
+        advanceUntilIdle()
+        assertEquals(false, v.providePaused.value)
     }
 
     @Test

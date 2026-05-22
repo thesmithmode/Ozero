@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -21,13 +22,11 @@ import ru.ozero.enginewarp.AwgParams
 import ru.ozero.enginewarp.DoHProvider
 import ru.ozero.enginewarp.WarpAutoConfig
 import ru.ozero.enginewarp.WarpConfig
+import ru.ozero.enginewarp.WarpConfigDuplicateException
 import ru.ozero.enginewarp.WarpConfigSlot
 import ru.ozero.enginewarp.WarpConfigSlotStore
 import ru.ozero.enginewarp.WarpFileImporter
 import java.io.InputStream
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
@@ -150,8 +149,9 @@ class WarpEngineSettingsViewModel @Inject constructor(
                 })
                 result.fold(
                     onSuccess = { registered ->
-                        val timestamp = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
-                        store.addSlot("WARP Auto $timestamp", registered.config, registered.rawIni)
+                        val generatedName = buildGeneratedName(registered.config.peerEndpoint, store.slots().first())
+                        runCatching { store.addSlot(generatedName, registered.config, registered.rawIni) }
+                            .onFailure { PersistentLoggers.warn(TAG, "generated addSlot failed: ${it.message}") }
                         _uiState.value = _uiState.value.copy(
                             isRegistering = false,
                             errorMessage = null,
@@ -189,13 +189,28 @@ class WarpEngineSettingsViewModel @Inject constructor(
             val result = fileImporter.import(stream)
             result.fold(
                 onSuccess = { imported ->
-                    val id = store.addSlot(suggestedName, imported.config, imported.rawIni)
-                    store.setActive(id)
-                    _uiState.value = _uiState.value.copy(
-                        errorMessage = null,
-                        errorMessageRes = null,
-                        importSuccessCount = _uiState.value.importSuccessCount + 1,
-                    )
+                    runCatching { store.addSlot(suggestedName, imported.config, imported.rawIni) }
+                        .onSuccess { id ->
+                            store.setActive(id)
+                            _uiState.value = _uiState.value.copy(
+                                errorMessage = null,
+                                errorMessageRes = null,
+                                importSuccessCount = _uiState.value.importSuccessCount + 1,
+                            )
+                        }
+                        .onFailure { t ->
+                            if (t is WarpConfigDuplicateException) {
+                                _uiState.value = _uiState.value.copy(
+                                    errorMessage = null,
+                                    errorMessageRes = R.string.warp_duplicate_hint,
+                                )
+                            } else {
+                                _uiState.value = _uiState.value.copy(
+                                    errorMessage = t.message ?: "import failed",
+                                    errorMessageRes = null,
+                                )
+                            }
+                        }
                 },
                 onFailure = { t ->
                     _uiState.value = _uiState.value.copy(
@@ -305,7 +320,7 @@ class WarpEngineSettingsViewModel @Inject constructor(
         val slotId = draft.slotId
         val name = draft.name.trim().ifBlank { "WARP" }
         viewModelScope.launch {
-            runCatching { store.updateSlot(slotId, name, config) }
+            runCatching { store.updateSlot(slotId, name, config, existingSlot?.rawIniOverride) }
                 .onSuccess {
                     _uiState.value = _uiState.value.copy(
                         editDraft = null,
@@ -329,5 +344,15 @@ class WarpEngineSettingsViewModel @Inject constructor(
     private companion object {
         const val COOLDOWN_POLL_INTERVAL_MS = 1_000L
         const val TAG = "WarpSettingsVM"
+        const val GENERATED_NAME_PREFIX = "WARP"
+
+        fun buildGeneratedName(endpoint: String, existing: List<WarpConfigSlot>): String {
+            val host = endpoint.substringBeforeLast(':').trim().ifBlank { "auto" }
+            val base = "$GENERATED_NAME_PREFIX $host"
+            if (existing.none { it.name == base }) return base
+            var counter = 2
+            while (existing.any { it.name == "$base #$counter" }) counter++
+            return "$base #$counter"
+        }
     }
 }

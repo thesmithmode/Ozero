@@ -13,7 +13,6 @@ dependencies {
     implementation(project(":engines-core"))
     implementation(project(":engine-warp"))
     implementation(project(":engine-urnetwork"))
-    implementation(project(":engine-telegram"))
     implementation(project(":core-storage"))
 
     testImplementation(libs.bundles.junit5)

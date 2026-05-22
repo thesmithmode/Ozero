@@ -138,7 +138,6 @@
 
     <string name="about_title">के बारे में</string>
     <string name="about_version">संस्करण %1$s</string>
-    <string name="about_description">Ozero एक ऐप में VPN और anti-DPI इंजनों का एग्रीगेटर है: ByeDPI, AmneziaWG (WARP), URnetwork P2P आदि।</string>
 
     <string name="diag_export_crashes">क्रैश लॉग एक्सपोर्ट</string>
     <string name="diag_export_no_crashes">क्रैश लॉग खाली है</string>
@@ -350,7 +349,6 @@
     <string name="backup_category_byedpi">ByeDPI</string>
     <string name="backup_category_warp">WARP accounts</string>
     <string name="backup_category_urnetwork">URnetwork</string>
-    <string name="backup_category_telegram">Telegram MTProxy</string>
     <string name="backup_category_strategy">Strategies and domain lists</string>
     <string name="backup_category_split_tunnel">Split tunnel</string>
     <string name="ip_card_title">Exit node</string>
@@ -401,30 +399,10 @@
     <string name="byedpi_dns_description">Override DNS for the VPN tunnel. System DNS is used by default.</string>
     <string name="byedpi_dns_auto">Auto</string>
     <string name="byedpi_dns_field_label">DNS addresses (comma-separated)</string>
-    <string name="telegram_proxy_title">Telegram MTProxy</string>
-    <string name="telegram_proxy_description">Local MTProxy server for Telegram. Traffic goes through the active VPN engine.</string>
-    <string name="telegram_proxy_enable">Enable MTProxy</string>
-    <string name="telegram_proxy_state_idle">Off</string>
-    <string name="telegram_proxy_state_starting">Starting…</string>
-    <string name="telegram_proxy_state_running_fmt">Running on port %1$d</string>
-    <string name="telegram_proxy_state_error_fmt">Error: %1$s</string>
-    <string name="telegram_proxy_port_label">Port</string>
-    <string name="telegram_proxy_save">Save</string>
-    <string name="telegram_proxy_domain_label">FakeTLS domain</string>
-    <string name="telegram_proxy_secret_missing">Secret is not generated. Tap the button below.</string>
-    <string name="telegram_proxy_secret_value_fmt">Secret: %1$s</string>
-    <string name="telegram_proxy_generate_secret">Generate key</string>
-    <string name="telegram_proxy_rotate_secret">Rotate key</string>
-    <string name="telegram_proxy_generate_error">Failed to generate key. Check logs.</string>
-    <string name="telegram_proxy_link_label">Telegram link:</string>
-    <string name="telegram_proxy_copy">Copy</string>
-    <string name="telegram_proxy_open_in_tg">Open in Telegram</string>
     <string name="settings_byedpi_title">ByeDPI args</string>
     <string name="settings_byedpi_summary">DPI bypass settings</string>
     <string name="settings_manual_server_title">Add server manually</string>
     <string name="settings_manual_server_summary">VLESS / Trojan / Hysteria2 / Shadowsocks URI</string>
-    <string name="settings_telegram_proxy_title">Telegram MTProxy</string>
-    <string name="settings_telegram_proxy_summary">Local MTProxy for Telegram over VPN</string>
     <string name="settings_logs">Logs</string>
     <string name="warp_progress_mirror_fmt">Mirror %1$s</string>
     <string name="warp_validation_required_fields">PrivateKey, Endpoint, PublicKey (Peer), Address are required</string>

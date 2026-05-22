@@ -1,0 +1,143 @@
+package ru.ozero.enginefptn
+
+import android.util.Base64
+import io.mockk.every
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+class FptnTokenTest {
+
+    @BeforeEach
+    fun setUp() {
+        mockkStatic(Base64::class)
+        every { Base64.decode(any<String>(), any<Int>()) } answers {
+            java.util.Base64.getDecoder().decode(firstArg<String>().trim())
+        }
+    }
+
+    @AfterEach
+    fun tearDown() {
+        unmockkStatic(Base64::class)
+    }
+
+    @Test
+    fun `should return null for empty string`() {
+        assertNull(FptnToken.parse(""))
+    }
+
+    @Test
+    fun `should return null for unknown prefix`() {
+        assertNull(FptnToken.parse("http:abc"))
+        assertNull(FptnToken.parse("xfptn:abc"))
+    }
+
+    @Test
+    fun `should return null when base64 decode throws`() {
+        every { Base64.decode(any<String>(), any<Int>()) } throws IllegalArgumentException("bad base64")
+        assertNull(FptnToken.parse("fptn:!!!not-base64!!!"))
+    }
+
+    @Test
+    fun `should return null when servers array is empty`() {
+        val json = """{"version":1,"username":"user","password":"pass","servers":[]}"""
+        assertNull(FptnToken.parse("fptn:${encode(json)}"))
+    }
+
+    @Test
+    fun `should return null when required field username is missing`() {
+        val json = """{"version":1,"password":"pass",
+            "servers":[{"name":"S","host":"1.2.3.4","port":443}]}"""
+        assertNull(FptnToken.parse("fptn:${encode(json)}"))
+    }
+
+    @Test
+    fun `should return null when required field password is missing`() {
+        val json = """{"version":1,"username":"u",
+            "servers":[{"name":"S","host":"1.2.3.4","port":443}]}"""
+        assertNull(FptnToken.parse("fptn:${encode(json)}"))
+    }
+
+    @Test
+    fun `should return null when servers key is absent`() {
+        val json = """{"version":1,"username":"u","password":"p"}"""
+        assertNull(FptnToken.parse("fptn:${encode(json)}"))
+    }
+
+    @Test
+    fun `should parse valid fptn token with single server`() {
+        val json = """{"version":2,"username":"alice","password":"s3cr3t",
+            "servers":[{"name":"DE-1","host":"1.2.3.4","port":443,
+                         "md5_fingerprint":"aabb","country_code":"de"}]}"""
+        val result = FptnToken.parse("fptn:${encode(json)}")
+        assertNotNull(result)
+        assertEquals(2, result.version)
+        assertEquals("alice", result.username)
+        assertEquals("s3cr3t", result.password)
+        assertEquals(1, result.servers.size)
+        val server = result.servers[0]
+        assertEquals("DE-1", server.name)
+        assertEquals("1.2.3.4", server.host)
+        assertEquals(443, server.port)
+        assertEquals("aabb", server.md5Fingerprint)
+        assertEquals("DE", server.countryCode)
+    }
+
+    @Test
+    fun `should parse token with multiple servers`() {
+        val json = """{"version":1,"username":"u","password":"p",
+            "servers":[
+                {"name":"RU-1","host":"10.0.0.1","port":443,"country_code":"ru"},
+                {"name":"US-1","host":"10.0.0.2","port":443,"country_code":"us"}
+            ]}"""
+        val result = FptnToken.parse("fptn:${encode(json)}")
+        assertNotNull(result)
+        assertEquals(2, result.servers.size)
+        assertEquals("RU", result.servers[0].countryCode)
+        assertEquals("US", result.servers[1].countryCode)
+    }
+
+    @Test
+    fun `should default version to 1 when absent`() {
+        val json = """{"username":"u","password":"p",
+            "servers":[{"name":"S","host":"h","port":443}]}"""
+        val result = FptnToken.parse("fptn:${encode(json)}")
+        assertNotNull(result)
+        assertEquals(1, result.version)
+    }
+
+    @Test
+    fun `should uppercase country code`() {
+        val json = """{"username":"u","password":"p",
+            "servers":[{"name":"S","host":"h","port":1,"country_code":"gb"}]}"""
+        val result = FptnToken.parse("fptn:${encode(json)}")
+        assertNotNull(result)
+        assertEquals("GB", result.servers[0].countryCode)
+    }
+
+    @Test
+    fun `toString should not expose username or password`() {
+        val json = """{"username":"sensitive_user","password":"secret_pass",
+            "servers":[{"name":"S","host":"h","port":1}]}"""
+        val result = FptnToken.parse("fptn:${encode(json)}")
+        assertNotNull(result)
+        val str = result.toString()
+        assertTrue(!str.contains("sensitive_user"), "username must not appear in toString")
+        assertTrue(!str.contains("secret_pass"), "password must not appear in toString")
+        assertTrue(str.contains("***"), "toString should mask credentials")
+    }
+
+    @Test
+    fun `should return null for fptnb prefix on any Android version in test`() {
+        assertNull(FptnToken.parse("fptnb:${encode("{}")}"))
+    }
+
+    private fun encode(json: String): String =
+        java.util.Base64.getEncoder().encodeToString(json.toByteArray())
+}

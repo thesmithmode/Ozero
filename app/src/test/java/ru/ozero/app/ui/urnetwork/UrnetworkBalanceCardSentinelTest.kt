@@ -2,6 +2,7 @@ package ru.ozero.app.ui.urnetwork
 
 import org.junit.jupiter.api.Test
 import java.io.File
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class UrnetworkBalanceCardSentinelTest {
@@ -14,27 +15,28 @@ class UrnetworkBalanceCardSentinelTest {
     }
 
     @Test
-    fun `FREE_TIER_CAP_BYTES равен 34 GiB — защита от случайного изменения значения`() {
-        assertTrue(
-            source.contains("34L * 1024L * 1024L * 1024L"),
-            "FREE_TIER_CAP_BYTES обязан быть 34 GiB (34L * 1024L * 1024L * 1024L) — " +
-                "URnetwork бэкенд выдаёт ровно 34 GiB на free tier за период",
+    fun `BalanceCard не применяет cap — отображает реальный баланс от бэкенда`() {
+        val balanceDetailsBody = source
+            .substringAfter("private fun BalanceDetails(")
+            .substringBefore("private fun TrafficProgressBar(")
+        assertFalse(
+            balanceDetailsBody.contains("FREE_TIER_CAP_BYTES"),
+            "BalanceDetails не должен применять FREE_TIER_CAP_BYTES — баланс показывается как есть от бэкенда",
+        )
+        assertFalse(
+            source.contains("FREE_TIER_CAP_BYTES"),
+            "FREE_TIER_CAP_BYTES не должен существовать — cap удалён намеренно чтобы показывать бонусный трафик",
         )
     }
 
     @Test
-    fun `BalanceDetails применяет FREE_TIER_CAP_BYTES — защита от регрессии overlap display`() {
+    fun `BalanceDetails использует coerceAtLeast для защиты от отрицательных значений`() {
         val balanceDetailsBody = source
             .substringAfter("private fun BalanceDetails(")
             .substringBefore("private fun TrafficProgressBar(")
         assertTrue(
-            balanceDetailsBody.contains("FREE_TIER_CAP_BYTES"),
-            "BalanceDetails обязан применять FREE_TIER_CAP_BYTES — иначе overlap window (30h TTL + 24h крон) " +
-                "показывает 68-102 GiB вместо 34 GiB",
-        )
-        assertTrue(
-            balanceDetailsBody.contains("minOf("),
-            "displayBalance и displayStart обязаны вычисляться через minOf — кэп не работает без min",
+            balanceDetailsBody.contains("coerceAtLeast(0L)"),
+            "displayBalance и displayStart обязаны использовать coerceAtLeast(0L) — бэкенд может вернуть отрицательное значение",
         )
     }
 }

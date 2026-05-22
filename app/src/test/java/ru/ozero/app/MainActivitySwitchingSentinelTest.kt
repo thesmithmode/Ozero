@@ -36,4 +36,16 @@ class MainActivitySwitchingSentinelTest {
                 "Block:\n$block",
         )
     }
+
+    @Test
+    fun `restartVpnIfConnected обязан передавать pendingTarget из switching а не null`() {
+        val block = source.substringAfter("private suspend fun restartVpnIfConnected")
+            .substringBefore("private fun observeLiveEngineSettingsChanges")
+        assertTrue(
+            block.contains("switching.value?.to"),
+            "to=null в onSwitchingStarted перетирает ранее установленный target от onManualEngineSelect — " +
+                "диск показывает Connected пока chip уже другой движок (UI desync для любой пары движков). " +
+                "Обязан читать tunnelController.switching.value?.to как pendingTarget. Block:\n$block",
+        )
+    }
 }

@@ -138,7 +138,6 @@
 
     <string name="about_title">Acerca de</string>
     <string name="about_version">Versión %1$s</string>
-    <string name="about_description">Ozero es un agregador de motores VPN y anti-DPI en una sola app. Incluye varias soluciones probadas para evadir bloqueos: ByeDPI, AmneziaWG (WARP), URnetwork P2P y otras.</string>
 
     <string name="diag_export_crashes">Exportar registro de fallos</string>
     <string name="diag_export_no_crashes">El registro de fallos está vacío</string>
@@ -255,7 +254,6 @@
     <string name="backup_category_byedpi">ByeDPI</string>
     <string name="backup_category_warp">Cuentas WARP</string>
     <string name="backup_category_urnetwork">URnetwork</string>
-    <string name="backup_category_telegram">Telegram MTProxy</string>
     <string name="backup_category_strategy">Estrategias y listas de dominios</string>
     <string name="backup_category_split_tunnel">Túnel dividido</string>
 
@@ -435,29 +433,10 @@
     <string name="settings_byedpi_summary">Configuración de omisión DPI</string>
     <string name="settings_manual_server_title">Agregar servidor manualmente</string>
     <string name="settings_manual_server_summary">URI VLESS / Trojan / Hysteria2 / Shadowsocks</string>
-    <string name="settings_telegram_proxy_title">Telegram MTProxy</string>
-    <string name="settings_telegram_proxy_summary">MTProxy local para Telegram a través de VPN</string>
     <string name="settings_logs">Registros</string>
-    <string name="telegram_proxy_title">Telegram MTProxy</string>
-    <string name="telegram_proxy_description">Servidor MTProxy local para Telegram. El tráfico pasa por el motor VPN activo.</string>
-    <string name="telegram_proxy_enable">Activar MTProxy</string>
-    <string name="telegram_proxy_state_idle">Apagado</string>
-    <string name="telegram_proxy_state_starting">Iniciando…</string>
-    <string name="telegram_proxy_state_running_fmt">Ejecutando en el puerto %1$d</string>
-    <string name="telegram_proxy_state_error_fmt">Error: %1$s</string>
-    <string name="telegram_proxy_port_label">Puerto</string>
-    <string name="telegram_proxy_save">Guardar</string>
-    <string name="telegram_proxy_domain_label">Dominio FakeTLS</string>
-    <string name="telegram_proxy_secret_missing">La clave no está generada. Pulsa el botón abajo.</string>
-    <string name="telegram_proxy_secret_value_fmt">Clave: %1$s</string>
-    <string name="telegram_proxy_generate_secret">Generar clave</string>
-    <string name="telegram_proxy_rotate_secret">Rotar clave</string>
-    <string name="telegram_proxy_generate_error">Error al generar la clave. Revisa los registros.</string>
-    <string name="telegram_proxy_link_label">Enlace de Telegram:</string>
-    <string name="telegram_proxy_copy">Copiar</string>
-    <string name="telegram_proxy_open_in_tg">Abrir en Telegram</string>
     <string name="warp_progress_mirror_fmt">Espejo %1$s</string>
     <string name="warp_validation_required_fields">PrivateKey, Endpoint, PublicKey (Par), Dirección son obligatorios</string>
+    <string name="warp_duplicate_hint">Esta configuración ya está cargada</string>
     <string name="warp_doh_section_label">Protocolo DNS (resolución de endpoint)</string>
     <string name="warp_next_generation_in_fmt">Próxima generación en %1$s</string>
     <string name="strategy_staleness_unverified">No verificado</string>
@@ -492,8 +471,8 @@
     <string name="urnetwork_insufficient_balance_body">El saldo de URnetwork se agotó — VPN se desconectó automáticamente. Recarga tu cuenta o comparte tráfico para continuar.</string>
     <string name="urnetwork_referral_bonus">+%d GB</string>
     <string name="urnetwork_referrals_label">Referidos: %d</string>
-    <string name="urnetwork_reliability_bonus">+%.3f GiB/día</string>
-    <string name="urnetwork_reliability_label">Fiabilidad: %.3f</string>
+    <string name="urnetwork_reliability_bonus">+%.1f GiB/día</string>
+    <string name="urnetwork_reliability_label">Fiabilidad: %.1f%%</string>
     <string name="engine_status_peers_title">Pares:</string>
     <string name="engine_status_peers_searching_value">Buscando %1$d s</string>
     <string name="engine_status_peers_unavailable">—</string>

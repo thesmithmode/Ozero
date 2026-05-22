@@ -179,7 +179,7 @@ class EngineWarp(
             ?: return null
         val v4Prefix = cfg.interfaceAddressV4.substringAfter('/', missingDelimiterValue = "32")
             .toIntOrNull() ?: 32
-        val ipv6Allowed = ipv6EnabledProvider()
+        val ipv6Allowed = cfg.interfaceAddressV6.isNotBlank() && ipv6EnabledProvider()
         val v6Addr = cfg.interfaceAddressV6.substringBefore('/').takeIf { it.isNotBlank() && ipv6Allowed }
         val v6Prefix = cfg.interfaceAddressV6.substringAfter('/', missingDelimiterValue = "128")
             .toIntOrNull() ?: 128
@@ -303,16 +303,27 @@ class EngineWarp(
                 PersistentLoggers.error(TAG, "register failed: ${t.message}")
                 return null
             }
-            runCatching { configStore.addSlot("WARP Auto", fresh.config, fresh.rawIni) }
+            val host = fresh.config.peerEndpoint.substringBeforeLast(':').trim().ifBlank { "auto" }
+            runCatching { configStore.addSlot("WARP $host", fresh.config, fresh.rawIni) }
                 .onSuccess { Log.i(TAG, "auto-registered config saved as slot $it") }
-                .onFailure { PersistentLoggers.warn(TAG, "addSlot failed: ${it.message}") }
+                .onFailure { t ->
+                    if (t is WarpConfigDuplicateException) {
+                        runCatching { configStore.setActive(t.existingSlotId) }
+                            .onSuccess {
+                                Log.i(TAG, "auto-register duplicate — activated existing slot ${t.existingSlotId}")
+                            }
+                            .onFailure { e -> PersistentLoggers.warn(TAG, "setActive duplicate failed: ${e.message}") }
+                    } else {
+                        PersistentLoggers.warn(TAG, "addSlot failed: ${t.message}")
+                    }
+                }
             buildResolved(fresh.config, fresh.rawIni, source = "auto")
         }
     }
 
     private suspend fun buildResolved(config: WarpConfig, rawIni: String?, source: String): ResolvedWarp {
         val resolvedConfig = resolveEndpointHost(config)
-        val ipv6Allowed = ipv6EnabledProvider()
+        val ipv6Allowed = config.interfaceAddressV6.isNotBlank() && ipv6EnabledProvider()
         val baseIni = if (!rawIni.isNullOrBlank()) {
             applyEndpointToRawIni(rawIni, resolvedConfig.peerEndpoint)
         } else {

@@ -5,8 +5,9 @@ tags: [urnetwork, architecture, cache, ux]
 sources:
   - "daily/2026-05-19.md"
   - "daily/2026-05-20.md"
+  - "daily/2026-05-22.md"
 created: 2026-05-19
-updated: 2026-05-20
+updated: 2026-05-22
 ---
 
 # URnetwork Balance Optimistic Cache (SharedPreferences)
@@ -74,6 +75,10 @@ The `RealUrnetworkBalanceRepository._state` was correctly hydrated from cache in
 
 Fix: `initialValue = balanceRepository.state.value` — reads the already-hydrated value at ViewModel construction time. Cache hydration now visible to the UI immediately on screen open without any async round-trip.
 
+### FREE_TIER_CAP_BYTES Removal (2026-05-22)
+
+`UrnetworkBalanceCard` originally capped displayed balance at `FREE_TIER_CAP_BYTES = 34 GiB` to normalize the server-side accumulation artifact (see [[concepts/urnetwork-balance-accumulation-mechanism]]). This cap was removed in commit `e0d53ca4` — the display formula changed to `balanceBytes.coerceAtLeast(0L)` (show real balance, clamp at 0). The decision: the server race is not client-fixable, and hiding legitimate surplus GiBs produces worse UX than showing the real number.
+
 ## Related Concepts
 
 - [[concepts/urnetwork-sdk-integration]] — full URnetwork SDK integration context
@@ -84,3 +89,4 @@ Fix: `initialValue = balanceRepository.state.value` — reads the already-hydrat
 
 - [[daily/2026-05-19.md]] — Session v0.1.5: `UrnetworkBalanceCache` (SharedPreferences) injected into `RealUrnetworkBalanceRepository`; `_state` hydrates from cache on init; successful refresh writes snapshot; plan label removed; traffic formula confirmed correct vs upstream
 - [[daily/2026-05-20.md]] — v0.1.9 prep: ViewModel `stateIn(initialValue = INITIAL)` masked cache hydration; fix: `initialValue = balanceRepository.state.value` to expose cache immediately at screen open
+- [[daily/2026-05-22.md]] — Session 16:42: FREE_TIER_CAP_BYTES=34GiB removed from UrnetworkBalanceCard; show real balance via coerceAtLeast(0L); cap decision reversed (see urnetwork-balance-accumulation-mechanism)

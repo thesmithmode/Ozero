@@ -166,6 +166,24 @@ class StartSequenceCoordinatorContractTest {
     }
 
     @Test
+    fun `run — onProbing вызывается ДО onEngineDied при no engine reachable — UI не застревает в Idle`() {
+        val body = source.substringAfter("suspend fun run(").substringBefore("suspend fun engineNeedsCustomTun(")
+        val failBlock = body.substringAfter("if (pick == null) {").substringBefore("stopVpnRequest()")
+        val probingIdx = failBlock.indexOf("tunnelController.onProbing(")
+        val diedIdx = failBlock.indexOf("tunnelController.onEngineDied(")
+        assertTrue(
+            probingIdx >= 0,
+            "run: при pick==null и targetForUi!=null обязан вызвать onProbing(targetForUi) " +
+                "ДО onEngineDied — иначе TunnelController в Idle игнорирует Failed transition, " +
+                "UI не показывает ошибку (invalid transition Idle→Failed).",
+        )
+        assertTrue(
+            probingIdx < diedIdx,
+            "onProbing обязан быть ДО onEngineDied. probingIdx=$probingIdx diedIdx=$diedIdx",
+        )
+    }
+
+    @Test
     fun `killswitchSetter получает значение из settings — без побочных эффектов`() {
         val body = source.substringAfter("suspend fun run(").substringBefore("suspend fun engineNeedsCustomTun(")
         assertTrue(

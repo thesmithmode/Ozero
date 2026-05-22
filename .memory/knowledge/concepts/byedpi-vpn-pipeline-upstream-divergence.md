@@ -169,6 +169,15 @@ applyLockdown(builder, "applyEngineTunSpec", applyUnderlying = true)
 3. Если нет → escalate к hypothesis #2 (init order swap для byedpi) — отдельный PR
 4. WARP/URnetwork отдельно тестировать на killswitch lockdown (P37 invariant)
 
+## ✓ Подтверждено на устройстве (2026-05-22)
+
+Лог `ozero.log` (сессия 2, 13:22:29–13:22:40):
+- hev stats Δrx=**1860146B / 1451p за 5 секунд** → ~370KB/s — YouTube видео-трафик
+- Нет WARN/ERROR по транспорту
+- CMD mode args verbatim, без авто-суффикса
+
+**Root cause confirmed: `setUnderlyingNetworks(null)` + per-engine fix. Следствие: больше не гадать про args — pipeline был виновен, не стратегия.**
+
 ## Related Concepts
 
 - [[concepts/byedpi-hev-pipeline-upstream-parity]] — YAML parity (scope: только YAML, не Builder)

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="settings_fptn_title">FPTN</string>
+    <string name="settings_fptn_summary">SNI Reality tunnel — bypasses DPI blocks</string>
+    <string name="fptn_settings_title">FPTN</string>
+    <string name="fptn_section_token">Token</string>
+    <string name="fptn_token_hint">fptn:… or fptnb:…</string>
+    <string name="fptn_token_save">Save</string>
+    <string name="fptn_token_invalid">Invalid token format</string>
+    <string name="fptn_bot_hint">Get your token from @fptn_bot on Telegram</string>
+    <string name="fptn_section_servers">Servers</string>
+    <string name="fptn_server_auto">Auto (auto-select)</string>
+    <string name="fptn_no_token">Enter a token to see the server list</string>
+    <string name="fptn_section_bypass">Bypass method</string>
+    <string name="fptn_experimental_button">Experimental settings</string>
+    <string name="fptn_experimental_title">Experimental settings</string>
+    <string name="fptn_reconnect_network">Reconnect on network change</string>
+    <string name="fptn_reconnect_ip">Reconnect on IP change</string>
+    <string name="fptn_max_attempts">Max reconnect attempts: <xliff:g id="count" example="5">%d</xliff:g></string>
+    <string name="fptn_pause_seconds">Pause between attempts: <xliff:g id="seconds" example="2">%d</xliff:g> s</string>
+    <string name="fptn_reset_server">Reset server on disconnect</string>
+    <string name="fptn_close">Close</string>
+</resources>

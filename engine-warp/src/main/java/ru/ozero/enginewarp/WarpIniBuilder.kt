@@ -30,14 +30,20 @@ object WarpIniBuilder {
         appendLine("Jmax = ${p.junkPacketMaxSize}")
         appendLine("S1 = ${p.initPacketJunkSize}")
         appendLine("S2 = ${p.responsePacketJunkSize}")
-        appendLine("S3 = ${p.underloadPacketJunkSize}")
-        appendLine("S4 = ${p.payloadPacketJunkSize}")
+        if (p.underloadPacketJunkSize != 0) appendLine("S3 = ${p.underloadPacketJunkSize}")
+        if (p.payloadPacketJunkSize != 0) appendLine("S4 = ${p.payloadPacketJunkSize}")
         appendLine("H1 = ${p.initPacketMagicHeader}")
         appendLine("H2 = ${p.responsePacketMagicHeader}")
         appendLine("H3 = ${p.cookieReplyMagicHeader}")
         appendLine("H4 = ${p.transportMagicHeader}")
-        appendLine("I1 = ${formatI(p.payloadHexI1, p.payloadPacketSizeCount1)}")
-        appendLine("I2 = ${formatI(p.payloadHexI2, p.payloadPacketSizeCount2)}")
+        when {
+            p.payloadHexI1 != null -> appendLine("I1 = ${formatI(p.payloadHexI1, p.payloadPacketSizeCount1)}")
+            p.payloadPacketSizeCount1 != 0 -> appendLine("I1 = ${p.payloadPacketSizeCount1}")
+        }
+        when {
+            p.payloadHexI2 != null -> appendLine("I2 = ${formatI(p.payloadHexI2, p.payloadPacketSizeCount2)}")
+            p.payloadPacketSizeCount2 != 0 -> appendLine("I2 = ${p.payloadPacketSizeCount2}")
+        }
         when {
             p.payloadHexI3 != null -> appendLine("I3 = <b 0x${p.payloadHexI3}>")
             p.specialJunk3 != 0 -> appendLine("I3 = ${p.specialJunk3}")
@@ -46,7 +52,10 @@ object WarpIniBuilder {
             p.payloadHexI4 != null -> appendLine("I4 = <b 0x${p.payloadHexI4}>")
             p.specialJunk4 != 0 -> appendLine("I4 = ${p.specialJunk4}")
         }
-        appendLine("I5 = ${formatI(p.payloadHexI5, p.payloadPacketSizeCount3)}")
+        when {
+            p.payloadHexI5 != null -> appendLine("I5 = ${formatI(p.payloadHexI5, p.payloadPacketSizeCount3)}")
+            p.payloadPacketSizeCount3 != 0 -> appendLine("I5 = ${p.payloadPacketSizeCount3}")
+        }
     }
 
     private fun formatI(hex: String?, intValue: Int): String =

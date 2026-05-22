@@ -55,8 +55,16 @@ internal class FakeUrnetworkBridge(
     override fun isRunning(): Boolean = connected
     override suspend fun attachTun(tunFd: Int): UrnetworkSdkBridge.AttachResult =
         UrnetworkSdkBridge.AttachResult.Success
-    override fun connectTo(location: UrnetworkSdkBridge.LocationToken) = Unit
-    override fun connectBestAvailable() = Unit
+    val connectToCallCount = AtomicInteger(0)
+    var lastConnectToLocation: UrnetworkSdkBridge.LocationToken? = null
+    override fun connectTo(location: UrnetworkSdkBridge.LocationToken) {
+        connectToCallCount.incrementAndGet()
+        lastConnectToLocation = location
+    }
+    val connectBestAvailableCallCount = AtomicInteger(0)
+    override fun connectBestAvailable() {
+        connectBestAvailableCallCount.incrementAndGet()
+    }
     override fun selectedLocation(): UrnetworkSdkBridge.LocationToken? = initialLocation
     override fun openLocationsViewController(): LocationsViewController? = null
     var lastAppliedWindowType: UrnetworkWindowType? = null

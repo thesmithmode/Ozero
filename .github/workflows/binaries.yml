@@ -17,7 +17,7 @@ on:
           - xray
           - userwireguard
           - urnetwork-sdk
-          - mtg
+          - fptn
   push:
     branches:
       - 'feat/**'
@@ -25,14 +25,14 @@ on:
       - '.github/workflows/binaries.yml'
       - 'build-tools/Dockerfile'
       - 'build-tools/Dockerfile.byedpi'
-      - 'build-tools/Dockerfile.mtg'
       - 'build-tools/build_byedpi.sh'
       - 'build-tools/build_naive.sh'
       - 'build-tools/build_amneziawg.sh'
       - 'build-tools/build_hysteria2.sh'
       - 'build-tools/build_tor.sh'
       - 'build-tools/build_xray.sh'
-      - 'build-tools/build_mtg.sh'
+      - 'build-tools/Dockerfile.fptn'
+      - 'build-tools/build_fptn.sh'
       - 'build-tools/regen_lock.py'
       - 'scripts/build_wireguard_android.sh'
 
@@ -80,8 +80,8 @@ jobs:
             urnetwork-sdk)
               FILES="build-tools/Dockerfile tools/build-urnetwork-aar.sh"
               ;;
-            mtg)
-              FILES="build-tools/Dockerfile.mtg build-tools/build_mtg.sh build-tools/regen_lock.py"
+            fptn)
+              FILES="build-tools/Dockerfile.fptn build-tools/build_fptn.sh build-tools/regen_lock.py"
               ;;
             *)
               echo "Unknown artifact: $ARTIFACT" >&2
@@ -228,21 +228,22 @@ jobs:
           bash build-tools/build_naive.sh
 
       # ---------------------------------------------------------------------
-      # mtg build (Go static binary, CGO_ENABLED=0, 3 ABI)
+      # fptn build (C++20 + Conan2 + NDK r28b → arm64-v8a only)
       # ---------------------------------------------------------------------
-      - name: Build mtg Docker image
-        if: env.ARTIFACT == 'mtg'
-        run: docker build -t ozero-mtg -f build-tools/Dockerfile.mtg build-tools/
+      - name: Build fptn Docker image
+        if: env.ARTIFACT == 'fptn'
+        run: docker build -t ozero-fptn -f build-tools/Dockerfile.fptn build-tools/
 
-      - name: Build mtg (3 ABI)
-        if: env.ARTIFACT == 'mtg'
+      - name: Build fptn (arm64-v8a)
+        if: env.ARTIFACT == 'fptn'
         run: |
           docker run --rm \
             -v "$PWD:/src" \
             -w /src \
-            -e OUT_DIR=/src/out/mtg \
-            ozero-mtg \
-            bash build-tools/build_mtg.sh
+            -e REPO_ROOT=/src \
+            -e OUT_DIR=/src/out/fptn \
+            ozero-fptn \
+            bash build-tools/build_fptn.sh
 
       # ---------------------------------------------------------------------
       # Upload — engine-specific glob
@@ -387,8 +388,8 @@ jobs:
           fail_on_unmatched_files: true
           prerelease: true
 
-      - name: Upload mtg assets
-        if: env.ARTIFACT == 'mtg' && github.event_name == 'workflow_dispatch'
+      - name: Upload fptn assets
+        if: env.ARTIFACT == 'fptn' && github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         env:
           GH_TAG: ${{ steps.tag.outputs.tag }}
@@ -398,12 +399,12 @@ jobs:
           body: |
             Auto-built native binaries.
 
-            Engine: mtg (MTProxy for Telegram)
-            Source: github.com/9seconds/mtg
+            Engine: fptn (SNI Reality tunnel)
+            Source: github.com/fptn-project/FptnClient-Android
             Commit: ${{ github.sha }}
           files: |
-            out/mtg/libmtg-*.so
-            out/mtg/manifest.txt
+            out/fptn/libfptn_native_lib-arm64-v8a.so
+            out/fptn/manifest.txt
           fail_on_unmatched_files: true
           prerelease: true
 
@@ -502,16 +503,16 @@ jobs:
               cp "$AAR" engine-urnetwork/libs/userwireguard.aar
               echo "Copied userwireguard.aar → engine-urnetwork/libs/"
               ;;
-            mtg)
-              for ABI in arm64-v8a armeabi-v7a x86_64; do
-                SRC="out/libmtg-${ABI}.so"
-                DST="engine-telegram/src/main/jniLibs/${ABI}/libmtg.so"
-                if [ -f "$SRC" ]; then
-                  mkdir -p "$(dirname "$DST")"
-                  cp "$SRC" "$DST"
-                  echo "Copied $SRC → $DST"
-                fi
-              done
+            fptn)
+              SRC="out/libfptn_native_lib-arm64-v8a.so"
+              DST="engine-fptn/src/main/jniLibs/arm64-v8a/libfptn_native_lib.so"
+              if [ -f "$SRC" ]; then
+                mkdir -p "$(dirname "$DST")"
+                cp "$SRC" "$DST"
+                echo "Copied $SRC → $DST"
+              else
+                echo "ERROR: $SRC not found" >&2; ls out/; exit 1
+              fi
               ;;
             *)
               echo "No repo-copy mapping for artifact=$ARTIFACT — skipping update-repo"

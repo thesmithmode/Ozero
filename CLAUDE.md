@@ -1,24 +1,21 @@
 # CLAUDE.md — Ozero
 
-Правило само-обучения:
-После каждой допущенной ошибки и исправления, или нарушения формата, стиля и так далее, в общей любое вновь открывшееся правило должно быть добавлено в этот файл CLAUDE.md проекта,
-чтобы впредь ты не допускал подобные ошибки. Следи, чтобы файл оставался минималистичным, без дублирований и повторений, обобщай одинаковые мысли, сокращай текст при необходимости.
-Короткий но содержательный CLAUDE.md залог успеха.
+Само-обучение: новое правило → сюда. Без дублей, ≤100 строк.
 
 ## Продукт и архитектурный контракт
 
-Видение продукта → `README.md`. Архитектура → `.claude/Контекст/Architect.md`.
+Видение → `README.md`. Архитектура → `.claude/Контекст/Architect.md`.
 
 **Нерушимые инварианты:**
-- Каждый движок = отдельный gradle-модуль `engine-*`. Падение одного не валит соседей. Удалить движок = убрать один модуль.
-- Контракт: `Engine.start(config, upstream)` — единый интерфейс. `app/` знает только контракт, не детали реализации.
+- Каждый движок = отдельный gradle-модуль `engine-*`. Падение одного не валит соседей.
+- Контракт: `Engine.start(config, upstream)`. `app/` знает только контракт, не детали.
 - Single-engine = chain длины 1. Новый движок никогда не идёт файлами в `app/`.
-- Единый UI, максимальная изоляция движков. Низкая связанность — приоритет над любым удобством реализации.
+- Единый UI, максимальная изоляция движков.
 
 ## Комментарии в коде — запрет
 
 - НЕ писать комментарии. Code self-documenting через имена.
-- Исключение: критическая нетривиальность (subtle invariant, hidden constraint, workaround конкретного бага). One-liner без внутреннего контекста.
+- Исключение: критическая нетривиальность (subtle invariant, hidden constraint, workaround конкретного бага). One-liner.
 - НЕ оставлять ссылки на тикеты/инциденты/фазы (RT.X, E10, F4, JIRA-XXX).
 - При правке файла — удалять старые комментарии если не критичны.
 - Перед commit: `git diff --staged` → убрать подозрительное.
@@ -28,20 +25,19 @@
 Репо публичный. Каждая строка индексируется навсегда.
 
 - Никаких user-specific доменов, имён хостов, тестовых юзеров, путей `/root/...`, токенов/ключей.
-- Никаких упоминаний инцидентов/людей в коде/доках.
-- Все логи приложения — sanitize (см. CrashLogStore pattern).
+- Никаких упоминаний инцидентов/людей в коде/доках. Все логи — sanitize (CrashLogStore pattern).
 - Перед push: "что узнает посторонний из этого diff?"
 
 ## Режим работы
 
-- **Никогда не ждать субагентов или CI без дела.** Пока субагент работает или CI крутится — делать следующую задачу из списка, ревью кода, писать тесты, читать контекст. Нет задач — провести код ревью последних изменений. Простой = нарушение.
+- **Никогда не ждать субагентов или CI без дела.** Простой = нарушение.
 
 ## Подход к проблемам
 
-- Минимизировать технические вопросы к юзеру. Сам исследовать → сам решать → сам валидировать. Спрашивать только при genuine ambiguity или destructive action.
-- Любая проблема (баг, красный CI, falling test): **широкий взгляд первым** → vertical (UI→handler→service→native) + horizontal (соседние модули, producers/consumers, тесты, конфиги) → **корень**, не первый видимый симптом.
-- Фиксить корень, не симптом. 3 фикса подряд не помогли → пересмотр гипотезы.
-- Структурный fix > точечный patch. Если корень = workflow/процесс, добавить gate (pre-push hook, sentinel test, CI check), а не повторять fix руками.
+- Минимизировать вопросы к юзеру. Сам исследовать → решать → валидировать.
+- Любая проблема: **широкий взгляд первым** → vertical (UI→handler→service→native) + horizontal → **корень**.
+- Фиксить корень, не симптом. 3 фикса подряд → пересмотр гипотезы.
+- Структурный fix > точечный patch. Корень = workflow → добавить gate.
 
 ## Workflow
 
@@ -50,92 +46,70 @@
 
 ## Билд
 
-- Один универсальный APK (`assembleRelease`), без dynamic features.
-- abiFilters в APK: только arm64-v8a (`app/build.gradle.kts`). libhev/libam-go/libbyedpi/libmtg существуют только под arm64-v8a — расширение ABI без перестройки native = рантайм-краш. Sentinel'ы в release.yml тоже arm64-v8a-only.
-- R8 minify+shrink включены, но Log.* НЕ стрипаются (см. proguard-rules.pro).
+- Один APK (`assembleRelease`), без dynamic features.
+- abiFilters: только arm64-v8a. Расширение ABI без перестройки native = рантайм-краш.
+- R8 minify+shrink включены, Log.* НЕ стрипаются (proguard-rules.pro).
 
 ## Native libs
 
-- `System.loadLibrary` — **только lazy** через идемпотентный `loadOnce()` (см. `hev.TProxyService`, `ByeDpiProxy`). Никогда в `Application.onCreate`, `attachBaseContext`, init-блоках, companion object init. Нарушение → SIGSEGV в JNI_OnLoad на Application bootstrap (v1.0.1 краш). Исключение: per-process eager-load в `OzeroApp.onCreate` через `isEngineWarpProcess()` guard. `libam-go` грузится **только** в `:engine_warp` (Application.onCreate ветка с return после load). `libgojni` грузится **только** в основном процессе. Coexistence двух Go-рантаймов в одном процессе запрещён — конфликт GC signal handlers → SIGABRT (v0.0.12 на Nubia/RedMagic, 6 tombstones). Process-isolation реализован через `android:process=":engine_warp"` на `WarpEngineService` + AIDL `IWarpEngineProcess`. Защищено `OzeroAppProcessIsolationTest`.
-- `loadOnce()` для `libhev-socks5-tunnel` вызывать **только из main thread** (через `OzeroVpnService.startVpn` до `serviceScope.launch`). Загрузка с coroutine worker → SIGSEGV в vendor `libglnubia.so` `nubia::Messager::timerLoop` на Nubia/RedMagic (v1.0.3 краш). Правило защищено `OzeroVpnServiceLifecycleTest`.
-- `libhev-socks5-tunnel.so` собирать с `APP_CFLAGS=-DPKGNAME=hev` (release.yml + ci.yml). Upstream `src/hev-jni.c` defaults `PKGNAME=hev/htproxy`, без override → `FindClass("hev/htproxy/TProxyService")` = NULL → `RegisterNatives(NULL,...)` → ART `JniAbort` при первом старте VPN (v1.0.2 краш). Защищено `JniContractTest` + step `Assert PKGNAME=hev зашит`.
-- `hev.TProxyService` обязан объявлять **все три** `external fun`: `TProxyStartService(String, Int)`, `TProxyStopService()`, `TProxyGetStats(): LongArray`. Upstream `hev-jni.c` регистрирует ровно эти 3 метода через `RegisterNatives`. Отсутствие любого → `NoSuchMethodError` из `Runtime.nativeLoad` → `libhev` не грузится → tunnel не поднимается (v1.0.2 follow-up). Защищено `JniContractTest`.
-- `loadOnce()` обязан иметь `catch (e: Throwable)` после специфичных catch-блоков. `Runtime.nativeLoad` может бросить `NoSuchMethodError`, `LinkageError`, `ClassNotFoundException` — все вне `UnsatisfiedLinkError`/`SecurityException`. Без generic catch `loadError` остаётся `null`, диагностика теряется. Защищено `TProxyServiceLogTest`.
-- ByeDPI: CMD mode (`byedpiUseUiMode=false`) — `byedpiWinningArgs` идут в byedpi **verbatim**, только `trim()`. Никаких авто-suffix (`-Ku -a1 -An` и т.д.). Причина: пользовательская стратегия проектируется целостно — топология `-a` секций строго упорядочена, `-As`/`-An` mutually exclusive. Авто-append `-Ku -a1 -An` к user CMD (см. legacy `ensureUdpDesync`, 7da7e852) добавляет лишнюю `-a` секцию + переопределяет `-As` на `-An` → byedpi обрабатывает hosts иначе → YouTube ломается. Если эволюция выдала args без UDP — фиксить на уровне `AutoStrategyPicker`, не в CMD path. Защищено `ByeDpiBuildManualConfigTest`.
-- ByeDPI: `ByeDpiEngine.stop()` и `start()` failure path **всегда** вызывают `proxy.forceClose()` после `job.join()`, не conditional на `isActive`. Причина: `jniStopProxy` делает только `shutdown(server_fd, SHUT_RDWR)` без `close()`/`reset`. Upstream byedpi `main()` хранит `server_fd` глобально и при next start видит stale fd → возвращает -1. Регрессия проявляется как серия 10+ `jniStartProxy завершился с кодом -1` подряд (видно в 2026-05-15 01:33–01:40 продовом логе), recovery только после случайного `proxyJob не завершился за 1500ms — jniForceClose`. Sentinel — `start failure clears upstream server_fd so next start can bind same port` + `stop always forceClose after join` в `ByeDpiEngineTest`. Также проявляется как 0% результат в `EvolutionEngine` (600 start/stop циклов = накопление stale fd → все `EvalResult.startFailed=true` → fitness 0).
+- `System.loadLibrary` — **только lazy** через `loadOnce()`. Никогда в `Application.onCreate`/`attachBaseContext`/init-блоках/companion init. Исключение: `OzeroApp.onCreate` с `isEngineWarpProcess()` guard. `libam-go` только в `:engine_warp`, `libgojni` только в main process. Coexistence = SIGABRT. [sentinel: `OzeroAppProcessIsolationTest`]
+- `loadOnce()` для `libhev-socks5-tunnel` — **только из main thread**, до `serviceScope.launch`. [sentinel: `OzeroVpnServiceLifecycleTest`]
+- `libhev-socks5-tunnel.so` — собирать с `APP_CFLAGS=-DPKGNAME=hev` (release.yml + ci.yml). [sentinel: `JniContractTest`]
+- `hev.TProxyService` — объявлять **все три** `external fun`: `TProxyStartService(String, Int)`, `TProxyStopService()`, `TProxyGetStats(): LongArray`. [sentinel: `JniContractTest`]
+- `loadOnce()` — `catch (e: Throwable)` после специфичных catch-блоков. [sentinel: `TProxyServiceLogTest`]
+- ByeDPI CMD mode (`byedpiUseUiMode=false`): args идут **verbatim**, только `trim()`. Никаких авто-suffix (`-Ku -a1 -An`). [sentinel: `ByeDpiBuildManualConfigTest`]
+- ByeDPI: `stop()` и `start()` failure path **всегда** `proxy.forceClose()` после `job.join()`. [sentinel: `ByeDpiEngineTest`]
 
 ## Logging
 
-- BootFileLogger (filesDir/debug/boot.log) — persistent, append-only, init из attachBaseContext.
-- LogcatReader → in-memory ring buffer для UI Logs tab.
-- Boot log tab отдельный (Settings → Boot log), очистка только вручную.
-- `PersistentLoggers.error/warn` — для критичных событий, обязанных попасть в boot.log на диск (errors, warnings, JNI pre-blocking checkpoints для hang-диагностики). На success-events запрещено: `Log.i/d` достаточно — UnifiedLogger пишет и в logcat, и в файл через один канал. Дубль `Log.i + PersistentLoggers.info` на success → шум, удалять.
+- `PersistentLoggers.error/warn` — только критичные события (errors, JNI checkpoints для hang-диагностики). На success — запрещено, `Log.i/d` достаточно. Дубль → шум, удалять.
 
 ## Коммиты — типовые ловушки
 
-- Удалил вызов → удали импорт. ktlint/detekt режут unused imports как errors.
-- Перед commit: `git diff --staged` → проверить нет ли осиротевших import строк.
+- Удалил вызов → удали импорт. ktlint режет unused imports как errors. Перед commit: `git diff --staged`.
 
 ## Тесты — типовые ловушки
 
-- **Интерфейс изменился** (добавлен/удалён метод) → сразу `grep -r "FakeXxx\|StubXxx\|FakeRepo"` по тестам и обновить все fake-реализации. Compile fail в CI = не обновил.
-- **ViewModel/объект с начальным StateFlow-состоянием в `@BeforeEach`**: если тест требует конкретного начального состояния store/repo — создавать VM **внутри теста** ПОСЛЕ `store.setRaw(...)`, не переиспользовать экземпляр из setUp. Иначе coroutine видит null раньше, чем тест успевает установить значение → race → ложный auto-trigger.
-- **Material Icons**: использовать только символы из `material-icons-core`. `Icons.Filled.Android`, `Icons.Filled.Apps`, `Icons.Filled.PhoneAndroid` — не существуют в core → compile fail. Placeholder без icon из расширенного набора → `Text("?")`.
+- Интерфейс изменился → `grep -r "FakeXxx\|StubXxx"` и обновить все fakes. Compile fail в CI = не обновил.
+- VM с StateFlow в `@BeforeEach`: создавать VM **внутри теста** ПОСЛЕ `store.setRaw(...)`. Иначе race.
+- Material Icons: только `material-icons-core`. `Icons.Filled.Android/Apps/PhoneAndroid` — нет в core.
 
 ## Per-engine UI
 
-- Каждый engine (текущие модули: byedpi, telegram, urnetwork, warp, masterdns) обязан иметь settings screen в `app/src/main/java/.../ui/settings/engines/` для пользовательского override config (subscription URL, server picker, args, bridges, и т.д.). При добавлении нового `engine-*` модуля — добавить сюда.
+- Каждый engine обязан иметь settings screen в `ui/settings/engines/`. Текущие: byedpi, fptn, urnetwork, warp, masterdns.
+
+## Subprocess-proxy
+
+- `engine-masterdns` — subprocess-pattern, но полноценный `EnginePlugin` (`@IntoSet` через `MasterDnsModule`). `libmdnsvpn.so` через `ProcessBuilder`, **не** `System.loadLibrary`.
+- Routing: WARP (`socksPort==0`) → subprocess наследует UID (TUN авто). SOCKS-engine → `--socks5-proxy-url socks5://127.0.0.1:<port>`.
 
 ## Расследование — порядок (закон)
 
-ПЕРЕД спавном субагента / advisor / гипотезой / Read большого файла:
-1. `wiki-find <тема>` — выжимки в `.memory/knowledge/` уже компилированы из daily логов. Большая часть прошлых корней (URnetwork init, hev YAML, awgTurnOn, sigsegv причины, MTU, sock paths, handle invariants) уже разобрана.
-2. `ls .claude/Контекст/` + читать `*_ANALYSIS.md` соответствующего движка — рабочий reference-код.
-3. Только если шаги 1-2 не дали ответ — спавнить субагента / делать новые гипотезы.
-Цель: не ходить кругами, не повторять найденные ранее корни, не делать ложные revert (handle=0, MTU=8500). Memory ведём не зря.
+ПЕРЕД субагентом/advisor/гипотезой:
+1. `wiki-find <тема>` — `.memory/knowledge/` уже компилированы из daily логов.
+2. `ls .claude/Контекст/` + читать `*_ANALYSIS.md` соответствующего движка.
+3. Только если 1-2 не дали ответ — субагент/новые гипотезы.
 
-## Reference impls движков (`.claude/Контекст/` — обязательно читать ПЕРЕД любой работой по движку)
+## Reference impls движков (`.claude/Контекст/`)
 
-В папке `.claude/Контекст/` собраны рабочие образцы кода (decompiled APK / official source) — это эталоны. Любая правка движка начинается с `ls .claude/Контекст/` и чтения соответствующего analysis-md.
-
-Маппинг папка → движок:
-- `Контекст/android/` → **URnetwork** (официальный Android source `bringyour/network-android`). Эталон для `engine-urnetwork`. См. `URNETWORK_INIT_ANALYSIS.md`. Покрывает locations, provideMode, enhanced anonymization, dedicated/sticky IP, ConnectGrid.
-- `Контекст/PORTAL_WG_v1.4.3/` + `Контекст/CYBERPORTAL_X-v1.0.2/` → **WARP** (AmneziaWG stack). Эталон для `engine-warp`. См. `PORTAL_WG_ANALYSIS.md`. Покрывает `awgTurnOn` 4-arg сигнатуру, uapiPath=`getDataDir()`, ReLinker для `libam-go`, mirror-контракт Cloudflare WARP API.
-- `Контекст/ByeByeDPI-v.1.7.5/` → **ByeDPI** (полный source ByeByeDPI 1.7.5, single-engine app). Эталон для `engine-byedpi` + hev pipeline. Сравнивать args, hev YAML, init order. byedpi submodule pin: `ba532298` (main HEAD 2026-03-26, 38 коммитов вперёд v0.17.3).
-- `Контекст/karing/`, `Контекст/Invizible_Pro*/`, `Контекст/КИБЕРЩИТ*/`, `Контекст/ResultV/`, `Контекст/PortalConnect*/`, `Контекст/amnezia-{client,vpn}/` — дополнительные источники (decompiled APK / source-mirror). Использовать как secondary references при поиске специфичных фич.
-- `Контекст/Architect.md`, `AUDIT.md`, `PRD.md`, `SPEC.md`, `ПЛАН.md` — проектные документы, не reference.
-
-## MTProxy / Subprocess-proxy паттерн
-
-- `engine-telegram` — не VPN routing engine, а side-car proxy subprocess. Не реализует `Engine` интерфейс, не регистрируется через `@IntoSet`.
-- `engine-masterdns` — subprocess-pattern по образцу `engine-telegram`, но **полноценный** `EnginePlugin` (регистрируется `@IntoSet` через `MasterDnsModule`). Go-бинарь `libmdnsvpn.so` в `jniLibs/arm64-v8a/`, запуск через `ProcessBuilder`, **не** `System.loadLibrary`. Конфиг: TOML + resolvers.txt пишутся в `filesDir/masterdns/` (writer перезатирает `LISTEN_IP/LISTEN_PORT/LOCAL_DNS_ENABLED`). Локальный SOCKS5 берёт `MasterDnsPortAllocator` из диапазона `18000..18999`. Свой Go-рантайм изолирован subprocess'ом → не конфликтует с `libgojni`/`libam-go`. Бинарь поставляется через `binaries.lock.yaml` после ручного workflow `build-masterdns.yml` (release-тег `masterdns-<short>`); до публикации lock-entry отсутствует, модуль собирается без артефакта.
-- Subprocess запускается через `ProcessBuilder` из `nativeLibraryDir`. Бинарь (`libmtg.so`) — prebuilt Go binary, помещается прямо в `jniLibs/<abi>/`. **Не** грузить через `System.loadLibrary` — бинарь запускается как отдельный процесс, не как .so.
-- Routing через VPN: при WARP (`socksPort == 0`) subprocess наследует UID → трафик через TUN автоматически (`excludeSelf=false`). При SOCKS-engine — передать `--socks5-proxy-url socks5://127.0.0.1:<port>` (loopback минует TUN).
-- `TelegramProxyCoordinator` — единственная точка связи VPN state и proxy: наблюдает `TunnelController.state` + `configStore.config()` через `combine`, выбирает upstream, вызывает `start/stop`. Инициализируется в `OzeroApp.onCreate` через Hilt inject + `runCatching`.
-
-## Контекст-файлы (читать в начале каждой сессии)
-
-- `.claude/Контекст/Architect.md` — карта связей между модулями + неочевидные решения (loadOnce/main thread, PKGNAME, два слоя Engine+Delegate, и т.д.). Обновлять при изменении модулей или появлении новых неочевидных инвариантов. Не превращать в ридми — только связи и обоснования.
-- `.claude/Контекст/AUDIT.md` — append-only журнал findings (P1…P##). Не суммаризировать в новый план без явной команды юзера.
+- `android/` → **URnetwork** (`URNETWORK_INIT_ANALYSIS.md`)
+- `PORTAL_WG_v1.4.3/` + `CYBERPORTAL_X-v1.0.2/` → **WARP** (`PORTAL_WG_ANALYSIS.md`)
+- `ByeByeDPI-v.1.7.5/` → **ByeDPI**. byedpi submodule pin: `ba532298`.
+- `karing/`, `Invizible_Pro*/`, `КИБЕРЩИТ*/`, `ResultV/`, `PortalConnect*/`, `amnezia-{client,vpn}/` — secondary references.
+- `Architect.md`, `AUDIT.md`, `PRD.md`, `SPEC.md`, `ПЛАН.md` — проектные документы, не reference.
 
 <!-- === rules:start === -->
-## Внешние правила (thesmithmode/rules — отфильтровано под Ozero)
+## Внешние правила
 
-Подтянуто скиллом `/rules`. Из 16 правил в репо — оставлено 5 релевантных Android/Kotlin/Compose проекту. Остальные (Next.js, Python, Postgres jobs, OAuth, billing, web-i18n, web-analytics, payments) **намеренно не скачаны** — для Ozero они дезориентируют. Re-run `/rules` обновит снапшот, но фильтр придётся применить заново вручную.
-
-- [`context7.md`](C:/Soft/Projects/Ozero/.claude/rules/context7.md) — **Закон.** Всегда использовать `context7` MCP при работе с любой библиотекой/SDK: установка, импорты, конфиг, обновления, дебаг. Применять для AndroidX, Compose, Hilt, Kotlin coroutines, Gradle plugins, и т.д.
-- [`tests.md`](C:/Soft/Projects/Ozero/.claude/rules/tests.md) — **Закон с поправкой.** AAA-паттерн, exhaustive edge-cases (null/empty/boundary/invalid types/race/auth/pagination). Coverage порог в Ozero **≥95%**, target 100%. Чек-лист "что тестировать" применять полностью.
-- [`folders.md`](C:/Soft/Projects/Ozero/.claude/rules/folders.md) — **Дух применим, буква нет.** Принцип "разделение по сервисам" в Ozero реализован через 9 gradle-модулей (`app`, `engines-core`, `core-storage`, `common-{vpn,dns,crypto}`, `engine-{byedpi,urnetwork,warp}`). Новый движок = новый `engine-*` модуль, не файлы в `app/`. Текст правила про `frontend/backend/worker/` — игнорить, у нас Android single-APK.
-- [`git.md`](C:/Soft/Projects/Ozero/.claude/rules/git.md) — **Только reference, НЕ закон.** В правиле: `develop` default + PR `develop→main`. У Ozero: `dev` default, ветки `feat/`/`fix/` от `dev`, **squash-merge без PR** (см. global `feedback_no_pull_requests`), main только по явной команде. При конфликте — побеждают глобальные/проектные правила.
-- [`translate.md`](C:/Soft/Projects/Ozero/.claude/rules/translate.md) — **Только baseline-локали.** Из правила берём список обязательных локалей: `ru`, `en`, `es`, `pt`. Архитектура (Next.js URL-locales, namespaced JSON) **не применима** — у Ozero Android `values-{en,es,pt}/strings.xml`. Сейчас активны только `ru`+`en` (W9.1), расширение до `es`+`pt` в W9.2.
+- [`context7.md`](.claude/rules/context7.md) — **Закон.** Context7 MCP для всех библиотек/SDK.
+- [`tests.md`](.claude/rules/tests.md) — **Закон.** AAA, coverage ≥95%, exhaustive edge-cases.
+- [`folders.md`](.claude/rules/folders.md) — **Дух.** Новый движок = `engine-*` модуль, не файлы в `app/`.
+- [`git.md`](.claude/rules/git.md) — **Reference.** У Ozero: `dev` default, squash-merge без PR, main только по команде.
+- [`translate.md`](.claude/rules/translate.md) — **Baseline.** Локали ru/en/es/pt → `values-{en,es,pt}/strings.xml`.
 
 <!-- === rules:end === -->
 
 ## graphify
 
-This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
-
-Rules:
-Две knowledge-системы, обе используются:
-- `graphify-out/` — структура кода (AST граф): `GRAPH_REPORT.md` (god nodes, communities), `graph.json`, `manifest.json`. Читать `GRAPH_REPORT.md` для ориентирования; для связей — `graphify query "..."`, `graphify path "A" "B"`, `graphify explain "..."`. После правок кода — `graphify update .`. Wiki-subdir у graphify не генерируется в этом проекте, не искать.
-- `.memory/knowledge/index.md` — project knowledge (концепции/lessons/connections), compiled из daily logs. Использовать для "почему так сделано", прошлых багов, неочевидных решений.
+- `graphify-out/GRAPH_REPORT.md` — god nodes, communities. `graphify query/path/explain`. После правок кода — `graphify update .`.
+- `.memory/knowledge/index.md` — project knowledge (почему так сделано, прошлые баги, неочевидные решения).

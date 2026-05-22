@@ -17,6 +17,7 @@ import ru.ozero.commonvpn.TunnelState
 import ru.ozero.engineurnetwork.InMemoryUrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkConfig
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
+import ru.ozero.engineurnetwork.setProvideEnabled
 import ru.ozero.enginescore.EngineId
 import kotlin.test.assertEquals
 
@@ -74,13 +75,32 @@ class UrnetworkRelayCoordinatorTest {
     }
 
     @Test
-    fun `relay не запускает bridge для URnetwork движка — только setProvidePaused`() = runTest(dispatcher) {
+    fun `relay не запускает bridge и не трогает setProvidePaused для URnetwork движка`() = runTest(dispatcher) {
         setByClientJwt("test-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.URNETWORK, socksPort = 0)
 
         assertEquals(0, bridge.startCalls)
-        assertEquals(1, bridge.setProvidePausedCalls)
+        assertEquals(0, bridge.setProvidePausedCalls)
+    }
+
+    @Test
+    fun `relay передаёт setProvidePaused false когда provideEnabled true в configStore`() = runTest(dispatcher) {
+        setByClientJwt("test-jwt")
+        configStore.setProvideEnabled(true)
+        tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
+
+        assertEquals(1, bridge.startCalls)
         assertEquals(false, bridge.lastProvidePaused)
+    }
+
+    @Test
+    fun `relay передаёт setProvidePaused true когда provideEnabled false в configStore`() = runTest(dispatcher) {
+        setByClientJwt("test-jwt")
+        configStore.setProvideEnabled(false)
+        tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
+
+        assertEquals(1, bridge.startCalls)
+        assertEquals(true, bridge.lastProvidePaused)
     }
 
     @Test

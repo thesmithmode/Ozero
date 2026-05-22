@@ -37,8 +37,15 @@ class DataStoreWarpConfigSlotStore(
 
     override suspend fun addSlot(name: String, config: WarpConfig, rawIni: String?): String = mutex.withLock {
         val id = UUID.randomUUID().toString()
+        val fingerprint = config.dedupFingerprint()
+        var duplicate: WarpConfigSlot? = null
         dataStore.edit { prefs ->
             val current = parseSlots(prefs[KEY_SLOTS] ?: "[]")
+            val existing = current.firstOrNull { it.config.dedupFingerprint() == fingerprint }
+            if (existing != null) {
+                duplicate = existing
+                return@edit
+            }
             val makeActive = current.isEmpty()
             val updated = current + WarpConfigSlot(
                 id = id,
@@ -49,6 +56,7 @@ class DataStoreWarpConfigSlotStore(
             )
             prefs[KEY_SLOTS] = serializeSlots(updated)
         }
+        duplicate?.let { throw WarpConfigDuplicateException(it.id, it.name) }
         id
     }
 
@@ -198,9 +206,28 @@ class DataStoreWarpConfigSlotStore(
         return WarpConfigSlot(
             id = obj.getString("id"),
             name = obj.getString("name"),
-            config = config,
+            config = config.copy(awgParams = migrateAwgParams(awg)),
             isActive = obj.optBoolean("isActive", false),
             rawIniOverride = rawIni,
+        )
+    }
+
+    private fun migrateAwgParams(awg: AwgParams): AwgParams {
+        val isOldInjected = awg.underloadPacketJunkSize == 19 &&
+            awg.payloadPacketJunkSize == 20 &&
+            awg.payloadPacketSizeCount1 == 28 &&
+            awg.payloadHexI1 == null &&
+            awg.payloadPacketSizeCount2 == 29 &&
+            awg.payloadHexI2 == null &&
+            awg.payloadPacketSizeCount3 == 10 &&
+            awg.payloadHexI5 == null
+        if (!isOldInjected) return awg
+        return awg.copy(
+            underloadPacketJunkSize = 0,
+            payloadPacketJunkSize = 0,
+            payloadPacketSizeCount1 = 0,
+            payloadPacketSizeCount2 = 0,
+            payloadPacketSizeCount3 = 0,
         )
     }
 

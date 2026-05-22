@@ -1,5 +1,221 @@
 # Build Log
 
+## [2026-05-22T24:00:00+03:00] compile | Daily Log 2026-05-22 (pass 24 — schema-driven audit)
+- Source: daily/2026-05-22.md
+- Articles created: (none — all prior passes complete)
+- Articles updated: (none)
+- Audit: all 23 prior passes confirmed complete; index fully up to date; no missed concepts
+- Status: daily/2026-05-22.md compilation verified as 100% complete
+
+## [2026-05-22T23:59:59+03:00] compile | Daily Log 2026-05-22 (pass 23 — final schema-driven verification)
+- Source: daily/2026-05-22.md
+- Articles created: (none — all 22 prior passes complete)
+- Articles updated: (none)
+- Verified articles (read and confirmed complete):
+  - [[concepts/fptn-engine-protocol]] — stop order, JNI fixes, brotli, Kotlin fd-leaks, CI failures; all present
+  - [[concepts/jni-local-global-ref-lifecycle]] — GetStringUTFChars, NewGlobalRef return value, NewWeakGlobalRef; complete
+  - [[concepts/android-brotliinputstream-hidden-api]] — fptnb: unsupported, org.brotli:dec alternative; complete
+  - [[concepts/warp-split-tunnel-allowfamily-bug]] — FIXED; allowFamily(AF_INET6) unconditional; v0.1.15; complete
+  - [[concepts/vpnservice-double-shutdown-guard]] — stopping reset in finally → double shutdown; join shutdownJobRef fix; complete
+  - [[concepts/urnetwork-relay-always]] — hardcode bug lines 67+81; two-branch fix; UI visibility; bootstrapJob.join(); complete
+  - [[concepts/engine-chip-race-observer]] — switching clear condition; restartVpnIfConnected target preservation; complete
+  - [[concepts/byedpi-hev-pipeline-upstream-parity]] — udp:tcp→udp:udp revert; hevLogLevel; YouTube 370KB/s confirmed; complete
+  - [[concepts/sentinel-protecting-bug-trap]] — switching-desync assertNull incident; complete
+  - [[concepts/vpn-slot-conflict-detection]] — isExternalVpnActive() ownerUid false positive v0.1.11/v0.1.12; complete
+  - [[concepts/engine-chip-switching-desync]] — generic fix + residual watchdog gap (fix pending 23:11); complete
+- Index: no new rows needed — all articles present
+- Status: daily/2026-05-22.md fully compiled across 23 passes
+
+## [2026-05-22T23:59:00+03:00] compile | Daily Log 2026-05-22 (pass 22 — final verification + warp-split-tunnel sources fix)
+- Source: daily/2026-05-22.md
+- Articles created: (none — all 21 prior passes complete)
+- Articles updated:
+  - [[concepts/warp-split-tunnel-allowfamily-bug]] — Sources section corrected: session 22:09 said "awaiting logs" but article body already said FIXED; added note that fix was confirmed post-session, applied in commit `badcb68e`, released v0.1.15; initial hypothesis (remove allowFamily) was revised to (add both AF_INET + AF_INET6)
+- Verified complete: all sessions 11:59–23:11 in daily/2026-05-22.md fully compiled across passes 1–22
+- Status: compilation 100% complete
+
+## [2026-05-22T23:11:00+03:00] compile | Daily Log 2026-05-22 (pass 21 — session 23:11 compiled)
+- Source: daily/2026-05-22.md
+- Articles created: (none)
+- Articles updated:
+  - [[concepts/fptn-engine-protocol]] — Kotlin fd-leak fixes (FileOutputStream on error path, FileInputStream .use{}, SupervisorJob accumulation from repeated attachTun without stop()); CI failure pattern: engine-telegram ci.yml refs left after module deletion; SettingsRepositoryTest reconcile broken by FPTN addition (must grep engine-enumeration tests when adding engine)
+  - [[concepts/engine-chip-switching-desync]] — Residual gap: switching watchdog resets _switching but does not stop running engine → ByeDPI survives watchdog timeout → WARP starts in parallel → traffic conflict; fix pending as of 23:11
+- Index updated: (no new rows — all articles pre-existing)
+
+## [2026-05-22T23:59:59+03:00] compile | Daily Log 2026-05-22 (pass 20 — new standalone articles)
+- Source: daily/2026-05-22.md
+- Articles created:
+  - [[concepts/jni-local-global-ref-lifecycle]] — general JNI ref management traps (GetStringUTFChars, NewGlobalRef return value, NewWeakGlobalRef lifecycle) extracted from FPTN C++ fix; applicable to all Android JNI
+  - [[concepts/android-brotliinputstream-hidden-api]] — android.util.BrotliInputStream not a public SDK API; discovered via FPTN fptnb: token parsing; use org.brotli:dec instead
+- Articles updated: (none — all prior content already compiled in passes 1-19)
+- Index updated: 2 new rows added
+- Note: previous 19 passes declared 100% complete; these two articles extract general-purpose traps that deserve independent discoverability beyond fptn-engine-protocol
+
+## [2026-05-22T23:59:00+03:00] compile | Daily Log 2026-05-22 (pass 19 — schema-triggered verification)
+- Source: daily/2026-05-22.md
+- Articles created: (none — all created in passes 1-17)
+- Articles updated: (none — all updated in passes 1-17)
+- Verified: vpnservice-double-shutdown-guard, warp-allowedips-tun-routing, engine-chip-switching-desync, qs-tile-vpn-integration, fptn-engine-protocol (JNI leaks + stop race + brotli API), warp-split-tunnel-allowfamily-bug, clash-module-architecture, urnetwork-relay-always (hardcode bug + UI fixes), urnetwork-balance-optimistic-cache (cap removed), vpn-slot-conflict-detection (ownerUid v0.1.12), byedpi-hev-pipeline-upstream-parity (YouTube 370KB/s confirmed), warp-config-generator-api (IP ranges), amnezia-wg-warp-migration (S3/S4/I1/I2/I5 defaults + migration), sentinel-protecting-bug-trap (switching-desync case), engine-chip-race-observer
+- Status: compilation 100% complete for all sessions 11:59–22:36 in daily/2026-05-22.md
+
+## [2026-05-22T22:36:02+03:00] compile | Daily Log 2026-05-22 (pass 18 — re-run verification)
+- Source: daily/2026-05-22.md
+- Articles created: (none)
+- Articles updated: (none)
+- Status: all content already compiled in passes 1-17; re-run confirms 100% coverage for all sessions 11:59–22:34
+
+## [2026-05-22T23:59:59+03:00] compile | Daily Log 2026-05-22 (pass 17 — full verification, compilation complete)
+- Source: daily/2026-05-22.md
+- Articles created: (none — all articles verified current)
+- Articles updated: (none — all 16 prior passes complete)
+- Verified: fptn-engine-protocol (JNI leaks/stop race/brotli), urnetwork-relay-always (hardcode bug + UI fixes), warp-allowedips-tun-routing (root cause confirmed), sentinel-protecting-bug-trap (switching-desync incident), vpn-slot-conflict-detection (ownerUid fix v0.1.12), vpnservice-double-shutdown-guard, engine-chip-switching-desync, qs-tile-vpn-integration, warp-split-tunnel-allowfamily-bug, clash-module-architecture, byedpi-hev-pipeline-upstream-parity, warp-config-generator-api, amnezia-wg-warp-migration, urnetwork-balance-accumulation-mechanism, urnetwork-balance-optimistic-cache, urnetwork-location-hierarchy-migration, urnetwork-location-stability-privacy-icons, engine-chip-race-observer
+- Status: compilation 100% complete for all sessions 11:59–22:34 in daily/2026-05-22.md
+
+## [2026-05-22T22:32:00+03:00] compile | Daily Log 2026-05-22 (pass 16 — session 22:20+ FPTN JNI implementation)
+- Source: daily/2026-05-22.md
+- Articles created: (none)
+- Articles updated:
+  - [[concepts/fptn-engine-protocol]] — added session 22:20+ content: android.util.BrotliInputStream not public API (fptnb: unsupported); JNI memory leaks (GetStringUTFChars/NewWeakGlobalRef/NewGlobalRef patterns); stop() race condition (correct teardown order: nativeStop→pfd.close→scope.cancel→join→nativeDestroy); diagnostic logging strategy; fis.read() blocking + coroutine cancellation rule
+- Index updated: (no new rows; fptn-engine-protocol row already present with correct 2026-05-22 date)
+- Gap: session 22:20+ was compiled at 22:00 (pass 9) before the session occurred; passes 10-15 did not revisit fptn-engine-protocol
+
+## [2026-05-22T23:59:00+03:00] compile | Daily Log 2026-05-22 (pass 15 — final: Clash architecture + providerCount)
+- Source: daily/2026-05-22.md
+- Articles created: [[concepts/clash-module-architecture]]
+- Articles updated:
+  - [[concepts/urnetwork-location-stability-privacy-icons]] — added providerCount semantics (total registered nodes, not online); isStrongPrivacy renders as lock icon (not infinity); source daily/2026-05-22.md added
+- Index updated: 1 new row (clash-module-architecture) + 1 updated row (urnetwork-location-stability-privacy-icons summary + date + source)
+- Gap closed: session 19:47 had two uncaptured facts — (1) Clash deferred decision with architecture; (2) providerCount semantic mismatch — both missed in passes 1-14
+- Status: compilation complete for all 2026-05-22 sessions (passes 1-15)
+
+## [2026-05-22T22:09:00+03:00] compile | Daily Log 2026-05-22 (pass 14 — session 22:09 captured)
+- Source: daily/2026-05-22.md
+- Articles created: [[concepts/warp-split-tunnel-allowfamily-bug]]
+- Articles updated: (none — passes 1-13 already covered sessions 11:59–21:27)
+- Gap closed: session 22:09 (WARP split tunnel + Gemini IPv6 failure) was beyond "21:27" boundary of pass 12 verification
+- Status: compilation complete for all 2026-05-22 sessions
+
+## [2026-05-22T23:59:59+03:00] compile | Daily Log 2026-05-22 (pass 13 — FREE_TIER_CAP contradiction fix)
+- Source: daily/2026-05-22.md
+- Articles created: (none)
+- Articles updated:
+  - [[concepts/urnetwork-balance-accumulation-mechanism]] — reversed UX decision: FREE_TIER_CAP_BYTES=34GiB removed (commit e0d53ca4); display real balance via coerceAtLeast(0L); old "cap at 34 GiB" recommendation was contradicted by session 16:42 decision
+  - [[concepts/urnetwork-balance-optimistic-cache]] — added FREE_TIER_CAP_BYTES removal note + 2026-05-22 source
+- Index updated: 2 rows (urnetwork-balance-accumulation-mechanism, urnetwork-balance-optimistic-cache — corrected summaries + dates)
+- Gap found by: grep for FREE_TIER_CAP / coerceAtLeast returned no hits in knowledge/ articles despite being in session 16:42 log
+- Status: pass 12 had "100% complete" but missed this contradiction with prior "UX fix: cap at 34 GiB" claim
+
+## [2026-05-22T23:59:59+03:00] compile | Daily Log 2026-05-22 (pass 12 — schema-triggered, full verification pass)
+- Source: daily/2026-05-22.md
+- Articles created: (none — all 5 articles from today confirmed complete: vpnservice-double-shutdown-guard, warp-allowedips-tun-routing, engine-chip-switching-desync, qs-tile-vpn-integration, fptn-engine-protocol)
+- Articles updated: (none — all 8 updates confirmed current: urnetwork-relay-always, byedpi-hev-pipeline-upstream-parity, warp-config-generator-api, amnezia-wg-warp-migration, sentinel-protecting-bug-trap, vpn-slot-conflict-detection, urnetwork-location-hierarchy-migration, engine-chip-race-observer)
+- Status: compilation 100% complete, all sessions 11:59–21:27 fully captured in passes 1-11
+
+## [2026-05-22T23:59:59+03:00] compile | Daily Log 2026-05-22 (pass 11 — triggered compilation, full verification)
+- Source: daily/2026-05-22.md
+- Articles created: (none — all 5 new articles verified complete)
+- Articles updated: (none — all 8 updates verified current)
+- Verified: urnetwork-relay-always, warp-config-generator-api, amnezia-wg-warp-migration, byedpi-hev-pipeline-upstream-parity, sentinel-protecting-bug-trap, vpn-slot-conflict-detection, urnetwork-location-hierarchy-migration, engine-chip-race-observer — all include 2026-05-22 source entries with correct content
+- Status: compilation 100% complete, no gaps found
+
+## [2026-05-22T23:59:59+03:00] compile | Daily Log 2026-05-22 (pass 10 — final verification, all sessions captured)
+- Source: daily/2026-05-22.md
+- Articles created: (none — all 5 new articles confirmed complete: vpnservice-double-shutdown-guard, warp-allowedips-tun-routing, engine-chip-switching-desync, qs-tile-vpn-integration, fptn-engine-protocol)
+- Articles updated: (none — all 8 updates from passes 1-9 verified current)
+- Status: all sessions from 11:59 through 21:27 fully compiled across 9 prior passes; pass 10 is verification-only
+
+## [2026-05-22T22:00:00+03:00] compile | Daily Log 2026-05-22 (pass 9 — FPTN session 21:27 captured)
+- Source: daily/2026-05-22.md
+- Articles created: [[concepts/fptn-engine-protocol]]
+- Articles updated: [[knowledge/index.md]] (new row added)
+- Gap found: passes 7+8 completed at 21:00 / 21:27 but session 21:27 (FPTN engine planning) occurred AFTER those passes ran
+
+## [2026-05-22T21:27:15+03:00] compile | Daily Log 2026-05-22 (pass 8 — schema-triggered recompile, verified complete)
+- Source: daily/2026-05-22.md
+- Articles created: (none — all 4 already exist: vpnservice-double-shutdown-guard, warp-allowedips-tun-routing, engine-chip-switching-desync, qs-tile-vpn-integration)
+- Articles updated: (none — all 8 updates from passes 1-7 verified current)
+- Status: compilation fully complete as of pass 7; this pass confirmed no gaps
+
+## [2026-05-22T21:00:00+03:00] compile | Daily Log 2026-05-22 (pass 7 — final verification, no gaps)
+- Source: daily/2026-05-22.md
+- Articles created: (none)
+- Articles updated: (none)
+- Verification: all sessions cross-checked against log entries; session 13:30 (reviewer domain memory injection insight) confirmed already captured in connections/self-review-insufficient-code-reviewer-required.md from daily/2026-05-20.md; compilation complete
+
+## [2026-05-22T20:30:00+03:00] compile | Daily Log 2026-05-22 (full verification — 6-pass compilation complete)
+- Source: daily/2026-05-22.md
+- Articles created: [[concepts/vpnservice-double-shutdown-guard]], [[concepts/warp-allowedips-tun-routing]], [[concepts/engine-chip-switching-desync]], [[concepts/qs-tile-vpn-integration]]
+- Articles updated: [[concepts/engine-chip-race-observer]], [[concepts/urnetwork-relay-always]], [[concepts/byedpi-hev-pipeline-upstream-parity]], [[concepts/warp-config-generator-api]], [[concepts/amnezia-wg-warp-migration]], [[concepts/sentinel-protecting-bug-trap]], [[concepts/vpn-slot-conflict-detection]], [[concepts/urnetwork-location-hierarchy-migration]]
+- Index updated: 4 new rows + 8 updated rows
+- Sessions covered: 11:59 (chip switching desync fix), 13:00 (YouTube/QUIC revert), 13:40+ (double-shutdown root cause, log analysis), 16:02+ (URnetwork relay coordinator hardcode bug + UI fixes), 17:51 (WARP AWG defaults/migration/AllowedIPs routing), 19:25 (QS tile), 19:32 (Ruslan ownerUid false positive), 19:47 (selectLocation offline fix)
+- Verification: all passes confirmed against daily log — no gaps found
+
+## [2026-05-22T23:59:00+03:00] compile | Daily Log 2026-05-22 (pass 6 — selectLocation offline fix, session 19:47)
+- Source: daily/2026-05-22.md
+- Articles created: (none)
+- Articles updated:
+  - [[concepts/urnetwork-location-hierarchy-migration]] — `selectLocation` early return `if (!isUrnetworkActive) return` blocked offline country selection; fix: remove guard — `bridge.setPreferredLocation()` is AtomicReference-safe, no active VPN required
+- Index updated: 1 row (urnetwork-location-hierarchy-migration summary + date + source)
+- Sessions covered: 19:47 (selectLocation offline fix; Clash-module deferred to future; ktlint `&&` start-of-line + line>120 + UnusedParameter CI patterns)
+
+## [2026-05-22T23:30:00+03:00] compile | Daily Log 2026-05-22 (pass 5 — isExternalVpnActive ownerUid false positive)
+- Source: daily/2026-05-22.md
+- Articles created: (none)
+- Articles updated:
+  - [[concepts/vpn-slot-conflict-detection]] — isExternalVpnActive() missing ownerUid filter: own dying VPN detected as external → 750ms delay + protect() conflict → cycling loop; fix c1123b04 (API 29+ ownerUid guard, v0.1.12); log pattern + diagnostic shortcut documented
+- Index updated: 1 row (vpn-slot-conflict-detection summary + date + source)
+- Sessions covered: 19:32 (Ruslan v0.1.11 user report — cycling VPN; isExternalVpnActive false positive root cause; v0.1.12 fix confirmed)
+- Note: Passes 1-4 covered all other sessions; this pass closes the remaining gap
+
+## [2026-05-22T22:00:00+03:00] compile | Daily Log 2026-05-22 (pass 4 — QS tile)
+- Source: daily/2026-05-22.md
+- Articles created:
+  - [[concepts/qs-tile-vpn-integration]] — QS tile smart toggle; ozero_logo_white icon; TunnelController.state flow collection; stub-existence pattern; toggle-via-Intent deferred
+
+## [2026-05-22T21:00:00+03:00] compile | Daily Log 2026-05-22 (pass 3 — AWG defaults migration gap)
+- Source: daily/2026-05-22.md
+- Articles created: (none)
+- Articles updated:
+  - [[concepts/amnezia-wg-warp-migration]] — S3/S4/I1/I2/I5 defaults reset to 0; WarpIniBuilder skips zero fields; normalizeAwgParams fingerprint migration (5-field fingerprint 19/20/28/29/10 in slotFromJson); commits 796932cc + 78cb33f2
+
+## [2026-05-22T20:00:00+03:00] compile | Daily Log 2026-05-22 (pass 2 — sentinel update + chip-switching article)
+- Source: daily/2026-05-22.md
+- Articles created:
+  - [[concepts/engine-chip-switching-desync]] — supplementary article for Connected(X) switching-clear desync; content also present in engine-chip-race-observer; indexed separately for retrieval clarity
+- Articles updated:
+  - [[concepts/sentinel-protecting-bug-trap]] — added 3rd incident (switching-desync assertNull sentinel); sources updated to daily/2026-05-22.md; date 2026-05-15→2026-05-22
+
+## [2026-05-22T19:15:00+03:00] compile | Daily Log 2026-05-22
+- Source: daily/2026-05-22.md
+- Articles created:
+  - [[concepts/vpnservice-double-shutdown-guard]] — stopping flag reset in performShutdown finally → onDestroy CAS triggers second shutdown; fix: join shutdownJobRef; idempotency guard pattern
+  - [[concepts/warp-allowedips-tun-routing]] — amneziawg.conf selective AllowedIPs + always 0.0.0.0/0 TUN route → non-matching traffic dropped by AWG; PORTAL_WG adds per-AllowedIPs TUN routes
+- Articles updated:
+  - [[concepts/engine-chip-race-observer]] — switching clear condition (sw.to==null||sw.to==X); restartVpnIfConnected preserves pending target; sentinel was asserting buggy behavior
+  - [[concepts/urnetwork-relay-always]] — RelayCoordinator hardcode bug (always setProvidePaused(false)); fix: URNETWORK branch no-override, relay branch reads configStore; BalanceCard/ProvideSection visibility; bootstrapJob.join() race
+  - [[concepts/byedpi-hev-pipeline-upstream-parity]] — udp:tcp→udp:udp revert (QUIC regression); hevLogLevel in YAML; YouTube CMD confirmed 370KB/s from v0.1.13 log
+  - [[concepts/warp-config-generator-api]] — validateCloudflarePeer expanded to IP ranges 162.159.192-195.* and 188.114.96-99.* (REQUEST_BODY returns IP not hostname)
+
+## [2026-05-22T18:30:00+03:00] compile | Daily Log 2026-05-21
+- Source: daily/2026-05-21.md
+- Articles created:
+  - [[concepts/engine-masterdns]] — subprocess EnginePlugin (ProcessBuilder libmdnsvpn.so); 7 review fixes: 10s timeout, @Suppress upstream, case-insensitive TOML, MasterDnsResolversCache Eagerly, host:port parsing, stdout limit, DataStore error handling; auto-mode enrollment
+  - [[concepts/applytunderlying-split-contract]] — applyUnderlying=false ByeDPI (QUIC parity) vs =true killswitch TUN (P37); 4th sentinel trap: literal vs signature assertion
+  - [[concepts/warp-config-naming-dedup]] — generated config name = endpoint hostname; WarpConfigDuplicateException fingerprint dedup
+  - [[concepts/urnetwork-providemmode-regions-cities]] — ProvideModeNone→empty regions/cities for fresh users; applyDeviceFields 13-field helper; ProvideModePublic override
+  - [[concepts/ontaskremoved-vpn-swipe-standard]] — onTaskRemoved must NOT call stopVpn; swipe ≠ stop VPN; sentinel regression guard
+- Articles updated:
+  - [[concepts/byedpi-ensure-udp-desync]] — CMD path removal: ensureUdpDesync removed from CMD mode (Task16); CMD verbatim contract; ensureUdpDesync still relevant for UI mode
+  - [[connections/sentinel-trap-family]] — 4th trap type added: literal-vs-signature assertion breaks when default-param refactor replaces inline literal with pass-through; table updated; sources updated
+
+## [2026-05-22T00:00:00+03:00] compile | Daily Log 2026-05-20 (pass 11 — session 20:00 ensureUdpDesync)
+- Source: daily/2026-05-20.md
+- Articles created: [[concepts/byedpi-ensure-udp-desync]] — auto-strategy/evolution probes HTTPS (TCP) only; winning args lack UDP desync; `ensureUdpDesync` appends `-Ku -a1 -An` at apply boundary; side-fix independent of YouTube root cause (setUnderlyingNetworks)
+- Articles updated:
+  - [[concepts/genetic-strategy-evolution]] — added ensureUdpDesync section + source daily/2026-05-20.md; updated date 2026-05-19→2026-05-20
+- Index: 1 row added (byedpi-ensure-udp-desync); genetic-strategy-evolution row was already correct
+- Sessions covered: 20:00 (UDP pipeline investigation start — ensureUdpDesync side-defect); sessions 20:30 (per-engine fix) previously captured via byedpi-vpn-pipeline-upstream-divergence article created inline during session
+
 ## [2026-05-20T22:00:00+03:00] compile | Daily Log 2026-05-20 (pass 10 — session 19:52 peerWatchdog wall clock + chip race file)
 - Source: daily/2026-05-20.md
 - Articles created: [[concepts/engine-chip-race-observer]] — file was missing despite pass 9 log entry; created: Connected-only gate drops Probing/Connecting engine changes; Probing(null) guard; sentinel inversions

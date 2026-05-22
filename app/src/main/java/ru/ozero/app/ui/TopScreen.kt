@@ -18,6 +18,6 @@ enum class TopScreen {
     AutoModeSettings,
     Language,
     UrnetworkSharedTraffic,
-    TelegramProxySettings,
     MasterDnsSettings,
+    FptnSettings,
 }

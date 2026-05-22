@@ -84,5 +84,6 @@ object MasterDnsModule {
         serviceFactory = { service },
         portAllocator = MasterDnsPortAllocator(),
         resolversProvider = { resolversCache.snapshot() },
+        configTomlProvider = { resolversCache.configTomlSnapshot() },
     )
 }

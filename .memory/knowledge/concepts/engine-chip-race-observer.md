@@ -4,8 +4,9 @@ aliases: [chip-race, engine-settings-restart-observer, probing-engine-change]
 tags: [engine, ui, race-condition, vpn, restart, observer]
 sources:
   - "daily/2026-05-20.md"
+  - "daily/2026-05-22.md"
 created: 2026-05-20
-updated: 2026-05-20
+updated: 2026-05-22
 ---
 
 # Engine Chip Race Observer
@@ -76,6 +77,23 @@ The 4-second debounce in `EngineSettingsRestartObserver` remains unchanged. It p
 - [[concepts/vpn-engine-pipeline]] - ManualEngineSource and how engine selection reaches the observer
 - [[concepts/viewmodel-stateflow-test-race]] - Related ViewModel state timing issue; sentinels protecting removed behavior is a recurrent pattern
 
+### Switching State Condition and restartVpnIfConnected (2026-05-22)
+
+A second related bug: `TunnelController.switching` was cleared on any `Connected` event, even when `Connected(X)` arrived for a different engine than the pending switch target. The corrected condition:
+
+```kotlin
+// Clear switching only if it matches the connected engine OR has no target
+val sw = switching.value
+if (sw != null && (sw.to == null || sw.to == X)) {
+    switching.value = null
+}
+```
+
+Additionally, `restartVpnIfConnected` previously reset `switching.to = null` before triggering a restart. This discarded the user's pending engine selection during the restart window. Fix: preserve the pending target via `to = tunnelController.switching.value?.to` — the restart carries the user intent through to completion.
+
+A sentinel test `switchingDoesNotClearOnConnectedOfDifferentEngine` had been written with `assertNull` when the connected engine differed from the switching target — this was asserting the buggy behavior. The test was rewritten to assert the correct invariant (switching NOT cleared on wrong-engine Connected).
+
 ## Sources
 
 - [[daily/2026-05-20.md]] - Session 19:07: EngineSettingsRestartObserver Connected-only gate dropped engine changes during Probing/Connecting; fix: restart from active states when engine ≠ manualEngine; Probing(null) guard; 3 sentinel inversions for removed NotSupported/Failed→stopVpn behavior; TunnelController.switching clear not touched to preserve contract test
+- [[daily/2026-05-22.md]] - Session 11:59: switching clear condition bug — Connected(X) clears switching regardless of sw.to; fix: clear only if sw.to==null || sw.to==X; restartVpnIfConnected preserves pending target via switching.value?.to; sentinel test was asserting buggy assertNull behavior — rewritten

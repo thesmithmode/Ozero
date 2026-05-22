@@ -2,6 +2,7 @@ package ru.ozero.app.ui.settings.engines
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -330,5 +331,105 @@ class UrnetworkLocationsViewModelTest {
             "bridge.setProvidePaused не должен вызываться когда isUrnetworkActive=false",
         )
         assertEquals(null, bridge.lastPausedValue)
+    }
+
+    @Test
+    fun `bootstrap завершается до проверки NotConnected — нет флаша при наличии JWT`() = runTest {
+        val bridge = FakeUrnetworkBridge(deviceAvailable = true)
+        val store = fakeUrnetworkConfigStoreWithJwt()
+        val v = vm(bridge = bridge, store = store)
+        var sawNotConnected = false
+        val job = launch {
+            v.uiState.collect { state ->
+                if (state is UrnetworkSettingsUiState.NotConnected) sawNotConnected = true
+            }
+        }
+        advanceUntilIdle()
+        job.cancel()
+        kotlin.test.assertFalse(
+            sawNotConnected,
+            "uiState не должен переходить в NotConnected если JWT есть и initDeviceForLocations успешен",
+        )
+    }
+
+    @Test
+    fun `sentinel — SettingsCard не имеет параметра showProvide — ProvideSection всегда видна`() {
+        val source = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/ui/settings/engines/UrnetworkEngineSettingsScreen.kt",
+        ).readText()
+        val settingsCardSignature = source
+            .substringAfter("private fun SettingsCard(")
+            .substringBefore(") {")
+        kotlin.test.assertFalse(
+            settingsCardSignature.contains("showProvide"),
+            "SettingsCard не должен иметь параметр showProvide — ProvideSection показывается всегда",
+        )
+        val settingsCardBody = source
+            .substringAfter("private fun SettingsCard(")
+            .substringBefore("private fun SectionDivider(")
+        kotlin.test.assertFalse(
+            settingsCardBody.contains("if (showProvide)"),
+            "SettingsCard не должен содержать if(showProvide) — ProvideSection показывается всегда",
+        )
+    }
+
+    @Test
+    fun `selectLocation persists countryCode в settings когда engine не активен`() = runTest {
+        val locB = FakeLocationToken("DE")
+        val bridge = FakeUrnetworkBridge(deviceAvailable = true)
+        val settings = FakeSettingsRepo()
+        val v = UrnetworkLocationsViewModel(bridge, settings, fakeUrnetworkConfigStoreWithJwt(), idleTunnel())
+        advanceUntilIdle()
+        v.selectLocation(locB)
+        advanceUntilIdle()
+        assertTrue(
+            settings.countryCodeUpdates.contains("DE"),
+            "selectLocation обязан вызывать setUrnetworkCountryCode даже когда URnetwork не активен",
+        )
+    }
+
+    @Test
+    fun `selectLocation НЕ вызывает connectTo когда engine не активен`() = runTest {
+        val locB = FakeLocationToken("DE")
+        val bridge = FakeUrnetworkBridge(deviceAvailable = true)
+        val v = UrnetworkLocationsViewModel(bridge, FakeSettingsRepo(), fakeUrnetworkConfigStoreWithJwt(), idleTunnel())
+        advanceUntilIdle()
+        v.selectLocation(locB)
+        runCurrent()
+        assertEquals(
+            0,
+            bridge.connectToCallCount.get(),
+            "bridge.connectTo не должен вызываться пока URnetwork не активен",
+        )
+    }
+
+    @Test
+    fun `selectLocation обновляет selectedLocation в Ready state когда engine не активен`() = runTest {
+        val locB = FakeLocationToken("DE")
+        val bridge = FakeUrnetworkBridge(deviceAvailable = true)
+        val v = UrnetworkLocationsViewModel(bridge, FakeSettingsRepo(), fakeUrnetworkConfigStoreWithJwt(), idleTunnel())
+        advanceUntilIdle()
+        assertIs<UrnetworkSettingsUiState.Ready>(v.uiState.value)
+        v.selectLocation(locB)
+        runCurrent()
+        val after = v.uiState.value
+        assertIs<UrnetworkSettingsUiState.Ready>(after)
+        assertEquals(locB, after.selectedLocation)
+    }
+
+    @Test
+    fun `sentinel — NotConnected branch содержит UrnetworkBalanceCard`() {
+        val source = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/ui/settings/engines/UrnetworkEngineSettingsScreen.kt",
+        ).readText()
+        val notConnectedBranch = source
+            .substringAfter("UrnetworkSettingsUiState.NotConnected ->")
+            .substringBefore("is UrnetworkSettingsUiState.Ready ->")
+        assertTrue(
+            notConnectedBranch.contains("UrnetworkBalanceCard"),
+            "NotConnected branch обязан содержать UrnetworkBalanceCard — баланс виден всегда",
+        )
     }
 }

@@ -71,7 +71,7 @@ class StartSequenceCoordinator(
                     splitConfig = splitConfig,
                     ipv6Enabled = startupIpv6,
                     customDnsServers = startupDns,
-                    applyUnderlying = true,
+                    applyUnderlying = false,
                 ).establish()
             }
                 .onSuccess { fd ->
@@ -97,6 +97,7 @@ class StartSequenceCoordinator(
                 PersistentLoggers.error(TAG, "no plugins registered — отказ старта")
             } else {
                 PersistentLoggers.error(TAG, "no engine reachable ($mode mode) — отказ старта")
+                deps.tunnelController.onProbing(targetForUi)
                 deps.tunnelController.onEngineDied(targetForUi, "no engine reachable ($mode mode)")
             }
             stopVpnRequest()
@@ -105,24 +106,19 @@ class StartSequenceCoordinator(
         val activeEngineId = pick.first
         val activeConfig = pick.second
         deps.tunnelController.onProbing(activeEngineId)
+        if (state.stopping.get()) return
         val usesCustomTun = engineNeedsCustomTun(activeEngineId)
         val ipv6Enabled = settings?.ipv6Enabled ?: false
-        val fd = if (usesCustomTun) {
-            establishTunForEngine(activeEngineId, splitConfig, ipv6Enabled) ?: return
-        } else {
-            establishTun(
-                splitConfig,
-                ipv6 = ipv6Enabled,
-                customDns = settings?.customDnsServers.orEmpty(),
-            ) ?: return
-        }
-        state.lockdownStartupFdRef.getAndSet(null)?.runCatching { close() }
-        if (state.stopping.get()) {
-            runCatching { fd.close() }
-            state.tunFdRef.compareAndSet(fd, null)
-            return
-        }
-        val chainResult = startChain(activeEngineId, activeConfig) ?: return
+        val established = establishTunAndChain(
+            activeEngineId = activeEngineId,
+            activeConfig = activeConfig,
+            splitConfig = splitConfig,
+            ipv6Enabled = ipv6Enabled,
+            customDns = settings?.customDnsServers.orEmpty(),
+            usesCustomTun = usesCustomTun,
+        ) ?: return
+        val fd = established.first
+        val chainResult = established.second
         if (!routeTrafficForEngine(activeEngineId, fd, chainResult.finalSocksPort)) return
 
         if (!awaitEngineReady(activeEngineId)) {
@@ -155,6 +151,44 @@ class StartSequenceCoordinator(
     suspend fun engineNeedsCustomTun(engineId: EngineId): Boolean {
         val plugin = deps.enginePlugins.firstOrNull { it.id == engineId } ?: return false
         return plugin is TunFdAcceptor
+    }
+
+    private suspend fun establishTunAndChain(
+        activeEngineId: EngineId,
+        activeConfig: EngineConfig,
+        splitConfig: SplitTunnelConfig,
+        ipv6Enabled: Boolean,
+        customDns: List<String>,
+        usesCustomTun: Boolean,
+    ): Pair<ParcelFileDescriptor, ChainResult.Success>? {
+        if (usesCustomTun) {
+            val tun = establishTunForEngine(activeEngineId, splitConfig, ipv6Enabled) ?: return null
+            state.lockdownStartupFdRef.getAndSet(null)?.runCatching { close() }
+            if (state.stopping.get()) {
+                runCatching { tun.close() }
+                state.tunFdRef.compareAndSet(tun, null)
+                return null
+            }
+            val chain = startChain(activeEngineId, activeConfig) ?: return null
+            return tun to chain
+        }
+        val chain = startChain(activeEngineId, activeConfig) ?: return null
+        val tun = establishTun(splitConfig, ipv6 = ipv6Enabled, customDns = customDns) ?: run {
+            runCatching { deps.chainOrchestrator.stop() }
+            deps.engineWatchdog.handleEngineFailure(
+                activeEngineId,
+                "establishTun fail после startChain — UI не должен застрять в Connecting",
+            )
+            return null
+        }
+        state.lockdownStartupFdRef.getAndSet(null)?.runCatching { close() }
+        if (state.stopping.get()) {
+            runCatching { tun.close() }
+            state.tunFdRef.compareAndSet(tun, null)
+            runCatching { deps.chainOrchestrator.stop() }
+            return null
+        }
+        return tun to chain
     }
 
     private suspend fun readSplitConfig(mode: SplitTunnelMode): SplitTunnelConfig {
@@ -253,6 +287,15 @@ class StartSequenceCoordinator(
         val spec = plugin.tunSpec() ?: return null
         val builder = deps.tunBuilderHelper.applyEngineTunSpec(spec, ipv6Enabled)
         TunBuilderConfigurator(packageName).apply(builder, splitConfig, excludeSelf = true)
+        PersistentLoggers.info(
+            TAG,
+            "engineTUN params: engine=$engineId mode=${splitConfig.mode} " +
+                "blocklist=${splitConfig.blocklist.size}[${splitConfig.blocklist.joinToString(",")}] " +
+                "allowlist=${splitConfig.allowlist.size} " +
+                "allowFamilyV4=${spec.allowFamilyV4} allowFamilyV6=${spec.allowFamilyV6} " +
+                "routeAllV4=${spec.routeAllV4} routeAllV6=${spec.routeAllV6} " +
+                "dns=${spec.dnsServers} ipv6Enabled=$ipv6Enabled",
+        )
         val before = TunInterfaceStats.snapshotTunInterfaces()
         val pfd = try {
             builder.establish()

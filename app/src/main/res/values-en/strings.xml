@@ -176,7 +176,6 @@
     
     <string name="about_title">About</string>
     <string name="about_version">Version %1$s</string>
-    <string name="about_description">Ozero is an aggregator of VPN and anti-DPI engines in a single app. It bundles several proven solutions for bypassing blocks: ByeDPI, AmneziaWG (WARP), URnetwork P2P and others. Pick a single engine manually or chain several engines — each link solves its own task.</string>
 
 
     <string name="diag_export_crashes">Export crash log</string>
@@ -278,8 +277,8 @@
     <string name="urnetwork_balance_error">Failed to fetch balance: %1$s</string>
     <string name="urnetwork_balance_empty">Balance unavailable. Connect to URnetwork.</string>
     <string name="urnetwork_daily_allocation">Daily allocation</string>
-    <string name="urnetwork_reliability_label">Reliability: %.3f</string>
-    <string name="urnetwork_reliability_bonus">+%.3f GiB/day</string>
+    <string name="urnetwork_reliability_label">Reliability: %.1f%%</string>
+    <string name="urnetwork_reliability_bonus">+%.1f GiB/day</string>
     <string name="urnetwork_referrals_label">Referrals: %d</string>
     <string name="urnetwork_referral_bonus">+%d GB</string>
     <string name="urnetwork_points_title">Points</string>
@@ -404,7 +403,6 @@
     <string name="backup_category_byedpi">ByeDPI</string>
     <string name="backup_category_warp">WARP accounts</string>
     <string name="backup_category_urnetwork">URnetwork</string>
-    <string name="backup_category_telegram">Telegram MTProxy</string>
     <string name="backup_category_strategy">Strategies and domain lists</string>
     <string name="backup_category_split_tunnel">Split tunnel</string>
     <string name="urnetwork_peer_count_label">Peers: %1$d</string>
@@ -468,38 +466,17 @@
     <string name="byedpi_dns_auto">Auto</string>
     <string name="byedpi_dns_field_label">DNS addresses (comma-separated)</string>
 
-    <!-- Telegram MTProxy settings -->
-    <string name="telegram_proxy_title">Telegram MTProxy</string>
-    <string name="telegram_proxy_description">Local MTProxy server for Telegram. Traffic goes through the active VPN engine.</string>
-    <string name="telegram_proxy_enable">Enable MTProxy</string>
-    <string name="telegram_proxy_state_idle">Off</string>
-    <string name="telegram_proxy_state_starting">Starting…</string>
-    <string name="telegram_proxy_state_running_fmt">Running on port %1$d</string>
-    <string name="telegram_proxy_state_error_fmt">Error: %1$s</string>
-    <string name="telegram_proxy_port_label">Port</string>
-    <string name="telegram_proxy_save">Save</string>
-    <string name="telegram_proxy_domain_label">FakeTLS domain</string>
-    <string name="telegram_proxy_secret_missing">Secret is not generated. Tap the button below.</string>
-    <string name="telegram_proxy_secret_value_fmt">Secret: %1$s</string>
-    <string name="telegram_proxy_generate_secret">Generate key</string>
-    <string name="telegram_proxy_rotate_secret">Rotate key</string>
-    <string name="telegram_proxy_generate_error">Failed to generate key. Check logs.</string>
-    <string name="telegram_proxy_link_label">Telegram link:</string>
-    <string name="telegram_proxy_copy">Copy</string>
-    <string name="telegram_proxy_open_in_tg">Open in Telegram</string>
-
     <!-- Settings additional rows -->
     <string name="settings_byedpi_title">ByeDPI args</string>
     <string name="settings_byedpi_summary">DPI bypass settings</string>
     <string name="settings_manual_server_title">Add server manually</string>
     <string name="settings_manual_server_summary">VLESS / Trojan / Hysteria2 / Shadowsocks URI</string>
-    <string name="settings_telegram_proxy_title">Telegram MTProxy</string>
-    <string name="settings_telegram_proxy_summary">Local MTProxy for Telegram over VPN</string>
     <string name="settings_logs">Logs</string>
 
     <!-- WARP engine settings -->
     <string name="warp_progress_mirror_fmt">Mirror %1$s</string>
     <string name="warp_validation_required_fields">PrivateKey, Endpoint, PublicKey (Peer), Address are required</string>
+    <string name="warp_duplicate_hint">This configuration is already loaded</string>
     <string name="warp_doh_section_label">DNS protocol (endpoint resolve)</string>
     <string name="warp_next_generation_in_fmt">Next generation in %1$s</string>
 

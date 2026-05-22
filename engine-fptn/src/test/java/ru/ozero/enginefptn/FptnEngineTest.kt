@@ -1,0 +1,191 @@
+package ru.ozero.enginefptn
+
+import android.util.Base64
+import io.mockk.every
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
+import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import ru.ozero.enginescore.EngineConfig
+import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.ProbeResult
+import ru.ozero.enginescore.StartResult
+import ru.ozero.enginescore.Upstream
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+
+class FptnEngineTest {
+
+    private lateinit var store: InMemoryFptnConfigStore
+    private lateinit var engine: FptnEngine
+
+    @BeforeEach
+    fun setUp() {
+        store = InMemoryFptnConfigStore()
+        engine = FptnEngine(store)
+        mockkStatic(Base64::class)
+        every { Base64.decode(any<String>(), any<Int>()) } answers {
+            java.util.Base64.getDecoder().decode(firstArg<String>().trim())
+        }
+    }
+
+    @AfterEach
+    fun tearDown() {
+        unmockkStatic(Base64::class)
+    }
+
+    @Test
+    fun `engine id is FPTN`() {
+        assertEquals(EngineId.FPTN, engine.id)
+    }
+
+    @Test
+    fun `capabilities require server and do not support upstream socks`() {
+        val caps = engine.capabilities
+        assertEquals(true, caps.requiresServer)
+        assertEquals(false, caps.supportsUpstreamSocks)
+        assertEquals(true, caps.supportsTcp)
+        assertEquals(true, caps.supportsUdp)
+    }
+
+    @Test
+    fun `start with wrong config type returns failure`() = runTest {
+        val result = engine.start(EngineConfig.ByeDpi(), Upstream.None)
+        assertIs<StartResult.Failure>(result)
+    }
+
+    @Test
+    fun `start with blank token returns failure`() = runTest {
+        val result = engine.start(EngineConfig.Fptn(token = ""), Upstream.None)
+        val failure = assertIs<StartResult.Failure>(result)
+        assertEquals(true, failure.reason.contains("token", ignoreCase = true))
+    }
+
+    @Test
+    fun `start with whitespace-only token returns failure`() = runTest {
+        val result = engine.start(EngineConfig.Fptn(token = "   "), Upstream.None)
+        assertIs<StartResult.Failure>(result)
+    }
+
+    @Test
+    fun `start with unknown token prefix returns failure`() = runTest {
+        val result = engine.start(EngineConfig.Fptn(token = "notfptn:abc"), Upstream.None)
+        assertIs<StartResult.Failure>(result)
+    }
+
+    @Test
+    fun `start with malformed base64 returns failure`() = runTest {
+        every { Base64.decode(any<String>(), any<Int>()) } throws IllegalArgumentException("bad")
+        val result = engine.start(EngineConfig.Fptn(token = "fptn:!!!"), Upstream.None)
+        assertIs<StartResult.Failure>(result)
+    }
+
+    @Test
+    fun `stop when not started does not throw`() = runTest {
+        engine.stop()
+    }
+
+    @Test
+    fun `stop is idempotent`() = runTest {
+        engine.stop()
+        engine.stop()
+    }
+
+    @Test
+    fun `probe returns failure when store has no token`() = runTest {
+        val result = engine.probe()
+        assertIs<ProbeResult.Failure>(result)
+    }
+
+    @Test
+    fun `probe returns failure when token is blank`() = runTest {
+        store.inject { it.copy(token = "  ") }
+        val result = engine.probe()
+        assertIs<ProbeResult.Failure>(result)
+    }
+
+    @Test
+    fun `probe returns failure when token is invalid`() = runTest {
+        every { Base64.decode(any<String>(), any<Int>()) } throws IllegalArgumentException("bad")
+        store.inject { it.copy(token = "fptn:garbage") }
+        val result = engine.probe()
+        assertIs<ProbeResult.Failure>(result)
+    }
+
+    @Test
+    fun `probe returns success when token has valid servers`() = runTest {
+        store.inject { it.copy(token = "fptn:${validTokenB64()}") }
+        val result = engine.probe()
+        assertIs<ProbeResult.Success>(result)
+    }
+
+    @Test
+    fun `buildManualConfig returns null when token blank`() {
+        assertNull(engine.buildManualConfig(null))
+    }
+
+    @Test
+    fun `buildManualConfig returns null when token whitespace only`() {
+        store.inject { it.copy(token = "   ") }
+        assertNull(engine.buildManualConfig(null))
+    }
+
+    @Test
+    fun `buildManualConfig returns Fptn config when token set`() {
+        store.inject {
+            it.copy(
+                token = "fptn:abc",
+                selectedServerName = "S1",
+                bypassMethod = FptnBypassMethod.SNI_REALITY_CHROME_147.strategyName,
+                autoSelect = false,
+                reconnectOnNetworkChange = true,
+                reconnectOnIpChange = true,
+                maxReconnectAttempts = 7,
+                reconnectPauseSeconds = 5,
+                resetServerOnDisconnect = false,
+            )
+        }
+        val cfg = engine.buildManualConfig(null)
+        val fptn = assertIs<EngineConfig.Fptn>(cfg)
+        assertEquals("fptn:abc", fptn.token)
+        assertEquals("S1", fptn.selectedServerName)
+        assertEquals(FptnBypassMethod.SNI_REALITY_CHROME_147.strategyName, fptn.bypassMethod)
+        assertEquals(false, fptn.autoSelect)
+        assertEquals(true, fptn.reconnectOnNetworkChange)
+        assertEquals(true, fptn.reconnectOnIpChange)
+        assertEquals(7, fptn.maxReconnectAttempts)
+        assertEquals(5, fptn.reconnectPauseSeconds)
+        assertEquals(false, fptn.resetServerOnDisconnect)
+    }
+
+    @Test
+    fun `buildManualConfig ignores settings parameter for FPTN-specific config`() {
+        store.inject { it.copy(token = "fptn:zzz") }
+        val withSettings = engine.buildManualConfig(null)
+        val withoutSettings = engine.buildManualConfig(null)
+        assertNotNull(withSettings)
+        assertEquals(withSettings, withoutSettings)
+    }
+
+    @Test
+    fun `EngineConfig Fptn default bypassMethod matches enum DEFAULT`() {
+        assertEquals(
+            FptnBypassMethod.DEFAULT.strategyName,
+            EngineConfig.Fptn.DEFAULT_BYPASS_METHOD,
+        )
+        assertEquals(
+            EngineConfig.Fptn.DEFAULT_BYPASS_METHOD,
+            EngineConfig.Fptn().bypassMethod,
+        )
+    }
+
+    private fun validTokenB64(): String {
+        val json = """{"version":1,"username":"u","password":"p",
+            "servers":[{"name":"S1","host":"1.2.3.4","port":443}]}"""
+        return java.util.Base64.getEncoder().encodeToString(json.toByteArray())
+    }
+}

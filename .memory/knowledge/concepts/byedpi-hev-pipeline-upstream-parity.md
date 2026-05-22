@@ -4,8 +4,9 @@ aliases: [hev-yaml-parity, byedpi-ipv6-blackhole-fix, hev-tunnel-config-fix]
 tags: [byedpi, hev, vpn, architecture, gotcha]
 sources:
   - "daily/2026-05-19.md"
+  - "daily/2026-05-22.md"
 created: 2026-05-19
-updated: 2026-05-20
+updated: 2026-05-22
 ---
 
 # ByeDPI HevTunnelConfig YAML and IPv6 Blackhole Upstream Parity
@@ -86,6 +87,24 @@ Init order was also compared: Ozero calls `waitSocksReady(port, proxyJob)` befor
 - [[concepts/vpnservice-builder-traps]] — TUN builder API traps including IPv6 route configuration
 - [[concepts/tun-self-exclusion-sdk-engines]] — excludeSelf=true keeps ByeDPI's own traffic from re-entering the tunnel
 
+### udp:tcp Regression (2026-05-22, v0.1.13)
+
+A regression introduced `udp: tcp` in `HevTunnelConfig.toYaml()` instead of `udp: udp`. The semantics:
+
+- `udp: udp` — hev forwards UDP packets via SOCKS5 UDP ASSOCIATE. ByeDPI without `-Ku` flag rejects the ASSOCIATE request → QUIC fast-fails → browser falls back to TCP → TCP desync strategies work on TCP streams. This is the correct behavior.
+- `udp: tcp` — hev routes QUIC (UDP) payloads as TCP connections to the upstream server. The server receives TCP packets with QUIC framing that it cannot parse → connection fails silently.
+
+The regression caused YouTube to fail in both UI and CMD modes. Revert: `udp: tcp` → `udp: udp` restored YouTube in CMD mode (confirmed from `v0.1.13` log: Δrx=1860146B/1451p in 5s ≈ 370KB/s).
+
+### hevLogLevel Added to YAML
+
+`hevLogLevel` was stored in the settings DataStore but not written to `HevTunnelConfig.toYaml()`. Added as `misc.log-level` field. Default changed to `"info"` for next-APK diagnostics (was omitted, hev defaulted to silent). Note: this re-adds the `misc.log-level` field removed in the earlier parity audit — the key distinction is user-controlled value vs hardcoded `2`.
+
+### YouTube CMD Mode Confirmed
+
+ozero.log `v0.1.13` analysis (session 13:22:09–13:22:40) confirmed YouTube traffic in CMD mode: `Δrx=1860146B/1451p` over 5 seconds ≈ 370 KB/s. CMD mode YouTube was previously believed to never have worked in Ozero — the log refuted this. The `udp:tcp` regression was the sole blocking issue.
+
 ## Sources
 
 - [[daily/2026-05-19.md]] — v0.1.5-4 session: HevTunnelConfig.toYaml() simplified to upstream ByeByeDPI 1.7.4 parity (removed ipv4/ipv6/misc.log-level, single-quote fix on `udp`); TunBuilderHelper.buildTunBuilder blackholeIpv6 removed for ByeDPI; sentinel OzeroVpnServiceIpv6BlackholeTest inverted; HevTunnelConfigTest updated; reference `.claude/Контекст/ByeByeDPI-v.1.7.4/ByeDpiVpnService.kt:239-250`
+- [[daily/2026-05-22.md]] — Session 13:00: udp:tcp→udp:udp revert (QUIC routed as TCP → server parse failure); hevLogLevel added to YAML, default="info"; Session 13:40+: YouTube CMD confirmed 370KB/s from ozero.log v0.1.13

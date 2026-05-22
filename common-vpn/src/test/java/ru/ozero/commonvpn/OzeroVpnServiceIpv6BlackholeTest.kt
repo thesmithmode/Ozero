@@ -72,31 +72,23 @@ class OzeroVpnServiceIpv6BlackholeTest {
     }
 
     @Test
-    fun `applyEngineTunSpec вызывает blackholeIpv6 если allowFamilyV6 false`() {
+    fun `applyEngineTunSpec НЕ blackhole IPv6 — bypass вместо blackhole`() {
         val body = helperSource
             .substringAfter("fun applyEngineTunSpec(")
             .substringBefore("fun buildTunBuilder(")
         assertTrue(
-            body.contains("blackholeIpv6(builder"),
-            "applyEngineTunSpec обязан вызывать blackholeIpv6 в else-ветке для engines с allowFamilyV6=false",
+            !body.contains("blackholeIpv6(builder"),
+            "applyEngineTunSpec НЕ должен blackhole IPv6 — при allowFamilyV6=false IPv6 обходит TUN " +
+                "напрямую (как PORTAL_WG). Blackhole ломал Gemini и IPv6-сервисы в amneziawg конфигах.",
         )
     }
 
     @Test
-    fun `applyEngineTunSpec принимает ipv6Enabled параметр и форсит blackhole при false`() {
+    fun `applyEngineTunSpec принимает ipv6Enabled параметр`() {
         val sig = helperSource.substringAfter("fun applyEngineTunSpec(").substringBefore("): VpnService.Builder")
         assertTrue(
             sig.contains("ipv6Enabled"),
-            "applyEngineTunSpec обязан иметь параметр ipv6Enabled — без него WARP/URnetwork с " +
-                "allowFamilyV6=true в spec проигнорируют пользовательский switch и leak IPv6 наружу",
-        )
-        val body = helperSource
-            .substringAfter("fun applyEngineTunSpec(")
-            .substringBefore("fun buildTunBuilder(")
-        assertTrue(
-            body.contains("if (ipv6Enabled && spec.allowFamilyV6"),
-            "IF-ветка обязана начинаться с ipv6Enabled — иначе spec.allowFamilyV6=true (WARP) " +
-                "обходит пользовательский запрет IPv6 и пускает CF v6 наружу. Body:\n$body",
+            "applyEngineTunSpec обязан иметь параметр ipv6Enabled — передаётся из StartSequenceCoordinator",
         )
     }
 

@@ -509,7 +509,6 @@ class ByeDpiEngineTest {
         }
         val eng = ByeDpiEngine(blockingProxy, socksProbe = { _, _, _ -> 1L })
         eng.start(EngineConfig.ByeDpi(socksPort = 1080))
-        every { blockingProxy.startProxy(any()) } returns 0
         val result = eng.start(EngineConfig.ByeDpi(socksPort = 1080))
         assertIs<StartResult.Success>(result)
         coVerify(atLeast = 1) { blockingProxy.stopProxy() }

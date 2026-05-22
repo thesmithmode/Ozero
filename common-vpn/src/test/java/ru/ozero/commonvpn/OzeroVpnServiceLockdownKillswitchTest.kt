@@ -52,6 +52,35 @@ class OzeroVpnServiceLockdownKillswitchTest {
             .substringBefore("suspend fun engineNeedsCustomTun")
     }
 
+    private val establishTunAndChainBody by lazy {
+        require("private suspend fun establishTunAndChain(" in startSequenceSource) {
+            "anchor 'private suspend fun establishTunAndChain' исчез — обнови sentinel"
+        }
+        require("private suspend fun readSplitConfig" in startSequenceSource) {
+            "anchor 'private suspend fun readSplitConfig' исчез — обнови sentinel"
+        }
+        startSequenceSource.substringAfter("private suspend fun establishTunAndChain(")
+            .substringBefore("private suspend fun readSplitConfig")
+    }
+
+    private val customTunBranchBody by lazy {
+        require("if (usesCustomTun) {" in establishTunAndChainBody) {
+            "anchor 'if (usesCustomTun)' исчез в establishTunAndChain — обнови sentinel"
+        }
+        require("return tun to chain\n        }\n" in establishTunAndChainBody) {
+            "anchor закрытия customTun branch исчез — обнови sentinel"
+        }
+        establishTunAndChainBody.substringAfter("if (usesCustomTun) {")
+            .substringBefore("return tun to chain\n        }\n")
+    }
+
+    private val regularTunBranchBody by lazy {
+        require("return tun to chain\n        }\n" in establishTunAndChainBody) {
+            "anchor закрытия customTun branch исчез — обнови sentinel"
+        }
+        establishTunAndChainBody.substringAfter("return tun to chain\n        }\n")
+    }
+
     @Test
     fun `anchors — функции-границы существуют`() {
         listOf(
@@ -178,18 +207,19 @@ class OzeroVpnServiceLockdownKillswitchTest {
     }
 
     @Test
-    fun `killswitch startup TUN использует buildTunBuilder с applyUnderlying=true — P37 lockdown invariant`() {
+    fun `killswitch startup TUN использует buildTunBuilder с applyUnderlying=false — QUIC parity`() {
         val block = runBody.substringAfter("if (killswitch)").substringBefore("val manualEngine")
         assertTrue(
             block.contains("buildTunBuilder"),
             "killswitch startup path обязан вызывать buildTunBuilder. Block:\n$block",
         )
         assertTrue(
-            block.contains("applyUnderlying = true"),
-            "killswitch startup TUN обязан applyUnderlying=true — без него startup gap (5+ сек до " +
-                "engine pick) не enforces lockdown через setUnderlyingNetworks(null) → " +
-                "при WiFi→Mobile транзиции lockdown breaks (P37). ByeDPI engine path использует " +
-                "default applyUnderlying=false (upstream parity для QUIC). Block:\n$block",
+            block.contains("applyUnderlying = false"),
+            "killswitch startup TUN обязан applyUnderlying=false — setUnderlyingNetworks(null) из " +
+                "startup TUN персистируется service-level и ломает QUIC-routing ByeDPI (UDP-сокеты " +
+                "byedpi-процесса теряют authoritative network context → YouTube падает). " +
+                "P37 (WiFi→Mobile) защищён WARP/URnetwork через applyEngineTunSpec(applyUnderlying=true) " +
+                "на их MAIN TUN — startup gap (~5 сек) слишком короток для транзиции сети. Block:\n$block",
         )
     }
 
@@ -216,11 +246,11 @@ class OzeroVpnServiceLockdownKillswitchTest {
     }
 
     @Test
-    fun `lockdownStartupFdRef закрывается после установки реального TUN в StartSequenceCoordinator run`() {
-        val establishIdx = runBody.indexOf("establishTun")
-        val clearIdx = runBody.indexOf("lockdownStartupFdRef.getAndSet(null)")
-        assertTrue(establishIdx >= 0, "establishTun не найден в run. Body:\n$runBody")
-        assertTrue(clearIdx >= 0, "lockdownStartupFdRef.getAndSet(null) не найден в run.")
+    fun `lockdownStartupFdRef закрывается после установки реального TUN в establishTunAndChain`() {
+        val establishIdx = establishTunAndChainBody.indexOf("establishTun")
+        val clearIdx = establishTunAndChainBody.indexOf("lockdownStartupFdRef.getAndSet(null)")
+        assertTrue(establishIdx >= 0, "establishTun не найден в establishTunAndChain. Body:\n$establishTunAndChainBody")
+        assertTrue(clearIdx >= 0, "lockdownStartupFdRef.getAndSet(null) не найден в establishTunAndChain.")
         assertTrue(
             clearIdx > establishIdx,
             "lockdownStartupFdRef должен очищаться ПОСЛЕ establish реального TUN. " +
@@ -229,39 +259,55 @@ class OzeroVpnServiceLockdownKillswitchTest {
     }
 
     @Test
-    fun `establishTun выполняется ДО startChain в run — applyLockdown активен раньше engine start (P35)`() {
-        val establishCustomIdx = runBody.indexOf("establishTunForEngine(activeEngineId")
-        val establishRegularIdx = runBody.indexOf("establishTun(\n")
-        val anyEstablishIdx = listOf(establishCustomIdx, establishRegularIdx)
-            .filter { it >= 0 }
-            .minOrNull() ?: -1
-        val startChainIdx = runBody.indexOf("startChain(activeEngineId")
+    fun `usesCustomTun branch — establishTunForEngine выполняется ДО startChain (P35 — WARP, URnetwork)`() {
+        val establishIdx = customTunBranchBody.indexOf("establishTunForEngine(activeEngineId")
+        val startChainIdx = customTunBranchBody.indexOf("startChain(activeEngineId")
         assertTrue(
-            anyEstablishIdx >= 0,
-            "establishTun/establishTunForEngine не найден в run — anchor сломан. Body:\n$runBody",
+            establishIdx >= 0,
+            "establishTunForEngine не найден в usesCustomTun branch — anchor сломан. Body:\n$customTunBranchBody",
         )
         assertTrue(
             startChainIdx >= 0,
-            "startChain(activeEngineId не найден в run — anchor сломан. Body:\n$runBody",
+            "startChain не найден в usesCustomTun branch — anchor сломан. Body:\n$customTunBranchBody",
         )
         assertTrue(
-            anyEstablishIdx < startChainIdx,
-            "establishTun (с applyLockdown внутри builder) обязан выполниться ДО startChain — " +
-                "иначе chainOrchestrator.start запускает engine native loops при отсутствии TUN " +
-                "с setUnderlyingNetworks(null) → трафик может выйти мимо туннеля в startup gap. " +
-                "establishIdx=$anyEstablishIdx startChainIdx=$startChainIdx",
+            establishIdx < startChainIdx,
+            "Для usesCustomTun (WARP/URnetwork): establishTunForEngine обязан выполняться ДО " +
+                "startChain — TUN с applyLockdown активен раньше engine.start, engine получает fd " +
+                "и attachTun сразу. establishIdx=$establishIdx startChainIdx=$startChainIdx",
         )
     }
 
     @Test
-    fun `routeTrafficForEngine вызывается ПОСЛЕ startChain — корректный порядок lockdown→engine→route (P35)`() {
-        val startChainIdx = runBody.indexOf("startChain(activeEngineId")
-        val routeIdx = runBody.indexOf("routeTrafficForEngine(")
-        assertTrue(startChainIdx >= 0 && routeIdx >= 0, "anchors сломаны: $runBody")
+    fun `not usesCustomTun branch — startChain выполняется ДО establishTun (ByeDPI, MasterDNS QUIC drop-window)`() {
+        val startChainIdx = regularTunBranchBody.indexOf("startChain(activeEngineId")
+        val establishIdx = regularTunBranchBody.indexOf("establishTun(")
         assertTrue(
-            startChainIdx < routeIdx,
-            "startChain (engine.start) обязан быть ДО routeTrafficForEngine (attachTun/hev) — " +
-                "engine должен быть готов принять fd. startChainIdx=$startChainIdx routeIdx=$routeIdx",
+            startChainIdx >= 0,
+            "startChain не найден в !usesCustomTun branch — anchor сломан. Body:\n$regularTunBranchBody",
+        )
+        assertTrue(
+            establishIdx >= 0,
+            "establishTun не найден в !usesCustomTun branch — anchor сломан. Body:\n$regularTunBranchBody",
+        )
+        assertTrue(
+            startChainIdx >= 0 && (startChainIdx < establishIdx || establishIdx < 0),
+            "Для !usesCustomTun (ByeDPI, MasterDNS): startChain (запуск hev/byedpi proxy chain) " +
+                "обязан выполняться ДО establishTun — иначе TUN установлен раньше, чем proxy готов " +
+                "принимать, и QUIC пакеты дропаются в startup gap (YouTube hypothesis #2). " +
+                "startChainIdx=$startChainIdx establishIdx=$establishIdx",
+        )
+    }
+
+    @Test
+    fun `routeTrafficForEngine вызывается ПОСЛЕ establishTunAndChain — порядок lockdown→engine→route (P35)`() {
+        val helperCallIdx = runBody.indexOf("establishTunAndChain(")
+        val routeIdx = runBody.indexOf("routeTrafficForEngine(")
+        assertTrue(helperCallIdx >= 0 && routeIdx >= 0, "anchors сломаны: $runBody")
+        assertTrue(
+            helperCallIdx < routeIdx,
+            "establishTunAndChain (engine.start + TUN) обязан быть ДО routeTrafficForEngine " +
+                "(attachTun/hev). helperCallIdx=$helperCallIdx routeIdx=$routeIdx",
         )
     }
 

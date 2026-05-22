@@ -30,8 +30,6 @@ import ru.ozero.app.ui.utils.formatBytes
 import ru.ozero.app.urnetwork.UrnetworkBalanceState
 import kotlin.math.min
 
-private const val FREE_TIER_CAP_BYTES = 34L * 1024L * 1024L * 1024L
-
 @Composable
 fun UrnetworkBalanceCard(
     state: UrnetworkBalanceState,
@@ -74,10 +72,8 @@ fun UrnetworkBalanceCard(
 @Composable
 private fun BalanceDetails(state: UrnetworkBalanceState) {
     val snapshot = state.snapshot ?: return
-    // Backend adds rows daily (30h TTL). In a ~5h overlap window multiple rows are
-    // simultaneously active → sum shows 68–102 GiB. Cap display at 34 GiB.
-    val displayBalance = minOf(snapshot.balanceBytes.coerceAtLeast(0L), FREE_TIER_CAP_BYTES)
-    val displayStart = minOf(snapshot.startBalanceBytes.coerceAtLeast(0L), FREE_TIER_CAP_BYTES)
+    val displayBalance = snapshot.balanceBytes.coerceAtLeast(0L)
+    val displayStart = snapshot.startBalanceBytes.coerceAtLeast(0L)
     val total = snapshot.usedBytes + snapshot.pendingBytes + displayBalance
     TrafficProgressBar(
         usedBytes = snapshot.usedBytes,
@@ -87,7 +83,7 @@ private fun BalanceDetails(state: UrnetworkBalanceState) {
     )
     BalanceRow(
         label = stringResource(R.string.urnetwork_balance_available),
-        value = formatBytes(displayBalance),
+        value = formatBytes(displayBalance + snapshot.pendingBytes.coerceAtLeast(0L)),
         highlight = true,
     )
     BalanceRow(
@@ -111,7 +107,7 @@ private fun BalanceDetails(state: UrnetworkBalanceState) {
             StatRow(
                 label = stringResource(
                     R.string.urnetwork_reliability_label,
-                    state.meanReliabilityWeight,
+                    state.meanReliabilityWeight * 100.0,
                 ),
                 value = stringResource(R.string.urnetwork_reliability_bonus, bonusGib),
             )

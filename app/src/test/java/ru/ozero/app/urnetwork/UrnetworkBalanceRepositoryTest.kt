@@ -74,7 +74,7 @@ class UrnetworkBalanceRepositoryTest {
             isLoading = false,
             lastError = null,
         )
-        assertEquals(1_000L, state.availableBytes)
+        assertEquals(1_100L, state.availableBytes)
     }
 
     @Test

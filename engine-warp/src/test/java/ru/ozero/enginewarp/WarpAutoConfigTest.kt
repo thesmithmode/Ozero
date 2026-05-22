@@ -377,6 +377,56 @@ class WarpAutoConfigTest {
     }
 
     @Test
+    fun `register принимает Cloudflare IP endpoint 162_159_195_1 — mirrors возвращают IP из REQUEST_BODY`() = runTest {
+        val ipConf = sampleConf.replace(
+            "Endpoint = engage.cloudflareclient.com:4500",
+            "Endpoint = 162.159.195.1:500",
+        )
+        val http = FakeHttpClient(Result.success(ipConf))
+        val auto = singleMirrorConfig(http)
+
+        val result = auto.register()
+
+        assertTrue(
+            result.isSuccess,
+            "Cloudflare WARP IP endpoint обязан приниматься: ${result.exceptionOrNull()?.message}",
+        )
+        assertEquals("162.159.195.1:500", result.getOrThrow().config.peerEndpoint)
+    }
+
+    @Test
+    fun `register принимает Cloudflare WARP IP из диапазона 188_114_96-99`() = runTest {
+        val ipConf = sampleConf.replace(
+            "Endpoint = engage.cloudflareclient.com:4500",
+            "Endpoint = 188.114.97.1:2408",
+        )
+        val http = FakeHttpClient(Result.success(ipConf))
+        val auto = singleMirrorConfig(http)
+
+        val result = auto.register()
+
+        assertTrue(
+            result.isSuccess,
+            "188.114.96-99.* Cloudflare WARP IP обязан приниматься: ${result.exceptionOrNull()?.message}",
+        )
+    }
+
+    @Test
+    fun `register отклоняет произвольный IP не из Cloudflare WARP диапазона`() = runTest {
+        val badIpConf = sampleConf.replace(
+            "Endpoint = engage.cloudflareclient.com:4500",
+            "Endpoint = 8.8.8.8:53",
+        )
+        val http = FakeHttpClient(Result.success(badIpConf))
+        val auto = singleMirrorConfig(http)
+
+        val result = auto.register()
+
+        assertTrue(result.isFailure, "не-Cloudflare IP обязан отклоняться")
+        assertTrue(result.exceptionOrNull()?.message?.contains("peer host") == true)
+    }
+
+    @Test
     fun `register принимает любой Cloudflare WARP UDP port (2408 4500 500 1701)`() = runTest {
         val ports = listOf(2408, 4500, 500, 1701)
         for (port in ports) {
