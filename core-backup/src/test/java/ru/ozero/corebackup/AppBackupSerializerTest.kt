@@ -2,7 +2,6 @@ package ru.ozero.corebackup
 
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -95,12 +94,6 @@ class AppBackupSerializerTest {
         assertEquals("Madrid", u.selectedLocation?.region)
         assertEquals("Madrid", u.selectedLocation?.city)
 
-        assertNotNull(restored.telegram)
-        assertEquals(true, restored.telegram!!.enabled)
-        assertEquals(2080, restored.telegram!!.port)
-        assertEquals("tg.host", restored.telegram!!.domain)
-        assertEquals("secret", restored.telegram!!.secret)
-
         assertEquals(1, restored.warpSlots.size)
         assertEquals("slot-1", restored.warpSlots[0].id)
         assertEquals(2, restored.splitRules.size)
@@ -126,7 +119,6 @@ class AppBackupSerializerTest {
         assertNull(restored.settings.splitMode)
         assertNull(restored.urnetwork.byJwt)
         assertNull(restored.urnetwork.selectedLocation)
-        assertNull(restored.telegram)
     }
 
     @Test
@@ -196,7 +188,6 @@ class AppBackupSerializerTest {
         assertEquals(fullData.exportedAt, restored.exportedAt)
         assertEquals(fullData.warpSlots[0].privateKey, restored.warpSlots[0].privateKey)
         assertEquals(fullData.urnetwork.byJwt, restored.urnetwork.byJwt)
-        assertEquals(fullData.telegram, restored.telegram)
     }
 
     @Test
@@ -207,11 +198,10 @@ class AppBackupSerializerTest {
     }
 
     @Test
-    fun `v1 backup — telegram и strategy null, новые поля null`() {
+    fun `v1 backup — strategy null, новые поля null`() {
         val json = """{"version":1,"exportedAt":"old","settings":{},"urnetwork":{},"warpSlots":[],"splitRules":[]}"""
         val restored = AppBackupSerializer.deserialize(json)
         assertEquals(1, restored.version)
-        assertNull(restored.telegram)
         assertNull(restored.strategy)
         assertNull(restored.settings.engineAutoPriority)
         assertNull(restored.urnetwork.selectedLocation)
