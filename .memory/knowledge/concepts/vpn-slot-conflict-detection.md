@@ -5,8 +5,9 @@ tags: [android, vpn, gotcha, architecture]
 sources:
   - "daily/2026-05-19.md"
   - "daily/2026-05-20.md"
+  - "daily/2026-05-22.md"
 created: 2026-05-19
-updated: 2026-05-20
+updated: 2026-05-22
 ---
 
 # VPN Slot Conflict: establish() Null Means Another App Owns the Slot
@@ -104,6 +105,35 @@ override fun onRevoke() {
 }
 ```
 
+### isExternalVpnActive() ownerUid False Positive (v0.1.11 Regression)
+
+A related bug found via user log analysis (Ruslan, v0.1.11, 2026-05-21): `isExternalVpnActive()` was checking for any VPN-capable network without filtering by `ownerUid`. When Ozero's own VPN was in a dying/restarting state, the system still reported it as an active VPN network. `isExternalVpnActive()` would detect it as "another VPN is active", triggering:
+
+1. A 750ms delay at engine start
+2. A `protect()` call conflict (can't protect sockets through a VPN you own but are tearing down)
+3. Repeated timeout → `Connecting` loop
+4. User symptom: VPN keeps cycling, never connects on both WiFi and mobile data
+
+Log pattern indicating false positive:
+```
+external VPN active at start — caps=[ Transports: CELLULAR|VPN
+```
+When no actual external VPN is running, this line means Ozero detected its own dying VPN slot.
+
+Fix (commit `c1123b04`, shipped in v0.1.12): filter the VPN network check by `ownerUid`:
+```kotlin
+private fun isExternalVpnActive(): Boolean {
+    val cm = getSystemService(ConnectivityManager::class.java) ?: return false
+    return cm.allNetworks.any { network ->
+        val caps = cm.getNetworkCapabilities(network) ?: return@any false
+        caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) &&
+            caps.ownerUid != Process.myUid()  // API 29+: exclude own VPN slot
+    }
+}
+```
+
+**Diagnostic shortcut:** If a user reports continuous VPN cycling without an active external VPN, check the log for `external VPN active at start` → if present, the ownerUid guard was missing or bypassed.
+
 ## Related Concepts
 
 - [[concepts/vpnservice-builder-traps]] — related Builder API gotchas (setBlocking, IPv6 routes, etc.)
@@ -115,3 +145,4 @@ override fun onRevoke() {
 
 - [[daily/2026-05-19.md]] — Session 16:23: root cause in ozero.log L34381-34540 (external VPN captured slot → establish() null → silent Idle); fix: `onEngineDied("VPN slot занят")` before `stopVpnRequest`; `logActiveExternalVpn()` diagnostic; detekt ReturnCount CI fail resolved by merging null branches
 - [[daily/2026-05-20.md]] — Session (VPN slot onRevoke): `onRevoke()` → `postDelayed(Process.killProcess, 2500ms)` releases libgojni + VPN slot cleanly for next app; `stopVpn/onDestroy` do NOT kill — only revoke means "user chose another VPN"
+- [[daily/2026-05-22.md]] — Session 19:32: user Ruslan v0.1.11 log — `isExternalVpnActive()` missing `ownerUid` filter detected own dying VPN as external VPN → false positive → cycling loop; fix `c1123b04` (API 29+ ownerUid guard) shipped in v0.1.12

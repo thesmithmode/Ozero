@@ -1,5 +1,19 @@
 # Build Log
 
+## [2026-05-22T23:30:00+03:00] compile | Daily Log 2026-05-22 (pass 5 — isExternalVpnActive ownerUid false positive)
+- Source: daily/2026-05-22.md
+- Articles created: (none)
+- Articles updated:
+  - [[concepts/vpn-slot-conflict-detection]] — isExternalVpnActive() missing ownerUid filter: own dying VPN detected as external → 750ms delay + protect() conflict → cycling loop; fix c1123b04 (API 29+ ownerUid guard, v0.1.12); log pattern + diagnostic shortcut documented
+- Index updated: 1 row (vpn-slot-conflict-detection summary + date + source)
+- Sessions covered: 19:32 (Ruslan v0.1.11 user report — cycling VPN; isExternalVpnActive false positive root cause; v0.1.12 fix confirmed)
+- Note: Passes 1-4 covered all other sessions; this pass closes the remaining gap
+
+## [2026-05-22T22:00:00+03:00] compile | Daily Log 2026-05-22 (pass 4 — QS tile)
+- Source: daily/2026-05-22.md
+- Articles created:
+  - [[concepts/qs-tile-vpn-integration]] — QS tile smart toggle; ozero_logo_white icon; TunnelController.state flow collection; stub-existence pattern; toggle-via-Intent deferred
+
 ## [2026-05-22T21:00:00+03:00] compile | Daily Log 2026-05-22 (pass 3 — AWG defaults migration gap)
 - Source: daily/2026-05-22.md
 - Articles created: (none)
