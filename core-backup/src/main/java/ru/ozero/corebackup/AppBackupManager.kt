@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.first
 import ru.ozero.corestorage.dao.AppSplitRuleDao
 import ru.ozero.corestorage.entity.AppSplitRule
 import ru.ozero.enginescore.settings.SettingsKeys
-import ru.ozero.enginetelegram.TelegramConfigStore
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkLocationSelection
 import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
@@ -27,7 +26,6 @@ class AppBackupManager(
     private val warpSlotStore: WarpConfigSlotStore,
     private val urnetworkStore: UrnetworkConfigStore,
     private val splitRuleDao: AppSplitRuleDao,
-    private val telegramStore: TelegramConfigStore,
     private val strategyProvider: StrategyBackupProvider? = null,
 ) {
 
@@ -38,7 +36,6 @@ class AppBackupManager(
             if (BackupCategory.WARP in categories) warpSlotStore.slots().first().map { it.toBackup() } else emptyList()
         val splitRules = if (BackupCategory.SPLIT_TUNNEL in categories) exportSplit() else emptyList()
         val strategy = if (BackupCategory.STRATEGY in categories) strategyProvider?.export() else null
-        val telegram = if (BackupCategory.TELEGRAM in categories) exportTelegram() else null
         return AppBackupData(
             exportedAt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).format(Date()),
             settings = exportSettings(prefs, categories),
@@ -46,7 +43,6 @@ class AppBackupManager(
             warpSlots = warpSlots,
             splitRules = splitRules,
             strategy = strategy,
-            telegram = telegram,
         )
     }
 
@@ -96,16 +92,6 @@ class AppBackupManager(
         splitRuleDao.observeAll().first().map {
             BackupSplitRule(packageName = it.packageName, isExcluded = it.isExcluded)
         }
-
-    private suspend fun exportTelegram(): BackupTelegram {
-        val tg = telegramStore.config().first()
-        return BackupTelegram(
-            enabled = tg.enabled,
-            port = tg.port,
-            domain = tg.domain.takeIf { it.isNotBlank() },
-            secret = tg.secret.takeIf { it.isNotBlank() },
-        )
-    }
 
     suspend fun import(data: AppBackupData, categories: Set<BackupCategory> = BackupCategory.ALL) {
         ozeroSettings.edit { prefs ->
