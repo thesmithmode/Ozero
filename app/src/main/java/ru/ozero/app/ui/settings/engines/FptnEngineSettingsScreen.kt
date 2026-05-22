@@ -303,14 +303,20 @@ private fun FptnBypassCard(selected: FptnBypassMethod, onSelect: (FptnBypassMeth
                         .fillMaxWidth()
                         .selectable(
                             selected = selected == method,
-                            onClick = { onSelect(method); showSheet = false },
+                            onClick = {
+                                onSelect(method)
+                                showSheet = false
+                            },
                         )
                         .padding(horizontal = 16.dp, vertical = 4.dp)
                         .testTag("fptn_bypass_${method.name.lowercase()}"),
                 ) {
                     RadioButton(
                         selected = selected == method,
-                        onClick = { onSelect(method); showSheet = false },
+                        onClick = {
+                            onSelect(method)
+                            showSheet = false
+                        },
                     )
                     Text(
                         text = method.displayName,
@@ -382,7 +388,10 @@ private fun FptnServersCard(
                 label = stringResource(R.string.fptn_server_auto),
                 flag = "",
                 selected = autoSelect,
-                onClick = { onAutoSelect(); showSheet = false },
+                onClick = {
+                    onAutoSelect()
+                    showSheet = false
+                },
                 tag = "fptn_server_auto",
             )
             servers.forEach { server ->
@@ -390,7 +399,10 @@ private fun FptnServersCard(
                     label = server.name,
                     flag = countryFlag(server.countryCode),
                     selected = !autoSelect && selectedServerName == server.name,
-                    onClick = { onServerSelect(server.name); showSheet = false },
+                    onClick = {
+                        onServerSelect(server.name)
+                        showSheet = false
+                    },
                     tag = "fptn_server_${server.name}",
                 )
             }
@@ -431,7 +443,13 @@ private fun FptnServerRow(
 @Composable
 private fun FptnExperimentalDialog(
     state: FptnSettingsUiState,
-    onSave: (reconnectNetwork: Boolean, reconnectIp: Boolean, maxAttempts: Int, pauseSeconds: Int, resetServer: Boolean) -> Unit,
+    onSave: (
+        reconnectNetwork: Boolean,
+        reconnectIp: Boolean,
+        maxAttempts: Int,
+        pauseSeconds: Int,
+        resetServer: Boolean,
+    ) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var reconnectNetwork by remember { mutableStateOf(state.reconnectOnNetworkChange) }
