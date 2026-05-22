@@ -36,8 +36,8 @@ class TunBuilderHelper(private val service: VpnService) {
             runCatching { builder.addDnsServer(dns) }
                 .onFailure { PersistentLoggers.warn(TAG, "spec addDnsServer rejected '$dns': ${it.message}") }
         }
-        if (spec.allowFamilyV4) builder.allowFamily(android.system.OsConstants.AF_INET)
-        if (spec.allowFamilyV6) builder.allowFamily(android.system.OsConstants.AF_INET6)
+        builder.allowFamily(android.system.OsConstants.AF_INET)
+        builder.allowFamily(android.system.OsConstants.AF_INET6)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             runCatching { builder.setMetered(false) }
         }

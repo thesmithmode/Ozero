@@ -146,6 +146,31 @@ class TunBuilderHelperContractTest {
     }
 
     @Test
+    fun `applyEngineTunSpec allowFamily AF_INET6 безусловный — иначе BLOCKLIST split tunnel теряет IPv6 для VPN-routed apps`() {
+        val body = source.substringAfter("fun applyEngineTunSpec(").substringBefore("fun buildTunBuilder(")
+        assertTrue(
+            body.contains("builder.allowFamily(android.system.OsConstants.AF_INET)"),
+            "allowFamily(AF_INET) обязан вызываться безусловно — VPN admits IPv4",
+        )
+        assertTrue(
+            body.contains("builder.allowFamily(android.system.OsConstants.AF_INET6)"),
+            "allowFamily(AF_INET6) обязан вызываться безусловно. " +
+                "Без этого в BLOCKLIST режиме (addDisallowedApplication) Android помечает " +
+                "non-excluded apps как VPN-routed, и их IPv6 трафик блокируется на VPN-слое " +
+                "(allowIPv6=false). Симптом: Gemini и другие IPv6-preferring сервисы перестают работать " +
+                "как только в blocklist добавляется любое приложение.",
+        )
+        assertTrue(
+            !body.contains("if (spec.allowFamilyV4) builder.allowFamily"),
+            "Условный allowFamily(AF_INET) запрещён — может быть рассинхронизирован с allowFamily(AF_INET6)",
+        )
+        assertTrue(
+            !body.contains("if (spec.allowFamilyV6) builder.allowFamily"),
+            "Условный allowFamily(AF_INET6) запрещён — корень бага split tunnel + Gemini",
+        )
+    }
+
+    @Test
     fun `applyEngineTunSpec setMetered false только на Q+ — pre-Q deprecated API`() {
         val body = source.substringAfter("fun applyEngineTunSpec(").substringBefore("fun buildTunBuilder(")
         val qIdx = body.indexOf("VERSION_CODES.Q")
