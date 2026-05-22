@@ -62,7 +62,9 @@ internal class FakeUrnetworkBridge(
         lastConnectToLocation = location
     }
     val connectBestAvailableCallCount = AtomicInteger(0)
-    override fun connectBestAvailable() { connectBestAvailableCallCount.incrementAndGet() }
+    override fun connectBestAvailable() {
+        connectBestAvailableCallCount.incrementAndGet()
+    }
     override fun selectedLocation(): UrnetworkSdkBridge.LocationToken? = initialLocation
     override fun openLocationsViewController(): LocationsViewController? = null
     var lastAppliedWindowType: UrnetworkWindowType? = null
