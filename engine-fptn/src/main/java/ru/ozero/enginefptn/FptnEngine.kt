@@ -3,6 +3,7 @@ package ru.ozero.enginefptn
 import android.os.ParcelFileDescriptor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -170,18 +171,23 @@ class FptnEngine(
     }
 
     override suspend fun stop() {
-        tunScope?.cancel()
+        val scope = tunScope
         tunScope = null
-
         val h = _nativeHandle
+        _nativeHandle = 0L
+
         if (h != 0L) {
             wsClient.nativeStop(h)
-            wsClient.nativeDestroy(h)
-            _nativeHandle = 0L
         }
-
         _pfd?.close()
         _pfd = null
+
+        scope?.cancel()
+        scope?.coroutineContext?.get(Job)?.join()
+
+        if (h != 0L) {
+            wsClient.nativeDestroy(h)
+        }
         _currentServer = null
         _accessToken = null
     }

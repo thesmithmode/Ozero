@@ -7,7 +7,10 @@
 
 namespace fptn::wrapper {
 inline std::string ConvertToCString(JNIEnv* p_env, jstring jstr) {
-  return p_env->GetStringUTFChars(jstr, nullptr);
+  const char* chars = p_env->GetStringUTFChars(jstr, nullptr);
+  std::string result(chars ? chars : "");
+  p_env->ReleaseStringUTFChars(jstr, chars);
+  return result;
 }
 
 bool init_logger();

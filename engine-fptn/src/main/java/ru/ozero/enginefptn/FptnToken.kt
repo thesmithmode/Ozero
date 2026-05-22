@@ -1,28 +1,19 @@
 package ru.ozero.enginefptn
 
-import android.os.Build
 import android.util.Base64
 import org.json.JSONObject
 
 object FptnToken {
 
     fun parse(raw: String): FptnTokenData? {
-        val (isBrotli, encoded) = when {
-            raw.startsWith("fptn:") -> false to raw.removePrefix("fptn:")
-            raw.startsWith("fptnb:") -> true to raw.removePrefix("fptnb:")
+        val encoded = when {
+            raw.startsWith("fptn:") -> raw.removePrefix("fptn:")
+            raw.startsWith("fptnb:") -> return null
             else -> return null
         }
         return try {
             val bytes = Base64.decode(encoded.trim(), Base64.DEFAULT)
-            val json = if (isBrotli) {
-                if (Build.VERSION.SDK_INT < 31) return null
-                android.util.BrotliInputStream(bytes.inputStream()).use {
-                    it.readBytes().toString(Charsets.UTF_8)
-                }
-            } else {
-                bytes.toString(Charsets.UTF_8)
-            }
-            parseJson(json)
+            parseJson(bytes.toString(Charsets.UTF_8))
         } catch (_: Exception) {
             null
         }

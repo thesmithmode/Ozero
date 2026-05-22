@@ -42,7 +42,9 @@ jobject create_response(JNIEnv* env,
     if (!response_obj) {
       throw std::runtime_error("Failed to create response object");
     }
-    response_obj = env->NewGlobalRef(response_obj);
+    env->DeleteLocalRef(clazz);
+    env->DeleteLocalRef(body_str);
+    env->DeleteLocalRef(error_str);
     return response_obj;
   } catch (const std::runtime_error& err) {
     SPDLOG_WARN("Create response: {}", err.what());
@@ -72,8 +74,6 @@ Java_ru_ozero_enginefptn_FptnNativeHttpsClient_nativeCreate(
     jstring md5_fingerprint_param,
     jstring censorship_strategy_name_param) {
   fptn::wrapper::init_logger();
-
-  jobject global_object_ref = env->NewWeakGlobalRef(thiz);
 
   auto host = fptn::wrapper::ConvertToCString(env, host_param);
   int port = port_param;
@@ -107,7 +107,7 @@ Java_ru_ozero_enginefptn_FptnNativeHttpsClient_nativeCreate(
     censorship_strategy = fptn::protocol::https::CensorshipStrategy::kSniRealityModeSafari26;
   }
 
-  auto* https_client = new WrapperHttpsClient(env, global_object_ref,
+  auto* https_client = new WrapperHttpsClient(env, nullptr,
       std::move(host), port, std::move(sni), std::move(md5_fingerprint), censorship_strategy);
   return reinterpret_cast<jlong>(https_client);
 }

@@ -121,9 +121,11 @@ Java_ru_ozero_enginefptn_FptnNativeWebSocket_nativeDestroy(
 
   auto* websocket_client = proxy.Get(native_handle);
   if (websocket_client) {
+    jweak weak_ref = static_cast<jweak>(websocket_client->GetWrapper());
     websocket_client->Stop();
     proxy.Delete(native_handle);
     delete websocket_client;
+    env->DeleteWeakGlobalRef(weak_ref);
   }
 }
 

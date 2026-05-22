@@ -29,6 +29,8 @@ class WrapperWebsocketClient final {
 
   bool Send(std::string pkt);
 
+  jobject GetWrapper() const noexcept { return wrapper_; }
+
  protected:
   void Run();
 
