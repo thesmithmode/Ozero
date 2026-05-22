@@ -124,7 +124,8 @@ class TunBuilderHelperContractTest {
         val body = source.substringAfter("fun applyEngineTunSpec(").substringBefore("fun buildTunBuilder(")
         assertTrue(
             body.contains("TIRAMISU && spec.excludeRfc1918"),
-            "RFC1918 exclude требует TIRAMISU API (33+) И spec.excludeRfc1918=true — иначе fallback на полную 0.0.0.0/0",
+            "RFC1918 exclude требует TIRAMISU API (33+) И spec.excludeRfc1918=true — " +
+                "иначе fallback на полную 0.0.0.0/0",
         )
         assertTrue(body.contains("\"10.0.0.0\""), "должен включать 10.0.0.0/8")
         assertTrue(body.contains("\"172.16.0.0\""), "должен включать 172.16.0.0/12")
@@ -146,7 +147,7 @@ class TunBuilderHelperContractTest {
     }
 
     @Test
-    fun `applyEngineTunSpec allowFamily AF_INET6 безусловный — иначе BLOCKLIST split tunnel теряет IPv6 для VPN-routed apps`() {
+    fun `applyEngineTunSpec allowFamily AF_INET6 безусловный — BLOCKLIST split tunnel sentinel`() {
         val body = source.substringAfter("fun applyEngineTunSpec(").substringBefore("fun buildTunBuilder(")
         assertTrue(
             body.contains("builder.allowFamily(android.system.OsConstants.AF_INET)"),
