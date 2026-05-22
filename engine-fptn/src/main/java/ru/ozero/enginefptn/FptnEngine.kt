@@ -88,7 +88,7 @@ class FptnEngine(
         val server = selectServer(fptn, tokenData)
             ?: return StartResult.Failure("No FPTN server available")
 
-        Log.i(TAG, "start server=${server.name}:${server.port} bypass=${fptn.bypassMethod} n=${tokenData.servers.size}")
+        Log.d(TAG, "start server=${server.name}:${server.port} bypass=${fptn.bypassMethod} n=${tokenData.servers.size}")
 
         FptnNativeWebSocket.loadOnce()
         if (!FptnNativeWebSocket.libraryLoaded) {
@@ -106,7 +106,7 @@ class FptnEngine(
         _accessToken = accessToken
         _bypassMethod = fptn.bypassMethod
 
-        Log.i(TAG, "start: authenticated, ready to attach TUN")
+        Log.d(TAG, "start: authenticated, ready to attach TUN")
         return StartResult.Success(socksPort = 0)
     }
 
@@ -114,14 +114,14 @@ class FptnEngine(
         val server = _currentServer ?: return TunAttachResult.Failure("Engine not started")
         val token = _accessToken ?: return TunAttachResult.Failure("No access token")
 
-        Log.i(TAG, "attachTun: fd=$tunFd server=${server.name}")
+        Log.d(TAG, "attachTun: fd=$tunFd server=${server.name}")
 
         val pfd = ParcelFileDescriptor.adoptFd(tunFd)
         _pfd = pfd
 
         val fos = FileOutputStream(pfd.fileDescriptor)
 
-        wsClient.onOpen = { Log.i(TAG, "WS connected") }
+        wsClient.onOpen = { Log.d(TAG, "WS connected") }
         wsClient.onMessage = { bytes ->
             try {
                 fos.write(bytes)
@@ -132,42 +132,54 @@ class FptnEngine(
             PersistentLoggers.error(TAG, "WS failure: all reconnect attempts exhausted")
         }
 
-        Log.i(TAG, "attachTun: creating native handle method=$_bypassMethod")
-        val handle = wsClient.nativeCreate(
-            serverIp = server.host,
-            serverPort = server.port,
-            tunIpv4 = "10.10.0.1",
-            tunIpv6 = "fd00::1",
-            sni = server.host,
-            accessToken = token,
-            md5Fingerprint = server.md5Fingerprint,
-            censorshipStrategy = _bypassMethod,
-        )
+        Log.d(TAG, "attachTun: creating native handle method=$_bypassMethod")
+        val handle = runCatching {
+            wsClient.nativeCreate(
+                serverIp = server.host,
+                serverPort = server.port,
+                tunIpv4 = "10.10.0.1",
+                tunIpv6 = "fd00::1",
+                sni = server.host,
+                accessToken = token,
+                md5Fingerprint = server.md5Fingerprint,
+                censorshipStrategy = _bypassMethod,
+            )
+        }.getOrElse { e ->
+            fos.runCatching { close() }
+            PersistentLoggers.error(TAG, "nativeCreate failed: ${e.message}")
+            return TunAttachResult.Failure("nativeCreate failed: ${e.message}")
+        }
         _nativeHandle = handle
-        Log.i(TAG, "attachTun: handle=$handle, starting WS thread")
-        wsClient.nativeRun(handle)
+        Log.d(TAG, "attachTun: handle=$handle, starting WS thread")
+        runCatching { wsClient.nativeRun(handle) }.getOrElse { e ->
+            fos.runCatching { close() }
+            PersistentLoggers.error(TAG, "nativeRun failed: ${e.message}")
+            return TunAttachResult.Failure("nativeRun failed: ${e.message}")
+        }
 
+        tunScope?.cancel()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         tunScope = scope
 
         scope.launch {
-            val fis = FileInputStream(pfd.fileDescriptor)
-            val buf = ByteArray(65535)
-            try {
-                while (isActive) {
-                    val n = fis.read(buf)
-                    if (n > 0) {
-                        wsClient.nativeSend(handle, buf.copyOf(n), n.toLong())
+            FileInputStream(pfd.fileDescriptor).use { fis ->
+                val buf = ByteArray(65535)
+                try {
+                    while (isActive) {
+                        val n = fis.read(buf)
+                        if (n > 0) {
+                            wsClient.nativeSend(handle, buf.copyOf(n), n.toLong())
+                        }
                     }
-                }
-            } catch (e: Exception) {
-                if (isActive) {
-                    PersistentLoggers.error(TAG, "TUN read loop terminated: ${e.javaClass.simpleName}")
+                } catch (e: Exception) {
+                    if (isActive) {
+                        PersistentLoggers.error(TAG, "TUN read loop terminated: ${e.javaClass.simpleName}")
+                    }
                 }
             }
         }
 
-        Log.i(TAG, "attachTun: TUN read loop launched")
+        Log.d(TAG, "attachTun: TUN read loop launched")
         return TunAttachResult.Success
     }
 
@@ -178,11 +190,11 @@ class FptnEngine(
             return EnginePlugin.ReadyResult.Timeout("No WS handle")
         }
 
-        Log.i(TAG, "awaitReady: polling WS started (timeout=${READY_TIMEOUT_MS}ms)")
+        Log.d(TAG, "awaitReady: polling WS started (timeout=${READY_TIMEOUT_MS}ms)")
         val deadline = System.currentTimeMillis() + READY_TIMEOUT_MS
         while (System.currentTimeMillis() < deadline) {
             if (wsClient.nativeIsStarted(handle)) {
-                Log.i(TAG, "awaitReady: WS ready")
+                Log.d(TAG, "awaitReady: WS ready")
                 return EnginePlugin.ReadyResult.Ready
             }
             delay(READY_POLL_MS)
@@ -192,14 +204,14 @@ class FptnEngine(
     }
 
     override suspend fun stop() {
-        Log.i(TAG, "stop: begin")
+        Log.d(TAG, "stop: begin")
         val scope = tunScope
         tunScope = null
         val h = _nativeHandle
         _nativeHandle = 0L
 
         if (h != 0L) {
-            Log.i(TAG, "stop: nativeStop handle=$h")
+            Log.d(TAG, "stop: nativeStop handle=$h")
             wsClient.nativeStop(h)
         }
         _pfd?.close()
@@ -207,15 +219,15 @@ class FptnEngine(
 
         scope?.cancel()
         scope?.coroutineContext?.get(Job)?.join()
-        Log.i(TAG, "stop: TUN loop joined")
+        Log.d(TAG, "stop: TUN loop joined")
 
         if (h != 0L) {
             wsClient.nativeDestroy(h)
-            Log.i(TAG, "stop: nativeDestroy done")
+            Log.d(TAG, "stop: nativeDestroy done")
         }
         _currentServer = null
         _accessToken = null
-        Log.i(TAG, "stop: done")
+        Log.d(TAG, "stop: done")
     }
 
     override suspend fun probe(): ProbeResult {
@@ -244,7 +256,7 @@ class FptnEngine(
             censorshipStrategy = bypassMethod,
         )
         return try {
-            Log.i(TAG, "authenticate: POST /api/v1/login timeout=${AUTH_TIMEOUT_S}s")
+            Log.d(TAG, "authenticate: POST /api/v1/login timeout=${AUTH_TIMEOUT_S}s")
             val body = JSONObject().apply {
                 put("username", data.username)
                 put("password", data.password)
@@ -253,7 +265,7 @@ class FptnEngine(
             if (resp.code == 200) {
                 val token = JSONObject(resp.body).optString("access_token").takeIf { it.isNotBlank() }
                 if (token != null) {
-                    Log.i(TAG, "authenticate: success")
+                    Log.d(TAG, "authenticate: success")
                 } else {
                     PersistentLoggers.error(TAG, "authenticate: 200 but no access_token in response")
                 }
