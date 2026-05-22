@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 interface FptnConfigStore {
     fun config(): Flow<FptnConfig>
+    fun currentConfig(): FptnConfig
     suspend fun update(transform: (FptnConfig) -> FptnConfig)
 }
 
@@ -27,6 +28,7 @@ class InMemoryFptnConfigStore(initial: FptnConfig = FptnConfig()) : FptnConfigSt
         state.value = transform(state.value)
     }
     override fun config(): Flow<FptnConfig> = state
+    override fun currentConfig(): FptnConfig = state.value
     override suspend fun update(transform: (FptnConfig) -> FptnConfig) {
         state.value = transform(state.value)
     }

@@ -28,6 +28,7 @@ import ru.ozero.enginescore.TunAttachResult
 import ru.ozero.enginescore.TunFdAcceptor
 import ru.ozero.enginescore.TunSpec
 import ru.ozero.enginescore.Upstream
+import ru.ozero.enginescore.settings.SettingsModel
 import java.io.FileInputStream
 import java.io.FileOutputStream
 
@@ -58,6 +59,22 @@ class FptnEngine(
     )
 
     override fun stats(): Flow<EngineStats> = _stats.asStateFlow()
+
+    override fun buildManualConfig(settings: SettingsModel?): EngineConfig? {
+        val cfg = configStore.currentConfig()
+        if (cfg.token.isBlank()) return null
+        return EngineConfig.Fptn(
+            token = cfg.token,
+            selectedServerName = cfg.selectedServerName,
+            bypassMethod = cfg.bypassMethod,
+            autoSelect = cfg.autoSelect,
+            reconnectOnNetworkChange = cfg.reconnectOnNetworkChange,
+            reconnectOnIpChange = cfg.reconnectOnIpChange,
+            maxReconnectAttempts = cfg.maxReconnectAttempts,
+            reconnectPauseSeconds = cfg.reconnectPauseSeconds,
+            resetServerOnDisconnect = cfg.resetServerOnDisconnect,
+        )
+    }
 
     override suspend fun tunSpec(): TunSpec = TunSpec(
         sessionName = "FPTN",
@@ -149,13 +166,14 @@ class FptnEngine(
             PersistentLoggers.error(TAG, "nativeCreate failed: ${e.message}")
             return TunAttachResult.Failure("nativeCreate failed: ${e.message}")
         }
-        _nativeHandle = handle
         Log.d(TAG, "attachTun: handle=$handle, starting WS thread")
         runCatching { wsClient.nativeRun(handle) }.getOrElse { e ->
             fos.runCatching { close() }
+            runCatching { wsClient.nativeDestroy(handle) }
             PersistentLoggers.error(TAG, "nativeRun failed: ${e.message}")
             return TunAttachResult.Failure("nativeRun failed: ${e.message}")
         }
+        _nativeHandle = handle
 
         tunScope?.cancel()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

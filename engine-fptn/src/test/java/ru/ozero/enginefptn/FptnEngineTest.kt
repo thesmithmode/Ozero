@@ -15,6 +15,8 @@ import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 class FptnEngineTest {
 
@@ -119,6 +121,66 @@ class FptnEngineTest {
         store.inject { it.copy(token = "fptn:${validTokenB64()}") }
         val result = engine.probe()
         assertIs<ProbeResult.Success>(result)
+    }
+
+    @Test
+    fun `buildManualConfig returns null when token blank`() {
+        assertNull(engine.buildManualConfig(null))
+    }
+
+    @Test
+    fun `buildManualConfig returns null when token whitespace only`() {
+        store.inject { it.copy(token = "   ") }
+        assertNull(engine.buildManualConfig(null))
+    }
+
+    @Test
+    fun `buildManualConfig returns Fptn config when token set`() {
+        store.inject {
+            it.copy(
+                token = "fptn:abc",
+                selectedServerName = "S1",
+                bypassMethod = FptnBypassMethod.SNI_REALITY_CHROME_147.strategyName,
+                autoSelect = false,
+                reconnectOnNetworkChange = true,
+                reconnectOnIpChange = true,
+                maxReconnectAttempts = 7,
+                reconnectPauseSeconds = 5,
+                resetServerOnDisconnect = false,
+            )
+        }
+        val cfg = engine.buildManualConfig(null)
+        val fptn = assertIs<EngineConfig.Fptn>(cfg)
+        assertEquals("fptn:abc", fptn.token)
+        assertEquals("S1", fptn.selectedServerName)
+        assertEquals(FptnBypassMethod.SNI_REALITY_CHROME_147.strategyName, fptn.bypassMethod)
+        assertEquals(false, fptn.autoSelect)
+        assertEquals(true, fptn.reconnectOnNetworkChange)
+        assertEquals(true, fptn.reconnectOnIpChange)
+        assertEquals(7, fptn.maxReconnectAttempts)
+        assertEquals(5, fptn.reconnectPauseSeconds)
+        assertEquals(false, fptn.resetServerOnDisconnect)
+    }
+
+    @Test
+    fun `buildManualConfig ignores settings parameter for FPTN-specific config`() {
+        store.inject { it.copy(token = "fptn:zzz") }
+        val withSettings = engine.buildManualConfig(null)
+        val withoutSettings = engine.buildManualConfig(null)
+        assertNotNull(withSettings)
+        assertEquals(withSettings, withoutSettings)
+    }
+
+    @Test
+    fun `EngineConfig Fptn default bypassMethod matches enum DEFAULT`() {
+        assertEquals(
+            FptnBypassMethod.DEFAULT.strategyName,
+            EngineConfig.Fptn.DEFAULT_BYPASS_METHOD,
+        )
+        assertEquals(
+            EngineConfig.Fptn.DEFAULT_BYPASS_METHOD,
+            EngineConfig.Fptn().bypassMethod,
+        )
     }
 
     private fun validTokenB64(): String {

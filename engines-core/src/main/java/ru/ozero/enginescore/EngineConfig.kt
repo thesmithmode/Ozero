@@ -71,7 +71,7 @@ sealed class EngineConfig {
     data class Fptn(
         val token: String = "",
         val selectedServerName: String? = null,
-        val bypassMethod: String = "SNI-REALITY-YANDEX-25",
+        val bypassMethod: String = DEFAULT_BYPASS_METHOD,
         val autoSelect: Boolean = true,
         val reconnectOnNetworkChange: Boolean = true,
         val reconnectOnIpChange: Boolean = false,
@@ -82,5 +82,9 @@ sealed class EngineConfig {
         override val engineId = EngineId.FPTN
         override fun toString(): String =
             "Fptn(token=***, server=$selectedServerName, method=$bypassMethod)"
+
+        companion object {
+            const val DEFAULT_BYPASS_METHOD: String = "SNI-REALITY-YANDEX-25"
+        }
     }
 }

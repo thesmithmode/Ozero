@@ -7,14 +7,26 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 
 class DataStoreFptnConfigStore(
     private val dataStore: DataStore<Preferences>,
+    scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) : FptnConfigStore {
 
-    override fun config(): Flow<FptnConfig> = dataStore.data.map { readConfig(it) }
+    private val cache = dataStore.data
+        .map { readConfig(it) }
+        .stateIn(scope, SharingStarted.Eagerly, FptnConfig())
+
+    override fun config(): Flow<FptnConfig> = cache
+
+    override fun currentConfig(): FptnConfig = cache.value
 
     override suspend fun update(transform: (FptnConfig) -> FptnConfig) {
         dataStore.edit { prefs ->
