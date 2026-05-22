@@ -35,9 +35,9 @@ class HevTunnelConfigTest {
     }
 
     @Test
-    fun `toYaml содержит log-level info — диагностика SOCKS5`() {
+    fun `toYaml НЕ содержит log-level — upstream parity`() {
         val yaml = base().toYaml()
-        assertTrue(yaml.contains("log-level: info"), "дефолт info — видны все SOCKS5 соединения в logcat")
+        assertFalse(yaml.contains("log-level:"), "misc.log-level отсутствует у upstream")
     }
 
     @Test

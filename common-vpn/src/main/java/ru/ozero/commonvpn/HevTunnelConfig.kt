@@ -31,7 +31,6 @@ data class HevTunnelConfig(
           mtu: $tunMtu
         misc:
           task-stack-size: 81920
-          log-level: $hevLogLevel
         socks5:
           address: $socksAddress
           port: $socksPort
@@ -44,7 +43,7 @@ data class HevTunnelConfig(
         private const val DEFAULT_TUN_IPV4: String = "10.10.10.10"
         private const val DEFAULT_TUN_IPV6: String = "fd00::1"
         private const val DEFAULT_UDP_MODE: String = "udp"
-        private const val DEFAULT_HEV_LOG_LEVEL: String = "info"
+        private const val DEFAULT_HEV_LOG_LEVEL: String = "warn"
 
         private val ADDRESS_REGEX = Regex("^[a-zA-Z0-9._:-]+$")
         private val HEV_LOG_LEVELS = setOf("debug", "info", "warn", "error")
