@@ -62,8 +62,6 @@ class TunBuilderHelper(private val service: VpnService) {
         if (spec.allowFamilyV6 && v6 != null) {
             builder.addAddress(v6, spec.ipv6PrefixLength)
             if (spec.routeAllV6) builder.addRoute("::", 0)
-        } else {
-            blackholeIpv6(builder, "applyEngineTunSpec")
         }
         return builder
     }

@@ -296,12 +296,12 @@ class EngineWarpContractTest {
     }
 
     @Test
-    fun `tunSpec — конфиг с IPv6 → allowFamilyV6=true независимо от ipv6Enabled=false`() = runTest {
+    fun `tunSpec — конфиг с IPv6 и ipv6Enabled=false → allowFamilyV6=false`() = runTest {
         val (e, _, _) = engineIpv6(ipv6Enabled = false)
         e.start(EngineConfig.Warp, Upstream.None)
         val spec = e.tunSpec() ?: error("tunSpec null")
-        assertTrue(spec.allowFamilyV6, "allowFamilyV6 must be true — config has IPv6")
-        assertEquals("2606:4700::1", spec.ipv6Address)
+        assertFalse(spec.allowFamilyV6, "allowFamilyV6 must be false — user disabled IPv6")
+        assertNull(spec.ipv6Address, "ipv6Address must be null — user disabled IPv6")
     }
 
     @Test
@@ -339,7 +339,7 @@ class EngineWarpContractTest {
     }
 
     @Test
-    fun `attachTun — конфиг с IPv6 при ipv6Enabled=false → ::/0 НЕ stripped (regression fix)`() = runTest {
+    fun `attachTun — конфиг с IPv6 при ipv6Enabled=false → ::/0 stripped из INI`() = runTest {
         val raw = """
             [Interface]
             PrivateKey = abc
@@ -357,8 +357,7 @@ class EngineWarpContractTest {
         e.start(EngineConfig.Warp, Upstream.None)
         e.attachTun(tunFd = 42)
         val ini = bridge.lastIni ?: error("ini missing")
-        assertTrue(ini.contains("::/0"), "::/0 must be preserved — config has IPv6. INI:\n$ini")
-        assertTrue(ini.contains("2606:4700::1"), "IPv6 address preserved — config has IPv6. INI:\n$ini")
+        assertFalse(ini.contains("::/0"), "::/0 must be stripped — user disabled IPv6. INI:\n$ini")
         assertTrue(ini.contains("0.0.0.0/0"), "IPv4 routing preserved. INI:\n$ini")
     }
 
