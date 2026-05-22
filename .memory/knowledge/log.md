@@ -1,5 +1,28 @@
 # Build Log
 
+## [2026-05-22T23:59:59+03:00] compile | Daily Log 2026-05-22 (pass 13 — FREE_TIER_CAP contradiction fix)
+- Source: daily/2026-05-22.md
+- Articles created: (none)
+- Articles updated:
+  - [[concepts/urnetwork-balance-accumulation-mechanism]] — reversed UX decision: FREE_TIER_CAP_BYTES=34GiB removed (commit e0d53ca4); display real balance via coerceAtLeast(0L); old "cap at 34 GiB" recommendation was contradicted by session 16:42 decision
+  - [[concepts/urnetwork-balance-optimistic-cache]] — added FREE_TIER_CAP_BYTES removal note + 2026-05-22 source
+- Index updated: 2 rows (urnetwork-balance-accumulation-mechanism, urnetwork-balance-optimistic-cache — corrected summaries + dates)
+- Gap found by: grep for FREE_TIER_CAP / coerceAtLeast returned no hits in knowledge/ articles despite being in session 16:42 log
+- Status: pass 12 had "100% complete" but missed this contradiction with prior "UX fix: cap at 34 GiB" claim
+
+## [2026-05-22T23:59:59+03:00] compile | Daily Log 2026-05-22 (pass 12 — schema-triggered, full verification pass)
+- Source: daily/2026-05-22.md
+- Articles created: (none — all 5 articles from today confirmed complete: vpnservice-double-shutdown-guard, warp-allowedips-tun-routing, engine-chip-switching-desync, qs-tile-vpn-integration, fptn-engine-protocol)
+- Articles updated: (none — all 8 updates confirmed current: urnetwork-relay-always, byedpi-hev-pipeline-upstream-parity, warp-config-generator-api, amnezia-wg-warp-migration, sentinel-protecting-bug-trap, vpn-slot-conflict-detection, urnetwork-location-hierarchy-migration, engine-chip-race-observer)
+- Status: compilation 100% complete, all sessions 11:59–21:27 fully captured in passes 1-11
+
+## [2026-05-22T23:59:59+03:00] compile | Daily Log 2026-05-22 (pass 11 — triggered compilation, full verification)
+- Source: daily/2026-05-22.md
+- Articles created: (none — all 5 new articles verified complete)
+- Articles updated: (none — all 8 updates verified current)
+- Verified: urnetwork-relay-always, warp-config-generator-api, amnezia-wg-warp-migration, byedpi-hev-pipeline-upstream-parity, sentinel-protecting-bug-trap, vpn-slot-conflict-detection, urnetwork-location-hierarchy-migration, engine-chip-race-observer — all include 2026-05-22 source entries with correct content
+- Status: compilation 100% complete, no gaps found
+
 ## [2026-05-22T23:59:59+03:00] compile | Daily Log 2026-05-22 (pass 10 — final verification, all sessions captured)
 - Source: daily/2026-05-22.md
 - Articles created: (none — all 5 new articles confirmed complete: vpnservice-double-shutdown-guard, warp-allowedips-tun-routing, engine-chip-switching-desync, qs-tile-vpn-integration, fptn-engine-protocol)

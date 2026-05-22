@@ -4,8 +4,9 @@ aliases: [urnetwork-balance-102gib, transfer-balance-insert, urnetwork-free-quot
 tags: [urnetwork, backend, balance, quota]
 sources:
   - "daily/2026-05-20.md"
+  - "daily/2026-05-22.md"
 created: 2026-05-20
-updated: 2026-05-20
+updated: 2026-05-22
 ---
 
 # URnetwork Balance Accumulation Mechanism
@@ -33,9 +34,9 @@ The `transfer_balance` table stores time-bounded balance grants. Each row has a 
 
 The behavior was confirmed by tracing the `clientId` — it was identical in all rows, confirming a single network rather than multiple `networkCreate` calls. The user who observed 68 GiB later checked and saw 34 GiB once the overlap window expired, confirming the time-bounded nature of the surplus.
 
-### Client-Side UX Fix
+### Client-Side UX Fix (Reversed 2026-05-22)
 
-Since the canonical free-tier quota is 34 GiB, the Ozero client should cap the displayed balance at 34 GiB for free-tier networks. This prevents user confusion from the transient 68–102 GiB sum without needing any server-side fix.
+Originally the Ozero client capped the displayed balance at `FREE_TIER_CAP_BYTES = 34 GiB` to normalize the transient 68–102 GiB overlap sum. This cap was **removed** (commit `e0d53ca4`, session 16:42) by user decision: the server-side surplus is non-client-fixable, and hiding the real number actively obscures legitimate bonus GiBs from time overlaps. The new display formula is `balanceBytes.coerceAtLeast(0L)` — show the real SDK value, never negative.
 
 ## Related Concepts
 
@@ -44,4 +45,5 @@ Since the canonical free-tier quota is 34 GiB, the Ozero client should cap the d
 
 ## Sources
 
-- [[daily/2026-05-20.md]] - Session 13:00: server source traced; INSERT not UPDATE; RefreshFreeTransferBalance=34GiB, duration=30h, cron=24h; 3-row overlap window confirmed; client doesn't call AddRefreshTransferBalance; UX fix: cap at 34 GiB
+- [[daily/2026-05-20.md]] - Session 13:00: server source traced; INSERT not UPDATE; RefreshFreeTransferBalance=34GiB, duration=30h, cron=24h; 3-row overlap window confirmed; client doesn't call AddRefreshTransferBalance; UX fix initially: cap at 34 GiB
+- [[daily/2026-05-22.md]] - Session 16:42: FREE_TIER_CAP_BYTES=34GiB removed from UrnetworkBalanceCard; decision: show real balance (coerceAtLeast(0L)) since backend race is not client-fixable and cap hid real balance
