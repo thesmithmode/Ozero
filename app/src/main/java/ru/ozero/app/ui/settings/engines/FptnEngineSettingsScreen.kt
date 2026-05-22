@@ -1,8 +1,5 @@
 package ru.ozero.app.ui.settings.engines
 
-import android.content.Context
-import android.content.Intent
-import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,11 +19,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -34,6 +29,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -43,6 +39,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -54,7 +51,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -82,11 +78,9 @@ private object FptnLinks {
 @Composable
 fun FptnEngineSettingsScreen(
     onBack: () -> Unit,
-    onOpenSplitTunnel: () -> Unit,
     viewModel: FptnEngineSettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
     var tokenDraft by rememberSaveable { mutableStateOf("") }
     var experimentalVisible by remember { mutableStateOf(false) }
 
@@ -123,8 +117,6 @@ fun FptnEngineSettingsScreen(
                 selected = state.bypassMethod,
                 onSelect = { viewModel.onBypassMethodChange(it) },
             )
-            FptnSplitTunnelCard(onOpenSplitTunnel = onOpenSplitTunnel)
-            FptnPermissionsCard(context = context)
             FptnServersCard(
                 hasToken = state.hasToken,
                 servers = state.servers,
@@ -146,11 +138,13 @@ fun FptnEngineSettingsScreen(
     if (experimentalVisible) {
         FptnExperimentalDialog(
             state = state,
-            onReconnectNetwork = viewModel::onReconnectNetworkChange,
-            onReconnectIp = viewModel::onReconnectIpChange,
-            onMaxAttempts = viewModel::onMaxAttemptsChange,
-            onPauseSeconds = viewModel::onPauseSecondsChange,
-            onResetServer = viewModel::onResetServerChange,
+            onSave = { network, ip, maxAttempts, pauseSeconds, resetServer ->
+                viewModel.onReconnectNetworkChange(network)
+                viewModel.onReconnectIpChange(ip)
+                viewModel.onMaxAttemptsChange(maxAttempts)
+                viewModel.onPauseSecondsChange(pauseSeconds)
+                viewModel.onResetServerChange(resetServer)
+            },
             onDismiss = { experimentalVisible = false },
         )
     }
@@ -270,43 +264,17 @@ private fun FptnTokenCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FptnBypassCard(selected: FptnBypassMethod, onSelect: (FptnBypassMethod) -> Unit) {
-    SettingsCard(testTag = "fptn_bypass_card") {
-        CardHeader(icon = Icons.Filled.Lock, title = stringResource(R.string.fptn_section_bypass))
-        Text(
-            text = stringResource(R.string.fptn_section_bypass_summary),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
-        )
-        FptnBypassMethod.entries.forEach { method ->
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .selectable(selected = selected == method, onClick = { onSelect(method) })
-                    .padding(vertical = 4.dp)
-                    .testTag("fptn_bypass_${method.name.lowercase()}"),
-            ) {
-                RadioButton(selected = selected == method, onClick = { onSelect(method) })
-                Text(
-                    text = method.displayName,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(start = 8.dp),
-                )
-            }
-        }
-    }
-}
+    var showSheet by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-@Composable
-private fun FptnSplitTunnelCard(onOpenSplitTunnel: () -> Unit) {
-    SettingsCard(testTag = "fptn_split_tunnel_card", onClick = onOpenSplitTunnel) {
+    SettingsCard(testTag = "fptn_bypass_card", onClick = { showSheet = true }) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             CardHeader(
-                icon = Icons.Filled.Settings,
-                title = stringResource(R.string.fptn_section_split_tunnel),
+                icon = Icons.Filled.Lock,
+                title = stringResource(R.string.fptn_section_bypass),
                 modifier = Modifier.weight(1f),
             )
             Icon(
@@ -316,58 +284,47 @@ private fun FptnSplitTunnelCard(onOpenSplitTunnel: () -> Unit) {
             )
         }
         Text(
-            text = stringResource(R.string.fptn_section_split_tunnel_summary),
+            text = selected.displayName,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp),
         )
     }
-}
 
-@Composable
-private fun FptnPermissionsCard(context: Context) {
-    SettingsCard(testTag = "fptn_permissions_card") {
-        CardHeader(
-            icon = Icons.Filled.Info,
-            title = stringResource(R.string.fptn_section_permissions),
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        PermissionRow(
-            label = stringResource(R.string.fptn_perm_battery),
-            tag = "fptn_perm_battery",
-            onClick = { openBatteryOptimizationSettings(context) },
-        )
-        PermissionRow(
-            label = stringResource(R.string.fptn_perm_background),
-            tag = "fptn_perm_background",
-            onClick = { openDataUsageSettings(context) },
-        )
+    if (showSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showSheet = false },
+            sheetState = sheetState,
+        ) {
+            FptnBypassMethod.entries.forEach { method ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .selectable(
+                            selected = selected == method,
+                            onClick = { onSelect(method); showSheet = false },
+                        )
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .testTag("fptn_bypass_${method.name.lowercase()}"),
+                ) {
+                    RadioButton(
+                        selected = selected == method,
+                        onClick = { onSelect(method); showSheet = false },
+                    )
+                    Text(
+                        text = method.displayName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+        }
     }
 }
 
-@Composable
-private fun PermissionRow(label: String, tag: String, onClick: () -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp)
-            .testTag(tag),
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f),
-        )
-        Icon(
-            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FptnServersCard(
     hasToken: Boolean,
@@ -377,33 +334,67 @@ private fun FptnServersCard(
     onAutoSelect: () -> Unit,
     onServerSelect: (String) -> Unit,
 ) {
-    SettingsCard(testTag = "fptn_server_list") {
-        CardHeader(icon = Icons.Filled.LocationOn, title = stringResource(R.string.fptn_section_servers))
-        if (!hasToken) {
-            Text(
-                text = stringResource(R.string.fptn_no_token),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp).testTag("fptn_no_token"),
+    var showSheet by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    val currentLabel = when {
+        !hasToken -> stringResource(R.string.fptn_no_token)
+        autoSelect -> stringResource(R.string.fptn_server_auto)
+        else -> selectedServerName ?: stringResource(R.string.fptn_server_auto)
+    }
+
+    SettingsCard(
+        testTag = "fptn_server_list",
+        onClick = if (hasToken) ({ showSheet = true }) else null,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            CardHeader(
+                icon = Icons.Filled.LocationOn,
+                title = stringResource(R.string.fptn_section_servers),
+                modifier = Modifier.weight(1f),
             )
-            return@SettingsCard
+            if (hasToken) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
-        Spacer(modifier = Modifier.height(8.dp))
-        FptnServerRow(
-            label = stringResource(R.string.fptn_server_auto),
-            flag = "",
-            selected = autoSelect,
-            onClick = onAutoSelect,
-            tag = "fptn_server_auto",
+        Text(
+            text = currentLabel,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (!hasToken) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            modifier = Modifier.padding(top = 4.dp).testTag("fptn_no_token"),
         )
-        servers.forEach { server ->
+    }
+
+    if (showSheet && hasToken) {
+        ModalBottomSheet(
+            onDismissRequest = { showSheet = false },
+            sheetState = sheetState,
+        ) {
             FptnServerRow(
-                label = server.name,
-                flag = countryFlag(server.countryCode),
-                selected = !autoSelect && selectedServerName == server.name,
-                onClick = { onServerSelect(server.name) },
-                tag = "fptn_server_${server.name}",
+                label = stringResource(R.string.fptn_server_auto),
+                flag = "",
+                selected = autoSelect,
+                onClick = { onAutoSelect(); showSheet = false },
+                tag = "fptn_server_auto",
             )
+            servers.forEach { server ->
+                FptnServerRow(
+                    label = server.name,
+                    flag = countryFlag(server.countryCode),
+                    selected = !autoSelect && selectedServerName == server.name,
+                    onClick = { onServerSelect(server.name); showSheet = false },
+                    tag = "fptn_server_${server.name}",
+                )
+            }
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
@@ -421,7 +412,7 @@ private fun FptnServerRow(
         modifier = Modifier
             .fillMaxWidth()
             .selectable(selected = selected, onClick = onClick)
-            .padding(vertical = 4.dp)
+            .padding(horizontal = 16.dp, vertical = 4.dp)
             .testTag(tag),
     ) {
         RadioButton(selected = selected, onClick = null)
@@ -440,13 +431,15 @@ private fun FptnServerRow(
 @Composable
 private fun FptnExperimentalDialog(
     state: FptnSettingsUiState,
-    onReconnectNetwork: (Boolean) -> Unit,
-    onReconnectIp: (Boolean) -> Unit,
-    onMaxAttempts: (Int) -> Unit,
-    onPauseSeconds: (Int) -> Unit,
-    onResetServer: (Boolean) -> Unit,
+    onSave: (reconnectNetwork: Boolean, reconnectIp: Boolean, maxAttempts: Int, pauseSeconds: Int, resetServer: Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    var reconnectNetwork by remember { mutableStateOf(state.reconnectOnNetworkChange) }
+    var reconnectIp by remember { mutableStateOf(state.reconnectOnIpChange) }
+    var maxAttempts by remember { mutableStateOf(state.maxReconnectAttempts) }
+    var pauseSeconds by remember { mutableStateOf(state.reconnectPauseSeconds) }
+    var resetServer by remember { mutableStateOf(state.resetServerOnDisconnect) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.fptn_experimental_title)) },
@@ -459,14 +452,14 @@ private fun FptnExperimentalDialog(
                 )
                 FptnSwitchRow(
                     label = stringResource(R.string.fptn_reconnect_network),
-                    checked = state.reconnectOnNetworkChange,
-                    onCheckedChange = onReconnectNetwork,
+                    checked = reconnectNetwork,
+                    onCheckedChange = { reconnectNetwork = it },
                     tag = "fptn_exp_reconnect_network",
                 )
                 FptnSwitchRow(
                     label = stringResource(R.string.fptn_reconnect_ip),
-                    checked = state.reconnectOnIpChange,
-                    onCheckedChange = onReconnectIp,
+                    checked = reconnectIp,
+                    onCheckedChange = { reconnectIp = it },
                     tag = "fptn_exp_reconnect_ip",
                 )
                 Spacer(modifier = Modifier.height(4.dp))
@@ -476,23 +469,23 @@ private fun FptnExperimentalDialog(
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = stringResource(R.string.fptn_max_attempts, state.maxReconnectAttempts),
+                    text = stringResource(R.string.fptn_max_attempts, maxAttempts),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Slider(
-                    value = state.maxReconnectAttempts.toFloat(),
-                    onValueChange = { onMaxAttempts(it.toInt()) },
+                    value = maxAttempts.toFloat(),
+                    onValueChange = { maxAttempts = it.toInt() },
                     valueRange = 1f..10f,
                     steps = 8,
                     modifier = Modifier.testTag("fptn_exp_max_attempts"),
                 )
                 Text(
-                    text = stringResource(R.string.fptn_pause_seconds, state.reconnectPauseSeconds),
+                    text = stringResource(R.string.fptn_pause_seconds, pauseSeconds),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Slider(
-                    value = state.reconnectPauseSeconds.toFloat(),
-                    onValueChange = { onPauseSeconds(it.toInt()) },
+                    value = pauseSeconds.toFloat(),
+                    onValueChange = { pauseSeconds = it.toInt() },
                     valueRange = 1f..10f,
                     steps = 8,
                     modifier = Modifier.testTag("fptn_exp_pause_seconds"),
@@ -505,14 +498,20 @@ private fun FptnExperimentalDialog(
                 )
                 FptnSwitchRow(
                     label = stringResource(R.string.fptn_reset_server),
-                    checked = state.resetServerOnDisconnect,
-                    onCheckedChange = onResetServer,
+                    checked = resetServer,
+                    onCheckedChange = { resetServer = it },
                     tag = "fptn_exp_reset_server",
                 )
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss, modifier = Modifier.testTag("fptn_exp_save")) {
+            TextButton(
+                onClick = {
+                    onSave(reconnectNetwork, reconnectIp, maxAttempts, pauseSeconds, resetServer)
+                    onDismiss()
+                },
+                modifier = Modifier.testTag("fptn_exp_save"),
+            ) {
                 Text(stringResource(R.string.fptn_experimental_save))
             }
         },
@@ -590,23 +589,6 @@ private fun CardHeader(
             modifier = Modifier.padding(start = 12.dp),
         )
     }
-}
-
-private fun openBatteryOptimizationSettings(context: Context) {
-    val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    runCatching { context.startActivity(intent) }
-}
-
-private fun openDataUsageSettings(context: Context) {
-    val intent = Intent(Settings.ACTION_DATA_USAGE_SETTINGS)
-        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    runCatching { context.startActivity(intent) }
-        .onFailure {
-            val fallback = Intent(Settings.ACTION_SETTINGS)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            runCatching { context.startActivity(fallback) }
-        }
 }
 
 private fun countryFlag(code: String): String {

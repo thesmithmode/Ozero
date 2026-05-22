@@ -20,13 +20,6 @@
     <string name="fptn_section_bypass">Métodos de bypass</string>
     <string name="fptn_section_bypass_summary">Configura los métodos de evasión de bloqueos</string>
 
-    <string name="fptn_section_split_tunnel">Túnel selectivo por aplicación</string>
-    <string name="fptn_section_split_tunnel_summary">Aquí puedes configurar una VPN selectiva: usar VPN para todas las aplicaciones (por defecto) o permitir/denegar el acceso a aplicaciones concretas.</string>
-
-    <string name="fptn_section_permissions">Permisos necesarios</string>
-    <string name="fptn_perm_battery">Desactivar optimización de batería</string>
-    <string name="fptn_perm_background">Datos en segundo plano</string>
-
     <string name="fptn_section_servers">Tus servidores VPN</string>
     <string name="fptn_server_auto">Auto (selección automática)</string>
     <string name="fptn_no_token">Ingresa un token para ver la lista de servidores</string>

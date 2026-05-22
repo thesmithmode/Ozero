@@ -113,12 +113,7 @@ fun WarpEngineSettingsScreen(
         uri ?: return@rememberLauncherForActivityResult
         val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
             ?: return@rememberLauncherForActivityResult
-        val name = uri.lastPathSegment
-            ?.substringAfterLast('/')
-            ?.substringBeforeLast('.')
-            ?.takeIf { it.isNotBlank() }
-            ?: "Imported"
-        viewModel.onImportFile(ByteArrayInputStream(bytes), name)
+        viewModel.onImportFile(ByteArrayInputStream(bytes))
     }
     Scaffold(
         modifier = Modifier.testTag("warp_settings"),

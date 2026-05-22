@@ -61,6 +61,7 @@ arch=armv8
 compiler=clang
 compiler.version=${CLANG_VERSION}
 compiler.libcxx=c++_shared
+compiler.cppstd=17
 build_type=Release
 
 [buildenv]

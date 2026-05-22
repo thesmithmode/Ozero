@@ -7,7 +7,10 @@ import io.mockk.unmockkStatic
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.io.ByteArrayInputStream
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -142,6 +145,29 @@ class FptnTokenTest {
     @Test
     fun `should return null for fptnb when base64 itself is invalid`() {
         assertNull(FptnToken.parse("fptnb:!!!not-base64!!!"))
+    }
+
+    @Test
+    fun `readBounded returns content when within limit`() {
+        val data = ByteArray(100) { it.toByte() }
+        val result = FptnToken.readBounded(ByteArrayInputStream(data), 1024)
+        assertContentEquals(data, result)
+    }
+
+    @Test
+    fun `readBounded throws when payload exceeds limit`() {
+        val oversized = ByteArray(200) { it.toByte() }
+        assertFailsWith<IllegalStateException> {
+            FptnToken.readBounded(ByteArrayInputStream(oversized), 100)
+        }
+    }
+
+    @Test
+    fun `parse returns null for fptnb with oversized payload via readBounded`() {
+        val oversized = ByteArray(2 * 1024 * 1024 + 1) { 0 }
+        assertFailsWith<IllegalStateException> {
+            FptnToken.readBounded(ByteArrayInputStream(oversized), 1 * 1024 * 1024)
+        }
     }
 
     @Test

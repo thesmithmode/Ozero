@@ -56,17 +56,18 @@ class RealWarpSdkBridge(
     }
 
     private fun cleanupStaleSockets(uapiPath: String, tunnelName: String) {
-        val legacySocket = File(uapiPath, "$tunnelName.sock")
+        val ownSocketName = "$tunnelName.sock"
+        val legacySocket = File(uapiPath, ownSocketName)
         if (legacySocket.exists()) {
             val deleted = legacySocket.delete()
             Log.i(TAG, "stale legacy socket $legacySocket deleted=$deleted")
         }
         val socketsDir = File(uapiPath, "sockets")
         if (!socketsDir.isDirectory) return
-        val stale = socketsDir.listFiles { f -> f.name.endsWith(".sock") }.orEmpty()
+        val stale = socketsDir.listFiles { f -> f.name == ownSocketName }.orEmpty()
         if (stale.isEmpty()) return
         val staleDeleted = stale.count { it.delete() }
-        Log.i(TAG, "stale sockets/ cleanup: deleted=$staleDeleted/${stale.size}")
+        Log.i(TAG, "stale sockets/ cleanup: name=$ownSocketName deleted=$staleDeleted/${stale.size}")
     }
 
     private fun invokeAwgTurnOnAndProtect(

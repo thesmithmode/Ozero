@@ -95,10 +95,7 @@ fun RootNavigation(
             TopScreen.UrnetworkSharedTraffic -> UrnetworkSharedTrafficScreen(onBack = { back() })
             TopScreen.WarpEngineSettings -> WarpEngineSettingsScreen(onBack = { back() })
             TopScreen.MasterDnsSettings -> MasterDnsSettingsScreen(onBack = { back() })
-            TopScreen.FptnSettings -> FptnEngineSettingsScreen(
-                onBack = { back() },
-                onOpenSplitTunnel = { navigate(TopScreen.SplitTunnel) },
-            )
+            TopScreen.FptnSettings -> FptnEngineSettingsScreen(onBack = { back() })
             TopScreen.StrategyTest -> StrategyTestScreen(onBack = { back() })
             TopScreen.ManualServer -> ManualServerScreen(onBack = { back() })
             TopScreen.StatsHistory -> TrafficStatsScreen(onBack = { back() })

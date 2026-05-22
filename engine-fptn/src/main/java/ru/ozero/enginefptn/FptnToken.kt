@@ -4,6 +4,7 @@ import android.util.Base64
 import org.brotli.dec.BrotliInputStream
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
+import java.io.InputStream
 
 object FptnToken {
 
@@ -26,18 +27,20 @@ object FptnToken {
 
     private fun brotliDecompress(bytes: ByteArray): ByteArray =
         BrotliInputStream(ByteArrayInputStream(bytes)).use { stream ->
-            val buffer = ByteArray(MAX_DECOMPRESSED_BYTES + 1)
-            var total = 0
-            while (true) {
-                val read = stream.read(buffer, total, buffer.size - total)
-                if (read <= 0) break
-                total += read
-                if (total > MAX_DECOMPRESSED_BYTES) {
-                    error("brotli decompressed payload exceeds $MAX_DECOMPRESSED_BYTES bytes")
-                }
-            }
-            buffer.copyOf(total)
+            readBounded(stream, MAX_DECOMPRESSED_BYTES)
         }
+
+    internal fun readBounded(stream: InputStream, maxBytes: Int): ByteArray {
+        val buffer = ByteArray(maxBytes + 1)
+        var total = 0
+        while (true) {
+            val read = stream.read(buffer, total, buffer.size - total)
+            if (read <= 0) break
+            total += read
+            if (total > maxBytes) error("decompressed payload exceeds $maxBytes bytes")
+        }
+        return buffer.copyOf(total)
+    }
 
     private fun parseJson(json: String): FptnTokenData? {
         return try {

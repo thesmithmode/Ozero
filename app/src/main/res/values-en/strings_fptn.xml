@@ -20,13 +20,6 @@
     <string name="fptn_section_bypass">Bypass methods</string>
     <string name="fptn_section_bypass_summary">Configure how blocks are bypassed</string>
 
-    <string name="fptn_section_split_tunnel">Per-app tunneling settings</string>
-    <string name="fptn_section_split_tunnel_summary">Here you can configure selective VPN: use the VPN for all apps (default) or allow/deny access for specific apps.</string>
-
-    <string name="fptn_section_permissions">Required permissions</string>
-    <string name="fptn_perm_battery">Disable battery optimization</string>
-    <string name="fptn_perm_background">Background data</string>
-
     <string name="fptn_section_servers">Your VPN servers</string>
     <string name="fptn_server_auto">Auto (auto-select)</string>
     <string name="fptn_no_token">Enter a token to see the server list</string>

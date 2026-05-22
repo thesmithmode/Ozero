@@ -223,6 +223,26 @@ class WarpEngineSettingsViewModelTest {
     }
 
     @Test
+    fun `onImportFile success называет слот Ozero-1`() = runTest {
+        importer.setConfig(SAMPLE)
+        vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
+        advanceUntilIdle()
+        assertEquals("Ozero-1", vm.uiState.value.slots.first().name)
+    }
+
+    @Test
+    fun `onImportFile второй слот называется Ozero-2`() = runTest {
+        importer.setConfig(SAMPLE)
+        vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
+        advanceUntilIdle()
+        importer.setConfig(SAMPLE.copy(privateKey = "second-private-key"))
+        vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
+        advanceUntilIdle()
+        val names = vm.uiState.value.slots.map { it.name }.sorted()
+        assertEquals(listOf("Ozero-1", "Ozero-2"), names)
+    }
+
+    @Test
     fun `onImportFile failure ставит errorMessage и не добавляет слот`() = runTest {
         importer.result = Result.failure<ImportedWarpConfig>(IOException("bad file"))
         vm.onImportFile(ByteArrayInputStream(ByteArray(0)))

@@ -149,7 +149,7 @@ class WarpEngineSettingsViewModel @Inject constructor(
                 })
                 result.fold(
                     onSuccess = { registered ->
-                        val generatedName = buildGeneratedName(registered.config.peerEndpoint, store.slots().first())
+                        val generatedName = buildOzeroName(store.slots().first())
                         runCatching { store.addSlot(generatedName, registered.config, registered.rawIni) }
                             .onFailure { PersistentLoggers.warn(TAG, "generated addSlot failed: ${it.message}") }
                         _uiState.value = _uiState.value.copy(
@@ -184,12 +184,13 @@ class WarpEngineSettingsViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(isRegistering = false)
     }
 
-    fun onImportFile(stream: InputStream, suggestedName: String = "Imported") {
+    fun onImportFile(stream: InputStream) {
         viewModelScope.launch {
             val result = fileImporter.import(stream)
             result.fold(
                 onSuccess = { imported ->
-                    runCatching { store.addSlot(suggestedName, imported.config, imported.rawIni) }
+                    val name = buildOzeroName(store.slots().first())
+                    runCatching { store.addSlot(name, imported.config, imported.rawIni) }
                         .onSuccess { id ->
                             store.setActive(id)
                             _uiState.value = _uiState.value.copy(
@@ -344,15 +345,12 @@ class WarpEngineSettingsViewModel @Inject constructor(
     private companion object {
         const val COOLDOWN_POLL_INTERVAL_MS = 1_000L
         const val TAG = "WarpSettingsVM"
-        const val GENERATED_NAME_PREFIX = "WARP"
 
-        fun buildGeneratedName(endpoint: String, existing: List<WarpConfigSlot>): String {
-            val host = endpoint.substringBeforeLast(':').trim().ifBlank { "auto" }
-            val base = "$GENERATED_NAME_PREFIX $host"
-            if (existing.none { it.name == base }) return base
-            var counter = 2
-            while (existing.any { it.name == "$base #$counter" }) counter++
-            return "$base #$counter"
+        fun buildOzeroName(existing: List<WarpConfigSlot>): String {
+            val used = existing.mapNotNull { it.name.removePrefix("Ozero-").toIntOrNull() }.toSet()
+            var n = 1
+            while (n in used) n++
+            return "Ozero-$n"
         }
     }
 }

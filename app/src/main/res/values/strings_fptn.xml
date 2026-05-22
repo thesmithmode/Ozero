@@ -20,13 +20,6 @@
     <string name="fptn_section_bypass">Методы обхода блокировок</string>
     <string name="fptn_section_bypass_summary">Настройка методов обхода блокировок</string>
 
-    <string name="fptn_section_split_tunnel">Настройки туннелирования для приложений</string>
-    <string name="fptn_section_split_tunnel_summary">Здесь вы можете настроить выборочный VPN: использовать VPN для всех приложений (по умолчанию) или разрешить/запретить доступ для конкретных программ.</string>
-
-    <string name="fptn_section_permissions">Необходимые разрешения</string>
-    <string name="fptn_perm_battery">Откл оптимизацию батареи</string>
-    <string name="fptn_perm_background">Передача данных в фоне</string>
-
     <string name="fptn_section_servers">Ваши VPN сервера</string>
     <string name="fptn_server_auto">Auto (автовыбор)</string>
     <string name="fptn_no_token">Введите токен, чтобы увидеть список серверов</string>
