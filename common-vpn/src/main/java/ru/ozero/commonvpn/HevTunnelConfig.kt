@@ -42,7 +42,7 @@ data class HevTunnelConfig(
 
         private const val DEFAULT_TUN_IPV4: String = "10.10.10.10"
         private const val DEFAULT_TUN_IPV6: String = "fd00::1"
-        private const val DEFAULT_UDP_MODE: String = "tcp"
+        private const val DEFAULT_UDP_MODE: String = "udp"
         private const val DEFAULT_HEV_LOG_LEVEL: String = "warn"
 
         private val ADDRESS_REGEX = Regex("^[a-zA-Z0-9._:-]+$")
