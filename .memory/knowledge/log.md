@@ -1,5 +1,39 @@
 # Build Log
 
+## [2026-05-22T24:00:00+03:00] compile | Daily Log 2026-05-22 (pass 24 — schema-driven audit)
+- Source: daily/2026-05-22.md
+- Articles created: (none — all prior passes complete)
+- Articles updated: (none)
+- Audit: all 23 prior passes confirmed complete; index fully up to date; no missed concepts
+- Status: daily/2026-05-22.md compilation verified as 100% complete
+
+## [2026-05-22T23:59:59+03:00] compile | Daily Log 2026-05-22 (pass 23 — final schema-driven verification)
+- Source: daily/2026-05-22.md
+- Articles created: (none — all 22 prior passes complete)
+- Articles updated: (none)
+- Verified articles (read and confirmed complete):
+  - [[concepts/fptn-engine-protocol]] — stop order, JNI fixes, brotli, Kotlin fd-leaks, CI failures; all present
+  - [[concepts/jni-local-global-ref-lifecycle]] — GetStringUTFChars, NewGlobalRef return value, NewWeakGlobalRef; complete
+  - [[concepts/android-brotliinputstream-hidden-api]] — fptnb: unsupported, org.brotli:dec alternative; complete
+  - [[concepts/warp-split-tunnel-allowfamily-bug]] — FIXED; allowFamily(AF_INET6) unconditional; v0.1.15; complete
+  - [[concepts/vpnservice-double-shutdown-guard]] — stopping reset in finally → double shutdown; join shutdownJobRef fix; complete
+  - [[concepts/urnetwork-relay-always]] — hardcode bug lines 67+81; two-branch fix; UI visibility; bootstrapJob.join(); complete
+  - [[concepts/engine-chip-race-observer]] — switching clear condition; restartVpnIfConnected target preservation; complete
+  - [[concepts/byedpi-hev-pipeline-upstream-parity]] — udp:tcp→udp:udp revert; hevLogLevel; YouTube 370KB/s confirmed; complete
+  - [[concepts/sentinel-protecting-bug-trap]] — switching-desync assertNull incident; complete
+  - [[concepts/vpn-slot-conflict-detection]] — isExternalVpnActive() ownerUid false positive v0.1.11/v0.1.12; complete
+  - [[concepts/engine-chip-switching-desync]] — generic fix + residual watchdog gap (fix pending 23:11); complete
+- Index: no new rows needed — all articles present
+- Status: daily/2026-05-22.md fully compiled across 23 passes
+
+## [2026-05-22T23:59:00+03:00] compile | Daily Log 2026-05-22 (pass 22 — final verification + warp-split-tunnel sources fix)
+- Source: daily/2026-05-22.md
+- Articles created: (none — all 21 prior passes complete)
+- Articles updated:
+  - [[concepts/warp-split-tunnel-allowfamily-bug]] — Sources section corrected: session 22:09 said "awaiting logs" but article body already said FIXED; added note that fix was confirmed post-session, applied in commit `badcb68e`, released v0.1.15; initial hypothesis (remove allowFamily) was revised to (add both AF_INET + AF_INET6)
+- Verified complete: all sessions 11:59–23:11 in daily/2026-05-22.md fully compiled across passes 1–22
+- Status: compilation 100% complete
+
 ## [2026-05-22T23:11:00+03:00] compile | Daily Log 2026-05-22 (pass 21 — session 23:11 compiled)
 - Source: daily/2026-05-22.md
 - Articles created: (none)

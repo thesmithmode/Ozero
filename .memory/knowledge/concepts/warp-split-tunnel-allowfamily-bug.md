@@ -71,4 +71,4 @@ The relevant class is `TunBuilderConfigurator` / `applyEngineTunSpec` in `common
 
 ## Sources
 
-- [[daily/2026-05-22.md]] — Session 22:09: user binary reproduction (split tunnel OFF=Gemini OK, split tunnel ON=Gemini fails); `allowFamily(AF_INET)` without `allowFamily(AF_INET6)` in BLOCKLIST mode hypothesis; proposed fix = remove allowFamily calls; awaiting ozero.log for confirmation before applying
+- [[daily/2026-05-22.md]] — Session 22:09: user binary reproduction (split tunnel OFF=Gemini OK, split tunnel ON=Gemini fails); `allowFamily(AF_INET)` without `allowFamily(AF_INET6)` in BLOCKLIST mode hypothesis; initial proposed fix = remove allowFamily calls; awaiting ozero.log. Post-session: hypothesis confirmed, fix revised to add both `allowFamily(AF_INET)` AND `allowFamily(AF_INET6)` unconditionally (removing one breaks IPv4, correct is to explicitly admit both families). Applied in commit `badcb68e`, released in v0.1.15. Memory commit `5b69cc87` records "split-tunnel FIXED".
