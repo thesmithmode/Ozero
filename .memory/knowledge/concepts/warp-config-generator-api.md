@@ -4,8 +4,9 @@ aliases: [warp-mirror-api, warp-gen1, nellimonix-warp-generator]
 tags: [warp, api, integration, networking]
 sources:
   - "daily/2026-05-02.md"
+  - "daily/2026-05-22.md"
 created: 2026-05-02
-updated: 2026-05-02
+updated: 2026-05-22
 ---
 
 # WARP Config Generator API Contract
@@ -43,6 +44,15 @@ The `endpoint` field in the request body specifies which Cloudflare endpoint to 
 
 During debugging, the user provided a decompiled `PortalConnect-1.1.6` APK (CYBERPORTAL_X/KIBERPORTAL) as potential WARP reference. Analysis revealed PortalConnect is not a WARP client — it implements VLESS+SOCKS5 proxy protocol, unrelated to Cloudflare WARP. The actual API reference was found in `nellimonix/warp-config-generator-vercel` GitHub repository.
 
+### Mirror Endpoint Returns IP, Not Hostname (2026-05-22)
+
+`validateCloudflarePeer()` originally validated that the mirror response's peer endpoint matched `engage.cloudflareclient.com`. In practice, the `REQUEST_BODY` path (Cloudflare's direct API) returns an IP address, not the canonical hostname. Two IP ranges are used:
+
+- `162.159.192.0/22` – `162.159.192.x` through `162.159.195.x`
+- `188.114.96.0/22` – `188.114.96.x` through `188.114.99.x`
+
+`validateCloudflarePeer` was expanded to accept these ranges via regex or range check alongside the hostname. Without this fix, configs generated via the direct Cloudflare API path were rejected as invalid by the validator, causing WARP to fall back unnecessarily to the mirror pool.
+
 ### Mirror Hardcoding Concern
 
 The 78 mirrors are hardcoded as a Kotlin list in `WarpEngine.kt`. This was flagged in both code review (High: move to config file) and security review (P3: no certificate pinning, MITM risk with TSPU trust injection). The mirrors cannot be updated without an APK release. These findings are tracked in AUDIT.md as SEC-P1-02 (key warning UI) and P3 (certificate pinning).
@@ -56,3 +66,4 @@ The 78 mirrors are hardcoded as a Kotlin list in `WarpEngine.kt`. This was flagg
 ## Sources
 
 - [[daily/2026-05-02.md]] - WARP root cause identified: wrong JSON parsing + insufficient timeout; nellimonix/warp-config-generator-vercel as reference; PortalConnect ≠ WARP
+- [[daily/2026-05-22.md]] - Session 17:51: validateCloudflarePeer expanded to IP ranges 162.159.192-195.* and 188.114.96-99.* — REQUEST_BODY path returns IP not hostname; validator was rejecting valid Cloudflare configs

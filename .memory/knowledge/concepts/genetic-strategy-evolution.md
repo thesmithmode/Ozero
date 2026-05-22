@@ -9,8 +9,9 @@ sources:
   - "daily/2026-05-17.md"
   - "daily/2026-05-18.md"
   - "daily/2026-05-19.md"
+  - "daily/2026-05-20.md"
 created: 2026-05-12
-updated: 2026-05-19
+updated: 2026-05-20
 ---
 
 # Genetic Algorithm for ByeDPI Strategy Optimization
@@ -155,6 +156,14 @@ Auto-save best chromosome to `savedStrategyStore` was also identified as polluti
 
 `ByeDpiKnownSeeds` updated from 75 to 78 strategies following ByeByeDPI v1.7.5 upstream update. All three files synchronized: `byedpi_strategies.list`, `ByeDpiKnownSeeds.kt`, and `ByeDpiAutoStrategyTest EXPECTED_COUNT=78`.
 
+### ensureUdpDesync — Winning Args UDP Coverage Gap (2026-05-20)
+
+Evolution probes use HTTPS over SOCKS5 (TCP). Winning chromosomes are validated for TCP DPI bypass only — no UDP/QUIC probe exists. When applied to production traffic, UDP streams pass without desync; YouTube QUIC handshake fails on ISPs that inspect UDP.
+
+`ByeDpiEngine.ensureUdpDesync(args)` appends `-Ku -a1 -An` to winning strategy args if they contain no `-K` with `u`. This is called at the apply-strategy boundary, not during evolution itself. Default args and UI mode args already include UDP desync — not modified.
+
+This was identified as a side-defect during YouTube investigation (session 20:00). It is NOT the root cause of YouTube failure — root was `setUnderlyingNetworks(null)` in `TunBuilderHelper`. See [[concepts/byedpi-ensure-udp-desync]] for full details.
+
 ## Related Concepts
 
 - [[concepts/byedpi-auto-strategy-testing]] - The fixed-list strategy testing that this genetic algorithm extends
@@ -162,6 +171,7 @@ Auto-save best chromosome to `savedStrategyStore` was also identified as polluti
 - [[concepts/gene-memory-concurrency-traps]] - Concurrency bugs found in GeneMemory and SavedStrategyStore during audit
 - [[concepts/byedpi-strategy-runtime-disconnect]] - Winning args static at start; auto-save mitigates but runtime hot-reload still absent
 - [[concepts/granular-probe-fitness-scoring]] - Fitness formula v3: gradient scoring replacing binary 0/1
+- [[concepts/byedpi-ensure-udp-desync]] - UDP coverage gap in winning strategy args; ensureUdpDesync side-fix
 
 ## Sources
 
@@ -171,3 +181,4 @@ Auto-save best chromosome to `savedStrategyStore` was also identified as polluti
 - [[daily/2026-05-17.md]] - GA v3 fitness: binary→granular computeProbeScore (gradient through connection stages); stagnation boost removed + sentinel; strategies 75→78 (v1.7.5); feat/ga-byedpi-v2 squash→dev
 - [[daily/2026-05-18.md]] - Session 11:38/12:06: 0% fitness traced to stale server_fd (600 start/stop cycles); unconditional forceClose fix; singleton sharing between VPN and testing identified; auto-save polluting favorites removed
 - [[daily/2026-05-19.md]] - Session 12:46: Thompson Sampling replaces UCB for strategy exploration; `ucbScore` deleted; `GeneMemoryTest` rewritten; sentinel added; `EvolutionEngineTest` decomposed into `EvolutionEngineSentinelTest` + shared helper to fix detekt LargeClass
+- [[daily/2026-05-20.md]] - Session 20:00: ensureUdpDesync side-fix discovered during YouTube investigation — auto-strategy testing probes HTTPS (TCP) only; winning args lack UDP desync; `ensureUdpDesync` appends `-Ku -a1 -An` at apply boundary; not root of YouTube failure (root = setUnderlyingNetworks)

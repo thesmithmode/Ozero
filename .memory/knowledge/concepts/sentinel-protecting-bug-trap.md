@@ -5,8 +5,9 @@ tags: [testing, gotcha, sentinel, ci]
 sources:
   - "daily/2026-05-13.md"
   - "daily/2026-05-15.md"
+  - "daily/2026-05-22.md"
 created: 2026-05-13
-updated: 2026-05-15
+updated: 2026-05-22
 ---
 
 # Sentinel Protecting Bug Trap: When Tests Guard Wrong Behavior
@@ -44,6 +45,10 @@ Commit `5a8089dd` changed `excludeSelf` from unconditional `true` to `excludeSel
 
 Both sentinels had to be deleted and replaced with a new sentinel that forbids `EngineId.WARP` from appearing in `common-vpn` source at all — enforcing the modular boundary rather than a specific conditional value. This confirms the pattern: sentinels written during the same session as a bug can enshrine the bug as an invariant, particularly when the developer believes the change is an improvement rather than a regression.
 
+### The Switching Desync Sentinel Incident (2026-05-22)
+
+`TunnelController` incorrectly cleared `switching` state on any `Connected(X)` event, regardless of whether `switching.to` matched `X`. A sentinel `switchingDoesNotClearOnConnectedOfDifferentEngine` was written with `assertNull(tunnelController.switching.value)` after emitting `Connected(WARP)` when `switching.to = URNETWORK`. The assertion was wrong — switching should survive when the connected engine doesn't match the pending target. When the bug was fixed (clear only if `sw.to == null || sw.to == X`), the sentinel went red. The sentinel was rewritten to assert that `switching` is NOT cleared when `Connected(engineA)` arrives while `switching.to = engineB`. See [[concepts/engine-chip-race-observer]] for the full context.
+
 ### Prevention
 
 1. When fixing a function, `grep -r "functionName\|ClassName" test/` and verify every sentinel asserts the CORRECT contract
@@ -62,3 +67,4 @@ Both sentinels had to be deleted and replaced with a new sentinel that forbids `
 
 - [[daily/2026-05-13.md]] — Session 20:53: sentinel `ipProbeRoute возвращает Unavailable когда country и name пустые` blocked correct fix; Session 21:13: sentinel renamed/rewritten, confirmed pattern "старый тест охранял баг, не инвариант"
 - [[daily/2026-05-15.md]] — Session 12:27: two sentinels guarding `excludeSelf=(engineId != WARP)` blocked revert to correct unconditional `true`; both deleted, replaced with modular boundary sentinel
+- [[daily/2026-05-22.md]] — Session 11:59: `switchingDoesNotClearOnConnectedOfDifferentEngine` asserted `assertNull` on switching after Connected(WARP) while switching.to=URNETWORK; fixed bug made sentinel red; sentinel rewritten to assert switching survives wrong-engine Connected events

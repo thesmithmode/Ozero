@@ -1,4 +1,20 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(git log *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git show *)",
+      "Bash(git branch *)",
+      "Bash(gh run list *)",
+      "Bash(gh run view *)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr list *)",
+      "Bash(gh pr diff *)",
+      "Bash(gradle *)",
+      "Bash(gradlew *)"
+    ]
+  },
   "hooks": {
     "SessionStart": [
       {

@@ -1,5 +1,43 @@
 # Build Log
 
+## [2026-05-22T20:00:00+03:00] compile | Daily Log 2026-05-22 (pass 2 — sentinel update + chip-switching article)
+- Source: daily/2026-05-22.md
+- Articles created:
+  - [[concepts/engine-chip-switching-desync]] — supplementary article for Connected(X) switching-clear desync; content also present in engine-chip-race-observer; indexed separately for retrieval clarity
+- Articles updated:
+  - [[concepts/sentinel-protecting-bug-trap]] — added 3rd incident (switching-desync assertNull sentinel); sources updated to daily/2026-05-22.md; date 2026-05-15→2026-05-22
+
+## [2026-05-22T19:15:00+03:00] compile | Daily Log 2026-05-22
+- Source: daily/2026-05-22.md
+- Articles created:
+  - [[concepts/vpnservice-double-shutdown-guard]] — stopping flag reset in performShutdown finally → onDestroy CAS triggers second shutdown; fix: join shutdownJobRef; idempotency guard pattern
+  - [[concepts/warp-allowedips-tun-routing]] — amneziawg.conf selective AllowedIPs + always 0.0.0.0/0 TUN route → non-matching traffic dropped by AWG; PORTAL_WG adds per-AllowedIPs TUN routes
+- Articles updated:
+  - [[concepts/engine-chip-race-observer]] — switching clear condition (sw.to==null||sw.to==X); restartVpnIfConnected preserves pending target; sentinel was asserting buggy behavior
+  - [[concepts/urnetwork-relay-always]] — RelayCoordinator hardcode bug (always setProvidePaused(false)); fix: URNETWORK branch no-override, relay branch reads configStore; BalanceCard/ProvideSection visibility; bootstrapJob.join() race
+  - [[concepts/byedpi-hev-pipeline-upstream-parity]] — udp:tcp→udp:udp revert (QUIC regression); hevLogLevel in YAML; YouTube CMD confirmed 370KB/s from v0.1.13 log
+  - [[concepts/warp-config-generator-api]] — validateCloudflarePeer expanded to IP ranges 162.159.192-195.* and 188.114.96-99.* (REQUEST_BODY returns IP not hostname)
+
+## [2026-05-22T18:30:00+03:00] compile | Daily Log 2026-05-21
+- Source: daily/2026-05-21.md
+- Articles created:
+  - [[concepts/engine-masterdns]] — subprocess EnginePlugin (ProcessBuilder libmdnsvpn.so); 7 review fixes: 10s timeout, @Suppress upstream, case-insensitive TOML, MasterDnsResolversCache Eagerly, host:port parsing, stdout limit, DataStore error handling; auto-mode enrollment
+  - [[concepts/applytunderlying-split-contract]] — applyUnderlying=false ByeDPI (QUIC parity) vs =true killswitch TUN (P37); 4th sentinel trap: literal vs signature assertion
+  - [[concepts/warp-config-naming-dedup]] — generated config name = endpoint hostname; WarpConfigDuplicateException fingerprint dedup
+  - [[concepts/urnetwork-providemmode-regions-cities]] — ProvideModeNone→empty regions/cities for fresh users; applyDeviceFields 13-field helper; ProvideModePublic override
+  - [[concepts/ontaskremoved-vpn-swipe-standard]] — onTaskRemoved must NOT call stopVpn; swipe ≠ stop VPN; sentinel regression guard
+- Articles updated:
+  - [[concepts/byedpi-ensure-udp-desync]] — CMD path removal: ensureUdpDesync removed from CMD mode (Task16); CMD verbatim contract; ensureUdpDesync still relevant for UI mode
+  - [[connections/sentinel-trap-family]] — 4th trap type added: literal-vs-signature assertion breaks when default-param refactor replaces inline literal with pass-through; table updated; sources updated
+
+## [2026-05-22T00:00:00+03:00] compile | Daily Log 2026-05-20 (pass 11 — session 20:00 ensureUdpDesync)
+- Source: daily/2026-05-20.md
+- Articles created: [[concepts/byedpi-ensure-udp-desync]] — auto-strategy/evolution probes HTTPS (TCP) only; winning args lack UDP desync; `ensureUdpDesync` appends `-Ku -a1 -An` at apply boundary; side-fix independent of YouTube root cause (setUnderlyingNetworks)
+- Articles updated:
+  - [[concepts/genetic-strategy-evolution]] — added ensureUdpDesync section + source daily/2026-05-20.md; updated date 2026-05-19→2026-05-20
+- Index: 1 row added (byedpi-ensure-udp-desync); genetic-strategy-evolution row was already correct
+- Sessions covered: 20:00 (UDP pipeline investigation start — ensureUdpDesync side-defect); sessions 20:30 (per-engine fix) previously captured via byedpi-vpn-pipeline-upstream-divergence article created inline during session
+
 ## [2026-05-20T22:00:00+03:00] compile | Daily Log 2026-05-20 (pass 10 — session 19:52 peerWatchdog wall clock + chip race file)
 - Source: daily/2026-05-20.md
 - Articles created: [[concepts/engine-chip-race-observer]] — file was missing despite pass 9 log entry; created: Connected-only gate drops Probing/Connecting engine changes; Probing(null) guard; sentinel inversions
