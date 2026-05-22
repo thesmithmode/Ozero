@@ -14,9 +14,8 @@ class MtgExtractNativeLibsSentinelTest {
             source.contains("jniLibs.useLegacyPackaging = true"),
             "ozero.android.application.gradle.kts должен содержать " +
                 "jniLibs.useLegacyPackaging = true. " +
-                "libmtg.so — Go subprocess, запускаемый через ProcessBuilder. " +
-                "Без extractNativeLibs=true он не извлекается на диск → " +
-                "binary.exists() = false → generateSecret() молча возвращает null.",
+                "subprocess-движки (masterdns: libmdnsvpn.so) запускаются через ProcessBuilder — " +
+                "без extractNativeLibs=true .so не извлекается на диск → binary.exists() = false.",
         )
     }
 

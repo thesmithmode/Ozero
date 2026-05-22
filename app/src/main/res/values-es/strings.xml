@@ -471,8 +471,8 @@
     <string name="urnetwork_insufficient_balance_body">El saldo de URnetwork se agotó — VPN se desconectó automáticamente. Recarga tu cuenta o comparte tráfico para continuar.</string>
     <string name="urnetwork_referral_bonus">+%d GB</string>
     <string name="urnetwork_referrals_label">Referidos: %d</string>
-    <string name="urnetwork_reliability_bonus">+%.3f GiB/día</string>
-    <string name="urnetwork_reliability_label">Fiabilidad: %.3f</string>
+    <string name="urnetwork_reliability_bonus">+%.1f GiB/día</string>
+    <string name="urnetwork_reliability_label">Fiabilidad: %.1f%%</string>
     <string name="engine_status_peers_title">Pares:</string>
     <string name="engine_status_peers_searching_value">Buscando %1$d s</string>
     <string name="engine_status_peers_unavailable">—</string>

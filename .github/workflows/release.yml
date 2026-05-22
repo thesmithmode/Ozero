@@ -205,22 +205,6 @@ jobs:
           fi
           echo "APK содержит libbyedpi.so (arm64-v8a)"
 
-      - name: Assert APK содержит libmtg.so (arm64-v8a)
-        run: |
-          set -euo pipefail
-          APK=$(find app/build/outputs/apk/release -name '*.apk' | head -n1)
-          if ! unzip -l "$APK" | grep -q "lib/arm64-v8a/libmtg.so"; then
-            echo "::error::В APK отсутствует lib/arm64-v8a/libmtg.so — engine-telegram MTProxy не загрузится"
-            unzip -l "$APK" | grep -E "lib/arm64-v8a/" || true
-            exit 1
-          fi
-          SIZE=$(unzip -l "$APK" "lib/arm64-v8a/libmtg.so" | awk 'NR==4{print $1}')
-          if [ "$SIZE" -lt 1000000 ]; then
-            echo "::error::lib/arm64-v8a/libmtg.so подозрительно мал ($SIZE байт), Go static ≥1MB"
-            exit 1
-          fi
-          echo "APK содержит libmtg.so (arm64-v8a)"
-
       - name: Assert WARP libam-go.so SHA256 == PORTAL_WG_v1.4.3 reference
         run: |
           set -euo pipefail

@@ -107,7 +107,7 @@ private fun BalanceDetails(state: UrnetworkBalanceState) {
             StatRow(
                 label = stringResource(
                     R.string.urnetwork_reliability_label,
-                    state.meanReliabilityWeight,
+                    state.meanReliabilityWeight * 100.0,
                 ),
                 value = stringResource(R.string.urnetwork_reliability_bonus, bonusGib),
             )
