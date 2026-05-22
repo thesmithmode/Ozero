@@ -25,7 +25,7 @@ data class UrnetworkBalanceState(
     val totalReferrals: Long = 0L,
 ) {
     val availableBytes: Long
-        get() = snapshot?.balanceBytes?.coerceAtLeast(0L) ?: 0L
+        get() = ((snapshot?.balanceBytes ?: 0L).coerceAtLeast(0L) + (snapshot?.pendingBytes ?: 0L).coerceAtLeast(0L))
 
     companion object {
         val INITIAL = UrnetworkBalanceState(snapshot = null, isLoading = false, lastError = null)

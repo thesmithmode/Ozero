@@ -83,7 +83,7 @@ private fun BalanceDetails(state: UrnetworkBalanceState) {
     )
     BalanceRow(
         label = stringResource(R.string.urnetwork_balance_available),
-        value = formatBytes(displayBalance),
+        value = formatBytes(displayBalance + snapshot.pendingBytes.coerceAtLeast(0L)),
         highlight = true,
     )
     BalanceRow(
