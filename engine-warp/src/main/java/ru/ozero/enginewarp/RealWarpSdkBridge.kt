@@ -40,10 +40,21 @@ class RealWarpSdkBridge(
             runCatching { awgRuntime.turnOff(staleHandle) }
                 .onFailure { PersistentLoggers.error(TAG, "stale awgTurnOff failed: ${it.message}") }
         }
-        val socketFile = File(uapiPath, "$tunnelName.sock")
-        if (socketFile.exists()) {
-            val deleted = socketFile.delete()
-            Log.i(TAG, "stale socket $socketFile deleted=$deleted")
+        val legacySocket = File(uapiPath, "$tunnelName.sock")
+        if (legacySocket.exists()) {
+            val deleted = legacySocket.delete()
+            Log.i(TAG, "stale legacy socket $legacySocket deleted=$deleted")
+        }
+        val socketsDir = File(uapiPath, "sockets")
+        if (socketsDir.isDirectory) {
+            val stale = socketsDir.listFiles { f -> f.name.endsWith(".sock") }.orEmpty()
+            var staleDeleted = 0
+            stale.forEach {
+                if (it.delete()) staleDeleted++
+            }
+            if (stale.isNotEmpty()) {
+                Log.i(TAG, "stale sockets/ cleanup: deleted=$staleDeleted/${stale.size}")
+            }
         }
         logIniDigest(tunnelName, iniConfig)
         val started = System.currentTimeMillis()
