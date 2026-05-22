@@ -88,8 +88,11 @@ class FptnEngine(
         val server = selectServer(fptn, tokenData)
             ?: return StartResult.Failure("No FPTN server available")
 
+        Log.i(TAG, "start server=${server.name}:${server.port} bypass=${fptn.bypassMethod} n=${tokenData.servers.size}")
+
         FptnNativeWebSocket.loadOnce()
         if (!FptnNativeWebSocket.libraryLoaded) {
+            PersistentLoggers.error(TAG, "native lib load failed: ${FptnNativeWebSocket.loadError}")
             return StartResult.Failure(
                 "fptn_native_lib not loaded: ${FptnNativeWebSocket.loadError}"
             )
@@ -103,6 +106,7 @@ class FptnEngine(
         _accessToken = accessToken
         _bypassMethod = fptn.bypassMethod
 
+        Log.i(TAG, "start: authenticated, ready to attach TUN")
         return StartResult.Success(socksPort = 0)
     }
 
@@ -110,12 +114,14 @@ class FptnEngine(
         val server = _currentServer ?: return TunAttachResult.Failure("Engine not started")
         val token = _accessToken ?: return TunAttachResult.Failure("No access token")
 
+        Log.i(TAG, "attachTun: fd=$tunFd server=${server.name}")
+
         val pfd = ParcelFileDescriptor.adoptFd(tunFd)
         _pfd = pfd
 
         val fos = FileOutputStream(pfd.fileDescriptor)
 
-        wsClient.onOpen = { Log.i(TAG, "FPTN WebSocket connected") }
+        wsClient.onOpen = { Log.i(TAG, "WS connected") }
         wsClient.onMessage = { bytes ->
             try {
                 fos.write(bytes)
@@ -123,9 +129,10 @@ class FptnEngine(
             }
         }
         wsClient.onFailure = {
-            PersistentLoggers.error(TAG, "FPTN WebSocket failure")
+            PersistentLoggers.error(TAG, "WS failure: all reconnect attempts exhausted")
         }
 
+        Log.i(TAG, "attachTun: creating native handle method=$_bypassMethod")
         val handle = wsClient.nativeCreate(
             serverIp = server.host,
             serverPort = server.port,
@@ -137,6 +144,7 @@ class FptnEngine(
             censorshipStrategy = _bypassMethod,
         )
         _nativeHandle = handle
+        Log.i(TAG, "attachTun: handle=$handle, starting WS thread")
         wsClient.nativeRun(handle)
 
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -152,31 +160,46 @@ class FptnEngine(
                         wsClient.nativeSend(handle, buf.copyOf(n), n.toLong())
                     }
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                if (isActive) {
+                    PersistentLoggers.error(TAG, "TUN read loop terminated: ${e.javaClass.simpleName}")
+                }
+            }
         }
 
+        Log.i(TAG, "attachTun: TUN read loop launched")
         return TunAttachResult.Success
     }
 
     override suspend fun awaitReady(): EnginePlugin.ReadyResult {
         val handle = _nativeHandle
-        if (handle == 0L) return EnginePlugin.ReadyResult.Timeout("No WS handle")
+        if (handle == 0L) {
+            PersistentLoggers.error(TAG, "awaitReady: no native handle")
+            return EnginePlugin.ReadyResult.Timeout("No WS handle")
+        }
 
+        Log.i(TAG, "awaitReady: polling WS started (timeout=${READY_TIMEOUT_MS}ms)")
         val deadline = System.currentTimeMillis() + READY_TIMEOUT_MS
         while (System.currentTimeMillis() < deadline) {
-            if (wsClient.nativeIsStarted(handle)) return EnginePlugin.ReadyResult.Ready
+            if (wsClient.nativeIsStarted(handle)) {
+                Log.i(TAG, "awaitReady: WS ready")
+                return EnginePlugin.ReadyResult.Ready
+            }
             delay(READY_POLL_MS)
         }
+        PersistentLoggers.error(TAG, "awaitReady: timeout after ${READY_TIMEOUT_MS}ms — WS never started")
         return EnginePlugin.ReadyResult.Timeout("FPTN WebSocket not started within ${READY_TIMEOUT_MS}ms")
     }
 
     override suspend fun stop() {
+        Log.i(TAG, "stop: begin")
         val scope = tunScope
         tunScope = null
         val h = _nativeHandle
         _nativeHandle = 0L
 
         if (h != 0L) {
+            Log.i(TAG, "stop: nativeStop handle=$h")
             wsClient.nativeStop(h)
         }
         _pfd?.close()
@@ -184,12 +207,15 @@ class FptnEngine(
 
         scope?.cancel()
         scope?.coroutineContext?.get(Job)?.join()
+        Log.i(TAG, "stop: TUN loop joined")
 
         if (h != 0L) {
             wsClient.nativeDestroy(h)
+            Log.i(TAG, "stop: nativeDestroy done")
         }
         _currentServer = null
         _accessToken = null
+        Log.i(TAG, "stop: done")
     }
 
     override suspend fun probe(): ProbeResult {
@@ -218,19 +244,26 @@ class FptnEngine(
             censorshipStrategy = bypassMethod,
         )
         return try {
+            Log.i(TAG, "authenticate: POST /api/v1/login timeout=${AUTH_TIMEOUT_S}s")
             val body = JSONObject().apply {
                 put("username", data.username)
                 put("password", data.password)
             }.toString()
             val resp = httpsClient.nativePost(handle, "/api/v1/login", body, AUTH_TIMEOUT_S)
             if (resp.code == 200) {
-                JSONObject(resp.body).optString("access_token").takeIf { it.isNotBlank() }
+                val token = JSONObject(resp.body).optString("access_token").takeIf { it.isNotBlank() }
+                if (token != null) {
+                    Log.i(TAG, "authenticate: success")
+                } else {
+                    PersistentLoggers.error(TAG, "authenticate: 200 but no access_token in response")
+                }
+                token
             } else {
-                PersistentLoggers.error(TAG, "FPTN auth failed: ${resp.code} ${resp.error}")
+                PersistentLoggers.error(TAG, "authenticate: HTTP ${resp.code} error=${resp.error}")
                 null
             }
         } catch (e: Exception) {
-            PersistentLoggers.error(TAG, "FPTN auth exception: ${e.message}")
+            PersistentLoggers.error(TAG, "authenticate: exception ${e.javaClass.simpleName}: ${e.message}")
             null
         } finally {
             httpsClient.nativeDestroy(handle)
