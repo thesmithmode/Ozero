@@ -76,15 +76,12 @@
 
 ## Per-engine UI
 
-- Каждый engine обязан иметь settings screen в `ui/settings/engines/`. Текущие: byedpi, telegram, urnetwork, warp, masterdns.
+- Каждый engine обязан иметь settings screen в `ui/settings/engines/`. Текущие: byedpi, fptn, urnetwork, warp, masterdns.
 
-## MTProxy / Subprocess-proxy
+## Subprocess-proxy
 
-- `engine-telegram` — side-car subprocess, НЕ реализует `Engine`, НЕ регистрируется `@IntoSet`.
 - `engine-masterdns` — subprocess-pattern, но полноценный `EnginePlugin` (`@IntoSet` через `MasterDnsModule`). `libmdnsvpn.so` через `ProcessBuilder`, **не** `System.loadLibrary`.
-- `libmtg.so` — prebuilt Go binary в `jniLibs/<abi>/`, запускается как процесс, не как .so.
 - Routing: WARP (`socksPort==0`) → subprocess наследует UID (TUN авто). SOCKS-engine → `--socks5-proxy-url socks5://127.0.0.1:<port>`.
-- `TelegramProxyCoordinator` — единственная точка связи: `TunnelController.state` + `configStore.config()` через `combine`.
 
 ## Расследование — порядок (закон)
 

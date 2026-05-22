@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="masterdns_engine_name">MasterDNS</string>
+    <string name="masterdns_config_toml">Contenido de client_config.toml</string>
+    <string name="masterdns_resolvers">Servidores DNS (uno por línea)</string>
+    <string name="masterdns_enabled">Activar MasterDNS</string>
+    <string name="masterdns_beta_badge">BETA</string>
+    <string name="masterdns_setup_title">Configura tu propio servidor en 15 minutos</string>
+    <string name="masterdns_setup_prereq">Requiere un VPS (1 vCPU, 512 MB RAM) y un dominio que puedas delegar mediante registros NS. Todos los comandos se copian con un toque.</string>
+    <string name="masterdns_setup_step1_title">Delegar un subdominio</string>
+    <string name="masterdns_setup_step1_body">En el DNS de tu dominio (sustituye example.com y la IP):\nns1.example.com  A   server-IP\nv.example.com    NS  ns1.example.com</string>
+    <string name="masterdns_setup_step2_title">Instalar el servidor (Debian/Ubuntu)</string>
+    <string name="masterdns_setup_step3_title">Generar la clave de cifrado (AES-256-GCM)</string>
+    <string name="masterdns_setup_step4_title">Editar /etc/masterdnsvpn/server_config.toml con tu dominio</string>
+    <string name="masterdns_setup_step4_body">DOMAIN = [\"v.example.com\"]\nPROTOCOL_TYPE = \"SOCKS5\"\nUDP_PORT = 53\nDATA_ENCRYPTION_METHOD = 5\nENCRYPTION_KEY_FILE = \"/etc/masterdnsvpn/encrypt_key.txt\"</string>
+    <string name="masterdns_setup_step5_title">Iniciar el servicio y abrir UDP/53 a internet</string>
+    <string name="masterdns_setup_step6_title">Pega la clave en el campo «client_config.toml» de abajo</string>
+    <string name="masterdns_setup_step6_body">DOMAINS = [\"v.example.com\"]\nDATA_ENCRYPTION_METHOD = 5\nENCRYPTION_KEY = \"&lt;contenido de encrypt_key.txt&gt;\"\nPROTOCOL_TYPE = \"SOCKS5\"\nRESOLVER_BALANCING_STRATEGY = 3</string>
+    <string name="masterdns_copy_button">Copiar</string>
+    <string name="masterdns_copied_toast">Copiado</string>
+    <string name="settings_masterdns_title">MasterDNS</string>
+    <string name="settings_masterdns_summary">Túnel DNS — bypass de emergencia cuando todos los VPN están bloqueados.</string>
+</resources>
