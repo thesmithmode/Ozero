@@ -138,7 +138,6 @@
 
     <string name="about_title">के बारे में</string>
     <string name="about_version">संस्करण %1$s</string>
-    <string name="about_description">Ozero एक ऐप में VPN और anti-DPI इंजनों का एग्रीगेटर है: ByeDPI, AmneziaWG (WARP), URnetwork P2P आदि।</string>
 
     <string name="diag_export_crashes">क्रैश लॉग एक्सपोर्ट</string>
     <string name="diag_export_no_crashes">क्रैश लॉग खाली है</string>

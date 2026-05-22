@@ -176,7 +176,6 @@
     
     <string name="about_title">About</string>
     <string name="about_version">Version %1$s</string>
-    <string name="about_description">Ozero is an aggregator of VPN and anti-DPI engines in a single app. It bundles several proven solutions for bypassing blocks: ByeDPI, AmneziaWG (WARP), URnetwork P2P and others. Pick a single engine manually or chain several engines — each link solves its own task.</string>
 
 
     <string name="diag_export_crashes">Export crash log</string>

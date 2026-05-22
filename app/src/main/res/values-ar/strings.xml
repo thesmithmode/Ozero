@@ -138,7 +138,6 @@
 
     <string name="about_title">حول</string>
     <string name="about_version">الإصدار %1$s</string>
-    <string name="about_description">Ozero هو تطبيق يجمع محركات VPN ومضادات DPI في تطبيق واحد. يحتوي على عدة حلول مجربة لتجاوز الحجب: ByeDPI و AmneziaWG (WARP) و URnetwork P2P وغيرها.</string>
 
     <string name="diag_export_crashes">تصدير سجل الأعطال</string>
     <string name="diag_export_no_crashes">سجل الأعطال فارغ</string>
