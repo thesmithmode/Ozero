@@ -22,8 +22,22 @@ object FptnToken {
         }
     }
 
+    private const val MAX_DECOMPRESSED_BYTES = 1 * 1024 * 1024
+
     private fun brotliDecompress(bytes: ByteArray): ByteArray =
-        BrotliInputStream(ByteArrayInputStream(bytes)).use { it.readBytes() }
+        BrotliInputStream(ByteArrayInputStream(bytes)).use { stream ->
+            val buffer = ByteArray(MAX_DECOMPRESSED_BYTES + 1)
+            var total = 0
+            while (true) {
+                val read = stream.read(buffer, total, buffer.size - total)
+                if (read <= 0) break
+                total += read
+                if (total > MAX_DECOMPRESSED_BYTES) {
+                    error("brotli decompressed payload exceeds $MAX_DECOMPRESSED_BYTES bytes")
+                }
+            }
+            buffer.copyOf(total)
+        }
 
     private fun parseJson(json: String): FptnTokenData? {
         return try {

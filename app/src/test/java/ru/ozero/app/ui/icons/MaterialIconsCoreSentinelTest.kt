@@ -20,12 +20,14 @@ class MaterialIconsCoreSentinelTest {
         "androidx.compose.material.icons.filled.KeyboardArrowUp",
         "androidx.compose.material.icons.filled.LocationOn",
         "androidx.compose.material.icons.filled.Lock",
+        "androidx.compose.material.icons.filled.Refresh",
         "androidx.compose.material.icons.filled.Search",
         "androidx.compose.material.icons.filled.Settings",
         "androidx.compose.material.icons.filled.Share",
         "androidx.compose.material.icons.filled.Star",
         "androidx.compose.material.icons.filled.Warning",
         "androidx.compose.material.icons.automirrored.filled.ArrowBack",
+        "androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight",
         "androidx.compose.material.icons.automirrored.filled.List",
     )
 

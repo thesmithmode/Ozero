@@ -145,6 +145,22 @@ class FptnTokenTest {
     }
 
     @Test
+    fun `sentinel brotli decompression имеет hard size limit против OOM DoS`() {
+        val sourceFile = locateFptnTokenSource()
+        val source = sourceFile.readText(Charsets.UTF_8)
+        assertTrue(
+            source.contains("MAX_DECOMPRESSED_BYTES"),
+            "FptnToken.brotliDecompress должен иметь MAX_DECOMPRESSED_BYTES лимит. " +
+                "Без него malicious fptnb: с brotli expansion 100KB→1GB крашит heap.",
+        )
+        assertTrue(
+            !Regex("""BrotliInputStream\([^)]+\)\.use\s*\{\s*it\.readBytes\(\)\s*\}""").containsMatchIn(source),
+            "FptnToken.brotliDecompress не должен использовать readBytes() — " +
+                "unbounded чтение в heap = OOM DoS. Использовать size-bounded цикл.",
+        )
+    }
+
+    @Test
     fun `fptnb prefix must be parsed not unconditionally rejected`() {
         val sourceFile = locateFptnTokenSource()
         val source = sourceFile.readText(Charsets.UTF_8)

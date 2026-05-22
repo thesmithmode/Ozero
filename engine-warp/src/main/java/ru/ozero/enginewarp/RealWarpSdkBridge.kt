@@ -104,7 +104,21 @@ class RealWarpSdkBridge(
             )
         }
         tunnelHandle.set(handle)
-        if (!protectSockets(combined.socketV4Fd, combined.socketV6Fd, protector)) {
+        val protectOk = try {
+            protectSockets(combined.socketV4Fd, combined.socketV6Fd, protector)
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (t: Throwable) {
+            PersistentLoggers.error(
+                TAG,
+                "protect threw: ${t.message} (${t.javaClass.name}) — rollback awgTurnOff",
+            )
+            if (tunnelHandle.compareAndSet(handle, INVALID_HANDLE)) {
+                runCatching { awgRuntime.turnOff(handle) }
+            }
+            return WarpSdkBridge.AttachResult.Failed("protect threw: ${t.message ?: t.javaClass.simpleName}")
+        }
+        if (!protectOk) {
             PersistentLoggers.error(TAG, "protect failed — rolling back to avoid routing loop")
             if (tunnelHandle.compareAndSet(handle, INVALID_HANDLE)) {
                 runCatching { awgRuntime.turnOff(handle) }
