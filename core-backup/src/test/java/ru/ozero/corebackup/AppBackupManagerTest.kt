@@ -125,7 +125,6 @@ class AppBackupManagerTest {
         assertEquals("Munich", data.urnetwork.selectedLocation?.city)
     }
 
-
     @Test
     fun `export — split rules из DAO`() = runTest {
         splitDao.rules.value = listOf(AppSplitRule("com.a", true), AppSplitRule("com.b", false))
@@ -149,7 +148,6 @@ class AppBackupManagerTest {
         assertTrue(data.splitRules.isEmpty())
         assertNull(data.strategy)
     }
-
 
     @Test
     fun `import — настройки записываются в DataStore`() = runTest {
@@ -215,7 +213,6 @@ class AppBackupManagerTest {
         assertEquals("Madrid", cfg.selectedLocation.city)
     }
 
-
     @Test
     fun `import categories — только URNETWORK — WARP не трогает`() = runTest {
         warpStore.slots.value = listOf(sampleWarpSlot)
@@ -228,7 +225,6 @@ class AppBackupManagerTest {
         assertEquals(listOf(sampleWarpSlot), warpStore.slots.value)
         assertEquals("new-jwt", urnStore.config().first().byJwt)
     }
-
 
     @Test
     fun `import — WARP пустой — replaceAll не вызывается`() = runTest {
@@ -424,7 +420,6 @@ class AppBackupManagerTest {
             rules.value = rules.value.filter { it.packageName != packageName }
         }
     }
-
 
     private class FakeStrategyBackupProvider : StrategyBackupProvider {
         var exported: BackupStrategy = BackupStrategy()
