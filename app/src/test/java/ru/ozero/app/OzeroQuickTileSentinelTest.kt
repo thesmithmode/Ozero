@@ -28,10 +28,10 @@ class OzeroQuickTileSentinelTest {
     fun `syncTileState маппит Connected Connecting Probing в STATE_ACTIVE`() {
         val source = locateTile().readText()
         assertTrue(
-            source.contains("TunnelState.Connected")
-                && source.contains("TunnelState.Connecting")
-                && source.contains("TunnelState.Probing")
-                && source.contains("Tile.STATE_ACTIVE"),
+            source.contains("TunnelState.Connected") &&
+                source.contains("TunnelState.Connecting") &&
+                source.contains("TunnelState.Probing") &&
+                source.contains("Tile.STATE_ACTIVE"),
             "syncTileState обязан маппить Connected/Connecting/Probing в STATE_ACTIVE — " +
                 "тайл должен подсвечиваться пока VPN включён или подключается",
         )
@@ -41,10 +41,10 @@ class OzeroQuickTileSentinelTest {
     fun `syncTileState маппит Idle Failed Disconnecting в STATE_INACTIVE`() {
         val source = locateTile().readText()
         assertTrue(
-            source.contains("TunnelState.Idle")
-                && source.contains("TunnelState.Failed")
-                && source.contains("TunnelState.Disconnecting")
-                && source.contains("Tile.STATE_INACTIVE"),
+            source.contains("TunnelState.Idle") &&
+                source.contains("TunnelState.Failed") &&
+                source.contains("TunnelState.Disconnecting") &&
+                source.contains("Tile.STATE_INACTIVE"),
             "syncTileState обязан маппить Idle/Failed/Disconnecting в STATE_INACTIVE — " +
                 "тайл должен быть серым когда VPN не работает",
         )
