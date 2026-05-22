@@ -1,5 +1,33 @@
 # Build Log
 
+## [2026-05-22T23:59:00+03:00] compile | Daily Log 2026-05-22 (pass 19 — schema-triggered verification)
+- Source: daily/2026-05-22.md
+- Articles created: (none — all created in passes 1-17)
+- Articles updated: (none — all updated in passes 1-17)
+- Verified: vpnservice-double-shutdown-guard, warp-allowedips-tun-routing, engine-chip-switching-desync, qs-tile-vpn-integration, fptn-engine-protocol (JNI leaks + stop race + brotli API), warp-split-tunnel-allowfamily-bug, clash-module-architecture, urnetwork-relay-always (hardcode bug + UI fixes), urnetwork-balance-optimistic-cache (cap removed), vpn-slot-conflict-detection (ownerUid v0.1.12), byedpi-hev-pipeline-upstream-parity (YouTube 370KB/s confirmed), warp-config-generator-api (IP ranges), amnezia-wg-warp-migration (S3/S4/I1/I2/I5 defaults + migration), sentinel-protecting-bug-trap (switching-desync case), engine-chip-race-observer
+- Status: compilation 100% complete for all sessions 11:59–22:36 in daily/2026-05-22.md
+
+## [2026-05-22T22:36:02+03:00] compile | Daily Log 2026-05-22 (pass 18 — re-run verification)
+- Source: daily/2026-05-22.md
+- Articles created: (none)
+- Articles updated: (none)
+- Status: all content already compiled in passes 1-17; re-run confirms 100% coverage for all sessions 11:59–22:34
+
+## [2026-05-22T23:59:59+03:00] compile | Daily Log 2026-05-22 (pass 17 — full verification, compilation complete)
+- Source: daily/2026-05-22.md
+- Articles created: (none — all articles verified current)
+- Articles updated: (none — all 16 prior passes complete)
+- Verified: fptn-engine-protocol (JNI leaks/stop race/brotli), urnetwork-relay-always (hardcode bug + UI fixes), warp-allowedips-tun-routing (root cause confirmed), sentinel-protecting-bug-trap (switching-desync incident), vpn-slot-conflict-detection (ownerUid fix v0.1.12), vpnservice-double-shutdown-guard, engine-chip-switching-desync, qs-tile-vpn-integration, warp-split-tunnel-allowfamily-bug, clash-module-architecture, byedpi-hev-pipeline-upstream-parity, warp-config-generator-api, amnezia-wg-warp-migration, urnetwork-balance-accumulation-mechanism, urnetwork-balance-optimistic-cache, urnetwork-location-hierarchy-migration, urnetwork-location-stability-privacy-icons, engine-chip-race-observer
+- Status: compilation 100% complete for all sessions 11:59–22:34 in daily/2026-05-22.md
+
+## [2026-05-22T22:32:00+03:00] compile | Daily Log 2026-05-22 (pass 16 — session 22:20+ FPTN JNI implementation)
+- Source: daily/2026-05-22.md
+- Articles created: (none)
+- Articles updated:
+  - [[concepts/fptn-engine-protocol]] — added session 22:20+ content: android.util.BrotliInputStream not public API (fptnb: unsupported); JNI memory leaks (GetStringUTFChars/NewWeakGlobalRef/NewGlobalRef patterns); stop() race condition (correct teardown order: nativeStop→pfd.close→scope.cancel→join→nativeDestroy); diagnostic logging strategy; fis.read() blocking + coroutine cancellation rule
+- Index updated: (no new rows; fptn-engine-protocol row already present with correct 2026-05-22 date)
+- Gap: session 22:20+ was compiled at 22:00 (pass 9) before the session occurred; passes 10-15 did not revisit fptn-engine-protocol
+
 ## [2026-05-22T23:59:00+03:00] compile | Daily Log 2026-05-22 (pass 15 — final: Clash architecture + providerCount)
 - Source: daily/2026-05-22.md
 - Articles created: [[concepts/clash-module-architecture]]

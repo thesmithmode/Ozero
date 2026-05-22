@@ -1,7 +1,7 @@
 ---
 title: "FPTN Engine Protocol Architecture"
 aliases: [fptn-engine, fptn-protocol, fptn-tun-engine]
-tags: [fptn, engine, tun, protocol, architecture, planning]
+tags: [fptn, engine, tun, protocol, architecture, planning, jni]
 sources:
   - "daily/2026-05-22.md"
 created: 2026-05-22
@@ -75,7 +75,7 @@ engine-fptn/
 
 ### Session Status (2026-05-22)
 
-Implementation was started mid-session and stopped by user request — a plan must be written first and approved before code is written. Three uncommitted changes also exist from AMNEZIA removal (EngineId.kt, EngineConfig.kt, MainScreen.kt) that must be committed before FPTN work begins.
+Implementation was started mid-session (21:27) and stopped by user request — a plan must be written first and approved before code is written. Three uncommitted changes also exist from AMNEZIA removal (EngineId.kt, EngineConfig.kt, MainScreen.kt) that must be committed before FPTN work begins.
 
 Pending plan topics:
 - CMakeLists.txt structure for C++ FPTN native library
@@ -83,6 +83,27 @@ Pending plan topics:
 - TUN fd lifecycle: when to call `Builder.establish()`, when to call `protect(socket)`
 - Token parsing and server selection algorithm
 - CI integration: native build in ci.yml arm64-v8a step
+
+### Implementation Details and JNI Bug Fixes (2026-05-22, session 22:20+)
+
+A partial implementation ran through CI and uncovered several critical issues:
+
+**`android.util.BrotliInputStream` is not a public SDK API.** Despite being present on some Android versions, it is inaccessible from user apps even with `@TargetApi(31)`. FPTN `fptnb:` tokens (Brotli-compressed) require `org.brotli:dec` dependency for decoding. Until this dep is explicitly approved, `fptnb:` tokens return `null` and are unsupported.
+
+**JNI memory leaks in the C++ layer** (all fixed in commit `eb237773`):
+- `utils.h`: `GetStringUTFChars` called without paired `ReleaseStringUTFChars` → memory leak per JNI call
+- `websocket_client.cpp`: `NewWeakGlobalRef(thiz)` in `nativeCreate`, `DeleteWeakGlobalRef` never called → leak; fixed by `GetWrapper()` getter + `nativeDestroy` cleanup
+- `https_client.cpp`: `NewWeakGlobalRef(thiz)` created but `wrapper_` never used → removed; `NewGlobalRef(response_obj)` in `create_response` → leak, removed; local refs `clazz/body_str/error_str` not deleted on success path → `DeleteLocalRef` added
+
+**`FptnEngine.stop()` race condition**: `tunScope.cancel()` without join before `nativeDestroy` left `fis.read()` (blocking native call) still running inside a cancelled coroutine. Correct teardown order: `nativeStop → pfd.close → scope.cancel → join → nativeDestroy`. Key principle: `fis.read()` does not respect coroutine cancellation — the fd must be closed first to unblock it, then scope cancelled, then joined, then native resources freed.
+
+**Rule**: `NewGlobalRef` in JNI is NOT needed for return values from JNI functions — local refs work correctly as return values. Creating a `GlobalRef` for a return value creates an untracked leak.
+
+**Diagnostic logging added:**
+- `Log.i` on: start (server:port, bypass, peer count), authenticate (request/success/HTTP code), attachTun (handle creation, WS run loop launch), awaitReady (poll/timeout), stop (begin/nativeStop/join/destroy/done)
+- `PersistentLoggers.error` on: native lib load fail, auth 200 without token, auth HTTP error, authenticate exception, TUN read loop IOException, awaitReady timeout
+
+JNI fixes are applied in C++ source but not verifiable in unit-test CI (the `.so` is only built during release/assembly steps, not during unit test runs).
 
 ## Related Concepts
 
@@ -95,4 +116,4 @@ Pending plan topics:
 
 ## Sources
 
-- [[daily/2026-05-22.md]] — Session 21:27: FPTN protocol analyzed (WebSocket+TLS+Protobuf, fptn: token format, auth endpoint); architecture decision: full EnginePlugin not subprocess; C++ native lib; JNI callbacks onOpenImpl/onMessageImpl/onFailureImpl; TUN-based fd integration; @fptn_bot UI; user stopped implementation to demand written plan first; MTG dropped; Clash deferred to SS/VMess future
+- [[daily/2026-05-22.md]] — Session 21:27: FPTN protocol analyzed (WebSocket+TLS+Protobuf, fptn: token format, auth endpoint); architecture decision: full EnginePlugin not subprocess; C++ native lib; JNI callbacks onOpenImpl/onMessageImpl/onFailureImpl; TUN-based fd integration; @fptn_bot UI; user stopped implementation to demand written plan first; MTG dropped; Clash deferred to SS/VMess future. Session 22:20+: CI implementation run — android.util.BrotliInputStream not public API (fptnb: unsupported); JNI memory leaks found and fixed (GetStringUTFChars without Release, NewWeakGlobalRef without Delete, NewGlobalRef return value leak); stop() race condition fixed (correct teardown order: nativeStop→pfd.close→scope.cancel→join→nativeDestroy); diagnostic logging added
