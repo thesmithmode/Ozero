@@ -72,18 +72,18 @@ fun UrnetworkBalanceCard(
 @Composable
 private fun BalanceDetails(state: UrnetworkBalanceState) {
     val snapshot = state.snapshot ?: return
-    val displayBalance = snapshot.balanceBytes.coerceAtLeast(0L)
     val displayStart = snapshot.startBalanceBytes.coerceAtLeast(0L)
-    val total = snapshot.usedBytes + snapshot.pendingBytes + displayBalance
+    val available = state.availableBytes
+    val total = snapshot.usedBytes + snapshot.pendingBytes + available
     TrafficProgressBar(
         usedBytes = snapshot.usedBytes,
         pendingBytes = snapshot.pendingBytes,
-        availableBytes = displayBalance,
+        availableBytes = available,
         totalBytes = total,
     )
     BalanceRow(
         label = stringResource(R.string.urnetwork_balance_available),
-        value = formatBytes(displayBalance + snapshot.pendingBytes.coerceAtLeast(0L)),
+        value = formatBytes(available),
         highlight = true,
     )
     BalanceRow(

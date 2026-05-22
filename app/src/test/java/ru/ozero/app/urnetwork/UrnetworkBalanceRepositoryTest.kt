@@ -93,6 +93,85 @@ class UrnetworkBalanceRepositoryTest {
     }
 
     @Test
+    fun `availableBytes включает reliabilityBonusBytes когда meanReliabilityWeight больше 0`() {
+        val state = UrnetworkBalanceState(
+            snapshot = sample(balance = 1_000L, pending = 0L, used = 0L),
+            isLoading = false,
+            lastError = null,
+            meanReliabilityWeight = 0.1,
+        )
+        val expectedBonusBytes = (0.1 * 100.0 * 1024.0 * 1024.0 * 1024.0).toLong()
+        assertEquals(1_000L + expectedBonusBytes, state.availableBytes)
+        assertEquals(expectedBonusBytes, state.reliabilityBonusBytes)
+        assertEquals(1_000L, state.baseBalanceBytes)
+    }
+
+    @Test
+    fun `reliabilityBonusBytes ограничен 100 ГиБ cap`() {
+        val state = UrnetworkBalanceState(
+            snapshot = sample(),
+            isLoading = false,
+            lastError = null,
+            meanReliabilityWeight = 5.0,
+        )
+        val cap = (100.0 * 1024.0 * 1024.0 * 1024.0).toLong()
+        assertEquals(cap, state.reliabilityBonusBytes)
+    }
+
+    @Test
+    fun `reliabilityBonusBytes равен 0 когда weight равен 0`() {
+        val state = UrnetworkBalanceState(
+            snapshot = sample(),
+            isLoading = false,
+            lastError = null,
+            meanReliabilityWeight = 0.0,
+        )
+        assertEquals(0L, state.reliabilityBonusBytes)
+    }
+
+    @Test
+    fun `прогресс бар total включает bonus — sentinel против регрессии`() {
+        val cardSrc = locateSource(
+            "app/src/main/java/ru/ozero/app/ui/urnetwork/UrnetworkBalanceCard.kt",
+        )
+        val text = cardSrc.readText(Charsets.UTF_8)
+        kotlin.test.assertTrue(
+            !text.contains("availableBytes = displayBalance"),
+            "UrnetworkBalanceCard.kt передаёт raw balanceBytes в прогресс-бар, " +
+                "вместо state.availableBytes (= baseBalance + reliabilityBonus). " +
+                "Прогресс-бар должен соответствовать полю Доступно.",
+        )
+        kotlin.test.assertTrue(
+            text.contains("availableBytes = available"),
+            "UrnetworkBalanceCard.kt должен передавать state.availableBytes в прогресс-бар.",
+        )
+    }
+
+    private fun locateSource(rel: String): java.io.File {
+        var dir = java.io.File(System.getProperty("user.dir") ?: ".").absoluteFile
+        repeat(5) {
+            val candidate = java.io.File(dir, rel)
+            if (candidate.isFile) return candidate
+            dir = dir.parentFile ?: return@repeat
+        }
+        error("$rel не найден от ${System.getProperty("user.dir")}")
+    }
+
+    @Test
+    fun `availableBytes регрессия — должен суммировать bonus из weight 0_103 как ~10_3 GiB`() {
+        val state = UrnetworkBalanceState(
+            snapshot = sample(balance = 33_810_000_000L, pending = 0L, used = 0L),
+            isLoading = false,
+            lastError = null,
+            meanReliabilityWeight = 0.103,
+        )
+        val bonusGib = state.reliabilityBonusBytes / (1024.0 * 1024.0 * 1024.0)
+        kotlin.test.assertTrue(bonusGib in 10.0..10.6, "bonus ~10.3 GiB but got $bonusGib")
+        val availableGb = state.availableBytes / 1_000_000_000.0
+        kotlin.test.assertTrue(availableGb > 33.8, "available должно быть > 33.8 GB, было $availableGb")
+    }
+
+    @Test
     fun `refresh успех сохраняет meanReliabilityWeight из bridge`() = runTest {
         val bridge = FakeBridge(snapshot = sample(), reliability = 0.75)
         val repo = RealUrnetworkBalanceRepository(bridge)

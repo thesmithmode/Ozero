@@ -24,11 +24,25 @@ data class UrnetworkBalanceState(
     val meanReliabilityWeight: Double = 0.0,
     val totalReferrals: Long = 0L,
 ) {
-    val availableBytes: Long
+    val baseBalanceBytes: Long
         get() = ((snapshot?.balanceBytes ?: 0L).coerceAtLeast(0L) + (snapshot?.pendingBytes ?: 0L).coerceAtLeast(0L))
+
+    val reliabilityBonusBytes: Long
+        get() {
+            val gib = (meanReliabilityWeight * RELIABILITY_BONUS_GIB_MULTIPLIER)
+                .coerceAtMost(RELIABILITY_BONUS_GIB_CAP)
+            if (gib <= 0.0) return 0L
+            return (gib * BYTES_IN_GIB).toLong()
+        }
+
+    val availableBytes: Long
+        get() = baseBalanceBytes + reliabilityBonusBytes
 
     companion object {
         val INITIAL = UrnetworkBalanceState(snapshot = null, isLoading = false, lastError = null)
+        private const val RELIABILITY_BONUS_GIB_MULTIPLIER = 100.0
+        private const val RELIABILITY_BONUS_GIB_CAP = 100.0
+        private const val BYTES_IN_GIB = 1024.0 * 1024.0 * 1024.0
     }
 }
 
