@@ -3,21 +3,45 @@
     <string name="settings_fptn_title">FPTN</string>
     <string name="settings_fptn_summary">Túnel SNI Reality — contorna bloqueios DPI</string>
     <string name="fptn_settings_title">FPTN</string>
-    <string name="fptn_section_token">Token</string>
+
+    <string name="fptn_about_description">FPTN é uma tecnologia VPN desenvolvida do zero, incluindo seu próprio protocolo, servidor e clientes multiplataforma. É um projeto sem fins lucrativos de código aberto, desenvolvido por voluntários e projetado para contornar a censura.</string>
+    <string name="fptn_link_website">Nosso site</string>
+    <string name="fptn_link_telegram">Nosso grupo no Telegram</string>
+    <string name="fptn_link_play">App na Google Play</string>
+    <string name="fptn_link_boosty">Apoie-nos no Boosty</string>
+
+    <string name="fptn_section_token">Atualização do token</string>
     <string name="fptn_token_hint">fptn:… ou fptnb:…</string>
     <string name="fptn_token_save">Salvar</string>
     <string name="fptn_token_invalid">Formato de token inválido</string>
-    <string name="fptn_bot_hint">Obtenha seu token com @fptn_bot no Telegram</string>
-    <string name="fptn_section_servers">Servidores</string>
+    <string name="fptn_section_token_description">A lista de servidores disponíveis é criptografada dentro do token. Para atualizar a lista, insira um novo token. O token funciona como uma senha: ao atualizá-lo, ele deixará de funcionar em todos os outros dispositivos onde era usado.</string>
+    <string name="fptn_bot_hint">Obtenha seu token com t.me/fptn_bot</string>
+
+    <string name="fptn_section_bypass">Métodos de bypass</string>
+    <string name="fptn_section_bypass_summary">Configurar métodos de bypass de bloqueios</string>
+
+    <string name="fptn_section_split_tunnel">Túnel por aplicativo</string>
+    <string name="fptn_section_split_tunnel_summary">Aqui você pode configurar VPN seletivo: usar VPN para todos os aplicativos (padrão) ou permitir/negar acesso para apps específicos.</string>
+
+    <string name="fptn_section_permissions">Permissões necessárias</string>
+    <string name="fptn_perm_battery">Desativar otimização de bateria</string>
+    <string name="fptn_perm_background">Dados em segundo plano</string>
+
+    <string name="fptn_section_servers">Seus servidores VPN</string>
     <string name="fptn_server_auto">Auto (seleção automática)</string>
     <string name="fptn_no_token">Insira um token para ver a lista de servidores</string>
-    <string name="fptn_section_bypass">Método de bypass</string>
+
     <string name="fptn_experimental_button">Configurações experimentais</string>
     <string name="fptn_experimental_title">Configurações experimentais</string>
-    <string name="fptn_reconnect_network">Reconectar ao trocar de rede</string>
-    <string name="fptn_reconnect_ip">Reconectar ao trocar de IP</string>
-    <string name="fptn_max_attempts">Máx. tentativas de reconexão: <xliff:g id="count" example="5">%d</xliff:g></string>
-    <string name="fptn_pause_seconds">Pausa entre tentativas: <xliff:g id="seconds" example="2">%d</xliff:g> s</string>
-    <string name="fptn_reset_server">Reiniciar servidor ao desconectar</string>
+    <string name="fptn_experimental_reconnect_header">Reconectar ao alterar:</string>
+    <string name="fptn_reconnect_network">tipo de rede</string>
+    <string name="fptn_reconnect_ip">endereço IP</string>
+    <string name="fptn_experimental_attempts_header">Tentativas de reconexão após perda de rede:</string>
+    <string name="fptn_max_attempts">Tentativas: <xliff:g id="count" example="5">%d</xliff:g></string>
+    <string name="fptn_pause_seconds">Pausa entre: <xliff:g id="seconds" example="2">%d</xliff:g> s</string>
+    <string name="fptn_experimental_others_header">Outras configurações:</string>
+    <string name="fptn_reset_server">Redefinir servidor ao desconectar?</string>
+    <string name="fptn_experimental_cancel">Cancelar</string>
+    <string name="fptn_experimental_save">Salvar</string>
     <string name="fptn_close">Fechar</string>
 </resources>
