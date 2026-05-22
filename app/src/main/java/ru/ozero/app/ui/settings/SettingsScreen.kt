@@ -64,7 +64,6 @@ fun SettingsScreen(
     onOpenBackup: () -> Unit = {},
     onOpenAutoModeSettings: () -> Unit = {},
     onOpenLanguage: () -> Unit = {},
-    onOpenTelegramProxySettings: () -> Unit = {},
     onOpenMasterDnsSettings: () -> Unit = {},
     onOpenFptnSettings: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
@@ -88,7 +87,6 @@ fun SettingsScreen(
             onOpenBackup = onOpenBackup,
             onOpenAutoModeSettings = onOpenAutoModeSettings,
             onOpenLanguage = onOpenLanguage,
-            onOpenTelegramProxySettings = onOpenTelegramProxySettings,
             onOpenMasterDnsSettings = onOpenMasterDnsSettings,
             onOpenFptnSettings = onOpenFptnSettings,
         ),
@@ -207,7 +205,6 @@ private fun ContentBody(
                 onOpenUrnetwork = nav.onOpenUrnetworkSettings,
                 onOpenWarp = nav.onOpenWarpSettings,
                 onOpenManualServer = nav.onOpenManualServer,
-                onOpenTelegramProxy = nav.onOpenTelegramProxySettings,
                 onOpenMasterDns = nav.onOpenMasterDnsSettings,
                 onOpenFptn = nav.onOpenFptnSettings,
             )
@@ -408,7 +405,6 @@ private fun EnginesSection(
     onOpenUrnetwork: () -> Unit,
     onOpenWarp: () -> Unit,
     onOpenManualServer: () -> Unit,
-    onOpenTelegramProxy: () -> Unit,
     onOpenMasterDns: () -> Unit,
     onOpenFptn: () -> Unit,
 ) {
@@ -444,13 +440,6 @@ private fun EnginesSection(
         summary = stringResource(R.string.settings_manual_server_summary),
         tag = "settings_manual_server_row",
         onClick = onOpenManualServer,
-        enabled = true,
-    )
-    NavRow(
-        title = stringResource(R.string.settings_telegram_proxy_title),
-        summary = stringResource(R.string.settings_telegram_proxy_summary),
-        tag = "settings_telegram_proxy_row",
-        onClick = onOpenTelegramProxy,
         enabled = true,
     )
     NavRow(

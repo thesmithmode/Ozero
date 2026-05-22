@@ -21,7 +21,6 @@ import ru.ozero.app.ui.settings.SettingsScreen
 import ru.ozero.app.ui.settings.engines.ByeDpiEngineSettingsScreen
 import ru.ozero.app.ui.settings.engines.FptnEngineSettingsScreen
 import ru.ozero.app.ui.settings.engines.MasterDnsSettingsScreen
-import ru.ozero.app.ui.settings.engines.TelegramProxySettingsScreen
 import ru.ozero.app.ui.settings.engines.UrnetworkEngineSettingsScreen
 import ru.ozero.app.ui.settings.engines.UrnetworkSharedTrafficScreen
 import ru.ozero.app.ui.settings.engines.WarpEngineSettingsScreen
@@ -67,7 +66,6 @@ fun RootNavigation(
                     onOpenByeDpiEngineSettings = { navigate(TopScreen.ByeDpiEngineSettings) },
                     onOpenUrnetworkSettings = { navigate(TopScreen.UrnetworkEngineSettings) },
                     onOpenWarpSettings = { navigate(TopScreen.WarpEngineSettings) },
-                    onOpenTelegramProxySettings = { navigate(TopScreen.TelegramProxySettings) },
                     onOpenMasterDnsSettings = { navigate(TopScreen.MasterDnsSettings) },
                     onOpenFptnSettings = { navigate(TopScreen.FptnSettings) },
                     onOpenManualServer = { navigate(TopScreen.ManualServer) },
@@ -96,7 +94,6 @@ fun RootNavigation(
             )
             TopScreen.UrnetworkSharedTraffic -> UrnetworkSharedTrafficScreen(onBack = { back() })
             TopScreen.WarpEngineSettings -> WarpEngineSettingsScreen(onBack = { back() })
-            TopScreen.TelegramProxySettings -> TelegramProxySettingsScreen(onBack = { back() })
             TopScreen.MasterDnsSettings -> MasterDnsSettingsScreen(onBack = { back() })
             TopScreen.FptnSettings -> FptnEngineSettingsScreen(onBack = { back() })
             TopScreen.StrategyTest -> StrategyTestScreen(onBack = { back() })
