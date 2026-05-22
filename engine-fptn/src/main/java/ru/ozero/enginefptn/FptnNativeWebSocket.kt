@@ -9,13 +9,19 @@ class FptnNativeWebSocket {
     var onFailure: () -> Unit = {}
 
     @Keep
-    fun onOpenImpl() { onOpen() }
+    fun onOpenImpl() {
+        onOpen()
+    }
 
     @Keep
-    fun onMessageImpl(data: ByteArray) { onMessage(data) }
+    fun onMessageImpl(data: ByteArray) {
+        onMessage(data)
+    }
 
     @Keep
-    fun onFailureImpl() { onFailure() }
+    fun onFailureImpl() {
+        onFailure()
+    }
 
     external fun nativeCreate(
         serverIp: String,

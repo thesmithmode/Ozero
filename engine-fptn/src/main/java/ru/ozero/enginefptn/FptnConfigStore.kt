@@ -23,7 +23,9 @@ data class FptnConfig(
 class InMemoryFptnConfigStore(initial: FptnConfig = FptnConfig()) : FptnConfigStore {
     private val state = MutableStateFlow(initial)
     val snapshot: FptnConfig get() = state.value
-    fun inject(transform: (FptnConfig) -> FptnConfig) { state.value = transform(state.value) }
+    fun inject(transform: (FptnConfig) -> FptnConfig) {
+        state.value = transform(state.value)
+    }
     override fun config(): Flow<FptnConfig> = state
     override suspend fun update(transform: (FptnConfig) -> FptnConfig) {
         state.value = transform(state.value)

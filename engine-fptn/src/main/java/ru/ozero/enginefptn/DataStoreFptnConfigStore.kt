@@ -38,8 +38,11 @@ class DataStoreFptnConfigStore(
 
     private fun writeConfig(prefs: MutablePreferences, cfg: FptnConfig) {
         prefs[KEY_TOKEN] = cfg.token
-        if (cfg.selectedServerName != null) prefs[KEY_SELECTED_SERVER] = cfg.selectedServerName
-        else prefs.remove(KEY_SELECTED_SERVER)
+        if (cfg.selectedServerName != null) {
+            prefs[KEY_SELECTED_SERVER] = cfg.selectedServerName
+        } else {
+            prefs.remove(KEY_SELECTED_SERVER)
+        }
         prefs[KEY_BYPASS_METHOD] = cfg.bypassMethod
         prefs[KEY_AUTO_SELECT] = cfg.autoSelect
         prefs[KEY_RECONNECT_NETWORK] = cfg.reconnectOnNetworkChange

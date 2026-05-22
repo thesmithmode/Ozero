@@ -116,7 +116,10 @@ class FptnEngine(
 
         wsClient.onOpen = { Log.i(TAG, "FPTN WebSocket connected") }
         wsClient.onMessage = { bytes ->
-            try { fos.write(bytes) } catch (_: Exception) {}
+            try {
+                fos.write(bytes)
+            } catch (_: Exception) {
+            }
         }
         wsClient.onFailure = {
             PersistentLoggers.error(TAG, "FPTN WebSocket failure")
@@ -187,8 +190,11 @@ class FptnEngine(
         val token = configStore.config().first().token
         if (token.isBlank()) return ProbeResult.Failure("No token configured")
         val parsed = FptnToken.parse(token) ?: return ProbeResult.Failure("Invalid token")
-        return if (parsed.servers.isNotEmpty()) ProbeResult.Success
-        else ProbeResult.Failure("No servers in token")
+        return if (parsed.servers.isNotEmpty()) {
+            ProbeResult.Success(latencyMs = 0L)
+        } else {
+            ProbeResult.Failure("No servers in token")
+        }
     }
 
     private fun selectServer(config: EngineConfig.Fptn, data: FptnTokenData): FptnServer? {

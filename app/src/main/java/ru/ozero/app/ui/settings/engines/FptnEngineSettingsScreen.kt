@@ -83,7 +83,9 @@ fun FptnEngineSettingsScreen(
                 isError = state.tokenInvalid,
                 supportingText = if (state.tokenInvalid) {
                     { Text(stringResource(R.string.fptn_token_invalid)) }
-                } else null,
+                } else {
+                    null
+                },
                 modifier = Modifier.fillMaxWidth().testTag("fptn_token_field"),
                 singleLine = true,
             )
