@@ -18,6 +18,7 @@ on:
           - userwireguard
           - urnetwork-sdk
           - mtg
+          - fptn
   push:
     branches:
       - 'feat/**'
@@ -33,6 +34,8 @@ on:
       - 'build-tools/build_tor.sh'
       - 'build-tools/build_xray.sh'
       - 'build-tools/build_mtg.sh'
+      - 'build-tools/Dockerfile.fptn'
+      - 'build-tools/build_fptn.sh'
       - 'build-tools/regen_lock.py'
       - 'scripts/build_wireguard_android.sh'
 
@@ -82,6 +85,9 @@ jobs:
               ;;
             mtg)
               FILES="build-tools/Dockerfile.mtg build-tools/build_mtg.sh build-tools/regen_lock.py"
+              ;;
+            fptn)
+              FILES="build-tools/Dockerfile.fptn build-tools/build_fptn.sh build-tools/regen_lock.py"
               ;;
             *)
               echo "Unknown artifact: $ARTIFACT" >&2
@@ -243,6 +249,24 @@ jobs:
             -e OUT_DIR=/src/out/mtg \
             ozero-mtg \
             bash build-tools/build_mtg.sh
+
+      # ---------------------------------------------------------------------
+      # fptn build (C++20 + Conan2 + NDK r28b → arm64-v8a only)
+      # ---------------------------------------------------------------------
+      - name: Build fptn Docker image
+        if: env.ARTIFACT == 'fptn'
+        run: docker build -t ozero-fptn -f build-tools/Dockerfile.fptn build-tools/
+
+      - name: Build fptn (arm64-v8a)
+        if: env.ARTIFACT == 'fptn'
+        run: |
+          docker run --rm \
+            -v "$PWD:/src" \
+            -w /src \
+            -e REPO_ROOT=/src \
+            -e OUT_DIR=/src/out/fptn \
+            ozero-fptn \
+            bash build-tools/build_fptn.sh
 
       # ---------------------------------------------------------------------
       # Upload — engine-specific glob
@@ -407,6 +431,26 @@ jobs:
           fail_on_unmatched_files: true
           prerelease: true
 
+      - name: Upload fptn assets
+        if: env.ARTIFACT == 'fptn' && github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        env:
+          GH_TAG: ${{ steps.tag.outputs.tag }}
+        with:
+          tag_name: ${{ env.GH_TAG }}
+          name: Native binaries ${{ env.GH_TAG }}
+          body: |
+            Auto-built native binaries.
+
+            Engine: fptn (SNI Reality tunnel)
+            Source: github.com/fptn-project/FptnClient-Android
+            Commit: ${{ github.sha }}
+          files: |
+            out/fptn/libfptn_native_lib-arm64-v8a.so
+            out/fptn/manifest.txt
+          fail_on_unmatched_files: true
+          prerelease: true
+
       # ---------------------------------------------------------------------
       # Auto-cleanup: оставляем последние 3 prerelease на движок, старее
       # удаляем (вместе с git tag). Защита от захламления Releases UI.
@@ -512,6 +556,17 @@ jobs:
                   echo "Copied $SRC → $DST"
                 fi
               done
+              ;;
+            fptn)
+              SRC="out/libfptn_native_lib-arm64-v8a.so"
+              DST="engine-fptn/src/main/jniLibs/arm64-v8a/libfptn_native_lib.so"
+              if [ -f "$SRC" ]; then
+                mkdir -p "$(dirname "$DST")"
+                cp "$SRC" "$DST"
+                echo "Copied $SRC → $DST"
+              else
+                echo "ERROR: $SRC not found" >&2; ls out/; exit 1
+              fi
               ;;
             *)
               echo "No repo-copy mapping for artifact=$ARTIFACT — skipping update-repo"

@@ -110,6 +110,7 @@ dependencies {
     implementation(project(":engine-warp"))
     implementation(project(":engine-telegram"))
     implementation(project(":engine-masterdns"))
+    implementation(project(":engine-fptn"))
     implementation(project(":core-backup"))
 
     implementation(

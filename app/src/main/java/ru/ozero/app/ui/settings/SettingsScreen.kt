@@ -66,6 +66,7 @@ fun SettingsScreen(
     onOpenLanguage: () -> Unit = {},
     onOpenTelegramProxySettings: () -> Unit = {},
     onOpenMasterDnsSettings: () -> Unit = {},
+    onOpenFptnSettings: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -89,6 +90,7 @@ fun SettingsScreen(
             onOpenLanguage = onOpenLanguage,
             onOpenTelegramProxySettings = onOpenTelegramProxySettings,
             onOpenMasterDnsSettings = onOpenMasterDnsSettings,
+            onOpenFptnSettings = onOpenFptnSettings,
         ),
         onIpv6Toggle = viewModel::onIpv6Toggle,
         onAutoStartToggle = viewModel::onAutoStartToggle,
@@ -207,6 +209,7 @@ private fun ContentBody(
                 onOpenManualServer = nav.onOpenManualServer,
                 onOpenTelegramProxy = nav.onOpenTelegramProxySettings,
                 onOpenMasterDns = nav.onOpenMasterDnsSettings,
+                onOpenFptn = nav.onOpenFptnSettings,
             )
         }
         item { SectionDivider() }
@@ -407,6 +410,7 @@ private fun EnginesSection(
     onOpenManualServer: () -> Unit,
     onOpenTelegramProxy: () -> Unit,
     onOpenMasterDns: () -> Unit,
+    onOpenFptn: () -> Unit,
 ) {
     NavRow(
         title = stringResource(R.string.settings_byedpi_title),
@@ -454,6 +458,13 @@ private fun EnginesSection(
         summary = stringResource(R.string.settings_masterdns_summary),
         tag = "settings_masterdns_row",
         onClick = onOpenMasterDns,
+        enabled = true,
+    )
+    NavRow(
+        title = stringResource(R.string.settings_fptn_title),
+        summary = stringResource(R.string.settings_fptn_summary),
+        tag = "settings_fptn_row",
+        onClick = onOpenFptn,
         enabled = true,
     )
 }

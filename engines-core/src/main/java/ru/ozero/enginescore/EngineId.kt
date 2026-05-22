@@ -9,5 +9,5 @@ enum class EngineId(val displayName: String, val isStub: Boolean) {
     HYSTERIA2(displayName = "Hysteria2", isStub = true),
     NAIVE(displayName = "NaiveProxy", isStub = true),
     TOR(displayName = "Tor", isStub = true),
-    FPTN(displayName = "FPTN", isStub = true),
+    FPTN(displayName = "FPTN", isStub = false),
 }

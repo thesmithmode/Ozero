@@ -16,4 +16,5 @@ data class SettingsNavActions(
     val onOpenLanguage: () -> Unit = {},
     val onOpenTelegramProxySettings: () -> Unit = {},
     val onOpenMasterDnsSettings: () -> Unit = {},
+    val onOpenFptnSettings: () -> Unit = {},
 )
