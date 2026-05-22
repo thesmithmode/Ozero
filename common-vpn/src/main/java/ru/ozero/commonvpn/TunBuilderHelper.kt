@@ -24,6 +24,7 @@ import ru.ozero.enginescore.TunSpec
  */
 class TunBuilderHelper(private val service: VpnService) {
 
+    @Suppress("UnusedParameter")
     fun applyEngineTunSpec(spec: TunSpec, ipv6Enabled: Boolean): VpnService.Builder {
         val builder = service.Builder()
             .setSession(spec.sessionName)
@@ -119,6 +120,7 @@ class TunBuilderHelper(private val service: VpnService) {
         }
     }
 
+    @Suppress("UnusedPrivateMember")
     private fun blackholeIpv6(builder: VpnService.Builder, callerTag: String) {
         runCatching {
             builder.addAddress(TUN_ADDRESS_V6, TUN_PREFIX_LENGTH_V6)

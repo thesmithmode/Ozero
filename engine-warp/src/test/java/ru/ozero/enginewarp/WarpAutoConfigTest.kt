@@ -377,7 +377,7 @@ class WarpAutoConfigTest {
     }
 
     @Test
-    fun `register принимает Cloudflare WARP IP endpoint 162_159_195_1 — mirrors возвращают IP из REQUEST_BODY`() = runTest {
+    fun `register принимает Cloudflare IP endpoint 162_159_195_1 — mirrors возвращают IP из REQUEST_BODY`() = runTest {
         val ipConf = sampleConf.replace(
             "Endpoint = engage.cloudflareclient.com:4500",
             "Endpoint = 162.159.195.1:500",
@@ -387,7 +387,10 @@ class WarpAutoConfigTest {
 
         val result = auto.register()
 
-        assertTrue(result.isSuccess, "Cloudflare WARP IP endpoint обязан приниматься: ${result.exceptionOrNull()?.message}")
+        assertTrue(
+            result.isSuccess,
+            "Cloudflare WARP IP endpoint обязан приниматься: ${result.exceptionOrNull()?.message}",
+        )
         assertEquals("162.159.195.1:500", result.getOrThrow().config.peerEndpoint)
     }
 
@@ -402,7 +405,10 @@ class WarpAutoConfigTest {
 
         val result = auto.register()
 
-        assertTrue(result.isSuccess, "188.114.96-99.* Cloudflare WARP IP обязан приниматься: ${result.exceptionOrNull()?.message}")
+        assertTrue(
+            result.isSuccess,
+            "188.114.96-99.* Cloudflare WARP IP обязан приниматься: ${result.exceptionOrNull()?.message}",
+        )
     }
 
     @Test

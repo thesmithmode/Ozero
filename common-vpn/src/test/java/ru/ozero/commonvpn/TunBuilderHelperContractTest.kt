@@ -132,7 +132,7 @@ class TunBuilderHelperContractTest {
     }
 
     @Test
-    fun `applyEngineTunSpec IPv6 маршрутизация определяется spec_allowFamilyV6, не ipv6Enabled — regression sentinel`() {
+    fun `applyEngineTunSpec IPv6 routing по spec_allowFamilyV6 не ipv6Enabled — regression sentinel`() {
         val body = source.substringAfter("fun applyEngineTunSpec(").substringBefore("fun buildTunBuilder(")
         assertTrue(
             body.contains("if (spec.allowFamilyV6 && v6 != null)"),

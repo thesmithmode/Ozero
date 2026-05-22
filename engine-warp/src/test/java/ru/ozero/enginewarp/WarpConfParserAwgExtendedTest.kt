@@ -189,8 +189,14 @@ class WarpConfParserAwgExtendedTest {
         """.trimIndent()
         val cfg = WarpConfParser.parse(confNoS3S4).getOrThrow()
         val ini = WarpIniBuilder.build(cfg)
-        kotlin.test.assertFalse(ini.contains("S3 = "), "S3=0 не должен записываться — amneziawg-go default=0 при отсутствии поля")
-        kotlin.test.assertFalse(ini.contains("S4 = "), "S4=0 не должен записываться — amneziawg-go default=0 при отсутствии поля")
+        kotlin.test.assertFalse(
+            ini.contains("S3 = "),
+            "S3=0 не должен записываться — amneziawg-go default=0 при отсутствии поля",
+        )
+        kotlin.test.assertFalse(
+            ini.contains("S4 = "),
+            "S4=0 не должен записываться — amneziawg-go default=0 при отсутствии поля",
+        )
         kotlin.test.assertFalse(ini.contains("I1 = "), "I1=0 не должен записываться")
         kotlin.test.assertFalse(ini.contains("I2 = "), "I2=0 не должен записываться")
         kotlin.test.assertFalse(ini.contains("I5 = "), "I5=0 не должен записываться")
