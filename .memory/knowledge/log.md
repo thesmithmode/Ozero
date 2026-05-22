@@ -1,5 +1,21 @@
 # Build Log
 
+## [2026-05-22T23:59:00+03:00] compile | Daily Log 2026-05-22 (pass 15 — final: Clash architecture + providerCount)
+- Source: daily/2026-05-22.md
+- Articles created: [[concepts/clash-module-architecture]]
+- Articles updated:
+  - [[concepts/urnetwork-location-stability-privacy-icons]] — added providerCount semantics (total registered nodes, not online); isStrongPrivacy renders as lock icon (not infinity); source daily/2026-05-22.md added
+- Index updated: 1 new row (clash-module-architecture) + 1 updated row (urnetwork-location-stability-privacy-icons summary + date + source)
+- Gap closed: session 19:47 had two uncaptured facts — (1) Clash deferred decision with architecture; (2) providerCount semantic mismatch — both missed in passes 1-14
+- Status: compilation complete for all 2026-05-22 sessions (passes 1-15)
+
+## [2026-05-22T22:09:00+03:00] compile | Daily Log 2026-05-22 (pass 14 — session 22:09 captured)
+- Source: daily/2026-05-22.md
+- Articles created: [[concepts/warp-split-tunnel-allowfamily-bug]]
+- Articles updated: (none — passes 1-13 already covered sessions 11:59–21:27)
+- Gap closed: session 22:09 (WARP split tunnel + Gemini IPv6 failure) was beyond "21:27" boundary of pass 12 verification
+- Status: compilation complete for all 2026-05-22 sessions
+
 ## [2026-05-22T23:59:59+03:00] compile | Daily Log 2026-05-22 (pass 13 — FREE_TIER_CAP contradiction fix)
 - Source: daily/2026-05-22.md
 - Articles created: (none)
