@@ -416,6 +416,27 @@ class WarpEngineSettingsViewModelTest {
     }
 
     @Test
+    fun `onSaveEdit сохраняет rawIniOverride из слота — не обнуляет`() = runTest {
+        val rawIni = "[Interface]\nPrivateKey = priv\n\n[Peer]\nPublicKey = peer\n"
+        val id = store.addSlot("S", SAMPLE, rawIni)
+        advanceUntilIdle()
+        vm.onStartEdit(id)
+        vm.onSaveEdit()
+        advanceUntilIdle()
+        assertEquals(rawIni, store.lastUpdateRawIni, "rawIniOverride должен сохраняться при редактировании")
+    }
+
+    @Test
+    fun `onSaveEdit для слота без rawIniOverride передаёт null`() = runTest {
+        val id = store.addSlot("S", SAMPLE, null)
+        advanceUntilIdle()
+        vm.onStartEdit(id)
+        vm.onSaveEdit()
+        advanceUntilIdle()
+        assertNull(store.lastUpdateRawIni)
+    }
+
+    @Test
     fun `init — ошибка миграции — errorMessage установлен`() = runTest {
         val throwingStore = object : FakeWarpStore() {
             override suspend fun migrateIfNeeded() = error("migration boom")
@@ -482,6 +503,7 @@ class WarpEngineSettingsViewModelTest {
         private val slotsFlow = MutableStateFlow<List<WarpConfigSlot>>(emptyList())
         val setActiveCalls = mutableListOf<String>()
         var lastUpdateCall: Triple<String, String, WarpConfig>? = null
+        var lastUpdateRawIni: String? = null
         private var idCounter = 0
 
         fun slotCount() = slotsFlow.value.size
@@ -528,6 +550,7 @@ class WarpEngineSettingsViewModelTest {
 
         override suspend fun updateSlot(id: String, name: String, config: WarpConfig, rawIni: String?) {
             lastUpdateCall = Triple(id, name, config)
+            lastUpdateRawIni = rawIni
             slotsFlow.value = slotsFlow.value.map {
                 if (it.id == id) it.copy(name = name, config = config, rawIniOverride = rawIni) else it
             }

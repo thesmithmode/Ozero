@@ -320,7 +320,7 @@ class WarpEngineSettingsViewModel @Inject constructor(
         val slotId = draft.slotId
         val name = draft.name.trim().ifBlank { "WARP" }
         viewModelScope.launch {
-            runCatching { store.updateSlot(slotId, name, config) }
+            runCatching { store.updateSlot(slotId, name, config, existingSlot?.rawIniOverride) }
                 .onSuccess {
                     _uiState.value = _uiState.value.copy(
                         editDraft = null,

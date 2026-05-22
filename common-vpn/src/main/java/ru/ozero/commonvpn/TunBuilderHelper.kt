@@ -59,7 +59,7 @@ class TunBuilderHelper(private val service: VpnService) {
             }
         }
         val v6 = spec.ipv6Address
-        if (ipv6Enabled && spec.allowFamilyV6 && v6 != null) {
+        if (spec.allowFamilyV6 && v6 != null) {
             builder.addAddress(v6, spec.ipv6PrefixLength)
             if (spec.routeAllV6) builder.addRoute("::", 0)
         } else {

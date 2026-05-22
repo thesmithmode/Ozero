@@ -132,6 +132,20 @@ class TunBuilderHelperContractTest {
     }
 
     @Test
+    fun `applyEngineTunSpec IPv6 маршрутизация определяется spec_allowFamilyV6, не ipv6Enabled — regression sentinel`() {
+        val body = source.substringAfter("fun applyEngineTunSpec(").substringBefore("fun buildTunBuilder(")
+        assertTrue(
+            body.contains("if (spec.allowFamilyV6 && v6 != null)"),
+            "IPv6 routing обязан базироваться на spec.allowFamilyV6 (из конфига), " +
+                "а не на ipv6Enabled — иначе WARP blackhole-ит IPv6 по умолчанию и часть сервисов недоступна",
+        )
+        assertTrue(
+            !body.contains("ipv6Enabled && spec.allowFamilyV6"),
+            "ipv6Enabled НЕ должен стоять перед spec.allowFamilyV6 — это регрессия",
+        )
+    }
+
+    @Test
     fun `applyEngineTunSpec setMetered false только на Q+ — pre-Q deprecated API`() {
         val body = source.substringAfter("fun applyEngineTunSpec(").substringBefore("fun buildTunBuilder(")
         val qIdx = body.indexOf("VERSION_CODES.Q")
