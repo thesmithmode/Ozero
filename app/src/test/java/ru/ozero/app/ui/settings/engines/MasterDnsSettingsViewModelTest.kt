@@ -223,7 +223,10 @@ class MasterDnsSettingsViewModelTest {
         val deployer = object : MasterDnsServerDeployer {
             override fun deploy(credentials: MasterDnsDeployCredentials): Flow<MasterDnsDeployState> {
                 deployCallCount++
-                return flow { gate.await(); emit(MasterDnsDeployState.Idle) }
+                return flow {
+                    gate.await()
+                    emit(MasterDnsDeployState.Idle)
+                }
             }
             override fun undeploy(credentials: MasterDnsDeployCredentials) =
                 flowOf(MasterDnsDeployState.Idle)
@@ -242,7 +245,10 @@ class MasterDnsSettingsViewModelTest {
         var undeployCallCount = 0
         val deployer = object : MasterDnsServerDeployer {
             override fun deploy(credentials: MasterDnsDeployCredentials): Flow<MasterDnsDeployState> =
-                flow { gate.await(); emit(MasterDnsDeployState.Idle) }
+                flow {
+                    gate.await()
+                    emit(MasterDnsDeployState.Idle)
+                }
             override fun undeploy(credentials: MasterDnsDeployCredentials): Flow<MasterDnsDeployState> {
                 undeployCallCount++
                 return flowOf(MasterDnsDeployState.Idle)
@@ -266,7 +272,10 @@ class MasterDnsSettingsViewModelTest {
                 return flowOf(MasterDnsDeployState.Idle)
             }
             override fun undeploy(credentials: MasterDnsDeployCredentials): Flow<MasterDnsDeployState> =
-                flow { gate.await(); emit(MasterDnsDeployState.Idle) }
+                flow {
+                    gate.await()
+                    emit(MasterDnsDeployState.Idle)
+                }
         }
         val vm = MasterDnsSettingsViewModel(store, deployer)
         vm.onUndeployClick("10.0.0.1", 22, "root", "pass".toCharArray())
