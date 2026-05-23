@@ -85,18 +85,24 @@ internal object MasterDnsDockerScripts {
             "echo RUN_OK"
 
     const val openFirewallPort53 =
-        "if command -v ufw >/dev/null 2>&1 && sudo ufw status 2>/dev/null | grep -q 'Status: active';" +
-            " then sudo ufw allow 53/udp >/dev/null 2>&1 && echo FW_UFW_OK;" +
+        "sudo mkdir -p /var/lib/masterdns-ozero 2>/dev/null;" +
+            " fw_kind=none;" +
+            " if command -v ufw >/dev/null 2>&1 && sudo ufw status 2>/dev/null | grep -q 'Status: active';" +
+            " then if ! sudo ufw status numbered 2>/dev/null | grep -qE '\\b53/udp\\b';" +
+            " then sudo ufw allow 53/udp >/dev/null 2>&1; fw_kind=ufw; fi; echo FW_UFW_OK;" +
             " elif command -v firewall-cmd >/dev/null 2>&1 && sudo firewall-cmd --state >/dev/null 2>&1;" +
+            " then if ! sudo firewall-cmd --query-port=53/udp >/dev/null 2>&1;" +
             " then sudo firewall-cmd --permanent --add-port=53/udp >/dev/null 2>&1" +
-            " && sudo firewall-cmd --reload >/dev/null 2>&1 && echo FW_FIREWALLD_OK;" +
+            " && sudo firewall-cmd --reload >/dev/null 2>&1; fw_kind=firewalld; fi; echo FW_FIREWALLD_OK;" +
             " elif command -v iptables >/dev/null 2>&1;" +
-            " then sudo iptables -C INPUT -p udp --dport 53 -j ACCEPT 2>/dev/null" +
-            " || sudo iptables -A INPUT -p udp --dport 53 -j ACCEPT;" +
+            " then if ! sudo iptables -C INPUT -p udp --dport 53 -j ACCEPT 2>/dev/null;" +
+            " then sudo iptables -A INPUT -p udp --dport 53 -j ACCEPT; fw_kind=iptables;" +
             " if command -v iptables-save >/dev/null 2>&1 && [ -d /etc/iptables ];" +
-            " then sudo iptables-save | sudo tee /etc/iptables/rules.v4 >/dev/null 2>&1; fi;" +
+            " then sudo iptables-save | sudo tee /etc/iptables/rules.v4 >/dev/null 2>&1; fi; fi;" +
             " echo FW_IPTABLES_OK;" +
-            " else echo FW_NONE_OK; fi"
+            " else echo FW_NONE_OK; fi;" +
+            " if [ \"\$fw_kind\" != \"none\" ];" +
+            " then echo \"\$fw_kind\" | sudo tee /var/lib/masterdns-ozero/fw_opened >/dev/null 2>&1; fi"
 
     const val readEncryptKey =
         "sudo docker exec masterdns-ozero cat /etc/masterdnsvpn/encrypt_key.txt 2>/dev/null"
@@ -106,6 +112,17 @@ internal object MasterDnsDockerScripts {
             " sudo docker rm -f masterdns-ozero 2>/dev/null || true;" +
             " sudo docker rmi masterdns-ozero 2>/dev/null || true;" +
             " sudo rm -rf /tmp/mdns_build 2>/dev/null || true;" +
+            " if [ -f /var/lib/masterdns-ozero/fw_opened ];" +
+            " then fw=\$(sudo cat /var/lib/masterdns-ozero/fw_opened 2>/dev/null);" +
+            " case \"\$fw\" in" +
+            " ufw) sudo ufw delete allow 53/udp >/dev/null 2>&1 || true;;" +
+            " firewalld) sudo firewall-cmd --permanent --remove-port=53/udp >/dev/null 2>&1 || true;" +
+            " sudo firewall-cmd --reload >/dev/null 2>&1 || true;;" +
+            " iptables) sudo iptables -D INPUT -p udp --dport 53 -j ACCEPT 2>/dev/null || true;" +
+            " if command -v iptables-save >/dev/null 2>&1 && [ -d /etc/iptables ];" +
+            " then sudo iptables-save | sudo tee /etc/iptables/rules.v4 >/dev/null 2>&1 || true; fi;;" +
+            " esac;" +
+            " sudo rm -f /var/lib/masterdns-ozero/fw_opened 2>/dev/null || true; fi;" +
             " echo REMOVE_OK"
 
     const val MARKER_REMOVE_OK = "REMOVE_OK"
