@@ -160,4 +160,14 @@ class MainScreenLabelsTest {
         )
         assertEquals(EngineId.BYEDPI, selected)
     }
+
+    @Test
+    fun `urnetwork visibility follows resolved runtime engine not stale manual`() {
+        val visible = isUrnetworkVisibleInMain(
+            state = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080),
+            switching = null,
+            manualEngine = EngineId.URNETWORK,
+        )
+        assertEquals(false, visible)
+    }
 }
