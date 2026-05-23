@@ -42,9 +42,7 @@ internal object MasterDnsDockerScripts {
             "RUN [ -f /usr/local/bin/masterdnsvpn-server ] || " +
             "(find / -maxdepth 6 -name 'masterdnsvpn-server' -type f 2>/dev/null" +
             " | head -1 | xargs -I{} install -m755 {} /usr/local/bin/ 2>/dev/null)\n" +
-            "RUN mkdir -p /etc/masterdnsvpn && openssl rand -hex 32" +
-            " > /etc/masterdnsvpn/encrypt_key.txt" +
-            " && chmod 600 /etc/masterdnsvpn/encrypt_key.txt\n" +
+            "RUN mkdir -p /etc/masterdnsvpn\n" +
             "EXPOSE 53/udp\n" +
             "CMD [\"/usr/local/bin/masterdnsvpn-server\"]\n" +
             "EODF\n" +
@@ -53,8 +51,19 @@ internal object MasterDnsDockerScripts {
 
     const val runContainer =
         "sudo docker rm -f masterdns-ozero 2>/dev/null; " +
+            "sudo docker volume inspect masterdns-key >/dev/null 2>&1 || " +
+            "sudo docker volume create masterdns-key >/dev/null; " +
             "sudo docker run -d --name masterdns-ozero --restart always" +
-            " -p 53:53/udp masterdns-ozero && echo RUN_OK || echo ERR_RUN"
+            " -v masterdns-key:/etc/masterdnsvpn" +
+            " -p 53:53/udp masterdns-ozero || { echo ERR_RUN; exit 0; }; " +
+            "sleep 2; " +
+            "sudo docker exec masterdns-ozero sh -c " +
+            "'test -f /etc/masterdnsvpn/encrypt_key.txt || " +
+            "(openssl rand -hex 32 > /etc/masterdnsvpn/encrypt_key.txt && " +
+            "chmod 600 /etc/masterdnsvpn/encrypt_key.txt && exit 42)'; " +
+            "rc=\$?; " +
+            "if [ \$rc -eq 42 ]; then sudo docker restart masterdns-ozero >/dev/null 2>&1; fi; " +
+            "echo RUN_OK"
 
     const val readEncryptKey =
         "sudo docker exec masterdns-ozero cat /etc/masterdnsvpn/encrypt_key.txt 2>/dev/null"
