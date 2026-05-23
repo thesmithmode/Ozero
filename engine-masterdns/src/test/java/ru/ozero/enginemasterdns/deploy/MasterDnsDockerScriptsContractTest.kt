@@ -134,6 +134,44 @@ class MasterDnsDockerScriptsContractTest {
     }
 
     @Test
+    fun `openFirewallPort53 detects ufw firewalld iptables and emits distinct markers`() {
+        val script = MasterDnsDockerScripts.openFirewallPort53
+        assertTrue(script.contains("ufw") && script.contains("ufw allow 53/udp"))
+        assertTrue(script.contains("firewall-cmd") && script.contains("--add-port=53/udp"))
+        assertTrue(script.contains("iptables") && script.contains("--dport 53"))
+        assertTrue(script.contains("FW_UFW_OK"))
+        assertTrue(script.contains("FW_FIREWALLD_OK"))
+        assertTrue(script.contains("FW_IPTABLES_OK"))
+        assertTrue(script.contains("FW_NONE_OK"))
+    }
+
+    @Test
+    fun `openFirewallPort53 persists iptables rule via iptables-save not just runtime allow`() {
+        val script = MasterDnsDockerScripts.openFirewallPort53
+        assertTrue(
+            script.contains("iptables-save"),
+            "Без iptables-save правило теряется после reboot — это Amnezia bug, у нас persistence обязательно.",
+        )
+    }
+
+    @Test
+    fun `openFirewallPort53 idempotent — check existing iptables rule before adding`() {
+        val script = MasterDnsDockerScripts.openFirewallPort53
+        assertTrue(
+            script.contains("iptables -C") || script.contains("iptables --check"),
+            "iptables -C проверка дубля — без неё каждый redeploy добавляет дублирующее правило.",
+        )
+    }
+
+    @Test
+    fun `firewall markers exposed as constants for deployer mapping`() {
+        assertEquals("FW_UFW_OK", MasterDnsDockerScripts.MARKER_FW_UFW_OK)
+        assertEquals("FW_FIREWALLD_OK", MasterDnsDockerScripts.MARKER_FW_FIREWALLD_OK)
+        assertEquals("FW_IPTABLES_OK", MasterDnsDockerScripts.MARKER_FW_IPTABLES_OK)
+        assertEquals("FW_NONE_OK", MasterDnsDockerScripts.MARKER_FW_NONE_OK)
+    }
+
+    @Test
     fun `sudo markers are exposed as constants for deployer mapping`() {
         assertEquals("ERR_SUDO_NOT_INSTALLED", MasterDnsDockerScripts.MARKER_ERR_SUDO_NOT_INSTALLED)
         assertEquals("ERR_SUDO_PWD_REQUIRED", MasterDnsDockerScripts.MARKER_ERR_SUDO_PWD_REQUIRED)
