@@ -212,7 +212,7 @@ private fun SimpleMainContent(
         }
 
         val visualConnected = isConnected || switching != null
-        if (visualConnected && manualEngine == EngineId.URNETWORK) {
+        if (visualConnected && resolveUiSelectedEngine(tunnelState, switching, manualEngine) == EngineId.URNETWORK) {
             UrnetworkPeerBadge(
                 count = urnetworkPeerCount,
                 searchSeconds = urnetworkPeerSearchSeconds,
@@ -348,6 +348,7 @@ private fun ExpertMainContent(
                 killswitchActive = killswitchActive,
                 manualEngine = manualEngine,
                 tunnelState = tunnelState,
+                switching = switching,
                 urnetworkPeerCount = urnetworkPeerCount,
                 urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
                 ipInfo = ipInfo,
@@ -359,7 +360,11 @@ private fun ExpertMainContent(
             )
 
             EngineChipsRow(
-                selectedEngine = manualEngine,
+                selectedEngine = resolveUiSelectedEngine(
+                    tunnelState = tunnelState,
+                    switching = switching,
+                    manualEngine = manualEngine,
+                ),
                 onSelect = onManualEngineSelect,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -369,7 +374,13 @@ private fun ExpertMainContent(
                 activeTabId = DOCK_TAB_HOME,
                 onTabSelected = { id ->
                     when (id) {
-                        DOCK_TAB_SERVERS -> onOpenEngineParams(manualEngine)
+                        DOCK_TAB_SERVERS -> onOpenEngineParams(
+                            resolveUiSelectedEngine(
+                                tunnelState = tunnelState,
+                                switching = switching,
+                                manualEngine = manualEngine,
+                            ),
+                        )
                         DOCK_TAB_SPLIT_TUNNEL -> onOpenSplitTunnel()
                         DOCK_TAB_SETTINGS -> onOpenSettings()
                     }
@@ -390,6 +401,7 @@ private fun ExpertStatusBadges(
     killswitchActive: Boolean,
     manualEngine: EngineId?,
     tunnelState: TunnelState,
+    switching: SwitchingTransition?,
     urnetworkPeerCount: Int,
     urnetworkPeerSearchSeconds: Int,
     ipInfo: IpInfoState,
@@ -408,7 +420,11 @@ private fun ExpertStatusBadges(
         )
     }
     if (visualConnected) {
-        val urnetworkActive = isUrnetworkVisibleInMain(tunnelState, manualEngine)
+        val urnetworkActive = isUrnetworkVisibleInMain(
+            state = tunnelState,
+            switching = switching,
+            manualEngine = manualEngine,
+        )
         IpInfoCard(
             state = ipInfo,
             onRefresh = onRefreshIpInfo,
@@ -446,16 +462,27 @@ private fun ExpertStatusBadges(
     }
 }
 
-internal fun isUrnetworkVisibleInMain(state: TunnelState, manualEngine: EngineId?): Boolean {
-    if (manualEngine == EngineId.URNETWORK) return true
-    return when (state) {
-        is TunnelState.Probing -> state.engineId == EngineId.URNETWORK
-        is TunnelState.Connecting -> state.engineId == EngineId.URNETWORK
-        is TunnelState.Connected -> state.engineId == EngineId.URNETWORK
-        is TunnelState.Failed -> state.engineId == EngineId.URNETWORK
-        else -> false
+
+internal fun resolveUiSelectedEngine(
+    tunnelState: TunnelState,
+    switching: SwitchingTransition?,
+    manualEngine: EngineId?,
+): EngineId? {
+    if (switching?.to != null) return switching.to
+    return when (tunnelState) {
+        is TunnelState.Probing -> tunnelState.engineId ?: manualEngine
+        is TunnelState.Connecting -> tunnelState.engineId
+        is TunnelState.Connected -> tunnelState.engineId
+        is TunnelState.Failed -> tunnelState.engineId
+        else -> manualEngine
     }
 }
+
+internal fun isUrnetworkVisibleInMain(
+    state: TunnelState,
+    switching: SwitchingTransition? = null,
+    manualEngine: EngineId?,
+): Boolean = resolveUiSelectedEngine(state, switching, manualEngine) == EngineId.URNETWORK
 
 @Composable
 private fun IpCardPeerValue(count: Int?, searchSeconds: Int?) {
