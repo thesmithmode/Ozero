@@ -3,6 +3,7 @@ package ru.ozero.enginemasterdns.deploy
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.common.IOUtils
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier
+import ru.ozero.enginescore.PersistentLoggers
 import java.util.concurrent.TimeUnit
 
 internal class SshjTransport : SshTransport {
@@ -27,9 +28,18 @@ internal class SshjTransport : SshTransport {
         val session = ssh.startSession()
         return try {
             val cmd = session.exec(command)
-            val output = IOUtils.readFully(cmd.inputStream).toString()
+            val stdout = IOUtils.readFully(cmd.inputStream).toString()
+            val stderr = runCatching { IOUtils.readFully(cmd.errorStream).toString() }.getOrDefault("")
             cmd.join(timeoutMs, TimeUnit.MILLISECONDS)
-            output
+            val exit = cmd.exitStatus
+            if (exit != null && exit != 0) {
+                PersistentLoggers.warn(
+                    TAG,
+                    "exec[exit=$exit] cmd=${command.take(CMD_LOG_MAX)}" +
+                        " stderr=${stderr.take(STDERR_LOG_MAX).trim()}",
+                )
+            }
+            stdout
         } finally {
             session.close()
         }
@@ -41,6 +51,9 @@ internal class SshjTransport : SshTransport {
     }
 
     private companion object {
+        const val TAG = "SshjTransport"
         const val CONNECTION_TIMEOUT_MS = 15_000L
+        const val CMD_LOG_MAX = 120
+        const val STDERR_LOG_MAX = 400
     }
 }
