@@ -183,6 +183,7 @@
     <!-- about -->
     <string name="about_title">О приложении</string>
     <string name="about_version">Версия %1$s</string>
+    <string name="about_telegram_channel">Telegram-канал Ozero</string>
 
     <!-- crash log export -->
     <string name="diag_export_crashes">Экспорт crash log</string>

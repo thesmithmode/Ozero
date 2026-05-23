@@ -133,6 +133,30 @@ class MasterDnsSettingsViewModelTest {
     }
 
     @Test
+    fun `deploy success auto-fills resolvers with serverIp colon 53`() = runTest {
+        val store = FakeStore(MasterDnsPersistedConfig())
+        val vm = MasterDnsSettingsViewModel(
+            store,
+            FakeDeployer(deployStates = listOf(MasterDnsDeployState.Done("toml"))),
+        )
+        vm.onDeployClick(host = "5.6.7.8", port = 22, login = "root", password = "pass".toCharArray())
+        vm.state.first { it.deployState is MasterDnsDeployState.Done }
+        assertEquals(listOf("5.6.7.8:53"), store.resolvers)
+    }
+
+    @Test
+    fun `deploy success auto-enables engine`() = runTest {
+        val store = FakeStore(MasterDnsPersistedConfig(enabled = false))
+        val vm = MasterDnsSettingsViewModel(
+            store,
+            FakeDeployer(deployStates = listOf(MasterDnsDeployState.Done("toml"))),
+        )
+        vm.onDeployClick(host = "5.6.7.8", port = 22, login = "root", password = "pass".toCharArray())
+        vm.state.first { it.deployState is MasterDnsDeployState.Done }
+        assertTrue(store.enabled)
+    }
+
+    @Test
     fun `deploy error does not change configToml`() = runTest {
         val store = FakeStore(MasterDnsPersistedConfig(configToml = "original"))
         val vm = MasterDnsSettingsViewModel(

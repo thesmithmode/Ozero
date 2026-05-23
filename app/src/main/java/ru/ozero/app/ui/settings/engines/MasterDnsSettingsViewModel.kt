@@ -88,6 +88,8 @@ class MasterDnsSettingsViewModel @Inject constructor(
                             store.setConfigToml(deployStep.configToml)
                             store.setServerIp(host)
                             store.setServerPort(port)
+                            store.setResolvers(listOf("$host:$MASTERDNS_DNS_PORT"))
+                            store.setEnabled(true)
                         }.onFailure { PersistentLoggers.error(TAG, "deploy persist failed: ${it.message}", it) }
                     }
                 }
@@ -132,5 +134,6 @@ class MasterDnsSettingsViewModel @Inject constructor(
 
     private companion object {
         const val TAG = "MasterDnsSettingsVM"
+        const val MASTERDNS_DNS_PORT = 53
     }
 }

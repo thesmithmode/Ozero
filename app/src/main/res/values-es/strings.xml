@@ -138,6 +138,7 @@
 
     <string name="about_title">Acerca de</string>
     <string name="about_version">Versión %1$s</string>
+    <string name="about_telegram_channel">Canal de Telegram de Ozero</string>
 
     <string name="diag_export_crashes">Exportar registro de fallos</string>
     <string name="diag_export_no_crashes">El registro de fallos está vacío</string>
