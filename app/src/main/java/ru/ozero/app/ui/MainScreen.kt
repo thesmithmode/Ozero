@@ -359,7 +359,11 @@ private fun ExpertMainContent(
             )
 
             EngineChipsRow(
-                selectedEngine = manualEngine,
+                selectedEngine = resolveUiSelectedEngine(
+                    tunnelState = tunnelState,
+                    switching = switching,
+                    manualEngine = manualEngine,
+                ),
                 onSelect = onManualEngineSelect,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -369,7 +373,13 @@ private fun ExpertMainContent(
                 activeTabId = DOCK_TAB_HOME,
                 onTabSelected = { id ->
                     when (id) {
-                        DOCK_TAB_SERVERS -> onOpenEngineParams(manualEngine)
+                        DOCK_TAB_SERVERS -> onOpenEngineParams(
+                            resolveUiSelectedEngine(
+                                tunnelState = tunnelState,
+                                switching = switching,
+                                manualEngine = manualEngine,
+                            ),
+                        )
                         DOCK_TAB_SPLIT_TUNNEL -> onOpenSplitTunnel()
                         DOCK_TAB_SETTINGS -> onOpenSettings()
                     }
@@ -443,6 +453,22 @@ private fun ExpertStatusBadges(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+
+internal fun resolveUiSelectedEngine(
+    tunnelState: TunnelState,
+    switching: SwitchingTransition?,
+    manualEngine: EngineId?,
+): EngineId? {
+    if (switching?.to != null) return switching.to
+    return when (tunnelState) {
+        is TunnelState.Probing -> tunnelState.engineId ?: manualEngine
+        is TunnelState.Connecting -> tunnelState.engineId
+        is TunnelState.Connected -> tunnelState.engineId
+        is TunnelState.Failed -> tunnelState.engineId
+        else -> manualEngine
     }
 }
 
