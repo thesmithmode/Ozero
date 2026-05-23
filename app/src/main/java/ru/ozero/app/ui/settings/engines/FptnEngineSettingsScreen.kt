@@ -67,10 +67,6 @@ import ru.ozero.enginefptn.FptnBypassMethod
 import ru.ozero.enginefptn.FptnServer
 
 private object FptnLinks {
-    const val WEBSITE = "https://fptn.online"
-    const val TELEGRAM_GROUP = "https://t.me/fptn_project"
-    const val PLAY = "https://play.google.com/store/apps/details?id=com.filantrop.pvnclient"
-    const val BOOSTY = "https://boosty.to/fptn"
     const val BOT = "https://t.me/fptn_bot"
 }
 
@@ -152,64 +148,13 @@ fun FptnEngineSettingsScreen(
 
 @Composable
 private fun FptnAboutCard() {
-    val uriHandler = LocalUriHandler.current
     SettingsCard(testTag = "fptn_about_card") {
         Text(
             text = stringResource(R.string.fptn_about_description),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(modifier = Modifier.height(12.dp))
-        FptnLink(
-            label = stringResource(R.string.fptn_link_website),
-            url = FptnLinks.WEBSITE,
-            tag = "fptn_link_website",
-            onClick = { uriHandler.openUri(FptnLinks.WEBSITE) },
-        )
-        FptnLink(
-            label = stringResource(R.string.fptn_link_telegram),
-            url = FptnLinks.TELEGRAM_GROUP,
-            tag = "fptn_link_telegram",
-            onClick = { uriHandler.openUri(FptnLinks.TELEGRAM_GROUP) },
-        )
-        FptnLink(
-            label = stringResource(R.string.fptn_link_play),
-            url = FptnLinks.PLAY,
-            tag = "fptn_link_play",
-            onClick = { uriHandler.openUri(FptnLinks.PLAY) },
-        )
-        FptnLink(
-            label = stringResource(R.string.fptn_link_boosty),
-            url = FptnLinks.BOOSTY,
-            tag = "fptn_link_boosty",
-            onClick = { uriHandler.openUri(FptnLinks.BOOSTY) },
-        )
     }
-}
-
-@Composable
-private fun FptnLink(label: String, url: String, tag: String, onClick: () -> Unit) {
-    val annotated = buildAnnotatedString {
-        append(label)
-        append(" ")
-        withStyle(
-            SpanStyle(
-                color = MaterialTheme.colorScheme.primary,
-                textDecoration = TextDecoration.Underline,
-            ),
-        ) {
-            append(url)
-        }
-    }
-    Text(
-        text = annotated,
-        style = MaterialTheme.typography.bodyMedium,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 4.dp)
-            .testTag(tag),
-    )
 }
 
 @Composable
@@ -250,12 +195,26 @@ private fun FptnTokenCard(
         ) {
             Text(stringResource(R.string.fptn_token_save))
         }
+        val botHint = stringResource(R.string.fptn_bot_hint)
+        val linkSpan = SpanStyle(
+            color = MaterialTheme.colorScheme.primary,
+            textDecoration = TextDecoration.Underline,
+        )
         Text(
             text = buildAnnotatedString {
-                append(stringResource(R.string.fptn_bot_hint))
+                val linkText = "t.me/fptn_bot"
+                val idx = botHint.indexOf(linkText)
+                if (idx >= 0) {
+                    append(botHint.substring(0, idx))
+                    withStyle(linkSpan) { append(linkText) }
+                    if (idx + linkText.length < botHint.length) {
+                        append(botHint.substring(idx + linkText.length))
+                    }
+                } else {
+                    withStyle(linkSpan) { append(botHint) }
+                }
             },
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.primary,
             modifier = Modifier
                 .padding(top = 4.dp)
                 .clickable { uriHandler.openUri(FptnLinks.BOT) }
