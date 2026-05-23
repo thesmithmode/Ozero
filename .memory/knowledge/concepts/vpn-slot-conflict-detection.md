@@ -5,6 +5,7 @@ tags: [android, vpn, gotcha, architecture]
 sources:
   - "daily/2026-05-19.md"
   - "daily/2026-05-20.md"
+  - "daily/2026-05-21.md"
   - "daily/2026-05-22.md"
 created: 2026-05-19
 updated: 2026-05-22
@@ -82,6 +83,21 @@ The fix added an extra return path to `StartSequenceCoordinator.awaitEngineReady
 
 Android allows only one active VPN at a time per device (not per user session). The `VpnService.prepare(ctx)` intent flow revokes any existing VPN and grants permission to the requesting app. However, if the user grants permission to app A but then immediately starts app B's VPN (which also called `prepare()`), app A's `onRevoke()` fires. When app A tries `establish()` next, null is returned because app B's VPN is active.
 
+### VPN Slot Race: EXTERNAL_VPN_RELEASE_DELAY_MS (2026-05-21)
+
+Task37 (commit `3965b00a`) introduced a symmetric fix for the race at VPN startup when an external VPN is detected active:
+
+- `REVOKE_KILL_DELAY_MS` reduced 2500ms → 1000ms: gives Ozero enough time for log flush + Go goroutine teardown without holding the slot too long for the next app
+- New `EXTERNAL_VPN_RELEASE_DELAY_MS = 750ms`: when `isExternalVpnActive()` detects another VPN is active at the time of `startVpn`, the engine waits 750ms before calling `establish()` to give the OS time to complete teardown of the external VPN. Without this delay, `establish()` can return `null` even though the user already granted permission and the other VPN is in the process of shutting down.
+
+```kotlin
+if (isExternalVpnActive()) {
+    Log.w(TAG, "External VPN active at start — waiting ${EXTERNAL_VPN_RELEASE_DELAY_MS}ms")
+    delay(EXTERNAL_VPN_RELEASE_DELAY_MS)  // give OS time for external VPN teardown
+}
+val tun = builder.establish()
+```
+
 ### onRevoke Kill for Clean Slot Release (2026-05-20)
 
 `VpnService.onRevoke()` fires when the Android system revokes VPN permission — this happens when the user starts another VPN app. Ozero's VPN process holds the Android VPN slot AND a loaded `libgojni.so` Go runtime (which cannot be unloaded on Android). If the process stays alive after revoke, the slot is technically released by the system, but leftover JNI/Go state can interfere with the next VPN app startup.
@@ -145,4 +161,5 @@ private fun isExternalVpnActive(): Boolean {
 
 - [[daily/2026-05-19.md]] — Session 16:23: root cause in ozero.log L34381-34540 (external VPN captured slot → establish() null → silent Idle); fix: `onEngineDied("VPN slot занят")` before `stopVpnRequest`; `logActiveExternalVpn()` diagnostic; detekt ReturnCount CI fail resolved by merging null branches
 - [[daily/2026-05-20.md]] — Session (VPN slot onRevoke): `onRevoke()` → `postDelayed(Process.killProcess, 2500ms)` releases libgojni + VPN slot cleanly for next app; `stopVpn/onDestroy` do NOT kill — only revoke means "user chose another VPN"
+- [[daily/2026-05-21.md]] — Task37: `REVOKE_KILL_DELAY_MS` 2500→1000ms; new `EXTERNAL_VPN_RELEASE_DELAY_MS = 750ms` for external VPN race at startVpn; commit `3965b00a`
 - [[daily/2026-05-22.md]] — Session 19:32: user Ruslan v0.1.11 log — `isExternalVpnActive()` missing `ownerUid` filter detected own dying VPN as external VPN → false positive → cycling loop; fix `c1123b04` (API 29+ ownerUid guard) shipped in v0.1.12

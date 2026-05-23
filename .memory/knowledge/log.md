@@ -1,5 +1,10 @@
 # Build Log
 
+## [2026-05-23T12:00:00+03:00] compile | Daily Log 2026-05-21
+- Source: daily/2026-05-21.md
+- Articles created: [[concepts/urnetwork-lazycolumn-key-collision]]
+- Articles updated: [[concepts/vpn-slot-conflict-detection]] (EXTERNAL_VPN_RELEASE_DELAY_MS=750ms, REVOKE 2500→1000ms from Task37)
+
 ## [2026-05-22T24:00:00+03:00] compile | Daily Log 2026-05-22 (pass 24 — schema-driven audit)
 - Source: daily/2026-05-22.md
 - Articles created: (none — all prior passes complete)
