@@ -29,6 +29,8 @@ import ru.ozero.enginescore.IpProbeRoute
 import ru.ozero.enginescore.probe.Socks5HandshakeProbe
 import ru.ozero.enginescore.settings.HostsMode
 import ru.ozero.enginescore.settings.SettingsModel
+import java.net.InetAddress
+import java.net.ServerSocket
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
@@ -37,6 +39,8 @@ class ByeDpiEngine(
     private val socksProbe: suspend (String, Int, Int) -> Long = Socks5HandshakeProbe::probe,
     private val readyProbeTimeoutMs: Int = READY_PROBE_TIMEOUT_MS,
     private val readyTotalTimeoutMs: Long = READY_TIMEOUT_MS,
+    // Checks whether a loopback port is available. Injectable for unit tests.
+    private val portFreeChecker: (Int) -> Boolean = ::defaultPortFreeCheck,
     testDispatcherOverride: CoroutineDispatcher? = null,
 ) : EnginePlugin {
 
@@ -145,8 +149,16 @@ class ByeDpiEngine(
         }
     }
 
-    private fun nextRotatedPort(): Int =
-        PORT_ROTATION_BASE + (portCounter.getAndIncrement() and (PORT_ROTATION_RANGE - 1))
+    // Cycles through 49152-49407 until a port that passes a bind-probe is found.
+    // TOCTOU window exists between probe and native bind, but is negligible in practice.
+    private fun nextRotatedPort(): Int {
+        repeat(PORT_ROTATION_RANGE) {
+            val candidate = PORT_ROTATION_BASE + (portCounter.getAndIncrement() and (PORT_ROTATION_RANGE - 1))
+            if (portFreeChecker(candidate)) return candidate
+        }
+        // All 256 ports in rotation range are occupied — fall back to OS-assigned ephemeral port.
+        return ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { it.localPort }
+    }
 
     private fun startProxyWithRecovery(args: Array<String>): Int {
         val code = safeJniCall(fallback = -1, tag = "jniStartProxy threw") {
@@ -282,3 +294,7 @@ class ByeDpiEngine(
         const val PORT_ROTATION_RANGE = 256
     }
 }
+
+private fun defaultPortFreeCheck(port: Int): Boolean = runCatching {
+    ServerSocket(port, 1, InetAddress.getLoopbackAddress()).use { }
+}.isSuccess

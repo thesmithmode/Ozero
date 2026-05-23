@@ -514,4 +514,32 @@ class ByeDpiEngineTest {
         coVerify(atLeast = 1) { blockingProxy.stopProxy() }
         unmockkObject(ByeDpiProxy.Companion)
     }
+
+    @Test
+    fun `autoRotatePort skips ports occupied by another app — sentinel for port-conflict regression`() = runTest {
+        // Simulates another app holding 49152 and 49153 on loopback.
+        // ByeDPI must skip those and bind on the first free candidate (49154).
+        val busyPorts = setOf(ByeDpiEngine.PORT_ROTATION_BASE, ByeDpiEngine.PORT_ROTATION_BASE + 1)
+        val conflictEngine = ByeDpiEngine(
+            proxy,
+            socksProbe = { _, _, _ -> 1L },
+            portFreeChecker = { port -> port !in busyPorts },
+            testDispatcherOverride = UnconfinedTestDispatcher(testScheduler),
+        )
+        every { proxy.startProxy(any()) } answers {
+            proxyRunning.await()
+            0
+        }
+        val result = conflictEngine.start(EngineConfig.ByeDpi(socksPort = ByeDpiEngine.AUTO_ROTATE_PORT))
+        assertIs<StartResult.Success>(result)
+        val assignedPort = result.socksPort
+        assertTrue(
+            assignedPort !in busyPorts,
+            "Движок должен пропускать занятые порты ${busyPorts}, получил $assignedPort",
+        )
+        assertTrue(
+            assignedPort >= ByeDpiEngine.PORT_ROTATION_BASE,
+            "Порт должен быть в диапазоне rotation или OS-ephemeral: $assignedPort",
+        )
+    }
 }
