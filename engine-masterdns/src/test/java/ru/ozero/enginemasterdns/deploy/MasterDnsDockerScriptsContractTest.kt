@@ -116,6 +116,24 @@ class MasterDnsDockerScriptsContractTest {
     }
 
     @Test
+    fun `runContainer uses retry loop instead of fixed sleep for readiness probe`() {
+        val cmd = MasterDnsDockerScripts.runContainer
+        assertFalse(
+            cmd.contains("sleep 2;"),
+            "Fixed sleep 2 race condition — readEncryptKey может вернуть пусто если контейнер ещё не готов. " +
+                "Заменить retry loop docker exec true.",
+        )
+        assertTrue(
+            cmd.contains("docker exec masterdns-ozero true"),
+            "readiness probe должен проверять что контейнер отвечает (docker exec true).",
+        )
+        assertTrue(
+            cmd.contains("seq 1 15"),
+            "Retry loop ≥15 итераций (15s при sleep 1) — достаточно для запуска контейнера на slow VPS.",
+        )
+    }
+
+    @Test
     fun `sudo markers are exposed as constants for deployer mapping`() {
         assertEquals("ERR_SUDO_NOT_INSTALLED", MasterDnsDockerScripts.MARKER_ERR_SUDO_NOT_INSTALLED)
         assertEquals("ERR_SUDO_PWD_REQUIRED", MasterDnsDockerScripts.MARKER_ERR_SUDO_PWD_REQUIRED)
