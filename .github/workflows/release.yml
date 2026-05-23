@@ -403,7 +403,8 @@ jobs:
           prerelease: ${{ contains(github.ref_name, '-') }}
           generate_release_notes: true
           fail_on_unmatched_files: true
-          allow_update_existing: true
+          overwrite_files: true
+          token: ${{ secrets.GITHUB_TOKEN }}
           files: |
             release-out/*.apk
             release-out/*.sha256
