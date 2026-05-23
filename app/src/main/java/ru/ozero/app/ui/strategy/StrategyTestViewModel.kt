@@ -222,10 +222,15 @@ class StrategyTestViewModel @Inject constructor(
             _runSummary.value = "0/${_strategies.value.size} strategies, ${sites.size} sites"
             val useEvolution = _settings.value.evolutionMode
             try {
-                if (useEvolution) {
-                    runEvolution(sites)
-                } else {
-                    runLoop(sites)
+                runCatching {
+                    if (useEvolution) {
+                        runEvolution(sites)
+                    } else {
+                        runLoop(sites)
+                    }
+                }.onFailure {
+                    PersistentLoggers.warn(TAG, "Strategy scan failed: ${it.message}")
+                    _runSummary.value = "Scan failed: ${it.message ?: "unknown error"}"
                 }
             } finally {
                 _evolutionState.update { it?.copy(evaluatingCommand = null, isInitializing = false) }

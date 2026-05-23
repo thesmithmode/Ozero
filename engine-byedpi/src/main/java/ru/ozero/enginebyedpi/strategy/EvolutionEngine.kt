@@ -40,6 +40,8 @@ class EvolutionEngine(
         val successRateExponent: Double = 1.5,
         val portRotationBase: Int = 49_152,
         val portRotationRange: Int = 256,
+        val explorationRate: Double = 0.18,
+        val mutationBoostOnStagnation: Float = 1.8f,
     )
 
     data class GenerationResult(
@@ -112,17 +114,41 @@ class EvolutionEngine(
             if (stagnationCount >= exitThreshold) break
 
             val survivorCount = (settings.populationSize / 4).coerceAtLeast(settings.eliteCount)
-            val survivors = evolver.tournament(fitnessPairs, survivorCount, random = random)
+            val survivors = selectSurvivors(fitnessPairs, survivorCount)
+            val adaptiveMutation = adaptiveMutationRate(stagnationCount)
             population = when {
                 stagnationCount >= injectThreshold ->
-                    buildSeedInjection(survivors, seedStrategies, settings.mutationRate)
+                    buildSeedInjection(survivors, seedStrategies, adaptiveMutation)
                 stagnationCount >= 2 ->
-                    buildDiverseGeneration(survivors, settings.mutationRate)
+                    buildDiverseGeneration(survivors, adaptiveMutation)
                 else ->
-                    buildNextGeneration(survivors, settings.mutationRate)
+                    buildNextGeneration(survivors, adaptiveMutation)
             }.withElite(best)
         }
         return best
+    }
+
+    private fun adaptiveMutationRate(stagnationCount: Int): Float {
+        if (stagnationCount <= 0) return settings.mutationRate
+        val boosted = settings.mutationRate * settings.mutationBoostOnStagnation
+        return boosted.coerceAtMost(0.95f)
+    }
+
+    private fun selectSurvivors(
+        fitnessPairs: List<Pair<Chromosome, Double>>,
+        survivorCount: Int,
+    ): List<Chromosome> {
+        if (fitnessPairs.isEmpty()) return emptyList()
+        val eliteCount = (survivorCount * (1.0 - settings.explorationRate)).toInt()
+            .coerceAtLeast(1)
+            .coerceAtMost(survivorCount)
+        val exploreCount = (survivorCount - eliteCount).coerceAtLeast(0)
+        val elites = evolver.tournament(fitnessPairs, eliteCount, random = random)
+        if (exploreCount == 0) return elites
+        val ascending = fitnessPairs.sortedBy { it.second }
+        val tailWindow = ascending.take((ascending.size * 0.4).toInt().coerceAtLeast(1))
+        val explorers = tailWindow.shuffled(random).take(exploreCount).map { it.first }
+        return (elites + explorers).distinct().take(survivorCount)
     }
 
     internal fun computeFitness(successRate: Double, avgLatencyMs: Double): Double {
