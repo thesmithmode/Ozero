@@ -101,15 +101,13 @@ conan install "$CPP_SRC" \
 rm -rf "$BUILD_DIR/cmake-build"
 mkdir -p "$BUILD_DIR/cmake-build"
 
+CONAN_GENERATORS="$CONAN_INSTALL_DIR/build/Release/generators"
+
 cmake \
     -S "$CPP_SRC" \
     -B "$BUILD_DIR/cmake-build" \
-    -DCMAKE_TOOLCHAIN_FILE="$NDK_HOME/build/cmake/android.toolchain.cmake" \
-    -DANDROID_ABI="$ABI" \
-    -DANDROID_PLATFORM="android-$API_LEVEL" \
+    -DCMAKE_TOOLCHAIN_FILE="$CONAN_GENERATORS/conan_toolchain.cmake" \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_FIND_ROOT_PATH="$CONAN_INSTALL_DIR" \
-    -DCMAKE_PREFIX_PATH="$CONAN_INSTALL_DIR" \
     -G Ninja
 
 cmake --build "$BUILD_DIR/cmake-build" --parallel
