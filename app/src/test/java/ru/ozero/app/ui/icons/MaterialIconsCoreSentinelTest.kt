@@ -10,6 +10,7 @@ class MaterialIconsCoreSentinelTest {
         "androidx.compose.material.icons.Icons",
         "androidx.compose.material.icons.filled.Add",
         "androidx.compose.material.icons.filled.Check",
+        "androidx.compose.material.icons.filled.CheckCircle",
         "androidx.compose.material.icons.filled.Clear",
         "androidx.compose.material.icons.filled.Close",
         "androidx.compose.material.icons.filled.Delete",
