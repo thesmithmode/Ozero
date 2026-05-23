@@ -103,12 +103,20 @@ mkdir -p "$BUILD_DIR/cmake-build"
 
 CONAN_GENERATORS="$CONAN_INSTALL_DIR/build/Release/generators"
 
+# Pre-populate CamouflageTLS so FetchContent skips download and uses our patched copy.
+# camouflage-tls CMakeLists.txt unconditionally adds tests/ and example/ — no BUILD_TESTING guard.
+CAMTLS_DIR="$BUILD_DIR/camouflage-tls-src"
+if [[ ! -d "$CAMTLS_DIR/.git" ]]; then
+    git clone --depth 1 https://github.com/fptn-project/camouflage-tls.git "$CAMTLS_DIR"
+fi
+sed -i '/^add_subdirectory(example)/d; /^enable_testing/d; /^add_subdirectory(tests)/d; /^include_directories(tests/d' "$CAMTLS_DIR/CMakeLists.txt"
+
 cmake \
     -S "$CPP_SRC" \
     -B "$BUILD_DIR/cmake-build" \
     -DCMAKE_TOOLCHAIN_FILE="$CONAN_GENERATORS/conan_toolchain.cmake" \
     -DCMAKE_BUILD_TYPE=Release \
-    -DBUILD_TESTING=OFF \
+    -DFETCHCONTENT_SOURCE_DIR_CAMOUFLAGETLS="$CAMTLS_DIR" \
     -G Ninja
 
 cmake --build "$BUILD_DIR/cmake-build" --parallel
