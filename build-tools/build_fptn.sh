@@ -66,6 +66,7 @@ build_type=Release
 
 [conf]
 tools.android:ndk_path=${NDK_HOME}
+tools.cmake.cmaketoolchain:generator=Ninja
 
 [buildenv]
 ANDROID_NDK_HOME=${NDK_HOME}
@@ -75,6 +76,11 @@ AR=${NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
 RANLIB=${NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ranlib
 STRIP=${NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip
 EOF
+
+# Ensure build profile (for host-machine packages like protobuf) also uses Ninja.
+if ! grep -q "tools.cmake.cmaketoolchain:generator" "$CONAN_PROFILE_DIR/default" 2>/dev/null; then
+    echo -e "\n[conf]\ntools.cmake.cmaketoolchain:generator=Ninja" >> "$CONAN_PROFILE_DIR/default"
+fi
 
 # ---------------------------------------------------------------------------
 # 4. Install Conan deps (nlohmann_json + fptn via local recipe)
