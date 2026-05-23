@@ -15,6 +15,7 @@ internal class MasterDnsDeployerImpl(
             transport.connect(credentials.host, credentials.port)
         } catch (e: Exception) {
             Log.w(TAG, "deploy: connection failed", e)
+            transport.close()
             emit(MasterDnsDeployState.Error("connection_failed"))
             return@flow
         }
@@ -93,6 +94,7 @@ internal class MasterDnsDeployerImpl(
             transport.connect(credentials.host, credentials.port)
         } catch (e: Exception) {
             Log.w(TAG, "undeploy: connection failed", e)
+            transport.close()
             emit(MasterDnsDeployState.Error("connection_failed"))
             return@flow
         }

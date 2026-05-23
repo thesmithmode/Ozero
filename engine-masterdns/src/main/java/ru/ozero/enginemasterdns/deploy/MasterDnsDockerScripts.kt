@@ -49,7 +49,7 @@ internal object MasterDnsDockerScripts {
             "CMD [\"/usr/local/bin/masterdnsvpn-server\"]\n" +
             "EODF\n" +
             "sudo docker build --no-cache -t masterdns-ozero /tmp/mdns_build 2>&1" +
-            " | tail -3 && echo BUILD_OK || echo ERR_BUILD"
+            " | tail -3; build_rc=\${PIPESTATUS[0]}; [ \$build_rc -eq 0 ] && echo BUILD_OK || echo ERR_BUILD"
 
     const val runContainer =
         "sudo docker rm -f masterdns-ozero 2>/dev/null; " +

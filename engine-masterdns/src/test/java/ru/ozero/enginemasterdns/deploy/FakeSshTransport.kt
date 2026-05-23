@@ -26,5 +26,9 @@ class FakeSshTransport : SshTransport {
         return ""
     }
 
-    override fun close() {}
+    var closeCalled = false
+
+    override fun close() {
+        closeCalled = true
+    }
 }

@@ -207,4 +207,43 @@ class MasterDnsDeployerTest {
         assertFalse(creds.toString().contains("top_secret"))
         assertTrue(creds.toString().contains("***"))
     }
+
+    @Test
+    fun `deployMasterDns script captures docker build exit code not bare pipe`() {
+        assertFalse(
+            MasterDnsDockerScripts.deployMasterDns.contains("| tail") &&
+                !MasterDnsDockerScripts.deployMasterDns.contains("PIPESTATUS"),
+            "deployMasterDns must use PIPESTATUS to capture docker build exit code — bare pipe loses it",
+        )
+        assertTrue(MasterDnsDockerScripts.deployMasterDns.contains("PIPESTATUS"))
+    }
+
+    @Test
+    fun `should call transport close on connection failure during deploy`() = runTest {
+        transport.connectShouldFail = true
+        deployer.deploy(credentials()).toList()
+        assertTrue(transport.closeCalled)
+    }
+
+    @Test
+    fun `should call transport close on connection failure during undeploy`() = runTest {
+        transport.connectShouldFail = true
+        deployer.undeploy(credentials()).toList()
+        assertTrue(transport.closeCalled)
+    }
+
+    @Test
+    fun `should return Error when undeploy remove command fails`() = runTest {
+        val states = deployer.undeploy(credentials()).toList()
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("remove_failed", error.message)
+    }
+
+    @Test
+    fun `should emit Removing then Removed on successful undeploy`() = runTest {
+        transport.setResponse("docker rm -f", MasterDnsDockerScripts.MARKER_REMOVE_OK)
+        val states = deployer.undeploy(credentials()).toList()
+        assertTrue(states.any { it is MasterDnsDeployState.Removing })
+        assertInstanceOf(MasterDnsDeployState.Removed::class.java, states.last())
+    }
 }
