@@ -60,7 +60,7 @@ os.api_level=${API_LEVEL}
 arch=armv8
 compiler=clang
 compiler.version=${CLANG_VERSION}
-compiler.libcxx=c++_shared
+compiler.libcxx=c++_static
 compiler.cppstd=17
 build_type=Release
 
