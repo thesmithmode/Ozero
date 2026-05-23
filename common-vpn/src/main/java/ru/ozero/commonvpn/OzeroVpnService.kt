@@ -250,7 +250,7 @@ class OzeroVpnService : android.net.VpnService() {
         val isMain = android.os.Looper.myLooper() === android.os.Looper.getMainLooper()
         PersistentLoggers.info(TAG, "loadOnce begin thread=$tName main=$isMain")
         // SENTINEL [OzeroVpnServiceLifecycleTest]: loadOnce() для libhev-socks5-tunnel — main thread,
-        // ДО serviceScope.launch. Background-load даёт UnsatisfiedLinkError на старте hev.
+        // до coroutine-старта ниже. Background-load даёт UnsatisfiedLinkError на старте hev.
         runCatching { hev.TProxyService.loadOnce() }
             .onFailure { PersistentLoggers.warn(TAG, "TProxyService.loadOnce threw: ${it.message}") }
         PersistentLoggers.info(TAG, "loadOnce done libraryLoaded=${hev.TProxyService.libraryLoaded}")
