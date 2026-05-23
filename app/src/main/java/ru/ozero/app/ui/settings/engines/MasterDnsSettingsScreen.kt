@@ -79,11 +79,7 @@ fun MasterDnsSettingsScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(stringResource(R.string.masterdns_engine_name))
-                        Spacer(Modifier.width(8.dp))
-                        BetaBadge()
-                    }
+                    Text(stringResource(R.string.masterdns_engine_name))
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -476,22 +472,6 @@ private fun deployErrorMessage(code: String): String = when (code) {
     "remove_failed" -> stringResource(R.string.masterdns_deploy_error_remove)
     "unexpected_error" -> stringResource(R.string.masterdns_deploy_error_unexpected)
     else -> stringResource(R.string.masterdns_deploy_error_generic, code)
-}
-
-@Composable
-private fun BetaBadge() {
-    Surface(
-        color = MaterialTheme.colorScheme.tertiaryContainer,
-        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-        shape = RoundedCornerShape(50),
-    ) {
-        Text(
-            text = stringResource(R.string.masterdns_beta_badge),
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-        )
-    }
 }
 
 @Composable

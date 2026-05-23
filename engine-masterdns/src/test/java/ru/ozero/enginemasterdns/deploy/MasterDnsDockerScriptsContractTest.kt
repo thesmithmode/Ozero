@@ -79,6 +79,46 @@ class MasterDnsDockerScriptsContractTest {
     }
 
     @Test
+    fun `installDocker uses official get-docker-com installer as primary path`() {
+        val cmd = MasterDnsDockerScripts.installDocker
+        assertTrue(
+            cmd.contains("https://get.docker.com"),
+            "installDocker обязан использовать https://get.docker.com primary — " +
+                "distro docker.io пакет фейлит 'Не удалось получить информацию о пакете' на " +
+                "минимальных Debian/Ubuntu без universe репа. Official installer Docker Inc " +
+                "сам подключает docker-ce репо на любом distro.",
+        )
+        assertTrue(
+            cmd.contains("curl -fsSL") || cmd.contains("wget -qO"),
+            "Должен быть curl или wget fetcher для get.docker.com installer.",
+        )
+    }
+
+    @Test
+    fun `installDocker captures install log to surface real failure reason`() {
+        val cmd = MasterDnsDockerScripts.installDocker
+        assertTrue(
+            cmd.contains("/tmp/docker-install.log"),
+            "При ERR_DOCKER юзер должен видеть конкретную причину (apt fail / no universe / network) — " +
+                "лог tail обязателен для диагностики без угадывания.",
+        )
+        assertTrue(
+            cmd.contains("tail -30 /tmp/docker-install.log") || cmd.contains("tail -n 30"),
+            "Tail последних строк лога должен попадать в stdout response для UI/PersistentLoggers.",
+        )
+    }
+
+    @Test
+    fun `installDocker is idempotent — skip install if docker binary already present`() {
+        val cmd = MasterDnsDockerScripts.installDocker
+        assertTrue(
+            cmd.contains("docker_already") && cmd.contains("docker --version"),
+            "Re-deploy на сервер с уже стоящим docker должен пропускать install — " +
+                "иначе мы перезаписываем рабочую установку.",
+        )
+    }
+
+    @Test
     fun `MARKER_ERR_DPKG_LOCKED constant exposed for deployer mapping`() {
         assertTrue(
             MasterDnsDockerScripts.MARKER_ERR_DPKG_LOCKED == "ERR_DPKG_LOCKED",

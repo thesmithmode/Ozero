@@ -26,28 +26,41 @@ internal object MasterDnsDockerScripts {
             " \$(df -m / 2>/dev/null | awk 'NR==2{print \$4}')"
 
     const val installDocker: String =
-        "if which apt-get > /dev/null 2>&1; then pm=\$(which apt-get);" +
-            " si=\"-yq install\"; su=\"-yq update\"; dp=\"docker.io\"; is_apt=1;" +
-            " elif which dnf > /dev/null 2>&1; then pm=\$(which dnf);" +
-            " si=\"-yq install\"; su=\"-yq check-update\"; dp=\"docker\"; is_apt=0;" +
-            " elif which yum > /dev/null 2>&1; then pm=\$(which yum);" +
-            " si=\"-y -q install\"; su=\"-y -q check-update\"; dp=\"docker\"; is_apt=0;" +
-            " elif which zypper > /dev/null 2>&1; then pm=\$(which zypper);" +
-            " si=\"-nq install\"; su=\"-nq refresh\"; dp=\"docker\"; is_apt=0;" +
-            " elif which pacman > /dev/null 2>&1; then pm=\$(which pacman);" +
-            " si=\"-S --noconfirm --quiet\"; su=\"-Sup\"; dp=\"docker\"; is_apt=0;" +
-            " else echo ERR_NO_PM; exit 1; fi;" +
-            " if [ \"\$is_apt\" = \"1\" ]; then export DEBIAN_FRONTEND=noninteractive;" +
+        "set +e;" +
+            " if command -v docker >/dev/null 2>&1 && sudo docker --version >/dev/null 2>&1;" +
+            " then docker_already=1; else docker_already=0; fi;" +
+            " if which apt-get >/dev/null 2>&1; then is_apt=1; else is_apt=0; fi;" +
+            " if [ \"\$is_apt\" = \"1\" ] && [ \"\$docker_already\" = \"0\" ];" +
+            " then export DEBIAN_FRONTEND=noninteractive;" +
             " locked=0; for i in \$(seq 1 30);" +
             " do sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || { locked=0; break; };" +
             " locked=1; sleep 10; done;" +
             " if [ \"\$locked\" = \"1\" ]; then echo ERR_DPKG_LOCKED; exit 0; fi; fi;" +
-            " if ! command -v docker > /dev/null 2>&1;" +
-            " then sudo \$pm \$su; sudo \$pm \$si \$dp;" +
-            " sleep 3; sudo systemctl enable --now docker; sleep 3; fi;" +
+            " if [ \"\$docker_already\" = \"0\" ];" +
+            " then if command -v curl >/dev/null 2>&1;" +
+            " then curl -fsSL https://get.docker.com -o /tmp/get-docker.sh 2>/dev/null" +
+            " && sudo sh /tmp/get-docker.sh >/tmp/docker-install.log 2>&1;" +
+            " elif command -v wget >/dev/null 2>&1;" +
+            " then wget -qO /tmp/get-docker.sh https://get.docker.com 2>/dev/null" +
+            " && sudo sh /tmp/get-docker.sh >/tmp/docker-install.log 2>&1;" +
+            " else echo INSTALLER_NO_FETCH >/tmp/docker-install.log; fi;" +
+            " if ! command -v docker >/dev/null 2>&1;" +
+            " then if which apt-get >/dev/null 2>&1; then pm=apt-get; si='-yq install'; su='-yq update'; dp='docker.io';" +
+            " elif which dnf >/dev/null 2>&1; then pm=dnf; si='-yq install'; su='-yq check-update'; dp='docker';" +
+            " elif which yum >/dev/null 2>&1; then pm=yum; si='-y -q install'; su='-y -q check-update'; dp='docker';" +
+            " elif which zypper >/dev/null 2>&1; then pm=zypper; si='-nq install'; su='-nq refresh'; dp='docker';" +
+            " elif which pacman >/dev/null 2>&1; then pm=pacman; si='-S --noconfirm --quiet'; su='-Sup'; dp='docker';" +
+            " else echo ERR_NO_PM; exit 0; fi;" +
+            " sudo \$pm \$su >>/tmp/docker-install.log 2>&1;" +
+            " sudo \$pm \$si \$dp >>/tmp/docker-install.log 2>&1; fi; fi;" +
+            " if command -v systemctl >/dev/null 2>&1;" +
+            " then sudo systemctl enable --now docker >/dev/null 2>&1; sleep 3;" +
             " if [ \"\$(sudo systemctl is-active docker 2>/dev/null)\" != \"active\" ];" +
-            " then sudo systemctl start docker; sleep 3; fi;" +
-            " docker --version > /dev/null 2>&1 && echo DOCKER_OK || echo ERR_DOCKER"
+            " then sudo systemctl start docker >/dev/null 2>&1; sleep 3; fi; fi;" +
+            " if sudo docker --version >/dev/null 2>&1; then echo DOCKER_OK;" +
+            " else echo \"--- /tmp/docker-install.log (tail -30) ---\";" +
+            " sudo tail -30 /tmp/docker-install.log 2>/dev/null || true;" +
+            " echo ERR_DOCKER; fi"
 
     const val deployMasterDns: String =
         "mkdir -p /tmp/mdns_build && cat > /tmp/mdns_build/Dockerfile << 'EODF'\n" +
