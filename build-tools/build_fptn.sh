@@ -108,6 +108,7 @@ cmake \
     -B "$BUILD_DIR/cmake-build" \
     -DCMAKE_TOOLCHAIN_FILE="$CONAN_GENERATORS/conan_toolchain.cmake" \
     -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_TESTING=OFF \
     -G Ninja
 
 cmake --build "$BUILD_DIR/cmake-build" --parallel
