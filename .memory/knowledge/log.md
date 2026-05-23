@@ -1,5 +1,11 @@
 # Build Log
 
+## [2026-05-23T22:00:00+03:00] compile | Daily Log 2026-05-23 (pass 5 — gap fill)
+- Source: daily/2026-05-23.md
+- Articles created: [[concepts/proguard-release-drift]] (broken wikilink from masterdns-deploy-hardening resolved; sshj→EdDSA→sun.security.x509 R8 crash pattern documented)
+- Articles updated: [[concepts/masterdns-deploy-hardening]] (Undeploy Feature section added: Removing/Removed states, removeAll script, ViewModel guard, UI buttons)
+- Notes: Passes 1-4 confirmed complete. Two gaps found: (1) [[concepts/proguard-release-drift]] was referenced from masterdns-deploy-hardening but never created — broken wikilink; (2) undeploy feature documented in sources but missing from Details section. Both resolved.
+
 ## [2026-05-23T21:30:00+03:00] compile | Daily Log 2026-05-23 (pass 4 — verification)
 - Source: daily/2026-05-23.md
 - Articles created: (none — all 6 new articles confirmed present from prior passes)

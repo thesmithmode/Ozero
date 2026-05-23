@@ -73,6 +73,19 @@ Fix in `proguard-rules.pro`:
 
 Pattern: any new dependency with EdDSA, JCE, or JDK cryptography → check for `sun.*` references before merge with R8 enabled. This is the same class of problem as the Proguard release drift feedback.
 
+### Undeploy Feature (Phase A extension)
+
+`MasterDnsServerDeployer` gained an `undeploy()` method that runs the inverse of deploy:
+
+1. Connect + authenticate with stored credentials
+2. Emit `MasterDnsDeployState.Removing`
+3. Execute `removeAll` script: `docker stop masterdns-ozero && docker rm masterdns-ozero && docker rmi masterdns-ozero && rm -rf /tmp/mdns_build`
+4. Emit `Removed`; clear credentials from memory
+
+The `removeAll` script does NOT touch `/etc/docker`, system packages, or firewall rules beyond the marker-tracked rule. `ViewModel.onUndeployClick` uses the same `deployJob` guard to prevent concurrent deploy+undeploy races.
+
+UI consequence: `DeployDoneRow` gains [Переустановить] + [Удалить сервер] buttons. `DeployRemovedRow` confirms removal. `isDeploying` predicate expanded to include `Removing` state.
+
 ### Phase D (Deferred)
 
 SSH key file authentication (instead of password) requires multi-line input in settings UI. Deferred to v0.3.x due to UI scope.
