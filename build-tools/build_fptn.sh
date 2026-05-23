@@ -128,6 +128,9 @@ rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 cp "$BUILD_DIR/cmake-build/libfptn_native_lib.so" "$OUT_DIR/libfptn_native_lib-${ABI}.so"
 
+"$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" \
+    --strip-unneeded "$OUT_DIR/libfptn_native_lib-${ABI}.so"
+
 # ---------------------------------------------------------------------------
 # 7. Manifest
 # ---------------------------------------------------------------------------
