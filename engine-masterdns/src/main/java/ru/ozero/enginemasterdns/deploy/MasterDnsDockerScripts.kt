@@ -13,18 +13,21 @@ internal object MasterDnsDockerScripts {
 
     const val installDocker: String =
         "if which apt-get > /dev/null 2>&1; then pm=\$(which apt-get);" +
-            " si=\"-yq install\"; su=\"-yq update\"; dp=\"docker.io\";" +
+            " si=\"-yq install\"; su=\"-yq update\"; dp=\"docker.io\"; is_apt=1;" +
             " elif which dnf > /dev/null 2>&1; then pm=\$(which dnf);" +
-            " si=\"-yq install\"; su=\"-yq check-update\"; dp=\"docker\";" +
+            " si=\"-yq install\"; su=\"-yq check-update\"; dp=\"docker\"; is_apt=0;" +
             " elif which yum > /dev/null 2>&1; then pm=\$(which yum);" +
-            " si=\"-y -q install\"; su=\"-y -q check-update\"; dp=\"docker\";" +
+            " si=\"-y -q install\"; su=\"-y -q check-update\"; dp=\"docker\"; is_apt=0;" +
             " elif which zypper > /dev/null 2>&1; then pm=\$(which zypper);" +
-            " si=\"-nq install\"; su=\"-nq refresh\"; dp=\"docker\";" +
+            " si=\"-nq install\"; su=\"-nq refresh\"; dp=\"docker\"; is_apt=0;" +
             " elif which pacman > /dev/null 2>&1; then pm=\$(which pacman);" +
-            " si=\"-S --noconfirm --quiet\"; su=\"-Sup\"; dp=\"docker\";" +
+            " si=\"-S --noconfirm --quiet\"; su=\"-Sup\"; dp=\"docker\"; is_apt=0;" +
             " else echo ERR_NO_PM; exit 1; fi;" +
-            " if [ \"\$(which apt-get 2>/dev/null)\" != \"\" ];" +
-            " then export DEBIAN_FRONTEND=noninteractive; fi;" +
+            " if [ \"\$is_apt\" = \"1\" ]; then export DEBIAN_FRONTEND=noninteractive;" +
+            " locked=0; for i in \$(seq 1 30);" +
+            " do sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || { locked=0; break; };" +
+            " locked=1; sleep 10; done;" +
+            " if [ \"\$locked\" = \"1\" ]; then echo ERR_DPKG_LOCKED; exit 0; fi; fi;" +
             " if ! command -v docker > /dev/null 2>&1;" +
             " then sudo \$pm \$su; sudo \$pm \$si \$dp;" +
             " sleep 3; sudo systemctl enable --now docker; sleep 3; fi;" +
@@ -85,6 +88,7 @@ internal object MasterDnsDockerScripts {
     const val MARKER_ERR_DOCKER = "ERR_DOCKER"
     const val MARKER_ERR_BUILD = "ERR_BUILD"
     const val MARKER_ERR_RUN = "ERR_RUN"
+    const val MARKER_ERR_DPKG_LOCKED = "ERR_DPKG_LOCKED"
 
     const val MIN_FREE_RAM_MB = 256
     const val MIN_FREE_DISK_MB = 500

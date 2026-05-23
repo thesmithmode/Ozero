@@ -375,6 +375,7 @@ private fun deployErrorMessage(code: String): String = when (code) {
     "port_53_busy" -> stringResource(R.string.masterdns_deploy_error_port_busy)
     "insufficient_resources" -> stringResource(R.string.masterdns_deploy_error_resources)
     "docker_install_failed" -> stringResource(R.string.masterdns_deploy_error_docker)
+    "dpkg_locked" -> stringResource(R.string.masterdns_deploy_error_dpkg_locked)
     "build_failed" -> stringResource(R.string.masterdns_deploy_error_build)
     "run_failed" -> stringResource(R.string.masterdns_deploy_error_run)
     "key_extraction_failed" -> stringResource(R.string.masterdns_deploy_error_key)

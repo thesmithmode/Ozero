@@ -110,6 +110,21 @@ class MasterDnsDeployerTest {
     }
 
     @Test
+    fun `should emit distinct dpkg_locked error when apt lock polling exhausts`() = runTest {
+        transport.setResponse("apt-get", MasterDnsDockerScripts.MARKER_ERR_DPKG_LOCKED)
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals(
+            "dpkg_locked",
+            error.message,
+            "ERR_DPKG_LOCKED marker должен mapи в distinct error 'dpkg_locked' — не сваливать в " +
+                "общий 'docker_install_failed', иначе UI покажет misleading 'не могу установить docker'.",
+        )
+    }
+
+    @Test
     fun `should return Error when docker build fails`() = runTest {
         transport.setResponse("Dockerfile", MasterDnsDockerScripts.MARKER_ERR_BUILD)
 

@@ -38,6 +38,7 @@
     <string name="masterdns_deploy_error_port_busy">El puerto 53/UDP ya está en uso. Libérelo e inténtelo de nuevo.</string>
     <string name="masterdns_deploy_error_resources">Recursos insuficientes: se necesitan ≥512 MB RAM y ≥1 GB de disco libre.</string>
     <string name="masterdns_deploy_error_docker">No se pudo instalar Docker. Compruebe el acceso a internet del servidor.</string>
+    <string name="masterdns_deploy_error_dpkg_locked">El gestor de paquetes del servidor está ocupado (bloqueo apt-get). Espere a que terminen las actualizaciones e inténtelo de nuevo.</string>
     <string name="masterdns_deploy_error_build">Error al construir la imagen. Compruebe la conexión a internet del servidor.</string>
     <string name="masterdns_deploy_error_run">No se pudo iniciar el contenedor.</string>
     <string name="masterdns_deploy_error_key">No se pudo extraer la clave de cifrado del contenedor.</string>

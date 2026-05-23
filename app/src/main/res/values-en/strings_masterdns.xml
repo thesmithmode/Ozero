@@ -38,6 +38,7 @@
     <string name="masterdns_deploy_error_port_busy">Port 53/UDP is already in use on the server. Free the port and try again.</string>
     <string name="masterdns_deploy_error_resources">Insufficient resources: need ≥512 MB RAM and ≥1 GB free disk.</string>
     <string name="masterdns_deploy_error_docker">Failed to install Docker. Check internet access on the server.</string>
+    <string name="masterdns_deploy_error_dpkg_locked">Server package manager is busy (apt-get lock). Wait for updates to finish and try again.</string>
     <string name="masterdns_deploy_error_build">Image build failed. Check the server\'s internet connection.</string>
     <string name="masterdns_deploy_error_run">Failed to start the container.</string>
     <string name="masterdns_deploy_error_key">Failed to extract encryption key from the container.</string>

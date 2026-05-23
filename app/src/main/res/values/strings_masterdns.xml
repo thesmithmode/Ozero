@@ -38,6 +38,7 @@
     <string name="masterdns_deploy_error_port_busy">Порт 53/UDP уже занят на сервере. Освободите порт и попробуйте снова.</string>
     <string name="masterdns_deploy_error_resources">Недостаточно ресурсов: нужно ≥512 МБ RAM и ≥1 ГБ дискового пространства.</string>
     <string name="masterdns_deploy_error_docker">Не удалось установить Docker. Проверьте доступ к интернету на сервере.</string>
+    <string name="masterdns_deploy_error_dpkg_locked">Менеджер пакетов сервера занят (apt-get lock). Подождите завершения обновлений и попробуйте снова.</string>
     <string name="masterdns_deploy_error_build">Ошибка сборки образа. Проверьте интернет-соединение сервера.</string>
     <string name="masterdns_deploy_error_run">Не удалось запустить контейнер.</string>
     <string name="masterdns_deploy_error_key">Не удалось извлечь ключ шифрования из контейнера.</string>

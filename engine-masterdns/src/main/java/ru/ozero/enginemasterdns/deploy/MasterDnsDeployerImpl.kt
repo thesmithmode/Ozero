@@ -57,7 +57,11 @@ internal class MasterDnsDeployerImpl(
             }
 
             emit(MasterDnsDeployState.InstallingDocker)
-            val dockerResult = transport.exec(MasterDnsDockerScripts.installDocker, timeoutMs = 120_000L)
+            val dockerResult = transport.exec(MasterDnsDockerScripts.installDocker, timeoutMs = 360_000L)
+            if (dockerResult.contains(MasterDnsDockerScripts.MARKER_ERR_DPKG_LOCKED)) {
+                emit(MasterDnsDeployState.Error("dpkg_locked"))
+                return@flow
+            }
             if (!dockerResult.contains(MasterDnsDockerScripts.MARKER_DOCKER_OK)) {
                 emit(MasterDnsDeployState.Error("docker_install_failed"))
                 return@flow
