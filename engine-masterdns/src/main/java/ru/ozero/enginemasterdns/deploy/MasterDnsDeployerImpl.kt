@@ -38,6 +38,25 @@ internal class MasterDnsDeployerImpl(
         if (!authed) return@flow
 
         try {
+            val sudoResult = transport.exec(MasterDnsDockerScripts.checkSudoNoPassword)
+            when {
+                sudoResult.contains(MasterDnsDockerScripts.MARKER_ERR_SUDO_NOT_INSTALLED) -> {
+                    emit(MasterDnsDeployState.Error("sudo_not_installed")); return@flow
+                }
+                sudoResult.contains(MasterDnsDockerScripts.MARKER_ERR_SUDO_PWD_REQUIRED) -> {
+                    emit(MasterDnsDeployState.Error("sudo_pwd_required")); return@flow
+                }
+                sudoResult.contains(MasterDnsDockerScripts.MARKER_ERR_SUDO_NOT_ALLOWED) -> {
+                    emit(MasterDnsDeployState.Error("sudo_not_allowed")); return@flow
+                }
+                sudoResult.contains(MasterDnsDockerScripts.MARKER_ERR_SUDO_NO_HOME) -> {
+                    emit(MasterDnsDeployState.Error("sudo_no_home")); return@flow
+                }
+                sudoResult.contains(MasterDnsDockerScripts.MARKER_ERR_SUDO_NOT_IN_GROUP) -> {
+                    emit(MasterDnsDeployState.Error("sudo_not_in_group")); return@flow
+                }
+            }
+
             emit(MasterDnsDeployState.CheckingPreflight)
             val portResult = transport.exec(MasterDnsDockerScripts.checkPort53)
             if (portResult.contains(MasterDnsDockerScripts.MARKER_PORT_BUSY)) {

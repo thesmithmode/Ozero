@@ -39,6 +39,11 @@
     <string name="masterdns_deploy_error_resources">Recursos insuficientes: necessário ≥512 MB RAM e ≥1 GB de disco livre.</string>
     <string name="masterdns_deploy_error_docker">Falha ao instalar o Docker. Verifique o acesso à internet do servidor.</string>
     <string name="masterdns_deploy_error_dpkg_locked">O gestor de pacotes do servidor está ocupado (bloqueio apt-get). Aguarde o fim das atualizações e tente novamente.</string>
+    <string name="masterdns_deploy_error_sudo_not_installed">sudo não está instalado no servidor. Instale o sudo e adicione o utilizador ao sudoers.</string>
+    <string name="masterdns_deploy_error_sudo_pwd_required">O utilizador precisa de senha para sudo. Configure NOPASSWD no sudoers.</string>
+    <string name="masterdns_deploy_error_sudo_not_allowed">O utilizador não tem permissão em /etc/sudoers. Conceda direitos de sudo.</string>
+    <string name="masterdns_deploy_error_sudo_no_home">O diretório home do utilizador está inacessível. Verifique as permissões.</string>
+    <string name="masterdns_deploy_error_sudo_not_in_group">O utilizador não está no grupo sudo/wheel. Adicione-o: usermod -aG sudo utilizador.</string>
     <string name="masterdns_deploy_error_build">Falha na construção da imagem. Verifique a conexão com a internet do servidor.</string>
     <string name="masterdns_deploy_error_run">Falha ao iniciar o contêiner.</string>
     <string name="masterdns_deploy_error_key">Falha ao extrair a chave de criptografia do contêiner.</string>

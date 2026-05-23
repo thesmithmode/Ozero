@@ -2,6 +2,20 @@ package ru.ozero.enginemasterdns.deploy
 
 internal object MasterDnsDockerScripts {
 
+    const val checkSudoNoPassword =
+        "sudo -K 2>/dev/null;" +
+            " if [ \"\$(whoami)\" = \"root\" ]; then echo SUDO_OK; exit 0; fi;" +
+            " if ! command -v sudo >/dev/null 2>&1; then echo ERR_SUDO_NOT_INSTALLED; exit 0; fi;" +
+            " out=\$(sudo -n true 2>&1);" +
+            " case \"\$out\" in" +
+            " *\"password is required\"*) echo ERR_SUDO_PWD_REQUIRED;;" +
+            " *\"not allowed\"*|*\"sudoers\"*) echo ERR_SUDO_NOT_ALLOWED;;" +
+            " *\"can't cd\"*|*\"Permission denied\"*) echo ERR_SUDO_NO_HOME;;" +
+            " \"\") if id -nG \"\$(whoami)\" | grep -qE '\\b(sudo|wheel)\\b';" +
+            " then echo SUDO_OK; else echo ERR_SUDO_NOT_IN_GROUP; fi;;" +
+            " *) echo ERR_SUDO_NOT_ALLOWED;;" +
+            " esac"
+
     const val checkPort53 =
         "if sudo docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^masterdns-ozero$';" +
             " then echo PORT_FREE;" +
@@ -89,6 +103,12 @@ internal object MasterDnsDockerScripts {
     const val MARKER_ERR_BUILD = "ERR_BUILD"
     const val MARKER_ERR_RUN = "ERR_RUN"
     const val MARKER_ERR_DPKG_LOCKED = "ERR_DPKG_LOCKED"
+    const val MARKER_SUDO_OK = "SUDO_OK"
+    const val MARKER_ERR_SUDO_NOT_INSTALLED = "ERR_SUDO_NOT_INSTALLED"
+    const val MARKER_ERR_SUDO_PWD_REQUIRED = "ERR_SUDO_PWD_REQUIRED"
+    const val MARKER_ERR_SUDO_NOT_ALLOWED = "ERR_SUDO_NOT_ALLOWED"
+    const val MARKER_ERR_SUDO_NO_HOME = "ERR_SUDO_NO_HOME"
+    const val MARKER_ERR_SUDO_NOT_IN_GROUP = "ERR_SUDO_NOT_IN_GROUP"
 
     const val MIN_FREE_RAM_MB = 256
     const val MIN_FREE_DISK_MB = 500
