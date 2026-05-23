@@ -45,11 +45,16 @@ internal object MasterDnsDockerScripts {
             " && sudo sh /tmp/get-docker.sh >/tmp/docker-install.log 2>&1;" +
             " else echo INSTALLER_NO_FETCH >/tmp/docker-install.log; fi;" +
             " if ! command -v docker >/dev/null 2>&1;" +
-            " then if which apt-get >/dev/null 2>&1; then pm=apt-get; si='-yq install'; su='-yq update'; dp='docker.io';" +
-            " elif which dnf >/dev/null 2>&1; then pm=dnf; si='-yq install'; su='-yq check-update'; dp='docker';" +
-            " elif which yum >/dev/null 2>&1; then pm=yum; si='-y -q install'; su='-y -q check-update'; dp='docker';" +
-            " elif which zypper >/dev/null 2>&1; then pm=zypper; si='-nq install'; su='-nq refresh'; dp='docker';" +
-            " elif which pacman >/dev/null 2>&1; then pm=pacman; si='-S --noconfirm --quiet'; su='-Sup'; dp='docker';" +
+            " then if which apt-get >/dev/null 2>&1;" +
+            " then pm=apt-get; si='-yq install'; su='-yq update'; dp='docker.io';" +
+            " elif which dnf >/dev/null 2>&1;" +
+            " then pm=dnf; si='-yq install'; su='-yq check-update'; dp='docker';" +
+            " elif which yum >/dev/null 2>&1;" +
+            " then pm=yum; si='-y -q install'; su='-y -q check-update'; dp='docker';" +
+            " elif which zypper >/dev/null 2>&1;" +
+            " then pm=zypper; si='-nq install'; su='-nq refresh'; dp='docker';" +
+            " elif which pacman >/dev/null 2>&1;" +
+            " then pm=pacman; si='-S --noconfirm --quiet'; su='-Sup'; dp='docker';" +
             " else echo ERR_NO_PM; exit 0; fi;" +
             " sudo \$pm \$su >>/tmp/docker-install.log 2>&1;" +
             " sudo \$pm \$si \$dp >>/tmp/docker-install.log 2>&1; fi; fi;" +
