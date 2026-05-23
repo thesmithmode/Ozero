@@ -114,7 +114,7 @@ bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = 
 relinker = { module = "com.getkeepsafe.relinker:relinker", version.ref = "relinker" }
 
 # SSH
-sshj = { module = "net.schmizz:sshj", version.ref = "sshj" }
+sshj = { module = "com.hierynomus:sshj", version.ref = "sshj" }
 slf4j-nop = { module = "org.slf4j:slf4j-nop", version.ref = "slf4j" }
 
 # Testing — JUnit 5
