@@ -73,7 +73,9 @@ internal object MasterDnsDockerScripts {
             "sudo docker run -d --name masterdns-ozero --restart always" +
             " -v masterdns-key:/etc/masterdnsvpn" +
             " -p 53:53/udp masterdns-ozero || { echo ERR_RUN; exit 0; }; " +
-            "sleep 2; " +
+            "for i in \$(seq 1 15);" +
+            " do sudo docker exec masterdns-ozero true >/dev/null 2>&1 && break;" +
+            " sleep 1; done; " +
             "sudo docker exec masterdns-ozero sh -c " +
             "'test -f /etc/masterdnsvpn/encrypt_key.txt || " +
             "(openssl rand -hex 32 > /etc/masterdnsvpn/encrypt_key.txt && " +
