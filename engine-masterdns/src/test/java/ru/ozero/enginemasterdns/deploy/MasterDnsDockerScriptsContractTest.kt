@@ -58,4 +58,30 @@ class MasterDnsDockerScriptsContractTest {
                 "до restart он работает без key",
         )
     }
+
+    @Test
+    fun `installDocker polls dpkg lock before apt-get to survive background apt update`() {
+        val cmd = MasterDnsDockerScripts.installDocker
+        assertTrue(
+            cmd.contains("fuser /var/lib/dpkg/lock-frontend"),
+            "Без dpkg-lock polling apt-get падает E: Could not get lock на серверах " +
+                "с unattended-upgrades. Polling обязателен перед sudo apt-get update/install.",
+        )
+        assertTrue(
+            cmd.contains("seq 1 30"),
+            "Polling loop должен быть min 30 итераций (≈5 мин при sleep 10) — типичная длительность apt update.",
+        )
+        assertTrue(
+            cmd.contains("ERR_DPKG_LOCKED"),
+            "Marker ERR_DPKG_LOCKED обязателен — UI должен показать distinct error при истечённом polling.",
+        )
+    }
+
+    @Test
+    fun `MARKER_ERR_DPKG_LOCKED constant exposed for deployer mapping`() {
+        assertTrue(
+            MasterDnsDockerScripts.MARKER_ERR_DPKG_LOCKED == "ERR_DPKG_LOCKED",
+            "Constant marker для consumer-mapping (MasterDnsDeployerImpl парсит этот marker → DeployFailure).",
+        )
+    }
 }
