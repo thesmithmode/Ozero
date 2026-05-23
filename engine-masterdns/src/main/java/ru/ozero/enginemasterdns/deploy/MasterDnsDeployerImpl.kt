@@ -11,24 +11,31 @@ internal class MasterDnsDeployerImpl(
 
     override fun deploy(credentials: MasterDnsDeployCredentials): Flow<MasterDnsDeployState> = flow {
         emit(MasterDnsDeployState.Connecting)
-        try {
+        val connected = try {
             transport.connect(credentials.host, credentials.port)
+            true
         } catch (e: Exception) {
             PersistentLoggers.warn(TAG, "deploy: connection failed", e)
             transport.close()
             emit(MasterDnsDeployState.Error("connection_failed"))
+            false
+        }
+        if (!connected) {
+            credentials.clear()
             return@flow
         }
-        try {
+        val authed = try {
             transport.auth(credentials.login, credentials.password)
+            true
         } catch (e: Exception) {
             PersistentLoggers.warn(TAG, "deploy: auth failed", e)
             transport.close()
             emit(MasterDnsDeployState.Error("auth_failed"))
-            return@flow
+            false
         } finally {
             credentials.clear()
         }
+        if (!authed) return@flow
 
         try {
             emit(MasterDnsDeployState.CheckingPreflight)
@@ -90,24 +97,31 @@ internal class MasterDnsDeployerImpl(
 
     override fun undeploy(credentials: MasterDnsDeployCredentials): Flow<MasterDnsDeployState> = flow {
         emit(MasterDnsDeployState.Connecting)
-        try {
+        val connected = try {
             transport.connect(credentials.host, credentials.port)
+            true
         } catch (e: Exception) {
             PersistentLoggers.warn(TAG, "undeploy: connection failed", e)
             transport.close()
             emit(MasterDnsDeployState.Error("connection_failed"))
+            false
+        }
+        if (!connected) {
+            credentials.clear()
             return@flow
         }
-        try {
+        val authed = try {
             transport.auth(credentials.login, credentials.password)
+            true
         } catch (e: Exception) {
             PersistentLoggers.warn(TAG, "undeploy: auth failed", e)
             transport.close()
             emit(MasterDnsDeployState.Error("auth_failed"))
-            return@flow
+            false
         } finally {
             credentials.clear()
         }
+        if (!authed) return@flow
 
         try {
             emit(MasterDnsDeployState.Removing)

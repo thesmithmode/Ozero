@@ -246,4 +246,20 @@ class MasterDnsDeployerTest {
         assertTrue(states.any { it is MasterDnsDeployState.Removing })
         assertInstanceOf(MasterDnsDeployState.Removed::class.java, states.last())
     }
+
+    @Test
+    fun `deploy clears credentials password when connect fails`() = runTest {
+        transport.connectShouldFail = true
+        val creds = credentials("super_secret_p@ssw0rd")
+        deployer.deploy(creds).toList()
+        assertTrue(creds.password.all { it == ' ' }, "password must be wiped after connect failure")
+    }
+
+    @Test
+    fun `undeploy clears credentials password when connect fails`() = runTest {
+        transport.connectShouldFail = true
+        val creds = credentials("super_secret_p@ssw0rd")
+        deployer.undeploy(creds).toList()
+        assertTrue(creds.password.all { it == ' ' }, "password must be wiped after connect failure")
+    }
 }
