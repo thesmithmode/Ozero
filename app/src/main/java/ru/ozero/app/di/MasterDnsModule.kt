@@ -22,6 +22,8 @@ import ru.ozero.enginemasterdns.MasterDnsConfigWriter
 import ru.ozero.enginemasterdns.MasterDnsEngine
 import ru.ozero.enginemasterdns.MasterDnsPortAllocator
 import ru.ozero.enginemasterdns.MasterDnsResolversCache
+import ru.ozero.enginemasterdns.deploy.MasterDnsServerDeployer
+import ru.ozero.enginemasterdns.deploy.SshjMasterDnsDeployer
 import ru.ozero.enginescore.EnginePlugin
 import java.io.File
 import javax.inject.Qualifier
@@ -73,6 +75,10 @@ object MasterDnsModule {
         config = configStore.config(),
         scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
     )
+
+    @Provides
+    @Singleton
+    fun provideMasterDnsServerDeployer(): MasterDnsServerDeployer = SshjMasterDnsDeployer()
 
     @Provides
     @Singleton

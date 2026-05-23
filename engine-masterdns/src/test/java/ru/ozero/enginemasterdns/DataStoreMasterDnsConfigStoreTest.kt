@@ -68,6 +68,36 @@ class DataStoreMasterDnsConfigStoreTest {
         assertEquals(listOf("8.8.8.8", "1.1.1.1"), resolvers)
     }
 
+    @Test
+    fun `default serverIp is empty and serverPort is 22`(@TempDir tmp: Path) = runTest {
+        val store = makeStore(tmp)
+        val cfg = store.config().first()
+        assertEquals("", cfg.serverIp)
+        assertEquals(22, cfg.serverPort)
+    }
+
+    @Test
+    fun `setServerIp persists`(@TempDir tmp: Path) = runTest {
+        val store = makeStore(tmp)
+        store.setServerIp("192.168.1.100")
+        assertEquals("192.168.1.100", store.config().first().serverIp)
+    }
+
+    @Test
+    fun `setServerPort persists`(@TempDir tmp: Path) = runTest {
+        val store = makeStore(tmp)
+        store.setServerPort(2222)
+        assertEquals(2222, store.config().first().serverPort)
+    }
+
+    @Test
+    fun `setServerIp with empty string clears`(@TempDir tmp: Path) = runTest {
+        val store = makeStore(tmp)
+        store.setServerIp("10.0.0.1")
+        store.setServerIp("")
+        assertEquals("", store.config().first().serverIp)
+    }
+
     private fun makeStore(tmp: Path): DataStoreMasterDnsConfigStore {
         val file = File(tmp.toFile(), "masterdns.preferences_pb")
         val ds = PreferenceDataStoreFactory.create(produceFile = { file })

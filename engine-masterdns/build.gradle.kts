@@ -17,6 +17,8 @@ dependencies {
     implementation(project(":common-vpn"))
     implementation(libs.bundles.coroutines)
     implementation(libs.datastore.preferences)
+    implementation(libs.sshj)
+    implementation(libs.slf4j.nop)
 
     testImplementation(libs.bundles.junit5)
     testRuntimeOnly(libs.junit.jupiter.engine)
