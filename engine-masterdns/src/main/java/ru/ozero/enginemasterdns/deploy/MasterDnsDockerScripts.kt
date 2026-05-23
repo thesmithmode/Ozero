@@ -2,14 +2,14 @@ package ru.ozero.enginemasterdns.deploy
 
 internal object MasterDnsDockerScripts {
 
-    val checkPort53 =
+    const val checkPort53 =
         "ss -uln 2>/dev/null | grep -q ':53 ' && echo PORT_BUSY || echo PORT_FREE"
 
-    val checkResources =
+    const val checkResources =
         "echo \$(free -m 2>/dev/null | awk 'NR==2{print \$7}')" +
             " \$(df -m / 2>/dev/null | awk 'NR==2{print \$4}')"
 
-    val installDocker: String =
+    const val installDocker: String =
         "if which apt-get > /dev/null 2>&1; then pm=\$(which apt-get);" +
             " si=\"-yq install\"; su=\"-yq update\"; dp=\"docker.io\";" +
             " elif which dnf > /dev/null 2>&1; then pm=\$(which dnf);" +
@@ -30,7 +30,7 @@ internal object MasterDnsDockerScripts {
             " then sudo systemctl start docker; sleep 3; fi;" +
             " docker --version > /dev/null 2>&1 && echo DOCKER_OK || echo ERR_DOCKER"
 
-    val deployMasterDns: String =
+    const val deployMasterDns: String =
         "mkdir -p /tmp/mdns_build && cat > /tmp/mdns_build/Dockerfile << 'EODF'\n" +
             "FROM ubuntu:22.04\n" +
             "ARG DEBIAN_FRONTEND=noninteractive\n" +
@@ -49,12 +49,12 @@ internal object MasterDnsDockerScripts {
             "sudo docker build --no-cache -t masterdns-ozero /tmp/mdns_build 2>&1" +
             " | tail -3 && echo BUILD_OK || echo ERR_BUILD"
 
-    val runContainer =
+    const val runContainer =
         "sudo docker rm -f masterdns-ozero 2>/dev/null; " +
             "sudo docker run -d --name masterdns-ozero --restart always" +
             " -p 53:53/udp masterdns-ozero && echo RUN_OK || echo ERR_RUN"
 
-    val readEncryptKey =
+    const val readEncryptKey =
         "sudo docker exec masterdns-ozero cat /etc/masterdnsvpn/encrypt_key.txt 2>/dev/null"
 
     const val MARKER_PORT_BUSY = "PORT_BUSY"

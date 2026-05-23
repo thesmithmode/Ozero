@@ -1,5 +1,6 @@
 package ru.ozero.enginemasterdns.deploy
 
+import android.util.Log
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -13,12 +14,14 @@ internal class MasterDnsDeployerImpl(
         try {
             transport.connect(credentials.host, credentials.port)
         } catch (e: Exception) {
+            Log.w(TAG, "deploy: connection failed", e)
             emit(MasterDnsDeployState.Error("connection_failed"))
             return@flow
         }
         try {
             transport.auth(credentials.login, credentials.password)
         } catch (e: Exception) {
+            Log.w(TAG, "deploy: auth failed", e)
             transport.close()
             emit(MasterDnsDeployState.Error("auth_failed"))
             return@flow
@@ -94,6 +97,7 @@ internal class MasterDnsDeployerImpl(
         """.trimIndent()
 
     private companion object {
+        const val TAG = "MasterDnsDeployer"
         const val CONTAINER_STARTUP_DELAY_MS = 3_000L
     }
 }
