@@ -1,9 +1,9 @@
 package ru.ozero.enginemasterdns.deploy
 
-import android.util.Log
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import ru.ozero.enginescore.PersistentLoggers
 
 internal class MasterDnsDeployerImpl(
     private val transport: SshTransport,
@@ -14,7 +14,7 @@ internal class MasterDnsDeployerImpl(
         try {
             transport.connect(credentials.host, credentials.port)
         } catch (e: Exception) {
-            Log.w(TAG, "deploy: connection failed", e)
+            PersistentLoggers.warn(TAG, "deploy: connection failed", e)
             transport.close()
             emit(MasterDnsDeployState.Error("connection_failed"))
             return@flow
@@ -22,7 +22,7 @@ internal class MasterDnsDeployerImpl(
         try {
             transport.auth(credentials.login, credentials.password)
         } catch (e: Exception) {
-            Log.w(TAG, "deploy: auth failed", e)
+            PersistentLoggers.warn(TAG, "deploy: auth failed", e)
             transport.close()
             emit(MasterDnsDeployState.Error("auth_failed"))
             return@flow
@@ -81,7 +81,7 @@ internal class MasterDnsDeployerImpl(
             val toml = buildClientToml(serverIp = credentials.host, encryptionKey = key)
             emit(MasterDnsDeployState.Done(toml))
         } catch (e: Exception) {
-            Log.w(TAG, "deploy: unexpected error", e)
+            PersistentLoggers.warn(TAG, "deploy: unexpected error", e)
             emit(MasterDnsDeployState.Error("unexpected_error"))
         } finally {
             transport.close()
@@ -93,7 +93,7 @@ internal class MasterDnsDeployerImpl(
         try {
             transport.connect(credentials.host, credentials.port)
         } catch (e: Exception) {
-            Log.w(TAG, "undeploy: connection failed", e)
+            PersistentLoggers.warn(TAG, "undeploy: connection failed", e)
             transport.close()
             emit(MasterDnsDeployState.Error("connection_failed"))
             return@flow
@@ -101,7 +101,7 @@ internal class MasterDnsDeployerImpl(
         try {
             transport.auth(credentials.login, credentials.password)
         } catch (e: Exception) {
-            Log.w(TAG, "undeploy: auth failed", e)
+            PersistentLoggers.warn(TAG, "undeploy: auth failed", e)
             transport.close()
             emit(MasterDnsDeployState.Error("auth_failed"))
             return@flow
@@ -118,7 +118,7 @@ internal class MasterDnsDeployerImpl(
             }
             emit(MasterDnsDeployState.Removed)
         } catch (e: Exception) {
-            Log.w(TAG, "undeploy: unexpected error", e)
+            PersistentLoggers.warn(TAG, "undeploy: unexpected error", e)
             emit(MasterDnsDeployState.Error("unexpected_error"))
         } finally {
             transport.close()
