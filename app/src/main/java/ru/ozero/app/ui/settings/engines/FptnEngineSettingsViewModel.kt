@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ru.ozero.enginefptn.FptnBypassMethod
+import ru.ozero.enginefptn.FptnConfig
 import ru.ozero.enginefptn.FptnConfigStore
 import ru.ozero.enginefptn.FptnServer
 import ru.ozero.enginefptn.FptnToken
@@ -22,6 +23,7 @@ data class FptnSettingsUiState(
     val selectedServerName: String? = null,
     val autoSelect: Boolean = true,
     val bypassMethod: FptnBypassMethod = FptnBypassMethod.DEFAULT,
+    val sniDomain: String = FptnConfig.DEFAULT_SNI_DOMAIN,
     val reconnectOnNetworkChange: Boolean = true,
     val reconnectOnIpChange: Boolean = false,
     val maxReconnectAttempts: Int = 5,
@@ -46,6 +48,7 @@ class FptnEngineSettingsViewModel @Inject constructor(
             selectedServerName = cfg.selectedServerName,
             autoSelect = cfg.autoSelect,
             bypassMethod = FptnBypassMethod.fromStrategyName(cfg.bypassMethod),
+            sniDomain = cfg.sniDomain,
             reconnectOnNetworkChange = cfg.reconnectOnNetworkChange,
             reconnectOnIpChange = cfg.reconnectOnIpChange,
             maxReconnectAttempts = cfg.maxReconnectAttempts,
@@ -75,6 +78,13 @@ class FptnEngineSettingsViewModel @Inject constructor(
     fun onBypassMethodChange(method: FptnBypassMethod) {
         viewModelScope.launch {
             configStore.update { it.copy(bypassMethod = method.strategyName) }
+        }
+    }
+
+    fun onSniDomainChange(domain: String) {
+        val trimmed = domain.trim()
+        if (trimmed.isNotBlank()) {
+            viewModelScope.launch { configStore.update { it.copy(sniDomain = trimmed) } }
         }
     }
 

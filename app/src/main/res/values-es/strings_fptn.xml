@@ -20,6 +20,17 @@
     <string name="fptn_section_bypass">Métodos de bypass</string>
     <string name="fptn_section_bypass_summary">Configura los métodos de evasión de bloqueos</string>
 
+    <string name="fptn_section_sni">SNI actual</string>
+    <string name="fptn_sni_description">La dirección del sitio declarada al conectarse al servidor VPN. Especifica un sitio popular accesible sin VPN desde tu país.</string>
+    <string name="fptn_sni_hint">Ej.: ads.x5.ru</string>
+    <string name="fptn_sni_save">Aplicar</string>
+    <string name="fptn_sni_reset">Restablecer predeterminado</string>
+    <string name="fptn_bypass_sni_label">Suplantación de dominio (SNI)</string>
+    <string name="fptn_bypass_obfuscation_label">Enmascaramiento de tráfico (ofuscación)</string>
+    <string name="fptn_bypass_reality_label">Suplantación avanzada de dominio (SNI + REALITY)</string>
+    <string name="fptn_bypass_reality_warning">Requiere un dominio real existente (de lo contrario pueden ocurrir errores)</string>
+    <string name="fptn_bypass_reality_variant">Perfil Reality</string>
+
     <string name="fptn_section_servers">Tus servidores VPN</string>
     <string name="fptn_server_auto">Auto (selección automática)</string>
     <string name="fptn_no_token">Ingresa un token para ver la lista de servidores</string>

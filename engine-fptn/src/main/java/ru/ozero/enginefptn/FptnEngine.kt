@@ -45,6 +45,7 @@ class FptnEngine(
     private var _currentServer: FptnServer? = null
     private var _accessToken: String? = null
     private var _bypassMethod: String = FptnBypassMethod.DEFAULT.strategyName
+    private var _sniDomain: String = FptnConfig.DEFAULT_SNI_DOMAIN
     private var _pfd: ParcelFileDescriptor? = null
 
     override val id = EngineId.FPTN
@@ -67,6 +68,7 @@ class FptnEngine(
             token = cfg.token,
             selectedServerName = cfg.selectedServerName,
             bypassMethod = cfg.bypassMethod,
+            sniDomain = cfg.sniDomain,
             autoSelect = cfg.autoSelect,
             reconnectOnNetworkChange = cfg.reconnectOnNetworkChange,
             reconnectOnIpChange = cfg.reconnectOnIpChange,
@@ -116,12 +118,13 @@ class FptnEngine(
         }
 
         val accessToken = withContext(Dispatchers.IO) {
-            authenticate(server, tokenData, fptn.bypassMethod)
+            authenticate(server, tokenData, fptn.bypassMethod, fptn.sniDomain)
         } ?: return StartResult.Failure("FPTN authentication failed")
 
         _currentServer = server
         _accessToken = accessToken
         _bypassMethod = fptn.bypassMethod
+        _sniDomain = fptn.sniDomain
 
         Log.d(TAG, "start: authenticated, ready to attach TUN")
         return StartResult.Success(socksPort = 0)
@@ -156,7 +159,7 @@ class FptnEngine(
                 serverPort = server.port,
                 tunIpv4 = "10.10.0.1",
                 tunIpv6 = "fd00::1",
-                sni = server.host,
+                sni = _sniDomain,
                 accessToken = token,
                 md5Fingerprint = server.md5Fingerprint,
                 censorshipStrategy = _bypassMethod,
@@ -265,11 +268,11 @@ class FptnEngine(
             ?: data.servers.firstOrNull()
     }
 
-    private fun authenticate(server: FptnServer, data: FptnTokenData, bypassMethod: String): String? {
+    private fun authenticate(server: FptnServer, data: FptnTokenData, bypassMethod: String, sniDomain: String): String? {
         val handle = httpsClient.nativeCreate(
             host = server.host,
             port = server.port,
-            sni = server.host,
+            sni = sniDomain,
             md5Fingerprint = server.md5Fingerprint,
             censorshipStrategy = bypassMethod,
         )

@@ -20,6 +20,17 @@
     <string name="fptn_section_bypass">Методы обхода блокировок</string>
     <string name="fptn_section_bypass_summary">Настройка методов обхода блокировок</string>
 
+    <string name="fptn_section_sni">Текущий SNI</string>
+    <string name="fptn_sni_description">Адрес сайта, декларируемый при подключении к VPN-серверу. Укажите популярный сайт, доступный без VPN из вашей страны.</string>
+    <string name="fptn_sni_hint">Например: ads.x5.ru</string>
+    <string name="fptn_sni_save">Применить</string>
+    <string name="fptn_sni_reset">Сбросить по умолчанию</string>
+    <string name="fptn_bypass_sni_label">Подмена домена (SNI)</string>
+    <string name="fptn_bypass_obfuscation_label">Маскировка трафика (обфускация)</string>
+    <string name="fptn_bypass_reality_label">Продвинутая подмена домена (SNI + REALITY)</string>
+    <string name="fptn_bypass_reality_warning">Требуется реальный существующий домен (иначе возможны ошибки)</string>
+    <string name="fptn_bypass_reality_variant">Профиль Reality</string>
+
     <string name="fptn_section_servers">Ваши VPN сервера</string>
     <string name="fptn_server_auto">Auto (автовыбор)</string>
     <string name="fptn_no_token">Введите токен, чтобы увидеть список серверов</string>

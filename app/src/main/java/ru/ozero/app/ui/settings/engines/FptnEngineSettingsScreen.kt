@@ -64,6 +64,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
 import ru.ozero.enginefptn.FptnBypassMethod
+import ru.ozero.enginefptn.FptnConfig
 import ru.ozero.enginefptn.FptnServer
 
 private object FptnLinks {
@@ -111,7 +112,9 @@ fun FptnEngineSettingsScreen(
             )
             FptnBypassCard(
                 selected = state.bypassMethod,
+                sniDomain = state.sniDomain,
                 onSelect = { viewModel.onBypassMethodChange(it) },
+                onSniDomainChange = { viewModel.onSniDomainChange(it) },
             )
             FptnServersCard(
                 hasToken = state.hasToken,
@@ -225,9 +228,16 @@ private fun FptnTokenCard(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun FptnBypassCard(selected: FptnBypassMethod, onSelect: (FptnBypassMethod) -> Unit) {
+private fun FptnBypassCard(
+    selected: FptnBypassMethod,
+    sniDomain: String,
+    onSelect: (FptnBypassMethod) -> Unit,
+    onSniDomainChange: (String) -> Unit,
+) {
     var showSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var sniDraft by remember(sniDomain) { mutableStateOf(sniDomain) }
+    val scrollState = rememberScrollState()
 
     SettingsCard(testTag = "fptn_bypass_card", onClick = { showSheet = true }) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -243,7 +253,7 @@ private fun FptnBypassCard(selected: FptnBypassMethod, onSelect: (FptnBypassMeth
             )
         }
         Text(
-            text = selected.displayName,
+            text = if (selected.usesSni) "${selected.displayName} · $sniDomain" else selected.displayName,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp),
@@ -251,40 +261,172 @@ private fun FptnBypassCard(selected: FptnBypassMethod, onSelect: (FptnBypassMeth
     }
 
     if (showSheet) {
+        val isReality = selected.isReality
         ModalBottomSheet(
             onDismissRequest = { showSheet = false },
             sheetState = sheetState,
         ) {
-            FptnBypassMethod.entries.forEach { method ->
+            Column(
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 24.dp)
+                    .verticalScroll(scrollState),
+                verticalArrangement = Arrangement.spacedBy(0.dp),
+            ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
                         .selectable(
-                            selected = selected == method,
-                            onClick = {
-                                onSelect(method)
-                                showSheet = false
-                            },
+                            selected = selected == FptnBypassMethod.SNI,
+                            onClick = { onSelect(FptnBypassMethod.SNI) },
                         )
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
-                        .testTag("fptn_bypass_${method.name.lowercase()}"),
+                        .padding(end = 16.dp, top = 4.dp, bottom = 4.dp)
+                        .testTag("fptn_bypass_sni"),
                 ) {
                     RadioButton(
-                        selected = selected == method,
-                        onClick = {
-                            onSelect(method)
-                            showSheet = false
-                        },
+                        selected = selected == FptnBypassMethod.SNI,
+                        onClick = { onSelect(FptnBypassMethod.SNI) },
                     )
                     Text(
-                        text = method.displayName,
+                        text = stringResource(R.string.fptn_bypass_sni_label),
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(start = 8.dp),
                     )
                 }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .selectable(
+                            selected = selected == FptnBypassMethod.OBFUSCATION,
+                            onClick = { onSelect(FptnBypassMethod.OBFUSCATION) },
+                        )
+                        .padding(end = 16.dp, top = 4.dp, bottom = 4.dp)
+                        .testTag("fptn_bypass_obfuscation"),
+                ) {
+                    RadioButton(
+                        selected = selected == FptnBypassMethod.OBFUSCATION,
+                        onClick = { onSelect(FptnBypassMethod.OBFUSCATION) },
+                    )
+                    Text(
+                        text = stringResource(R.string.fptn_bypass_obfuscation_label),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .selectable(
+                            selected = isReality,
+                            onClick = { if (!isReality) onSelect(FptnBypassMethod.DEFAULT_REALITY) },
+                        )
+                        .padding(end = 16.dp, top = 4.dp, bottom = 4.dp)
+                        .testTag("fptn_bypass_reality"),
+                ) {
+                    RadioButton(
+                        selected = isReality,
+                        onClick = { if (!isReality) onSelect(FptnBypassMethod.DEFAULT_REALITY) },
+                    )
+                    Text(
+                        text = stringResource(R.string.fptn_bypass_reality_label),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
+                if (isReality) {
+                    Text(
+                        text = stringResource(R.string.fptn_bypass_reality_variant),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 40.dp, top = 8.dp),
+                    )
+                    FptnBypassMethod.REALITY_METHODS.forEach { method ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .selectable(
+                                    selected = selected == method,
+                                    onClick = { onSelect(method) },
+                                )
+                                .padding(start = 32.dp, end = 16.dp, top = 2.dp, bottom = 2.dp)
+                                .testTag("fptn_bypass_reality_${method.name.lowercase()}"),
+                        ) {
+                            RadioButton(selected = selected == method, onClick = { onSelect(method) })
+                            Text(
+                                text = method.displayName,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(start = 8.dp),
+                            )
+                        }
+                    }
+                    Text(
+                        text = stringResource(R.string.fptn_bypass_reality_warning),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(start = 40.dp, top = 4.dp, bottom = 4.dp),
+                    )
+                }
+                if (selected.usesSni) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = stringResource(R.string.fptn_section_sni),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = stringResource(R.string.fptn_sni_description),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                    OutlinedTextField(
+                        value = sniDraft,
+                        onValueChange = { sniDraft = it },
+                        label = { Text(stringResource(R.string.fptn_sni_hint)) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp)
+                            .testTag("fptn_sni_field"),
+                        singleLine = true,
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                sniDraft = FptnConfig.DEFAULT_SNI_DOMAIN
+                                onSniDomainChange(FptnConfig.DEFAULT_SNI_DOMAIN)
+                            },
+                            modifier = Modifier.weight(1f).testTag("fptn_sni_reset"),
+                        ) {
+                            Text(stringResource(R.string.fptn_sni_reset))
+                        }
+                        TextButton(
+                            onClick = {
+                                val trimmed = sniDraft.trim()
+                                if (trimmed.isNotBlank()) onSniDomainChange(trimmed)
+                            },
+                            modifier = Modifier.testTag("fptn_sni_save"),
+                        ) {
+                            Text(stringResource(R.string.fptn_sni_save))
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                TextButton(
+                    onClick = { showSheet = false },
+                    modifier = Modifier.fillMaxWidth().testTag("fptn_close"),
+                ) {
+                    Text(stringResource(R.string.fptn_close))
+                }
             }
-            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }

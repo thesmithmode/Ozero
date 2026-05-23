@@ -141,6 +141,7 @@ class FptnEngineTest {
                 token = "fptn:abc",
                 selectedServerName = "S1",
                 bypassMethod = FptnBypassMethod.SNI_REALITY_CHROME_147.strategyName,
+                sniDomain = "example.com",
                 autoSelect = false,
                 reconnectOnNetworkChange = true,
                 reconnectOnIpChange = true,
@@ -154,12 +155,20 @@ class FptnEngineTest {
         assertEquals("fptn:abc", fptn.token)
         assertEquals("S1", fptn.selectedServerName)
         assertEquals(FptnBypassMethod.SNI_REALITY_CHROME_147.strategyName, fptn.bypassMethod)
+        assertEquals("example.com", fptn.sniDomain)
         assertEquals(false, fptn.autoSelect)
         assertEquals(true, fptn.reconnectOnNetworkChange)
         assertEquals(true, fptn.reconnectOnIpChange)
         assertEquals(7, fptn.maxReconnectAttempts)
         assertEquals(5, fptn.reconnectPauseSeconds)
         assertEquals(false, fptn.resetServerOnDisconnect)
+    }
+
+    @Test
+    fun `buildManualConfig propagates sniDomain`() {
+        store.inject { it.copy(token = "fptn:abc", sniDomain = "custom.example.com") }
+        val fptn = assertIs<EngineConfig.Fptn>(engine.buildManualConfig(null))
+        assertEquals("custom.example.com", fptn.sniDomain)
     }
 
     @Test
@@ -181,6 +190,52 @@ class FptnEngineTest {
             EngineConfig.Fptn.DEFAULT_BYPASS_METHOD,
             EngineConfig.Fptn().bypassMethod,
         )
+    }
+
+    @Test
+    fun `DEFAULT bypass method strategyName is SNI`() {
+        assertEquals("SNI", FptnBypassMethod.DEFAULT.strategyName)
+        assertEquals("SNI", EngineConfig.Fptn.DEFAULT_BYPASS_METHOD)
+    }
+
+    @Test
+    fun `FptnConfig DEFAULT_SNI_DOMAIN is ads x5 ru`() {
+        assertEquals("ads.x5.ru", FptnConfig.DEFAULT_SNI_DOMAIN)
+    }
+
+    @Test
+    fun `EngineConfig Fptn DEFAULT_SNI_DOMAIN is ads x5 ru`() {
+        assertEquals("ads.x5.ru", EngineConfig.Fptn.DEFAULT_SNI_DOMAIN)
+        assertEquals(EngineConfig.Fptn.DEFAULT_SNI_DOMAIN, EngineConfig.Fptn().sniDomain)
+    }
+
+    @Test
+    fun `FptnBypassMethod SNI usesSni is true`() {
+        assertEquals(true, FptnBypassMethod.SNI.usesSni)
+    }
+
+    @Test
+    fun `FptnBypassMethod OBFUSCATION usesSni is false`() {
+        assertEquals(false, FptnBypassMethod.OBFUSCATION.usesSni)
+    }
+
+    @Test
+    fun `FptnBypassMethod OBFUSCATION isReality is false`() {
+        assertEquals(false, FptnBypassMethod.OBFUSCATION.isReality)
+    }
+
+    @Test
+    fun `FptnBypassMethod reality variants all have isReality true`() {
+        FptnBypassMethod.REALITY_METHODS.forEach { method ->
+            assertEquals(true, method.isReality, "Expected ${method.name} isReality=true")
+            assertEquals(true, method.usesSni, "Expected ${method.name} usesSni=true")
+        }
+    }
+
+    @Test
+    fun `FptnBypassMethod REALITY_METHODS does not include SNI or OBFUSCATION`() {
+        assertEquals(false, FptnBypassMethod.REALITY_METHODS.contains(FptnBypassMethod.SNI))
+        assertEquals(false, FptnBypassMethod.REALITY_METHODS.contains(FptnBypassMethod.OBFUSCATION))
     }
 
     private fun validTokenB64(): String {

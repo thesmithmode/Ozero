@@ -13,13 +13,18 @@ data class FptnConfig(
     val token: String = "",
     val selectedServerName: String? = null,
     val bypassMethod: String = FptnBypassMethod.DEFAULT.strategyName,
+    val sniDomain: String = DEFAULT_SNI_DOMAIN,
     val autoSelect: Boolean = true,
     val reconnectOnNetworkChange: Boolean = true,
     val reconnectOnIpChange: Boolean = false,
     val maxReconnectAttempts: Int = 5,
     val reconnectPauseSeconds: Int = 2,
     val resetServerOnDisconnect: Boolean = true,
-)
+) {
+    companion object {
+        const val DEFAULT_SNI_DOMAIN = "ads.x5.ru"
+    }
+}
 
 class InMemoryFptnConfigStore(initial: FptnConfig = FptnConfig()) : FptnConfigStore {
     private val state = MutableStateFlow(initial)
