@@ -117,6 +117,7 @@ fun MasterDnsSettingsScreen(
             DeployCard(
                 state = state,
                 onDeployClick = viewModel::onDeployClick,
+                onUndeployClick = viewModel::onUndeployClick,
                 onDeployReset = viewModel::onDeployReset,
             )
             ServerSetupCard(onCopy = onCopy)
@@ -142,6 +143,7 @@ fun MasterDnsSettingsScreen(
 private fun DeployCard(
     state: MasterDnsSettingsState,
     onDeployClick: (host: String, port: Int, login: String, password: CharArray) -> Unit,
+    onUndeployClick: (host: String, port: Int, login: String, password: CharArray) -> Unit,
     onDeployReset: () -> Unit,
 ) {
     var host by rememberSaveable { mutableStateOf(state.serverIp) }
@@ -152,10 +154,15 @@ private fun DeployCard(
     var password by rememberSaveable { mutableStateOf("") }
 
     val deployState = state.deployState
-    val isDeploying = deployState !is MasterDnsDeployState.Idle &&
-        deployState !is MasterDnsDeployState.Done &&
-        deployState !is MasterDnsDeployState.Error
+    val isDeploying = deployState is MasterDnsDeployState.Connecting ||
+        deployState is MasterDnsDeployState.CheckingPreflight ||
+        deployState is MasterDnsDeployState.InstallingDocker ||
+        deployState is MasterDnsDeployState.BuildingImage ||
+        deployState is MasterDnsDeployState.StartingContainer ||
+        deployState is MasterDnsDeployState.ExtractingKey ||
+        deployState is MasterDnsDeployState.Removing
     val isDone = deployState is MasterDnsDeployState.Done
+    val isRemoved = deployState is MasterDnsDeployState.Removed
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp)) {
@@ -224,12 +231,21 @@ private fun DeployCard(
             Spacer(Modifier.height(12.dp))
             when {
                 isDeploying -> DeployProgressRow(deployState)
-                isDone -> DeployDoneRow()
-                deployState is MasterDnsDeployState.Error -> DeployErrorRow(
-                    error = deployState,
-                    onRetry = {
+                isDone -> DeployDoneRow(
+                    onRedeploy = {
                         onDeployReset()
                     },
+                    onUndeploy = {
+                        val port = portText.toIntOrNull() ?: 22
+                        onUndeployClick(host, port, login, password.toCharArray())
+                        password = ""
+                    },
+                    enabled = host.isNotBlank() && login.isNotBlank(),
+                )
+                isRemoved -> DeployRemovedRow(onReset = onDeployReset)
+                deployState is MasterDnsDeployState.Error -> DeployErrorRow(
+                    error = deployState,
+                    onRetry = { onDeployReset() },
                 )
                 else -> Button(
                     onClick = {
@@ -260,20 +276,63 @@ private fun DeployProgressRow(state: MasterDnsDeployState) {
 }
 
 @Composable
-private fun DeployDoneRow() {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            Icons.Filled.CheckCircle,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(20.dp),
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = stringResource(R.string.masterdns_deploy_state_done),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.primary,
-        )
+private fun DeployDoneRow(
+    onRedeploy: () -> Unit,
+    onUndeploy: () -> Unit,
+    enabled: Boolean,
+) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Filled.CheckCircle,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = stringResource(R.string.masterdns_deploy_state_done),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(onClick = onRedeploy, modifier = Modifier.weight(1f)) {
+                Text(stringResource(R.string.masterdns_redeploy_button))
+            }
+            TextButton(
+                onClick = onUndeploy,
+                modifier = Modifier.weight(1f),
+                enabled = enabled,
+            ) {
+                Text(stringResource(R.string.masterdns_remove_button))
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeployRemovedRow(onReset: () -> Unit) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Filled.CheckCircle,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = stringResource(R.string.masterdns_deploy_state_removed),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        TextButton(onClick = onReset, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.masterdns_deploy_retry_button))
+        }
     }
 }
 
@@ -307,6 +366,7 @@ private fun deployStateLabel(state: MasterDnsDeployState): String = when (state)
     is MasterDnsDeployState.BuildingImage -> stringResource(R.string.masterdns_deploy_state_building_image)
     is MasterDnsDeployState.StartingContainer -> stringResource(R.string.masterdns_deploy_state_starting_container)
     is MasterDnsDeployState.ExtractingKey -> stringResource(R.string.masterdns_deploy_state_extracting_key)
+    is MasterDnsDeployState.Removing -> stringResource(R.string.masterdns_deploy_state_removing)
     else -> ""
 }
 
@@ -320,6 +380,8 @@ private fun deployErrorMessage(code: String): String = when (code) {
     "key_extraction_failed" -> stringResource(R.string.masterdns_deploy_error_key)
     "auth_failed" -> stringResource(R.string.masterdns_deploy_error_auth)
     "connection_failed" -> stringResource(R.string.masterdns_deploy_error_connection)
+    "remove_failed" -> stringResource(R.string.masterdns_deploy_error_remove)
+    "unexpected_error" -> stringResource(R.string.masterdns_deploy_error_unexpected)
     else -> stringResource(R.string.masterdns_deploy_error_generic, code)
 }
 

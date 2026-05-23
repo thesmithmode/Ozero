@@ -3,6 +3,7 @@ package ru.ozero.app.ui.settings.engines
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -32,6 +33,7 @@ class MasterDnsSettingsViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val deployState = MutableStateFlow<MasterDnsDeployState>(MasterDnsDeployState.Idle)
+    private var deployJob: Job? = null
 
     val state: StateFlow<MasterDnsSettingsState> = combine(
         store.config(),
@@ -70,27 +72,61 @@ class MasterDnsSettingsViewModel @Inject constructor(
     }
 
     fun onDeployClick(host: String, port: Int, login: String, password: CharArray) {
+        if (deployJob?.isActive == true) return
         val credentials = MasterDnsDeployCredentials(
             host = host,
             port = port,
             login = login,
             password = password,
         )
-        viewModelScope.launch {
-            deployer.deploy(credentials).collect { deployStep ->
-                deployState.value = deployStep
-                if (deployStep is MasterDnsDeployState.Done) {
-                    runCatching {
-                        store.setConfigToml(deployStep.configToml)
-                        store.setServerIp(host)
-                        store.setServerPort(port)
-                    }.onFailure { PersistentLoggers.error(TAG, "deploy persist failed: ${it.message}", it) }
+        deployJob = viewModelScope.launch {
+            runCatching {
+                deployer.deploy(credentials).collect { deployStep ->
+                    deployState.value = deployStep
+                    if (deployStep is MasterDnsDeployState.Done) {
+                        runCatching {
+                            store.setConfigToml(deployStep.configToml)
+                            store.setServerIp(host)
+                            store.setServerPort(port)
+                        }.onFailure { PersistentLoggers.error(TAG, "deploy persist failed: ${it.message}", it) }
+                    }
                 }
+            }.onFailure {
+                PersistentLoggers.error(TAG, "deploy flow threw: ${it.message}", it)
+                deployState.value = MasterDnsDeployState.Error("unexpected_error")
+            }
+        }
+    }
+
+    fun onUndeployClick(host: String, port: Int, login: String, password: CharArray) {
+        if (deployJob?.isActive == true) return
+        val credentials = MasterDnsDeployCredentials(
+            host = host,
+            port = port,
+            login = login,
+            password = password,
+        )
+        deployJob = viewModelScope.launch {
+            runCatching {
+                deployer.undeploy(credentials).collect { step ->
+                    deployState.value = step
+                    if (step is MasterDnsDeployState.Removed) {
+                        runCatching {
+                            store.setServerIp("")
+                            store.setServerPort(22)
+                        }.onFailure { PersistentLoggers.error(TAG, "undeploy persist failed: ${it.message}", it) }
+                    }
+                }
+            }.onFailure {
+                PersistentLoggers.error(TAG, "undeploy flow threw: ${it.message}", it)
+                deployState.value = MasterDnsDeployState.Error("unexpected_error")
             }
         }
     }
 
     fun onDeployReset() {
+        deployJob?.cancel()
+        deployJob = null
         deployState.value = MasterDnsDeployState.Idle
     }
 

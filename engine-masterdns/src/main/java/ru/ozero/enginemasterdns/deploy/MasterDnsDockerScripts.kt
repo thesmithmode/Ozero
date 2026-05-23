@@ -3,7 +3,9 @@ package ru.ozero.enginemasterdns.deploy
 internal object MasterDnsDockerScripts {
 
     const val checkPort53 =
-        "ss -uln 2>/dev/null | grep -q ':53 ' && echo PORT_BUSY || echo PORT_FREE"
+        "if sudo docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^masterdns-ozero$';" +
+            " then echo PORT_FREE;" +
+            " else ss -uln 2>/dev/null | grep -q ':53 ' && echo PORT_BUSY || echo PORT_FREE; fi"
 
     const val checkResources =
         "echo \$(free -m 2>/dev/null | awk 'NR==2{print \$7}')" +
@@ -57,6 +59,14 @@ internal object MasterDnsDockerScripts {
     const val readEncryptKey =
         "sudo docker exec masterdns-ozero cat /etc/masterdnsvpn/encrypt_key.txt 2>/dev/null"
 
+    const val removeAll =
+        "sudo docker stop masterdns-ozero 2>/dev/null || true;" +
+            " sudo docker rm -f masterdns-ozero 2>/dev/null || true;" +
+            " sudo docker rmi masterdns-ozero 2>/dev/null || true;" +
+            " sudo rm -rf /tmp/mdns_build 2>/dev/null || true;" +
+            " echo REMOVE_OK"
+
+    const val MARKER_REMOVE_OK = "REMOVE_OK"
     const val MARKER_PORT_BUSY = "PORT_BUSY"
     const val MARKER_PORT_FREE = "PORT_FREE"
     const val MARKER_DOCKER_OK = "DOCKER_OK"

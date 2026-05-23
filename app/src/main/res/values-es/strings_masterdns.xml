@@ -44,4 +44,10 @@
     <string name="masterdns_deploy_error_auth">Error de autenticación. Verifique el usuario y la contraseña.</string>
     <string name="masterdns_deploy_error_connection">No se pudo conectar al servidor. Verifique la IP y el puerto SSH.</string>
     <string name="masterdns_deploy_error_generic">Error de despliegue: %1$s</string>
+    <string name="masterdns_remove_button">Eliminar servidor</string>
+    <string name="masterdns_redeploy_button">Redesplegar</string>
+    <string name="masterdns_deploy_state_removing">Eliminando contenedor e imagen…</string>
+    <string name="masterdns_deploy_state_removed">Servidor eliminado</string>
+    <string name="masterdns_deploy_error_remove">No se pudo eliminar el servidor.</string>
+    <string name="masterdns_deploy_error_unexpected">Error inesperado. Inténtelo de nuevo.</string>
 </resources>

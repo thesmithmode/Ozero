@@ -44,4 +44,10 @@
     <string name="masterdns_deploy_error_auth">Ошибка аутентификации. Проверьте логин и пароль.</string>
     <string name="masterdns_deploy_error_connection">Не удалось подключиться к серверу. Проверьте IP-адрес и SSH-порт.</string>
     <string name="masterdns_deploy_error_generic">Ошибка деплоя: %1$s</string>
+    <string name="masterdns_remove_button">Удалить сервер</string>
+    <string name="masterdns_redeploy_button">Переустановить</string>
+    <string name="masterdns_deploy_state_removing">Удаление контейнера и образа…</string>
+    <string name="masterdns_deploy_state_removed">Сервер удалён</string>
+    <string name="masterdns_deploy_error_remove">Не удалось удалить сервер.</string>
+    <string name="masterdns_deploy_error_unexpected">Непредвиденная ошибка. Попробуйте снова.</string>
 </resources>

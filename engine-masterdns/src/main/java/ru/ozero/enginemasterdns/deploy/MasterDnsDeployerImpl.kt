@@ -79,6 +79,45 @@ internal class MasterDnsDeployerImpl(
 
             val toml = buildClientToml(serverIp = credentials.host, encryptionKey = key)
             emit(MasterDnsDeployState.Done(toml))
+        } catch (e: Exception) {
+            Log.w(TAG, "deploy: unexpected error", e)
+            emit(MasterDnsDeployState.Error("unexpected_error"))
+        } finally {
+            transport.close()
+        }
+    }
+
+    override fun undeploy(credentials: MasterDnsDeployCredentials): Flow<MasterDnsDeployState> = flow {
+        emit(MasterDnsDeployState.Connecting)
+        try {
+            transport.connect(credentials.host, credentials.port)
+        } catch (e: Exception) {
+            Log.w(TAG, "undeploy: connection failed", e)
+            emit(MasterDnsDeployState.Error("connection_failed"))
+            return@flow
+        }
+        try {
+            transport.auth(credentials.login, credentials.password)
+        } catch (e: Exception) {
+            Log.w(TAG, "undeploy: auth failed", e)
+            transport.close()
+            emit(MasterDnsDeployState.Error("auth_failed"))
+            return@flow
+        } finally {
+            credentials.clear()
+        }
+
+        try {
+            emit(MasterDnsDeployState.Removing)
+            val result = transport.exec(MasterDnsDockerScripts.removeAll)
+            if (!result.contains(MasterDnsDockerScripts.MARKER_REMOVE_OK)) {
+                emit(MasterDnsDeployState.Error("remove_failed"))
+                return@flow
+            }
+            emit(MasterDnsDeployState.Removed)
+        } catch (e: Exception) {
+            Log.w(TAG, "undeploy: unexpected error", e)
+            emit(MasterDnsDeployState.Error("unexpected_error"))
         } finally {
             transport.close()
         }

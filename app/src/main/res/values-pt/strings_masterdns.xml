@@ -44,4 +44,10 @@
     <string name="masterdns_deploy_error_auth">Erro de autenticação. Verifique o login e a senha.</string>
     <string name="masterdns_deploy_error_connection">Não foi possível conectar ao servidor. Verifique o IP e a porta SSH.</string>
     <string name="masterdns_deploy_error_generic">Erro de implantação: %1$s</string>
+    <string name="masterdns_remove_button">Remover servidor</string>
+    <string name="masterdns_redeploy_button">Reimplantar</string>
+    <string name="masterdns_deploy_state_removing">Removendo contêiner e imagem…</string>
+    <string name="masterdns_deploy_state_removed">Servidor removido</string>
+    <string name="masterdns_deploy_error_remove">Falha ao remover o servidor.</string>
+    <string name="masterdns_deploy_error_unexpected">Erro inesperado. Tente novamente.</string>
 </resources>
