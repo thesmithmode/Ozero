@@ -2,6 +2,7 @@ package ru.ozero.enginemasterdns.deploy
 
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import ru.ozero.enginescore.PersistentLoggers
 
@@ -10,102 +11,13 @@ internal class MasterDnsDeployerImpl(
 ) : MasterDnsServerDeployer {
 
     override fun deploy(credentials: MasterDnsDeployCredentials): Flow<MasterDnsDeployState> = flow {
-        emit(MasterDnsDeployState.Connecting)
-        val connected = try {
-            transport.connect(credentials.host, credentials.port)
-            true
-        } catch (e: Exception) {
-            PersistentLoggers.warn(TAG, "deploy: connection failed", e)
-            transport.close()
-            emit(MasterDnsDeployState.Error("connection_failed"))
-            false
-        }
-        if (!connected) {
-            credentials.clear()
-            return@flow
-        }
-        val authed = try {
-            transport.auth(credentials.login, credentials.password)
-            true
-        } catch (e: Exception) {
-            PersistentLoggers.warn(TAG, "deploy: auth failed", e)
-            transport.close()
-            emit(MasterDnsDeployState.Error("auth_failed"))
-            false
-        } finally {
-            credentials.clear()
-        }
-        if (!authed) return@flow
-
+        if (!connectAndAuth(credentials, "deploy")) return@flow
         try {
-            val sudoError = mapSudoResult(transport.exec(MasterDnsDockerScripts.checkSudoNoPassword))
-            if (sudoError != null) {
-                emit(MasterDnsDeployState.Error(sudoError))
-                return@flow
-            }
-
-            emit(MasterDnsDeployState.CheckingPreflight)
-            val portResult = transport.exec(MasterDnsDockerScripts.checkPort53)
-            if (portResult.contains(MasterDnsDockerScripts.MARKER_PORT_BUSY)) {
-                emit(MasterDnsDeployState.Error("port_53_busy"))
-                return@flow
-            }
-
-            val resources = transport.exec(MasterDnsDockerScripts.checkResources)
-            val parts = resources.trim().split(" ")
-            val freeMem = parts.getOrNull(0)?.trim()?.toIntOrNull() ?: 0
-            val freeDisk = parts.getOrNull(1)?.trim()?.toIntOrNull() ?: 0
-            val insufficientResources = freeMem < MasterDnsDockerScripts.MIN_FREE_RAM_MB ||
-                freeDisk < MasterDnsDockerScripts.MIN_FREE_DISK_MB
-            if (insufficientResources) {
-                emit(MasterDnsDeployState.Error("insufficient_resources"))
-                return@flow
-            }
-
-            emit(MasterDnsDeployState.InstallingDocker)
-            val dockerResult = transport.exec(MasterDnsDockerScripts.installDocker, timeoutMs = 360_000L)
-            if (dockerResult.contains(MasterDnsDockerScripts.MARKER_ERR_DPKG_LOCKED)) {
-                emit(MasterDnsDeployState.Error("dpkg_locked"))
-                return@flow
-            }
-            if (!dockerResult.contains(MasterDnsDockerScripts.MARKER_DOCKER_OK)) {
-                emit(MasterDnsDeployState.Error("docker_install_failed"))
-                return@flow
-            }
-
-            emit(MasterDnsDeployState.BuildingImage)
-            val buildResult = transport.exec(MasterDnsDockerScripts.deployMasterDns, timeoutMs = 300_000L)
-            if (!buildResult.contains(MasterDnsDockerScripts.MARKER_BUILD_OK)) {
-                emit(MasterDnsDeployState.Error("build_failed"))
-                return@flow
-            }
-
-            emit(MasterDnsDeployState.StartingContainer)
-            val runResult = transport.exec(MasterDnsDockerScripts.runContainer)
-            if (!runResult.contains(MasterDnsDockerScripts.MARKER_RUN_OK)) {
-                emit(MasterDnsDeployState.Error("run_failed"))
-                return@flow
-            }
-            delay(CONTAINER_STARTUP_DELAY_MS)
-
-            val fwResult = transport.exec(MasterDnsDockerScripts.openFirewallPort53)
-            if (!fwResult.contains("FW_") || fwResult.contains(MasterDnsDockerScripts.MARKER_FW_NONE_OK)) {
-                PersistentLoggers.warn(
-                    TAG,
-                    "deploy: firewall step не открыл 53/udp (result=${fwResult.take(80)}) — продолжаем, " +
-                        "юзеру возможно придётся открыть порт вручную",
-                )
-            }
-
-            emit(MasterDnsDeployState.ExtractingKey)
-            val key = transport.exec(MasterDnsDockerScripts.readEncryptKey).trim()
-            if (key.isEmpty()) {
-                emit(MasterDnsDeployState.Error("key_extraction_failed"))
-                return@flow
-            }
-
-            val toml = buildClientToml(serverIp = credentials.host, encryptionKey = key)
-            emit(MasterDnsDeployState.Done(toml))
+            if (!preflightChecks()) return@flow
+            if (!installDocker()) return@flow
+            if (!buildAndRun()) return@flow
+            val key = extractKey() ?: return@flow
+            emit(MasterDnsDeployState.Done(buildClientToml(credentials.host, key)))
         } catch (e: Exception) {
             PersistentLoggers.warn(TAG, "deploy: unexpected error", e)
             emit(MasterDnsDeployState.Error("unexpected_error"))
@@ -115,33 +27,7 @@ internal class MasterDnsDeployerImpl(
     }
 
     override fun undeploy(credentials: MasterDnsDeployCredentials): Flow<MasterDnsDeployState> = flow {
-        emit(MasterDnsDeployState.Connecting)
-        val connected = try {
-            transport.connect(credentials.host, credentials.port)
-            true
-        } catch (e: Exception) {
-            PersistentLoggers.warn(TAG, "undeploy: connection failed", e)
-            transport.close()
-            emit(MasterDnsDeployState.Error("connection_failed"))
-            false
-        }
-        if (!connected) {
-            credentials.clear()
-            return@flow
-        }
-        val authed = try {
-            transport.auth(credentials.login, credentials.password)
-            true
-        } catch (e: Exception) {
-            PersistentLoggers.warn(TAG, "undeploy: auth failed", e)
-            transport.close()
-            emit(MasterDnsDeployState.Error("auth_failed"))
-            false
-        } finally {
-            credentials.clear()
-        }
-        if (!authed) return@flow
-
+        if (!connectAndAuth(credentials, "undeploy")) return@flow
         try {
             emit(MasterDnsDeployState.Removing)
             val result = transport.exec(MasterDnsDockerScripts.removeAll)
@@ -156,6 +42,118 @@ internal class MasterDnsDeployerImpl(
         } finally {
             transport.close()
         }
+    }
+
+    private suspend fun FlowCollector<MasterDnsDeployState>.connectAndAuth(
+        credentials: MasterDnsDeployCredentials,
+        tag: String,
+    ): Boolean {
+        emit(MasterDnsDeployState.Connecting)
+        val connected = try {
+            transport.connect(credentials.host, credentials.port)
+            true
+        } catch (e: Exception) {
+            PersistentLoggers.warn(TAG, "$tag: connection failed", e)
+            transport.close()
+            emit(MasterDnsDeployState.Error("connection_failed"))
+            false
+        }
+        if (!connected) {
+            credentials.clear()
+            return false
+        }
+        val authed = try {
+            transport.auth(credentials.login, credentials.password)
+            true
+        } catch (e: Exception) {
+            PersistentLoggers.warn(TAG, "$tag: auth failed", e)
+            transport.close()
+            emit(MasterDnsDeployState.Error("auth_failed"))
+            false
+        } finally {
+            credentials.clear()
+        }
+        return authed
+    }
+
+    private suspend fun FlowCollector<MasterDnsDeployState>.preflightChecks(): Boolean {
+        val sudoError = mapSudoResult(transport.exec(MasterDnsDockerScripts.checkSudoNoPassword))
+        if (sudoError != null) {
+            emit(MasterDnsDeployState.Error(sudoError))
+            return false
+        }
+        emit(MasterDnsDeployState.CheckingPreflight)
+        val portResult = transport.exec(MasterDnsDockerScripts.checkPort53)
+        if (portResult.contains(MasterDnsDockerScripts.MARKER_PORT_BUSY)) {
+            emit(MasterDnsDeployState.Error("port_53_busy"))
+            return false
+        }
+        return checkResources()
+    }
+
+    private suspend fun FlowCollector<MasterDnsDeployState>.checkResources(): Boolean {
+        val resources = transport.exec(MasterDnsDockerScripts.checkResources)
+        val parts = resources.trim().split(" ")
+        val freeMem = parts.getOrNull(0)?.trim()?.toIntOrNull() ?: 0
+        val freeDisk = parts.getOrNull(1)?.trim()?.toIntOrNull() ?: 0
+        if (freeMem < MasterDnsDockerScripts.MIN_FREE_RAM_MB || freeDisk < MasterDnsDockerScripts.MIN_FREE_DISK_MB) {
+            emit(MasterDnsDeployState.Error("insufficient_resources"))
+            return false
+        }
+        return true
+    }
+
+    private suspend fun FlowCollector<MasterDnsDeployState>.installDocker(): Boolean {
+        emit(MasterDnsDeployState.InstallingDocker)
+        val dockerResult = transport.exec(MasterDnsDockerScripts.installDocker, timeoutMs = 360_000L)
+        if (dockerResult.contains(MasterDnsDockerScripts.MARKER_ERR_DPKG_LOCKED)) {
+            emit(MasterDnsDeployState.Error("dpkg_locked"))
+            return false
+        }
+        if (!dockerResult.contains(MasterDnsDockerScripts.MARKER_DOCKER_OK)) {
+            emit(MasterDnsDeployState.Error("docker_install_failed"))
+            return false
+        }
+        return true
+    }
+
+    private suspend fun FlowCollector<MasterDnsDeployState>.buildAndRun(): Boolean {
+        emit(MasterDnsDeployState.BuildingImage)
+        val buildResult = transport.exec(MasterDnsDockerScripts.deployMasterDns, timeoutMs = 300_000L)
+        if (!buildResult.contains(MasterDnsDockerScripts.MARKER_BUILD_OK)) {
+            emit(MasterDnsDeployState.Error("build_failed"))
+            return false
+        }
+        emit(MasterDnsDeployState.StartingContainer)
+        val runResult = transport.exec(MasterDnsDockerScripts.runContainer)
+        if (!runResult.contains(MasterDnsDockerScripts.MARKER_RUN_OK)) {
+            emit(MasterDnsDeployState.Error("run_failed"))
+            return false
+        }
+        delay(CONTAINER_STARTUP_DELAY_MS)
+        openFirewall()
+        return true
+    }
+
+    private suspend fun openFirewall() {
+        val fwResult = transport.exec(MasterDnsDockerScripts.openFirewallPort53)
+        if (!fwResult.contains("FW_") || fwResult.contains(MasterDnsDockerScripts.MARKER_FW_NONE_OK)) {
+            PersistentLoggers.warn(
+                TAG,
+                "deploy: firewall step не открыл 53/udp (result=${fwResult.take(80)}) — продолжаем, " +
+                    "юзеру возможно придётся открыть порт вручную",
+            )
+        }
+    }
+
+    private suspend fun FlowCollector<MasterDnsDeployState>.extractKey(): String? {
+        emit(MasterDnsDeployState.ExtractingKey)
+        val key = transport.exec(MasterDnsDockerScripts.readEncryptKey).trim()
+        if (key.isEmpty()) {
+            emit(MasterDnsDeployState.Error("key_extraction_failed"))
+            return null
+        }
+        return key
     }
 
     private fun mapSudoResult(result: String): String? = when {
