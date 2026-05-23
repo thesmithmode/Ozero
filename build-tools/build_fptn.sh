@@ -64,6 +64,9 @@ compiler.libcxx=c++_shared
 compiler.cppstd=17
 build_type=Release
 
+[conf]
+tools.android:ndk_path=${NDK_HOME}
+
 [buildenv]
 ANDROID_NDK_HOME=${NDK_HOME}
 CC=${NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android${API_LEVEL}-clang
