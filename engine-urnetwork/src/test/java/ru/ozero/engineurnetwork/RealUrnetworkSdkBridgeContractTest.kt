@@ -478,7 +478,7 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
-    fun `runStartOnMain регистрирует addProvideSecretKeysListener перед initProvideSecretKeys — sentinel bug provideSecretKeys потеря`() {
+    fun `runStartOnMain addProvideSecretKeysListener регистрируется до initProvideSecretKeys sentinel`() {
         val startBlock = source.substringAfter("private suspend fun runStartOnMain")
             .substringBefore("override suspend fun stop")
         val listenerIdx = startBlock.indexOf("addProvideSecretKeysListener")
@@ -503,13 +503,13 @@ class RealUrnetworkSdkBridgeContractTest {
             .substringBefore("d.initProvideSecretKeys()")
         assertTrue(
             listenerBody.contains("localState.provideSecretKeys = "),
-            "Listener в runStartOnMain обязан сохранять generated keys через localState.provideSecretKeys = generated — " +
-                "без этого provider identity сбрасывается на каждом рестарте → сеть URnetwork не маршрутизирует трафик → 0 раздачи.",
+            "Listener в runStartOnMain обязан сохранять ключи через localState.provideSecretKeys — " +
+                "без этого provider identity сбрасывается на каждом рестарте → 0 раздачи.",
         )
     }
 
     @Test
-    fun `ensureDeviceOnMain регистрирует addProvideSecretKeysListener перед initProvideSecretKeys — sentinel bug provideSecretKeys потеря`() {
+    fun `ensureDeviceOnMain addProvideSecretKeysListener регистрируется до initProvideSecretKeys sentinel`() {
         val ensureBlock = source.substringAfter("private suspend fun ensureDeviceOnMain")
             .substringBefore("private fun applyDeviceFields")
         val listenerIdx = ensureBlock.indexOf("addProvideSecretKeysListener")
@@ -540,6 +540,23 @@ class RealUrnetworkSdkBridgeContractTest {
             listenerBody.contains("localState.byClientJwt = "),
             "addJwtRefreshListener callback обязан сохранять newJwt в localState.byClientJwt — " +
                 "иначе SDK RotationJWT не персистится через lifecycle bridge.stop()/start().",
+        )
+    }
+
+    @Test
+    fun `ensureDeviceOnMain addJwtRefreshListener присутствует — reuse device получает JWT listener`() {
+        val ensureBlock = source.substringAfter("private suspend fun ensureDeviceOnMain")
+            .substringBefore("private fun applyDeviceFields")
+        assertTrue(
+            ensureBlock.contains("addJwtRefreshListener"),
+            "ensureDeviceOnMain обязан вызывать addJwtRefreshListener — если runStartOnMain переиспользует " +
+                "этот device, JWT refresh listener иначе никогда не будет добавлен к нему.",
+        )
+        val listenerBody = ensureBlock.substringAfter("addJwtRefreshListener {")
+            .substringBefore("applyDeviceFields")
+        assertTrue(
+            listenerBody.contains("localState.byClientJwt = "),
+            "ensureDevice addJwtRefreshListener callback обязан сохранять newJwt в localState.byClientJwt.",
         )
     }
 

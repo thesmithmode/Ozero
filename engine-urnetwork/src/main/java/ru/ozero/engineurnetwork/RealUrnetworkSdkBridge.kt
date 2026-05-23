@@ -392,6 +392,13 @@ class RealUrnetworkSdkBridge(
                 Log.i(TAG, "ensureDevice: provideSecretKeys not found — generating new keys")
             }
         }
+        runCatching {
+            device.addJwtRefreshListener { newJwt ->
+                runCatching { localState.byClientJwt = newJwt }
+                    .onSuccess { Log.i(TAG, "ensureDevice: SDK JWT refreshed — localState updated") }
+                    .onFailure { PersistentLoggers.warn(TAG, "ensureDevice: JWT refresh localState: ${it.message}") }
+            }
+        }.onFailure { PersistentLoggers.warn(TAG, "ensureDevice: addJwtRefreshListener threw: ${it.message}") }
         applyDeviceFields(device, localState)
         deviceRef.set(device)
         Log.i(TAG, "initDeviceForLocations: device ready for location browse — applyDeviceFields done")
