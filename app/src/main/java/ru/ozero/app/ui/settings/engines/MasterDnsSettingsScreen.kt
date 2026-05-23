@@ -26,6 +26,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -229,6 +230,15 @@ private fun DeployCard(
                 enabled = !isDeploying,
             )
             Spacer(Modifier.height(12.dp))
+            val showProgress = isDeploying || isDone || isRemoved
+            if (showProgress) {
+                DeployProgressBar(deployState.progressPercent)
+                Spacer(Modifier.height(8.dp))
+            }
+            if (state.deployLog.isNotEmpty()) {
+                DeployLogPanel(state.deployLog)
+                Spacer(Modifier.height(8.dp))
+            }
             when {
                 isDeploying -> DeployProgressRow(deployState)
                 isDone -> DeployDoneRow(
@@ -262,6 +272,57 @@ private fun DeployCard(
         }
     }
 }
+
+@Composable
+private fun DeployProgressBar(percent: Int) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.masterdns_deploy_progress_label),
+                style = MaterialTheme.typography.labelSmall,
+            )
+            Text(
+                text = "$percent%",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        LinearProgressIndicator(
+            progress = { (percent.coerceIn(0, 100) / 100f) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+@Composable
+private fun DeployLogPanel(lines: List<String>) {
+    Surface(
+        shape = RoundedCornerShape(6.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+        ) {
+            lines.takeLast(LOG_VISIBLE_LINES).forEach { line ->
+                Text(
+                    text = line,
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+private const val LOG_VISIBLE_LINES = 10
 
 @Composable
 private fun DeployProgressRow(state: MasterDnsDeployState) {

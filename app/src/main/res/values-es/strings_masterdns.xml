@@ -21,6 +21,7 @@
     <string name="settings_masterdns_title">MasterDNS</string>
     <string name="settings_masterdns_summary">Túnel DNS — bypass de emergencia cuando todos los VPN están bloqueados.</string>
     <string name="masterdns_deploy_section_title">Despliegue automático del servidor</string>
+    <string name="masterdns_deploy_progress_label">Progreso de instalación</string>
     <string name="masterdns_vps_requirements">Requisitos del VPS: ≥512 MB RAM, 1 vCPU, ≥1 GB disco, puerto 53/UDP abierto</string>
     <string name="masterdns_deploy_host_label">IP / nombre de host del VPS</string>
     <string name="masterdns_deploy_port_label">Puerto SSH</string>

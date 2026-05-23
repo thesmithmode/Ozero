@@ -145,6 +145,66 @@ class MasterDnsSettingsViewModelTest {
     }
 
     @Test
+    fun `deploy log contains step descriptions for happy path`() = runTest {
+        val store = FakeStore(MasterDnsPersistedConfig())
+        val vm = MasterDnsSettingsViewModel(
+            store,
+            FakeDeployer(
+                deployStates = listOf(
+                    MasterDnsDeployState.Connecting,
+                    MasterDnsDeployState.CheckingPreflight,
+                    MasterDnsDeployState.InstallingDocker,
+                    MasterDnsDeployState.BuildingImage,
+                    MasterDnsDeployState.StartingContainer,
+                    MasterDnsDeployState.ExtractingKey,
+                    MasterDnsDeployState.Done("toml"),
+                ),
+            ),
+        )
+        vm.onDeployClick(host = "9.9.9.9", port = 22, login = "root", password = "p".toCharArray())
+        val state = vm.state.first { it.deployState is MasterDnsDeployState.Done }
+        val combined = state.deployLog.joinToString("\n")
+        assertTrue(combined.contains("9.9.9.9"), "лог должен содержать host: $combined")
+        assertTrue(combined.contains("Docker"), "лог должен описать шаг установки Docker: $combined")
+        assertTrue(combined.contains("encrypt_key") || combined.contains("ключ"), combined)
+        assertTrue(combined.contains("Резолверы") || combined.contains("✓"), combined)
+    }
+
+    @Test
+    fun `deploy log error step shown for user`() = runTest {
+        val store = FakeStore(MasterDnsPersistedConfig())
+        val vm = MasterDnsSettingsViewModel(
+            store,
+            FakeDeployer(
+                deployStates = listOf(
+                    MasterDnsDeployState.Connecting,
+                    MasterDnsDeployState.Error("port_53_busy"),
+                ),
+            ),
+        )
+        vm.onDeployClick(host = "1.1.1.1", port = 22, login = "root", password = "p".toCharArray())
+        val state = vm.state.first { it.deployState is MasterDnsDeployState.Error }
+        assertTrue(
+            state.deployLog.any { it.contains("port_53_busy") },
+            "лог должен показать причину ошибки: ${state.deployLog}",
+        )
+    }
+
+    @Test
+    fun `onDeployReset clears deploy log`() = runTest {
+        val store = FakeStore(MasterDnsPersistedConfig())
+        val vm = MasterDnsSettingsViewModel(
+            store,
+            FakeDeployer(deployStates = listOf(MasterDnsDeployState.Connecting, MasterDnsDeployState.Done("t"))),
+        )
+        vm.onDeployClick(host = "5.5.5.5", port = 22, login = "root", password = "p".toCharArray())
+        vm.state.first { it.deployLog.isNotEmpty() }
+        vm.onDeployReset()
+        val state = vm.state.first { it.deployLog.isEmpty() }
+        assertTrue(state.deployLog.isEmpty())
+    }
+
+    @Test
     fun `deploy success auto-enables engine`() = runTest {
         val store = FakeStore(MasterDnsPersistedConfig(enabled = false))
         val vm = MasterDnsSettingsViewModel(

@@ -11,12 +11,14 @@ internal class MasterDnsDeployerImpl(
 ) : MasterDnsServerDeployer {
 
     override fun deploy(credentials: MasterDnsDeployCredentials): Flow<MasterDnsDeployState> = flow {
+        PersistentLoggers.info(TAG, "deploy: start host=${credentials.host}:${credentials.port}")
         if (!connectAndAuth(credentials, "deploy")) return@flow
         try {
             if (!preflightChecks()) return@flow
             if (!installDocker()) return@flow
             if (!buildAndRun()) return@flow
             val key = extractKey() ?: return@flow
+            PersistentLoggers.info(TAG, "deploy: done host=${credentials.host} key_len=${key.length}")
             emit(MasterDnsDeployState.Done(buildClientToml(credentials.host, key)))
         } catch (e: Exception) {
             PersistentLoggers.warn(TAG, "deploy: unexpected error", e)
@@ -77,13 +79,18 @@ internal class MasterDnsDeployerImpl(
     }
 
     private suspend fun FlowCollector<MasterDnsDeployState>.preflightChecks(): Boolean {
-        val sudoError = mapSudoResult(transport.exec(MasterDnsDockerScripts.checkSudoNoPassword))
+        PersistentLoggers.info(TAG, "deploy: sudo check")
+        val sudoResult = transport.exec(MasterDnsDockerScripts.checkSudoNoPassword)
+        PersistentLoggers.info(TAG, "deploy: sudo result=${sudoResult.takeShort()}")
+        val sudoError = mapSudoResult(sudoResult)
         if (sudoError != null) {
             emit(MasterDnsDeployState.Error(sudoError))
             return false
         }
         emit(MasterDnsDeployState.CheckingPreflight)
+        PersistentLoggers.info(TAG, "deploy: port 53 check")
         val portResult = transport.exec(MasterDnsDockerScripts.checkPort53)
+        PersistentLoggers.info(TAG, "deploy: port result=${portResult.takeShort()}")
         if (portResult.contains(MasterDnsDockerScripts.MARKER_PORT_BUSY)) {
             emit(MasterDnsDeployState.Error("port_53_busy"))
             return false
@@ -96,6 +103,7 @@ internal class MasterDnsDeployerImpl(
         val parts = resources.trim().split(" ")
         val freeMem = parts.getOrNull(0)?.trim()?.toIntOrNull() ?: 0
         val freeDisk = parts.getOrNull(1)?.trim()?.toIntOrNull() ?: 0
+        PersistentLoggers.info(TAG, "deploy: resources freeMem=${freeMem}MB freeDisk=${freeDisk}MB")
         if (freeMem < MasterDnsDockerScripts.MIN_FREE_RAM_MB || freeDisk < MasterDnsDockerScripts.MIN_FREE_DISK_MB) {
             emit(MasterDnsDeployState.Error("insufficient_resources"))
             return false
@@ -105,7 +113,9 @@ internal class MasterDnsDeployerImpl(
 
     private suspend fun FlowCollector<MasterDnsDeployState>.installDocker(): Boolean {
         emit(MasterDnsDeployState.InstallingDocker)
+        PersistentLoggers.info(TAG, "deploy: installing docker (timeout 360s)")
         val dockerResult = transport.exec(MasterDnsDockerScripts.installDocker, timeoutMs = 360_000L)
+        PersistentLoggers.info(TAG, "deploy: docker install result=${dockerResult.takeShort()}")
         if (dockerResult.contains(MasterDnsDockerScripts.MARKER_ERR_DPKG_LOCKED)) {
             emit(MasterDnsDeployState.Error("dpkg_locked"))
             return false
@@ -119,13 +129,17 @@ internal class MasterDnsDeployerImpl(
 
     private suspend fun FlowCollector<MasterDnsDeployState>.buildAndRun(): Boolean {
         emit(MasterDnsDeployState.BuildingImage)
+        PersistentLoggers.info(TAG, "deploy: docker build masterdns-ozero (timeout 300s)")
         val buildResult = transport.exec(MasterDnsDockerScripts.deployMasterDns, timeoutMs = 300_000L)
+        PersistentLoggers.info(TAG, "deploy: build result=${buildResult.takeShort()}")
         if (!buildResult.contains(MasterDnsDockerScripts.MARKER_BUILD_OK)) {
             emit(MasterDnsDeployState.Error("build_failed"))
             return false
         }
         emit(MasterDnsDeployState.StartingContainer)
+        PersistentLoggers.info(TAG, "deploy: docker run masterdns-ozero -p 53:53/udp")
         val runResult = transport.exec(MasterDnsDockerScripts.runContainer)
+        PersistentLoggers.info(TAG, "deploy: run result=${runResult.takeShort()}")
         if (!runResult.contains(MasterDnsDockerScripts.MARKER_RUN_OK)) {
             emit(MasterDnsDeployState.Error("run_failed"))
             return false
@@ -136,7 +150,9 @@ internal class MasterDnsDeployerImpl(
     }
 
     private suspend fun openFirewall() {
+        PersistentLoggers.info(TAG, "deploy: открываю 53/udp в firewall")
         val fwResult = transport.exec(MasterDnsDockerScripts.openFirewallPort53)
+        PersistentLoggers.info(TAG, "deploy: firewall result=${fwResult.takeShort()}")
         if (!fwResult.contains("FW_") || fwResult.contains(MasterDnsDockerScripts.MARKER_FW_NONE_OK)) {
             PersistentLoggers.warn(
                 TAG,
@@ -148,7 +164,9 @@ internal class MasterDnsDeployerImpl(
 
     private suspend fun FlowCollector<MasterDnsDeployState>.extractKey(): String? {
         emit(MasterDnsDeployState.ExtractingKey)
+        PersistentLoggers.info(TAG, "deploy: читаю encrypt_key из контейнера")
         val key = transport.exec(MasterDnsDockerScripts.readEncryptKey).trim()
+        PersistentLoggers.info(TAG, "deploy: encrypt_key len=${key.length}")
         if (key.isEmpty()) {
             emit(MasterDnsDeployState.Error("key_extraction_failed"))
             return null
@@ -176,6 +194,9 @@ internal class MasterDnsDeployerImpl(
         SERVER = "$serverIp"
         DOMAINS = []
         """.trimIndent()
+
+    private fun String.takeShort(maxLen: Int = 160): String =
+        replace('\n', ' ').replace('\r', ' ').trim().take(maxLen)
 
     private companion object {
         const val TAG = "MasterDnsDeployer"

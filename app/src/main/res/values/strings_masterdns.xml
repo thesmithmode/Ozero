@@ -21,6 +21,7 @@
     <string name="settings_masterdns_title">MasterDNS</string>
     <string name="settings_masterdns_summary">DNS-туннель для экстренного обхода полной блокировки VPN.</string>
     <string name="masterdns_deploy_section_title">Автодеплой сервера</string>
+    <string name="masterdns_deploy_progress_label">Прогресс установки</string>
     <string name="masterdns_vps_requirements">Требования к VPS: ≥512 МБ RAM, 1 vCPU, ≥1 ГБ диск, порт 53/UDP открыт</string>
     <string name="masterdns_deploy_host_label">IP-адрес / хост VPS</string>
     <string name="masterdns_deploy_port_label">SSH-порт</string>
