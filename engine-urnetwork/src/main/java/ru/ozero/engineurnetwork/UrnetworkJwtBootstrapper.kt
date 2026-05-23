@@ -30,8 +30,13 @@ class RealUrnetworkJwtBootstrapper(
     private val mutex = Mutex()
 
     override suspend fun ensureClientJwt(): UrnetworkJwtBootstrapper.Result = mutex.withLock {
-        val preCheck = configStore.byClientJwt().first()
-        if (preCheck != null) return@withLock UrnetworkJwtBootstrapper.Result.AlreadyPresent
+        val preCjwt = configStore.byClientJwt().first()
+        val preByJwt = configStore.byJwt().first()
+        val prePubkey = configStore.devicePubkey().first()
+        val migrationPending = preByJwt != null && prePubkey.isNullOrBlank() && deviceIdentity != null
+        if (preCjwt != null && !migrationPending) {
+            return@withLock UrnetworkJwtBootstrapper.Result.AlreadyPresent
+        }
 
         val byJwt = ensureGuestJwt()
             ?: return@withLock UrnetworkJwtBootstrapper.Result.Failed(

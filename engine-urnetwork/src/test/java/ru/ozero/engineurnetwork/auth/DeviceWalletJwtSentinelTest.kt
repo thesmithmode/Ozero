@@ -20,7 +20,7 @@ class DeviceWalletJwtSentinelTest {
 
     private val engineSource: String by lazy {
         val moduleRoot = File(System.getProperty("user.dir") ?: ".")
-        File(moduleRoot, "src/main/java/ru/ozero/engineurnetwork/EngineUrnetwork.kt").readText()
+        File(moduleRoot, "src/main/java/ru/ozero/engineurnetwork/UrnetworkJwtBootstrapper.kt").readText()
     }
 
     @Test
