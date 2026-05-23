@@ -51,6 +51,7 @@ class RealUrnetworkSdkBridge(
     private val connectVcRef = AtomicReference<ConnectViewController?>(null)
     private val walletVcRef = AtomicReference<WalletViewController?>(null)
     private val unpaidBytesRef = AtomicReference(0L)
+    private val sharingTrafficLogged = AtomicBoolean(false)
     private val running = AtomicBoolean(false)
     private val preferredLocationRef = AtomicReference<UrnetworkLocationSelection?>(null)
     private val bridgeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -193,24 +194,47 @@ class RealUrnetworkSdkBridge(
             PersistentLoggers.error(TAG, "node start: routing controller null — connectivity unavailable")
         }
 
+        setupWalletControllerAndPipeline(device, walletAddress)
+        contractStatusListener.attach(device)
+        running.set(true)
+        PersistentLoggers.info(TAG, "node start: ready — awaiting attach(fd)")
+        return UrnetworkSdkBridge.StartResult.Success
+    }
+
+    private suspend fun setupWalletControllerAndPipeline(device: DeviceLocal, walletAddress: String) {
         val walletVcStarted = runCatching {
             val walletVc = device.openWalletViewController()
             walletVcRef.set(walletVc)
-            walletVc?.addUnpaidByteCountListener { ubc -> unpaidBytesRef.set(ubc) }
+            walletVc?.addUnpaidByteCountListener { ubc ->
+                unpaidBytesRef.set(ubc)
+                if (ubc > 0L && sharingTrafficLogged.compareAndSet(false, true)) {
+                    PersistentLoggers.info(
+                        TAG,
+                        "relay sharing: traffic forwarded — accumulated_bytes=$ubc " +
+                            "(peer consumed bandwidth, accumulator active)",
+                    )
+                }
+            }
             walletVc?.start()
             walletVc?.fetchTransferStats()
             PersistentLoggers.info(TAG, "node start: account controller opened — metrics listener attached")
             walletVc
         }.onFailure {
             PersistentLoggers.warn(TAG, "node start: account controller init threw: ${it.message}")
-        }.getOrNull()
-        if (walletVcStarted != null) {
-            payoutWalletSetup.configure(walletVcStarted, walletAddress)
+        }.getOrNull() ?: return
+        val bound = payoutWalletSetup.configure(walletVcStarted, walletAddress)
+        if (bound) {
+            PersistentLoggers.info(
+                TAG,
+                "relay sharing: endpoint bound — accumulator armed, traffic-forwarding ready",
+            )
+        } else {
+            PersistentLoggers.warn(
+                TAG,
+                "relay sharing: endpoint deferred — accumulator pending registration, " +
+                    "retry on next start (relay продолжит работу, привязка повторится)",
+            )
         }
-        contractStatusListener.attach(device)
-        running.set(true)
-        PersistentLoggers.info(TAG, "node start: ready — awaiting attach(fd)")
-        return UrnetworkSdkBridge.StartResult.Success
     }
 
     override suspend fun stop() {
@@ -235,6 +259,7 @@ class RealUrnetworkSdkBridge(
     private suspend fun stopUnderLock() {
         runCatching { bridgeScope.coroutineContext.cancelChildren() }
         contractStatusListener.detach()
+        sharingTrafficLogged.set(false)
         val completed = withTimeoutOrNull(STOP_TIMEOUT_MS) {
             withContext(Dispatchers.Main.immediate) {
                 walletVcRef.getAndSet(null)?.also { vc ->

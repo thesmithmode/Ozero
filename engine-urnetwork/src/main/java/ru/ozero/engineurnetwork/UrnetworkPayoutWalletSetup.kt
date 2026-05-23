@@ -11,12 +11,12 @@ import ru.ozero.enginescore.PersistentLoggers
 
 internal class UrnetworkPayoutWalletSetup {
 
-    suspend fun configure(walletVc: WalletViewController, walletAddress: String) {
+    suspend fun configure(walletVc: WalletViewController, walletAddress: String): Boolean {
         if (walletAddress.isBlank()) {
             Log.i(TAG, "endpoint sync skipped: target not configured")
-            return
+            return false
         }
-        runCatching {
+        return runCatching {
             val initialCount = currentWalletCount(walletVc)
             PersistentLoggers.info(
                 TAG,
@@ -53,16 +53,18 @@ internal class UrnetworkPayoutWalletSetup {
             if (walletId != null) {
                 walletVc.updatePayoutWallet(walletId)
                 PersistentLoggers.info(TAG, "endpoint sync: registry id bound — routing active")
+                true
             } else {
                 PersistentLoggers.warn(
                     TAG,
                     "endpoint sync: registry id not resolved after fetch+register (entries=" +
                         "${currentWalletCount(walletVc)})",
                 )
+                false
             }
         }.onFailure {
             PersistentLoggers.warn(TAG, "endpoint sync threw: ${it.message}")
-        }
+        }.getOrDefault(false)
     }
 
     private suspend fun awaitWalletsChanged(
@@ -108,7 +110,7 @@ internal class UrnetworkPayoutWalletSetup {
     private companion object {
         const val TAG = "UrnAccountSync"
         const val WALLET_FETCH_TIMEOUT_MS = 5_000L
-        const val WALLET_ADD_TIMEOUT_MS = 10_000L
+        const val WALLET_ADD_TIMEOUT_MS = 30_000L
         const val WALLET_BLOCKCHAIN_SOLANA = "solana"
     }
 }
