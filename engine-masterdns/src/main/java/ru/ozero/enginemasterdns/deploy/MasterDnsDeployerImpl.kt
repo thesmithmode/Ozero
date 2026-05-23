@@ -101,6 +101,15 @@ internal class MasterDnsDeployerImpl(
             }
             delay(CONTAINER_STARTUP_DELAY_MS)
 
+            val fwResult = transport.exec(MasterDnsDockerScripts.openFirewallPort53)
+            if (!fwResult.contains("FW_") || fwResult.contains(MasterDnsDockerScripts.MARKER_FW_NONE_OK)) {
+                PersistentLoggers.warn(
+                    TAG,
+                    "deploy: firewall step не открыл 53/udp (result=${fwResult.take(80)}) — продолжаем, " +
+                        "юзеру возможно придётся открыть порт вручную",
+                )
+            }
+
             emit(MasterDnsDeployState.ExtractingKey)
             val key = transport.exec(MasterDnsDockerScripts.readEncryptKey).trim()
             if (key.isEmpty()) {

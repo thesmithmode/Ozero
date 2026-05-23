@@ -84,6 +84,20 @@ internal object MasterDnsDockerScripts {
             "if [ \$rc -eq 42 ]; then sudo docker restart masterdns-ozero >/dev/null 2>&1; fi; " +
             "echo RUN_OK"
 
+    const val openFirewallPort53 =
+        "if command -v ufw >/dev/null 2>&1 && sudo ufw status 2>/dev/null | grep -q 'Status: active';" +
+            " then sudo ufw allow 53/udp >/dev/null 2>&1 && echo FW_UFW_OK;" +
+            " elif command -v firewall-cmd >/dev/null 2>&1 && sudo firewall-cmd --state >/dev/null 2>&1;" +
+            " then sudo firewall-cmd --permanent --add-port=53/udp >/dev/null 2>&1" +
+            " && sudo firewall-cmd --reload >/dev/null 2>&1 && echo FW_FIREWALLD_OK;" +
+            " elif command -v iptables >/dev/null 2>&1;" +
+            " then sudo iptables -C INPUT -p udp --dport 53 -j ACCEPT 2>/dev/null" +
+            " || sudo iptables -A INPUT -p udp --dport 53 -j ACCEPT;" +
+            " if command -v iptables-save >/dev/null 2>&1 && [ -d /etc/iptables ];" +
+            " then sudo iptables-save | sudo tee /etc/iptables/rules.v4 >/dev/null 2>&1; fi;" +
+            " echo FW_IPTABLES_OK;" +
+            " else echo FW_NONE_OK; fi"
+
     const val readEncryptKey =
         "sudo docker exec masterdns-ozero cat /etc/masterdnsvpn/encrypt_key.txt 2>/dev/null"
 
@@ -111,6 +125,10 @@ internal object MasterDnsDockerScripts {
     const val MARKER_ERR_SUDO_NOT_ALLOWED = "ERR_SUDO_NOT_ALLOWED"
     const val MARKER_ERR_SUDO_NO_HOME = "ERR_SUDO_NO_HOME"
     const val MARKER_ERR_SUDO_NOT_IN_GROUP = "ERR_SUDO_NOT_IN_GROUP"
+    const val MARKER_FW_UFW_OK = "FW_UFW_OK"
+    const val MARKER_FW_FIREWALLD_OK = "FW_FIREWALLD_OK"
+    const val MARKER_FW_IPTABLES_OK = "FW_IPTABLES_OK"
+    const val MARKER_FW_NONE_OK = "FW_NONE_OK"
 
     const val MIN_FREE_RAM_MB = 256
     const val MIN_FREE_DISK_MB = 500
