@@ -1,5 +1,6 @@
 package ru.ozero.enginemasterdns.deploy
 
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -83,5 +84,44 @@ class MasterDnsDockerScriptsContractTest {
             MasterDnsDockerScripts.MARKER_ERR_DPKG_LOCKED == "ERR_DPKG_LOCKED",
             "Constant marker для consumer-mapping (MasterDnsDeployerImpl парсит этот marker → DeployFailure).",
         )
+    }
+
+    @Test
+    fun `checkSudoNoPassword script clears sudo cache before probe`() {
+        val script = MasterDnsDockerScripts.checkSudoNoPassword
+        assertTrue(
+            script.contains("sudo -K"),
+            "sudo -K обязателен перед probe — иначе cached credentials дадут false SUDO_OK " +
+                "на серверах где пароль требуется но кэш ещё не истёк.",
+        )
+    }
+
+    @Test
+    fun `checkSudoNoPassword emits SUDO_OK for root user without running sudo`() {
+        val script = MasterDnsDockerScripts.checkSudoNoPassword
+        assertTrue(
+            script.contains("whoami") && script.contains("root"),
+            "Root user должен получать SUDO_OK без sudo probe — sudo для root всегда available.",
+        )
+    }
+
+    @Test
+    fun `checkSudoNoPassword emits all 5 distinct error markers`() {
+        val script = MasterDnsDockerScripts.checkSudoNoPassword
+        assertTrue(script.contains("ERR_SUDO_NOT_INSTALLED"), "marker для отсутствия sudo binary")
+        assertTrue(script.contains("ERR_SUDO_PWD_REQUIRED"), "marker когда пароль требуется")
+        assertTrue(script.contains("ERR_SUDO_NOT_ALLOWED"), "marker когда запрещён в sudoers")
+        assertTrue(script.contains("ERR_SUDO_NO_HOME"), "marker когда home dir недоступен")
+        assertTrue(script.contains("ERR_SUDO_NOT_IN_GROUP"), "marker когда не в sudo/wheel группе")
+    }
+
+    @Test
+    fun `sudo markers are exposed as constants for deployer mapping`() {
+        assertEquals("ERR_SUDO_NOT_INSTALLED", MasterDnsDockerScripts.MARKER_ERR_SUDO_NOT_INSTALLED)
+        assertEquals("ERR_SUDO_PWD_REQUIRED", MasterDnsDockerScripts.MARKER_ERR_SUDO_PWD_REQUIRED)
+        assertEquals("ERR_SUDO_NOT_ALLOWED", MasterDnsDockerScripts.MARKER_ERR_SUDO_NOT_ALLOWED)
+        assertEquals("ERR_SUDO_NO_HOME", MasterDnsDockerScripts.MARKER_ERR_SUDO_NO_HOME)
+        assertEquals("ERR_SUDO_NOT_IN_GROUP", MasterDnsDockerScripts.MARKER_ERR_SUDO_NOT_IN_GROUP)
+        assertEquals("SUDO_OK", MasterDnsDockerScripts.MARKER_SUDO_OK)
     }
 }

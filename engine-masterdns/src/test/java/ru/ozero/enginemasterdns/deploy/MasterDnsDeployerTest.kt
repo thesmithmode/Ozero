@@ -110,6 +110,46 @@ class MasterDnsDeployerTest {
     }
 
     @Test
+    fun `should emit sudo_not_installed error when sudo binary absent`() = runTest {
+        transport.setResponse("sudo -K", MasterDnsDockerScripts.MARKER_ERR_SUDO_NOT_INSTALLED)
+        val states = deployer.deploy(credentials()).toList()
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("sudo_not_installed", error.message)
+    }
+
+    @Test
+    fun `should emit sudo_pwd_required error when password needed`() = runTest {
+        transport.setResponse("sudo -K", MasterDnsDockerScripts.MARKER_ERR_SUDO_PWD_REQUIRED)
+        val states = deployer.deploy(credentials()).toList()
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("sudo_pwd_required", error.message)
+    }
+
+    @Test
+    fun `should emit sudo_not_allowed error when user denied in sudoers`() = runTest {
+        transport.setResponse("sudo -K", MasterDnsDockerScripts.MARKER_ERR_SUDO_NOT_ALLOWED)
+        val states = deployer.deploy(credentials()).toList()
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("sudo_not_allowed", error.message)
+    }
+
+    @Test
+    fun `should emit sudo_no_home error when home dir inaccessible`() = runTest {
+        transport.setResponse("sudo -K", MasterDnsDockerScripts.MARKER_ERR_SUDO_NO_HOME)
+        val states = deployer.deploy(credentials()).toList()
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("sudo_no_home", error.message)
+    }
+
+    @Test
+    fun `should emit sudo_not_in_group error when user not in sudo group`() = runTest {
+        transport.setResponse("sudo -K", MasterDnsDockerScripts.MARKER_ERR_SUDO_NOT_IN_GROUP)
+        val states = deployer.deploy(credentials()).toList()
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("sudo_not_in_group", error.message)
+    }
+
+    @Test
     fun `should emit distinct dpkg_locked error when apt lock polling exhausts`() = runTest {
         transport.setResponse("apt-get", MasterDnsDockerScripts.MARKER_ERR_DPKG_LOCKED)
 
