@@ -40,6 +40,8 @@ class DataStoreFptnConfigStore(
         selectedServerName = prefs[KEY_SELECTED_SERVER]?.takeIf { it.isNotBlank() },
         bypassMethod = prefs[KEY_BYPASS_METHOD]?.takeIf { it.isNotBlank() }
             ?: FptnBypassMethod.DEFAULT.strategyName,
+        sniDomain = prefs[KEY_SNI_DOMAIN]?.takeIf { it.isNotBlank() }
+            ?: FptnConfig.DEFAULT_SNI_DOMAIN,
         autoSelect = prefs[KEY_AUTO_SELECT] != false,
         reconnectOnNetworkChange = prefs[KEY_RECONNECT_NETWORK] != false,
         reconnectOnIpChange = prefs[KEY_RECONNECT_IP] == true,
@@ -56,6 +58,7 @@ class DataStoreFptnConfigStore(
             prefs.remove(KEY_SELECTED_SERVER)
         }
         prefs[KEY_BYPASS_METHOD] = cfg.bypassMethod
+        prefs[KEY_SNI_DOMAIN] = cfg.sniDomain
         prefs[KEY_AUTO_SELECT] = cfg.autoSelect
         prefs[KEY_RECONNECT_NETWORK] = cfg.reconnectOnNetworkChange
         prefs[KEY_RECONNECT_IP] = cfg.reconnectOnIpChange
@@ -68,6 +71,7 @@ class DataStoreFptnConfigStore(
         private val KEY_TOKEN = stringPreferencesKey("fptn_token")
         private val KEY_SELECTED_SERVER = stringPreferencesKey("fptn_selected_server")
         private val KEY_BYPASS_METHOD = stringPreferencesKey("fptn_bypass_method")
+        private val KEY_SNI_DOMAIN = stringPreferencesKey("fptn_sni_domain")
         private val KEY_AUTO_SELECT = booleanPreferencesKey("fptn_auto_select")
         private val KEY_RECONNECT_NETWORK = booleanPreferencesKey("fptn_reconnect_network")
         private val KEY_RECONNECT_IP = booleanPreferencesKey("fptn_reconnect_ip")

@@ -60,8 +60,13 @@ os.api_level=${API_LEVEL}
 arch=armv8
 compiler=clang
 compiler.version=${CLANG_VERSION}
-compiler.libcxx=c++_shared
+compiler.libcxx=c++_static
+compiler.cppstd=17
 build_type=Release
+
+[conf]
+tools.android:ndk_path=${NDK_HOME}
+tools.cmake.cmaketoolchain:generator=Ninja
 
 [buildenv]
 ANDROID_NDK_HOME=${NDK_HOME}
@@ -71,6 +76,11 @@ AR=${NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
 RANLIB=${NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ranlib
 STRIP=${NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip
 EOF
+
+# Ensure build profile (for host-machine packages like protobuf) also uses Ninja.
+if ! grep -q "tools.cmake.cmaketoolchain:generator" "$CONAN_PROFILE_DIR/default" 2>/dev/null; then
+    echo -e "\n[conf]\ntools.cmake.cmaketoolchain:generator=Ninja" >> "$CONAN_PROFILE_DIR/default"
+fi
 
 # ---------------------------------------------------------------------------
 # 4. Install Conan deps (nlohmann_json + fptn via local recipe)
@@ -91,15 +101,22 @@ conan install "$CPP_SRC" \
 rm -rf "$BUILD_DIR/cmake-build"
 mkdir -p "$BUILD_DIR/cmake-build"
 
+CONAN_GENERATORS="$CONAN_INSTALL_DIR/build/Release/generators"
+
+# Pre-populate CamouflageTLS so FetchContent skips download and uses our patched copy.
+# camouflage-tls CMakeLists.txt unconditionally adds tests/ and example/ — no BUILD_TESTING guard.
+CAMTLS_DIR="$BUILD_DIR/camouflage-tls-src"
+if [[ ! -d "$CAMTLS_DIR/.git" ]]; then
+    git clone --depth 1 https://github.com/fptn-project/camouflage-tls.git "$CAMTLS_DIR"
+fi
+sed -i '/^add_subdirectory(example)/d; /^enable_testing/d; /^add_subdirectory(tests)/d; /^include_directories(tests/d' "$CAMTLS_DIR/CMakeLists.txt"
+
 cmake \
     -S "$CPP_SRC" \
     -B "$BUILD_DIR/cmake-build" \
-    -DCMAKE_TOOLCHAIN_FILE="$NDK_HOME/build/cmake/android.toolchain.cmake" \
-    -DANDROID_ABI="$ABI" \
-    -DANDROID_PLATFORM="android-$API_LEVEL" \
+    -DCMAKE_TOOLCHAIN_FILE="$CONAN_GENERATORS/conan_toolchain.cmake" \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_FIND_ROOT_PATH="$CONAN_INSTALL_DIR" \
-    -DCMAKE_PREFIX_PATH="$CONAN_INSTALL_DIR" \
+    -DFETCHCONTENT_SOURCE_DIR_CAMOUFLAGETLS="$CAMTLS_DIR" \
     -G Ninja
 
 cmake --build "$BUILD_DIR/cmake-build" --parallel

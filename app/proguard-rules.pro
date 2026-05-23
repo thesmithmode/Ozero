@@ -85,6 +85,18 @@
 -keep class com.bringyour.sdk.** { *; }
 -dontwarn com.bringyour.sdk.**
 
+-keep class net.schmizz.sshj.** { *; }
+-keep interface net.schmizz.sshj.** { *; }
+-dontwarn net.schmizz.sshj.**
+-keep class com.hierynomus.** { *; }
+-dontwarn com.hierynomus.**
+-keep class net.i2p.crypto.eddsa.** { *; }
+-dontwarn net.i2p.crypto.eddsa.**
+-dontwarn sun.security.**
+-dontwarn javax.naming.**
+-dontwarn com.jcraft.jzlib.**
+-dontwarn org.slf4j.**
+
 -keep class **_MapFactory { *; }
 -keep class **_InjectedMapFactory { *; }
 -keep class **_MapKeys { *; }

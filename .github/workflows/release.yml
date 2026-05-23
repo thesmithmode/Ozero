@@ -161,6 +161,29 @@ jobs:
           fi
           gh release download "$TAG" -p "*" -D engine-urnetwork/libs --clobber
 
+      - name: Download FPTN native lib
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          DST="engine-fptn/src/main/jniLibs/arm64-v8a/libfptn_native_lib.so"
+          if [ -f "$DST" ] && [ "$(stat -c%s "$DST")" -gt 1000 ]; then
+            echo "libfptn_native_lib.so already in repo — skipping download"
+            exit 0
+          fi
+          TAG=$(gh release list --limit 100 --json tagName \
+            | grep -oE '"fptn-[a-f0-9]{8}"' \
+            | head -n1 | tr -d '"')
+          if [ -z "$TAG" ]; then
+            echo "::error::no fptn release found — run binaries.yml with artifact=fptn first"
+            exit 1
+          fi
+          mkdir -p "$(dirname "$DST")"
+          gh release download "$TAG" -p "libfptn_native_lib-arm64-v8a.so" \
+            -D /tmp/fptn-dl --clobber
+          cp /tmp/fptn-dl/libfptn_native_lib-arm64-v8a.so "$DST"
+          echo "Downloaded $DST from $TAG"
+
       - name: Build signed release APK
         env:
           OZERO_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
@@ -204,6 +227,22 @@ jobs:
             exit 1
           fi
           echo "APK содержит libbyedpi.so (arm64-v8a)"
+
+      - name: Assert APK содержит libfptn_native_lib.so (arm64-v8a)
+        run: |
+          set -euo pipefail
+          APK=$(find app/build/outputs/apk/release -name '*.apk' | head -n1)
+          if ! unzip -l "$APK" | grep -q "lib/arm64-v8a/libfptn_native_lib.so"; then
+            echo "::error::В APK отсутствует lib/arm64-v8a/libfptn_native_lib.so"
+            unzip -l "$APK" | grep -E "lib/arm64-v8a/" || true
+            exit 1
+          fi
+          SIZE=$(unzip -l "$APK" "lib/arm64-v8a/libfptn_native_lib.so" | awk 'NR==4{print $1}')
+          if [ "$SIZE" -lt 50000 ]; then
+            echo "::error::libfptn_native_lib.so подозрительно мал ($SIZE байт)"
+            exit 1
+          fi
+          echo "APK содержит libfptn_native_lib.so (arm64-v8a)"
 
       - name: Assert WARP libam-go.so SHA256 == PORTAL_WG_v1.4.3 reference
         run: |

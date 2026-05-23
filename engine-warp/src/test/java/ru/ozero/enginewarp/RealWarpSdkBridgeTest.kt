@@ -212,6 +212,25 @@ class RealWarpSdkBridgeTest {
     }
 
     @Test
+    fun `attachTun protect throws — Failed и turnOff rollback (AttachResult contract)`() = runTest {
+        val rt = FakeAwgRuntime(returnHandle = 5, socketV4 = 100, socketV6 = 0)
+        val (b, _) = bridgeWith(rt)
+        val throwingProtector = VpnSocketProtector { error("vpn-service-died") }
+        val r = b.attachTun("n", 5, validIni, "/x", throwingProtector)
+        val f = assertIs<WarpSdkBridge.AttachResult.Failed>(r)
+        assertTrue(
+            f.reason.contains("vpn-service-died"),
+            "AttachResult.Failed.reason должен включать оригинальное сообщение исключения protect",
+        )
+        assertEquals(
+            1,
+            rt.turnOffCalls,
+            "при throw из protect — обязан вызвать turnOff rollback, иначе AWG handle leak",
+        )
+        assertFalse(b.isRunning())
+    }
+
+    @Test
     fun `attachTun — protect v4 false → Failed и turnOff (rollback)`() = runTest {
         val rt = FakeAwgRuntime(returnHandle = 1, socketV4 = 100, socketV6 = 0)
         val (b, _) = bridgeWith(rt)

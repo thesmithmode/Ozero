@@ -35,8 +35,9 @@ internal object WarpHandshakeUapi {
         val sockets = File(uapiPath, "sockets")
         val preferred = File(sockets, "$tunnelName.sock")
         if (preferred.exists()) return preferred
-        val anySock = sockets.listFiles { f -> f.name.endsWith(".sock") }?.firstOrNull()
-        if (anySock != null) return anySock
+        val newest = sockets.listFiles { f -> f.name.endsWith(".sock") }
+            ?.maxByOrNull { it.lastModified() }
+        if (newest != null) return newest
         val legacy = File(uapiPath, "$tunnelName.sock")
         return if (legacy.exists()) legacy else null
     }

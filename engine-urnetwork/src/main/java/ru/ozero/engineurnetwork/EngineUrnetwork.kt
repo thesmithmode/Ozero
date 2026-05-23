@@ -13,11 +13,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import ru.ozero.engineurnetwork.auth.ClientJwtResult
-import ru.ozero.engineurnetwork.auth.DeviceWalletJwtResult
-import ru.ozero.engineurnetwork.auth.GuestJwtResult
-import ru.ozero.engineurnetwork.auth.UrnetworkAuthService
-import ru.ozero.engineurnetwork.auth.UrnetworkDeviceIdentity
 import ru.ozero.enginescore.EngineCapabilities
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
@@ -36,9 +31,7 @@ import java.util.concurrent.atomic.AtomicReference
 class EngineUrnetwork(
     private val configStore: UrnetworkConfigStore,
     private val sdkBridge: UrnetworkSdkBridge,
-    private val authService: UrnetworkAuthService,
-    private val deviceIdentity: UrnetworkDeviceIdentity?,
-    private val networkNameGenerator: () -> String = { defaultNetworkName() },
+    private val jwtBootstrapper: UrnetworkJwtBootstrapper,
     private val pluginScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
     private val statsPollIntervalMs: Long = STATS_POLL_INTERVAL_MS,
     private val peerReadyTimeoutMs: Long = PEER_READY_TIMEOUT_MS,
@@ -78,12 +71,14 @@ class EngineUrnetwork(
             "EngineUrnetwork не принимает upstream — supportsUpstreamSocks=false"
         }
 
-        val byJwt = ensureGuestJwt() ?: return StartResult.Failure(
-            reason = "URnetwork guest jwt acquire failed — нет интернета или сервер недоступен",
-        )
-
-        val byClientJwt = ensureClientJwt(byJwt) ?: return StartResult.Failure(
-            reason = "URnetwork client jwt acquire failed — нет интернета или сервер недоступен",
+        when (val r = jwtBootstrapper.ensureClientJwt()) {
+            UrnetworkJwtBootstrapper.Result.AlreadyPresent,
+            UrnetworkJwtBootstrapper.Result.Acquired -> Unit
+            is UrnetworkJwtBootstrapper.Result.Failed ->
+                return StartResult.Failure(reason = r.reason)
+        }
+        val byClientJwt = configStore.byClientJwt().first() ?: return StartResult.Failure(
+            reason = "URnetwork client jwt missing after bootstrap — race condition",
         )
 
         val wallet = configStore.walletAddress().first()
@@ -112,6 +107,7 @@ class EngineUrnetwork(
                     .onFailure { PersistentLoggers.warn(TAG, "applyPerformanceProfile threw: ${it.message}") }
                 val provideEnabled = configStore.provideEnabled().first()
                 runCatching { sdkBridge.setProvidePaused(!provideEnabled) }
+                    .onSuccess { Log.i(TAG, "setProvidePaused(${!provideEnabled}) — provideEnabled=$provideEnabled") }
                     .onFailure { PersistentLoggers.warn(TAG, "setProvidePaused threw: ${it.message}") }
                 val controlMode = configStore.provideControlMode().first()
                 runCatching { sdkBridge.setProvideControlMode(controlMode) }
@@ -240,112 +236,15 @@ class EngineUrnetwork(
         }
     }
 
-    private suspend fun ensureGuestJwt(): String? {
-        val existing = configStore.byJwt().first()
-        val pubkey = configStore.devicePubkey().first()
-        if (existing != null && !pubkey.isNullOrBlank()) return existing
-        val deviceJwt = tryAcquireDeviceJwt(legacyMigration = existing != null)
-        if (deviceJwt != null) return deviceJwt
-        if (existing != null) {
-            PersistentLoggers.info(TAG, "device walletAuth unavailable — keeping legacy guest byJwt")
-            return existing
-        }
-        PersistentLoggers.info(TAG, "device walletAuth unavailable — fallback to guest network")
-        return when (val r = authService.acquireGuestJwt()) {
-            is GuestJwtResult.Success -> {
-                configStore.setByJwt(r.byJwt)
-                Log.i(TAG, "guest jwt acquired and persisted")
-                r.byJwt
-            }
-            is GuestJwtResult.Error -> {
-                PersistentLoggers.error(TAG, "acquireGuestJwt failed: ${r.message}")
-                null
-            }
-        }
-    }
-
-    // walletAuth migration критична: каждый Ozero-юзер должен иметь свою URnetwork-network
-    // (per-device Ed25519 identity), payout = PRESET_WALLET общий. БЕЗ migration legacy guest
-    // юзеры остаются на shared guest network → НЕ становятся per-user providers → выплаты не идут.
-    //
-    // Заметка о startBalance > 34 GiB: НЕ баг клиента. Бэкенд добавляет строку в transfer_balance
-    // при каждом ежедневном кроне (RefreshTransferBalanceDuration=30ч, крон=каждые 24ч). SubscriptionBalance
-    // суммирует ВСЕ активные строки. При создании сети незадолго до полуночи UTC → 3 строки могут
-    // быть активны одновременно (overlap window ~5ч) → startBalance = 3×34 = 102 GiB. Само падает.
-    // UX fix: кэпировать отображение на 34 GiB (free tier) в UrnetworkBalanceCard.
-    private suspend fun tryAcquireDeviceJwt(legacyMigration: Boolean): String? {
-        val identity = deviceIdentity ?: return null
-        val storedName = configStore.deviceNetworkName().first()
-        val networkName = storedName?.takeIf { it.isNotBlank() } ?: networkNameGenerator()
-        PersistentLoggers.info(
-            TAG,
-            if (legacyMigration) {
-                "device walletAuth — migrating legacy guest byJwt to per-device keypair"
-            } else {
-                "device walletAuth — acquiring jwt via per-device keypair"
-            },
-        )
-        return when (val r = authService.acquireDeviceWalletJwt(identity, networkName)) {
-            is DeviceWalletJwtResult.Success -> {
-                val pubkey = runCatching { identity.pubkeyBase58() }.getOrNull()
-                configStore.update { cfg ->
-                    cfg.copy(
-                        byJwt = r.byJwt,
-                        byClientJwt = if (legacyMigration) null else cfg.byClientJwt,
-                        devicePubkey = pubkey ?: cfg.devicePubkey,
-                        deviceNetworkName = networkName,
-                    )
-                }
-                Log.i(
-                    TAG,
-                    "device walletAuth jwt acquired isNew=${r.isNewNetwork} " +
-                        "migration=$legacyMigration " +
-                        "pubkey=${pubkey?.take(PUBKEY_LOG_PREFIX_LEN) ?: "?"}…",
-                )
-                r.byJwt
-            }
-            is DeviceWalletJwtResult.Error -> {
-                PersistentLoggers.warn(TAG, "device walletAuth failed: ${r.message}")
-                null
-            }
-        }
-    }
-
-    private suspend fun ensureClientJwt(byJwt: String): String? {
-        val existing = configStore.byClientJwt().first()
-        if (existing != null) return existing
-        PersistentLoggers.info(TAG, "no byClientJwt in store — calling authNetworkClient")
-        return when (val r = authService.acquireClientJwt(byJwt)) {
-            is ClientJwtResult.Success -> {
-                configStore.setByClientJwt(r.byClientJwt)
-                Log.i(TAG, "client jwt acquired and persisted")
-                r.byClientJwt
-            }
-            is ClientJwtResult.Error -> {
-                PersistentLoggers.error(TAG, "acquireClientJwt failed: ${r.message}")
-                null
-            }
-        }
-    }
-
     private companion object {
         const val TAG = "EngineUrnetwork"
-        const val PUBKEY_LOG_PREFIX_LEN = 8
         const val TUN_MTU = 1440
         const val TUN_PREFIX = 32
         const val STATS_POLL_INTERVAL_MS = 2_000L
-        const val NETWORK_NAME_RANDOM_BYTES = 8
 
         const val URN_STOP_TIMEOUT_MS = 8_000L
         const val PEER_READY_TIMEOUT_MS = 45_000L
         const val PEER_READY_POLL_MS = 200L
         const val PEER_PROGRESS_LOG_EVERY = 15
-
-        private fun defaultNetworkName(): String {
-            val rnd = java.security.SecureRandom()
-            val bytes = ByteArray(NETWORK_NAME_RANDOM_BYTES).also { rnd.nextBytes(it) }
-            val hex = bytes.joinToString(separator = "") { "%02x".format(it.toInt() and 0xff) }
-            return "n$hex"
-        }
     }
 }

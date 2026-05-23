@@ -3,21 +3,49 @@
     <string name="settings_fptn_title">FPTN</string>
     <string name="settings_fptn_summary">SNI Reality tunnel — bypasses DPI blocks</string>
     <string name="fptn_settings_title">FPTN</string>
-    <string name="fptn_section_token">Token</string>
+
+    <string name="fptn_about_description">FPTN is a VPN technology built from scratch, including its own protocol, server and cross-platform clients. It is a non-commercial open-source project developed by volunteers and designed to bypass censorship.</string>
+    <string name="fptn_link_website">Our website</string>
+    <string name="fptn_link_telegram">Our Telegram group</string>
+    <string name="fptn_link_play">App on Google Play</string>
+    <string name="fptn_link_boosty">Support us on Boosty</string>
+
+    <string name="fptn_section_token">Token update</string>
     <string name="fptn_token_hint">fptn:… or fptnb:…</string>
     <string name="fptn_token_save">Save</string>
     <string name="fptn_token_invalid">Invalid token format</string>
-    <string name="fptn_bot_hint">Get your token from @fptn_bot on Telegram</string>
-    <string name="fptn_section_servers">Servers</string>
+    <string name="fptn_section_token_description">The list of available servers is encrypted inside the token. To refresh the server list, enter a new token. The token works like a password: once updated, it will stop working on every other device where it was used before.</string>
+    <string name="fptn_bot_hint">Get your token from t.me/fptn_bot</string>
+
+    <string name="fptn_section_bypass">Bypass methods</string>
+    <string name="fptn_section_bypass_summary">Configure how blocks are bypassed</string>
+
+    <string name="fptn_section_sni">Current SNI</string>
+    <string name="fptn_sni_description">The website address declared when connecting to the VPN server. Specify a popular site accessible without VPN from your country.</string>
+    <string name="fptn_sni_hint">E.g.: ads.x5.ru</string>
+    <string name="fptn_sni_save">Apply</string>
+    <string name="fptn_sni_reset">Reset to default</string>
+    <string name="fptn_bypass_sni_label">Domain spoofing (SNI)</string>
+    <string name="fptn_bypass_obfuscation_label">Traffic masking (obfuscation)</string>
+    <string name="fptn_bypass_reality_label">Advanced domain spoofing (SNI + REALITY)</string>
+    <string name="fptn_bypass_reality_warning">Requires a real existing domain (otherwise errors may occur)</string>
+    <string name="fptn_bypass_reality_variant">Reality profile</string>
+
+    <string name="fptn_section_servers">Your VPN servers</string>
     <string name="fptn_server_auto">Auto (auto-select)</string>
     <string name="fptn_no_token">Enter a token to see the server list</string>
-    <string name="fptn_section_bypass">Bypass method</string>
+
     <string name="fptn_experimental_button">Experimental settings</string>
     <string name="fptn_experimental_title">Experimental settings</string>
-    <string name="fptn_reconnect_network">Reconnect on network change</string>
-    <string name="fptn_reconnect_ip">Reconnect on IP change</string>
-    <string name="fptn_max_attempts">Max reconnect attempts: <xliff:g id="count" example="5">%d</xliff:g></string>
-    <string name="fptn_pause_seconds">Pause between attempts: <xliff:g id="seconds" example="2">%d</xliff:g> s</string>
-    <string name="fptn_reset_server">Reset server on disconnect</string>
+    <string name="fptn_experimental_reconnect_header">Reconnect on change of:</string>
+    <string name="fptn_reconnect_network">network type</string>
+    <string name="fptn_reconnect_ip">IP address</string>
+    <string name="fptn_experimental_attempts_header">Reconnect attempts after network loss:</string>
+    <string name="fptn_max_attempts">Attempts: <xliff:g id="count" example="5">%d</xliff:g></string>
+    <string name="fptn_pause_seconds">Pause between: <xliff:g id="seconds" example="2">%d</xliff:g> s</string>
+    <string name="fptn_experimental_others_header">Other settings:</string>
+    <string name="fptn_reset_server">Reset selected server after disconnect?</string>
+    <string name="fptn_experimental_cancel">Cancel</string>
+    <string name="fptn_experimental_save">Save</string>
     <string name="fptn_close">Close</string>
 </resources>

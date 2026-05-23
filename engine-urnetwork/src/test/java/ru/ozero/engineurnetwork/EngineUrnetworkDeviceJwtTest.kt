@@ -155,9 +155,12 @@ class EngineUrnetworkDeviceJwtTest {
         val engine = EngineUrnetwork(
             configStore = store,
             sdkBridge = SuccessBridge(),
-            authService = auth,
-            deviceIdentity = identity,
-            networkNameGenerator = { "fixed-name" },
+            jwtBootstrapper = RealUrnetworkJwtBootstrapper(
+                configStore = store,
+                authService = auth,
+                deviceIdentity = identity,
+                networkNameGenerator = { "fixed-name" },
+            ),
         )
 
         engine.start(EngineConfig.Urnetwork(jwtToken = "", region = null), Upstream.None)
@@ -173,9 +176,12 @@ class EngineUrnetworkDeviceJwtTest {
     ): EngineUrnetwork = EngineUrnetwork(
         configStore = store,
         sdkBridge = SuccessBridge(),
-        authService = auth,
-        deviceIdentity = identity,
-        networkNameGenerator = { "n-test" },
+        jwtBootstrapper = RealUrnetworkJwtBootstrapper(
+            configStore = store,
+            authService = auth,
+            deviceIdentity = identity,
+            networkNameGenerator = { "n-test" },
+        ),
     )
 
     private class RecordingAuthService(

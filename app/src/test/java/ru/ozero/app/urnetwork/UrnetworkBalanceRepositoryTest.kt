@@ -68,13 +68,28 @@ class UrnetworkBalanceRepositoryTest {
     }
 
     @Test
-    fun `availableBytes равно balanceBytes`() {
+    fun `availableBytes равно balanceBytes без pending`() {
         val state = UrnetworkBalanceState(
             snapshot = sample(balance = 1_000L, pending = 100L, used = 200L),
             isLoading = false,
             lastError = null,
         )
-        assertEquals(1_100L, state.availableBytes)
+        assertEquals(1_000L, state.availableBytes)
+    }
+
+    @Test
+    fun `sentinel availableBytes НЕ включает pendingBytes — regression против инициативы`() {
+        val state = UrnetworkBalanceState(
+            snapshot = sample(balance = 5_000_000_000L, pending = 9_999_999_999L, used = 0L),
+            isLoading = false,
+            lastError = null,
+        )
+        assertEquals(
+            5_000_000_000L,
+            state.availableBytes,
+            "availableBytes = balance + bonus, БЕЗ pending. Не путать общую ёмкость с лимитом.",
+        )
+        assertEquals(5_000_000_000L, state.baseBalanceBytes)
     }
 
     @Test
@@ -90,6 +105,85 @@ class UrnetworkBalanceRepositoryTest {
     @Test
     fun `availableBytes null snapshot вернёт 0`() {
         assertEquals(0L, UrnetworkBalanceState.INITIAL.availableBytes)
+    }
+
+    @Test
+    fun `availableBytes включает reliabilityBonusBytes когда meanReliabilityWeight больше 0`() {
+        val state = UrnetworkBalanceState(
+            snapshot = sample(balance = 1_000L, pending = 0L, used = 0L),
+            isLoading = false,
+            lastError = null,
+            meanReliabilityWeight = 0.1,
+        )
+        val expectedBonusBytes = (0.1 * 100.0 * 1024.0 * 1024.0 * 1024.0).toLong()
+        assertEquals(1_000L + expectedBonusBytes, state.availableBytes)
+        assertEquals(expectedBonusBytes, state.reliabilityBonusBytes)
+        assertEquals(1_000L, state.baseBalanceBytes)
+    }
+
+    @Test
+    fun `reliabilityBonusBytes ограничен 100 ГиБ cap`() {
+        val state = UrnetworkBalanceState(
+            snapshot = sample(),
+            isLoading = false,
+            lastError = null,
+            meanReliabilityWeight = 5.0,
+        )
+        val cap = (100.0 * 1024.0 * 1024.0 * 1024.0).toLong()
+        assertEquals(cap, state.reliabilityBonusBytes)
+    }
+
+    @Test
+    fun `reliabilityBonusBytes равен 0 когда weight равен 0`() {
+        val state = UrnetworkBalanceState(
+            snapshot = sample(),
+            isLoading = false,
+            lastError = null,
+            meanReliabilityWeight = 0.0,
+        )
+        assertEquals(0L, state.reliabilityBonusBytes)
+    }
+
+    @Test
+    fun `прогресс бар total включает bonus — sentinel против регрессии`() {
+        val cardSrc = locateSource(
+            "app/src/main/java/ru/ozero/app/ui/urnetwork/UrnetworkBalanceCard.kt",
+        )
+        val text = cardSrc.readText(Charsets.UTF_8)
+        kotlin.test.assertTrue(
+            !text.contains("availableBytes = displayBalance"),
+            "UrnetworkBalanceCard.kt передаёт raw balanceBytes в прогресс-бар, " +
+                "вместо state.availableBytes (= baseBalance + reliabilityBonus). " +
+                "Прогресс-бар должен соответствовать полю Доступно.",
+        )
+        kotlin.test.assertTrue(
+            text.contains("availableBytes = available"),
+            "UrnetworkBalanceCard.kt должен передавать state.availableBytes в прогресс-бар.",
+        )
+    }
+
+    private fun locateSource(rel: String): java.io.File {
+        var dir = java.io.File(System.getProperty("user.dir") ?: ".").absoluteFile
+        repeat(5) {
+            val candidate = java.io.File(dir, rel)
+            if (candidate.isFile) return candidate
+            dir = dir.parentFile ?: return@repeat
+        }
+        error("$rel не найден от ${System.getProperty("user.dir")}")
+    }
+
+    @Test
+    fun `availableBytes регрессия — должен суммировать bonus из weight 0_103 как ~10_3 GiB`() {
+        val state = UrnetworkBalanceState(
+            snapshot = sample(balance = 33_810_000_000L, pending = 0L, used = 0L),
+            isLoading = false,
+            lastError = null,
+            meanReliabilityWeight = 0.103,
+        )
+        val bonusGib = state.reliabilityBonusBytes / (1024.0 * 1024.0 * 1024.0)
+        kotlin.test.assertTrue(bonusGib in 10.0..10.6, "bonus ~10.3 GiB but got $bonusGib")
+        val availableGb = state.availableBytes / 1_000_000_000.0
+        kotlin.test.assertTrue(availableGb > 33.8, "available должно быть > 33.8 GB, было $availableGb")
     }
 
     @Test

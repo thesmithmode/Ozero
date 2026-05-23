@@ -11,15 +11,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,6 +41,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,10 +51,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
+import ru.ozero.enginemasterdns.deploy.MasterDnsDeployState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -104,6 +114,12 @@ fun MasterDnsSettingsScreen(
                     onCheckedChange = viewModel::onEnabledChange,
                 )
             }
+            DeployCard(
+                state = state,
+                onDeployClick = viewModel::onDeployClick,
+                onUndeployClick = viewModel::onUndeployClick,
+                onDeployReset = viewModel::onDeployReset,
+            )
             ServerSetupCard(onCopy = onCopy)
             OutlinedTextField(
                 value = state.configToml,
@@ -121,6 +137,253 @@ fun MasterDnsSettingsScreen(
             )
         }
     }
+}
+
+@Composable
+private fun DeployCard(
+    state: MasterDnsSettingsState,
+    onDeployClick: (host: String, port: Int, login: String, password: CharArray) -> Unit,
+    onUndeployClick: (host: String, port: Int, login: String, password: CharArray) -> Unit,
+    onDeployReset: () -> Unit,
+) {
+    var host by rememberSaveable { mutableStateOf(state.serverIp) }
+    var portText by rememberSaveable {
+        mutableStateOf(if (state.serverPort != 22) state.serverPort.toString() else "22")
+    }
+    var login by rememberSaveable { mutableStateOf("root") }
+    var password by rememberSaveable { mutableStateOf("") }
+
+    val deployState = state.deployState
+    val isDeploying = deployState is MasterDnsDeployState.Connecting ||
+        deployState is MasterDnsDeployState.CheckingPreflight ||
+        deployState is MasterDnsDeployState.InstallingDocker ||
+        deployState is MasterDnsDeployState.BuildingImage ||
+        deployState is MasterDnsDeployState.StartingContainer ||
+        deployState is MasterDnsDeployState.ExtractingKey ||
+        deployState is MasterDnsDeployState.Removing
+    val isDone = deployState is MasterDnsDeployState.Done
+    val isRemoved = deployState is MasterDnsDeployState.Removed
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = stringResource(R.string.masterdns_deploy_section_title),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(Modifier.height(4.dp))
+            Surface(
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                shape = RoundedCornerShape(6.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = stringResource(R.string.masterdns_vps_requirements),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(8.dp),
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = host,
+                onValueChange = { host = it },
+                label = { Text(stringResource(R.string.masterdns_deploy_host_label)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                enabled = !isDeploying,
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedTextField(
+                    value = portText,
+                    onValueChange = { portText = it },
+                    label = { Text(stringResource(R.string.masterdns_deploy_port_label)) },
+                    modifier = Modifier.weight(0.35f),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    enabled = !isDeploying,
+                )
+                OutlinedTextField(
+                    value = login,
+                    onValueChange = { login = it },
+                    label = { Text(stringResource(R.string.masterdns_deploy_login_label)) },
+                    modifier = Modifier.weight(0.65f),
+                    singleLine = true,
+                    enabled = !isDeploying,
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text(stringResource(R.string.masterdns_deploy_password_label)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                enabled = !isDeploying,
+            )
+            Spacer(Modifier.height(12.dp))
+            when {
+                isDeploying -> DeployProgressRow(deployState)
+                isDone -> DeployDoneRow(
+                    onRedeploy = {
+                        onDeployReset()
+                    },
+                    onUndeploy = {
+                        val port = portText.toIntOrNull() ?: 22
+                        onUndeployClick(host, port, login, password.toCharArray())
+                        password = ""
+                    },
+                    enabled = host.isNotBlank() && login.isNotBlank(),
+                )
+                isRemoved -> DeployRemovedRow(onReset = onDeployReset)
+                deployState is MasterDnsDeployState.Error -> DeployErrorRow(
+                    error = deployState,
+                    onRetry = { onDeployReset() },
+                )
+                else -> Button(
+                    onClick = {
+                        val port = portText.toIntOrNull() ?: 22
+                        onDeployClick(host, port, login, password.toCharArray())
+                        password = ""
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = host.isNotBlank() && login.isNotBlank(),
+                ) {
+                    Text(stringResource(R.string.masterdns_deploy_button))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeployProgressRow(state: MasterDnsDeployState) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = deployStateLabel(state),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+    }
+}
+
+@Composable
+private fun DeployDoneRow(
+    onRedeploy: () -> Unit,
+    onUndeploy: () -> Unit,
+    enabled: Boolean,
+) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Filled.CheckCircle,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = stringResource(R.string.masterdns_deploy_state_done),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(onClick = onRedeploy, modifier = Modifier.weight(1f)) {
+                Text(stringResource(R.string.masterdns_redeploy_button))
+            }
+            TextButton(
+                onClick = onUndeploy,
+                modifier = Modifier.weight(1f),
+                enabled = enabled,
+            ) {
+                Text(stringResource(R.string.masterdns_remove_button))
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeployRemovedRow(onReset: () -> Unit) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Filled.CheckCircle,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = stringResource(R.string.masterdns_deploy_state_removed),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        TextButton(onClick = onReset, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.masterdns_deploy_retry_button))
+        }
+    }
+}
+
+@Composable
+private fun DeployErrorRow(
+    error: MasterDnsDeployState.Error,
+    onRetry: () -> Unit,
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(8.dp)) {
+            Text(
+                text = deployErrorMessage(error.message),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+            TextButton(onClick = onRetry) {
+                Text(stringResource(R.string.masterdns_deploy_retry_button))
+            }
+        }
+    }
+}
+
+@Composable
+private fun deployStateLabel(state: MasterDnsDeployState): String = when (state) {
+    is MasterDnsDeployState.Connecting -> stringResource(R.string.masterdns_deploy_state_connecting)
+    is MasterDnsDeployState.CheckingPreflight -> stringResource(R.string.masterdns_deploy_state_preflight)
+    is MasterDnsDeployState.InstallingDocker -> stringResource(R.string.masterdns_deploy_state_installing_docker)
+    is MasterDnsDeployState.BuildingImage -> stringResource(R.string.masterdns_deploy_state_building_image)
+    is MasterDnsDeployState.StartingContainer -> stringResource(R.string.masterdns_deploy_state_starting_container)
+    is MasterDnsDeployState.ExtractingKey -> stringResource(R.string.masterdns_deploy_state_extracting_key)
+    is MasterDnsDeployState.Removing -> stringResource(R.string.masterdns_deploy_state_removing)
+    else -> ""
+}
+
+@Composable
+private fun deployErrorMessage(code: String): String = when (code) {
+    "port_53_busy" -> stringResource(R.string.masterdns_deploy_error_port_busy)
+    "insufficient_resources" -> stringResource(R.string.masterdns_deploy_error_resources)
+    "docker_install_failed" -> stringResource(R.string.masterdns_deploy_error_docker)
+    "dpkg_locked" -> stringResource(R.string.masterdns_deploy_error_dpkg_locked)
+    "build_failed" -> stringResource(R.string.masterdns_deploy_error_build)
+    "run_failed" -> stringResource(R.string.masterdns_deploy_error_run)
+    "key_extraction_failed" -> stringResource(R.string.masterdns_deploy_error_key)
+    "auth_failed" -> stringResource(R.string.masterdns_deploy_error_auth)
+    "connection_failed" -> stringResource(R.string.masterdns_deploy_error_connection)
+    "remove_failed" -> stringResource(R.string.masterdns_deploy_error_remove)
+    "unexpected_error" -> stringResource(R.string.masterdns_deploy_error_unexpected)
+    else -> stringResource(R.string.masterdns_deploy_error_generic, code)
 }
 
 @Composable

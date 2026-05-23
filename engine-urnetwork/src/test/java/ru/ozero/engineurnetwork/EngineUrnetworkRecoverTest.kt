@@ -29,11 +29,11 @@ class EngineUrnetworkRecoverTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val scope = CoroutineScope(SupervisorJob() + dispatcher)
         val bridge = FakeRecoverBridge(running = false)
+        val store = fakeStore(byJwt = "j", byClientJwt = "cj")
         val engine = EngineUrnetwork(
-            configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
+            configStore = store,
             sdkBridge = bridge,
-            authService = FakeAuth(),
-            deviceIdentity = null,
+            jwtBootstrapper = RealUrnetworkJwtBootstrapper(store, FakeAuth(), null),
             pluginScope = scope,
         )
         val result = engine.recover()
@@ -46,11 +46,11 @@ class EngineUrnetworkRecoverTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val scope = CoroutineScope(SupervisorJob() + dispatcher)
         val bridge = FakeRecoverBridge(running = true, location = null)
+        val store = fakeStore(byJwt = "j", byClientJwt = "cj")
         val engine = EngineUrnetwork(
-            configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
+            configStore = store,
             sdkBridge = bridge,
-            authService = FakeAuth(),
-            deviceIdentity = null,
+            jwtBootstrapper = RealUrnetworkJwtBootstrapper(store, FakeAuth(), null),
             pluginScope = scope,
         )
         engine.start(baseConfig, Upstream.None)
@@ -68,11 +68,11 @@ class EngineUrnetworkRecoverTest {
         val scope = CoroutineScope(SupervisorJob() + dispatcher)
         val fakeLocation = FakeLocation()
         val bridge = FakeRecoverBridge(running = true, location = fakeLocation)
+        val store = fakeStore(byJwt = "j", byClientJwt = "cj")
         val engine = EngineUrnetwork(
-            configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
+            configStore = store,
             sdkBridge = bridge,
-            authService = FakeAuth(),
-            deviceIdentity = null,
+            jwtBootstrapper = RealUrnetworkJwtBootstrapper(store, FakeAuth(), null),
             pluginScope = scope,
         )
         engine.start(baseConfig, Upstream.None)
@@ -94,11 +94,11 @@ class EngineUrnetworkRecoverTest {
             location = FakeLocation(),
             throwOnConnect = CancellationException("upstream cancel"),
         )
+        val store = fakeStore(byJwt = "j", byClientJwt = "cj")
         val engine = EngineUrnetwork(
-            configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
+            configStore = store,
             sdkBridge = bridge,
-            authService = FakeAuth(),
-            deviceIdentity = null,
+            jwtBootstrapper = RealUrnetworkJwtBootstrapper(store, FakeAuth(), null),
             pluginScope = scope,
         )
         engine.start(baseConfig, Upstream.None)
@@ -118,11 +118,11 @@ class EngineUrnetworkRecoverTest {
             location = FakeLocation(),
             throwOnConnect = RuntimeException("sdk transient"),
         )
+        val store = fakeStore(byJwt = "j", byClientJwt = "cj")
         val engine = EngineUrnetwork(
-            configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
+            configStore = store,
             sdkBridge = bridge,
-            authService = FakeAuth(),
-            deviceIdentity = null,
+            jwtBootstrapper = RealUrnetworkJwtBootstrapper(store, FakeAuth(), null),
             pluginScope = scope,
         )
         engine.start(baseConfig, Upstream.None)

@@ -72,6 +72,7 @@ sealed class EngineConfig {
         val token: String = "",
         val selectedServerName: String? = null,
         val bypassMethod: String = DEFAULT_BYPASS_METHOD,
+        val sniDomain: String = DEFAULT_SNI_DOMAIN,
         val autoSelect: Boolean = true,
         val reconnectOnNetworkChange: Boolean = true,
         val reconnectOnIpChange: Boolean = false,
@@ -81,10 +82,11 @@ sealed class EngineConfig {
     ) : EngineConfig() {
         override val engineId = EngineId.FPTN
         override fun toString(): String =
-            "Fptn(token=***, server=$selectedServerName, method=$bypassMethod)"
+            "Fptn(token=***, server=$selectedServerName, method=$bypassMethod, sni=$sniDomain)"
 
         companion object {
-            const val DEFAULT_BYPASS_METHOD: String = "SNI-REALITY-YANDEX-25"
+            const val DEFAULT_BYPASS_METHOD: String = "SNI"
+            const val DEFAULT_SNI_DOMAIN: String = "ads.x5.ru"
         }
     }
 }

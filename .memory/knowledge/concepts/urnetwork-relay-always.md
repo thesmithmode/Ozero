@@ -7,8 +7,9 @@ sources:
   - "daily/2026-05-17.md"
   - "daily/2026-05-18.md"
   - "daily/2026-05-22.md"
+  - "daily/2026-05-23.md"
 created: 2026-05-14
-updated: 2026-05-22
+updated: 2026-05-23
 ---
 
 # URnetwork Relay-Always Architecture
@@ -68,6 +69,8 @@ This means relay-always is currently: (1) inactive for users who never tried URn
 
 The guest mode monetization blocker was resolved by implementing per-device Ed25519 walletAuth auto-registration. Each device generates a keypair, calls `authLogin(walletAuth)` to obtain a non-guest `byJwt`, then `setupPayoutWallet(PRESET_WALLET)` succeeds because the server accepts wallet API calls from non-guest accounts. Existing guest users are migrated on first engine start — their guest `byJwt` is replaced atomically with a walletAuth-derived JWT. See [[concepts/urnetwork-walletauth-per-device-registration]] for full implementation details.
 
+> **Важная оговорка (выявлено 2026-05-23):** walletAuth resolved server-side guest blocker, но bootstrap trigger остался прикручен к `EngineUrnetwork.start()`. Если новый юзер устанавливает приложение, открывает ByeDPI/WARP без захода в URnetwork — `EngineUrnetwork.start()` никогда не зовётся → JWT не acquire'ится → coordinator skip'ает relay → раздачи нет → payouts нет. Это НЕ regression сегодняшних коммитов (cc9e3c67/6c856fff фиксили REFRESH+identity), а архитектурный gap с момента введения coordinator (194d7701, 2026-05-17). См. секцию ниже о JWT Bootstrapper fix.
+
 ### Discovery: Relay Was Not Working (2026-05-17)
 
 Critical finding during session: relay only worked when URnetwork was the active engine. When user selected ByeDPI or WARP, URnetwork SDK never started → relay didn't run → no traffic shared → no payouts. The user directly challenged: "ты уверен что это работает?" — agent honestly answered "НЕТ." The `UrnetworkRelayCoordinator` was the P0 fix to make relay truly engine-independent.
@@ -100,9 +103,27 @@ The bug was invisible until the UI gained a toggle for `provideEnabled` in the s
 
 `UrnetworkLocationsViewModel.init` had two concurrent `launch` blocks without synchronization — a NotConnected UI flash occurred on screen open when `bootstrapJob` had not yet completed. Fix: `bootstrapJob.join()` before the active/inactive branch decision.
 
+### JWT Bootstrapper Fix (2026-05-23, commit e6bac9eb)
+
+Архитектурный gap finally закрыт. Раньше JWT acquire был приватной логикой `EngineUrnetwork.start()` → coordinator никак не мог триггерить acquire, только skip'ать. Юзеры, никогда не заходившие в URnetwork, оставались без JWT навсегда.
+
+Fix:
+- Extract `UrnetworkJwtBootstrapper` interface + `RealUrnetworkJwtBootstrapper` impl в `engine-urnetwork`. Логика `ensureGuestJwt → tryAcquireDeviceJwt → ensureClientJwt` перенесена туда. Mutex+double-check внутри защищают от race "юзер start'ил URnetwork и мгновенно свич на WARP" (два параллельных POST с одним pubkey → дубль/409 server-side).
+- `EngineUrnetwork.start()` теперь делегирует в bootstrapper.
+- `UrnetworkRelayCoordinator` инжектится bootstrapper. При `tunnel.Connected(engineId != URNETWORK) && byClientJwt == null` зовёт `bootstrapper.ensureClientJwt()` → configStore.byClientJwt() обновляется → combine re-emit → coordinator стартует bridge.
+- `AtomicBoolean bootstrapAttemptedThisSession` сбрасывается на `!Connected` → защищает от thrash на reconnect (acquire не вызывается дважды в одной session, но retry разрешён после disconnect+reconnect).
+
+Sentinel-тесты в `UrnetworkRelayCoordinatorTest`:
+- `bootstrap acquires JWT и затем relay стартует когда JWT появился через configStore` — gate behavior
+- `bootstrap не зовётся повторно в одной tunnel session`
+- `bootstrap session flag сбрасывается на disconnect`
+- `bootstrap не зовётся когда URnetwork engine активен` (engine.start сам делает)
+- `bootstrap не зовётся когда JWT уже есть`
+
 ## Sources
 
 - [[daily/2026-05-14.md]] — Session 20:30: architectural discussion of relay-always, SDK `tunnelStarted` vs `providePaused` decoupling, monetization constraints; Session 21:29: `setupPayoutWallet` implementation + contract tests
 - [[daily/2026-05-17.md]] — Session 14:41+: relay NOT working for non-URnetwork engines discovered; P0 #111 UrnetworkRelayCoordinator implemented (commit 194d7701); relayOwned AtomicBoolean ownership; bridge.start() made idempotent; SharedTrafficScreen simplified
 - [[daily/2026-05-18.md]] — Session 17:51: relay requires byClientJwt (saved on first URnetwork connect only); Session 18:25: guest JWT blocked from wallet API server-side → relay runs idle, no USDC payouts
 - [[daily/2026-05-22.md]] — Session 16:02+: hardcode bug (lines 67+81 always setProvidePaused(false) ignoring configStore); fix: URNETWORK branch = no override, relay branch = read configStore.provideEnabled(); BalanceCard/ProvideSection visibility fixes; bootstrapJob.join() race fix
+- [[daily/2026-05-23.md]] — JWT bootstrap blind spot для новых юзеров обнаружен (5 cross-validated haiku агентов); fix через extract UrnetworkJwtBootstrapper + coordinator session-flag (commit e6bac9eb)

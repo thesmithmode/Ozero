@@ -23,29 +23,60 @@ class RealWarpSdkBridge(
         uapiPath: String,
         protector: VpnSocketProtector,
     ): WarpSdkBridge.AttachResult = withContext(Dispatchers.IO) {
-        if (tunFd < 0) return@withContext WarpSdkBridge.AttachResult.Failed("invalid tunFd=$tunFd")
-        if (iniConfig.isBlank()) return@withContext WarpSdkBridge.AttachResult.Failed("empty iniConfig")
-        if (uapiPath.isBlank()) return@withContext WarpSdkBridge.AttachResult.Failed("empty uapiPath")
+        validateAttachArgs(tunFd, iniConfig, uapiPath)?.let {
+            return@withContext WarpSdkBridge.AttachResult.Failed(it)
+        }
+        closeStaleHandle()
+        cleanupStaleSockets(uapiPath, tunnelName)
+        logIniDigest(tunnelName, iniConfig)
+        invokeAwgTurnOnAndProtect(tunnelName, tunFd, iniConfig, uapiPath, protector)
+    }
+
+    private fun validateAttachArgs(tunFd: Int, iniConfig: String, uapiPath: String): String? {
+        if (tunFd < 0) return "invalid tunFd=$tunFd"
+        if (iniConfig.isBlank()) return "empty iniConfig"
+        if (uapiPath.isBlank()) return "empty uapiPath"
         val structuralError = validateIniStructure(iniConfig)
         if (structuralError != null) {
             PersistentLoggers.error(TAG, "INI rejected: $structuralError")
-            return@withContext WarpSdkBridge.AttachResult.Failed("INI invalid: $structuralError")
+            return "INI invalid: $structuralError"
         }
+        return null
+    }
+
+    private fun closeStaleHandle() {
         val staleHandle = tunnelHandle.getAndSet(INVALID_HANDLE)
-        if (staleHandle != INVALID_HANDLE) {
-            PersistentLoggers.warn(
-                TAG,
-                "attachTun: stale handle=$staleHandle обнаружен — закрываю до нового awgTurnOn",
-            )
-            runCatching { awgRuntime.turnOff(staleHandle) }
-                .onFailure { PersistentLoggers.error(TAG, "stale awgTurnOff failed: ${it.message}") }
+        if (staleHandle == INVALID_HANDLE) return
+        PersistentLoggers.warn(
+            TAG,
+            "attachTun: stale handle=$staleHandle обнаружен — закрываю до нового awgTurnOn",
+        )
+        runCatching { awgRuntime.turnOff(staleHandle) }
+            .onFailure { PersistentLoggers.error(TAG, "stale awgTurnOff failed: ${it.message}") }
+    }
+
+    private fun cleanupStaleSockets(uapiPath: String, tunnelName: String) {
+        val ownSocketName = "$tunnelName.sock"
+        val legacySocket = File(uapiPath, ownSocketName)
+        if (legacySocket.exists()) {
+            val deleted = legacySocket.delete()
+            Log.i(TAG, "stale legacy socket $legacySocket deleted=$deleted")
         }
-        val socketFile = File(uapiPath, "$tunnelName.sock")
-        if (socketFile.exists()) {
-            val deleted = socketFile.delete()
-            Log.i(TAG, "stale socket $socketFile deleted=$deleted")
-        }
-        logIniDigest(tunnelName, iniConfig)
+        val socketsDir = File(uapiPath, "sockets")
+        if (!socketsDir.isDirectory) return
+        val stale = socketsDir.listFiles { f -> f.name == ownSocketName }.orEmpty()
+        if (stale.isEmpty()) return
+        val staleDeleted = stale.count { it.delete() }
+        Log.i(TAG, "stale sockets/ cleanup: name=$ownSocketName deleted=$staleDeleted/${stale.size}")
+    }
+
+    private fun invokeAwgTurnOnAndProtect(
+        tunnelName: String,
+        tunFd: Int,
+        iniConfig: String,
+        uapiPath: String,
+        protector: VpnSocketProtector,
+    ): WarpSdkBridge.AttachResult {
         val started = System.currentTimeMillis()
         val threadName = Thread.currentThread().name
         val runtimeVersion = runCatching { awgRuntime.version() }
@@ -54,41 +85,58 @@ class RealWarpSdkBridge(
             TAG,
             "awgTurnOn JNI entry name=$tunnelName fd=$tunFd iniLen=${iniConfig.length} thread=$threadName version=$runtimeVersion",
         )
-        try {
-            val combined = awgRuntime.turnOnAndGetSockets(tunnelName, tunFd, iniConfig, uapiPath)
-            val handle = combined.handle
-            val dt = System.currentTimeMillis() - started
-            PersistentLoggers.warn(
-                TAG,
-                "awgTurnOn JNI exit handle=$handle v4=${combined.socketV4Fd} v6=${combined.socketV6Fd} dt=${dt}ms thread=$threadName",
-            )
-            // amnezia api.go: errors → -1, success → first free slot (0,1,2,...). PORTAL_WG g.java:106 тоже `< 0`. Не менять на `<= 0`.
-            if (handle < 0) {
-                return@withContext WarpSdkBridge.AttachResult.Failed(
-                    "awgTurnOn handle=$handle (<0 = AWG SDK ошибка; 0 = валидный первый tunnel slot)",
-                )
-            }
-            tunnelHandle.set(handle)
-            val protectOk = protectSockets(combined.socketV4Fd, combined.socketV6Fd, protector)
-            if (!protectOk) {
-                PersistentLoggers.error(TAG, "protect failed — rolling back to avoid routing loop")
-                if (tunnelHandle.compareAndSet(handle, INVALID_HANDLE)) {
-                    runCatching { awgRuntime.turnOff(handle) }
-                }
-                return@withContext WarpSdkBridge.AttachResult.Failed("protect underlying sockets failed")
-            }
-            WarpSdkBridge.AttachResult.Success
+        val combined = try {
+            awgRuntime.turnOnAndGetSockets(tunnelName, tunFd, iniConfig, uapiPath)
         } catch (ce: CancellationException) {
             throw ce
         } catch (t: Throwable) {
-            val dt = System.currentTimeMillis() - started
-            val msg = t.message ?: t.javaClass.simpleName
+            return logAwgFailure(started, threadName, t)
+        }
+        val handle = combined.handle
+        val dt = System.currentTimeMillis() - started
+        PersistentLoggers.warn(
+            TAG,
+            "awgTurnOn JNI exit handle=$handle v4=${combined.socketV4Fd} v6=${combined.socketV6Fd} dt=${dt}ms thread=$threadName",
+        )
+        // amnezia api.go: errors → -1, success → first free slot (0,1,2,...). PORTAL_WG g.java:106 тоже `< 0`. Не менять на `<= 0`.
+        if (handle < 0) {
+            return WarpSdkBridge.AttachResult.Failed(
+                "awgTurnOn handle=$handle (<0 = AWG SDK ошибка; 0 = валидный первый tunnel slot)",
+            )
+        }
+        tunnelHandle.set(handle)
+        val protectOk = try {
+            protectSockets(combined.socketV4Fd, combined.socketV6Fd, protector)
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (t: Throwable) {
             PersistentLoggers.error(
                 TAG,
-                "awgTurnOn threw dt=${dt}ms thread=$threadName: $msg (${t.javaClass.name})",
+                "protect threw: ${t.message} (${t.javaClass.name}) — rollback awgTurnOff",
             )
-            WarpSdkBridge.AttachResult.Failed("awgTurnOn failed: $msg")
+            if (tunnelHandle.compareAndSet(handle, INVALID_HANDLE)) {
+                runCatching { awgRuntime.turnOff(handle) }
+            }
+            return WarpSdkBridge.AttachResult.Failed("protect threw: ${t.message ?: t.javaClass.simpleName}")
         }
+        if (!protectOk) {
+            PersistentLoggers.error(TAG, "protect failed — rolling back to avoid routing loop")
+            if (tunnelHandle.compareAndSet(handle, INVALID_HANDLE)) {
+                runCatching { awgRuntime.turnOff(handle) }
+            }
+            return WarpSdkBridge.AttachResult.Failed("protect underlying sockets failed")
+        }
+        return WarpSdkBridge.AttachResult.Success
+    }
+
+    private fun logAwgFailure(startedMs: Long, threadName: String, t: Throwable): WarpSdkBridge.AttachResult {
+        val dt = System.currentTimeMillis() - startedMs
+        val msg = t.message ?: t.javaClass.simpleName
+        PersistentLoggers.error(
+            TAG,
+            "awgTurnOn threw dt=${dt}ms thread=$threadName: $msg (${t.javaClass.name})",
+        )
+        return WarpSdkBridge.AttachResult.Failed("awgTurnOn failed: $msg")
     }
 
     private fun protectSockets(v4: Int, v6: Int, protector: VpnSocketProtector): Boolean {

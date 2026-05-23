@@ -30,8 +30,11 @@ class EngineUrnetworkStatsPollingTest {
         val engine = EngineUrnetwork(
             configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
-            authService = FakeAuth(),
-            deviceIdentity = null,
+            jwtBootstrapper = RealUrnetworkJwtBootstrapper(
+                fakeStore(byJwt = "j", byClientJwt = "cj"),
+                FakeAuth(),
+                null,
+            ),
             pluginScope = scope,
             statsPollIntervalMs = pollIntervalMs,
         )
@@ -50,8 +53,11 @@ class EngineUrnetworkStatsPollingTest {
         val engine = EngineUrnetwork(
             configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
-            authService = FakeAuth(),
-            deviceIdentity = null,
+            jwtBootstrapper = RealUrnetworkJwtBootstrapper(
+                fakeStore(byJwt = "j", byClientJwt = "cj"),
+                FakeAuth(),
+                null,
+            ),
             pluginScope = scope,
             statsPollIntervalMs = pollIntervalMs,
         )
@@ -75,8 +81,11 @@ class EngineUrnetworkStatsPollingTest {
         val engine = EngineUrnetwork(
             configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
-            authService = FakeAuth(),
-            deviceIdentity = null,
+            jwtBootstrapper = RealUrnetworkJwtBootstrapper(
+                fakeStore(byJwt = "j", byClientJwt = "cj"),
+                FakeAuth(),
+                null,
+            ),
             pluginScope = scope,
             statsPollIntervalMs = pollIntervalMs,
         )
@@ -96,8 +105,11 @@ class EngineUrnetworkStatsPollingTest {
         val engine = EngineUrnetwork(
             configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
-            authService = FakeAuth(),
-            deviceIdentity = null,
+            jwtBootstrapper = RealUrnetworkJwtBootstrapper(
+                fakeStore(byJwt = "j", byClientJwt = "cj"),
+                FakeAuth(),
+                null,
+            ),
             pluginScope = scope,
             statsPollIntervalMs = pollIntervalMs,
         )
@@ -115,8 +127,11 @@ class EngineUrnetworkStatsPollingTest {
         val engine = EngineUrnetwork(
             configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
             sdkBridge = bridge,
-            authService = FakeAuth(),
-            deviceIdentity = null,
+            jwtBootstrapper = RealUrnetworkJwtBootstrapper(
+                fakeStore(byJwt = "j", byClientJwt = "cj"),
+                FakeAuth(),
+                null,
+            ),
             pluginScope = scope,
             statsPollIntervalMs = pollIntervalMs,
         )

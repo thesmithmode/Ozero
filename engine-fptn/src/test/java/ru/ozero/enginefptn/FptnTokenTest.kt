@@ -7,7 +7,10 @@ import io.mockk.unmockkStatic
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.io.ByteArrayInputStream
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -134,8 +137,78 @@ class FptnTokenTest {
     }
 
     @Test
-    fun `should return null for fptnb prefix on any Android version in test`() {
-        assertNull(FptnToken.parse("fptnb:${encode("{}")}"))
+    fun `should return null for fptnb when base64 payload is not valid brotli`() {
+        val notBrotli = java.util.Base64.getEncoder().encodeToString("plain-text-not-brotli".toByteArray())
+        assertNull(FptnToken.parse("fptnb:$notBrotli"))
+    }
+
+    @Test
+    fun `should return null for fptnb when base64 itself is invalid`() {
+        assertNull(FptnToken.parse("fptnb:!!!not-base64!!!"))
+    }
+
+    @Test
+    fun `readBounded returns content when within limit`() {
+        val data = ByteArray(100) { it.toByte() }
+        val result = FptnToken.readBounded(ByteArrayInputStream(data), 1024)
+        assertContentEquals(data, result)
+    }
+
+    @Test
+    fun `readBounded throws when payload exceeds limit`() {
+        val oversized = ByteArray(200) { it.toByte() }
+        assertFailsWith<IllegalStateException> {
+            FptnToken.readBounded(ByteArrayInputStream(oversized), 100)
+        }
+    }
+
+    @Test
+    fun `parse returns null for fptnb with oversized payload via readBounded`() {
+        val oversized = ByteArray(2 * 1024 * 1024 + 1) { 0 }
+        assertFailsWith<IllegalStateException> {
+            FptnToken.readBounded(ByteArrayInputStream(oversized), 1 * 1024 * 1024)
+        }
+    }
+
+    @Test
+    fun `sentinel brotli decompression имеет hard size limit против OOM DoS`() {
+        val sourceFile = locateFptnTokenSource()
+        val source = sourceFile.readText(Charsets.UTF_8)
+        assertTrue(
+            source.contains("MAX_DECOMPRESSED_BYTES"),
+            "FptnToken.brotliDecompress должен иметь MAX_DECOMPRESSED_BYTES лимит. " +
+                "Без него malicious fptnb: с brotli expansion 100KB→1GB крашит heap.",
+        )
+        assertTrue(
+            !Regex("""BrotliInputStream\([^)]+\)\.use\s*\{\s*it\.readBytes\(\)\s*\}""").containsMatchIn(source),
+            "FptnToken.brotliDecompress не должен использовать readBytes() — " +
+                "unbounded чтение в heap = OOM DoS. Использовать size-bounded цикл.",
+        )
+    }
+
+    @Test
+    fun `fptnb prefix must be parsed not unconditionally rejected`() {
+        val sourceFile = locateFptnTokenSource()
+        val source = sourceFile.readText(Charsets.UTF_8)
+        assertTrue(
+            !source.contains("""startsWith("fptnb:") -> return null"""),
+            "FptnToken.kt безусловно отвергает fptnb: префикс. " +
+                "User-feedback 2026-05-23: валидные fptnb: токены (brotli-compressed) " +
+                "должны парситься. Регрессия — добавь brotli decompression.",
+        )
+    }
+
+    private fun locateFptnTokenSource(): java.io.File {
+        var dir = java.io.File(System.getProperty("user.dir") ?: ".").absoluteFile
+        repeat(5) {
+            val candidate = java.io.File(
+                dir,
+                "engine-fptn/src/main/java/ru/ozero/enginefptn/FptnToken.kt",
+            )
+            if (candidate.isFile) return candidate
+            dir = dir.parentFile ?: return@repeat
+        }
+        error("FptnToken.kt не найден от ${System.getProperty("user.dir")}")
     }
 
     private fun encode(json: String): String =

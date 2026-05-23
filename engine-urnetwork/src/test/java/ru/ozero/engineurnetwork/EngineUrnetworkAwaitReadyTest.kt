@@ -28,8 +28,7 @@ class EngineUrnetworkAwaitReadyTest {
     ) = EngineUrnetwork(
         configStore = minimalConfigStore,
         sdkBridge = bridge,
-        authService = ImmediateAuthService,
-        deviceIdentity = null,
+        jwtBootstrapper = RealUrnetworkJwtBootstrapper(minimalConfigStore, ImmediateAuthService, null),
         pluginScope = scope,
         statsPollIntervalMs = 10_000L,
         peerReadyTimeoutMs = peerReadyTimeoutMs,

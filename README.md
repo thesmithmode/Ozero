@@ -1,62 +1,37 @@
+Русский | [English](README.en.md) | [Español](README.es.md) | [Português](README.pt.md)
+
 # Ozero
 
 [![CI](https://github.com/thesmithmode/Ozero/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/thesmithmode/Ozero/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/thesmithmode/Ozero?include_prereleases&sort=semver)](https://github.com/thesmithmode/Ozero/releases)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
-Ozero — Android VPN-клиент с поддержкой нескольких транспортных протоколов под единым интерфейсом.
+Бесплатный Android VPN-клиент с поддержкой нескольких транспортных протоколов под единым интерфейсом.
 
-## Поддерживаемые движки
-
-| Engine | Статус | Транспорт | Краткое описание |
-|--------|--------|-----------|------------------|
-| **ByeDPI** | ✅ | TCP, локальный SOCKS5 | Локальный TCP-прокси, фрагментация SNI |
-| **WARP (AmneziaWG)** | ✅ | UDP | Cloudflare WARP через AmneziaWG (junk packets / S1-S2 / H1-H4) |
-| **URnetwork** | ✅ | P2P | Decentralized P2P provider mesh |
-| **Xray-core** | ⏳ stub | TCP/UDP | VLESS + Reality + XHTTP/gRPC |
-| **Hysteria2** | ⏳ stub | UDP/QUIC | QUIC-протокол с port hopping и Salamander obfs |
-| **Tor + IPtProxy** | ⏳ stub | TCP, on-demand | obfs4 / snowflake / webtunnel |
-
-Auto-mode: probe-движок выбирает рабочий transport по приоритету (отдельный экран в Settings → Auto-режим). Health monitor переключает движки при деградации соединения.
-
-## Технические требования
+## Требования
 
 - Android 7.0+ (API 24); рекомендуется Android 10+
-- ABI: `arm64-v8a`, `armeabi-v7a`, `x86_64`
+- ABI: `arm64-v8a`
 
-## Архитектурные принципы
+## Архитектура
 
-- Единый интерфейс `Engine` для всех транспортов
-- Probe-движок выбирает рабочий transport автоматически
-- Internal kill-switch: при сбое engine трафик не идёт в обход TUN (fail-closed)
+- Модульная архитектура: каждый транспорт изолирован в отдельном Gradle-модуле
+- Единый интерфейс `Engine` — приложение не зависит от деталей транспорта
+- Расширяемая система плагинов движков
+- Internal kill-switch: при отказе транспорта трафик блокируется (fail-closed)
 - Подписки серверов верифицируются Ed25519
-- Hardening сборки: R8 minify+shrink, anti-debug, signature check
+- Hardening сборки: R8 minify + shrink
 
 ## Сборка
 
 ```bash
 git clone https://github.com/thesmithmode/Ozero.git
 cd Ozero
-./gradlew assembleDebug
+./gradlew assembleRelease
 ```
 
-Native-артефакты (`libxray.aar`, `libbyedpi.so`, …) скачиваются автоматически по `binaries.lock.yaml` через Gradle plugin `ozero.binaries` (sha256-pinned). Подробнее — [`docs/binaries-pipeline.md`](docs/binaries-pipeline.md).
-
-## Документация
-
-| Документ | Содержание |
-|----------|------------|
-| [`docs/architecture.md`](docs/architecture.md) | Слои, Gradle модули, Hilt DI-граф |
-| [`docs/engines.md`](docs/engines.md) | Технические параметры engine-модулей |
-| [`docs/runtime-flow.md`](docs/runtime-flow.md) | Поток Connect → probe → engine.start → tunnel |
-| [`docs/binaries-pipeline.md`](docs/binaries-pipeline.md) | Native-сборка, lock-файл, sha256 |
-| [`docs/build.md`](docs/build.md) | Локальная сборка APK |
-| [`docs/trust-chain.md`](docs/trust-chain.md) | Source → reproducible build → signed APK |
-| [`docs/key-rotation.md`](docs/key-rotation.md) | Ed25519 subscription key — модель и процедура |
-| [`docs/release-signing.md`](docs/release-signing.md) | Release keystore — генерация, backup, подпись APK |
-| [`docs/cert-pinning-rotation.md`](docs/cert-pinning-rotation.md) | Pinning subscription endpoints, ротация сертификатов |
-| [`docs/backend.md`](docs/backend.md) | Backend инфраструктура подписок |
+Сборка требует переменных окружения для подписи APK и публичного ключа обновлений.
 
 ## Лицензия
 
-GPLv3 — см. [`LICENSE`](LICENSE).
+GPLv3 — см. [LICENSE](LICENSE).

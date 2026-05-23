@@ -1,22 +1,45 @@
 package ru.ozero.enginefptn
 
 import android.util.Base64
+import org.brotli.dec.BrotliInputStream
 import org.json.JSONObject
+import java.io.ByteArrayInputStream
+import java.io.InputStream
 
 object FptnToken {
 
     fun parse(raw: String): FptnTokenData? {
-        val encoded = when {
-            raw.startsWith("fptn:") -> raw.removePrefix("fptn:")
-            raw.startsWith("fptnb:") -> return null
+        val (encoded, brotliCompressed) = when {
+            raw.startsWith("fptn:") -> raw.removePrefix("fptn:") to false
+            raw.startsWith("fptnb:") -> raw.removePrefix("fptnb:") to true
             else -> return null
         }
         return try {
-            val bytes = Base64.decode(encoded.trim(), Base64.DEFAULT)
-            parseJson(bytes.toString(Charsets.UTF_8))
+            val base64Bytes = Base64.decode(encoded.trim(), Base64.DEFAULT)
+            val jsonBytes = if (brotliCompressed) brotliDecompress(base64Bytes) else base64Bytes
+            parseJson(jsonBytes.toString(Charsets.UTF_8))
         } catch (_: Exception) {
             null
         }
+    }
+
+    private const val MAX_DECOMPRESSED_BYTES = 1 * 1024 * 1024
+
+    private fun brotliDecompress(bytes: ByteArray): ByteArray =
+        BrotliInputStream(ByteArrayInputStream(bytes)).use { stream ->
+            readBounded(stream, MAX_DECOMPRESSED_BYTES)
+        }
+
+    internal fun readBounded(stream: InputStream, maxBytes: Int): ByteArray {
+        val buffer = ByteArray(maxBytes + 1)
+        var total = 0
+        while (true) {
+            val read = stream.read(buffer, total, buffer.size - total)
+            if (read <= 0) break
+            total += read
+            if (total > maxBytes) error("decompressed payload exceeds $maxBytes bytes")
+        }
+        return buffer.copyOf(total)
     }
 
     private fun parseJson(json: String): FptnTokenData? {

@@ -11,6 +11,7 @@ import com.bringyour.sdk.LocalState
 import com.bringyour.sdk.LocationsViewController
 import com.bringyour.sdk.PerformanceProfile
 import com.bringyour.sdk.Sdk
+import com.bringyour.sdk.Sub
 import com.bringyour.sdk.SubscriptionBalanceCallback
 import com.bringyour.sdk.WalletViewController
 import com.bringyour.sdk.WindowSizeSettings
@@ -138,8 +139,28 @@ class RealUrnetworkSdkBridge(
             }
             runCatching {
                 val keys = localState.provideSecretKeys
-                if (keys != null) d.loadProvideSecretKeys(keys) else d.initProvideSecretKeys()
+                if (keys != null) {
+                    d.loadProvideSecretKeys(keys)
+                    Log.i(TAG, "provideSecretKeys loaded from localState — stable provider identity")
+                } else {
+                    var sub: Sub? = null
+                    sub = d.addProvideSecretKeysListener { generated ->
+                        runCatching { localState.provideSecretKeys = generated }
+                            .onSuccess { Log.i(TAG, "provideSecretKeys generated and persisted") }
+                            .onFailure { PersistentLoggers.warn(TAG, "persist provideSecretKeys: ${it.message}") }
+                        runCatching { sub?.close() }
+                    }
+                    d.initProvideSecretKeys()
+                    Log.i(TAG, "provideSecretKeys not in localState — generating new keys")
+                }
             }.onFailure { PersistentLoggers.warn(TAG, "provideSecretKeys init threw: ${it.message}") }
+            runCatching {
+                d.addJwtRefreshListener { newJwt ->
+                    runCatching { localState.byClientJwt = newJwt }
+                        .onSuccess { Log.i(TAG, "SDK JWT refreshed — localState updated") }
+                        .onFailure { PersistentLoggers.warn(TAG, "JWT refresh localState: ${it.message}") }
+                }
+            }.onFailure { PersistentLoggers.warn(TAG, "addJwtRefreshListener threw: ${it.message}") }
             applyDeviceFields(d, localState)
             Log.i(TAG, "runStartOnMain: device created — applyDeviceFields done (паритет с initDeviceForLocations)")
             deviceRef.set(d)
@@ -356,8 +377,28 @@ class RealUrnetworkSdkBridge(
         }
         runCatching {
             val keys = localState.provideSecretKeys
-            if (keys != null) device.loadProvideSecretKeys(keys) else device.initProvideSecretKeys()
+            if (keys != null) {
+                device.loadProvideSecretKeys(keys)
+                Log.i(TAG, "ensureDevice: provideSecretKeys loaded — stable provider identity")
+            } else {
+                var sub: Sub? = null
+                sub = device.addProvideSecretKeysListener { generated ->
+                    runCatching { localState.provideSecretKeys = generated }
+                        .onSuccess { Log.i(TAG, "ensureDevice: provideSecretKeys generated and persisted") }
+                        .onFailure { PersistentLoggers.warn(TAG, "ensureDevice: persist keys: ${it.message}") }
+                    runCatching { sub?.close() }
+                }
+                device.initProvideSecretKeys()
+                Log.i(TAG, "ensureDevice: provideSecretKeys not found — generating new keys")
+            }
         }
+        runCatching {
+            device.addJwtRefreshListener { newJwt ->
+                runCatching { localState.byClientJwt = newJwt }
+                    .onSuccess { Log.i(TAG, "ensureDevice: SDK JWT refreshed — localState updated") }
+                    .onFailure { PersistentLoggers.warn(TAG, "ensureDevice: JWT refresh localState: ${it.message}") }
+            }
+        }.onFailure { PersistentLoggers.warn(TAG, "ensureDevice: addJwtRefreshListener threw: ${it.message}") }
         applyDeviceFields(device, localState)
         deviceRef.set(device)
         Log.i(TAG, "initDeviceForLocations: device ready for location browse — applyDeviceFields done")
@@ -591,6 +632,8 @@ class RealUrnetworkSdkBridge(
                 ioLoopRef.set(loop)
                 runCatching { device.setTunnelStarted(true) }
                     .onFailure { PersistentLoggers.warn(TAG, "setTunnelStarted(true) threw: ${it.message}") }
+                val providePausedNow = runCatching { device.providePaused }.getOrNull()
+                Log.i(TAG, "tunnelStarted fd=$tunFd providePaused=$providePausedNow")
                 val cv = connectVcRef.get()
                 if (cv != null) {
                     val preferred = preferredLocationRef.get()
