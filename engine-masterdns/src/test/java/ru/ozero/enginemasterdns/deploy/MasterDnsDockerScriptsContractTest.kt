@@ -164,6 +164,30 @@ class MasterDnsDockerScriptsContractTest {
     }
 
     @Test
+    fun `removeAll closes firewall port 53 only if we opened it (marker file gate)`() {
+        val cmd = MasterDnsDockerScripts.removeAll
+        assertTrue(
+            cmd.contains("/var/lib/masterdns-ozero/fw_opened"),
+            "Marker file gate обязателен — без него removeAll удалит юзерское правило ufw allow 53/udp " +
+                "которое существовало до нашего deploy.",
+        )
+        assertTrue(cmd.contains("ufw delete allow 53/udp"))
+        assertTrue(cmd.contains("--remove-port=53/udp"))
+        assertTrue(cmd.contains("iptables -D INPUT"))
+    }
+
+    @Test
+    fun `openFirewallPort53 writes marker file to track ownership`() {
+        val script = MasterDnsDockerScripts.openFirewallPort53
+        assertTrue(
+            script.contains("/var/lib/masterdns-ozero/fw_opened") &&
+                (script.contains("mkdir -p /var/lib/masterdns-ozero") ||
+                    script.contains("install -d /var/lib/masterdns-ozero")),
+            "openFirewallPort53 должен писать marker — нужен для removeAll cleanup gating.",
+        )
+    }
+
+    @Test
     fun `firewall markers exposed as constants for deployer mapping`() {
         assertEquals("FW_UFW_OK", MasterDnsDockerScripts.MARKER_FW_UFW_OK)
         assertEquals("FW_FIREWALLD_OK", MasterDnsDockerScripts.MARKER_FW_FIREWALLD_OK)
