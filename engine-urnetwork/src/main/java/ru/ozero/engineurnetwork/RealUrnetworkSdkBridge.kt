@@ -103,7 +103,7 @@ class RealUrnetworkSdkBridge(
     ): UrnetworkSdkBridge.StartResult {
         val existingDevice = deviceRef.get()
         val device: DeviceLocal = if (existingDevice != null) {
-            Log.i(TAG, "start: reusing device from initDeviceForLocations")
+            PersistentLoggers.info(TAG, "node start: reusing existing node from prior session")
             existingDevice
         } else {
             val space = try {
@@ -141,41 +141,56 @@ class RealUrnetworkSdkBridge(
                 val keys = localState.provideSecretKeys
                 if (keys != null) {
                     d.loadProvideSecretKeys(keys)
-                    Log.i(TAG, "provideSecretKeys loaded from localState — stable provider identity")
+                    PersistentLoggers.info(TAG, "node start: session keys loaded — stable identity")
                 } else {
                     var sub: Sub? = null
                     sub = d.addProvideSecretKeysListener { generated ->
                         runCatching { localState.provideSecretKeys = generated }
-                            .onSuccess { Log.i(TAG, "provideSecretKeys generated and persisted") }
-                            .onFailure { PersistentLoggers.warn(TAG, "persist provideSecretKeys: ${it.message}") }
+                            .onSuccess {
+                                PersistentLoggers.info(TAG, "node start: session keys generated and persisted")
+                            }
+                            .onFailure {
+                                PersistentLoggers.warn(TAG, "node start: session keys persist threw: ${it.message}")
+                            }
                         runCatching { sub?.close() }
                     }
                     d.initProvideSecretKeys()
-                    Log.i(TAG, "provideSecretKeys not in localState — generating new keys")
+                    PersistentLoggers.info(TAG, "node start: session keys absent — generating new identity")
                 }
-            }.onFailure { PersistentLoggers.warn(TAG, "provideSecretKeys init threw: ${it.message}") }
+            }.onFailure {
+                PersistentLoggers.warn(TAG, "node start: session keys init threw: ${it.message}")
+            }
             runCatching {
                 d.addJwtRefreshListener { newJwt ->
                     runCatching { localState.byClientJwt = newJwt }
-                        .onSuccess { Log.i(TAG, "SDK JWT refreshed — localState updated") }
-                        .onFailure { PersistentLoggers.warn(TAG, "JWT refresh localState: ${it.message}") }
+                        .onSuccess {
+                            PersistentLoggers.info(TAG, "node start: credential refreshed — state updated")
+                        }
+                        .onFailure {
+                            PersistentLoggers.warn(
+                                TAG,
+                                "node start: credential refresh persist threw: ${it.message}",
+                            )
+                        }
                 }
-            }.onFailure { PersistentLoggers.warn(TAG, "addJwtRefreshListener threw: ${it.message}") }
+            }.onFailure {
+                PersistentLoggers.warn(TAG, "node start: credential refresh listener threw: ${it.message}")
+            }
             applyDeviceFields(d, localState)
-            Log.i(TAG, "runStartOnMain: device created — applyDeviceFields done (паритет с initDeviceForLocations)")
+            PersistentLoggers.info(TAG, "node start: instance created — fields applied")
             deviceRef.set(d)
             d
         }
 
         val cv = runCatching { device.openConnectViewController() }.getOrElse {
-            PersistentLoggers.warn(TAG, "openConnectViewController threw: ${it.message}")
+            PersistentLoggers.warn(TAG, "node start: routing controller threw: ${it.message}")
             null
         }
         if (cv != null) {
             connectVcRef.set(cv)
-            Log.i(TAG, "ConnectViewController opened — locations available")
+            PersistentLoggers.info(TAG, "node start: routing controller opened — endpoints available")
         } else {
-            PersistentLoggers.error(TAG, "ConnectViewController is null — P2P connection unavailable")
+            PersistentLoggers.error(TAG, "node start: routing controller null — connectivity unavailable")
         }
 
         val walletVcStarted = runCatching {
@@ -184,17 +199,17 @@ class RealUrnetworkSdkBridge(
             walletVc?.addUnpaidByteCountListener { ubc -> unpaidBytesRef.set(ubc) }
             walletVc?.start()
             walletVc?.fetchTransferStats()
-            Log.i(TAG, "WalletViewController opened — provider stats listener attached")
+            PersistentLoggers.info(TAG, "node start: account controller opened — metrics listener attached")
             walletVc
         }.onFailure {
-            PersistentLoggers.warn(TAG, "WalletViewController init threw: ${it.message}")
+            PersistentLoggers.warn(TAG, "node start: account controller init threw: ${it.message}")
         }.getOrNull()
         if (walletVcStarted != null) {
             payoutWalletSetup.configure(walletVcStarted, walletAddress)
         }
         contractStatusListener.attach(device)
         running.set(true)
-        PersistentLoggers.info(TAG, "device created — awaiting attachTun(fd) before tunnelStarted")
+        PersistentLoggers.info(TAG, "node start: ready — awaiting attach(fd)")
         return UrnetworkSdkBridge.StartResult.Success
     }
 

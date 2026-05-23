@@ -1,6 +1,5 @@
 package ru.ozero.app.relay
 
-import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -60,7 +59,7 @@ class UrnetworkRelayCoordinator(
         if (tunnelState !is TunnelState.Connected) {
             bootstrapAttemptedThisSession.set(false)
             if (relayOwned.compareAndSet(true, false)) {
-                Log.i(TAG, "relay stop: tunnel not connected")
+                PersistentLoggers.info(TAG, "mesh session: tunnel offline — releasing worker")
                 runCatching { bridge.stop() }
             }
             return
@@ -73,11 +72,13 @@ class UrnetworkRelayCoordinator(
             if (bootstrapAttemptedThisSession.compareAndSet(false, true)) {
                 PersistentLoggers.info(
                     TAG,
-                    "bootstrap: jwt missing while ${tunnelState.engineId} active — acquiring",
+                    "mesh session: credential missing while ${tunnelState.engineId} active — acquiring",
                 )
                 val r = jwtBootstrapper.ensureClientJwt()
                 if (r is UrnetworkJwtBootstrapper.Result.Failed) {
-                    PersistentLoggers.warn(TAG, "bootstrap failed: ${r.reason}")
+                    PersistentLoggers.warn(TAG, "mesh session: credential acquisition failed: ${r.reason}")
+                } else {
+                    PersistentLoggers.info(TAG, "mesh session: credential acquired (${r.javaClass.simpleName})")
                 }
             }
             return
@@ -94,10 +95,13 @@ class UrnetworkRelayCoordinator(
             relayOwned.set(true)
             val provideEnabled = runCatching { configStore.provideEnabled().first() }.getOrDefault(true)
             runCatching { bridge.setProvidePaused(!provideEnabled) }
-                .onFailure { PersistentLoggers.warn(TAG, "setProvidePaused threw: ${it.message}") }
-            Log.i(TAG, "relay started alongside ${tunnelState.engineId}")
+                .onFailure { PersistentLoggers.warn(TAG, "mesh session: worker pause toggle threw: ${it.message}") }
+            PersistentLoggers.info(
+                TAG,
+                "mesh session: worker started alongside ${tunnelState.engineId} (provideEnabled=$provideEnabled)",
+            )
         } else {
-            PersistentLoggers.warn(TAG, "relay bridge.start failed: $result")
+            PersistentLoggers.warn(TAG, "mesh session: worker start failed: $result")
         }
     }
 
@@ -106,6 +110,6 @@ class UrnetworkRelayCoordinator(
     }
 
     private companion object {
-        const val TAG = "UrnetworkRelayCoord"
+        const val TAG = "MeshSession"
     }
 }

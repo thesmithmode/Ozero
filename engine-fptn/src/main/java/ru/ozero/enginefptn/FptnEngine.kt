@@ -102,11 +102,27 @@ class FptnEngine(
         }
 
         val tokenData = FptnToken.parse(fptn.token)
-            ?: return StartResult.Failure("Invalid FPTN token")
+            ?: run {
+                PersistentLoggers.error(TAG, "start: token parse failed (invalid/expired token format)")
+                return StartResult.Failure("Invalid FPTN token")
+            }
 
         val server = selectServer(fptn, tokenData)
-            ?: return StartResult.Failure("No FPTN server available")
+            ?: run {
+                PersistentLoggers.error(
+                    TAG,
+                    "start: no server available — token contained ${tokenData.servers.size} server(s), " +
+                        "selected=${fptn.selectedServerName ?: "<auto>"}",
+                )
+                return StartResult.Failure("No FPTN server available")
+            }
 
+        PersistentLoggers.info(
+            TAG,
+            "start: server=${server.name} port=${server.port} bypass=${fptn.bypassMethod} " +
+                "sniDomain=${fptn.sniDomain} tokenServers=${tokenData.servers.size} " +
+                "autoSelect=${fptn.autoSelect}",
+        )
         Log.d(TAG, "start server=${server.name}:${server.port} bypass=${fptn.bypassMethod} n=${tokenData.servers.size}")
 
         FptnNativeWebSocket.loadOnce()
@@ -282,7 +298,11 @@ class FptnEngine(
             censorshipStrategy = bypassMethod,
         )
         return try {
-            Log.d(TAG, "authenticate: POST /api/v1/login timeout=${AUTH_TIMEOUT_S}s")
+            PersistentLoggers.info(
+                TAG,
+                "authenticate: POST /api/v1/login server=${server.name}:${server.port} " +
+                    "sni=$sniDomain bypass=$bypassMethod timeout=${AUTH_TIMEOUT_S}s",
+            )
             val body = JSONObject().apply {
                 put("username", data.username)
                 put("password", data.password)
@@ -291,17 +311,25 @@ class FptnEngine(
             if (resp.code == 200) {
                 val token = JSONObject(resp.body).optString("access_token").takeIf { it.isNotBlank() }
                 if (token != null) {
-                    Log.d(TAG, "authenticate: success")
+                    PersistentLoggers.info(TAG, "authenticate: success server=${server.name}")
                 } else {
                     PersistentLoggers.error(TAG, "authenticate: 200 but no access_token in response")
                 }
                 token
             } else {
-                PersistentLoggers.error(TAG, "authenticate: HTTP ${resp.code} error=${resp.error}")
+                PersistentLoggers.error(
+                    TAG,
+                    "authenticate: HTTP ${resp.code} error=${resp.error} " +
+                        "server=${server.name}:${server.port} sni=$sniDomain bypass=$bypassMethod",
+                )
                 null
             }
         } catch (e: Exception) {
-            PersistentLoggers.error(TAG, "authenticate: exception ${e.javaClass.simpleName}: ${e.message}")
+            PersistentLoggers.error(
+                TAG,
+                "authenticate: exception ${e.javaClass.simpleName}: ${e.message} " +
+                    "server=${server.name}:${server.port} sni=$sniDomain bypass=$bypassMethod",
+            )
             null
         } finally {
             httpsClient.nativeDestroy(handle)

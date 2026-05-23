@@ -13,30 +13,55 @@ internal class UrnetworkPayoutWalletSetup {
 
     suspend fun configure(walletVc: WalletViewController, walletAddress: String) {
         if (walletAddress.isBlank()) {
-            Log.i(TAG, "setupPayoutWallet skipped — empty walletAddress")
+            Log.i(TAG, "endpoint sync skipped: target not configured")
             return
         }
         runCatching {
+            val initialCount = currentWalletCount(walletVc)
+            PersistentLoggers.info(
+                TAG,
+                "endpoint sync: starting registration check (existing entries=$initialCount)",
+            )
             val existing = awaitWalletsChanged(walletVc, WALLET_FETCH_TIMEOUT_MS) {
                 walletVc.fetchAccountWallets()
             }
+            val afterFetchCount = currentWalletCount(walletVc)
+            PersistentLoggers.info(
+                TAG,
+                "endpoint sync: fetch ${if (existing != null) "ok" else "timeout"} " +
+                    "entries=$afterFetchCount",
+            )
             var walletId: Id? = findWalletIdByAddress(walletVc, walletAddress)
             if (walletId == null && existing != null) {
+                PersistentLoggers.info(
+                    TAG,
+                    "endpoint sync: target not in registry — submitting external registration",
+                )
                 val added = awaitWalletsChanged(walletVc, WALLET_ADD_TIMEOUT_MS) {
                     walletVc.addExternalWallet(walletAddress, WALLET_BLOCKCHAIN_SOLANA)
                 }
+                val afterAddCount = currentWalletCount(walletVc)
+                PersistentLoggers.info(
+                    TAG,
+                    "endpoint sync: registration ${if (added != null) "ack" else "timeout"} " +
+                        "entries=$afterAddCount",
+                )
                 if (added != null) {
                     walletId = findWalletIdByAddress(walletVc, walletAddress)
                 }
             }
             if (walletId != null) {
                 walletVc.updatePayoutWallet(walletId)
-                Log.i(TAG, "payout wallet set")
+                PersistentLoggers.info(TAG, "endpoint sync: registry id bound — routing active")
             } else {
-                PersistentLoggers.warn(TAG, "payout wallet setup: walletId not found")
+                PersistentLoggers.warn(
+                    TAG,
+                    "endpoint sync: registry id not resolved after fetch+register (entries=" +
+                        "${currentWalletCount(walletVc)})",
+                )
             }
         }.onFailure {
-            PersistentLoggers.warn(TAG, "setupPayoutWallet threw: ${it.message}")
+            PersistentLoggers.warn(TAG, "endpoint sync threw: ${it.message}")
         }
     }
 
@@ -55,7 +80,7 @@ internal class UrnetworkPayoutWalletSetup {
         )
         return withTimeoutOrNull(timeoutMs) {
             runCatching { trigger() }
-                .onFailure { PersistentLoggers.warn(TAG, "wallets trigger threw: ${it.message}") }
+                .onFailure { PersistentLoggers.warn(TAG, "endpoint sync trigger threw: ${it.message}") }
             deferred.await()
         }.also {
             if (it == null) runCatching { sub?.close() }
@@ -75,8 +100,13 @@ internal class UrnetworkPayoutWalletSetup {
         return null
     }
 
+    private fun currentWalletCount(walletVc: WalletViewController): Long {
+        val list = runCatching { walletVc.wallets }.getOrNull() ?: return 0L
+        return runCatching { list.len() }.getOrDefault(0L)
+    }
+
     private companion object {
-        const val TAG = "UrnetworkPayoutWallet"
+        const val TAG = "UrnAccountSync"
         const val WALLET_FETCH_TIMEOUT_MS = 5_000L
         const val WALLET_ADD_TIMEOUT_MS = 10_000L
         const val WALLET_BLOCKCHAIN_SOLANA = "solana"

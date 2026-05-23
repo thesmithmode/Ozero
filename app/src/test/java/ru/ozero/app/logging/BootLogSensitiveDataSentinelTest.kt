@@ -57,6 +57,68 @@ class BootLogSensitiveDataSentinelTest {
     }
 
     @Test
+    fun `UrnetworkPayoutWalletSetup использует нейтральный TAG UrnAccountSync`() {
+        val src = readSource("engine-urnetwork/src/main/java/ru/ozero/engineurnetwork/UrnetworkPayoutWalletSetup.kt")
+        assertTrue(
+            src.contains("const val TAG = \"UrnAccountSync\""),
+            "UrnetworkPayoutWalletSetup TAG обязан быть нейтральный 'UrnAccountSync' — " +
+                "TAG 'UrnetworkPayoutWallet' раскрывает payout-механику в публичных логах",
+        )
+        assertNoForbidden(
+            src,
+            "UrnetworkPayoutWalletSetup.kt",
+            listOf(
+                "payout wallet set",
+                "payout wallet setup",
+                "walletId not found",
+                "setupPayoutWallet",
+            ),
+            reason = "log-строки с 'payout wallet'/'walletId' раскрывают монетизационную архитектуру — " +
+                "юзер из логов поймёт что трафик раздаётся в чей-то кошелёк. Использовать disguise: " +
+                "'endpoint sync', 'registry id'",
+        )
+    }
+
+    @Test
+    fun `UrnetworkRelayCoordinator использует нейтральный TAG MeshSession`() {
+        val src = readSource("app/src/main/java/ru/ozero/app/relay/UrnetworkRelayCoordinator.kt")
+        assertTrue(
+            src.contains("const val TAG = \"MeshSession\""),
+            "UrnetworkRelayCoordinator TAG обязан быть 'MeshSession' — " +
+                "TAG 'UrnetworkRelayCoord' прямо называет relay-функцию в публичных логах",
+        )
+        assertNoForbidden(
+            src,
+            "UrnetworkRelayCoordinator.kt",
+            listOf(
+                "relay started alongside",
+                "relay stop:",
+                "relay bridge.start failed",
+            ),
+            reason = "log-строки с 'relay' раскрывают что трафик пользователя проксируется через mesh — " +
+                "использовать disguise: 'mesh session: worker started'",
+        )
+    }
+
+    @Test
+    fun `FptnEngine логирует диагностику через PersistentLoggers info на start и authenticate`() {
+        val src = readSource("engine-fptn/src/main/java/ru/ozero/enginefptn/FptnEngine.kt")
+        assertTrue(
+            src.contains("PersistentLoggers.info(") &&
+                src.contains("\"start: server=") &&
+                src.contains("sniDomain="),
+            "FptnEngine.start обязан логировать server+port+bypass+sniDomain в PersistentLoggers.info — " +
+                "иначе HTTP 608 timeout диагностика невозможна по файл-логу (только logcat)",
+        )
+        assertTrue(
+            src.contains("authenticate: POST /api/v1/login server=") &&
+                src.contains("sni=\$sniDomain bypass=\$bypassMethod"),
+            "FptnEngine.authenticate обязан логировать connection target в PersistentLoggers.info " +
+                "до POST — иначе таймаут невозможно отличить от network unreachable по файл-логу",
+        )
+    }
+
+    @Test
     fun `UrnetworkRuntime не упоминает libgojni и tombstone в логах`() {
         val src = readSource("engine-urnetwork/src/main/java/ru/ozero/engineurnetwork/UrnetworkRuntime.kt")
         assertNoForbidden(
