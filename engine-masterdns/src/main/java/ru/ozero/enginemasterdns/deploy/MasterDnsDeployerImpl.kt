@@ -38,23 +38,10 @@ internal class MasterDnsDeployerImpl(
         if (!authed) return@flow
 
         try {
-            val sudoResult = transport.exec(MasterDnsDockerScripts.checkSudoNoPassword)
-            when {
-                sudoResult.contains(MasterDnsDockerScripts.MARKER_ERR_SUDO_NOT_INSTALLED) -> {
-                    emit(MasterDnsDeployState.Error("sudo_not_installed")); return@flow
-                }
-                sudoResult.contains(MasterDnsDockerScripts.MARKER_ERR_SUDO_PWD_REQUIRED) -> {
-                    emit(MasterDnsDeployState.Error("sudo_pwd_required")); return@flow
-                }
-                sudoResult.contains(MasterDnsDockerScripts.MARKER_ERR_SUDO_NOT_ALLOWED) -> {
-                    emit(MasterDnsDeployState.Error("sudo_not_allowed")); return@flow
-                }
-                sudoResult.contains(MasterDnsDockerScripts.MARKER_ERR_SUDO_NO_HOME) -> {
-                    emit(MasterDnsDeployState.Error("sudo_no_home")); return@flow
-                }
-                sudoResult.contains(MasterDnsDockerScripts.MARKER_ERR_SUDO_NOT_IN_GROUP) -> {
-                    emit(MasterDnsDeployState.Error("sudo_not_in_group")); return@flow
-                }
+            val sudoError = mapSudoResult(transport.exec(MasterDnsDockerScripts.checkSudoNoPassword))
+            if (sudoError != null) {
+                emit(MasterDnsDeployState.Error(sudoError))
+                return@flow
             }
 
             emit(MasterDnsDeployState.CheckingPreflight)
@@ -169,6 +156,15 @@ internal class MasterDnsDeployerImpl(
         } finally {
             transport.close()
         }
+    }
+
+    private fun mapSudoResult(result: String): String? = when {
+        result.contains(MasterDnsDockerScripts.MARKER_ERR_SUDO_NOT_INSTALLED) -> "sudo_not_installed"
+        result.contains(MasterDnsDockerScripts.MARKER_ERR_SUDO_PWD_REQUIRED) -> "sudo_pwd_required"
+        result.contains(MasterDnsDockerScripts.MARKER_ERR_SUDO_NOT_ALLOWED) -> "sudo_not_allowed"
+        result.contains(MasterDnsDockerScripts.MARKER_ERR_SUDO_NO_HOME) -> "sudo_no_home"
+        result.contains(MasterDnsDockerScripts.MARKER_ERR_SUDO_NOT_IN_GROUP) -> "sudo_not_in_group"
+        else -> null
     }
 
     private fun buildClientToml(serverIp: String, encryptionKey: String): String =

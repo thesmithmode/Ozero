@@ -179,10 +179,11 @@ class MasterDnsDockerScriptsContractTest {
     @Test
     fun `openFirewallPort53 writes marker file to track ownership`() {
         val script = MasterDnsDockerScripts.openFirewallPort53
+        val hasMarker = script.contains("/var/lib/masterdns-ozero/fw_opened")
+        val hasMkdir = script.contains("mkdir -p /var/lib/masterdns-ozero") ||
+            script.contains("install -d /var/lib/masterdns-ozero")
         assertTrue(
-            script.contains("/var/lib/masterdns-ozero/fw_opened") &&
-                (script.contains("mkdir -p /var/lib/masterdns-ozero") ||
-                    script.contains("install -d /var/lib/masterdns-ozero")),
+            hasMarker && hasMkdir,
             "openFirewallPort53 должен писать marker — нужен для removeAll cleanup gating.",
         )
     }
