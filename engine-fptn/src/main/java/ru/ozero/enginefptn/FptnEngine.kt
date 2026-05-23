@@ -268,7 +268,12 @@ class FptnEngine(
             ?: data.servers.firstOrNull()
     }
 
-    private fun authenticate(server: FptnServer, data: FptnTokenData, bypassMethod: String, sniDomain: String): String? {
+    private fun authenticate(
+        server: FptnServer,
+        data: FptnTokenData,
+        bypassMethod: String,
+        sniDomain: String,
+    ): String? {
         val handle = httpsClient.nativeCreate(
             host = server.host,
             port = server.port,
