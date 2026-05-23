@@ -4,7 +4,6 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -14,27 +13,11 @@ import java.nio.file.Path
 class DataStoreMasterDnsConfigStoreTest {
 
     @Test
-    fun `default config is empty and disabled`(@TempDir tmp: Path) = runTest {
+    fun `default config is empty`(@TempDir tmp: Path) = runTest {
         val store = makeStore(tmp)
         val cfg = store.config().first()
-        assertFalse(cfg.enabled)
         assertEquals("", cfg.configToml)
         assertTrue(cfg.resolvers.isEmpty())
-    }
-
-    @Test
-    fun `setEnabled persists true`(@TempDir tmp: Path) = runTest {
-        val store = makeStore(tmp)
-        store.setEnabled(true)
-        assertTrue(store.config().first().enabled)
-    }
-
-    @Test
-    fun `setEnabled persists false after true`(@TempDir tmp: Path) = runTest {
-        val store = makeStore(tmp)
-        store.setEnabled(true)
-        store.setEnabled(false)
-        assertFalse(store.config().first().enabled)
     }
 
     @Test

@@ -34,7 +34,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -97,20 +96,6 @@ fun MasterDnsSettingsScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    text = stringResource(R.string.masterdns_enabled),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Switch(
-                    checked = state.enabled,
-                    onCheckedChange = viewModel::onEnabledChange,
-                )
-            }
             DeployCard(
                 state = state,
                 onDeployClick = viewModel::onDeployClick,

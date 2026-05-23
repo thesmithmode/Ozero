@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Assertions.assertTrue
+
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.enginemasterdns.MasterDnsConfigStore
@@ -38,11 +39,10 @@ class MasterDnsSettingsViewModelTest {
     @Test
     fun `state reflects store config`() = runTest {
         val store = FakeStore(
-            MasterDnsPersistedConfig(enabled = true, configToml = "x", resolvers = listOf("8.8.8.8")),
+            MasterDnsPersistedConfig(configToml = "x", resolvers = listOf("8.8.8.8")),
         )
         val vm = MasterDnsSettingsViewModel(store, FakeDeployer())
-        val state = vm.state.first { it.enabled }
-        assertTrue(state.enabled)
+        val state = vm.state.first { it.configToml == "x" }
         assertEquals("x", state.configToml)
         assertEquals("8.8.8.8", state.resolversText)
     }
@@ -79,22 +79,6 @@ class MasterDnsSettingsViewModelTest {
         val vm = MasterDnsSettingsViewModel(store, FakeDeployer())
         vm.onConfigTomlChange("DOMAINS=[]")
         assertEquals("DOMAINS=[]", store.toml)
-    }
-
-    @Test
-    fun `onEnabledChange persists true`() = runTest {
-        val store = FakeStore(MasterDnsPersistedConfig())
-        val vm = MasterDnsSettingsViewModel(store, FakeDeployer())
-        vm.onEnabledChange(true)
-        assertTrue(store.enabled)
-    }
-
-    @Test
-    fun `onEnabledChange persists false`() = runTest {
-        val store = FakeStore(MasterDnsPersistedConfig(enabled = true))
-        val vm = MasterDnsSettingsViewModel(store, FakeDeployer())
-        vm.onEnabledChange(false)
-        assertFalse(store.enabled)
     }
 
     @Test
@@ -202,18 +186,6 @@ class MasterDnsSettingsViewModelTest {
         vm.onDeployReset()
         val state = vm.state.first { it.deployLog.isEmpty() }
         assertTrue(state.deployLog.isEmpty())
-    }
-
-    @Test
-    fun `deploy success auto-enables engine`() = runTest {
-        val store = FakeStore(MasterDnsPersistedConfig(enabled = false))
-        val vm = MasterDnsSettingsViewModel(
-            store,
-            FakeDeployer(deployStates = listOf(MasterDnsDeployState.Done("toml"))),
-        )
-        vm.onDeployClick(host = "5.6.7.8", port = 22, login = "root", password = "pass".toCharArray())
-        vm.state.first { it.deployState is MasterDnsDeployState.Done }
-        assertTrue(store.enabled)
     }
 
     @Test
@@ -408,16 +380,11 @@ class MasterDnsSettingsViewModelTest {
 
     private class FakeStore(initial: MasterDnsPersistedConfig) : MasterDnsConfigStore {
         private val flow = MutableStateFlow(initial)
-        var enabled: Boolean = initial.enabled
         var toml: String = initial.configToml
         var resolvers: List<String> = initial.resolvers
         var serverIp: String = initial.serverIp
         var serverPort: Int = initial.serverPort
         override fun config() = flow
-        override suspend fun setEnabled(enabled: Boolean) {
-            this.enabled = enabled
-            flow.value = flow.value.copy(enabled = enabled)
-        }
         override suspend fun setConfigToml(toml: String) {
             this.toml = toml
             flow.value = flow.value.copy(configToml = toml)

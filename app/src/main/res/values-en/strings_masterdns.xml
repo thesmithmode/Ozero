@@ -3,7 +3,6 @@
     <string name="masterdns_engine_name">MasterDNS</string>
     <string name="masterdns_config_toml">client_config.toml content</string>
     <string name="masterdns_resolvers">DNS resolvers (one per line)</string>
-    <string name="masterdns_enabled">Enable MasterDNS</string>
     <string name="masterdns_setup_title">Bring up your own server in 15 minutes</string>
     <string name="masterdns_setup_prereq">Requires a VPS (1 vCPU, 512 MB RAM) and a domain you can delegate via NS records. All commands are one-tap copy.</string>
     <string name="masterdns_setup_step1_title">Delegate a subdomain</string>

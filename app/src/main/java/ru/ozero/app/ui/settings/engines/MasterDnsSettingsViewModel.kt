@@ -18,7 +18,6 @@ import ru.ozero.enginescore.PersistentLoggers
 import javax.inject.Inject
 
 data class MasterDnsSettingsState(
-    val enabled: Boolean = false,
     val configToml: String = "",
     val resolversText: String = "",
     val serverIp: String = "",
@@ -43,7 +42,6 @@ class MasterDnsSettingsViewModel @Inject constructor(
         deployLog,
     ) { cfg, deploy, log ->
         MasterDnsSettingsState(
-            enabled = cfg.enabled,
             configToml = cfg.configToml,
             resolversText = cfg.resolvers.joinToString("\n"),
             serverIp = cfg.serverIp,
@@ -52,13 +50,6 @@ class MasterDnsSettingsViewModel @Inject constructor(
             deployLog = log,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, MasterDnsSettingsState())
-
-    fun onEnabledChange(enabled: Boolean) {
-        viewModelScope.launch {
-            runCatching { store.setEnabled(enabled) }
-                .onFailure { PersistentLoggers.error(TAG, "setEnabled failed: ${it.message}", it) }
-        }
-    }
 
     fun onConfigTomlChange(toml: String) {
         viewModelScope.launch {
@@ -96,7 +87,6 @@ class MasterDnsSettingsViewModel @Inject constructor(
                             store.setServerIp(host)
                             store.setServerPort(port)
                             store.setResolvers(listOf("$host:$MASTERDNS_DNS_PORT"))
-                            store.setEnabled(true)
                         }.onFailure { PersistentLoggers.error(TAG, "deploy persist failed: ${it.message}", it) }
                         appendLog("✓ Резолверы и client_config записаны автоматически")
                     }

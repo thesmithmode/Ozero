@@ -2,7 +2,6 @@ package ru.ozero.enginemasterdns
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -15,7 +14,6 @@ class DataStoreMasterDnsConfigStore(
 
     override fun config(): Flow<MasterDnsPersistedConfig> = dataStore.data.map { prefs ->
         MasterDnsPersistedConfig(
-            enabled = prefs[KEY_ENABLED] ?: false,
             configToml = prefs[KEY_TOML].orEmpty(),
             resolvers = prefs[KEY_RESOLVERS].orEmpty()
                 .split('\n')
@@ -24,10 +22,6 @@ class DataStoreMasterDnsConfigStore(
             serverIp = prefs[KEY_SERVER_IP].orEmpty(),
             serverPort = prefs[KEY_SERVER_PORT] ?: 22,
         )
-    }
-
-    override suspend fun setEnabled(enabled: Boolean) {
-        dataStore.edit { it[KEY_ENABLED] = enabled }
     }
 
     override suspend fun setConfigToml(toml: String) {
@@ -47,7 +41,6 @@ class DataStoreMasterDnsConfigStore(
     }
 
     private companion object {
-        val KEY_ENABLED = booleanPreferencesKey("masterdns.enabled")
         val KEY_TOML = stringPreferencesKey("masterdns.toml")
         val KEY_RESOLVERS = stringPreferencesKey("masterdns.resolvers")
         val KEY_SERVER_IP = stringPreferencesKey("masterdns.server_ip")

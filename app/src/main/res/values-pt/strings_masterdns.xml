@@ -3,7 +3,6 @@
     <string name="masterdns_engine_name">MasterDNS</string>
     <string name="masterdns_config_toml">Conteúdo de client_config.toml</string>
     <string name="masterdns_resolvers">Servidores DNS (um por linha)</string>
-    <string name="masterdns_enabled">Ativar MasterDNS</string>
     <string name="masterdns_setup_title">Configure seu próprio servidor em 15 minutos</string>
     <string name="masterdns_setup_prereq">Requer um VPS (1 vCPU, 512 MB RAM) e um domínio que você possa delegar via registros NS. Todos os comandos são copiados com um toque.</string>
     <string name="masterdns_setup_step1_title">Delegar um subdomínio</string>

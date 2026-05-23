@@ -3,7 +3,6 @@
     <string name="masterdns_engine_name">MasterDNS</string>
     <string name="masterdns_config_toml">Конфигурация client_config.toml</string>
     <string name="masterdns_resolvers">DNS-резолверы (по одному на строку)</string>
-    <string name="masterdns_enabled">Включить MasterDNS</string>
     <string name="masterdns_setup_title">Как поднять свой сервер за 15 минут</string>
     <string name="masterdns_setup_prereq">Нужен VPS (1 vCPU, 512 МБ RAM) и домен с возможностью настроить NS-делегирование. Все команды копируются в один клик.</string>
     <string name="masterdns_setup_step1_title">Делегировать поддомен</string>
