@@ -76,10 +76,6 @@ EOF
 # ---------------------------------------------------------------------------
 # 4. Install Conan deps (nlohmann_json + fptn via local recipe)
 # ---------------------------------------------------------------------------
-# Ensure build-host profile exists with compiler settings (needed for build
-# requirements like protoc that run on the CI machine, not the Android device).
-conan profile detect --force
-
 CONAN_INSTALL_DIR="$BUILD_DIR/conan-deps"
 rm -rf "$CONAN_INSTALL_DIR"
 mkdir -p "$CONAN_INSTALL_DIR"
