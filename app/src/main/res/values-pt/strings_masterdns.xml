@@ -19,7 +19,7 @@
     <string name="masterdns_copy_button">Copiar</string>
     <string name="masterdns_copied_toast">Copiado</string>
     <string name="settings_masterdns_title">MasterDNS</string>
-    <string name="settings_masterdns_summary">Túnel DNS — bypass de emergência quando todos os VPNs estão bloqueados.</string>
+    <string name="settings_masterdns_summary">Túnel DNS — fallback de emergência quando os protocolos padrão estão indisponíveis.</string>
     <string name="masterdns_deploy_section_title">Implantação automática do servidor</string>
     <string name="masterdns_deploy_progress_label">Progresso da instalação</string>
     <string name="masterdns_vps_requirements">Requisitos do VPS: ≥512 MB RAM, 1 vCPU, ≥1 GB disco, porta 53/UDP aberta</string>

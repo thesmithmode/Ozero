@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="settings_fptn_title">FPTN</string>
-    <string name="settings_fptn_summary">Túnel SNI Reality — contorna bloqueios DPI</string>
+    <string name="settings_fptn_summary">Túnel SNI Reality — ofuscação do handshake TLS</string>
     <string name="fptn_settings_title">FPTN</string>
 
-    <string name="fptn_about_description">FPTN é uma tecnologia VPN desenvolvida do zero, incluindo seu próprio protocolo, servidor e clientes multiplataforma. É um projeto sem fins lucrativos de código aberto, desenvolvido por voluntários e projetado para contornar a censura.</string>
+    <string name="fptn_about_description">FPTN é uma tecnologia VPN desenvolvida do zero, incluindo seu próprio protocolo, servidor e clientes multiplataforma. É um projeto sem fins lucrativos de código aberto, desenvolvido por voluntários e projetado para a ofuscação do tráfego de rede.</string>
     <string name="fptn_link_website">Nosso site</string>
     <string name="fptn_link_telegram">Nosso grupo no Telegram</string>
     <string name="fptn_link_play">App na Google Play</string>
@@ -17,8 +17,8 @@
     <string name="fptn_section_token_description">A lista de servidores disponíveis é criptografada dentro do token. Para atualizar a lista, insira um novo token. O token funciona como uma senha: ao atualizá-lo, ele deixará de funcionar em todos os outros dispositivos onde era usado.</string>
     <string name="fptn_bot_hint">Obtenha seu token com t.me/fptn_bot</string>
 
-    <string name="fptn_section_bypass">Métodos de bypass</string>
-    <string name="fptn_section_bypass_summary">Configurar métodos de bypass de bloqueios</string>
+    <string name="fptn_section_bypass">Métodos de ofuscação</string>
+    <string name="fptn_section_bypass_summary">Configurar métodos de ofuscação de tráfego</string>
 
     <string name="fptn_section_sni">SNI atual</string>
     <string name="fptn_sni_description">O endereço do site declarado ao conectar-se ao servidor VPN. Especifique um site popular acessível sem VPN no seu país.</string>

@@ -173,18 +173,7 @@ private fun DeployCard(
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(Modifier.height(4.dp))
-            Surface(
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                shape = RoundedCornerShape(6.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    text = stringResource(R.string.masterdns_vps_requirements),
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(8.dp),
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                )
-            }
+            VpsRequirementsHint()
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(
                 value = host,
@@ -239,36 +228,73 @@ private fun DeployCard(
                 DeployLogPanel(state.deployLog)
                 Spacer(Modifier.height(8.dp))
             }
-            when {
-                isDeploying -> DeployProgressRow(deployState)
-                isDone -> DeployDoneRow(
-                    onRedeploy = {
-                        onDeployReset()
-                    },
-                    onUndeploy = {
-                        val port = portText.toIntOrNull() ?: 22
-                        onUndeployClick(host, port, login, password.toCharArray())
-                        password = ""
-                    },
-                    enabled = host.isNotBlank() && login.isNotBlank(),
-                )
-                isRemoved -> DeployRemovedRow(onReset = onDeployReset)
-                deployState is MasterDnsDeployState.Error -> DeployErrorRow(
-                    error = deployState,
-                    onRetry = { onDeployReset() },
-                )
-                else -> Button(
-                    onClick = {
-                        val port = portText.toIntOrNull() ?: 22
-                        onDeployClick(host, port, login, password.toCharArray())
-                        password = ""
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = host.isNotBlank() && login.isNotBlank(),
-                ) {
-                    Text(stringResource(R.string.masterdns_deploy_button))
-                }
-            }
+            DeployActionPanel(
+                deployState = deployState,
+                isDeploying = isDeploying,
+                isDone = isDone,
+                isRemoved = isRemoved,
+                actionsEnabled = host.isNotBlank() && login.isNotBlank(),
+                onDeploy = {
+                    val port = portText.toIntOrNull() ?: 22
+                    onDeployClick(host, port, login, password.toCharArray())
+                    password = ""
+                },
+                onUndeploy = {
+                    val port = portText.toIntOrNull() ?: 22
+                    onUndeployClick(host, port, login, password.toCharArray())
+                    password = ""
+                },
+                onDeployReset = onDeployReset,
+            )
+        }
+    }
+}
+
+@Composable
+private fun VpsRequirementsHint() {
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        shape = RoundedCornerShape(6.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(
+            text = stringResource(R.string.masterdns_vps_requirements),
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(8.dp),
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+        )
+    }
+}
+
+@Composable
+private fun DeployActionPanel(
+    deployState: MasterDnsDeployState,
+    isDeploying: Boolean,
+    isDone: Boolean,
+    isRemoved: Boolean,
+    actionsEnabled: Boolean,
+    onDeploy: () -> Unit,
+    onUndeploy: () -> Unit,
+    onDeployReset: () -> Unit,
+) {
+    when {
+        isDeploying -> DeployProgressRow(deployState)
+        isDone -> DeployDoneRow(
+            onRedeploy = onDeployReset,
+            onUndeploy = onUndeploy,
+            enabled = actionsEnabled,
+        )
+        isRemoved -> DeployRemovedRow(onReset = onDeployReset)
+        deployState is MasterDnsDeployState.Error -> DeployErrorRow(
+            error = deployState,
+            onRetry = onDeployReset,
+        )
+        else -> Button(
+            onClick = onDeploy,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = actionsEnabled,
+        ) {
+            Text(stringResource(R.string.masterdns_deploy_button))
         }
     }
 }

@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="settings_fptn_title">FPTN</string>
-    <string name="settings_fptn_summary">SNI Reality tunnel — bypasses DPI blocks</string>
+    <string name="settings_fptn_summary">SNI Reality tunnel — TLS handshake obfuscation</string>
     <string name="fptn_settings_title">FPTN</string>
 
-    <string name="fptn_about_description">FPTN is a VPN technology built from scratch, including its own protocol, server and cross-platform clients. It is a non-commercial open-source project developed by volunteers and designed to bypass censorship.</string>
+    <string name="fptn_about_description">FPTN is a VPN technology built from scratch, including its own protocol, server and cross-platform clients. It is a non-commercial open-source project developed by volunteers and designed for network traffic obfuscation.</string>
     <string name="fptn_link_website">Our website</string>
     <string name="fptn_link_telegram">Our Telegram group</string>
     <string name="fptn_link_play">App on Google Play</string>
@@ -17,8 +17,8 @@
     <string name="fptn_section_token_description">The list of available servers is encrypted inside the token. To refresh the server list, enter a new token. The token works like a password: once updated, it will stop working on every other device where it was used before.</string>
     <string name="fptn_bot_hint">Get your token from t.me/fptn_bot</string>
 
-    <string name="fptn_section_bypass">Bypass methods</string>
-    <string name="fptn_section_bypass_summary">Configure how blocks are bypassed</string>
+    <string name="fptn_section_bypass">Obfuscation methods</string>
+    <string name="fptn_section_bypass_summary">Configure traffic obfuscation methods</string>
 
     <string name="fptn_section_sni">Current SNI</string>
     <string name="fptn_sni_description">The website address declared when connecting to the VPN server. Specify a popular site accessible without VPN from your country.</string>
