@@ -524,7 +524,6 @@ class ByeDpiEngineTest {
             proxy,
             socksProbe = { _, _, _ -> 1L },
             portFreeChecker = { port -> port !in busyPorts },
-            testDispatcherOverride = UnconfinedTestDispatcher(testScheduler),
         )
         every { proxy.startProxy(any()) } answers {
             proxyRunning.await()
@@ -535,7 +534,7 @@ class ByeDpiEngineTest {
         val assignedPort = result.socksPort
         assertTrue(
             assignedPort !in busyPorts,
-            "Движок должен пропускать занятые порты ${busyPorts}, получил $assignedPort",
+            "Движок должен пропускать занятые порты $busyPorts, получил $assignedPort",
         )
         assertTrue(
             assignedPort >= ByeDpiEngine.PORT_ROTATION_BASE,
