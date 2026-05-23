@@ -6,8 +6,9 @@ sources:
   - "daily/2026-05-19.md"
   - "daily/2026-05-20.md"
   - "daily/2026-05-22.md"
+  - "daily/2026-05-23.md"
 created: 2026-05-19
-updated: 2026-05-22
+updated: 2026-05-23
 ---
 
 # URnetwork Balance Optimistic Cache (SharedPreferences)
@@ -75,6 +76,25 @@ The `RealUrnetworkBalanceRepository._state` was correctly hydrated from cache in
 
 Fix: `initialValue = balanceRepository.state.value` — reads the already-hydrated value at ViewModel construction time. Cache hydration now visible to the UI immediately on screen open without any async round-trip.
 
+### pendingBytes Semantics and availableBytes Formula (2026-05-23)
+
+`openTransferByteCount` (SDK field, exposed as `pendingBytes` in Ozero) is bytes **in active relay sessions right now** — traffic being transferred at this moment, a reserve that will move into `usedBytes`. It is NOT "income in processing" or "payout in pipeline." Adding it to "Доступно" would double-count: those bytes are already deducted from `balanceBytes` via the `usedBytes` computation path.
+
+Final formula for "Доступно" display (sentinel at `UrnetworkBalanceRepositoryTest.kt:81`):
+
+```kotlin
+val availableBytes = balanceBytes + reliabilityBonusBytes
+// reliabilityBonusBytes = min(meanReliabilityWeight * 100, 100).GiB  — heuristic, not real SDK field
+```
+
+`reliabilityBonusBytes` is a cosmetic heuristic derived from the SDK's `meanReliabilityWeight` field (0.0–1.0). It was added at user request to approximate the URnetwork "reliability bonus" concept, since the SDK does not expose an explicit `bonusByteCount` field. Displayed alongside `availableBytes` but based on estimated relay quality, not actual accrued bytes.
+
+Progress bar formula: `total = used + pending + available` (where `available` includes the heuristic bonus). This distorts the denominator cosmetically but keeps it synchronized with the "Доступно" readout per user requirement.
+
+This replaces the earlier (incorrect) formula `availableBytes = balanceBytes + pendingBytes + reliabilityBonusBytes` (commit `277d1dfb`), reverted by commit `defc0438`. The revert removed `pendingBytes` from the sum.
+
+If URnetwork SDK eventually exposes a real `bonusByteCount` field, replace the `reliabilityBonusBytes` heuristic with it.
+
 ### FREE_TIER_CAP_BYTES Removal (2026-05-22)
 
 `UrnetworkBalanceCard` originally capped displayed balance at `FREE_TIER_CAP_BYTES = 34 GiB` to normalize the server-side accumulation artifact (see [[concepts/urnetwork-balance-accumulation-mechanism]]). This cap was removed in commit `e0d53ca4` — the display formula changed to `balanceBytes.coerceAtLeast(0L)` (show real balance, clamp at 0). The decision: the server race is not client-fixable, and hiding legitimate surplus GiBs produces worse UX than showing the real number.
@@ -90,3 +110,4 @@ Fix: `initialValue = balanceRepository.state.value` — reads the already-hydrat
 - [[daily/2026-05-19.md]] — Session v0.1.5: `UrnetworkBalanceCache` (SharedPreferences) injected into `RealUrnetworkBalanceRepository`; `_state` hydrates from cache on init; successful refresh writes snapshot; plan label removed; traffic formula confirmed correct vs upstream
 - [[daily/2026-05-20.md]] — v0.1.9 prep: ViewModel `stateIn(initialValue = INITIAL)` masked cache hydration; fix: `initialValue = balanceRepository.state.value` to expose cache immediately at screen open
 - [[daily/2026-05-22.md]] — Session 16:42: FREE_TIER_CAP_BYTES=34GiB removed from UrnetworkBalanceCard; show real balance via coerceAtLeast(0L); cap decision reversed (see urnetwork-balance-accumulation-mechanism)
+- [[daily/2026-05-23.md]] — Session 02:16: `openTransferByteCount` (pendingBytes) = active session bytes in flight, NOT payout income; removing from "Доступно" formula (commit defc0438, reverting 277d1dfb); final formula `balanceBytes + reliabilityBonusBytes` with sentinel at `UrnetworkBalanceRepositoryTest.kt:81`; `reliabilityBonusBytes` is a heuristic from `meanReliabilityWeight × 100 GiB`

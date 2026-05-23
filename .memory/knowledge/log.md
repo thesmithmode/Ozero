@@ -1,5 +1,36 @@
 # Build Log
 
+## [2026-05-23T21:30:00+03:00] compile | Daily Log 2026-05-23 (pass 4 — verification)
+- Source: daily/2026-05-23.md
+- Articles created: (none — all 6 new articles confirmed present from prior passes)
+- Articles updated: (none — all updates confirmed present from prior passes)
+- Verified complete: [[concepts/warp-uapi-stale-socket-cleanup]], [[concepts/fptn-sni-bypass-method]], [[concepts/urnetwork-provide-secret-keys-identity]], [[concepts/masterdns-deploy-hardening]], [[concepts/gradle-configuration-cache-agp-bug]], [[concepts/urnetwork-jwt-bootstrapper]]
+- Notes: Full read-verification of all 6 new articles and 4 updated articles (urnetwork-balance-optimistic-cache, urnetwork-relay-always, fptn-engine-protocol, engine-masterdns). All content complete. Index entries confirmed. Passes 1-3 captured everything correctly.
+
+## [2026-05-23T20:00:00+03:00] compile | Daily Log 2026-05-23 (pass 3 — pendingBytes semantics)
+- Source: daily/2026-05-23.md
+- Articles created: (none — all prior passes complete)
+- Articles updated: [[concepts/urnetwork-balance-optimistic-cache]] (pendingBytes = active session bytes NOT income; final formula availableBytes=balanceBytes+reliabilityBonusBytes; sentinel UrnetworkBalanceRepositoryTest.kt:81; reliabilityBonusBytes heuristic from meanReliabilityWeight; commit defc0438 revert of 277d1dfb)
+- Notes: Prior passes (18:11 + 19:00) captured 7 new articles and 5 updates. This pass fills the remaining gap from session 02:16 — pendingBytes semantics clarification and the final "Доступно" formula with reliabilityBonusBytes heuristic
+
+## [2026-05-23T19:00:00+03:00] compile | Daily Log 2026-05-23 (pass 2 — late-session gaps)
+- Source: daily/2026-05-23.md
+- Articles created: [[concepts/urnetwork-jwt-bootstrapper]]
+- Articles updated: [[concepts/urnetwork-relay-always]] (migration pre-check bug in JWT Bootstrapper section + new wikilink)
+- Notes: Prior pass (18:11) missed sessions 15:57/16:22/16:30/~18:00 JWT bootstrapper extract and regression. New article captures: UrnetworkJwtBootstrapper extract architecture, session-flag (AtomicBoolean), Mutex+double-check, migration pre-check short-circuit bug (commit 1a58aa88, byClientJwt!=null → AlreadyPresent skips migration), sentinel source-path migration EngineUrnetwork.kt→RealUrnetworkJwtBootstrapper.kt, 14 test sites updated.
+
+## [2026-05-23T18:11:09+03:00] compile | Daily Log 2026-05-23
+- Source: daily/2026-05-23.md
+- Articles created: [[concepts/warp-uapi-stale-socket-cleanup]], [[concepts/fptn-sni-bypass-method]], [[concepts/urnetwork-provide-secret-keys-identity]], [[concepts/masterdns-deploy-hardening]], [[concepts/gradle-configuration-cache-agp-bug]]
+- Articles updated: [[concepts/warp-uapi-handshake-polling]] (stale socket section + new source), [[concepts/fptn-engine-protocol]] (brotli implemented, SNI fix, c++_static, cppstd=17), [[concepts/engine-masterdns]] (SSH+Docker deploy hardening), [[concepts/urnetwork-sdk-integration]] (provideSecretKeys persistence fix, commit cc9e3c67)
+- Notes: urnetwork-relay-always.md already contained 2026-05-23 JWT bootstrapper content from prior pass. Key themes: WARP stale Unix socket regression (bd6a178a → f458dd5d fix); FPTN SNI domain correctness (sni=host→sni=config.sniDomain; c++_static link; fptnb: brotli now live); URnetwork relay provider identity (addProvideSecretKeysListener missing = 0 relay bytes + addJwtRefreshListener); MasterDNS Phase A-F hardening (firewall markers, dpkg-lock, container readiness, sshj proguard); Gradle config cache AGP 8.7.x workaround
+
+## [2026-05-23T18:07:01+03:00] compile | Daily Log 2026-05-22
+- Source: daily/2026-05-22.md
+- Articles created: [[concepts/switching-watchdog-engine-conflict]]
+- Articles updated: (none — prior 24 passes already captured all other concepts)
+- Notes: All major concepts (fptn-engine-protocol, jni-local-global-ref-lifecycle, urnetwork-relay-always, vpn-slot-conflict-detection, vpnservice-double-shutdown-guard, engine-chip-switching-desync, byedpi-hev-pipeline-upstream-parity, warp-allowedips-tun-routing, warp-config-generator-api, qs-tile-vpn-integration) confirmed complete from prior compilation passes. New article: switching watchdog gap — watchdog resets _switching without stopping running engine, causing parallel engine conflict.
+
 ## [2026-05-23T12:00:00+03:00] compile | Daily Log 2026-05-21
 - Source: daily/2026-05-21.md
 - Articles created: [[concepts/urnetwork-lazycolumn-key-collision]]

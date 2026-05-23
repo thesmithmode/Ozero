@@ -6,8 +6,9 @@ sources:
   - "daily/2026-05-14.md"
   - "daily/2026-05-18.md"
   - "daily/2026-05-20.md"
+  - "daily/2026-05-23.md"
 created: 2026-05-14
-updated: 2026-05-20
+updated: 2026-05-23
 ---
 
 # WARP UAPI Handshake Polling via LocalSocket
@@ -98,6 +99,15 @@ The `soTimeout` reduction is a correctness fix, not an optimization: a 500ms blo
 - [[concepts/warp-false-connected-no-handshake]] - The problem this solves: awgTurnOn returns valid handle but no handshake = false-connected
 - [[concepts/engine-await-ready-pattern]] - awaitReady() architecture that uses this polling as WARP's readiness signal
 - [[concepts/amneziawg-turnon-minus-one]] - Complementary failure: awgTurnOn returns -1 (complete failure); this article covers handle OK but no handshake
+- [[concepts/warp-uapi-stale-socket-cleanup]] - Deep dive on stale socket regression: Unix socket lifecycle, maxByOrNull selection, pre-start cleanup pattern
+
+### Stale Socket Regression (2026-05-20, commit bd6a178a → fixed 2026-05-23, commit f458dd5d)
+
+`bd6a178a` added `sockets/` subdir discovery but did NOT add cleanup. amneziawg-go creates `tunN.sock` (kernel-assigned name) in `sockets/`. After process death, `.sock` files persist on disk. On next session, `findUapiSocket` used `firstOrNull()` (lexicographic) → could return a stale file from a prior session → `LocalSocket.connect()` → ECONNREFUSED → every handshake poll fails → 10s timeout → `Failed`.
+
+Diagnostic signature: `[sockets/]={tun5.sock,tun0.sock}` — two files, one is stale.
+
+Fix (commit `f458dd5d`): `RealWarpSdkBridge.attachTun` deletes ALL `*.sock` in `sockets/` BEFORE calling `awgTurnOn`. `WarpHandshakeUapi.findUapiSocket` uses `maxByOrNull { lastModified() }` instead of `firstOrNull`. See [[concepts/warp-uapi-stale-socket-cleanup]] for full analysis.
 
 ## Sources
 
@@ -105,3 +115,4 @@ The `soTimeout` reduction is a correctness fix, not an optimization: a 500ms blo
 - [[daily/2026-05-14.md]] - Session 16:33: awgTurnOn ≠ handshake; TSPU blocks vanilla WG; polling pattern documented
 - [[daily/2026-05-18.md]] - Session 23:41: `soTimeout` 500ms→50ms (correctness, unix socket <1ms), `WARP_READY_POLL_MS` 300ms→100ms (optimization, peer engine analogy); detection lag max 800ms→150ms
 - [[daily/2026-05-20.md]] - WarpUapi.readState using legacy `ozero-warp.sock` path → null stats → false DEGRADED → spurious recovers; fix: findUapiSocket() cascade through sockets/ subdir + listFiles discovery; WarpSocketDiagnostics added
+- [[daily/2026-05-23.md]] - Session 02:30: stale `.sock` regression from bd6a178a; ozero.log confirmed `{tun5.sock,tun0.sock}` in sockets/; pre-start cleanup + maxByOrNull fix (commit f458dd5d)

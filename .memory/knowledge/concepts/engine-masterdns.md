@@ -4,8 +4,9 @@ aliases: [masterdns, engine-masterdns, masterdns-subprocess]
 tags: [masterdns, subprocess, engine, dns, architecture]
 sources:
   - "daily/2026-05-21.md"
+  - "daily/2026-05-23.md"
 created: 2026-05-21
-updated: 2026-05-21
+updated: 2026-05-23
 ---
 
 # engine-masterdns — Subprocess EnginePlugin (libmdnsvpn.so)
@@ -44,6 +45,15 @@ A `stateIn(SharingStarted.Eagerly)` snapshot of available DNS resolvers injected
 
 `MasterDnsSettingsViewModel` wraps each DataStore write (`setX`) in `runCatching + PersistentLoggers.error` so DataStore IO errors surface in the persistent log rather than being silently swallowed.
 
+### SSH+Docker Server Deploy (2026-05-23)
+
+`engine-masterdns` includes optional server-side deploy: SSH into a Linux VPS, pull source, build Docker image, start container. Implemented via `com.hierynomus:sshj` (pure-Java, Android-compatible SSH client). See [[concepts/masterdns-deploy-hardening]] for the full Phase A-F hardening analysis including:
+- Re-deploy idempotency (checkPort53 false-BUSY when own container running)
+- Firewall marker file pattern
+- dpkg-lock polling (unattended-upgrades)
+- Container readiness polling (vs fixed sleep)
+- R8/proguard fix for sshj EdDSA dependency (`dontwarn sun.security.x509.**`)
+
 ### Auto-mode enrollment
 
 After squash merge, `engine-masterdns` was added to `engineAutoPriority` in auto-mode engine list. Any new VPN engine that is a full `EnginePlugin` must be added to `engineAutoPriority` — absence means the engine never appears in auto-mode rotation. See [[concepts/vpn-engine-pipeline]].
@@ -55,7 +65,9 @@ After squash merge, `engine-masterdns` was added to `engineAutoPriority` in auto
 - [[concepts/stateIn-eagerly-test-trap]] — Eagerly vs WhileSubscribed: Eagerly guarantees .value; WhileSubscribed returns initialValue when no subscriber
 - [[concepts/persistent-logger-accumulation-trap]] — stdout log spam → PersistentLoggers.warn only at limit, not on each line
 - [[concepts/extract-native-libs-legacy-packaging]] — useLegacyPackaging=true required for ProcessBuilder subprocess launch
+- [[concepts/masterdns-deploy-hardening]] — SSH+Docker deploy hardening: firewall markers, dpkg-lock, container readiness, sshj R8 fix
 
 ## Sources
 
 - [[daily/2026-05-21.md]] — squash merge dns-tunnel-module + 7 review fixes: timeout, upstream @Suppress, case-insensitive TOML, MasterDnsResolversCache Eagerly, host:port parsing, log spam limit, silent DataStore errors
+- [[daily/2026-05-23.md]] — SSH+Docker server deploy: sshj lib, MasterDnsServerDeployer interface, undeploy (Removing/Removed states, removeAll script), MasterDnsSettingsViewModel 13 tests; hardening Phase A-F: idempotency, firewall markers, dpkg-lock, container readiness, R8/proguard for sshj EdDSA
