@@ -1,5 +1,11 @@
 # Build Log
 
+## [2026-05-23T20:44:00+03:00] compile | Daily Log 2026-05-23 (pass 7 — session 20:44 versionCode trap)
+- Source: daily/2026-05-23.md
+- Articles created: (none)
+- Articles updated: [[concepts/release-process]] (fetch-depth: 0 requirement for versionCode; shallow clone → versionCode=1 → INSTALL_FAILED_VERSION_DOWNGRADE; sentinel assert versionCode > 1; commit 75e72b48)
+- Notes: Final remaining gap from session 20:44: v0.2.0 APK install failure root cause. All other sessions captured in passes 1-6.
+
 ## [2026-05-23T20:30:00+03:00] compile | Daily Log 2026-05-23 (pass 6 — session 20:05 gaps)
 - Source: daily/2026-05-23.md
 - Articles created: (none)
