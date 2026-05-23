@@ -112,6 +112,7 @@ class EngineUrnetwork(
                     .onFailure { PersistentLoggers.warn(TAG, "applyPerformanceProfile threw: ${it.message}") }
                 val provideEnabled = configStore.provideEnabled().first()
                 runCatching { sdkBridge.setProvidePaused(!provideEnabled) }
+                    .onSuccess { Log.i(TAG, "setProvidePaused(${!provideEnabled}) — provideEnabled=$provideEnabled") }
                     .onFailure { PersistentLoggers.warn(TAG, "setProvidePaused threw: ${it.message}") }
                 val controlMode = configStore.provideControlMode().first()
                 runCatching { sdkBridge.setProvideControlMode(controlMode) }
