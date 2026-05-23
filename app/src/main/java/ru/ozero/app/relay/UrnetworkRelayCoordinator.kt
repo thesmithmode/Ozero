@@ -14,6 +14,7 @@ import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkDefaults
+import ru.ozero.engineurnetwork.UrnetworkJwtBootstrapper
 import ru.ozero.engineurnetwork.byClientJwt
 import ru.ozero.engineurnetwork.provideEnabled
 import ru.ozero.engineurnetwork.walletAddress
@@ -23,18 +24,17 @@ import ru.ozero.enginescore.PersistentLoggers
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
-// Relay coordinator шарит URnetwork provider трафик ТОЛЬКО когда tunnel.Connected (любой engine).
-// VPN off → bridge.stop → relay не работает. Это намеренно: always-on provider в фоне без VPN
-// прожирал бы батарею + дата-план юзера без явного opt-in. Не "TODO" — design constraint.
 class UrnetworkRelayCoordinator(
     private val bridge: UrnetworkSdkBridge,
     private val configStore: UrnetworkConfigStore,
     private val tunnelController: TunnelController,
+    private val jwtBootstrapper: UrnetworkJwtBootstrapper,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) {
 
     private val jobRef = AtomicReference<Job?>(null)
     private val relayOwned = AtomicBoolean(false)
+    private val bootstrapAttemptedThisSession = AtomicBoolean(false)
 
     fun start() {
         val newJob = combine(
@@ -57,15 +57,29 @@ class UrnetworkRelayCoordinator(
         byClientJwt: String?,
         walletAddress: String,
     ) {
-        if (tunnelState !is TunnelState.Connected || byClientJwt == null) {
+        if (tunnelState !is TunnelState.Connected) {
+            bootstrapAttemptedThisSession.set(false)
             if (relayOwned.compareAndSet(true, false)) {
-                Log.i(TAG, "relay stop: tunnel not connected or no JWT")
+                Log.i(TAG, "relay stop: tunnel not connected")
                 runCatching { bridge.stop() }
             }
             return
         }
         if (tunnelState.engineId == EngineId.URNETWORK) {
             relayOwned.set(false)
+            return
+        }
+        if (byClientJwt == null) {
+            if (bootstrapAttemptedThisSession.compareAndSet(false, true)) {
+                PersistentLoggers.info(
+                    TAG,
+                    "bootstrap: jwt missing while ${tunnelState.engineId} active — acquiring",
+                )
+                val r = jwtBootstrapper.ensureClientJwt()
+                if (r is UrnetworkJwtBootstrapper.Result.Failed) {
+                    PersistentLoggers.warn(TAG, "bootstrap failed: ${r.reason}")
+                }
+            }
             return
         }
         val result = runCatching {

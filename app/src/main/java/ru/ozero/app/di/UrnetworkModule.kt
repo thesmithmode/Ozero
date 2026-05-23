@@ -21,9 +21,11 @@ import ru.ozero.app.urnetwork.UrnetworkBalanceRepository
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.engineurnetwork.DataStoreUrnetworkConfigStore
 import ru.ozero.engineurnetwork.EngineUrnetwork
+import ru.ozero.engineurnetwork.RealUrnetworkJwtBootstrapper
 import ru.ozero.engineurnetwork.RealUrnetworkSdkBridge
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkContractStatusObserver
+import ru.ozero.engineurnetwork.UrnetworkJwtBootstrapper
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.auth.RealUrnetworkAuthService
 import ru.ozero.engineurnetwork.auth.RealUrnetworkDeviceIdentity
@@ -74,17 +76,27 @@ object UrnetworkModule {
 
     @Provides
     @Singleton
+    fun provideUrnetworkJwtBootstrapper(
+        store: UrnetworkConfigStore,
+        authService: UrnetworkAuthService,
+        deviceIdentity: UrnetworkDeviceIdentity,
+    ): UrnetworkJwtBootstrapper = RealUrnetworkJwtBootstrapper(
+        configStore = store,
+        authService = authService,
+        deviceIdentity = deviceIdentity,
+    )
+
+    @Provides
+    @Singleton
     @IntoSet
     fun provideEngineUrnetwork(
         store: UrnetworkConfigStore,
         bridge: UrnetworkSdkBridge,
-        authService: UrnetworkAuthService,
-        deviceIdentity: UrnetworkDeviceIdentity,
+        jwtBootstrapper: UrnetworkJwtBootstrapper,
     ): EnginePlugin = EngineUrnetwork(
         configStore = store,
         sdkBridge = bridge,
-        authService = authService,
-        deviceIdentity = deviceIdentity,
+        jwtBootstrapper = jwtBootstrapper,
     )
 
     @Provides
@@ -105,7 +117,13 @@ object UrnetworkModule {
         bridge: UrnetworkSdkBridge,
         configStore: UrnetworkConfigStore,
         tunnelController: TunnelController,
-    ): UrnetworkRelayCoordinator = UrnetworkRelayCoordinator(bridge, configStore, tunnelController)
+        jwtBootstrapper: UrnetworkJwtBootstrapper,
+    ): UrnetworkRelayCoordinator = UrnetworkRelayCoordinator(
+        bridge = bridge,
+        configStore = configStore,
+        tunnelController = tunnelController,
+        jwtBootstrapper = jwtBootstrapper,
+    )
 
     @Provides
     @Singleton
