@@ -1,5 +1,16 @@
 # Build Log
 
+## [2026-05-23T20:30:00+03:00] compile | Daily Log 2026-05-23 (pass 6 — session 20:05 gaps)
+- Source: daily/2026-05-23.md
+- Articles created: (none)
+- Articles updated: [[connections/sentinel-trap-family]] (5th trap: comment-token collision in OzeroVpnService sentinel comment b1c6cba0; table + evidence + rule updated), [[concepts/urnetwork-walletauth-per-device-registration]] (WALLET_ADD_TIMEOUT_MS 10s→30s b86fb16f; relay sharing telemetry: endpoint bound/deferred/traffic-forwarded; 6 sentinel tests)
+- Notes: Passes 1-5 (18:11–23:59) captured all earlier sessions. This pass covers session (20:05): sentinel comment-token collision as Trap 5, and payout wallet timeout increase with telemetry log events.
+
+## [2026-05-23T23:59:00+03:00] compile | 2026-05-23.md
+- Source: daily/2026-05-23.md
+- Articles created: (none — all concepts existed)
+- Articles updated: [[concepts/urnetwork-jwt-bootstrapper]] (migration pre-check bug 1a58aa88), [[concepts/urnetwork-balance-optimistic-cache]] (pendingBytes semantics, FREE_TIER_CAP removed), [[concepts/urnetwork-relay-always]] (JWT bootstrapper fix e6bac9eb), [[concepts/fptn-sni-bypass-method]] (HTTP 608 root cause, sniDomain trace, Reality IP fix), [[concepts/masterdns-deploy-hardening]] (Phase A-F complete, auto-setup post-deploy), [[concepts/engine-masterdns]] (auto-fill resolvers), [[concepts/urnetwork-provide-secret-keys-identity]] (listener ordering, JWT vs provideSecretKeys separation), [[concepts/warp-uapi-stale-socket-cleanup]] (regression bd6a178a, firstOrNull vs maxByOrNull fix)
+
 ## [2026-05-23T22:00:00+03:00] compile | Daily Log 2026-05-23 (pass 5 — gap fill)
 - Source: daily/2026-05-23.md
 - Articles created: [[concepts/proguard-release-drift]] (broken wikilink from masterdns-deploy-hardening resolved; sshj→EdDSA→sun.security.x509 R8 crash pattern documented)

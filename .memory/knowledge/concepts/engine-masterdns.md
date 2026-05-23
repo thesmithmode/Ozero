@@ -54,6 +54,14 @@ A `stateIn(SharingStarted.Eagerly)` snapshot of available DNS resolvers injected
 - Container readiness polling (vs fixed sleep)
 - R8/proguard fix for sshj EdDSA dependency (`dontwarn sun.security.x509.**`)
 
+### Auto-Setup After Successful Deploy
+
+After a successful deploy, `MasterDnsSettingsViewModel.onDeployClick` auto-fills the engine configuration:
+1. Resolvers set to `["${host}:53"]` — no manual entry required
+2. Engine enabled automatically (`setEnabled(true)`)
+
+Zero post-deploy manual configuration needed.
+
 ### Auto-mode enrollment
 
 After squash merge, `engine-masterdns` was added to `engineAutoPriority` in auto-mode engine list. Any new VPN engine that is a full `EnginePlugin` must be added to `engineAutoPriority` — absence means the engine never appears in auto-mode rotation. See [[concepts/vpn-engine-pipeline]].

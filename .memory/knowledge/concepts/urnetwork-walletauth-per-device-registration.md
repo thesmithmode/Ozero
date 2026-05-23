@@ -4,8 +4,9 @@ aliases: [walletauth, per-device-registration, ed25519-device-identity, urnetwor
 tags: [urnetwork, authentication, crypto, architecture, monetization]
 sources:
   - "daily/2026-05-18.md"
+  - "daily/2026-05-23.md"
 created: 2026-05-18
-updated: 2026-05-18
+updated: 2026-05-23
 ---
 
 # URnetwork Per-Device walletAuth Auto-Registration
@@ -89,6 +90,17 @@ After successful walletAuth and `bridge.start()`, the existing `UrnetworkPayoutW
 - `updatePayoutWallet(PRESET_WALLET)` — sets it as the active payout destination
 
 With a non-guest JWT, these wallet API calls now succeed (previously blocked by server-side 401 for guest accounts).
+
+### Payout Pipeline Telemetry (2026-05-23)
+
+`WALLET_ADD_TIMEOUT_MS` raised from 10 s to 30 s (commit b86fb16f). The original 10 s budget was insufficient when the backend takes longer to process `addExternalWallet` — `updatePayoutWallet` would not be called if the first call timed out, leaving the device with no payout wallet set for that session.
+
+`configure()` now returns `Boolean` and emits explicit log events:
+- `relay sharing: endpoint bound` — `addExternalWallet` succeeded within timeout
+- `relay sharing: endpoint deferred` — timeout hit, `updatePayoutWallet` not called; will retry on next engine start
+- `relay sharing: traffic forwarded — accumulated_bytes=N` — direct proof of mesh forwarding to a peer
+
+Six sentinel-tests in `UrnetworkPayoutPipelineSentinelTest` gate the WALLET_ADD_TIMEOUT_MS value, the `configure()` return type, and the three log message patterns.
 
 ### ToS Risk Assessment
 

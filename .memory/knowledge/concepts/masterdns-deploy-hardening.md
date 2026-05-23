@@ -94,6 +94,30 @@ SSH key file authentication (instead of password) requires multi-line input in s
 
 `PromiscuousVerifier` in sshj accepts any host key — MITM vulnerable. Fix: Trust-On-First-Use (TOFU) via `SharedPreferences` storing `host:port → Base64(publicKey)`. On second connect, verify stored key matches. Planned but not implemented as of 2026-05-23.
 
+### Phase F (exec stderr logging)
+
+Non-zero SSH exec exit codes previously threw exceptions silently swallowed by the `runCatching` wrapper. Fix: non-zero exit → `PersistentLoggers.warn` with command + exit code + first 200 chars of stderr output. Silent failures now visible in ozero.log without crashing the deploy flow.
+
+### Auto-Setup After Deploy
+
+`MasterDnsSettingsViewModel.onDeployClick` auto-configures the engine after a successful deploy. After emitting `Done`:
+1. Calls `setResolvers(["${host}:53"])` — fills resolvers field with the deployed server
+2. Calls `setEnabled(true)` — activates the engine
+
+Zero manual configuration required post-deploy. Sentinel-tested in `MasterDnsSettingsViewModelTest`.
+
+### Amnezia Patterns Adopted vs Not Adopted
+
+Adopted from Amnezia SSH deploy reference:
+- Root-user skip: skip sudo-check entirely when SSH user is `root` (uid==0)
+- `chmod 600` on all secrets before copy to server
+- Cleanup script runs before build (not after) — cleans stale artifacts from prior deploy
+- 5 sudo error codes (205-210 in spirit): `sudo_not_installed`, `auth_failed`, `no_permission`, `command_failed`, `unknown_error`
+
+NOT adopted (Amnezia bugs):
+- `iptables` rules without `iptables-save` — lose rules after reboot. Ozero uses `ufw` (persistent) + firewall marker file pattern instead.
+- SSH reconnect on failure — Amnezia opens a new channel per command. Ozero cancels the Flow on disconnect (cleaner resource management).
+
 ## Related Concepts
 
 - [[concepts/engine-masterdns]] — Base subprocess engine architecture; hardening applies on top of the deploy flow
