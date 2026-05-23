@@ -192,7 +192,11 @@ class StrategyTestViewModel @Inject constructor(
         }
         _evolutionState.value = null
         _isRunning.value = true
-        context.startForegroundService(Intent(context, StrategyScanService::class.java))
+        runCatching {
+            context.startForegroundService(Intent(context, StrategyScanService::class.java))
+        }.onFailure {
+            PersistentLoggers.warn(TAG, "unable to start StrategyScanService: ${it.message}")
+        }
         testJob = viewModelScope.launch {
             val sites = domainListManager.getActiveDomains(_domainLists.value)
             if (sites.isEmpty()) {

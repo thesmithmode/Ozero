@@ -30,7 +30,7 @@ class StrategyScanService : Service() {
         } else {
             startForeground(NOTIFICATION_ID, notification)
         }
-        return START_NOT_STICKY
+        return START_STICKY
     }
 
     private fun ensureChannel() {
