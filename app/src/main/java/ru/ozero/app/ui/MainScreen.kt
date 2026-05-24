@@ -541,8 +541,7 @@ private fun computePowerDiscState(
     switching != null -> PowerDiscState.Switching
     state is TunnelState.Connected && currentEngineDegraded -> PowerDiscState.Switching
     state is TunnelState.Connected -> PowerDiscState.Connected
-    state is TunnelState.Probing || state is TunnelState.Connecting || state is TunnelState.Disconnecting ->
-        PowerDiscState.Connecting
+    state is TunnelState.Probing || state is TunnelState.Connecting -> PowerDiscState.Connecting
     else -> PowerDiscState.Off
 }
 
