@@ -130,7 +130,17 @@ fun SingboxEngineSettingsScreen(
                     .testTag("singbox_link_input"),
                 placeholder = { Text("vless://...") },
                 isError = state.customLinkError != null,
-                supportingText = state.customLinkError?.let { err -> { Text(err) } },
+                supportingText = state.customLinkError?.let { err ->
+                    {
+                        Text(
+                            when (err) {
+                                is CustomLinkError.Empty -> stringResource(R.string.singbox_link_error_empty)
+                                is CustomLinkError.ParseFailed -> stringResource(R.string.singbox_link_error_parse, err.cause)
+                                is CustomLinkError.SaveFailed -> stringResource(R.string.singbox_link_error_save, err.cause)
+                            },
+                        )
+                    }
+                },
                 singleLine = false,
                 minLines = 2,
             )

@@ -17,4 +17,7 @@
     <string name="singbox_cancel">Отмена</string>
     <string name="singbox_refreshing">Обновление…</string>
     <string name="singbox_add_error_empty_fields">Укажите название и URL</string>
+    <string name="singbox_link_error_empty">Вставьте VLESS share-link</string>
+    <string name="singbox_link_error_parse">Ошибка парсинга: %1$s</string>
+    <string name="singbox_link_error_save">Ошибка сохранения: %1$s</string>
 </resources>

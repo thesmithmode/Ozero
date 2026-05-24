@@ -25,6 +25,12 @@ import ru.ozero.singboxroom.entity.SubscriptionGroup
 import ru.ozero.singboxsubscription.RawUpdater
 import javax.inject.Inject
 
+sealed class CustomLinkError {
+    data object Empty : CustomLinkError()
+    data class ParseFailed(val cause: String) : CustomLinkError()
+    data class SaveFailed(val cause: String) : CustomLinkError()
+}
+
 data class SingboxSettingsUiState(
     val groups: List<SubscriptionGroup> = emptyList(),
     val expandedGroupId: Long? = null,
@@ -32,7 +38,7 @@ data class SingboxSettingsUiState(
     val selectedProfileId: Long? = null,
     val customLinkInput: String = "",
     val customLinkSaved: Boolean = false,
-    val customLinkError: String? = null,
+    val customLinkError: CustomLinkError? = null,
     val isRefreshing: Set<Long> = emptySet(),
     val showAddGroupDialog: Boolean = false,
     val addGroupName: String = "",
@@ -140,17 +146,17 @@ class SingboxEngineSettingsViewModel @Inject constructor(
     fun onSaveCustomLink() {
         val raw = _uiState.value.customLinkInput.trim()
         if (raw.isEmpty()) {
-            _uiState.update { it.copy(customLinkError = "Вставьте VLESS share-link") }
+            _uiState.update { it.copy(customLinkError = CustomLinkError.Empty) }
             return
         }
         val bean = runCatching { V2RayFmt.parseVLESS(raw) }
             .getOrElse { e ->
-                _uiState.update { it.copy(customLinkError = "Ошибка парсинга: ${e.message}") }
+                _uiState.update { it.copy(customLinkError = CustomLinkError.ParseFailed(e.message ?: "")) }
                 return
             }
         val blob = runCatching { KryoSerializer.serialize(bean) }
             .getOrElse { e ->
-                _uiState.update { it.copy(customLinkError = "Ошибка сохранения: ${e.message}") }
+                _uiState.update { it.copy(customLinkError = CustomLinkError.SaveFailed(e.message ?: "")) }
                 return
             }
         viewModelScope.launch {

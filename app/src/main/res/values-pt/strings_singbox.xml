@@ -17,4 +17,7 @@
     <string name="singbox_cancel">Cancelar</string>
     <string name="singbox_refreshing">Atualizando…</string>
     <string name="singbox_add_error_empty_fields">Informe nome e URL</string>
+    <string name="singbox_link_error_empty">Cole um VLESS share-link</string>
+    <string name="singbox_link_error_parse">Erro de análise: %1$s</string>
+    <string name="singbox_link_error_save">Erro ao salvar: %1$s</string>
 </resources>
