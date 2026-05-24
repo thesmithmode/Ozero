@@ -6,11 +6,11 @@ import kotlinx.coroutines.coroutineScope
 import java.net.InetSocketAddress
 import java.net.Socket
 
-class WarpEndpointProber(private val connectTimeoutMs: Int = 1500) {
+open class WarpEndpointProber(private val connectTimeoutMs: Int = 1500) {
 
     data class ProbeResult(val endpoint: String, val rttMs: Long)
 
-    suspend fun probe(endpoints: List<String>): List<ProbeResult> = coroutineScope {
+    open suspend fun probe(endpoints: List<String>): List<ProbeResult> = coroutineScope {
         endpoints.map { endpoint ->
             async { ProbeResult(endpoint, measureTcpRtt(endpoint)) }
         }.awaitAll().sortedBy { it.rttMs }
