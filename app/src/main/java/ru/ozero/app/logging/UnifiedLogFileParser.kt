@@ -17,7 +17,10 @@ internal object UnifiedLogFileParser {
         val trimmed = line.trim()
         if (trimmed.startsWith("LOGCAT ")) return null
         val m = LINE.matchEntire(trimmed) ?: return null
-        val (ts, levelStr, tag, msg) = m.destructured
+        val ts = m.groupValues[1]
+        val levelStr = m.groupValues[2]
+        val tag = m.groupValues[3]
+        val msg = m.groupValues[4]
         val tsMs = runCatching { synchronized(tsFmt) { tsFmt.parse(ts)?.time } }.getOrNull() ?: return null
         val level = when (levelStr) {
             "VERBOSE", "TRACE" -> LogLevel.TRACE
