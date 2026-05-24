@@ -12,6 +12,7 @@ class EngineAutoCascadeContractTest {
         EngineId.URNETWORK to "ru.ozero.engineurnetwork.EngineUrnetwork",
         EngineId.WARP to "ru.ozero.enginewarp.EngineWarp",
         EngineId.MASTERDNS to "ru.ozero.enginemasterdns.MasterDnsEngine",
+        EngineId.SINGBOX to "ru.ozero.enginesingbox.SingboxEngine",
         EngineId.FPTN to "ru.ozero.enginefptn.FptnEngine",
     )
 

@@ -7,16 +7,14 @@ import com.esotericsoftware.kryo.util.Pool
 import java.io.ByteArrayOutputStream
 
 object KryoSerializer {
-    private val pool = Pool.Builder<Kryo>()
-        .create {
-            Kryo().apply {
-                isRegistrationRequired = false
-                register(VLESSBean::class.java)
-                register(StandardV2RayBean::class.java)
-                register(AbstractBean::class.java)
-            }
+    private val pool = object : Pool<Kryo>(true, false, 4) {
+        override fun create(): Kryo = Kryo().apply {
+            isRegistrationRequired = false
+            register(VLESSBean::class.java)
+            register(StandardV2RayBean::class.java)
+            register(AbstractBean::class.java)
         }
-        .build()
+    }
 
     fun serialize(bean: AbstractBean): ByteArray {
         val kryo = pool.obtain()

@@ -25,39 +25,36 @@ internal object SingboxRuntime {
     @Volatile
     private var tun2ray: Tun2ray? = null
 
-    suspend fun start(
-        tunFd: Int,
-        singboxJsonConfig: String,
-        protectorBridge: SingboxProtectorBridge,
-    ) = withContext(Dispatchers.Main.immediate) {
-        mutex.withLock {
-            check(v2ray == null) { "SingboxRuntime already running" }
-            val instance = V2RayInstance()
-            instance.loadConfig(singboxJsonConfig)
-            instance.start()
+    suspend fun start(tunFd: Int, singboxJsonConfig: String, protectorBridge: SingboxProtectorBridge) =
+        withContext(Dispatchers.Main.immediate) {
+            mutex.withLock {
+                check(v2ray == null) { "SingboxRuntime already running" }
+                val instance = V2RayInstance()
+                instance.loadConfig(singboxJsonConfig)
+                instance.start()
 
-            val tunConfig = TunConfig().apply {
-                fileDescriptor = tunFd
-                mtu = DEFAULT_MTU
-                v2Ray = instance
-                protect = true
-                protector = protectorBridge
-                addr4 = "$TUN_ADDR4/30"
-                addr6 = "$TUN_ADDR6/126"
-                dns4 = DNS4
-                dns6 = DNS6
-                enableIPv6 = true
-                sniffing = true
-                overrideDestination = true
-                trafficStats = true
+                val tunConfig = TunConfig().apply {
+                    fileDescriptor = tunFd
+                    mtu = DEFAULT_MTU
+                    v2Ray = instance
+                    protect = true
+                    protector = protectorBridge
+                    addr4 = "$TUN_ADDR4/30"
+                    addr6 = "$TUN_ADDR6/126"
+                    dns4 = DNS4
+                    dns6 = DNS6
+                    enableIPv6 = true
+                    sniffing = true
+                    overrideDestination = true
+                    trafficStats = true
+                }
+
+                val tun = Tun2ray.create(tunConfig)
+                v2ray = instance
+                tun2ray = tun
+                Log.i(TAG, "runtime started fd=$tunFd")
             }
-
-            val tun = Tun2ray.create(tunConfig)
-            v2ray = instance
-            tun2ray = tun
-            Log.i(TAG, "runtime started fd=$tunFd")
         }
-    }
 
     suspend fun stop() = withContext(Dispatchers.Main.immediate) {
         mutex.withLock {

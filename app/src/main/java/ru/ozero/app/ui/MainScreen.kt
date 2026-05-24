@@ -888,6 +888,7 @@ internal fun probingLabelRes(engineId: EngineId?, isReconnecting: Boolean): Int 
         EngineId.NAIVE,
         EngineId.TOR -> R.string.main_status_connecting
         EngineId.FPTN -> R.string.main_status_probing
+        EngineId.SINGBOX -> R.string.main_status_connecting
     }
 }
 
