@@ -224,7 +224,11 @@ class MainViewModel @Inject constructor(
                 }
                 else -> {
                     graceTicks++
-                    if (graceTicks > URNETWORK_STARTUP_GRACE_TICKS) seconds++ else seconds = 0
+                    if (graceTicks > URNETWORK_STARTUP_GRACE_TICKS) {
+                        if (seconds < MAX_PEER_SEARCH_DISPLAY_SECONDS) seconds++
+                    } else {
+                        seconds = 0
+                    }
                 }
             }
             emit(seconds)
@@ -390,6 +394,7 @@ class MainViewModel @Inject constructor(
         const val URNETWORK_PEER_POLL_KEEP_MS = 5_000L
         const val URNETWORK_SEARCH_TICK_MS = 1_000L
         const val URNETWORK_STARTUP_GRACE_TICKS = 10
+        const val MAX_PEER_SEARCH_DISPLAY_SECONDS = 120
         const val IP_INFO_WARMUP_MS = 500L
         const val IP_INFO_RETRY_ATTEMPTS = 3
         const val IP_INFO_RETRY_DELAY_MS = 1_500L

@@ -187,12 +187,13 @@ class RealUrnetworkSdkBridge(
             PersistentLoggers.warn(TAG, "node start: routing controller threw: ${it.message}")
             null
         }
-        if (cv != null) {
-            connectVcRef.set(cv)
-            PersistentLoggers.info(TAG, "node start: routing controller opened — endpoints available")
-        } else {
-            PersistentLoggers.error(TAG, "node start: routing controller null — connectivity unavailable")
+        if (cv == null) {
+            PersistentLoggers.error(TAG, "node start: routing controller unavailable — start aborted")
+            cleanupOnFailure()
+            return UrnetworkSdkBridge.StartResult.Failed("ConnectViewController unavailable")
         }
+        connectVcRef.set(cv)
+        PersistentLoggers.info(TAG, "node start: routing controller opened — endpoints available")
 
         setupWalletControllerAndPipeline(device, walletAddress)
         contractStatusListener.attach(device)
