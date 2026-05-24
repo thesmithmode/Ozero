@@ -16,9 +16,11 @@ import dagger.multibindings.IntoSet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import ru.ozero.commonvpn.TunnelController
 import ru.ozero.enginefptn.DataStoreFptnConfigStore
 import ru.ozero.enginefptn.FptnConfigStore
 import ru.ozero.enginefptn.FptnEngine
+import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
 import javax.inject.Qualifier
 import javax.inject.Singleton
@@ -52,5 +54,11 @@ object FptnModule {
     @Provides
     @Singleton
     @IntoSet
-    fun provideFptnEngine(store: FptnConfigStore): EnginePlugin = FptnEngine(store)
+    fun provideFptnEngine(
+        store: FptnConfigStore,
+        tunnelController: TunnelController,
+    ): EnginePlugin = FptnEngine(
+        configStore = store,
+        onEngineFailed = { reason -> tunnelController.onEngineDied(EngineId.FPTN, reason) },
+    )
 }

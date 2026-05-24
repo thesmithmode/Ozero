@@ -34,6 +34,7 @@ import java.io.FileOutputStream
 
 class FptnEngine(
     private val configStore: FptnConfigStore,
+    private val onEngineFailed: (String) -> Unit = {},
 ) : EnginePlugin, TunFdAcceptor {
 
     private val wsClient = FptnNativeWebSocket()
@@ -157,7 +158,10 @@ class FptnEngine(
 
         val fos = FileOutputStream(pfd.fileDescriptor)
 
-        wsClient.onOpen = { Log.d(TAG, "WS connected") }
+        wsClient.onOpen = {
+            Log.d(TAG, "WS connected")
+            _stats.value = _stats.value.copy(activeConnections = 1, connectedSince = System.currentTimeMillis())
+        }
         wsClient.onMessage = { bytes ->
             try {
                 fos.write(bytes)
@@ -166,6 +170,8 @@ class FptnEngine(
         }
         wsClient.onFailure = {
             PersistentLoggers.error(TAG, "WS failure: all reconnect attempts exhausted")
+            _stats.value = _stats.value.copy(activeConnections = 0, connectedSince = 0L)
+            onEngineFailed("fptn-ws-reconnect-exhausted")
         }
 
         Log.d(TAG, "attachTun: creating native handle method=$_bypassMethod")

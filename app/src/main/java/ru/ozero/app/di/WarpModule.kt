@@ -125,6 +125,7 @@ object WarpModule {
         configStore = store,
         sdkBridge = bridge,
         uapiPathProvider = { context.dataDir.absolutePath },
+        context = context,
         socketProtector = ru.ozero.enginescore.VpnSocketProtectorHolder,
         ipv6EnabledProvider = {
             runBlocking {

@@ -88,8 +88,8 @@ class ShutdownCoordinator(
             } else {
                 Log.i(TAG, "chainOrchestrator.stop completed")
             }
-            val remaining = maxOf(0L, PARALLEL_STOP_TIMEOUT_MS - (System.currentTimeMillis() - stopStart))
-            nativeStopThread.join(remaining)
+            val remaining = PARALLEL_STOP_TIMEOUT_MS - (System.currentTimeMillis() - stopStart)
+            if (remaining > 0) nativeStopThread.join(remaining)
             if (nativeStopThread.isAlive) {
                 PersistentLoggers.warn(TAG, "native tunnel stop hung — abandon thread")
             } else {

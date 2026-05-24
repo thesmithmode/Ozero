@@ -15,6 +15,8 @@ interface WarpSdkBridge {
 
     fun isRunning(): Boolean
 
+    fun reprotectSockets()
+
     sealed interface AttachResult {
         data object Success : AttachResult
         data class Failed(val reason: String) : AttachResult

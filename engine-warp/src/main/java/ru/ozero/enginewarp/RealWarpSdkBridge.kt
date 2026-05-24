@@ -15,6 +15,7 @@ class RealWarpSdkBridge(
 ) : WarpSdkBridge {
 
     private val tunnelHandle = AtomicInteger(INVALID_HANDLE)
+    @Volatile private var savedProtector: VpnSocketProtector? = null
 
     override suspend fun attachTun(
         tunnelName: String,
@@ -29,7 +30,19 @@ class RealWarpSdkBridge(
         closeStaleHandle()
         cleanupStaleSockets(uapiPath, tunnelName)
         logIniDigest(tunnelName, iniConfig)
-        invokeAwgTurnOnAndProtect(tunnelName, tunFd, iniConfig, uapiPath, protector)
+        val result = invokeAwgTurnOnAndProtect(tunnelName, tunFd, iniConfig, uapiPath, protector)
+        if (result is WarpSdkBridge.AttachResult.Success) savedProtector = protector
+        result
+    }
+
+    override fun reprotectSockets() {
+        val handle = tunnelHandle.get()
+        if (handle == INVALID_HANDLE) return
+        val protector = savedProtector ?: return
+        val v4 = runCatching { awgRuntime.getSocketV4(handle) }.getOrDefault(-1)
+        val v6 = runCatching { awgRuntime.getSocketV6(handle) }.getOrDefault(-1)
+        PersistentLoggers.warn(TAG, "reprotectSockets network change: v4=$v4 v6=$v6 handle=$handle")
+        protectSockets(v4, v6, protector)
     }
 
     private fun validateAttachArgs(tunFd: Int, iniConfig: String, uapiPath: String): String? {

@@ -1,5 +1,8 @@
 package ru.ozero.enginewarp
 
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,6 +40,7 @@ class EngineWarp(
     private val configStore: WarpConfigSlotStore,
     private val sdkBridge: WarpSdkBridge,
     private val uapiPathProvider: () -> String,
+    private val context: Context? = null,
     private val socketProtector: VpnSocketProtector = VpnSocketProtectorHolder,
     private val ipv6EnabledProvider: () -> Boolean = { false },
     private val handshakeChecker: (uapiPath: String, tunnelName: String) -> Boolean = WarpHandshakeUapi::check,
@@ -52,6 +56,7 @@ class EngineWarp(
         pluginScope ?: CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val statsJobRef = AtomicReference<Job?>(null)
     private val connectedSinceRef = AtomicReference<Long>(0L)
+    @Volatile private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
     override val id = EngineId.WARP
 
@@ -99,6 +104,7 @@ class EngineWarp(
         statsJobRef.getAndSet(null)?.cancel()
         connectedSinceRef.set(0L)
         _stats.value = EngineStats()
+        unregisterNetworkCallback()
         sdkBridge.detachTun()
         resolvedConfig = null
         resolvedIni = null
@@ -209,6 +215,7 @@ class EngineWarp(
         return when (val r = sdkBridge.attachTun(TUNNEL_NAME, tunFd, ini, uapiPath, socketProtector)) {
             WarpSdkBridge.AttachResult.Success -> {
                 startStatsPoll(uapiPath)
+                registerNetworkCallback()
                 TunAttachResult.Success
             }
             is WarpSdkBridge.AttachResult.Failed -> {
@@ -217,6 +224,26 @@ class EngineWarp(
                 TunAttachResult.Failure(r.reason)
             }
         }
+    }
+
+    private fun registerNetworkCallback() {
+        val cm = context?.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
+        val cb = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                sdkBridge.reprotectSockets()
+            }
+        }
+        runCatching { cm.registerDefaultNetworkCallback(cb) }
+            .onSuccess { networkCallback = cb }
+            .onFailure { PersistentLoggers.warn(TAG, "registerDefaultNetworkCallback failed: ${it.message}") }
+    }
+
+    private fun unregisterNetworkCallback() {
+        val cb = networkCallback ?: return
+        networkCallback = null
+        val cm = context?.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
+        runCatching { cm.unregisterNetworkCallback(cb) }
+            .onFailure { PersistentLoggers.warn(TAG, "unregisterNetworkCallback failed: ${it.message}") }
     }
 
     private fun startStatsPoll(uapiPath: String) {

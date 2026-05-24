@@ -218,6 +218,8 @@ class ByeDpiEngine(
         withContext(Dispatchers.IO) {
             runCatching { proxy.stopProxy() }
                 .onFailure { PersistentLoggers.warn(TAG, "jniStopProxy исключение: ${it.message}") }
+            runCatching { proxy.forceClose() }
+                .onFailure { PersistentLoggers.warn(TAG, "jniForceClose исключение: ${it.message}") }
             val job = proxyJobRef.getAndSet(null)
             if (job != null) {
                 val completed = withTimeoutOrNull(STOP_GRACE_MS) {
@@ -229,8 +231,6 @@ class ByeDpiEngine(
                     job.cancel()
                 }
             }
-            runCatching { proxy.forceClose() }
-                .onFailure { PersistentLoggers.warn(TAG, "jniForceClose исключение: ${it.message}") }
             activeSocksPort = 0
         }
     }

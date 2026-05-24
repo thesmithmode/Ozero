@@ -334,6 +334,7 @@ class OzeroVpnService : android.net.VpnService() {
         super.onRevoke()
         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(
             {
+                runCatching { tunFdRef.getAndSet(null)?.close() }
                 PersistentLoggers.warn(TAG, "onRevoke kill pid=${android.os.Process.myPid()} — slot release")
                 processKiller.kill(android.os.Process.myPid())
             },
