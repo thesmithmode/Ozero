@@ -182,6 +182,33 @@ jobs:
           gh release download "${{ steps.aar-tag.outputs.tag }}" -p "*" -D engine-urnetwork/libs --clobber
           ls -la engine-urnetwork/libs/
 
+      - name: Get Singbox AAR tag
+        id: singbox-aar-tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=$(gh release list --limit 100 --json tagName \
+            | grep -oE '"singbox-[a-f0-9]{8}"' \
+            | head -n1 | tr -d '"')
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Singbox AAR
+        if: steps.singbox-aar-tag.outputs.tag != ''
+        uses: actions/cache@v5
+        id: singbox-aar-cache
+        with:
+          path: singbox-core/libs
+          key: singbox-aar-${{ steps.singbox-aar-tag.outputs.tag }}
+
+      - name: Download Singbox AAR
+        if: steps.singbox-aar-tag.outputs.tag != '' && steps.singbox-aar-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p singbox-core/libs
+          gh release download "${{ steps.singbox-aar-tag.outputs.tag }}" -p "*.aar" -D singbox-core/libs --clobber
+          ls -la singbox-core/libs/
+
       - name: assembleDebug
         run: ./gradlew assembleDebug --stacktrace
 
@@ -253,6 +280,33 @@ jobs:
         run: |
           mkdir -p engine-urnetwork/libs
           gh release download "${{ steps.aar-tag.outputs.tag }}" -p "*" -D engine-urnetwork/libs --clobber
+
+      - name: Get Singbox AAR tag
+        id: singbox-aar-tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=$(gh release list --limit 100 --json tagName \
+            | grep -oE '"singbox-[a-f0-9]{8}"' \
+            | head -n1 | tr -d '"')
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Singbox AAR
+        if: steps.singbox-aar-tag.outputs.tag != ''
+        uses: actions/cache@v5
+        id: singbox-aar-cache
+        with:
+          path: singbox-core/libs
+          key: singbox-aar-${{ steps.singbox-aar-tag.outputs.tag }}
+
+      - name: Download Singbox AAR
+        if: steps.singbox-aar-tag.outputs.tag != '' && steps.singbox-aar-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p singbox-core/libs
+          gh release download "${{ steps.singbox-aar-tag.outputs.tag }}" -p "*.aar" -D singbox-core/libs --clobber
+          ls -la singbox-core/libs/
 
       - name: testDebugUnitTest + coverage
         run: ./gradlew :app:testDebugUnitTest :app:jacocoTestReport :app:jacocoTestCoverageVerification --stacktrace --continue
