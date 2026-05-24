@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_singbox_title">Sing-box</string>
+    <string name="settings_singbox_summary">VLESS/VMess/Trojan — cliente sing-box completo</string>
+    <string name="singbox_link_label">Share-link (vless://…)</string>
+    <string name="singbox_save_button">Salvar</string>
+    <string name="singbox_saved_hint">Salvo. Toque em Conectar na tela principal.</string>
+    <string name="singbox_current_server">Servidor: %1$s</string>
+    <string name="singbox_add_group_button">Adicionar assinatura</string>
+    <string name="singbox_custom_link_section">Manual (link VLESS)</string>
+    <string name="singbox_group_refresh">Atualizar</string>
+    <string name="singbox_group_delete">Excluir</string>
+    <string name="singbox_no_profiles_hint">Sem servidores — atualize a assinatura</string>
+    <string name="singbox_add_group_title">Nova assinatura</string>
+    <string name="singbox_group_name_hint">Nome</string>
+    <string name="singbox_group_url_hint">URL da assinatura</string>
+    <string name="singbox_cancel">Cancelar</string>
+    <string name="singbox_refreshing">Atualizando…</string>
+    <string name="singbox_add_error_empty_fields">Informe nome e URL</string>
+</resources>

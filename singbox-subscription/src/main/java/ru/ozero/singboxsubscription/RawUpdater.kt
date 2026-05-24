@@ -1,0 +1,64 @@
+package ru.ozero.singboxsubscription
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import ru.ozero.singboxfmt.KryoSerializer
+import ru.ozero.singboxroom.dao.ProxyProfileDao
+import ru.ozero.singboxroom.dao.SubscriptionGroupDao
+import ru.ozero.singboxroom.entity.ProxyProfile
+import ru.ozero.singboxroom.entity.SubscriptionGroup
+import ru.ozero.singboxsubscription.parser.Base64BundleParser
+import ru.ozero.singboxsubscription.parser.RawShareLinksParser
+import ru.ozero.singboxsubscription.parser.SubscriptionInfoParser
+
+class RawUpdater(
+    private val okHttpClient: OkHttpClient,
+    private val groupDao: SubscriptionGroupDao,
+    private val profileDao: ProxyProfileDao,
+) {
+    suspend fun refresh(group: SubscriptionGroup): Result<Int> = withContext(Dispatchers.IO) {
+        runCatching {
+            val request = Request.Builder().url(group.subscriptionUrl).build()
+            okHttpClient.newCall(request).execute().use { response ->
+                val body = response.body?.string() ?: ""
+                val subInfo = SubscriptionInfoParser.parse(response.header("Subscription-Userinfo"))
+
+                val beans = Base64BundleParser.parse(body)
+                    .ifEmpty { RawShareLinksParser.parse(body) }
+
+                val profiles = beans.mapIndexed { idx, bean ->
+                    ProxyProfile(
+                        groupId = group.id,
+                        name = bean.name.ifBlank { "Server ${idx + 1}" },
+                        beanBlob = KryoSerializer.serialize(bean),
+                        protocolType = PROTOCOL_VLESS,
+                        userOrder = idx,
+                    )
+                }
+
+                profileDao.replaceForGroup(group.id, profiles)
+
+                val usedBytes = subInfo?.let { it.uploadBytes + it.downloadBytes } ?: group.bytesUsed
+                val remainingBytes = subInfo?.let {
+                    maxOf(0L, it.totalBytes - it.uploadBytes - it.downloadBytes)
+                } ?: group.bytesRemaining
+                groupDao.update(
+                    group.copy(
+                        lastUpdated = System.currentTimeMillis(),
+                        bytesUsed = usedBytes,
+                        bytesRemaining = remainingBytes,
+                        expiryDate = subInfo?.expiryTimestamp ?: group.expiryDate,
+                    ),
+                )
+
+                profiles.size
+            }
+        }
+    }
+
+    companion object {
+        private const val PROTOCOL_VLESS = 0
+    }
+}

@@ -66,6 +66,7 @@ fun SettingsScreen(
     onOpenLanguage: () -> Unit = {},
     onOpenMasterDnsSettings: () -> Unit = {},
     onOpenFptnSettings: () -> Unit = {},
+    onOpenSingboxSettings: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -89,6 +90,7 @@ fun SettingsScreen(
             onOpenLanguage = onOpenLanguage,
             onOpenMasterDnsSettings = onOpenMasterDnsSettings,
             onOpenFptnSettings = onOpenFptnSettings,
+            onOpenSingboxSettings = onOpenSingboxSettings,
         ),
         onIpv6Toggle = viewModel::onIpv6Toggle,
         onAutoStartToggle = viewModel::onAutoStartToggle,
@@ -207,6 +209,7 @@ private fun ContentBody(
                 onOpenManualServer = nav.onOpenManualServer,
                 onOpenMasterDns = nav.onOpenMasterDnsSettings,
                 onOpenFptn = nav.onOpenFptnSettings,
+                onOpenSingbox = nav.onOpenSingboxSettings,
             )
         }
         item { SectionDivider() }
@@ -407,6 +410,7 @@ private fun EnginesSection(
     onOpenManualServer: () -> Unit,
     onOpenMasterDns: () -> Unit,
     onOpenFptn: () -> Unit,
+    onOpenSingbox: () -> Unit,
 ) {
     NavRow(
         title = stringResource(R.string.settings_byedpi_title),
@@ -454,6 +458,13 @@ private fun EnginesSection(
         summary = stringResource(R.string.settings_fptn_summary),
         tag = "settings_fptn_row",
         onClick = onOpenFptn,
+        enabled = true,
+    )
+    NavRow(
+        title = stringResource(R.string.settings_singbox_title),
+        summary = stringResource(R.string.settings_singbox_summary),
+        tag = "settings_singbox_row",
+        onClick = onOpenSingbox,
         enabled = true,
     )
 }

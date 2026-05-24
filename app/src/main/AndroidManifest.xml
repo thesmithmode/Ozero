@@ -121,6 +121,11 @@
             android:exported="false" />
 
         <service
+            android:name="ru.ozero.singboxprocess.SingboxEngineService"
+            android:process=":engine_singbox"
+            android:exported="false" />
+
+        <service
             android:name=".ui.strategy.StrategyScanService"
             android:foregroundServiceType="dataSync"
             android:exported="false" />

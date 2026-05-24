@@ -4,8 +4,9 @@ aliases: [dependabot-main-target, dependabot-dev-mismatch, dependabot-triage]
 tags: [ci, github, dependencies, workflow, process]
 sources:
   - "daily/2026-05-09.md"
+  - "daily/2026-05-24.md"
 created: 2026-05-09
-updated: 2026-05-09
+updated: 2026-05-24
 ---
 
 # Dependabot PR Workflow Mismatch with dev-Only Flow
@@ -47,7 +48,7 @@ From prior experience documented in project memory:
 - **Kotlin 2.3**: K2 compiler mode breaks ktlint baselines; requires synchronized compose-compiler bump; `runTest` + `Dispatchers.IO` regressions documented in `feedback_dependency_bumps` and `feedback_runtest_while_true_init`
 - **AGP 9.2**: Major version; may require Gradle version bump, change build API surface
 - **ktlint 14**: Major version; rule changes may cause mass violations requiring baseline regeneration
-- **upload-artifact v7 / gh-release v3 / cache v5**: GitHub Actions major versions; may change inputs/outputs API
+- **upload-artifact v7 / gh-release v3 / cache v5**: GitHub Actions major versions; `upload-artifact@v7` confirmed breaking — `name` + `path` now required, deprecated params removed (2026-05-24 incident)
 
 The user explicitly confirmed the risky PRs should not be touched: "не просто так использовали не самые новые версии" — deliberate version pinning based on prior compatibility issues.
 
@@ -61,3 +62,4 @@ The user explicitly confirmed the risky PRs should not be touched: "не про�
 
 - [[daily/2026-05-09.md]] - Session 12:27: 10 dependabot PRs analyzed; 4 safe applied to dev, 6 risky deferred; user confirmed deliberate version pinning
 - [[daily/2026-05-09.md]] - Session 12:32: Kotlin 2.3 risk assessed (K2 + ktlint + compose-compiler + runTest); explicit user rejection of risky bumps
+- [[daily/2026-05-24.md]] - Session 15:46: v0.3.0 batch triage — hilt-navigation-compose 1.3.0, lifecycle 2.10.0, actions/cache v5, upload-artifact v7, gh-release v3, peter-evans/create-pull-request v8 applied as safe; AGP9, Kotlin 2.3, ktlint 14, KSP (without Kotlin match verification) rejected; upload-artifact v7 confirmed breaking (name+path required)
