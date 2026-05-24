@@ -19,6 +19,7 @@ When a Kotlin file imports a non-existent class, the Kotlin compiler produces `U
 - Symbols on the same line as a phantom class usage also appear as unresolved (e.g., `uuid` in `uuid = nonExistentMethod()`)
 - Fix strategy: grep for ALL unresolved imports first, fix them, then reassess remaining errors
 - In Kotlin/Gradle, the first error in a file often causes all subsequent errors in that file to be spurious cascade
+- Importing non-existent model classes (e.g., `WireGuardServer`, `SingboxServerJson` that were never created) causes `"Unresolved reference: URI"` on unrelated code — the real error (missing import) masks completely different errors (correct `java.net.URI` usage); always verify imported classes exist before debugging usage-site errors
 
 ## Details
 
@@ -59,4 +60,4 @@ The `engine-singbox` module was built incrementally with many new classes. Parse
 
 ## Sources
 
-- [[daily/2026-05-24.md]] — Session 19:13: engine-singbox parser had imports of `WireGuardServer`, `SingboxServerJson`, `ShareLink` that didn't exist; caused cascade "Unresolved reference: URI", "uuid", "getUserInfo" errors that appeared to be logic bugs; removing phantom imports cleared the cascade
+- [[daily/2026-05-24.md]] — Session 19:13: engine-singbox parser had imports of `WireGuardServer`, `SingboxServerJson`, `ShareLink` that didn't exist; caused cascade "Unresolved reference: URI", "uuid", "getUserInfo" errors that appeared to be logic bugs; removing phantom imports cleared the cascade; `WireGuardServer` and `SingboxServerJson` were never created as standalone classes — correct references are `SingboxServer.WireGuard` and the sealed class hierarchy; java.net.URI usage was correct but masked by the phantom import failure

@@ -17,8 +17,9 @@ Every Gradle module that uses Hilt (`@HiltViewModel`, `@AndroidEntryPoint`, `@In
 - `kapt(libs.hilt.compiler)` is required in every module that uses `@HiltViewModel`, `@AndroidEntryPoint`, or `@InstallIn`
 - `kapt(libs.room.compiler)` is required in every module that declares `@Dao`, `@Database`, or `@Entity`
 - The `implementation` dependency on Hilt/Room is separate from the `kapt` processor — both are needed
-- Missing kapt causes silent failure or cryptic "None of the following candidates is applicable" errors at compile time
+- Missing kapt causes silent failure or cryptic "None of the following candidates is applicable" / "unresolved reference" errors at compile time
 - First Hilt engine module in Ozero with direct Hilt usage was `engine-singbox` — prior engine modules didn't use Hilt directly
+- `engine-singbox` had `@AndroidEntryPoint` services but no `hilt.compiler` kapt — caused persistent CI failures until the declaration was added
 
 ## Details
 
@@ -54,4 +55,4 @@ Earlier engine modules (`engine-warp`, `engine-byedpi`, `engine-masterdns`) did 
 
 ## Sources
 
-- [[daily/2026-05-24.md]] — Session 19:13: engine-singbox CI failures traced to missing `kapt(libs.hilt.compiler)` in engine-singbox/build.gradle.kts; first engine module to use Hilt annotations directly within the module
+- [[daily/2026-05-24.md]] — Session 19:13: engine-singbox CI failures traced to missing `kapt(libs.hilt.compiler)` in engine-singbox/build.gradle.kts; first engine module to use Hilt annotations directly within the module; `@AndroidEntryPoint` services in engine-singbox without hilt.compiler kapt caused persistent compile errors (unresolved references on injected classes)
