@@ -15,14 +15,14 @@ class MainScreenUrnetworkTogglesSentinelTest {
 
     @Test
     fun `isUrnetworkVisibleInMain true для manualEngine=URNETWORK независимо от tunnelState`() {
-        assertTrue(isUrnetworkVisibleInMain(TunnelState.Idle, EngineId.URNETWORK))
+        assertTrue(isUrnetworkVisibleInMain(TunnelState.Idle, manualEngine = EngineId.URNETWORK))
     }
 
     @Test
     fun `isUrnetworkVisibleInMain false для Idle без manualEngine`() {
-        assertFalse(isUrnetworkVisibleInMain(TunnelState.Idle, null))
-        assertFalse(isUrnetworkVisibleInMain(TunnelState.Idle, EngineId.BYEDPI))
-        assertFalse(isUrnetworkVisibleInMain(TunnelState.Idle, EngineId.WARP))
+        assertFalse(isUrnetworkVisibleInMain(TunnelState.Idle, manualEngine = null))
+        assertFalse(isUrnetworkVisibleInMain(TunnelState.Idle, manualEngine = EngineId.BYEDPI))
+        assertFalse(isUrnetworkVisibleInMain(TunnelState.Idle, manualEngine = EngineId.WARP))
     }
 
     @Test
