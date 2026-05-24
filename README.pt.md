@@ -45,13 +45,6 @@ cd Ozero
 
 A compilação de release requer variáveis de ambiente para a assinatura do APK e a chave pública de atualizações.
 
-## Documentação
-
-- [`docs/architecture.md`](docs/architecture.md) — camadas, módulos, DI
-- [`docs/engines.md`](docs/engines.md) — detalhes por motor
-- [`docs/runtime-flow.md`](docs/runtime-flow.md) — fluxo VPN do início ao fim
-- [`docs/masterdns-server-setup.md`](docs/masterdns-server-setup.md) — implantar o servidor MasterDNS em 15 minutos
-
 ## Licença
 
 GPLv3 — veja [LICENSE](LICENSE).
