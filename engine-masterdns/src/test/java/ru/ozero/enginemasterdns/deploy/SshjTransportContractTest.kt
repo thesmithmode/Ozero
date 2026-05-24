@@ -28,6 +28,15 @@ class SshjTransportContractTest {
     }
 
     @Test
+    fun `curve25519 kex excluded to avoid X25519 NoSuchAlgorithmException on Android BC`() {
+        assertTrue(
+            source.contains("curve25519") && source.contains("filter"),
+            "SshjTransport must filter out curve25519 from keyExchangeFactories — " +
+                "Android BC lacks X25519 causing NoSuchAlgorithmException on kex handshake",
+        )
+    }
+
+    @Test
     fun `non-zero exit logs stderr via PersistentLoggers warn`() {
         val execBlock = source.substringAfter("override fun exec")
             .substringBefore("override fun close")

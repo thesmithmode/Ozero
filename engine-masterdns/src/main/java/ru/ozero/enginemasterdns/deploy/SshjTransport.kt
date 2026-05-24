@@ -12,7 +12,11 @@ internal class SshjTransport : SshTransport {
     private var client: SSHClient? = null
 
     override fun connect(host: String, port: Int) {
-        val ssh = SSHClient(AndroidConfig())
+        val config = AndroidConfig()
+        config.keyExchangeFactories = config.keyExchangeFactories.filter {
+            "curve25519" !in it.name.lowercase()
+        }
+        val ssh = SSHClient(config)
         ssh.addHostKeyVerifier(PromiscuousVerifier())
         ssh.connectTimeout = CONNECTION_TIMEOUT_MS.toInt()
         ssh.connect(host, port)
