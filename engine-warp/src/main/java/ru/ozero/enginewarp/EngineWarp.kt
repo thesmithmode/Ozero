@@ -245,8 +245,6 @@ class EngineWarp(
             .onFailure { PersistentLoggers.warn(TAG, "registerDefaultNetworkCallback failed: ${it.message}") }
     }
 
-
-
     private fun startStatsPoll(uapiPath: String) {
         statsJobRef.getAndSet(null)?.cancel()
         val job = ownedScope.launch {
