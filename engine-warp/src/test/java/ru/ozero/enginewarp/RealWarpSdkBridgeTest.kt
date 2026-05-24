@@ -492,8 +492,10 @@ class RealWarpSdkBridgeTest {
 
     @Test
     fun `sentinel AWG_TEARDOWN_COOLDOWN_MS — cooldown после turnOff для Go goroutine cleanup`() {
-        val f = java.io.File(System.getProperty("user.dir") ?: ".",
-            "src/main/java/ru/ozero/enginewarp/RealWarpSdkBridge.kt")
+        val f = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/enginewarp/RealWarpSdkBridge.kt",
+        )
         assertTrue(f.exists(), "RealWarpSdkBridge.kt не найден: $f")
         val src = f.readText()
         assertTrue(

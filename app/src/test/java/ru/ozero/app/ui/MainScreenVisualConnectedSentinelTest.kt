@@ -73,7 +73,10 @@ class MainScreenVisualConnectedSentinelTest {
         while (i < source.length) {
             when (source[i]) {
                 '{' -> depth++
-                '}' -> { depth--; if (depth == 0) break }
+                '}' -> {
+                    depth--
+                    if (depth == 0) break
+                }
             }
             i++
         }
