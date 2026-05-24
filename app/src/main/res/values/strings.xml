@@ -239,6 +239,12 @@
     <string name="evolution_initializing">Подготовка популяции…</string>
     <string name="evolution_stagnating">Топчусь на месте — ищу другие варианты…</string>
     <string name="saved_strategy_rename_title">Переименовать</string>
+    <string name="saved_strategy_edit_title">Редактировать</string>
+    <string name="saved_strategy_add_title">Добавить стратегию</string>
+    <string name="saved_strategy_command_hint">Параметры (например, -Ku -An)</string>
+    <string name="saved_strategy_add_button">Добавить</string>
+    <string name="saved_strategy_command_empty_error">Параметры не могут быть пустыми</string>
+    <string name="saved_strategy_cancel">Отмена</string>
     <string name="usage_history_title">История применений</string>
     <string name="usage_history_empty">Ещё не применялись</string>
     <string name="strategy_scan_notification_title">Подбор стратегий ByeDPI…</string>

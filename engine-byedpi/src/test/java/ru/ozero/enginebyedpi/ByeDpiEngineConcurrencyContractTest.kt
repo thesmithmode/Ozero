@@ -78,4 +78,18 @@ class ByeDpiEngineConcurrencyContractTest {
                 "Без discrimination guard busy выглядит как real failure → ложные алерты в логах.",
         )
     }
+
+    @Test
+    fun `start дренирует proxyDispatcher после cleanup старого job`() {
+        val pattern = Regex(
+            """withContext\(proxyDispatcher\)\s*\{\s*\}""",
+        )
+        assertTrue(
+            pattern.containsMatchIn(engineSource),
+            "start() обязан вызывать withContext(proxyDispatcher) {} после cleanup old job. " +
+                "Cancelled JNI игнорирует Thread.interrupt() и может держать единственный слот " +
+                "dispatcher; без drain новый proxy coroutine встаёт в очередь за ним → " +
+                "waitSocksReady() timeout → ECONNREFUSED при restart после engine switch.",
+        )
+    }
 }

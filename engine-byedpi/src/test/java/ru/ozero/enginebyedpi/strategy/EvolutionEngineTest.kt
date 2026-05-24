@@ -524,4 +524,60 @@ class EvolutionEngineTest {
             "ports должны быть в range 50000..50002, got=${engine.ports}",
         )
     }
+
+    @Test
+    fun `selectSurvivors returns empty for empty fitness pairs`() {
+        val pool = GenePool(seeds)
+        val engine = EvolutionEngine(
+            byeDpiEngine = AlwaysSucceedEngine(),
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(pool),
+            pool = pool,
+            sites = listOf("s1"),
+            random = Random(0),
+        )
+        val result = engine.selectSurvivors(fitnessPairs = emptyList(), survivorCount = 5)
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun `selectSurvivors returns only elites when survivorExplorationRate is zero`() {
+        val pool = GenePool(seeds)
+        val engine = EvolutionEngine(
+            byeDpiEngine = AlwaysSucceedEngine(),
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(pool),
+            pool = pool,
+            sites = listOf("s1"),
+            settings = EvolutionEngine.EvolutionSettings(survivorExplorationRate = 0.0),
+            random = Random(0),
+        )
+        val pairs = listOf<Pair<Chromosome, Double>>(
+            listOf(StrategyGene("-a")) to 0.9,
+            listOf(StrategyGene("-b")) to 0.1,
+            listOf(StrategyGene("-c")) to 0.5,
+        )
+        val survivors = engine.selectSurvivors(pairs, survivorCount = 2)
+        assertEquals(2, survivors.size)
+        assertTrue(survivors.all { ch -> pairs.any { it.first == ch } })
+    }
+
+    @Test
+    fun `selectSurvivors mixes elites and tail-window explorers when exploration enabled`() {
+        val pool = GenePool(seeds)
+        val engine = EvolutionEngine(
+            byeDpiEngine = AlwaysSucceedEngine(),
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(pool),
+            pool = pool,
+            sites = listOf("s1"),
+            settings = EvolutionEngine.EvolutionSettings(survivorExplorationRate = 0.5),
+            random = Random(0),
+        )
+        val pairs = (0..9).map { listOf(StrategyGene("-g$it")) to it.toDouble() / 10.0 }
+        val survivors = engine.selectSurvivors(pairs, survivorCount = 4)
+        assertTrue(survivors.size <= 4)
+        assertTrue(survivors.isNotEmpty())
+        assertTrue(survivors.all { ch -> pairs.any { it.first == ch } })
+    }
 }

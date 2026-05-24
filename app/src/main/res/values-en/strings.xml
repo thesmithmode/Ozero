@@ -232,6 +232,12 @@
     <string name="evolution_initializing">Preparing population…</string>
     <string name="evolution_stagnating">Stuck — exploring new variants…</string>
     <string name="saved_strategy_rename_title">Rename</string>
+    <string name="saved_strategy_edit_title">Edit strategy</string>
+    <string name="saved_strategy_add_title">Add strategy</string>
+    <string name="saved_strategy_command_hint">Parameters (e.g. -Ku -An)</string>
+    <string name="saved_strategy_add_button">Add</string>
+    <string name="saved_strategy_command_empty_error">Parameters cannot be empty</string>
+    <string name="saved_strategy_cancel">Cancel</string>
     <string name="usage_history_title">Usage history</string>
     <string name="usage_history_empty">Not used yet</string>
     <string name="strategy_scan_notification_title">ByeDPI strategy scan…</string>

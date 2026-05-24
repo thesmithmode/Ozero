@@ -108,6 +108,8 @@ class ByeDpiEngine(
                 withTimeoutOrNull(STOP_GRACE_MS) { oldJob.join() }
                 if (oldJob.isActive) oldJob.cancel()
             }
+            // JNI ignores Thread.interrupt() so a cancelled call may still hold the slot.
+            withContext(proxyDispatcher) {}
         }
 
         val args = buildArgs(resolvedConfig)

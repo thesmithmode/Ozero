@@ -192,7 +192,11 @@ class StrategyTestViewModel @Inject constructor(
         }
         _evolutionState.value = null
         _isRunning.value = true
-        context.startForegroundService(Intent(context, StrategyScanService::class.java))
+        runCatching {
+            context.startForegroundService(Intent(context, StrategyScanService::class.java))
+        }.onFailure {
+            PersistentLoggers.warn(TAG, "unable to start StrategyScanService: ${it.message}")
+        }
         testJob = viewModelScope.launch {
             val sites = domainListManager.getActiveDomains(_domainLists.value)
             if (sites.isEmpty()) {
@@ -221,11 +225,18 @@ class StrategyTestViewModel @Inject constructor(
             }
             _runSummary.value = "0/${_strategies.value.size} strategies, ${sites.size} sites"
             val useEvolution = _settings.value.evolutionMode
+            var scanFailed = false
             try {
-                if (useEvolution) {
-                    runEvolution(sites)
-                } else {
-                    runLoop(sites)
+                runCatching {
+                    if (useEvolution) {
+                        runEvolution(sites)
+                    } else {
+                        runLoop(sites)
+                    }
+                }.onFailure {
+                    scanFailed = true
+                    PersistentLoggers.warn(TAG, "Strategy scan failed: ${it.message}")
+                    _runSummary.value = "Scan failed: ${it.message ?: "unknown error"}"
                 }
             } finally {
                 _evolutionState.update { it?.copy(evaluatingCommand = null, isInitializing = false) }
@@ -233,7 +244,7 @@ class StrategyTestViewModel @Inject constructor(
                 withContext(ioDispatcher) {
                     runCatching { resultsStore.save(_strategies.value) }
                 }
-                _runSummary.value = ""
+                if (!scanFailed) _runSummary.value = ""
                 _isRunning.value = false
                 context.stopService(Intent(context, StrategyScanService::class.java))
             }
@@ -278,6 +289,23 @@ class StrategyTestViewModel @Inject constructor(
     fun onRename(id: String, name: String) {
         viewModelScope.launch(ioDispatcher) {
             val updated = runCatching { savedStrategyStore.rename(id, name) }.getOrElse { savedStrategyStore.load() }
+            _savedStrategies.value = updated
+        }
+    }
+
+    fun onEdit(id: String, name: String, command: String) {
+        viewModelScope.launch(ioDispatcher) {
+            val updated = runCatching { savedStrategyStore.editStrategy(id, name, command) }
+                .getOrElse { savedStrategyStore.load() }
+            _savedStrategies.value = updated
+        }
+    }
+
+    fun onAddManual(name: String, command: String) {
+        if (command.isBlank()) return
+        viewModelScope.launch(ioDispatcher) {
+            val updated = runCatching { savedStrategyStore.addWithName(name, command) }
+                .getOrElse { savedStrategyStore.load() }
             _savedStrategies.value = updated
         }
     }
