@@ -8,8 +8,9 @@ connects:
 sources:
   - "daily/2026-05-01.md"
   - "daily/2026-05-12.md"
+  - "daily/2026-05-02.md"
 created: 2026-05-01
-updated: 2026-05-12
+updated: 2026-05-02
 ---
 
 # Connection: CI False Green Vectors
@@ -42,6 +43,10 @@ The fix chain demonstrates that CI truthfulness is a multi-layered property requ
 
 A third false-green vector was identified during a 6-subagent audit: test assertions that are logically always true (e.g., `assertTrue(list.isEmpty() || list.isNotEmpty())`). These tests run, pass, and contribute to coverage metrics — but verify nothing about the implementation. Unlike the first two vectors (tests don't run, or modules are skipped), tautology tests actively inflate both test counts and coverage percentages, making the false green harder to detect. See [[concepts/test-tautology-always-green]].
 
+### Detekt Fail-Fast Masking Compile Errors (2026-05-02)
+
+A fourth false-green-adjacent vector: when `assemble-debug` has `needs: kotlin-style` (detekt), a detekt failure causes `assemble-debug` to be skipped entirely. If a compile error exists in the release build path (`release.yml`), it is invisible until the detekt gate passes. The developer sees "CI red: detekt" and fixes only that, not realizing a compile error lurks behind it. Fixing detekt reveals the compile error, requiring a second CI run. See [[concepts/detekt-ratchet-desync-after-refactor]].
+
 ## Related Concepts
 
 - [[concepts/junit-platform-silent-skip]] - Test runner misconfiguration vector: tests exist but don't execute
@@ -49,3 +54,4 @@ A third false-green vector was identified during a 6-subagent audit: test assert
 - [[concepts/ci-workflow-discipline]] - The CI workflow where both vectors were discovered and fixed
 - [[concepts/test-tautology-always-green]] - Assertion logic vector: tests run and pass but verify nothing
 - [[concepts/sentinel-fqn-desync]] - Naming mismatch vector: sentinel matches wrong string, passes vacuously
+- [[concepts/detekt-ratchet-desync-after-refactor]] - Detekt ratchet drift + fail-fast hiding downstream compile errors

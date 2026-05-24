@@ -4,9 +4,10 @@ aliases: [warp-mirror-api, warp-gen1, nellimonix-warp-generator]
 tags: [warp, api, integration, networking]
 sources:
   - "daily/2026-05-02.md"
+  - "daily/2026-05-07.md"
   - "daily/2026-05-22.md"
 created: 2026-05-02
-updated: 2026-05-22
+updated: 2026-05-24
 ---
 
 # WARP Config Generator API Contract
@@ -53,6 +54,12 @@ During debugging, the user provided a decompiled `PortalConnect-1.1.6` APK (CYBE
 
 `validateCloudflarePeer` was expanded to accept these ranges via regex or range check alongside the hostname. Without this fix, configs generated via the direct Cloudflare API path were rejected as invalid by the validator, causing WARP to fall back unnecessarily to the mirror pool.
 
+### Suspicious Mirror DNS Servers (2026-05-07)
+
+A real working WARP config obtained via the mirror auto-config API from a Russian ISP environment contained DNS servers `176.99.11.77` and `80.78.247.254`. These IPs do not belong to Cloudflare (which uses `1.1.1.1`, `1.0.0.1`, and the DoH endpoint `cloudflare-dns.com`). The origin of these DNS servers is unknown — they may be injected by the mirror generator, set by the TSPU environment, or belong to a third-party resolver. Using unknown DNS servers in a privacy-sensitive VPN application is a security concern.
+
+This was identified during session 15:11 as a follow-up item: verify which mirrors inject non-Cloudflare DNS and determine whether `WarpIniBuilder` should override the DNS field to a known-safe resolver.
+
 ### Mirror Hardcoding Concern
 
 The 78 mirrors are hardcoded as a Kotlin list in `WarpEngine.kt`. This was flagged in both code review (High: move to config file) and security review (P3: no certificate pinning, MITM risk with TSPU trust injection). The mirrors cannot be updated without an APK release. These findings are tracked in AUDIT.md as SEC-P1-02 (key warning UI) and P3 (certificate pinning).
@@ -66,4 +73,5 @@ The 78 mirrors are hardcoded as a Kotlin list in `WarpEngine.kt`. This was flagg
 ## Sources
 
 - [[daily/2026-05-02.md]] - WARP root cause identified: wrong JSON parsing + insufficient timeout; nellimonix/warp-config-generator-vercel as reference; PortalConnect ≠ WARP
+- [[daily/2026-05-07.md]] - Session 15:11: mirror auto-config returned DNS servers 176.99.11.77 + 80.78.247.254 (not Cloudflare); origin unknown — may be mirror-injected or ISP-specific; identified as security follow-up
 - [[daily/2026-05-22.md]] - Session 17:51: validateCloudflarePeer expanded to IP ranges 162.159.192-195.* and 188.114.96-99.* — REQUEST_BODY path returns IP not hostname; validator was rejecting valid Cloudflare configs

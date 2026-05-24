@@ -4,6 +4,7 @@ aliases: [release-workflow, apk-release, version-tagging]
 tags: [release, ci, workflow]
 sources:
   - "daily/2026-04-29.md"
+  - "daily/2026-05-04.md"
   - "daily/2026-05-20.md"
   - "daily/2026-05-23.md"
 created: 2026-04-29
@@ -24,6 +25,12 @@ Ozero releases are triggered by pushing a version tag (`v*.*.*`) to the `dev` br
 - **`fetch-depth: 0` is REQUIRED in `actions/checkout`** — without it, shallow clone makes `git rev-list --count HEAD = 1`, producing `versionCode=1` → Android rejects install as downgrade (`INSTALL_FAILED_VERSION_DOWNGRADE`)
 
 ## Details
+
+### Prerelease vs Full Release Tag Convention
+
+`release.yml` determines whether a GitHub Release is a pre-release or full release by inspecting the tag string: `prerelease = contains(tag, '-')`. A tag without a hyphen (e.g., `v0.0.2`) produces a full release visible to all users. A tag with a hyphen (e.g., `v0.0.2-5`, `v1.0.0-rc1`) produces a pre-release. This means the tagging convention directly controls release visibility without any additional workflow flags.
+
+Consequence: when a tag is created incorrectly (wrong prerelease/full designation), the tag must be deleted and recreated. During v0.0.2, the tag was recreated twice — once to fix the OkHttp hotfix and once to remove stub classes from the APK.
 
 The release flow is linear: feature work completes on `dev`, CI goes green, and a version tag is applied. The `release.yml` workflow handles the rest — building the APK with `assembleRelease`, signing it, and creating a GitHub release with the artifact.
 
@@ -63,5 +70,6 @@ The rule: **any CI job that uses `git rev-list --count` for version numbering mu
 ## Sources
 
 - [[daily/2026-04-29.md]] - v1.0.5 tag created after third CI run; release watcher killed before APK build confirmed
+- [[daily/2026-05-04.md]] - Session 12:05: prerelease = contains(tag, '-') logic confirmed; v0.0.2 full release (no hyphen); tag recreated twice (OkHttp fix + stub removal)
 - [[daily/2026-05-20.md]] - KB audit (18:43): arm64-v8a only constraint confirmed; "universal APK" in old summary was misleading — universal means single APK for all users, not multi-ABI; other ABIs excluded because libhev/libam-go/libbyedpi/libmtg are arm64-v8a only
 - [[daily/2026-05-23.md]] - Session 20:44: v0.2.0 regression — `actions/checkout` without `fetch-depth: 0` → shallow clone → `git rev-list --count HEAD = 1` → `versionCode=1` → Android `INSTALL_FAILED_VERSION_DOWNGRADE`; fix: `fetch-depth: 0` + sentinel assert `versionCode > 1` in pipeline (commit `75e72b48`)

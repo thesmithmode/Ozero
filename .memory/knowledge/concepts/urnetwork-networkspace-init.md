@@ -53,6 +53,7 @@ The fix in `RealUrnetworkSdkBridge`:
 ## Related Concepts
 
 - [[concepts/urnetwork-sdk-integration]] - Parent article covering the full URnetwork integration journey
+- [[concepts/urnetwork-networkspace-env-bundle-fields]] - After creating the NetworkSpace, `env_name=main` and bundle fields must be set via `updateNetworkSpace` before `networkCreate` — a distinct failure mode (SIGABRT vs null)
 - [[concepts/gomobile-bind-gotchas]] - The AAR that exposes these SDK methods was built through the gomobile pipeline with its own set of traps
 
 ## Sources

@@ -3,8 +3,9 @@ title: "WARP UAPI Socket: Stale File Regression and Cleanup Pattern"
 aliases: [warp-stale-sock, uapi-stale-socket, warp-socket-cleanup]
 tags: [warp, amneziawg, regression, filesystem, uapi]
 sources:
+  - "daily/2026-05-06.md"
   - "daily/2026-05-23.md"
-created: 2026-05-23
+created: 2026-05-06
 updated: 2026-05-23
 ---
 
@@ -56,13 +57,21 @@ Any time a native library (Go, C++) writes a Unix domain socket (`*.sock` file) 
 
 This applies equally to `wireguard-go` forks and any other Go/C native library that uses UAPI-style sockets.
 
+### EADDRINUSE on Bind: Second Stale Socket Variant
+
+A second manifestation of the stale socket problem involves the UAPI server socket bind path (e.g., `ozero-warp.sock` at `$dataDir/ozero-warp.sock`). If WARP crashes without cleanup, this file persists. On the next start, `awgTurnOn` attempts to `bind()` a new Unix domain socket at the same path, gets `EADDRINUSE`, and returns `-1`. The symptom is identical to the blocking-fd failure: stable -1 on every retry.
+
+Fix: explicitly delete `$dataDir/ozero-warp.sock` (and equivalent named sockets) immediately before calling `awgTurnOn`. This is independent of the `sockets/tunN.sock` cleanup described above — both must be performed.
+
 ## Related Concepts
 
 - [[concepts/warp-uapi-handshake-polling]] — The polling mechanism that uses the socket; stale socket causes ECONNREFUSED during polls
 - [[concepts/go-runtime-process-isolation]] — WARP process isolation; Go process death leaves socket files behind
 - [[concepts/engine-await-ready-pattern]] — awaitReady() timeout that surfaced this regression
 - [[concepts/warp-false-connected-no-handshake]] — False failure vs false connected; stale socket caused false failure (timeout = Failed, not connected)
+- [[concepts/warp-awgturnon-blocking-fd]] — Other cause of stable awgTurnOn=-1; both must be checked when diagnosing -1 failures
 
 ## Sources
 
+- [[daily/2026-05-06.md]] — Session 13:16: stale ozero-warp.sock → EADDRINUSE on bind → awgTurnOn=-1; fix = delete named socket file before awgTurnOn call
 - [[daily/2026-05-23.md]] — Session 02:30: ozero.log showed 4 WARP awaitReady timeouts in sequence; root cause traced to `bd6a178a` socket path migration without matching cleanup; stale `tun5.sock` vs live `tun0.sock` confirmed in diagnostic log; fix: pre-start cleanup of all `*.sock` + `maxByOrNull{lastModified}` selection (commit `f458dd5d`); 5 unit + 2 source-sentinel tests
