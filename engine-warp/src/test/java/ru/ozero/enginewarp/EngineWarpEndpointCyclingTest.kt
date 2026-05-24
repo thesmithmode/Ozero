@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
+import ru.ozero.enginescore.VpnSocketProtector
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
@@ -33,10 +34,21 @@ class EngineWarpEndpointCyclingTest {
             override fun slots(): Flow<List<WarpConfigSlot>> = MutableStateFlow(listOf(slot))
             override fun activeSlot(): Flow<WarpConfigSlot?> = MutableStateFlow(slot)
             override fun activeConfig(): Flow<WarpConfig?> = MutableStateFlow(slot.config)
-            override suspend fun addSlot(name: String, config: WarpConfig, rawIni: String?, endpointList: List<String>): String = "id"
+            override suspend fun addSlot(
+                name: String,
+                config: WarpConfig,
+                rawIni: String?,
+                endpointList: List<String>,
+            ): String = "id"
             override suspend fun setActive(id: String) = Unit
             override suspend fun rename(id: String, name: String) = Unit
-            override suspend fun updateSlot(id: String, name: String, config: WarpConfig, rawIni: String?, endpointList: List<String>) = Unit
+            override suspend fun updateSlot(
+                id: String,
+                name: String,
+                config: WarpConfig,
+                rawIni: String?,
+                endpointList: List<String>,
+            ) = Unit
             override suspend fun delete(id: String) = Unit
             override suspend fun clear() = Unit
             override suspend fun replaceAll(slots: List<WarpConfigSlot>) = Unit
@@ -52,21 +64,14 @@ class EngineWarpEndpointCyclingTest {
             isActive = true,
             endpointList = endpoints,
         )
-        val prober = makeProber(mapOf("1.0.0.1:2408" to Long.MAX_VALUE, "1.0.0.2:2408" to 42L, "1.0.0.3:2408" to 100L))
+        val prober = makeProber(
+            mapOf("1.0.0.1:2408" to Long.MAX_VALUE, "1.0.0.2:2408" to 42L, "1.0.0.3:2408" to 100L),
+        )
         var attachedIni: String? = null
-        val bridge = object : WarpSdkBridge {
-            override suspend fun attachTun(tunnelName: String, tunFd: Int, iniConfig: String, uapiPath: String, protector: ru.ozero.enginescore.VpnSocketProtector): WarpSdkBridge.AttachResult {
-                attachedIni = iniConfig
-                return WarpSdkBridge.AttachResult.Success
-            }
-            override suspend fun detachTun() = Unit
-            override fun isRunning() = false
-            override fun reprotectSockets() = Unit
-        }
         val engine = EngineWarp(
             autoConfig = FakeAutoConfig(),
             configStore = makeStore(slot),
-            sdkBridge = bridge,
+            sdkBridge = FakeBridge { attachedIni = it },
             uapiPathProvider = { "/tmp" },
             endpointProber = prober,
         )
@@ -91,19 +96,10 @@ class EngineWarpEndpointCyclingTest {
         )
         val prober = makeProber(emptyMap())
         var attachedIni: String? = null
-        val bridge = object : WarpSdkBridge {
-            override suspend fun attachTun(tunnelName: String, tunFd: Int, iniConfig: String, uapiPath: String, protector: ru.ozero.enginescore.VpnSocketProtector): WarpSdkBridge.AttachResult {
-                attachedIni = iniConfig
-                return WarpSdkBridge.AttachResult.Success
-            }
-            override suspend fun detachTun() = Unit
-            override fun isRunning() = false
-            override fun reprotectSockets() = Unit
-        }
         val engine = EngineWarp(
             autoConfig = FakeAutoConfig(),
             configStore = makeStore(slot),
-            sdkBridge = bridge,
+            sdkBridge = FakeBridge { attachedIni = it },
             uapiPathProvider = { "/tmp" },
             endpointProber = prober,
         )
@@ -134,7 +130,7 @@ class EngineWarpEndpointCyclingTest {
         val engine = EngineWarp(
             autoConfig = FakeAutoConfig(),
             configStore = makeStore(slot),
-            sdkBridge = FakeNoopBridge(),
+            sdkBridge = FakeBridge(),
             uapiPathProvider = { "/tmp" },
             endpointProber = prober,
         )
@@ -162,7 +158,7 @@ class EngineWarpEndpointCyclingTest {
         val engine = EngineWarp(
             autoConfig = FakeAutoConfig(),
             configStore = makeStore(slot),
-            sdkBridge = FakeNoopBridge(),
+            sdkBridge = FakeBridge(),
             uapiPathProvider = { "/tmp" },
             endpointProber = prober,
         )
@@ -178,9 +174,17 @@ class EngineWarpEndpointCyclingTest {
             Result.failure(IllegalStateException("should not be called"))
     }
 
-    private class FakeNoopBridge : WarpSdkBridge {
-        override suspend fun attachTun(tunnelName: String, tunFd: Int, iniConfig: String, uapiPath: String, protector: ru.ozero.enginescore.VpnSocketProtector): WarpSdkBridge.AttachResult =
-            WarpSdkBridge.AttachResult.Success
+    private class FakeBridge(private val onAttach: (String) -> Unit = {}) : WarpSdkBridge {
+        override suspend fun attachTun(
+            tunnelName: String,
+            tunFd: Int,
+            iniConfig: String,
+            uapiPath: String,
+            protector: VpnSocketProtector,
+        ): WarpSdkBridge.AttachResult {
+            onAttach(iniConfig)
+            return WarpSdkBridge.AttachResult.Success
+        }
         override suspend fun detachTun() = Unit
         override fun isRunning() = false
         override fun reprotectSockets() = Unit
