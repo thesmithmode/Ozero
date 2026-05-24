@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -66,6 +67,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.io.ByteArrayInputStream
 import ru.ozero.app.R
+import ru.ozero.app.ui.theme.OzeroPalette
+import androidx.compose.ui.text.font.FontFamily
 import ru.ozero.enginewarp.AwgPreset
 import ru.ozero.enginewarp.AwgPresets
 import ru.ozero.enginewarp.DnsPreset
@@ -82,6 +85,17 @@ fun WarpEngineSettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val cooldownRemainingMs by viewModel.cooldownRemainingMs.collectAsStateWithLifecycle()
+
+    if (state.showTweaks && state.editDraft != null) {
+        BackHandler { viewModel.onEditCancel() }
+        WarpConnectionTweaksScreen(
+            draft = state.editDraft!!,
+            onDraftChange = viewModel::onEditDraftChange,
+            onSave = viewModel::onSaveEdit,
+            onCancel = viewModel::onEditCancel,
+        )
+        return
+    }
 
     if (state.editDraft != null) {
         BackHandler { viewModel.onEditCancel() }
@@ -156,6 +170,7 @@ fun WarpEngineSettingsScreen(
                 onSetActive = viewModel::onSetActive,
                 onStartEdit = viewModel::onStartEdit,
                 onDeleteSlot = viewModel::onDeleteSlot,
+                onOpenTweaks = viewModel::onStartTweaks,
             )
             if (overlayAlpha > 0f) {
                 ImportSuccessOverlay(
@@ -491,7 +506,12 @@ private fun WarpDoHSection(
     selected: ru.ozero.enginewarp.DoHProvider,
     onSelect: (ru.ozero.enginewarp.DoHProvider) -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth().testTag("warp_doh_section")) {
+    Card(
+        modifier = Modifier.fillMaxWidth().testTag("warp_doh_section"),
+        colors = CardDefaults.cardColors(
+            containerColor = OzeroPalette.Bg1,
+        ),
+    ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
                 text = stringResource(R.string.warp_doh_section_label),
@@ -563,6 +583,7 @@ private fun WarpScreenContent(
     onSetActive: (String) -> Unit,
     onStartEdit: (String) -> Unit,
     onDeleteSlot: (String) -> Unit,
+    onOpenTweaks: () -> Unit = {},
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         if (state.slots.isEmpty()) {
@@ -604,9 +625,11 @@ private fun WarpScreenContent(
                 WarpActionRow(
                     isRegistering = false,
                     cooldownRemainingMs = cooldownRemainingMs,
+                    hasSlotsForTweaks = state.slots.isNotEmpty(),
                     onGenerate = onGenerate,
                     onCancelGenerate = onCancelGenerate,
                     onImportFile = onImportFile,
+                    onOpenTweaks = onOpenTweaks,
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
@@ -709,9 +732,11 @@ private fun WarpGenerateButton(
 private fun WarpActionRow(
     isRegistering: Boolean,
     cooldownRemainingMs: Long = 0L,
+    hasSlotsForTweaks: Boolean = false,
     onGenerate: () -> Unit,
     onCancelGenerate: () -> Unit,
     onImportFile: () -> Unit,
+    onOpenTweaks: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
@@ -724,7 +749,7 @@ private fun WarpActionRow(
             )
         }
         Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             WarpGenerateButton(
@@ -739,6 +764,18 @@ private fun WarpActionRow(
                 modifier = Modifier.weight(1f).testTag("warp_import_button"),
             ) {
                 Text(stringResource(R.string.warp_import_file))
+            }
+        }
+        if (hasSlotsForTweaks) {
+            OutlinedButton(
+                onClick = onOpenTweaks,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 8.dp)
+                    .testTag("warp_tweaks_button"),
+            ) {
+                Text(stringResource(R.string.warp_tweaks_button))
             }
         }
     }
@@ -817,7 +854,12 @@ private fun WarpConfigSlotCard(
     onStartEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = OzeroPalette.Bg1,
+        ),
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -835,6 +877,7 @@ private fun WarpConfigSlotCard(
                     text = slot.config.peerEndpoint,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontFamily = FontFamily.Monospace,
                 )
                 if (slot.endpointList.size > 1) {
                     Text(
@@ -849,6 +892,140 @@ private fun WarpConfigSlotCard(
             }
             IconButton(onClick = onDelete) {
                 Icon(Icons.Filled.Delete, contentDescription = null)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WarpConnectionTweaksScreen(
+    draft: WarpEditDraft,
+    onDraftChange: (WarpEditDraft) -> Unit,
+    onSave: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.warp_tweaks_title)) },
+                navigationIcon = {
+                    IconButton(onClick = onCancel) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                    }
+                },
+                actions = {
+                    TextButton(onClick = onSave) {
+                        Text(stringResource(R.string.warp_edit_save))
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            WarpTweaksEndpointSection(draft, onDraftChange)
+            WarpTweaksAwgSection(draft, onDraftChange)
+            WarpDoHSection(
+                selected = draft.doHProvider,
+                onSelect = { onDraftChange(draft.copy(doHProvider = it)) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun WarpTweaksEndpointSection(draft: WarpEditDraft, onDraftChange: (WarpEditDraft) -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().testTag("warp_tweaks_endpoint"),
+        colors = CardDefaults.cardColors(
+            containerColor = OzeroPalette.Bg1,
+        ),
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = stringResource(R.string.warp_tweaks_endpoint_section),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            EndpointPresets.ALL.forEach { preset ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .selectable(
+                            selected = draft.endpoint == preset.endpoint,
+                            onClick = { onDraftChange(draft.copy(endpoint = preset.endpoint)) },
+                        )
+                        .testTag("warp_tweaks_ep_${preset.id}"),
+                ) {
+                    RadioButton(
+                        selected = draft.endpoint == preset.endpoint,
+                        onClick = { onDraftChange(draft.copy(endpoint = preset.endpoint)) },
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = preset.name, style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            text = preset.endpoint,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontFamily = FontFamily.Monospace,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WarpTweaksAwgSection(draft: WarpEditDraft, onDraftChange: (WarpEditDraft) -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().testTag("warp_tweaks_awg"),
+        colors = CardDefaults.cardColors(
+            containerColor = OzeroPalette.Bg1,
+        ),
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = stringResource(R.string.warp_tweaks_awg_section),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            AwgPresets.ALL.forEach { preset ->
+                val p = preset.params
+                val isSelected = draft.jc == p.junkPacketCount.toString() &&
+                    draft.jmin == p.junkPacketMinSize.toString() &&
+                    draft.jmax == p.junkPacketMaxSize.toString()
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .selectable(
+                            selected = isSelected,
+                            onClick = { onDraftChange(applyPreset(draft, preset)) },
+                        )
+                        .testTag("warp_tweaks_awg_${preset.id}"),
+                ) {
+                    RadioButton(
+                        selected = isSelected,
+                        onClick = { onDraftChange(applyPreset(draft, preset)) },
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = preset.name, style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            text = "Jc=${p.junkPacketCount} Jmin=${p.junkPacketMinSize} Jmax=${p.junkPacketMaxSize}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontFamily = FontFamily.Monospace,
+                        )
+                    }
+                }
             }
         }
     }
