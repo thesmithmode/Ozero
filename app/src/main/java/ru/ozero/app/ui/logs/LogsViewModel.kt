@@ -5,26 +5,41 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.ozero.app.logging.LogBuffer
+import ru.ozero.app.logging.LogEntry
 import ru.ozero.app.logging.LogcatReader
 import ru.ozero.app.logging.UnifiedLogger
 import javax.inject.Inject
 import kotlin.coroutines.CoroutineContext
 
+internal const val FILTER_ALL = "Все"
+
 data class LogsUiState(
-    val tail: String = "",
     val fileSize: Long = 0L,
     val filePath: String = "",
-)
+    val entries: List<LogEntry> = emptyList(),
+    val tagFilter: String = FILTER_ALL,
+    val levelFilter: String = FILTER_ALL,
+) {
+    val availableTags: List<String> = buildList {
+        add(FILTER_ALL)
+        entries.map { it.tag }.distinct().sorted().forEach { add(it) }
+    }
+
+    val filteredEntries: List<LogEntry> = entries.filter { entry ->
+        (tagFilter == FILTER_ALL || entry.tag == tagFilter) &&
+            (levelFilter == FILTER_ALL || entry.level.name == levelFilter)
+    }
+}
 
 @HiltViewModel
 class LogsViewModel @Inject constructor(
@@ -37,25 +52,34 @@ class LogsViewModel @Inject constructor(
     private val _refresh = MutableStateFlow(0L)
     val refresh: StateFlow<Long> = _refresh.asStateFlow()
 
-    val uiState: StateFlow<LogsUiState> = pollFile().stateIn(
+    private val _tagFilter = MutableStateFlow(FILTER_ALL)
+    private val _levelFilter = MutableStateFlow(FILTER_ALL)
+
+    val uiState: StateFlow<LogsUiState> = combine(
+        buffer.entries,
+        _tagFilter,
+        _levelFilter,
+        fileStateFlow(),
+    ) { entries: List<LogEntry>, tag: String, level: String, fs: Pair<Long, String> ->
+        LogsUiState(
+            fileSize = fs.first,
+            filePath = fs.second,
+            entries = entries,
+            tagFilter = tag,
+            levelFilter = level,
+        )
+    }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
         initialValue = LogsUiState(),
     )
 
-    private fun pollFile(): Flow<LogsUiState> = flow {
-        while (true) {
-            emit(snapshot())
-            delay(POLL_INTERVAL_MS)
-        }
+    fun onTagFilter(tag: String) {
+        _tagFilter.value = tag
     }
 
-    private suspend fun snapshot(): LogsUiState = withContext(ioContext) {
-        LogsUiState(
-            tail = UnifiedLogger.readTail(),
-            fileSize = UnifiedLogger.fileSize(),
-            filePath = UnifiedLogger.file()?.absolutePath.orEmpty(),
-        )
+    fun onLevelFilter(level: String) {
+        _levelFilter.value = level
     }
 
     fun copyAll(): String = UnifiedLogger.read()
@@ -65,6 +89,16 @@ class LogsViewModel @Inject constructor(
             reader.clearAll()
             UnifiedLogger.clear()
             _refresh.value = System.currentTimeMillis()
+        }
+    }
+
+    private fun fileStateFlow() = flow {
+        while (true) {
+            val pair = withContext(ioContext) {
+                Pair(UnifiedLogger.fileSize(), UnifiedLogger.file()?.absolutePath.orEmpty())
+            }
+            emit(pair)
+            delay(POLL_INTERVAL_MS)
         }
     }
 

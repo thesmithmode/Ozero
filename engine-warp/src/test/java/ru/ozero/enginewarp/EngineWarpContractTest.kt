@@ -522,7 +522,12 @@ class EngineWarpContractTest {
         override fun activeSlot(): Flow<WarpConfigSlot?> = MutableStateFlow(slotsList.value.firstOrNull { it.isActive })
         override fun activeConfig(): Flow<WarpConfig?> = activeFlow
 
-        override suspend fun addSlot(name: String, config: WarpConfig, rawIni: String?): String {
+        override suspend fun addSlot(
+            name: String,
+            config: WarpConfig,
+            rawIni: String?,
+            endpointList: List<String>,
+        ): String {
             lastAdded = AddedSlot(name, config, rawIni)
             val id = "fake-${slotsList.value.size}"
             slotsList.value = slotsList.value +
@@ -532,6 +537,7 @@ class EngineWarpContractTest {
                     config = config,
                     isActive = slotsList.value.isEmpty(),
                     rawIniOverride = rawIni,
+                    endpointList = endpointList,
                 )
             activeFlow.value = config
             return id
@@ -546,9 +552,19 @@ class EngineWarpContractTest {
             slotsList.value = slotsList.value.map { if (it.id == id) it.copy(name = name) else it }
         }
 
-        override suspend fun updateSlot(id: String, name: String, config: WarpConfig, rawIni: String?) {
+        override suspend fun updateSlot(
+            id: String,
+            name: String,
+            config: WarpConfig,
+            rawIni: String?,
+            endpointList: List<String>,
+        ) {
             slotsList.value = slotsList.value.map {
-                if (it.id == id) it.copy(name = name, config = config, rawIniOverride = rawIni) else it
+                if (it.id == id) {
+                    it.copy(name = name, config = config, rawIniOverride = rawIni, endpointList = endpointList)
+                } else {
+                    it
+                }
             }
         }
 

@@ -337,6 +337,7 @@
     <string name="warp_endpoint_label">Endpoint:</string>
     <string name="warp_license_label">Лицензия:</string>
     <string name="warp_import_file">Импорт из файла .conf</string>
+    <string name="warp_endpoint_count">%d эндпоинтов (авто)</string>
     <string name="warp_no_license">—</string>
     <string name="warp_import_error">Ошибка импорта</string>
     <string name="warp_imported">Конфиг импортирован</string>
@@ -457,13 +458,21 @@
     <string name="manual_server_error_import_unavailable">Импорт недоступен в этой версии</string>
 
     <!-- Logs screen -->
+    <string name="logs_title">Логи</string>
     <string name="logs_title_fmt">Логи (%1$dKB)</string>
     <string name="logs_back_cd">Назад</string>
     <string name="logs_copy">Копировать</string>
     <string name="logs_clear_cd">Очистить</string>
     <string name="logs_share_cd">Поделиться</string>
-    <string name="logs_empty">(пусто — лог ещё не записан)</string>
+    <string name="logs_empty">Записей нет</string>
     <string name="logs_share_chooser_title">Поделиться ozero.log</string>
+    <string name="logs_export">Экспорт .log</string>
+    <string name="logs_footer_fmt">%1$d / %2$d строк</string>
+    <!-- Warp tweaks screen -->
+    <string name="warp_tweaks_button">Параметры подключения</string>
+    <string name="warp_tweaks_title">Параметры подключения</string>
+    <string name="warp_tweaks_endpoint_section">Конечная точка</string>
+    <string name="warp_tweaks_awg_section">Параметры AmneziaWG</string>
     <string name="logs_copy_empty_toast">Пусто — нечего копировать</string>
     <string name="logs_copy_done_toast_fmt">Скопировано (%1$d симв.)</string>
 

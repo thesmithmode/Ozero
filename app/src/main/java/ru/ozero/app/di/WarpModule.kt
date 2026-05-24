@@ -36,6 +36,7 @@ import ru.ozero.enginewarp.RemoteAwgRuntime
 import ru.ozero.enginewarp.RealWarpSdkBridge
 import ru.ozero.enginewarp.WarpAutoConfig
 import ru.ozero.enginewarp.WarpConfFileImporter
+import ru.ozero.enginewarp.WarpEndpointProber
 import ru.ozero.enginewarp.WarpFileImporter
 import ru.ozero.enginewarp.WarpConfigSlotStore
 import ru.ozero.enginewarp.WarpSdkBridge
@@ -98,6 +99,10 @@ object WarpModule {
 
     @Provides
     @Singleton
+    fun provideWarpEndpointProber(): WarpEndpointProber = WarpEndpointProber()
+
+    @Provides
+    @Singleton
     fun provideWarpSdkBridge(
         @ApplicationContext context: Context,
         tunnelController: TunnelController,
@@ -120,6 +125,7 @@ object WarpModule {
         store: WarpConfigSlotStore,
         bridge: WarpSdkBridge,
         settingsRepository: SettingsRepository,
+        endpointProber: WarpEndpointProber,
     ): EnginePlugin = EngineWarp(
         autoConfig = autoConfig,
         configStore = store,
@@ -134,6 +140,7 @@ object WarpModule {
                 }?.ipv6Enabled ?: SettingsModel.DEFAULT_IPV6_ENABLED
             }
         },
+        endpointProber = endpointProber,
     )
 
     private const val SETTINGS_READ_TIMEOUT_MS = 1_500L

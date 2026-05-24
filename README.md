@@ -43,16 +43,7 @@ cd Ozero
 ./gradlew assembleRelease
 ```
 
-Сборка требует переменных окружения для подписи APK и публичного ключа обновлений. Подробности — [`docs/release-signing.md`](docs/release-signing.md), [`docs/build.md`](docs/build.md).
-
-## Документация
-
-- [`docs/architecture.md`](docs/architecture.md) — слои, модули, DI
-- [`docs/engines.md`](docs/engines.md) — детали по каждому движку
-- [`docs/runtime-flow.md`](docs/runtime-flow.md) — VPN flow от запуска до останова
-- [`docs/binaries-pipeline.md`](docs/binaries-pipeline.md) — сборка native-библиотек
-- [`docs/masterdns-server-setup.md`](docs/masterdns-server-setup.md) — поднять MasterDNS-сервер за 15 минут
-- [`docs/trust-chain.md`](docs/trust-chain.md) — цепочка доверия (подписи, ключи)
+Сборка требует переменных окружения для подписи APK и публичного ключа обновлений. Подробности — `.claude/Контекст/Architect.md`.
 
 ## Лицензия
 

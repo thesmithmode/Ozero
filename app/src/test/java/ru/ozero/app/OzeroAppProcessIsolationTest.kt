@@ -81,6 +81,51 @@ class OzeroAppProcessIsolationTest {
         return count
     }
 
+    @Test
+    fun `OzeroApp singbox guard appears before warp guard in onCreate`() {
+        val source = locateOzeroApp().readText()
+        val onCreate = extractOnCreateBlock(source)
+
+        val singboxGuardPos = onCreate.indexOf("isEngineSingboxProcess()")
+        val warpGuardPos = onCreate.indexOf("isEngineWarpProcess()")
+
+        assertTrue(
+            singboxGuardPos >= 0,
+            "isEngineSingboxProcess() guard must be present in onCreate — AD-1: singbox guard before warp guard",
+        )
+        assertTrue(
+            warpGuardPos >= 0,
+            "isEngineWarpProcess() guard must be present in onCreate",
+        )
+        assertTrue(
+            singboxGuardPos < warpGuardPos,
+            "isEngineSingboxProcess() guard must come BEFORE isEngineWarpProcess() — " +
+                "order matters: each process guard must return early before the next",
+        )
+    }
+
+    @Test
+    fun `OzeroApp singbox process does not load am-go or gojni`() {
+        val source = locateOzeroApp().readText()
+        val onCreate = extractOnCreateBlock(source)
+
+        val singboxStart = onCreate.indexOf("isEngineSingboxProcess()")
+        val singboxReturn = onCreate.indexOf("return", startIndex = singboxStart)
+        val warpStart = onCreate.indexOf("isEngineWarpProcess()")
+
+        assertTrue(singboxStart >= 0 && singboxReturn >= 0, "singbox guard + return must exist")
+        assertTrue(
+            singboxReturn < warpStart,
+            "return in singbox branch must be before warp block — singbox process must not reach am-go load",
+        )
+
+        val singboxBlock = onCreate.substring(singboxStart, singboxReturn)
+        assertTrue(
+            !singboxBlock.contains("loadLibrary"),
+            "singbox process guard block must not load any native library",
+        )
+    }
+
     private fun locateOzeroApp(): File {
         val repoRoot = locateRepoRoot()
         val file = File(repoRoot, "app/src/main/java/ru/ozero/app/OzeroApp.kt")

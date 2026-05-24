@@ -383,10 +383,21 @@ class AppBackupManagerTest {
         override fun slots(): Flow<List<WarpConfigSlot>> = slots
         override fun activeSlot(): Flow<WarpConfigSlot?> = slots.map { it.firstOrNull { s -> s.isActive } }
         override fun activeConfig(): Flow<WarpConfig?> = slots.map { it.firstOrNull { s -> s.isActive }?.config }
-        override suspend fun addSlot(name: String, config: WarpConfig, rawIni: String?): String = error("not used")
+        override suspend fun addSlot(
+            name: String,
+            config: WarpConfig,
+            rawIni: String?,
+            endpointList: List<String>,
+        ): String = error("not used")
         override suspend fun setActive(id: String) = Unit
         override suspend fun rename(id: String, name: String) = Unit
-        override suspend fun updateSlot(id: String, name: String, config: WarpConfig, rawIni: String?) = Unit
+        override suspend fun updateSlot(
+            id: String,
+            name: String,
+            config: WarpConfig,
+            rawIni: String?,
+            endpointList: List<String>,
+        ) = Unit
         override suspend fun delete(id: String) = Unit
         override suspend fun clear() {
             slots.value = emptyList()

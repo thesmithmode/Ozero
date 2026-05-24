@@ -49,6 +49,7 @@ class EngineWarp(
     private val warpReadyPollMs: Long = WARP_READY_POLL_MS,
     private val statsPollIntervalMs: Long = STATS_POLL_INTERVAL_MS,
     private val handshakeStaleThresholdSec: Long = HANDSHAKE_STALE_THRESHOLD_SEC,
+    private val endpointProber: WarpEndpointProber = WarpEndpointProber(),
     pluginScope: CoroutineScope? = null,
 ) : EnginePlugin, TunFdAcceptor {
 
@@ -321,7 +322,15 @@ class EngineWarp(
     private suspend fun resolveActive(): ResolvedWarp? {
         val slot = configStore.activeSlot().first()
         return if (slot != null) {
-            buildResolved(slot.config, slot.rawIniOverride, source = "slot")
+            val effectiveConfig = if (slot.endpointList.isNotEmpty()) {
+                val probed = endpointProber.probe(slot.endpointList)
+                val best = probed.firstOrNull { it.rttMs < Long.MAX_VALUE }?.endpoint
+                    ?: slot.endpointList.first()
+                slot.config.copy(peerEndpoint = best)
+            } else {
+                slot.config
+            }
+            buildResolved(effectiveConfig, slot.rawIniOverride, source = "slot")
         } else {
             PersistentLoggers.info(TAG, "no active config — autoConfig.register")
             val regResult = autoConfig.register()

@@ -50,6 +50,9 @@ espresso = "3.7.0"
 composeTest = "1.7.2"
 testExtJunit = "1.2.1"
 
+# Kryo (Bean persistence + exclave:// share format binary compat)
+kryo = "5.6.2"
+
 # Quality
 detekt = "1.23.7"
 ktlint = "12.1.1"
@@ -112,6 +115,8 @@ bouncycastle-prov = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = 
 bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bouncycastle" }
 
 relinker = { module = "com.getkeepsafe.relinker:relinker", version.ref = "relinker" }
+
+kryo = { module = "com.esotericsoftware:kryo", version.ref = "kryo" }
 
 # SSH
 sshj = { module = "com.hierynomus:sshj", version.ref = "sshj" }

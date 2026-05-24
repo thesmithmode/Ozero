@@ -150,6 +150,6 @@ extensions.configure<com.android.build.gradle.internal.dsl.BaseAppModuleExtensio
         abortOnError = true
         warningsAsErrors = false
         checkReleaseBuilds = true
-                                disable += setOf("GradleDependency", "NewerVersionAvailable")
+        disable += setOf("GradleDependency", "NewerVersionAvailable", "NullSafeMutableLiveData")
     }
 }

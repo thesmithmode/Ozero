@@ -43,16 +43,7 @@ cd Ozero
 ./gradlew assembleRelease
 ```
 
-The release build requires environment variables for APK signing and the update public key. Details — [`docs/release-signing.md`](docs/release-signing.md), [`docs/build.md`](docs/build.md).
-
-## Documentation
-
-- [`docs/architecture.md`](docs/architecture.md) — layers, modules, DI
-- [`docs/engines.md`](docs/engines.md) — per-engine details
-- [`docs/runtime-flow.md`](docs/runtime-flow.md) — VPN flow from start to stop
-- [`docs/binaries-pipeline.md`](docs/binaries-pipeline.md) — native library build
-- [`docs/masterdns-server-setup.md`](docs/masterdns-server-setup.md) — deploy MasterDNS server in 15 minutes
-- [`docs/trust-chain.md`](docs/trust-chain.md) — trust chain (signing, keys)
+The release build requires environment variables for APK signing and the update public key. Details — `.claude/Контекст/Architect.md`.
 
 ## License
 

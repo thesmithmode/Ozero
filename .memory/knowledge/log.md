@@ -1,5 +1,70 @@
 # Build Log
 
+## [2026-05-24T21:46:00] compile | 2026-05-24.md
+- Source: daily/2026-05-24.md
+- Articles created: [[concepts/ktlint-volatile-annotation-spacing]]
+- Articles updated: [[concepts/hilt-cross-process-injection]], [[concepts/singbox-engine-design]], [[concepts/singbox-subscription-architecture]], [[concepts/kotlin-expression-body-return-trap]], [[concepts/kapt-per-module-requirement]], [[concepts/ci-gradle-log-reading]], [[concepts/cascade-unresolved-import-masking]]
+
+## [2026-05-24T21:10:45+03:00] compile | daily/2026-05-24.md
+- Source: daily/2026-05-24.md
+- Articles created: (none)
+- Articles updated: [[concepts/singbox-engine-design]], [[concepts/singbox-subscription-architecture]], [[concepts/ci-gradle-log-reading]], [[concepts/kotlin-expression-body-return-trap]], [[concepts/hilt-cross-process-injection]], [[concepts/kapt-per-module-requirement]], [[concepts/cascade-unresolved-import-masking]], [[concepts/parallel-chat-instruction-leak]], [[concepts/git-contributor-rewrite]]
+- Notes: All listed articles were fully compiled in passes 1-7 (same day). No new information to add — all facts from this instruction block are already present in existing articles.
+
+## [2026-05-24T21:30:00+03:00] compile | 2026-05-24.md (pass 7 — gap fill)
+- Source: daily/2026-05-24.md
+- Articles created: [[concepts/singbox-subscription-architecture]] (file was missing despite being listed in index/log)
+- Articles updated: (none — all other articles from this log already compiled in passes 1-6)
+
+## [2026-05-24T20:29:06+03:00] compile | 2026-05-24.md
+- Source: daily/2026-05-24.md
+- Articles created: [[concepts/singbox-subscription-architecture]]
+- Articles updated: [[concepts/singbox-engine-design]], [[concepts/kotlin-expression-body-return-trap]], [[concepts/ci-gradle-log-reading]], [[concepts/cascade-unresolved-import-masking]], [[concepts/hilt-cross-process-injection]], [[concepts/kapt-per-module-requirement]], [[concepts/room-entity-database-registration]]
+
+## [2026-05-24T20:30:00+03:00] compile | 2026-05-24.md (pass 6 — sessions 19:34 + 19:53)
+- Source: daily/2026-05-24.md
+- Articles created: [[concepts/kotlin-import-at-file-level-only]]
+- Articles updated: [[concepts/index]] (new entry added)
+- Notes: Sessions 19:34/19:53 added: import-inside-function trap, MutableList.replaceAll UnaryOperator issue, PowerShell heredoc limitation. All other concepts from these sessions already covered in passes 1-5.
+
+## [2026-05-24T23:59:00+03:00] compile | 2026-05-24.md (pass 3)
+- Source: daily/2026-05-24.md
+- Articles created: (none — all concepts already captured in passes 1 and 2)
+
+## [2026-05-24T23:59:45+03:00] compile | 2026-05-24.md (pass 5 — subscription modules + kapt/room patterns)
+- Source: daily/2026-05-24.md
+- Articles created: [[concepts/kapt-per-module-requirement]], [[concepts/room-entity-database-registration]]
+- Articles updated: [[concepts/singbox-engine-design]] (P4/P5 subscription architecture, CI pitfalls, cross-references)
+
+## [2026-05-24T23:59:30+03:00] compile | 2026-05-24.md (pass 4 — engine-singbox P4/P5 CI sessions)
+- Source: daily/2026-05-24.md
+- Articles created: [[concepts/hilt-cross-process-injection]], [[concepts/kotlin-expression-body-return-trap]], [[concepts/ci-gradle-log-reading]], [[concepts/cascade-unresolved-import-masking]]
+- Articles updated: (none — existing articles already current)
+- Articles updated: (none — all updates complete)
+- Notes: Full audit pass confirmed coverage: singbox-engine-design (urlTest, AD-15 Gradle isolation, preset_groups AD-14 restore, kill switch inheritance), parallel-chat-instruction-leak (sing-box/WARP context bleed incident), toml-windows-path-escaping-trap, git-contributor-rewrite, ci-workflow-discipline (@Volatile blank line + upload-artifact v7), dependabot-dev-workflow-mismatch (v0.3.0 triage). No gaps found.
+
+## [2026-05-24T23:45:00+03:00] compile | 2026-05-24.md (pass 2)
+- Source: daily/2026-05-24.md
+- Articles created: [[concepts/parallel-chat-instruction-leak]]
+- Articles updated: (none — pass 1 already complete)
+
+## [2026-05-24T23:30:00+03:00] compile | 2026-05-24.md
+- Source: daily/2026-05-24.md
+- Articles created: [[concepts/toml-windows-path-escaping-trap]], [[concepts/singbox-engine-design]], [[concepts/git-contributor-rewrite]]
+- Articles updated: [[concepts/ci-workflow-discipline]] (@Volatile blank line + upload-artifact v7 breaking), [[concepts/dependabot-dev-workflow-mismatch]] (v0.3.0 triage data + upload-artifact v7 confirmed breaking)
+
+## [2026-05-24T19:00:00+03:00] compile | 2026-05-23.md
+- Source: daily/2026-05-23.md
+- Articles created: [[concepts/android-ndk-cxx-static-linking]]
+- Articles updated: (none — all other 2026-05-23 concepts were compiled in-session: [[concepts/warp-uapi-stale-socket-cleanup]], [[concepts/fptn-sni-bypass-method]], [[concepts/urnetwork-provide-secret-keys-identity]], [[concepts/urnetwork-jwt-bootstrapper]], [[concepts/masterdns-deploy-hardening]], [[concepts/urnetwork-balance-optimistic-cache]], [[concepts/gradle-configuration-cache-agp-bug]], [[concepts/proguard-release-drift]], [[concepts/release-process]])
+- Notes: One net-new concept: Android NDK c++_static requirement for clns-7 namespace. FPTN libfptn_native_lib.so crashed on first System.loadLibrary() because c++_shared is not visible in clns-7; fix = Conan profile compiler.libcxx=c++_static. All other sessions' concepts from this dense day were already captured during the coding sessions themselves.
+
+## [2026-05-24T18:06:14+03:00] compile | 2026-05-22 (1).md
+- Source: daily/2026-05-22 (1).md
+- Articles created: [[concepts/urnetwork-locvm-bootstrap-race]]
+- Articles updated: [[concepts/relay-coordinator-ownership-transfer]] (added providePaused hardcode bug + fix from session 16:02+; commit e0d53ca4)
+- Notes: Most 2026-05-22 concepts were already compiled in prior sessions (engine-chip-switching-desync, vpnservice-double-shutdown-guard, warp-allowedips-tun-routing, byedpi-hev-pipeline-upstream-parity udp:tcp, byedpi-vpn-pipeline-upstream-divergence confirmation, urnetwork-balance-optimistic-cache FREE_TIER_CAP removal, self-review-insufficient false-positives). Two gaps filled: (1) LocVM bootstrap race — new article; (2) RelayCoordinator setProvidePaused hardcode — updated existing article.
+
 ## [2026-05-24T00:47:26+00:00] compile | 2026-05-08.md
 - Source: daily/2026-05-08.md
 - Articles created: (all were compiled in-session; none net-new this pass)

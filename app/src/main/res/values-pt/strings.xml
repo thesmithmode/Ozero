@@ -362,6 +362,7 @@
     <string name="warp_endpoint_label">Endpoint:</string>
     <string name="warp_license_label">Licença:</string>
     <string name="warp_import_file">Importar de arquivo .conf</string>
+    <string name="warp_endpoint_count">%d endpoints (auto)</string>
     <string name="warp_no_license">—</string>
     <string name="warp_import_error">Erro de importação</string>
     <string name="warp_imported">Configuração importada</string>

@@ -1,0 +1,169 @@
+package ru.ozero.singboxsubscription
+
+import android.util.Base64
+import kotlinx.coroutines.runBlocking
+import okhttp3.OkHttpClient
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import ru.ozero.singboxroom.entity.SubscriptionGroup
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [33])
+class RawUpdaterTest {
+
+    private val server = MockWebServer()
+    private lateinit var groupDao: FakeSubscriptionGroupDao
+    private lateinit var profileDao: FakeProxyProfileDao
+    private lateinit var rawUpdater: RawUpdater
+
+    private val vless1 =
+        "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@s1.example.com:443?type=tcp&security=none#S1"
+    private val vless2 =
+        "vless://bbbbbbbb-2222-2222-2222-bbbbbbbbbbbb@s2.example.com:443?type=tcp&security=none#S2"
+
+    @Before
+    fun setUp() {
+        server.start()
+        groupDao = FakeSubscriptionGroupDao()
+        profileDao = FakeProxyProfileDao()
+        rawUpdater = RawUpdater(
+            okHttpClient = OkHttpClient(),
+            groupDao = groupDao,
+            profileDao = profileDao,
+        )
+    }
+
+    @After
+    fun tearDown() {
+        server.shutdown()
+    }
+
+    private fun group(id: Long = 1L): SubscriptionGroup {
+        val g = SubscriptionGroup(id = id, name = "Test", subscriptionUrl = server.url("/sub").toString())
+        groupDao.groups.add(g)
+        return g
+    }
+
+    @Test
+    fun `should fetch raw links and insert profiles`() = runBlocking {
+        server.enqueue(MockResponse().setBody("$vless1\n$vless2"))
+        val g = group()
+
+        val result = rawUpdater.refresh(g)
+
+        assertTrue(result.isSuccess)
+        assertEquals(2, result.getOrNull())
+        assertEquals(2, profileDao.profiles.size)
+        assertTrue(profileDao.profiles.all { it.groupId == g.id })
+    }
+
+    @Test
+    fun `should fetch base64 bundle and insert profiles`() = runBlocking {
+        val encoded = Base64.encodeToString("$vless1\n$vless2".toByteArray(), Base64.NO_WRAP)
+        server.enqueue(MockResponse().setBody(encoded))
+        val g = group()
+
+        val result = rawUpdater.refresh(g)
+
+        assertTrue(result.isSuccess)
+        assertEquals(2, result.getOrNull())
+    }
+
+    @Test
+    fun `should replace existing profiles on refresh`() = runBlocking {
+        server.enqueue(MockResponse().setBody(vless1))
+        val g = group()
+        profileDao.profiles.add(
+            ru.ozero.singboxroom.entity.ProxyProfile(
+                id = 99L, groupId = g.id, name = "Old",
+                beanBlob = byteArrayOf(1, 2), protocolType = 0,
+            ),
+        )
+
+        rawUpdater.refresh(g)
+
+        assertEquals(1, profileDao.profiles.size)
+        assertTrue(profileDao.profiles.none { it.id == 99L })
+    }
+
+    @Test
+    fun `should parse Subscription-Userinfo header and update group metadata`() = runBlocking {
+        server.enqueue(
+            MockResponse()
+                .addHeader("Subscription-Userinfo", "upload=100; download=200; total=1000; expire=1800000000")
+                .setBody(vless1),
+        )
+        val g = group()
+
+        rawUpdater.refresh(g)
+
+        val updated = groupDao.groups.first { it.id == g.id }
+        assertEquals(1800000000L, updated.expiryDate)
+        assertEquals(700L, updated.bytesRemaining)
+    }
+
+    @Test
+    fun `should update lastUpdated timestamp after successful refresh`() = runBlocking {
+        val before = System.currentTimeMillis()
+        server.enqueue(MockResponse().setBody(vless1))
+        val g = group()
+
+        rawUpdater.refresh(g)
+
+        val updated = groupDao.groups.first { it.id == g.id }
+        assertTrue(updated.lastUpdated >= before)
+    }
+
+    @Test
+    fun `should return failure on network error`() = runBlocking {
+        server.shutdown()
+
+        val g = SubscriptionGroup(id = 1L, name = "Test", subscriptionUrl = "http://127.0.0.1:1/sub")
+        groupDao.groups.add(g)
+
+        val result = rawUpdater.refresh(g)
+
+        assertTrue(result.isFailure)
+    }
+
+    @Test
+    fun `should return zero count for empty body`() = runBlocking {
+        server.enqueue(MockResponse().setBody(""))
+        val g = group()
+
+        val result = rawUpdater.refresh(g)
+
+        assertTrue(result.isSuccess)
+        assertEquals(0, result.getOrNull())
+        assertEquals(0, profileDao.profiles.size)
+    }
+
+    @Test
+    fun `should skip comment lines in raw body`() = runBlocking {
+        server.enqueue(MockResponse().setBody("# header comment\n$vless1\n# another comment\n$vless2"))
+        val g = group()
+
+        rawUpdater.refresh(g)
+
+        assertEquals(2, profileDao.profiles.size)
+    }
+
+    @Test
+    fun `should set sequential userOrder on inserted profiles`() = runBlocking {
+        server.enqueue(MockResponse().setBody("$vless1\n$vless2"))
+        val g = group()
+
+        rawUpdater.refresh(g)
+
+        val orders = profileDao.profiles.sortedBy { it.userOrder }.map { it.userOrder }
+        assertEquals(listOf(0, 1), orders)
+    }
+}

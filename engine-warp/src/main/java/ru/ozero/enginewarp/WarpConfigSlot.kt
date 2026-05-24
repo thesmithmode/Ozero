@@ -8,4 +8,5 @@ data class WarpConfigSlot(
     val config: WarpConfig,
     val isActive: Boolean = false,
     val rawIniOverride: String? = null,
+    val endpointList: List<String> = emptyList(),
 )

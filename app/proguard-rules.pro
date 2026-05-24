@@ -107,3 +107,24 @@
 
 -renamesourcefileattribute SourceFile
 -keepattributes SourceFile,LineNumberTable
+
+# sing-box AIDL stubs
+-keep class ru.ozero.enginesingbox.** { *; }
+-keep class ru.ozero.singboxprocess.** { *; }
+-keep class * extends android.os.IInterface { *; }
+-keep class **$Stub { *; }
+-keep class **$Stub$Proxy { *; }
+
+# Kryo reads Bean fields via reflection
+-keep class ru.ozero.singboxfmt.** { <fields>; <init>(); }
+-keepclassmembers class ru.ozero.singboxfmt.** { <init>(); <fields>; }
+
+# sing-box JNI wrapper
+-keep class ru.ozero.singboxcore.** { *; }
+-dontwarn ru.ozero.singboxcore.**
+
+# gomobile-generated JNI classes (both possible package names)
+-keep class libcore.** { *; }
+-keep class libsingboxgojni.** { *; }
+-dontwarn libcore.**
+-dontwarn libsingboxgojni.**
