@@ -17,6 +17,7 @@ import kotlinx.coroutines.withContext
 import ru.ozero.app.logging.LogBuffer
 import ru.ozero.app.logging.LogEntry
 import ru.ozero.app.logging.LogcatReader
+import ru.ozero.app.logging.UnifiedLogFileParser
 import ru.ozero.app.logging.UnifiedLogger
 import javax.inject.Inject
 import kotlin.coroutines.CoroutineContext
@@ -56,7 +57,7 @@ class LogsViewModel @Inject constructor(
     private val _levelFilter = MutableStateFlow(FILTER_ALL)
 
     val uiState: StateFlow<LogsUiState> = combine(
-        buffer.entries,
+        fileEntriesFlow(),
         _tagFilter,
         _levelFilter,
         fileStateFlow(),
@@ -89,6 +90,22 @@ class LogsViewModel @Inject constructor(
             reader.clearAll()
             UnifiedLogger.clear()
             _refresh.value = System.currentTimeMillis()
+        }
+    }
+
+    private fun fileEntriesFlow() = flow {
+        var lastSize = -1L
+        var cached = emptyList<LogEntry>()
+        while (true) {
+            val size = withContext(ioContext) { UnifiedLogger.fileSize() }
+            if (size != lastSize) {
+                lastSize = size
+                cached = withContext(ioContext) {
+                    UnifiedLogFileParser.parseAll(UnifiedLogger.readTail())
+                }
+            }
+            emit(cached)
+            delay(POLL_INTERVAL_MS)
         }
     }
 
