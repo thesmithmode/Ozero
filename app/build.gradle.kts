@@ -72,7 +72,7 @@ gradle.taskGraph.whenReady {
     if (key.isNullOrBlank() || key == placeholder) {
         throw GradleException(
             "UPDATE_PUBLIC_KEY_HEX env var обязателен для release-сборки " +
-                "(self-update будет навсегда сломан). См. docs/key-rotation.md.",
+                "(self-update будет навсегда сломан).",
         )
     }
     require(key.length == 64 && key.all { it in "0123456789abcdefABCDEF" }) {
