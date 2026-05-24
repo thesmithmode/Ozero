@@ -1,5 +1,6 @@
 plugins {
     id("ozero.android.library")
+    id("kotlin-parcelize")
 }
 
 android {
