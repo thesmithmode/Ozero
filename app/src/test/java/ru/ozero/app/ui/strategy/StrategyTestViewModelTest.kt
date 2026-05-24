@@ -562,13 +562,13 @@ class StrategyTestViewModelTest {
     }
 
     @Test
-    fun `onRename updates saved strategy name`() = runTest(dispatcher) {
+    fun `onEdit updates saved strategy name`() = runTest(dispatcher) {
         val vm = newVm()
         advanceUntilIdle()
         vm.onToggleSave("-Ku -An")
         advanceUntilIdle()
         val id = vm.savedStrategies.value.first().id
-        vm.onRename(id, "Для ютуба")
+        vm.onEdit(id, "Для ютуба", "-Ku -An")
         advanceUntilIdle()
         assertEquals("Для ютуба", vm.savedStrategies.value.first().name)
     }
@@ -687,7 +687,7 @@ class StrategyTestViewModelTest {
         vm.onToggleSave("-Ku -An")
         advanceUntilIdle()
         val id = vm.savedStrategies.value.first().id
-        vm.onRename(id, "Мой VPN")
+        vm.onEdit(id, "Мой VPN", "-Ku -An")
         advanceUntilIdle()
         vm.onApply("-Ku -An")
         advanceUntilIdle()

@@ -112,12 +112,15 @@ fun SavedStrategyStore.markVerified(commands: Set<String>, nowMs: Long): List<Sa
 }
 
 fun SavedStrategyStore.addWithName(name: String, command: String): List<SavedStrategy> = update { existing ->
-    if (existing.any { it.command == command }) existing
-    else existing + SavedStrategy(
-        id = UUID.randomUUID().toString(),
-        command = command,
-        name = name.takeIf { it.isNotBlank() },
-    )
+    if (existing.any { it.command == command }) {
+        existing
+    } else {
+        existing + SavedStrategy(
+            id = UUID.randomUUID().toString(),
+            command = command,
+            name = name.takeIf { it.isNotBlank() },
+        )
+    }
 }
 
 fun SavedStrategyStore.editStrategy(id: String, name: String, command: String): List<SavedStrategy> = update { list ->

@@ -286,13 +286,6 @@ class StrategyTestViewModel @Inject constructor(
         }
     }
 
-    fun onRename(id: String, name: String) {
-        viewModelScope.launch(ioDispatcher) {
-            val updated = runCatching { savedStrategyStore.rename(id, name) }.getOrElse { savedStrategyStore.load() }
-            _savedStrategies.value = updated
-        }
-    }
-
     fun onEdit(id: String, name: String, command: String) {
         viewModelScope.launch(ioDispatcher) {
             val updated = runCatching { savedStrategyStore.editStrategy(id, name, command) }
