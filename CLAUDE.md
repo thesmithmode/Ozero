@@ -58,7 +58,7 @@
 - `hev.TProxyService` — объявлять **все три** `external fun`: `TProxyStartService(String, Int)`, `TProxyStopService()`, `TProxyGetStats(): LongArray`. [sentinel: `JniContractTest`]
 - `loadOnce()` — `catch (e: Throwable)` после специфичных catch-блоков. [sentinel: `TProxyServiceLogTest`]
 - ByeDPI CMD mode (`byedpiUseUiMode=false`): args идут **verbatim**, только `trim()`. Никаких авто-suffix (`-Ku -a1 -An`). [sentinel: `ByeDpiBuildManualConfigTest`]
-- ByeDPI: `stop()` и `start()` failure path **всегда** `proxy.forceClose()` после `job.join()`. [sentinel: `ByeDpiEngineTest`]
+- ByeDPI: `stop()` — `proxy.forceClose()` ДО `job.join()` (unblock READ_WAIT перед ожиданием). [sentinel: `ByeDpiEngineTest`]
 
 ## Logging
 

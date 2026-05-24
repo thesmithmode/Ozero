@@ -8,8 +8,9 @@ sources:
   - "daily/2026-05-05.md"
   - "daily/2026-05-12.md"
   - "daily/2026-05-20.md"
+  - "daily/2026-05-23.md"
 created: 2026-05-01
-updated: 2026-05-20
+updated: 2026-05-23
 ---
 
 # URnetwork SDK Integration
@@ -79,9 +80,21 @@ Fix: apply all 12 fields in `runStartOnMain` as well, or extract the field-appli
 
 `switchingCountry` flag added to URnetwork ViewModel. When user selects a different exit country, StatusRow shows "Переключение страны…" and the engine performs soft peer re-discovery targeting the new country's relay nodes. Uses the watchdog `recover()` mechanism for non-destructive mesh refresh.
 
+### Provider Identity Persistence (2026-05-23, commit cc9e3c67)
+
+Root cause of 0 relay bytes despite successful VPN connections: `addProvideSecretKeysListener` was missing from `RealUrnetworkSdkBridge`. Without the listener, `initProvideSecretKeys()` generated a new keypair on every app restart. Each restart = new relay node identity in the URnetwork mesh → mesh routes 0 bytes to unknown node.
+
+Upstream `DeviceManager.kt:121-130` registers the listener before `initProvideSecretKeys()` to save generated keys into `localState.provideSecretKeys`. The fix replicates this pattern. Additionally, `addJwtRefreshListener` was added to update `localState.byClientJwt` when the SDK auto-refreshes the JWT.
+
+**Identity components are separate:**
+- `byClientJwt` = billing identity (walletAuth-derived, stable after first engine start)
+- `provideSecretKeys` = mesh identity (P2P relay node keypair, must persist across restarts)
+
+See [[concepts/urnetwork-provide-secret-keys-identity]] for full analysis.
+
 ## Remaining Work
 
-- CI verification of full fix chain (env + bundle fields)
+- TOFU host key verification for MasterDNS SSH (unrelated; see [[concepts/masterdns-deploy-hardening]])
 - `libgojni.so` ~28MB in APK — size impact assessment pending
 
 ## Related Concepts
@@ -92,6 +105,7 @@ Fix: apply all 12 fields in `runStartOnMain` as well, or extract the field-appli
 - [[concepts/urnetwork-networkspace-init]] - First-run initialization flow for NetworkSpace creation
 - [[connections/symptom-fix-vs-system-removal]] - Consent removal decision pattern
 - [[concepts/urnetwork-peer-watchdog-recovery]] - Peer discovery loss and auto-recovery pattern
+- [[concepts/urnetwork-provide-secret-keys-identity]] - provideSecretKeys persistence fix; listener registration order; mesh identity vs billing identity distinction
 
 ## Sources
 
@@ -99,3 +113,4 @@ Fix: apply all 12 fields in `runStartOnMain` as well, or extract the field-appli
 - [[daily/2026-05-02.md]] - Consent system removed, stop() leak fixed, NetworkSpace init flow discovered via bytecode introspection, RealBridge implemented
 - [[daily/2026-05-12.md]] - Session 21:19: peer discovery loss after 4-5 min diagnosed; recover() watchdog added; Solana/URx/wallet UI removed; country switch UX with switchingCountry flag
 - [[daily/2026-05-20.md]] - runStartOnMain symmetry fix: both runStartOnMain AND ensureDeviceOnMain must apply all 12 device fields; previous fix only covered ensureDeviceOnMain (settings path); engine.start() path stayed at 1 field → SDK hid cities/regions
+- [[daily/2026-05-23.md]] - 5-subagent diagnostic proved 0 relay bytes; root cause addProvideSecretKeysListener missing → keypair regenerated each restart → new mesh identity → 0 routed bytes; also addJwtRefreshListener; commit cc9e3c67; 5 sentinel tests in RealUrnetworkSdkBridgeContractTest

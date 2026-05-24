@@ -40,6 +40,8 @@ The correct operational sequence for wiki maintenance is: compact first (creates
 
 Broken links in compile output are expected when a daily log references concepts that will become articles during that same compile pass. The compiler creates articles sequentially, so early articles may reference later ones before they exist. A post-compile lint resolves these.
 
+An API 400 error triggered by an `advisor_tool_result` content block makes a Claude Code session completely non-functional — all subsequent agent responses are blocked. The only recovery is to restart the session. This occurred during the 2026-04-30 wiki maintenance session and is distinct from hook failures or SDK errors.
+
 ### Continued Flush Failures (2026-05-01)
 
 The flush hook unreliability continued on 2026-05-01. Three flush attempts across two productive sessions (pre-release fix wave + URnetwork SDK integration) all failed: one with "Control request timeout: initialize" and two with "Command failed with exit code 1." The pattern is now confirmed across three consecutive days of use — auto-flush hooks are structurally unreliable and daily logs must be maintained manually or via explicit `/wiki-compact` invocations. The error types vary (timeout, exit code 1, "nothing worth saving") suggesting multiple independent failure modes in the flush pipeline.

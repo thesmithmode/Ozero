@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="settings_fptn_title">FPTN</string>
-    <string name="settings_fptn_summary">SNI Reality туннель — обходит DPI-блокировки</string>
+    <string name="settings_fptn_summary">SNI Reality туннель — обфускация TLS-handshake</string>
     <string name="fptn_settings_title">FPTN</string>
 
-    <string name="fptn_about_description">FPTN — это полностью разработанная с нуля технология VPN, включая собственный протокол, сервер и кроссплатформенные клиенты. Некоммерческий проект с открытым исходным кодом, развиваемый волонтёрами и предназначенный для обхода цензуры.</string>
+    <string name="fptn_about_description">FPTN — это полностью разработанная с нуля технология VPN, включая собственный протокол, сервер и кроссплатформенные клиенты. Некоммерческий проект с открытым исходным кодом, развиваемый волонтёрами и предназначенный для обфускации сетевого трафика.</string>
     <string name="fptn_link_website">Наш сайт</string>
     <string name="fptn_link_telegram">Наша группа в Telegram</string>
     <string name="fptn_link_play">Приложение в Google Play Market</string>
@@ -17,8 +17,8 @@
     <string name="fptn_section_token_description">Список доступных серверов зашифрован в токене. Чтобы обновить список серверов, введите новый токен. Токен работает как пароль: при его обновлении он перестанет действовать на всех устройствах, где использовался ранее.</string>
     <string name="fptn_bot_hint">Токен можно получить у бота t.me/fptn_bot</string>
 
-    <string name="fptn_section_bypass">Методы обхода блокировок</string>
-    <string name="fptn_section_bypass_summary">Настройка методов обхода блокировок</string>
+    <string name="fptn_section_bypass">Методы обфускации</string>
+    <string name="fptn_section_bypass_summary">Настройка методов обфускации трафика</string>
 
     <string name="fptn_section_sni">Текущий SNI</string>
     <string name="fptn_sni_description">Адрес сайта, декларируемый при подключении к VPN-серверу. Укажите популярный сайт, доступный без VPN из вашей страны.</string>

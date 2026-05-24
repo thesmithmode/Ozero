@@ -249,6 +249,8 @@ class OzeroVpnService : android.net.VpnService() {
         val tName = Thread.currentThread().name
         val isMain = android.os.Looper.myLooper() === android.os.Looper.getMainLooper()
         PersistentLoggers.info(TAG, "loadOnce begin thread=$tName main=$isMain")
+        // SENTINEL [OzeroVpnServiceLifecycleTest]: loadOnce() для libhev-socks5-tunnel — main thread,
+        // до coroutine-старта ниже. Background-load даёт UnsatisfiedLinkError на старте hev.
         runCatching { hev.TProxyService.loadOnce() }
             .onFailure { PersistentLoggers.warn(TAG, "TProxyService.loadOnce threw: ${it.message}") }
         PersistentLoggers.info(TAG, "loadOnce done libraryLoaded=${hev.TProxyService.libraryLoaded}")
@@ -320,6 +322,8 @@ class OzeroVpnService : android.net.VpnService() {
         }.getOrDefault(false)
     }
 
+    // SENTINEL [project_vpn_slot_onrevoke_kill]: killProcess только в onRevoke (юзер запустил другой VPN).
+    // Никогда не убивать процесс в onDestroy/stopVpn — это сломает re-connect и swipe-close persistence.
     override fun onRevoke() {
         PersistentLoggers.warn(
             TAG,
@@ -330,6 +334,7 @@ class OzeroVpnService : android.net.VpnService() {
         super.onRevoke()
         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(
             {
+                runCatching { tunFdRef.getAndSet(null)?.close() }
                 PersistentLoggers.warn(TAG, "onRevoke kill pid=${android.os.Process.myPid()} — slot release")
                 processKiller.kill(android.os.Process.myPid())
             },

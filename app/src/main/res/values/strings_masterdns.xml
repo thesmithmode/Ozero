@@ -3,8 +3,6 @@
     <string name="masterdns_engine_name">MasterDNS</string>
     <string name="masterdns_config_toml">Конфигурация client_config.toml</string>
     <string name="masterdns_resolvers">DNS-резолверы (по одному на строку)</string>
-    <string name="masterdns_enabled">Включить MasterDNS</string>
-    <string name="masterdns_beta_badge">BETA</string>
     <string name="masterdns_setup_title">Как поднять свой сервер за 15 минут</string>
     <string name="masterdns_setup_prereq">Нужен VPS (1 vCPU, 512 МБ RAM) и домен с возможностью настроить NS-делегирование. Все команды копируются в один клик.</string>
     <string name="masterdns_setup_step1_title">Делегировать поддомен</string>
@@ -19,8 +17,9 @@
     <string name="masterdns_copy_button">Скопировать</string>
     <string name="masterdns_copied_toast">Скопировано</string>
     <string name="settings_masterdns_title">MasterDNS</string>
-    <string name="settings_masterdns_summary">DNS-туннель для экстренного обхода полной блокировки VPN.</string>
+    <string name="settings_masterdns_summary">DNS-туннель — экстренный fallback при недоступности обычных протоколов.</string>
     <string name="masterdns_deploy_section_title">Автодеплой сервера</string>
+    <string name="masterdns_deploy_progress_label">Прогресс установки</string>
     <string name="masterdns_vps_requirements">Требования к VPS: ≥512 МБ RAM, 1 vCPU, ≥1 ГБ диск, порт 53/UDP открыт</string>
     <string name="masterdns_deploy_host_label">IP-адрес / хост VPS</string>
     <string name="masterdns_deploy_port_label">SSH-порт</string>
@@ -39,6 +38,11 @@
     <string name="masterdns_deploy_error_resources">Недостаточно ресурсов: нужно ≥512 МБ RAM и ≥1 ГБ дискового пространства.</string>
     <string name="masterdns_deploy_error_docker">Не удалось установить Docker. Проверьте доступ к интернету на сервере.</string>
     <string name="masterdns_deploy_error_dpkg_locked">Менеджер пакетов сервера занят (apt-get lock). Подождите завершения обновлений и попробуйте снова.</string>
+    <string name="masterdns_deploy_error_sudo_not_installed">sudo не установлен на сервере. Установите sudo и добавьте пользователя в sudoers.</string>
+    <string name="masterdns_deploy_error_sudo_pwd_required">Пользователю требуется пароль для sudo. Настройте NOPASSWD в sudoers.</string>
+    <string name="masterdns_deploy_error_sudo_not_allowed">Пользователь не разрешён в /etc/sudoers. Предоставьте права sudo.</string>
+    <string name="masterdns_deploy_error_sudo_no_home">Домашняя директория пользователя недоступна. Проверьте права доступа.</string>
+    <string name="masterdns_deploy_error_sudo_not_in_group">Пользователь не в группе sudo/wheel. Добавьте: usermod -aG sudo пользователь.</string>
     <string name="masterdns_deploy_error_build">Ошибка сборки образа. Проверьте интернет-соединение сервера.</string>
     <string name="masterdns_deploy_error_run">Не удалось запустить контейнер.</string>
     <string name="masterdns_deploy_error_key">Не удалось извлечь ключ шифрования из контейнера.</string>

@@ -84,6 +84,7 @@ Additional constraint discovered: `EngineUrnetwork.start()` calls `sdkBridge.sta
 - [[concepts/relay-coordinator-ownership-transfer]] — Detailed ownership transfer pattern with AtomicBoolean guard
 - [[concepts/urnetwork-walletauth-per-device-registration]] — Per-device Ed25519 auth that resolved guest mode monetization blocker
 - [[concepts/urnetwork-guest-mode-relay-blocker]] — The guest JWT monetization problem walletAuth solved
+- [[concepts/urnetwork-jwt-bootstrapper]] — Full UrnetworkJwtBootstrapper extract architecture, session-flag, migration pre-check bug detail
 
 ### RelayCoordinator Hardcode Bug (2026-05-22, commit e0d53ca4)
 
@@ -120,10 +121,16 @@ Sentinel-тесты в `UrnetworkRelayCoordinatorTest`:
 - `bootstrap не зовётся когда URnetwork engine активен` (engine.start сам делает)
 - `bootstrap не зовётся когда JWT уже есть`
 
+### JWT Migration Pre-Check Bug (commit 1a58aa88 — same day regression)
+
+Extracted bootstrapper introduced a CI regression for legacy-migration users. Pre-check `if (byClientJwt != null) return AlreadyPresent` short-circuited migration for users with `byJwt="legacy", byClientJwt="legacy-cjwt", devicePubkey=null` — cjwt present → AlreadyPresent → `tryAcquireDeviceJwt` never ran → wallet API blocked → `DeviceWalletJwtSentinelTest` failed (0 wallet calls).
+
+Fix: pre-check computes `migrationPending = byJwt != null && devicePubkey.isNullOrBlank() && deviceIdentity != null`. `AlreadyPresent` only when `cjwt != null && !migrationPending`. `DeviceWalletJwtSentinelTest` source updated: grep patterns moved from `EngineUrnetwork.kt` → `RealUrnetworkJwtBootstrapper.kt`. See [[concepts/urnetwork-jwt-bootstrapper]] for full analysis.
+
 ## Sources
 
 - [[daily/2026-05-14.md]] — Session 20:30: architectural discussion of relay-always, SDK `tunnelStarted` vs `providePaused` decoupling, monetization constraints; Session 21:29: `setupPayoutWallet` implementation + contract tests
 - [[daily/2026-05-17.md]] — Session 14:41+: relay NOT working for non-URnetwork engines discovered; P0 #111 UrnetworkRelayCoordinator implemented (commit 194d7701); relayOwned AtomicBoolean ownership; bridge.start() made idempotent; SharedTrafficScreen simplified
 - [[daily/2026-05-18.md]] — Session 17:51: relay requires byClientJwt (saved on first URnetwork connect only); Session 18:25: guest JWT blocked from wallet API server-side → relay runs idle, no USDC payouts
 - [[daily/2026-05-22.md]] — Session 16:02+: hardcode bug (lines 67+81 always setProvidePaused(false) ignoring configStore); fix: URNETWORK branch = no override, relay branch = read configStore.provideEnabled(); BalanceCard/ProvideSection visibility fixes; bootstrapJob.join() race fix
-- [[daily/2026-05-23.md]] — JWT bootstrap blind spot для новых юзеров обнаружен (5 cross-validated haiku агентов); fix через extract UrnetworkJwtBootstrapper + coordinator session-flag (commit e6bac9eb)
+- [[daily/2026-05-23.md]] — JWT bootstrap blind spot для новых юзеров обнаружен (5 cross-validated haiku агентов); fix через extract UrnetworkJwtBootstrapper + coordinator session-flag (commit e6bac9eb); migration pre-check bug (commit 1a58aa88) + sentinel path update EngineUrnetwork.kt→RealUrnetworkJwtBootstrapper.kt

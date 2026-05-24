@@ -1,5 +1,112 @@
 # Build Log
 
+## [2026-05-24T00:47:26+00:00] compile | 2026-05-08.md
+- Source: daily/2026-05-08.md
+- Articles created: (all were compiled in-session; none net-new this pass)
+- Articles updated: [[concepts/amneziawg-jni-classpath-completeness]] (index corrected: stale 2026-04-30 source → 2026-05-08; summary updated with discovery method), [[concepts/amneziawg-so-binary-integrity]] (index corrected: stale source → 2026-05-08; summary updated), [[concepts/compose-remember-stale-collectasstate]] (index corrected: stale source → 2026-05-08; summary updated), [[concepts/gitignore-jnilibs-conflict]] (index corrected: stale source → 2026-05-08; summary updated), [[concepts/health-monitor-p2p-mismatch]] (index corrected: stale source → 2026-05-08; summary updated with URnetwork false-start detail), [[concepts/test-io-thread-zombie-trap]] (index corrected: stale source → 2026-05-08; summary updated), [[concepts/warp-handle-leak-sigabrt]] (index corrected: stale source → 2026-05-08; summary updated)
+- Notes: All 7 key concepts from 2026-05-08 (WARP maven→PORTAL_WG migration, JNI classpath, SO SHA256, attachTun handle guard, gitignore SO conflict, HealthMonitor P2P mismatch, IO thread zombie, compose-remember stale) were compiled during the session itself. This pass corrected the index which had placeholder entries with wrong source daily/2026-04-30.md and wrong dates for all 7 articles. No articles required content updates — only the index was stale.
+
+## [2026-05-24T00:45:00+00:00] compile | 2026-05-07.md
+- Source: daily/2026-05-07.md
+- Articles created: [[concepts/git-stash-task-switch-trap]]
+- Articles updated: [[concepts/ci-workflow-discipline]] (added intermediate commit validation gap rule: gh run list --commit empty → CI not triggered on ee1c1ea; forceVanilla=false + VANILLA test mismatch undetected; source added), [[concepts/warp-config-generator-api]] (added suspicious mirror DNS 176.99.11.77+80.78.247.254 ≠ Cloudflare; source added)
+- Notes: Most 2026-05-07 concepts were already compiled during the session itself (warp-awg-obfuscation-russian-isps, android-vpn-traffic-stats, dual-go-runtime-eager-loading, warp-false-connected-no-handshake all cite daily/2026-05-07.md). Three gaps filled: (1) git stash task-switch trap new article from Session 13:24 stash loss; (2) intermediate commit CI gap added to ci-workflow-discipline; (3) mirror DNS suspicion added to warp-config-generator-api.
+
+## [2026-05-24T00:42:00+00:00] compile | 2026-05-06.md
+- Source: daily/2026-05-06.md
+- Articles created: [[concepts/warp-awgturnon-blocking-fd]], [[concepts/warp-dns-routing-loop]]
+- Articles updated: [[concepts/warp-uapi-stale-socket-cleanup]] (added EADDRINUSE/bind-path stale socket variant from session 13:16; added daily/2026-05-06.md as source)
+- Notes: android-xml-string-escaping and kotlin-suspendcancellablecoroutine-type-inference were already compiled from this log in a prior pass. Core new findings: (1) awgTurnOn=-1 root cause = non-blocking fd, fixed by blocking=true in TunSpec; (2) DNS loop = endpoint hostname resolved after establish(), fixed by resolveEndpointHost() pre-VPN. Full investigation chain documented in warp-awgturnon-blocking-fd article (7 eliminated hypotheses before root cause identified).
+
+## [2026-05-24T00:38:00+00:00] compile | 2026-05-05.md
+- Source: daily/2026-05-05.md
+- Articles created: [[concepts/urnetwork-networkspace-env-bundle-fields]]
+- Articles updated: [[concepts/amneziawg-relinker-loading-trap]] (index corrected: source was misattributed to 2026-04-30; article was already written from this log), [[concepts/core-backup-module]] (index corrected: already contained 2026-05-05 decisions), [[concepts/warp-slot-corrupt-json-resilience]] (index corrected: article existed but missing from index), [[concepts/runtest-uncompleted-coroutines-trap]] (added runBlocking-in-runTest deadlock pattern from code review), [[concepts/urnetwork-networkspace-init]] (added cross-reference to new env-bundle-fields article)
+- Notes: Three articles (amneziawg-relinker-loading-trap, core-backup-module, warp-slot-corrupt-json-resilience) were already written from this log in a prior incomplete pass but were absent or stale in index.md. New gap: URnetwork env=main + bundle fields SIGABRT (unmasked by removing Nubia guard, commit 47d0156). Minor gap: runBlocking-in-runTest deadlock added to existing coroutine trap article. Code review findings (P2: hardcoded error string, missing RomCompat test cases; P3: PersistentLoggers misuse on success, missing TextField attrs, oversized state parameter) were one-time review notes already addressed in implementation — not extractable as reusable knowledge patterns.
+
+## [2026-05-24T00:34:03+00:00] compile | 2026-05-04.md
+- Source: daily/2026-05-04.md
+- Articles created: [[concepts/engine-config-private-key-plaintext]]
+- Articles updated: [[concepts/release-process]] (prerelease tag logic: contains(tag, '-'); tag recreation pattern; source added), [[concepts/ci-workflow-discipline]] (multi-root CI failure reading rule: read ALL errors before acting; first symptom ≠ only root; source added)
+- Notes: AWG WARP swap (session 1), v0.0.2 release decisions (session 2), OkHttp/stub CI fixes (session 3) were already fully compiled into [[concepts/amnezia-wg-warp-migration]], [[concepts/okhttp5-kotlin-version-constraint]], [[concepts/gradle-force-vs-catalog]], [[concepts/release-stub-gate]] — all citing daily/2026-05-04.md. Three gaps filled: prerelease tag convention added to release-process; multi-root CI lesson added to ci-workflow-discipline; new article for P2 plaintext private key debt.
+
+## [2026-05-24T00:29:28+00:00] compile | 2026-05-02.md
+- Source: daily/2026-05-02.md
+- Articles created: [[concepts/android-parcelfiledescriptor-close-trap]], [[concepts/detekt-ratchet-desync-after-refactor]], [[concepts/engine-sdk-bridge-stop-lifecycle]]
+- Articles updated: [[connections/ci-false-green-vectors]] (detekt fail-fast as 4th false-green vector added)
+- Notes: Sessions covered WarpEngine auto-config (WARP root cause already in warp-config-generator-api), URnetwork consent deletion (already in symptom-fix-vs-system-removal), NetworkSpace init (already in urnetwork-networkspace-init). New gaps: Os.close(Int) POSIX trap, detekt ratchet desync + CI fail-fast masking, EngineUrnetwork.stop() not propagating to sdkBridge (goroutine leak P1 fix).
+
+## [2026-05-24T00:26:29+00:00] compile | 2026-05-01.md
+- Source: daily/2026-05-01.md
+- Articles created: [[concepts/android-build-dockerfile-env-trap]]
+- Articles updated: (none — all other concepts were already compiled into existing articles citing this log: [[concepts/robolectric-room-migration-testing]], [[concepts/vpnservice-main-thread-preload]], [[concepts/junit-platform-silent-skip]], [[concepts/gradle-continue-full-failures]], [[concepts/gomobile-bind-gotchas]], [[concepts/feature-branch-code-review-2026-05-01]])
+- Notes: 5 commits pre-release v0.0.2-1 (C3 migration runtime test, C1 runBlocking elimination, W7.1 HealthMonitor UI badge, W9.1 locale filter, DOCS), CI v0.0.2-2 green (session 13:57), URnetwork AAR build iterations + Dockerfile env trap (session 15:24), latent test infrastructure failures revealed by useJUnitPlatform activation (session 21:55). Only gap was Dockerfile SHA256 env propagation trap — new article created.
+
+## [2026-05-24T00:14:00+00:00] compile | 2026-04-30.md
+- Source: daily/2026-04-30.md
+- Articles created: [[concepts/byedpi-ipv6-silent-drop]]
+- Articles updated: [[concepts/wiki-knowledge-base]] (API 400 advisor_tool_result session-killer note added)
+- Notes: Most concepts from this log were already compiled into existing articles (v001-dpi-bypass-fix-chain, byedpi-args-parsing, tun-mtu-dual-layer, libhev-tunnel-stats, byedpi-auto-strategy-testing) with daily/2026-04-30.md as source. New gap: IPv6 silent drop in ByeDPI had no dedicated article. index.md reconstructed from full article list (was missing/empty).
+
+## [2026-05-23T20:44:00+03:00] compile | Daily Log 2026-05-23 (pass 7 — session 20:44 versionCode trap)
+- Source: daily/2026-05-23.md
+- Articles created: (none)
+- Articles updated: [[concepts/release-process]] (fetch-depth: 0 requirement for versionCode; shallow clone → versionCode=1 → INSTALL_FAILED_VERSION_DOWNGRADE; sentinel assert versionCode > 1; commit 75e72b48)
+- Notes: Final remaining gap from session 20:44: v0.2.0 APK install failure root cause. All other sessions captured in passes 1-6.
+
+## [2026-05-23T20:30:00+03:00] compile | Daily Log 2026-05-23 (pass 6 — session 20:05 gaps)
+- Source: daily/2026-05-23.md
+- Articles created: (none)
+- Articles updated: [[connections/sentinel-trap-family]] (5th trap: comment-token collision in OzeroVpnService sentinel comment b1c6cba0; table + evidence + rule updated), [[concepts/urnetwork-walletauth-per-device-registration]] (WALLET_ADD_TIMEOUT_MS 10s→30s b86fb16f; relay sharing telemetry: endpoint bound/deferred/traffic-forwarded; 6 sentinel tests)
+- Notes: Passes 1-5 (18:11–23:59) captured all earlier sessions. This pass covers session (20:05): sentinel comment-token collision as Trap 5, and payout wallet timeout increase with telemetry log events.
+
+## [2026-05-23T23:59:00+03:00] compile | 2026-05-23.md
+- Source: daily/2026-05-23.md
+- Articles created: (none — all concepts existed)
+- Articles updated: [[concepts/urnetwork-jwt-bootstrapper]] (migration pre-check bug 1a58aa88), [[concepts/urnetwork-balance-optimistic-cache]] (pendingBytes semantics, FREE_TIER_CAP removed), [[concepts/urnetwork-relay-always]] (JWT bootstrapper fix e6bac9eb), [[concepts/fptn-sni-bypass-method]] (HTTP 608 root cause, sniDomain trace, Reality IP fix), [[concepts/masterdns-deploy-hardening]] (Phase A-F complete, auto-setup post-deploy), [[concepts/engine-masterdns]] (auto-fill resolvers), [[concepts/urnetwork-provide-secret-keys-identity]] (listener ordering, JWT vs provideSecretKeys separation), [[concepts/warp-uapi-stale-socket-cleanup]] (regression bd6a178a, firstOrNull vs maxByOrNull fix)
+
+## [2026-05-23T22:00:00+03:00] compile | Daily Log 2026-05-23 (pass 5 — gap fill)
+- Source: daily/2026-05-23.md
+- Articles created: [[concepts/proguard-release-drift]] (broken wikilink from masterdns-deploy-hardening resolved; sshj→EdDSA→sun.security.x509 R8 crash pattern documented)
+- Articles updated: [[concepts/masterdns-deploy-hardening]] (Undeploy Feature section added: Removing/Removed states, removeAll script, ViewModel guard, UI buttons)
+- Notes: Passes 1-4 confirmed complete. Two gaps found: (1) [[concepts/proguard-release-drift]] was referenced from masterdns-deploy-hardening but never created — broken wikilink; (2) undeploy feature documented in sources but missing from Details section. Both resolved.
+
+## [2026-05-23T21:30:00+03:00] compile | Daily Log 2026-05-23 (pass 4 — verification)
+- Source: daily/2026-05-23.md
+- Articles created: (none — all 6 new articles confirmed present from prior passes)
+- Articles updated: (none — all updates confirmed present from prior passes)
+- Verified complete: [[concepts/warp-uapi-stale-socket-cleanup]], [[concepts/fptn-sni-bypass-method]], [[concepts/urnetwork-provide-secret-keys-identity]], [[concepts/masterdns-deploy-hardening]], [[concepts/gradle-configuration-cache-agp-bug]], [[concepts/urnetwork-jwt-bootstrapper]]
+- Notes: Full read-verification of all 6 new articles and 4 updated articles (urnetwork-balance-optimistic-cache, urnetwork-relay-always, fptn-engine-protocol, engine-masterdns). All content complete. Index entries confirmed. Passes 1-3 captured everything correctly.
+
+## [2026-05-23T20:00:00+03:00] compile | Daily Log 2026-05-23 (pass 3 — pendingBytes semantics)
+- Source: daily/2026-05-23.md
+- Articles created: (none — all prior passes complete)
+- Articles updated: [[concepts/urnetwork-balance-optimistic-cache]] (pendingBytes = active session bytes NOT income; final formula availableBytes=balanceBytes+reliabilityBonusBytes; sentinel UrnetworkBalanceRepositoryTest.kt:81; reliabilityBonusBytes heuristic from meanReliabilityWeight; commit defc0438 revert of 277d1dfb)
+- Notes: Prior passes (18:11 + 19:00) captured 7 new articles and 5 updates. This pass fills the remaining gap from session 02:16 — pendingBytes semantics clarification and the final "Доступно" formula with reliabilityBonusBytes heuristic
+
+## [2026-05-23T19:00:00+03:00] compile | Daily Log 2026-05-23 (pass 2 — late-session gaps)
+- Source: daily/2026-05-23.md
+- Articles created: [[concepts/urnetwork-jwt-bootstrapper]]
+- Articles updated: [[concepts/urnetwork-relay-always]] (migration pre-check bug in JWT Bootstrapper section + new wikilink)
+- Notes: Prior pass (18:11) missed sessions 15:57/16:22/16:30/~18:00 JWT bootstrapper extract and regression. New article captures: UrnetworkJwtBootstrapper extract architecture, session-flag (AtomicBoolean), Mutex+double-check, migration pre-check short-circuit bug (commit 1a58aa88, byClientJwt!=null → AlreadyPresent skips migration), sentinel source-path migration EngineUrnetwork.kt→RealUrnetworkJwtBootstrapper.kt, 14 test sites updated.
+
+## [2026-05-23T18:11:09+03:00] compile | Daily Log 2026-05-23
+- Source: daily/2026-05-23.md
+- Articles created: [[concepts/warp-uapi-stale-socket-cleanup]], [[concepts/fptn-sni-bypass-method]], [[concepts/urnetwork-provide-secret-keys-identity]], [[concepts/masterdns-deploy-hardening]], [[concepts/gradle-configuration-cache-agp-bug]]
+- Articles updated: [[concepts/warp-uapi-handshake-polling]] (stale socket section + new source), [[concepts/fptn-engine-protocol]] (brotli implemented, SNI fix, c++_static, cppstd=17), [[concepts/engine-masterdns]] (SSH+Docker deploy hardening), [[concepts/urnetwork-sdk-integration]] (provideSecretKeys persistence fix, commit cc9e3c67)
+- Notes: urnetwork-relay-always.md already contained 2026-05-23 JWT bootstrapper content from prior pass. Key themes: WARP stale Unix socket regression (bd6a178a → f458dd5d fix); FPTN SNI domain correctness (sni=host→sni=config.sniDomain; c++_static link; fptnb: brotli now live); URnetwork relay provider identity (addProvideSecretKeysListener missing = 0 relay bytes + addJwtRefreshListener); MasterDNS Phase A-F hardening (firewall markers, dpkg-lock, container readiness, sshj proguard); Gradle config cache AGP 8.7.x workaround
+
+## [2026-05-23T18:07:01+03:00] compile | Daily Log 2026-05-22
+- Source: daily/2026-05-22.md
+- Articles created: [[concepts/switching-watchdog-engine-conflict]]
+- Articles updated: (none — prior 24 passes already captured all other concepts)
+- Notes: All major concepts (fptn-engine-protocol, jni-local-global-ref-lifecycle, urnetwork-relay-always, vpn-slot-conflict-detection, vpnservice-double-shutdown-guard, engine-chip-switching-desync, byedpi-hev-pipeline-upstream-parity, warp-allowedips-tun-routing, warp-config-generator-api, qs-tile-vpn-integration) confirmed complete from prior compilation passes. New article: switching watchdog gap — watchdog resets _switching without stopping running engine, causing parallel engine conflict.
+
+## [2026-05-23T12:00:00+03:00] compile | Daily Log 2026-05-21
+- Source: daily/2026-05-21.md
+- Articles created: [[concepts/urnetwork-lazycolumn-key-collision]]
+- Articles updated: [[concepts/vpn-slot-conflict-detection]] (EXTERNAL_VPN_RELEASE_DELAY_MS=750ms, REVOKE 2500→1000ms from Task37)
+
 ## [2026-05-22T24:00:00+03:00] compile | Daily Log 2026-05-22 (pass 24 — schema-driven audit)
 - Source: daily/2026-05-22.md
 - Articles created: (none — all prior passes complete)

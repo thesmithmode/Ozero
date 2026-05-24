@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="settings_fptn_title">FPTN</string>
-    <string name="settings_fptn_summary">Túnel SNI Reality — elude bloqueos DPI</string>
+    <string name="settings_fptn_summary">Túnel SNI Reality — ofuscación del handshake TLS</string>
     <string name="fptn_settings_title">FPTN</string>
 
-    <string name="fptn_about_description">FPTN es una tecnología VPN desarrollada desde cero, incluyendo su propio protocolo, servidor y clientes multiplataforma. Es un proyecto de código abierto sin fines de lucro, desarrollado por voluntarios y diseñado para evadir la censura.</string>
+    <string name="fptn_about_description">FPTN es una tecnología VPN desarrollada desde cero, incluyendo su propio protocolo, servidor y clientes multiplataforma. Es un proyecto de código abierto sin fines de lucro, desarrollado por voluntarios y diseñado para la ofuscación del tráfico de red.</string>
     <string name="fptn_link_website">Nuestro sitio web</string>
     <string name="fptn_link_telegram">Nuestro grupo de Telegram</string>
     <string name="fptn_link_play">Aplicación en Google Play</string>
@@ -17,8 +17,8 @@
     <string name="fptn_section_token_description">La lista de servidores disponibles está cifrada dentro del token. Para actualizar la lista, ingrese un token nuevo. El token funciona como una contraseña: al actualizarlo, dejará de funcionar en todos los demás dispositivos donde se utilizaba.</string>
     <string name="fptn_bot_hint">Obtén tu token con t.me/fptn_bot</string>
 
-    <string name="fptn_section_bypass">Métodos de bypass</string>
-    <string name="fptn_section_bypass_summary">Configura los métodos de evasión de bloqueos</string>
+    <string name="fptn_section_bypass">Métodos de ofuscación</string>
+    <string name="fptn_section_bypass_summary">Configura los métodos de ofuscación de tráfico</string>
 
     <string name="fptn_section_sni">SNI actual</string>
     <string name="fptn_sni_description">La dirección del sitio declarada al conectarse al servidor VPN. Especifica un sitio popular accesible sin VPN desde tu país.</string>

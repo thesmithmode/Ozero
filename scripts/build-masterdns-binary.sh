@@ -10,8 +10,11 @@ TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 echo "Cloning MasterDnsVPN at $MASTERDNS_REF"
-git clone --depth 1 --branch "$MASTERDNS_REF" "$MASTERDNS_REPO" "$TMP_DIR/src"
+git init -q "$TMP_DIR/src"
 cd "$TMP_DIR/src"
+git remote add origin "$MASTERDNS_REPO"
+git fetch --depth 1 origin "$MASTERDNS_REF"
+git checkout -q FETCH_HEAD
 COMMIT="$(git rev-parse HEAD)"
 COMMIT_SHORT="$(git rev-parse --short HEAD)"
 echo "Source commit: $COMMIT"

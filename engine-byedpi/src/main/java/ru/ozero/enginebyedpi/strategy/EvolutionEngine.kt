@@ -40,6 +40,10 @@ class EvolutionEngine(
         val successRateExponent: Double = 1.5,
         val portRotationBase: Int = 49_152,
         val portRotationRange: Int = 256,
+        val minMutationRate: Float = 0.12f,
+        val maxMutationRate: Float = 0.72f,
+        val explorationRate: Double = 0.25,
+        val survivorExplorationRate: Double = 0.2,
     )
 
     data class GenerationResult(
@@ -75,6 +79,7 @@ class EvolutionEngine(
         var bestFitness = -1.0
         var bestSuccessRate = 0.0
         var stagnationCount = 0
+        var mutationRate = settings.mutationRate.coerceIn(settings.minMutationRate, settings.maxMutationRate)
         val evalCache = HashMap<Chromosome, EvalResult>()
 
         val exitThreshold = (settings.maxGenerations / 2).coerceAtLeast(3)
@@ -95,6 +100,17 @@ class EvolutionEngine(
             } else {
                 stagnationCount++
             }
+            mutationRate = adaptMutationRate(mutationRate, stagnationCount)
+            val reducedBest = reduceChromosome(best, evalCache)
+            if (reducedBest != best) {
+                val reducedResult = evalCache.getOrPut(reducedBest) { evaluate(reducedBest) }
+                if (reducedResult.fitness >= bestFitness) {
+                    best = reducedBest
+                    bestFitness = reducedResult.fitness
+                    bestSuccessRate = reducedResult.successRate
+                    stagnationCount = 0
+                }
+            }
             onGeneration(
                 GenerationResult(
                     generation = generation,
@@ -112,17 +128,40 @@ class EvolutionEngine(
             if (stagnationCount >= exitThreshold) break
 
             val survivorCount = (settings.populationSize / 4).coerceAtLeast(settings.eliteCount)
-            val survivors = evolver.tournament(fitnessPairs, survivorCount, random = random)
+            val survivors = selectSurvivors(fitnessPairs, survivorCount)
             population = when {
                 stagnationCount >= injectThreshold ->
-                    buildSeedInjection(survivors, seedStrategies, settings.mutationRate)
+                    buildSeedInjection(survivors, seedStrategies, mutationRate)
                 stagnationCount >= 2 ->
-                    buildDiverseGeneration(survivors, settings.mutationRate)
+                    buildDiverseGeneration(survivors, mutationRate)
                 else ->
-                    buildNextGeneration(survivors, settings.mutationRate)
+                    buildNextGeneration(survivors, mutationRate)
             }.withElite(best)
         }
         return best
+    }
+
+    internal fun selectSurvivors(
+        fitnessPairs: List<Pair<Chromosome, Double>>,
+        survivorCount: Int,
+    ): List<Chromosome> {
+        if (fitnessPairs.isEmpty()) return emptyList()
+        val eliteCount = (survivorCount * (1.0 - settings.survivorExplorationRate)).toInt()
+            .coerceAtLeast(1)
+            .coerceAtMost(survivorCount)
+        val exploreCount = (survivorCount - eliteCount).coerceAtLeast(0)
+        val elites = evolver.tournament(fitnessPairs, eliteCount, random = random)
+        if (exploreCount == 0) return elites
+        val ascending = fitnessPairs.sortedBy { it.second }
+        val tailWindowSize = (ascending.size * SURVIVOR_TAIL_WINDOW_RATIO).toInt().coerceAtLeast(1)
+        val tailWindow = ascending.take(tailWindowSize)
+        val explorers = tailWindow.shuffled(random).take(exploreCount).map { it.first }
+        return (elites + explorers).distinct().take(survivorCount)
+    }
+
+    private fun adaptMutationRate(current: Float, stagnationCount: Int): Float {
+        val next = if (stagnationCount >= 2) current * 1.25f else current * 0.93f
+        return next.coerceIn(settings.minMutationRate, settings.maxMutationRate)
     }
 
     internal fun computeFitness(successRate: Double, avgLatencyMs: Double): Double {
@@ -183,6 +222,18 @@ class EvolutionEngine(
         }
         val offspring = mutableListOf<Chromosome>()
         offspring.addAll(survivors)
+        val exploreCount = (settings.populationSize * settings.explorationRate).toInt()
+            .coerceAtLeast(1)
+            .coerceAtMost((settings.populationSize - offspring.size).coerceAtLeast(0))
+        repeat(exploreCount) {
+            offspring.add(
+                if (memory != null && memory.hasData()) {
+                    pool.weightedRandomChromosome(memory, random = random)
+                } else {
+                    pool.randomChromosome(random = random)
+                },
+            )
+        }
         while (offspring.size < settings.populationSize) {
             val p1 = survivors[random.nextInt(survivors.size)]
             val p2 = survivors[random.nextInt(survivors.size)]
@@ -258,6 +309,30 @@ class EvolutionEngine(
         return results
     }
 
+    private suspend fun reduceChromosome(
+        chromosome: Chromosome,
+        evalCache: MutableMap<Chromosome, EvalResult>,
+    ): Chromosome {
+        if (chromosome.size <= 1) return chromosome
+        val baseline = evalCache.getOrPut(chromosome) { evaluate(chromosome) }
+        var current = chromosome
+        var improved = true
+        while (improved && current.size > 1) {
+            improved = false
+            for (idx in current.indices) {
+                if (!currentCoroutineContext().isActive) return current
+                val candidate = current.toMutableList().also { it.removeAt(idx) }.toList()
+                val candidateEval = evalCache.getOrPut(candidate) { evaluate(candidate) }
+                if (candidateEval.fitness >= baseline.fitness * REDUCTION_TOLERANCE) {
+                    current = candidate
+                    improved = true
+                    break
+                }
+            }
+        }
+        return current
+    }
+
     private suspend fun evaluate(chromosome: Chromosome): EvalResult {
         if (sites.isEmpty() || chromosome.isEmpty()) return EvalResult(0.0, 0.0)
         val command = chromosome.toCommand()
@@ -302,5 +377,7 @@ class EvolutionEngine(
         const val SCORE_HTTP_HEADERS = 0.3
         const val ADAPTIVE_SEED_RATIO = 0.2
         const val ADAPTIVE_MEMORY_RATIO = 0.5
+        const val REDUCTION_TOLERANCE = 0.995
+        const val SURVIVOR_TAIL_WINDOW_RATIO = 0.4
     }
 }

@@ -562,15 +562,60 @@ class StrategyTestViewModelTest {
     }
 
     @Test
-    fun `onRename updates saved strategy name`() = runTest(dispatcher) {
+    fun `onEdit updates saved strategy name`() = runTest(dispatcher) {
         val vm = newVm()
         advanceUntilIdle()
         vm.onToggleSave("-Ku -An")
         advanceUntilIdle()
         val id = vm.savedStrategies.value.first().id
-        vm.onRename(id, "Для ютуба")
+        vm.onEdit(id, "Для ютуба", "-Ku -An")
         advanceUntilIdle()
         assertEquals("Для ютуба", vm.savedStrategies.value.first().name)
+    }
+
+    @Test
+    fun `onEdit updates name and command`() = runTest(dispatcher) {
+        val vm = newVm()
+        advanceUntilIdle()
+        vm.onToggleSave("-old")
+        advanceUntilIdle()
+        val id = vm.savedStrategies.value.first().id
+        vm.onEdit(id, "Renamed", "-new")
+        advanceUntilIdle()
+        val saved = vm.savedStrategies.value.first()
+        assertEquals("Renamed", saved.name)
+        assertEquals("-new", saved.command)
+    }
+
+    @Test
+    fun `onAddManual adds entry with name and command`() = runTest(dispatcher) {
+        val vm = newVm()
+        advanceUntilIdle()
+        vm.onAddManual("My Strategy", "-Ku -An")
+        advanceUntilIdle()
+        assertEquals(1, vm.savedStrategies.value.size)
+        assertEquals("My Strategy", vm.savedStrategies.value.first().name)
+        assertEquals("-Ku -An", vm.savedStrategies.value.first().command)
+    }
+
+    @Test
+    fun `onAddManual does not duplicate same command`() = runTest(dispatcher) {
+        val vm = newVm()
+        advanceUntilIdle()
+        vm.onAddManual("First", "-cmd")
+        advanceUntilIdle()
+        vm.onAddManual("Second", "-cmd")
+        advanceUntilIdle()
+        assertEquals(1, vm.savedStrategies.value.size)
+    }
+
+    @Test
+    fun `onAddManual blank command is ignored`() = runTest(dispatcher) {
+        val vm = newVm()
+        advanceUntilIdle()
+        vm.onAddManual("Name", "   ")
+        advanceUntilIdle()
+        assertEquals(0, vm.savedStrategies.value.size)
     }
 
     @Test
@@ -642,7 +687,7 @@ class StrategyTestViewModelTest {
         vm.onToggleSave("-Ku -An")
         advanceUntilIdle()
         val id = vm.savedStrategies.value.first().id
-        vm.onRename(id, "Мой VPN")
+        vm.onEdit(id, "Мой VPN", "-Ku -An")
         advanceUntilIdle()
         vm.onApply("-Ku -An")
         advanceUntilIdle()

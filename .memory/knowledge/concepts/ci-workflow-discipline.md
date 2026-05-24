@@ -6,9 +6,11 @@ sources:
   - "daily/2026-04-29.md"
   - "daily/2026-05-01.md"
   - "daily/2026-05-02.md"
+  - "daily/2026-05-04.md"
+  - "daily/2026-05-07.md"
   - "daily/2026-05-14.md"
 created: 2026-04-29
-updated: 2026-05-14
+updated: 2026-05-24
 ---
 
 # CI Workflow Discipline
@@ -45,6 +47,22 @@ Both rules were codified in the global `CLAUDE.md` as permanent CI practices aft
 
 A third CI truthfulness issue was discovered: GitHub Actions `needs:` dependencies create hard gates where a failing predecessor silently skips all successors. During v0.0.2-5, a detekt threshold failure in the `kotlin-style` job caused `assemble-debug` to be skipped entirely, hiding a compile error (`Os.close(Int)` — nonexistent API) that was only caught later in `release.yml`. This is a job-level analog of Gradle's task-level fail-fast. See [[concepts/ci-job-dependency-masking]] for the full incident analysis.
 
+### Read ALL Errors in a Red Run, Not One By One (2026-05-04)
+
+When CI is red multiple times consecutively, the instinct is to fix the first visible error, push, and check again. The failure pattern from v0.0.2 release: CI red → fix OkHttp version in catalog → CI still red (force() override untouched) → then discover stub class in DEX separately. Each iteration wasted a full CI run.
+
+Rule: when CI fails, read ALL failure output in the current run before writing a single line of fix code. The first error shown may not be the only root — it may not even be the most important root. The multi-root scenario (two independent failures in the same push) is common and wastes 2-3x CI cycles if treated as single-root.
+
+Corollary: the `--continue` flag (established 2026-05-01) ensures all modules are checked. Combining `--continue` output reading with reading ALL job output before acting eliminates most multi-cycle CI debugging.
+
+### Intermediate Commits Are Not Validated by CI (2026-05-07)
+
+A fifth CI truthfulness gap: when multiple commits are pushed in sequence and CI is only triggered on the final `dev` push, intermediate commits have no CI validation. The gap can hide test/implementation mismatches introduced in those commits.
+
+In the 2026-05-07 WARP incident: commit `ee1c1ea` introduced `forceVanilla=false` in `RealWarpSdkBridge` alongside a test that expected VANILLA output — an internal contradiction. `gh run list --commit ee1c1ea` returned empty: CI was never triggered for that commit. The contradiction persisted until the next full CI run on a later push.
+
+Rule: after any commit sequence that touches both tests and their implementation, verify `gh run list --commit <sha>` shows a completed run. If the run list is empty, squash or re-push to ensure CI validation before moving to dependent work. A green CI on branch tip does not retroactively validate intermediate commits.
+
 ### New Module Must Be Explicitly Added to CI Test Job (2026-05-14)
 
 A fourth CI truthfulness rule: when a new Gradle module is created, it is NOT automatically included in the CI test job. Gradle's `:test` task runs only modules listed in `settings.gradle` AND explicitly included in the CI command. If `ci.yml` runs `./gradlew :app:test :engines-core:test` (explicit list), a new module `engine-telegram` will be silently skipped — zero tests, zero failures, false green.
@@ -64,4 +82,6 @@ Rule: whenever a new `engine-*` module is added, immediately verify that `ci.yml
 - [[daily/2026-04-29.md]] - CI failed twice on v1.0.5 batch (ktlint+detekt, then tests), third run green; confirmed rule about not waiting for CI on side branches
 - [[daily/2026-05-01.md]] - `--continue` added to ci.yml; N > 0 test verification rule established after useJUnitPlatform() revealed 3 months of silent test skipping
 - [[daily/2026-05-02.md]] - detekt failure in `kotlin-style` job masked compile error in `assemble-debug` via `needs:` dependency chain
+- [[daily/2026-05-04.md]] - Session 15:22: v0.0.2 CI red twice in succession (OkHttp force() + stub class); lesson = read ALL errors in a run before acting; first symptom ≠ only root
+- [[daily/2026-05-07.md]] - Session 13:24: commit `ee1c1ea` forceVanilla=false + test expecting VANILLA undetected; `gh run list --commit ee1c1ea` empty — CI not triggered; intermediate commit validation gap rule established
 - [[daily/2026-05-14.md]] - new `engine-telegram` module silently skipped by CI test job; explicit module list in ci.yml required

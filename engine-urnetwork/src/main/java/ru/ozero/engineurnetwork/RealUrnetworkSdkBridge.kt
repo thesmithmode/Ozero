@@ -51,6 +51,7 @@ class RealUrnetworkSdkBridge(
     private val connectVcRef = AtomicReference<ConnectViewController?>(null)
     private val walletVcRef = AtomicReference<WalletViewController?>(null)
     private val unpaidBytesRef = AtomicReference(0L)
+    private val sharingTrafficLogged = AtomicBoolean(false)
     private val running = AtomicBoolean(false)
     private val preferredLocationRef = AtomicReference<UrnetworkLocationSelection?>(null)
     private val bridgeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -103,7 +104,7 @@ class RealUrnetworkSdkBridge(
     ): UrnetworkSdkBridge.StartResult {
         val existingDevice = deviceRef.get()
         val device: DeviceLocal = if (existingDevice != null) {
-            Log.i(TAG, "start: reusing device from initDeviceForLocations")
+            PersistentLoggers.info(TAG, "node start: reusing existing node from prior session")
             existingDevice
         } else {
             val space = try {
@@ -141,61 +142,100 @@ class RealUrnetworkSdkBridge(
                 val keys = localState.provideSecretKeys
                 if (keys != null) {
                     d.loadProvideSecretKeys(keys)
-                    Log.i(TAG, "provideSecretKeys loaded from localState — stable provider identity")
+                    PersistentLoggers.info(TAG, "node start: session keys loaded — stable identity")
                 } else {
                     var sub: Sub? = null
                     sub = d.addProvideSecretKeysListener { generated ->
                         runCatching { localState.provideSecretKeys = generated }
-                            .onSuccess { Log.i(TAG, "provideSecretKeys generated and persisted") }
-                            .onFailure { PersistentLoggers.warn(TAG, "persist provideSecretKeys: ${it.message}") }
+                            .onSuccess {
+                                PersistentLoggers.info(TAG, "node start: session keys generated and persisted")
+                            }
+                            .onFailure {
+                                PersistentLoggers.warn(TAG, "node start: session keys persist threw: ${it.message}")
+                            }
                         runCatching { sub?.close() }
                     }
                     d.initProvideSecretKeys()
-                    Log.i(TAG, "provideSecretKeys not in localState — generating new keys")
+                    PersistentLoggers.info(TAG, "node start: session keys absent — generating new identity")
                 }
-            }.onFailure { PersistentLoggers.warn(TAG, "provideSecretKeys init threw: ${it.message}") }
+            }.onFailure {
+                PersistentLoggers.warn(TAG, "node start: session keys init threw: ${it.message}")
+            }
             runCatching {
                 d.addJwtRefreshListener { newJwt ->
                     runCatching { localState.byClientJwt = newJwt }
-                        .onSuccess { Log.i(TAG, "SDK JWT refreshed — localState updated") }
-                        .onFailure { PersistentLoggers.warn(TAG, "JWT refresh localState: ${it.message}") }
+                        .onSuccess {
+                            PersistentLoggers.info(TAG, "node start: credential refreshed — state updated")
+                        }
+                        .onFailure {
+                            PersistentLoggers.warn(
+                                TAG,
+                                "node start: credential refresh persist threw: ${it.message}",
+                            )
+                        }
                 }
-            }.onFailure { PersistentLoggers.warn(TAG, "addJwtRefreshListener threw: ${it.message}") }
+            }.onFailure {
+                PersistentLoggers.warn(TAG, "node start: credential refresh listener threw: ${it.message}")
+            }
             applyDeviceFields(d, localState)
-            Log.i(TAG, "runStartOnMain: device created — applyDeviceFields done (паритет с initDeviceForLocations)")
+            PersistentLoggers.info(TAG, "node start: instance created — fields applied")
             deviceRef.set(d)
             d
         }
 
         val cv = runCatching { device.openConnectViewController() }.getOrElse {
-            PersistentLoggers.warn(TAG, "openConnectViewController threw: ${it.message}")
+            PersistentLoggers.warn(TAG, "node start: routing controller threw: ${it.message}")
             null
         }
-        if (cv != null) {
-            connectVcRef.set(cv)
-            Log.i(TAG, "ConnectViewController opened — locations available")
-        } else {
-            PersistentLoggers.error(TAG, "ConnectViewController is null — P2P connection unavailable")
+        if (cv == null) {
+            PersistentLoggers.error(TAG, "node start: routing controller unavailable — start aborted")
+            cleanupOnFailure()
+            return UrnetworkSdkBridge.StartResult.Failed("ConnectViewController unavailable")
         }
+        connectVcRef.set(cv)
+        PersistentLoggers.info(TAG, "node start: routing controller opened — endpoints available")
 
+        setupWalletControllerAndPipeline(device, walletAddress)
+        contractStatusListener.attach(device)
+        running.set(true)
+        PersistentLoggers.info(TAG, "node start: ready — awaiting attach(fd)")
+        return UrnetworkSdkBridge.StartResult.Success
+    }
+
+    private suspend fun setupWalletControllerAndPipeline(device: DeviceLocal, walletAddress: String) {
         val walletVcStarted = runCatching {
             val walletVc = device.openWalletViewController()
             walletVcRef.set(walletVc)
-            walletVc?.addUnpaidByteCountListener { ubc -> unpaidBytesRef.set(ubc) }
+            walletVc?.addUnpaidByteCountListener { ubc ->
+                unpaidBytesRef.set(ubc)
+                if (ubc > 0L && sharingTrafficLogged.compareAndSet(false, true)) {
+                    PersistentLoggers.info(
+                        TAG,
+                        "relay sharing: traffic forwarded — accumulated_bytes=$ubc " +
+                            "(peer consumed bandwidth, accumulator active)",
+                    )
+                }
+            }
             walletVc?.start()
             walletVc?.fetchTransferStats()
-            Log.i(TAG, "WalletViewController opened — provider stats listener attached")
+            PersistentLoggers.info(TAG, "node start: account controller opened — metrics listener attached")
             walletVc
         }.onFailure {
-            PersistentLoggers.warn(TAG, "WalletViewController init threw: ${it.message}")
-        }.getOrNull()
-        if (walletVcStarted != null) {
-            payoutWalletSetup.configure(walletVcStarted, walletAddress)
+            PersistentLoggers.warn(TAG, "node start: account controller init threw: ${it.message}")
+        }.getOrNull() ?: return
+        val bound = payoutWalletSetup.configure(walletVcStarted, walletAddress)
+        if (bound) {
+            PersistentLoggers.info(
+                TAG,
+                "relay sharing: endpoint bound — accumulator armed, traffic-forwarding ready",
+            )
+        } else {
+            PersistentLoggers.warn(
+                TAG,
+                "relay sharing: endpoint deferred — accumulator pending registration, " +
+                    "retry on next start (relay продолжит работу, привязка повторится)",
+            )
         }
-        contractStatusListener.attach(device)
-        running.set(true)
-        PersistentLoggers.info(TAG, "device created — awaiting attachTun(fd) before tunnelStarted")
-        return UrnetworkSdkBridge.StartResult.Success
     }
 
     override suspend fun stop() {
@@ -220,6 +260,7 @@ class RealUrnetworkSdkBridge(
     private suspend fun stopUnderLock() {
         runCatching { bridgeScope.coroutineContext.cancelChildren() }
         contractStatusListener.detach()
+        sharingTrafficLogged.set(false)
         val completed = withTimeoutOrNull(STOP_TIMEOUT_MS) {
             withContext(Dispatchers.Main.immediate) {
                 walletVcRef.getAndSet(null)?.also { vc ->

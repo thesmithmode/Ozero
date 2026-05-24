@@ -3,8 +3,6 @@
     <string name="masterdns_engine_name">MasterDNS</string>
     <string name="masterdns_config_toml">Conteúdo de client_config.toml</string>
     <string name="masterdns_resolvers">Servidores DNS (um por linha)</string>
-    <string name="masterdns_enabled">Ativar MasterDNS</string>
-    <string name="masterdns_beta_badge">BETA</string>
     <string name="masterdns_setup_title">Configure seu próprio servidor em 15 minutos</string>
     <string name="masterdns_setup_prereq">Requer um VPS (1 vCPU, 512 MB RAM) e um domínio que você possa delegar via registros NS. Todos os comandos são copiados com um toque.</string>
     <string name="masterdns_setup_step1_title">Delegar um subdomínio</string>
@@ -19,8 +17,9 @@
     <string name="masterdns_copy_button">Copiar</string>
     <string name="masterdns_copied_toast">Copiado</string>
     <string name="settings_masterdns_title">MasterDNS</string>
-    <string name="settings_masterdns_summary">Túnel DNS — bypass de emergência quando todos os VPNs estão bloqueados.</string>
+    <string name="settings_masterdns_summary">Túnel DNS — fallback de emergência quando os protocolos padrão estão indisponíveis.</string>
     <string name="masterdns_deploy_section_title">Implantação automática do servidor</string>
+    <string name="masterdns_deploy_progress_label">Progresso da instalação</string>
     <string name="masterdns_vps_requirements">Requisitos do VPS: ≥512 MB RAM, 1 vCPU, ≥1 GB disco, porta 53/UDP aberta</string>
     <string name="masterdns_deploy_host_label">IP / hostname do VPS</string>
     <string name="masterdns_deploy_port_label">Porta SSH</string>
@@ -39,6 +38,11 @@
     <string name="masterdns_deploy_error_resources">Recursos insuficientes: necessário ≥512 MB RAM e ≥1 GB de disco livre.</string>
     <string name="masterdns_deploy_error_docker">Falha ao instalar o Docker. Verifique o acesso à internet do servidor.</string>
     <string name="masterdns_deploy_error_dpkg_locked">O gestor de pacotes do servidor está ocupado (bloqueio apt-get). Aguarde o fim das atualizações e tente novamente.</string>
+    <string name="masterdns_deploy_error_sudo_not_installed">sudo não está instalado no servidor. Instale o sudo e adicione o utilizador ao sudoers.</string>
+    <string name="masterdns_deploy_error_sudo_pwd_required">O utilizador precisa de senha para sudo. Configure NOPASSWD no sudoers.</string>
+    <string name="masterdns_deploy_error_sudo_not_allowed">O utilizador não tem permissão em /etc/sudoers. Conceda direitos de sudo.</string>
+    <string name="masterdns_deploy_error_sudo_no_home">O diretório home do utilizador está inacessível. Verifique as permissões.</string>
+    <string name="masterdns_deploy_error_sudo_not_in_group">O utilizador não está no grupo sudo/wheel. Adicione-o: usermod -aG sudo utilizador.</string>
     <string name="masterdns_deploy_error_build">Falha na construção da imagem. Verifique a conexão com a internet do servidor.</string>
     <string name="masterdns_deploy_error_run">Falha ao iniciar o contêiner.</string>
     <string name="masterdns_deploy_error_key">Falha ao extrair a chave de criptografia do contêiner.</string>

@@ -3,8 +3,6 @@
     <string name="masterdns_engine_name">MasterDNS</string>
     <string name="masterdns_config_toml">client_config.toml content</string>
     <string name="masterdns_resolvers">DNS resolvers (one per line)</string>
-    <string name="masterdns_enabled">Enable MasterDNS</string>
-    <string name="masterdns_beta_badge">BETA</string>
     <string name="masterdns_setup_title">Bring up your own server in 15 minutes</string>
     <string name="masterdns_setup_prereq">Requires a VPS (1 vCPU, 512 MB RAM) and a domain you can delegate via NS records. All commands are one-tap copy.</string>
     <string name="masterdns_setup_step1_title">Delegate a subdomain</string>
@@ -19,8 +17,9 @@
     <string name="masterdns_copy_button">Copy</string>
     <string name="masterdns_copied_toast">Copied</string>
     <string name="settings_masterdns_title">MasterDNS</string>
-    <string name="settings_masterdns_summary">DNS tunnel — emergency bypass when all VPNs are blocked.</string>
+    <string name="settings_masterdns_summary">DNS tunnel — emergency fallback when standard protocols are unavailable.</string>
     <string name="masterdns_deploy_section_title">Auto-deploy server</string>
+    <string name="masterdns_deploy_progress_label">Install progress</string>
     <string name="masterdns_vps_requirements">VPS requirements: ≥512 MB RAM, 1 vCPU, ≥1 GB disk, port 53/UDP open</string>
     <string name="masterdns_deploy_host_label">VPS IP address / hostname</string>
     <string name="masterdns_deploy_port_label">SSH port</string>
@@ -39,6 +38,11 @@
     <string name="masterdns_deploy_error_resources">Insufficient resources: need ≥512 MB RAM and ≥1 GB free disk.</string>
     <string name="masterdns_deploy_error_docker">Failed to install Docker. Check internet access on the server.</string>
     <string name="masterdns_deploy_error_dpkg_locked">Server package manager is busy (apt-get lock). Wait for updates to finish and try again.</string>
+    <string name="masterdns_deploy_error_sudo_not_installed">sudo is not installed on the server. Install sudo and add the user to sudoers.</string>
+    <string name="masterdns_deploy_error_sudo_pwd_required">User requires a password for sudo. Configure NOPASSWD in sudoers.</string>
+    <string name="masterdns_deploy_error_sudo_not_allowed">User is not permitted in /etc/sudoers. Grant sudo rights.</string>
+    <string name="masterdns_deploy_error_sudo_no_home">User home directory is inaccessible. Check directory permissions.</string>
+    <string name="masterdns_deploy_error_sudo_not_in_group">User is not in the sudo/wheel group. Add them: usermod -aG sudo user.</string>
     <string name="masterdns_deploy_error_build">Image build failed. Check the server\'s internet connection.</string>
     <string name="masterdns_deploy_error_run">Failed to start the container.</string>
     <string name="masterdns_deploy_error_key">Failed to extract encryption key from the container.</string>

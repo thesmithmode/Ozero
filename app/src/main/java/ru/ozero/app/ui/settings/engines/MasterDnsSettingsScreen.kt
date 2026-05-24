@@ -26,6 +26,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,7 +34,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -78,11 +78,7 @@ fun MasterDnsSettingsScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(stringResource(R.string.masterdns_engine_name))
-                        Spacer(Modifier.width(8.dp))
-                        BetaBadge()
-                    }
+                    Text(stringResource(R.string.masterdns_engine_name))
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -100,20 +96,6 @@ fun MasterDnsSettingsScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    text = stringResource(R.string.masterdns_enabled),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Switch(
-                    checked = state.enabled,
-                    onCheckedChange = viewModel::onEnabledChange,
-                )
-            }
             DeployCard(
                 state = state,
                 onDeployClick = viewModel::onDeployClick,
@@ -172,18 +154,7 @@ private fun DeployCard(
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(Modifier.height(4.dp))
-            Surface(
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                shape = RoundedCornerShape(6.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    text = stringResource(R.string.masterdns_vps_requirements),
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(8.dp),
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                )
-            }
+            VpsRequirementsHint()
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(
                 value = host,
@@ -229,39 +200,136 @@ private fun DeployCard(
                 enabled = !isDeploying,
             )
             Spacer(Modifier.height(12.dp))
-            when {
-                isDeploying -> DeployProgressRow(deployState)
-                isDone -> DeployDoneRow(
-                    onRedeploy = {
-                        onDeployReset()
-                    },
-                    onUndeploy = {
-                        val port = portText.toIntOrNull() ?: 22
-                        onUndeployClick(host, port, login, password.toCharArray())
-                        password = ""
-                    },
-                    enabled = host.isNotBlank() && login.isNotBlank(),
+            val showProgress = isDeploying || isDone || isRemoved
+            if (showProgress) {
+                DeployProgressBar(deployState.progressPercent)
+                Spacer(Modifier.height(8.dp))
+            }
+            if (state.deployLog.isNotEmpty()) {
+                DeployLogPanel(state.deployLog)
+                Spacer(Modifier.height(8.dp))
+            }
+            DeployActionPanel(
+                deployState = deployState,
+                isDeploying = isDeploying,
+                isDone = isDone,
+                isRemoved = isRemoved,
+                actionsEnabled = host.isNotBlank() && login.isNotBlank(),
+                onDeploy = {
+                    val port = portText.toIntOrNull() ?: 22
+                    onDeployClick(host, port, login, password.toCharArray())
+                    password = ""
+                },
+                onUndeploy = {
+                    val port = portText.toIntOrNull() ?: 22
+                    onUndeployClick(host, port, login, password.toCharArray())
+                    password = ""
+                },
+                onDeployReset = onDeployReset,
+            )
+        }
+    }
+}
+
+@Composable
+private fun VpsRequirementsHint() {
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        shape = RoundedCornerShape(6.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(
+            text = stringResource(R.string.masterdns_vps_requirements),
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(8.dp),
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+        )
+    }
+}
+
+@Composable
+private fun DeployActionPanel(
+    deployState: MasterDnsDeployState,
+    isDeploying: Boolean,
+    isDone: Boolean,
+    isRemoved: Boolean,
+    actionsEnabled: Boolean,
+    onDeploy: () -> Unit,
+    onUndeploy: () -> Unit,
+    onDeployReset: () -> Unit,
+) {
+    when {
+        isDeploying -> DeployProgressRow(deployState)
+        isDone -> DeployDoneRow(
+            onRedeploy = onDeployReset,
+            onUndeploy = onUndeploy,
+            enabled = actionsEnabled,
+        )
+        isRemoved -> DeployRemovedRow(onReset = onDeployReset)
+        deployState is MasterDnsDeployState.Error -> DeployErrorRow(
+            error = deployState,
+            onRetry = onDeployReset,
+        )
+        else -> Button(
+            onClick = onDeploy,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = actionsEnabled,
+        ) {
+            Text(stringResource(R.string.masterdns_deploy_button))
+        }
+    }
+}
+
+@Composable
+private fun DeployProgressBar(percent: Int) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.masterdns_deploy_progress_label),
+                style = MaterialTheme.typography.labelSmall,
+            )
+            Text(
+                text = "$percent%",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        LinearProgressIndicator(
+            progress = { (percent.coerceIn(0, 100) / 100f) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+@Composable
+private fun DeployLogPanel(lines: List<String>) {
+    Surface(
+        shape = RoundedCornerShape(6.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+        ) {
+            lines.takeLast(LOG_VISIBLE_LINES).forEach { line ->
+                Text(
+                    text = line,
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                isRemoved -> DeployRemovedRow(onReset = onDeployReset)
-                deployState is MasterDnsDeployState.Error -> DeployErrorRow(
-                    error = deployState,
-                    onRetry = { onDeployReset() },
-                )
-                else -> Button(
-                    onClick = {
-                        val port = portText.toIntOrNull() ?: 22
-                        onDeployClick(host, port, login, password.toCharArray())
-                        password = ""
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = host.isNotBlank() && login.isNotBlank(),
-                ) {
-                    Text(stringResource(R.string.masterdns_deploy_button))
-                }
             }
         }
     }
 }
+
+private const val LOG_VISIBLE_LINES = 10
 
 @Composable
 private fun DeployProgressRow(state: MasterDnsDeployState) {
@@ -376,6 +444,11 @@ private fun deployErrorMessage(code: String): String = when (code) {
     "insufficient_resources" -> stringResource(R.string.masterdns_deploy_error_resources)
     "docker_install_failed" -> stringResource(R.string.masterdns_deploy_error_docker)
     "dpkg_locked" -> stringResource(R.string.masterdns_deploy_error_dpkg_locked)
+    "sudo_not_installed" -> stringResource(R.string.masterdns_deploy_error_sudo_not_installed)
+    "sudo_pwd_required" -> stringResource(R.string.masterdns_deploy_error_sudo_pwd_required)
+    "sudo_not_allowed" -> stringResource(R.string.masterdns_deploy_error_sudo_not_allowed)
+    "sudo_no_home" -> stringResource(R.string.masterdns_deploy_error_sudo_no_home)
+    "sudo_not_in_group" -> stringResource(R.string.masterdns_deploy_error_sudo_not_in_group)
     "build_failed" -> stringResource(R.string.masterdns_deploy_error_build)
     "run_failed" -> stringResource(R.string.masterdns_deploy_error_run)
     "key_extraction_failed" -> stringResource(R.string.masterdns_deploy_error_key)
@@ -384,22 +457,6 @@ private fun deployErrorMessage(code: String): String = when (code) {
     "remove_failed" -> stringResource(R.string.masterdns_deploy_error_remove)
     "unexpected_error" -> stringResource(R.string.masterdns_deploy_error_unexpected)
     else -> stringResource(R.string.masterdns_deploy_error_generic, code)
-}
-
-@Composable
-private fun BetaBadge() {
-    Surface(
-        color = MaterialTheme.colorScheme.tertiaryContainer,
-        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-        shape = RoundedCornerShape(50),
-    ) {
-        Text(
-            text = stringResource(R.string.masterdns_beta_badge),
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-        )
-    }
 }
 
 @Composable

@@ -18,6 +18,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
@@ -48,6 +50,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -154,7 +157,8 @@ fun StrategyTestScreen(
                 },
                 onDelete = viewModel::onDeleteSaved,
                 onPin = { id, pin -> viewModel.onPinSaved(id, pin) },
-                onRename = viewModel::onRename,
+                onEdit = viewModel::onEdit,
+                onAddManual = viewModel::onAddManual,
             )
         }
     }
@@ -782,6 +786,8 @@ private fun StrategySettingsSheet(
     }
 }
 
+private data class EditDialogState(val id: String?, val name: String, val command: String)
+
 @Composable
 private fun SavedStrategiesSheet(
     strategies: List<SavedStrategy>,
@@ -790,39 +796,20 @@ private fun SavedStrategiesSheet(
     onApply: (String) -> Unit,
     onDelete: (String) -> Unit,
     onPin: (String, Boolean) -> Unit,
-    onRename: (String, String) -> Unit,
+    onEdit: (String, String, String) -> Unit,
+    onAddManual: (String, String) -> Unit,
 ) {
-    var renamingId by rememberSaveable { mutableStateOf<String?>(null) }
-    var renameText by rememberSaveable { mutableStateOf("") }
+    var editState by remember { mutableStateOf<EditDialogState?>(null) }
     var savedExpanded by rememberSaveable { mutableStateOf(true) }
     var historyExpanded by rememberSaveable { mutableStateOf(true) }
 
-    renamingId?.let { id ->
-        AlertDialog(
-            onDismissRequest = { renamingId = null },
-            title = { Text(stringResource(R.string.saved_strategy_rename_title)) },
-            text = {
-                OutlinedTextField(
-                    value = renameText,
-                    onValueChange = { renameText = it },
-                    label = { Text(stringResource(R.string.saved_strategy_rename_hint)) },
-                    modifier = Modifier.fillMaxWidth().testTag("rename_field"),
-                    singleLine = true,
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onRename(id, renameText)
-                        renamingId = null
-                    },
-                    modifier = Modifier.testTag("rename_confirm"),
-                ) { Text(stringResource(R.string.domain_list_save)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { renamingId = null }) {
-                    Text(stringResource(R.string.domain_list_cancel))
-                }
+    editState?.let { state ->
+        SavedStrategyEditDialog(
+            state = state,
+            onDismiss = { editState = null },
+            onConfirm = { name, command ->
+                if (state.id == null) onAddManual(name, command) else onEdit(state.id, name, command)
+                editState = null
             },
         )
     }
@@ -834,11 +821,24 @@ private fun SavedStrategiesSheet(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        SectionHeader(
-            title = stringResource(R.string.saved_strategies_title),
-            expanded = savedExpanded,
-            onToggle = { savedExpanded = !savedExpanded },
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SectionHeader(
+                title = stringResource(R.string.saved_strategies_title),
+                expanded = savedExpanded,
+                onToggle = { savedExpanded = !savedExpanded },
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(
+                onClick = { editState = EditDialogState(id = null, name = "", command = "") },
+                modifier = Modifier.testTag("add_manual_button"),
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = null)
+                Text(stringResource(R.string.saved_strategy_add_button))
+            }
+        }
         if (savedExpanded) {
             if (strategies.isEmpty()) {
                 Text(
@@ -858,9 +858,12 @@ private fun SavedStrategiesSheet(
                     onApply = { onApply(saved.command) },
                     onDelete = { onDelete(saved.id) },
                     onPin = { onPin(saved.id, !saved.isPinned) },
-                    onRename = {
-                        renameText = saved.name ?: ""
-                        renamingId = saved.id
+                    onEdit = {
+                        editState = EditDialogState(
+                            id = saved.id,
+                            name = saved.name ?: "",
+                            command = saved.command,
+                        )
                     },
                 )
             }
@@ -894,10 +897,73 @@ private fun SavedStrategiesSheet(
 }
 
 @Composable
-private fun SectionHeader(title: String, expanded: Boolean, onToggle: () -> Unit) {
+private fun SavedStrategyEditDialog(
+    state: EditDialogState,
+    onDismiss: () -> Unit,
+    onConfirm: (name: String, command: String) -> Unit,
+) {
+    var name by remember { mutableStateOf(state.name) }
+    var command by remember { mutableStateOf(state.command) }
+    var commandError by remember { mutableStateOf(false) }
+    val commandErrorText: (@Composable () -> Unit)? = if (commandError) {
+        { Text(stringResource(R.string.saved_strategy_command_empty_error)) }
+    } else {
+        null
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                stringResource(
+                    if (state.id == null) R.string.saved_strategy_add_title else R.string.saved_strategy_edit_title,
+                ),
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text(stringResource(R.string.saved_strategy_rename_hint)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = command,
+                    onValueChange = {
+                        command = it
+                        commandError = false
+                    },
+                    label = { Text(stringResource(R.string.saved_strategy_command_hint)) },
+                    isError = commandError,
+                    supportingText = commandErrorText,
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (command.isBlank()) {
+                        commandError = true
+                    } else {
+                        onConfirm(name, command)
+                    }
+                },
+            ) { Text(stringResource(R.string.saved_strategy_save)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.saved_strategy_cancel)) }
+        },
+    )
+}
+
+@Composable
+private fun SectionHeader(title: String, expanded: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
     TextButton(
         onClick = onToggle,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier,
         contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
     ) {
         Text(
@@ -915,7 +981,7 @@ private fun SavedStrategyCard(
     onApply: () -> Unit,
     onDelete: () -> Unit,
     onPin: () -> Unit,
-    onRename: () -> Unit,
+    onEdit: () -> Unit,
 ) {
     Card(
         modifier = Modifier
@@ -941,12 +1007,12 @@ private fun SavedStrategyCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 IconButton(
-                    onClick = onRename,
-                    modifier = Modifier.testTag("saved_rename_${saved.id}"),
+                    onClick = onEdit,
+                    modifier = Modifier.testTag("saved_edit_${saved.id}"),
                 ) {
                     Icon(
                         Icons.Filled.Edit,
-                        contentDescription = stringResource(R.string.saved_strategy_rename_title),
+                        contentDescription = stringResource(R.string.saved_strategy_edit_title),
                     )
                 }
                 IconButton(
@@ -954,7 +1020,7 @@ private fun SavedStrategyCard(
                     modifier = Modifier.testTag("saved_pin_${saved.id}"),
                 ) {
                     Icon(
-                        Icons.Filled.Star,
+                        if (saved.isPinned) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
                         contentDescription = stringResource(
                             if (saved.isPinned) R.string.saved_strategy_unpin else R.string.saved_strategy_pin,
                         ),
@@ -966,16 +1032,14 @@ private fun SavedStrategyCard(
                     )
                 }
             }
-            if (saved.name != null) {
-                Text(
-                    text = saved.command,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            Text(
+                text = saved.command,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             StalenessLabel(lastVerifiedAtMs = saved.lastVerifiedAtMs)
             NetworkBadge(bestNetworks = saved.bestNetworks, currentNetworkId = currentNetworkId)
             Row(

@@ -140,4 +140,34 @@ class MainScreenLabelsTest {
         )
         assertEquals(R.string.main_status_connected, res)
     }
+
+    @Test
+    fun `ui selected engine prefers real tunnel engine over manual selection`() {
+        val selected = resolveUiSelectedEngine(
+            tunnelState = TunnelState.Connected(EngineId.URNETWORK, socksPort = 0),
+            switching = null,
+            manualEngine = EngineId.BYEDPI,
+        )
+        assertEquals(EngineId.URNETWORK, selected)
+    }
+
+    @Test
+    fun `ui selected engine prefers switching target while transition is active`() {
+        val selected = resolveUiSelectedEngine(
+            tunnelState = TunnelState.Connected(EngineId.URNETWORK, socksPort = 0),
+            switching = SwitchingTransition(from = EngineId.URNETWORK, to = EngineId.BYEDPI),
+            manualEngine = EngineId.URNETWORK,
+        )
+        assertEquals(EngineId.BYEDPI, selected)
+    }
+
+    @Test
+    fun `urnetwork visibility follows resolved runtime engine not stale manual`() {
+        val visible = isUrnetworkVisibleInMain(
+            state = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080),
+            switching = null,
+            manualEngine = EngineId.URNETWORK,
+        )
+        assertEquals(false, visible)
+    }
 }

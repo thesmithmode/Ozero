@@ -3,9 +3,10 @@ title: "runTest + UncompletedCoroutinesError: testScope Children Trap"
 aliases: [uncompleted-coroutines, testscope-infinite-coroutine, backgroundscope-pattern]
 tags: [kotlin, testing, coroutines, gotcha]
 sources:
+  - "daily/2026-05-05.md"
   - "daily/2026-05-14.md"
 created: 2026-05-14
-updated: 2026-05-14
+updated: 2026-05-24
 ---
 
 # runTest + UncompletedCoroutinesError: testScope Children Trap
@@ -48,12 +49,21 @@ Fix: per-test `datastoreScope = CoroutineScope(dispatcher + SupervisorJob())` pa
 
 Used in Ozero for `startStatsPolling` in `EngineUrnetworkAwaitReadyTest`: `pluginScope = backgroundScope` instead of `this` (TestScope).
 
+### runBlocking Nested in runTest
+
+`runBlocking` inside a `runTest` block risks deadlock. `runTest` uses `TestCoroutineScheduler` with virtual time and a `TestCoroutineDispatcher`. `runBlocking` creates a new event loop and blocks the calling thread waiting for real-time completion. If the blocked operation dispatches back onto the same `TestCoroutineDispatcher`, the dispatcher's thread is already blocked by `runBlocking` → deadlock.
+
+Observed in `DataStoreWarpConfigSlotStoreTest.buildLegacyDataStore`: `runBlocking { store.write(...) }` nested in `runTest {}`. The risk is higher when the DataStore coroutine scope uses the same dispatcher as the test.
+
+Fix: replace `runBlocking { }` inside `runTest` with `launch { }.join()` or restructure the helper as a `suspend fun`.
+
 ### Rules
 
 - Never pass `testScope` to production objects with infinite coroutines
 - `@AfterEach` cannot save you from `UncompletedCoroutinesError` — exception fires before tearDown
 - Use `backgroundScope` for long-running background jobs in tests
 - Use separate `CoroutineScope(dispatcher + SupervisorJob())` when `backgroundScope` is not available (e.g., object created outside `runTest` block)
+- Never nest `runBlocking` inside `runTest` — use `launch { }.join()` or suspend helpers instead
 
 ## Related Concepts
 
@@ -66,3 +76,4 @@ Used in Ozero for `startStatsPolling` in `EngineUrnetworkAwaitReadyTest`: `plugi
 - [[daily/2026-05-14.md]] - Session 15:xx: `TelegramProxyCoordinatorTest` 6x `UncompletedCoroutinesError` — `launchIn(testScope)` root cause; `@AfterEach` too late; fix = separate coordinatorScope
 - [[daily/2026-05-14.md]] - Session 17:xx: `DataStoreTelegramConfigStoreTest` 7x same error — DataStore with `testScope`; fix = per-test `datastoreScope`
 - [[daily/2026-05-14.md]] - Session 18:00+: `EngineUrnetworkAwaitReadyTest` 4x same error — `startStatsPolling` while(true) in TestScope; fix = `backgroundScope`
+- [[daily/2026-05-05.md]] - Code review session 11:43: `DataStoreWarpConfigSlotStoreTest.buildLegacyDataStore` — `runBlocking` nested inside `runTest`; deadlock risk when DataStore coroutine scope shares dispatcher with test

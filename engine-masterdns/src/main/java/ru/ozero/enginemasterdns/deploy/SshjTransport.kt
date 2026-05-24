@@ -1,5 +1,6 @@
 package ru.ozero.enginemasterdns.deploy
 
+import net.schmizz.sshj.AndroidConfig
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.common.IOUtils
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier
@@ -11,7 +12,11 @@ internal class SshjTransport : SshTransport {
     private var client: SSHClient? = null
 
     override fun connect(host: String, port: Int) {
-        val ssh = SSHClient()
+        val config = AndroidConfig()
+        config.keyExchangeFactories = config.keyExchangeFactories.filter {
+            "curve25519" !in it.name.lowercase()
+        }
+        val ssh = SSHClient(config)
         ssh.addHostKeyVerifier(PromiscuousVerifier())
         ssh.connectTimeout = CONNECTION_TIMEOUT_MS.toInt()
         ssh.connect(host, port)

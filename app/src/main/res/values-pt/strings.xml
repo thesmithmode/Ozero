@@ -138,6 +138,7 @@
 
     <string name="about_title">Sobre</string>
     <string name="about_version">Versão %1$s</string>
+    <string name="about_telegram_channel">Canal de Telegram do Ozero</string>
 
     <string name="diag_export_crashes">Exportar log de falhas</string>
     <string name="diag_export_no_crashes">Log de falhas vazio</string>
@@ -397,6 +398,12 @@
     <string name="evolution_initializing">Preparando população…</string>
     <string name="evolution_stagnating">Estagnado — buscando outras opções…</string>
     <string name="saved_strategy_rename_title">Renomear</string>
+    <string name="saved_strategy_edit_title">Editar estratégia</string>
+    <string name="saved_strategy_add_title">Adicionar estratégia</string>
+    <string name="saved_strategy_command_hint">Parâmetros (ex: -Ku -An)</string>
+    <string name="saved_strategy_add_button">Adicionar</string>
+    <string name="saved_strategy_command_empty_error">Os parâmetros não podem estar vazios</string>
+    <string name="saved_strategy_cancel">Cancelar</string>
     <string name="usage_history_title">Histórico de uso</string>
     <string name="usage_history_empty">Ainda não aplicadas</string>
     <string name="strategy_scan_notification_title">Seleção de estratégias ByeDPI…</string>

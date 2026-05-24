@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Assertions.assertTrue
+
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.enginemasterdns.MasterDnsConfigStore
@@ -38,11 +39,10 @@ class MasterDnsSettingsViewModelTest {
     @Test
     fun `state reflects store config`() = runTest {
         val store = FakeStore(
-            MasterDnsPersistedConfig(enabled = true, configToml = "x", resolvers = listOf("8.8.8.8")),
+            MasterDnsPersistedConfig(configToml = "x", resolvers = listOf("8.8.8.8")),
         )
         val vm = MasterDnsSettingsViewModel(store, FakeDeployer())
-        val state = vm.state.first { it.enabled }
-        assertTrue(state.enabled)
+        val state = vm.state.first { it.configToml == "x" }
         assertEquals("x", state.configToml)
         assertEquals("8.8.8.8", state.resolversText)
     }
@@ -82,22 +82,6 @@ class MasterDnsSettingsViewModelTest {
     }
 
     @Test
-    fun `onEnabledChange persists true`() = runTest {
-        val store = FakeStore(MasterDnsPersistedConfig())
-        val vm = MasterDnsSettingsViewModel(store, FakeDeployer())
-        vm.onEnabledChange(true)
-        assertTrue(store.enabled)
-    }
-
-    @Test
-    fun `onEnabledChange persists false`() = runTest {
-        val store = FakeStore(MasterDnsPersistedConfig(enabled = true))
-        val vm = MasterDnsSettingsViewModel(store, FakeDeployer())
-        vm.onEnabledChange(false)
-        assertFalse(store.enabled)
-    }
-
-    @Test
     fun `state includes serverIp and serverPort from store`() = runTest {
         val store = FakeStore(MasterDnsPersistedConfig(serverIp = "1.2.3.4", serverPort = 2222))
         val vm = MasterDnsSettingsViewModel(store, FakeDeployer())
@@ -130,6 +114,78 @@ class MasterDnsSettingsViewModelTest {
         assertEquals("10.0.0.1", store.serverIp)
         assertEquals(22, store.serverPort)
         assertInstanceOf(MasterDnsDeployState.Done::class.java, state.deployState)
+    }
+
+    @Test
+    fun `deploy success auto-fills resolvers with serverIp colon 53`() = runTest {
+        val store = FakeStore(MasterDnsPersistedConfig())
+        val vm = MasterDnsSettingsViewModel(
+            store,
+            FakeDeployer(deployStates = listOf(MasterDnsDeployState.Done("toml"))),
+        )
+        vm.onDeployClick(host = "5.6.7.8", port = 22, login = "root", password = "pass".toCharArray())
+        vm.state.first { it.deployState is MasterDnsDeployState.Done }
+        assertEquals(listOf("5.6.7.8:53"), store.resolvers)
+    }
+
+    @Test
+    fun `deploy log contains step descriptions for happy path`() = runTest {
+        val store = FakeStore(MasterDnsPersistedConfig())
+        val vm = MasterDnsSettingsViewModel(
+            store,
+            FakeDeployer(
+                deployStates = listOf(
+                    MasterDnsDeployState.Connecting,
+                    MasterDnsDeployState.CheckingPreflight,
+                    MasterDnsDeployState.InstallingDocker,
+                    MasterDnsDeployState.BuildingImage,
+                    MasterDnsDeployState.StartingContainer,
+                    MasterDnsDeployState.ExtractingKey,
+                    MasterDnsDeployState.Done("toml"),
+                ),
+            ),
+        )
+        vm.onDeployClick(host = "9.9.9.9", port = 22, login = "root", password = "p".toCharArray())
+        val state = vm.state.first { it.deployState is MasterDnsDeployState.Done }
+        val combined = state.deployLog.joinToString("\n")
+        assertTrue(combined.contains("9.9.9.9"), "лог должен содержать host: $combined")
+        assertTrue(combined.contains("Docker"), "лог должен описать шаг установки Docker: $combined")
+        assertTrue(combined.contains("encrypt_key") || combined.contains("ключ"), combined)
+        assertTrue(combined.contains("Резолверы") || combined.contains("✓"), combined)
+    }
+
+    @Test
+    fun `deploy log error step shown for user`() = runTest {
+        val store = FakeStore(MasterDnsPersistedConfig())
+        val vm = MasterDnsSettingsViewModel(
+            store,
+            FakeDeployer(
+                deployStates = listOf(
+                    MasterDnsDeployState.Connecting,
+                    MasterDnsDeployState.Error("port_53_busy"),
+                ),
+            ),
+        )
+        vm.onDeployClick(host = "1.1.1.1", port = 22, login = "root", password = "p".toCharArray())
+        val state = vm.state.first { it.deployState is MasterDnsDeployState.Error }
+        assertTrue(
+            state.deployLog.any { it.contains("port_53_busy") },
+            "лог должен показать причину ошибки: ${state.deployLog}",
+        )
+    }
+
+    @Test
+    fun `onDeployReset clears deploy log`() = runTest {
+        val store = FakeStore(MasterDnsPersistedConfig())
+        val vm = MasterDnsSettingsViewModel(
+            store,
+            FakeDeployer(deployStates = listOf(MasterDnsDeployState.Connecting, MasterDnsDeployState.Done("t"))),
+        )
+        vm.onDeployClick(host = "5.5.5.5", port = 22, login = "root", password = "p".toCharArray())
+        vm.state.first { it.deployLog.isNotEmpty() }
+        vm.onDeployReset()
+        val state = vm.state.first { it.deployLog.isEmpty() }
+        assertTrue(state.deployLog.isEmpty())
     }
 
     @Test
@@ -324,16 +380,11 @@ class MasterDnsSettingsViewModelTest {
 
     private class FakeStore(initial: MasterDnsPersistedConfig) : MasterDnsConfigStore {
         private val flow = MutableStateFlow(initial)
-        var enabled: Boolean = initial.enabled
         var toml: String = initial.configToml
         var resolvers: List<String> = initial.resolvers
         var serverIp: String = initial.serverIp
         var serverPort: Int = initial.serverPort
         override fun config() = flow
-        override suspend fun setEnabled(enabled: Boolean) {
-            this.enabled = enabled
-            flow.value = flow.value.copy(enabled = enabled)
-        }
         override suspend fun setConfigToml(toml: String) {
             this.toml = toml
             flow.value = flow.value.copy(configToml = toml)

@@ -250,6 +250,22 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
+    fun `runStartOnMain возвращает Failed если openConnectViewController вернул null — guard infinite peer search`() {
+        val startBlock = source.substringAfter("private suspend fun runStartOnMain")
+            .substringBefore("override suspend fun stop")
+        val afterCvCheck = startBlock.substringAfter("openConnectViewController")
+        assertTrue(
+            afterCvCheck.contains("StartResult.Failed"),
+            "runStartOnMain обязан возвращать StartResult.Failed если openConnectViewController null — " +
+                "без этого running=true с null connectVc → peerCount() всегда 0 → бесконечный peer search",
+        )
+        assertTrue(
+            afterCvCheck.contains("cleanupOnFailure"),
+            "runStartOnMain обязан вызвать cleanupOnFailure() при null connectVc — иначе deviceRef утекает",
+        )
+    }
+
+    @Test
     fun `attachTun вызывает connectBestAvailable через существующий connectVcRef`() {
         val attachBlock = source.substringAfter("override suspend fun attachTun")
             .substringBefore("private fun cleanupOnFailure")

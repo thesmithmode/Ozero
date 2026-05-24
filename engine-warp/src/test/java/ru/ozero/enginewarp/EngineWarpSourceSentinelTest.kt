@@ -187,5 +187,6 @@ class EngineWarpSourceSentinelTest {
         ): WarpSdkBridge.AttachResult = WarpSdkBridge.AttachResult.Success
         override suspend fun detachTun() {}
         override fun isRunning(): Boolean = false
+        override fun reprotectSockets() {}
     }
 }

@@ -74,6 +74,9 @@ object UrnetworkRuntime {
     fun manager(): NetworkSpaceManager? = manager
     fun space(): NetworkSpace? = space
 
+    // SENTINEL [project_urnetwork_runtime_release]: каждому ensure() должен соответствовать release()
+    // при teardown — setActiveNetworkSpace(null) + Sdk.freeMemory(). Без release Go-runtime singleton
+    // удерживает сессию и конфликтует с URnetwork-app, установленным параллельно.
     suspend fun release() = withContext(Dispatchers.Main.immediate) {
         mutex.withLock {
             val mgr = manager

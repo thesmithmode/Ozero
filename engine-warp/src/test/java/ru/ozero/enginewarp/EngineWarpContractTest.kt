@@ -598,5 +598,6 @@ class EngineWarpContractTest {
         }
 
         override fun isRunning(): Boolean = running
+        override fun reprotectSockets() {}
     }
 }

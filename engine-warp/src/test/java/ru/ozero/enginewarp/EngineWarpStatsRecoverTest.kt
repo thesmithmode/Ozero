@@ -263,5 +263,6 @@ class EngineWarpStatsRecoverTest {
             running = false
         }
         override fun isRunning(): Boolean = running
+        override fun reprotectSockets() {}
     }
 }

@@ -226,6 +226,64 @@ class SavedStrategyStoreTest {
     }
 
     @Test
+    fun `addWithName creates entry with name and command`() {
+        val result = store.addWithName("My Strategy", "-Ku -An")
+        assertEquals(1, result.size)
+        assertEquals("-Ku -An", result[0].command)
+        assertEquals("My Strategy", result[0].name)
+    }
+
+    @Test
+    fun `addWithName blank name results in null name`() {
+        val result = store.addWithName("  ", "-Ku")
+        assertNull(result[0].name)
+    }
+
+    @Test
+    fun `addWithName deduplicates same command`() {
+        store.addWithName("Name A", "-cmd")
+        store.addWithName("Name B", "-cmd")
+        assertEquals(1, store.load().size)
+    }
+
+    @Test
+    fun `editStrategy updates name and command by id`() {
+        store.save(listOf(SavedStrategy(id = "e1", command = "-old", name = "Old", addedAt = 1L)))
+        store.editStrategy("e1", "New Name", "-new -args")
+        val loaded = store.load()[0]
+        assertEquals("New Name", loaded.name)
+        assertEquals("-new -args", loaded.command)
+    }
+
+    @Test
+    fun `editStrategy blank name results in null name`() {
+        store.save(listOf(SavedStrategy(id = "e2", command = "-cmd", name = "Named", addedAt = 1L)))
+        store.editStrategy("e2", "", "-cmd")
+        assertNull(store.load()[0].name)
+    }
+
+    @Test
+    fun `editStrategy trims command whitespace`() {
+        store.save(listOf(SavedStrategy(id = "e3", command = "-cmd", addedAt = 1L)))
+        store.editStrategy("e3", "", "  -trimmed  ")
+        assertEquals("-trimmed", store.load()[0].command)
+    }
+
+    @Test
+    fun `editStrategy does not affect other entries`() {
+        store.save(
+            listOf(
+                SavedStrategy(id = "keep", command = "-keep", name = "Keep", addedAt = 1L),
+                SavedStrategy(id = "edit", command = "-edit", addedAt = 2L),
+            ),
+        )
+        store.editStrategy("edit", "Renamed", "-new")
+        val loaded = store.load().associateBy { it.id }
+        assertEquals("Keep", loaded["keep"]!!.name)
+        assertEquals("-keep", loaded["keep"]!!.command)
+    }
+
+    @Test
     fun `markBestOnNetwork with empty commands is no-op`() {
         store.save(
             listOf(SavedStrategy(id = "a", command = "-a", addedAt = 1L, bestNetworks = setOf("net-x"))),
