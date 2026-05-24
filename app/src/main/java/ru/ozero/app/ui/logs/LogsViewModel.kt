@@ -74,8 +74,13 @@ class LogsViewModel @Inject constructor(
         initialValue = LogsUiState(),
     )
 
-    fun onTagFilter(tag: String) { _tagFilter.value = tag }
-    fun onLevelFilter(level: String) { _levelFilter.value = level }
+    fun onTagFilter(tag: String) {
+        _tagFilter.value = tag
+    }
+
+    fun onLevelFilter(level: String) {
+        _levelFilter.value = level
+    }
 
     fun copyAll(): String = UnifiedLogger.read()
 

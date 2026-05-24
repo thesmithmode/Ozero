@@ -135,8 +135,10 @@ fun SingboxEngineSettingsScreen(
                         Text(
                             when (err) {
                                 is CustomLinkError.Empty -> stringResource(R.string.singbox_link_error_empty)
-                                is CustomLinkError.ParseFailed -> stringResource(R.string.singbox_link_error_parse, err.cause)
-                                is CustomLinkError.SaveFailed -> stringResource(R.string.singbox_link_error_save, err.cause)
+                                is CustomLinkError.ParseFailed ->
+                                    stringResource(R.string.singbox_link_error_parse, err.cause)
+                                is CustomLinkError.SaveFailed ->
+                                    stringResource(R.string.singbox_link_error_save, err.cause)
                             },
                         )
                     }
