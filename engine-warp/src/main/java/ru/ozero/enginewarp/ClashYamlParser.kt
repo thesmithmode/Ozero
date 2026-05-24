@@ -96,12 +96,7 @@ object ClashYamlParser {
                 }
                 else -> {
                     inAwg = false
-                    val colon = innerTrimmed.indexOf(':')
-                    if (colon > 0) {
-                        val key = innerTrimmed.substring(0, colon).trim()
-                        val value = innerTrimmed.substring(colon + 1).trim().unquote()
-                        if (value.isNotEmpty()) data[key] = value
-                    }
+                    addAnchorField(data, innerTrimmed)
                     i++
                 }
             }
@@ -194,6 +189,15 @@ object ClashYamlParser {
             payloadHexI4 = hex("i4"),
             payloadHexI5 = hex("i5"),
         )
+    }
+
+    private fun addAnchorField(data: MutableMap<String, String>, line: String) {
+        val colon = line.indexOf(':')
+        if (colon > 0) {
+            val key = line.substring(0, colon).trim()
+            val value = line.substring(colon + 1).trim().unquote()
+            if (value.isNotEmpty()) data[key] = value
+        }
     }
 
     private fun parseDnsList(raw: String): List<String> =

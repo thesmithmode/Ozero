@@ -90,18 +90,18 @@ class DataStoreWarpConfigSlotStore(
         rawIni: String?,
         endpointList: List<String>,
     ): Unit = mutex.withLock {
-            dataStore.edit { prefs ->
-                val current = parseSlots(prefs[KEY_SLOTS] ?: "[]")
-                val updated = current.map { slot ->
-                    if (slot.id == id) {
-                        slot.copy(name = name, config = config, rawIniOverride = rawIni, endpointList = endpointList)
-                    } else {
-                        slot
-                    }
+        dataStore.edit { prefs ->
+            val current = parseSlots(prefs[KEY_SLOTS] ?: "[]")
+            val updated = current.map { slot ->
+                if (slot.id == id) {
+                    slot.copy(name = name, config = config, rawIniOverride = rawIni, endpointList = endpointList)
+                } else {
+                    slot
                 }
-                prefs[KEY_SLOTS] = serializeSlots(updated)
             }
+            prefs[KEY_SLOTS] = serializeSlots(updated)
         }
+    }
 
     override suspend fun delete(id: String): Unit = mutex.withLock {
         dataStore.edit { prefs ->
