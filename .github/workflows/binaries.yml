@@ -250,7 +250,7 @@ jobs:
       # ---------------------------------------------------------------------
       - name: Upload byedpi assets
         if: env.ARTIFACT == 'byedpi' && github.event_name == 'workflow_dispatch'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         env:
           GH_TAG: ${{ steps.tag.outputs.tag }}
         with:
@@ -269,7 +269,7 @@ jobs:
 
       - name: Upload naive assets
         if: env.ARTIFACT == 'naive' && github.event_name == 'workflow_dispatch'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         env:
           GH_TAG: ${{ steps.tag.outputs.tag }}
         with:
@@ -288,7 +288,7 @@ jobs:
 
       - name: Upload amneziawg assets
         if: env.ARTIFACT == 'amneziawg' && github.event_name == 'workflow_dispatch'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         env:
           GH_TAG: ${{ steps.tag.outputs.tag }}
         with:
@@ -307,7 +307,7 @@ jobs:
 
       - name: Upload hysteria2 assets
         if: env.ARTIFACT == 'hysteria2' && github.event_name == 'workflow_dispatch'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         env:
           GH_TAG: ${{ steps.tag.outputs.tag }}
         with:
@@ -326,7 +326,7 @@ jobs:
 
       - name: Upload urnetwork-sdk assets
         if: env.ARTIFACT == 'urnetwork-sdk' && github.event_name == 'workflow_dispatch'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         env:
           GH_TAG: ${{ steps.tag.outputs.tag }}
         with:
@@ -347,7 +347,7 @@ jobs:
 
       - name: Upload userwireguard assets
         if: env.ARTIFACT == 'userwireguard' && github.event_name == 'workflow_dispatch'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         env:
           GH_TAG: ${{ steps.tag.outputs.tag }}
         with:
@@ -368,7 +368,7 @@ jobs:
 
       - name: Upload tor assets
         if: env.ARTIFACT == 'tor' && github.event_name == 'workflow_dispatch'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         env:
           GH_TAG: ${{ steps.tag.outputs.tag }}
         with:
@@ -390,7 +390,7 @@ jobs:
 
       - name: Upload fptn assets
         if: env.ARTIFACT == 'fptn' && github.event_name == 'workflow_dispatch'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         env:
           GH_TAG: ${{ steps.tag.outputs.tag }}
         with:
