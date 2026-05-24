@@ -212,9 +212,10 @@ jobs:
           OZERO_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           OZERO_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
           UPDATE_PUBLIC_KEY_HEX: ${{ secrets.UPDATE_PUBLIC_KEY_HEX }}
+          OZERO_VERSION_NAME: ${{ steps.ver.outputs.tag }}
         run: ./gradlew :app:assembleRelease --stacktrace
 
-      - name: Assert APK versionCode > 1 (shallow-clone regression guard)
+      - name: Assert APK versionCode matches gradle.properties
         run: |
           set -euo pipefail
           APK=$(find app/build/outputs/apk/release -name '*.apk' | head -n1)
@@ -225,8 +226,13 @@ jobs:
             exit 1
           fi
           VC=$("$AAPT" dump badging "$APK" | grep -oE "versionCode='[0-9]+'" | head -n1 | grep -oE "[0-9]+")
-          if [ -z "$VC" ] || [ "$VC" -le 1 ]; then
-            echo "::error::APK versionCode=$VC (≤1) — shallow-clone bug: actions/checkout без fetch-depth: 0 даёт git rev-list --count HEAD=1. Android отвергнет install как version downgrade."
+          VC_EXPECTED=$(grep '^VERSION_CODE=' gradle.properties | cut -d= -f2)
+          if [ -z "$VC" ] || [ "$VC" != "$VC_EXPECTED" ]; then
+            echo "::error::APK versionCode=$VC ≠ VERSION_CODE=$VC_EXPECTED в gradle.properties"
+            exit 1
+          fi
+          if [ "$VC" -lt 2211 ]; then
+            echo "::error::APK versionCode=$VC < floor 2211 (v0.2.1 baseline)"
             exit 1
           fi
           echo "APK versionCode=$VC OK"

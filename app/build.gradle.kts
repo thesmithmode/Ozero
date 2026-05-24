@@ -1,12 +1,12 @@
-val gitVersionName: String = providers.exec {
-    commandLine("git", "describe", "--tags", "--match", "v*.*.*", "--abbrev=0")
-    isIgnoreExitValue = true
-}.standardOutput.asText.get().trim().removePrefix("v").ifEmpty { "0.0.0" }
+val gitVersionName: String = providers.environmentVariable("OZERO_VERSION_NAME")
+    .orNull?.removePrefix("v")?.ifEmpty { null }
+    ?: providers.exec {
+        commandLine("git", "describe", "--tags", "--match", "v*.*.*", "--abbrev=0")
+        isIgnoreExitValue = true
+    }.standardOutput.asText.get().trim().removePrefix("v").ifEmpty { "0.0.0" }
 
-val gitVersionCode: Int = providers.exec {
-    commandLine("git", "rev-list", "--count", "HEAD")
-    isIgnoreExitValue = true
-}.standardOutput.asText.get().trim().toIntOrNull() ?: 1
+val gitVersionCode: Int = (findProperty("VERSION_CODE") as? String)?.toInt()
+    ?: error("VERSION_CODE not set in gradle.properties")
 
 plugins {
     id("ozero.android.application")
