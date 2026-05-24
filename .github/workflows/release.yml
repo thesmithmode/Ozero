@@ -363,7 +363,7 @@ jobs:
 
       - name: Collect artifacts
         env:
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ steps.ver.outputs.tag }}
         run: |
           set -euo pipefail
           mkdir -p release-out
@@ -414,9 +414,9 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: ${{ steps.ver.outputs.tag }}
+          prerelease: ${{ contains(steps.ver.outputs.tag, '-') }}
           generate_release_notes: true
           fail_on_unmatched_files: true
           overwrite_files: true
