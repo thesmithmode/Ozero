@@ -445,7 +445,9 @@ class StrategyTestViewModel @Inject constructor(
             } finally {
                 runCatching { byeDpiEngine.stop() }
             }
-            markStrategyCompleted(command)
+            _strategies.update { list ->
+                list.map { s -> if (s.command == command) s.copy(isCompleted = true) else s }.sortedForUi()
+            }
             if (snap.delayBetweenMs > 0L) delay(snap.delayBetweenMs)
         }
     }
@@ -480,17 +482,6 @@ class StrategyTestViewModel @Inject constructor(
                         lastSite = site,
                         lastError = if (result.success) null else "probe failed",
                     )
-                } else {
-                    s
-                }
-            }.sortedForUi()
-        }
-
-    private fun markStrategyCompleted(command: String) =
-        _strategies.update { list ->
-            list.map { s ->
-                if (s.command == command) {
-                    s.copy(isCompleted = true)
                 } else {
                     s
                 }
