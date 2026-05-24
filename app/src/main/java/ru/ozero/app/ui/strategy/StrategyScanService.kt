@@ -16,6 +16,7 @@ class StrategyScanService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
+            stopForegroundCompat()
             stopSelf()
             return START_NOT_STICKY
         }
@@ -30,7 +31,17 @@ class StrategyScanService : Service() {
         } else {
             startForeground(NOTIFICATION_ID, notification)
         }
-        return START_NOT_STICKY
+        return START_STICKY
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        startService(Intent(this, StrategyScanService::class.java))
+        super.onTaskRemoved(rootIntent)
+    }
+
+    override fun onDestroy() {
+        stopForegroundCompat()
+        super.onDestroy()
     }
 
     private fun ensureChannel() {
@@ -50,5 +61,14 @@ class StrategyScanService : Service() {
         const val ACTION_STOP = "ru.ozero.app.strategy.ACTION_STOP"
         const val CHANNEL_ID = "strategy_scan"
         const val NOTIFICATION_ID = 23
+    }
+
+    private fun stopForegroundCompat() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+            @Suppress("DEPRECATION")
+            stopForeground(true)
+        }
     }
 }
