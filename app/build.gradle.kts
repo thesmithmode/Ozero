@@ -1,12 +1,19 @@
-val gitVersionName: String = providers.exec {
-    commandLine("git", "describe", "--tags", "--match", "v*.*.*", "--abbrev=0")
-    isIgnoreExitValue = true
-}.standardOutput.asText.get().trim().removePrefix("v").ifEmpty { "0.0.0" }
+val gitVersionName: String = providers.environmentVariable("OZERO_VERSION_NAME")
+    .orNull?.removePrefix("v")?.ifEmpty { null }
+    ?: providers.exec {
+        commandLine("git", "describe", "--tags", "--match", "v*.*.*", "--abbrev=0")
+        isIgnoreExitValue = true
+    }.standardOutput.asText.get().trim().removePrefix("v").ifEmpty { "0.0.0" }
 
-val gitVersionCode: Int = providers.exec {
-    commandLine("git", "rev-list", "--count", "HEAD")
-    isIgnoreExitValue = true
-}.standardOutput.asText.get().trim().toIntOrNull() ?: 1
+val versionCodeOffset = 1500
+val versionCodeFloor = 2000
+val gitVersionCode: Int = maxOf(
+    (providers.exec {
+        commandLine("git", "rev-list", "--count", "HEAD")
+        isIgnoreExitValue = true
+    }.standardOutput.asText.get().trim().toIntOrNull() ?: 1) + versionCodeOffset,
+    versionCodeFloor,
+)
 
 plugins {
     id("ozero.android.application")
