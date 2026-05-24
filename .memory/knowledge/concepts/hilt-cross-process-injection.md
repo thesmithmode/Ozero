@@ -16,9 +16,10 @@ When an Android VPN service runs in a separate process (`:engine_singbox`, `:eng
 
 - Hilt's `SingletonComponent` is per-process; app process and VPN service process each have their own instance
 - `OkHttpClient`, `AppDatabase`, `Gson` provided in `app/` modules cannot be injected in the VPN process
-- Fix: create dependencies inline in VPN-process classes (e.g., `OkHttpClient()` in constructor body) rather than injecting them
+- Fix: create dependencies inline in VPN-process classes — `OkHttpClient()` and `Gson()` constructor calls — rather than injecting them
 - Alternatively: move the operation requiring the dependency to the `app/` process and use AIDL/IPC
 - `@InstallIn(SingletonComponent::class)` in a module used by VPN service does NOT share the app's SingletonComponent
+- `kapt(libs.hilt.compiler)` must be in every Gradle module that uses `@AndroidEntryPoint` or `@HiltViewModel` — Hilt annotation processing is not transitive
 
 ## Details
 
@@ -55,4 +56,4 @@ A module annotated `@InstallIn(SingletonComponent::class)` and listed in the app
 
 ## Sources
 
-- [[daily/2026-05-24.md]] — Session 19:13: engine-singbox P4 CI failures; `OkHttpClient`/`Gson` inject from app/ failed in VPN process; fix = inline construction; `AppDatabase` also unavailable cross-process; architecture corrected to fetch subscriptions in app/ process only
+- [[daily/2026-05-24.md]] — Session 19:13: engine-singbox P4 CI failures; `OkHttpClient`/`Gson` inject from app/ failed in VPN process; fix = inline construction (`OkHttpClient()`, `Gson()` constructors); `AppDatabase` also unavailable cross-process; architecture corrected to fetch subscriptions in app/ process only; `kapt(libs.hilt.compiler)` missing from engine-singbox module — Hilt annotation processing not transitive

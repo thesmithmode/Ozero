@@ -19,6 +19,7 @@ Subscription fetching and storage for the sing-box engine must run exclusively i
 - `AppDatabase` must include `SubscriptionEntity` in its `entities` list + version bump + DAO accessor — all three required or runtime crash
 - VPN service process only receives the active config as a `SingboxConfig` data class serialized via Gson; it does not touch Room
 - `SingboxPresetRepository` provides built-in subscriptions (preset_groups.json assets); `SingboxSubscriptionRepository` stores user-added ones in Room
+- Subscription fetching must happen ONLY in `app/` process — VPN service process cannot inject `AppDatabase` or `SubscriptionDao` from app/; classes in the VPN process that need HTTP must create `OkHttpClient()` inline
 
 ## Details
 
@@ -88,4 +89,4 @@ Importing `WireGuardServer` (non-existent flat class) instead of referencing `Si
 
 ## Sources
 
-- [[daily/2026-05-24.md]] — Sessions 19:13, 19:34, 19:53: engine-singbox P4/P5 implementation; cross-process Hilt trap for OkHttp/Gson/AppDatabase; DAO method naming mismatches (getAllActive vs getActiveSubscriptions); SingboxServer sealed class vs flat class imports; AppDatabase version bump requirement
+- [[daily/2026-05-24.md]] — Sessions 19:13, 19:34, 19:53: engine-singbox P4/P5 implementation; cross-process Hilt trap for OkHttp/Gson/AppDatabase; subscription fetch must stay in app/ process only; VPN process cannot inject AppDatabase or SubscriptionDao; classes in VPN process create OkHttpClient inline; DAO method naming mismatches (getAllActive vs getActiveSubscriptions); SingboxServer sealed class vs flat class imports; AppDatabase version bump requirement
