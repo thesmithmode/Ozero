@@ -215,7 +215,7 @@ jobs:
           OZERO_VERSION_NAME: ${{ steps.ver.outputs.tag }}
         run: ./gradlew :app:assembleRelease --stacktrace
 
-      - name: Assert APK versionCode >= 2000 (downgrade regression guard)
+      - name: Assert APK versionCode matches gradle.properties
         run: |
           set -euo pipefail
           APK=$(find app/build/outputs/apk/release -name '*.apk' | head -n1)
@@ -226,8 +226,13 @@ jobs:
             exit 1
           fi
           VC=$("$AAPT" dump badging "$APK" | grep -oE "versionCode='[0-9]+'" | head -n1 | grep -oE "[0-9]+")
-          if [ -z "$VC" ] || [ "$VC" -lt 2000 ]; then
-            echo "::error::APK versionCode=$VC (<2000) — version downgrade regression. v0.2.0 had versionCode=1155, floor = 2000. Проверь VERSION_CODE_OFFSET и fetch-depth: 0."
+          VC_EXPECTED=$(grep '^VERSION_CODE=' gradle.properties | cut -d= -f2)
+          if [ -z "$VC" ] || [ "$VC" != "$VC_EXPECTED" ]; then
+            echo "::error::APK versionCode=$VC ≠ VERSION_CODE=$VC_EXPECTED в gradle.properties"
+            exit 1
+          fi
+          if [ "$VC" -lt 2211 ]; then
+            echo "::error::APK versionCode=$VC < floor 2211 (v0.2.1 baseline)"
             exit 1
           fi
           echo "APK versionCode=$VC OK"
