@@ -7,13 +7,11 @@ val gitVersionName: String = providers.environmentVariable("OZERO_VERSION_NAME")
 
 val versionCodeOffset = 1500
 val versionCodeFloor = 2000
-val gitVersionCode: Int = maxOf(
-    (providers.exec {
-        commandLine("git", "rev-list", "--count", "HEAD")
-        isIgnoreExitValue = true
-    }.standardOutput.asText.get().trim().toIntOrNull() ?: 1) + versionCodeOffset,
-    versionCodeFloor,
-)
+val gitCommitCount: Int = providers.exec {
+    commandLine("git", "rev-list", "--count", "HEAD")
+    isIgnoreExitValue = true
+}.standardOutput.asText.get().trim().toIntOrNull() ?: 1
+val gitVersionCode: Int = maxOf(gitCommitCount + versionCodeOffset, versionCodeFloor)
 
 plugins {
     id("ozero.android.application")
