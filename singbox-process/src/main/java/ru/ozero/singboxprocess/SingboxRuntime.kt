@@ -25,11 +25,8 @@ internal object SingboxRuntime {
     @Volatile
     private var tun2ray: Tun2ray? = null
 
-    suspend fun start(
-        tunFd: Int,
-        singboxJsonConfig: String,
-        protectorBridge: SingboxProtectorBridge,
-    ) = withContext(Dispatchers.Main.immediate) {
+    suspend fun start(tunFd: Int, singboxJsonConfig: String, protectorBridge: SingboxProtectorBridge) =
+        withContext(Dispatchers.Main.immediate) {
         mutex.withLock {
             check(v2ray == null) { "SingboxRuntime already running" }
             val instance = V2RayInstance()
