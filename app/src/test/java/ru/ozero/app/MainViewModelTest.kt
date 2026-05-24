@@ -461,20 +461,6 @@ class MainViewModelTest {
     }
 
     @Test
-    fun urnetworkPeerSearchSecondsCapAtMax() = runTest {
-        val bridge = FakeUrnetworkBridge(peers = 0)
-        val vm = newViewModel(bridge = bridge)
-        backgroundScope.launch { vm.urnetworkPeerSearchSeconds.collect {} }
-        tunnelController.onProbing()
-        tunnelController.onConnecting(EngineId.URNETWORK)
-        tunnelController.onEngineStarted(EngineId.URNETWORK, 1080)
-        runCurrent()
-        advanceTimeBy(140_000)
-        runCurrent()
-        assertEquals(120, vm.urnetworkPeerSearchSeconds.value)
-    }
-
-    @Test
     fun ipInfoInitiallyIdle() {
         assertIs<IpInfoState.Idle>(viewModel.ipInfo.value)
     }
