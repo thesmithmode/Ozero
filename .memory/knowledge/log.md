@@ -1,5 +1,11 @@
 # Build Log
 
+## [2026-05-24T21:10:45+03:00] compile | daily/2026-05-24.md
+- Source: daily/2026-05-24.md
+- Articles created: (none)
+- Articles updated: [[concepts/singbox-engine-design]], [[concepts/singbox-subscription-architecture]], [[concepts/ci-gradle-log-reading]], [[concepts/kotlin-expression-body-return-trap]], [[concepts/hilt-cross-process-injection]], [[concepts/kapt-per-module-requirement]], [[concepts/cascade-unresolved-import-masking]], [[concepts/parallel-chat-instruction-leak]], [[concepts/git-contributor-rewrite]]
+- Notes: All listed articles were fully compiled in passes 1-7 (same day). No new information to add — all facts from this instruction block are already present in existing articles.
+
 ## [2026-05-24T21:30:00+03:00] compile | 2026-05-24.md (pass 7 — gap fill)
 - Source: daily/2026-05-24.md
 - Articles created: [[concepts/singbox-subscription-architecture]] (file was missing despite being listed in index/log)
