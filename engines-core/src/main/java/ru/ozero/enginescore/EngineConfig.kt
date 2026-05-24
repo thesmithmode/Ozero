@@ -68,6 +68,20 @@ sealed class EngineConfig {
             "MasterDns(configToml=***, resolvers=${resolvers.size} entries, socksPort=$socksPort)"
     }
 
+    data class Singbox(
+        val beanBlob: ByteArray,
+        val protocolType: Int,
+    ) : EngineConfig() {
+        override val engineId = EngineId.SINGBOX
+        override fun toString(): String = "Singbox(protocol=$protocolType, blobSize=${beanBlob.size})"
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is Singbox) return false
+            return protocolType == other.protocolType && beanBlob.contentEquals(other.beanBlob)
+        }
+        override fun hashCode(): Int = 31 * protocolType + beanBlob.contentHashCode()
+    }
+
     data class Fptn(
         val token: String = "",
         val selectedServerName: String? = null,

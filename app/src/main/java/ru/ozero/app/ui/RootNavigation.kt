@@ -24,6 +24,7 @@ import ru.ozero.app.ui.settings.engines.MasterDnsSettingsScreen
 import ru.ozero.app.ui.settings.engines.UrnetworkEngineSettingsScreen
 import ru.ozero.app.ui.settings.engines.UrnetworkSharedTrafficScreen
 import ru.ozero.app.ui.settings.engines.WarpEngineSettingsScreen
+import ru.ozero.app.ui.settings.engines.singbox.SingboxEngineSettingsScreen
 import ru.ozero.app.ui.splittunnel.SplitTunnelScreen
 import ru.ozero.app.ui.stats.TrafficStatsScreen
 import ru.ozero.app.ui.strategy.StrategyTestScreen
@@ -35,6 +36,7 @@ private fun engineParamsTarget(engineId: EngineId?): TopScreen = when (engineId)
     EngineId.BYEDPI -> TopScreen.ByeDpiEngineSettings
     EngineId.MASTERDNS -> TopScreen.MasterDnsSettings
     EngineId.FPTN -> TopScreen.FptnSettings
+    EngineId.SINGBOX -> TopScreen.SingboxSettings
     else -> TopScreen.Servers
 }
 
@@ -68,6 +70,7 @@ fun RootNavigation(
                     onOpenWarpSettings = { navigate(TopScreen.WarpEngineSettings) },
                     onOpenMasterDnsSettings = { navigate(TopScreen.MasterDnsSettings) },
                     onOpenFptnSettings = { navigate(TopScreen.FptnSettings) },
+                    onOpenSingboxSettings = { navigate(TopScreen.SingboxSettings) },
                     onOpenManualServer = { navigate(TopScreen.ManualServer) },
                     onOpenStatsHistory = { navigate(TopScreen.StatsHistory) },
                     onOpenDiagnostics = { navigate(TopScreen.Diagnostics) },
@@ -96,6 +99,7 @@ fun RootNavigation(
             TopScreen.WarpEngineSettings -> WarpEngineSettingsScreen(onBack = { back() })
             TopScreen.MasterDnsSettings -> MasterDnsSettingsScreen(onBack = { back() })
             TopScreen.FptnSettings -> FptnEngineSettingsScreen(onBack = { back() })
+            TopScreen.SingboxSettings -> SingboxEngineSettingsScreen(onBack = { back() })
             TopScreen.StrategyTest -> StrategyTestScreen(onBack = { back() })
             TopScreen.ManualServer -> ManualServerScreen(onBack = { back() })
             TopScreen.StatsHistory -> TrafficStatsScreen(onBack = { back() })

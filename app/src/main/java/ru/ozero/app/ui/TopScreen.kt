@@ -20,4 +20,5 @@ enum class TopScreen {
     UrnetworkSharedTraffic,
     MasterDnsSettings,
     FptnSettings,
+    SingboxSettings,
 }

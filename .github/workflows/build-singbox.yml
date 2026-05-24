@@ -1,0 +1,61 @@
+name: Build Singbox AAR
+
+on:
+  workflow_dispatch:
+    inputs:
+      singbox_ref:
+        description: 'sing-box-for-android git ref (commit/tag/branch)'
+        required: true
+        default: 'main'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Ozero
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android NDK
+        run: |
+          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME" >> "$GITHUB_ENV"
+
+      - name: Build singbox AAR
+        env:
+          SINGBOX_REF: ${{ inputs.singbox_ref }}
+        run: bash engine-singbox/scripts/build_singbox.sh
+
+      - name: Read meta
+        id: meta
+        run: |
+          source build/singbox-binaries/meta.txt
+          echo "commit_short=${commit_short}" >> "$GITHUB_OUTPUT"
+          echo "tag=singbox-${commit_short}" >> "$GITHUB_OUTPUT"
+
+      - name: Print sha256sums
+        run: cat build/singbox-binaries/sha256sums.txt
+
+      - name: Create release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: singbox-${{ steps.meta.outputs.commit_short }}
+          files: |
+            build/singbox-binaries/libsingboxgojni.aar
+            build/singbox-binaries/libsingboxgojni-arm64-v8a.so
+            build/singbox-binaries/sha256sums.txt
+          generate_release_notes: false
+          fail_on_unmatched_files: true

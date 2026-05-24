@@ -110,6 +110,13 @@ dependencies {
     implementation(project(":engine-warp"))
     implementation(project(":engine-masterdns"))
     implementation(project(":engine-fptn"))
+    implementation(project(":engine-singbox"))
+    implementation(project(":singbox-process"))
+    implementation(project(":singbox-core"))
+    implementation(project(":singbox-fmt"))
+    implementation(project(":singbox-config"))
+    implementation(project(":singbox-room"))
+    implementation(project(":singbox-subscription"))
     implementation(project(":core-backup"))
 
     implementation(

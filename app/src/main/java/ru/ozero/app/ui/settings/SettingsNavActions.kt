@@ -16,4 +16,5 @@ data class SettingsNavActions(
     val onOpenLanguage: () -> Unit = {},
     val onOpenMasterDnsSettings: () -> Unit = {},
     val onOpenFptnSettings: () -> Unit = {},
+    val onOpenSingboxSettings: () -> Unit = {},
 )

@@ -9,6 +9,7 @@ sources:
   - "daily/2026-05-04.md"
   - "daily/2026-05-07.md"
   - "daily/2026-05-14.md"
+  - "daily/2026-05-24.md"
 created: 2026-04-29
 updated: 2026-05-24
 ---
@@ -69,6 +70,20 @@ A fourth CI truthfulness rule: when a new Gradle module is created, it is NOT au
 
 Rule: whenever a new `engine-*` module is added, immediately verify that `ci.yml` includes it in the test command. A `BUILD SUCCESSFUL — 0 tests run` on the new module is the signal to check the CI config.
 
+### @Volatile Fields Require a Blank Line Before Them (2026-05-24)
+
+ktlint enforces that declarations with annotations (`@Volatile`, `@GuardedBy`, etc.) must have an empty line before them when they follow another declaration. Absence of the blank line produces the error: `Declarations and declarations with annotations should have an empty space between`.
+
+This was caught during v0.3.0 preparation: `EngineWarp` and `RealWarpSdkBridge` each had `@Volatile` fields added without a blank line separator. The fix is mechanical — add a blank line before any `@Volatile`/`@GuardedBy` field when it follows another field or function.
+
+Rule: whenever adding an annotated field (especially `@Volatile`), check that there is a blank line between it and the preceding declaration.
+
+### upload-artifact v7 Breaking API Change (2026-05-24)
+
+`actions/upload-artifact@v7` changed its required inputs: both `name` and `path` are now mandatory; previously optional deprecated parameters were removed. Bumping from v3/v4 to v7 in `release.yml` without updating the step inputs causes the action to fail with a missing required input error.
+
+Rule: when bumping `upload-artifact` version, read the release notes for input changes before applying the bump.
+
 ## Related Concepts
 
 - [[concepts/release-process]] - Release tagging happens only after CI is green on `dev`
@@ -85,3 +100,4 @@ Rule: whenever a new `engine-*` module is added, immediately verify that `ci.yml
 - [[daily/2026-05-04.md]] - Session 15:22: v0.0.2 CI red twice in succession (OkHttp force() + stub class); lesson = read ALL errors in a run before acting; first symptom ≠ only root
 - [[daily/2026-05-07.md]] - Session 13:24: commit `ee1c1ea` forceVanilla=false + test expecting VANILLA undetected; `gh run list --commit ee1c1ea` empty — CI not triggered; intermediate commit validation gap rule established
 - [[daily/2026-05-14.md]] - new `engine-telegram` module silently skipped by CI test job; explicit module list in ci.yml required
+- [[daily/2026-05-24.md]] - Session 15:46: v0.3.0 CI failed on `@Volatile` blank line missing (EngineWarp + RealWarpSdkBridge) and `upload-artifact@v7` breaking input API change

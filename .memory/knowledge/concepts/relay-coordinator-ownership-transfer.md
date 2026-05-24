@@ -4,8 +4,9 @@ aliases: [relay-owned, coordinator-ownership, relay-bridge-lifecycle]
 tags: [urnetwork, architecture, coordinator-pattern, concurrency]
 sources:
   - "daily/2026-05-17.md"
+  - "daily/2026-05-22 (1).md"
 created: 2026-05-17
-updated: 2026-05-17
+updated: 2026-05-22
 ---
 
 # Relay Coordinator Ownership Transfer Pattern
@@ -94,6 +95,35 @@ The coordinator observes `byClientJwt` and `walletAddress` flows alongside tunne
 - [[concepts/engine-telegram-mtproxy]] - TelegramProxyCoordinator follows the same combine(tunnelState, config) observer pattern
 - [[concepts/engine-ownership-boundary]] - VpnService owns engine lifecycle; coordinator owns relay lifecycle — distinct ownership domains
 
+### providePaused Hardcode Bug (2026-05-22)
+
+`UrnetworkRelayCoordinator` lines 67+81 originally called `bridge.setProvidePaused(false)` unconditionally in both branches — ignoring `configStore`. This meant:
+
+- **URNETWORK branch**: coordinator overwrote the result of `EngineUrnetwork.start()` which had already applied configStore. If the user had disabled "provide" in settings, the coordinator immediately re-enabled it.
+- **Relay branch (other engines)**: coordinator hardcoded `false` instead of reading `configStore.provideEnabled()`.
+
+The bug was latent from commit `194d7701` (first implementation) and became visible only when the UI gained a settings toggle for `provide` that could be changed from NotConnected state.
+
+**Fix** (commit `e0d53ca4`):
+
+```kotlin
+when (engineId) {
+    EngineId.URNETWORK -> {
+        // Engine already applied configStore — do NOT override
+        relayOwned.set(false)
+        // removed: bridge.setProvidePaused(false)
+    }
+    else -> {
+        bridge.start(relayConfig)
+        relayOwned.set(true)
+        bridge.setProvidePaused(!configStore.provideEnabled())  // read from store
+    }
+}
+```
+
+`UrnetworkEngineSettingsViewModel` now exposes `providePaused: StateFlow` sourced from `configStore`, keeping UI and coordinator in sync.
+
 ## Sources
 
 - [[daily/2026-05-17.md]] - Session current: UrnetworkRelayCoordinator implemented with relayOwned AtomicBoolean; bridge.start() made idempotent; commit 194d7701; ownership transfer between engine and coordinator for URNETWORK↔other transitions
+- [[daily/2026-05-22 (1).md]] - Session 16:02+: setProvidePaused(false) hardcoded in both coordinator branches since 194d7701; ignored configStore; engine branch overwrote EngineUrnetwork.start() result; fix: URNETWORK branch removes call, relay branch reads configStore.provideEnabled(); commit e0d53ca4
