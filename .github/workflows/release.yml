@@ -338,6 +338,12 @@ jobs:
             "Lru/ozero/app/OzeroApp;"
             "Lru/ozero/app/Hilt_OzeroApp;"
             "Lru/ozero/app/MainActivity;"
+            "Lru/ozero/app/OzeroQuickTile;"
+            "Lru/ozero/app/BootReceiver;"
+            "Lru/ozero/app/selfupdate/UpdateInstallResultReceiver;"
+            "Lru/ozero/app/warp/WarpEngineService;"
+            "Lru/ozero/singboxprocess/SingboxEngineService;"
+            "Lru/ozero/app/ui/strategy/StrategyScanService;"
           )
           for cls in "${REQUIRED_CLASSES[@]}"; do
             if ! grep -aor "$cls" "$WORK"/classes*.dex | head -n1 | grep -q "$cls"; then
