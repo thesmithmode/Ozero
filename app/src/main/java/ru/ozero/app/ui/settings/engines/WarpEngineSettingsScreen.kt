@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -111,9 +113,16 @@ fun WarpEngineSettingsScreen(
         contract = ActivityResultContracts.GetContent(),
     ) { uri ->
         uri ?: return@rememberLauncherForActivityResult
+        val displayName = context.contentResolver.query(
+            uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null,
+        )?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null } ?: "import"
         val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
             ?: return@rememberLauncherForActivityResult
-        viewModel.onImportFile(ByteArrayInputStream(bytes))
+        if (displayName.endsWith(".yaml", ignoreCase = true) || displayName.endsWith(".yml", ignoreCase = true)) {
+            viewModel.onImportClashYaml(ByteArrayInputStream(bytes), displayName)
+        } else {
+            viewModel.onImportFile(ByteArrayInputStream(bytes))
+        }
     }
     Scaffold(
         modifier = Modifier.testTag("warp_settings"),
@@ -152,6 +161,18 @@ fun WarpEngineSettingsScreen(
                 ImportSuccessOverlay(
                     modifier = Modifier.align(Alignment.Center).alpha(overlayAlpha),
                 )
+            }
+            if (state.isProvingEndpoints) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator()
+                        Spacer(Modifier.height(16.dp))
+                        Text(state.provingProgress, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
             }
         }
     }
@@ -815,6 +836,13 @@ private fun WarpConfigSlotCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (slot.endpointList.size > 1) {
+                    Text(
+                        text = stringResource(R.string.warp_endpoint_count, slot.endpointList.size),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
             IconButton(onClick = onStartEdit) {
                 Icon(Icons.Filled.Edit, contentDescription = null)
