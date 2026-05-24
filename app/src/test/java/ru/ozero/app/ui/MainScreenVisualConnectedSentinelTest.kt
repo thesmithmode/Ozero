@@ -62,6 +62,31 @@ class MainScreenVisualConnectedSentinelTest {
         )
     }
 
+    @Test
+    fun `computePowerDiscState — Disconnecting маппится в Off а не в Connecting`() {
+        val source = locateMainScreen().readText()
+        val fnStart = source.indexOf("private fun computePowerDiscState(")
+        assertTrue(fnStart >= 0, "computePowerDiscState не найдена в MainScreen.kt")
+        var depth = 0
+        var i = source.indexOf('{', fnStart)
+        val bodyStart = i
+        while (i < source.length) {
+            when (source[i]) {
+                '{' -> depth++
+                '}' -> { depth--; if (depth == 0) break }
+            }
+            i++
+        }
+        val body = source.substring(bodyStart, i + 1)
+        assertFalse(
+            body.contains("TunnelState.Disconnecting"),
+            "computePowerDiscState НЕ должен упоминать TunnelState.Disconnecting — " +
+                "Disconnecting маппится в Off через else-ветку. " +
+                "Disconnecting → Connecting вызывает yellow flash после green при фейле WARP: " +
+                "видно оба цвета одновременно (yellow+green overlap). Баг 2026-05-25.",
+        )
+    }
+
     private fun extractFunBody(source: String, funName: String): String {
         val pattern = Regex("""fun\s+$funName\s*\(""")
         val match = pattern.find(source) ?: error("$funName не найдена в MainScreen.kt")

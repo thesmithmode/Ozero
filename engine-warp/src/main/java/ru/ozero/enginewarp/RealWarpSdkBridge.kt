@@ -4,6 +4,7 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.VpnSocketProtector
@@ -200,6 +201,10 @@ class RealWarpSdkBridge(
                 awgRuntime.turnOff(h)
                 val dt = System.currentTimeMillis() - started
                 PersistentLoggers.warn(TAG, "awgTurnOff JNI exit handle=$h dt=${dt}ms thread=$thread")
+                // Go goroutines from the killed tunnel don't stop synchronously.
+                // Without a pause, a rapid awgTurnOn reuses handle=0 before the old
+                // goroutines finish, causing handshake interference on the next session.
+                delay(AWG_TEARDOWN_COOLDOWN_MS)
             } catch (t: Throwable) {
                 val dt = System.currentTimeMillis() - started
                 PersistentLoggers.error(TAG, "awgTurnOff failed dt=${dt}ms: ${t.message} (${t.javaClass.name})")
@@ -212,6 +217,7 @@ class RealWarpSdkBridge(
     private companion object {
         const val TAG = "RealWarpSdkBridge"
         const val INVALID_HANDLE = -1
+        const val AWG_TEARDOWN_COOLDOWN_MS = 300L
 
         fun validateIniStructure(ini: String): String? {
             val hasInterface = ini.lineSequence().any { it.trim().equals("[Interface]", ignoreCase = true) }
