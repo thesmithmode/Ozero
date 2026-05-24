@@ -35,7 +35,12 @@ class DataStoreWarpConfigSlotStore(
         list.firstOrNull { it.isActive }?.config
     }
 
-    override suspend fun addSlot(name: String, config: WarpConfig, rawIni: String?, endpointList: List<String>): String = mutex.withLock {
+    override suspend fun addSlot(
+        name: String,
+        config: WarpConfig,
+        rawIni: String?,
+        endpointList: List<String>,
+    ): String = mutex.withLock {
         val id = UUID.randomUUID().toString()
         val fingerprint = config.dedupFingerprint()
         var duplicate: WarpConfigSlot? = null
@@ -78,8 +83,13 @@ class DataStoreWarpConfigSlotStore(
         }
     }
 
-    override suspend fun updateSlot(id: String, name: String, config: WarpConfig, rawIni: String?, endpointList: List<String>): Unit =
-        mutex.withLock {
+    override suspend fun updateSlot(
+        id: String,
+        name: String,
+        config: WarpConfig,
+        rawIni: String?,
+        endpointList: List<String>,
+    ): Unit = mutex.withLock {
             dataStore.edit { prefs ->
                 val current = parseSlots(prefs[KEY_SLOTS] ?: "[]")
                 val updated = current.map { slot ->

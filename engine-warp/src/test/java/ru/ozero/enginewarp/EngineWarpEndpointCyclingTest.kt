@@ -79,9 +79,12 @@ class EngineWarpEndpointCyclingTest {
         assertIs<StartResult.Success>(result)
         engine.tunSpec()
         engine.attachTun(42)
-        assertEquals("1.0.0.2:2408", attachedIni?.lines()
-            ?.firstOrNull { it.trimStart().startsWith("Endpoint") }
-            ?.substringAfter('=')?.trim())
+        assertEquals(
+            "1.0.0.2:2408",
+            attachedIni?.lines()
+                ?.firstOrNull { it.trimStart().startsWith("Endpoint") }
+                ?.substringAfter('=')?.trim(),
+        )
     }
 
     @Test
@@ -106,9 +109,12 @@ class EngineWarpEndpointCyclingTest {
         engine.start(EngineConfig.Warp, Upstream.None)
         engine.tunSpec()
         engine.attachTun(42)
-        assertEquals(endpoints.first(), attachedIni?.lines()
-            ?.firstOrNull { it.trimStart().startsWith("Endpoint") }
-            ?.substringAfter('=')?.trim())
+        assertEquals(
+            endpoints.first(),
+            attachedIni?.lines()
+                ?.firstOrNull { it.trimStart().startsWith("Endpoint") }
+                ?.substringAfter('=')?.trim(),
+        )
     }
 
     @Test

@@ -234,10 +234,21 @@ class EngineWarpStatsRecoverTest {
         override fun activeSlot(): Flow<WarpConfigSlot?> =
             MutableStateFlow(slots.value.firstOrNull { it.isActive })
         override fun activeConfig(): Flow<WarpConfig?> = MutableStateFlow(active)
-        override suspend fun addSlot(name: String, config: WarpConfig, rawIni: String?, endpointList: List<String>): String = "id"
+        override suspend fun addSlot(
+            name: String,
+            config: WarpConfig,
+            rawIni: String?,
+            endpointList: List<String>,
+        ): String = "id"
         override suspend fun setActive(id: String) = Unit
         override suspend fun rename(id: String, name: String) = Unit
-        override suspend fun updateSlot(id: String, name: String, config: WarpConfig, rawIni: String?, endpointList: List<String>) = Unit
+        override suspend fun updateSlot(
+            id: String,
+            name: String,
+            config: WarpConfig,
+            rawIni: String?,
+            endpointList: List<String>,
+        ) = Unit
         override suspend fun delete(id: String) = Unit
         override suspend fun clear() = Unit
         override suspend fun replaceAll(slots: List<WarpConfigSlot>) = Unit

@@ -3,7 +3,6 @@ package ru.ozero.enginewarp
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class ClashYamlParserTest {

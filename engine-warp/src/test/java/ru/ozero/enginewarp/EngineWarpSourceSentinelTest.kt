@@ -168,10 +168,22 @@ class EngineWarpSourceSentinelTest {
         override fun slots(): Flow<List<WarpConfigSlot>> = MutableStateFlow(listOf(slot))
         override fun activeSlot(): Flow<WarpConfigSlot?> = MutableStateFlow(slot)
         override fun activeConfig(): Flow<WarpConfig?> = MutableStateFlow(slot.config)
-        override suspend fun addSlot(name: String, config: WarpConfig, rawIni: String?, endpointList: List<String>) = "id"
+        override suspend fun addSlot(
+            name: String,
+            config: WarpConfig,
+            rawIni: String?,
+            endpointList: List<String>,
+        ) = "id"
         override suspend fun setActive(id: String) {}
         override suspend fun rename(id: String, name: String) {}
-        override suspend fun updateSlot(id: String, name: String, config: WarpConfig, rawIni: String?, endpointList: List<String>) {}
+        override suspend fun updateSlot(
+            id: String,
+            name: String,
+            config: WarpConfig,
+            rawIni: String?,
+            endpointList: List<String>,
+        ) {
+        }
         override suspend fun delete(id: String) {}
         override suspend fun clear() {}
         override suspend fun replaceAll(slots: List<WarpConfigSlot>) {}
