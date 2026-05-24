@@ -13,6 +13,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":engines-core"))
     implementation(
         fileTree(
             mapOf(
