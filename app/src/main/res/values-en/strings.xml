@@ -452,15 +452,23 @@
     <string name="manual_server_error_import_unavailable">Import is not available in this build</string>
 
     <!-- Logs screen -->
+    <string name="logs_title">Logs</string>
     <string name="logs_title_fmt">Logs (%1$dKB)</string>
     <string name="logs_back_cd">Back</string>
     <string name="logs_copy">Copy</string>
     <string name="logs_clear_cd">Clear</string>
     <string name="logs_share_cd">Share</string>
-    <string name="logs_empty">(empty — log has not been written yet)</string>
+    <string name="logs_empty">No entries</string>
     <string name="logs_share_chooser_title">Share ozero.log</string>
     <string name="logs_copy_empty_toast">Empty — nothing to copy</string>
     <string name="logs_copy_done_toast_fmt">Copied (%1$d chars)</string>
+    <string name="logs_export">Export .log</string>
+    <string name="logs_footer_fmt">%1$d / %2$d entries</string>
+    <!-- Warp tweaks screen -->
+    <string name="warp_tweaks_button">Connection Settings</string>
+    <string name="warp_tweaks_title">Connection Settings</string>
+    <string name="warp_tweaks_endpoint_section">Endpoint</string>
+    <string name="warp_tweaks_awg_section">AmneziaWG Settings</string>
 
     <!-- ByeDPI engine settings -->
     <string name="byedpi_args_description">libbyedpi launch arguments. Used to bypass DPI inspection. Details: github.com/hufrea/byedpi</string>
