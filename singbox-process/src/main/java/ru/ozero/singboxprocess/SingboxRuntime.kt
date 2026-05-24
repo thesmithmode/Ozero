@@ -1,10 +1,10 @@
 package ru.ozero.singboxprocess
 
-import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.singboxcore.Tun2ray
 import ru.ozero.singboxcore.TunConfig
 import ru.ozero.singboxcore.V2RayInstance
@@ -52,7 +52,7 @@ internal object SingboxRuntime {
                 val tun = Tun2ray.create(tunConfig)
                 v2ray = instance
                 tun2ray = tun
-                Log.i(TAG, "runtime started fd=$tunFd")
+                PersistentLoggers.info(TAG, "runtime started fd=$tunFd")
             }
         }
 
@@ -62,7 +62,7 @@ internal object SingboxRuntime {
             tun2ray = null
             v2ray?.stop()
             v2ray = null
-            Log.i(TAG, "runtime stopped")
+            PersistentLoggers.info(TAG, "runtime stopped")
         }
     }
 

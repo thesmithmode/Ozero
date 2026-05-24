@@ -20,4 +20,5 @@
     <string name="singbox_link_error_empty">Pegue un VLESS share-link</string>
     <string name="singbox_link_error_parse">Error de análisis: %1$s</string>
     <string name="singbox_link_error_save">Error al guardar: %1$s</string>
+    <string name="singbox_refresh_error">Error al actualizar: %1$s</string>
 </resources>

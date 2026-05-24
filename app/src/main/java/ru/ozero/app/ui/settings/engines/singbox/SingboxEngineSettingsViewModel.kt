@@ -40,6 +40,7 @@ data class SingboxSettingsUiState(
     val customLinkSaved: Boolean = false,
     val customLinkError: CustomLinkError? = null,
     val isRefreshing: Set<Long> = emptySet(),
+    val groupRefreshErrors: Map<Long, String> = emptyMap(),
     val showAddGroupDialog: Boolean = false,
     val addGroupName: String = "",
     val addGroupUrl: String = "",
@@ -99,13 +100,28 @@ class SingboxEngineSettingsViewModel @Inject constructor(
 
     private suspend fun refreshGroupInternal(groupId: Long) {
         val group = groupDao.getById(groupId) ?: return
-        _uiState.update { it.copy(isRefreshing = it.isRefreshing + groupId) }
-        rawUpdater.refresh(group)
+        _uiState.update {
+            it.copy(
+                isRefreshing = it.isRefreshing + groupId,
+                groupRefreshErrors = it.groupRefreshErrors - groupId,
+            )
+        }
+        val result = rawUpdater.refresh(group)
         val profiles = profileDao.getByGroupId(groupId)
         _uiState.update {
+            val errorMsg = if (result.isFailure && profiles.isEmpty()) {
+                result.exceptionOrNull()?.message ?: "error"
+            } else {
+                null
+            }
             it.copy(
                 isRefreshing = it.isRefreshing - groupId,
                 groupProfiles = it.groupProfiles + (groupId to profiles),
+                groupRefreshErrors = if (errorMsg != null) {
+                    it.groupRefreshErrors + (groupId to errorMsg)
+                } else {
+                    it.groupRefreshErrors - groupId
+                },
             )
         }
     }

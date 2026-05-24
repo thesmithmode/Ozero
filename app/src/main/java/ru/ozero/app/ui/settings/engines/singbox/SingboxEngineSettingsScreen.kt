@@ -92,6 +92,7 @@ fun SingboxEngineSettingsScreen(
                     profiles = state.groupProfiles[group.id] ?: emptyList(),
                     selectedProfileId = state.selectedProfileId,
                     isRefreshing = group.id in state.isRefreshing,
+                    refreshError = state.groupRefreshErrors[group.id],
                     onToggle = { viewModel.onGroupExpand(group.id) },
                     onRefresh = { viewModel.onRefreshGroup(group.id) },
                     onDelete = { viewModel.onDeleteGroup(group) },
@@ -177,6 +178,7 @@ private fun SubscriptionGroupItem(
     profiles: List<ProxyProfile>,
     selectedProfileId: Long?,
     isRefreshing: Boolean,
+    refreshError: String?,
     onToggle: () -> Unit,
     onRefresh: () -> Unit,
     onDelete: () -> Unit,
@@ -220,11 +222,20 @@ private fun SubscriptionGroupItem(
 
         if (isExpanded) {
             if (profiles.isEmpty() && !isRefreshing) {
-                Text(
-                    text = stringResource(R.string.singbox_no_profiles_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(start = 28.dp, bottom = 8.dp),
-                )
+                if (refreshError != null) {
+                    Text(
+                        text = stringResource(R.string.singbox_refresh_error, refreshError),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(start = 28.dp, bottom = 8.dp),
+                    )
+                } else {
+                    Text(
+                        text = stringResource(R.string.singbox_no_profiles_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(start = 28.dp, bottom = 8.dp),
+                    )
+                }
             } else {
                 profiles.forEach { profile ->
                     ProfileItem(
