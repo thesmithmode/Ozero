@@ -462,7 +462,6 @@ private fun ExpertStatusBadges(
     }
 }
 
-
 internal fun resolveUiSelectedEngine(
     tunnelState: TunnelState,
     switching: SwitchingTransition?,

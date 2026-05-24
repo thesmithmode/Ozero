@@ -15,6 +15,7 @@ class RealWarpSdkBridge(
 ) : WarpSdkBridge {
 
     private val tunnelHandle = AtomicInteger(INVALID_HANDLE)
+
     @Volatile private var savedProtector: VpnSocketProtector? = null
 
     override suspend fun attachTun(

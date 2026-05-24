@@ -56,6 +56,7 @@ class EngineWarp(
         pluginScope ?: CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val statsJobRef = AtomicReference<Job?>(null)
     private val connectedSinceRef = AtomicReference<Long>(0L)
+
     @Volatile private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
     override val id = EngineId.WARP
@@ -104,7 +105,13 @@ class EngineWarp(
         statsJobRef.getAndSet(null)?.cancel()
         connectedSinceRef.set(0L)
         _stats.value = EngineStats()
-        unregisterNetworkCallback()
+        networkCallback?.let { cb ->
+            networkCallback = null
+            runCatching {
+                (context?.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager)
+                    ?.unregisterNetworkCallback(cb)
+            }.onFailure { PersistentLoggers.warn(TAG, "unregisterNetworkCallback failed: ${it.message}") }
+        }
         sdkBridge.detachTun()
         resolvedConfig = null
         resolvedIni = null
@@ -238,13 +245,7 @@ class EngineWarp(
             .onFailure { PersistentLoggers.warn(TAG, "registerDefaultNetworkCallback failed: ${it.message}") }
     }
 
-    private fun unregisterNetworkCallback() {
-        val cb = networkCallback ?: return
-        networkCallback = null
-        val cm = context?.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
-        runCatching { cm.unregisterNetworkCallback(cb) }
-            .onFailure { PersistentLoggers.warn(TAG, "unregisterNetworkCallback failed: ${it.message}") }
-    }
+
 
     private fun startStatsPoll(uapiPath: String) {
         statsJobRef.getAndSet(null)?.cancel()
