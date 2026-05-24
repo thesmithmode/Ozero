@@ -43,7 +43,7 @@ extensions.configure<BaseAppModuleExtension> {
                 storePassword = keystorePassword
                 this.keyAlias = keyAlias
                 this.keyPassword = keyPassword
-                                                enableV1Signing = false
+                enableV1Signing = true
                 enableV2Signing = true
                 enableV3Signing = true
             }
