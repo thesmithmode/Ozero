@@ -464,7 +464,9 @@ class WarpEngineSettingsViewModelTest {
         val throwingStore = object : FakeWarpStore() {
             override suspend fun migrateIfNeeded() = error("migration boom")
         }
-        val vm = WarpEngineSettingsViewModel(throwingStore, FakeAutoConfig(), FakeFileImporter())
+        val vm = WarpEngineSettingsViewModel(
+            throwingStore, FakeAutoConfig(), FakeFileImporter(), FakeWarpEndpointProber(),
+        )
         advanceUntilIdle()
         assertEquals("migration boom", vm.uiState.value.errorMessage)
     }
