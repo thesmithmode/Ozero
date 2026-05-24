@@ -97,4 +97,4 @@ Key pitfalls encountered during P4 CI cycles:
 
 ## Sources
 
-- [[daily/2026-05-24.md]] — Evening sessions: sing-box engine design plan v1.0→v1.2; urlTest multi-outbound architecture; AD-15 Gradle physical isolation; preset_groups.json from КИБЕРЩИТ-X restored after misattributed user message; kill switch/split tunnel inheritance from OzeroVpnService; P4 subscription module implementation with Room + fetch pipeline; P5 UI subscription management; 15+ CI iterations resolving Kotlin compile errors
+- [[daily/2026-05-24.md]] — Evening sessions: sing-box engine design plan v1.0→v1.2; urlTest multi-outbound architecture; AD-15 Gradle physical isolation (`singbox-process` must NOT depend on `:singbox-room`); preset_groups.json from КИБЕРЩИТ-X restored after misattributed user message (parallel-chat leak: "no presets" instruction sent to WARP context, incorrectly removed AD-14 from sing-box plan — restored after detection); kill switch/split tunnel inheritance from OzeroVpnService; P4 subscription module implementation with Room + fetch pipeline; P5 UI subscription management; 15+ CI iterations resolving Kotlin compile errors
