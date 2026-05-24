@@ -15,10 +15,11 @@ In Kotlin, a function declared with expression body syntax (`fun foo() = expr`) 
 ## Key Points
 
 - `fun foo(): T? = try { ... return null ... }` → compile error; must convert to block body `fun foo(): T? { return try { ... null ... } }`
-- `return@functionName` is only valid inside a lambda call (e.g., `forEach`, `map`), NOT inside the function itself
+- `return@functionName` syntax in a regular function (not a lambda) is illegal — causes `'return' is not allowed here` compile error; only valid inside lambdas
 - `return` inside a `map { }` lambda (which is inline) is a non-local return — exits the enclosing function, not just the lambda
 - `return@map null` is the labeled return to exit only the lambda, keeping the surrounding function running
 - `return@async null` inside an `async { }` block is valid because it labels the async coroutine builder's lambda
+- Expression body functions defined as `fun foo() = try { ... }` cannot have any `return` or `return@label` inside — must rewrite as block body `fun foo() { return try { ... } }` or use `null` directly as the last expression
 
 ## Details
 
@@ -74,4 +75,4 @@ This trap was encountered massively during the `engine-singbox` P4 implementatio
 
 ## Sources
 
-- [[daily/2026-05-24.md]] — Session 19:13: multiple CI failures in engine-singbox due to `return` in expression body functions (`parseVlessUrl`, `parseShadowsocksUrl`, etc.) and `return@coroutineScope` in `SingboxPresetRepository.fetchAll()`; fixed by converting to block body and removing non-local returns
+- [[daily/2026-05-24.md]] — Session 19:13: multiple CI failures in engine-singbox due to `return` in expression body functions (`parseVlessUrl`, `parseShadowsocksUrl`, etc.) and `return@coroutineScope` in `SingboxPresetRepository.fetchAll()`; fixed by converting to block body and removing non-local returns; `return@label` in regular function bodies also caused `'return' is not allowed here` — only valid inside lambdas

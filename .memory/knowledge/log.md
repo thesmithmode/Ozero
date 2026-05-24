@@ -1,5 +1,10 @@
 # Build Log
 
+## [2026-05-24T21:46:00] compile | 2026-05-24.md
+- Source: daily/2026-05-24.md
+- Articles created: [[concepts/ktlint-volatile-annotation-spacing]]
+- Articles updated: [[concepts/hilt-cross-process-injection]], [[concepts/singbox-engine-design]], [[concepts/singbox-subscription-architecture]], [[concepts/kotlin-expression-body-return-trap]], [[concepts/kapt-per-module-requirement]], [[concepts/ci-gradle-log-reading]], [[concepts/cascade-unresolved-import-masking]]
+
 ## [2026-05-24T21:10:45+03:00] compile | daily/2026-05-24.md
 - Source: daily/2026-05-24.md
 - Articles created: (none)
