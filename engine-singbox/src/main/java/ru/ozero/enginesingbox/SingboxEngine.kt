@@ -16,11 +16,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import ru.ozero.enginescore.EngineCapabilities
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
@@ -51,11 +48,11 @@ class SingboxEngine @Inject constructor(
     private val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Volatile
-    private var cachedBlob: ByteArray? = runBlocking { dataStore.data.first()[BEAN_KEY] }
+    private var cachedBlob: ByteArray? = null
 
     init {
         engineScope.launch {
-            dataStore.data.drop(1).collect { prefs -> cachedBlob = prefs[BEAN_KEY] }
+            dataStore.data.collect { prefs -> cachedBlob = prefs[BEAN_KEY] }
         }
     }
 

@@ -25,8 +25,10 @@ class SubscriptionUpdateWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         val groups = groupDao.getAll().filter { it.autoUpdate }
-        groups.forEach { group -> rawUpdater.refresh(group) }
-        return Result.success()
+        if (groups.isEmpty()) return Result.success()
+        val results = groups.map { group -> rawUpdater.refresh(group) }
+        val allFailed = results.all { it.isFailure }
+        return if (allFailed) Result.retry() else Result.success()
     }
 
     companion object {

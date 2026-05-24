@@ -131,12 +131,25 @@ object ConfigBuilder {
     }
 
     private fun jsonString(s: String): String {
-        val escaped = s
-            .replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-            .replace("\n", "\\n")
-            .replace("\r", "\\r")
-            .replace("\t", "\\t")
-        return "\"$escaped\""
+        val sb = StringBuilder(s.length + 2)
+        sb.append('"')
+        for (c in s) {
+            when (c) {
+                '\\' -> sb.append("\\\\")
+                '"' -> sb.append("\\\"")
+                '\n' -> sb.append("\\n")
+                '\r' -> sb.append("\\r")
+                '\t' -> sb.append("\\t")
+                '\b' -> sb.append("\\b")
+                '' -> sb.append("\\f")
+                else -> if (c.code < 0x20) {
+                    sb.append("\\u%04x".format(c.code))
+                } else {
+                    sb.append(c)
+                }
+            }
+        }
+        sb.append('"')
+        return sb.toString()
     }
 }
