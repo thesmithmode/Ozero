@@ -142,7 +142,10 @@ class SettingsRepositoryTest {
     fun `engineAutoPriority default содержит все non-stub engines в этом порядке`() = runTest {
         val current = repository.settings.first()
         assertEquals(
-            listOf(EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI, EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN),
+            listOf(
+                EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI,
+                EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN,
+            ),
             current.engineAutoPriority,
         )
     }
@@ -151,7 +154,10 @@ class SettingsRepositoryTest {
     fun `setEngineAutoPriority сохраняет CSV и читается обратно с reconcile`() = runTest {
         repository.setEngineAutoPriority(listOf(EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI))
         assertEquals(
-            listOf(EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI, EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN),
+            listOf(
+                EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI,
+                EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN,
+            ),
             repository.settings.first().engineAutoPriority,
         )
     }
@@ -165,7 +171,10 @@ class SettingsRepositoryTest {
             ),
         )
         assertEquals(
-            listOf(EngineId.BYEDPI, EngineId.WARP, EngineId.URNETWORK, EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN),
+            listOf(
+                EngineId.BYEDPI, EngineId.WARP, EngineId.URNETWORK,
+                EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN,
+            ),
             repository.settings.first().engineAutoPriority,
         )
     }
@@ -196,7 +205,10 @@ class SettingsRepositoryTest {
             prefs[SettingsKeys.ENGINE_AUTO_PRIORITY] = " WARP , BYEDPI "
         }
         assertEquals(
-            listOf(EngineId.WARP, EngineId.BYEDPI, EngineId.URNETWORK, EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN),
+            listOf(
+                EngineId.WARP, EngineId.BYEDPI, EngineId.URNETWORK,
+                EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN,
+            ),
             repository.settings.first().engineAutoPriority,
         )
     }
