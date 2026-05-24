@@ -5,13 +5,8 @@ val gitVersionName: String = providers.environmentVariable("OZERO_VERSION_NAME")
         isIgnoreExitValue = true
     }.standardOutput.asText.get().trim().removePrefix("v").ifEmpty { "0.0.0" }
 
-val versionCodeOffset = 1500
-val versionCodeFloor = 2000
-val gitCommitCount: Int = providers.exec {
-    commandLine("git", "rev-list", "--count", "HEAD")
-    isIgnoreExitValue = true
-}.standardOutput.asText.get().trim().toIntOrNull() ?: 1
-val gitVersionCode: Int = maxOf(gitCommitCount + versionCodeOffset, versionCodeFloor)
+val gitVersionCode: Int = (findProperty("VERSION_CODE") as? String)?.toInt()
+    ?: error("VERSION_CODE not set in gradle.properties")
 
 plugins {
     id("ozero.android.application")
