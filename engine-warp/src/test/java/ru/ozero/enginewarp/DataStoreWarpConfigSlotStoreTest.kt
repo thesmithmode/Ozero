@@ -413,6 +413,36 @@ class DataStoreWarpConfigSlotStoreTest {
     }
 
     @Test
+    fun `addSlot с endpointList — список сохраняется и читается обратно`() = runTest {
+        val store = newStore()
+        val endpoints = listOf("1.1.1.1:2408", "8.8.8.8:2408", "188.114.97.1:500")
+        val id = store.addSlot("Ultra", sample, endpointList = endpoints)
+        val saved = store.slots().first().first { it.id == id }
+        assertEquals(endpoints, saved.endpointList)
+    }
+
+    @Test
+    fun `addSlot без endpointList — десериализуется как emptyList (backward compat)`() = runTest {
+        val ds = FakePreferencesDataStore()
+        val goodSlot = buildValidSlotJson("id-no-ep", "NoEndpoints")
+        ds.edit { it[stringPreferencesKey("warp_slots_json")] = """[$goodSlot]""" }
+        val store = DataStoreWarpConfigSlotStore(ds, DataStoreWarpConfigStore(FakePreferencesDataStore()))
+        val slots = store.slots().first()
+        assertEquals(1, slots.size)
+        assertTrue(slots[0].endpointList.isEmpty(), "слот без endpointList в JSON → emptyList()")
+    }
+
+    @Test
+    fun `updateSlot с endpointList — обновляет список`() = runTest {
+        val store = newStore()
+        val id = store.addSlot("S", sample)
+        val newEndpoints = listOf("10.0.0.1:2408", "10.0.0.2:2408")
+        store.updateSlot(id, "S", sample, endpointList = newEndpoints)
+        val saved = store.slots().first().first { it.id == id }
+        assertEquals(newEndpoints, saved.endpointList)
+    }
+
+    @Test
     fun `migrateAwgParams — частичное совпадение не триггерит миграцию (защита от false positive)`() = runTest {
         val store = newStore()
         val intentional = AwgParams(

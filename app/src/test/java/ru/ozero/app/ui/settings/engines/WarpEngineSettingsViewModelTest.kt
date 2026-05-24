@@ -538,7 +538,7 @@ class WarpEngineSettingsViewModelTest {
 
         var lastAddedRawIni: String? = null
 
-        override suspend fun addSlot(name: String, config: WarpConfig, rawIni: String?): String {
+        override suspend fun addSlot(name: String, config: WarpConfig, rawIni: String?, endpointList: List<String>): String {
             val fingerprint = listOf(config.privateKey, config.peerPublicKey, config.peerEndpoint)
             val duplicate = slotsFlow.value.firstOrNull {
                 listOf(it.config.privateKey, it.config.peerPublicKey, it.config.peerEndpoint) == fingerprint
@@ -555,6 +555,7 @@ class WarpEngineSettingsViewModelTest {
                 config = config,
                 isActive = makeActive,
                 rawIniOverride = rawIni,
+                endpointList = endpointList,
             )
             return id
         }
@@ -568,11 +569,11 @@ class WarpEngineSettingsViewModelTest {
             slotsFlow.value = slotsFlow.value.map { if (it.id == id) it.copy(name = name) else it }
         }
 
-        override suspend fun updateSlot(id: String, name: String, config: WarpConfig, rawIni: String?) {
+        override suspend fun updateSlot(id: String, name: String, config: WarpConfig, rawIni: String?, endpointList: List<String>) {
             lastUpdateCall = Triple(id, name, config)
             lastUpdateRawIni = rawIni
             slotsFlow.value = slotsFlow.value.map {
-                if (it.id == id) it.copy(name = name, config = config, rawIniOverride = rawIni) else it
+                if (it.id == id) it.copy(name = name, config = config, rawIniOverride = rawIni, endpointList = endpointList) else it
             }
         }
 

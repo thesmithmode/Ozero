@@ -35,7 +35,7 @@ class DataStoreWarpConfigSlotStore(
         list.firstOrNull { it.isActive }?.config
     }
 
-    override suspend fun addSlot(name: String, config: WarpConfig, rawIni: String?): String = mutex.withLock {
+    override suspend fun addSlot(name: String, config: WarpConfig, rawIni: String?, endpointList: List<String>): String = mutex.withLock {
         val id = UUID.randomUUID().toString()
         val fingerprint = config.dedupFingerprint()
         var duplicate: WarpConfigSlot? = null
@@ -53,6 +53,7 @@ class DataStoreWarpConfigSlotStore(
                 config = config,
                 isActive = makeActive,
                 rawIniOverride = rawIni,
+                endpointList = endpointList,
             )
             prefs[KEY_SLOTS] = serializeSlots(updated)
         }
@@ -77,13 +78,13 @@ class DataStoreWarpConfigSlotStore(
         }
     }
 
-    override suspend fun updateSlot(id: String, name: String, config: WarpConfig, rawIni: String?): Unit =
+    override suspend fun updateSlot(id: String, name: String, config: WarpConfig, rawIni: String?, endpointList: List<String>): Unit =
         mutex.withLock {
             dataStore.edit { prefs ->
                 val current = parseSlots(prefs[KEY_SLOTS] ?: "[]")
                 val updated = current.map { slot ->
                     if (slot.id == id) {
-                        slot.copy(name = name, config = config, rawIniOverride = rawIni)
+                        slot.copy(name = name, config = config, rawIniOverride = rawIni, endpointList = endpointList)
                     } else {
                         slot
                     }
@@ -203,12 +204,16 @@ class DataStoreWarpConfigSlotStore(
             },
         )
         val rawIni = obj.optString("rawIni", "").takeIf { it.isNotEmpty() }
+        val endpointList = obj.optJSONArray("endpointList")?.let { arr ->
+            (0 until arr.length()).map { arr.getString(it) }
+        } ?: emptyList()
         return WarpConfigSlot(
             id = obj.getString("id"),
             name = obj.getString("name"),
             config = config.copy(awgParams = migrateAwgParams(awg)),
             isActive = obj.optBoolean("isActive", false),
             rawIniOverride = rawIni,
+            endpointList = endpointList,
         )
     }
 
@@ -239,6 +244,11 @@ class DataStoreWarpConfigSlotStore(
             obj.put("name", slot.name)
             obj.put("isActive", slot.isActive)
             slot.rawIniOverride?.takeIf { it.isNotEmpty() }?.let { obj.put("rawIni", it) }
+            if (slot.endpointList.isNotEmpty()) {
+                val epArr = JSONArray()
+                slot.endpointList.forEach { epArr.put(it) }
+                obj.put("endpointList", epArr)
+            }
             val cfg = slot.config
             val configObj = JSONObject()
             configObj.put("priv", cfg.privateKey)
