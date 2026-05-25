@@ -26,7 +26,7 @@ class SingboxRefreshErrorSentinelTest {
     fun `refreshGroupInternal обрабатывает Result от rawUpdater`() {
         val src = locateFile(vmPath)
         val text = src.readText()
-        val refreshBlock = text.substringAfter("refreshGroupInternal(").substringBefore("\n    fun ")
+        val refreshBlock = text.substringAfter("fun refreshGroupInternal(").substringBefore("\n    private ")
         assertFalse(
             Regex("""(?m)^\s*rawUpdater\.refresh\(group\)\s*$""").containsMatchIn(refreshBlock),
             "refreshGroupInternal НЕ должен игнорировать Result от rawUpdater.refresh() — " +
