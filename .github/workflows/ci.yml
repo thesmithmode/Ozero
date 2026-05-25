@@ -187,7 +187,7 @@ jobs:
         id: singbox-aar-cache
         with:
           path: singbox-core/libs
-          key: singbox-libbox-1.13.12-stripped
+          key: singbox-libbox-1.13.12-v2
 
       - name: Download Singbox AAR
         if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
@@ -199,7 +199,7 @@ jobs:
           gh release download singbox-1.13.12 -p "libbox.aar" -D singbox-core/libs --clobber
           cd singbox-core/libs
           unzip -o libbox.aar classes.jar
-          zip -d classes.jar 'go/*'
+          zip -d classes.jar 'go/Universe$proxyerror.class' 'go/Universe.class' 'go/error.class'
           zip libbox.aar classes.jar
           rm classes.jar
           cd ../..
@@ -282,7 +282,7 @@ jobs:
         id: singbox-aar-cache
         with:
           path: singbox-core/libs
-          key: singbox-libbox-1.13.12-stripped
+          key: singbox-libbox-1.13.12-v2
 
       - name: Download Singbox AAR
         if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
@@ -294,7 +294,7 @@ jobs:
           gh release download singbox-1.13.12 -p "libbox.aar" -D singbox-core/libs --clobber
           cd singbox-core/libs
           unzip -o libbox.aar classes.jar
-          zip -d classes.jar 'go/*'
+          zip -d classes.jar 'go/Universe$proxyerror.class' 'go/Universe.class' 'go/error.class'
           zip libbox.aar classes.jar
           rm classes.jar
           cd ../..
