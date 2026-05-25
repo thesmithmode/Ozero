@@ -272,6 +272,18 @@ private fun ProfileItem(
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.weight(1f),
         )
+        if (profile.latencyMs >= 0) {
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = "${profile.latencyMs}ms",
+                style = MaterialTheme.typography.labelSmall,
+                color = when {
+                    profile.latencyMs < 200 -> MaterialTheme.colorScheme.primary
+                    profile.latencyMs < 500 -> MaterialTheme.colorScheme.secondary
+                    else -> MaterialTheme.colorScheme.error
+                },
+            )
+        }
     }
 }
 

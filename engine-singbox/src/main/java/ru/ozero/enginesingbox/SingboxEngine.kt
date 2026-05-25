@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
-import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.byteArrayPreferencesKey
@@ -109,10 +108,15 @@ class SingboxEngine @Inject constructor(
         val p = proxy ?: return TunAttachResult.Failure("SingboxEngineService not connected")
         return runCatching {
             val pfd = ParcelFileDescriptor.fromFd(tunFd)
-            p.startWithConfig(pfd, json, localProtector)
-            Log.i(TAG, "startWithConfig sent over AIDL")
+            try {
+                p.startWithConfig(pfd, json, localProtector)
+            } finally {
+                runCatching { pfd.close() }
+            }
+            PersistentLoggers.info(TAG, "startWithConfig sent over AIDL")
             TunAttachResult.Success
         }.getOrElse {
+            PersistentLoggers.error(TAG, "startWithConfig AIDL call failed: ${it.message}", it)
             TunAttachResult.Failure("startWithConfig AIDL call failed: ${it.message}")
         }
     }
@@ -188,7 +192,7 @@ class SingboxEngine @Inject constructor(
                     deathRecipient = recipient
                     runCatching { binder.linkToDeath(recipient, 0) }
                     latch.countDown()
-                    Log.i(TAG, "SingboxEngineService connected")
+                    PersistentLoggers.info(TAG, "SingboxEngineService connected")
                 }
 
                 override fun onServiceDisconnected(name: ComponentName) {
