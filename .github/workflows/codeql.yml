@@ -45,7 +45,10 @@ jobs:
         with:
           cache-read-only: true
 
-      - name: Download URnetwork AAR (urnetwork-sdk only — Portal Tor parity)
+      - name: Download ByeDPI native binaries
+        run: ./gradlew :engine-byedpi:downloadBinaries --stacktrace
+
+      - name: Download URnetwork AAR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -58,9 +61,35 @@ jobs:
             echo "::error::no urnetwork-sdk release found"
             exit 1
           fi
-          echo "Download $TAG"
           gh release download "$TAG" -p "*" -D engine-urnetwork/libs --clobber
-          ls -la engine-urnetwork/libs/
+          for aar in engine-urnetwork/libs/*.aar; do
+            [ -f "$aar" ] || continue
+            tmpdir=$(mktemp -d)
+            unzip -o "$aar" -d "$tmpdir/aar-exploded"
+            zip -d "$tmpdir/aar-exploded/classes.jar" 'go/*.class' 2>/dev/null || true
+            (cd "$tmpdir/aar-exploded" && zip -r9 "$GITHUB_WORKSPACE/$aar" .)
+            rm -rf "$tmpdir"
+          done
+
+      - name: Download and explode Singbox AAR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TMPAAR=/tmp/libbox.aar
+          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
+          mkdir -p singbox-core/libs singbox-core/libs-stubs /tmp/go-stubs
+          unzip -o "$TMPAAR" classes.jar -d /tmp
+          cp /tmp/classes.jar singbox-core/libs/libbox.jar
+          unzip -o /tmp/classes.jar 'go/*.class' -d /tmp/go-stubs 2>/dev/null || true
+          jar cf singbox-core/libs-stubs/go-stubs.jar -C /tmp/go-stubs . 2>/dev/null || true
+          python3 scripts/patch-go-seq.py singbox-core/libs-stubs/go-stubs.jar
+          zip -d singbox-core/libs/libbox.jar 'go/*.class' || true
+          mkdir -p singbox-core/src/main/jniLibs
+          unzip -o "$TMPAAR" 'jni/*' -d /tmp/aar-exploded || true
+          if [ -d /tmp/aar-exploded/jni ]; then
+            cp -r /tmp/aar-exploded/jni/* singbox-core/src/main/jniLibs/
+          fi
 
       - name: Build for CodeQL analysis
         run: ./gradlew assembleDebug --no-daemon

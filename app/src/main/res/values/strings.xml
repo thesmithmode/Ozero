@@ -19,6 +19,7 @@
     <string name="main_active_engine">Активный движок: %1$s</string>
     <string name="stats_session">Сессия: ↓ %1$s ↑ %2$s</string>
     <string name="stats_uptime">Время: %1$s</string>
+    <string name="main_engine_failed_hint">Нажмите для повторного подключения</string>
     <string name="main_stagnation_warning">Трафик не идёт уже 30 секунд</string>
     <string name="main_health_degraded">Связь нестабильна</string>
     <string name="main_health_degraded_hint">Проба маршрута не отвечает 3 раза подряд. Попробуйте сменить движок.</string>
