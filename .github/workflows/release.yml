@@ -203,6 +203,7 @@ jobs:
           cp /tmp/classes.jar singbox-core/libs/libbox.jar
           unzip -o /tmp/classes.jar 'go/*.class' -d /tmp/go-stubs 2>/dev/null || true
           jar cf singbox-core/libs-stubs/go-stubs.jar -C /tmp/go-stubs . 2>/dev/null || true
+          python3 scripts/patch-go-seq.py singbox-core/libs-stubs/go-stubs.jar
           zip -d singbox-core/libs/libbox.jar 'go/*.class' || true
           mkdir -p singbox-core/src/main/jniLibs
           unzip -o "$TMPAAR" 'jni/*' -d /tmp/aar-exploded || true
