@@ -599,5 +599,7 @@
     <string name="singbox_group_name_hint">Name</string>
     <string name="singbox_group_url_hint">Subscription URL</string>
     <string name="singbox_add_error_empty_fields">Fill in all fields</string>
+    <string name="singbox_auto_select_button">Best server</string>
+    <string name="singbox_auto_select_hint">Checks latency of all servers and picks the fastest</string>
     <string name="singbox_cancel">Cancel</string>
 </resources>

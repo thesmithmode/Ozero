@@ -270,6 +270,8 @@
     <string name="singbox_group_name_hint">Название</string>
     <string name="singbox_group_url_hint">URL подписки</string>
     <string name="singbox_add_error_empty_fields">Заполните все поля</string>
+    <string name="singbox_auto_select_button">Лучший сервер</string>
+    <string name="singbox_auto_select_hint">Проверяет задержку всех серверов и выбирает самый быстрый</string>
     <string name="singbox_cancel">Отмена</string>
 
     <!-- URnetwork -->
