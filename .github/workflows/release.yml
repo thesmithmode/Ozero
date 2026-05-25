@@ -183,26 +183,28 @@ jobs:
           fi
           gh release download "$TAG" -p "*" -D engine-urnetwork/libs --clobber
 
-      - name: Download Singbox AAR
+      - name: Download and explode Singbox AAR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          mkdir -p singbox-core/libs
-          gh release download singbox-1.13.12 -p "libbox.aar" -D singbox-core/libs --clobber
+          TMPAAR=/tmp/libbox.aar
+          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
           wget -q https://repo1.maven.org/maven2/org/pantsbuild/jarjar/1.7.2/jarjar-1.7.2.jar -O /tmp/jarjar.jar
           wget -q https://repo1.maven.org/maven2/org/ow2/asm/asm/9.7.1/asm-9.7.1.jar -O /tmp/asm.jar
           wget -q https://repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.7.1/asm-commons-9.7.1.jar -O /tmp/asm-commons.jar
           wget -q https://repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.7.1/asm-tree-9.7.1.jar -O /tmp/asm-tree.jar
           echo 'rule go.** go_singbox.@1' > /tmp/jarjar-rules.txt
-          cd singbox-core/libs
-          unzip -o libbox.aar classes.jar
-          java -cp /tmp/jarjar.jar:/tmp/asm.jar:/tmp/asm-commons.jar:/tmp/asm-tree.jar org.pantsbuild.jarjar.Main process /tmp/jarjar-rules.txt classes.jar classes-relocated.jar
-          mv classes-relocated.jar classes.jar
-          zip libbox.aar classes.jar
-          rm classes.jar
-          cd ../..
+          mkdir -p singbox-core/libs
+          unzip -o "$TMPAAR" classes.jar -d /tmp
+          java -cp /tmp/jarjar.jar:/tmp/asm.jar:/tmp/asm-commons.jar:/tmp/asm-tree.jar org.pantsbuild.jarjar.Main process /tmp/jarjar-rules.txt /tmp/classes.jar singbox-core/libs/libbox.jar
+          mkdir -p singbox-core/src/main/jniLibs
+          unzip -o "$TMPAAR" 'jni/*' -d /tmp/aar-exploded || true
+          if [ -d /tmp/aar-exploded/jni ]; then
+            cp -r /tmp/aar-exploded/jni/* singbox-core/src/main/jniLibs/
+          fi
           ls -la singbox-core/libs/
+          find singbox-core/src/main/jniLibs -type f 2>/dev/null || echo "no jniLibs"
 
       - name: Download FPTN native lib
         env:
