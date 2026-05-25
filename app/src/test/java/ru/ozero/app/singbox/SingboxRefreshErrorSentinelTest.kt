@@ -7,9 +7,12 @@ import kotlin.test.assertTrue
 
 class SingboxRefreshErrorSentinelTest {
 
+    private val vmPath =
+        "app/src/main/java/ru/ozero/app/ui/settings/engines/singbox/SingboxEngineSettingsViewModel.kt"
+
     @Test
     fun `SingboxSettingsUiState содержит groupRefreshErrors`() {
-        val src = locateFile("app/src/main/java/ru/ozero/app/ui/settings/engines/singbox/SingboxEngineSettingsViewModel.kt")
+        val src = locateFile(vmPath)
         val text = src.readText()
         assertTrue(
             text.contains("groupRefreshErrors"),
@@ -21,7 +24,7 @@ class SingboxRefreshErrorSentinelTest {
 
     @Test
     fun `refreshGroupInternal обрабатывает Result от rawUpdater`() {
-        val src = locateFile("app/src/main/java/ru/ozero/app/ui/settings/engines/singbox/SingboxEngineSettingsViewModel.kt")
+        val src = locateFile(vmPath)
         val text = src.readText()
         val refreshBlock = text.substringAfter("refreshGroupInternal(").substringBefore("\n    fun ")
         assertFalse(

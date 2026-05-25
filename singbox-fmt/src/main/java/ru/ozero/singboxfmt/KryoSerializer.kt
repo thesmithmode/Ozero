@@ -11,6 +11,9 @@ object KryoSerializer {
         override fun create(): Kryo = Kryo().apply {
             isRegistrationRequired = false
             register(VLESSBean::class.java)
+            register(VMessBean::class.java)
+            register(TrojanBean::class.java)
+            register(ShadowsocksBean::class.java)
             register(StandardV2RayBean::class.java)
             register(AbstractBean::class.java)
         }
