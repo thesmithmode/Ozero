@@ -190,6 +190,12 @@ jobs:
           set -euo pipefail
           mkdir -p singbox-core/libs
           gh release download singbox-1.13.12 -p "libbox.aar" -D singbox-core/libs --clobber
+          cd singbox-core/libs
+          unzip -o libbox.aar classes.jar
+          zip -d classes.jar 'go/*'
+          zip libbox.aar classes.jar
+          rm classes.jar
+          cd ../..
           ls -la singbox-core/libs/
 
       - name: Download FPTN native lib
