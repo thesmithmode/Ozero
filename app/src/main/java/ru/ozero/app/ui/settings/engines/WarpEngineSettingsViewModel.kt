@@ -236,6 +236,11 @@ class WarpEngineSettingsViewModel @Inject constructor(
             runCatching {
                 val yaml = stream.bufferedReader().readText()
                 val parsed = ClashYamlParser.parse(yaml)
+                if (parsed.reserved.isNotEmpty()) {
+                    throw ClashYamlParser.ParseException(
+                        "Формат Clash с reserved bytes не поддерживается WARP-движком",
+                    )
+                }
                 _uiState.value = _uiState.value.copy(
                     provingProgress = "Проверка ${parsed.endpoints.size} эндпоинтов...",
                 )
