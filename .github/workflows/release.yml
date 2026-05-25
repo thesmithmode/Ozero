@@ -190,9 +190,12 @@ jobs:
           set -euo pipefail
           mkdir -p singbox-core/libs
           gh release download singbox-1.13.12 -p "libbox.aar" -D singbox-core/libs --clobber
+          wget -q https://repo1.maven.org/maven2/org/pantsbuild/jarjar/1.7.2/jarjar-1.7.2.jar -O /tmp/jarjar.jar
+          echo 'rule go.** go_singbox.@1' > /tmp/jarjar-rules.txt
           cd singbox-core/libs
           unzip -o libbox.aar classes.jar
-          zip -d classes.jar 'go/Universe$proxyerror.class' 'go/Universe.class' 'go/error.class'
+          java -jar /tmp/jarjar.jar process /tmp/jarjar-rules.txt classes.jar classes-relocated.jar
+          mv classes-relocated.jar classes.jar
           zip libbox.aar classes.jar
           rm classes.jar
           cd ../..
