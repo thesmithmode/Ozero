@@ -36,18 +36,6 @@ class SingboxEngineService : Service() {
             }
         }
 
-        override fun startWithConfigFile(
-            tunFd: ParcelFileDescriptor,
-            configFilePath: String,
-            protector: ISingboxProtector,
-        ) {
-            val config = runCatching { java.io.File(configFilePath).readText() }.getOrElse {
-                PersistentLoggers.error(TAG, "startWithConfigFile: cannot read $configFilePath: ${it.message}")
-                return
-            }
-            startWithConfig(tunFd, config, protector)
-        }
-
         override fun stop() {
             serviceScope.launch {
                 runCatching { SingboxRuntime.stop() }
@@ -56,30 +44,37 @@ class SingboxEngineService : Service() {
         }
 
         override fun getStats(): SingboxStats {
-            val txTotal = SingboxRuntime.queryStats("proxy", "uplink")
-            val rxTotal = SingboxRuntime.queryStats("proxy", "downlink")
-            return SingboxStats(
-                txRateProxy = txTotal,
-                rxRateProxy = rxTotal,
-                txTotal = txTotal,
-                rxTotal = rxTotal,
-                activeConnections = if (SingboxRuntime.isRunning()) 1 else 0,
-            )
+            val status = SingboxRuntime.getLastStatus()
+            return if (status != null) {
+                SingboxStats(
+                    txRateProxy = status.uplink,
+                    rxRateProxy = status.downlink,
+                    txTotal = status.uplinkTotal,
+                    rxTotal = status.downlinkTotal,
+                    activeConnections = status.connectionsIn + status.connectionsOut,
+                )
+            } else {
+                SingboxStats(
+                    activeConnections = if (SingboxRuntime.isRunning()) 1 else 0,
+                )
+            }
         }
 
         override fun registerStatusCallback(cb: ISingboxStatusCallback?) {}
-
-        override fun urlTest(profileId: Long, url: String): Int = -1
-
-        override fun setPerAppPackages(packages: Array<out String>?, isAllowList: Boolean) {
-            PersistentLoggers.warn(TAG, "setPerAppPackages called but per-app routing not yet implemented")
-        }
     }
 
     override fun onCreate() {
         super.onCreate()
         Libsingboxgojni.loadOnce()
-        PersistentLoggers.info(TAG, "SingboxEngineService created pid=${android.os.Process.myPid()} libraryLoaded=${Libsingboxgojni.libraryLoaded} loadError=${Libsingboxgojni.loadError}")
+        val dataDir = applicationContext.filesDir.absolutePath + "/singbox"
+        java.io.File(dataDir).mkdirs()
+        java.io.File("$dataDir/tmp").mkdirs()
+        SingboxRuntime.setup(dataDir)
+        PersistentLoggers.info(
+            TAG,
+            "SingboxEngineService created pid=${android.os.Process.myPid()} " +
+                "libraryLoaded=${Libsingboxgojni.libraryLoaded} loadError=${Libsingboxgojni.loadError}",
+        )
     }
 
     override fun onBind(intent: Intent?): IBinder = binder

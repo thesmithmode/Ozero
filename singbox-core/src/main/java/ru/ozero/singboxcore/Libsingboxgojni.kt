@@ -4,7 +4,7 @@ import android.os.Build
 import ru.ozero.enginescore.PersistentLoggers
 
 object Libsingboxgojni {
-    private const val TAG = "Libsingboxgojni"
+    private const val TAG = "LibboxLoader"
 
     @Volatile
     var libraryLoaded: Boolean = false
@@ -27,23 +27,23 @@ object Libsingboxgojni {
             val ctx = "device=${Build.MANUFACTURER}/${Build.MODEL} sdk=${Build.VERSION.SDK_INT}"
             PersistentLoggers.instance?.info(TAG, "loadLibrary begin $ctx")
             try {
-                System.loadLibrary("singboxgojni")
+                System.loadLibrary("box")
                 libraryLoaded = true
                 val dtMs = (System.nanoTime() - t0) / 1_000_000
-                PersistentLoggers.instance?.info(TAG, "libsingboxgojni loaded OK dt=${dtMs}ms")
+                PersistentLoggers.instance?.info(TAG, "libbox loaded OK dt=${dtMs}ms")
             } catch (e: UnsatisfiedLinkError) {
                 loadError = e.message ?: e.javaClass.simpleName
                 libraryLoaded = false
                 val dtMs = (System.nanoTime() - t0) / 1_000_000
-                PersistentLoggers.instance?.error(TAG, "libsingboxgojni load FAILED dt=${dtMs}ms: $loadError", e)
+                PersistentLoggers.instance?.error(TAG, "libbox load FAILED dt=${dtMs}ms: $loadError", e)
             } catch (e: SecurityException) {
                 loadError = e.message ?: e.javaClass.simpleName
                 libraryLoaded = false
-                PersistentLoggers.instance?.error(TAG, "libsingboxgojni load denied: $loadError", e)
+                PersistentLoggers.instance?.error(TAG, "libbox load denied: $loadError", e)
             } catch (e: Throwable) {
                 loadError = e.message ?: e.javaClass.simpleName
                 libraryLoaded = false
-                PersistentLoggers.instance?.error(TAG, "libsingboxgojni load error: $loadError", e)
+                PersistentLoggers.instance?.error(TAG, "libbox load error: $loadError", e)
             }
         }
     }
