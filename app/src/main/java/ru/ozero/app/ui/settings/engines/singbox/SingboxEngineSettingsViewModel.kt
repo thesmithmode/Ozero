@@ -108,6 +108,13 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         viewModelScope.launch { refreshGroupInternal(groupId) }
     }
 
+    fun onRefreshAll() {
+        viewModelScope.launch {
+            val groups = groupDao.getAll()
+            groups.forEach { group -> refreshGroupInternal(group.id) }
+        }
+    }
+
     private suspend fun refreshGroupInternal(groupId: Long) {
         val group = groupDao.getById(groupId) ?: return
         _uiState.update {
