@@ -87,5 +87,6 @@ object SingboxModule {
     fun provideSingboxEngine(
         @ApplicationContext context: Context,
         @SingboxPrefs dataStore: DataStore<Preferences>,
-    ): EnginePlugin = SingboxEngine(context, dataStore)
+        profileDao: ProxyProfileDao,
+    ): EnginePlugin = SingboxEngine(context, dataStore, profileDao)
 }

@@ -23,6 +23,7 @@ dependencies {
     implementation(project(":singbox-core"))
     implementation(project(":singbox-fmt"))
     implementation(project(":singbox-config"))
+    implementation(project(":singbox-room"))
     implementation(libs.bundles.coroutines)
     implementation(libs.hilt.android)
     implementation(libs.datastore.preferences)

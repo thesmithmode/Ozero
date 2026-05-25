@@ -25,4 +25,6 @@
     <string name="singbox_group_ping">Пинг серверов</string>
     <string name="singbox_auto_select_button">Лучший сервер</string>
     <string name="singbox_auto_select_hint">Проверяет задержку всех серверов и выбирает самый быстрый</string>
+    <string name="singbox_auto_mode_title">Авто-выбор</string>
+    <string name="singbox_auto_mode_desc">Подключается к серверу с наименьшим пингом, автоматически переключается при деградации</string>
 </resources>
