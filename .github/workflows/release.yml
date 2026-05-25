@@ -190,9 +190,11 @@ jobs:
           set -euo pipefail
           TMPAAR=/tmp/libbox.aar
           gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
-          mkdir -p singbox-core/libs
+          mkdir -p singbox-core/libs singbox-core/libs-stubs /tmp/go-stubs
           unzip -o "$TMPAAR" classes.jar -d /tmp
           cp /tmp/classes.jar singbox-core/libs/libbox.jar
+          unzip -o /tmp/classes.jar 'go/*.class' -d /tmp/go-stubs 2>/dev/null || true
+          jar cf singbox-core/libs-stubs/go-stubs.jar -C /tmp/go-stubs . 2>/dev/null || true
           zip -d singbox-core/libs/libbox.jar 'go/*.class' || true
           mkdir -p singbox-core/src/main/jniLibs
           unzip -o "$TMPAAR" 'jni/*' -d /tmp/aar-exploded || true
