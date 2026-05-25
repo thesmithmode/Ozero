@@ -48,6 +48,7 @@ data class SingboxSettingsUiState(
     val customLinkError: CustomLinkError? = null,
     val isRefreshing: Set<Long> = emptySet(),
     val isPinging: Set<Long> = emptySet(),
+    val isAutoSelecting: Boolean = false,
     val groupRefreshErrors: Map<Long, String> = emptyMap(),
     val showAddGroupDialog: Boolean = false,
     val addGroupName: String = "",
@@ -113,6 +114,20 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             val groups = groupDao.getAll()
             groups.forEach { group -> refreshGroupInternal(group.id) }
+        }
+    }
+
+    fun onAutoSelectBest() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isAutoSelecting = true) }
+            val allProfiles = groupDao.getAll().flatMap { profileDao.getByGroupId(it.id) }
+            if (allProfiles.isNotEmpty()) {
+                probeAndAutoSelect(allProfiles)
+                val groupIds = _uiState.value.groupProfiles.keys
+                val refreshed = groupIds.associateWith { gid -> profileDao.getByGroupId(gid) }
+                _uiState.update { it.copy(groupProfiles = it.groupProfiles + refreshed) }
+            }
+            _uiState.update { it.copy(isAutoSelecting = false) }
         }
     }
 

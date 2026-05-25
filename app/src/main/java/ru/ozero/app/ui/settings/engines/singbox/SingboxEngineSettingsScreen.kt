@@ -190,6 +190,35 @@ private fun SingboxSettingsContent(
             )
         }
 
+        if (state.groups.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = stringResource(R.string.singbox_auto_select_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            Button(
+                onClick = viewModel::onAutoSelectBest,
+                enabled = !state.isAutoSelecting && state.isRefreshing.isEmpty() && state.isPinging.isEmpty(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("singbox_auto_select_button"),
+            ) {
+                if (state.isAutoSelecting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text(stringResource(R.string.singbox_auto_select_button))
+            }
+        }
+
         Spacer(Modifier.height(24.dp))
     }
 }
