@@ -290,12 +290,8 @@ class OzeroVpnService : android.net.VpnService() {
         if (!::chainOrchestrator.isInitialized) return ""
         return runCatching {
             chainOrchestrator.activeEngines()
-                .mapNotNull { plugin ->
-                    val flow = plugin.stats() as? kotlinx.coroutines.flow.StateFlow<*>
-                    val stats = flow?.value as? ru.ozero.enginescore.EngineStats ?: return@mapNotNull null
-                    plugin.statsLabel(stats)
-                }
-                .joinToString(" · ")
+                .map { it.id.displayName }
+                .joinToString(" + ")
         }.getOrDefault("")
     }
 

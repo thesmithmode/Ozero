@@ -13,8 +13,8 @@ object NotificationStatsFormatter {
             0L
         }
         val duration = BytesFormatter.durationHms(durationMs)
-        val baseLine = "↓ $rxRate  ↑ $txRate"
-        val totalLine = "Σ ↓$rxTotal / ↑$txTotal  $duration"
-        return if (extras.isNotEmpty()) "$baseLine\n$totalLine · $extras" else "$baseLine\n$totalLine"
+        val speedLine = if (extras.isNotEmpty()) "$extras  ↓ $rxRate  ↑ $txRate" else "↓ $rxRate  ↑ $txRate"
+        val totalLine = "↓ $rxTotal / ↑ $txTotal  $duration"
+        return "$speedLine\n$totalLine"
     }
 }
