@@ -74,6 +74,15 @@ fun SingboxEngineSettingsScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                     }
                 },
+                actions = {
+                    IconButton(
+                        onClick = viewModel::onRefreshAll,
+                        enabled = state.groups.isNotEmpty() && state.isRefreshing.isEmpty(),
+                        modifier = Modifier.testTag("singbox_refresh_all_button"),
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.singbox_refresh_all_button))
+                    }
+                },
             )
         },
     ) { padding ->
