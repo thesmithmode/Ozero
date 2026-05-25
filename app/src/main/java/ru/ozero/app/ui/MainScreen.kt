@@ -86,6 +86,7 @@ fun MainScreen(
     val healthStatus by viewModel.healthStatus.collectAsStateWithLifecycle()
     val appMode by viewModel.appMode.collectAsStateWithLifecycle()
     val manualEngine by viewModel.manualEngine.collectAsStateWithLifecycle()
+    val engineAutoPriority by viewModel.engineAutoPriority.collectAsStateWithLifecycle()
     val speedHistory by viewModel.speedHistory.collectAsStateWithLifecycle()
     val urnetworkPeerCount by viewModel.urnetworkPeerCount.collectAsStateWithLifecycle()
     val urnetworkPeerSearchSeconds by viewModel.urnetworkPeerSearchSeconds.collectAsStateWithLifecycle()
@@ -132,6 +133,7 @@ fun MainScreen(
                         powerState = powerState,
                         isConnected = isConnected,
                         manualEngine = manualEngine,
+                        engineAutoPriority = engineAutoPriority,
                         urnetworkPeerCount = urnetworkPeerCount,
                         urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
                         ipInfo = ipInfo,
@@ -273,6 +275,7 @@ data class ExpertMainState(
     val powerState: PowerDiscState,
     val isConnected: Boolean,
     val manualEngine: EngineId?,
+    val engineAutoPriority: List<EngineId>,
     val urnetworkPeerCount: Int,
     val urnetworkPeerSearchSeconds: Int,
     val ipInfo: IpInfoState,
@@ -303,6 +306,7 @@ private fun ExpertMainContent(
     val powerState = state.powerState
     val isConnected = state.isConnected
     val manualEngine = state.manualEngine
+    val engineAutoPriority = state.engineAutoPriority
     val urnetworkPeerCount = state.urnetworkPeerCount
     val urnetworkPeerSearchSeconds = state.urnetworkPeerSearchSeconds
     val ipInfo = state.ipInfo
@@ -373,6 +377,7 @@ private fun ExpertMainContent(
                     switching = switching,
                     manualEngine = manualEngine,
                 ),
+                engineOrder = engineAutoPriority,
                 onSelect = onManualEngineSelect,
                 modifier = Modifier.fillMaxWidth(),
             )
