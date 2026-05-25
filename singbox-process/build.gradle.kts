@@ -15,6 +15,7 @@ android {
 dependencies {
     implementation(project(":engine-singbox"))
     implementation(project(":singbox-core"))
+    implementation(project(":engines-core"))
     implementation(libs.bundles.coroutines)
 
     testImplementation(libs.bundles.junit5)

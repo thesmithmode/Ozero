@@ -13,7 +13,7 @@ import ru.ozero.enginesingbox.ISingboxEngineProcess
 import ru.ozero.enginesingbox.ISingboxProtector
 import ru.ozero.enginesingbox.ISingboxStatusCallback
 import ru.ozero.enginesingbox.SingboxStats
-import android.util.Log
+import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.singboxcore.Libsingboxgojni
 
 class SingboxEngineService : Service() {
@@ -31,7 +31,23 @@ class SingboxEngineService : Service() {
                 runCatching {
                     SingboxRuntime.start(rawFd, singboxJsonConfig, SingboxProtectorBridge(protector))
                 }.onFailure {
-                    Log.e(TAG, "startWithConfig failed: ${it.message}", it)
+                    PersistentLoggers.error(TAG, "startWithConfig failed: ${it.message}", it)
+                }
+            }
+        }
+
+        override fun startWithConfigFile(
+            tunFd: ParcelFileDescriptor,
+            configFilePath: String,
+            protector: ISingboxProtector,
+        ) {
+            val rawFd = tunFd.detachFd()
+            val json = java.io.File(configFilePath).readText()
+            serviceScope.launch {
+                runCatching {
+                    SingboxRuntime.start(rawFd, json, SingboxProtectorBridge(protector))
+                }.onFailure {
+                    PersistentLoggers.error(TAG, "startWithConfigFile failed: ${it.message}", it)
                 }
             }
         }
@@ -39,7 +55,7 @@ class SingboxEngineService : Service() {
         override fun stop() {
             serviceScope.launch {
                 runCatching { SingboxRuntime.stop() }
-                    .onFailure { Log.e(TAG, "stop failed: ${it.message}", it) }
+                    .onFailure { PersistentLoggers.error(TAG, "stop failed: ${it.message}", it) }
             }
         }
 
@@ -61,6 +77,12 @@ class SingboxEngineService : Service() {
         }
 
         override fun registerStatusCallback(cb: ISingboxStatusCallback?) {}
+
+        override fun urlTest(profileId: Long): Long = -1
+
+        override fun setPerAppPackages(packages: Array<String>?, isAllowList: Boolean) {
+            PersistentLoggers.warn(TAG, "per-app routing not yet implemented")
+        }
     }
 
     override fun onCreate() {
@@ -70,7 +92,7 @@ class SingboxEngineService : Service() {
         java.io.File(dataDir).mkdirs()
         java.io.File("$dataDir/tmp").mkdirs()
         SingboxRuntime.setup(dataDir)
-        Log.i(
+        PersistentLoggers.info(
             TAG,
             "SingboxEngineService created pid=${android.os.Process.myPid()} " +
                 "libraryLoaded=${Libsingboxgojni.libraryLoaded} loadError=${Libsingboxgojni.loadError}",

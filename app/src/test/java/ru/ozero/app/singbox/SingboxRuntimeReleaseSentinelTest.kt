@@ -7,7 +7,7 @@ import kotlin.test.assertTrue
 class SingboxRuntimeReleaseSentinelTest {
 
     @Test
-    fun `should SingboxRuntime stop clear both v2ray and tun2ray`() {
+    fun `should SingboxRuntime stop clear commandServer and lastStatus`() {
         val root = locateRepoRoot()
         val runtime = File(
             root,
@@ -20,25 +20,21 @@ class SingboxRuntimeReleaseSentinelTest {
             .substringBefore("fun ")
 
         assertTrue(
-            stopBlock.contains("tun2ray = null"),
-            "SingboxRuntime.stop must null out tun2ray — sentinel [feedback_go_runtime_guard_release]",
+            stopBlock.contains("commandServer = null"),
+            "SingboxRuntime.stop must null out commandServer — release Go runtime resources",
         )
         assertTrue(
-            stopBlock.contains("v2ray = null"),
-            "SingboxRuntime.stop must null out v2ray — sentinel [feedback_go_runtime_guard_release]",
+            stopBlock.contains("lastStatus = null"),
+            "SingboxRuntime.stop must null out lastStatus — stale status after stop is misleading",
         )
         assertTrue(
-            stopBlock.contains("tun2ray?.close()") || stopBlock.contains(".close()"),
-            "SingboxRuntime.stop must call tun2ray.close() before clearing",
-        )
-        assertTrue(
-            stopBlock.contains("v2ray?.stop()") || stopBlock.contains(".stop()"),
-            "SingboxRuntime.stop must call v2ray.stop() before clearing",
+            stopBlock.contains("closeService()") || stopBlock.contains(".close()"),
+            "SingboxRuntime.stop must call closeService/close before clearing",
         )
     }
 
     @Test
-    fun `should SingboxRuntime stop release before v2ray`() {
+    fun `should SingboxRuntime stop closeService before close`() {
         val root = locateRepoRoot()
         val content = File(
             root,
@@ -48,11 +44,11 @@ class SingboxRuntimeReleaseSentinelTest {
         val stopBlock = content.substringAfter("fun stop()")
             .substringBefore("fun ")
 
-        val tun2rayClosePos = stopBlock.indexOf("tun2ray")
-        val v2rayStopPos = stopBlock.indexOf("v2ray?.stop()")
+        val closeServicePos = stopBlock.indexOf("closeService()")
+        val closePos = stopBlock.indexOf("server.close()")
         assertTrue(
-            tun2rayClosePos < v2rayStopPos || v2rayStopPos < 0,
-            "tun2ray must be closed before v2ray.stop() — TUN must stop receiving before closing underlying core",
+            closeServicePos >= 0 && closePos >= 0 && closeServicePos < closePos,
+            "closeService must be called before close — stop TUN traffic before shutting down core",
         )
     }
 
