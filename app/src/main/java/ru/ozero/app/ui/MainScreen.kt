@@ -927,9 +927,9 @@ private fun StatusLabel(
         }
         if (failedReason != null && failedReason.isNotBlank()) {
             Text(
-                text = failedReason,
+                text = stringResource(R.string.main_engine_failed_hint),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
+                color = OzeroPalette.Text3,
                 modifier = Modifier.testTag(MainScreenTestTags.FAILED_REASON),
             )
         }
