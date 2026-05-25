@@ -590,6 +590,7 @@
     <string name="singbox_link_error_save">Save error: %1$s</string>
     <string name="singbox_save_button">Save</string>
     <string name="singbox_saved_hint">Link saved</string>
+    <string name="singbox_group_ping">Ping servers</string>
     <string name="singbox_group_refresh">Refresh group</string>
     <string name="singbox_group_delete">Delete group</string>
     <string name="singbox_refresh_error">Error: %1$s</string>
