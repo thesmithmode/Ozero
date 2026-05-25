@@ -1,6 +1,7 @@
 package ru.ozero.app.ui
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -92,8 +93,7 @@ fun MainScreen(
     val killswitchActive by viewModel.killswitchActive.collectAsStateWithLifecycle()
     val switching by viewModel.switching.collectAsStateWithLifecycle()
     val isReconnecting by viewModel.isReconnecting.collectAsStateWithLifecycle()
-    val currentEngineDegraded by viewModel.currentEngineDegraded.collectAsStateWithLifecycle()
-    val powerState = computePowerDiscState(state, switching, currentEngineDegraded)
+    val powerState by viewModel.powerDiscState.collectAsStateWithLifecycle()
     val backgroundState = powerState.toBackgroundState()
     val isConnected = state is TunnelState.Connected
 
@@ -194,7 +194,11 @@ private fun SimpleMainContent(
     ) {
         Spacer(modifier = Modifier.height(20.dp))
 
-        AnimatedContent(targetState = switching to tunnelState, label = "status") { (sw, s) ->
+        AnimatedContent(
+            targetState = switching to tunnelState,
+            transitionSpec = { fadeIn(tween(150)) togetherWith fadeOut(tween(150)) },
+            label = "status",
+        ) { (sw, s) ->
             StatusLabel(s, sw, urnetworkPeerCount, isReconnecting)
         }
 
@@ -317,7 +321,11 @@ private fun ExpertMainContent(
     ) {
         Spacer(modifier = Modifier.height(16.dp))
 
-        AnimatedContent(targetState = switching to tunnelState, label = "status") { (sw, s) ->
+        AnimatedContent(
+            targetState = switching to tunnelState,
+            transitionSpec = { fadeIn(tween(150)) togetherWith fadeOut(tween(150)) },
+            label = "status",
+        ) { (sw, s) ->
             StatusLabel(s, sw, urnetworkPeerCount, isReconnecting)
         }
 
@@ -531,18 +539,6 @@ private fun expertDockTabs(): List<DockTab> {
             DockTab(DOCK_TAB_SETTINGS, Icons.Filled.Settings, labelSettings),
         )
     }
-}
-
-private fun computePowerDiscState(
-    state: TunnelState,
-    switching: SwitchingTransition?,
-    currentEngineDegraded: Boolean,
-): PowerDiscState = when {
-    switching != null -> PowerDiscState.Switching
-    state is TunnelState.Connected && currentEngineDegraded -> PowerDiscState.Switching
-    state is TunnelState.Connected -> PowerDiscState.Connected
-    state is TunnelState.Probing || state is TunnelState.Connecting -> PowerDiscState.Connecting
-    else -> PowerDiscState.Off
 }
 
 private fun PowerDiscState.toBackgroundState(): OzeroBackgroundState = when (this) {
