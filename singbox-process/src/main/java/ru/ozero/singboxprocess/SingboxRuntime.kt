@@ -19,7 +19,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import ru.ozero.enginescore.PersistentLoggers
+import android.util.Log
 
 internal object SingboxRuntime {
     private const val TAG = "SingboxRuntime"
@@ -43,7 +43,7 @@ internal object SingboxRuntime {
         options.tempPath = "$basePath/tmp"
         Libbox.setup(options)
         setupDone = true
-        PersistentLoggers.info(TAG, "libbox setup basePath=$basePath")
+        Log.i(TAG, "libbox setup basePath=$basePath")
     }
 
     suspend fun start(
@@ -68,7 +68,7 @@ internal object SingboxRuntime {
             }
 
             commandServer = server
-            PersistentLoggers.info(TAG, "runtime started fd=$tunFd")
+            Log.i(TAG, "runtime started fd=$tunFd")
         }
     }
 
@@ -76,12 +76,12 @@ internal object SingboxRuntime {
         mutex.withLock {
             val server = commandServer ?: return@withLock
             runCatching { server.closeService() }
-                .onFailure { PersistentLoggers.warn(TAG, "closeService: ${it.message}") }
+                .onFailure { Log.w(TAG, "closeService: ${it.message}") }
             runCatching { server.close() }
-                .onFailure { PersistentLoggers.warn(TAG, "close: ${it.message}") }
+                .onFailure { Log.w(TAG, "close: ${it.message}") }
             commandServer = null
             lastStatus = null
-            PersistentLoggers.info(TAG, "runtime stopped")
+            Log.i(TAG, "runtime stopped")
         }
     }
 
@@ -91,11 +91,11 @@ internal object SingboxRuntime {
 
     private class OzeroCommandServerHandler : CommandServerHandler {
         override fun serviceStop() {
-            PersistentLoggers.info(TAG, "serviceStop requested by libbox")
+            Log.i(TAG, "serviceStop requested by libbox")
         }
 
         override fun serviceReload() {
-            PersistentLoggers.info(TAG, "serviceReload requested by libbox")
+            Log.i(TAG, "serviceReload requested by libbox")
         }
 
         override fun getSystemProxyStatus(): SystemProxyStatus {
@@ -108,7 +108,7 @@ internal object SingboxRuntime {
         override fun setSystemProxyEnabled(enabled: Boolean) {}
 
         override fun writeDebugMessage(message: String) {
-            PersistentLoggers.info(TAG, "debug: $message")
+            Log.i(TAG, "debug: $message")
         }
     }
 
@@ -124,7 +124,7 @@ internal object SingboxRuntime {
         }
 
         override fun openTun(options: TunOptions): Int {
-            PersistentLoggers.info(TAG, "openTun mtu=${options.mtu}")
+            Log.i(TAG, "openTun mtu=${options.mtu}")
             return tunFd
         }
 
