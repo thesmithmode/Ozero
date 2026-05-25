@@ -189,7 +189,7 @@ jobs:
           path: |
             singbox-core/libs
             singbox-core/src/main/jniLibs
-          key: singbox-libbox-1.13.12-exploded-v3
+          key: singbox-libbox-1.13.12-exploded-v4
 
       - name: Download and explode Singbox AAR
         if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
@@ -202,6 +202,7 @@ jobs:
           mkdir -p singbox-core/libs
           unzip -o "$TMPAAR" classes.jar -d /tmp
           cp /tmp/classes.jar singbox-core/libs/libbox.jar
+          zip -d singbox-core/libs/libbox.jar 'go/*.class' || true
           mkdir -p singbox-core/src/main/jniLibs
           unzip -o "$TMPAAR" 'jni/*' -d /tmp/aar-exploded || true
           if [ -d /tmp/aar-exploded/jni ]; then
@@ -289,7 +290,7 @@ jobs:
           path: |
             singbox-core/libs
             singbox-core/src/main/jniLibs
-          key: singbox-libbox-1.13.12-exploded-v3
+          key: singbox-libbox-1.13.12-exploded-v4
 
       - name: Download and explode Singbox AAR
         if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
@@ -302,6 +303,7 @@ jobs:
           mkdir -p singbox-core/libs
           unzip -o "$TMPAAR" classes.jar -d /tmp
           cp /tmp/classes.jar singbox-core/libs/libbox.jar
+          zip -d singbox-core/libs/libbox.jar 'go/*.class' || true
           mkdir -p singbox-core/src/main/jniLibs
           unzip -o "$TMPAAR" 'jni/*' -d /tmp/aar-exploded || true
           if [ -d /tmp/aar-exploded/jni ]; then
