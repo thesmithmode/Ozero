@@ -19,6 +19,7 @@ dependencies {
     implementation(libs.datastore.preferences)
     implementation(libs.sshj)
     implementation(libs.slf4j.nop)
+    implementation(libs.bundles.bouncycastle)
 
     testImplementation(libs.bundles.junit5)
     testRuntimeOnly(libs.junit.jupiter.engine)
