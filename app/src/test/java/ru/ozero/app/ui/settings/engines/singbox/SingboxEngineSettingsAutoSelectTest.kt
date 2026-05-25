@@ -21,7 +21,6 @@ import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.dao.SubscriptionGroupDao
 import ru.ozero.singboxroom.entity.ProxyProfile
 import ru.ozero.singboxroom.entity.SubscriptionGroup
-import ru.ozero.singboxsubscription.RawUpdater
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -29,8 +28,8 @@ import kotlin.test.assertTrue
 
 class SingboxEngineSettingsAutoSelectTest {
 
-    private val BEAN_KEY = byteArrayPreferencesKey("singbox_vless_bean")
-    private val SELECTED_PROFILE_KEY = longPreferencesKey("singbox_selected_profile_id")
+    private val beanKey = byteArrayPreferencesKey("singbox_vless_bean")
+    private val selectedProfileKey = longPreferencesKey("singbox_selected_profile_id")
     private val dispatcher = StandardTestDispatcher()
 
     private lateinit var prefsFlow: MutableStateFlow<Preferences>
@@ -99,16 +98,16 @@ class SingboxEngineSettingsAutoSelectTest {
         vm.onEnableAutoSelect()
         advanceUntilIdle()
 
-        val storedId = prefsFlow.value[SELECTED_PROFILE_KEY]
+        val storedId = prefsFlow.value[selectedProfileKey]
         assertNotNull(storedId)
         assertTrue(storedId == -1L)
     }
 
     @Test
-    fun `onEnableAutoSelect clears BEAN_KEY`() = runTest {
+    fun `onEnableAutoSelect clears beanKey`() = runTest {
         prefsFlow.value = mutablePreferencesOf(
-            BEAN_KEY to byteArrayOf(1, 2, 3),
-            SELECTED_PROFILE_KEY to 5L,
+            beanKey to byteArrayOf(1, 2, 3),
+            selectedProfileKey to 5L,
         )
         val vm = buildViewModel()
         backgroundScope.launch(Dispatchers.Main) { vm.state.collect {} }
@@ -117,12 +116,12 @@ class SingboxEngineSettingsAutoSelectTest {
         vm.onEnableAutoSelect()
         advanceUntilIdle()
 
-        assertNull(prefsFlow.value[BEAN_KEY])
+        assertNull(prefsFlow.value[beanKey])
     }
 
     @Test
     fun `onDisableAutoSelect removes selectedProfileId from DataStore`() = runTest {
-        prefsFlow.value = mutablePreferencesOf(SELECTED_PROFILE_KEY to -1L)
+        prefsFlow.value = mutablePreferencesOf(selectedProfileKey to -1L)
         val vm = buildViewModel()
         backgroundScope.launch(Dispatchers.Main) { vm.state.collect {} }
         advanceUntilIdle()
@@ -130,12 +129,12 @@ class SingboxEngineSettingsAutoSelectTest {
         vm.onDisableAutoSelect()
         advanceUntilIdle()
 
-        assertNull(prefsFlow.value[SELECTED_PROFILE_KEY])
+        assertNull(prefsFlow.value[selectedProfileKey])
     }
 
     @Test
     fun `isAutoSelectMode is true when DataStore has selectedProfileId of -1L`() = runTest {
-        prefsFlow.value = mutablePreferencesOf(SELECTED_PROFILE_KEY to -1L)
+        prefsFlow.value = mutablePreferencesOf(selectedProfileKey to -1L)
         val vm = buildViewModel()
         backgroundScope.launch(Dispatchers.Main) { vm.state.collect {} }
         advanceUntilIdle()
@@ -145,7 +144,7 @@ class SingboxEngineSettingsAutoSelectTest {
 
     @Test
     fun `isAutoSelectMode is false when DataStore has normal selectedProfileId`() = runTest {
-        prefsFlow.value = mutablePreferencesOf(SELECTED_PROFILE_KEY to 42L)
+        prefsFlow.value = mutablePreferencesOf(selectedProfileKey to 42L)
         val vm = buildViewModel()
         backgroundScope.launch(Dispatchers.Main) { vm.state.collect {} }
         advanceUntilIdle()
