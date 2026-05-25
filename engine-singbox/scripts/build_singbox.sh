@@ -27,16 +27,28 @@ COMMIT_SHORT="$(git rev-parse --short HEAD)"
 echo "Source commit: $COMMIT"
 
 echo "Building gomobile AAR (arm64-v8a only)"
-go install golang.org/x/mobile/cmd/gomobile@latest
+GOMOBILE_VER="$(go install golang.org/x/mobile/cmd/gomobile@latest 2>&1; go version -m "$(go env GOPATH)/bin/gomobile" 2>/dev/null | grep 'golang.org/x/mobile' | awk '{print $3}' || echo latest)"
 go install golang.org/x/mobile/cmd/gobind@latest
 gomobile init
 
+# gomobile bind requires golang.org/x/mobile in the source module's go.mod
+cd "$TMP_DIR/src"
+MOBILE_VERSION="$(go list -m -f '{{.Version}}' golang.org/x/mobile 2>/dev/null || echo '')"
+if [ -z "$MOBILE_VERSION" ]; then
+    echo "Adding golang.org/x/mobile to source go.mod"
+    go get golang.org/x/mobile@latest
+    go mod tidy
+fi
+cd "$TMP_DIR"
+
 AAR_OUT="$TMP_DIR/singboxgojni.aar"
+cd "$TMP_DIR/src"
 gomobile bind \
     -target=android/arm64 \
     -androidapi 21 \
     -o "$AAR_OUT" \
     github.com/sagernet/sing-box-for-android/libcore
+cd "$TMP_DIR"
 
 echo "Verifying loadLibrary name in classes.jar"
 PATCH_NEEDED=0
