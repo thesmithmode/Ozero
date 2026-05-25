@@ -107,6 +107,16 @@ private fun SingboxSettingsContent(
     ) {
         Spacer(Modifier.height(8.dp))
 
+        if (state.groups.isNotEmpty()) {
+            AutoSelectModeItem(
+                isSelected = state.isAutoSelectMode,
+                onClick = if (state.isAutoSelectMode) viewModel::onDisableAutoSelect else viewModel::onEnableAutoSelect,
+            )
+            Spacer(Modifier.height(4.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(8.dp))
+        }
+
         state.groups.forEach { group ->
             SubscriptionGroupItem(
                 group = group,
@@ -227,6 +237,35 @@ private fun SingboxCustomLinkSection(
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.testTag("singbox_saved_hint"),
         )
+    }
+}
+
+@Composable
+private fun AutoSelectModeItem(
+    isSelected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp)
+            .testTag("singbox_auto_mode_item"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(selected = isSelected, onClick = null)
+        Spacer(Modifier.width(4.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.singbox_auto_mode_title),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                text = stringResource(R.string.singbox_auto_mode_desc),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

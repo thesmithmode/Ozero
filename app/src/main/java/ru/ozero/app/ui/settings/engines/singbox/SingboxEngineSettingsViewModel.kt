@@ -49,6 +49,7 @@ data class SingboxSettingsUiState(
     val isRefreshing: Set<Long> = emptySet(),
     val isPinging: Set<Long> = emptySet(),
     val isAutoSelecting: Boolean = false,
+    val isAutoSelectMode: Boolean = false,
     val groupRefreshErrors: Map<Long, String> = emptyMap(),
     val showAddGroupDialog: Boolean = false,
     val addGroupName: String = "",
@@ -74,6 +75,7 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         ui.copy(
             groups = groups.sortedBy { it.userOrder },
             selectedProfileId = prefs[SELECTED_PROFILE_KEY],
+            isAutoSelectMode = prefs[SELECTED_PROFILE_KEY] == -1L,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SingboxSettingsUiState())
 
@@ -103,6 +105,24 @@ class SingboxEngineSettingsViewModel @Inject constructor(
                 prefs[BEAN_KEY] = profile.beanBlob
             }
             _uiState.update { it.copy(customLinkSaved = false) }
+        }
+    }
+
+    fun onEnableAutoSelect() {
+        viewModelScope.launch {
+            dataStore.edit { prefs ->
+                prefs[SELECTED_PROFILE_KEY] = -1L
+                prefs.remove(BEAN_KEY)
+            }
+        }
+    }
+
+    fun onDisableAutoSelect() {
+        viewModelScope.launch {
+            dataStore.edit { prefs ->
+                prefs.remove(SELECTED_PROFILE_KEY)
+                prefs.remove(BEAN_KEY)
+            }
         }
     }
 

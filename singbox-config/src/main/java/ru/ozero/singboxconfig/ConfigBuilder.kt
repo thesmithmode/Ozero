@@ -10,17 +10,41 @@ import ru.ozero.singboxfmt.VMessBean
 object ConfigBuilder {
 
     fun buildSingboxConfig(bean: AbstractBean): String {
-        val outbound = when (bean) {
-            is VLESSBean -> vlessOutbound(bean)
-            is VMessBean -> vmessOutbound(bean)
-            is TrojanBean -> trojanOutbound(bean)
-            is ShadowsocksBean -> shadowsocksOutbound(bean)
-            else -> error("Unsupported bean type: ${bean::class.simpleName}")
-        }
-        return buildFullConfig(outbound)
+        val outbound = beanOutbound(bean, "proxy")
+        return buildFullConfig(listOf(outbound))
     }
 
-    private fun buildFullConfig(proxyOutbound: String): String {
+    fun buildSingboxAutoConfig(beans: List<AbstractBean>): String {
+        require(beans.isNotEmpty()) { "beans must not be empty for auto-select config" }
+        val proxyOutbounds = beans.mapIndexed { index, bean ->
+            beanOutbound(bean, "proxy-$index")
+        }
+        val tags = proxyOutbounds.indices.map { "proxy-$it" }
+        val urltestOutbound = buildUrltestOutbound(tags)
+        return buildFullConfig(listOf(urltestOutbound) + proxyOutbounds)
+    }
+
+    private fun beanOutbound(bean: AbstractBean, tag: String): String = when (bean) {
+        is VLESSBean -> vlessOutbound(bean, tag)
+        is VMessBean -> vmessOutbound(bean, tag)
+        is TrojanBean -> trojanOutbound(bean, tag)
+        is ShadowsocksBean -> shadowsocksOutbound(bean, tag)
+        else -> error("Unsupported bean type: ${bean::class.simpleName}")
+    }
+
+    private fun buildUrltestOutbound(tags: List<String>): String {
+        val sb = StringBuilder()
+        sb.append("""{"type":"urltest","tag":"proxy",""")
+        sb.append(""""outbounds":[${tags.joinToString(",") { jsonString(it) }}],""")
+        sb.append(""""url":"https://www.gstatic.com/generate_204",""")
+        sb.append(""""interval":"3m",""")
+        sb.append(""""tolerance":50,""")
+        sb.append(""""interrupt_exist_connections":false,""")
+        sb.append(""""idle_timeout":"30m"}""")
+        return sb.toString()
+    }
+
+    private fun buildFullConfig(proxyOutbounds: List<String>): String {
         val sb = StringBuilder()
         sb.append('{')
         sb.append(""""log":{"level":"warn","timestamp":true},""")
@@ -28,7 +52,10 @@ object ConfigBuilder {
         sb.append(tunInbound())
         sb.append("""],""")
         sb.append(""""outbounds":[""")
-        sb.append(proxyOutbound)
+        proxyOutbounds.forEachIndexed { i, outbound ->
+            if (i > 0) sb.append(',')
+            sb.append(outbound)
+        }
         sb.append(""",{"type":"direct","tag":"direct"}""")
         sb.append(""",{"type":"block","tag":"block"}""")
         sb.append(""",{"type":"dns","tag":"dns-out"}""")
@@ -59,9 +86,9 @@ object ConfigBuilder {
         return sb.toString()
     }
 
-    private fun vlessOutbound(bean: VLESSBean): String {
+    private fun vlessOutbound(bean: VLESSBean, tag: String): String {
         val sb = StringBuilder()
-        sb.append("""{"type":"vless","tag":"proxy",""")
+        sb.append("""{"type":"vless","tag":${jsonString(tag)},""")
         sb.append(""""server":${jsonString(bean.serverAddress)},""")
         sb.append(""""server_port":${bean.serverPort},""")
         sb.append(""""uuid":${jsonString(bean.uuid)},""")
@@ -83,9 +110,9 @@ object ConfigBuilder {
         return sb.toString()
     }
 
-    private fun vmessOutbound(bean: VMessBean): String {
+    private fun vmessOutbound(bean: VMessBean, tag: String): String {
         val sb = StringBuilder()
-        sb.append("""{"type":"vmess","tag":"proxy",""")
+        sb.append("""{"type":"vmess","tag":${jsonString(tag)},""")
         sb.append(""""server":${jsonString(bean.serverAddress)},""")
         sb.append(""""server_port":${bean.serverPort},""")
         sb.append(""""uuid":${jsonString(bean.uuid)},""")
@@ -102,9 +129,9 @@ object ConfigBuilder {
         return sb.toString()
     }
 
-    private fun trojanOutbound(bean: TrojanBean): String {
+    private fun trojanOutbound(bean: TrojanBean, tag: String): String {
         val sb = StringBuilder()
-        sb.append("""{"type":"trojan","tag":"proxy",""")
+        sb.append("""{"type":"trojan","tag":${jsonString(tag)},""")
         sb.append(""""server":${jsonString(bean.serverAddress)},""")
         sb.append(""""server_port":${bean.serverPort},""")
         sb.append(""""password":${jsonString(bean.password)},""")
@@ -120,9 +147,9 @@ object ConfigBuilder {
         return sb.toString()
     }
 
-    private fun shadowsocksOutbound(bean: ShadowsocksBean): String {
+    private fun shadowsocksOutbound(bean: ShadowsocksBean, tag: String): String {
         val sb = StringBuilder()
-        sb.append("""{"type":"shadowsocks","tag":"proxy",""")
+        sb.append("""{"type":"shadowsocks","tag":${jsonString(tag)},""")
         sb.append(""""server":${jsonString(bean.serverAddress)},""")
         sb.append(""""server_port":${bean.serverPort},""")
         sb.append(""""method":${jsonString(bean.method)},""")

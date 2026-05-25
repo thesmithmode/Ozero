@@ -9,14 +9,17 @@ import android.os.ParcelFileDescriptor
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.byteArrayPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import ru.ozero.enginescore.EngineCapabilities
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
@@ -39,6 +42,7 @@ import ru.ozero.singboxfmt.ShadowsocksBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
+import ru.ozero.singboxroom.dao.ProxyProfileDao
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -46,6 +50,7 @@ import javax.inject.Inject
 class SingboxEngine @Inject constructor(
     @ApplicationContext private val context: Context,
     @SingboxPrefs private val dataStore: DataStore<Preferences>,
+    private val profileDao: ProxyProfileDao,
 ) : EnginePlugin, TunFdAcceptor {
 
     private val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -53,9 +58,23 @@ class SingboxEngine @Inject constructor(
     @Volatile
     private var cachedBlob: ByteArray? = null
 
+    @Volatile
+    private var cachedSelectedProfileId: Long? = null
+
+    @Volatile
+    private var cachedAutoBlobs: List<ByteArray> = emptyList()
+
     init {
         engineScope.launch {
-            dataStore.data.collect { prefs -> cachedBlob = prefs[BEAN_KEY] }
+            dataStore.data.collect { prefs ->
+                cachedBlob = prefs[BEAN_KEY]
+                cachedSelectedProfileId = prefs[SELECTED_PROFILE_KEY]
+            }
+        }
+        engineScope.launch {
+            profileDao.getAllFlow().collect { profiles ->
+                cachedAutoBlobs = profiles.map { it.beanBlob }
+            }
         }
     }
 
@@ -94,6 +113,18 @@ class SingboxEngine @Inject constructor(
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
         require(config is EngineConfig.Singbox) { "SingboxEngine requires EngineConfig.Singbox" }
         require(upstream is Upstream.None) { "SingboxEngine: supportsUpstreamSocks=false" }
+
+        if (config.autoSelectBeanBlobs.isNotEmpty()) {
+            val beans = config.autoSelectBeanBlobs.mapNotNull {
+                runCatching { KryoSerializer.deserialize<AbstractBean>(it) }.getOrNull()
+            }
+            if (beans.isEmpty()) return StartResult.Failure("auto-select: no valid beans")
+            val json = runCatching { ConfigBuilder.buildSingboxAutoConfig(beans) }
+                .getOrElse { return StartResult.Failure("Failed to build auto-select config: ${it.message}") }
+            pendingConfig = json
+            bindOrFail()?.let { return it }
+            return StartResult.Success(socksPort = 0)
+        }
 
         val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(config.beanBlob) }
             .getOrElse { return StartResult.Failure("Failed to deserialize config: ${it.message}") }
@@ -171,6 +202,20 @@ class SingboxEngine @Inject constructor(
     override suspend fun ipProbeRoute(socksPort: Int): IpProbeRoute = IpProbeRoute.Default
 
     override fun buildManualConfig(settings: SettingsModel?): EngineConfig? {
+        if (cachedSelectedProfileId == SELECTED_AUTO) {
+            val blobs = cachedAutoBlobs.ifEmpty {
+                // cold-start race: cache not yet populated; do synchronous fallback read
+                runBlocking(Dispatchers.IO) {
+                    profileDao.getAllFlow().first()
+                }.map { it.beanBlob }
+            }
+            if (blobs.isEmpty()) return null
+            return EngineConfig.Singbox(
+                beanBlob = ByteArray(0),
+                protocolType = PROTOCOL_AUTO_SELECT,
+                autoSelectBeanBlobs = blobs,
+            )
+        }
         val blob = cachedBlob ?: return null
         val type = runCatching {
             protocolTypeOf(KryoSerializer.deserialize<AbstractBean>(blob))
@@ -275,6 +320,9 @@ class SingboxEngine @Inject constructor(
         private const val CONNECT_TIMEOUT_S = 5L
         private const val STATS_POLL_MS = 1_000L
         private val BEAN_KEY = byteArrayPreferencesKey("singbox_vless_bean")
+        private val SELECTED_PROFILE_KEY = longPreferencesKey("singbox_selected_profile_id")
+        const val SELECTED_AUTO = -1L
+        const val PROTOCOL_AUTO_SELECT = -1
         const val PROTOCOL_VLESS = 0
         const val PROTOCOL_VMESS = 1
         const val PROTOCOL_TROJAN = 2

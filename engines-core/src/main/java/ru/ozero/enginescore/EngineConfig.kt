@@ -71,15 +71,26 @@ sealed class EngineConfig {
     data class Singbox(
         val beanBlob: ByteArray,
         val protocolType: Int,
+        val autoSelectBeanBlobs: List<ByteArray> = emptyList(),
     ) : EngineConfig() {
         override val engineId = EngineId.SINGBOX
-        override fun toString(): String = "Singbox(protocol=$protocolType, blobSize=${beanBlob.size})"
+        override fun toString(): String =
+            "Singbox(protocol=$protocolType, blobSize=${beanBlob.size}, auto=${autoSelectBeanBlobs.size})"
+
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
             if (other !is Singbox) return false
-            return protocolType == other.protocolType && beanBlob.contentEquals(other.beanBlob)
+            return protocolType == other.protocolType &&
+                beanBlob.contentEquals(other.beanBlob) &&
+                autoSelectBeanBlobs.size == other.autoSelectBeanBlobs.size &&
+                autoSelectBeanBlobs.zip(other.autoSelectBeanBlobs).all { (a, b) -> a.contentEquals(b) }
         }
-        override fun hashCode(): Int = 31 * protocolType + beanBlob.contentHashCode()
+
+        override fun hashCode(): Int {
+            var result = 31 * protocolType + beanBlob.contentHashCode()
+            for (blob in autoSelectBeanBlobs) result = 31 * result + blob.contentHashCode()
+            return result
+        }
     }
 
     data class Fptn(

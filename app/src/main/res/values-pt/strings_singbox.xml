@@ -25,4 +25,6 @@
     <string name="singbox_group_ping">Medir latência</string>
     <string name="singbox_auto_select_button">Melhor servidor</string>
     <string name="singbox_auto_select_hint">Verifica a latência de todos os servidores e escolhe o mais rápido</string>
+    <string name="singbox_auto_mode_title">Seleção automática</string>
+    <string name="singbox_auto_mode_desc">Conecta ao servidor com menor ping e troca automaticamente quando a latência piora</string>
 </resources>
