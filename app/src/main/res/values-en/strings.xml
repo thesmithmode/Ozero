@@ -579,27 +579,4 @@
     <string name="urnetwork_shared_traffic_chart_empty">No data yet — provide some traffic and stats will show up here.</string>
     <string name="urnetwork_shared_traffic_chart_peak">Peak day: %1$s</string>
 
-    <!-- SingBox engine settings -->
-    <string name="settings_singbox_title">SingBox</string>
-    <string name="settings_singbox_summary">VLESS subscriptions and servers</string>
-    <string name="singbox_add_group_button">Add group</string>
-    <string name="singbox_refresh_all_button">Refresh all</string>
-    <string name="singbox_custom_link_section">Custom link</string>
-    <string name="singbox_link_error_empty">Link cannot be empty</string>
-    <string name="singbox_link_error_parse">Parse error: %1$s</string>
-    <string name="singbox_link_error_save">Save error: %1$s</string>
-    <string name="singbox_save_button">Save</string>
-    <string name="singbox_saved_hint">Link saved</string>
-    <string name="singbox_group_ping">Ping servers</string>
-    <string name="singbox_group_refresh">Refresh group</string>
-    <string name="singbox_group_delete">Delete group</string>
-    <string name="singbox_refresh_error">Error: %1$s</string>
-    <string name="singbox_no_profiles_hint">No servers</string>
-    <string name="singbox_add_group_title">Add group</string>
-    <string name="singbox_group_name_hint">Name</string>
-    <string name="singbox_group_url_hint">Subscription URL</string>
-    <string name="singbox_add_error_empty_fields">Fill in all fields</string>
-    <string name="singbox_auto_select_button">Best server</string>
-    <string name="singbox_auto_select_hint">Checks latency of all servers and picks the fastest</string>
-    <string name="singbox_cancel">Cancel</string>
 </resources>
