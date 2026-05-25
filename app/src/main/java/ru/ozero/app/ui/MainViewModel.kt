@@ -23,6 +23,7 @@ import kotlinx.coroutines.launch
 import ru.ozero.commonnet.IpInfo
 import ru.ozero.commonnet.IpInfoProvider
 import ru.ozero.commonvpn.HealthMonitor
+import ru.ozero.app.ui.components.PowerDiscState
 import ru.ozero.commonvpn.SwitchingTransition
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
@@ -188,6 +189,26 @@ class MainViewModel @Inject constructor(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
             initialValue = false,
+        )
+
+    val powerDiscState: StateFlow<PowerDiscState> = combine(
+        tunnelController.state,
+        tunnelController.switching,
+        currentEngineDegraded,
+    ) { s, sw, degraded ->
+        when {
+            sw != null -> PowerDiscState.Switching
+            s is TunnelState.Connected && degraded -> PowerDiscState.Switching
+            s is TunnelState.Connected -> PowerDiscState.Connected
+            s is TunnelState.Probing || s is TunnelState.Connecting -> PowerDiscState.Connecting
+            else -> PowerDiscState.Off
+        }
+    }
+        .distinctUntilChanged()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = PowerDiscState.Off,
         )
 
     val urnetworkPeerCount: StateFlow<Int> = flow {

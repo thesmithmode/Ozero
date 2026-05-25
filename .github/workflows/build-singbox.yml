@@ -3,10 +3,10 @@ name: Build Singbox AAR
 on:
   workflow_dispatch:
     inputs:
-      singbox_ref:
-        description: 'sing-box-for-android git ref (commit/tag/branch)'
+      libbox_version:
+        description: 'libbox version from singbox-android/libbox releases'
         required: true
-        default: 'main'
+        default: '1.13.12'
 
 permissions:
   contents: write
@@ -18,44 +18,22 @@ jobs:
       - name: Checkout Ozero
         uses: actions/checkout@v4
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.23'
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Setup Android NDK
-        run: |
-          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME" >> "$GITHUB_ENV"
-
-      - name: Build singbox AAR
+      - name: Download libbox AAR
         env:
-          SINGBOX_REF: ${{ inputs.singbox_ref }}
-        run: bash engine-singbox/scripts/build_singbox.sh
-
-      - name: Read meta
-        id: meta
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          source build/singbox-binaries/meta.txt
-          echo "commit_short=${commit_short}" >> "$GITHUB_OUTPUT"
-          echo "tag=singbox-${commit_short}" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          VERSION="${{ inputs.libbox_version }}"
+          mkdir -p singbox-core/libs
+          gh release download "singbox-$VERSION" -p "libbox.aar" -D singbox-core/libs --clobber
+          ls -la singbox-core/libs/
+          sha256sum singbox-core/libs/libbox.aar
 
-      - name: Print sha256sums
-        run: cat build/singbox-binaries/sha256sums.txt
-
-      - name: Create release
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: ${{ steps.meta.outputs.tag }}
-          name: singbox-${{ steps.meta.outputs.commit_short }}
-          files: |
-            build/singbox-binaries/libsingboxgojni.aar
-            build/singbox-binaries/libsingboxgojni-arm64-v8a.so
-            build/singbox-binaries/sha256sums.txt
-          generate_release_notes: false
-          fail_on_unmatched_files: true
+      - name: Verify AAR contents
+        run: |
+          set -euo pipefail
+          AAR="singbox-core/libs/libbox.aar"
+          echo "=== AAR size ==="
+          stat --printf="%s bytes\n" "$AAR"
+          echo "=== Key entries ==="
+          unzip -l "$AAR" | grep -E '\.so$|classes\.jar|AndroidManifest'

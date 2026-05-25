@@ -491,6 +491,27 @@ class RealWarpSdkBridgeTest {
     }
 
     @Test
+    fun `sentinel AWG_TEARDOWN_COOLDOWN_MS — cooldown после turnOff для Go goroutine cleanup`() {
+        val f = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/enginewarp/RealWarpSdkBridge.kt",
+        )
+        assertTrue(f.exists(), "RealWarpSdkBridge.kt не найден: $f")
+        val src = f.readText()
+        assertTrue(
+            src.contains("AWG_TEARDOWN_COOLDOWN_MS"),
+            "RealWarpSdkBridge обязан содержать константу AWG_TEARDOWN_COOLDOWN_MS — " +
+                "Go goroutines от предыдущего tunnel не останавливаются синхронно при turnOff. " +
+                "Без cooldown следующий awgTurnOn (handle=0) получает handshake interference. " +
+                "Симптом: lastHsAge=never после rapid config switches, лечится только рестартом приложения.",
+        )
+        assertTrue(
+            src.contains("delay(AWG_TEARDOWN_COOLDOWN_MS)"),
+            "detachTun обязан вызывать delay(AWG_TEARDOWN_COOLDOWN_MS) после awgTurnOff",
+        )
+    }
+
+    @Test
     fun `concurrent detachTun не вызывает double awgTurnOff на одном handle`() = runTest {
         val runtime = FakeAwgRuntime(returnHandle = 7, socketV4 = 100)
         val (bridge, _) = bridgeWith(runtime)

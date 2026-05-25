@@ -171,7 +171,7 @@ jobs:
         id: aar-cache
         with:
           path: engine-urnetwork/libs
-          key: urnetwork-aar-${{ steps.aar-tag.outputs.tag }}
+          key: urnetwork-aar-${{ steps.aar-tag.outputs.tag }}-go-stripped-v1
 
       - name: Download URnetwork AAR (urnetwork-sdk only — Portal Tor parity)
         if: steps.aar-cache.outputs.cache-hit != 'true'
@@ -180,7 +180,48 @@ jobs:
         run: |
           mkdir -p engine-urnetwork/libs
           gh release download "${{ steps.aar-tag.outputs.tag }}" -p "*" -D engine-urnetwork/libs --clobber
+          for aar in engine-urnetwork/libs/*.aar; do
+            [ -f "$aar" ] || continue
+            tmpdir=$(mktemp -d)
+            unzip -o "$aar" -d "$tmpdir/aar-exploded"
+            zip -d "$tmpdir/aar-exploded/classes.jar" 'go/*.class' 2>/dev/null || true
+            (cd "$tmpdir/aar-exploded" && zip -r9 "$GITHUB_WORKSPACE/$aar" .)
+            rm -rf "$tmpdir"
+          done
           ls -la engine-urnetwork/libs/
+
+      - name: Cache Singbox libs
+        uses: actions/cache@v5
+        id: singbox-aar-cache
+        with:
+          path: |
+            singbox-core/libs
+            singbox-core/libs-stubs
+            singbox-core/src/main/jniLibs
+          key: singbox-libbox-1.13.12-exploded-v5
+
+      - name: Download and explode Singbox AAR
+        if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TMPAAR=/tmp/libbox.aar
+          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
+          mkdir -p singbox-core/libs
+          unzip -o "$TMPAAR" classes.jar -d /tmp
+          cp /tmp/classes.jar singbox-core/libs/libbox.jar
+          mkdir -p singbox-core/libs-stubs /tmp/go-stubs
+          unzip -o /tmp/classes.jar 'go/*.class' -d /tmp/go-stubs 2>/dev/null || true
+          jar cf singbox-core/libs-stubs/go-stubs.jar -C /tmp/go-stubs . 2>/dev/null || true
+          zip -d singbox-core/libs/libbox.jar 'go/*.class' || true
+          mkdir -p singbox-core/src/main/jniLibs
+          unzip -o "$TMPAAR" 'jni/*' -d /tmp/aar-exploded || true
+          if [ -d /tmp/aar-exploded/jni ]; then
+            cp -r /tmp/aar-exploded/jni/* singbox-core/src/main/jniLibs/
+          fi
+          ls -la singbox-core/libs/
+          find singbox-core/src/main/jniLibs -type f 2>/dev/null || echo "no jniLibs"
 
       - name: assembleDebug
         run: ./gradlew assembleDebug --stacktrace
@@ -244,7 +285,7 @@ jobs:
         id: aar-cache
         with:
           path: engine-urnetwork/libs
-          key: urnetwork-aar-${{ steps.aar-tag.outputs.tag }}
+          key: urnetwork-aar-${{ steps.aar-tag.outputs.tag }}-go-stripped-v1
 
       - name: Download URnetwork AAR
         if: steps.aar-cache.outputs.cache-hit != 'true'
@@ -253,6 +294,47 @@ jobs:
         run: |
           mkdir -p engine-urnetwork/libs
           gh release download "${{ steps.aar-tag.outputs.tag }}" -p "*" -D engine-urnetwork/libs --clobber
+          for aar in engine-urnetwork/libs/*.aar; do
+            [ -f "$aar" ] || continue
+            tmpdir=$(mktemp -d)
+            unzip -o "$aar" -d "$tmpdir/aar-exploded"
+            zip -d "$tmpdir/aar-exploded/classes.jar" 'go/*.class' 2>/dev/null || true
+            (cd "$tmpdir/aar-exploded" && zip -r9 "$GITHUB_WORKSPACE/$aar" .)
+            rm -rf "$tmpdir"
+          done
+
+      - name: Cache Singbox libs
+        uses: actions/cache@v5
+        id: singbox-aar-cache
+        with:
+          path: |
+            singbox-core/libs
+            singbox-core/libs-stubs
+            singbox-core/src/main/jniLibs
+          key: singbox-libbox-1.13.12-exploded-v5
+
+      - name: Download and explode Singbox AAR
+        if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TMPAAR=/tmp/libbox.aar
+          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
+          mkdir -p singbox-core/libs
+          unzip -o "$TMPAAR" classes.jar -d /tmp
+          cp /tmp/classes.jar singbox-core/libs/libbox.jar
+          mkdir -p singbox-core/libs-stubs /tmp/go-stubs
+          unzip -o /tmp/classes.jar 'go/*.class' -d /tmp/go-stubs 2>/dev/null || true
+          jar cf singbox-core/libs-stubs/go-stubs.jar -C /tmp/go-stubs . 2>/dev/null || true
+          zip -d singbox-core/libs/libbox.jar 'go/*.class' || true
+          mkdir -p singbox-core/src/main/jniLibs
+          unzip -o "$TMPAAR" 'jni/*' -d /tmp/aar-exploded || true
+          if [ -d /tmp/aar-exploded/jni ]; then
+            cp -r /tmp/aar-exploded/jni/* singbox-core/src/main/jniLibs/
+          fi
+          ls -la singbox-core/libs/
+          find singbox-core/src/main/jniLibs -type f 2>/dev/null || echo "no jniLibs"
 
       - name: testDebugUnitTest + coverage
         run: ./gradlew :app:testDebugUnitTest :app:jacocoTestReport :app:jacocoTestCoverageVerification --stacktrace --continue
@@ -415,7 +497,7 @@ jobs:
         id: aar-cache
         with:
           path: engine-urnetwork/libs
-          key: urnetwork-aar-${{ steps.aar-tag.outputs.tag }}
+          key: urnetwork-aar-${{ steps.aar-tag.outputs.tag }}-go-stripped-v1
 
       - name: Download URnetwork AAR
         if: steps.aar-cache.outputs.cache-hit != 'true'
@@ -424,6 +506,14 @@ jobs:
         run: |
           mkdir -p engine-urnetwork/libs
           gh release download "${{ steps.aar-tag.outputs.tag }}" -p "*" -D engine-urnetwork/libs --clobber
+          for aar in engine-urnetwork/libs/*.aar; do
+            [ -f "$aar" ] || continue
+            tmpdir=$(mktemp -d)
+            unzip -o "$aar" -d "$tmpdir/aar-exploded"
+            zip -d "$tmpdir/aar-exploded/classes.jar" 'go/*.class' 2>/dev/null || true
+            (cd "$tmpdir/aar-exploded" && zip -r9 "$GITHUB_WORKSPACE/$aar" .)
+            rm -rf "$tmpdir"
+          done
 
       - name: testDebugUnitTest + coverage
         run: >
@@ -503,7 +593,7 @@ jobs:
         id: aar-cache
         with:
           path: engine-urnetwork/libs
-          key: urnetwork-aar-${{ steps.aar-tag.outputs.tag }}
+          key: urnetwork-aar-${{ steps.aar-tag.outputs.tag }}-go-stripped-v1
 
       - name: Download URnetwork AAR
         if: steps.aar-cache.outputs.cache-hit != 'true'
@@ -512,6 +602,14 @@ jobs:
         run: |
           mkdir -p engine-urnetwork/libs
           gh release download "${{ steps.aar-tag.outputs.tag }}" -p "*" -D engine-urnetwork/libs --clobber
+          for aar in engine-urnetwork/libs/*.aar; do
+            [ -f "$aar" ] || continue
+            tmpdir=$(mktemp -d)
+            unzip -o "$aar" -d "$tmpdir/aar-exploded"
+            zip -d "$tmpdir/aar-exploded/classes.jar" 'go/*.class' 2>/dev/null || true
+            (cd "$tmpdir/aar-exploded" && zip -r9 "$GITHUB_WORKSPACE/$aar" .)
+            rm -rf "$tmpdir"
+          done
 
       - name: testDebugUnitTest + coverage
         run: >

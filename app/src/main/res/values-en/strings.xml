@@ -464,9 +464,6 @@
     <string name="logs_copy_done_toast_fmt">Copied (%1$d chars)</string>
     <string name="logs_export">Export .log</string>
     <string name="logs_footer_fmt">%1$d / %2$d entries</string>
-    <!-- Warp tweaks screen -->
-    <string name="warp_tweaks_button">Connection Settings</string>
-    <string name="warp_tweaks_title">Connection Settings</string>
     <string name="warp_tweaks_endpoint_section">Endpoint</string>
     <string name="warp_tweaks_awg_section">AmneziaWG Settings</string>
 
@@ -578,4 +575,5 @@
     <string name="urnetwork_shared_traffic_chart_title">30-day chart</string>
     <string name="urnetwork_shared_traffic_chart_empty">No data yet — provide some traffic and stats will show up here.</string>
     <string name="urnetwork_shared_traffic_chart_peak">Peak day: %1$s</string>
+
 </resources>

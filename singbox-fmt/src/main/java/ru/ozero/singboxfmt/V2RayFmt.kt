@@ -11,11 +11,16 @@ object V2RayFmt {
         val parsed = Uri.parse(uri)
         val bean = VLESSBean()
         parseBasicParams(bean, parsed)
-        parseSecurityParams(bean, parsed)
+        V2RayFmtUtils.parseSecurityParams(bean, parsed)
         parseTransportParams(bean, parsed)
         bean.initializeDefaultValues()
         return bean
     }
+
+    fun parseVMess(uri: String): VMessBean = VMessFmt.parse(uri)
+    fun parseTrojan(uri: String): TrojanBean = TrojanFmt.parse(uri)
+    fun parseShadowsocks(uri: String): ShadowsocksBean =
+        ShadowsocksFmt.parse(uri)
 
     private fun parseBasicParams(bean: VLESSBean, parsed: Uri) {
         bean.uuid = parsed.userInfo ?: error("VLESS URI missing UUID")
@@ -28,32 +33,21 @@ object V2RayFmt {
         bean.encryption = parsed.getQueryParameter("encryption") ?: "none"
     }
 
-    private fun parseSecurityParams(bean: VLESSBean, parsed: Uri) {
-        bean.security = parsed.getQueryParameter("security") ?: "none"
-        bean.sni = parsed.getQueryParameter("sni") ?: ""
-        bean.alpn = parsed.getQueryParameter("alpn") ?: ""
-        bean.utlsFingerprint = parsed.getQueryParameter("fp") ?: ""
-        bean.realityPublicKey = parsed.getQueryParameter("pbk") ?: ""
-        bean.realityShortId = parsed.getQueryParameter("sid") ?: ""
-        bean.realityFingerprint = parsed.getQueryParameter("fp") ?: "chrome"
-    }
-
-    private fun mapTransportType(raw: String): String = when (raw) {
-        "h2" -> "http"
-        "xhttp" -> "splithttp"
-        else -> raw
-    }
-
     private fun parseTransportParams(bean: VLESSBean, parsed: Uri) {
-        bean.type = mapTransportType(parsed.getQueryParameter("type") ?: "tcp")
+        bean.type = V2RayFmtUtils.mapTransportType(
+            parsed.getQueryParameter("type") ?: "tcp",
+        )
         when (bean.type) {
             "ws", "httpupgrade" -> parseWsParams(bean, parsed)
             "http" -> parseHttpParams(bean, parsed)
-            "grpc" -> bean.grpcServiceName = parsed.getQueryParameter("serviceName") ?: ""
+            "grpc" -> {
+                bean.grpcServiceName =
+                    parsed.getQueryParameter("serviceName") ?: ""
+            }
             "splithttp" -> parseSplithttpParams(bean, parsed)
             "kcp", "mkcp" -> parseKcpParams(bean, parsed)
             "quic" -> parseQuicParams(bean, parsed)
-            "tcp" -> parseTcpParams(bean, parsed)
+            "tcp" -> V2RayFmtUtils.parseTcpParams(bean, parsed)
         }
     }
 
@@ -82,15 +76,8 @@ object V2RayFmt {
 
     private fun parseQuicParams(bean: VLESSBean, parsed: Uri) {
         bean.headerType = parsed.getQueryParameter("headerType") ?: "none"
-        bean.quicSecurity = parsed.getQueryParameter("quicSecurity") ?: "none"
+        bean.quicSecurity =
+            parsed.getQueryParameter("quicSecurity") ?: "none"
         bean.quicKey = parsed.getQueryParameter("key") ?: ""
-    }
-
-    private fun parseTcpParams(bean: VLESSBean, parsed: Uri) {
-        bean.headerType = parsed.getQueryParameter("headerType") ?: "none"
-        if (bean.headerType == "http") {
-            bean.host = parsed.getQueryParameter("host") ?: ""
-            bean.path = parsed.getQueryParameter("path") ?: "/"
-        }
     }
 }

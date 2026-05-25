@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import ru.ozero.app.R
 import ru.ozero.enginescore.PersistentLoggers
@@ -68,7 +69,6 @@ data class WarpSettingsUiState(
     val progressTotal: Int = 0,
     val importSuccessCount: Int = 0,
     val editDraft: WarpEditDraft? = null,
-    val showTweaks: Boolean = false,
     val isProvingEndpoints: Boolean = false,
     val provingProgress: String = "",
 )
@@ -230,50 +230,8 @@ class WarpEngineSettingsViewModel @Inject constructor(
         }
     }
 
-    fun onImportClashYaml(stream: InputStream, displayName: String) {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isProvingEndpoints = true, provingProgress = "Парсинг...")
-            runCatching {
-                val yaml = stream.bufferedReader().readText()
-                val parsed = ClashYamlParser.parse(yaml)
-                _uiState.value = _uiState.value.copy(
-                    provingProgress = "Проверка ${parsed.endpoints.size} эндпоинтов...",
-                )
-                val probed = endpointProber.probe(parsed.endpoints)
-                val sortedEndpoints = probed.map { it.endpoint }
-                val bestEndpoint = probed.firstOrNull { it.rttMs < Long.MAX_VALUE }?.endpoint
-                    ?: parsed.endpoints.first()
-                val config = WarpConfig(
-                    privateKey = parsed.privateKey,
-                    peerPublicKey = parsed.peerPublicKey,
-                    peerEndpoint = bestEndpoint,
-                    interfaceAddressV4 = parsed.interfaceAddressV4,
-                    interfaceAddressV6 = parsed.interfaceAddressV6,
-                    dnsServers = parsed.dnsServers,
-                    mtu = parsed.mtu,
-                    keepaliveSeconds = parsed.keepaliveSeconds,
-                    awgParams = parsed.awgParams,
-                )
-                val rawIni = WarpIniBuilder.build(config)
-                val slotName = ClashYamlParser.slotNameFromFilename(displayName)
-                val id = store.addSlot(slotName, config, rawIni, sortedEndpoints)
-                store.setActive(id)
-            }.onSuccess {
-                _uiState.value = _uiState.value.copy(
-                    isProvingEndpoints = false,
-                    provingProgress = "",
-                    importSuccessCount = _uiState.value.importSuccessCount + 1,
-                    errorMessage = null,
-                    errorMessageRes = null,
-                )
-            }.onFailure { e ->
-                _uiState.value = _uiState.value.copy(
-                    isProvingEndpoints = false,
-                    provingProgress = "",
-                    errorMessage = e.message ?: "Ошибка импорта YAML",
-                )
-            }
-        }
+    fun onClashYamlRejected() {
+        _uiState.update { it.copy(errorMessage = "Формат Clash не поддерживается") }
     }
 
     fun onSetActive(id: String) {
@@ -378,7 +336,6 @@ class WarpEngineSettingsViewModel @Inject constructor(
                 .onSuccess {
                     _uiState.value = _uiState.value.copy(
                         editDraft = null,
-                        showTweaks = false,
                         errorMessage = null,
                         errorMessageRes = null,
                     )

@@ -2,6 +2,7 @@ package ru.ozero.app.ui
 
 import org.junit.jupiter.api.Test
 import java.io.File
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class MainScreenVisualConnectedSentinelTest {
@@ -47,18 +48,42 @@ class MainScreenVisualConnectedSentinelTest {
     }
 
     @Test
-    fun `computePowerDiscState — Connected плюс degraded даёт Switching (жёлтый)`() {
-        val source = locateMainScreen().readText()
+    fun `powerDiscState в MainViewModel — Connected плюс degraded даёт Switching (жёлтый)`() {
+        val source = locateMainViewModel().readText()
         assertTrue(
-            source.contains("state is TunnelState.Connected && currentEngineDegraded -> PowerDiscState.Switching"),
-            "computePowerDiscState обязан рисовать жёлтую кнопку (Switching) при Connected + currentEngineDegraded — " +
+            source.contains("s is TunnelState.Connected && degraded -> PowerDiscState.Switching"),
+            "MainViewModel.powerDiscState обязан рисовать жёлтую кнопку (Switching) при Connected + degraded — " +
                 "это общий паттерн для WARP (UAPI null/handshake stale) и URnetwork (peers==0). " +
                 "Зелёная кнопка ⇔ реально трафик идёт. Регрессия 2026-05-20: WARP висел Connected зелёным без трафика.",
         )
         assertTrue(
-            source.contains("computePowerDiscState(state, switching, currentEngineDegraded)"),
-            "MainScreen обязан передавать currentEngineDegraded из MainViewModel в computePowerDiscState — " +
-                "иначе degraded флаг не доходит до UI",
+            source.contains("val powerDiscState"),
+            "MainViewModel обязан содержать powerDiscState StateFlow — " +
+                "атомарное состояние кнопки, без гонки трёх отдельных StateFlow в UI",
+        )
+        val screenSource = locateMainScreen().readText()
+        assertTrue(
+            screenSource.contains("viewModel.powerDiscState"),
+            "MainScreen обязан читать viewModel.powerDiscState — " +
+                "единый источник истины, вычисленный через combine() в VM",
+        )
+    }
+
+    @Test
+    fun `powerDiscState в MainViewModel — Disconnecting маппится в Off а не в Connecting`() {
+        val source = locateMainViewModel().readText()
+        val fnStart = source.indexOf("val powerDiscState")
+        assertTrue(fnStart >= 0, "powerDiscState не найден в MainViewModel.kt")
+        val blockStart = source.indexOf("combine(", fnStart)
+        assertTrue(blockStart >= 0, "powerDiscState обязан использовать combine() — Регрессия 2026-05-25")
+        val blockEnd = source.indexOf(".stateIn(", blockStart)
+        val combineBody = if (blockEnd > blockStart) source.substring(blockStart, blockEnd) else ""
+        assertFalse(
+            combineBody.contains("TunnelState.Disconnecting"),
+            "powerDiscState combine-блок НЕ должен упоминать TunnelState.Disconnecting — " +
+                "Disconnecting маппится в Off через else-ветку. " +
+                "Disconnecting → Connecting вызывает yellow flash после green при фейле WARP: " +
+                "видно оба цвета одновременно (yellow+green overlap). Баг 2026-05-25.",
         )
     }
 
@@ -86,6 +111,13 @@ class MainScreenVisualConnectedSentinelTest {
         val repoRoot = locateRepoRoot()
         val file = File(repoRoot, "app/src/main/java/ru/ozero/app/ui/MainScreen.kt")
         check(file.isFile) { "MainScreen.kt не найден по пути ${file.absolutePath}" }
+        return file
+    }
+
+    private fun locateMainViewModel(): File {
+        val repoRoot = locateRepoRoot()
+        val file = File(repoRoot, "app/src/main/java/ru/ozero/app/ui/MainViewModel.kt")
+        check(file.isFile) { "MainViewModel.kt не найден по пути ${file.absolutePath}" }
         return file
     }
 

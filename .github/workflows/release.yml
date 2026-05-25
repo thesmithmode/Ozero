@@ -182,6 +182,58 @@ jobs:
             exit 1
           fi
           gh release download "$TAG" -p "*" -D engine-urnetwork/libs --clobber
+          for aar in engine-urnetwork/libs/*.aar; do
+            [ -f "$aar" ] || continue
+            tmpdir=$(mktemp -d)
+            unzip -o "$aar" -d "$tmpdir/aar-exploded"
+            zip -d "$tmpdir/aar-exploded/classes.jar" 'go/*.class' 2>/dev/null || true
+            (cd "$tmpdir/aar-exploded" && zip -r9 "$GITHUB_WORKSPACE/$aar" .)
+            rm -rf "$tmpdir"
+          done
+
+      - name: Download and explode Singbox AAR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TMPAAR=/tmp/libbox.aar
+          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
+          mkdir -p singbox-core/libs singbox-core/libs-stubs /tmp/go-stubs
+          unzip -o "$TMPAAR" classes.jar -d /tmp
+          cp /tmp/classes.jar singbox-core/libs/libbox.jar
+          unzip -o /tmp/classes.jar 'go/*.class' -d /tmp/go-stubs 2>/dev/null || true
+          jar cf singbox-core/libs-stubs/go-stubs.jar -C /tmp/go-stubs . 2>/dev/null || true
+          zip -d singbox-core/libs/libbox.jar 'go/*.class' || true
+          mkdir -p singbox-core/src/main/jniLibs
+          unzip -o "$TMPAAR" 'jni/*' -d /tmp/aar-exploded || true
+          if [ -d /tmp/aar-exploded/jni ]; then
+            cp -r /tmp/aar-exploded/jni/* singbox-core/src/main/jniLibs/
+          fi
+          ls -la singbox-core/libs/
+          find singbox-core/src/main/jniLibs -type f 2>/dev/null || echo "no jniLibs"
+
+      - name: Download FPTN native lib
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          DST="engine-fptn/src/main/jniLibs/arm64-v8a/libfptn_native_lib.so"
+          if [ -f "$DST" ] && [ "$(stat -c%s "$DST")" -gt 1000 ]; then
+            echo "libfptn_native_lib.so already in repo — skipping download"
+            exit 0
+          fi
+          TAG=$(gh release list --limit 100 --json tagName \
+            | grep -oE '"fptn-[a-f0-9]{8}"' \
+            | head -n1 | tr -d '"')
+          if [ -z "$TAG" ]; then
+            echo "::error::no fptn release found — run binaries.yml with artifact=fptn first"
+            exit 1
+          fi
+          mkdir -p "$(dirname "$DST")"
+          gh release download "$TAG" -p "libfptn_native_lib-arm64-v8a.so" \
+            -D /tmp/fptn-dl --clobber
+          cp /tmp/fptn-dl/libfptn_native_lib-arm64-v8a.so "$DST"
+          echo "Downloaded $DST from $TAG"
 
       - name: Download FPTN native lib
         env:

@@ -4,7 +4,6 @@ import android.app.Service
 import android.content.Intent
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
-import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -14,6 +13,7 @@ import ru.ozero.enginesingbox.ISingboxEngineProcess
 import ru.ozero.enginesingbox.ISingboxProtector
 import ru.ozero.enginesingbox.ISingboxStatusCallback
 import ru.ozero.enginesingbox.SingboxStats
+import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.singboxcore.Libsingboxgojni
 
 class SingboxEngineService : Service() {
@@ -31,7 +31,7 @@ class SingboxEngineService : Service() {
                 runCatching {
                     SingboxRuntime.start(rawFd, singboxJsonConfig, SingboxProtectorBridge(protector))
                 }.onFailure {
-                    Log.e(TAG, "startWithConfig failed: ${it.message}", it)
+                    PersistentLoggers.error(TAG, "startWithConfig failed: ${it.message}", it)
                 }
             }
         }
@@ -41,56 +41,79 @@ class SingboxEngineService : Service() {
             configFilePath: String,
             protector: ISingboxProtector,
         ) {
-            val config = runCatching { java.io.File(configFilePath).readText() }.getOrElse {
-                Log.e(TAG, "startWithConfigFile: cannot read $configFilePath: ${it.message}")
-                return
+            val rawFd = tunFd.detachFd()
+            val json = java.io.File(configFilePath).readText()
+            serviceScope.launch {
+                runCatching {
+                    SingboxRuntime.start(rawFd, json, SingboxProtectorBridge(protector))
+                }.onFailure {
+                    PersistentLoggers.error(TAG, "startWithConfigFile failed: ${it.message}", it)
+                }
             }
-            startWithConfig(tunFd, config, protector)
         }
 
         override fun stop() {
             serviceScope.launch {
                 runCatching { SingboxRuntime.stop() }
-                    .onFailure { Log.e(TAG, "stop failed: ${it.message}", it) }
+                    .onFailure { PersistentLoggers.error(TAG, "stop failed: ${it.message}", it) }
             }
         }
 
         override fun getStats(): SingboxStats {
-            val txRate = SingboxRuntime.queryStats("proxy", "uplink")
-            val rxRate = SingboxRuntime.queryStats("proxy", "downlink")
-            return SingboxStats(
-                txRateProxy = txRate,
-                rxRateProxy = rxRate,
-                txTotal = 0L,
-                rxTotal = 0L,
-                activeConnections = 0,
-            )
+            val status = SingboxRuntime.getLastStatus()
+            return if (status != null) {
+                SingboxStats(
+                    txRateProxy = status.uplink,
+                    rxRateProxy = status.downlink,
+                    txTotal = status.uplinkTotal,
+                    rxTotal = status.downlinkTotal,
+                    activeConnections = status.connectionsIn + status.connectionsOut,
+                )
+            } else {
+                SingboxStats(
+                    activeConnections = if (SingboxRuntime.isRunning()) 1 else 0,
+                )
+            }
         }
 
         override fun registerStatusCallback(cb: ISingboxStatusCallback?) {}
 
-        override fun urlTest(profileId: Long, url: String): Int = -1
+        override fun urlTest(profileId: Long): Long = -1
 
-        override fun setPerAppPackages(packages: Array<out String>?, isAllowList: Boolean) {
-            Log.w(TAG, "setPerAppPackages called but per-app routing not yet implemented")
+        override fun setPerAppPackages(packages: Array<String>?, isAllowList: Boolean) {
+            PersistentLoggers.warn(TAG, "per-app routing not yet implemented")
         }
     }
 
     override fun onCreate() {
         super.onCreate()
         Libsingboxgojni.loadOnce()
-        Log.i(TAG, "SingboxEngineService created pid=${android.os.Process.myPid()}")
+        val dataDir = applicationContext.filesDir.absolutePath + "/singbox"
+        java.io.File(dataDir).mkdirs()
+        java.io.File("$dataDir/tmp").mkdirs()
+        SingboxRuntime.setup(dataDir)
+        PersistentLoggers.info(
+            TAG,
+            "SingboxEngineService created pid=${android.os.Process.myPid()} " +
+                "libraryLoaded=${Libsingboxgojni.libraryLoaded} loadError=${Libsingboxgojni.loadError}",
+        )
     }
 
     override fun onBind(intent: Intent?): IBinder = binder
 
     override fun onDestroy() {
-        serviceScope.launch { SingboxRuntime.stop() }
+        val latch = java.util.concurrent.CountDownLatch(1)
+        serviceScope.launch {
+            runCatching { SingboxRuntime.stop() }
+            latch.countDown()
+        }
+        latch.await(DESTROY_STOP_TIMEOUT_S, java.util.concurrent.TimeUnit.SECONDS)
         serviceScope.cancel()
         super.onDestroy()
     }
 
     companion object {
         private const val TAG = "SingboxEngineService"
+        private const val DESTROY_STOP_TIMEOUT_S = 3L
     }
 }

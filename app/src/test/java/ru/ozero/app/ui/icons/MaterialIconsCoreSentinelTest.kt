@@ -25,6 +25,7 @@ class MaterialIconsCoreSentinelTest {
         "androidx.compose.material.icons.filled.Search",
         "androidx.compose.material.icons.filled.Settings",
         "androidx.compose.material.icons.filled.Share",
+        "androidx.compose.material.icons.filled.PlayArrow",
         "androidx.compose.material.icons.filled.Star",
         "androidx.compose.material.icons.filled.Warning",
         "androidx.compose.material.icons.automirrored.filled.ArrowBack",

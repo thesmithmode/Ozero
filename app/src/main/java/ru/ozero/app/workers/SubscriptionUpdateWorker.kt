@@ -24,7 +24,10 @@ class SubscriptionUpdateWorker @AssistedInject constructor(
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
-        val groups = groupDao.getAll().filter { it.autoUpdate }
+        val now = System.currentTimeMillis()
+        val groups = groupDao.getAll().filter { group ->
+            group.autoUpdate && (now - group.lastUpdated) >= MIN_UPDATE_INTERVAL_MS
+        }
         if (groups.isEmpty()) return Result.success()
         val results = groups.map { group -> rawUpdater.refresh(group) }
         val allFailed = results.all { it.isFailure }
@@ -33,7 +36,8 @@ class SubscriptionUpdateWorker @AssistedInject constructor(
 
     companion object {
         private const val WORK_NAME = "singbox_subscription_update"
-        private const val INTERVAL_HOURS = 6L
+        private const val INTERVAL_HOURS = 24L
+        private const val MIN_UPDATE_INTERVAL_MS = 23L * 60 * 60 * 1000
 
         fun schedule(workManager: WorkManager) {
             val constraints = Constraints.Builder()

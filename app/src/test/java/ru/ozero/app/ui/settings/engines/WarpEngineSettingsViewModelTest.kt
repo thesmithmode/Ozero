@@ -114,7 +114,7 @@ class WarpEngineSettingsViewModelTest {
         }
         val freshAuto = FakeAutoConfig()
         val freshVm = WarpEngineSettingsViewModel(
-            throwingStore, freshAuto, FakeFileImporter(), FakeWarpEndpointProber(),
+            throwingStore, freshAuto, FakeFileImporter(),
         )
         advanceUntilIdle()
         assertEquals(0, freshAuto.callCount, "Migration fail блокирует auto-trigger")
@@ -465,7 +465,7 @@ class WarpEngineSettingsViewModelTest {
             override suspend fun migrateIfNeeded() = error("migration boom")
         }
         val vm = WarpEngineSettingsViewModel(
-            throwingStore, FakeAutoConfig(), FakeFileImporter(), FakeWarpEndpointProber(),
+            throwingStore, FakeAutoConfig(), FakeFileImporter(),
         )
         advanceUntilIdle()
         assertEquals("migration boom", vm.uiState.value.errorMessage)

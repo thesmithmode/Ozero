@@ -6,18 +6,20 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
-import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.byteArrayPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import ru.ozero.enginescore.EngineCapabilities
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
@@ -34,8 +36,13 @@ import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.VpnSocketProtectorHolder
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.singboxconfig.ConfigBuilder
+import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
+import ru.ozero.singboxfmt.ShadowsocksBean
+import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
+import ru.ozero.singboxfmt.VMessBean
+import ru.ozero.singboxroom.dao.ProxyProfileDao
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -43,6 +50,8 @@ import javax.inject.Inject
 class SingboxEngine @Inject constructor(
     @ApplicationContext private val context: Context,
     @SingboxPrefs private val dataStore: DataStore<Preferences>,
+    private val profileDao: ProxyProfileDao,
+    private val onProcessDied: () -> Unit = {},
 ) : EnginePlugin, TunFdAcceptor {
 
     private val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -50,9 +59,23 @@ class SingboxEngine @Inject constructor(
     @Volatile
     private var cachedBlob: ByteArray? = null
 
+    @Volatile
+    private var cachedSelectedProfileId: Long? = null
+
+    @Volatile
+    private var cachedAutoBlobs: List<ByteArray> = emptyList()
+
     init {
         engineScope.launch {
-            dataStore.data.collect { prefs -> cachedBlob = prefs[BEAN_KEY] }
+            dataStore.data.collect { prefs ->
+                cachedBlob = prefs[BEAN_KEY]
+                cachedSelectedProfileId = prefs[SELECTED_PROFILE_KEY]
+            }
+        }
+        engineScope.launch {
+            profileDao.getAllFlow().collect { profiles ->
+                cachedAutoBlobs = profiles.map { it.beanBlob }
+            }
         }
     }
 
@@ -92,7 +115,21 @@ class SingboxEngine @Inject constructor(
         require(config is EngineConfig.Singbox) { "SingboxEngine requires EngineConfig.Singbox" }
         require(upstream is Upstream.None) { "SingboxEngine: supportsUpstreamSocks=false" }
 
-        val bean = runCatching { KryoSerializer.deserialize<VLESSBean>(config.beanBlob) }
+        if (config.autoSelectBeanBlobs.isNotEmpty()) {
+            val beans = config.autoSelectBeanBlobs
+                .take(MAX_AUTO_SELECT_OUTBOUNDS)
+                .mapNotNull {
+                    runCatching { KryoSerializer.deserialize<AbstractBean>(it) }.getOrNull()
+                }
+            if (beans.isEmpty()) return StartResult.Failure("auto-select: no valid beans")
+            val json = runCatching { ConfigBuilder.buildSingboxAutoConfig(beans) }
+                .getOrElse { return StartResult.Failure("Failed to build auto-select config: ${it.message}") }
+            pendingConfig = json
+            bindOrFail()?.let { return it }
+            return StartResult.Success(socksPort = 0)
+        }
+
+        val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(config.beanBlob) }
             .getOrElse { return StartResult.Failure("Failed to deserialize config: ${it.message}") }
 
         val json = runCatching { ConfigBuilder.buildSingboxConfig(bean) }
@@ -109,10 +146,15 @@ class SingboxEngine @Inject constructor(
         val p = proxy ?: return TunAttachResult.Failure("SingboxEngineService not connected")
         return runCatching {
             val pfd = ParcelFileDescriptor.fromFd(tunFd)
-            p.startWithConfig(pfd, json, localProtector)
-            Log.i(TAG, "startWithConfig sent over AIDL")
+            try {
+                p.startWithConfig(pfd, json, localProtector)
+            } finally {
+                runCatching { pfd.close() }
+            }
+            PersistentLoggers.info(TAG, "startWithConfig sent over AIDL")
             TunAttachResult.Success
         }.getOrElse {
+            PersistentLoggers.error(TAG, "startWithConfig AIDL call failed: ${it.message}", it)
             TunAttachResult.Failure("startWithConfig AIDL call failed: ${it.message}")
         }
     }
@@ -163,8 +205,33 @@ class SingboxEngine @Inject constructor(
     override suspend fun ipProbeRoute(socksPort: Int): IpProbeRoute = IpProbeRoute.Default
 
     override fun buildManualConfig(settings: SettingsModel?): EngineConfig? {
+        if (cachedSelectedProfileId == SELECTED_AUTO) {
+            val blobs = cachedAutoBlobs.ifEmpty {
+                // cold-start race: cache not yet populated; do synchronous fallback read
+                runBlocking(Dispatchers.IO) {
+                    profileDao.getAllFlow().first()
+                }.map { it.beanBlob }
+            }
+            if (blobs.isEmpty()) return null
+            return EngineConfig.Singbox(
+                beanBlob = ByteArray(0),
+                protocolType = PROTOCOL_AUTO_SELECT,
+                autoSelectBeanBlobs = blobs,
+            )
+        }
         val blob = cachedBlob ?: return null
-        return EngineConfig.Singbox(beanBlob = blob, protocolType = PROTOCOL_VLESS)
+        val type = runCatching {
+            protocolTypeOf(KryoSerializer.deserialize<AbstractBean>(blob))
+        }.getOrDefault(PROTOCOL_VLESS)
+        return EngineConfig.Singbox(beanBlob = blob, protocolType = type)
+    }
+
+    private fun protocolTypeOf(bean: AbstractBean): Int = when (bean) {
+        is VLESSBean -> PROTOCOL_VLESS
+        is VMessBean -> PROTOCOL_VMESS
+        is TrojanBean -> PROTOCOL_TROJAN
+        is ShadowsocksBean -> PROTOCOL_SHADOWSOCKS
+        else -> PROTOCOL_VLESS
     }
 
     private fun bindOrFail(): StartResult.Failure? {
@@ -184,11 +251,12 @@ class SingboxEngine @Inject constructor(
                         serviceConn = null
                         if (ref != null) runCatching { context.unbindService(ref) }
                         PersistentLoggers.warn(TAG, "SingboxEngineService binder died — :engine_singbox crash")
+                        runCatching { onProcessDied() }
                     }
                     deathRecipient = recipient
                     runCatching { binder.linkToDeath(recipient, 0) }
                     latch.countDown()
-                    Log.i(TAG, "SingboxEngineService connected")
+                    PersistentLoggers.info(TAG, "SingboxEngineService connected")
                 }
 
                 override fun onServiceDisconnected(name: ComponentName) {
@@ -199,6 +267,7 @@ class SingboxEngine @Inject constructor(
                     serviceConn = null
                     if (ref != null) runCatching { context.unbindService(ref) }
                     PersistentLoggers.warn(TAG, "SingboxEngineService disconnected — system unbind")
+                    runCatching { onProcessDied() }
                 }
 
                 override fun onBindingDied(name: ComponentName?) {
@@ -209,6 +278,7 @@ class SingboxEngine @Inject constructor(
                     serviceConn = null
                     if (ref != null) runCatching { context.unbindService(ref) }
                     PersistentLoggers.warn(TAG, "SingboxEngineService binding died")
+                    runCatching { onProcessDied() }
                 }
             }
             val component = ComponentName(context, "ru.ozero.singboxprocess.SingboxEngineService")
@@ -255,7 +325,14 @@ class SingboxEngine @Inject constructor(
         private const val TAG = "SingboxEngine"
         private const val CONNECT_TIMEOUT_S = 5L
         private const val STATS_POLL_MS = 1_000L
+        private const val MAX_AUTO_SELECT_OUTBOUNDS = 50
         private val BEAN_KEY = byteArrayPreferencesKey("singbox_vless_bean")
+        private val SELECTED_PROFILE_KEY = longPreferencesKey("singbox_selected_profile_id")
+        const val SELECTED_AUTO = -1L
+        const val PROTOCOL_AUTO_SELECT = -1
         const val PROTOCOL_VLESS = 0
+        const val PROTOCOL_VMESS = 1
+        const val PROTOCOL_TROJAN = 2
+        const val PROTOCOL_SHADOWSOCKS = 3
     }
 }

@@ -127,6 +127,8 @@ dependencies {
             ),
         ),
     )
+    val goStubsDir = "${rootProject.projectDir}/singbox-core/libs-stubs"
+    compileOnly(fileTree(mapOf("dir" to goStubsDir, "include" to listOf("*.jar"))))
 
     implementation(libs.bundles.okhttp)
 

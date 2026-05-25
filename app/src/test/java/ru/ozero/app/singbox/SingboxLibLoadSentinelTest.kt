@@ -8,15 +8,15 @@ import kotlin.test.assertTrue
 class SingboxLibLoadSentinelTest {
 
     @Test
-    fun `should Libsingboxgojni load singboxgojni not gojni`() {
+    fun `should Libsingboxgojni load box not gojni`() {
         val root = locateRepoRoot()
         val libFile = File(root, "singbox-core/src/main/java/ru/ozero/singboxcore/Libsingboxgojni.kt")
         assertTrue(libFile.isFile, "Libsingboxgojni.kt must exist")
         val content = libFile.readText()
 
-        val msg = "Libsingboxgojni must load 'singboxgojni' — " +
+        val msg = "Libsingboxgojni must load 'box' (upstream libbox.so) — " +
             "'gojni' would clash with URnetwork's libgojni.so causing SIGABRT"
-        assertTrue(content.contains("System.loadLibrary(\"singboxgojni\")"), msg)
+        assertTrue(content.contains("System.loadLibrary(\"box\")"), msg)
         assertFalse(
             content.contains("System.loadLibrary(\"gojni\")"),
             "Libsingboxgojni must NOT load 'gojni' — this conflicts with URnetwork process",
@@ -69,6 +69,24 @@ class SingboxLibLoadSentinelTest {
             ozeroApp.contains("loadLibrary(\"singboxgojni\")"),
             "singboxgojni must NEVER load in main process — it is a Go runtime for :engine_singbox only",
         )
+    }
+
+    @Test
+    fun `CI workflows must not rename go package via jarjar`() {
+        val root = locateRepoRoot()
+        listOf(".github/workflows/ci.yml", ".github/workflows/release.yml").forEach { path ->
+            val text = File(root, path).readText()
+            assertFalse(
+                text.contains("jarjar"),
+                "$path содержит jarjar — jarjar переименовывает go.** → go_singbox.** в JAR, " +
+                    "но JNI-символы в libbox.so остаются Java_go_Seq_init. " +
+                    "JVM ищет Java_go_1singbox_Seq_init → UnsatisfiedLinkError. Регрессия 2026-05-25.",
+            )
+            assertFalse(
+                text.contains("go_singbox"),
+                "$path содержит go_singbox — пакет не должен переименовываться через jarjar",
+            )
+        }
     }
 
     private fun locateRepoRoot(): File {

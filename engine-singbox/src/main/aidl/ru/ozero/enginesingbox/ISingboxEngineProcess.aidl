@@ -10,6 +10,6 @@ interface ISingboxEngineProcess {
     void stop();
     SingboxStats getStats();
     void registerStatusCallback(ISingboxStatusCallback cb);
-    int urlTest(long profileId, String url);
+    long urlTest(long profileId);
     oneway void setPerAppPackages(in String[] packages, boolean isAllowList);
 }

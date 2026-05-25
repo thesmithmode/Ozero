@@ -111,13 +111,18 @@ class NotificationStatsFormatterTest {
             extras = "",
             nowMs = 100_000,
         )
-        assertTrue(result.contains("Σ"), "должен содержать символ Σ для total: $result")
+        val totalLine = result.lines().last()
+        assertTrue(
+            totalLine.contains("↓") && totalLine.contains("/") && totalLine.contains("↑"),
+            "вторая строка содержит rx/tx total через /: $totalLine",
+        )
     }
 
     @Test
-    fun format_extras_отделяется_серединным_dot_separator() {
-        val result = NotificationStatsFormatter.format(baseSnapshot, "5 peers", 100_000)
-        val totalLine = result.lines().last()
-        assertTrue(totalLine.endsWith("· 5 peers"), "extras в конце второй строки через ·: $totalLine")
+    fun format_extras_появляется_в_первой_строке() {
+        val result = NotificationStatsFormatter.format(baseSnapshot, "Sing-box", 100_000)
+        val speedLine = result.lines().first()
+        assertTrue(speedLine.startsWith("Sing-box"), "extras в начале первой строки: $speedLine")
+        assertTrue(speedLine.contains("↓") && speedLine.contains("↑"), "первая строка содержит скорости: $speedLine")
     }
 }
