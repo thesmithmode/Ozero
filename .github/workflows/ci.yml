@@ -189,7 +189,7 @@ jobs:
           path: |
             singbox-core/libs
             singbox-core/src/main/jniLibs
-          key: singbox-libbox-1.13.12-exploded-v2
+          key: singbox-libbox-1.13.12-exploded-v3
 
       - name: Download and explode Singbox AAR
         if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
@@ -199,16 +199,9 @@ jobs:
           set -euo pipefail
           TMPAAR=/tmp/libbox.aar
           gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
-          wget -q https://repo1.maven.org/maven2/org/pantsbuild/jarjar/1.7.2/jarjar-1.7.2.jar -O /tmp/jarjar.jar
-          wget -q https://repo1.maven.org/maven2/org/ow2/asm/asm/9.7.1/asm-9.7.1.jar -O /tmp/asm.jar
-          wget -q https://repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.7.1/asm-commons-9.7.1.jar -O /tmp/asm-commons.jar
-          wget -q https://repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.7.1/asm-tree-9.7.1.jar -O /tmp/asm-tree.jar
-          echo 'rule go.** go_singbox.@1' > /tmp/jarjar-rules.txt
-          # Extract and relocate classes.jar
           mkdir -p singbox-core/libs
           unzip -o "$TMPAAR" classes.jar -d /tmp
-          java -cp /tmp/jarjar.jar:/tmp/asm.jar:/tmp/asm-commons.jar:/tmp/asm-tree.jar org.pantsbuild.jarjar.Main process /tmp/jarjar-rules.txt /tmp/classes.jar singbox-core/libs/libbox.jar
-          # Extract native .so files
+          cp /tmp/classes.jar singbox-core/libs/libbox.jar
           mkdir -p singbox-core/src/main/jniLibs
           unzip -o "$TMPAAR" 'jni/*' -d /tmp/aar-exploded || true
           if [ -d /tmp/aar-exploded/jni ]; then
@@ -296,7 +289,7 @@ jobs:
           path: |
             singbox-core/libs
             singbox-core/src/main/jniLibs
-          key: singbox-libbox-1.13.12-exploded-v2
+          key: singbox-libbox-1.13.12-exploded-v3
 
       - name: Download and explode Singbox AAR
         if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
@@ -306,14 +299,9 @@ jobs:
           set -euo pipefail
           TMPAAR=/tmp/libbox.aar
           gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
-          wget -q https://repo1.maven.org/maven2/org/pantsbuild/jarjar/1.7.2/jarjar-1.7.2.jar -O /tmp/jarjar.jar
-          wget -q https://repo1.maven.org/maven2/org/ow2/asm/asm/9.7.1/asm-9.7.1.jar -O /tmp/asm.jar
-          wget -q https://repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.7.1/asm-commons-9.7.1.jar -O /tmp/asm-commons.jar
-          wget -q https://repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.7.1/asm-tree-9.7.1.jar -O /tmp/asm-tree.jar
-          echo 'rule go.** go_singbox.@1' > /tmp/jarjar-rules.txt
           mkdir -p singbox-core/libs
           unzip -o "$TMPAAR" classes.jar -d /tmp
-          java -cp /tmp/jarjar.jar:/tmp/asm.jar:/tmp/asm-commons.jar:/tmp/asm-tree.jar org.pantsbuild.jarjar.Main process /tmp/jarjar-rules.txt /tmp/classes.jar singbox-core/libs/libbox.jar
+          cp /tmp/classes.jar singbox-core/libs/libbox.jar
           mkdir -p singbox-core/src/main/jniLibs
           unzip -o "$TMPAAR" 'jni/*' -d /tmp/aar-exploded || true
           if [ -d /tmp/aar-exploded/jni ]; then
