@@ -18,11 +18,12 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -34,13 +35,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
 import ru.ozero.singboxroom.entity.ProxyProfile
 import ru.ozero.singboxroom.entity.SubscriptionGroup
@@ -80,103 +81,116 @@ fun SingboxEngineSettingsScreen(
                         enabled = state.groups.isNotEmpty() && state.isRefreshing.isEmpty(),
                         modifier = Modifier.testTag("singbox_refresh_all_button"),
                     ) {
-                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.singbox_refresh_all_button))
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = stringResource(R.string.singbox_refresh_all_button),
+                        )
                     }
                 },
             )
         },
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .padding(horizontal = 16.dp)
-                .verticalScroll(rememberScrollState()),
-        ) {
-            Spacer(Modifier.height(8.dp))
+        SingboxSettingsContent(state = state, viewModel = viewModel, modifier = Modifier.padding(padding))
+    }
+}
 
-            state.groups.forEach { group ->
-                SubscriptionGroupItem(
-                    group = group,
-                    isExpanded = state.expandedGroupId == group.id,
-                    profiles = state.groupProfiles[group.id] ?: emptyList(),
-                    selectedProfileId = state.selectedProfileId,
-                    isRefreshing = group.id in state.isRefreshing,
-                    refreshError = state.groupRefreshErrors[group.id],
-                    onToggle = { viewModel.onGroupExpand(group.id) },
-                    onRefresh = { viewModel.onRefreshGroup(group.id) },
-                    onDelete = { viewModel.onDeleteGroup(group) },
-                    onProfileSelect = { viewModel.onProfileSelect(it) },
-                )
-                Spacer(Modifier.height(4.dp))
-            }
+@Composable
+private fun SingboxSettingsContent(
+    state: SingboxSettingsUiState,
+    viewModel: SingboxEngineSettingsViewModel,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .padding(horizontal = 16.dp)
+            .verticalScroll(rememberScrollState()),
+    ) {
+        Spacer(Modifier.height(8.dp))
 
-            Spacer(Modifier.height(8.dp))
-
-            TextButton(
-                onClick = viewModel::onAddGroupDialogOpen,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("singbox_add_group_button"),
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(Modifier.width(4.dp))
-                Text(stringResource(R.string.singbox_add_group_button))
-            }
-
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider()
-            Spacer(Modifier.height(12.dp))
-
-            Text(
-                text = stringResource(R.string.singbox_custom_link_section),
-                style = MaterialTheme.typography.labelMedium,
+        state.groups.forEach { group ->
+            SubscriptionGroupItem(
+                group = group,
+                isExpanded = state.expandedGroupId == group.id,
+                profiles = state.groupProfiles[group.id] ?: emptyList(),
+                selectedProfileId = state.selectedProfileId,
+                isRefreshing = group.id in state.isRefreshing,
+                isPinging = group.id in state.isPinging,
+                refreshError = state.groupRefreshErrors[group.id],
+                onToggle = { viewModel.onGroupExpand(group.id) },
+                onRefresh = { viewModel.onRefreshGroup(group.id) },
+                onPing = { viewModel.onPingGroup(group.id) },
+                onDelete = { viewModel.onDeleteGroup(group) },
+                onProfileSelect = { viewModel.onProfileSelect(it) },
             )
             Spacer(Modifier.height(4.dp))
-            OutlinedTextField(
-                value = state.customLinkInput,
-                onValueChange = viewModel::onCustomLinkChanged,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("singbox_link_input"),
-                placeholder = { Text("vless://...") },
-                isError = state.customLinkError != null,
-                supportingText = state.customLinkError?.let { err ->
-                    {
-                        Text(
-                            when (err) {
-                                is CustomLinkError.Empty -> stringResource(R.string.singbox_link_error_empty)
-                                is CustomLinkError.ParseFailed ->
-                                    stringResource(R.string.singbox_link_error_parse, err.cause)
-                                is CustomLinkError.SaveFailed ->
-                                    stringResource(R.string.singbox_link_error_save, err.cause)
-                            },
-                        )
-                    }
-                },
-                singleLine = false,
-                minLines = 2,
-            )
-            Spacer(Modifier.height(8.dp))
-            Button(
-                onClick = viewModel::onSaveCustomLink,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("singbox_save_button"),
-            ) {
-                Text(stringResource(R.string.singbox_save_button))
-            }
-            if (state.customLinkSaved) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = stringResource(R.string.singbox_saved_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.testTag("singbox_saved_hint"),
-                )
-            }
-
-            Spacer(Modifier.height(24.dp))
         }
+
+        Spacer(Modifier.height(8.dp))
+
+        TextButton(
+            onClick = viewModel::onAddGroupDialogOpen,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("singbox_add_group_button"),
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null)
+            Spacer(Modifier.width(4.dp))
+            Text(stringResource(R.string.singbox_add_group_button))
+        }
+
+        Spacer(Modifier.height(16.dp))
+        HorizontalDivider()
+        Spacer(Modifier.height(12.dp))
+
+        Text(
+            text = stringResource(R.string.singbox_custom_link_section),
+            style = MaterialTheme.typography.labelMedium,
+        )
+        Spacer(Modifier.height(4.dp))
+        OutlinedTextField(
+            value = state.customLinkInput,
+            onValueChange = viewModel::onCustomLinkChanged,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("singbox_link_input"),
+            placeholder = { Text("vless://...") },
+            isError = state.customLinkError != null,
+            supportingText = state.customLinkError?.let { err ->
+                {
+                    Text(
+                        when (err) {
+                            is CustomLinkError.Empty -> stringResource(R.string.singbox_link_error_empty)
+                            is CustomLinkError.ParseFailed ->
+                                stringResource(R.string.singbox_link_error_parse, err.cause)
+                            is CustomLinkError.SaveFailed ->
+                                stringResource(R.string.singbox_link_error_save, err.cause)
+                        },
+                    )
+                }
+            },
+            singleLine = false,
+            minLines = 2,
+        )
+        Spacer(Modifier.height(8.dp))
+        Button(
+            onClick = viewModel::onSaveCustomLink,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("singbox_save_button"),
+        ) {
+            Text(stringResource(R.string.singbox_save_button))
+        }
+        if (state.customLinkSaved) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = stringResource(R.string.singbox_saved_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.testTag("singbox_saved_hint"),
+            )
+        }
+
+        Spacer(Modifier.height(24.dp))
     }
 }
 
@@ -187,9 +201,11 @@ private fun SubscriptionGroupItem(
     profiles: List<ProxyProfile>,
     selectedProfileId: Long?,
     isRefreshing: Boolean,
+    isPinging: Boolean,
     refreshError: String?,
     onToggle: () -> Unit,
     onRefresh: () -> Unit,
+    onPing: () -> Unit,
     onDelete: () -> Unit,
     onProfileSelect: (ProxyProfile) -> Unit,
 ) {
@@ -212,9 +228,12 @@ private fun SubscriptionGroupItem(
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.weight(1f),
             )
-            if (isRefreshing) {
+            if (isRefreshing || isPinging) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
             } else {
+                IconButton(onClick = onPing, modifier = Modifier.size(36.dp), enabled = profiles.isNotEmpty()) {
+                    Icon(Icons.Default.Star, contentDescription = stringResource(R.string.singbox_group_ping))
+                }
                 IconButton(onClick = onRefresh, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.singbox_group_refresh))
                 }
