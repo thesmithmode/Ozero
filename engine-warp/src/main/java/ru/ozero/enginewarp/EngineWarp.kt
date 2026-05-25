@@ -59,7 +59,9 @@ class EngineWarp(
     private val connectedSinceRef = AtomicReference<Long>(0L)
 
     @Volatile private var networkCallback: ConnectivityManager.NetworkCallback? = null
+
     @Volatile private var savedTunFd: Int = -1
+
     @Volatile private var consecutiveRecoverFails: Int = 0
 
     override val id = EngineId.WARP
