@@ -8,6 +8,9 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -15,14 +18,18 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import ru.ozero.enginesingbox.SingboxPrefs
 import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.V2RayFmt
+import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.dao.SubscriptionGroupDao
 import ru.ozero.singboxroom.entity.ProxyProfile
 import ru.ozero.singboxroom.entity.SubscriptionGroup
 import ru.ozero.singboxsubscription.RawUpdater
+import java.net.InetSocketAddress
+import java.net.Socket
 import javax.inject.Inject
 
 sealed class CustomLinkError {
@@ -108,6 +115,9 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
         val result = rawUpdater.refresh(group)
         val profiles = profileDao.getByGroupId(groupId)
+        if (result.isSuccess && profiles.isNotEmpty()) {
+            probeAndAutoSelect(profiles)
+        }
         _uiState.update {
             val errorMsg = if (result.isFailure && profiles.isEmpty()) {
                 result.exceptionOrNull()?.message ?: "error"
@@ -116,7 +126,7 @@ class SingboxEngineSettingsViewModel @Inject constructor(
             }
             it.copy(
                 isRefreshing = it.isRefreshing - groupId,
-                groupProfiles = it.groupProfiles + (groupId to profiles),
+                groupProfiles = it.groupProfiles + (groupId to profileDao.getByGroupId(groupId)),
                 groupRefreshErrors = if (errorMsg != null) {
                     it.groupRefreshErrors + (groupId to errorMsg)
                 } else {
@@ -124,6 +134,33 @@ class SingboxEngineSettingsViewModel @Inject constructor(
                 },
             )
         }
+    }
+
+    private suspend fun probeAndAutoSelect(profiles: List<ProxyProfile>) {
+        val results = profiles.map { profile ->
+            viewModelScope.async(Dispatchers.IO) {
+                val latency = probeLatencyMs(profile)
+                if (latency >= 0) profileDao.updateLatency(profile.id, latency)
+                profile to latency
+            }
+        }.awaitAll()
+        val best = results.filter { it.second >= 0 }.minByOrNull { it.second }?.first ?: return
+        dataStore.edit { prefs ->
+            prefs[SELECTED_PROFILE_KEY] = best.id
+            prefs[BEAN_KEY] = best.beanBlob
+        }
+    }
+
+    private suspend fun probeLatencyMs(profile: ProxyProfile): Int = withContext(Dispatchers.IO) {
+        val bean = runCatching { KryoSerializer.deserialize<VLESSBean>(profile.beanBlob) }
+            .getOrNull() ?: return@withContext -1
+        val t0 = System.currentTimeMillis()
+        val ok = runCatching {
+            Socket().use { s ->
+                s.connect(InetSocketAddress(bean.serverAddress, bean.serverPort), PROBE_TIMEOUT_MS)
+            }
+        }.isSuccess
+        if (ok) (System.currentTimeMillis() - t0).toInt() else -1
     }
 
     fun onAddGroupDialogOpen() = _uiState.update { it.copy(showAddGroupDialog = true) }
@@ -187,5 +224,6 @@ class SingboxEngineSettingsViewModel @Inject constructor(
     companion object {
         private val BEAN_KEY = byteArrayPreferencesKey("singbox_vless_bean")
         private val SELECTED_PROFILE_KEY = longPreferencesKey("singbox_selected_profile_id")
+        private const val PROBE_TIMEOUT_MS = 3_000
     }
 }
