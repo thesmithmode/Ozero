@@ -13,7 +13,7 @@ import ru.ozero.enginesingbox.ISingboxEngineProcess
 import ru.ozero.enginesingbox.ISingboxProtector
 import ru.ozero.enginesingbox.ISingboxStatusCallback
 import ru.ozero.enginesingbox.SingboxStats
-import ru.ozero.enginescore.PersistentLoggers
+import android.util.Log
 import ru.ozero.singboxcore.Libsingboxgojni
 
 class SingboxEngineService : Service() {
@@ -31,7 +31,7 @@ class SingboxEngineService : Service() {
                 runCatching {
                     SingboxRuntime.start(rawFd, singboxJsonConfig, SingboxProtectorBridge(protector))
                 }.onFailure {
-                    PersistentLoggers.error(TAG, "startWithConfig failed: ${it.message}", it)
+                    Log.e(TAG, "startWithConfig failed: ${it.message}", it)
                 }
             }
         }
@@ -39,7 +39,7 @@ class SingboxEngineService : Service() {
         override fun stop() {
             serviceScope.launch {
                 runCatching { SingboxRuntime.stop() }
-                    .onFailure { PersistentLoggers.error(TAG, "stop failed: ${it.message}", it) }
+                    .onFailure { Log.e(TAG, "stop failed: ${it.message}", it) }
             }
         }
 
@@ -70,7 +70,7 @@ class SingboxEngineService : Service() {
         java.io.File(dataDir).mkdirs()
         java.io.File("$dataDir/tmp").mkdirs()
         SingboxRuntime.setup(dataDir)
-        PersistentLoggers.info(
+        Log.i(
             TAG,
             "SingboxEngineService created pid=${android.os.Process.myPid()} " +
                 "libraryLoaded=${Libsingboxgojni.libraryLoaded} loadError=${Libsingboxgojni.loadError}",
