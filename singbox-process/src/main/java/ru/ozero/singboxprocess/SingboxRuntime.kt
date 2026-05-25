@@ -49,7 +49,14 @@ internal object SingboxRuntime {
     suspend fun start(tunFd: Int, singboxJsonConfig: String, protectorBridge: SingboxProtectorBridge) =
         withContext(Dispatchers.Main.immediate) {
             mutex.withLock {
-                check(commandServer == null) { "SingboxRuntime already running" }
+                val oldServer = commandServer
+                if (oldServer != null) {
+                    PersistentLoggers.warn(TAG, "start: previous runtime active — stopping first")
+                    runCatching { oldServer.closeService() }
+                    runCatching { oldServer.close() }
+                    commandServer = null
+                    lastStatus = null
+                }
 
                 val platform = OzeroPlatformInterface(tunFd, protectorBridge)
                 val handler = OzeroCommandServerHandler()

@@ -59,6 +59,8 @@ class EngineWarp(
     private val connectedSinceRef = AtomicReference<Long>(0L)
 
     @Volatile private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    @Volatile private var savedTunFd: Int = -1
+    @Volatile private var consecutiveRecoverFails: Int = 0
 
     override val id = EngineId.WARP
 
@@ -106,6 +108,8 @@ class EngineWarp(
         statsJobRef.getAndSet(null)?.cancel()
         connectedSinceRef.set(0L)
         _stats.value = EngineStats()
+        savedTunFd = -1
+        consecutiveRecoverFails = 0
         networkCallback?.let { cb ->
             networkCallback = null
             runCatching {
@@ -123,16 +127,62 @@ class EngineWarp(
         val state = uapiStateReader(uapiPath, TUNNEL_NAME)
             ?: return EnginePlugin.RecoverResult.Failed("UAPI недоступен — handshake state не читается")
         val ageS = state.handshakeAgeSeconds
-        return if (ageS != null && ageS < handshakeStaleThresholdSec) {
-            PersistentLoggers.info(TAG, "recover: handshake age=${ageS}s — OK, без действий")
-            EnginePlugin.RecoverResult.Success
-        } else {
+        if (ageS != null && ageS < handshakeStaleThresholdSec) {
+            consecutiveRecoverFails = 0
+            PersistentLoggers.info(TAG, "recover: handshake age=${ageS}s — OK, без дей��твий")
+            return EnginePlugin.RecoverResult.Success
+        }
+        consecutiveRecoverFails++
+        if (consecutiveRecoverFails < RECOVER_PASSIVE_ATTEMPTS) {
             PersistentLoggers.warn(
                 TAG,
-                "recover: handshake stale (age=$ageS, threshold=${handshakeStaleThresholdSec}s) — " +
-                    "Failed — amneziawg-go ретраит handshake в фоне, watchdog продолжит ждать",
+                "recover: handshake stale (age=$ageS) — passive attempt " +
+                    "$consecutiveRecoverFails/$RECOVER_PASSIVE_ATTEMPTS",
             )
-            EnginePlugin.RecoverResult.Failed("handshake stale age=${ageS ?: "never"}s")
+            return EnginePlugin.RecoverResult.Failed("handshake stale age=${ageS ?: "never"}s")
+        }
+        val fd = savedTunFd
+        val ini = resolvedIni
+        if (fd < 0 || ini == null) {
+            PersistentLoggers.warn(TAG, "recover: reattach impossible — fd=$fd ini=${ini != null}")
+            return EnginePlugin.RecoverResult.Failed("handshake stale, reattach unavailable")
+        }
+        PersistentLoggers.warn(TAG, "recover: handshake stale age=$ageS — reattach attempt")
+        statsJobRef.getAndSet(null)?.cancel()
+        networkCallback?.let { cb ->
+            networkCallback = null
+            runCatching {
+                (context?.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager)
+                    ?.unregisterNetworkCallback(cb)
+            }
+        }
+        sdkBridge.detachTun()
+        delay(RECOVER_REATTACH_DELAY_MS)
+        val result = sdkBridge.attachTun(TUNNEL_NAME, fd, ini, uapiPath, socketProtector)
+        if (result is WarpSdkBridge.AttachResult.Failed) {
+            PersistentLoggers.error(TAG, "recover reattach failed: ${result.reason}")
+            return EnginePlugin.RecoverResult.Failed("reattach failed: ${result.reason}")
+        }
+        startStatsPoll(uapiPath)
+        registerNetworkCallback()
+        val handshakeOk = withTimeoutOrNull(RECOVER_HANDSHAKE_WAIT_MS) {
+            while (true) {
+                val ready = runCatching {
+                    handshakeChecker(uapiPath, TUNNEL_NAME)
+                }.getOrDefault(false)
+                if (ready) return@withTimeoutOrNull true
+                delay(warpReadyPollMs)
+            }
+            @Suppress("UNREACHABLE_CODE")
+            false
+        } ?: false
+        consecutiveRecoverFails = 0
+        return if (handshakeOk) {
+            PersistentLoggers.info(TAG, "recover: reattach success — handshake established")
+            EnginePlugin.RecoverResult.Success
+        } else {
+            PersistentLoggers.warn(TAG, "recover: reattach done but handshake pending")
+            EnginePlugin.RecoverResult.Success
         }
     }
 
@@ -218,6 +268,7 @@ class EngineWarp(
         val ini = resolvedIni ?: return TunAttachResult.Failure(
             reason = "attachTun до start — нет ini config",
         )
+        savedTunFd = tunFd
         val uapiPath = uapiPathProvider()
         Log.i(TAG, "attachTun fd=$tunFd uapi=$uapiPath/$TUNNEL_NAME.sock")
         return when (val r = sdkBridge.attachTun(TUNNEL_NAME, tunFd, ini, uapiPath, socketProtector)) {
@@ -472,5 +523,8 @@ class EngineWarp(
         const val STATS_LOG_EVERY = 5
         const val UAPI_NULL_DEGRADED_THRESHOLD = 3
         const val PEER_WATCHDOG_HINT_S = 30
+        const val RECOVER_PASSIVE_ATTEMPTS = 2
+        const val RECOVER_REATTACH_DELAY_MS = 500L
+        const val RECOVER_HANDSHAKE_WAIT_MS = 5_000L
     }
 }

@@ -108,8 +108,16 @@ class ByeDpiEngine(
                 withTimeoutOrNull(STOP_GRACE_MS) { oldJob.join() }
                 if (oldJob.isActive) oldJob.cancel()
             }
-            // JNI ignores Thread.interrupt() so a cancelled call may still hold the slot.
-            withContext(proxyDispatcher) {}
+            val drained = withTimeoutOrNull(DRAIN_TIMEOUT_MS) {
+                withContext(proxyDispatcher) {}
+            }
+            if (drained == null) {
+                PersistentLoggers.warn(
+                    TAG,
+                    "proxyDispatcher drain timeout ${DRAIN_TIMEOUT_MS}ms — emergencyReset",
+                )
+                runCatching { proxy.emergencyReset() }
+            }
         }
 
         val args = buildArgs(resolvedConfig)
@@ -294,6 +302,7 @@ class ByeDpiEngine(
         const val READY_PROBE_TIMEOUT_MS = 500
         const val READY_RETRY_MS = 100L
         const val STOP_GRACE_MS = 3_000L
+        const val DRAIN_TIMEOUT_MS = 3_000L
         const val AUTO_ROTATE_PORT = 0
         const val PORT_ROTATION_BASE = 49_152
         const val PORT_ROTATION_RANGE = 256
