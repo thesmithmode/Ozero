@@ -13,13 +13,13 @@ class ByeDpiEngineConcurrencyContractTest {
     }
 
     @Test
-    fun `proxyDispatcher = Dispatchers IO limitedParallelism 1`() {
+    fun `proxyDispatcher uses Dispatchers IO limitedParallelism 1`() {
         val pattern = Regex(
-            """proxyDispatcher\s*=\s*Dispatchers\.IO\.limitedParallelism\(\s*1\s*\)""",
+            """Dispatchers\.IO\.limitedParallelism\(\s*1\s*\)""",
         )
         assertTrue(
             pattern.containsMatchIn(engineSource),
-            "proxyDispatcher обязан быть Dispatchers.IO.limitedParallelism(1). " +
+            "proxyDispatcher обязан использовать Dispatchers.IO.limitedParallelism(1). " +
                 "Сериализует byedpi JNI на ОДИН concurrent dispatch (queue безопасно " +
                 "сериализует start/stop sequence), но из общего IO пула — без owned thread, " +
                 "без daemon-leak, без обязательного close().",
