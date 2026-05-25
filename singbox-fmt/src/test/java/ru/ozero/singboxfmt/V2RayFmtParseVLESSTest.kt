@@ -8,9 +8,11 @@ class V2RayFmtParseVLESSTest {
 
     private val fmtSource: String by lazy {
         val root = locateRepoRoot()
-        File(root, "singbox-fmt/src/main/java/ru/ozero/singboxfmt/V2RayFmt.kt")
+        val main = File(root, "singbox-fmt/src/main/java/ru/ozero/singboxfmt/V2RayFmt.kt")
             .also { assertTrue(it.isFile, "V2RayFmt.kt must exist") }
             .readText()
+        val utils = File(root, "singbox-fmt/src/main/java/ru/ozero/singboxfmt/V2RayFmtUtils.kt")
+        if (utils.isFile) main + "\n" + utils.readText() else main
     }
 
     @Test
