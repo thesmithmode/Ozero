@@ -229,6 +229,8 @@ class ByeDpiEngine(
                 if (completed == null) {
                     PersistentLoggers.warn(TAG, "proxyJob не завершился за ${STOP_GRACE_MS}ms")
                     job.cancel()
+                    runCatching { proxy.emergencyReset() }
+                    PersistentLoggers.warn(TAG, "emergencyReset — принудительный сброс guard")
                 }
             }
             activeSocksPort = 0
