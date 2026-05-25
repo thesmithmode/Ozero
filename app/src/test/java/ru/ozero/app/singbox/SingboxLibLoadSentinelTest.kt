@@ -8,15 +8,15 @@ import kotlin.test.assertTrue
 class SingboxLibLoadSentinelTest {
 
     @Test
-    fun `should Libsingboxgojni load singboxgojni not gojni`() {
+    fun `should Libsingboxgojni load box not gojni`() {
         val root = locateRepoRoot()
         val libFile = File(root, "singbox-core/src/main/java/ru/ozero/singboxcore/Libsingboxgojni.kt")
         assertTrue(libFile.isFile, "Libsingboxgojni.kt must exist")
         val content = libFile.readText()
 
-        val msg = "Libsingboxgojni must load 'singboxgojni' — " +
+        val msg = "Libsingboxgojni must load 'box' (upstream libbox.so) — " +
             "'gojni' would clash with URnetwork's libgojni.so causing SIGABRT"
-        assertTrue(content.contains("System.loadLibrary(\"singboxgojni\")"), msg)
+        assertTrue(content.contains("System.loadLibrary(\"box\")"), msg)
         assertFalse(
             content.contains("System.loadLibrary(\"gojni\")"),
             "Libsingboxgojni must NOT load 'gojni' — this conflicts with URnetwork process",

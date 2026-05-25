@@ -19,7 +19,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import android.util.Log
+import ru.ozero.enginescore.PersistentLoggers
 
 internal object SingboxRuntime {
     private const val TAG = "SingboxRuntime"
@@ -43,45 +43,42 @@ internal object SingboxRuntime {
         options.tempPath = "$basePath/tmp"
         Libbox.setup(options)
         setupDone = true
-        Log.i(TAG, "libbox setup basePath=$basePath")
+        PersistentLoggers.info(TAG, "libbox setup basePath=$basePath")
     }
 
-    suspend fun start(
-        tunFd: Int,
-        singboxJsonConfig: String,
-        protectorBridge: SingboxProtectorBridge,
-    ) = withContext(Dispatchers.Main.immediate) {
-        mutex.withLock {
-            check(commandServer == null) { "SingboxRuntime already running" }
+    suspend fun start(tunFd: Int, singboxJsonConfig: String, protectorBridge: SingboxProtectorBridge) =
+        withContext(Dispatchers.Main.immediate) {
+            mutex.withLock {
+                check(commandServer == null) { "SingboxRuntime already running" }
 
-            val platform = OzeroPlatformInterface(tunFd, protectorBridge)
-            val handler = OzeroCommandServerHandler()
+                val platform = OzeroPlatformInterface(tunFd, protectorBridge)
+                val handler = OzeroCommandServerHandler()
 
-            val server = CommandServer(handler, platform)
-            server.start()
+                val server = CommandServer(handler, platform)
+                server.start()
 
-            try {
-                server.startOrReloadService(singboxJsonConfig, null)
-            } catch (e: Exception) {
-                server.close()
-                throw e
+                try {
+                    server.startOrReloadService(singboxJsonConfig, null)
+                } catch (e: Exception) {
+                    server.close()
+                    throw e
+                }
+
+                commandServer = server
+                PersistentLoggers.info(TAG, "runtime started fd=$tunFd")
             }
-
-            commandServer = server
-            Log.i(TAG, "runtime started fd=$tunFd")
         }
-    }
 
     suspend fun stop() = withContext(Dispatchers.Main.immediate) {
         mutex.withLock {
             val server = commandServer ?: return@withLock
             runCatching { server.closeService() }
-                .onFailure { Log.w(TAG, "closeService: ${it.message}") }
+                .onFailure { PersistentLoggers.warn(TAG, "closeService: ${it.message}") }
             runCatching { server.close() }
-                .onFailure { Log.w(TAG, "close: ${it.message}") }
+                .onFailure { PersistentLoggers.warn(TAG, "close: ${it.message}") }
             commandServer = null
             lastStatus = null
-            Log.i(TAG, "runtime stopped")
+            PersistentLoggers.info(TAG, "runtime stopped")
         }
     }
 
@@ -91,11 +88,11 @@ internal object SingboxRuntime {
 
     private class OzeroCommandServerHandler : CommandServerHandler {
         override fun serviceStop() {
-            Log.i(TAG, "serviceStop requested by libbox")
+            PersistentLoggers.info(TAG, "serviceStop requested by libbox")
         }
 
         override fun serviceReload() {
-            Log.i(TAG, "serviceReload requested by libbox")
+            PersistentLoggers.info(TAG, "serviceReload requested by libbox")
         }
 
         override fun getSystemProxyStatus(): SystemProxyStatus {
@@ -108,7 +105,7 @@ internal object SingboxRuntime {
         override fun setSystemProxyEnabled(enabled: Boolean) {}
 
         override fun writeDebugMessage(message: String) {
-            Log.i(TAG, "debug: $message")
+            PersistentLoggers.info(TAG, "debug: $message")
         }
     }
 
@@ -124,7 +121,7 @@ internal object SingboxRuntime {
         }
 
         override fun openTun(options: TunOptions): Int {
-            Log.i(TAG, "openTun mtu=${options.mtu}")
+            PersistentLoggers.info(TAG, "openTun mtu=${options.mtu}")
             return tunFd
         }
 

@@ -59,14 +59,15 @@ class SingboxTunFdLifecycleSentinelTest {
         assertTrue(runtime.isFile, "SingboxRuntime.kt must exist")
         val content = runtime.readText()
 
-        val startSig = content.lines().firstOrNull { it.contains("fun start(") } ?: ""
+        val startBlock = content.substringAfter("fun start(").substringBefore(") =\n")
+            .ifEmpty { content.substringAfter("fun start(").substringBefore(") {") }
         assertFalse(
-            startSig.contains("ParcelFileDescriptor"),
+            startBlock.contains("ParcelFileDescriptor"),
             "SingboxRuntime.start must accept raw Int tunFd, not ParcelFileDescriptor — " +
                 "PFD is detached in SingboxEngineService before passing to runtime",
         )
         assertTrue(
-            startSig.contains("tunFd") || startSig.contains("Int"),
+            startBlock.contains("tunFd") && startBlock.contains("Int"),
             "SingboxRuntime.start must accept tunFd as Int",
         )
     }
