@@ -112,8 +112,10 @@ class NotificationStatsFormatterTest {
             nowMs = 100_000,
         )
         val totalLine = result.lines().last()
-        assertTrue(totalLine.contains("↓") && totalLine.contains("/") && totalLine.contains("↑"),
-            "вторая строка содержит rx/tx total через /: $totalLine")
+        assertTrue(
+            totalLine.contains("↓") && totalLine.contains("/") && totalLine.contains("↑"),
+            "вторая строка содержит rx/tx total через /: $totalLine",
+        )
     }
 
     @Test
