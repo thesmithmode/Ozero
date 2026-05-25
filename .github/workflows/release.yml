@@ -194,7 +194,7 @@ jobs:
           echo 'rule go.** go_singbox.@1' > /tmp/jarjar-rules.txt
           cd singbox-core/libs
           unzip -o libbox.aar classes.jar
-          java -jar /tmp/jarjar.jar process /tmp/jarjar-rules.txt classes.jar classes-relocated.jar
+          java -cp /tmp/jarjar.jar org.pantsbuild.jarjar.Main process /tmp/jarjar-rules.txt classes.jar classes-relocated.jar
           mv classes-relocated.jar classes.jar
           zip libbox.aar classes.jar
           rm classes.jar
