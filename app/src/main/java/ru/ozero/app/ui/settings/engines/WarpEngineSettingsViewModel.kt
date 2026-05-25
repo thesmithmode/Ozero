@@ -66,7 +66,6 @@ data class WarpSettingsUiState(
     val progressTotal: Int = 0,
     val importSuccessCount: Int = 0,
     val editDraft: WarpEditDraft? = null,
-    val showTweaks: Boolean = false,
     val isProvingEndpoints: Boolean = false,
     val provingProgress: String = "",
 )
@@ -333,7 +332,6 @@ class WarpEngineSettingsViewModel @Inject constructor(
                 .onSuccess {
                     _uiState.value = _uiState.value.copy(
                         editDraft = null,
-                        showTweaks = false,
                         errorMessage = null,
                         errorMessageRes = null,
                     )
@@ -347,15 +345,8 @@ class WarpEngineSettingsViewModel @Inject constructor(
         }
     }
 
-    fun onStartTweaks() {
-        val slot = _uiState.value.slots.firstOrNull { it.isActive }
-            ?: _uiState.value.slots.firstOrNull() ?: return
-        onStartEdit(slot.id)
-        _uiState.value = _uiState.value.copy(showTweaks = true)
-    }
-
     fun onEditCancel() {
-        _uiState.value = _uiState.value.copy(editDraft = null, showTweaks = false)
+        _uiState.value = _uiState.value.copy(editDraft = null)
     }
 
     private companion object {

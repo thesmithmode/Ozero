@@ -468,9 +468,6 @@
     <string name="logs_share_chooser_title">Поделиться ozero.log</string>
     <string name="logs_export">Экспорт .log</string>
     <string name="logs_footer_fmt">%1$d / %2$d строк</string>
-    <!-- Warp tweaks screen -->
-    <string name="warp_tweaks_button">Параметры подключения</string>
-    <string name="warp_tweaks_title">Параметры подключения</string>
     <string name="warp_tweaks_endpoint_section">Конечная точка</string>
     <string name="warp_tweaks_awg_section">Параметры AmneziaWG</string>
     <string name="logs_copy_empty_toast">Пусто — нечего копировать</string>
