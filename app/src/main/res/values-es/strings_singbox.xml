@@ -22,6 +22,7 @@
     <string name="singbox_link_error_save">Error al guardar: %1$s</string>
     <string name="singbox_refresh_error">Error al actualizar: %1$s</string>
     <string name="singbox_refresh_all_button">Actualizar todo</string>
+    <string name="singbox_ping_all_button">Medir todo</string>
     <string name="singbox_group_ping">Medir latencia</string>
     <string name="singbox_auto_select_button">Mejor servidor</string>
     <string name="singbox_auto_select_hint">Comprueba la latencia de todos los servidores y elige el más rápido</string>

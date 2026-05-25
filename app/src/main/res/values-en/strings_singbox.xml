@@ -22,6 +22,7 @@
     <string name="singbox_link_error_save">Save error: %1$s</string>
     <string name="singbox_refresh_error">Refresh error: %1$s</string>
     <string name="singbox_refresh_all_button">Refresh all</string>
+    <string name="singbox_ping_all_button">Ping all</string>
     <string name="singbox_group_ping">Ping servers</string>
     <string name="singbox_auto_select_button">Best server</string>
     <string name="singbox_auto_select_hint">Checks latency of all servers and picks the fastest</string>

@@ -133,7 +133,28 @@ class SingboxEngineSettingsViewModel @Inject constructor(
     fun onRefreshAll() {
         viewModelScope.launch {
             val groups = groupDao.getAll()
-            groups.forEach { group -> refreshGroupInternal(group.id) }
+            groups.map { group -> async { refreshGroupInternal(group.id) } }.awaitAll()
+        }
+    }
+
+    fun onPingAll() {
+        viewModelScope.launch {
+            val groups = groupDao.getAll()
+            groups.map { group ->
+                async {
+                    val profiles = profileDao.getByGroupId(group.id)
+                    if (profiles.isEmpty()) return@async
+                    _uiState.update { it.copy(isPinging = it.isPinging + group.id) }
+                    probeAndAutoSelect(profiles)
+                    val updated = profileDao.getByGroupId(group.id)
+                    _uiState.update {
+                        it.copy(
+                            isPinging = it.isPinging - group.id,
+                            groupProfiles = it.groupProfiles + (group.id to updated),
+                        )
+                    }
+                }
+            }.awaitAll()
         }
     }
 
