@@ -133,7 +133,7 @@ fun WarpEngineSettingsScreen(
         val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
             ?: return@rememberLauncherForActivityResult
         if (displayName.endsWith(".yaml", ignoreCase = true) || displayName.endsWith(".yml", ignoreCase = true)) {
-            viewModel.onImportClashYaml(ByteArrayInputStream(bytes), displayName)
+            viewModel.onClashYamlRejected()
         } else {
             viewModel.onImportFile(ByteArrayInputStream(bytes))
         }

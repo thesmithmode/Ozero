@@ -19,7 +19,6 @@ import kotlinx.coroutines.launch
 import ru.ozero.app.R
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginewarp.AwgParams
-import ru.ozero.enginewarp.ClashYamlParser
 import ru.ozero.enginewarp.DoHProvider
 import ru.ozero.enginewarp.WarpAutoConfig
 import ru.ozero.enginewarp.WarpConfig
@@ -230,55 +229,8 @@ class WarpEngineSettingsViewModel @Inject constructor(
         }
     }
 
-    fun onImportClashYaml(stream: InputStream, displayName: String) {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isProvingEndpoints = true, provingProgress = "Парсинг...")
-            runCatching {
-                val yaml = stream.bufferedReader().readText()
-                val parsed = ClashYamlParser.parse(yaml)
-                if (parsed.reserved.isNotEmpty()) {
-                    throw ClashYamlParser.ParseException(
-                        "Формат Clash не поддерживается",
-                    )
-                }
-                _uiState.value = _uiState.value.copy(
-                    provingProgress = "Проверка ${parsed.endpoints.size} эндпоинтов...",
-                )
-                val probed = endpointProber.probe(parsed.endpoints)
-                val sortedEndpoints = probed.map { it.endpoint }
-                val bestEndpoint = probed.firstOrNull { it.rttMs < Long.MAX_VALUE }?.endpoint
-                    ?: parsed.endpoints.first()
-                val config = WarpConfig(
-                    privateKey = parsed.privateKey,
-                    peerPublicKey = parsed.peerPublicKey,
-                    peerEndpoint = bestEndpoint,
-                    interfaceAddressV4 = parsed.interfaceAddressV4,
-                    interfaceAddressV6 = parsed.interfaceAddressV6,
-                    dnsServers = parsed.dnsServers,
-                    mtu = parsed.mtu,
-                    keepaliveSeconds = parsed.keepaliveSeconds,
-                    awgParams = parsed.awgParams,
-                )
-                val rawIni = WarpIniBuilder.build(config)
-                val slotName = ClashYamlParser.slotNameFromFilename(displayName)
-                val id = store.addSlot(slotName, config, rawIni, sortedEndpoints)
-                store.setActive(id)
-            }.onSuccess {
-                _uiState.value = _uiState.value.copy(
-                    isProvingEndpoints = false,
-                    provingProgress = "",
-                    importSuccessCount = _uiState.value.importSuccessCount + 1,
-                    errorMessage = null,
-                    errorMessageRes = null,
-                )
-            }.onFailure { e ->
-                _uiState.value = _uiState.value.copy(
-                    isProvingEndpoints = false,
-                    provingProgress = "",
-                    errorMessage = e.message ?: "Ошибка импорта YAML",
-                )
-            }
-        }
+    fun onClashYamlRejected() {
+        _uiState.update { it.copy(errorMessage = "Формат Clash не поддерживается") }
     }
 
     fun onSetActive(id: String) {
