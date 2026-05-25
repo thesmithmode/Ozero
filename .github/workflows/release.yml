@@ -235,6 +235,29 @@ jobs:
           cp /tmp/fptn-dl/libfptn_native_lib-arm64-v8a.so "$DST"
           echo "Downloaded $DST from $TAG"
 
+      - name: Download FPTN native lib
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          DST="engine-fptn/src/main/jniLibs/arm64-v8a/libfptn_native_lib.so"
+          if [ -f "$DST" ] && [ "$(stat -c%s "$DST")" -gt 1000 ]; then
+            echo "libfptn_native_lib.so already in repo — skipping download"
+            exit 0
+          fi
+          TAG=$(gh release list --limit 100 --json tagName \
+            | grep -oE '"fptn-[a-f0-9]{8}"' \
+            | head -n1 | tr -d '"')
+          if [ -z "$TAG" ]; then
+            echo "::error::no fptn release found — run binaries.yml with artifact=fptn first"
+            exit 1
+          fi
+          mkdir -p "$(dirname "$DST")"
+          gh release download "$TAG" -p "libfptn_native_lib-arm64-v8a.so" \
+            -D /tmp/fptn-dl --clobber
+          cp /tmp/fptn-dl/libfptn_native_lib-arm64-v8a.so "$DST"
+          echo "Downloaded $DST from $TAG"
+
       - name: Build signed release APK
         env:
           OZERO_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
