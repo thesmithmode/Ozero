@@ -51,7 +51,7 @@ internal object SingboxRuntime {
             mutex.withLock {
                 val oldServer = commandServer
                 if (oldServer != null) {
-                    PersistentLoggers.warn(TAG, "start: previous runtime active — stopping first")
+                    PersistentLoggers.warn(TAG, "start: already running — graceful restart")
                     runCatching { oldServer.closeService() }
                     runCatching { oldServer.close() }
                     commandServer = null
