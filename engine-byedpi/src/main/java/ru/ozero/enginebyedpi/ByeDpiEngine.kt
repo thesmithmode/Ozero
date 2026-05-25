@@ -60,7 +60,6 @@ class ByeDpiEngine(
     private val _stats = MutableStateFlow(EngineStats())
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    @Volatile
     private var proxyDispatcher: CoroutineDispatcher = newProxyDispatcher()
     private val proxyScope = CoroutineScope(SupervisorJob() + (testDispatcherOverride ?: proxyDispatcher))
     private val proxyJobRef = AtomicReference<Job?>(null)
