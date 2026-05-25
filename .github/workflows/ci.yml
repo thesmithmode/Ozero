@@ -515,30 +515,6 @@ jobs:
             rm -rf "$tmpdir"
           done
 
-      - name: Cache Singbox libs
-        uses: actions/cache@v5
-        id: singbox-aar-cache
-        with:
-          path: |
-            singbox-core/libs
-            singbox-core/libs-stubs
-            singbox-core/src/main/jniLibs
-          key: singbox-libbox-1.13.12-exploded-v5
-
-      - name: Download and explode Singbox AAR
-        if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
-          unzip -o /tmp/libbox.aar classes.jar -d /tmp
-          mkdir -p singbox-core/libs
-          cp /tmp/classes.jar singbox-core/libs/libbox.jar
-          mkdir -p singbox-core/libs-stubs /tmp/go-stubs
-          unzip -o /tmp/classes.jar 'go/*.class' -d /tmp/go-stubs 2>/dev/null || true
-          jar cf singbox-core/libs-stubs/go-stubs.jar -C /tmp/go-stubs . 2>/dev/null || true
-          zip -d singbox-core/libs/libbox.jar 'go/*.class' || true
-
       - name: testDebugUnitTest + coverage
         run: >
           ./gradlew
@@ -634,30 +610,6 @@ jobs:
             (cd "$tmpdir/aar-exploded" && zip -r9 "$GITHUB_WORKSPACE/$aar" .)
             rm -rf "$tmpdir"
           done
-
-      - name: Cache Singbox libs
-        uses: actions/cache@v5
-        id: singbox-aar-cache
-        with:
-          path: |
-            singbox-core/libs
-            singbox-core/libs-stubs
-            singbox-core/src/main/jniLibs
-          key: singbox-libbox-1.13.12-exploded-v5
-
-      - name: Download and explode Singbox AAR
-        if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
-          unzip -o /tmp/libbox.aar classes.jar -d /tmp
-          mkdir -p singbox-core/libs
-          cp /tmp/classes.jar singbox-core/libs/libbox.jar
-          mkdir -p singbox-core/libs-stubs /tmp/go-stubs
-          unzip -o /tmp/classes.jar 'go/*.class' -d /tmp/go-stubs 2>/dev/null || true
-          jar cf singbox-core/libs-stubs/go-stubs.jar -C /tmp/go-stubs . 2>/dev/null || true
-          zip -d singbox-core/libs/libbox.jar 'go/*.class' || true
 
       - name: testDebugUnitTest + coverage
         run: >
