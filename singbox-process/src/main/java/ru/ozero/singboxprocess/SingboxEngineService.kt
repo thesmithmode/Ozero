@@ -102,14 +102,18 @@ class SingboxEngineService : Service() {
     override fun onBind(intent: Intent?): IBinder = binder
 
     override fun onDestroy() {
-        kotlinx.coroutines.runBlocking(Dispatchers.Main.immediate) {
+        val latch = java.util.concurrent.CountDownLatch(1)
+        serviceScope.launch {
             runCatching { SingboxRuntime.stop() }
+            latch.countDown()
         }
+        latch.await(DESTROY_STOP_TIMEOUT_S, java.util.concurrent.TimeUnit.SECONDS)
         serviceScope.cancel()
         super.onDestroy()
     }
 
     companion object {
         private const val TAG = "SingboxEngineService"
+        private const val DESTROY_STOP_TIMEOUT_S = 3L
     }
 }
