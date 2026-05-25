@@ -25,7 +25,6 @@ import ru.ozero.enginewarp.WarpConfigDuplicateException
 import ru.ozero.enginewarp.WarpConfigSlot
 import ru.ozero.enginewarp.DoHProvider
 import ru.ozero.enginewarp.WarpConfigSlotStore
-import ru.ozero.enginewarp.WarpEndpointProber
 import ru.ozero.enginewarp.WarpFileImporter
 import java.io.ByteArrayInputStream
 import java.io.IOException
@@ -51,7 +50,7 @@ class WarpEngineSettingsViewModelTest {
         store = FakeWarpStore()
         auto = FakeAutoConfig()
         importer = FakeFileImporter()
-        vm = WarpEngineSettingsViewModel(store, auto, importer, FakeWarpEndpointProber())
+        vm = WarpEngineSettingsViewModel(store, auto, importer)
     }
 
     @AfterEach
@@ -62,7 +61,7 @@ class WarpEngineSettingsViewModelTest {
     @Test
     fun `init подхватывает слоты из store`() = runTest {
         store.addSlot("Test", SAMPLE)
-        val freshVm = WarpEngineSettingsViewModel(store, FakeAutoConfig(), FakeFileImporter(), FakeWarpEndpointProber())
+        val freshVm = WarpEngineSettingsViewModel(store, FakeAutoConfig(), FakeFileImporter())
         advanceUntilIdle()
         assertEquals(1, freshVm.uiState.value.slots.size)
         assertEquals("Test", freshVm.uiState.value.slots[0].name)
@@ -79,7 +78,7 @@ class WarpEngineSettingsViewModelTest {
     fun `init с непустым store — auto-trigger НЕ срабатывает`() = runTest {
         store.addSlot("Existing", SAMPLE)
         val freshAuto = FakeAutoConfig()
-        val freshVm = WarpEngineSettingsViewModel(store, freshAuto, FakeFileImporter(), FakeWarpEndpointProber())
+        val freshVm = WarpEngineSettingsViewModel(store, freshAuto, FakeFileImporter())
         advanceUntilIdle()
         assertEquals(0, freshAuto.callCount, "Непустой store не должен триггерить auto-register")
         assertEquals(1, freshVm.uiState.value.slots.size)
@@ -89,7 +88,7 @@ class WarpEngineSettingsViewModelTest {
     fun `auto-trigger respects cooldown — НЕ срабатывает пока active`() = runTest {
         val freshStore = FakeWarpStore()
         val freshAuto = FakeAutoConfig().apply { cooldownMs = 30_000L }
-        WarpEngineSettingsViewModel(freshStore, freshAuto, FakeFileImporter(), FakeWarpEndpointProber())
+        WarpEngineSettingsViewModel(freshStore, freshAuto, FakeFileImporter())
         advanceUntilIdle()
         assertEquals(0, freshAuto.callCount, "Активный cooldown блокирует auto-trigger")
     }
@@ -616,10 +615,6 @@ class WarpEngineSettingsViewModelTest {
             result = Result.success(ImportedWarpConfig(cfg, rawIni))
         }
         override fun import(stream: InputStream): Result<ImportedWarpConfig> = result
-    }
-
-    private class FakeWarpEndpointProber : WarpEndpointProber() {
-        override suspend fun probe(endpoints: List<String>): List<ProbeResult> = emptyList()
     }
 
     private class FakeAutoConfig : WarpAutoConfig {

@@ -84,17 +84,6 @@ fun WarpEngineSettingsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val cooldownRemainingMs by viewModel.cooldownRemainingMs.collectAsStateWithLifecycle()
 
-    if (state.showTweaks && state.editDraft != null) {
-        BackHandler { viewModel.onEditCancel() }
-        WarpConnectionTweaksScreen(
-            draft = state.editDraft!!,
-            onDraftChange = viewModel::onEditDraftChange,
-            onSave = viewModel::onSaveEdit,
-            onCancel = viewModel::onEditCancel,
-        )
-        return
-    }
-
     if (state.editDraft != null) {
         BackHandler { viewModel.onEditCancel() }
         WarpEditScreen(
@@ -168,7 +157,6 @@ fun WarpEngineSettingsScreen(
                 onSetActive = viewModel::onSetActive,
                 onStartEdit = viewModel::onStartEdit,
                 onDeleteSlot = viewModel::onDeleteSlot,
-                onOpenTweaks = viewModel::onStartTweaks,
             )
             if (overlayAlpha > 0f) {
                 ImportSuccessOverlay(
@@ -593,7 +581,6 @@ private fun WarpScreenContent(
     onSetActive: (String) -> Unit,
     onStartEdit: (String) -> Unit,
     onDeleteSlot: (String) -> Unit,
-    onOpenTweaks: () -> Unit = {},
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         if (state.slots.isEmpty()) {
@@ -635,11 +622,9 @@ private fun WarpScreenContent(
                 WarpActionRow(
                     isRegistering = false,
                     cooldownRemainingMs = cooldownRemainingMs,
-                    hasSlotsForTweaks = state.slots.isNotEmpty(),
                     onGenerate = onGenerate,
                     onCancelGenerate = onCancelGenerate,
                     onImportFile = onImportFile,
-                    onOpenTweaks = onOpenTweaks,
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
@@ -742,11 +727,9 @@ private fun WarpGenerateButton(
 private fun WarpActionRow(
     isRegistering: Boolean,
     cooldownRemainingMs: Long = 0L,
-    hasSlotsForTweaks: Boolean = false,
     onGenerate: () -> Unit,
     onCancelGenerate: () -> Unit,
     onImportFile: () -> Unit,
-    onOpenTweaks: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
@@ -774,18 +757,6 @@ private fun WarpActionRow(
                 modifier = Modifier.weight(1f).testTag("warp_import_button"),
             ) {
                 Text(stringResource(R.string.warp_import_file))
-            }
-        }
-        if (hasSlotsForTweaks) {
-            OutlinedButton(
-                onClick = onOpenTweaks,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .padding(bottom = 8.dp)
-                    .testTag("warp_tweaks_button"),
-            ) {
-                Text(stringResource(R.string.warp_tweaks_button))
             }
         }
     }

@@ -241,8 +241,6 @@ class ByeDpiEngine(
                     PersistentLoggers.warn(TAG, "emergencyReset — принудительный сброс guard")
                 }
             }
-            runCatching { proxy.forceClose() }
-                .onFailure { PersistentLoggers.warn(TAG, "jniForceClose исключение: ${it.message}") }
             activeSocksPort = 0
             withContext(proxyDispatcher) {}
         }
