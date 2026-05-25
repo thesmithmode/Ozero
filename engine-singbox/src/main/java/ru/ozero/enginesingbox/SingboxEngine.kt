@@ -116,9 +116,11 @@ class SingboxEngine @Inject constructor(
         require(upstream is Upstream.None) { "SingboxEngine: supportsUpstreamSocks=false" }
 
         if (config.autoSelectBeanBlobs.isNotEmpty()) {
-            val beans = config.autoSelectBeanBlobs.mapNotNull {
-                runCatching { KryoSerializer.deserialize<AbstractBean>(it) }.getOrNull()
-            }
+            val beans = config.autoSelectBeanBlobs
+                .take(MAX_AUTO_SELECT_OUTBOUNDS)
+                .mapNotNull {
+                    runCatching { KryoSerializer.deserialize<AbstractBean>(it) }.getOrNull()
+                }
             if (beans.isEmpty()) return StartResult.Failure("auto-select: no valid beans")
             val json = runCatching { ConfigBuilder.buildSingboxAutoConfig(beans) }
                 .getOrElse { return StartResult.Failure("Failed to build auto-select config: ${it.message}") }
@@ -323,6 +325,7 @@ class SingboxEngine @Inject constructor(
         private const val TAG = "SingboxEngine"
         private const val CONNECT_TIMEOUT_S = 5L
         private const val STATS_POLL_MS = 1_000L
+        private const val MAX_AUTO_SELECT_OUTBOUNDS = 50
         private val BEAN_KEY = byteArrayPreferencesKey("singbox_vless_bean")
         private val SELECTED_PROFILE_KEY = longPreferencesKey("singbox_selected_profile_id")
         const val SELECTED_AUTO = -1L

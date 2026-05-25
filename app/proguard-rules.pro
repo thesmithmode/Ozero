@@ -123,6 +123,14 @@
 -keep class ru.ozero.singboxcore.** { *; }
 -dontwarn ru.ozero.singboxcore.**
 
+# gomobile bridge classes — referenced by libbox.so via JNI (GetMethodID)
+-keep class go.** { *; }
+-dontwarn go.**
+
+# libbox Java wrapper — JNI entry points from libbox.so
+-keep class io.nekohasekai.** { *; }
+-dontwarn io.nekohasekai.**
+
 # gomobile-generated JNI classes (both possible package names)
 -keep class libcore.** { *; }
 -keep class libsingboxgojni.** { *; }
