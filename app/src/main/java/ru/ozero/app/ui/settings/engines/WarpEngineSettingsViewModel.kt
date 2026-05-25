@@ -20,13 +20,16 @@ import kotlinx.coroutines.launch
 import ru.ozero.app.R
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginewarp.AwgParams
+import ru.ozero.enginewarp.ClashYamlParser
 import ru.ozero.enginewarp.DoHProvider
 import ru.ozero.enginewarp.WarpAutoConfig
 import ru.ozero.enginewarp.WarpConfig
 import ru.ozero.enginewarp.WarpConfigDuplicateException
 import ru.ozero.enginewarp.WarpConfigSlot
 import ru.ozero.enginewarp.WarpConfigSlotStore
+import ru.ozero.enginewarp.WarpEndpointProber
 import ru.ozero.enginewarp.WarpFileImporter
+import ru.ozero.enginewarp.WarpIniBuilder
 import java.io.InputStream
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
@@ -75,6 +78,7 @@ class WarpEngineSettingsViewModel @Inject constructor(
     private val store: WarpConfigSlotStore,
     private val autoConfig: WarpAutoConfig,
     private val fileImporter: WarpFileImporter,
+    private val endpointProber: WarpEndpointProber,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(WarpSettingsUiState())
@@ -345,8 +349,15 @@ class WarpEngineSettingsViewModel @Inject constructor(
         }
     }
 
+    fun onStartTweaks() {
+        val slot = _uiState.value.slots.firstOrNull { it.isActive }
+            ?: _uiState.value.slots.firstOrNull() ?: return
+        onStartEdit(slot.id)
+        _uiState.value = _uiState.value.copy(showTweaks = true)
+    }
+
     fun onEditCancel() {
-        _uiState.value = _uiState.value.copy(editDraft = null)
+        _uiState.value = _uiState.value.copy(editDraft = null, showTweaks = false)
     }
 
     private companion object {
