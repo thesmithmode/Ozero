@@ -138,57 +138,7 @@ private fun SingboxSettingsContent(
             Text(stringResource(R.string.singbox_add_group_button))
         }
 
-        Spacer(Modifier.height(16.dp))
-        HorizontalDivider()
-        Spacer(Modifier.height(12.dp))
-
-        Text(
-            text = stringResource(R.string.singbox_custom_link_section),
-            style = MaterialTheme.typography.labelMedium,
-        )
-        Spacer(Modifier.height(4.dp))
-        OutlinedTextField(
-            value = state.customLinkInput,
-            onValueChange = viewModel::onCustomLinkChanged,
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("singbox_link_input"),
-            placeholder = { Text("vless://...") },
-            isError = state.customLinkError != null,
-            supportingText = state.customLinkError?.let { err ->
-                {
-                    Text(
-                        when (err) {
-                            is CustomLinkError.Empty -> stringResource(R.string.singbox_link_error_empty)
-                            is CustomLinkError.ParseFailed ->
-                                stringResource(R.string.singbox_link_error_parse, err.cause)
-                            is CustomLinkError.SaveFailed ->
-                                stringResource(R.string.singbox_link_error_save, err.cause)
-                        },
-                    )
-                }
-            },
-            singleLine = false,
-            minLines = 2,
-        )
-        Spacer(Modifier.height(8.dp))
-        Button(
-            onClick = viewModel::onSaveCustomLink,
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("singbox_save_button"),
-        ) {
-            Text(stringResource(R.string.singbox_save_button))
-        }
-        if (state.customLinkSaved) {
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = stringResource(R.string.singbox_saved_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.testTag("singbox_saved_hint"),
-            )
-        }
+        SingboxCustomLinkSection(state = state, viewModel = viewModel)
 
         if (state.groups.isNotEmpty()) {
             Spacer(Modifier.height(16.dp))
@@ -220,6 +170,63 @@ private fun SingboxSettingsContent(
         }
 
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun SingboxCustomLinkSection(
+    state: SingboxSettingsUiState,
+    viewModel: SingboxEngineSettingsViewModel,
+) {
+    Spacer(Modifier.height(16.dp))
+    HorizontalDivider()
+    Spacer(Modifier.height(12.dp))
+    Text(
+        text = stringResource(R.string.singbox_custom_link_section),
+        style = MaterialTheme.typography.labelMedium,
+    )
+    Spacer(Modifier.height(4.dp))
+    OutlinedTextField(
+        value = state.customLinkInput,
+        onValueChange = viewModel::onCustomLinkChanged,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("singbox_link_input"),
+        placeholder = { Text("vless://...") },
+        isError = state.customLinkError != null,
+        supportingText = state.customLinkError?.let { err ->
+            {
+                Text(
+                    when (err) {
+                        is CustomLinkError.Empty -> stringResource(R.string.singbox_link_error_empty)
+                        is CustomLinkError.ParseFailed ->
+                            stringResource(R.string.singbox_link_error_parse, err.cause)
+                        is CustomLinkError.SaveFailed ->
+                            stringResource(R.string.singbox_link_error_save, err.cause)
+                    },
+                )
+            }
+        },
+        singleLine = false,
+        minLines = 2,
+    )
+    Spacer(Modifier.height(8.dp))
+    Button(
+        onClick = viewModel::onSaveCustomLink,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("singbox_save_button"),
+    ) {
+        Text(stringResource(R.string.singbox_save_button))
+    }
+    if (state.customLinkSaved) {
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = stringResource(R.string.singbox_saved_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.testTag("singbox_saved_hint"),
+        )
     }
 }
 
