@@ -198,7 +198,7 @@ jobs:
             singbox-core/libs
             singbox-core/libs-stubs
             singbox-core/src/main/jniLibs
-          key: singbox-libbox-1.13.12-exploded-v5
+          key: singbox-libbox-1.13.12-exploded-v6
 
       - name: Download and explode Singbox AAR
         if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
@@ -214,6 +214,7 @@ jobs:
           mkdir -p singbox-core/libs-stubs /tmp/go-stubs
           unzip -o /tmp/classes.jar 'go/*.class' -d /tmp/go-stubs 2>/dev/null || true
           jar cf singbox-core/libs-stubs/go-stubs.jar -C /tmp/go-stubs . 2>/dev/null || true
+          python3 scripts/patch-go-seq.py singbox-core/libs-stubs/go-stubs.jar
           zip -d singbox-core/libs/libbox.jar 'go/*.class' || true
           mkdir -p singbox-core/src/main/jniLibs
           unzip -o "$TMPAAR" 'jni/*' -d /tmp/aar-exploded || true
@@ -311,7 +312,7 @@ jobs:
             singbox-core/libs
             singbox-core/libs-stubs
             singbox-core/src/main/jniLibs
-          key: singbox-libbox-1.13.12-exploded-v5
+          key: singbox-libbox-1.13.12-exploded-v6
 
       - name: Download and explode Singbox AAR
         if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
@@ -327,6 +328,7 @@ jobs:
           mkdir -p singbox-core/libs-stubs /tmp/go-stubs
           unzip -o /tmp/classes.jar 'go/*.class' -d /tmp/go-stubs 2>/dev/null || true
           jar cf singbox-core/libs-stubs/go-stubs.jar -C /tmp/go-stubs . 2>/dev/null || true
+          python3 scripts/patch-go-seq.py singbox-core/libs-stubs/go-stubs.jar
           zip -d singbox-core/libs/libbox.jar 'go/*.class' || true
           mkdir -p singbox-core/src/main/jniLibs
           unzip -o "$TMPAAR" 'jni/*' -d /tmp/aar-exploded || true

@@ -33,6 +33,7 @@ import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.IpProbeRoute
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.settings.AppMode
+import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import javax.inject.Inject
@@ -133,6 +134,15 @@ class MainViewModel @Inject constructor(
                 scope = viewModelScope,
                 started = SharingStarted.Eagerly,
                 initialValue = null,
+            )
+
+    val engineAutoPriority: StateFlow<List<EngineId>> =
+        settingsRepository.settings
+            .map { it.engineAutoPriority }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.Eagerly,
+                initialValue = SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY,
             )
 
     private val _speedHistory = MutableStateFlow<List<SpeedSample>>(emptyList())

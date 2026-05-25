@@ -20,10 +20,10 @@ import ru.ozero.enginescore.EngineId
 @Composable
 fun EngineChipsRow(
     selectedEngine: EngineId?,
+    engineOrder: List<EngineId>,
     onSelect: (EngineId?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val engines = EngineId.entries.filter { !it.isStub }
     LazyRow(
         modifier = modifier.testTag(MainScreenTestTags.ENGINE_CHIPS_ROW),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -41,7 +41,7 @@ fun EngineChipsRow(
                 ),
             )
         }
-        items(engines, key = { it.name }) { engine ->
+        items(engineOrder, key = { it.name }) { engine ->
             FilterChip(
                 selected = selectedEngine == engine,
                 onClick = { onSelect(engine) },
