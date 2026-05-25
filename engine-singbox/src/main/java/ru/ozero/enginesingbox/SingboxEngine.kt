@@ -51,6 +51,7 @@ class SingboxEngine @Inject constructor(
     @ApplicationContext private val context: Context,
     @SingboxPrefs private val dataStore: DataStore<Preferences>,
     private val profileDao: ProxyProfileDao,
+    private val onProcessDied: () -> Unit = {},
 ) : EnginePlugin, TunFdAcceptor {
 
     private val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -248,6 +249,7 @@ class SingboxEngine @Inject constructor(
                         serviceConn = null
                         if (ref != null) runCatching { context.unbindService(ref) }
                         PersistentLoggers.warn(TAG, "SingboxEngineService binder died — :engine_singbox crash")
+                        runCatching { onProcessDied() }
                     }
                     deathRecipient = recipient
                     runCatching { binder.linkToDeath(recipient, 0) }
@@ -263,6 +265,7 @@ class SingboxEngine @Inject constructor(
                     serviceConn = null
                     if (ref != null) runCatching { context.unbindService(ref) }
                     PersistentLoggers.warn(TAG, "SingboxEngineService disconnected — system unbind")
+                    runCatching { onProcessDied() }
                 }
 
                 override fun onBindingDied(name: ComponentName?) {
@@ -273,6 +276,7 @@ class SingboxEngine @Inject constructor(
                     serviceConn = null
                     if (ref != null) runCatching { context.unbindService(ref) }
                     PersistentLoggers.warn(TAG, "SingboxEngineService binding died")
+                    runCatching { onProcessDied() }
                 }
             }
             val component = ComponentName(context, "ru.ozero.singboxprocess.SingboxEngineService")

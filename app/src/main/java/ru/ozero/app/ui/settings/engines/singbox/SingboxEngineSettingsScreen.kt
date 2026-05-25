@@ -18,7 +18,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -76,6 +76,16 @@ fun SingboxEngineSettingsScreen(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = viewModel::onPingAll,
+                        enabled = state.groups.isNotEmpty() && state.isPinging.isEmpty(),
+                        modifier = Modifier.testTag("singbox_ping_all_button"),
+                    ) {
+                        Icon(
+                            Icons.Default.FlashOn,
+                            contentDescription = stringResource(R.string.singbox_ping_all_button),
+                        )
+                    }
                     IconButton(
                         onClick = viewModel::onRefreshAll,
                         enabled = state.groups.isNotEmpty() && state.isRefreshing.isEmpty(),
@@ -307,7 +317,7 @@ private fun SubscriptionGroupItem(
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
             } else {
                 IconButton(onClick = onPing, modifier = Modifier.size(36.dp), enabled = profiles.isNotEmpty()) {
-                    Icon(Icons.Default.Star, contentDescription = stringResource(R.string.singbox_group_ping))
+                    Icon(Icons.Default.FlashOn, contentDescription = stringResource(R.string.singbox_group_ping))
                 }
                 IconButton(onClick = onRefresh, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.singbox_group_refresh))

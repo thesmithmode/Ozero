@@ -82,6 +82,55 @@ class SingboxBindServiceTimeoutSentinelTest {
         )
     }
 
+    @Test
+    fun `should singbox-core build gradle use implementation not compileOnly for go-stubs`() {
+        val root = locateRepoRoot()
+        val gradle = File(root, "singbox-core/build.gradle.kts")
+        assertTrue(gradle.isFile, "singbox-core/build.gradle.kts must exist")
+        val content = gradle.readText()
+        val stubsDecl = content.lines().firstOrNull { it.contains("libs-stubs") }
+        assertTrue(
+            stubsDecl != null && stubsDecl.trimStart().startsWith("implementation("),
+            "singbox-core/build.gradle.kts must use implementation(libs-stubs) not compileOnly — " +
+                "compileOnly omits go.Seq classes from DEX; libbox.so calls GetMethodID on URnetwork's " +
+                "incompatible go.Seq → JniAbort SIGSEGV. Actual decl: $stubsDecl",
+        )
+    }
+
+    @Test
+    fun `should SingboxEngine call onProcessDied from DeathRecipient and service callbacks`() {
+        val root = locateRepoRoot()
+        val content = File(
+            root,
+            "engine-singbox/src/main/java/ru/ozero/enginesingbox/SingboxEngine.kt",
+        ).readText()
+
+        assertTrue(
+            content.contains("onProcessDied"),
+            "SingboxEngine must have onProcessDied callback parameter — " +
+                "missing callback means binder death never clears tunnel state (stuck Amber button)",
+        )
+        val deathBlock = content.substringAfter("IBinder.DeathRecipient {")
+            .substringBefore("deathRecipient = recipient")
+        assertTrue(
+            deathBlock.contains("onProcessDied"),
+            "DeathRecipient lambda must call onProcessDied() — " +
+                "otherwise :engine_singbox crash leaves TunnelController in Connecting/Switching state forever",
+        )
+        assertTrue(
+            content.substringAfter("onServiceDisconnected").substringBefore("onBindingDied")
+                .contains("onProcessDied"),
+            "onServiceDisconnected must call onProcessDied() — " +
+                "system unbind must also clear tunnel state",
+        )
+        assertTrue(
+            content.substringAfter("onBindingDied").substringBefore("private fun bindOrFail")
+                .contains("onProcessDied"),
+            "onBindingDied must call onProcessDied() — " +
+                "binding death must also clear tunnel state",
+        )
+    }
+
     private fun locateRepoRoot(): File {
         var dir = File(System.getProperty("user.dir") ?: ".").absoluteFile
         repeat(5) {
