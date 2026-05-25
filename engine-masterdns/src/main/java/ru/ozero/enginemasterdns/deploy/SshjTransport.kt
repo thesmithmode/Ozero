@@ -14,7 +14,8 @@ internal class SshjTransport : SshTransport {
     override fun connect(host: String, port: Int) {
         val config = AndroidConfig()
         config.keyExchangeFactories = config.keyExchangeFactories.filter {
-            "curve25519" !in it.name.lowercase()
+            val n = it.name.lowercase()
+            "curve25519" !in n && "group-exchange" !in n
         }
         val ssh = SSHClient(config)
         ssh.addHostKeyVerifier(PromiscuousVerifier())

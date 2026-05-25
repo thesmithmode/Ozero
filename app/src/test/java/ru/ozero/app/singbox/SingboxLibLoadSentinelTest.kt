@@ -71,6 +71,24 @@ class SingboxLibLoadSentinelTest {
         )
     }
 
+    @Test
+    fun `CI workflows must not rename go package via jarjar`() {
+        val root = locateRepoRoot()
+        listOf(".github/workflows/ci.yml", ".github/workflows/release.yml").forEach { path ->
+            val text = File(root, path).readText()
+            assertFalse(
+                text.contains("jarjar"),
+                "$path содержит jarjar — jarjar переименовывает go.** → go_singbox.** в JAR, " +
+                    "но JNI-символы в libbox.so остаются Java_go_Seq_init. " +
+                    "JVM ищет Java_go_1singbox_Seq_init → UnsatisfiedLinkError. Регрессия 2026-05-25.",
+            )
+            assertFalse(
+                text.contains("go_singbox"),
+                "$path содержит go_singbox — пакет не должен переименовываться через jarjar",
+            )
+        }
+    }
+
     private fun locateRepoRoot(): File {
         var dir = File(System.getProperty("user.dir") ?: ".").absoluteFile
         repeat(5) {
