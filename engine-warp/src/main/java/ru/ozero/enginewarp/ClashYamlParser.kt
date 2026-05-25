@@ -14,6 +14,7 @@ object ClashYamlParser {
         val mtu: Int,
         val keepaliveSeconds: Int,
         val awgParams: AwgParams,
+        val reserved: List<Int> = emptyList(),
     )
 
     fun parse(yaml: String): ClashParseResult {
@@ -44,6 +45,7 @@ object ClashYamlParser {
             mtu = data["mtu"]?.toIntOrNull() ?: 1280,
             keepaliveSeconds = 25,
             awgParams = parseAwgBlock(awgBlock),
+            reserved = data["reserved"]?.let(::parseReservedList) ?: emptyList(),
         )
     }
 
@@ -199,6 +201,11 @@ object ClashYamlParser {
             if (value.isNotEmpty()) data[key] = value
         }
     }
+
+    private fun parseReservedList(raw: String): List<Int> =
+        raw.trim().removePrefix("[").removeSuffix("]")
+            .split(',')
+            .mapNotNull { it.trim().toIntOrNull() }
 
     private fun parseDnsList(raw: String): List<String> =
         raw.trim().removePrefix("[").removeSuffix("]")
