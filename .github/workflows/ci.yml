@@ -188,8 +188,9 @@ jobs:
         with:
           path: |
             singbox-core/libs
+            singbox-core/libs-stubs
             singbox-core/src/main/jniLibs
-          key: singbox-libbox-1.13.12-exploded-v4
+          key: singbox-libbox-1.13.12-exploded-v5
 
       - name: Download and explode Singbox AAR
         if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
@@ -202,6 +203,9 @@ jobs:
           mkdir -p singbox-core/libs
           unzip -o "$TMPAAR" classes.jar -d /tmp
           cp /tmp/classes.jar singbox-core/libs/libbox.jar
+          mkdir -p singbox-core/libs-stubs /tmp/go-stubs
+          unzip -o /tmp/classes.jar 'go/*.class' -d /tmp/go-stubs 2>/dev/null || true
+          jar cf singbox-core/libs-stubs/go-stubs.jar -C /tmp/go-stubs . 2>/dev/null || true
           zip -d singbox-core/libs/libbox.jar 'go/*.class' || true
           mkdir -p singbox-core/src/main/jniLibs
           unzip -o "$TMPAAR" 'jni/*' -d /tmp/aar-exploded || true
@@ -289,8 +293,9 @@ jobs:
         with:
           path: |
             singbox-core/libs
+            singbox-core/libs-stubs
             singbox-core/src/main/jniLibs
-          key: singbox-libbox-1.13.12-exploded-v4
+          key: singbox-libbox-1.13.12-exploded-v5
 
       - name: Download and explode Singbox AAR
         if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
@@ -303,6 +308,9 @@ jobs:
           mkdir -p singbox-core/libs
           unzip -o "$TMPAAR" classes.jar -d /tmp
           cp /tmp/classes.jar singbox-core/libs/libbox.jar
+          mkdir -p singbox-core/libs-stubs /tmp/go-stubs
+          unzip -o /tmp/classes.jar 'go/*.class' -d /tmp/go-stubs 2>/dev/null || true
+          jar cf singbox-core/libs-stubs/go-stubs.jar -C /tmp/go-stubs . 2>/dev/null || true
           zip -d singbox-core/libs/libbox.jar 'go/*.class' || true
           mkdir -p singbox-core/src/main/jniLibs
           unzip -o "$TMPAAR" 'jni/*' -d /tmp/aar-exploded || true
