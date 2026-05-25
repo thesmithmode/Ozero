@@ -108,19 +108,14 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
     }
 
-    fun onEnableAutoSelect() {
+    fun onSetAutoSelect(enabled: Boolean) {
         viewModelScope.launch {
             dataStore.edit { prefs ->
-                prefs[SELECTED_PROFILE_KEY] = -1L
-                prefs.remove(BEAN_KEY)
-            }
-        }
-    }
-
-    fun onDisableAutoSelect() {
-        viewModelScope.launch {
-            dataStore.edit { prefs ->
-                prefs.remove(SELECTED_PROFILE_KEY)
+                if (enabled) {
+                    prefs[SELECTED_PROFILE_KEY] = -1L
+                } else {
+                    prefs.remove(SELECTED_PROFILE_KEY)
+                }
                 prefs.remove(BEAN_KEY)
             }
         }

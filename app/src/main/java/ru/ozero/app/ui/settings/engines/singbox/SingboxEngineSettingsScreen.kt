@@ -120,7 +120,7 @@ private fun SingboxSettingsContent(
         if (state.groups.isNotEmpty()) {
             AutoSelectModeItem(
                 isSelected = state.isAutoSelectMode,
-                onClick = if (state.isAutoSelectMode) viewModel::onDisableAutoSelect else viewModel::onEnableAutoSelect,
+                onClick = { viewModel.onSetAutoSelect(!state.isAutoSelectMode) },
             )
             Spacer(Modifier.height(4.dp))
             HorizontalDivider()

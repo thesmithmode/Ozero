@@ -91,12 +91,12 @@ class SingboxEngineSettingsAutoSelectTest {
     }
 
     @Test
-    fun `onEnableAutoSelect stores selectedProfileId as -1L in DataStore`() = runTest {
+    fun `onSetAutoSelect true stores selectedProfileId as -1L in DataStore`() = runTest {
         val vm = buildViewModel()
         backgroundScope.launch(Dispatchers.Main) { vm.state.collect {} }
         advanceUntilIdle()
 
-        vm.onEnableAutoSelect()
+        vm.onSetAutoSelect(true)
         advanceUntilIdle()
 
         val storedId = prefsFlow.value[selectedProfileKey]
@@ -105,7 +105,7 @@ class SingboxEngineSettingsAutoSelectTest {
     }
 
     @Test
-    fun `onEnableAutoSelect clears beanKey`() = runTest {
+    fun `onSetAutoSelect true clears beanKey`() = runTest {
         prefsFlow.value = mutablePreferencesOf(
             beanKey to byteArrayOf(1, 2, 3),
             selectedProfileKey to 5L,
@@ -114,20 +114,20 @@ class SingboxEngineSettingsAutoSelectTest {
         backgroundScope.launch(Dispatchers.Main) { vm.state.collect {} }
         advanceUntilIdle()
 
-        vm.onEnableAutoSelect()
+        vm.onSetAutoSelect(true)
         advanceUntilIdle()
 
         assertNull(prefsFlow.value[beanKey])
     }
 
     @Test
-    fun `onDisableAutoSelect removes selectedProfileId from DataStore`() = runTest {
+    fun `onSetAutoSelect false removes selectedProfileId from DataStore`() = runTest {
         prefsFlow.value = mutablePreferencesOf(selectedProfileKey to -1L)
         val vm = buildViewModel()
         backgroundScope.launch(Dispatchers.Main) { vm.state.collect {} }
         advanceUntilIdle()
 
-        vm.onDisableAutoSelect()
+        vm.onSetAutoSelect(false)
         advanceUntilIdle()
 
         assertNull(prefsFlow.value[selectedProfileKey])
@@ -163,26 +163,26 @@ class SingboxEngineSettingsAutoSelectTest {
     }
 
     @Test
-    fun `onEnableAutoSelect then state reflects isAutoSelectMode true`() = runTest {
+    fun `onSetAutoSelect true then state reflects isAutoSelectMode true`() = runTest {
         val vm = buildViewModel()
         backgroundScope.launch(Dispatchers.Main) { vm.state.collect {} }
         advanceUntilIdle()
 
-        vm.onEnableAutoSelect()
+        vm.onSetAutoSelect(true)
         advanceUntilIdle()
 
         assertTrue(vm.state.value.isAutoSelectMode)
     }
 
     @Test
-    fun `onDisableAutoSelect after enable then state reflects isAutoSelectMode false`() = runTest {
+    fun `onSetAutoSelect false after enable then state reflects isAutoSelectMode false`() = runTest {
         val vm = buildViewModel()
         backgroundScope.launch(Dispatchers.Main) { vm.state.collect {} }
         advanceUntilIdle()
 
-        vm.onEnableAutoSelect()
+        vm.onSetAutoSelect(true)
         advanceUntilIdle()
-        vm.onDisableAutoSelect()
+        vm.onSetAutoSelect(false)
         advanceUntilIdle()
 
         assertFalse(vm.state.value.isAutoSelectMode)
