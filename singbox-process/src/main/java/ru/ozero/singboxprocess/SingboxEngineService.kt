@@ -102,7 +102,9 @@ class SingboxEngineService : Service() {
     override fun onBind(intent: Intent?): IBinder = binder
 
     override fun onDestroy() {
-        serviceScope.launch { SingboxRuntime.stop() }
+        kotlinx.coroutines.runBlocking(Dispatchers.Main.immediate) {
+            runCatching { SingboxRuntime.stop() }
+        }
         serviceScope.cancel()
         super.onDestroy()
     }
