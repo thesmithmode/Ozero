@@ -31,18 +31,19 @@ go install golang.org/x/mobile/cmd/gomobile@latest
 go install golang.org/x/mobile/cmd/gobind@latest
 gomobile init
 
-# gomobile bind requires golang.org/x/mobile as a direct dependency in the source module.
-# sing-box-for-android doesn't include it — force-pin via go mod edit.
+# gomobile bind (Go 1.24+) requires golang.org/x/mobile as a tool dependency.
+# sing-box-for-android doesn't include it — add it before binding.
 MOBILE_VERSION="$(go version -m "$(go env GOPATH)/bin/gomobile" 2>/dev/null \
-    | awk '/golang.org\/x\/mobile/{print $3}' || echo '')"
-if [ -z "$MOBILE_VERSION" ]; then
-    MOBILE_VERSION="$(go list -m -f '{{.Version}}' golang.org/x/mobile 2>/dev/null || echo 'latest')"
-fi
-echo "Pinning golang.org/x/mobile@$MOBILE_VERSION into source module"
+    | awk '/golang.org\/x\/mobile/{print $3}' || echo 'latest')"
+echo "Adding golang.org/x/mobile@$MOBILE_VERSION as tool dep in source module"
 cd "$TMP_DIR/src"
-go mod edit -require "golang.org/x/mobile@$MOBILE_VERSION"
-go mod download "golang.org/x/mobile@$MOBILE_VERSION" 2>/dev/null || \
-    go get "golang.org/x/mobile@$MOBILE_VERSION"
+# go get -tool works on Go 1.24+; fall back to plain go get for older Go
+GO_MINOR="$(go version | grep -oP '1\.\K[0-9]+' | head -1)"
+if [ "${GO_MINOR:-0}" -ge 24 ] 2>/dev/null; then
+    go get -tool "golang.org/x/mobile/cmd/gobind@$MOBILE_VERSION"
+else
+    GOFLAGS='-mod=mod' go get "golang.org/x/mobile@$MOBILE_VERSION"
+fi
 cd "$TMP_DIR"
 
 AAR_OUT="$TMP_DIR/singboxgojni.aar"
