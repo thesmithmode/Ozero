@@ -183,6 +183,22 @@ jobs:
           fi
           gh release download "$TAG" -p "*" -D engine-urnetwork/libs --clobber
 
+      - name: Download Singbox AAR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG=$(gh release list --limit 100 --json tagName \
+            | grep -oE '"singbox-[a-f0-9]{8}"' \
+            | head -n1 | tr -d '"')
+          if [ -z "$TAG" ]; then
+            echo "::warning::no singbox AAR release found — building without real singbox library"
+          else
+            mkdir -p singbox-core/libs
+            gh release download "$TAG" -p "*.aar" -D singbox-core/libs --clobber
+            ls -la singbox-core/libs/
+          fi
+
       - name: Download FPTN native lib
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
