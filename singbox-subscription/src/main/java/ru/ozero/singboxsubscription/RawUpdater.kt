@@ -5,6 +5,9 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import ru.ozero.singboxfmt.KryoSerializer
+import ru.ozero.singboxfmt.ShadowsocksBean
+import ru.ozero.singboxfmt.TrojanBean
+import ru.ozero.singboxfmt.VMessBean
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.dao.SubscriptionGroupDao
 import ru.ozero.singboxroom.entity.ProxyProfile
@@ -33,7 +36,7 @@ class RawUpdater(
                         groupId = group.id,
                         name = bean.name.ifBlank { "Server ${idx + 1}" },
                         beanBlob = KryoSerializer.serialize(bean),
-                        protocolType = PROTOCOL_VLESS,
+                        protocolType = protocolTypeOf(bean),
                         userOrder = idx,
                     )
                 }
@@ -59,6 +62,17 @@ class RawUpdater(
     }
 
     companion object {
-        private const val PROTOCOL_VLESS = 0
+        const val PROTOCOL_VLESS = 0
+        const val PROTOCOL_VMESS = 1
+        const val PROTOCOL_TROJAN = 2
+        const val PROTOCOL_SHADOWSOCKS = 3
+
+        fun protocolTypeOf(bean: ru.ozero.singboxfmt.AbstractBean): Int = when (bean) {
+            is ru.ozero.singboxfmt.VLESSBean -> PROTOCOL_VLESS
+            is VMessBean -> PROTOCOL_VMESS
+            is TrojanBean -> PROTOCOL_TROJAN
+            is ShadowsocksBean -> PROTOCOL_SHADOWSOCKS
+            else -> PROTOCOL_VLESS
+        }
     }
 }

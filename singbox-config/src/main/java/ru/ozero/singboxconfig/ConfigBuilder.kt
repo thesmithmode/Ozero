@@ -1,14 +1,20 @@
 package ru.ozero.singboxconfig
 
 import ru.ozero.singboxfmt.AbstractBean
+import ru.ozero.singboxfmt.ShadowsocksBean
 import ru.ozero.singboxfmt.StandardV2RayBean
+import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
+import ru.ozero.singboxfmt.VMessBean
 
 object ConfigBuilder {
 
     fun buildSingboxConfig(bean: AbstractBean): String {
         val outbound = when (bean) {
             is VLESSBean -> vlessOutbound(bean)
+            is VMessBean -> vmessOutbound(bean)
+            is TrojanBean -> trojanOutbound(bean)
+            is ShadowsocksBean -> shadowsocksOutbound(bean)
             else -> error("Unsupported bean type: ${bean::class.simpleName}")
         }
         return buildFullConfig(outbound)
@@ -75,6 +81,66 @@ object ConfigBuilder {
 
         sb.append(""""packet_encoding":"xudp"}""")
         return sb.toString()
+    }
+
+    private fun vmessOutbound(bean: VMessBean): String {
+        val sb = StringBuilder()
+        sb.append("""{"type":"vmess","tag":"proxy",""")
+        sb.append(""""server":${jsonString(bean.serverAddress)},""")
+        sb.append(""""server_port":${bean.serverPort},""")
+        sb.append(""""uuid":${jsonString(bean.uuid)},""")
+        sb.append(""""alter_id":${bean.alterId},""")
+        sb.append(""""security":${jsonString(bean.encryption.ifEmpty { "auto" })},""")
+
+        val transport = buildTransport(bean)
+        if (transport != null) sb.append(""""transport":$transport,""")
+
+        val tls = buildTls(bean)
+        if (tls != null) sb.append(""""tls":$tls,""")
+
+        sb.append(""""packet_encoding":"xudp"}""")
+        return sb.toString()
+    }
+
+    private fun trojanOutbound(bean: TrojanBean): String {
+        val sb = StringBuilder()
+        sb.append("""{"type":"trojan","tag":"proxy",""")
+        sb.append(""""server":${jsonString(bean.serverAddress)},""")
+        sb.append(""""server_port":${bean.serverPort},""")
+        sb.append(""""password":${jsonString(bean.password)},""")
+
+        val transport = buildTransport(bean)
+        if (transport != null) sb.append(""""transport":$transport,""")
+
+        val tls = buildTls(bean)
+        if (tls != null) sb.append(""""tls":$tls,""")
+
+        removeTrailingComma(sb)
+        sb.append('}')
+        return sb.toString()
+    }
+
+    private fun shadowsocksOutbound(bean: ShadowsocksBean): String {
+        val sb = StringBuilder()
+        sb.append("""{"type":"shadowsocks","tag":"proxy",""")
+        sb.append(""""server":${jsonString(bean.serverAddress)},""")
+        sb.append(""""server_port":${bean.serverPort},""")
+        sb.append(""""method":${jsonString(bean.method)},""")
+        sb.append(""""password":${jsonString(bean.password)}""")
+        if (bean.plugin.isNotEmpty()) {
+            sb.append(""","plugin":${jsonString(bean.plugin)}""")
+            if (bean.pluginOpts.isNotEmpty()) {
+                sb.append(""","plugin_opts":${jsonString(bean.pluginOpts)}""")
+            }
+        }
+        sb.append('}')
+        return sb.toString()
+    }
+
+    private fun removeTrailingComma(sb: StringBuilder) {
+        if (sb.isNotEmpty() && sb[sb.length - 1] == ',') {
+            sb.deleteCharAt(sb.length - 1)
+        }
     }
 
     private fun buildTransport(bean: StandardV2RayBean): String? = when (bean.type) {

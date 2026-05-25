@@ -12,6 +12,9 @@ object RawShareLinksParser {
                 runCatching {
                     when {
                         line.startsWith("vless://") -> V2RayFmt.parseVLESS(line)
+                        line.startsWith("vmess://") -> V2RayFmt.parseVMess(line)
+                        line.startsWith("trojan://") -> V2RayFmt.parseTrojan(line)
+                        line.startsWith("ss://") -> V2RayFmt.parseShadowsocks(line)
                         else -> null
                     }
                 }.getOrNull()

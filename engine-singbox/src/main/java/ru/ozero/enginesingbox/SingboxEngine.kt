@@ -33,8 +33,12 @@ import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.VpnSocketProtectorHolder
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.singboxconfig.ConfigBuilder
+import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
+import ru.ozero.singboxfmt.ShadowsocksBean
+import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
+import ru.ozero.singboxfmt.VMessBean
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -91,7 +95,7 @@ class SingboxEngine @Inject constructor(
         require(config is EngineConfig.Singbox) { "SingboxEngine requires EngineConfig.Singbox" }
         require(upstream is Upstream.None) { "SingboxEngine: supportsUpstreamSocks=false" }
 
-        val bean = runCatching { KryoSerializer.deserialize<VLESSBean>(config.beanBlob) }
+        val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(config.beanBlob) }
             .getOrElse { return StartResult.Failure("Failed to deserialize config: ${it.message}") }
 
         val json = runCatching { ConfigBuilder.buildSingboxConfig(bean) }
@@ -168,7 +172,18 @@ class SingboxEngine @Inject constructor(
 
     override fun buildManualConfig(settings: SettingsModel?): EngineConfig? {
         val blob = cachedBlob ?: return null
-        return EngineConfig.Singbox(beanBlob = blob, protocolType = PROTOCOL_VLESS)
+        val type = runCatching {
+            protocolTypeOf(KryoSerializer.deserialize<AbstractBean>(blob))
+        }.getOrDefault(PROTOCOL_VLESS)
+        return EngineConfig.Singbox(beanBlob = blob, protocolType = type)
+    }
+
+    private fun protocolTypeOf(bean: AbstractBean): Int = when (bean) {
+        is VLESSBean -> PROTOCOL_VLESS
+        is VMessBean -> PROTOCOL_VMESS
+        is TrojanBean -> PROTOCOL_TROJAN
+        is ShadowsocksBean -> PROTOCOL_SHADOWSOCKS
+        else -> PROTOCOL_VLESS
     }
 
     private fun bindOrFail(): StartResult.Failure? {
@@ -261,5 +276,8 @@ class SingboxEngine @Inject constructor(
         private const val STATS_POLL_MS = 1_000L
         private val BEAN_KEY = byteArrayPreferencesKey("singbox_vless_bean")
         const val PROTOCOL_VLESS = 0
+        const val PROTOCOL_VMESS = 1
+        const val PROTOCOL_TROJAN = 2
+        const val PROTOCOL_SHADOWSOCKS = 3
     }
 }
