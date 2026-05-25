@@ -195,7 +195,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p singbox-core/libs
-          gh release download 1.13.12 --repo singbox-android/libbox -p "libbox.aar" -D singbox-core/libs --clobber
+          gh release download singbox-1.13.12 -p "libbox.aar" -D singbox-core/libs --clobber
           ls -la singbox-core/libs/
 
       - name: assembleDebug
@@ -283,7 +283,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p singbox-core/libs
-          gh release download 1.13.12 --repo singbox-android/libbox -p "libbox.aar" -D singbox-core/libs --clobber
+          gh release download singbox-1.13.12 -p "libbox.aar" -D singbox-core/libs --clobber
           ls -la singbox-core/libs/
 
       - name: testDebugUnitTest + coverage
