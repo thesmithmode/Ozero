@@ -238,7 +238,7 @@ class WarpEngineSettingsViewModel @Inject constructor(
                 val parsed = ClashYamlParser.parse(yaml)
                 if (parsed.reserved.isNotEmpty()) {
                     throw ClashYamlParser.ParseException(
-                        "Формат Clash с reserved bytes не поддерживается WARP-движком",
+                        "Формат Clash не поддерживается",
                     )
                 }
                 _uiState.value = _uiState.value.copy(
