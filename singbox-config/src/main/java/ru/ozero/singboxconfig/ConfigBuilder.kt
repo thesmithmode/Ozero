@@ -18,7 +18,12 @@ object ConfigBuilder {
         require(beans.isNotEmpty()) { "beans must not be empty for auto-select config" }
         val proxyOutbounds = beans.mapIndexed { index, bean -> beanOutbound(bean, "proxy-$index") }
         val tagList = proxyOutbounds.indices.joinToString(",") { jsonString("proxy-$it") }
-        val urltest = """{"type":"urltest","tag":"proxy","outbounds":[$tagList],"url":"https://www.gstatic.com/generate_204","interval":"3m","tolerance":50,"interrupt_exist_connections":false,"idle_timeout":"30m"}"""
+        val urltest = buildString {
+            append("""{"type":"urltest","tag":"proxy","outbounds":[$tagList],""")
+            append(""""url":"https://www.gstatic.com/generate_204",""")
+            append(""""interval":"3m","tolerance":50,""")
+            append(""""interrupt_exist_connections":false,"idle_timeout":"30m"}""")
+        }
         return buildFullConfig(listOf(urltest) + proxyOutbounds)
     }
 
