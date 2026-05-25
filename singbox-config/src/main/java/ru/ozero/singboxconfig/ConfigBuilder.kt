@@ -16,12 +16,10 @@ object ConfigBuilder {
 
     fun buildSingboxAutoConfig(beans: List<AbstractBean>): String {
         require(beans.isNotEmpty()) { "beans must not be empty for auto-select config" }
-        val proxyOutbounds = beans.mapIndexed { index, bean ->
-            beanOutbound(bean, "proxy-$index")
-        }
-        val tags = proxyOutbounds.indices.map { "proxy-$it" }
-        val urltestOutbound = buildUrltestOutbound(tags)
-        return buildFullConfig(listOf(urltestOutbound) + proxyOutbounds)
+        val proxyOutbounds = beans.mapIndexed { index, bean -> beanOutbound(bean, "proxy-$index") }
+        val tagList = proxyOutbounds.indices.joinToString(",") { jsonString("proxy-$it") }
+        val urltest = """{"type":"urltest","tag":"proxy","outbounds":[$tagList],"url":"https://www.gstatic.com/generate_204","interval":"3m","tolerance":50,"interrupt_exist_connections":false,"idle_timeout":"30m"}"""
+        return buildFullConfig(listOf(urltest) + proxyOutbounds)
     }
 
     private fun beanOutbound(bean: AbstractBean, tag: String): String = when (bean) {
@@ -30,18 +28,6 @@ object ConfigBuilder {
         is TrojanBean -> trojanOutbound(bean, tag)
         is ShadowsocksBean -> shadowsocksOutbound(bean, tag)
         else -> error("Unsupported bean type: ${bean::class.simpleName}")
-    }
-
-    private fun buildUrltestOutbound(tags: List<String>): String {
-        val sb = StringBuilder()
-        sb.append("""{"type":"urltest","tag":"proxy",""")
-        sb.append(""""outbounds":[${tags.joinToString(",") { jsonString(it) }}],""")
-        sb.append(""""url":"https://www.gstatic.com/generate_204",""")
-        sb.append(""""interval":"3m",""")
-        sb.append(""""tolerance":50,""")
-        sb.append(""""interrupt_exist_connections":false,""")
-        sb.append(""""idle_timeout":"30m"}""")
-        return sb.toString()
     }
 
     private fun buildFullConfig(proxyOutbounds: List<String>): String {

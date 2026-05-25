@@ -21,8 +21,8 @@ import kotlin.test.assertTrue
 
 class SingboxEngineAutoSelectTest {
 
-    private val BEAN_KEY = byteArrayPreferencesKey("singbox_vless_bean")
-    private val SELECTED_PROFILE_KEY = longPreferencesKey("singbox_selected_profile_id")
+    private val beanKey = byteArrayPreferencesKey("singbox_vless_bean")
+    private val selectedProfileKey = longPreferencesKey("singbox_selected_profile_id")
 
     private fun makeVlessBlob(host: String = "proxy.example.com", port: Int = 443): ByteArray {
         val bean = VLESSBean().apply {
@@ -88,7 +88,7 @@ class SingboxEngineAutoSelectTest {
 
     @Test
     fun `should return null when auto mode active and cache empty`() {
-        val prefs = mutablePreferencesOf(SELECTED_PROFILE_KEY to SingboxEngine.SELECTED_AUTO)
+        val prefs = mutablePreferencesOf(selectedProfileKey to SingboxEngine.SELECTED_AUTO)
         val engine = buildEngine(prefs = prefs)
         awaitInit()
 
@@ -103,7 +103,7 @@ class SingboxEngineAutoSelectTest {
             makeProfile(1L, 1L, "server1.example.com", 443),
             makeProfile(2L, 1L, "server2.example.com", 444),
         )
-        val prefs = mutablePreferencesOf(SELECTED_PROFILE_KEY to SingboxEngine.SELECTED_AUTO)
+        val prefs = mutablePreferencesOf(selectedProfileKey to SingboxEngine.SELECTED_AUTO)
         val engine = buildEngine(
             prefs = prefs,
             profilesByGroup = mapOf(1L to profiles),
@@ -122,7 +122,7 @@ class SingboxEngineAutoSelectTest {
     @Test
     fun `should return single-profile config when manual profile selected`() {
         val blob = makeVlessBlob()
-        val prefs = mutablePreferencesOf(BEAN_KEY to blob, SELECTED_PROFILE_KEY to 42L)
+        val prefs = mutablePreferencesOf(beanKey to blob, selectedProfileKey to 42L)
         val engine = buildEngine(prefs = prefs)
         awaitInit()
 
@@ -150,7 +150,7 @@ class SingboxEngineAutoSelectTest {
             makeProfile(2L, 2L, "s2.example.com", 444),
             makeProfile(3L, 2L, "s3.example.com", 445),
         )
-        val prefs = mutablePreferencesOf(SELECTED_PROFILE_KEY to SingboxEngine.SELECTED_AUTO)
+        val prefs = mutablePreferencesOf(selectedProfileKey to SingboxEngine.SELECTED_AUTO)
         val engine = buildEngine(
             prefs = prefs,
             profilesByGroup = mapOf(1L to profiles1, 2L to profiles2),
