@@ -60,7 +60,8 @@ class ByeDpiEngine(
     private val _stats = MutableStateFlow(EngineStats())
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val proxyDispatcher = Dispatchers.IO.limitedParallelism(1)
+    @Volatile
+    private var proxyDispatcher: CoroutineDispatcher = newProxyDispatcher()
     private val proxyScope = CoroutineScope(SupervisorJob() + (testDispatcherOverride ?: proxyDispatcher))
     private val proxyJobRef = AtomicReference<Job?>(null)
 
@@ -108,16 +109,18 @@ class ByeDpiEngine(
                 withTimeoutOrNull(STOP_GRACE_MS) { oldJob.join() }
                 if (oldJob.isActive) oldJob.cancel()
             }
-            val drained = withTimeoutOrNull(DRAIN_TIMEOUT_MS) {
-                withContext(proxyDispatcher) {}
-            }
-            if (drained == null) {
-                PersistentLoggers.warn(
-                    TAG,
-                    "proxyDispatcher drain timeout ${DRAIN_TIMEOUT_MS}ms — emergencyReset",
-                )
-                runCatching { proxy.emergencyReset() }
-            }
+        }
+        // Orphan JNI may hold dispatcher even if proxyJobRef was null (cancelled stop lost the ref)
+        val drained = withTimeoutOrNull(DRAIN_TIMEOUT_MS) {
+            withContext(proxyDispatcher) {}
+        }
+        if (drained == null) {
+            PersistentLoggers.warn(
+                TAG,
+                "proxyDispatcher drain timeout ${DRAIN_TIMEOUT_MS}ms — emergencyReset + recreate",
+            )
+            runCatching { proxy.emergencyReset() }
+            proxyDispatcher = newProxyDispatcher()
         }
 
         val args = buildArgs(resolvedConfig)
@@ -221,6 +224,8 @@ class ByeDpiEngine(
         return if (probeSuccess) System.currentTimeMillis() - started else -1
     }
 
+    override fun stopTimeoutMs(): Long = BYEDPI_STOP_TIMEOUT_MS
+
     override suspend fun stop() {
         Log.i(TAG, "stop")
         withContext(Dispatchers.IO) {
@@ -228,7 +233,7 @@ class ByeDpiEngine(
                 .onFailure { PersistentLoggers.warn(TAG, "jniStopProxy исключение: ${it.message}") }
             runCatching { proxy.forceClose() }
                 .onFailure { PersistentLoggers.warn(TAG, "jniForceClose исключение: ${it.message}") }
-            val job = proxyJobRef.getAndSet(null)
+            val job = proxyJobRef.get()
             if (job != null) {
                 val completed = withTimeoutOrNull(STOP_GRACE_MS) {
                     job.join()
@@ -240,6 +245,7 @@ class ByeDpiEngine(
                     runCatching { proxy.emergencyReset() }
                     PersistentLoggers.warn(TAG, "emergencyReset — принудительный сброс guard")
                 }
+                proxyJobRef.compareAndSet(job, null)
             }
             activeSocksPort = 0
             withContext(proxyDispatcher) {}
@@ -303,9 +309,14 @@ class ByeDpiEngine(
         const val READY_RETRY_MS = 100L
         const val STOP_GRACE_MS = 3_000L
         const val DRAIN_TIMEOUT_MS = 3_000L
+        const val BYEDPI_STOP_TIMEOUT_MS = 7_000L
         const val AUTO_ROTATE_PORT = 0
         const val PORT_ROTATION_BASE = 49_152
         const val PORT_ROTATION_RANGE = 256
+
+        @OptIn(ExperimentalCoroutinesApi::class)
+        private fun newProxyDispatcher(): CoroutineDispatcher =
+            Dispatchers.IO.limitedParallelism(1)
     }
 }
 
