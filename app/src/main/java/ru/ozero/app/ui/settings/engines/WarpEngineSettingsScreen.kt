@@ -71,9 +71,7 @@ import ru.ozero.app.ui.theme.OzeroPalette
 import androidx.compose.ui.text.font.FontFamily
 import ru.ozero.enginewarp.AwgPreset
 import ru.ozero.enginewarp.AwgPresets
-import ru.ozero.enginewarp.DnsPreset
 import ru.ozero.enginewarp.DnsPresets
-import ru.ozero.enginewarp.EndpointPreset
 import ru.ozero.enginewarp.EndpointPresets
 import ru.ozero.enginewarp.WarpConfigSlot
 
@@ -85,17 +83,6 @@ fun WarpEngineSettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val cooldownRemainingMs by viewModel.cooldownRemainingMs.collectAsStateWithLifecycle()
-
-    if (state.showTweaks && state.editDraft != null) {
-        BackHandler { viewModel.onEditCancel() }
-        WarpConnectionTweaksScreen(
-            draft = state.editDraft!!,
-            onDraftChange = viewModel::onEditDraftChange,
-            onSave = viewModel::onSaveEdit,
-            onCancel = viewModel::onEditCancel,
-        )
-        return
-    }
 
     if (state.editDraft != null) {
         BackHandler { viewModel.onEditCancel() }
@@ -170,7 +157,6 @@ fun WarpEngineSettingsScreen(
                 onSetActive = viewModel::onSetActive,
                 onStartEdit = viewModel::onStartEdit,
                 onDeleteSlot = viewModel::onDeleteSlot,
-                onOpenTweaks = viewModel::onStartTweaks,
             )
             if (overlayAlpha > 0f) {
                 ImportSuccessOverlay(
@@ -315,173 +301,195 @@ private fun WarpEditScreen(
 
 @Composable
 private fun WarpInterfaceSection(draft: WarpEditDraft, onDraftChange: (WarpEditDraft) -> Unit) {
-    SectionLabel(stringResource(R.string.warp_section_interface))
-    WarpTextField(
-        label = stringResource(R.string.warp_field_private_key),
-        value = draft.privateKey,
-        onValueChange = { onDraftChange(draft.copy(privateKey = it)) },
-        tag = "warp_edit_priv",
-    )
-    WarpTextField(
-        label = stringResource(R.string.warp_field_public_key),
-        value = draft.publicKey,
-        onValueChange = { onDraftChange(draft.copy(publicKey = it)) },
-        tag = "warp_edit_pub",
-    )
-    WarpTextField(
-        label = stringResource(R.string.warp_field_address_v4),
-        value = draft.addressV4,
-        onValueChange = { onDraftChange(draft.copy(addressV4 = it)) },
-        tag = "warp_edit_addr4",
-    )
-    WarpTextField(
-        label = stringResource(R.string.warp_field_address_v6),
-        value = draft.addressV6,
-        onValueChange = { onDraftChange(draft.copy(addressV6 = it)) },
-        tag = "warp_edit_addr6",
-    )
-    WarpDnsPresetsRow(onPresetClick = { preset ->
-        onDraftChange(draft.copy(dns = preset.servers.joinToString(", ")))
-    })
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = OzeroPalette.Bg1),
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = stringResource(R.string.warp_section_interface),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            WarpTextField(
+                label = stringResource(R.string.warp_field_private_key),
+                value = draft.privateKey,
+                onValueChange = { onDraftChange(draft.copy(privateKey = it)) },
+                tag = "warp_edit_priv",
+            )
+            WarpTextField(
+                label = stringResource(R.string.warp_field_public_key),
+                value = draft.publicKey,
+                onValueChange = { onDraftChange(draft.copy(publicKey = it)) },
+                tag = "warp_edit_pub",
+            )
+            WarpTextField(
+                label = stringResource(R.string.warp_field_address_v4),
+                value = draft.addressV4,
+                onValueChange = { onDraftChange(draft.copy(addressV4 = it)) },
+                tag = "warp_edit_addr4",
+            )
+            WarpTextField(
+                label = stringResource(R.string.warp_field_address_v6),
+                value = draft.addressV6,
+                onValueChange = { onDraftChange(draft.copy(addressV6 = it)) },
+                tag = "warp_edit_addr6",
+            )
+            WarpTextField(
+                label = stringResource(R.string.warp_field_mtu),
+                value = draft.mtu,
+                onValueChange = { onDraftChange(draft.copy(mtu = it)) },
+                keyboardType = KeyboardType.Number,
+                tag = "warp_edit_mtu",
+            )
+        }
+    }
+    WarpDnsPresetsCard(draft, onDraftChange)
     WarpTextField(
         label = stringResource(R.string.warp_field_dns),
         value = draft.dns,
         onValueChange = { onDraftChange(draft.copy(dns = it)) },
         tag = "warp_edit_dns",
     )
-    WarpTextField(
-        label = stringResource(R.string.warp_field_mtu),
-        value = draft.mtu,
-        onValueChange = { onDraftChange(draft.copy(mtu = it)) },
-        keyboardType = KeyboardType.Number,
-        tag = "warp_edit_mtu",
-    )
 }
 
 @Composable
 private fun WarpPeerSection(draft: WarpEditDraft, onDraftChange: (WarpEditDraft) -> Unit) {
-    SectionLabel(stringResource(R.string.warp_section_peer))
-    WarpEndpointPresetsRow(onPresetClick = { preset ->
-        onDraftChange(draft.copy(endpoint = preset.endpoint))
-    })
-    WarpTextField(
-        label = stringResource(R.string.warp_field_endpoint),
-        value = draft.endpoint,
-        onValueChange = { onDraftChange(draft.copy(endpoint = it)) },
-        tag = "warp_edit_endpoint",
-    )
-    WarpTextField(
-        label = stringResource(R.string.warp_field_peer_public_key),
-        value = draft.peerPublicKey,
-        onValueChange = { onDraftChange(draft.copy(peerPublicKey = it)) },
-        tag = "warp_edit_peer_pub",
-    )
-    WarpTextField(
-        label = stringResource(R.string.warp_field_keepalive),
-        value = draft.keepalive,
-        onValueChange = { onDraftChange(draft.copy(keepalive = it)) },
-        keyboardType = KeyboardType.Number,
-        tag = "warp_edit_keepalive",
-    )
+    WarpTweaksEndpointSection(draft, onDraftChange)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = OzeroPalette.Bg1),
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = stringResource(R.string.warp_section_peer),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            WarpTextField(
+                label = stringResource(R.string.warp_field_endpoint),
+                value = draft.endpoint,
+                onValueChange = { onDraftChange(draft.copy(endpoint = it)) },
+                tag = "warp_edit_endpoint",
+            )
+            WarpTextField(
+                label = stringResource(R.string.warp_field_peer_public_key),
+                value = draft.peerPublicKey,
+                onValueChange = { onDraftChange(draft.copy(peerPublicKey = it)) },
+                tag = "warp_edit_peer_pub",
+            )
+            WarpTextField(
+                label = stringResource(R.string.warp_field_keepalive),
+                value = draft.keepalive,
+                onValueChange = { onDraftChange(draft.copy(keepalive = it)) },
+                keyboardType = KeyboardType.Number,
+                tag = "warp_edit_keepalive",
+            )
+        }
+    }
 }
 
 @Composable
 private fun WarpAwgSection(draft: WarpEditDraft, onDraftChange: (WarpEditDraft) -> Unit) {
-    SectionLabel(stringResource(R.string.warp_section_awg))
-    WarpAwgPresetsRow(onPresetClick = { preset ->
-        onDraftChange(applyPreset(draft, preset))
-    })
-    WarpTextField(
-        label = "Jc", value = draft.jc,
-        onValueChange = { onDraftChange(draft.copy(jc = it)) },
-        keyboardType = KeyboardType.Number, tag = "warp_edit_jc",
-    )
-    WarpTextField(
-        label = "Jmin", value = draft.jmin,
-        onValueChange = { onDraftChange(draft.copy(jmin = it)) },
-        keyboardType = KeyboardType.Number, tag = "warp_edit_jmin",
-    )
-    WarpTextField(
-        label = "Jmax", value = draft.jmax,
-        onValueChange = { onDraftChange(draft.copy(jmax = it)) },
-        keyboardType = KeyboardType.Number, tag = "warp_edit_jmax",
-    )
-    WarpTextField(
-        label = "S1", value = draft.s1,
-        onValueChange = { onDraftChange(draft.copy(s1 = it)) },
-        keyboardType = KeyboardType.Number, tag = "warp_edit_s1",
-    )
-    WarpTextField(
-        label = "S2", value = draft.s2,
-        onValueChange = { onDraftChange(draft.copy(s2 = it)) },
-        keyboardType = KeyboardType.Number, tag = "warp_edit_s2",
-    )
-    WarpTextField(
-        label = "H1", value = draft.h1,
-        onValueChange = { onDraftChange(draft.copy(h1 = it)) },
-        keyboardType = KeyboardType.Number, tag = "warp_edit_h1",
-    )
-    WarpTextField(
-        label = "H2", value = draft.h2,
-        onValueChange = { onDraftChange(draft.copy(h2 = it)) },
-        keyboardType = KeyboardType.Number, tag = "warp_edit_h2",
-    )
-    WarpTextField(
-        label = "H3", value = draft.h3,
-        onValueChange = { onDraftChange(draft.copy(h3 = it)) },
-        keyboardType = KeyboardType.Number, tag = "warp_edit_h3",
-    )
-    WarpTextField(
-        label = "H4", value = draft.h4,
-        onValueChange = { onDraftChange(draft.copy(h4 = it)) },
-        keyboardType = KeyboardType.Number, tag = "warp_edit_h4",
-    )
-}
-
-@Composable
-private fun WarpAwgPresetsRow(onPresetClick: (AwgPreset) -> Unit) {
-    androidx.compose.foundation.lazy.LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxWidth().testTag("warp_awg_presets"),
+    WarpTweaksAwgSection(draft, onDraftChange)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = OzeroPalette.Bg1),
     ) {
-        items(AwgPresets.ALL) { preset ->
-            androidx.compose.material3.AssistChip(
-                onClick = { onPresetClick(preset) },
-                label = { Text(preset.name) },
-                modifier = Modifier.testTag("warp_awg_preset_${preset.id}"),
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = stringResource(R.string.warp_section_awg),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            WarpTextField(
+                label = "Jc", value = draft.jc,
+                onValueChange = { onDraftChange(draft.copy(jc = it)) },
+                keyboardType = KeyboardType.Number, tag = "warp_edit_jc",
+            )
+            WarpTextField(
+                label = "Jmin", value = draft.jmin,
+                onValueChange = { onDraftChange(draft.copy(jmin = it)) },
+                keyboardType = KeyboardType.Number, tag = "warp_edit_jmin",
+            )
+            WarpTextField(
+                label = "Jmax", value = draft.jmax,
+                onValueChange = { onDraftChange(draft.copy(jmax = it)) },
+                keyboardType = KeyboardType.Number, tag = "warp_edit_jmax",
+            )
+            WarpTextField(
+                label = "S1", value = draft.s1,
+                onValueChange = { onDraftChange(draft.copy(s1 = it)) },
+                keyboardType = KeyboardType.Number, tag = "warp_edit_s1",
+            )
+            WarpTextField(
+                label = "S2", value = draft.s2,
+                onValueChange = { onDraftChange(draft.copy(s2 = it)) },
+                keyboardType = KeyboardType.Number, tag = "warp_edit_s2",
+            )
+            WarpTextField(
+                label = "H1", value = draft.h1,
+                onValueChange = { onDraftChange(draft.copy(h1 = it)) },
+                keyboardType = KeyboardType.Number, tag = "warp_edit_h1",
+            )
+            WarpTextField(
+                label = "H2", value = draft.h2,
+                onValueChange = { onDraftChange(draft.copy(h2 = it)) },
+                keyboardType = KeyboardType.Number, tag = "warp_edit_h2",
+            )
+            WarpTextField(
+                label = "H3", value = draft.h3,
+                onValueChange = { onDraftChange(draft.copy(h3 = it)) },
+                keyboardType = KeyboardType.Number, tag = "warp_edit_h3",
+            )
+            WarpTextField(
+                label = "H4", value = draft.h4,
+                onValueChange = { onDraftChange(draft.copy(h4 = it)) },
+                keyboardType = KeyboardType.Number, tag = "warp_edit_h4",
             )
         }
     }
 }
 
 @Composable
-private fun WarpEndpointPresetsRow(onPresetClick: (EndpointPreset) -> Unit) {
-    androidx.compose.foundation.lazy.LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxWidth().testTag("warp_endpoint_presets"),
-    ) {
-        items(EndpointPresets.ALL) { preset ->
-            androidx.compose.material3.AssistChip(
-                onClick = { onPresetClick(preset) },
-                label = { Text(preset.name) },
-                modifier = Modifier.testTag("warp_endpoint_preset_${preset.id}"),
-            )
-        }
-    }
-}
-
-@Composable
-private fun WarpDnsPresetsRow(onPresetClick: (DnsPreset) -> Unit) {
-    androidx.compose.foundation.lazy.LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+private fun WarpDnsPresetsCard(draft: WarpEditDraft, onDraftChange: (WarpEditDraft) -> Unit) {
+    Card(
         modifier = Modifier.fillMaxWidth().testTag("warp_dns_presets"),
+        colors = CardDefaults.cardColors(containerColor = OzeroPalette.Bg1),
     ) {
-        items(DnsPresets.ALL) { preset ->
-            androidx.compose.material3.AssistChip(
-                onClick = { onPresetClick(preset) },
-                label = { Text(preset.name) },
-                modifier = Modifier.testTag("warp_dns_preset_${preset.id}"),
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = stringResource(R.string.warp_field_dns),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
             )
+            DnsPresets.ALL.forEach { preset ->
+                val selected = draft.dns == preset.servers.joinToString(", ")
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .selectable(
+                            selected = selected,
+                            onClick = { onDraftChange(draft.copy(dns = preset.servers.joinToString(", "))) },
+                        )
+                        .testTag("warp_dns_preset_${preset.id}"),
+                ) {
+                    RadioButton(
+                        selected = selected,
+                        onClick = { onDraftChange(draft.copy(dns = preset.servers.joinToString(", "))) },
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = preset.name, style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            text = preset.servers.joinToString(", "),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontFamily = FontFamily.Monospace,
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -545,16 +553,6 @@ private fun WarpDoHSection(
 }
 
 @Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(top = 8.dp),
-    )
-}
-
-@Composable
 private fun WarpTextField(
     label: String,
     value: String,
@@ -583,7 +581,6 @@ private fun WarpScreenContent(
     onSetActive: (String) -> Unit,
     onStartEdit: (String) -> Unit,
     onDeleteSlot: (String) -> Unit,
-    onOpenTweaks: () -> Unit = {},
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         if (state.slots.isEmpty()) {
@@ -625,11 +622,9 @@ private fun WarpScreenContent(
                 WarpActionRow(
                     isRegistering = false,
                     cooldownRemainingMs = cooldownRemainingMs,
-                    hasSlotsForTweaks = state.slots.isNotEmpty(),
                     onGenerate = onGenerate,
                     onCancelGenerate = onCancelGenerate,
                     onImportFile = onImportFile,
-                    onOpenTweaks = onOpenTweaks,
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
@@ -732,11 +727,9 @@ private fun WarpGenerateButton(
 private fun WarpActionRow(
     isRegistering: Boolean,
     cooldownRemainingMs: Long = 0L,
-    hasSlotsForTweaks: Boolean = false,
     onGenerate: () -> Unit,
     onCancelGenerate: () -> Unit,
     onImportFile: () -> Unit,
-    onOpenTweaks: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
@@ -764,18 +757,6 @@ private fun WarpActionRow(
                 modifier = Modifier.weight(1f).testTag("warp_import_button"),
             ) {
                 Text(stringResource(R.string.warp_import_file))
-            }
-        }
-        if (hasSlotsForTweaks) {
-            OutlinedButton(
-                onClick = onOpenTweaks,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .padding(bottom = 8.dp)
-                    .testTag("warp_tweaks_button"),
-            ) {
-                Text(stringResource(R.string.warp_tweaks_button))
             }
         }
     }
@@ -893,48 +874,6 @@ private fun WarpConfigSlotCard(
             IconButton(onClick = onDelete) {
                 Icon(Icons.Filled.Delete, contentDescription = null)
             }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun WarpConnectionTweaksScreen(
-    draft: WarpEditDraft,
-    onDraftChange: (WarpEditDraft) -> Unit,
-    onSave: () -> Unit,
-    onCancel: () -> Unit,
-) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.warp_tweaks_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onCancel) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                    }
-                },
-                actions = {
-                    TextButton(onClick = onSave) {
-                        Text(stringResource(R.string.warp_edit_save))
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            WarpTweaksEndpointSection(draft, onDraftChange)
-            WarpTweaksAwgSection(draft, onDraftChange)
-            WarpDoHSection(
-                selected = draft.doHProvider,
-                onSelect = { onDraftChange(draft.copy(doHProvider = it)) },
-            )
         }
     }
 }
