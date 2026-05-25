@@ -4,7 +4,9 @@ import net.schmizz.sshj.AndroidConfig
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.common.IOUtils
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import ru.ozero.enginescore.PersistentLoggers
+import java.security.Security
 import java.util.concurrent.TimeUnit
 
 internal class SshjTransport : SshTransport {
@@ -12,6 +14,7 @@ internal class SshjTransport : SshTransport {
     private var client: SSHClient? = null
 
     override fun connect(host: String, port: Int) {
+        ensureBouncyCastleProvider()
         val config = AndroidConfig()
         config.keyExchangeFactories = config.keyExchangeFactories.filter {
             val n = it.name.lowercase()
@@ -61,5 +64,16 @@ internal class SshjTransport : SshTransport {
         const val CONNECTION_TIMEOUT_MS = 15_000L
         const val CMD_LOG_MAX = 120
         const val STDERR_LOG_MAX = 400
+
+        @Volatile
+        private var bcRegistered = false
+
+        @Synchronized
+        private fun ensureBouncyCastleProvider() {
+            if (bcRegistered) return
+            Security.removeProvider("BC")
+            Security.insertProviderAt(BouncyCastleProvider(), 1)
+            bcRegistered = true
+        }
     }
 }
