@@ -12,22 +12,16 @@ android {
     }
 }
 
-val hasNativeAar = file("libs").listFiles()?.any { it.extension == "aar" } == true
-
 dependencies {
     implementation(project(":engines-core"))
-    if (hasNativeAar) {
-        implementation(
-            fileTree(
-                mapOf(
-                    "dir" to "libs",
-                    "include" to listOf("*.aar", "*.jar"),
-                ),
+    api(
+        fileTree(
+            mapOf(
+                "dir" to "libs",
+                "include" to listOf("*.aar", "*.jar"),
             ),
-        )
-    } else {
-        compileOnly(project(":singbox-stubs"))
-    }
+        ),
+    )
     implementation(libs.bundles.coroutines)
 
     testImplementation(libs.bundles.junit5)

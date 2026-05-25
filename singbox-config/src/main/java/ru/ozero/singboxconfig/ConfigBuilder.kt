@@ -7,18 +7,49 @@ import ru.ozero.singboxfmt.VLESSBean
 object ConfigBuilder {
 
     fun buildSingboxConfig(bean: AbstractBean): String {
-        return when (bean) {
-            is VLESSBean -> buildVless(bean)
-            else -> error("Unsupported bean type in P1: ${bean::class.simpleName}")
+        val outbound = when (bean) {
+            is VLESSBean -> vlessOutbound(bean)
+            else -> error("Unsupported bean type: ${bean::class.simpleName}")
         }
+        return buildFullConfig(outbound)
     }
 
-    private fun buildVless(bean: VLESSBean): String {
+    private fun buildFullConfig(proxyOutbound: String): String {
         val sb = StringBuilder()
-        sb.append("""{"log":{"level":"warn","timestamp":true},"outbounds":[""")
-        sb.append(vlessOutbound(bean))
-        sb.append(""",{"type":"direct","tag":"direct"},{"type":"block","tag":"block"}]""")
-        sb.append(""","route":{"final":"proxy","auto_detect_interface":true,"rules":[]}}""")
+        sb.append('{')
+        sb.append(""""log":{"level":"warn","timestamp":true},""")
+        sb.append(""""inbounds":[""")
+        sb.append(tunInbound())
+        sb.append("""],""")
+        sb.append(""""outbounds":[""")
+        sb.append(proxyOutbound)
+        sb.append(""",{"type":"direct","tag":"direct"}""")
+        sb.append(""",{"type":"block","tag":"block"}""")
+        sb.append(""",{"type":"dns","tag":"dns-out"}""")
+        sb.append("""],""")
+        sb.append(""""dns":{"servers":[{"tag":"dns-direct","address":"1.1.1.1"}]},""")
+        sb.append(""""route":{""")
+        sb.append(""""final":"proxy",""")
+        sb.append(""""auto_detect_interface":true,""")
+        sb.append(""""rules":[{"protocol":"dns","outbound":"dns-out"}]""")
+        sb.append('}')
+        sb.append('}')
+        return sb.toString()
+    }
+
+    private fun tunInbound(): String {
+        val sb = StringBuilder()
+        sb.append('{')
+        sb.append(""""type":"tun",""")
+        sb.append(""""tag":"tun-in",""")
+        sb.append(""""inet4_address":"172.19.0.1/30",""")
+        sb.append(""""inet6_address":"fdfe:dcba:9876::1/126",""")
+        sb.append(""""mtu":9000,""")
+        sb.append(""""auto_route":true,""")
+        sb.append(""""strict_route":false,""")
+        sb.append(""""sniff":true,""")
+        sb.append(""""sniff_override_destination":true""")
+        sb.append('}')
         return sb.toString()
     }
 

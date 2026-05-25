@@ -188,16 +188,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG=$(gh release list --limit 100 --json tagName \
-            | grep -oE '"singbox-[a-f0-9]{8}"' \
-            | head -n1 | tr -d '"')
-          if [ -z "$TAG" ]; then
-            echo "::warning::no singbox AAR release found — building without real singbox library"
-          else
-            mkdir -p singbox-core/libs
-            gh release download "$TAG" -p "*.aar" -D singbox-core/libs --clobber
-            ls -la singbox-core/libs/
-          fi
+          mkdir -p singbox-core/libs
+          gh release download 1.13.12 --repo singbox-android/libbox -p "libbox.aar" -D singbox-core/libs --clobber
+          ls -la singbox-core/libs/
 
       - name: Download FPTN native lib
         env:
