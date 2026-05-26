@@ -512,6 +512,36 @@ jobs:
       - name: Install NSIS
         run: choco install nsis -y
 
+      - name: Download desktop engine binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          BINDIR="app-desktop/src/main/resources/binaries"
+          mkdir -p "$BINDIR"
+
+          echo "=== sing-box ==="
+          gh release download v1.13.12 -R SagerNet/sing-box \
+            -p "sing-box-1.13.12-windows-amd64.zip" -D /tmp
+          unzip -o /tmp/sing-box-1.13.12-windows-amd64.zip -d /tmp/singbox
+          cp /tmp/singbox/sing-box-1.13.12-windows-amd64/sing-box.exe "$BINDIR/"
+
+          echo "=== byedpi ==="
+          gh release download v0.17.3 -R hufrea/byedpi \
+            -p "byedpi-17.3-x86_64-w64.zip" -D /tmp
+          unzip -o /tmp/byedpi-17.3-x86_64-w64.zip -d /tmp/byedpi
+          cp /tmp/byedpi/byedpi.exe "$BINDIR/" 2>/dev/null \
+            || cp /tmp/byedpi/ciadpi.exe "$BINDIR/byedpi.exe" 2>/dev/null \
+            || find /tmp/byedpi -name '*.exe' -exec cp {} "$BINDIR/byedpi.exe" \;
+
+          echo "=== wintun ==="
+          curl -fsSL "https://www.wintun.net/builds/wintun-0.14.1.zip" -o /tmp/wintun.zip
+          unzip -o /tmp/wintun.zip -d /tmp/wintun
+          cp /tmp/wintun/wintun/bin/amd64/wintun.dll "$BINDIR/"
+
+          ls -la "$BINDIR/"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build Ozero.exe installer
         env:
           TAG: ${{ steps.ver.outputs.tag }}
@@ -582,6 +612,30 @@ jobs:
       - name: Install fakeroot
         run: sudo apt-get update && sudo apt-get install -y fakeroot
 
+      - name: Download desktop engine binaries
+        run: |
+          set -euo pipefail
+          BINDIR="app-desktop/src/main/resources/binaries"
+          mkdir -p "$BINDIR"
+
+          echo "=== sing-box ==="
+          gh release download v1.13.12 -R SagerNet/sing-box \
+            -p "sing-box-1.13.12-linux-amd64.tar.gz" -D /tmp
+          tar xzf /tmp/sing-box-1.13.12-linux-amd64.tar.gz -C /tmp
+          cp /tmp/sing-box-1.13.12-linux-amd64/sing-box "$BINDIR/"
+          chmod +x "$BINDIR/sing-box"
+
+          echo "=== byedpi ==="
+          gh release download v0.17.3 -R hufrea/byedpi \
+            -p "byedpi-17.3-x86_64-linux.tar.gz" -D /tmp
+          tar xzf /tmp/byedpi-17.3-x86_64-linux.tar.gz -C /tmp/byedpi-linux || true
+          find /tmp -name 'ciadpi' -exec cp {} "$BINDIR/" \; 2>/dev/null || true
+          chmod +x "$BINDIR/ciadpi" 2>/dev/null || true
+
+          ls -la "$BINDIR/"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build Ozero.deb
         env:
           TAG: ${{ steps.ver.outputs.tag }}
@@ -647,6 +701,23 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
+
+      - name: Download desktop engine binaries
+        run: |
+          set -euo pipefail
+          BINDIR="app-desktop/src/main/resources/binaries"
+          mkdir -p "$BINDIR"
+
+          echo "=== sing-box ==="
+          gh release download v1.13.12 -R SagerNet/sing-box \
+            -p "sing-box-1.13.12-darwin-arm64.tar.gz" -D /tmp
+          tar xzf /tmp/sing-box-1.13.12-darwin-arm64.tar.gz -C /tmp
+          cp /tmp/sing-box-1.13.12-darwin-arm64/sing-box "$BINDIR/"
+          chmod +x "$BINDIR/sing-box"
+
+          ls -la "$BINDIR/"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Ozero.dmg
         env:
