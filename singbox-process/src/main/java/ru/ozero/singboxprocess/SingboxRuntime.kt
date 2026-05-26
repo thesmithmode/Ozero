@@ -64,7 +64,11 @@ internal object SingboxRuntime {
                 }
 
                 val configPreview = singboxJsonConfig.take(200).replace(UUID_REDACT_REGEX, """"uuid":"***"""")
-                PersistentLoggers.info(TAG, "start configLen=${singboxJsonConfig.length} fd=$tunFd configPreview=$configPreview")
+                PersistentLoggers.info(
+                    TAG,
+                    "start configLen=${singboxJsonConfig.length} fd=$tunFd" +
+                        " configPreview=$configPreview",
+                )
 
                 val socketFile = java.io.File(basePath, "command.sock")
                 if (socketFile.exists()) {

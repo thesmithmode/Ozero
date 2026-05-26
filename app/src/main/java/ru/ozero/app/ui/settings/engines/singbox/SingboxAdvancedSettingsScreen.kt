@@ -57,7 +57,6 @@ fun SingboxAdvancedSettingsScreen(
     LaunchedEffect(restoreError) {
         if (restoreError != null) {
             snackbarHostState.showSnackbar(restoreError)
-            viewModel.onDismissRestoreError()
         }
     }
 
@@ -153,37 +152,48 @@ fun SingboxAdvancedSettingsScreen(
             HorizontalDivider()
             Spacer(Modifier.height(16.dp))
 
-            Text(
-                text = stringResource(R.string.singbox_subscriptions_section),
-                style = MaterialTheme.typography.labelLarge,
+            SubscriptionsSection(
+                isRestoringDefaults = state.isRestoringDefaults,
+                onRestoreClick = { showRestoreDialog = true },
             )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = stringResource(R.string.singbox_restore_defaults_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(8.dp))
-            Button(
-                onClick = { showRestoreDialog = true },
-                enabled = !state.isRestoringDefaults,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("singbox_restore_defaults_button"),
-            ) {
-                if (state.isRestoringDefaults) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                    Spacer(Modifier.width(8.dp))
-                }
-                Text(stringResource(R.string.singbox_restore_defaults_button))
-            }
 
             Spacer(Modifier.height(24.dp))
         }
+    }
+}
+
+@Composable
+private fun SubscriptionsSection(
+    isRestoringDefaults: Boolean,
+    onRestoreClick: () -> Unit,
+) {
+    Text(
+        text = stringResource(R.string.singbox_subscriptions_section),
+        style = MaterialTheme.typography.labelLarge,
+    )
+    Spacer(Modifier.height(4.dp))
+    Text(
+        text = stringResource(R.string.singbox_restore_defaults_hint),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(Modifier.height(8.dp))
+    Button(
+        onClick = onRestoreClick,
+        enabled = !isRestoringDefaults,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("singbox_restore_defaults_button"),
+    ) {
+        if (isRestoringDefaults) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.onPrimary,
+            )
+            Spacer(Modifier.width(8.dp))
+        }
+        Text(stringResource(R.string.singbox_restore_defaults_button))
     }
 }
 

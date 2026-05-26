@@ -133,7 +133,7 @@ class UrnetworkRelayCoordinator(
 
     private fun startWatchdog() {
         stopWatchdog()
-        watchdogRef.set(scope.launch {
+        val job = scope.launch {
             while (isActive) {
                 delay(WATCHDOG_INTERVAL_MS)
                 if (!relayOwned.get()) break
@@ -147,7 +147,8 @@ class UrnetworkRelayCoordinator(
                     break
                 }
             }
-        })
+        }
+        watchdogRef.set(job)
     }
 
     private fun stopWatchdog() {

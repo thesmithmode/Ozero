@@ -295,7 +295,9 @@ class UrnetworkRelayCoordinatorTest {
         override fun isRunning() = running
         override suspend fun attachTun(tunFd: Int) = UrnetworkSdkBridge.AttachResult.Success
         override fun connectTo(location: UrnetworkSdkBridge.LocationToken) = Unit
-        override fun connectBestAvailable() { connectBestAvailableCalls++ }
+        override fun connectBestAvailable() {
+            connectBestAvailableCalls++
+        }
         override fun selectedLocation(): UrnetworkSdkBridge.LocationToken? = null
         override fun openLocationsViewController(): com.bringyour.sdk.LocationsViewController? = null
         override fun setProvidePaused(paused: Boolean) {
