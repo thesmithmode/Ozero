@@ -27,7 +27,7 @@ compose.desktop {
         }
 
         nativeDistributions {
-            targetFormats(TargetFormat.Exe)
+            targetFormats(TargetFormat.Exe, TargetFormat.Deb, TargetFormat.Dmg)
             packageName = "Ozero"
             packageVersion = "1.0.0"
             description = "Ozero VPN"
@@ -39,6 +39,16 @@ compose.desktop {
                 dirChooser = true
                 upgradeUuid = "d3b07384-d113-4ec6-a5ea-024c9c7b1f2a"
                 perUserInstall = true
+            }
+
+            linux {
+                shortcut = true
+                menuGroup = "Ozero"
+                debMaintainer = "ozero@ozero.ru"
+            }
+
+            macOS {
+                bundleID = "ru.ozero.desktop"
             }
         }
     }

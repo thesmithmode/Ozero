@@ -524,9 +524,8 @@ jobs:
             find app-desktop/build/compose/binaries/ -type f 2>/dev/null || true
             exit 1
           fi
-          cp "$EXE" "Ozero-${TAG}-win-x64.exe"
-          sha256sum "Ozero-${TAG}-win-x64.exe" > "Ozero-${TAG}-win-x64.exe.sha256"
-          echo "Built: Ozero-${TAG}-win-x64.exe ($(stat -c%s "Ozero-${TAG}-win-x64.exe") bytes)"
+          cp "$EXE" "Ozero-${TAG}.exe"
+          sha256sum "Ozero-${TAG}.exe" > "Ozero-${TAG}.exe.sha256"
 
       - name: Upload Ozero.exe to release
         uses: softprops/action-gh-release@v3
@@ -536,5 +535,136 @@ jobs:
           overwrite_files: true
           token: ${{ secrets.GITHUB_TOKEN }}
           files: |
-            Ozero-*-win-x64.exe
-            Ozero-*-win-x64.exe.sha256
+            Ozero-*.exe
+            Ozero-*.exe.sha256
+
+  linux:
+    name: Build Ozero.deb
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: release
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version tag
+        id: ver
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          else
+            LAST=$(git tag -l 'v*.*.*' | sort -V | tail -1)
+            if [ -z "$LAST" ]; then LAST="v0.0.0"; fi
+            IFS='.' read -r ma mi pa <<< "${LAST#v}"
+            echo "tag=v${ma}.${mi}.$((pa + 1))" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install fakeroot
+        run: sudo apt-get update && sudo apt-get install -y fakeroot
+
+      - name: Build Ozero.deb
+        run: ./gradlew :app-desktop:packageDeb --no-daemon --stacktrace
+
+      - name: Collect Linux artifact
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: |
+          set -euo pipefail
+          DEB=$(find app-desktop/build/compose/binaries/main/deb -name '*.deb' | head -n1)
+          if [ -z "$DEB" ]; then
+            echo "::error::Ozero.deb not found after packageDeb"
+            find app-desktop/build/compose/binaries/ -type f 2>/dev/null || true
+            exit 1
+          fi
+          cp "$DEB" "Ozero-${TAG}.deb"
+          sha256sum "Ozero-${TAG}.deb" > "Ozero-${TAG}.deb.sha256"
+
+      - name: Upload Ozero.deb to release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          fail_on_unmatched_files: true
+          overwrite_files: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          files: |
+            Ozero-*.deb
+            Ozero-*.deb.sha256
+
+  macos:
+    name: Build Ozero.dmg
+    runs-on: macos-latest
+    timeout-minutes: 30
+    needs: release
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version tag
+        id: ver
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          else
+            LAST=$(git tag -l 'v*.*.*' | sort -V | tail -1)
+            if [ -z "$LAST" ]; then LAST="v0.0.0"; fi
+            IFS='.' read -r ma mi pa <<< "${LAST#v}"
+            echo "tag=v${ma}.${mi}.$((pa + 1))" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Build Ozero.dmg
+        run: ./gradlew :app-desktop:packageDmg --no-daemon --stacktrace
+
+      - name: Collect macOS artifact
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: |
+          set -euo pipefail
+          DMG=$(find app-desktop/build/compose/binaries/main/dmg -name '*.dmg' | head -n1)
+          if [ -z "$DMG" ]; then
+            echo "::error::Ozero.dmg not found after packageDmg"
+            find app-desktop/build/compose/binaries/ -type f 2>/dev/null || true
+            exit 1
+          fi
+          cp "$DMG" "Ozero-${TAG}.dmg"
+          shasum -a 256 "Ozero-${TAG}.dmg" > "Ozero-${TAG}.dmg.sha256"
+
+      - name: Upload Ozero.dmg to release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          fail_on_unmatched_files: true
+          overwrite_files: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          files: |
+            Ozero-*.dmg
+            Ozero-*.dmg.sha256
