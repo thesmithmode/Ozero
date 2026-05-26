@@ -69,7 +69,7 @@ class ByeDpiEngine(
             settings?.byedpiUseUiMode == true ->
                 ByeDpiUiArgsBuilder.buildArgsOnly(settings.byedpiUiSettings).joinToString(" ")
             !settings?.byedpiWinningArgs.isNullOrBlank() ->
-                settings.byedpiWinningArgs!!.trim()
+                settings.byedpiWinningArgs!!.trim() // verbatim, без авто-suffix — ломает user стратегии
             else -> EngineConfig.ByeDpi().args
         }
         return EngineConfig.ByeDpi(
@@ -109,6 +109,7 @@ class ByeDpiEngine(
                 if (oldJob.isActive) oldJob.cancel()
             }
             PersistentLoggers.info(TAG, "start: barrier pre-drain oldJob.isActive=${oldJob.isActive}")
+            // limitedParallelism(1) — пустой withContext ждёт пока предыдущий JNI main() освободит поток
             withContext(proxyDispatcher) {}
             PersistentLoggers.info(TAG, "start: barrier passed — dispatcher drained")
         }
@@ -221,6 +222,7 @@ class ByeDpiEngine(
         withContext(Dispatchers.IO) {
             runCatching { proxy.stopProxy() }
                 .onFailure { PersistentLoggers.warn(TAG, "jniStopProxy исключение: ${it.message}") }
+            // forceClose ДО join — разблокировать JNI READ_WAIT, иначе join висит бесконечно
             runCatching { proxy.forceClose() }
                 .onFailure { PersistentLoggers.warn(TAG, "jniForceClose исключение: ${it.message}") }
             val job = proxyJobRef.getAndSet(null)
@@ -230,6 +232,7 @@ class ByeDpiEngine(
                     true
                 }
                 if (completed == null) {
+                    // JNI main() зависла на READ_WAIT — эскалация: forceClose→emergencyReset→cancel
                     PersistentLoggers.warn(TAG, "proxyJob не завершился за ${STOP_GRACE_MS}ms — escalate")
                     runCatching { proxy.forceClose() }
                     runCatching { proxy.emergencyReset() }
@@ -274,6 +277,7 @@ class ByeDpiEngine(
         return if (port > 0) IpProbeRoute.Socks("127.0.0.1", port) else IpProbeRoute.Default
     }
 
+    // НЕ добавлять argv[0] здесь — native-lib.c:85 ставит argv[0]="byedpi", двойной = hev IDLE
     internal fun buildArgs(config: EngineConfig.ByeDpi): Array<String> {
         val extra =
             config.args.trim()
