@@ -87,6 +87,30 @@ class ConfigBuilderVLESSTest {
     }
 
     @Test
+    fun `tun inbound must use address array and auto_route false for Android VPN`() {
+        val json = ConfigBuilder.buildSingboxConfig(makeBean())
+
+        assertContains(json, "\"address\":[\"172.19.0.1/30\"")
+        assertContains(json, "\"auto_route\":false")
+        assertFalse(
+            json.contains("\"inet4_address\""),
+            "inet4_address deprecated in sing-box 1.10+ — use address array",
+        )
+        assertFalse(
+            json.contains("\"inet6_address\""),
+            "inet6_address deprecated in sing-box 1.10+ — use address array",
+        )
+    }
+
+    @Test
+    fun `dns servers must use type and server fields for sing-box 1_13`() {
+        val json = ConfigBuilder.buildSingboxConfig(makeBean())
+
+        assertContains(json, "\"type\":\"udp\"")
+        assertContains(json, "\"server\":\"1.1.1.1\"")
+    }
+
+    @Test
     fun `should include xudp packet encoding`() {
         val json = ConfigBuilder.buildSingboxConfig(makeBean())
 

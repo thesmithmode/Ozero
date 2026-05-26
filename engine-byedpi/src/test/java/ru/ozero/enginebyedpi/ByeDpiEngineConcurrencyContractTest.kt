@@ -2,6 +2,7 @@ package ru.ozero.enginebyedpi
 
 import org.junit.jupiter.api.Test
 import java.io.File
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ByeDpiEngineConcurrencyContractTest {
@@ -12,13 +13,13 @@ class ByeDpiEngineConcurrencyContractTest {
     }
 
     @Test
-    fun `proxyDispatcher = Dispatchers IO limitedParallelism 1`() {
+    fun `proxyDispatcher uses Dispatchers IO limitedParallelism 1`() {
         val pattern = Regex(
-            """proxyDispatcher\s*=\s*Dispatchers\.IO\.limitedParallelism\(\s*1\s*\)""",
+            """Dispatchers\.IO\.limitedParallelism\(\s*1\s*\)""",
         )
         assertTrue(
             pattern.containsMatchIn(engineSource),
-            "proxyDispatcher обязан быть Dispatchers.IO.limitedParallelism(1). " +
+            "proxyDispatcher обязан использовать Dispatchers.IO.limitedParallelism(1). " +
                 "Сериализует byedpi JNI на ОДИН concurrent dispatch (queue безопасно " +
                 "сериализует start/stop sequence), но из общего IO пула — без owned thread, " +
                 "без daemon-leak, без обязательного close().",
@@ -90,6 +91,27 @@ class ByeDpiEngineConcurrencyContractTest {
                 "Cancelled JNI игнорирует Thread.interrupt() и может держать единственный слот " +
                 "dispatcher; без drain новый proxy coroutine встаёт в очередь за ним → " +
                 "waitSocksReady() timeout → ECONNREFUSED при restart после engine switch.",
+        )
+    }
+
+    @Test
+    fun `stopTimeoutMs переопределён и превышает STOP_GRACE_MS`() {
+        assertTrue(
+            engineSource.contains("override fun stopTimeoutMs()"),
+            "ByeDpiEngine обязан переопределить stopTimeoutMs() >= STOP_GRACE_MS + margin. " +
+                "Без override ChainOrchestrator отменяет stop() через 2s (DEFAULT_STOP_TIMEOUT_MS), " +
+                "а внутренний grace 3s — гарантированная потеря proxyJobRef.",
+        )
+    }
+
+    @Test
+    fun `stop не обнуляет proxyJobRef через getAndSet`() {
+        val stopBlock = engineSource.substringAfter("override suspend fun stop()")
+            .substringBefore("override suspend fun probe()")
+        assertFalse(
+            stopBlock.contains("getAndSet(null)"),
+            "stop() НЕ должен использовать getAndSet(null) — ref теряется при CancellationException. " +
+                "Использовать proxyJobRef.get() + compareAndSet(job, null) после cleanup.",
         )
     }
 }

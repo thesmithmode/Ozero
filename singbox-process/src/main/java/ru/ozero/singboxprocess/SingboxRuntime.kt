@@ -58,6 +58,8 @@ internal object SingboxRuntime {
                     lastStatus = null
                 }
 
+                PersistentLoggers.info(TAG, "start configLen=${singboxJsonConfig.length} fd=$tunFd")
+
                 val platform = OzeroPlatformInterface(tunFd, protectorBridge)
                 val handler = OzeroCommandServerHandler()
 
@@ -67,6 +69,7 @@ internal object SingboxRuntime {
                 try {
                     server.startOrReloadService(singboxJsonConfig, null)
                 } catch (e: Exception) {
+                    PersistentLoggers.error(TAG, "startOrReloadService failed: ${e.message}")
                     server.close()
                     throw e
                 }
