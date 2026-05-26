@@ -195,10 +195,14 @@ class RealUrnetworkSdkBridge(
         connectVcRef.set(cv)
         PersistentLoggers.info(TAG, "node start: routing controller opened — endpoints available")
 
-        setupWalletControllerAndPipeline(device, walletAddress)
         contractStatusListener.attach(device)
         running.set(true)
         PersistentLoggers.info(TAG, "node start: ready — awaiting attach(fd)")
+        bridgeScope.launch {
+            withContext(Dispatchers.Main.immediate) {
+                setupWalletControllerAndPipeline(device, walletAddress)
+            }
+        }
         return UrnetworkSdkBridge.StartResult.Success
     }
 
@@ -698,6 +702,7 @@ class RealUrnetworkSdkBridge(
     }
 
     private fun cleanupOnFailure() {
+        if (running.get()) return
         deviceRef.getAndSet(null)?.also { runCatching { it.close() } }
     }
 
