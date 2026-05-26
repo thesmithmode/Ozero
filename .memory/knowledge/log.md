@@ -1,5 +1,11 @@
 # Build Log
 
+## [2026-05-26T19:10:12+03:00] compile | daily/2026-05-26.md (pass 2 — gap fill)
+- Source: daily/2026-05-26.md
+- Articles created: (none — all already compiled in 18:31 pass)
+- Articles updated: [[concepts/urnetwork-provide-tun-investigation]] (гипотеза D: connectBestAvailable() не вызывался после device.start())
+- Notes: Предыдущий проход пропустил запись гипотезы D в файл; все остальные статьи корректны
+
 ## [2026-05-26T18:31:00+03:00] compile | daily/2026-05-26.md
 - Source: daily/2026-05-26.md
 - Articles created: [[concepts/detekt-toomany-functions-semantics]]

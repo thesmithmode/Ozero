@@ -37,6 +37,7 @@ Relay coordinator работает с 2026-05-17 (commit 194d7701). `unpaidBytes
 - **A:** provide через raw sockets работает без IoLoop на Android → fix ~50 строк
 - **B:** Go SDK на Android требует IoLoop для init → нужен "пустой TUN" или base layer refactor
 - **C:** `providePaused=true` застревает из-за missing NetworkCallback
+- **D:** `connectBestAvailable()` не вызывался после `device.start()` → device создавался, но не подключался к mesh → provide не получал peers
 
 ## Диагностика
 commit 48d0b350: `relayDiagnostics()` логирует `provideEnabled`, `providePaused`, `tunnelStarted`, `provideMode`, `connectEnabled`, `offline`, `unpaidBytes` под тегом `MeshSession`.
