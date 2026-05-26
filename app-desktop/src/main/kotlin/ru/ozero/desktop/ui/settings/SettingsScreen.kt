@@ -39,6 +39,7 @@ import ru.ozero.desktop.strings.Strings
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
+    currentAppMode: AppMode = AppMode.EXPERT,
     onOpenAllowedApps: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
     onOpenLogs: () -> Unit = {},
@@ -60,7 +61,7 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(vertical = 8.dp),
         ) {
-            item { AppModeSection(onSelect = onAppModeSelect) }
+            item { AppModeSection(currentMode = currentAppMode, onSelect = onAppModeSelect) }
             item { SectionDivider() }
             item {
                 SectionHeader(Strings.SETTINGS_SECTION_CONNECTION)
@@ -85,7 +86,7 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun AppModeSection(onSelect: (AppMode) -> Unit) {
+private fun AppModeSection(currentMode: AppMode, onSelect: (AppMode) -> Unit) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = Strings.SETTINGS_APP_MODE_TITLE,
@@ -93,12 +94,16 @@ private fun AppModeSection(onSelect: (AppMode) -> Unit) {
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
         )
-        RadioRow(label = Strings.SETTINGS_APP_MODE_SIMPLE, hint = Strings.SETTINGS_APP_MODE_SIMPLE_HINT) {
-            onSelect(AppMode.SIMPLE)
-        }
-        RadioRow(label = Strings.SETTINGS_APP_MODE_EXPERT, hint = Strings.SETTINGS_APP_MODE_EXPERT_HINT) {
-            onSelect(AppMode.EXPERT)
-        }
+        RadioRow(
+            label = Strings.SETTINGS_APP_MODE_SIMPLE,
+            hint = Strings.SETTINGS_APP_MODE_SIMPLE_HINT,
+            isSelected = currentMode == AppMode.SIMPLE,
+        ) { onSelect(AppMode.SIMPLE) }
+        RadioRow(
+            label = Strings.SETTINGS_APP_MODE_EXPERT,
+            hint = Strings.SETTINGS_APP_MODE_EXPERT_HINT,
+            isSelected = currentMode == AppMode.EXPERT,
+        ) { onSelect(AppMode.EXPERT) }
     }
 }
 
@@ -123,15 +128,15 @@ private fun SectionHeader(title: String) {
 }
 
 @Composable
-private fun RadioRow(label: String, hint: String, onClick: () -> Unit) {
+private fun RadioRow(label: String, hint: String, isSelected: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .selectable(selected = false, onClick = onClick, role = Role.RadioButton)
+            .selectable(selected = isSelected, onClick = onClick, role = Role.RadioButton)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        RadioButton(selected = false, onClick = null)
+        RadioButton(selected = isSelected, onClick = null)
         Column(modifier = Modifier.padding(start = 12.dp)) {
             Text(text = label, style = MaterialTheme.typography.bodyLarge)
             Text(

@@ -1,6 +1,7 @@
 package ru.ozero.desktop.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,13 +35,17 @@ fun RootNavigation(viewModel: MainViewModel) {
     }
 
     when (screen) {
-        TopScreen.Settings -> SettingsScreen(
-            onBack = { back() },
-            onOpenAllowedApps = { navigate(TopScreen.SplitTunnel) },
-            onOpenAbout = { navigate(TopScreen.About) },
-            onOpenLogs = { navigate(TopScreen.Logs) },
-            onAppModeSelect = viewModel::onAppModeSelect,
-        )
+        TopScreen.Settings -> {
+            val currentMode by viewModel.appMode.collectAsState()
+            SettingsScreen(
+                onBack = { back() },
+                currentAppMode = currentMode,
+                onOpenAllowedApps = { navigate(TopScreen.SplitTunnel) },
+                onOpenAbout = { navigate(TopScreen.About) },
+                onOpenLogs = { navigate(TopScreen.Logs) },
+                onAppModeSelect = viewModel::onAppModeSelect,
+            )
+        }
         TopScreen.About -> AboutScreen(onBack = { back() })
         TopScreen.Logs -> LogsScreen(onBack = { back() })
         TopScreen.SplitTunnel -> SplitTunnelScreen(onBack = { back() })

@@ -7,7 +7,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 import ru.ozero.desktop.model.AppMode
 import ru.ozero.desktop.model.EngineId
 import ru.ozero.desktop.model.SettingsModel
@@ -27,15 +26,11 @@ class MainViewModel(
     val state: StateFlow<TunnelState> = vpnManager.state
     val stats: StateFlow<TunnelStats?> = vpnManager.stats
     val switching: StateFlow<SwitchingTransition?> = vpnManager.switching
-
-    private val _stagnant = MutableStateFlow(false)
-    val stagnant: StateFlow<Boolean> = _stagnant.asStateFlow()
-
-    private val _killswitchActive = MutableStateFlow(false)
-    val killswitchActive: StateFlow<Boolean> = _killswitchActive.asStateFlow()
-
-    private val _isReconnecting = MutableStateFlow(false)
-    val isReconnecting: StateFlow<Boolean> = _isReconnecting.asStateFlow()
+    val stagnant: StateFlow<Boolean> = MutableStateFlow(false)
+    val killswitchActive: StateFlow<Boolean> = MutableStateFlow(false)
+    val isReconnecting: StateFlow<Boolean> = MutableStateFlow(false)
+    val speedHistory: StateFlow<List<SpeedSample>> = MutableStateFlow(emptyList())
+    val powerDiscState: StateFlow<PowerDiscState> = vpnManager.powerDiscState
 
     val appMode: StateFlow<AppMode> = settingsStore.settings
         .map { it.appMode }
@@ -49,33 +44,8 @@ class MainViewModel(
         .map { it.engineAutoPriority }
         .stateIn(scope, SharingStarted.Eagerly, SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY)
 
-    private val _speedHistory = MutableStateFlow<List<SpeedSample>>(emptyList())
-    val speedHistory: StateFlow<List<SpeedSample>> = _speedHistory.asStateFlow()
-
-    private val _ipInfo = MutableStateFlow<IpInfoState>(IpInfoState.Idle)
-    val ipInfo: StateFlow<IpInfoState> = _ipInfo.asStateFlow()
-
-    val powerDiscState: StateFlow<PowerDiscState> = vpnManager.powerDiscState
-
-    init {
-        scope.launch {
-            var lastRecordMs = 0L
-            vpnManager.stats.collect { s ->
-                if (s != null) {
-                    val now = System.currentTimeMillis()
-                    if (now - lastRecordMs >= 1_000L) {
-                        lastRecordMs = now
-                        val prev = _speedHistory.value
-                        _speedHistory.value = (prev + SpeedSample(now, s.bpsIn.toFloat(), s.bpsOut.toFloat()))
-                            .takeLast(3_600)
-                    }
-                }
-            }
-        }
-    }
-
     fun onConnectClick() {
-        scope.launch { vpnManager.toggle() }
+        vpnManager.toggle()
     }
 
     fun onManualEngineSelect(engine: EngineId?) {
@@ -85,13 +55,4 @@ class MainViewModel(
     fun onAppModeSelect(mode: AppMode) {
         settingsStore.update { copy(appMode = mode) }
     }
-
-    fun refreshIpInfo() {}
-}
-
-sealed class IpInfoState {
-    data object Idle : IpInfoState()
-    data object Loading : IpInfoState()
-    data class Loaded(val ip: String, val country: String?, val countryCode: String?, val city: String?) : IpInfoState()
-    data class Error(val message: String) : IpInfoState()
 }

@@ -12,7 +12,6 @@ dependencies {
     implementation(compose.materialIconsExtended)
     implementation(compose.foundation)
     implementation(libs.coroutines.core)
-    implementation("org.json:json:20240303")
 
     testImplementation(libs.bundles.junit5)
     testRuntimeOnly(libs.junit.jupiter.engine)
@@ -33,7 +32,6 @@ compose.desktop {
             windows {
                 menuGroup = "Ozero"
                 upgradeUuid = "d3b07384-d113-4ec6-a5ea-024c9c7b1f2a"
-                iconFile.set(project.file("src/main/resources/icon.ico"))
             }
         }
     }
