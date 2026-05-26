@@ -98,13 +98,14 @@ class OzeroVpnServicePeerWatchdogTest {
     }
 
     @Test
-    fun `enterKillswitchMode отменяет peerWatchJobRef в координаторе`() {
+    fun `enterKillswitchMode отменяет все watchJobRef в координаторе`() {
         val body = watchdogSource
             .substringAfter("private fun enterKillswitchMode")
             .substringBefore("companion object")
         assertTrue(
-            body.contains("peerWatchJobRef.getAndSet(null)"),
-            "enterKillswitchMode обязан отменять peerWatchJobRef — иначе watchdog продолжает " +
+            body.contains("peerWatchJobRef.getAndSet(null)") &&
+                body.contains("stagnationWatchJobRef.getAndSet(null)"),
+            "enterKillswitchMode обязан отменять все watchdog jobs — иначе watchdog продолжает " +
                 "работать после killswitch и может создать race condition. Body:\n$body",
         )
     }
