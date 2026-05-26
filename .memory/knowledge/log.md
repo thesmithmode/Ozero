@@ -1,5 +1,17 @@
 # Build Log
 
+## [2026-05-26T23:30:00+03:00] compile | daily/2026-05-26.md (pass 6 — tombstone gap)
+- Source: daily/2026-05-26.md
+- Articles created: [[concepts/singbox-crash-tombstone-diagnosis]]
+- Articles updated: [[knowledge/index.md]] (new entry added)
+- Notes: Pass 6 captured one concept missed in passes 1-5: tombstone pull path `adb pull /data/user/0/ru.ozero.app/files/debug/` from session 13:59 + crash root cause map from session 19:44 (dns outbound, splithttp, Connected race). All other 10 concepts confirmed compiled.
+
+## [2026-05-26T22:00:00+03:00] compile | daily/2026-05-26.md (pass 5 — duplicate guard)
+- Source: daily/2026-05-26.md
+- Articles created: (none)
+- Articles updated: (none)
+- Notes: Re-invoked compiler; all articles verified as fully compiled in passes 1-4. No gaps found.
+
 ## [2026-05-26T21:30:00+03:00] compile | daily/2026-05-26.md (pass 4 — recheck)
 - Source: daily/2026-05-26.md
 - Articles created: (none — all already compiled in passes 1-3)
