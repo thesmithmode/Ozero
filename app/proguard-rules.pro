@@ -1,28 +1,19 @@
--keep class ru.ozero.enginescore.** { *; }
--keep class ru.ozero.commonvpn.OzeroVpnService { *; }
--keep class ru.ozero.commonvpn.HevTunnelGateway { *; }
+# ── Obfuscation dictionaries ──────────────────────────────────────────────────
+-obfuscationdictionary obfuscation-dict.txt
+-classobfuscationdictionary obfuscation-dict.txt
+-packageobfuscationdictionary obfuscation-dict.txt
 
--keep class hev.** { *; }
--keep class ru.ozero.enginebyedpi.ByeDpiProxy { *; }
-
--keep class android.util.Log { *; }
--keep class ru.ozero.commoncrypto.** { *; }
--keep class ru.ozero.commondns.** { *; }
--keep class org.bouncycastle.** { *; }
--dontwarn org.bouncycastle.**
-
+# ── Native methods (JNI) ─────────────────────────────────────────────────────
 -keepclasseswithmembernames class * { native <methods>; }
 -keepclasseswithmembers class * { native <methods>; }
 
+# ── Hilt / Dagger DI ─────────────────────────────────────────────────────────
 -keep,allowobfuscation @interface dagger.hilt.android.AndroidEntryPoint
 -keep,allowobfuscation @interface dagger.hilt.android.HiltAndroidApp
 -keep,allowobfuscation @interface dagger.hilt.android.lifecycle.HiltViewModel
 -keep class dagger.hilt.** { *; }
 -keep class * extends dagger.hilt.android.internal.managers.ApplicationComponentManager { *; }
 -keep class hilt_aggregated_deps.** { *; }
--keep class ru.ozero.app.OzeroApp { *; }
--keep class ru.ozero.app.MainActivity { *; }
--keep class ru.ozero.app.Hilt_* { *; }
 -keep class ru.ozero.**.Hilt_* { *; }
 -keep class **_HiltModules** { *; }
 -keep class **_HiltModules_*Factory { *; }
@@ -40,7 +31,13 @@
 -keep @dagger.hilt.android.lifecycle.HiltViewModel class * extends androidx.lifecycle.ViewModel { <init>(...); }
 -keepnames @dagger.hilt.android.lifecycle.HiltViewModel class * extends androidx.lifecycle.ViewModel
 -keepclassmembers class * { @dagger.assisted.AssistedInject <init>(...); }
+-keep class **_MapFactory { *; }
+-keep class **_InjectedMapFactory { *; }
+-keep class **_MapKeys { *; }
+-keep class androidx.hilt.work.HiltWorkerFactory { *; }
+-keep class androidx.hilt.work.** { *; }
 
+# ── WorkManager / Startup ────────────────────────────────────────────────────
 -keep class * extends androidx.work.Worker { <init>(...); }
 -keep class * extends androidx.work.CoroutineWorker { <init>(...); }
 -keep class * extends androidx.work.ListenableWorker { <init>(...); }
@@ -48,39 +45,37 @@
 -keep class * implements androidx.work.Configuration$Provider { *; }
 -keep class * extends androidx.startup.Initializer { *; }
 
--keep class kotlinx.coroutines.** { *; }
--dontwarn kotlinx.coroutines.**
-
+# ── Annotations / attributes ─────────────────────────────────────────────────
 -keepattributes *Annotation*, InnerClasses, EnclosingMethod, Signature
+-keepattributes RuntimeVisibleAnnotations,RuntimeVisibleParameterAnnotations,AnnotationDefault
 -dontnote kotlinx.serialization.AnnotationsKt
+-renamesourcefileattribute SourceFile
+-keepattributes SourceFile,LineNumberTable
 
--keep class androidx.compose.runtime.** { *; }
+# ── AIDL (cross-process IPC) ─────────────────────────────────────────────────
+-keep class * extends android.os.IInterface { *; }
+-keep class **$Stub { *; }
+-keep class **$Stub$Proxy { *; }
 
--keep class ru.ozero.app.** { *; }
--keep class ru.ozero.app.logging.BootFileLogger { *; }
--keep class ru.ozero.app.logging.UnifiedLogger { *; }
--keep class ru.ozero.app.logging.BootDiagnostics { *; }
--keep class ru.ozero.commonvpn.** { *; }
+# ── Kryo (singbox-fmt bean serialization, blobs stored in Room DB) ───────────
+-keepclassmembers class ru.ozero.singboxfmt.** { <init>(); <fields>; }
 
--keep class ru.ozero.corestorage.** { *; }
+# ── gomobile bridge — libbox.so calls via JNI (GetMethodID) ──────────────────
+-keep class go.** { *; }
+-dontwarn go.**
+-keep class io.nekohasekai.** { *; }
+-dontwarn io.nekohasekai.**
+-keep class libcore.** { *; }
+-keep class libsingboxgojni.** { *; }
+-dontwarn libcore.**
+-dontwarn libsingboxgojni.**
 
--keep class ru.ozero.enginebyedpi.** { *; }
--keep class ru.ozero.enginewarp.** { *; }
--keep class ru.ozero.engineurnetwork.** { *; }
+# ── Third-party libs without own consumer-rules ──────────────────────────────
+-keep class android.util.Log { *; }
 
--keep class org.amnezia.awg.** { *; }
--dontwarn org.amnezia.awg.**
-
--keep class okhttp3.** { *; }
--keep interface okhttp3.** { *; }
--keep class okhttp3.internal.platform.** { *; }
--keep class okhttp3.internal.platform.android.** { *; }
--keep class okio.** { *; }
--dontwarn okhttp3.**
--dontwarn okio.**
--dontwarn org.conscrypt.**
+-keep class org.bouncycastle.** { *; }
+-dontwarn org.bouncycastle.**
 -dontwarn org.bouncycastle.jsse.**
--dontwarn org.openjsse.**
 
 -keep class com.bringyour.sdk.** { *; }
 -dontwarn com.bringyour.sdk.**
@@ -92,47 +87,10 @@
 -dontwarn com.hierynomus.**
 -keep class net.i2p.crypto.eddsa.** { *; }
 -dontwarn net.i2p.crypto.eddsa.**
+
 -dontwarn sun.security.**
 -dontwarn javax.naming.**
 -dontwarn com.jcraft.jzlib.**
 -dontwarn org.slf4j.**
-
--keep class **_MapFactory { *; }
--keep class **_InjectedMapFactory { *; }
--keep class **_MapKeys { *; }
--keep class androidx.hilt.work.HiltWorkerFactory { *; }
--keep class androidx.hilt.work.** { *; }
-
--keepattributes RuntimeVisibleAnnotations,RuntimeVisibleParameterAnnotations,AnnotationDefault
-
--renamesourcefileattribute SourceFile
--keepattributes SourceFile,LineNumberTable
-
-# sing-box AIDL stubs
--keep class ru.ozero.enginesingbox.** { *; }
--keep class ru.ozero.singboxprocess.** { *; }
--keep class * extends android.os.IInterface { *; }
--keep class **$Stub { *; }
--keep class **$Stub$Proxy { *; }
-
-# Kryo reads Bean fields via reflection
--keep class ru.ozero.singboxfmt.** { <fields>; <init>(); }
--keepclassmembers class ru.ozero.singboxfmt.** { <init>(); <fields>; }
-
-# sing-box JNI wrapper
--keep class ru.ozero.singboxcore.** { *; }
--dontwarn ru.ozero.singboxcore.**
-
-# gomobile bridge classes — referenced by libbox.so via JNI (GetMethodID)
--keep class go.** { *; }
--dontwarn go.**
-
-# libbox Java wrapper — JNI entry points from libbox.so
--keep class io.nekohasekai.** { *; }
--dontwarn io.nekohasekai.**
-
-# gomobile-generated JNI classes (both possible package names)
--keep class libcore.** { *; }
--keep class libsingboxgojni.** { *; }
--dontwarn libcore.**
--dontwarn libsingboxgojni.**
+-dontwarn org.conscrypt.**
+-dontwarn org.openjsse.**
