@@ -23,6 +23,7 @@ import ru.ozero.enginescore.PersistentLoggers
 
 internal object SingboxRuntime {
     private const val TAG = "SingboxRuntime"
+    private val UUID_REDACT_REGEX = Regex(""""uuid":"[^"]*"""")
 
     private val mutex = Mutex()
 
@@ -35,6 +36,7 @@ internal object SingboxRuntime {
     @Volatile
     private var setupDone = false
 
+    @Volatile
     private var basePath: String = ""
 
     fun setup(basePath: String) {
@@ -61,8 +63,12 @@ internal object SingboxRuntime {
                     lastStatus = null
                 }
 
-                val configPreview = singboxJsonConfig.take(200).replace(Regex(""""uuid":"[^"]*""""), """"uuid":"***"""")
-                PersistentLoggers.info(TAG, "start configLen=${singboxJsonConfig.length} fd=$tunFd configPreview=$configPreview")
+                val configPreview = singboxJsonConfig.take(200).replace(UUID_REDACT_REGEX, """"uuid":"***"""")
+                PersistentLoggers.info(
+                    TAG,
+                    "start configLen=${singboxJsonConfig.length} fd=$tunFd" +
+                        " configPreview=$configPreview",
+                )
 
                 val socketFile = java.io.File(basePath, "command.sock")
                 if (socketFile.exists()) {

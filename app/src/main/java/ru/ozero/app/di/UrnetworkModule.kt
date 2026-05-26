@@ -15,6 +15,11 @@ import dagger.multibindings.IntoSet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import android.net.ConnectivityManager
+import android.net.wifi.WifiManager
+import android.os.PowerManager
+import ru.ozero.app.relay.RelayLockManager
+import ru.ozero.app.relay.RelayNetworkMonitor
 import ru.ozero.app.relay.UrnetworkRelayCoordinator
 import ru.ozero.app.urnetwork.RealUrnetworkBalanceRepository
 import ru.ozero.app.urnetwork.UrnetworkBalanceRepository
@@ -113,16 +118,39 @@ object UrnetworkModule {
 
     @Provides
     @Singleton
+    fun provideRelayNetworkMonitor(
+        @ApplicationContext context: Context,
+        bridge: UrnetworkSdkBridge,
+    ): RelayNetworkMonitor = RelayNetworkMonitor(
+        connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager,
+        bridge = bridge,
+    )
+
+    @Provides
+    @Singleton
+    fun provideRelayLockManager(
+        @ApplicationContext context: Context,
+    ): RelayLockManager = RelayLockManager(
+        powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager,
+        wifiManager = context.getSystemService(Context.WIFI_SERVICE) as WifiManager,
+    )
+
+    @Provides
+    @Singleton
     fun provideUrnetworkRelayCoordinator(
         bridge: UrnetworkSdkBridge,
         configStore: UrnetworkConfigStore,
         tunnelController: TunnelController,
         jwtBootstrapper: UrnetworkJwtBootstrapper,
+        networkMonitor: RelayNetworkMonitor,
+        lockManager: RelayLockManager,
     ): UrnetworkRelayCoordinator = UrnetworkRelayCoordinator(
         bridge = bridge,
         configStore = configStore,
         tunnelController = tunnelController,
         jwtBootstrapper = jwtBootstrapper,
+        networkMonitor = networkMonitor,
+        relayLockManager = lockManager,
     )
 
     @Provides

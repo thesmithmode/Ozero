@@ -23,10 +23,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,6 +51,14 @@ fun SingboxAdvancedSettingsScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var showRestoreDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    val restoreError = state.restoreError
+    LaunchedEffect(restoreError) {
+        if (restoreError != null) {
+            snackbarHostState.showSnackbar(restoreError)
+        }
+    }
 
     if (showRestoreDialog) {
         AlertDialog(
@@ -81,6 +92,7 @@ fun SingboxAdvancedSettingsScreen(
                 },
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         Column(
             modifier = Modifier
@@ -140,37 +152,48 @@ fun SingboxAdvancedSettingsScreen(
             HorizontalDivider()
             Spacer(Modifier.height(16.dp))
 
-            Text(
-                text = stringResource(R.string.singbox_subscriptions_section),
-                style = MaterialTheme.typography.labelLarge,
+            SubscriptionsSection(
+                isRestoringDefaults = state.isRestoringDefaults,
+                onRestoreClick = { showRestoreDialog = true },
             )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = stringResource(R.string.singbox_restore_defaults_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(8.dp))
-            Button(
-                onClick = { showRestoreDialog = true },
-                enabled = !state.isRestoringDefaults,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("singbox_restore_defaults_button"),
-            ) {
-                if (state.isRestoringDefaults) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                    Spacer(Modifier.width(8.dp))
-                }
-                Text(stringResource(R.string.singbox_restore_defaults_button))
-            }
 
             Spacer(Modifier.height(24.dp))
         }
+    }
+}
+
+@Composable
+private fun SubscriptionsSection(
+    isRestoringDefaults: Boolean,
+    onRestoreClick: () -> Unit,
+) {
+    Text(
+        text = stringResource(R.string.singbox_subscriptions_section),
+        style = MaterialTheme.typography.labelLarge,
+    )
+    Spacer(Modifier.height(4.dp))
+    Text(
+        text = stringResource(R.string.singbox_restore_defaults_hint),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(Modifier.height(8.dp))
+    Button(
+        onClick = onRestoreClick,
+        enabled = !isRestoringDefaults,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("singbox_restore_defaults_button"),
+    ) {
+        if (isRestoringDefaults) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.onPrimary,
+            )
+            Spacer(Modifier.width(8.dp))
+        }
+        Text(stringResource(R.string.singbox_restore_defaults_button))
     }
 }
 
