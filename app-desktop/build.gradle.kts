@@ -29,8 +29,9 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Exe, TargetFormat.Deb, TargetFormat.Dmg)
             packageName = "Ozero"
-            packageVersion = project.findProperty("desktopVersion")?.toString()
+            val ver = project.findProperty("desktopVersion")?.toString()
                 ?.removePrefix("v") ?: "1.0.0"
+            packageVersion = ver
             description = "Ozero VPN"
             vendor = "Ozero"
 
@@ -50,6 +51,13 @@ compose.desktop {
 
             macOS {
                 bundleID = "ru.ozero.desktop"
+                // macOS DMG требует MAJOR > 0; при 0.x.y подменяем на 1.x.y
+                val parts = ver.split(".")
+                if (parts.isNotEmpty() && (parts[0].toIntOrNull() ?: 0) < 1) {
+                    val macVer = (listOf("1") + parts.drop(1)).joinToString(".")
+                    packageVersion = macVer
+                    packageBuildVersion = macVer
+                }
             }
         }
     }
