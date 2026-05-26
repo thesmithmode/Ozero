@@ -138,7 +138,7 @@ object ConfigBuilder {
         val tls = buildTls(bean)
         if (tls != null) sb.append(""""tls":$tls,""")
 
-        removeTrailingComma(sb)
+        if (sb.isNotEmpty() && sb[sb.length - 1] == ',') sb.deleteCharAt(sb.length - 1)
         sb.append('}')
         return sb.toString()
     }
@@ -158,12 +158,6 @@ object ConfigBuilder {
         }
         sb.append('}')
         return sb.toString()
-    }
-
-    private fun removeTrailingComma(sb: StringBuilder) {
-        if (sb.isNotEmpty() && sb[sb.length - 1] == ',') {
-            sb.deleteCharAt(sb.length - 1)
-        }
     }
 
     private fun buildTransport(bean: StandardV2RayBean): String? = when (bean.type) {

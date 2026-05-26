@@ -262,9 +262,12 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
     }
 
-    fun onAddGroupNameChanged(name: String) = _uiState.update { it.copy(addGroupName = name) }
-
-    fun onAddGroupUrlChanged(url: String) = _uiState.update { it.copy(addGroupUrl = url) }
+    fun onAddGroupFieldChanged(name: String? = null, url: String? = null) = _uiState.update {
+        it.copy(
+            addGroupName = name ?: it.addGroupName,
+            addGroupUrl = url ?: it.addGroupUrl,
+        )
+    }
 
     fun onAddGroupConfirm() {
         val name = _uiState.value.addGroupName.trim()

@@ -60,8 +60,8 @@ fun SingboxEngineSettingsScreen(
             name = state.addGroupName,
             url = state.addGroupUrl,
             error = state.addGroupError,
-            onNameChanged = viewModel::onAddGroupNameChanged,
-            onUrlChanged = viewModel::onAddGroupUrlChanged,
+            onNameChanged = { viewModel.onAddGroupFieldChanged(name = it) },
+            onUrlChanged = { viewModel.onAddGroupFieldChanged(url = it) },
             onConfirm = viewModel::onAddGroupConfirm,
             onDismiss = { viewModel.onAddGroupDialog(false) },
         )
