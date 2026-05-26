@@ -108,18 +108,17 @@ class ByeDpiEngine(
                 withTimeoutOrNull(STOP_GRACE_MS) { oldJob.join() }
                 if (oldJob.isActive) oldJob.cancel()
             }
-        }
-        // Orphan JNI may hold dispatcher even if proxyJobRef was null (cancelled stop lost the ref)
-        val drained = withTimeoutOrNull(DRAIN_TIMEOUT_MS) {
-            withContext(proxyDispatcher) {}
-        }
-        if (drained == null) {
-            PersistentLoggers.warn(
-                TAG,
-                "proxyDispatcher drain timeout ${DRAIN_TIMEOUT_MS}ms — emergencyReset + recreate",
-            )
-            runCatching { proxy.emergencyReset() }
-            proxyDispatcher = newProxyDispatcher()
+            val drained = withTimeoutOrNull(DRAIN_TIMEOUT_MS) {
+                withContext(proxyDispatcher) {}
+            }
+            if (drained == null) {
+                PersistentLoggers.warn(
+                    TAG,
+                    "proxyDispatcher drain timeout ${DRAIN_TIMEOUT_MS}ms — emergencyReset + recreate",
+                )
+                runCatching { proxy.emergencyReset() }
+                proxyDispatcher = newProxyDispatcher()
+            }
         }
 
         val args = buildArgs(resolvedConfig)
