@@ -131,7 +131,7 @@ class EngineWarp(
         val ageS = state.handshakeAgeSeconds
         if (ageS != null && ageS < handshakeStaleThresholdSec) {
             consecutiveRecoverFails = 0
-            PersistentLoggers.info(TAG, "recover: handshake age=${ageS}s — OK, без дей��твий")
+            PersistentLoggers.debug(TAG, "recover: handshake age=${ageS}s — OK, без дей��твий")
             return EnginePlugin.RecoverResult.Success
         }
         consecutiveRecoverFails++
@@ -329,7 +329,7 @@ class EngineWarp(
                         if (tick % STATS_LOG_EVERY == 0) {
                             val dRx = state.rxBytes - prevRx
                             val dTx = state.txBytes - prevTx
-                            PersistentLoggers.info(
+                            PersistentLoggers.trace(
                                 TAG,
                                 "warp stats tx=${state.txBytes}B rx=${state.rxBytes}B " +
                                     "Δtx=${dTx}B Δrx=${dRx}B hsAge=${ageS ?: "never"}s",
@@ -386,7 +386,7 @@ class EngineWarp(
             }
             buildResolved(effectiveConfig, slot.rawIniOverride, source = "slot")
         } else {
-            PersistentLoggers.info(TAG, "no active config — autoConfig.register")
+            PersistentLoggers.debug(TAG, "no active config — autoConfig.register")
             val regResult = autoConfig.register()
             val fresh = regResult.getOrElse { t ->
                 PersistentLoggers.error(TAG, "register failed: ${t.message}")

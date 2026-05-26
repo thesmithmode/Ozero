@@ -210,7 +210,7 @@ class EngineUrnetwork(
                 }
                 polls += 1
                 if (polls % PEER_PROGRESS_LOG_EVERY == 0) {
-                    PersistentLoggers.info(
+                    PersistentLoggers.debug(
                         TAG,
                         "awaitReady progress: peers=0 elapsed≈${polls * peerReadyPollMs}ms " +
                             "deadline=${peerReadyTimeoutMs}ms",
@@ -229,7 +229,7 @@ class EngineUrnetwork(
     }
 
     override suspend fun attachTun(tunFd: Int): TunAttachResult {
-        PersistentLoggers.info(TAG, "attachTun fd=$tunFd")
+        PersistentLoggers.debug(TAG, "attachTun fd=$tunFd")
         return when (val r = sdkBridge.attachTun(tunFd)) {
             UrnetworkSdkBridge.AttachResult.Success -> TunAttachResult.Success
             is UrnetworkSdkBridge.AttachResult.Failed -> TunAttachResult.Failure(r.reason)

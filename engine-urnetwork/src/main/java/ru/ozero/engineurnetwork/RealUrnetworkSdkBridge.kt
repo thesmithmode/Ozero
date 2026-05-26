@@ -105,7 +105,7 @@ class RealUrnetworkSdkBridge(
     ): UrnetworkSdkBridge.StartResult {
         val existingDevice = deviceRef.get()
         val device: DeviceLocal = if (existingDevice != null) {
-            PersistentLoggers.info(TAG, "node start: reusing existing node from prior session")
+            PersistentLoggers.debug(TAG, "node start: reusing existing node from prior session")
             existingDevice
         } else {
             val space = try {
@@ -143,13 +143,13 @@ class RealUrnetworkSdkBridge(
                 val keys = localState.provideSecretKeys
                 if (keys != null) {
                     d.loadProvideSecretKeys(keys)
-                    PersistentLoggers.info(TAG, "node start: session keys loaded — stable identity")
+                    PersistentLoggers.debug(TAG, "node start: session keys loaded — stable identity")
                 } else {
                     var sub: Sub? = null
                     sub = d.addProvideSecretKeysListener { generated ->
                         runCatching { localState.provideSecretKeys = generated }
                             .onSuccess {
-                                PersistentLoggers.info(TAG, "node start: session keys generated and persisted")
+                                PersistentLoggers.debug(TAG, "node start: session keys generated and persisted")
                             }
                             .onFailure {
                                 PersistentLoggers.warn(TAG, "node start: session keys persist threw: ${it.message}")
@@ -157,7 +157,7 @@ class RealUrnetworkSdkBridge(
                         runCatching { sub?.close() }
                     }
                     d.initProvideSecretKeys()
-                    PersistentLoggers.info(TAG, "node start: session keys absent — generating new identity")
+                    PersistentLoggers.debug(TAG, "node start: session keys absent — generating new identity")
                 }
             }.onFailure {
                 PersistentLoggers.warn(TAG, "node start: session keys init threw: ${it.message}")
@@ -166,7 +166,7 @@ class RealUrnetworkSdkBridge(
                 d.addJwtRefreshListener { newJwt ->
                     runCatching { localState.byClientJwt = newJwt }
                         .onSuccess {
-                            PersistentLoggers.info(TAG, "node start: credential refreshed — state updated")
+                            PersistentLoggers.debug(TAG, "node start: credential refreshed — state updated")
                         }
                         .onFailure {
                             PersistentLoggers.warn(
@@ -179,7 +179,7 @@ class RealUrnetworkSdkBridge(
                 PersistentLoggers.warn(TAG, "node start: credential refresh listener threw: ${it.message}")
             }
             applyDeviceFields(d, localState)
-            PersistentLoggers.info(TAG, "node start: instance created — fields applied")
+            PersistentLoggers.debug(TAG, "node start: instance created — fields applied")
             deviceRef.set(d)
             d
         }
@@ -194,7 +194,7 @@ class RealUrnetworkSdkBridge(
             return UrnetworkSdkBridge.StartResult.Failed("ConnectViewController unavailable")
         }
         connectVcRef.set(cv)
-        PersistentLoggers.info(TAG, "node start: routing controller opened — endpoints available")
+        PersistentLoggers.debug(TAG, "node start: routing controller opened — endpoints available")
 
         contractStatusListener.attach(device)
         running.set(true)
@@ -214,7 +214,7 @@ class RealUrnetworkSdkBridge(
             walletVc?.addUnpaidByteCountListener { ubc ->
                 unpaidBytesRef.set(ubc)
                 if (ubc > 0L && sharingTrafficLogged.compareAndSet(false, true)) {
-                    PersistentLoggers.info(
+                    PersistentLoggers.debug(
                         TAG,
                         "relay sharing: traffic forwarded — accumulated_bytes=$ubc " +
                             "(peer consumed bandwidth, accumulator active)",
@@ -223,14 +223,14 @@ class RealUrnetworkSdkBridge(
             }
             walletVc?.start()
             walletVc?.fetchTransferStats()
-            PersistentLoggers.info(TAG, "node start: account controller opened — metrics listener attached")
+            PersistentLoggers.debug(TAG, "node start: account controller opened — metrics listener attached")
             walletVc
         }.onFailure {
             PersistentLoggers.warn(TAG, "node start: account controller init threw: ${it.message}")
         }.getOrNull() ?: return
         val bound = payoutWalletSetup.configure(walletVcStarted, walletAddress)
         if (bound) {
-            PersistentLoggers.info(
+            PersistentLoggers.debug(
                 TAG,
                 "relay sharing: endpoint bound — accumulator armed, traffic-forwarding ready",
             )

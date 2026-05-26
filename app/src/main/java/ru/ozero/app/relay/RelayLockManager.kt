@@ -20,7 +20,7 @@ class RelayLockManager(
             wakeLock = powerManager
                 .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ozero::relay-provide")
                 .apply { acquire() }
-            PersistentLoggers.info(TAG, "WakeLock acquired")
+            PersistentLoggers.debug(TAG, "WakeLock acquired")
         }
         if (wifiLock == null) {
             val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -32,7 +32,7 @@ class RelayLockManager(
             wifiLock = wifiManager
                 .createWifiLock(mode, "ozero::relay-provide")
                 .apply { acquire() }
-            PersistentLoggers.info(TAG, "WifiLock acquired")
+            PersistentLoggers.debug(TAG, "WifiLock acquired")
         }
     }
 
@@ -40,12 +40,12 @@ class RelayLockManager(
         wakeLock?.let {
             if (it.isHeld) it.release()
             wakeLock = null
-            PersistentLoggers.info(TAG, "WakeLock released")
+            PersistentLoggers.debug(TAG, "WakeLock released")
         }
         wifiLock?.let {
             if (it.isHeld) it.release()
             wifiLock = null
-            PersistentLoggers.info(TAG, "WifiLock released")
+            PersistentLoggers.debug(TAG, "WifiLock released")
         }
     }
 

@@ -43,7 +43,7 @@ class RealWarpSdkBridge(
         val protector = savedProtector ?: return
         val v4 = runCatching { awgRuntime.getSocketV4(handle) }.getOrDefault(-1)
         val v6 = runCatching { awgRuntime.getSocketV6(handle) }.getOrDefault(-1)
-        PersistentLoggers.warn(TAG, "reprotectSockets network change: v4=$v4 v6=$v6 handle=$handle")
+        PersistentLoggers.debug(TAG, "reprotectSockets network change: v4=$v4 v6=$v6 handle=$handle")
         protectSockets(v4, v6, protector)
     }
 
@@ -96,7 +96,7 @@ class RealWarpSdkBridge(
         val threadName = Thread.currentThread().name
         val runtimeVersion = runCatching { awgRuntime.version() }
             .getOrElse { "version-threw:${it.javaClass.simpleName}" }
-        PersistentLoggers.warn(
+        PersistentLoggers.debug(
             TAG,
             "awgTurnOn JNI entry name=$tunnelName fd=$tunFd iniLen=${iniConfig.length} thread=$threadName version=$runtimeVersion",
         )
@@ -109,7 +109,7 @@ class RealWarpSdkBridge(
         }
         val handle = combined.handle
         val dt = System.currentTimeMillis() - started
-        PersistentLoggers.warn(
+        PersistentLoggers.debug(
             TAG,
             "awgTurnOn JNI exit handle=$handle v4=${combined.socketV4Fd} v6=${combined.socketV6Fd} dt=${dt}ms thread=$threadName",
         )
@@ -196,11 +196,11 @@ class RealWarpSdkBridge(
             if (h == INVALID_HANDLE) return@withContext
             val started = System.currentTimeMillis()
             val thread = Thread.currentThread().name
-            PersistentLoggers.warn(TAG, "awgTurnOff JNI entry handle=$h thread=$thread")
+            PersistentLoggers.debug(TAG, "awgTurnOff JNI entry handle=$h thread=$thread")
             try {
                 awgRuntime.turnOff(h)
                 val dt = System.currentTimeMillis() - started
-                PersistentLoggers.warn(TAG, "awgTurnOff JNI exit handle=$h dt=${dt}ms thread=$thread")
+                PersistentLoggers.debug(TAG, "awgTurnOff JNI exit handle=$h dt=${dt}ms thread=$thread")
                 // Go goroutines from the killed tunnel don't stop synchronously.
                 // Without a pause, a rapid awgTurnOn reuses handle=0 before the old
                 // goroutines finish, causing handshake interference on the next session.

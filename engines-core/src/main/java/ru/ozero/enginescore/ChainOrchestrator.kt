@@ -29,7 +29,7 @@ class ChainOrchestrator(
                 )
             }
             val r = try {
-                PersistentLoggers.info(TAG, "step[$idx] ${step.engineId} start upstream=$upstream")
+                PersistentLoggers.debug(TAG, "step[$idx] ${step.engineId} start upstream=$upstream")
                 plugin.start(step.config, upstream)
             } catch (ce: CancellationException) {
                 PersistentLoggers.warn(TAG, "step $idx ${step.engineId} cancelled, rollback")

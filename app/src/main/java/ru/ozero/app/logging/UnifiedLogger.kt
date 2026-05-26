@@ -41,7 +41,8 @@ object UnifiedLogger : PersistentLogger {
 
     fun file(): File? = LogFileStore.current()
 
-    fun debug(tag: String, msg: String) = log("DEBUG", tag, msg)
+    override fun trace(tag: String, msg: String) = log("TRACE", tag, msg)
+    override fun debug(tag: String, msg: String) = log("DEBUG", tag, msg)
     override fun info(tag: String, msg: String) = log("INFO", tag, msg)
     override fun warn(tag: String, msg: String, t: Throwable?) = log("WARN", tag, msg, t)
     override fun error(tag: String, msg: String, t: Throwable?) = log("ERROR", tag, msg, t)

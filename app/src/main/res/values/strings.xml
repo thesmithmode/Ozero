@@ -472,6 +472,7 @@
     <string name="warp_tweaks_awg_section">Параметры AmneziaWG</string>
     <string name="logs_copy_empty_toast">Пусто — нечего копировать</string>
     <string name="logs_copy_done_toast_fmt">Скопировано (%1$d симв.)</string>
+    <string name="logs_export_level_title">Минимальный уровень</string>
 
     <!-- ByeDPI engine settings -->
     <string name="byedpi_args_description">Аргументы запуска libbyedpi. Используются для обхода ТСПУ DPI. Подробности: github.com/hufrea/byedpi</string>

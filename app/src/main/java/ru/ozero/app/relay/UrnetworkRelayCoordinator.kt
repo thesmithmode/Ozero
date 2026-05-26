@@ -69,7 +69,7 @@ class UrnetworkRelayCoordinator(
         if (tunnelState !is TunnelState.Connected) {
             bootstrapAttemptedThisSession.set(false)
             if (relayOwned.compareAndSet(true, false)) {
-                PersistentLoggers.info(TAG, "mesh session: tunnel offline — releasing worker")
+                PersistentLoggers.debug(TAG, "mesh session: tunnel offline — releasing worker")
                 stopWatchdog()
                 runCatching { networkMonitor?.stop() }
                 runCatching { relayLockManager?.release() }
@@ -83,7 +83,7 @@ class UrnetworkRelayCoordinator(
         }
         if (byClientJwt == null) {
             if (bootstrapAttemptedThisSession.compareAndSet(false, true)) {
-                PersistentLoggers.info(
+                PersistentLoggers.debug(
                     TAG,
                     "mesh session: credential missing while ${tunnelState.engineId} active — acquiring",
                 )
@@ -91,7 +91,7 @@ class UrnetworkRelayCoordinator(
                 if (r is UrnetworkJwtBootstrapper.Result.Failed) {
                     PersistentLoggers.warn(TAG, "mesh session: credential acquisition failed: ${r.reason}")
                 } else {
-                    PersistentLoggers.info(TAG, "mesh session: credential acquired (${r.javaClass.simpleName})")
+                    PersistentLoggers.debug(TAG, "mesh session: credential acquired (${r.javaClass.simpleName})")
                 }
             }
             return
@@ -119,7 +119,7 @@ class UrnetworkRelayCoordinator(
                     .onFailure { PersistentLoggers.warn(TAG, "mesh session: lockManager threw: ${it.message}") }
             }
             val diag = runCatching { bridge.relayDiagnostics() }.getOrDefault("unavailable")
-            PersistentLoggers.info(
+            PersistentLoggers.debug(
                 TAG,
                 "mesh session: worker started alongside ${tunnelState.engineId} " +
                     "(provideEnabled=$provideEnabled controlMode=${controlMode.rawValue} " +

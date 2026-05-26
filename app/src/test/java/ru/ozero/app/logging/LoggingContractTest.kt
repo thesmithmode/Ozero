@@ -79,9 +79,11 @@ class LoggingContractTest {
         val source = candidates.firstNotNullOfOrNull { File(repoRoot, it).takeIf(File::isFile) }
             ?.readText()
             ?: error("PersistentLoggers facade не найден в engines-core")
+        assertTrue(source.contains("fun trace"), "PersistentLoggers должен иметь fun trace")
+        assertTrue(source.contains("fun debug"), "PersistentLoggers должен иметь fun debug")
+        assertTrue(source.contains("fun info"), "PersistentLoggers должен иметь fun info")
         assertTrue(source.contains("fun warn"), "PersistentLoggers должен иметь fun warn")
         assertTrue(source.contains("fun error"), "PersistentLoggers должен иметь fun error")
-        assertTrue(source.contains("fun info"), "PersistentLoggers должен иметь fun info")
     }
 
     private fun locateRepoRoot(): File {

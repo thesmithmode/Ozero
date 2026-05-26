@@ -24,7 +24,7 @@ class RelayNetworkMonitor(
             override fun onAvailable(network: Network) {
                 connectedNetwork = network
                 bridge.setProvidePaused(false)
-                PersistentLoggers.info(TAG, "network available — providePaused=false")
+                PersistentLoggers.debug(TAG, "network available — providePaused=false")
             }
 
             override fun onCapabilitiesChanged(
@@ -45,14 +45,14 @@ class RelayNetworkMonitor(
 
             override fun onUnavailable() {
                 bridge.setProvidePaused(true)
-                PersistentLoggers.info(TAG, "network unavailable — providePaused=true")
+                PersistentLoggers.debug(TAG, "network unavailable — providePaused=true")
             }
 
             override fun onLost(network: Network) {
                 if (network == connectedNetwork) {
                     connectedNetwork = null
                     bridge.setProvidePaused(true)
-                    PersistentLoggers.info(TAG, "network lost — providePaused=true")
+                    PersistentLoggers.debug(TAG, "network lost — providePaused=true")
                 }
             }
         }

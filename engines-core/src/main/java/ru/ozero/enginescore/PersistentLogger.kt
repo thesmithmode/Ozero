@@ -3,6 +3,8 @@ package ru.ozero.enginescore
 import android.util.Log
 
 interface PersistentLogger {
+    fun trace(tag: String, msg: String)
+    fun debug(tag: String, msg: String)
     fun info(tag: String, msg: String)
     fun warn(tag: String, msg: String, t: Throwable? = null)
     fun error(tag: String, msg: String, t: Throwable? = null)
@@ -11,6 +13,24 @@ interface PersistentLogger {
 object PersistentLoggers {
     @Volatile
     var instance: PersistentLogger? = null
+
+    fun trace(tag: String, msg: String) {
+        val i = instance
+        if (i != null) {
+            i.trace(tag, msg)
+        } else {
+            runCatching { Log.v(tag, "[fallback] $msg") }
+        }
+    }
+
+    fun debug(tag: String, msg: String) {
+        val i = instance
+        if (i != null) {
+            i.debug(tag, msg)
+        } else {
+            runCatching { Log.d(tag, "[fallback] $msg") }
+        }
+    }
 
     fun info(tag: String, msg: String) {
         val i = instance

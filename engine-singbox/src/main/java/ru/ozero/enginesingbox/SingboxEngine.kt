@@ -151,7 +151,7 @@ class SingboxEngine @Inject constructor(
             } finally {
                 runCatching { pfd.close() }
             }
-            PersistentLoggers.info(TAG, "startWithConfig sent over AIDL")
+            PersistentLoggers.debug(TAG, "startWithConfig sent over AIDL")
             TunAttachResult.Success
         }.getOrElse {
             PersistentLoggers.error(TAG, "startWithConfig AIDL call failed: ${it.message}", it)
@@ -256,7 +256,7 @@ class SingboxEngine @Inject constructor(
                     deathRecipient = recipient
                     runCatching { binder.linkToDeath(recipient, 0) }
                     latch.countDown()
-                    PersistentLoggers.info(TAG, "SingboxEngineService connected")
+                    PersistentLoggers.debug(TAG, "SingboxEngineService connected")
                 }
 
                 override fun onServiceDisconnected(name: ComponentName) {

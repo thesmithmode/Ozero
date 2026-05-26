@@ -11,7 +11,7 @@ class SocksDohResolver(socksPort: Int, endpoint: String = DohResolver.CLOUDFLARE
 
     init {
         require(socksPort in 1..65535) { "socksPort вне диапазона: $socksPort" }
-        PersistentLoggers.info(TAG, "init via 127.0.0.1:$socksPort → $endpoint")
+        PersistentLoggers.debug(TAG, "init via 127.0.0.1:$socksPort → $endpoint")
         val client = OkHttpClient.Builder()
             .connectTimeout(timeoutMs, TimeUnit.MILLISECONDS)
             .callTimeout(timeoutMs, TimeUnit.MILLISECONDS)

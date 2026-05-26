@@ -84,7 +84,7 @@ class SingboxEngineService : Service() {
         java.io.File(dataDir).mkdirs()
         java.io.File("$dataDir/tmp").mkdirs()
         SingboxRuntime.setup(dataDir)
-        PersistentLoggers.info(
+        PersistentLoggers.debug(
             TAG,
             "SingboxEngineService created pid=${android.os.Process.myPid()} " +
                 "libraryLoaded=${Libsingboxgojni.libraryLoaded} loadError=${Libsingboxgojni.loadError}",

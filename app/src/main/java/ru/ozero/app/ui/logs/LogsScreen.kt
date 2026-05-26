@@ -32,6 +32,8 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -43,6 +45,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -56,7 +61,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
 import ru.ozero.app.logging.LogEntry
 import ru.ozero.app.logging.LogLevel
-import ru.ozero.app.logging.UnifiedLogger
 import ru.ozero.app.ui.theme.OzeroPalette
 import java.io.File
 import java.util.Calendar
@@ -72,11 +76,17 @@ fun LogsScreen(
         state = state,
         onBack = onBack,
         onClear = viewModel::clear,
-        onCopy = viewModel::copyAll,
+        onCopyAll = viewModel::copyAll,
+        onCopyFiltered = viewModel::copyFiltered,
+        onCreateFilteredFile = viewModel::createFilteredFile,
         onTagFilter = viewModel::onTagFilter,
         onLevelFilter = viewModel::onLevelFilter,
     )
 }
+
+private enum class ExportAction { COPY, SHARE }
+
+private val EXPORT_LEVELS = LogLevel.entries.toList()
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -84,11 +94,15 @@ internal fun LogsScreenContent(
     state: LogsUiState,
     onBack: () -> Unit,
     onClear: () -> Unit,
-    onCopy: () -> String,
+    onCopyAll: () -> String,
+    onCopyFiltered: (LogLevel) -> String,
+    onCreateFilteredFile: (LogLevel) -> File?,
     onTagFilter: (String) -> Unit,
     onLevelFilter: (String) -> Unit,
 ) {
     val ctx = LocalContext.current
+    var exportMenuAction by remember { mutableStateOf<ExportAction?>(null) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -102,11 +116,32 @@ internal fun LogsScreenContent(
                     }
                 },
                 actions = {
-                    TextButton(onClick = { copyToClipboard(ctx, "ozero.log", onCopy()) }) {
-                        Text(stringResource(R.string.logs_copy))
+                    Box {
+                        TextButton(onClick = { exportMenuAction = ExportAction.COPY }) {
+                            Text(stringResource(R.string.logs_copy))
+                        }
+                        LogLevelDropdown(
+                            expanded = exportMenuAction == ExportAction.COPY,
+                            onDismiss = { exportMenuAction = null },
+                            onPick = { level ->
+                                exportMenuAction = null
+                                val text = if (level == LogLevel.TRACE) onCopyAll() else onCopyFiltered(level)
+                                copyToClipboard(ctx, "ozero.log", text)
+                            },
+                        )
                     }
-                    IconButton(onClick = { shareLogFile(ctx) }) {
-                        Icon(Icons.Default.Share, contentDescription = stringResource(R.string.logs_share_cd))
+                    Box {
+                        IconButton(onClick = { exportMenuAction = ExportAction.SHARE }) {
+                            Icon(Icons.Default.Share, contentDescription = stringResource(R.string.logs_share_cd))
+                        }
+                        LogLevelDropdown(
+                            expanded = exportMenuAction == ExportAction.SHARE,
+                            onDismiss = { exportMenuAction = null },
+                            onPick = { level ->
+                                exportMenuAction = null
+                                shareFilteredLogFile(ctx, level, onCreateFilteredFile)
+                            },
+                        )
                     }
                     IconButton(onClick = onClear) {
                         Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.logs_clear_cd))
@@ -120,13 +155,61 @@ internal fun LogsScreenContent(
             padding = padding,
             onTagFilter = onTagFilter,
             onLevelFilter = onLevelFilter,
-            onExport = { shareLogFile(ctx) },
+            onExport = { exportMenuAction = ExportAction.SHARE },
             onClear = onClear,
         )
     }
 }
 
-private val LEVEL_FILTERS = listOf(FILTER_ALL, "DEBUG", "INFO", "WARN", "ERROR")
+@Composable
+private fun LogLevelDropdown(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    onPick: (LogLevel) -> Unit,
+) {
+    DropdownMenu(expanded = expanded, onDismiss = onDismiss) {
+        EXPORT_LEVELS.forEach { level ->
+            DropdownMenuItem(
+                text = {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = level.name,
+                            color = levelColor(level),
+                            fontFamily = FontFamily.Monospace,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(
+                            text = levelHint(level),
+                            color = OzeroPalette.Text3,
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+                },
+                onClick = { onPick(level) },
+            )
+        }
+    }
+}
+
+private fun levelHint(level: LogLevel): String = when (level) {
+    LogLevel.TRACE -> "+ debug, info, warn, error"
+    LogLevel.DEBUG -> "+ info, warn, error"
+    LogLevel.INFO -> "+ warn, error"
+    LogLevel.WARN -> "+ error"
+    LogLevel.ERROR -> ""
+}
+
+private fun levelColor(level: LogLevel): Color = when (level) {
+    LogLevel.ERROR -> OzeroPalette.StateDanger
+    LogLevel.WARN -> OzeroPalette.Amber
+    LogLevel.DEBUG, LogLevel.TRACE -> OzeroPalette.Text3
+    LogLevel.INFO -> OzeroPalette.Aqua
+}
+
+private val LEVEL_FILTERS = listOf(FILTER_ALL, "TRACE", "DEBUG", "INFO", "WARN", "ERROR")
 
 @Composable
 private fun LogsBody(
@@ -255,12 +338,7 @@ private fun LogFilterChip(label: String, selected: Boolean, onClick: () -> Unit)
 @Composable
 private fun LogEntryRow(entry: LogEntry) {
     val timeStr = formatLogTime(entry.timestampMs)
-    val levelColor = when (entry.level) {
-        LogLevel.ERROR -> OzeroPalette.StateDanger
-        LogLevel.WARN -> OzeroPalette.Amber
-        LogLevel.DEBUG, LogLevel.TRACE -> OzeroPalette.Text3
-        LogLevel.INFO -> OzeroPalette.Aqua
-    }
+    val lvlColor = levelColor(entry.level)
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -287,7 +365,7 @@ private fun LogEntryRow(entry: LogEntry) {
             text = entry.level.name.take(5),
             fontFamily = FontFamily.Monospace,
             style = MaterialTheme.typography.labelSmall,
-            color = levelColor,
+            color = lvlColor,
             modifier = Modifier.width(40.dp),
             maxLines = 1,
         )
@@ -349,8 +427,12 @@ private fun LogFooter(
     }
 }
 
-private fun shareLogFile(ctx: Context) {
-    val file: File = UnifiedLogger.file() ?: return
+private fun shareFilteredLogFile(
+    ctx: Context,
+    level: LogLevel,
+    createFilteredFile: (LogLevel) -> File?,
+) {
+    val file: File = createFilteredFile(level) ?: return
     if (!file.exists()) return
     val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
     val intent = Intent(Intent.ACTION_SEND).apply {

@@ -187,7 +187,7 @@ class OzeroVpnService : android.net.VpnService() {
             .distinctUntilChanged()
             .onEach { enabled ->
                 killswitchCached = enabled
-                PersistentLoggers.info(TAG, "killswitch live update: $enabled")
+                PersistentLoggers.debug(TAG, "killswitch live update: $enabled")
             }
             .launchIn(serviceScope)
     }
@@ -248,21 +248,21 @@ class OzeroVpnService : android.net.VpnService() {
 
         val tName = Thread.currentThread().name
         val isMain = android.os.Looper.myLooper() === android.os.Looper.getMainLooper()
-        PersistentLoggers.info(TAG, "loadOnce begin thread=$tName main=$isMain")
+        PersistentLoggers.debug(TAG, "loadOnce begin thread=$tName main=$isMain")
         // SENTINEL [OzeroVpnServiceLifecycleTest]: loadOnce() для libhev-socks5-tunnel — main thread,
         // до coroutine-старта ниже. Background-load даёт UnsatisfiedLinkError на старте hev.
         runCatching { hev.TProxyService.loadOnce() }
             .onFailure { PersistentLoggers.warn(TAG, "TProxyService.loadOnce threw: ${it.message}") }
-        PersistentLoggers.info(TAG, "loadOnce done libraryLoaded=${hev.TProxyService.libraryLoaded}")
+        PersistentLoggers.debug(TAG, "loadOnce done libraryLoaded=${hev.TProxyService.libraryLoaded}")
 
         val job = serviceScope.launch {
             try {
                 shutdownJobRef.getAndSet(null)?.let { prev ->
-                    PersistentLoggers.info(TAG, "startVpn: ожидание завершения предыдущего shutdown")
+                    PersistentLoggers.debug(TAG, "startVpn: ожидание завершения предыдущего shutdown")
                     runCatching {
                         withTimeoutOrNull(SHUTDOWN_JOIN_TIMEOUT_MS) { prev.join() }
                     }
-                    PersistentLoggers.info(TAG, "startVpn: предыдущий shutdown завершён → продолжаем старт")
+                    PersistentLoggers.debug(TAG, "startVpn: предыдущий shutdown завершён → продолжаем старт")
                 }
                 if (stopping.get()) {
                     PersistentLoggers.warn(TAG, "startVpn: stopping всё ещё активен после join — отказ старта")

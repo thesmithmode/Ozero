@@ -17,7 +17,7 @@ class DnsResolverChain(private val resolvers: List<DnsResolver>) : DnsResolver {
         for ((index, resolver) in resolvers.withIndex()) {
             when (val r = resolver.resolve(hostname)) {
                 is DohResult.Ok -> {
-                    if (index > 0) PersistentLoggers.info(TAG, "fallback #$index OK для $hostname")
+                    if (index > 0) PersistentLoggers.debug(TAG, "fallback #$index OK для $hostname")
                     return r
                 }
                 is DohResult.Failure -> {

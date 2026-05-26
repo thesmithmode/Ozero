@@ -39,7 +39,7 @@ class DohResolver(
         }
 
     private suspend fun execute(query: ByteArray, parseV6: Boolean): DohResult = withContext(Dispatchers.IO) {
-        PersistentLoggers.info(TAG, "resolve via $endpoint v6=$parseV6")
+        PersistentLoggers.debug(TAG, "resolve via $endpoint v6=$parseV6")
         val request =
             Request.Builder()
                 .url(endpoint)

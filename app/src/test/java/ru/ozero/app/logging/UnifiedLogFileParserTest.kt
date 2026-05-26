@@ -99,4 +99,70 @@ class UnifiedLogFileParserTest {
     fun `parseAll — пустой текст`() {
         assertTrue(UnifiedLogFileParser.parseAll("").isEmpty())
     }
+
+    @Test
+    fun `filterByLevel — WARN фильтрует только warn и error`() {
+        val text = """
+            2026-05-25 10:00:00.000 TRACE [T] A: trace msg
+            2026-05-25 10:00:01.000 DEBUG [T] B: debug msg
+            2026-05-25 10:00:02.000 INFO [T] C: info msg
+            2026-05-25 10:00:03.000 WARN [T] D: warn msg
+            2026-05-25 10:00:04.000 ERROR [T] E: error msg
+        """.trimIndent()
+        val filtered = UnifiedLogFileParser.filterByLevel(text, LogLevel.WARN)
+        assertTrue(filtered.contains("warn msg"))
+        assertTrue(filtered.contains("error msg"))
+        assertTrue(!filtered.contains("trace msg"))
+        assertTrue(!filtered.contains("debug msg"))
+        assertTrue(!filtered.contains("info msg"))
+    }
+
+    @Test
+    fun `filterByLevel — TRACE возвращает всё`() {
+        val text = """
+            2026-05-25 10:00:00.000 TRACE [T] A: t
+            2026-05-25 10:00:01.000 INFO [T] B: i
+            2026-05-25 10:00:02.000 ERROR [T] C: e
+        """.trimIndent()
+        val filtered = UnifiedLogFileParser.filterByLevel(text, LogLevel.TRACE)
+        assertTrue(filtered.contains("A: t"))
+        assertTrue(filtered.contains("B: i"))
+        assertTrue(filtered.contains("C: e"))
+    }
+
+    @Test
+    fun `filterByLevel — ERROR возвращает только error`() {
+        val text = """
+            2026-05-25 10:00:00.000 WARN [T] A: w
+            2026-05-25 10:00:01.000 ERROR [T] B: e
+        """.trimIndent()
+        val filtered = UnifiedLogFileParser.filterByLevel(text, LogLevel.ERROR)
+        assertTrue(!filtered.contains("A: w"))
+        assertTrue(filtered.contains("B: e"))
+    }
+
+    @Test
+    fun `filterByLevel — многострочная запись включается вместе с заголовком`() {
+        val text = """
+            2026-05-25 10:00:00.000 INFO [T] A: start
+            2026-05-25 10:00:01.000 ERROR [T] B: crash
+            java.lang.RuntimeException: boom
+                at com.example.Foo.bar(Foo.kt:42)
+            2026-05-25 10:00:02.000 DEBUG [T] C: after
+        """.trimIndent()
+        val filtered = UnifiedLogFileParser.filterByLevel(text, LogLevel.ERROR)
+        assertTrue(filtered.contains("crash"))
+        assertTrue(filtered.contains("RuntimeException"))
+        assertTrue(filtered.contains("at com.example"))
+        assertTrue(!filtered.contains("start"))
+        assertTrue(!filtered.contains("after"))
+    }
+
+    @Test
+    fun `LogLevel severity order is correct`() {
+        assertTrue(LogLevel.TRACE.severity < LogLevel.DEBUG.severity)
+        assertTrue(LogLevel.DEBUG.severity < LogLevel.INFO.severity)
+        assertTrue(LogLevel.INFO.severity < LogLevel.WARN.severity)
+        assertTrue(LogLevel.WARN.severity < LogLevel.ERROR.severity)
+    }
 }

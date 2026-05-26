@@ -118,7 +118,7 @@ class FptnEngine(
                 return StartResult.Failure("No FPTN server available")
             }
 
-        PersistentLoggers.info(
+        PersistentLoggers.debug(
             TAG,
             "start: server=${server.name} port=${server.port} bypass=${fptn.bypassMethod} " +
                 "sniDomain=${fptn.sniDomain} tokenServers=${tokenData.servers.size} " +
@@ -304,7 +304,7 @@ class FptnEngine(
             censorshipStrategy = bypassMethod,
         )
         return try {
-            PersistentLoggers.info(
+            PersistentLoggers.debug(
                 TAG,
                 "authenticate: POST /api/v1/login server=${server.name}:${server.port} " +
                     "sni=$sniDomain bypass=$bypassMethod timeout=${AUTH_TIMEOUT_S}s",
@@ -317,7 +317,7 @@ class FptnEngine(
             if (resp.code == 200) {
                 val token = JSONObject(resp.body).optString("access_token").takeIf { it.isNotBlank() }
                 if (token != null) {
-                    PersistentLoggers.info(TAG, "authenticate: success server=${server.name}")
+                    PersistentLoggers.debug(TAG, "authenticate: success server=${server.name}")
                 } else {
                     PersistentLoggers.error(TAG, "authenticate: 200 but no access_token in response")
                 }

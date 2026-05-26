@@ -16,9 +16,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.ozero.app.logging.LogBuffer
 import ru.ozero.app.logging.LogEntry
+import ru.ozero.app.logging.LogLevel
 import ru.ozero.app.logging.LogcatReader
 import ru.ozero.app.logging.UnifiedLogFileParser
 import ru.ozero.app.logging.UnifiedLogger
+import java.io.File
 import javax.inject.Inject
 import kotlin.coroutines.CoroutineContext
 
@@ -37,8 +39,14 @@ data class LogsUiState(
     }
 
     val filteredEntries: List<LogEntry> = entries.filter { entry ->
-        (tagFilter == FILTER_ALL || entry.tag == tagFilter) &&
-            (levelFilter == FILTER_ALL || entry.level.name == levelFilter)
+        val tagOk = tagFilter == FILTER_ALL || entry.tag == tagFilter
+        val levelOk = if (levelFilter == FILTER_ALL) {
+            true
+        } else {
+            val minLevel = LogLevel.entries.firstOrNull { it.name == levelFilter }
+            minLevel == null || entry.level.severity >= minLevel.severity
+        }
+        tagOk && levelOk
     }
 }
 
@@ -84,6 +92,22 @@ class LogsViewModel @Inject constructor(
     }
 
     fun copyAll(): String = UnifiedLogger.read()
+
+    fun copyFiltered(minLevel: LogLevel): String {
+        val text = UnifiedLogger.read()
+        return UnifiedLogFileParser.filterByLevel(text, minLevel)
+    }
+
+    fun createFilteredFile(minLevel: LogLevel): File? {
+        val text = UnifiedLogger.read()
+        val filtered = UnifiedLogFileParser.filterByLevel(text, minLevel)
+        if (filtered.isBlank()) return null
+        val src = UnifiedLogger.file() ?: return null
+        val dir = src.parentFile ?: return null
+        val out = File(dir, "ozero_${minLevel.name.lowercase()}.log")
+        out.writeText(filtered)
+        return out
+    }
 
     fun clear() {
         viewModelScope.launch(ioContext) {

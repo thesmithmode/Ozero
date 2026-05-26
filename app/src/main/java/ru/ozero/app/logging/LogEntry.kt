@@ -1,11 +1,11 @@
 package ru.ozero.app.logging
 
-enum class LogLevel(val short: Char) {
-    TRACE('V'),
-    DEBUG('D'),
-    INFO('I'),
-    WARN('W'),
-    ERROR('E');
+enum class LogLevel(val short: Char, val severity: Int) {
+    TRACE('V', 0),
+    DEBUG('D', 1),
+    INFO('I', 2),
+    WARN('W', 3),
+    ERROR('E', 4);
 
     companion object {
         fun fromShort(c: Char): LogLevel = when (c) {

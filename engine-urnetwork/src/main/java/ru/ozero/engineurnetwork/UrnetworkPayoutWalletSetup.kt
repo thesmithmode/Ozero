@@ -18,7 +18,7 @@ internal class UrnetworkPayoutWalletSetup {
         }
         return runCatching {
             val initialCount = currentWalletCount(walletVc)
-            PersistentLoggers.info(
+            PersistentLoggers.debug(
                 TAG,
                 "endpoint sync: starting registration check (existing entries=$initialCount)",
             )
@@ -26,14 +26,14 @@ internal class UrnetworkPayoutWalletSetup {
                 walletVc.fetchAccountWallets()
             }
             val afterFetchCount = currentWalletCount(walletVc)
-            PersistentLoggers.info(
+            PersistentLoggers.debug(
                 TAG,
                 "endpoint sync: fetch ${if (existing != null) "ok" else "timeout"} " +
                     "entries=$afterFetchCount",
             )
             var walletId: Id? = findWalletIdByAddress(walletVc, walletAddress)
             if (walletId == null && existing != null) {
-                PersistentLoggers.info(
+                PersistentLoggers.debug(
                     TAG,
                     "endpoint sync: target not in registry — submitting external registration",
                 )
@@ -41,7 +41,7 @@ internal class UrnetworkPayoutWalletSetup {
                     walletVc.addExternalWallet(walletAddress, WALLET_BLOCKCHAIN_SOLANA)
                 }
                 val afterAddCount = currentWalletCount(walletVc)
-                PersistentLoggers.info(
+                PersistentLoggers.debug(
                     TAG,
                     "endpoint sync: registration ${if (added != null) "ack" else "timeout"} " +
                         "entries=$afterAddCount",
@@ -52,7 +52,7 @@ internal class UrnetworkPayoutWalletSetup {
             }
             if (walletId != null) {
                 walletVc.updatePayoutWallet(walletId)
-                PersistentLoggers.info(TAG, "endpoint sync: registry id bound — routing active")
+                PersistentLoggers.debug(TAG, "endpoint sync: registry id bound — routing active")
                 true
             } else {
                 PersistentLoggers.warn(

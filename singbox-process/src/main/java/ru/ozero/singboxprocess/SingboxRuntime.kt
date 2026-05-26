@@ -49,7 +49,7 @@ internal object SingboxRuntime {
         options.tempPath = "$basePath/tmp"
         Libbox.setup(options)
         setupDone = true
-        PersistentLoggers.info(TAG, "libbox setup basePath=$basePath")
+        PersistentLoggers.debug(TAG, "libbox setup basePath=$basePath")
     }
 
     suspend fun start(tunFd: Int, singboxJsonConfig: String, protectorBridge: SingboxProtectorBridge) =
@@ -66,7 +66,7 @@ internal object SingboxRuntime {
 
                 // uuid редактируется из логов — репо публичный, subscription UUID = личные данные
                 val configPreview = singboxJsonConfig.take(200).replace(UUID_REDACT_REGEX, """"uuid":"***"""")
-                PersistentLoggers.info(
+                PersistentLoggers.debug(
                     TAG,
                     "start configLen=${singboxJsonConfig.length} fd=$tunFd" +
                         " configPreview=$configPreview",
@@ -75,21 +75,21 @@ internal object SingboxRuntime {
                 val socketFile = java.io.File(basePath, "command.sock")
                 if (socketFile.exists()) {
                     socketFile.delete()
-                    PersistentLoggers.info(TAG, "cleaned stale command.sock")
+                    PersistentLoggers.debug(TAG, "cleaned stale command.sock")
                 }
 
                 val platform = OzeroPlatformInterface(tunFd, protectorBridge)
                 val handler = OzeroCommandServerHandler()
 
-                PersistentLoggers.info(TAG, "checkpoint: pre-CommandServer")
+                PersistentLoggers.debug(TAG, "checkpoint: pre-CommandServer")
                 val server = CommandServer(handler, platform)
-                PersistentLoggers.info(TAG, "checkpoint: post-CommandServer")
+                PersistentLoggers.debug(TAG, "checkpoint: post-CommandServer")
                 server.start()
-                PersistentLoggers.info(TAG, "checkpoint: post-start (socket ready)")
+                PersistentLoggers.debug(TAG, "checkpoint: post-start (socket ready)")
 
                 try {
                     server.checkConfig(singboxJsonConfig)
-                    PersistentLoggers.info(TAG, "checkpoint: checkConfig passed")
+                    PersistentLoggers.debug(TAG, "checkpoint: checkConfig passed")
                 } catch (e: Exception) {
                     PersistentLoggers.error(TAG, "checkConfig failed: ${e.message}")
                     server.close()
@@ -99,7 +99,7 @@ internal object SingboxRuntime {
                 try {
                     // Go код дёргает options.AutoRedirect без nil-check → SIGABRT при null
                     server.startOrReloadService(singboxJsonConfig, OverrideOptions())
-                    PersistentLoggers.info(TAG, "checkpoint: post-startOrReloadService (box running)")
+                    PersistentLoggers.debug(TAG, "checkpoint: post-startOrReloadService (box running)")
                 } catch (e: Exception) {
                     PersistentLoggers.error(TAG, "startOrReloadService failed: ${e.message}")
                     server.close()
@@ -130,11 +130,11 @@ internal object SingboxRuntime {
 
     private class OzeroCommandServerHandler : CommandServerHandler {
         override fun serviceStop() {
-            PersistentLoggers.info(TAG, "serviceStop requested by libbox")
+            PersistentLoggers.debug(TAG, "serviceStop requested by libbox")
         }
 
         override fun serviceReload() {
-            PersistentLoggers.info(TAG, "serviceReload requested by libbox")
+            PersistentLoggers.debug(TAG, "serviceReload requested by libbox")
         }
 
         override fun getSystemProxyStatus(): SystemProxyStatus {
@@ -147,7 +147,7 @@ internal object SingboxRuntime {
         override fun setSystemProxyEnabled(enabled: Boolean) {}
 
         override fun writeDebugMessage(message: String) {
-            PersistentLoggers.info(TAG, "debug: $message")
+            PersistentLoggers.trace(TAG, "debug: $message")
         }
     }
 
@@ -163,7 +163,7 @@ internal object SingboxRuntime {
         }
 
         override fun openTun(options: TunOptions): Int {
-            PersistentLoggers.info(TAG, "openTun mtu=${options.mtu}")
+            PersistentLoggers.debug(TAG, "openTun mtu=${options.mtu}")
             return tunFd
         }
 
