@@ -63,7 +63,9 @@ class OzeroApp : Application(), Configuration.Provider {
                     "abi=${Build.SUPPORTED_ABIS.joinToString()} " +
                     "device=${Build.MANUFACTURER}/${Build.MODEL}",
             )
-            BootDiagnostics.dumpExitReasons(base)
+            if (!isEngineSingboxProcess() && !isEngineWarpProcess()) {
+                BootDiagnostics.dumpExitReasons(base)
+            }
         }
     }
 

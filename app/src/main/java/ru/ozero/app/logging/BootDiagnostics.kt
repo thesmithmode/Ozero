@@ -82,10 +82,6 @@ object BootDiagnostics {
                                 TAG,
                                 "tombstone saved pid=${info.pid} bytes=${bytes.size} path=${saved.absolutePath}",
                             )
-                            val symbols = extractAsciiStrings(bytes)
-                            if (symbols.isNotEmpty()) {
-                                BootFileLogger.error(TAG, "tombstone symbols pid=${info.pid}:\n$symbols")
-                            }
                         }
                     }.onFailure { BootFileLogger.warn(TAG, "tombstone read failed pid=${info.pid}", it) }
                 } else if (info.reason == ApplicationExitInfo.REASON_ANR ||

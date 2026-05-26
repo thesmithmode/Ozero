@@ -78,18 +78,17 @@ class BootDiagnosticsTombstoneTest {
     }
 
     @Test
-    fun `dumpExitReasons CRASH_NATIVE branch использует saveTombstone и extractAsciiStrings`() {
+    fun `dumpExitReasons CRASH_NATIVE branch saves tombstone file without dumping symbols`() {
         val src = readSelfSource()
         val nativeBranch = src.substringAfter("REASON_CRASH_NATIVE)").substringBefore("else if (info.reason")
         assertContains(nativeBranch, "saveTombstone(", message = "CRASH_NATIVE ветка обязана сохранять бинарь")
-        assertContains(
-            nativeBranch,
-            "extractAsciiStrings(",
-            message = "CRASH_NATIVE ветка обязана извлекать читаемые ASCII",
+        assertTrue(
+            !nativeBranch.contains("extractAsciiStrings("),
+            "tombstone symbols НЕ должны дампиться в лог — файл сохранён, символы раздувают лог в 100x",
         )
         assertTrue(
             !nativeBranch.contains("BufferedReader"),
-            "CRASH_NATIVE НЕ должен читать через BufferedReader — это бинарный protobuf, выход — каракули",
+            "CRASH_NATIVE НЕ должен читать через BufferedReader — это бинарный protobuf",
         )
     }
 

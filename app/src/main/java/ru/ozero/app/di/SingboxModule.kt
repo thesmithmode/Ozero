@@ -76,8 +76,9 @@ object SingboxModule {
     ): RawUpdater =
         RawUpdater(
             okHttpClient = OkHttpClient.Builder()
-                .connectTimeout(15, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(15, TimeUnit.SECONDS)
+                .callTimeout(30, TimeUnit.SECONDS)
                 .build(),
             groupDao = groupDao,
             profileDao = profileDao,

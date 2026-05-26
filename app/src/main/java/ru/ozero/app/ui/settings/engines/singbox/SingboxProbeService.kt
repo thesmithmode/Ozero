@@ -33,7 +33,7 @@ class SingboxProbeService @Inject constructor(
         val results = profiles.map { profile ->
             scope.async(Dispatchers.IO) {
                 val latency = probeLatencyMs(profile)
-                if (latency >= 0) profileDao.updateLatency(profile.id, latency)
+                profileDao.updateLatency(profile.id, latency)
                 profile to latency
             }
         }.awaitAll()
@@ -46,19 +46,21 @@ class SingboxProbeService @Inject constructor(
 
     private suspend fun probeLatencyMs(profile: ProxyProfile): Int = withContext(Dispatchers.IO) {
         val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(profile.beanBlob) }
-            .getOrNull() ?: return@withContext -1
+            .getOrNull() ?: return@withContext LATENCY_UNTESTED
         val t0 = System.currentTimeMillis()
         val ok = runCatching {
             Socket().use { s ->
                 s.connect(InetSocketAddress(bean.serverAddress, bean.serverPort), PROBE_TIMEOUT_MS)
             }
         }.isSuccess
-        if (ok) (System.currentTimeMillis() - t0).toInt() else -1
+        if (ok) (System.currentTimeMillis() - t0).toInt() else LATENCY_FAILED
     }
 
     companion object {
         val BEAN_KEY = byteArrayPreferencesKey("singbox_vless_bean")
         val SELECTED_PROFILE_KEY = longPreferencesKey("singbox_selected_profile_id")
         private const val PROBE_TIMEOUT_MS = 3_000
+        const val LATENCY_UNTESTED = -1
+        const val LATENCY_FAILED = -2
     }
 }

@@ -201,6 +201,7 @@ class EngineWarp(
             }
         }
         return if (reached != null) {
+            _stats.value = _stats.value.copy(activeConnections = 1)
             EnginePlugin.ReadyResult.Ready
         } else {
             val state = runCatching { uapiStateReader(uapiPath, TUNNEL_NAME) }.getOrNull()

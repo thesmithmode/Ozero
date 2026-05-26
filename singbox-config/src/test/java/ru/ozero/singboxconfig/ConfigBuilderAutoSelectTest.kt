@@ -105,7 +105,7 @@ class ConfigBuilderAutoSelectTest {
 
         assertContains(json, "\"type\":\"direct\"")
         assertContains(json, "\"type\":\"block\"")
-        assertContains(json, "\"type\":\"dns\"")
+        assertFalse(json.contains("\"type\":\"dns\""), "dns outbound removed in sing-box 1.13.0")
         assertContains(json, "\"auto_detect_interface\":true")
     }
 

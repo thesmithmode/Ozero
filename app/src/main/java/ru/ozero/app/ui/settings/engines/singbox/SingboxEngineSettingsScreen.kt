@@ -99,15 +99,27 @@ fun SingboxEngineSettingsScreen(
                             )
                         }
                     }
-                    IconButton(
-                        onClick = viewModel::onRefreshAll,
-                        enabled = state.groups.isNotEmpty() && state.isRefreshing.isEmpty(),
-                        modifier = Modifier.testTag("singbox_refresh_all_button"),
-                    ) {
-                        Icon(
-                            Icons.Default.Refresh,
-                            contentDescription = stringResource(R.string.singbox_refresh_all_button),
-                        )
+                    if (state.isRefreshing.isNotEmpty()) {
+                        TextButton(
+                            onClick = viewModel::onCancelRefresh,
+                            modifier = Modifier.testTag("singbox_cancel_refresh_button"),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.singbox_cancel),
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                        }
+                    } else {
+                        IconButton(
+                            onClick = viewModel::onRefreshAll,
+                            enabled = state.groups.isNotEmpty(),
+                            modifier = Modifier.testTag("singbox_refresh_all_button"),
+                        ) {
+                            Icon(
+                                Icons.Default.Refresh,
+                                contentDescription = stringResource(R.string.singbox_refresh_all_button),
+                            )
+                        }
                     }
                     IconButton(
                         onClick = onOpenAdvanced,
@@ -179,7 +191,7 @@ private fun SingboxSettingsContent(
 
         SingboxCustomLinkSection(state = state, viewModel = viewModel)
 
-        if (state.groups.isNotEmpty()) {
+        if (state.groups.isNotEmpty() && !state.isAutoSelectMode) {
             Spacer(Modifier.height(16.dp))
             HorizontalDivider()
             Spacer(Modifier.height(12.dp))
@@ -231,7 +243,7 @@ private fun SingboxCustomLinkSection(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("singbox_link_input"),
-        placeholder = { Text("vless://...") },
+        placeholder = { Text("vless://, vmess://, trojan://, ss://") },
         isError = state.customLinkError != null,
         supportingText = state.customLinkError?.let { err ->
             {
@@ -356,21 +368,20 @@ private fun SubscriptionGroupItem(
         }
 
         if (isExpanded) {
-            if (profiles.isEmpty() && !isRefreshing) {
-                if (refreshError != null) {
-                    Text(
-                        text = stringResource(R.string.singbox_refresh_error, refreshError),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(start = 28.dp, bottom = 8.dp),
-                    )
-                } else {
-                    Text(
-                        text = stringResource(R.string.singbox_no_profiles_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(start = 28.dp, bottom = 8.dp),
-                    )
-                }
+            if (refreshError != null) {
+                Text(
+                    text = stringResource(R.string.singbox_refresh_error, refreshError),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(start = 28.dp, bottom = 8.dp),
+                )
+            }
+            if (profiles.isEmpty() && !isRefreshing && refreshError == null) {
+                Text(
+                    text = stringResource(R.string.singbox_no_profiles_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(start = 28.dp, bottom = 8.dp),
+                )
             } else {
                 profiles.forEach { profile ->
                     ProfileItem(
@@ -407,17 +418,27 @@ private fun ProfileItem(
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.weight(1f),
         )
-        if (profile.latencyMs >= 0) {
-            Spacer(Modifier.width(4.dp))
-            Text(
-                text = "${profile.latencyMs}ms",
-                style = MaterialTheme.typography.labelSmall,
-                color = when {
-                    profile.latencyMs < 200 -> MaterialTheme.colorScheme.primary
-                    profile.latencyMs < 500 -> MaterialTheme.colorScheme.secondary
-                    else -> MaterialTheme.colorScheme.error
-                },
-            )
+        when {
+            profile.latencyMs >= 0 -> {
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = "${profile.latencyMs}ms",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = when {
+                        profile.latencyMs < 200 -> MaterialTheme.colorScheme.primary
+                        profile.latencyMs < 500 -> MaterialTheme.colorScheme.secondary
+                        else -> MaterialTheme.colorScheme.error
+                    },
+                )
+            }
+            profile.latencyMs == SingboxProbeService.LATENCY_FAILED -> {
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = "---",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.6f),
+                )
+            }
         }
     }
 }
