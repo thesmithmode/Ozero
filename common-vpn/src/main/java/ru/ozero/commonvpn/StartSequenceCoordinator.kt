@@ -145,6 +145,7 @@ class StartSequenceCoordinator(
         }
         if (!usesCustomTun) deps.engineWatchdog.startHealthKillswitchWatcher(activeEngineId)
         if (usesCustomTun) deps.engineWatchdog.startPeerWatchdog(activeEngineId)
+        deps.engineWatchdog.startStagnationWatchdog(activeEngineId)
         deps.statsLogger.start()
     }
 

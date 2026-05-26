@@ -292,7 +292,7 @@ class ByeDpiEngineTest {
             proxy,
             socksProbe = { _, _, _ -> throw IOException("refused") },
             readyTotalTimeoutMs = 200,
-            testDispatcherOverride = UnconfinedTestDispatcher(testScheduler),
+            testDispatcher = UnconfinedTestDispatcher(testScheduler),
         )
         every { proxy.startProxy(any()) } returns -1
         val result = failEngine.start(EngineConfig.ByeDpi(socksPort = 19001))
@@ -315,7 +315,7 @@ class ByeDpiEngineTest {
                 if (callCount == 1) throw IOException("refused") else 1L
             },
             readyTotalTimeoutMs = 300,
-            testDispatcherOverride = UnconfinedTestDispatcher(testScheduler),
+            testDispatcher = UnconfinedTestDispatcher(testScheduler),
         )
         val first = recEngine.start(EngineConfig.ByeDpi(socksPort = 1080))
         assertIs<StartResult.Failure>(first)
@@ -344,7 +344,7 @@ class ByeDpiEngineTest {
             recProxy,
             socksProbe = { _, _, _ -> throw IOException("refused") },
             readyTotalTimeoutMs = 100,
-            testDispatcherOverride = UnconfinedTestDispatcher(testScheduler),
+            testDispatcher = UnconfinedTestDispatcher(testScheduler),
         )
         val first = recEngine.start(EngineConfig.ByeDpi(socksPort = 1080))
         assertIs<StartResult.Failure>(first)

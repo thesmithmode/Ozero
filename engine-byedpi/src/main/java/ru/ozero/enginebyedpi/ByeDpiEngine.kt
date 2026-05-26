@@ -41,7 +41,7 @@ class ByeDpiEngine(
     private val readyTotalTimeoutMs: Long = READY_TIMEOUT_MS,
     // Checks whether a loopback port is available. Injectable for unit tests.
     private val portFreeChecker: (Int) -> Boolean = ::defaultPortFreeCheck,
-    testDispatcherOverride: CoroutineDispatcher? = null,
+    private val testDispatcher: CoroutineDispatcher? = null,
 ) : EnginePlugin {
 
     override val id = EngineId.BYEDPI
@@ -61,7 +61,7 @@ class ByeDpiEngine(
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private var proxyDispatcher: CoroutineDispatcher = newProxyDispatcher()
-    private val proxyScope = CoroutineScope(SupervisorJob() + (testDispatcherOverride ?: proxyDispatcher))
+    private var proxyScope = CoroutineScope(SupervisorJob() + (testDispatcher ?: proxyDispatcher))
     private val proxyJobRef = AtomicReference<Job?>(null)
 
     override fun buildManualConfig(settings: SettingsModel?): EngineConfig {
@@ -118,6 +118,7 @@ class ByeDpiEngine(
                 )
                 runCatching { proxy.emergencyReset() }
                 proxyDispatcher = newProxyDispatcher()
+                proxyScope = CoroutineScope(SupervisorJob() + (testDispatcher ?: proxyDispatcher))
             }
         }
 

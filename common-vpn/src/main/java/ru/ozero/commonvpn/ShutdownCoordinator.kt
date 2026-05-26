@@ -85,6 +85,7 @@ class ShutdownCoordinator(
             val chainOk = withTimeoutOrNull(PARALLEL_STOP_TIMEOUT_MS) { chainStopJob.join() }
             if (chainOk == null) {
                 PersistentLoggers.warn(TAG, "chainOrchestrator.stop hung > ${PARALLEL_STOP_TIMEOUT_MS}ms")
+                chainStopJob.cancel()
             } else {
                 Log.i(TAG, "chainOrchestrator.stop completed")
             }

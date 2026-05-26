@@ -26,6 +26,7 @@ class EngineWatchdogCoordinatorContractTest {
         listOf(
             "fun startHealthKillswitchWatcher(",
             "fun startPeerWatchdog(",
+            "fun startStagnationWatchdog(",
             "fun handleEngineFailure(",
             "fun cancelWatchers(",
         ).forEach { anchor ->
@@ -42,12 +43,13 @@ class EngineWatchdogCoordinatorContractTest {
     }
 
     @Test
-    fun `cancelWatchers отменяет оба watch job`() {
-        val body = source.substringAfter("fun cancelWatchers(").substringBefore("private fun handleEngineFailure")
+    fun `cancelWatchers отменяет все watch jobs`() {
+        val body = source.substringAfter("fun cancelWatchers(").substringBefore("fun handleEngineFailure")
         assertTrue(
             body.contains("healthWatchJobRef.getAndSet(null)") &&
-                body.contains("peerWatchJobRef.getAndSet(null)"),
-            "cancelWatchers обязан отменить оба job — иначе утечка watchers при stop. Body:\n$body",
+                body.contains("peerWatchJobRef.getAndSet(null)") &&
+                body.contains("stagnationWatchJobRef.getAndSet(null)"),
+            "cancelWatchers обязан отменить все jobs — иначе утечка watchers при stop. Body:\n$body",
         )
     }
 
@@ -81,7 +83,7 @@ class EngineWatchdogCoordinatorContractTest {
 
     @Test
     fun `startPeerWatchdog cancels previous job + early return если plugin не найден`() {
-        val body = source.substringAfter("fun startPeerWatchdog(").substringBefore("fun cancelWatchers")
+        val body = source.substringAfter("fun startPeerWatchdog(").substringBefore("fun startStagnationWatchdog")
         assertTrue(
             body.contains("peerWatchJobRef.getAndSet(null)?.cancel()"),
             "Обязан отменить предыдущий peer watch job.",
