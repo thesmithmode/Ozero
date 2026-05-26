@@ -1,28 +1,19 @@
 package ru.ozero.desktop.vpn
 
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import ru.ozero.desktop.engines.ByeDpiSubprocess
-import ru.ozero.desktop.engines.SingboxSubprocess
 import ru.ozero.desktop.model.EngineId
 import ru.ozero.desktop.model.SwitchingTransition
 import ru.ozero.desktop.model.TunnelState
 import ru.ozero.desktop.model.TunnelStats
 import ru.ozero.desktop.ui.components.PowerDiscState
-import java.util.logging.Logger
+import java.io.File
 
 class DesktopVpnManager(private val scope: CoroutineScope) {
-
-    private val log = Logger.getLogger("DesktopVpnManager")
-
-    private val byedpi = ByeDpiSubprocess()
-    private val singbox = SingboxSubprocess()
-    private val configBuilder = SingboxConfigBuilder()
 
     private val _state = MutableStateFlow<TunnelState>(TunnelState.Idle)
     val state: StateFlow<TunnelState> = _state.asStateFlow()
@@ -36,83 +27,39 @@ class DesktopVpnManager(private val scope: CoroutineScope) {
     private val _powerDiscState = MutableStateFlow(PowerDiscState.Off)
     val powerDiscState: StateFlow<PowerDiscState> = _powerDiscState.asStateFlow()
 
-    private var activeEngine: EngineId? = null
-    private var sessionStartMs: Long = 0L
-
-    suspend fun toggle() {
+    fun toggle() {
         when (_state.value) {
             is TunnelState.Connected -> disconnect()
-            is TunnelState.Idle, is TunnelState.Failed -> connect(EngineId.BYEDPI)
+            is TunnelState.Idle, is TunnelState.Failed -> connect()
             else -> Unit
         }
     }
 
-    suspend fun connect(engineId: EngineId, socksPort: Int = DEFAULT_SOCKS_PORT) {
-        _state.value = TunnelState.Connecting(engineId)
+    private fun connect() {
+        val engine = EngineId.BYEDPI
+        _state.value = TunnelState.Connecting(engine)
         _powerDiscState.value = PowerDiscState.Connecting
-        log.info("Connecting with engine $engineId on port $socksPort")
 
-        val engineStarted = when (engineId) {
-            EngineId.BYEDPI -> byedpi.start(socksPort)
-            else -> {
-                log.info("Engine $engineId: using sing-box TUN only")
-                true
+        scope.launch {
+            delay(800)
+            if (!hasBinaries()) {
+                _state.value = TunnelState.Failed(engine, "Движки не установлены. Положите byedpi.exe и sing-box.exe в binaries/")
+                _powerDiscState.value = PowerDiscState.Off
+                return@launch
             }
-        }
-
-        if (!engineStarted) {
-            _state.value = TunnelState.Failed(engineId, "Engine failed to start")
+            _state.value = TunnelState.Failed(engine, "VPN подключение пока не реализовано")
             _powerDiscState.value = PowerDiscState.Off
-            return
         }
-
-        val config = configBuilder.socksUpstream(socksPort).buildTun2Socks()
-        val tunStarted = singbox.startWithConfig(config)
-
-        if (!tunStarted) {
-            byedpi.stop()
-            _state.value = TunnelState.Failed(engineId, "TUN interface failed to start")
-            _powerDiscState.value = PowerDiscState.Off
-            return
-        }
-
-        activeEngine = engineId
-        sessionStartMs = System.currentTimeMillis()
-        _state.value = TunnelState.Connected(engineId, socksPort)
-        _powerDiscState.value = PowerDiscState.Connected
-        log.info("Connected via $engineId")
-
-        startStatsPolling()
     }
 
-    fun disconnect() {
-        _state.value = TunnelState.Disconnecting
-        _powerDiscState.value = PowerDiscState.Off
-        singbox.stop()
-        byedpi.stop()
-        _stats.value = null
-        activeEngine = null
+    private fun disconnect() {
         _state.value = TunnelState.Idle
-        log.info("Disconnected")
+        _powerDiscState.value = PowerDiscState.Off
+        _stats.value = null
     }
 
-    private fun startStatsPolling() {
-        scope.launch(Dispatchers.IO) {
-            while (_state.value is TunnelState.Connected) {
-                _stats.value = TunnelStats(
-                    txPackets = 0,
-                    txBytes = 0,
-                    rxPackets = 0,
-                    rxBytes = 0,
-                    timestampMs = System.currentTimeMillis(),
-                    sessionStartMs = sessionStartMs,
-                )
-                delay(1_000)
-            }
-        }
-    }
-
-    companion object {
-        private const val DEFAULT_SOCKS_PORT = 1080
+    private fun hasBinaries(): Boolean {
+        val binDir = File(System.getProperty("app.dir", "."), "binaries")
+        return File(binDir, "byedpi.exe").exists() || File(binDir, "sing-box.exe").exists()
     }
 }
