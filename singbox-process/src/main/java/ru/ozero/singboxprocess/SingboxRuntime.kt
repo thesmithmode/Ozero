@@ -2,6 +2,7 @@ package ru.ozero.singboxprocess
 
 import io.nekohasekai.libbox.CommandServer
 import io.nekohasekai.libbox.CommandServerHandler
+import io.nekohasekai.libbox.OverrideOptions
 import io.nekohasekai.libbox.InterfaceUpdateListener
 import io.nekohasekai.libbox.Libbox
 import io.nekohasekai.libbox.LocalDNSTransport
@@ -95,7 +96,7 @@ internal object SingboxRuntime {
                 }
 
                 try {
-                    server.startOrReloadService(singboxJsonConfig, null)
+                    server.startOrReloadService(singboxJsonConfig, OverrideOptions())
                     PersistentLoggers.info(TAG, "checkpoint: post-startOrReloadService (box running)")
                 } catch (e: Exception) {
                     PersistentLoggers.error(TAG, "startOrReloadService failed: ${e.message}")

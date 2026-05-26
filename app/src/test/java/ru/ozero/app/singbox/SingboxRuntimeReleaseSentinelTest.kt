@@ -2,9 +2,32 @@ package ru.ozero.app.singbox
 
 import org.junit.jupiter.api.Test
 import java.io.File
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SingboxRuntimeReleaseSentinelTest {
+
+    @Test
+    fun `sentinel startOrReloadService must pass non-null OverrideOptions`() {
+        val root = locateRepoRoot()
+        val content = File(
+            root,
+            "singbox-process/src/main/java/ru/ozero/singboxprocess/SingboxRuntime.kt",
+        ).readText()
+
+        val startBlock = content.substringAfter("fun start(")
+            .substringBefore("fun stop(")
+
+        assertTrue(
+            startBlock.contains("OverrideOptions()"),
+            "startOrReloadService must receive OverrideOptions(), not null — " +
+                "Go code dereferences options.AutoRedirect without nil check → SIGABRT",
+        )
+        assertFalse(
+            startBlock.contains("startOrReloadService(singboxJsonConfig, null)"),
+            "startOrReloadService(config, null) causes nil pointer dereference in Go → SIGABRT",
+        )
+    }
 
     @Test
     fun `should SingboxRuntime stop clear commandServer and lastStatus`() {
