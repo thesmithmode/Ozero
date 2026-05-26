@@ -4,11 +4,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.isActive
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
@@ -32,10 +35,13 @@ class UrnetworkRelayCoordinator(
     private val configStore: UrnetworkConfigStore,
     private val tunnelController: TunnelController,
     private val jwtBootstrapper: UrnetworkJwtBootstrapper,
+    private val networkMonitor: RelayNetworkMonitor? = null,
+    private val relayLockManager: RelayLockManager? = null,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) {
 
     private val jobRef = AtomicReference<Job?>(null)
+    private val watchdogRef = AtomicReference<Job?>(null)
     private val relayOwned = AtomicBoolean(false)
     private val bootstrapAttemptedThisSession = AtomicBoolean(false)
 
@@ -64,6 +70,9 @@ class UrnetworkRelayCoordinator(
             bootstrapAttemptedThisSession.set(false)
             if (relayOwned.compareAndSet(true, false)) {
                 PersistentLoggers.info(TAG, "mesh session: tunnel offline — releasing worker")
+                stopWatchdog()
+                runCatching { networkMonitor?.stop() }
+                runCatching { relayLockManager?.release() }
                 runCatching { bridge.stop() }
             }
             return
@@ -87,14 +96,7 @@ class UrnetworkRelayCoordinator(
             }
             return
         }
-        val result = runCatching {
-            bridge.start(
-                walletAddress = walletAddress,
-                apiUrl = UrnetworkDefaults.DEFAULT_API_URL,
-                connectUrl = UrnetworkDefaults.DEFAULT_CONNECT_URL,
-                byClientJwt = byClientJwt,
-            )
-        }.getOrNull()
+        val result = startBridgeWithRetry(walletAddress, byClientJwt)
         if (result is UrnetworkSdkBridge.StartResult.Success) {
             relayOwned.set(true)
             val provideEnabled = runCatching { configStore.provideEnabled().first() }.getOrDefault(true)
@@ -108,6 +110,14 @@ class UrnetworkRelayCoordinator(
                 .getOrDefault(UrnetworkProvideNetworkMode.WIFI)
             runCatching { bridge.setProvideNetworkMode(networkMode) }
                 .onFailure { PersistentLoggers.warn(TAG, "mesh session: setProvideNetworkMode threw: ${it.message}") }
+            runCatching { bridge.connectBestAvailable() }
+                .onFailure { PersistentLoggers.warn(TAG, "mesh session: connectBestAvailable threw: ${it.message}") }
+            runCatching { networkMonitor?.start(networkMode) }
+                .onFailure { PersistentLoggers.warn(TAG, "mesh session: networkMonitor threw: ${it.message}") }
+            if (provideEnabled) {
+                runCatching { relayLockManager?.acquire() }
+                    .onFailure { PersistentLoggers.warn(TAG, "mesh session: lockManager threw: ${it.message}") }
+            }
             val diag = runCatching { bridge.relayDiagnostics() }.getOrDefault("unavailable")
             PersistentLoggers.info(
                 TAG,
@@ -115,16 +125,72 @@ class UrnetworkRelayCoordinator(
                     "(provideEnabled=$provideEnabled controlMode=${controlMode.rawValue} " +
                     "networkMode=${networkMode.rawValue}) diag=[$diag]",
             )
+            startWatchdog()
         } else {
             PersistentLoggers.warn(TAG, "mesh session: worker start failed: $result")
         }
     }
 
+    private fun startWatchdog() {
+        stopWatchdog()
+        watchdogRef.set(scope.launch {
+            while (isActive) {
+                delay(WATCHDOG_INTERVAL_MS)
+                if (!relayOwned.get()) break
+                val diag = runCatching { bridge.relayDiagnostics() }.getOrNull()
+                if (diag == null || diag == "device=null") {
+                    PersistentLoggers.warn(TAG, "watchdog: bridge unhealthy ($diag) — resetting")
+                    runCatching { networkMonitor?.stop() }
+                    runCatching { relayLockManager?.release() }
+                    runCatching { bridge.stop() }
+                    relayOwned.set(false)
+                    break
+                }
+            }
+        })
+    }
+
+    private fun stopWatchdog() {
+        watchdogRef.getAndSet(null)?.cancel()
+    }
+
+    private suspend fun startBridgeWithRetry(
+        walletAddress: String,
+        byClientJwt: String,
+    ): UrnetworkSdkBridge.StartResult? {
+        repeat(MAX_START_RETRIES) { attempt ->
+            val result = runCatching {
+                bridge.start(
+                    walletAddress = walletAddress,
+                    apiUrl = UrnetworkDefaults.DEFAULT_API_URL,
+                    connectUrl = UrnetworkDefaults.DEFAULT_CONNECT_URL,
+                    byClientJwt = byClientJwt,
+                )
+            }.getOrNull()
+            if (result is UrnetworkSdkBridge.StartResult.Success) return result
+            PersistentLoggers.warn(
+                TAG,
+                "mesh session: start attempt ${attempt + 1}/$MAX_START_RETRIES failed: $result",
+            )
+            if (attempt < MAX_START_RETRIES - 1) {
+                delay(RETRY_DELAY_MS)
+                if (!scope.isActive) return null
+            }
+        }
+        return null
+    }
+
     fun stop() {
         jobRef.getAndSet(null)?.cancel()
+        stopWatchdog()
+        runCatching { networkMonitor?.stop() }
+        runCatching { relayLockManager?.release() }
     }
 
     private companion object {
         const val TAG = "MeshSession"
+        const val MAX_START_RETRIES = 3
+        const val RETRY_DELAY_MS = 30_000L
+        const val WATCHDOG_INTERVAL_MS = 60_000L
     }
 }

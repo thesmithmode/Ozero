@@ -206,6 +206,24 @@ class UrnetworkRelayCoordinatorTest {
     }
 
     @Test
+    fun `connectBestAvailable вызывается после успешного start`() = runTest(dispatcher) {
+        setByClientJwt("test-jwt")
+        tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
+
+        assertEquals(1, bridge.connectBestAvailableCalls)
+    }
+
+    @Test
+    fun `connectBestAvailable не вызывается при failed start`() = runTest(dispatcher) {
+        bridge.startResult = UrnetworkSdkBridge.StartResult.Failed("test")
+        setByClientJwt("test-jwt")
+        tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
+
+        assertEquals(0, bridge.connectBestAvailableCalls)
+        assertEquals(3, bridge.startCalls, "retry 3 attempts")
+    }
+
+    @Test
     fun `relay перезапускается при смене с URnetwork на ByeDPI`() = runTest(dispatcher) {
         setByClientJwt("test-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.URNETWORK, socksPort = 0)
@@ -215,6 +233,22 @@ class UrnetworkRelayCoordinatorTest {
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
         assertEquals(1, bridge.startCalls)
+        assertEquals(1, bridge.connectBestAvailableCalls)
+    }
+
+    @Test
+    fun `relay при смене WARP на ByeDPI перезапускается с connectBestAvailable`() = runTest(dispatcher) {
+        setByClientJwt("test-jwt")
+        tunnelStateFlow.value = TunnelState.Connected(EngineId.WARP, socksPort = 0)
+        assertEquals(1, bridge.startCalls)
+        assertEquals(1, bridge.connectBestAvailableCalls)
+
+        bridge.running = true
+        tunnelStateFlow.value = TunnelState.Idle
+        tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
+
+        assertEquals(2, bridge.startCalls)
+        assertEquals(2, bridge.connectBestAvailableCalls)
     }
 
     private class FakeJwtBootstrapper : UrnetworkJwtBootstrapper {
@@ -239,8 +273,11 @@ class UrnetworkRelayCoordinatorTest {
         var startCalls = 0
         var stopCalls = 0
         var setProvidePausedCalls = 0
+        var connectBestAvailableCalls = 0
         var lastProvidePaused: Boolean? = null
         var running = false
+        var startResult: UrnetworkSdkBridge.StartResult = UrnetworkSdkBridge.StartResult.Success
+        var diagnosticsResult: String = "running=true"
 
         override suspend fun start(
             walletAddress: String,
@@ -249,7 +286,7 @@ class UrnetworkRelayCoordinatorTest {
             byClientJwt: String,
         ): UrnetworkSdkBridge.StartResult {
             startCalls++
-            return UrnetworkSdkBridge.StartResult.Success
+            return startResult
         }
 
         override suspend fun stop() {
@@ -258,7 +295,7 @@ class UrnetworkRelayCoordinatorTest {
         override fun isRunning() = running
         override suspend fun attachTun(tunFd: Int) = UrnetworkSdkBridge.AttachResult.Success
         override fun connectTo(location: UrnetworkSdkBridge.LocationToken) = Unit
-        override fun connectBestAvailable() = Unit
+        override fun connectBestAvailable() { connectBestAvailableCalls++ }
         override fun selectedLocation(): UrnetworkSdkBridge.LocationToken? = null
         override fun openLocationsViewController(): com.bringyour.sdk.LocationsViewController? = null
         override fun setProvidePaused(paused: Boolean) {
@@ -270,5 +307,6 @@ class UrnetworkRelayCoordinatorTest {
         override fun unpaidByteCount() = 0L
         override fun fetchTransferStats() = Unit
         override suspend fun fetchSubscriptionBalance() = null
+        override fun relayDiagnostics() = diagnosticsResult
     }
 }

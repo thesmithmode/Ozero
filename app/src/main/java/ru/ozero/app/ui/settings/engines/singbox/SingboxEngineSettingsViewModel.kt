@@ -66,6 +66,7 @@ data class SingboxSettingsUiState(
     val groupRefreshErrors: Map<Long, String> = emptyMap(),
     val sortOrder: SortOrder = SortOrder.BY_LATENCY,
     val isRestoringDefaults: Boolean = false,
+    val restoreError: String? = null,
     val showAddGroupDialog: Boolean = false,
     val addGroupName: String = "",
     val addGroupUrl: String = "",
@@ -163,6 +164,7 @@ class SingboxEngineSettingsViewModel @Inject constructor(
 
     fun onPingAll() {
         pingJob?.cancel()
+        _uiState.update { it.copy(isPinging = emptySet()) }
         pingJob = viewModelScope.launch {
             val groups = groupDao.getAll()
             groups.map { group ->
@@ -205,6 +207,7 @@ class SingboxEngineSettingsViewModel @Inject constructor(
 
     fun onPingGroup(groupId: Long) {
         pingJob?.cancel()
+        _uiState.update { it.copy(isPinging = emptySet()) }
         pingJob = viewModelScope.launch {
             val profiles = profileDao.getByGroupId(groupId)
             if (profiles.isEmpty()) return@launch
@@ -344,8 +347,8 @@ class SingboxEngineSettingsViewModel @Inject constructor(
 
     fun onRestoreDefaults() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isRestoringDefaults = true) }
-            runCatching {
+            _uiState.update { it.copy(isRestoringDefaults = true, restoreError = null) }
+            val error = runCatching {
                 val json = appContext.assets.open("singbox/preset_groups.json").bufferedReader().readText()
                 val obj = org.json.JSONObject(json)
                 val arr = obj.getJSONArray("groups")
@@ -354,9 +357,18 @@ class SingboxEngineSettingsViewModel @Inject constructor(
                     GroupSeeder.PresetGroup(name = g.getString("name"), url = g.getString("url"))
                 }
                 groupSeeder.seedPresets(presets)
+            }.exceptionOrNull()
+            _uiState.update {
+                it.copy(
+                    isRestoringDefaults = false,
+                    restoreError = error?.let { e -> e.message ?: e.javaClass.simpleName },
+                )
             }
-            _uiState.update { it.copy(isRestoringDefaults = false) }
         }
+    }
+
+    fun onDismissRestoreError() {
+        _uiState.update { it.copy(restoreError = null) }
     }
 
     companion object {

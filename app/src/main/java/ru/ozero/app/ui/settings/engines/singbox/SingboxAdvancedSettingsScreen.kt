@@ -23,10 +23,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,6 +51,15 @@ fun SingboxAdvancedSettingsScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var showRestoreDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    val restoreError = state.restoreError
+    LaunchedEffect(restoreError) {
+        if (restoreError != null) {
+            snackbarHostState.showSnackbar(restoreError)
+            viewModel.onDismissRestoreError()
+        }
+    }
 
     if (showRestoreDialog) {
         AlertDialog(
@@ -81,6 +93,7 @@ fun SingboxAdvancedSettingsScreen(
                 },
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         Column(
             modifier = Modifier
