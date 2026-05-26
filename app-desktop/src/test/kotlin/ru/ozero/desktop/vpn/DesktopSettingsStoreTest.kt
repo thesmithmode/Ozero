@@ -1,19 +1,15 @@
 package ru.ozero.desktop.vpn
 
-import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.io.TempDir
 import ru.ozero.desktop.model.AppMode
 import ru.ozero.desktop.model.EngineId
 import ru.ozero.desktop.model.SettingsModel
 import ru.ozero.desktop.model.VpnMode
-import java.io.File
-import java.util.Properties
 
 class DesktopSettingsStoreTest {
 

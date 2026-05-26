@@ -1,7 +1,5 @@
 package ru.ozero.desktop.vpn
 
-import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -11,14 +9,11 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-import ru.ozero.desktop.engine.DesktopEngine
-import ru.ozero.desktop.engine.DesktopEngineRegistry
-import ru.ozero.desktop.engine.EngineConfig
-import ru.ozero.desktop.engine.EngineStartResult
 import ru.ozero.desktop.model.EngineId
 import ru.ozero.desktop.model.TunnelState
 import ru.ozero.desktop.model.VpnMode
@@ -201,7 +196,6 @@ class DesktopVpnManagerTest {
 
         @Test
         fun `should not do anything when connecting`() = testScope.runTest {
-            val connecting = TunnelState.Connecting(EngineId.SINGBOX)
             manager.toggle()
         }
     }
@@ -213,7 +207,7 @@ class DesktopVpnManagerTest {
         fun `should set switching transition`() = testScope.runTest {
             manager.switchEngine(EngineId.BYEDPI)
 
-            assertTrue(manager.switching.value != null || manager.switching.value == null)
+            assertNotNull(manager.switching.value)
         }
     }
 
