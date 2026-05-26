@@ -2,6 +2,7 @@ package ru.ozero.enginewarp
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineConfig
@@ -418,6 +419,42 @@ class EngineWarpContractTest {
         val result = e.awaitReady()
         assertEquals(EnginePlugin.ReadyResult.Ready, result, "handshake ok → Ready")
         assertTrue(calls.get() >= 1, "handshakeChecker должен быть вызван хотя бы раз")
+    }
+
+    @Test
+    fun `awaitReady Ready устанавливает activeConnections=1 — без amber flash`() = runTest {
+        val (e, _, _) = engine(
+            activeConfig = sampleConfig,
+            handshakeChecker = { _, _ -> true },
+        )
+        e.start(EngineConfig.Warp, Upstream.None)
+        assertEquals(0, e.stats().first().activeConnections, "до awaitReady connections=0")
+        val result = e.awaitReady()
+        assertEquals(EnginePlugin.ReadyResult.Ready, result)
+        assertEquals(
+            1,
+            e.stats().first().activeConnections,
+            "awaitReady Ready обязан ставить activeConnections=1 сразу — " +
+                "без этого UI кратковременно показывает amber dot (0 connections) до первого stats poll. " +
+                "Регрессия 2026-05-26: WARP amber flash fix.",
+        )
+    }
+
+    @Test
+    fun `awaitReady Timeout не устанавливает activeConnections`() = runTest {
+        val (e, _, _) = engine(
+            activeConfig = sampleConfig,
+            handshakeChecker = { _, _ -> false },
+            warpReadyTimeoutMs = 200L,
+            warpReadyPollMs = 50L,
+        )
+        e.start(EngineConfig.Warp, Upstream.None)
+        e.awaitReady()
+        assertEquals(
+            0,
+            e.stats().first().activeConnections,
+            "при Timeout activeConnections остаётся 0 — handshake не состоялся",
+        )
     }
 
     @Test

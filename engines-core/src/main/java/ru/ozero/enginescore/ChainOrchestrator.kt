@@ -1,6 +1,5 @@
 package ru.ozero.enginescore
 
-import android.util.Log
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -30,7 +29,7 @@ class ChainOrchestrator(
                 )
             }
             val r = try {
-                Log.i(TAG, "step[$idx] ${step.engineId} start upstream=$upstream")
+                PersistentLoggers.info(TAG, "step[$idx] ${step.engineId} start upstream=$upstream")
                 plugin.start(step.config, upstream)
             } catch (ce: CancellationException) {
                 PersistentLoggers.warn(TAG, "step $idx ${step.engineId} cancelled, rollback")
@@ -49,7 +48,7 @@ class ChainOrchestrator(
                     synchronized(started) { started.add(plugin) }
                     lastSocksPort = r.socksPort
                     upstream = Upstream.Socks5(host = LOOPBACK, port = r.socksPort)
-                    Log.i(TAG, "step[$idx] ${step.engineId} success socksPort=${r.socksPort}")
+                    PersistentLoggers.info(TAG, "step[$idx] ${step.engineId} success socksPort=${r.socksPort}")
                 }
             }
         }

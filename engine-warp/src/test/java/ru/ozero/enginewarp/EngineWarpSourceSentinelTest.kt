@@ -89,6 +89,18 @@ class EngineWarpSourceSentinelTest {
     }
 
     @Test
+    fun `sentinel awaitReady при Ready ставит activeConnections=1 — amber flash fix`() {
+        val awaitBody = source.substringAfter("override suspend fun awaitReady()")
+            .substringBefore("override suspend fun recover()")
+        assertTrue(
+            awaitBody.contains("activeConnections = 1") || awaitBody.contains("activeConnections=1"),
+            "awaitReady обязан ставить activeConnections=1 при Ready — " +
+                "без этого UI мигает amber (0 connections → 1) до первого stats poll. " +
+                "Регрессия 2026-05-26: amber flash fix.",
+        )
+    }
+
+    @Test
     fun `anchors — все функции-границы существуют в источнике`() {
         listOf(
             "private suspend fun resolveEndpointHost",

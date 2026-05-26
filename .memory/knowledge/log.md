@@ -1,5 +1,10 @@
 # Build Log
 
+## [2026-05-26T23:55:00+03:00] compile | daily/2026-05-26.md (pass 7 — session 21:41 gap fill)
+- Source: daily/2026-05-26.md
+- Articles created: [[concepts/warp-amber-flash-sentinel]]
+- Articles updated: [[concepts/singbox-crash-tombstone-diagnosis]] (added startWithConfig DeadObjectException + configLen details from session 21:41)
+
 ## [2026-05-26T23:30:00+03:00] compile | daily/2026-05-26.md (pass 6 — tombstone gap)
 - Source: daily/2026-05-26.md
 - Articles created: [[concepts/singbox-crash-tombstone-diagnosis]]
