@@ -69,7 +69,7 @@ class ByeDpiEngine(
             settings?.byedpiUseUiMode == true ->
                 ByeDpiUiArgsBuilder.buildArgsOnly(settings.byedpiUiSettings).joinToString(" ")
             !settings?.byedpiWinningArgs.isNullOrBlank() ->
-                settings.byedpiWinningArgs!!.trim()
+                settings.byedpiWinningArgs!!.trim() // verbatim, без авто-suffix — ломает user стратегии
             else -> EngineConfig.ByeDpi().args
         }
         return EngineConfig.ByeDpi(
@@ -108,7 +108,10 @@ class ByeDpiEngine(
                 withTimeoutOrNull(STOP_GRACE_MS) { oldJob.join() }
                 if (oldJob.isActive) oldJob.cancel()
             }
+            PersistentLoggers.info(TAG, "start: barrier pre-drain oldJob.isActive=${oldJob.isActive}")
+            // limitedParallelism(1) — пустой withContext ждёт пока предыдущий JNI main() освободит поток
             withContext(proxyDispatcher) {}
+            PersistentLoggers.info(TAG, "start: barrier passed — dispatcher drained")
         }
 
         val args = buildArgs(resolvedConfig)
@@ -117,7 +120,9 @@ class ByeDpiEngine(
             "jniStartProxy argv=[${args.joinToString(" ")}] (native префиксует argv[0]=\"byedpi\")",
         )
         val proxyJob = proxyScope.launch {
+            PersistentLoggers.info(TAG, "launch entered port=$resolvedPort")
             val code = startProxyWithRecovery(args)
+            PersistentLoggers.info(TAG, "startProxy returned code=$code port=$resolvedPort")
             when {
                 code == 0 -> { /* success — main() returned 0 */ }
                 code == JNI_GUARD_BUSY -> PersistentLoggers.warn(
@@ -217,6 +222,7 @@ class ByeDpiEngine(
         withContext(Dispatchers.IO) {
             runCatching { proxy.stopProxy() }
                 .onFailure { PersistentLoggers.warn(TAG, "jniStopProxy исключение: ${it.message}") }
+            // forceClose ДО join — разблокировать JNI READ_WAIT, иначе join висит бесконечно
             runCatching { proxy.forceClose() }
                 .onFailure { PersistentLoggers.warn(TAG, "jniForceClose исключение: ${it.message}") }
             val job = proxyJobRef.getAndSet(null)
@@ -226,8 +232,19 @@ class ByeDpiEngine(
                     true
                 }
                 if (completed == null) {
-                    PersistentLoggers.warn(TAG, "proxyJob не завершился за ${STOP_GRACE_MS}ms")
-                    job.cancel()
+                    // JNI main() зависла на READ_WAIT — эскалация: forceClose→emergencyReset→cancel
+                    PersistentLoggers.warn(TAG, "proxyJob не завершился за ${STOP_GRACE_MS}ms — escalate")
+                    runCatching { proxy.forceClose() }
+                    runCatching { proxy.emergencyReset() }
+                        .onSuccess { PersistentLoggers.warn(TAG, "emergencyReset в stop (prior guard=$it)") }
+                    val retriedJoin = withTimeoutOrNull(STOP_GRACE_MS) {
+                        job.join()
+                        true
+                    }
+                    if (retriedJoin == null) {
+                        PersistentLoggers.error(TAG, "proxyJob не завершился после emergencyReset — cancel")
+                        job.cancel()
+                    }
                 }
             }
             activeSocksPort = 0
@@ -260,6 +277,7 @@ class ByeDpiEngine(
         return if (port > 0) IpProbeRoute.Socks("127.0.0.1", port) else IpProbeRoute.Default
     }
 
+    // НЕ добавлять argv[0] здесь — native-lib.c:85 ставит argv[0]="byedpi", двойной = hev IDLE
     internal fun buildArgs(config: EngineConfig.ByeDpi): Array<String> {
         val extra =
             config.args.trim()

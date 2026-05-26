@@ -64,6 +64,7 @@ internal object SingboxRuntime {
                     lastStatus = null
                 }
 
+                // uuid редактируется из логов — репо публичный, subscription UUID = личные данные
                 val configPreview = singboxJsonConfig.take(200).replace(UUID_REDACT_REGEX, """"uuid":"***"""")
                 PersistentLoggers.info(
                     TAG,
@@ -96,6 +97,7 @@ internal object SingboxRuntime {
                 }
 
                 try {
+                    // Go код дёргает options.AutoRedirect без nil-check → SIGABRT при null
                     server.startOrReloadService(singboxJsonConfig, OverrideOptions())
                     PersistentLoggers.info(TAG, "checkpoint: post-startOrReloadService (box running)")
                 } catch (e: Exception) {

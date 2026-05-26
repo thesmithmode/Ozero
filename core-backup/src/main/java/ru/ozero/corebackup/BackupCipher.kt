@@ -15,6 +15,7 @@ internal object BackupCipher {
     private const val GCM_TAG_BITS = 128
     private const val MIN_ENCRYPTED_SIZE = 4 + 1 + NONCE_LEN + GCM_TAG_BITS / 8 // 33
 
+    // Ключ хардкожен намеренно: one-click cross-device restore без аккаунта/сервера
     private val key: SecretKeySpec by lazy {
         val raw = MessageDigest.getInstance("SHA-256")
             .digest("ru.ozero.app:bkp-v1:hf7k2m9x".toByteArray(Charsets.UTF_8))
