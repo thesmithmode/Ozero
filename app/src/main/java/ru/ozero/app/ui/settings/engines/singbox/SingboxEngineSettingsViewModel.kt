@@ -338,6 +338,8 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
     }
 
+    fun consumeRestoreError() = _uiState.update { it.copy(restoreError = null) }
+
     companion object {
         private val SORT_ORDER_KEY = intPreferencesKey("singbox_sort_order")
     }

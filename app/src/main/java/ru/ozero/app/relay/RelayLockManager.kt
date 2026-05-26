@@ -1,5 +1,6 @@
 package ru.ozero.app.relay
 
+import android.annotation.SuppressLint
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.PowerManager
@@ -13,6 +14,7 @@ class RelayLockManager(
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
 
+    @SuppressLint("WakelockTimeout")
     fun acquire() {
         if (wakeLock == null) {
             wakeLock = powerManager

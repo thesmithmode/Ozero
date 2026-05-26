@@ -7,7 +7,9 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -66,8 +68,17 @@ class UrnetworkRelayCoordinatorTest {
         configStore.inject { it.copy(byClientJwt = value) }
     }
 
+    private fun relayTest(block: suspend TestScope.() -> Unit) = runTest(dispatcher) {
+        try {
+            block()
+        } finally {
+            coordinator.stop()
+            coordinatorScope.cancel()
+        }
+    }
+
     @Test
-    fun `relay запускается для ByeDPI когда JWT есть`() = runTest(dispatcher) {
+    fun `relay запускается для ByeDPI когда JWT есть`() = relayTest {
         setByClientJwt("test-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
@@ -76,7 +87,7 @@ class UrnetworkRelayCoordinatorTest {
     }
 
     @Test
-    fun `relay запускается для WARP когда JWT есть`() = runTest(dispatcher) {
+    fun `relay запускается для WARP когда JWT есть`() = relayTest {
         setByClientJwt("test-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.WARP, socksPort = 0)
 
@@ -85,7 +96,7 @@ class UrnetworkRelayCoordinatorTest {
     }
 
     @Test
-    fun `relay не запускает bridge и не трогает setProvidePaused для URnetwork движка`() = runTest(dispatcher) {
+    fun `relay не запускает bridge и не трогает setProvidePaused для URnetwork движка`() = relayTest {
         setByClientJwt("test-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.URNETWORK, socksPort = 0)
 
@@ -94,7 +105,7 @@ class UrnetworkRelayCoordinatorTest {
     }
 
     @Test
-    fun `relay передаёт setProvidePaused false когда provideEnabled true в configStore`() = runTest(dispatcher) {
+    fun `relay передаёт setProvidePaused false когда provideEnabled true в configStore`() = relayTest {
         setByClientJwt("test-jwt")
         configStore.setProvideEnabled(true)
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
@@ -104,7 +115,7 @@ class UrnetworkRelayCoordinatorTest {
     }
 
     @Test
-    fun `relay передаёт setProvidePaused true когда provideEnabled false в configStore`() = runTest(dispatcher) {
+    fun `relay передаёт setProvidePaused true когда provideEnabled false в configStore`() = relayTest {
         setByClientJwt("test-jwt")
         configStore.setProvideEnabled(false)
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
@@ -114,7 +125,7 @@ class UrnetworkRelayCoordinatorTest {
     }
 
     @Test
-    fun `relay не запускает bridge если JWT null но триггерит bootstrap`() = runTest(dispatcher) {
+    fun `relay не запускает bridge если JWT null но триггерит bootstrap`() = relayTest {
         setByClientJwt(null)
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
@@ -124,7 +135,7 @@ class UrnetworkRelayCoordinatorTest {
     }
 
     @Test
-    fun `bootstrap acquires JWT и затем relay стартует когда JWT появился через configStore`() = runTest(dispatcher) {
+    fun `bootstrap acquires JWT и затем relay стартует когда JWT появился через configStore`() = relayTest {
         bootstrapper.onCallSetJwt("bootstrapped-jwt", configStore)
         setByClientJwt(null)
 
@@ -135,7 +146,7 @@ class UrnetworkRelayCoordinatorTest {
     }
 
     @Test
-    fun `bootstrap не зовётся повторно в одной tunnel session`() = runTest(dispatcher) {
+    fun `bootstrap не зовётся повторно в одной tunnel session`() = relayTest {
         setByClientJwt(null)
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
@@ -146,7 +157,7 @@ class UrnetworkRelayCoordinatorTest {
 
     @Test
     fun `bootstrap session flag сбрасывается на disconnect — позволяет retry на следующем reconnect`() =
-        runTest(dispatcher) {
+        relayTest {
             setByClientJwt(null)
             tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
             assertEquals(1, bootstrapper.calls)
@@ -158,7 +169,7 @@ class UrnetworkRelayCoordinatorTest {
         }
 
     @Test
-    fun `bootstrap не зовётся когда URnetwork engine активен — он сам acquires`() = runTest(dispatcher) {
+    fun `bootstrap не зовётся когда URnetwork engine активен — он сам acquires`() = relayTest {
         setByClientJwt(null)
         tunnelStateFlow.value = TunnelState.Connected(EngineId.URNETWORK, socksPort = 0)
 
@@ -166,7 +177,7 @@ class UrnetworkRelayCoordinatorTest {
     }
 
     @Test
-    fun `bootstrap не зовётся когда JWT уже есть`() = runTest(dispatcher) {
+    fun `bootstrap не зовётся когда JWT уже есть`() = relayTest {
         setByClientJwt("existing-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
@@ -175,7 +186,7 @@ class UrnetworkRelayCoordinatorTest {
     }
 
     @Test
-    fun `relay останавливает bridge при Idle если был owned`() = runTest(dispatcher) {
+    fun `relay останавливает bridge при Idle если был owned`() = relayTest {
         setByClientJwt("test-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
         assertEquals(1, bridge.startCalls)
@@ -187,14 +198,14 @@ class UrnetworkRelayCoordinatorTest {
     }
 
     @Test
-    fun `relay не останавливает bridge при Idle если не был owned`() = runTest(dispatcher) {
+    fun `relay не останавливает bridge при Idle если не был owned`() = relayTest {
         tunnelStateFlow.value = TunnelState.Idle
 
         assertEquals(0, bridge.stopCalls)
     }
 
     @Test
-    fun `relay ownership сбрасывается когда URnetwork становится активным`() = runTest(dispatcher) {
+    fun `relay ownership сбрасывается когда URnetwork становится активным`() = relayTest {
         setByClientJwt("test-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
         assertEquals(1, bridge.startCalls)
@@ -206,7 +217,7 @@ class UrnetworkRelayCoordinatorTest {
     }
 
     @Test
-    fun `connectBestAvailable вызывается после успешного start`() = runTest(dispatcher) {
+    fun `connectBestAvailable вызывается после успешного start`() = relayTest {
         setByClientJwt("test-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
@@ -214,17 +225,19 @@ class UrnetworkRelayCoordinatorTest {
     }
 
     @Test
-    fun `connectBestAvailable не вызывается при failed start`() = runTest(dispatcher) {
+    fun `connectBestAvailable не вызывается при failed start`() = relayTest {
         bridge.startResult = UrnetworkSdkBridge.StartResult.Failed("test")
         setByClientJwt("test-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
+
+        advanceUntilIdle()
 
         assertEquals(0, bridge.connectBestAvailableCalls)
         assertEquals(3, bridge.startCalls, "retry 3 attempts")
     }
 
     @Test
-    fun `relay перезапускается при смене с URnetwork на ByeDPI`() = runTest(dispatcher) {
+    fun `relay перезапускается при смене с URnetwork на ByeDPI`() = relayTest {
         setByClientJwt("test-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.URNETWORK, socksPort = 0)
         assertEquals(0, bridge.startCalls)
@@ -237,7 +250,7 @@ class UrnetworkRelayCoordinatorTest {
     }
 
     @Test
-    fun `relay при смене WARP на ByeDPI перезапускается с connectBestAvailable`() = runTest(dispatcher) {
+    fun `relay при смене WARP на ByeDPI перезапускается с connectBestAvailable`() = relayTest {
         setByClientJwt("test-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.WARP, socksPort = 0)
         assertEquals(1, bridge.startCalls)
