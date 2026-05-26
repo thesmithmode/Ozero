@@ -441,15 +441,6 @@
     <string name="chart_tf_1h">1h</string>
 
     <!-- Manual server -->
-    <string name="manual_server_title">Add server</string>
-    <string name="manual_server_hint">Paste a VLESS / Trojan / Hysteria2 / Shadowsocks URI. The server will be saved to the database and picked up by engine candidates on the next connection.</string>
-    <string name="manual_server_uri_label">Server URI</string>
-    <string name="manual_server_add">Add</string>
-    <string name="manual_server_clear">Clear</string>
-    <string name="manual_server_error_prefix">Error: %1$s</string>
-    <string name="manual_server_success_prefix">OK: added server %1$s</string>
-    <string name="manual_server_error_empty_uri">Empty URI</string>
-    <string name="manual_server_error_import_unavailable">Import is not available in this build</string>
 
     <!-- Logs screen -->
     <string name="logs_title">Logs</string>
@@ -482,8 +473,6 @@
     <!-- Settings additional rows -->
     <string name="settings_byedpi_title">ByeDPI args</string>
     <string name="settings_byedpi_summary">DPI bypass settings</string>
-    <string name="settings_manual_server_title">Add server manually</string>
-    <string name="settings_manual_server_summary">VLESS / Trojan / Hysteria2 / Shadowsocks URI</string>
     <string name="settings_logs">Logs</string>
 
     <!-- WARP engine settings -->

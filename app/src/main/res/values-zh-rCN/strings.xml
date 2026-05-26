@@ -371,15 +371,6 @@
     <string name="chart_tf_5min">5m</string>
     <string name="chart_tf_30min">30m</string>
     <string name="chart_tf_1h">1h</string>
-    <string name="manual_server_title">Add server</string>
-    <string name="manual_server_hint">Paste a VLESS / Trojan / Hysteria2 / Shadowsocks URI. The server will be saved to the database and picked up by engine candidates on the next connection.</string>
-    <string name="manual_server_uri_label">Server URI</string>
-    <string name="manual_server_add">Add</string>
-    <string name="manual_server_clear">Clear</string>
-    <string name="manual_server_error_prefix">Error: %1$s</string>
-    <string name="manual_server_success_prefix">OK: added server %1$s</string>
-    <string name="manual_server_error_empty_uri">Empty URI</string>
-    <string name="manual_server_error_import_unavailable">Import is not available in this build</string>
     <string name="logs_title_fmt">Logs (%1$dKB)</string>
     <string name="logs_back_cd">Back</string>
     <string name="logs_copy">Copy</string>
@@ -401,8 +392,6 @@
     <string name="byedpi_dns_field_label">DNS addresses (comma-separated)</string>
     <string name="settings_byedpi_title">ByeDPI args</string>
     <string name="settings_byedpi_summary">DPI bypass settings</string>
-    <string name="settings_manual_server_title">Add server manually</string>
-    <string name="settings_manual_server_summary">VLESS / Trojan / Hysteria2 / Shadowsocks URI</string>
     <string name="settings_logs">Logs</string>
     <string name="warp_progress_mirror_fmt">Mirror %1$s</string>
     <string name="warp_validation_required_fields">PrivateKey, Endpoint, PublicKey (Peer), Address are required</string>

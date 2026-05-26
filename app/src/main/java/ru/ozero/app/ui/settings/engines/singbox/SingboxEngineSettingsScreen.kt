@@ -1,6 +1,10 @@
 package ru.ozero.app.ui.settings.engines.singbox
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,14 +18,16 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -37,6 +43,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -54,6 +61,18 @@ fun SingboxEngineSettingsScreen(
     viewModel: SingboxEngineSettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val text = runCatching {
+            context.contentResolver.openInputStream(uri)?.bufferedReader()?.readText()
+        }.getOrNull() ?: return@rememberLauncherForActivityResult
+        val fileName = uri.lastPathSegment
+        viewModel.onImportFromFile(text, fileName)
+    }
 
     if (state.showAddGroupDialog) {
         AddGroupDialog(
@@ -67,6 +86,18 @@ fun SingboxEngineSettingsScreen(
         )
     }
 
+    if (state.showAddManualLinksDialog) {
+        AddManualLinksDialog(
+            input = state.manualLinksInput,
+            groupName = state.manualLinksGroupName,
+            error = state.manualLinksError,
+            onInputChanged = viewModel::onManualLinksInputChanged,
+            onGroupNameChanged = viewModel::onManualLinksGroupNameChanged,
+            onConfirm = viewModel::onConfirmManualLinks,
+            onDismiss = { viewModel.onShowAddManualLinksDialog(false) },
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -77,15 +108,43 @@ fun SingboxEngineSettingsScreen(
                     }
                 },
                 actions = {
+                    Box {
+                        IconButton(
+                            onClick = { viewModel.onShowAddMenu(true) },
+                            modifier = Modifier.testTag("singbox_add_button"),
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                        }
+                        DropdownMenu(
+                            expanded = state.showAddMenu,
+                            onDismissRequest = { viewModel.onShowAddMenu(false) },
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.singbox_add_menu_subscription)) },
+                                onClick = {
+                                    viewModel.onShowAddMenu(false)
+                                    viewModel.onAddGroupDialog(true)
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.singbox_add_menu_manual)) },
+                                onClick = { viewModel.onShowAddManualLinksDialog(true) },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.singbox_add_menu_file)) },
+                                onClick = {
+                                    viewModel.onShowAddMenu(false)
+                                    filePickerLauncher.launch(arrayOf("text/*", "application/octet-stream"))
+                                },
+                            )
+                        }
+                    }
                     if (state.isPinging.isNotEmpty()) {
-                        TextButton(
+                        IconButton(
                             onClick = viewModel::onCancelPing,
                             modifier = Modifier.testTag("singbox_cancel_ping_button"),
                         ) {
-                            Text(
-                                text = stringResource(R.string.singbox_cancel),
-                                style = MaterialTheme.typography.labelMedium,
-                            )
+                            Icon(Icons.Default.Close, contentDescription = null)
                         }
                     } else {
                         TextButton(
@@ -100,14 +159,11 @@ fun SingboxEngineSettingsScreen(
                         }
                     }
                     if (state.isRefreshing.isNotEmpty()) {
-                        TextButton(
+                        IconButton(
                             onClick = viewModel::onCancelRefresh,
                             modifier = Modifier.testTag("singbox_cancel_refresh_button"),
                         ) {
-                            Text(
-                                text = stringResource(R.string.singbox_cancel),
-                                style = MaterialTheme.typography.labelMedium,
-                            )
+                            Icon(Icons.Default.Close, contentDescription = null)
                         }
                     } else {
                         IconButton(
@@ -176,108 +232,7 @@ private fun SingboxSettingsContent(
             Spacer(Modifier.height(4.dp))
         }
 
-        Spacer(Modifier.height(8.dp))
-
-        TextButton(
-            onClick = { viewModel.onAddGroupDialog(true) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("singbox_add_group_button"),
-        ) {
-            Icon(Icons.Default.Add, contentDescription = null)
-            Spacer(Modifier.width(4.dp))
-            Text(stringResource(R.string.singbox_add_group_button))
-        }
-
-        SingboxCustomLinkSection(state = state, viewModel = viewModel)
-
-        if (state.groups.isNotEmpty() && !state.isAutoSelectMode) {
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider()
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = stringResource(R.string.singbox_auto_select_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(8.dp))
-            Button(
-                onClick = viewModel::onAutoSelectBest,
-                enabled = !state.isAutoSelecting && state.isRefreshing.isEmpty() && state.isPinging.isEmpty(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("singbox_auto_select_button"),
-            ) {
-                if (state.isAutoSelecting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                    Spacer(Modifier.width(8.dp))
-                }
-                Text(stringResource(R.string.singbox_auto_select_button))
-            }
-        }
-
         Spacer(Modifier.height(24.dp))
-    }
-}
-
-@Composable
-private fun SingboxCustomLinkSection(
-    state: SingboxSettingsUiState,
-    viewModel: SingboxEngineSettingsViewModel,
-) {
-    Spacer(Modifier.height(16.dp))
-    HorizontalDivider()
-    Spacer(Modifier.height(12.dp))
-    Text(
-        text = stringResource(R.string.singbox_custom_link_section),
-        style = MaterialTheme.typography.labelMedium,
-    )
-    Spacer(Modifier.height(4.dp))
-    OutlinedTextField(
-        value = state.customLinkInput,
-        onValueChange = viewModel::onCustomLinkChanged,
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag("singbox_link_input"),
-        placeholder = { Text("vless://, vmess://, trojan://, ss://") },
-        isError = state.customLinkError != null,
-        supportingText = state.customLinkError?.let { err ->
-            {
-                Text(
-                    when (err) {
-                        is CustomLinkError.Empty -> stringResource(R.string.singbox_link_error_empty)
-                        is CustomLinkError.ParseFailed ->
-                            stringResource(R.string.singbox_link_error_parse, err.cause)
-                        is CustomLinkError.SaveFailed ->
-                            stringResource(R.string.singbox_link_error_save, err.cause)
-                    },
-                )
-            }
-        },
-        singleLine = false,
-        minLines = 2,
-    )
-    Spacer(Modifier.height(8.dp))
-    Button(
-        onClick = viewModel::onSaveCustomLink,
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag("singbox_save_button"),
-    ) {
-        Text(stringResource(R.string.singbox_save_button))
-    }
-    if (state.customLinkSaved) {
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = stringResource(R.string.singbox_saved_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.testTag("singbox_saved_hint"),
-        )
     }
 }
 
@@ -353,8 +308,10 @@ private fun SubscriptionGroupItem(
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }
-                IconButton(onClick = onRefresh, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.singbox_group_refresh))
+                if (group.subscriptionUrl.isNotEmpty()) {
+                    IconButton(onClick = onRefresh, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.singbox_group_refresh))
+                    }
                 }
             }
             IconButton(
@@ -462,6 +419,7 @@ private fun AddGroupDialog(
                     value = name,
                     onValueChange = onNameChanged,
                     label = { Text(stringResource(R.string.singbox_group_name_hint)) },
+                    placeholder = { Text(stringResource(R.string.singbox_group_name_auto_hint)) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("singbox_add_group_name"),
@@ -491,6 +449,66 @@ private fun AddGroupDialog(
                 modifier = Modifier.testTag("singbox_add_group_confirm"),
             ) {
                 Text(stringResource(R.string.singbox_add_group_button))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.singbox_cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun AddManualLinksDialog(
+    input: String,
+    groupName: String,
+    error: String?,
+    onInputChanged: (String) -> Unit,
+    onGroupNameChanged: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.singbox_add_menu_manual)) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = groupName,
+                    onValueChange = onGroupNameChanged,
+                    label = { Text(stringResource(R.string.singbox_manual_links_name_hint)) },
+                    placeholder = { Text(stringResource(R.string.singbox_group_name_auto_hint)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = input,
+                    onValueChange = onInputChanged,
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("vless://, vmess://, trojan://, ss://") },
+                    isError = error != null,
+                    supportingText = if (error != null) {
+                        {
+                            Text(
+                                when (error) {
+                                    "empty" -> stringResource(R.string.singbox_manual_links_error_empty)
+                                    else -> stringResource(R.string.singbox_manual_links_error_parse)
+                                },
+                            )
+                        }
+                    } else {
+                        null
+                    },
+                    singleLine = false,
+                    minLines = 3,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.singbox_save_button))
             }
         },
         dismissButton = {

@@ -409,15 +409,6 @@
     <string name="usage_history_empty">Aún no aplicadas</string>
     <string name="strategy_scan_notification_title">Selección de estrategias ByeDPI…</string>
     <string name="strategy_scan_channel_name">Selección de estrategias</string>
-    <string name="manual_server_title">Agregar servidor</string>
-    <string name="manual_server_hint">Pega un URI VLESS / Trojan / Hysteria2 / Shadowsocks. El servidor se guardará en la base de datos y será utilizado por los motores en la próxima conexión.</string>
-    <string name="manual_server_uri_label">URI del servidor</string>
-    <string name="manual_server_add">Agregar</string>
-    <string name="manual_server_clear">Limpiar</string>
-    <string name="manual_server_error_prefix">Error: %1$s</string>
-    <string name="manual_server_success_prefix">OK: servidor agregado %1$s</string>
-    <string name="manual_server_error_empty_uri">URI vacío</string>
-    <string name="manual_server_error_import_unavailable">La importación no está disponible en esta versión</string>
     <string name="logs_title">Registros</string>
     <string name="logs_title_fmt">Registros (%1$dKB)</string>
     <string name="logs_back_cd">Volver</string>
@@ -444,8 +435,6 @@
     <string name="byedpi_dns_field_label">Direcciones DNS (separadas por coma)</string>
     <string name="settings_byedpi_title">Args de ByeDPI</string>
     <string name="settings_byedpi_summary">Configuración de omisión DPI</string>
-    <string name="settings_manual_server_title">Agregar servidor manualmente</string>
-    <string name="settings_manual_server_summary">URI VLESS / Trojan / Hysteria2 / Shadowsocks</string>
     <string name="settings_logs">Registros</string>
     <string name="warp_progress_mirror_fmt">Espejo %1$s</string>
     <string name="warp_validation_required_fields">PrivateKey, Endpoint, PublicKey (Par), Dirección son obligatorios</string>

@@ -58,7 +58,6 @@ fun SettingsScreen(
     onOpenByeDpiEngineSettings: () -> Unit = {},
     onOpenUrnetworkSettings: () -> Unit = {},
     onOpenWarpSettings: () -> Unit = {},
-    onOpenManualServer: () -> Unit = {},
     onOpenStatsHistory: () -> Unit = {},
     onOpenDiagnostics: () -> Unit = {},
     onOpenBackup: () -> Unit = {},
@@ -82,7 +81,6 @@ fun SettingsScreen(
             onOpenByeDpiEngineSettings = onOpenByeDpiEngineSettings,
             onOpenUrnetworkSettings = onOpenUrnetworkSettings,
             onOpenWarpSettings = onOpenWarpSettings,
-            onOpenManualServer = onOpenManualServer,
             onOpenStatsHistory = onOpenStatsHistory,
             onOpenDiagnostics = onOpenDiagnostics,
             onOpenBackup = onOpenBackup,
@@ -206,7 +204,6 @@ private fun ContentBody(
                 onOpenByeDpi = nav.onOpenByeDpiEngineSettings,
                 onOpenUrnetwork = nav.onOpenUrnetworkSettings,
                 onOpenWarp = nav.onOpenWarpSettings,
-                onOpenManualServer = nav.onOpenManualServer,
                 onOpenMasterDns = nav.onOpenMasterDnsSettings,
                 onOpenFptn = nav.onOpenFptnSettings,
                 onOpenSingbox = nav.onOpenSingboxSettings,
@@ -407,7 +404,6 @@ private fun EnginesSection(
     onOpenByeDpi: () -> Unit,
     onOpenUrnetwork: () -> Unit,
     onOpenWarp: () -> Unit,
-    onOpenManualServer: () -> Unit,
     onOpenMasterDns: () -> Unit,
     onOpenFptn: () -> Unit,
     onOpenSingbox: () -> Unit,
@@ -437,13 +433,6 @@ private fun EnginesSection(
         summary = stringResource(R.string.settings_warp_summary),
         tag = "settings_warp_row",
         onClick = onOpenWarp,
-        enabled = true,
-    )
-    NavRow(
-        title = stringResource(R.string.settings_manual_server_title),
-        summary = stringResource(R.string.settings_manual_server_summary),
-        tag = "settings_manual_server_row",
-        onClick = onOpenManualServer,
         enabled = true,
     )
     NavRow(

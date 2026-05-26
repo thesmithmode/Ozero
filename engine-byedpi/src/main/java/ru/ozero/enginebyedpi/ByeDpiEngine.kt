@@ -114,6 +114,17 @@ class ByeDpiEngine(
             PersistentLoggers.debug(TAG, "start: barrier passed — dispatcher drained")
         }
 
+        // Безусловный drain: после dirty stop (emergencyReset+cancel) старый нативный main()
+        // может ещё держать единственный слот limitedParallelism(1). Без drain новая корутина
+        // встанет в очередь и jniStartProxy никогда не вызовется.
+        val drained = withTimeoutOrNull(STOP_GRACE_MS) {
+            withContext(proxyDispatcher) {}
+            true
+        }
+        if (drained == null) {
+            PersistentLoggers.warn(TAG, "start: dispatcher drain timeout — native thread may still be active")
+        }
+
         val args = buildArgs(resolvedConfig)
         PersistentLoggers.debug(
             TAG,

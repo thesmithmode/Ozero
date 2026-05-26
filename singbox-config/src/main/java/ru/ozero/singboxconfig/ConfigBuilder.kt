@@ -26,7 +26,7 @@ object ConfigBuilder {
             append("""{"type":"urltest","tag":"proxy","outbounds":[$tagList],""")
             append(""""url":"https://www.gstatic.com/generate_204",""")
             append(""""interval":"3m","tolerance":50,""")
-            append(""""interrupt_exist_connections":false,"idle_timeout":"30m"}""")
+            append(""""interrupt_exist_connections":true,"idle_timeout":"30m"}""")
         }
         return buildFullConfig(listOf(urltest) + proxyOutbounds)
     }

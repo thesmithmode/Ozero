@@ -446,17 +446,6 @@
     <string name="chart_tf_30min">30м</string>
     <string name="chart_tf_1h">1ч</string>
 
-    <!-- Manual server -->
-    <string name="manual_server_title">Добавить сервер</string>
-    <string name="manual_server_hint">Вставьте VLESS / Trojan / Hysteria2 / Shadowsocks URI. Сервер будет добавлен в БД и подхвачен engine кандидатами при следующем подключении.</string>
-    <string name="manual_server_uri_label">Server URI</string>
-    <string name="manual_server_add">Добавить</string>
-    <string name="manual_server_clear">Очистить</string>
-    <string name="manual_server_error_prefix">Ошибка: %1$s</string>
-    <string name="manual_server_success_prefix">OK: добавлен сервер %1$s</string>
-    <string name="manual_server_error_empty_uri">Пустой URI</string>
-    <string name="manual_server_error_import_unavailable">Импорт недоступен в этой версии</string>
-
     <!-- Logs screen -->
     <string name="logs_title">Логи</string>
     <string name="logs_title_fmt">Логи (%1$dKB)</string>
@@ -489,8 +478,6 @@
     <!-- Settings additional rows -->
     <string name="settings_byedpi_title">ByeDPI args</string>
     <string name="settings_byedpi_summary">Настройки обхода ТСПУ</string>
-    <string name="settings_manual_server_title">Добавить сервер вручную</string>
-    <string name="settings_manual_server_summary">VLESS / Trojan / Hysteria2 / Shadowsocks URI</string>
     <string name="settings_logs">Логи</string>
 
     <!-- WARP engine settings -->

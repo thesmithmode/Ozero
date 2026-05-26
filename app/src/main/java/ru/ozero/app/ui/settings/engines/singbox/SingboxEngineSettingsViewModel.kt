@@ -40,20 +40,11 @@ enum class SortOrder {
     }
 }
 
-sealed class CustomLinkError {
-    data object Empty : CustomLinkError()
-    data class ParseFailed(val cause: String) : CustomLinkError()
-    data class SaveFailed(val cause: String) : CustomLinkError()
-}
-
 data class SingboxSettingsUiState(
     val groups: List<SubscriptionGroup> = emptyList(),
     val expandedGroupId: Long? = null,
     val groupProfiles: Map<Long, List<ProxyProfile>> = emptyMap(),
     val selectedProfileId: Long? = null,
-    val customLinkInput: String = "",
-    val customLinkSaved: Boolean = false,
-    val customLinkError: CustomLinkError? = null,
     val isRefreshing: Set<Long> = emptySet(),
     val isPinging: Set<Long> = emptySet(),
     val isAutoSelecting: Boolean = false,
@@ -66,6 +57,11 @@ data class SingboxSettingsUiState(
     val addGroupName: String = "",
     val addGroupUrl: String = "",
     val addGroupError: String? = null,
+    val showAddMenu: Boolean = false,
+    val showAddManualLinksDialog: Boolean = false,
+    val manualLinksInput: String = "",
+    val manualLinksGroupName: String = "",
+    val manualLinksError: String? = null,
 )
 
 @HiltViewModel
@@ -131,7 +127,6 @@ class SingboxEngineSettingsViewModel @Inject constructor(
                 prefs[SingboxProbeService.SELECTED_PROFILE_KEY] = profile.id
                 prefs[SingboxProbeService.BEAN_KEY] = profile.beanBlob
             }
-            _uiState.update { it.copy(customLinkSaved = false) }
         }
     }
 
@@ -270,12 +265,13 @@ class SingboxEngineSettingsViewModel @Inject constructor(
     }
 
     fun onAddGroupConfirm() {
-        val name = _uiState.value.addGroupName.trim()
         val url = _uiState.value.addGroupUrl.trim()
-        if (name.isEmpty() || url.isEmpty()) {
+        if (url.isEmpty()) {
             _uiState.update { it.copy(addGroupError = "empty") }
             return
         }
+        val rawName = _uiState.value.addGroupName.trim()
+        val name = rawName.ifEmpty { "Ozero-${state.value.groups.size + 1}" }
         viewModelScope.launch {
             groupDao.insert(SubscriptionGroup(name = name, subscriptionUrl = url, userOrder = state.value.groups.size))
             _uiState.update {
@@ -288,36 +284,89 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         viewModelScope.launch { groupDao.delete(group) }
     }
 
-    fun onCustomLinkChanged(text: String) {
-        _uiState.update { it.copy(customLinkInput = text, customLinkError = null, customLinkSaved = false) }
+    fun onShowAddMenu(show: Boolean) = _uiState.update { it.copy(showAddMenu = show) }
+
+    fun onShowAddManualLinksDialog(show: Boolean) = _uiState.update {
+        if (show) {
+            it.copy(showAddManualLinksDialog = true, showAddMenu = false)
+        } else {
+            it.copy(showAddManualLinksDialog = false, manualLinksInput = "", manualLinksGroupName = "", manualLinksError = null)
+        }
     }
 
-    fun onSaveCustomLink() {
-        val raw = _uiState.value.customLinkInput.trim()
+    fun onManualLinksInputChanged(text: String) = _uiState.update {
+        it.copy(manualLinksInput = text, manualLinksError = null)
+    }
+
+    fun onManualLinksGroupNameChanged(name: String) = _uiState.update {
+        it.copy(manualLinksGroupName = name)
+    }
+
+    fun onConfirmManualLinks() {
+        val raw = _uiState.value.manualLinksInput.trim()
         if (raw.isEmpty()) {
-            _uiState.update { it.copy(customLinkError = CustomLinkError.Empty) }
+            _uiState.update { it.copy(manualLinksError = "empty") }
             return
         }
         val parsed = RawShareLinksParser.parse(raw)
         if (parsed.isEmpty()) {
-            _uiState.update {
-                it.copy(customLinkError = CustomLinkError.ParseFailed("vless://, vmess://, trojan://, ss://"))
-            }
+            _uiState.update { it.copy(manualLinksError = "parse") }
             return
         }
-        val bean = parsed.first()
-        val blob = runCatching { KryoSerializer.serialize(bean) }
-            .getOrElse { e ->
-                _uiState.update { it.copy(customLinkError = CustomLinkError.SaveFailed(e.message ?: "")) }
-                return
-            }
+        val rawName = _uiState.value.manualLinksGroupName.trim()
+        val name = rawName.ifEmpty { "Ozero-${state.value.groups.size + 1}" }
         viewModelScope.launch {
-            dataStore.edit { prefs ->
-                prefs[SingboxProbeService.BEAN_KEY] = blob
-                prefs.remove(SingboxProbeService.SELECTED_PROFILE_KEY)
+            val groupId = groupDao.insert(
+                SubscriptionGroup(name = name, subscriptionUrl = "", userOrder = state.value.groups.size),
+            )
+            val profiles = parsed.mapIndexed { idx, bean ->
+                ProxyProfile(
+                    groupId = groupId,
+                    name = bean.name.ifBlank { "Server ${idx + 1}" },
+                    beanBlob = KryoSerializer.serialize(bean),
+                    protocolType = protocolTypeOf(bean),
+                    userOrder = idx,
+                )
             }
-            _uiState.update { it.copy(customLinkSaved = true, customLinkError = null) }
+            profileDao.insertAll(profiles)
+            _uiState.update {
+                it.copy(
+                    showAddManualLinksDialog = false,
+                    manualLinksInput = "",
+                    manualLinksGroupName = "",
+                    manualLinksError = null,
+                )
+            }
         }
+    }
+
+    fun onImportFromFile(text: String, fileName: String?) {
+        val parsed = RawShareLinksParser.parse(text)
+        if (parsed.isEmpty()) return
+        val name = fileName?.substringBeforeLast(".") ?: "Ozero-${state.value.groups.size + 1}"
+        viewModelScope.launch {
+            val groupId = groupDao.insert(
+                SubscriptionGroup(name = name, subscriptionUrl = "", userOrder = state.value.groups.size),
+            )
+            val profiles = parsed.mapIndexed { idx, bean ->
+                ProxyProfile(
+                    groupId = groupId,
+                    name = bean.name.ifBlank { "Server ${idx + 1}" },
+                    beanBlob = KryoSerializer.serialize(bean),
+                    protocolType = protocolTypeOf(bean),
+                    userOrder = idx,
+                )
+            }
+            profileDao.insertAll(profiles)
+        }
+    }
+
+    private fun protocolTypeOf(bean: ru.ozero.singboxfmt.AbstractBean): Int = when (bean) {
+        is ru.ozero.singboxfmt.VLESSBean -> 0
+        is ru.ozero.singboxfmt.VMessBean -> 1
+        is ru.ozero.singboxfmt.TrojanBean -> 2
+        is ru.ozero.singboxfmt.ShadowsocksBean -> 3
+        else -> 0
     }
 
     fun onSortOrderChanged(order: SortOrder) {

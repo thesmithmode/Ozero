@@ -12,7 +12,6 @@ enum class TopScreen {
     UrnetworkEngineSettings,
     WarpEngineSettings,
     StrategyTest,
-    ManualServer,
     StatsHistory,
     Backup,
     AutoModeSettings,

@@ -13,7 +13,6 @@ import ru.ozero.app.ui.about.AboutScreen
 import ru.ozero.app.ui.backup.BackupScreen
 import ru.ozero.app.ui.diag.DiagnosticsScreen
 import ru.ozero.app.ui.logs.LogsScreen
-import ru.ozero.app.ui.servers.ManualServerScreen
 import ru.ozero.app.ui.servers.ServersScreen
 import ru.ozero.app.ui.settings.AutoModeSettingsScreen
 import ru.ozero.app.ui.settings.LanguageScreen
@@ -72,7 +71,6 @@ fun RootNavigation(
                     onOpenMasterDnsSettings = { navigate(TopScreen.MasterDnsSettings) },
                     onOpenFptnSettings = { navigate(TopScreen.FptnSettings) },
                     onOpenSingboxSettings = { navigate(TopScreen.SingboxSettings) },
-                    onOpenManualServer = { navigate(TopScreen.ManualServer) },
                     onOpenStatsHistory = { navigate(TopScreen.StatsHistory) },
                     onOpenDiagnostics = { navigate(TopScreen.Diagnostics) },
                     onOpenBackup = { navigate(TopScreen.Backup) },
@@ -106,7 +104,6 @@ fun RootNavigation(
             )
             TopScreen.SingboxAdvancedSettings -> SingboxAdvancedSettingsScreen(onBack = { back() })
             TopScreen.StrategyTest -> StrategyTestScreen(onBack = { back() })
-            TopScreen.ManualServer -> ManualServerScreen(onBack = { back() })
             TopScreen.StatsHistory -> TrafficStatsScreen(onBack = { back() })
             TopScreen.Main ->
                 MainScreen(
