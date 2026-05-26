@@ -18,8 +18,6 @@
     <string name="singbox_refresh_all_button">Actualizar todo</string>
     <string name="singbox_ping_all_button">Test</string>
     <string name="singbox_group_ping">Test</string>
-    <string name="singbox_auto_select_button">Mejor servidor</string>
-    <string name="singbox_auto_select_hint">Comprueba la latencia de todos los servidores y elige el más rápido</string>
     <string name="singbox_auto_mode_title">Selección automática</string>
     <string name="singbox_auto_mode_desc">Se conecta al servidor con menor ping y cambia automáticamente cuando la latencia empeora</string>
     <string name="singbox_advanced_title">Ajustes de Sing-box</string>

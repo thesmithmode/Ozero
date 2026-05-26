@@ -25,8 +25,6 @@
     <string name="singbox_refresh_all_button">Refresh all</string>
     <string name="singbox_ping_all_button">Test</string>
     <string name="singbox_group_ping">Test</string>
-    <string name="singbox_auto_select_button">Best server</string>
-    <string name="singbox_auto_select_hint">Checks latency of all servers and picks the fastest</string>
     <string name="singbox_auto_mode_title">Auto-select</string>
     <string name="singbox_auto_mode_desc">Connects to the server with lowest ping, switches automatically when latency degrades</string>
     <string name="singbox_advanced_title">Sing-box Settings</string>
