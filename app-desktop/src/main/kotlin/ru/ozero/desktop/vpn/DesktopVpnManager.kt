@@ -12,10 +12,14 @@ import ru.ozero.desktop.engine.DesktopEngine
 import ru.ozero.desktop.engine.DesktopEngineRegistry
 import ru.ozero.desktop.engine.EngineConfig
 import ru.ozero.desktop.engine.EngineStartResult
+import ru.ozero.desktop.engine.SingboxDesktopEngine
+import ru.ozero.desktop.engine.TunFrontend
 import ru.ozero.desktop.model.EngineId
 import ru.ozero.desktop.model.SwitchingTransition
 import ru.ozero.desktop.model.TunnelState
 import ru.ozero.desktop.model.TunnelStats
+import ru.ozero.desktop.model.VpnMode
+import ru.ozero.desktop.platform.PlatformDetector
 import ru.ozero.desktop.proxy.SystemProxy
 import ru.ozero.desktop.proxy.WindowsSystemProxy
 import ru.ozero.desktop.ui.components.PowerDiscState
@@ -24,6 +28,7 @@ import java.util.logging.Logger
 class DesktopVpnManager(
     private val scope: CoroutineScope,
     private val systemProxy: SystemProxy = WindowsSystemProxy.create(),
+    private val platformDetector: PlatformDetectorPort = DefaultPlatformDetectorPort,
 ) {
     private val log = Logger.getLogger("DesktopVpnManager")
 
@@ -39,7 +44,11 @@ class DesktopVpnManager(
     private val _powerDiscState = MutableStateFlow(PowerDiscState.Off)
     val powerDiscState: StateFlow<PowerDiscState> = _powerDiscState.asStateFlow()
 
+    private val _effectiveVpnMode = MutableStateFlow(VpnMode.TUN)
+    val effectiveVpnMode: StateFlow<VpnMode> = _effectiveVpnMode.asStateFlow()
+
     private var activeEngine: DesktopEngine? = null
+    private var tunFrontend: TunFrontend? = null
     private var watchdogJob: Job? = null
 
     fun toggle() {
@@ -50,7 +59,7 @@ class DesktopVpnManager(
         }
     }
 
-    fun connect(engineId: EngineId? = null) {
+    fun connect(engineId: EngineId? = null, vpnMode: VpnMode = VpnMode.TUN) {
         val id = engineId ?: EngineId.SINGBOX
         val engine = DesktopEngineRegistry.get(id)
         if (engine == null) {
@@ -62,46 +71,126 @@ class DesktopVpnManager(
         _powerDiscState.value = PowerDiscState.Connecting
 
         scope.launch {
-            val config = EngineConfig()
-            val result = engine.start(config)
+            val effectiveMode = resolveVpnMode(id, vpnMode)
+            _effectiveVpnMode.value = effectiveMode
 
-            when (result) {
-                is EngineStartResult.Success -> {
-                    activeEngine = engine
-                    val port = result.port
-                    _state.value = TunnelState.Connected(id, port)
-                    _powerDiscState.value = PowerDiscState.On
-
-                    runCatching { systemProxy.enable("127.0.0.1:$port") }
-                        .onFailure { log.warning("system proxy set failed: ${it.message}") }
-
-                    startWatchdog(engine, id)
-                    log.info("connected via ${id.displayName} on port $port")
-                }
-
-                is EngineStartResult.BinaryMissing -> {
-                    _state.value = TunnelState.Failed(id, "${id.displayName}: ${result.binaryName} not found")
-                    _powerDiscState.value = PowerDiscState.Off
-                    log.warning("binary missing: ${result.binaryName}")
-                }
-
-                is EngineStartResult.PlatformUnavailable -> {
-                    _state.value = TunnelState.Failed(id, result.reason)
-                    _powerDiscState.value = PowerDiscState.Off
-                    log.warning("platform unavailable: ${result.reason}")
-                }
-
-                is EngineStartResult.Failed -> {
-                    _state.value = TunnelState.Failed(id, result.reason)
-                    _powerDiscState.value = PowerDiscState.Off
-                    log.warning("start failed: ${result.reason}")
-                }
+            when (effectiveMode) {
+                VpnMode.TUN -> connectTun(id, engine)
+                VpnMode.PROXY -> connectProxy(id, engine)
             }
         }
     }
 
+    private suspend fun connectTun(id: EngineId, engine: DesktopEngine) {
+        when (id) {
+            EngineId.SINGBOX -> connectSingboxTun(id, engine)
+            EngineId.WARP -> connectWarpTun(id, engine)
+            EngineId.BYEDPI -> connectWithTunFrontend(id, engine)
+            else -> {
+                log.info("${id.displayName} no TUN support, falling back to proxy")
+                _effectiveVpnMode.value = VpnMode.PROXY
+                connectProxy(id, engine)
+            }
+        }
+    }
+
+    private suspend fun connectSingboxTun(id: EngineId, engine: DesktopEngine) {
+        val tunJson = SingboxDesktopEngine.buildTunConfig()
+        val config = EngineConfig(singboxJson = tunJson)
+        val result = engine.start(config)
+        handleStartResult(id, engine, result)
+    }
+
+    private suspend fun connectWarpTun(id: EngineId, engine: DesktopEngine) {
+        val config = EngineConfig()
+        val result = engine.start(config)
+        handleStartResult(id, engine, result)
+    }
+
+    private suspend fun connectWithTunFrontend(id: EngineId, engine: DesktopEngine) {
+        val config = EngineConfig()
+        val result = engine.start(config)
+
+        when (result) {
+            is EngineStartResult.Success -> {
+                val frontend = TunFrontend()
+                val tunStarted = frontend.start(result.port)
+
+                if (tunStarted) {
+                    activeEngine = engine
+                    tunFrontend = frontend
+                    _state.value = TunnelState.Connected(id, result.port)
+                    _powerDiscState.value = PowerDiscState.Connected
+                    startWatchdog(engine, id, frontend)
+                    log.info("connected via ${id.displayName} + TUN frontend on port ${result.port}")
+                } else {
+                    log.warning("TUN frontend failed, falling back to proxy")
+                    _effectiveVpnMode.value = VpnMode.PROXY
+                    activeEngine = engine
+                    _state.value = TunnelState.Connected(id, result.port)
+                    _powerDiscState.value = PowerDiscState.Connected
+                    runCatching { systemProxy.enable("127.0.0.1:${result.port}") }
+                        .onFailure { log.warning("system proxy set failed: ${it.message}") }
+                    startWatchdog(engine, id, null)
+                    log.info("connected via ${id.displayName} proxy fallback on port ${result.port}")
+                }
+            }
+
+            else -> handleFailedResult(id, result)
+        }
+    }
+
+    private suspend fun connectProxy(id: EngineId, engine: DesktopEngine) {
+        val config = EngineConfig()
+        val result = engine.start(config)
+
+        when (result) {
+            is EngineStartResult.Success -> {
+                activeEngine = engine
+                val port = result.port
+                _state.value = TunnelState.Connected(id, port)
+                _powerDiscState.value = PowerDiscState.Connected
+
+                runCatching { systemProxy.enable("127.0.0.1:$port") }
+                    .onFailure { log.warning("system proxy set failed: ${it.message}") }
+
+                startWatchdog(engine, id, null)
+                log.info("connected via ${id.displayName} proxy on port $port")
+            }
+
+            else -> handleFailedResult(id, result)
+        }
+    }
+
+    private fun handleStartResult(id: EngineId, engine: DesktopEngine, result: EngineStartResult) {
+        when (result) {
+            is EngineStartResult.Success -> {
+                activeEngine = engine
+                _state.value = TunnelState.Connected(id, result.port)
+                _powerDiscState.value = PowerDiscState.Connected
+                startWatchdog(engine, id, null)
+                log.info("connected via ${id.displayName} TUN on port ${result.port}")
+            }
+
+            else -> handleFailedResult(id, result)
+        }
+    }
+
+    private fun handleFailedResult(id: EngineId, result: EngineStartResult) {
+        val reason = when (result) {
+            is EngineStartResult.BinaryMissing -> "${id.displayName}: ${result.binaryName} not found"
+            is EngineStartResult.PlatformUnavailable -> result.reason
+            is EngineStartResult.Failed -> result.reason
+            is EngineStartResult.Success -> return
+        }
+        _state.value = TunnelState.Failed(id, reason)
+        _powerDiscState.value = PowerDiscState.Off
+        log.warning("start failed: $reason")
+    }
+
     fun disconnect() {
         val engine = activeEngine
+        val frontend = tunFrontend
         _state.value = TunnelState.Disconnecting
         _powerDiscState.value = PowerDiscState.Off
 
@@ -111,6 +200,12 @@ class DesktopVpnManager(
 
             runCatching { systemProxy.disable() }
                 .onFailure { log.warning("system proxy disable failed: ${it.message}") }
+
+            frontend?.let {
+                runCatching { it.stop() }
+                    .onFailure { log.warning("TUN frontend stop failed: ${it.message}") }
+            }
+            tunFrontend = null
 
             engine?.let {
                 runCatching { it.stop() }
@@ -124,7 +219,7 @@ class DesktopVpnManager(
         }
     }
 
-    fun switchEngine(newEngineId: EngineId) {
+    fun switchEngine(newEngineId: EngineId, vpnMode: VpnMode = VpnMode.TUN) {
         val currentState = _state.value
         val currentEngineId = when (currentState) {
             is TunnelState.Connected -> currentState.engineId
@@ -140,21 +235,41 @@ class DesktopVpnManager(
                 disconnect()
                 delay(500)
             }
-            connect(newEngineId)
+            connect(newEngineId, vpnMode)
             _switching.value = null
         }
     }
 
-    private fun startWatchdog(engine: DesktopEngine, engineId: EngineId) {
+    private fun resolveVpnMode(engineId: EngineId, requested: VpnMode): VpnMode {
+        if (requested == VpnMode.PROXY) return VpnMode.PROXY
+
+        if (engineId == EngineId.WARP) return VpnMode.TUN
+
+        if (!platformDetector.canUseTun()) {
+            log.info("TUN not available (admin=${platformDetector.isAdmin()}, wintun=${platformDetector.hasWintun()}), using proxy")
+            return VpnMode.PROXY
+        }
+
+        return VpnMode.TUN
+    }
+
+    private fun startWatchdog(engine: DesktopEngine, engineId: EngineId, frontend: TunFrontend?) {
         watchdogJob?.cancel()
         watchdogJob = scope.launch {
             while (isActive) {
                 delay(WATCHDOG_INTERVAL_MS)
-                if (!engine.isRunning()) {
-                    log.warning("watchdog: engine ${engineId.displayName} died unexpectedly")
+                val engineDead = !engine.isRunning()
+                val frontendDead = frontend != null && !frontend.isRunning()
+
+                if (engineDead || frontendDead) {
+                    val what = if (engineDead) "engine" else "TUN frontend"
+                    log.warning("watchdog: $what ${engineId.displayName} died unexpectedly")
+
+                    frontend?.let { runCatching { it.stop() } }
+                    tunFrontend = null
                     runCatching { systemProxy.disable() }
                     activeEngine = null
-                    _state.value = TunnelState.Failed(engineId, "Engine process terminated unexpectedly")
+                    _state.value = TunnelState.Failed(engineId, "Process terminated unexpectedly")
                     _powerDiscState.value = PowerDiscState.Off
                     break
                 }
@@ -165,4 +280,16 @@ class DesktopVpnManager(
     private companion object {
         const val WATCHDOG_INTERVAL_MS = 2_000L
     }
+}
+
+interface PlatformDetectorPort {
+    fun isAdmin(): Boolean
+    fun hasWintun(): Boolean
+    fun canUseTun(): Boolean
+}
+
+object DefaultPlatformDetectorPort : PlatformDetectorPort {
+    override fun isAdmin() = PlatformDetector.isAdmin()
+    override fun hasWintun() = PlatformDetector.hasWintun()
+    override fun canUseTun() = PlatformDetector.canUseTun()
 }

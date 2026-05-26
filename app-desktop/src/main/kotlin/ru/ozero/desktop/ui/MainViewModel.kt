@@ -13,6 +13,7 @@ import ru.ozero.desktop.model.SpeedSample
 import ru.ozero.desktop.model.SwitchingTransition
 import ru.ozero.desktop.model.TunnelState
 import ru.ozero.desktop.model.TunnelStats
+import ru.ozero.desktop.model.VpnMode
 import ru.ozero.desktop.ui.components.PowerDiscState
 import ru.ozero.desktop.vpn.DesktopSettingsStore
 import ru.ozero.desktop.vpn.DesktopVpnManager
@@ -30,6 +31,11 @@ class MainViewModel(
     val isReconnecting: StateFlow<Boolean> = MutableStateFlow(false)
     val speedHistory: StateFlow<List<SpeedSample>> = MutableStateFlow(emptyList())
     val powerDiscState: StateFlow<PowerDiscState> = vpnManager.powerDiscState
+    val effectiveVpnMode: StateFlow<VpnMode> = vpnManager.effectiveVpnMode
+
+    val vpnMode: StateFlow<VpnMode> = settingsStore.settings
+        .map { it.vpnMode }
+        .stateIn(scope, SharingStarted.Eagerly, VpnMode.TUN)
 
     val appMode: StateFlow<AppMode> = settingsStore.settings
         .map { it.appMode }
@@ -44,7 +50,19 @@ class MainViewModel(
         .stateIn(scope, SharingStarted.Eagerly, SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY)
 
     fun onConnectClick() {
-        vpnManager.toggle()
+        val mode = settingsStore.settings.value.vpnMode
+        when (state.value) {
+            is TunnelState.Connected -> vpnManager.disconnect()
+            is TunnelState.Idle, is TunnelState.Failed -> {
+                val engine = settingsStore.settings.value.manualEngine
+                vpnManager.connect(engine, mode)
+            }
+            else -> Unit
+        }
+    }
+
+    fun onVpnModeSelect(mode: VpnMode) {
+        settingsStore.update { copy(vpnMode = mode) }
     }
 
     fun onManualEngineSelect(engine: EngineId?) {

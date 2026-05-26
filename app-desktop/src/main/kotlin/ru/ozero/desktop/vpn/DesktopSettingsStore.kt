@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import ru.ozero.desktop.model.AppMode
 import ru.ozero.desktop.model.EngineId
 import ru.ozero.desktop.model.SettingsModel
+import ru.ozero.desktop.model.VpnMode
 import java.io.File
 import java.util.Properties
 
@@ -34,12 +35,16 @@ class DesktopSettingsStore {
             val mode = props.getProperty("appMode")
                 ?.let { runCatching { AppMode.valueOf(it) }.getOrNull() }
                 ?: AppMode.EXPERT
+            val vpnMode = props.getProperty("vpnMode")
+                ?.let { runCatching { VpnMode.valueOf(it) }.getOrNull() }
+                ?: VpnMode.TUN
             _settings.value = SettingsModel(
                 ipv6Enabled = props.getProperty("ipv6", "false").toBoolean(),
                 autoStart = props.getProperty("autoStart", "false").toBoolean(),
                 manualEngine = engine,
                 appMode = mode,
                 killswitchEnabled = props.getProperty("killswitch", "false").toBoolean(),
+                vpnMode = vpnMode,
             )
         }
     }
@@ -54,6 +59,7 @@ class DesktopSettingsStore {
             s.manualEngine?.let { props.setProperty("manualEngine", it.name) }
             props.setProperty("appMode", s.appMode.name)
             props.setProperty("killswitch", s.killswitchEnabled.toString())
+            props.setProperty("vpnMode", s.vpnMode.name)
             file.outputStream().use { props.store(it, "Ozero Desktop Settings") }
         }
     }

@@ -89,6 +89,100 @@ class SingboxDesktopEngine : SubprocessEngine() {
             append('}')
         }
 
+        fun buildTunConfig(
+            dnsServer: String = "1.1.1.1",
+        ): String = buildString {
+            append('{')
+            append(""""log":{"level":"warn","timestamp":true},""")
+            append(""""inbounds":[{""")
+            append(""""type":"tun",""")
+            append(""""tag":"tun-in",""")
+            append(""""interface_name":"ozero-tun",""")
+            append(""""inet4_address":"172.19.0.1/30",""")
+            append(""""auto_route":true,""")
+            append(""""strict_route":false,""")
+            append(""""stack":"gvisor",""")
+            append(""""sniff":true,""")
+            append(""""sniff_override_destination":true""")
+            append("""}],""")
+            append(""""outbounds":[""")
+            append("""{"type":"direct","tag":"direct"},""")
+            append("""{"type":"block","tag":"block"},""")
+            append("""{"type":"dns","tag":"dns-out"}""")
+            append("""],""")
+            append(""""dns":{"servers":[{"type":"udp","tag":"dns-direct","server":"$dnsServer"}]},""")
+            append(""""route":{""")
+            append(""""final":"direct",""")
+            append(""""auto_detect_interface":true,""")
+            append(""""rules":[{"protocol":"dns","outbound":"dns-out"}]""")
+            append('}')
+            append('}')
+        }
+
+        fun buildTunForwardConfig(
+            socksPort: Int,
+            dnsServer: String = "1.1.1.1",
+        ): String = buildString {
+            append('{')
+            append(""""log":{"level":"warn","timestamp":true},""")
+            append(""""inbounds":[{""")
+            append(""""type":"tun",""")
+            append(""""tag":"tun-in",""")
+            append(""""interface_name":"ozero-tun",""")
+            append(""""inet4_address":"172.19.0.1/30",""")
+            append(""""auto_route":true,""")
+            append(""""strict_route":false,""")
+            append(""""stack":"gvisor",""")
+            append(""""sniff":true,""")
+            append(""""sniff_override_destination":true""")
+            append("""}],""")
+            append(""""outbounds":[""")
+            append("""{"type":"socks","tag":"proxy","server":"127.0.0.1","server_port":$socksPort},""")
+            append("""{"type":"direct","tag":"direct"},""")
+            append("""{"type":"block","tag":"block"},""")
+            append("""{"type":"dns","tag":"dns-out"}""")
+            append("""],""")
+            append(""""dns":{"servers":[{"type":"udp","tag":"dns-direct","server":"$dnsServer"}]},""")
+            append(""""route":{""")
+            append(""""final":"proxy",""")
+            append(""""auto_detect_interface":true,""")
+            append(""""rules":[{"protocol":"dns","outbound":"dns-out"}]""")
+            append('}')
+            append('}')
+        }
+
+        fun buildFullTunConfig(
+            proxyOutbound: String,
+            dnsServer: String = "1.1.1.1",
+        ): String = buildString {
+            append('{')
+            append(""""log":{"level":"warn","timestamp":true},""")
+            append(""""inbounds":[{""")
+            append(""""type":"tun",""")
+            append(""""tag":"tun-in",""")
+            append(""""interface_name":"ozero-tun",""")
+            append(""""inet4_address":"172.19.0.1/30",""")
+            append(""""auto_route":true,""")
+            append(""""strict_route":false,""")
+            append(""""stack":"gvisor",""")
+            append(""""sniff":true,""")
+            append(""""sniff_override_destination":true""")
+            append("""}],""")
+            append(""""outbounds":[""")
+            append(proxyOutbound)
+            append(""",{"type":"direct","tag":"direct"}""")
+            append(""",{"type":"block","tag":"block"}""")
+            append(""",{"type":"dns","tag":"dns-out"}""")
+            append("""],""")
+            append(""""dns":{"servers":[{"type":"udp","tag":"dns-direct","server":"$dnsServer"}]},""")
+            append(""""route":{""")
+            append(""""final":"proxy",""")
+            append(""""auto_detect_interface":true,""")
+            append(""""rules":[{"protocol":"dns","outbound":"dns-out"}]""")
+            append('}')
+            append('}')
+        }
+
         private fun isWindows(): Boolean =
             System.getProperty("os.name").lowercase().contains("win")
     }

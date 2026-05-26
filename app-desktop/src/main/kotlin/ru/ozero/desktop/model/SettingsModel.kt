@@ -9,6 +9,7 @@ data class SettingsModel(
     val killswitchEnabled: Boolean = false,
     val alwaysOnBannerDismissed: Boolean = false,
     val uiLocaleTag: String? = null,
+    val vpnMode: VpnMode = VpnMode.TUN,
 ) {
     companion object {
         val DEFAULT_ENGINE_AUTO_PRIORITY: List<EngineId> = listOf(

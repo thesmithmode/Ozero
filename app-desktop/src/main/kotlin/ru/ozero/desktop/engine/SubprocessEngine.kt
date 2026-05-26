@@ -24,11 +24,11 @@ abstract class SubprocessEngine : DesktopEngine {
 
     override fun listeningPort(): Int = portRef.get()
 
-    protected abstract fun buildCommand(config: EngineConfig, binaryPath: String): List<String>
+    internal abstract fun buildCommand(config: EngineConfig, binaryPath: String): List<String>
 
-    protected abstract fun extractPort(config: EngineConfig): Int
+    internal abstract fun extractPort(config: EngineConfig): Int
 
-    protected open fun detectReady(line: String): Boolean = false
+    internal open fun detectReady(line: String): Boolean = false
 
     protected open val startupTimeoutMs: Long = 5_000L
 
