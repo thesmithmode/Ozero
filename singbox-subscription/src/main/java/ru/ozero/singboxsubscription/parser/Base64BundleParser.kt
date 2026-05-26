@@ -14,7 +14,13 @@ object Base64BundleParser {
 
     private fun tryDecode(text: String, urlSafe: Boolean): String? =
         runCatching {
-            val decoder = if (urlSafe) Base64.getUrlDecoder() else Base64.getDecoder()
-            decoder.decode(text).toString(Charsets.UTF_8)
+            val padded = padBase64(text)
+            val decoder = if (urlSafe) Base64.getUrlDecoder() else Base64.getMimeDecoder()
+            decoder.decode(padded).toString(Charsets.UTF_8)
         }.getOrNull()
+
+    private fun padBase64(s: String): String {
+        val rem = s.length % 4
+        return if (rem == 0) s else s + "=".repeat(4 - rem)
+    }
 }

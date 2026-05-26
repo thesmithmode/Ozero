@@ -29,7 +29,8 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Exe, TargetFormat.Deb, TargetFormat.Dmg)
             packageName = "Ozero"
-            packageVersion = "1.0.0"
+            packageVersion = project.findProperty("desktopVersion")?.toString()
+                ?.removePrefix("v") ?: "1.0.0"
             description = "Ozero VPN"
             vendor = "Ozero"
 

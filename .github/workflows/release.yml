@@ -509,8 +509,13 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
 
+      - name: Install NSIS
+        run: choco install nsis -y
+
       - name: Build Ozero.exe installer
-        run: ./gradlew :app-desktop:packageExe --no-daemon --stacktrace
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: ./gradlew :app-desktop:packageExe -PdesktopVersion=$env:TAG --no-daemon --stacktrace
 
       - name: Collect Windows artifact
         shell: bash
@@ -578,7 +583,9 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y fakeroot
 
       - name: Build Ozero.deb
-        run: ./gradlew :app-desktop:packageDeb --no-daemon --stacktrace
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: ./gradlew :app-desktop:packageDeb -PdesktopVersion=$TAG --no-daemon --stacktrace
 
       - name: Collect Linux artifact
         env:
@@ -642,7 +649,9 @@ jobs:
         uses: android-actions/setup-android@v4
 
       - name: Build Ozero.dmg
-        run: ./gradlew :app-desktop:packageDmg --no-daemon --stacktrace
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: ./gradlew :app-desktop:packageDmg -PdesktopVersion=$TAG --no-daemon --stacktrace
 
       - name: Collect macOS artifact
         env:

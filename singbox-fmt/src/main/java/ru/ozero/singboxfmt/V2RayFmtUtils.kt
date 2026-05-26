@@ -50,10 +50,16 @@ internal object V2RayFmtUtils {
     fun tryBase64Decode(text: String): String? {
         val cleaned = text.trim()
         if (cleaned.isEmpty()) return null
+        val padded = padBase64(cleaned)
         return runCatching {
-            JBase64.getUrlDecoder().decode(cleaned).toString(Charsets.UTF_8)
+            JBase64.getUrlDecoder().decode(padded).toString(Charsets.UTF_8)
         }.getOrNull() ?: runCatching {
-            JBase64.getDecoder().decode(cleaned).toString(Charsets.UTF_8)
+            JBase64.getMimeDecoder().decode(padded).toString(Charsets.UTF_8)
         }.getOrNull()
+    }
+
+    private fun padBase64(s: String): String {
+        val rem = s.length % 4
+        return if (rem == 0) s else s + "=".repeat(4 - rem)
     }
 }
