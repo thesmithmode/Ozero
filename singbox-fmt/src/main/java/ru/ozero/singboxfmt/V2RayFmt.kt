@@ -1,6 +1,5 @@
 package ru.ozero.singboxfmt
 
-import android.net.Uri
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 
@@ -8,7 +7,7 @@ object V2RayFmt {
 
     fun parseVLESS(uri: String): VLESSBean {
         require(uri.startsWith("vless://")) { "Not a vless:// URI" }
-        val parsed = Uri.parse(uri)
+        val parsed = UriCompat.parse(uri)
         val bean = VLESSBean()
         parseBasicParams(bean, parsed)
         V2RayFmtUtils.parseSecurityParams(bean, parsed)
@@ -22,7 +21,7 @@ object V2RayFmt {
     fun parseShadowsocks(uri: String): ShadowsocksBean =
         ShadowsocksFmt.parse(uri)
 
-    private fun parseBasicParams(bean: VLESSBean, parsed: Uri) {
+    private fun parseBasicParams(bean: VLESSBean, parsed: UriCompat) {
         bean.uuid = parsed.userInfo ?: error("VLESS URI missing UUID")
         bean.serverAddress = parsed.host ?: error("VLESS URI missing host")
         bean.serverPort = parsed.port.takeIf { it > 0 } ?: 443
@@ -33,7 +32,7 @@ object V2RayFmt {
         bean.encryption = parsed.getQueryParameter("encryption") ?: "none"
     }
 
-    private fun parseTransportParams(bean: VLESSBean, parsed: Uri) {
+    private fun parseTransportParams(bean: VLESSBean, parsed: UriCompat) {
         bean.type = V2RayFmtUtils.mapTransportType(
             parsed.getQueryParameter("type") ?: "tcp",
         )
@@ -51,30 +50,30 @@ object V2RayFmt {
         }
     }
 
-    private fun parseWsParams(bean: VLESSBean, parsed: Uri) {
+    private fun parseWsParams(bean: VLESSBean, parsed: UriCompat) {
         bean.host = parsed.getQueryParameter("host") ?: ""
         bean.path = parsed.getQueryParameter("path") ?: "/"
         bean.earlyDataHeaderName = parsed.getQueryParameter("ed") ?: ""
     }
 
-    private fun parseHttpParams(bean: VLESSBean, parsed: Uri) {
+    private fun parseHttpParams(bean: VLESSBean, parsed: UriCompat) {
         bean.host = parsed.getQueryParameter("host") ?: ""
         bean.path = parsed.getQueryParameter("path") ?: "/"
     }
 
-    private fun parseSplithttpParams(bean: VLESSBean, parsed: Uri) {
+    private fun parseSplithttpParams(bean: VLESSBean, parsed: UriCompat) {
         bean.host = parsed.getQueryParameter("host") ?: ""
         bean.path = parsed.getQueryParameter("path") ?: "/"
         bean.splithttpMode = parsed.getQueryParameter("mode") ?: "auto"
     }
 
-    private fun parseKcpParams(bean: VLESSBean, parsed: Uri) {
+    private fun parseKcpParams(bean: VLESSBean, parsed: UriCompat) {
         bean.type = "kcp"
         bean.headerType = parsed.getQueryParameter("headerType") ?: "none"
         bean.mKcpSeed = parsed.getQueryParameter("seed") ?: ""
     }
 
-    private fun parseQuicParams(bean: VLESSBean, parsed: Uri) {
+    private fun parseQuicParams(bean: VLESSBean, parsed: UriCompat) {
         bean.headerType = parsed.getQueryParameter("headerType") ?: "none"
         bean.quicSecurity =
             parsed.getQueryParameter("quicSecurity") ?: "none"

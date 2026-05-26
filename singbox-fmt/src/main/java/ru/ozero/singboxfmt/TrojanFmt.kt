@@ -1,6 +1,5 @@
 package ru.ozero.singboxfmt
 
-import android.net.Uri
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 
@@ -8,7 +7,7 @@ object TrojanFmt {
 
     fun parse(uri: String): TrojanBean {
         require(uri.startsWith("trojan://")) { "Not a trojan:// URI" }
-        val parsed = Uri.parse(uri)
+        val parsed = UriCompat.parse(uri)
         val bean = TrojanBean()
         bean.password = parsed.userInfo ?: error("Trojan URI missing password")
         bean.serverAddress = parsed.host ?: error("Trojan URI missing host")

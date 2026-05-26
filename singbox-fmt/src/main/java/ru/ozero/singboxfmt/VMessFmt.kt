@@ -1,6 +1,5 @@
 package ru.ozero.singboxfmt
 
-import android.net.Uri
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import org.json.JSONObject
@@ -14,7 +13,7 @@ object VMessFmt {
         if (json != null && json.trimStart().startsWith("{")) {
             return parseJson(json)
         }
-        return parseStd(Uri.parse(uri))
+        return parseStd(UriCompat.parse(uri))
     }
 
     private fun parseJson(raw: String): VMessBean {
@@ -39,7 +38,7 @@ object VMessFmt {
         return bean
     }
 
-    private fun parseStd(parsed: Uri): VMessBean {
+    private fun parseStd(parsed: UriCompat): VMessBean {
         val bean = VMessBean()
         bean.uuid = parsed.userInfo ?: error("VMess URI missing UUID")
         bean.serverAddress = parsed.host ?: error("VMess URI missing host")

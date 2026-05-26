@@ -1,6 +1,5 @@
 package ru.ozero.singboxfmt
 
-import android.net.Uri
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 
@@ -70,7 +69,7 @@ object ShadowsocksFmt {
                 hostPort.substring(lastColon + 1).toIntOrNull() ?: 443
         }
         if (queryIdx >= 0) {
-            val parsed = Uri.parse(
+            val parsed = UriCompat.parse(
                 "ss://x@x:0?${serverPart.substring(queryIdx + 1)}",
             )
             bean.plugin = parsed.getQueryParameter("plugin") ?: ""
