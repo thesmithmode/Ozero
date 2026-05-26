@@ -29,7 +29,6 @@ class SingboxRuntimeReleaseSentinelTest {
         )
     }
 
-
     @Test
     fun `should SingboxRuntime stop clear commandServer and lastStatus`() {
         val root = locateRepoRoot()
