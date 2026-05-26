@@ -42,6 +42,7 @@ internal object UnifiedLogFileParser {
         val sb = StringBuilder()
         var include = false
         for (line in text.lineSequence()) {
+            if (line.startsWith("LOGCAT ")) continue
             val m = LEVEL_TOKEN.find(line)
             if (m != null) {
                 val lvl = when (m.groupValues[1]) {

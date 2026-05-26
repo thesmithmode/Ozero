@@ -98,15 +98,20 @@ class LogsViewModel @Inject constructor(
         return UnifiedLogFileParser.filterByLevel(text, minLevel)
     }
 
-    fun createFilteredFile(minLevel: LogLevel): File? {
-        val text = UnifiedLogger.read()
-        val filtered = UnifiedLogFileParser.filterByLevel(text, minLevel)
-        if (filtered.isBlank()) return null
-        val src = UnifiedLogger.file() ?: return null
-        val dir = src.parentFile ?: return null
-        val out = File(dir, "ozero_${minLevel.name.lowercase()}.log")
-        out.writeText(filtered)
-        return out
+    fun createFilteredFile(minLevel: LogLevel, onReady: (File?) -> Unit) {
+        viewModelScope.launch(ioContext) {
+            val file = runCatching {
+                val text = UnifiedLogger.read()
+                val filtered = UnifiedLogFileParser.filterByLevel(text, minLevel)
+                if (filtered.isBlank()) return@runCatching null
+                val src = UnifiedLogger.file() ?: return@runCatching null
+                val dir = src.parentFile ?: return@runCatching null
+                val out = File(dir, "ozero_${minLevel.name.lowercase()}.log")
+                out.writeText(filtered)
+                out
+            }.getOrNull()
+            withContext(Dispatchers.Main) { onReady(file) }
+        }
     }
 
     fun clear() {

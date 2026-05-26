@@ -159,6 +159,19 @@ class UnifiedLogFileParserTest {
     }
 
     @Test
+    fun `filterByLevel — LOGCAT строки исключаются из фильтрованного вывода`() {
+        val text = """
+            2026-05-25 10:00:00.000 WARN [T] A: warning
+            LOGCAT 05-25 10:00:00.100  1234  1234 I Tag    : raw logcat line
+            2026-05-25 10:00:01.000 DEBUG [T] B: debug
+        """.trimIndent()
+        val filtered = UnifiedLogFileParser.filterByLevel(text, LogLevel.WARN)
+        assertTrue(filtered.contains("warning"))
+        assertTrue(!filtered.contains("raw logcat line"))
+        assertTrue(!filtered.contains("debug"))
+    }
+
+    @Test
     fun `LogLevel severity order is correct`() {
         assertTrue(LogLevel.TRACE.severity < LogLevel.DEBUG.severity)
         assertTrue(LogLevel.DEBUG.severity < LogLevel.INFO.severity)

@@ -96,7 +96,7 @@ internal fun LogsScreenContent(
     onClear: () -> Unit,
     onCopyAll: () -> String,
     onCopyFiltered: (LogLevel) -> String,
-    onCreateFilteredFile: (LogLevel) -> File?,
+    onCreateFilteredFile: (LogLevel, (File?) -> Unit) -> Unit,
     onTagFilter: (String) -> Unit,
     onLevelFilter: (String) -> Unit,
 ) {
@@ -122,7 +122,7 @@ internal fun LogsScreenContent(
                         }
                         LogLevelDropdown(
                             expanded = exportMenuAction == ExportAction.COPY,
-                            onDismiss = { exportMenuAction = null },
+                            onDismissRequest = { exportMenuAction = null },
                             onPick = { level ->
                                 exportMenuAction = null
                                 val text = if (level == LogLevel.TRACE) onCopyAll() else onCopyFiltered(level)
@@ -136,10 +136,12 @@ internal fun LogsScreenContent(
                         }
                         LogLevelDropdown(
                             expanded = exportMenuAction == ExportAction.SHARE,
-                            onDismiss = { exportMenuAction = null },
+                            onDismissRequest = { exportMenuAction = null },
                             onPick = { level ->
                                 exportMenuAction = null
-                                shareFilteredLogFile(ctx, level, onCreateFilteredFile)
+                                onCreateFilteredFile(level) { file ->
+                                    if (file != null) shareFilteredLogFile(ctx, file)
+                                }
                             },
                         )
                     }
@@ -164,10 +166,10 @@ internal fun LogsScreenContent(
 @Composable
 private fun LogLevelDropdown(
     expanded: Boolean,
-    onDismiss: () -> Unit,
+    onDismissRequest: () -> Unit,
     onPick: (LogLevel) -> Unit,
 ) {
-    DropdownMenu(expanded = expanded, onDismiss = onDismiss) {
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismissRequest) {
         EXPORT_LEVELS.forEach { level ->
             DropdownMenuItem(
                 text = {
@@ -427,12 +429,7 @@ private fun LogFooter(
     }
 }
 
-private fun shareFilteredLogFile(
-    ctx: Context,
-    level: LogLevel,
-    createFilteredFile: (LogLevel) -> File?,
-) {
-    val file: File = createFilteredFile(level) ?: return
+private fun shareFilteredLogFile(ctx: Context, file: File) {
     if (!file.exists()) return
     val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
     val intent = Intent(Intent.ACTION_SEND).apply {
