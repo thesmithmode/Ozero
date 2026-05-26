@@ -22,10 +22,20 @@
     <string name="singbox_link_error_save">Error al guardar: %1$s</string>
     <string name="singbox_refresh_error">Error al actualizar: %1$s</string>
     <string name="singbox_refresh_all_button">Actualizar todo</string>
-    <string name="singbox_ping_all_button">Medir todo</string>
-    <string name="singbox_group_ping">Medir latencia</string>
+    <string name="singbox_ping_all_button">Test</string>
+    <string name="singbox_group_ping">Test</string>
     <string name="singbox_auto_select_button">Mejor servidor</string>
     <string name="singbox_auto_select_hint">Comprueba la latencia de todos los servidores y elige el más rápido</string>
     <string name="singbox_auto_mode_title">Selección automática</string>
     <string name="singbox_auto_mode_desc">Se conecta al servidor con menor ping y cambia automáticamente cuando la latencia empeora</string>
+    <string name="singbox_advanced_title">Ajustes de Sing-box</string>
+    <string name="singbox_sort_section">Orden</string>
+    <string name="singbox_sort_by_latency">Por latencia</string>
+    <string name="singbox_sort_by_name">Por nombre</string>
+    <string name="singbox_actions_section">Acciones</string>
+    <string name="singbox_subscriptions_section">Suscripciones</string>
+    <string name="singbox_restore_defaults_button">Restaurar valores</string>
+    <string name="singbox_restore_defaults_title">Restaurar suscripciones</string>
+    <string name="singbox_restore_defaults_confirm">Las suscripciones predeterminadas eliminadas se restaurarán. Sus suscripciones personalizadas no se verán afectadas.</string>
+    <string name="singbox_restore_defaults_hint">Restaura las suscripciones predeterminadas eliminadas sin afectar las personalizadas</string>
 </resources>

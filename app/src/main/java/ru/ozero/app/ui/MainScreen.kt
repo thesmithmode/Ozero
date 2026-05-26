@@ -911,7 +911,6 @@ private fun StatusLabel(
 ) {
     val labelRes = pickStatusLabelRes(state, switching, urnetworkPeerCount, isReconnecting)
     val engine = pickStatusEngine(state, switching)
-    val failedReason = if (switching != null) null else (state as? TunnelState.Failed)?.reason
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = stringResource(labelRes),
@@ -923,14 +922,6 @@ private fun StatusLabel(
                 text = engine,
                 style = MaterialTheme.typography.bodySmall,
                 color = OzeroPalette.Text3,
-            )
-        }
-        if (failedReason != null && failedReason.isNotBlank()) {
-            Text(
-                text = stringResource(R.string.main_engine_failed_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = OzeroPalette.Text3,
-                modifier = Modifier.testTag(MainScreenTestTags.FAILED_REASON),
             )
         }
     }

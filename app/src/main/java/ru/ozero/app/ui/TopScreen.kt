@@ -21,4 +21,5 @@ enum class TopScreen {
     MasterDnsSettings,
     FptnSettings,
     SingboxSettings,
+    SingboxAdvancedSettings,
 }

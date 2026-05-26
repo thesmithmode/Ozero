@@ -19,7 +19,6 @@
     <string name="main_active_engine">Active engine: %1$s</string>
     <string name="stats_session">Session: ↓ %1$s ↑ %2$s</string>
     <string name="stats_uptime">Uptime: %1$s</string>
-    <string name="main_engine_failed_hint">Tap to reconnect</string>
     <string name="main_stagnation_warning">No traffic for 30 seconds</string>
     <string name="main_health_degraded">Connection unstable</string>
     <string name="main_health_degraded_hint">Route probe failed 3 times in a row. Try switching engine.</string>
