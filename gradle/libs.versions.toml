@@ -4,6 +4,9 @@ kotlin = "2.0.20"
 agp = "8.7.3"
 ksp = "2.0.20-1.0.25"
 
+# Desktop
+composeMultiplatform = "1.7.0"
+
 # AndroidX
 coreKtx = "1.18.0"
 appcompat = "1.7.1"
@@ -169,6 +172,7 @@ android-dynamic-feature = { id = "com.android.dynamic-feature", version.ref = "a
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
