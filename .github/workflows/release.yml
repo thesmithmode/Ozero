@@ -19,6 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.ver.outputs.tag }}
+      version: ${{ steps.ver.outputs.version }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -28,14 +29,16 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+            TAG="${GITHUB_REF#refs/tags/}"
           else
             LAST=$(git tag -l 'v*.*.*' | sort -V | tail -1)
             if [ -z "$LAST" ]; then LAST="v0.0.0"; fi
             IFS='.' read -r ma mi pa <<< "${LAST#v}"
-            echo "tag=v${ma}.${mi}.$((pa + 1))" >> "$GITHUB_OUTPUT"
+            TAG="v${ma}.${mi}.$((pa + 1))"
           fi
-          echo "Resolved release tag: $(grep tag $GITHUB_OUTPUT | cut -d= -f2)"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "Resolved release tag: $TAG (version: ${TAG#v})"
 
   build-apk:
     name: Build Android APK
@@ -529,9 +532,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Ozero.exe installer
+        shell: bash
         env:
-          TAG: ${{ needs.resolve-version.outputs.tag }}
-        run: ./gradlew :app-desktop:packageExe -PdesktopVersion=$env:TAG --no-daemon --stacktrace
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: ./gradlew :app-desktop:packageExe -PdesktopVersion=$VERSION --no-daemon --stacktrace
 
       - name: Collect Windows artifact
         shell: bash
@@ -596,8 +600,9 @@ jobs:
 
           echo "=== byedpi ==="
           gh release download v0.17.3 -R hufrea/byedpi \
-            -p "byedpi-17.3-x86_64-linux.tar.gz" -D /tmp
-          tar xzf /tmp/byedpi-17.3-x86_64-linux.tar.gz -C /tmp/byedpi-linux || true
+            -p "byedpi-17.3-x86_64.tar.gz" -D /tmp
+          mkdir -p /tmp/byedpi-linux
+          tar xzf /tmp/byedpi-17.3-x86_64.tar.gz -C /tmp/byedpi-linux || true
           find /tmp -name 'ciadpi' -exec cp {} "$BINDIR/" \; 2>/dev/null || true
           chmod +x "$BINDIR/ciadpi" 2>/dev/null || true
 
@@ -607,8 +612,8 @@ jobs:
 
       - name: Build Ozero.deb
         env:
-          TAG: ${{ needs.resolve-version.outputs.tag }}
-        run: ./gradlew :app-desktop:packageDeb -PdesktopVersion=$TAG --no-daemon --stacktrace
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: ./gradlew :app-desktop:packageDeb -PdesktopVersion=$VERSION --no-daemon --stacktrace
 
       - name: Collect Linux artifact
         env:
@@ -673,8 +678,8 @@ jobs:
 
       - name: Build Ozero.dmg
         env:
-          TAG: ${{ needs.resolve-version.outputs.tag }}
-        run: ./gradlew :app-desktop:packageDmg -PdesktopVersion=$TAG --no-daemon --stacktrace
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: ./gradlew :app-desktop:packageDmg -PdesktopVersion=$VERSION --no-daemon --stacktrace
 
       - name: Collect macOS artifact
         env:

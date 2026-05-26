@@ -1,5 +1,11 @@
 # Build Log
 
+## [2026-05-26T23:59:00+03:00] compile | daily/2026-05-26.md (pass 8 — verification)
+- Source: daily/2026-05-26.md
+- Articles created: (none)
+- Articles updated: (none)
+- Notes: Full verification pass. All 12 concepts confirmed fully compiled across passes 1-7: warp-amber-flash-sentinel, singbox-crash-tombstone-diagnosis (incl. startWithConfig DeadObjectException configLen=868/20448), singbox-subscription-fetch-robustness, singbox-dns-outbound-deprecated, singbox-splithttp-unsupported, git-active-branch-discipline, singbox-ping-abstractbean-deserialization, pingJob-viewmodel-cancellation, gh-run-list-watcher-race, detekt-toomany-functions-semantics, urnetwork-provide-tun-investigation (connectBestAvailable hypothesis D), subagent-code-review-false-positives. Index and log entries verified consistent.
+
 ## [2026-05-26T23:55:00+03:00] compile | daily/2026-05-26.md (pass 7 — session 21:41 gap fill)
 - Source: daily/2026-05-26.md
 - Articles created: [[concepts/warp-amber-flash-sentinel]]
