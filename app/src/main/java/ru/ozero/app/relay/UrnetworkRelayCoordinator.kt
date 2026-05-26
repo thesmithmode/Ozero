@@ -191,7 +191,7 @@ class UrnetworkRelayCoordinator(
     private companion object {
         const val TAG = "MeshSession"
         const val MAX_START_RETRIES = 3
-        const val RETRY_DELAY_MS = 30_000L
+        const val RETRY_DELAY_MS = 5_000L
         const val WATCHDOG_INTERVAL_MS = 60_000L
     }
 }
