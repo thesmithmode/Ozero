@@ -14,7 +14,11 @@ updated: 2026-05-23
 
 # URnetwork Relay-Always Architecture
 
-URnetwork SDK decouples TUN-routing (`tunnelStarted`) from relay contribution (`providePaused`). Relay works without an active TUN interface — meaning Ozero can contribute relay capacity in parallel with any VPN engine (ByeDPI, WARP, URnetwork, etc.).
+**[ИСПРАВЛЕНО 2026-05-26]** Предыдущее утверждение "Relay works without an active TUN interface" ОШИБОЧНО. Было assumptions-based, не verified. Upstream URnetwork code подтверждает: provide требует IoLoop/TUN fd. `updateVpnService()` стартует VPN service при `provideEnabled=true`. `unpaidBytes=0` за все недели работы Ozero подтверждает: relay coordinator стартует SDK device, регистрирует wallet, но трафик НЕ течёт без IoLoop.
+
+Provide и connect мультиплексируются через один IoLoop. SDK принимает peer connections через WebSocket от connect.bringyour.com, но forward'ит трафик через TUN interface. Без TUN = нет I/O path = 0 bytes provided.
+
+Архитектурная проблема: Android разрешает 1 VpnService → 1 TUN fd. Когда основной движок (WARP/ByeDPI) владеет TUN, URnetwork relay не может создать второй. Варианты решения: (1) URnetwork как base layer (владеет TUN, другие движки через SOCKS), (2) provide через обычные sockets без TUN (требует SDK investigation), (3) share IoLoop device с основным движком (архитектурно сложно).
 
 ## Key Points
 

@@ -20,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -195,10 +196,14 @@ class RealUrnetworkSdkBridge(
         connectVcRef.set(cv)
         PersistentLoggers.info(TAG, "node start: routing controller opened — endpoints available")
 
-        setupWalletControllerAndPipeline(device, walletAddress)
         contractStatusListener.attach(device)
         running.set(true)
         PersistentLoggers.info(TAG, "node start: ready — awaiting attach(fd)")
+        bridgeScope.launch {
+            withContext(Dispatchers.Main.immediate) {
+                setupWalletControllerAndPipeline(device, walletAddress)
+            }
+        }
         return UrnetworkSdkBridge.StartResult.Success
     }
 
@@ -501,6 +506,22 @@ class RealUrnetworkSdkBridge(
             Log.i(TAG, "setProvideNetworkMode mode=${mode.rawValue} OK")
         }
 
+    override fun relayDiagnostics(): String {
+        val device = deviceRef.get() ?: return "device=null"
+        return buildString {
+            append("running=").append(running.get())
+            append(" provideEnabled=").append(runCatching { device.provideEnabled }.getOrNull())
+            append(" providePaused=").append(runCatching { device.providePaused }.getOrNull())
+            append(" tunnelStarted=").append(runCatching { device.tunnelStarted }.getOrNull())
+            append(" provideMode=").append(runCatching { device.provideMode }.getOrNull())
+            append(" provideControlMode=").append(runCatching { device.provideControlMode }.getOrNull())
+            append(" provideNetworkMode=").append(runCatching { device.provideNetworkMode }.getOrNull())
+            append(" connectEnabled=").append(runCatching { device.connectEnabled }.getOrNull())
+            append(" offline=").append(runCatching { device.offline }.getOrNull())
+            append(" unpaidBytes=").append(unpaidBytesRef.get())
+        }
+    }
+
     override fun applyPerformanceProfile(
         windowType: UrnetworkWindowType,
         fixedIpSize: Boolean,
@@ -698,6 +719,7 @@ class RealUrnetworkSdkBridge(
     }
 
     private fun cleanupOnFailure() {
+        if (running.get()) return
         deviceRef.getAndSet(null)?.also { runCatching { it.close() } }
     }
 
