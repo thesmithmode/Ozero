@@ -58,16 +58,21 @@ internal object SingboxRuntime {
                     lastStatus = null
                 }
 
-                PersistentLoggers.info(TAG, "start configLen=${singboxJsonConfig.length} fd=$tunFd")
+                val configPreview = singboxJsonConfig.take(200).replace(Regex(""""uuid":"[^"]*""""), """"uuid":"***"""")
+                PersistentLoggers.info(TAG, "start configLen=${singboxJsonConfig.length} fd=$tunFd configPreview=$configPreview")
 
                 val platform = OzeroPlatformInterface(tunFd, protectorBridge)
                 val handler = OzeroCommandServerHandler()
 
+                PersistentLoggers.info(TAG, "checkpoint: pre-CommandServer")
                 val server = CommandServer(handler, platform)
+                PersistentLoggers.info(TAG, "checkpoint: post-CommandServer")
                 server.start()
+                PersistentLoggers.info(TAG, "checkpoint: post-start (socket ready)")
 
                 try {
                     server.startOrReloadService(singboxJsonConfig, null)
+                    PersistentLoggers.info(TAG, "checkpoint: post-startOrReloadService (box running)")
                 } catch (e: Exception) {
                     PersistentLoggers.error(TAG, "startOrReloadService failed: ${e.message}")
                     server.close()

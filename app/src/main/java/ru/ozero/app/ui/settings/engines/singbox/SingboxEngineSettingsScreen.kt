@@ -17,8 +17,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -50,6 +50,7 @@ import ru.ozero.singboxroom.entity.SubscriptionGroup
 @Composable
 fun SingboxEngineSettingsScreen(
     onBack: () -> Unit,
+    onOpenAdvanced: () -> Unit = {},
     viewModel: SingboxEngineSettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -76,15 +77,27 @@ fun SingboxEngineSettingsScreen(
                     }
                 },
                 actions = {
-                    IconButton(
-                        onClick = viewModel::onPingAll,
-                        enabled = state.groups.isNotEmpty() && state.isPinging.isEmpty(),
-                        modifier = Modifier.testTag("singbox_ping_all_button"),
-                    ) {
-                        Icon(
-                            Icons.Default.PlayArrow,
-                            contentDescription = stringResource(R.string.singbox_ping_all_button),
-                        )
+                    if (state.isPinging.isNotEmpty()) {
+                        TextButton(
+                            onClick = viewModel::onCancelPing,
+                            modifier = Modifier.testTag("singbox_cancel_ping_button"),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.singbox_cancel),
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                        }
+                    } else {
+                        TextButton(
+                            onClick = viewModel::onPingAll,
+                            enabled = state.groups.isNotEmpty(),
+                            modifier = Modifier.testTag("singbox_ping_all_button"),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.singbox_ping_all_button),
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                        }
                     }
                     IconButton(
                         onClick = viewModel::onRefreshAll,
@@ -95,6 +108,12 @@ fun SingboxEngineSettingsScreen(
                             Icons.Default.Refresh,
                             contentDescription = stringResource(R.string.singbox_refresh_all_button),
                         )
+                    }
+                    IconButton(
+                        onClick = onOpenAdvanced,
+                        modifier = Modifier.testTag("singbox_advanced_settings_button"),
+                    ) {
+                        Icon(Icons.Filled.Settings, contentDescription = null)
                     }
                 },
             )
@@ -316,8 +335,11 @@ private fun SubscriptionGroupItem(
             if (isRefreshing || isPinging) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
             } else {
-                IconButton(onClick = onPing, modifier = Modifier.size(36.dp), enabled = profiles.isNotEmpty()) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = stringResource(R.string.singbox_group_ping))
+                TextButton(onClick = onPing, enabled = profiles.isNotEmpty()) {
+                    Text(
+                        text = stringResource(R.string.singbox_group_ping),
+                        style = MaterialTheme.typography.labelSmall,
+                    )
                 }
                 IconButton(onClick = onRefresh, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.singbox_group_refresh))

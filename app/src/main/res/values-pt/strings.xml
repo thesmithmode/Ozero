@@ -14,7 +14,6 @@
     <string name="main_active_engine">Motor ativo: %1$s</string>
     <string name="stats_session">Sessão: ↓ %1$s ↑ %2$s</string>
     <string name="stats_uptime">Tempo: %1$s</string>
-    <string name="main_engine_failed_hint">Toque para reconectar</string>
     <string name="main_stagnation_warning">Sem tráfego há 30 segundos</string>
     <string name="main_health_degraded">Conexão instável</string>
     <string name="main_health_degraded_hint">A sonda de rota falhou 3 vezes seguidas. Tente trocar de motor.</string>

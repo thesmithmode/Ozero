@@ -1,14 +1,18 @@
 package ru.ozero.app.ui.settings.engines.singbox
 
+import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.byteArrayPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,17 +24,26 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.ozero.enginesingbox.SingboxPrefs
+import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.V2RayFmt
-import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.dao.SubscriptionGroupDao
 import ru.ozero.singboxroom.entity.ProxyProfile
 import ru.ozero.singboxroom.entity.SubscriptionGroup
+import ru.ozero.singboxsubscription.GroupSeeder
 import ru.ozero.singboxsubscription.RawUpdater
 import java.net.InetSocketAddress
 import java.net.Socket
 import javax.inject.Inject
+
+enum class SortOrder {
+    BY_LATENCY, BY_NAME;
+
+    companion object {
+        fun fromOrdinal(value: Int): SortOrder = entries.getOrElse(value) { BY_LATENCY }
+    }
+}
 
 sealed class CustomLinkError {
     data object Empty : CustomLinkError()
@@ -51,6 +64,8 @@ data class SingboxSettingsUiState(
     val isAutoSelecting: Boolean = false,
     val isAutoSelectMode: Boolean = false,
     val groupRefreshErrors: Map<Long, String> = emptyMap(),
+    val sortOrder: SortOrder = SortOrder.BY_LATENCY,
+    val isRestoringDefaults: Boolean = false,
     val showAddGroupDialog: Boolean = false,
     val addGroupName: String = "",
     val addGroupUrl: String = "",
@@ -59,23 +74,37 @@ data class SingboxSettingsUiState(
 
 @HiltViewModel
 class SingboxEngineSettingsViewModel @Inject constructor(
+    @ApplicationContext private val appContext: Context,
     @SingboxPrefs private val dataStore: DataStore<Preferences>,
     private val groupDao: SubscriptionGroupDao,
     private val profileDao: ProxyProfileDao,
     private val rawUpdater: RawUpdater,
+    private val groupSeeder: GroupSeeder,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SingboxSettingsUiState())
+    private var pingJob: Job? = null
 
     val state: StateFlow<SingboxSettingsUiState> = combine(
         groupDao.getAllFlow(),
         dataStore.data,
         _uiState,
     ) { groups, prefs, ui ->
+        val sort = SortOrder.fromOrdinal(prefs[SORT_ORDER_KEY] ?: 0)
+        val sortedProfiles = ui.groupProfiles.mapValues { (_, profiles) ->
+            when (sort) {
+                SortOrder.BY_LATENCY -> profiles.sortedWith(
+                    compareBy { if (it.latencyMs < 0) Int.MAX_VALUE else it.latencyMs },
+                )
+                SortOrder.BY_NAME -> profiles.sortedBy { it.name.lowercase() }
+            }
+        }
         ui.copy(
             groups = groups.sortedBy { it.userOrder },
             selectedProfileId = prefs[SELECTED_PROFILE_KEY],
             isAutoSelectMode = prefs[SELECTED_PROFILE_KEY] == -1L,
+            groupProfiles = sortedProfiles,
+            sortOrder = sort,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SingboxSettingsUiState())
 
@@ -133,7 +162,8 @@ class SingboxEngineSettingsViewModel @Inject constructor(
     }
 
     fun onPingAll() {
-        viewModelScope.launch {
+        pingJob?.cancel()
+        pingJob = viewModelScope.launch {
             val groups = groupDao.getAll()
             groups.map { group ->
                 async {
@@ -153,6 +183,12 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
     }
 
+    fun onCancelPing() {
+        pingJob?.cancel()
+        pingJob = null
+        _uiState.update { it.copy(isPinging = emptySet()) }
+    }
+
     fun onAutoSelectBest() {
         viewModelScope.launch {
             _uiState.update { it.copy(isAutoSelecting = true) }
@@ -168,7 +204,8 @@ class SingboxEngineSettingsViewModel @Inject constructor(
     }
 
     fun onPingGroup(groupId: Long) {
-        viewModelScope.launch {
+        pingJob?.cancel()
+        pingJob = viewModelScope.launch {
             val profiles = profileDao.getByGroupId(groupId)
             if (profiles.isEmpty()) return@launch
             _uiState.update { it.copy(isPinging = it.isPinging + groupId) }
@@ -230,7 +267,7 @@ class SingboxEngineSettingsViewModel @Inject constructor(
     }
 
     private suspend fun probeLatencyMs(profile: ProxyProfile): Int = withContext(Dispatchers.IO) {
-        val bean = runCatching { KryoSerializer.deserialize<VLESSBean>(profile.beanBlob) }
+        val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(profile.beanBlob) }
             .getOrNull() ?: return@withContext -1
         val t0 = System.currentTimeMillis()
         val ok = runCatching {
@@ -299,9 +336,33 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
     }
 
+    fun onSortOrderChanged(order: SortOrder) {
+        viewModelScope.launch {
+            dataStore.edit { prefs -> prefs[SORT_ORDER_KEY] = order.ordinal }
+        }
+    }
+
+    fun onRestoreDefaults() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRestoringDefaults = true) }
+            runCatching {
+                val json = appContext.assets.open("singbox/preset_groups.json").bufferedReader().readText()
+                val obj = org.json.JSONObject(json)
+                val arr = obj.getJSONArray("groups")
+                val presets = (0 until arr.length()).map { i ->
+                    val g = arr.getJSONObject(i)
+                    GroupSeeder.PresetGroup(name = g.getString("name"), url = g.getString("url"))
+                }
+                groupSeeder.seedPresets(presets)
+            }
+            _uiState.update { it.copy(isRestoringDefaults = false) }
+        }
+    }
+
     companion object {
         private val BEAN_KEY = byteArrayPreferencesKey("singbox_vless_bean")
         private val SELECTED_PROFILE_KEY = longPreferencesKey("singbox_selected_profile_id")
+        private val SORT_ORDER_KEY = intPreferencesKey("singbox_sort_order")
         private const val PROBE_TIMEOUT_MS = 3_000
     }
 }
