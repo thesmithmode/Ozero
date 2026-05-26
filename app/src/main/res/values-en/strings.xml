@@ -440,8 +440,6 @@
     <string name="chart_tf_30min">30m</string>
     <string name="chart_tf_1h">1h</string>
 
-    <!-- Manual server -->
-
     <!-- Logs screen -->
     <string name="logs_title">Logs</string>
     <string name="logs_title_fmt">Logs (%1$dKB)</string>

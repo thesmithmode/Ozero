@@ -347,7 +347,17 @@ class SingboxEngineSettingsViewModel @Inject constructor(
 
     fun onImportFromFile(text: String, fileName: String?) {
         val parsed = RawShareLinksParser.parse(text)
-        if (parsed.isEmpty()) return
+        if (parsed.isEmpty()) {
+            _uiState.update {
+                it.copy(
+                    showAddManualLinksDialog = true,
+                    manualLinksInput = text.take(2000),
+                    manualLinksGroupName = fileName?.substringBeforeLast(".") ?: "",
+                    manualLinksError = "parse",
+                )
+            }
+            return
+        }
         val name = fileName?.substringBeforeLast(".") ?: "Ozero-${state.value.groups.size + 1}"
         viewModelScope.launch {
             val groupId = groupDao.insert(

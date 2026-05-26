@@ -18,8 +18,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.byteArrayPreferencesKey
-import androidx.datastore.preferences.core.longPreferencesKey
 import ru.ozero.app.logging.AppLogger
 import ru.ozero.app.logging.LogcatReader
 import ru.ozero.app.settings.UserFlagsRepository
@@ -32,8 +30,8 @@ import ru.ozero.app.ui.theme.OzeroTheme
 import ru.ozero.app.vpn.EngineSettingsRestartObserver
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
-import ru.ozero.enginescore.EngineId
 import ru.ozero.enginesingbox.SingboxPrefs
+import ru.ozero.enginesingbox.SingboxProbeService
 import ru.ozero.enginewarp.WarpConfigSlotStore
 import javax.inject.Inject
 
@@ -152,21 +150,14 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch(safeUiCoroutineHandler) {
             singboxDataStore.data
                 .map { prefs ->
-                    prefs[longPreferencesKey("singbox_selected_profile_id")] to
-                        (prefs[byteArrayPreferencesKey("singbox_vless_bean")]?.contentHashCode() ?: 0)
+                    prefs[SingboxProbeService.SELECTED_PROFILE_KEY] to
+                        (prefs[SingboxProbeService.BEAN_KEY]?.contentHashCode() ?: 0)
                 }
                 .distinctUntilChanged()
                 .drop(1)
                 .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
                 .collect {
-                    val engine = when (val s = viewModel.state.value) {
-                        is TunnelState.Connected -> s.engineId
-                        is TunnelState.Connecting -> s.engineId
-                        else -> null
-                    }
-                    if (engine == EngineId.SINGBOX) {
-                        restartVpnIfConnected("singbox profile changed while connected → restart")
-                    }
+                    restartVpnIfConnected("singbox profile changed while connected → restart")
                 }
         }
     }
