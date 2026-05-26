@@ -23,6 +23,7 @@ import ru.ozero.enginescore.PersistentLoggers
 
 internal object SingboxRuntime {
     private const val TAG = "SingboxRuntime"
+    private val UUID_REDACT_REGEX = Regex(""""uuid":"[^"]*"""")
 
     private val mutex = Mutex()
 
@@ -35,8 +36,12 @@ internal object SingboxRuntime {
     @Volatile
     private var setupDone = false
 
+    @Volatile
+    private var basePath: String = ""
+
     fun setup(basePath: String) {
         if (setupDone) return
+        this.basePath = basePath
         val options = SetupOptions()
         options.basePath = basePath
         options.workingPath = basePath
@@ -58,16 +63,40 @@ internal object SingboxRuntime {
                     lastStatus = null
                 }
 
-                PersistentLoggers.info(TAG, "start configLen=${singboxJsonConfig.length} fd=$tunFd")
+                val configPreview = singboxJsonConfig.take(200).replace(UUID_REDACT_REGEX, """"uuid":"***"""")
+                PersistentLoggers.info(
+                    TAG,
+                    "start configLen=${singboxJsonConfig.length} fd=$tunFd" +
+                        " configPreview=$configPreview",
+                )
+
+                val socketFile = java.io.File(basePath, "command.sock")
+                if (socketFile.exists()) {
+                    socketFile.delete()
+                    PersistentLoggers.info(TAG, "cleaned stale command.sock")
+                }
 
                 val platform = OzeroPlatformInterface(tunFd, protectorBridge)
                 val handler = OzeroCommandServerHandler()
 
+                PersistentLoggers.info(TAG, "checkpoint: pre-CommandServer")
                 val server = CommandServer(handler, platform)
+                PersistentLoggers.info(TAG, "checkpoint: post-CommandServer")
                 server.start()
+                PersistentLoggers.info(TAG, "checkpoint: post-start (socket ready)")
+
+                try {
+                    server.checkConfig(singboxJsonConfig)
+                    PersistentLoggers.info(TAG, "checkpoint: checkConfig passed")
+                } catch (e: Exception) {
+                    PersistentLoggers.error(TAG, "checkConfig failed: ${e.message}")
+                    server.close()
+                    throw e
+                }
 
                 try {
                     server.startOrReloadService(singboxJsonConfig, null)
+                    PersistentLoggers.info(TAG, "checkpoint: post-startOrReloadService (box running)")
                 } catch (e: Exception) {
                     PersistentLoggers.error(TAG, "startOrReloadService failed: ${e.message}")
                     server.close()

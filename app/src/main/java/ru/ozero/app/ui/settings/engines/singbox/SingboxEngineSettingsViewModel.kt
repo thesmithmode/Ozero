@@ -1,14 +1,15 @@
 package ru.ozero.app.ui.settings.engines.singbox
 
+import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.byteArrayPreferencesKey
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,19 +19,26 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import ru.ozero.enginesingbox.SingboxPrefs
 import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.V2RayFmt
-import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.dao.SubscriptionGroupDao
 import ru.ozero.singboxroom.entity.ProxyProfile
 import ru.ozero.singboxroom.entity.SubscriptionGroup
+import ru.ozero.singboxsubscription.GroupSeeder
 import ru.ozero.singboxsubscription.RawUpdater
-import java.net.InetSocketAddress
-import java.net.Socket
 import javax.inject.Inject
+
+enum class SortOrder {
+    BY_LATENCY,
+    BY_NAME,
+    ;
+
+    companion object {
+        fun fromOrdinal(value: Int): SortOrder = entries.getOrElse(value) { BY_LATENCY }
+    }
+}
 
 sealed class CustomLinkError {
     data object Empty : CustomLinkError()
@@ -51,6 +59,9 @@ data class SingboxSettingsUiState(
     val isAutoSelecting: Boolean = false,
     val isAutoSelectMode: Boolean = false,
     val groupRefreshErrors: Map<Long, String> = emptyMap(),
+    val sortOrder: SortOrder = SortOrder.BY_LATENCY,
+    val isRestoringDefaults: Boolean = false,
+    val restoreError: String? = null,
     val showAddGroupDialog: Boolean = false,
     val addGroupName: String = "",
     val addGroupUrl: String = "",
@@ -59,23 +70,38 @@ data class SingboxSettingsUiState(
 
 @HiltViewModel
 class SingboxEngineSettingsViewModel @Inject constructor(
+    @ApplicationContext private val appContext: Context,
     @SingboxPrefs private val dataStore: DataStore<Preferences>,
     private val groupDao: SubscriptionGroupDao,
     private val profileDao: ProxyProfileDao,
     private val rawUpdater: RawUpdater,
+    private val groupSeeder: GroupSeeder,
+    private val probeService: SingboxProbeService,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SingboxSettingsUiState())
+    private var pingJob: Job? = null
 
     val state: StateFlow<SingboxSettingsUiState> = combine(
         groupDao.getAllFlow(),
         dataStore.data,
         _uiState,
     ) { groups, prefs, ui ->
+        val sort = SortOrder.fromOrdinal(prefs[SORT_ORDER_KEY] ?: 0)
+        val sortedProfiles = ui.groupProfiles.mapValues { (_, profiles) ->
+            when (sort) {
+                SortOrder.BY_LATENCY -> profiles.sortedWith(
+                    compareBy { if (it.latencyMs < 0) Int.MAX_VALUE else it.latencyMs },
+                )
+                SortOrder.BY_NAME -> profiles.sortedBy { it.name.lowercase() }
+            }
+        }
         ui.copy(
             groups = groups.sortedBy { it.userOrder },
-            selectedProfileId = prefs[SELECTED_PROFILE_KEY],
-            isAutoSelectMode = prefs[SELECTED_PROFILE_KEY] == -1L,
+            selectedProfileId = prefs[SingboxProbeService.SELECTED_PROFILE_KEY],
+            isAutoSelectMode = prefs[SingboxProbeService.SELECTED_PROFILE_KEY] == -1L,
+            groupProfiles = sortedProfiles,
+            sortOrder = sort,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SingboxSettingsUiState())
 
@@ -101,8 +127,8 @@ class SingboxEngineSettingsViewModel @Inject constructor(
     fun onProfileSelect(profile: ProxyProfile) {
         viewModelScope.launch {
             dataStore.edit { prefs ->
-                prefs[SELECTED_PROFILE_KEY] = profile.id
-                prefs[BEAN_KEY] = profile.beanBlob
+                prefs[SingboxProbeService.SELECTED_PROFILE_KEY] = profile.id
+                prefs[SingboxProbeService.BEAN_KEY] = profile.beanBlob
             }
             _uiState.update { it.copy(customLinkSaved = false) }
         }
@@ -112,11 +138,11 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             dataStore.edit { prefs ->
                 if (enabled) {
-                    prefs[SELECTED_PROFILE_KEY] = -1L
+                    prefs[SingboxProbeService.SELECTED_PROFILE_KEY] = -1L
                 } else {
-                    prefs.remove(SELECTED_PROFILE_KEY)
+                    prefs.remove(SingboxProbeService.SELECTED_PROFILE_KEY)
                 }
-                prefs.remove(BEAN_KEY)
+                prefs.remove(SingboxProbeService.BEAN_KEY)
             }
         }
     }
@@ -133,14 +159,16 @@ class SingboxEngineSettingsViewModel @Inject constructor(
     }
 
     fun onPingAll() {
-        viewModelScope.launch {
+        pingJob?.cancel()
+        _uiState.update { it.copy(isPinging = emptySet()) }
+        pingJob = viewModelScope.launch {
             val groups = groupDao.getAll()
             groups.map { group ->
                 async {
                     val profiles = profileDao.getByGroupId(group.id)
                     if (profiles.isEmpty()) return@async
                     _uiState.update { it.copy(isPinging = it.isPinging + group.id) }
-                    probeAndAutoSelect(profiles)
+                    probeService.probeAndAutoSelect(profiles, viewModelScope)
                     val updated = profileDao.getByGroupId(group.id)
                     _uiState.update {
                         it.copy(
@@ -153,12 +181,18 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
     }
 
+    fun onCancelPing() {
+        pingJob?.cancel()
+        pingJob = null
+        _uiState.update { it.copy(isPinging = emptySet()) }
+    }
+
     fun onAutoSelectBest() {
         viewModelScope.launch {
             _uiState.update { it.copy(isAutoSelecting = true) }
             val allProfiles = groupDao.getAll().flatMap { profileDao.getByGroupId(it.id) }
             if (allProfiles.isNotEmpty()) {
-                probeAndAutoSelect(allProfiles)
+                probeService.probeAndAutoSelect(allProfiles, viewModelScope)
                 val groupIds = _uiState.value.groupProfiles.keys
                 val refreshed = groupIds.associateWith { gid -> profileDao.getByGroupId(gid) }
                 _uiState.update { it.copy(groupProfiles = it.groupProfiles + refreshed) }
@@ -168,11 +202,13 @@ class SingboxEngineSettingsViewModel @Inject constructor(
     }
 
     fun onPingGroup(groupId: Long) {
-        viewModelScope.launch {
+        pingJob?.cancel()
+        _uiState.update { it.copy(isPinging = emptySet()) }
+        pingJob = viewModelScope.launch {
             val profiles = profileDao.getByGroupId(groupId)
             if (profiles.isEmpty()) return@launch
             _uiState.update { it.copy(isPinging = it.isPinging + groupId) }
-            probeAndAutoSelect(profiles)
+            probeService.probeAndAutoSelect(profiles, viewModelScope)
             val updated = profileDao.getByGroupId(groupId)
             _uiState.update {
                 it.copy(
@@ -194,7 +230,7 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         val result = rawUpdater.refresh(group)
         val profiles = profileDao.getByGroupId(groupId)
         if (result.isSuccess && profiles.isNotEmpty()) {
-            probeAndAutoSelect(profiles)
+            probeService.probeAndAutoSelect(profiles, viewModelScope)
         }
         _uiState.update {
             val errorMsg = if (result.isFailure && profiles.isEmpty()) {
@@ -214,37 +250,12 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
     }
 
-    private suspend fun probeAndAutoSelect(profiles: List<ProxyProfile>) {
-        val results = profiles.map { profile ->
-            viewModelScope.async(Dispatchers.IO) {
-                val latency = probeLatencyMs(profile)
-                if (latency >= 0) profileDao.updateLatency(profile.id, latency)
-                profile to latency
-            }
-        }.awaitAll()
-        val best = results.filter { it.second >= 0 }.minByOrNull { it.second }?.first ?: return
-        dataStore.edit { prefs ->
-            prefs[SELECTED_PROFILE_KEY] = best.id
-            prefs[BEAN_KEY] = best.beanBlob
+    fun onAddGroupDialog(show: Boolean) = _uiState.update {
+        if (show) {
+            it.copy(showAddGroupDialog = true)
+        } else {
+            it.copy(showAddGroupDialog = false, addGroupName = "", addGroupUrl = "", addGroupError = null)
         }
-    }
-
-    private suspend fun probeLatencyMs(profile: ProxyProfile): Int = withContext(Dispatchers.IO) {
-        val bean = runCatching { KryoSerializer.deserialize<VLESSBean>(profile.beanBlob) }
-            .getOrNull() ?: return@withContext -1
-        val t0 = System.currentTimeMillis()
-        val ok = runCatching {
-            Socket().use { s ->
-                s.connect(InetSocketAddress(bean.serverAddress, bean.serverPort), PROBE_TIMEOUT_MS)
-            }
-        }.isSuccess
-        if (ok) (System.currentTimeMillis() - t0).toInt() else -1
-    }
-
-    fun onAddGroupDialogOpen() = _uiState.update { it.copy(showAddGroupDialog = true) }
-
-    fun onAddGroupDialogDismiss() = _uiState.update {
-        it.copy(showAddGroupDialog = false, addGroupName = "", addGroupUrl = "", addGroupError = null)
     }
 
     fun onAddGroupNameChanged(name: String) = _uiState.update { it.copy(addGroupName = name) }
@@ -292,16 +303,42 @@ class SingboxEngineSettingsViewModel @Inject constructor(
             }
         viewModelScope.launch {
             dataStore.edit { prefs ->
-                prefs[BEAN_KEY] = blob
-                prefs.remove(SELECTED_PROFILE_KEY)
+                prefs[SingboxProbeService.BEAN_KEY] = blob
+                prefs.remove(SingboxProbeService.SELECTED_PROFILE_KEY)
             }
             _uiState.update { it.copy(customLinkSaved = true, customLinkError = null) }
         }
     }
 
+    fun onSortOrderChanged(order: SortOrder) {
+        viewModelScope.launch {
+            dataStore.edit { prefs -> prefs[SORT_ORDER_KEY] = order.ordinal }
+        }
+    }
+
+    fun onRestoreDefaults() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRestoringDefaults = true, restoreError = null) }
+            val error = runCatching {
+                val json = appContext.assets.open("singbox/preset_groups.json").bufferedReader().readText()
+                val obj = org.json.JSONObject(json)
+                val arr = obj.getJSONArray("groups")
+                val presets = (0 until arr.length()).map { i ->
+                    val g = arr.getJSONObject(i)
+                    GroupSeeder.PresetGroup(name = g.getString("name"), url = g.getString("url"))
+                }
+                groupSeeder.seedPresets(presets)
+            }.exceptionOrNull()
+            _uiState.update {
+                it.copy(
+                    isRestoringDefaults = false,
+                    restoreError = error?.let { e -> e.message ?: e.javaClass.simpleName },
+                )
+            }
+        }
+    }
+
     companion object {
-        private val BEAN_KEY = byteArrayPreferencesKey("singbox_vless_bean")
-        private val SELECTED_PROFILE_KEY = longPreferencesKey("singbox_selected_profile_id")
-        private const val PROBE_TIMEOUT_MS = 3_000
+        private val SORT_ORDER_KEY = intPreferencesKey("singbox_sort_order")
     }
 }

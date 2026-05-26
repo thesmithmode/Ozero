@@ -83,10 +83,13 @@ class SingboxEngineSettingsAutoSelectTest {
             override suspend fun delete(profile: ProxyProfile) {}
         }
         return SingboxEngineSettingsViewModel(
+            appContext = mockk(relaxed = true),
             dataStore = dataStore,
             groupDao = groupDao,
             profileDao = profileDao,
             rawUpdater = mockk(relaxed = true),
+            groupSeeder = mockk(relaxed = true),
+            probeService = mockk(relaxed = true),
         )
     }
 

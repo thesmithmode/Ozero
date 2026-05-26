@@ -22,10 +22,20 @@
     <string name="singbox_link_error_save">Ошибка сохранения: %1$s</string>
     <string name="singbox_refresh_error">Ошибка обновления: %1$s</string>
     <string name="singbox_refresh_all_button">Обновить все</string>
-    <string name="singbox_ping_all_button">Пинговать все</string>
-    <string name="singbox_group_ping">Пинг серверов</string>
+    <string name="singbox_ping_all_button">Тест</string>
+    <string name="singbox_group_ping">Тест</string>
     <string name="singbox_auto_select_button">Лучший сервер</string>
     <string name="singbox_auto_select_hint">Проверяет задержку всех серверов и выбирает самый быстрый</string>
     <string name="singbox_auto_mode_title">Авто-выбор</string>
     <string name="singbox_auto_mode_desc">Подключается к серверу с наименьшим пингом, автоматически переключается при деградации</string>
+    <string name="singbox_advanced_title">Параметры Sing-box</string>
+    <string name="singbox_sort_section">Сортировка</string>
+    <string name="singbox_sort_by_latency">По задержке</string>
+    <string name="singbox_sort_by_name">По имени</string>
+    <string name="singbox_actions_section">Действия</string>
+    <string name="singbox_subscriptions_section">Подписки</string>
+    <string name="singbox_restore_defaults_button">Восстановить по умолчанию</string>
+    <string name="singbox_restore_defaults_title">Восстановить подписки</string>
+    <string name="singbox_restore_defaults_confirm">Удалённые стандартные подписки будут восстановлены. Ваши подписки останутся без изменений.</string>
+    <string name="singbox_restore_defaults_hint">Восстанавливает удалённые стандартные подписки, не затрагивая добавленные вами</string>
 </resources>

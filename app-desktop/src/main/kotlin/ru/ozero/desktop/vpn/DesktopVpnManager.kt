@@ -55,7 +55,7 @@ class DesktopVpnManager(private val scope: CoroutineScope) {
         }
     }
 
-    private fun disconnect() {
+    fun disconnect() {
         _state.value = TunnelState.Idle
         _powerDiscState.value = PowerDiscState.Off
         _stats.value = null

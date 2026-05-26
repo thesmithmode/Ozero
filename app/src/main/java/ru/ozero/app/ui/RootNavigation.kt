@@ -24,6 +24,7 @@ import ru.ozero.app.ui.settings.engines.MasterDnsSettingsScreen
 import ru.ozero.app.ui.settings.engines.UrnetworkEngineSettingsScreen
 import ru.ozero.app.ui.settings.engines.UrnetworkSharedTrafficScreen
 import ru.ozero.app.ui.settings.engines.WarpEngineSettingsScreen
+import ru.ozero.app.ui.settings.engines.singbox.SingboxAdvancedSettingsScreen
 import ru.ozero.app.ui.settings.engines.singbox.SingboxEngineSettingsScreen
 import ru.ozero.app.ui.splittunnel.SplitTunnelScreen
 import ru.ozero.app.ui.stats.TrafficStatsScreen
@@ -99,7 +100,11 @@ fun RootNavigation(
             TopScreen.WarpEngineSettings -> WarpEngineSettingsScreen(onBack = { back() })
             TopScreen.MasterDnsSettings -> MasterDnsSettingsScreen(onBack = { back() })
             TopScreen.FptnSettings -> FptnEngineSettingsScreen(onBack = { back() })
-            TopScreen.SingboxSettings -> SingboxEngineSettingsScreen(onBack = { back() })
+            TopScreen.SingboxSettings -> SingboxEngineSettingsScreen(
+                onBack = { back() },
+                onOpenAdvanced = { navigate(TopScreen.SingboxAdvancedSettings) },
+            )
+            TopScreen.SingboxAdvancedSettings -> SingboxAdvancedSettingsScreen(onBack = { back() })
             TopScreen.StrategyTest -> StrategyTestScreen(onBack = { back() })
             TopScreen.ManualServer -> ManualServerScreen(onBack = { back() })
             TopScreen.StatsHistory -> TrafficStatsScreen(onBack = { back() })

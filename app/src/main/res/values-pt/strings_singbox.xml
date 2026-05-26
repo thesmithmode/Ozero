@@ -22,10 +22,20 @@
     <string name="singbox_link_error_save">Erro ao salvar: %1$s</string>
     <string name="singbox_refresh_error">Erro ao atualizar: %1$s</string>
     <string name="singbox_refresh_all_button">Atualizar tudo</string>
-    <string name="singbox_ping_all_button">Medir tudo</string>
-    <string name="singbox_group_ping">Medir latência</string>
+    <string name="singbox_ping_all_button">Teste</string>
+    <string name="singbox_group_ping">Teste</string>
     <string name="singbox_auto_select_button">Melhor servidor</string>
     <string name="singbox_auto_select_hint">Verifica a latência de todos os servidores e escolhe o mais rápido</string>
     <string name="singbox_auto_mode_title">Seleção automática</string>
     <string name="singbox_auto_mode_desc">Conecta ao servidor com menor ping e troca automaticamente quando a latência piora</string>
+    <string name="singbox_advanced_title">Configurações Sing-box</string>
+    <string name="singbox_sort_section">Ordenação</string>
+    <string name="singbox_sort_by_latency">Por latência</string>
+    <string name="singbox_sort_by_name">Por nome</string>
+    <string name="singbox_actions_section">Ações</string>
+    <string name="singbox_subscriptions_section">Assinaturas</string>
+    <string name="singbox_restore_defaults_button">Restaurar padrões</string>
+    <string name="singbox_restore_defaults_title">Restaurar assinaturas</string>
+    <string name="singbox_restore_defaults_confirm">As assinaturas padrão excluídas serão restauradas. Suas assinaturas personalizadas não serão afetadas.</string>
+    <string name="singbox_restore_defaults_hint">Restaura assinaturas padrão excluídas sem afetar as personalizadas</string>
 </resources>

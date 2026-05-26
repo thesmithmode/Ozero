@@ -14,7 +14,6 @@
     <string name="main_active_engine">Motor activo: %1$s</string>
     <string name="stats_session">Sesión: ↓ %1$s ↑ %2$s</string>
     <string name="stats_uptime">Tiempo activo: %1$s</string>
-    <string name="main_engine_failed_hint">Toque para reconectar</string>
     <string name="main_stagnation_warning">Sin tráfico durante 30 segundos</string>
     <string name="main_health_degraded">Conexión inestable</string>
     <string name="main_health_degraded_hint">La sonda de ruta falló 3 veces seguidas. Pruebe a cambiar de motor.</string>
