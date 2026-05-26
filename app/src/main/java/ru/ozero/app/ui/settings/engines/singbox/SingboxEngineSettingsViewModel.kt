@@ -297,7 +297,9 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
         val parsed = RawShareLinksParser.parse(raw)
         if (parsed.isEmpty()) {
-            _uiState.update { it.copy(customLinkError = CustomLinkError.ParseFailed("vless://, vmess://, trojan://, ss://")) }
+            _uiState.update {
+                it.copy(customLinkError = CustomLinkError.ParseFailed("vless://, vmess://, trojan://, ss://"))
+            }
             return
         }
         val bean = parsed.first()
