@@ -33,6 +33,7 @@ class EngineWatchdogCoordinator(
 
     private val healthWatchJobRef = AtomicReference<Job?>(null)
     private val peerWatchJobRef = AtomicReference<Job?>(null)
+    private val stagnationWatchJobRef = AtomicReference<Job?>(null)
 
     fun startHealthKillswitchWatcher(engineId: EngineId) {
         healthWatchJobRef.getAndSet(null)?.cancel()
@@ -115,9 +116,50 @@ class EngineWatchdogCoordinator(
         peerWatchJobRef.set(job)
     }
 
+    fun startStagnationWatchdog(engineId: EngineId) {
+        stagnationWatchJobRef.getAndSet(null)?.cancel()
+        val plugin = enginePlugins.firstOrNull { it.id == engineId } ?: return
+        val job = scope.launch {
+            try {
+                var consecutivePolls = 0
+                while (isActive) {
+                    delay(STAGNATION_POLL_MS)
+                    if (tunnelController.stagnant.value) {
+                        consecutivePolls++
+                        if (consecutivePolls * STAGNATION_POLL_MS < STAGNATION_RECOVER_THRESHOLD_MS) continue
+                        PersistentLoggers.warn(
+                            TAG,
+                            "stagnation watchdog: traffic flat ${STAGNATION_RECOVER_THRESHOLD_MS / 1000}s → recover",
+                        )
+                        val result = runCatching { plugin.recover() }.getOrElse { t ->
+                            EnginePlugin.RecoverResult.Failed("recover threw: ${t.message}")
+                        }
+                        when (result) {
+                            EnginePlugin.RecoverResult.Success -> consecutivePolls = 0
+                            EnginePlugin.RecoverResult.NotSupported -> return@launch
+                            is EnginePlugin.RecoverResult.Failed -> {
+                                PersistentLoggers.warn(TAG, "stagnation recover failed: ${result.reason}")
+                                consecutivePolls = 0
+                            }
+                        }
+                        delay(STAGNATION_RECOVER_GRACE_MS)
+                    } else {
+                        consecutivePolls = 0
+                    }
+                }
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (t: Throwable) {
+                PersistentLoggers.warn(TAG, "stagnation watchdog threw: ${t.message}")
+            }
+        }
+        stagnationWatchJobRef.set(job)
+    }
+
     fun cancelWatchers() {
         healthWatchJobRef.getAndSet(null)?.cancel()
         peerWatchJobRef.getAndSet(null)?.cancel()
+        stagnationWatchJobRef.getAndSet(null)?.cancel()
     }
 
     fun handleEngineFailure(engineId: EngineId, reason: String) {
@@ -136,6 +178,7 @@ class EngineWatchdogCoordinator(
         statsJobRef.getAndSet(null)?.cancel()
         healthWatchJobRef.getAndSet(null)?.cancel()
         peerWatchJobRef.getAndSet(null)?.cancel()
+        stagnationWatchJobRef.getAndSet(null)?.cancel()
         scope.launch {
             runCatching { chainOrchestrator.stop() }
                 .onFailure { t ->
@@ -152,5 +195,8 @@ class EngineWatchdogCoordinator(
         const val PEER_WATCHDOG_POLL_MS = 5_000L
         const val PEER_WATCHDOG_TIMEOUT_MS = 30_000L
         const val PEER_WATCHDOG_RECOVER_GRACE_MS = 30_000L
+        const val STAGNATION_POLL_MS = 10_000L
+        const val STAGNATION_RECOVER_THRESHOLD_MS = 60_000L
+        const val STAGNATION_RECOVER_GRACE_MS = 30_000L
     }
 }

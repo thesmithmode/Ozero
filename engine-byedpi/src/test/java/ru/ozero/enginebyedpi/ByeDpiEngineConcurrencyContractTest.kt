@@ -28,8 +28,9 @@ class ByeDpiEngineConcurrencyContractTest {
 
     @Test
     fun `proxyScope использует proxyDispatcher не сырой Dispatchers IO`() {
-        val proxyScopeLine = engineSource.lines().firstOrNull { it.contains("val proxyScope") }
-            ?: error("val proxyScope не найден в ByeDpiEngine.kt")
+        val proxyScopeLine = engineSource.lines().firstOrNull {
+            it.contains("var proxyScope") || it.contains("val proxyScope")
+        } ?: error("proxyScope не найден в ByeDpiEngine.kt")
 
         assertTrue(
             proxyScopeLine.contains("proxyDispatcher") && !proxyScopeLine.contains("Dispatchers.IO"),
