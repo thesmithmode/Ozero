@@ -108,7 +108,9 @@ class ByeDpiEngine(
                 withTimeoutOrNull(STOP_GRACE_MS) { oldJob.join() }
                 if (oldJob.isActive) oldJob.cancel()
             }
+            PersistentLoggers.info(TAG, "start: barrier pre-drain oldJob.isActive=${oldJob.isActive}")
             withContext(proxyDispatcher) {}
+            PersistentLoggers.info(TAG, "start: barrier passed — dispatcher drained")
         }
 
         val args = buildArgs(resolvedConfig)
@@ -117,7 +119,9 @@ class ByeDpiEngine(
             "jniStartProxy argv=[${args.joinToString(" ")}] (native префиксует argv[0]=\"byedpi\")",
         )
         val proxyJob = proxyScope.launch {
+            PersistentLoggers.info(TAG, "launch entered port=$resolvedPort")
             val code = startProxyWithRecovery(args)
+            PersistentLoggers.info(TAG, "startProxy returned code=$code port=$resolvedPort")
             when {
                 code == 0 -> { /* success — main() returned 0 */ }
                 code == JNI_GUARD_BUSY -> PersistentLoggers.warn(
@@ -226,8 +230,18 @@ class ByeDpiEngine(
                     true
                 }
                 if (completed == null) {
-                    PersistentLoggers.warn(TAG, "proxyJob не завершился за ${STOP_GRACE_MS}ms")
-                    job.cancel()
+                    PersistentLoggers.warn(TAG, "proxyJob не завершился за ${STOP_GRACE_MS}ms — escalate")
+                    runCatching { proxy.forceClose() }
+                    runCatching { proxy.emergencyReset() }
+                        .onSuccess { PersistentLoggers.warn(TAG, "emergencyReset в stop (prior guard=$it)") }
+                    val retriedJoin = withTimeoutOrNull(STOP_GRACE_MS) {
+                        job.join()
+                        true
+                    }
+                    if (retriedJoin == null) {
+                        PersistentLoggers.error(TAG, "proxyJob не завершился после emergencyReset — cancel")
+                        job.cancel()
+                    }
                 }
             }
             activeSocksPort = 0
