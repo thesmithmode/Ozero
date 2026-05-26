@@ -250,10 +250,9 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
     }
 
-    fun onAddGroupDialogOpen() = _uiState.update { it.copy(showAddGroupDialog = true) }
-
-    fun onAddGroupDialogDismiss() = _uiState.update {
-        it.copy(showAddGroupDialog = false, addGroupName = "", addGroupUrl = "", addGroupError = null)
+    fun onAddGroupDialog(show: Boolean) = _uiState.update {
+        if (show) it.copy(showAddGroupDialog = true)
+        else it.copy(showAddGroupDialog = false, addGroupName = "", addGroupUrl = "", addGroupError = null)
     }
 
     fun onAddGroupNameChanged(name: String) = _uiState.update { it.copy(addGroupName = name) }

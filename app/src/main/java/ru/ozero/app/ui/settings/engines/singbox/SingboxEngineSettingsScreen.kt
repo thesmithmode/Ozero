@@ -63,7 +63,7 @@ fun SingboxEngineSettingsScreen(
             onNameChanged = viewModel::onAddGroupNameChanged,
             onUrlChanged = viewModel::onAddGroupUrlChanged,
             onConfirm = viewModel::onAddGroupConfirm,
-            onDismiss = viewModel::onAddGroupDialogDismiss,
+            onDismiss = { viewModel.onAddGroupDialog(false) },
         )
     }
 
@@ -167,7 +167,7 @@ private fun SingboxSettingsContent(
         Spacer(Modifier.height(8.dp))
 
         TextButton(
-            onClick = viewModel::onAddGroupDialogOpen,
+            onClick = { viewModel.onAddGroupDialog(true) },
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("singbox_add_group_button"),
