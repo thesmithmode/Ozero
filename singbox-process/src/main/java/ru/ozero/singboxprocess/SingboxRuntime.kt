@@ -35,8 +35,11 @@ internal object SingboxRuntime {
     @Volatile
     private var setupDone = false
 
+    private var basePath: String = ""
+
     fun setup(basePath: String) {
         if (setupDone) return
+        this.basePath = basePath
         val options = SetupOptions()
         options.basePath = basePath
         options.workingPath = basePath
@@ -61,6 +64,12 @@ internal object SingboxRuntime {
                 val configPreview = singboxJsonConfig.take(200).replace(Regex(""""uuid":"[^"]*""""), """"uuid":"***"""")
                 PersistentLoggers.info(TAG, "start configLen=${singboxJsonConfig.length} fd=$tunFd configPreview=$configPreview")
 
+                val socketFile = java.io.File(basePath, "command.sock")
+                if (socketFile.exists()) {
+                    socketFile.delete()
+                    PersistentLoggers.info(TAG, "cleaned stale command.sock")
+                }
+
                 val platform = OzeroPlatformInterface(tunFd, protectorBridge)
                 val handler = OzeroCommandServerHandler()
 
@@ -69,6 +78,15 @@ internal object SingboxRuntime {
                 PersistentLoggers.info(TAG, "checkpoint: post-CommandServer")
                 server.start()
                 PersistentLoggers.info(TAG, "checkpoint: post-start (socket ready)")
+
+                try {
+                    server.checkConfig(singboxJsonConfig)
+                    PersistentLoggers.info(TAG, "checkpoint: checkConfig passed")
+                } catch (e: Exception) {
+                    PersistentLoggers.error(TAG, "checkConfig failed: ${e.message}")
+                    server.close()
+                    throw e
+                }
 
                 try {
                     server.startOrReloadService(singboxJsonConfig, null)
