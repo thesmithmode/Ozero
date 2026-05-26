@@ -509,32 +509,32 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
 
-      - name: Build Ozero Desktop distributable
-        run: ./gradlew :app-desktop:createDistributable --no-daemon --stacktrace
+      - name: Build Ozero.exe installer
+        run: ./gradlew :app-desktop:packageExe --no-daemon --stacktrace
 
-      - name: Package Ozero.exe zip
+      - name: Collect Windows artifact
         shell: bash
         env:
           TAG: ${{ steps.ver.outputs.tag }}
         run: |
           set -euo pipefail
-          DIST="app-desktop/build/compose/binaries/main/app/Ozero"
-          if [ ! -d "$DIST" ]; then
-            echo "::error::Distributable directory not found at $DIST"
+          EXE=$(find app-desktop/build/compose/binaries/main/exe -name '*.exe' | head -n1)
+          if [ -z "$EXE" ]; then
+            echo "::error::Ozero.exe not found after packageExe"
+            find app-desktop/build/compose/binaries/ -type f 2>/dev/null || true
             exit 1
           fi
-          cd "$DIST/.."
-          7z a -mx9 "$GITHUB_WORKSPACE/Ozero-${TAG}-win-x64.zip" Ozero/
-          cd "$GITHUB_WORKSPACE"
-          sha256sum "Ozero-${TAG}-win-x64.zip" > "Ozero-${TAG}-win-x64.zip.sha256"
+          cp "$EXE" "Ozero-${TAG}-win-x64.exe"
+          sha256sum "Ozero-${TAG}-win-x64.exe" > "Ozero-${TAG}-win-x64.exe.sha256"
+          echo "Built: Ozero-${TAG}-win-x64.exe ($(stat -c%s "Ozero-${TAG}-win-x64.exe") bytes)"
 
-      - name: Upload Windows artifacts to release
+      - name: Upload Ozero.exe to release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
-          fail_on_unmatched_files: false
+          fail_on_unmatched_files: true
           overwrite_files: true
           token: ${{ secrets.GITHUB_TOKEN }}
           files: |
-            Ozero-*-win-x64.zip
-            Ozero-*-win-x64.zip.sha256
+            Ozero-*-win-x64.exe
+            Ozero-*-win-x64.exe.sha256

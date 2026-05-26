@@ -22,16 +22,23 @@ compose.desktop {
     application {
         mainClass = "ru.ozero.desktop.MainKt"
 
+        buildTypes.release.proguard {
+            isEnabled = false
+        }
+
         nativeDistributions {
-            targetFormats(TargetFormat.Msi, TargetFormat.Exe)
+            targetFormats(TargetFormat.Exe)
             packageName = "Ozero"
             packageVersion = "1.0.0"
-            description = "Ozero VPN for Windows"
+            description = "Ozero VPN"
             vendor = "Ozero"
 
             windows {
                 menuGroup = "Ozero"
+                shortcut = true
+                dirChooser = true
                 upgradeUuid = "d3b07384-d113-4ec6-a5ea-024c9c7b1f2a"
+                perUserInstall = true
             }
         }
     }
