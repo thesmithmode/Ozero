@@ -27,8 +27,12 @@ class SingboxEngineService : Service() {
             protector: ISingboxProtector,
         ) {
             val rawFd = tunFd.detachFd()
-            kotlinx.coroutines.runBlocking(Dispatchers.Main.immediate) {
-                SingboxRuntime.start(rawFd, singboxJsonConfig, SingboxProtectorBridge(protector))
+            serviceScope.launch {
+                runCatching {
+                    SingboxRuntime.start(rawFd, singboxJsonConfig, SingboxProtectorBridge(protector))
+                }.onFailure {
+                    PersistentLoggers.error(TAG, "startWithConfig failed: ${it.message}", it)
+                }
             }
         }
 
@@ -39,14 +43,19 @@ class SingboxEngineService : Service() {
         ) {
             val rawFd = tunFd.detachFd()
             val json = java.io.File(configFilePath).readText()
-            kotlinx.coroutines.runBlocking(Dispatchers.Main.immediate) {
-                SingboxRuntime.start(rawFd, json, SingboxProtectorBridge(protector))
+            serviceScope.launch {
+                runCatching {
+                    SingboxRuntime.start(rawFd, json, SingboxProtectorBridge(protector))
+                }.onFailure {
+                    PersistentLoggers.error(TAG, "startWithConfigFile failed: ${it.message}", it)
+                }
             }
         }
 
         override fun stop() {
-            kotlinx.coroutines.runBlocking(Dispatchers.Main.immediate) {
-                SingboxRuntime.stop()
+            serviceScope.launch {
+                runCatching { SingboxRuntime.stop() }
+                    .onFailure { PersistentLoggers.error(TAG, "stop failed: ${it.message}", it) }
             }
         }
 

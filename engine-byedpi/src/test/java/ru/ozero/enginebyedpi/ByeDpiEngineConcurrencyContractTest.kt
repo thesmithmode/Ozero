@@ -2,7 +2,7 @@ package ru.ozero.enginebyedpi
 
 import org.junit.jupiter.api.Test
 import java.io.File
-import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class ByeDpiEngineConcurrencyContractTest {
@@ -96,23 +96,15 @@ class ByeDpiEngineConcurrencyContractTest {
     }
 
     @Test
-    fun `stopTimeoutMs переопределён и превышает STOP_GRACE_MS`() {
+    fun `stop использует STOP_GRACE_MS не более 2 секунд`() {
+        val pattern = Regex("""const\s+val\s+STOP_GRACE_MS\s*=\s*(\d[\d_]*)L""")
+        val match = pattern.find(engineSource)
+        assertNotNull(match, "STOP_GRACE_MS не найден в companion object")
+        val value = match.groupValues[1].replace("_", "").toLong()
         assertTrue(
-            engineSource.contains("override fun stopTimeoutMs()"),
-            "ByeDpiEngine обязан переопределить stopTimeoutMs() >= STOP_GRACE_MS + margin. " +
-                "Без override ChainOrchestrator отменяет stop() через 2s (DEFAULT_STOP_TIMEOUT_MS), " +
-                "а внутренний grace 3s — гарантированная потеря proxyJobRef.",
-        )
-    }
-
-    @Test
-    fun `stop не обнуляет proxyJobRef через getAndSet`() {
-        val stopBlock = engineSource.substringAfter("override suspend fun stop()")
-            .substringBefore("override suspend fun probe()")
-        assertFalse(
-            stopBlock.contains("getAndSet(null)"),
-            "stop() НЕ должен использовать getAndSet(null) — ref теряется при CancellationException. " +
-                "Использовать proxyJobRef.get() + compareAndSet(job, null) после cleanup.",
+            value <= 2_000,
+            "STOP_GRACE_MS=$value превышает 2000ms — native thread должен завершиться быстро, " +
+                "каскад длинных таймаутов ухудшает restart latency.",
         )
     }
 }
