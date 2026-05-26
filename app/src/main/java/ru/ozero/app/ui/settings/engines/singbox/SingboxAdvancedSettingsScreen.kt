@@ -57,7 +57,6 @@ fun SingboxAdvancedSettingsScreen(
     LaunchedEffect(restoreError) {
         if (restoreError != null) {
             snackbarHostState.showSnackbar(restoreError)
-            viewModel.consumeRestoreError()
         }
     }
 
