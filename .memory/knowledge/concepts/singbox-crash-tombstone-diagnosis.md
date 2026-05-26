@@ -58,6 +58,23 @@ Config parse failures (SIGABRT type 1 and 2 above) are deterministic and reprodu
 
 True runtime crashes (SIGSEGV from GC corruption, JNI ref leaks, or Go runtime state corruption) require the tombstone native trace to identify the Go call frame. The `checkConfig passed → startWithConfig SIGABRT` sequence is in this category — it is non-deterministic with respect to input and requires deeper investigation of the Go runtime state at crash time.
 
+### Ruled Out: block outbound (v0.2.10 session)
+
+`block` outbound verified STILL registered in sing-box v1.13.12 source (`protocol/block/outbound.go`, `outbound.Register[option.StubOptions](registry, C.TypeBlock, New)`). NOT the crash cause. `checkConfig` passing both configs confirms config format is valid.
+
+### Remaining hypotheses (need tombstone)
+
+1. `PlatformInterface` callback crash — `localDNSTransport()` returns null, 1.13 DNS refactoring may dereference it
+2. Go runtime conflict with other Go engines (gomobile go.Seq multi-SDK)
+3. TUN fd lifecycle across AIDL — `ParcelFileDescriptor.fromFd()` pattern
+4. Crash timing: 600ms between checkConfig and DeadObjectException — crash during `startOrReloadService` execution, `post-startOrReloadService` checkpoint never reached
+
+### Next steps
+
+- Pull tombstone from device: `adb pull /data/user/0/ru.ozero.app/files/debug/`
+- Add diagnostic checkpoint inside startOrReloadService 600ms window
+- Check if `localDNSTransport()` returning null causes panic in 1.13.12
+
 ## Related Concepts
 
 - [[concepts/singbox-dns-outbound-deprecated]] - Config parse failure: `dns` outbound removed in 1.13.0; fix in parser
