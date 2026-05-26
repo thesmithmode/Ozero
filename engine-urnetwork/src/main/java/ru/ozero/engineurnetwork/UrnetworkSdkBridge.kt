@@ -43,6 +43,8 @@ interface UrnetworkSdkBridge {
     fun setProvideControlMode(mode: UrnetworkProvideControlMode) {}
     fun setProvideNetworkMode(mode: UrnetworkProvideNetworkMode) {}
 
+    fun relayDiagnostics(): String = "unavailable"
+
     fun peerCount(): Int
 
     fun unpaidByteCount(): Long

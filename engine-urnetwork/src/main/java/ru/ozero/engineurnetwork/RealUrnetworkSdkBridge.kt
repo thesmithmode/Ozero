@@ -506,6 +506,22 @@ class RealUrnetworkSdkBridge(
             Log.i(TAG, "setProvideNetworkMode mode=${mode.rawValue} OK")
         }
 
+    override fun relayDiagnostics(): String {
+        val device = deviceRef.get() ?: return "device=null"
+        return buildString {
+            append("running=").append(running.get())
+            append(" provideEnabled=").append(runCatching { device.provideEnabled }.getOrNull())
+            append(" providePaused=").append(runCatching { device.providePaused }.getOrNull())
+            append(" tunnelStarted=").append(runCatching { device.tunnelStarted }.getOrNull())
+            append(" provideMode=").append(runCatching { device.provideMode }.getOrNull())
+            append(" provideControlMode=").append(runCatching { device.provideControlMode }.getOrNull())
+            append(" provideNetworkMode=").append(runCatching { device.provideNetworkMode }.getOrNull())
+            append(" connectEnabled=").append(runCatching { device.connectEnabled }.getOrNull())
+            append(" offline=").append(runCatching { device.offline }.getOrNull())
+            append(" unpaidBytes=").append(unpaidBytesRef.get())
+        }
+    }
+
     override fun applyPerformanceProfile(
         windowType: UrnetworkWindowType,
         fixedIpSize: Boolean,
