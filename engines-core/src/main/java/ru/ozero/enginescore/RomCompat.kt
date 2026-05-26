@@ -1,11 +1,9 @@
 package ru.ozero.enginescore
 
-import android.os.Build
-
 object RomCompat {
     fun isNubiaRedMagic(
-        manufacturer: String = Build.MANUFACTURER,
-        model: String = Build.MODEL,
+        manufacturer: String = "",
+        model: String = "",
     ): Boolean {
         val mfr = manufacturer.lowercase()
         val mdl = model.lowercase()

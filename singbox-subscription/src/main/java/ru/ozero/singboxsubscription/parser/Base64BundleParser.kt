@@ -1,19 +1,20 @@
 package ru.ozero.singboxsubscription.parser
 
-import android.util.Base64
 import ru.ozero.singboxfmt.AbstractBean
+import java.util.Base64
 
 object Base64BundleParser {
     fun parse(encoded: String): List<AbstractBean> {
         val cleaned = encoded.trim()
-        val decoded = tryDecode(cleaned, Base64.DEFAULT)
-            ?: tryDecode(cleaned, Base64.URL_SAFE)
+        val decoded = tryDecode(cleaned, urlSafe = false)
+            ?: tryDecode(cleaned, urlSafe = true)
             ?: return emptyList()
         return RawShareLinksParser.parse(decoded)
     }
 
-    private fun tryDecode(text: String, flags: Int): String? =
+    private fun tryDecode(text: String, urlSafe: Boolean): String? =
         runCatching {
-            Base64.decode(text, flags).toString(Charsets.UTF_8)
+            val decoder = if (urlSafe) Base64.getUrlDecoder() else Base64.getDecoder()
+            decoder.decode(text).toString(Charsets.UTF_8)
         }.getOrNull()
 }

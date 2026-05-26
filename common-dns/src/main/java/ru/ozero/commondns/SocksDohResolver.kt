@@ -1,7 +1,7 @@
 package ru.ozero.commondns
 
-import android.util.Log
 import okhttp3.OkHttpClient
+import ru.ozero.enginescore.PersistentLoggers
 import java.net.InetSocketAddress
 import java.net.Proxy
 import java.util.concurrent.TimeUnit
@@ -11,7 +11,7 @@ class SocksDohResolver(socksPort: Int, endpoint: String = DohResolver.CLOUDFLARE
 
     init {
         require(socksPort in 1..65535) { "socksPort вне диапазона: $socksPort" }
-        Log.i(TAG, "init via 127.0.0.1:$socksPort → $endpoint")
+        PersistentLoggers.info(TAG, "init via 127.0.0.1:$socksPort → $endpoint")
         val client = OkHttpClient.Builder()
             .connectTimeout(timeoutMs, TimeUnit.MILLISECONDS)
             .callTimeout(timeoutMs, TimeUnit.MILLISECONDS)

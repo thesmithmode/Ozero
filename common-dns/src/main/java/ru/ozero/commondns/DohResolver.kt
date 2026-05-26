@@ -1,6 +1,5 @@
 package ru.ozero.commondns
 
-import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.CertificatePinner
@@ -40,7 +39,7 @@ class DohResolver(
         }
 
     private suspend fun execute(query: ByteArray, parseV6: Boolean): DohResult = withContext(Dispatchers.IO) {
-        Log.i(TAG, "resolve via $endpoint v6=$parseV6")
+        PersistentLoggers.info(TAG, "resolve via $endpoint v6=$parseV6")
         val request =
             Request.Builder()
                 .url(endpoint)

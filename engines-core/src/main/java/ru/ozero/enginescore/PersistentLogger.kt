@@ -1,6 +1,7 @@
 package ru.ozero.enginescore
 
-import android.util.Log
+import java.util.logging.Level
+import java.util.logging.Logger
 
 interface PersistentLogger {
     fun info(tag: String, msg: String)
@@ -12,12 +13,14 @@ object PersistentLoggers {
     @Volatile
     var instance: PersistentLogger? = null
 
+    private val fallback: Logger = Logger.getLogger("OzeroFallback")
+
     fun info(tag: String, msg: String) {
         val i = instance
         if (i != null) {
             i.info(tag, msg)
         } else {
-            runCatching { Log.i(tag, "[fallback] $msg") }
+            runCatching { fallback.log(Level.INFO, "[$tag] $msg") }
         }
     }
 
@@ -26,9 +29,7 @@ object PersistentLoggers {
         if (i != null) {
             i.warn(tag, msg, t)
         } else {
-            runCatching {
-                if (t != null) Log.w(tag, "[fallback] $msg", t) else Log.w(tag, "[fallback] $msg")
-            }
+            runCatching { fallback.log(Level.WARNING, "[$tag] $msg", t) }
         }
     }
 
@@ -37,9 +38,7 @@ object PersistentLoggers {
         if (i != null) {
             i.error(tag, msg, t)
         } else {
-            runCatching {
-                if (t != null) Log.e(tag, "[fallback] $msg", t) else Log.e(tag, "[fallback] $msg")
-            }
+            runCatching { fallback.log(Level.SEVERE, "[$tag] $msg", t) }
         }
     }
 }
