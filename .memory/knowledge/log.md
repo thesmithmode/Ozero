@@ -1,5 +1,15 @@
 # Build Log
 
+## [2026-05-26T20:30:00+03:00] compile | daily/2026-05-26.md (pass 2 — gap fill)
+- Source: daily/2026-05-26.md
+- Articles created: [[concepts/subagent-code-review-false-positives]]
+- Articles updated: [[concepts/urnetwork-provide-tun-investigation]] (hypothesis D connectBestAvailable added to body, was only in comment)
+
+## [2026-05-26T20:00:00+03:00] compile | daily/2026-05-26.md
+- Source: daily/2026-05-26.md
+- Articles created: [[concepts/singbox-ping-abstractbean-deserialization]], [[concepts/pingJob-viewmodel-cancellation]], [[concepts/gh-run-list-watcher-race]], [[concepts/detekt-toomany-functions-semantics]], [[concepts/singbox-dns-outbound-deprecated]], [[concepts/singbox-splithttp-unsupported]], [[concepts/git-active-branch-discipline]]
+- Articles updated: [[concepts/urnetwork-provide-tun-investigation]] (connectBestAvailable hypothesis added), [[concepts/singbox-engine-design]] (1.13.0 breaking changes: dns outbound + splithttp; ping AbstractBean), [[concepts/warp-false-connected-no-handshake]] (4ms stale tunnel reconnect from v0.2.8/v0.2.9 logs)
+
 ## [2026-05-24T21:46:00] compile | 2026-05-24.md
 - Source: daily/2026-05-24.md
 - Articles created: [[concepts/ktlint-volatile-annotation-spacing]]

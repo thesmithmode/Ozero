@@ -95,6 +95,20 @@ Key pitfalls encountered during P4 CI cycles:
 - [[concepts/kotlin-expression-body-return-trap]] - Hit repeatedly during Parser implementation
 - [[concepts/ci-gradle-log-reading]] - Only way to see Kotlin errors during 15+ CI iterations
 
+### Breaking Changes in sing-box 1.13.0 (2026-05-26)
+
+Two config-level breaking changes observed in v0.2.8/v0.2.9 SIGABRT traces:
+
+1. **`dns` outbound type removed**: Any outbound with `"type": "dns"` causes config parse failure. Replace with route rule `"action": "hijack-dns"`. See [[concepts/singbox-dns-outbound-deprecated]].
+2. **`splithttp` transport unsupported**: Current `libbox.so` does not support `"transport": {"type": "splithttp"}`. Profiles containing it must be filtered in `SingboxSubscriptionParser`. See [[concepts/singbox-splithttp-unsupported]].
+
+Both issues manifest as SIGABRTs in `:engine_singbox` process. Fix location: `SingboxSubscriptionParser` filter at parse time.
+
+### Ping Deserialization (2026-05-26)
+
+`probeLatencyMs` deserialization must use `AbstractBean`, not `VlessBean` or other protocol-specific subclasses. See [[concepts/singbox-ping-abstractbean-deserialization]].
+
 ## Sources
 
-- [[daily/2026-05-24.md]] — Evening sessions: sing-box engine design plan v1.0→v1.2; urlTest multi-outbound architecture; AD-15 Gradle physical isolation (`singbox-process` must NOT depend on `:singbox-room`); preset_groups.json from КИБЕРЩИТ-X restored after misattributed user message (parallel-chat leak: "no presets" instruction sent to WARP context, incorrectly removed AD-14 from sing-box plan — restored after detection); kill switch/split tunnel inheritance from OzeroVpnService; P4 subscription module implementation with Room + fetch pipeline; P5 UI subscription management; 15+ CI iterations resolving Kotlin compile errors
+- [[daily/2026-05-24.md]] — Evening sessions: sing-box engine design plan v1.0→v1.2; urlTest multi-outbound architecture; AD-15 Gradle physical isolation; preset_groups.json from КИБЕРЩИТ-X; kill switch/split tunnel inheritance; P4/P5 implementation; 15+ CI iterations
+- [[daily/2026-05-26.md]] — Session 19:44: v0.2.8/v0.2.9 log analysis; `dns outbound deprecated in 1.13.0`; `unknown transport type: splithttp`; 3 SIGABRTs in `:engine_singbox`; T1/T2 fix priorities assigned

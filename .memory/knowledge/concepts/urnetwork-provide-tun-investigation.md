@@ -7,6 +7,7 @@ sources:
 created: 2026-05-26
 updated: 2026-05-26
 ---
+<!-- updated 2026-05-26: added connectBestAvailable hypothesis from session 16:22 -->
 
 # URnetwork Provide: требует ли TUN?
 
@@ -37,6 +38,7 @@ Relay coordinator работает с 2026-05-17 (commit 194d7701). `unpaidBytes
 - **A:** provide через raw sockets работает без IoLoop на Android → fix ~50 строк
 - **B:** Go SDK на Android требует IoLoop для init → нужен "пустой TUN" или base layer refactor
 - **C:** `providePaused=true` застревает из-за missing NetworkCallback
+- **D (main, session 16:22):** `device.start()` вызывается, но `device.connectBestAvailable()` НЕ вызывается → device не подключается к mesh-сети → provide не имеет peers → 0 bytes. Upstream app вызывает оба последовательно. Наш relay coordinator вызывает только `start()`. Это наиболее вероятный корень проблемы, требующий 1 строки fix.
 
 ## Диагностика
 commit 48d0b350: `relayDiagnostics()` логирует `provideEnabled`, `providePaused`, `tunnelStarted`, `provideMode`, `connectEnabled`, `offline`, `unpaidBytes` под тегом `MeshSession`.
