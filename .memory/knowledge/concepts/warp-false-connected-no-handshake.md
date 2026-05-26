@@ -122,8 +122,15 @@ Reverted in v0.1.5-4 by reading primary source `.claude/Контекст/amnezia
 
 The actual false-connected root (handshake not arriving) was already addressed by `awaitReady()` returning `false` on timeout → `handleEngineFailure`. No relationship to the handle value.
 
+### Stale Tunnel Reuse on Reconnect: 4ms awgTurnOn (2026-05-26)
+
+In Ozero v0.2.8/v0.2.9 logs, WARP reconnect showed `awgTurnOn dt=4ms` — an impossibly fast TUN setup that indicates stale tunnel reuse without proper teardown. The previous tunnel handle was not released before `awgTurnOn` was called again, so the Go bridge reused the existing tunnel state. This produces a "connected" state backed by a stale tunnel that never completes a new handshake.
+
+The fix: ensure `awgTurnOff(handle)` completes fully before any subsequent `awgTurnOn` in reconnect flows. See [[concepts/warp-handle-leak-sigabrt]] for the handle leak pattern.
+
 ## Sources
 
 - [[daily/2026-05-07.md]] - Session 15:11: `awgTurnOn OK` + state=Connected does not mean real handshake; need polling `last_handshake_time_sec` from `awgGetConfig`; handshake polling identified as required follow-up; mirror DNS suspicion (176.99.11.77, 80.78.247.254 — not Cloudflare)
 - [[daily/2026-05-14.md]] - Session 16:41: handshake polling implemented via WarpHandshakeUapi.kt + LocalSocket (not awgGetConfig JNI — SIGSEGV risk); 300ms/10s; integrated into EngineWarp.awaitReady()
 - [[daily/2026-05-19.md]] - v0.1.5 session: `WARP_READY_TIMEOUT_MS` 10s→5s; `SWITCHING_TIMEOUT_MS` 12s→6s; `awaitEngineReady` returns Boolean; timeout → `handleEngineFailure` + `chainOrchestrator.stop` (no more false-Connected on handshake timeout); ozero.log confirmed awaitReady never got handshake in any WARP session; v0.1.5-4: 5s timeout reverted to 10s (too aggressive for slow networks); handle<=0 misdiagnosis found and reverted to handle<0
+- [[daily/2026-05-26.md]] - Session 19:44: v0.2.8/v0.2.9 log analysis found `awgTurnOn dt=4ms` on reconnect = stale tunnel reuse; awgTurnOff not completing before next awgTurnOn; categorized as T10 in fix priority list

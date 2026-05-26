@@ -1,5 +1,6 @@
 package ru.ozero.singboxsubscription
 
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -22,9 +23,12 @@ class RawUpdater(
     private val profileDao: ProxyProfileDao,
 ) {
     suspend fun refresh(group: SubscriptionGroup): Result<Int> = withContext(Dispatchers.IO) {
-        runCatching {
+        runCatching<Int> {
             val request = Request.Builder().url(group.subscriptionUrl).build()
             okHttpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    error("HTTP ${response.code} for ${group.name}")
+                }
                 val body = response.body?.string() ?: ""
                 val subInfo = SubscriptionInfoParser.parse(response.header("Subscription-Userinfo"))
 
@@ -56,12 +60,16 @@ class RawUpdater(
                     ),
                 )
 
+                Log.i(TAG, "refresh ok group=${group.name} servers=${profiles.size}")
                 profiles.size
             }
+        }.onFailure { e ->
+            Log.w(TAG, "refresh failed group=${group.name}: ${e.message}")
         }
     }
 
     companion object {
+        private const val TAG = "RawUpdater"
         const val PROTOCOL_VLESS = 0
         const val PROTOCOL_VMESS = 1
         const val PROTOCOL_TROJAN = 2

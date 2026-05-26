@@ -9,14 +9,18 @@ import ru.ozero.singboxfmt.VMessBean
 
 object ConfigBuilder {
 
+    private val SUPPORTED_TRANSPORTS = setOf("tcp", "ws", "grpc", "http", "h2", "httpupgrade", "")
+
     fun buildSingboxConfig(bean: AbstractBean): String {
+        require(isSupportedBean(bean)) { "Unsupported transport: ${(bean as? StandardV2RayBean)?.type}" }
         val outbound = beanOutbound(bean, "proxy")
         return buildFullConfig(listOf(outbound))
     }
 
     fun buildSingboxAutoConfig(beans: List<AbstractBean>): String {
-        require(beans.isNotEmpty()) { "beans must not be empty for auto-select config" }
-        val proxyOutbounds = beans.mapIndexed { index, bean -> beanOutbound(bean, "proxy-$index") }
+        val supported = beans.filter { isSupportedBean(it) }
+        require(supported.isNotEmpty()) { "no beans with supported transport types" }
+        val proxyOutbounds = supported.mapIndexed { index, bean -> beanOutbound(bean, "proxy-$index") }
         val tagList = proxyOutbounds.indices.joinToString(",") { jsonString("proxy-$it") }
         val urltest = buildString {
             append("""{"type":"urltest","tag":"proxy","outbounds":[$tagList],""")
@@ -25,6 +29,11 @@ object ConfigBuilder {
             append(""""interrupt_exist_connections":false,"idle_timeout":"30m"}""")
         }
         return buildFullConfig(listOf(urltest) + proxyOutbounds)
+    }
+
+    fun isSupportedBean(bean: AbstractBean): Boolean {
+        if (bean !is StandardV2RayBean) return true
+        return bean.type in SUPPORTED_TRANSPORTS
     }
 
     private fun beanOutbound(bean: AbstractBean, tag: String): String = when (bean) {
@@ -49,13 +58,12 @@ object ConfigBuilder {
         }
         sb.append(""",{"type":"direct","tag":"direct"}""")
         sb.append(""",{"type":"block","tag":"block"}""")
-        sb.append(""",{"type":"dns","tag":"dns-out"}""")
         sb.append("""],""")
         sb.append(""""dns":{"servers":[{"type":"udp","tag":"dns-direct","server":"1.1.1.1"}]},""")
         sb.append(""""route":{""")
         sb.append(""""final":"proxy",""")
         sb.append(""""auto_detect_interface":true,""")
-        sb.append(""""rules":[{"action":"sniff"},{"protocol":"dns","action":"route","outbound":"dns-out"}]""")
+        sb.append(""""rules":[{"action":"sniff"},{"protocol":"dns","action":"hijack-dns"}]""")
         sb.append('}')
         sb.append('}')
         return sb.toString()
@@ -130,7 +138,7 @@ object ConfigBuilder {
         val tls = buildTls(bean)
         if (tls != null) sb.append(""""tls":$tls,""")
 
-        removeTrailingComma(sb)
+        if (sb.isNotEmpty() && sb[sb.length - 1] == ',') sb.deleteCharAt(sb.length - 1)
         sb.append('}')
         return sb.toString()
     }
@@ -150,12 +158,6 @@ object ConfigBuilder {
         }
         sb.append('}')
         return sb.toString()
-    }
-
-    private fun removeTrailingComma(sb: StringBuilder) {
-        if (sb.isNotEmpty() && sb[sb.length - 1] == ',') {
-            sb.deleteCharAt(sb.length - 1)
-        }
     }
 
     private fun buildTransport(bean: StandardV2RayBean): String? = when (bean.type) {

@@ -218,16 +218,25 @@ class ConfigBuilderVLESSTest {
     }
 
     @Test
-    fun `should include splithttp transport block`() {
+    fun `should reject splithttp transport as unsupported`() {
         val bean = makeBean(type = "splithttp").apply {
             host = "splithttp.example.com"
             path = "/stream"
         }
-        val json = ConfigBuilder.buildSingboxConfig(bean)
+        assertFalse(ConfigBuilder.isSupportedBean(bean), "splithttp not supported by libbox")
+        val result = runCatching { ConfigBuilder.buildSingboxConfig(bean) }
+        assertTrue(result.isFailure, "buildSingboxConfig must throw for splithttp")
+    }
 
-        assertContains(json, "\"transport\":")
-        assertContains(json, "\"type\":\"splithttp\"")
-        assertContains(json, "/stream")
+    @Test
+    fun `auto config should filter out unsupported splithttp beans`() {
+        val supported = makeBean(type = "tcp")
+        val unsupported = makeBean(type = "splithttp").apply {
+            host = "splithttp.example.com"
+        }
+        val json = ConfigBuilder.buildSingboxAutoConfig(listOf(supported, unsupported))
+        assertFalse(json.contains("splithttp"), "splithttp beans must be filtered out")
+        assertContains(json, "\"type\":\"vless\"")
     }
 
     @Test

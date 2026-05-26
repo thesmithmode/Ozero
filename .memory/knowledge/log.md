@@ -1,5 +1,39 @@
 # Build Log
 
+## [2026-05-26T23:30:00+03:00] compile | daily/2026-05-26.md (pass 6 — tombstone gap)
+- Source: daily/2026-05-26.md
+- Articles created: [[concepts/singbox-crash-tombstone-diagnosis]]
+- Articles updated: [[knowledge/index.md]] (new entry added)
+- Notes: Pass 6 captured one concept missed in passes 1-5: tombstone pull path `adb pull /data/user/0/ru.ozero.app/files/debug/` from session 13:59 + crash root cause map from session 19:44 (dns outbound, splithttp, Connected race). All other 10 concepts confirmed compiled.
+
+## [2026-05-26T22:00:00+03:00] compile | daily/2026-05-26.md (pass 5 — duplicate guard)
+- Source: daily/2026-05-26.md
+- Articles created: (none)
+- Articles updated: (none)
+- Notes: Re-invoked compiler; all articles verified as fully compiled in passes 1-4. No gaps found.
+
+## [2026-05-26T21:30:00+03:00] compile | daily/2026-05-26.md (pass 4 — recheck)
+- Source: daily/2026-05-26.md
+- Articles created: (none — all already compiled in passes 1-3)
+- Articles updated: (none)
+- Notes: Recheck pass confirmed all 10 concepts fully compiled: singbox-subscription-fetch-robustness, singbox-dns-outbound-deprecated, singbox-splithttp-unsupported, git-active-branch-discipline, singbox-ping-abstractbean-deserialization, pingJob-viewmodel-cancellation, gh-run-list-watcher-race, detekt-toomany-functions-semantics, urnetwork-provide-tun-investigation, subagent-code-review-false-positives. singbox-subscription-fetch-robustness.md untracked — needs commit.
+
+## [2026-05-26T21:00:00+03:00] compile | daily/2026-05-26.md (pass 3 — final gap fill)
+- Source: daily/2026-05-26.md
+- Articles created: [[concepts/singbox-subscription-fetch-robustness]]
+- Articles updated: (none — all other articles from this log already compiled in passes 1-2)
+- Notes: Pass 3 captured subscription timeout/cancel anti-pattern (T5-T6 from session 19:44); all other concepts (dns outbound, splithttp, AbstractBean ping, pingJob cancel, gh watcher race, detekt semantics, git branch discipline, subagent false positives, urnetwork connectBestAvailable, WARP stale tunnel 4ms) already fully compiled
+
+## [2026-05-26T20:30:00+03:00] compile | daily/2026-05-26.md (pass 2 — gap fill)
+- Source: daily/2026-05-26.md
+- Articles created: [[concepts/subagent-code-review-false-positives]]
+- Articles updated: [[concepts/urnetwork-provide-tun-investigation]] (hypothesis D connectBestAvailable added to body, was only in comment)
+
+## [2026-05-26T20:00:00+03:00] compile | daily/2026-05-26.md
+- Source: daily/2026-05-26.md
+- Articles created: [[concepts/singbox-ping-abstractbean-deserialization]], [[concepts/pingJob-viewmodel-cancellation]], [[concepts/gh-run-list-watcher-race]], [[concepts/detekt-toomany-functions-semantics]], [[concepts/singbox-dns-outbound-deprecated]], [[concepts/singbox-splithttp-unsupported]], [[concepts/git-active-branch-discipline]]
+- Articles updated: [[concepts/urnetwork-provide-tun-investigation]] (connectBestAvailable hypothesis added), [[concepts/singbox-engine-design]] (1.13.0 breaking changes: dns outbound + splithttp; ping AbstractBean), [[concepts/warp-false-connected-no-handshake]] (4ms stale tunnel reconnect from v0.2.8/v0.2.9 logs)
+
 ## [2026-05-24T21:46:00] compile | 2026-05-24.md
 - Source: daily/2026-05-24.md
 - Articles created: [[concepts/ktlint-volatile-annotation-spacing]]

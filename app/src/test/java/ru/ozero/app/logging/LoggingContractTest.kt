@@ -24,6 +24,7 @@ class LoggingContractTest {
         "engines-core/src/main/java/ru/ozero/enginescore/PersistentLogger.kt",
         "engines-core/src/main/java/ru/ozero/enginescore/probe/Socks5HandshakeProbe.kt",
         "singbox-process/src/main/java/ru/ozero/singboxprocess/SingboxEngineService.kt",
+        "singbox-subscription/src/main/java/ru/ozero/singboxsubscription/RawUpdater.kt",
     )
 
     private val rawLogPattern = Regex("""\bLog\.(e|w|wtf)\(""")

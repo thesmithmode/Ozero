@@ -21,13 +21,13 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import ru.ozero.enginesingbox.SingboxPrefs
 import ru.ozero.singboxfmt.KryoSerializer
-import ru.ozero.singboxfmt.V2RayFmt
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.dao.SubscriptionGroupDao
 import ru.ozero.singboxroom.entity.ProxyProfile
 import ru.ozero.singboxroom.entity.SubscriptionGroup
 import ru.ozero.singboxsubscription.GroupSeeder
 import ru.ozero.singboxsubscription.RawUpdater
+import ru.ozero.singboxsubscription.parser.RawShareLinksParser
 import javax.inject.Inject
 
 enum class SortOrder {
@@ -81,6 +81,7 @@ class SingboxEngineSettingsViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(SingboxSettingsUiState())
     private var pingJob: Job? = null
+    private var refreshJob: Job? = null
 
     val state: StateFlow<SingboxSettingsUiState> = combine(
         groupDao.getAllFlow(),
@@ -152,10 +153,17 @@ class SingboxEngineSettingsViewModel @Inject constructor(
     }
 
     fun onRefreshAll() {
-        viewModelScope.launch {
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch {
             val groups = groupDao.getAll()
             groups.map { group -> async { refreshGroupInternal(group.id) } }.awaitAll()
         }
+    }
+
+    fun onCancelRefresh() {
+        refreshJob?.cancel()
+        refreshJob = null
+        _uiState.update { it.copy(isRefreshing = emptySet()) }
     }
 
     fun onPingAll() {
@@ -233,11 +241,7 @@ class SingboxEngineSettingsViewModel @Inject constructor(
             probeService.probeAndAutoSelect(profiles, viewModelScope)
         }
         _uiState.update {
-            val errorMsg = if (result.isFailure && profiles.isEmpty()) {
-                result.exceptionOrNull()?.message ?: "error"
-            } else {
-                null
-            }
+            val errorMsg = result.exceptionOrNull()?.message
             it.copy(
                 isRefreshing = it.isRefreshing - groupId,
                 groupProfiles = it.groupProfiles + (groupId to profileDao.getByGroupId(groupId)),
@@ -258,9 +262,12 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
     }
 
-    fun onAddGroupNameChanged(name: String) = _uiState.update { it.copy(addGroupName = name) }
-
-    fun onAddGroupUrlChanged(url: String) = _uiState.update { it.copy(addGroupUrl = url) }
+    fun onAddGroupFieldChanged(name: String? = null, url: String? = null) = _uiState.update {
+        it.copy(
+            addGroupName = name ?: it.addGroupName,
+            addGroupUrl = url ?: it.addGroupUrl,
+        )
+    }
 
     fun onAddGroupConfirm() {
         val name = _uiState.value.addGroupName.trim()
@@ -291,11 +298,14 @@ class SingboxEngineSettingsViewModel @Inject constructor(
             _uiState.update { it.copy(customLinkError = CustomLinkError.Empty) }
             return
         }
-        val bean = runCatching { V2RayFmt.parseVLESS(raw) }
-            .getOrElse { e ->
-                _uiState.update { it.copy(customLinkError = CustomLinkError.ParseFailed(e.message ?: "")) }
-                return
+        val parsed = RawShareLinksParser.parse(raw)
+        if (parsed.isEmpty()) {
+            _uiState.update {
+                it.copy(customLinkError = CustomLinkError.ParseFailed("vless://, vmess://, trojan://, ss://"))
             }
+            return
+        }
+        val bean = parsed.first()
         val blob = runCatching { KryoSerializer.serialize(bean) }
             .getOrElse { e ->
                 _uiState.update { it.copy(customLinkError = CustomLinkError.SaveFailed(e.message ?: "")) }

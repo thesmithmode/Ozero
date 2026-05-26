@@ -40,9 +40,10 @@ class ConfigBuilderSingbox13SentinelTest {
     }
 
     @Test
-    fun `dns route rule must use action route with outbound`() {
+    fun `dns route rule must use hijack-dns action`() {
         val json = ConfigBuilder.buildSingboxConfig(makeBean())
-        assertContains(json, """"protocol":"dns","action":"route","outbound":"dns-out"""")
+        assertContains(json, """"protocol":"dns","action":"hijack-dns"""")
+        assertFalse(json.contains(""""type":"dns""""), "dns outbound removed in sing-box 1.13.0")
     }
 
     @Test
