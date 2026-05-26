@@ -246,7 +246,10 @@ class DesktopVpnManager(
         if (engineId == EngineId.WARP) return VpnMode.TUN
 
         if (!platformDetector.canUseTun()) {
-            log.info("TUN not available (admin=${platformDetector.isAdmin()}, wintun=${platformDetector.hasWintun()}), using proxy")
+            log.info(
+                "TUN not available (admin=${platformDetector.isAdmin()}" +
+                    ", wintun=${platformDetector.hasWintun()}), using proxy",
+            )
             return VpnMode.PROXY
         }
 
