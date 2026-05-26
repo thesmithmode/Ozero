@@ -1,5 +1,11 @@
 # Build Log
 
+## [2026-05-26T18:31:00+03:00] compile | daily/2026-05-26.md
+- Source: daily/2026-05-26.md
+- Articles created: [[concepts/detekt-toomany-functions-semantics]]
+- Articles updated: [[concepts/urnetwork-provide-tun-investigation]] (гипотеза D: connectBestAvailable после device.start()), [[concepts/singbox-ping-abstractbean-deserialization]] (уже создана в ранней сессии), [[concepts/pingJob-viewmodel-cancellation]] (уже создана), [[concepts/gh-run-list-watcher-race]] (уже создана)
+- Notes: Большинство концептов дня скомпилированы в более ранней сессии того же дня. Новое: detekt >=N семантика. Дублирующий файл gh-run-list-stale-race.md создан случайно — не в индексе.
+
 ## [2026-05-24T21:46:00] compile | 2026-05-24.md
 - Source: daily/2026-05-24.md
 - Articles created: [[concepts/ktlint-volatile-annotation-spacing]]
