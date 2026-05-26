@@ -1,5 +1,17 @@
 # Build Log
 
+## [2026-05-26T21:30:00+03:00] compile | daily/2026-05-26.md (pass 4 — recheck)
+- Source: daily/2026-05-26.md
+- Articles created: (none — all already compiled in passes 1-3)
+- Articles updated: (none)
+- Notes: Recheck pass confirmed all 10 concepts fully compiled: singbox-subscription-fetch-robustness, singbox-dns-outbound-deprecated, singbox-splithttp-unsupported, git-active-branch-discipline, singbox-ping-abstractbean-deserialization, pingJob-viewmodel-cancellation, gh-run-list-watcher-race, detekt-toomany-functions-semantics, urnetwork-provide-tun-investigation, subagent-code-review-false-positives. singbox-subscription-fetch-robustness.md untracked — needs commit.
+
+## [2026-05-26T21:00:00+03:00] compile | daily/2026-05-26.md (pass 3 — final gap fill)
+- Source: daily/2026-05-26.md
+- Articles created: [[concepts/singbox-subscription-fetch-robustness]]
+- Articles updated: (none — all other articles from this log already compiled in passes 1-2)
+- Notes: Pass 3 captured subscription timeout/cancel anti-pattern (T5-T6 from session 19:44); all other concepts (dns outbound, splithttp, AbstractBean ping, pingJob cancel, gh watcher race, detekt semantics, git branch discipline, subagent false positives, urnetwork connectBestAvailable, WARP stale tunnel 4ms) already fully compiled
+
 ## [2026-05-26T20:30:00+03:00] compile | daily/2026-05-26.md (pass 2 — gap fill)
 - Source: daily/2026-05-26.md
 - Articles created: [[concepts/subagent-code-review-false-positives]]
