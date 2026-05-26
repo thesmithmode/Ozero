@@ -87,7 +87,7 @@ class SingboxEngine @Inject constructor(
         supportsDoH = false,
         localOnly = false,
         requiresServer = true,
-        supportsUpstreamSocks = false,
+        supportsUpstreamSocks = true,
     )
 
     @Volatile
@@ -105,6 +105,12 @@ class SingboxEngine @Inject constructor(
     @Volatile
     private var pendingConfig: String? = null
 
+    @Volatile
+    private var chainMode: Boolean = false
+
+    @Volatile
+    private var activeSocksPort: Int = 0
+
     private val bindLock = Any()
 
     private val localProtector = object : ISingboxProtector.Stub() {
@@ -113,7 +119,15 @@ class SingboxEngine @Inject constructor(
 
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
         require(config is EngineConfig.Singbox) { "SingboxEngine requires EngineConfig.Singbox" }
-        require(upstream is Upstream.None) { "SingboxEngine: supportsUpstreamSocks=false" }
+
+        val isChain = upstream !is Upstream.None
+        chainMode = isChain
+
+        if (isChain) {
+            val socks = upstream as? Upstream.Socks5
+                ?: return StartResult.Failure("SingboxEngine chain mode requires Socks5 upstream, got $upstream")
+            return startChainMode(config, socks)
+        }
 
         if (config.autoSelectBeanBlobs.isNotEmpty()) {
             val beans = config.autoSelectBeanBlobs
@@ -124,8 +138,8 @@ class SingboxEngine @Inject constructor(
             if (beans.isEmpty()) return StartResult.Failure("auto-select: no valid beans")
             val json = runCatching { ConfigBuilder.buildSingboxAutoConfig(beans) }
                 .getOrElse { return StartResult.Failure("Failed to build auto-select config: ${it.message}") }
-            pendingConfig = json
             bindOrFail()?.let { return it }
+            pendingConfig = json
             return StartResult.Success(socksPort = 0)
         }
 
@@ -141,7 +155,43 @@ class SingboxEngine @Inject constructor(
         return StartResult.Success(socksPort = 0)
     }
 
+    private suspend fun startChainMode(config: EngineConfig.Singbox, upstream: Upstream.Socks5): StartResult {
+        val port = allocateChainPort()
+        activeSocksPort = port
+        val configUpstream = ConfigBuilder.Upstream(upstream.host, upstream.port)
+
+        val json = if (config.autoSelectBeanBlobs.isNotEmpty()) {
+            val beans = config.autoSelectBeanBlobs
+                .take(MAX_AUTO_SELECT_OUTBOUNDS)
+                .mapNotNull { runCatching { KryoSerializer.deserialize<AbstractBean>(it) }.getOrNull() }
+            if (beans.isEmpty()) return StartResult.Failure("chain auto-select: no valid beans")
+            runCatching { ConfigBuilder.buildAutoChainConfig(beans, port, configUpstream) }
+                .getOrElse { return StartResult.Failure("chain auto config: ${it.message}") }
+        } else if (config.wireGuardConfig != null) {
+            runCatching { ConfigBuilder.buildWireGuardChainConfig(config.wireGuardConfig, port, configUpstream) }
+                .getOrElse { return StartResult.Failure("chain WG config: ${it.message}") }
+        } else {
+            val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(config.beanBlob) }
+                .getOrElse { return StartResult.Failure("chain deserialize: ${it.message}") }
+            runCatching { ConfigBuilder.buildChainConfig(bean, port, configUpstream) }
+                .getOrElse { return StartResult.Failure("chain config: ${it.message}") }
+        }
+
+        bindOrFail()?.let { return it }
+
+        val p = proxy ?: return StartResult.Failure("SingboxEngineService not connected for chain mode")
+        return runCatching {
+            p.startProxyMode(json, localProtector)
+            PersistentLoggers.info(TAG, "startProxyMode sent over AIDL port=$port")
+            StartResult.Success(socksPort = port)
+        }.getOrElse {
+            PersistentLoggers.error(TAG, "startProxyMode AIDL call failed: ${it.message}", it)
+            StartResult.Failure("startProxyMode failed: ${it.message}")
+        }
+    }
+
     override suspend fun attachTun(tunFd: Int): TunAttachResult {
+        if (chainMode) return TunAttachResult.Failure("chain mode — TUN not used")
         val json = pendingConfig ?: return TunAttachResult.Failure("attachTun called before start()")
         val p = proxy ?: return TunAttachResult.Failure("SingboxEngineService not connected")
         return runCatching {
@@ -161,6 +211,8 @@ class SingboxEngine @Inject constructor(
 
     override suspend fun stop() {
         pendingConfig = null
+        chainMode = false
+        activeSocksPort = 0
         runCatching { proxy?.stop() }
             .onFailure { PersistentLoggers.warn(TAG, "proxy.stop() failed: ${it.message}") }
         close()
@@ -321,11 +373,19 @@ class SingboxEngine @Inject constructor(
         deathRecipient = null
     }
 
+    private fun allocateChainPort(): Int {
+        val offset = chainPortCounter.getAndIncrement() % CHAIN_PORT_RANGE
+        return CHAIN_PORT_BASE + offset
+    }
+
     companion object {
         private const val TAG = "SingboxEngine"
         private const val CONNECT_TIMEOUT_S = 5L
         private const val STATS_POLL_MS = 1_000L
         private const val MAX_AUTO_SELECT_OUTBOUNDS = 50
+        private const val CHAIN_PORT_BASE = 49408
+        private const val CHAIN_PORT_RANGE = 256
+        private val chainPortCounter = java.util.concurrent.atomic.AtomicInteger(0)
         private val BEAN_KEY = byteArrayPreferencesKey("singbox_vless_bean")
         private val SELECTED_PROFILE_KEY = longPreferencesKey("singbox_selected_profile_id")
         const val SELECTED_AUTO = -1L

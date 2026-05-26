@@ -66,6 +66,7 @@ fun SettingsScreen(
     onOpenMasterDnsSettings: () -> Unit = {},
     onOpenFptnSettings: () -> Unit = {},
     onOpenSingboxSettings: () -> Unit = {},
+    onOpenChainSettings: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -89,6 +90,7 @@ fun SettingsScreen(
             onOpenMasterDnsSettings = onOpenMasterDnsSettings,
             onOpenFptnSettings = onOpenFptnSettings,
             onOpenSingboxSettings = onOpenSingboxSettings,
+            onOpenChainSettings = onOpenChainSettings,
         ),
         onIpv6Toggle = viewModel::onIpv6Toggle,
         onAutoStartToggle = viewModel::onAutoStartToggle,
@@ -208,6 +210,10 @@ private fun ContentBody(
                 onOpenFptn = nav.onOpenFptnSettings,
                 onOpenSingbox = nav.onOpenSingboxSettings,
             )
+        }
+        if (model.appMode == AppMode.EXPERT) {
+            item { SectionDivider() }
+            item { ProxyChainRow(onOpen = nav.onOpenChainSettings) }
         }
         item { SectionDivider() }
         item {
@@ -724,6 +730,17 @@ private fun NavRow(
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha * 0.6f),
         )
     }
+}
+
+@Composable
+private fun ProxyChainRow(onOpen: () -> Unit) {
+    NavRow(
+        title = stringResource(R.string.chain_settings_title),
+        summary = stringResource(R.string.chain_settings_summary),
+        tag = "settings_proxy_chain_row",
+        onClick = onOpen,
+        enabled = true,
+    )
 }
 
 @Composable

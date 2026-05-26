@@ -44,4 +44,6 @@ interface SettingsRepository {
     suspend fun setKillswitchEnabled(enabled: Boolean)
 
     suspend fun setAlwaysOnBannerDismissed(dismissed: Boolean)
+
+    suspend fun setProxyChain(chain: List<ChainStepConfig>) = Unit
 }

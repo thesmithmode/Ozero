@@ -72,10 +72,12 @@ sealed class EngineConfig {
         val beanBlob: ByteArray,
         val protocolType: Int,
         val autoSelectBeanBlobs: List<ByteArray> = emptyList(),
+        val wireGuardConfig: WireGuardOutboundConfig? = null,
     ) : EngineConfig() {
         override val engineId = EngineId.SINGBOX
         override fun toString(): String =
-            "Singbox(protocol=$protocolType, blobSize=${beanBlob.size}, auto=${autoSelectBeanBlobs.size})"
+            "Singbox(protocol=$protocolType, blobSize=${beanBlob.size}, auto=${autoSelectBeanBlobs.size}" +
+                "${if (wireGuardConfig != null) ", wg=$wireGuardConfig" else ""})"
 
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -83,12 +85,14 @@ sealed class EngineConfig {
             return protocolType == other.protocolType &&
                 beanBlob.contentEquals(other.beanBlob) &&
                 autoSelectBeanBlobs.size == other.autoSelectBeanBlobs.size &&
-                autoSelectBeanBlobs.zip(other.autoSelectBeanBlobs).all { (a, b) -> a.contentEquals(b) }
+                autoSelectBeanBlobs.zip(other.autoSelectBeanBlobs).all { (a, b) -> a.contentEquals(b) } &&
+                wireGuardConfig == other.wireGuardConfig
         }
 
         override fun hashCode(): Int {
             var result = 31 * protocolType + beanBlob.contentHashCode()
             for (blob in autoSelectBeanBlobs) result = 31 * result + blob.contentHashCode()
+            result = 31 * result + (wireGuardConfig?.hashCode() ?: 0)
             return result
         }
     }

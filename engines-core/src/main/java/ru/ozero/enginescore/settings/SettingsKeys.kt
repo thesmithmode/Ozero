@@ -38,4 +38,6 @@ object SettingsKeys {
 
     val KILLSWITCH_ENABLED = booleanPreferencesKey("killswitch_enabled")
     val ALWAYS_ON_BANNER_DISMISSED = booleanPreferencesKey("always_on_banner_dismissed")
+
+    val PROXY_CHAIN = stringPreferencesKey("proxy_chain")
 }

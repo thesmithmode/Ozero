@@ -567,4 +567,14 @@
     <string name="urnetwork_shared_traffic_chart_title">График за 30 дней</string>
     <string name="urnetwork_shared_traffic_chart_empty">Пока нет данных — поработайте провайдером, и здесь появится статистика.</string>
     <string name="urnetwork_shared_traffic_chart_peak">Пиковый день: %1$s</string>
+
+    <string name="chain_settings_title">Цепочка прокси</string>
+    <string name="chain_settings_summary">Последовательное подключение через несколько движков</string>
+    <string name="chain_screen_title">Цепочка прокси</string>
+    <string name="chain_add_step">Добавить движок</string>
+    <string name="chain_remove_step">Удалить</string>
+    <string name="chain_empty_hint">Добавьте движки для построения цепочки</string>
+    <string name="chain_enabled">Цепочка включена</string>
+    <string name="chain_head_only">Только в начале цепочки</string>
+    <string name="chain_not_chainable">Не поддерживает цепочки</string>
 </resources>

@@ -8,6 +8,7 @@ data class SettingsModel(
     val autoStart: Boolean = DEFAULT_AUTO_START,
     val manualEngine: EngineId? = DEFAULT_MANUAL_ENGINE,
     val engineAutoPriority: List<EngineId> = DEFAULT_ENGINE_AUTO_PRIORITY,
+    val proxyChain: List<ChainStepConfig> = DEFAULT_PROXY_CHAIN,
     val urnetworkEnabled: Boolean = DEFAULT_URNETWORK_ENABLED,
     val urnetworkJwt: String? = DEFAULT_URNETWORK_JWT,
     val urnetworkCountryCode: String? = DEFAULT_URNETWORK_COUNTRY_CODE,
@@ -28,6 +29,7 @@ data class SettingsModel(
         const val DEFAULT_IPV6_ENABLED: Boolean = false
         const val DEFAULT_AUTO_START: Boolean = false
         val DEFAULT_MANUAL_ENGINE: EngineId? = null
+        val DEFAULT_PROXY_CHAIN: List<ChainStepConfig> = emptyList()
         val DEFAULT_ENGINE_AUTO_PRIORITY: List<EngineId> = listOf(
             EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI, EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN,
         )

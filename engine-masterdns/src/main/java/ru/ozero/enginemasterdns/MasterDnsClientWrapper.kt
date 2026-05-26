@@ -4,15 +4,15 @@ import java.io.File
 
 interface MasterDnsClientWrapperContract {
     val binary: File
-    fun startClient(configPath: String, resolversPath: String, logPath: String?): Process
+    fun startClient(configPath: String, resolversPath: String, logPath: String?, upstreamSocksUrl: String? = null): Process
 }
 
 class MasterDnsClientWrapper(private val nativeLibDir: String) : MasterDnsClientWrapperContract {
 
     override val binary: File get() = File(nativeLibDir, "libmdnsvpn.so")
 
-    override fun startClient(configPath: String, resolversPath: String, logPath: String?): Process {
-        val args = buildArgs(binary.absolutePath, configPath, resolversPath, logPath)
+    override fun startClient(configPath: String, resolversPath: String, logPath: String?, upstreamSocksUrl: String?): Process {
+        val args = buildArgs(binary.absolutePath, configPath, resolversPath, logPath, upstreamSocksUrl)
         return ProcessBuilder(args)
             .redirectErrorStream(true)
             .start()
@@ -24,6 +24,7 @@ class MasterDnsClientWrapper(private val nativeLibDir: String) : MasterDnsClient
             configPath: String,
             resolversPath: String,
             logPath: String?,
+            upstreamSocksUrl: String? = null,
         ): List<String> = buildList {
             add(binaryPath)
             add("-config")
@@ -33,6 +34,10 @@ class MasterDnsClientWrapper(private val nativeLibDir: String) : MasterDnsClient
             if (logPath != null) {
                 add("-log")
                 add(logPath)
+            }
+            if (upstreamSocksUrl != null) {
+                add("--socks5-proxy-url")
+                add(upstreamSocksUrl)
             }
         }
     }

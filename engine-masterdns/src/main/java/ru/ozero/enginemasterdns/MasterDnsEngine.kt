@@ -31,7 +31,7 @@ class MasterDnsEngine(
         supportsDoH = false,
         localOnly = false,
         requiresServer = true,
-        supportsUpstreamSocks = false,
+        supportsUpstreamSocks = true,
     )
 
     @Volatile private var service: MasterDnsClientServiceContract? = null
@@ -45,12 +45,16 @@ class MasterDnsEngine(
         )
     }
 
-    @Suppress("UNUSED_PARAMETER")
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
         val md = config as? EngineConfig.MasterDns
             ?: return StartResult.Failure("expected EngineConfig.MasterDns, got ${config::class.simpleName}")
         val port = portAllocator.allocate(md.socksPort)
-        val runtime = MasterDnsRuntimeConfig(md.configToml, md.resolvers, port)
+        val upstreamUrl = when (upstream) {
+            is Upstream.Socks5 -> "socks5://${upstream.host}:${upstream.port}"
+            is Upstream.Http -> "http://${upstream.host}:${upstream.port}"
+            is Upstream.None -> null
+        }
+        val runtime = MasterDnsRuntimeConfig(md.configToml, md.resolvers, port, upstreamUrl)
         val activeService = serviceFactory().also { service = it }
         activeService.start(runtime)
         val terminal = withTimeoutOrNull(startTimeoutMs) {

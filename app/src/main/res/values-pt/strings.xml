@@ -553,4 +553,14 @@
     <string name="warp_info_intro">Se a geração automática falhar, tente obter uma configuração em um destes sites e importe o arquivo .conf.</string>
     <string name="warp_info_close">Fechar</string>
     <string name="warp_register_error_hint">Não foi possível obter uma configuração automaticamente — todas as fontes estão indisponíveis. Toque em ⓘ acima, abra um dos sites geradores, baixe um .conf e importe-o.</string>
+
+    <string name="chain_settings_title">Cadeia de proxies</string>
+    <string name="chain_settings_summary">Conectar através de vários motores em sequência</string>
+    <string name="chain_screen_title">Cadeia de proxies</string>
+    <string name="chain_add_step">Adicionar motor</string>
+    <string name="chain_remove_step">Remover</string>
+    <string name="chain_empty_hint">Adicione motores para construir uma cadeia</string>
+    <string name="chain_enabled">Cadeia ativada</string>
+    <string name="chain_head_only">Apenas no início da cadeia</string>
+    <string name="chain_not_chainable">Não suporta encadeamento</string>
 </resources>

@@ -563,4 +563,13 @@
     <string name="urnetwork_shared_traffic_chart_empty">No data yet — provide some traffic and stats will show up here.</string>
     <string name="urnetwork_shared_traffic_chart_peak">Peak day: %1$s</string>
 
+    <string name="chain_settings_title">Proxy Chain</string>
+    <string name="chain_settings_summary">Route traffic through multiple engines sequentially</string>
+    <string name="chain_screen_title">Proxy Chain</string>
+    <string name="chain_add_step">Add engine</string>
+    <string name="chain_remove_step">Remove</string>
+    <string name="chain_empty_hint">Add engines to build a proxy chain</string>
+    <string name="chain_enabled">Chain enabled</string>
+    <string name="chain_head_only">Head position only</string>
+    <string name="chain_not_chainable">Does not support chaining</string>
 </resources>
