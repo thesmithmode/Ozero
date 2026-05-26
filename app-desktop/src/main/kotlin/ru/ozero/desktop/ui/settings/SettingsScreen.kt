@@ -65,7 +65,11 @@ fun SettingsScreen(
             item { SectionDivider() }
             item {
                 SectionHeader(Strings.SETTINGS_SECTION_NETWORK)
-                NavRow(Strings.SETTINGS_ALLOWED_APPS_TITLE, Strings.SETTINGS_ALLOWED_APPS_SUMMARY, onClick = onOpenAllowedApps)
+                NavRow(
+                    Strings.SETTINGS_ALLOWED_APPS_TITLE,
+                    Strings.SETTINGS_ALLOWED_APPS_SUMMARY,
+                    onClick = onOpenAllowedApps,
+                )
             }
             item { SectionDivider() }
             item {

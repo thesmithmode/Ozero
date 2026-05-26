@@ -29,11 +29,16 @@ class DesktopSettingsStore {
         runCatching {
             val props = Properties()
             file.inputStream().use { props.load(it) }
+            val engine = props.getProperty("manualEngine")
+                ?.let { runCatching { EngineId.valueOf(it) }.getOrNull() }
+            val mode = props.getProperty("appMode")
+                ?.let { runCatching { AppMode.valueOf(it) }.getOrNull() }
+                ?: AppMode.EXPERT
             _settings.value = SettingsModel(
                 ipv6Enabled = props.getProperty("ipv6", "false").toBoolean(),
                 autoStart = props.getProperty("autoStart", "false").toBoolean(),
-                manualEngine = props.getProperty("manualEngine")?.let { runCatching { EngineId.valueOf(it) }.getOrNull() },
-                appMode = props.getProperty("appMode")?.let { runCatching { AppMode.valueOf(it) }.getOrNull() } ?: AppMode.EXPERT,
+                manualEngine = engine,
+                appMode = mode,
                 killswitchEnabled = props.getProperty("killswitch", "false").toBoolean(),
             )
         }

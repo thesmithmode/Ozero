@@ -329,10 +329,13 @@ private fun pickStatusLabel(
     if (switching != null) return Strings.MAIN_STATUS_SWITCHING
     return when (state) {
         is TunnelState.Idle -> Strings.MAIN_STATUS_DISCONNECTED
-        is TunnelState.Probing -> if (isReconnecting) Strings.MAIN_STATUS_RECONNECTING else Strings.MAIN_STATUS_PROBING
-        is TunnelState.Connecting -> if (isReconnecting) Strings.MAIN_STATUS_RECONNECTING else Strings.MAIN_STATUS_CONNECTING
+        is TunnelState.Probing ->
+            if (isReconnecting) Strings.MAIN_STATUS_RECONNECTING else Strings.MAIN_STATUS_PROBING
+        is TunnelState.Connecting ->
+            if (isReconnecting) Strings.MAIN_STATUS_RECONNECTING else Strings.MAIN_STATUS_CONNECTING
         is TunnelState.Connected -> Strings.MAIN_STATUS_CONNECTED
-        is TunnelState.Failed -> if (isReconnecting) Strings.MAIN_STATUS_RECONNECTING else Strings.MAIN_STATUS_FAILED
+        is TunnelState.Failed ->
+            if (isReconnecting) Strings.MAIN_STATUS_RECONNECTING else Strings.MAIN_STATUS_FAILED
         is TunnelState.Disconnecting -> Strings.MAIN_STATUS_DISCONNECTING
     }
 }

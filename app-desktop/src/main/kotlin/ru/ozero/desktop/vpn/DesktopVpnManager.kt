@@ -43,7 +43,10 @@ class DesktopVpnManager(private val scope: CoroutineScope) {
         scope.launch {
             delay(800)
             if (!hasBinaries()) {
-                _state.value = TunnelState.Failed(engine, "Движки не установлены. Положите byedpi.exe и sing-box.exe в binaries/")
+                _state.value = TunnelState.Failed(
+                    engine,
+                    "Движки не установлены",
+                )
                 _powerDiscState.value = PowerDiscState.Off
                 return@launch
             }
