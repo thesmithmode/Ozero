@@ -32,9 +32,11 @@ class SingboxRefreshErrorSentinelTest {
             "refreshGroupInternal НЕ должен игнорировать Result от rawUpdater.refresh() — " +
                 "присваивать результат и проверять isFailure для установки groupRefreshErrors",
         )
+        val handlesError = refreshBlock.contains("result") &&
+            (refreshBlock.contains("isFailure") || refreshBlock.contains("exceptionOrNull"))
         assertTrue(
-            refreshBlock.contains("result") && refreshBlock.contains("isFailure"),
-            "refreshGroupInternal обязан проверять result.isFailure и устанавливать groupRefreshErrors при провале",
+            handlesError,
+            "refreshGroupInternal обязан проверять result.isFailure/exceptionOrNull и устанавливать groupRefreshErrors при провале",
         )
     }
 
