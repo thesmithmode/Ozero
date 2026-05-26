@@ -20,7 +20,12 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import ru.ozero.enginesingbox.SingboxPrefs
+import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
+import ru.ozero.singboxfmt.ShadowsocksBean
+import ru.ozero.singboxfmt.TrojanBean
+import ru.ozero.singboxfmt.VLESSBean
+import ru.ozero.singboxfmt.VMessBean
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.dao.SubscriptionGroupDao
 import ru.ozero.singboxroom.entity.ProxyProfile
@@ -361,11 +366,11 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
     }
 
-    private fun protocolTypeOf(bean: ru.ozero.singboxfmt.AbstractBean): Int = when (bean) {
-        is ru.ozero.singboxfmt.VLESSBean -> 0
-        is ru.ozero.singboxfmt.VMessBean -> 1
-        is ru.ozero.singboxfmt.TrojanBean -> 2
-        is ru.ozero.singboxfmt.ShadowsocksBean -> 3
+    private fun protocolTypeOf(bean: AbstractBean): Int = when (bean) {
+        is VLESSBean -> 0
+        is VMessBean -> 1
+        is TrojanBean -> 2
+        is ShadowsocksBean -> 3
         else -> 0
     }
 

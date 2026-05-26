@@ -13,7 +13,7 @@
     <string name="singbox_group_url_hint">URL de suscripción</string>
     <string name="singbox_cancel">Cancelar</string>
     <string name="singbox_refreshing">Actualizando…</string>
-    <string name="singbox_add_error_empty_fields">Ingrese nombre y URL</string>
+    <string name="singbox_add_error_empty_fields">Introduzca la URL de suscripción</string>
     <string name="singbox_refresh_error">Error al actualizar: %1$s</string>
     <string name="singbox_refresh_all_button">Actualizar todo</string>
     <string name="singbox_ping_all_button">Test</string>

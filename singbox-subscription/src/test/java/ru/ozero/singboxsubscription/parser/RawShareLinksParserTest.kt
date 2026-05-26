@@ -89,6 +89,17 @@ class RawShareLinksParserTest {
     }
 
     @Test
+    fun `should parse space-separated links on the same line`() {
+        val vless1 = "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@s1.example.com:443?type=tcp#S1"
+        val vless2 = "vless://bbbbbbbb-2222-2222-2222-bbbbbbbbbbbb@s2.example.com:443?type=tcp#S2"
+        val vless3 = "vless://cccccccc-3333-3333-3333-cccccccccccc@s3.example.com:443?type=tcp#S3"
+        val text = "$vless1 $vless2\n$vless3"
+
+        val result = RawShareLinksParser.parse(text)
+        assertEquals(3, result.size)
+    }
+
+    @Test
     fun `should extract server address from parsed vless bean`() {
         val result = RawShareLinksParser.parse(sampleVless)
         val bean = result.first() as VLESSBean

@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
+import ru.ozero.enginesingbox.SingboxProbeService
 import ru.ozero.singboxroom.entity.ProxyProfile
 import ru.ozero.singboxroom.entity.SubscriptionGroup
 
@@ -68,7 +69,7 @@ fun SingboxEngineSettingsScreen(
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         val text = runCatching {
-            context.contentResolver.openInputStream(uri)?.bufferedReader()?.readText()
+            context.contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() }
         }.getOrNull() ?: return@rememberLauncherForActivityResult
         val fileName = uri.lastPathSegment
         viewModel.onImportFromFile(text, fileName)

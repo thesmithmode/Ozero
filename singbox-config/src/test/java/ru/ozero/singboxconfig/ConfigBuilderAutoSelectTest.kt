@@ -56,7 +56,7 @@ class ConfigBuilderAutoSelectTest {
         assertContains(json, "https://www.gstatic.com/generate_204")
         assertContains(json, "\"interval\":\"3m\"")
         assertContains(json, "\"tolerance\":50")
-        assertContains(json, "\"interrupt_exist_connections\":false")
+        assertContains(json, "\"interrupt_exist_connections\":true")
         assertContains(json, "\"idle_timeout\":\"30m\"")
     }
 
