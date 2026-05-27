@@ -7,7 +7,7 @@ mkdir -p "$OUT"
 chmod 700 "$OUT"
 
 ALIAS="ozero"
-DNAME="CN=Ozero, OU=Release, O=thesmithmode, L=Internet, ST=Internet, C=RU"
+DNAME="CN=Ozero, OU=Release, O=Ozero, L=Internet, ST=Internet, C=RU"
 VALIDITY=10000
 KEYSIZE=4096
 

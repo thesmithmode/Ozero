@@ -378,7 +378,6 @@ jobs:
             "Lru/ozero/enginebyedpi/ByeDpiProxy;"
             "Lru/ozero/commonvpn/OzeroVpnService;"
             "Lru/ozero/commonvpn/HevTunnelGateway;"
-            "Lru/ozero/commonvpn/split/TunBuilderConfigurator;"
             "Lru/ozero/enginescore/PersistentLoggers;"
             "Lru/ozero/enginescore/PersistentLogger;"
             "Lru/ozero/app/logging/BootFileLogger;"
