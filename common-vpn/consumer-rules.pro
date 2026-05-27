@@ -1,4 +1,6 @@
 -keep class hev.** { *; }
 -keep class ru.ozero.commonvpn.OzeroVpnService { *; }
 -keep class ru.ozero.commonvpn.OzeroVpnService$* { *; }
+-keep class ru.ozero.commonvpn.HevTunnelGateway { *; }
+-keep class ru.ozero.commonvpn.NativeHevTunnelGateway { *; }
 -keepclasseswithmembernames class * { native <methods>; }
