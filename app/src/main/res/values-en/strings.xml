@@ -169,6 +169,7 @@
     <string name="onboarding_body_2">Multiple engines (Xray, Hysteria2, ByeDPI, AmneziaWG, Tor) auto-selected for your network.</string>
     <string name="onboarding_title_3">VPN consent</string>
     <string name="onboarding_body_3">Ozero needs Android VPN mode. The tunnel stays on-device.</string>
+    <string name="onboarding_import_backup">Import from backup</string>
     <string name="onboarding_next">Next</string>
     <string name="onboarding_finish">Start</string>
     <string name="onboarding_skip">Skip</string>
@@ -363,6 +364,12 @@
     <!-- Onboarding mode pick -->
     <string name="onboarding_mode_title">Choose a mode</string>
     <string name="onboarding_mode_body">You can change this any time in Settings.</string>
+    <string name="onboarding_mode_simple_feature_auto">Automatic route selection</string>
+    <string name="onboarding_mode_simple_feature_default">Best for most users</string>
+    <string name="onboarding_mode_expert_feature_manual">Manual rules and route setup</string>
+    <string name="onboarding_mode_expert_feature_advanced">For advanced users</string>
+    <string name="onboarding_mode_hint_title">Tip</string>
+    <string name="onboarding_mode_hint_body">You can switch modes any time in app Settings.</string>
 
     <!-- Traffic stats -->
     <string name="stats_traffic_title">Traffic statistics</string>

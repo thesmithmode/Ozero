@@ -132,6 +132,7 @@
     <string name="onboarding_body_2">Varios motores (Xray, Hysteria2, ByeDPI, AmneziaWG, Tor) elegidos automáticamente.</string>
     <string name="onboarding_title_3">Permiso VPN</string>
     <string name="onboarding_body_3">Ozero necesita el modo VPN de Android. El túnel queda en el dispositivo.</string>
+    <string name="onboarding_import_backup">Importar desde copia de seguridad</string>
     <string name="onboarding_next">Siguiente</string>
     <string name="onboarding_finish">Empezar</string>
     <string name="onboarding_skip">Omitir</string>
@@ -291,6 +292,12 @@
     <!-- Onboarding mode -->
     <string name="onboarding_mode_title">Elige un modo</string>
     <string name="onboarding_mode_body">Puedes cambiarlo en Ajustes cuando quieras.</string>
+    <string name="onboarding_mode_simple_feature_auto">Selección automática de rutas</string>
+    <string name="onboarding_mode_simple_feature_default">Óptimo para la mayoría de usuarios</string>
+    <string name="onboarding_mode_expert_feature_manual">Configuración manual de reglas y rutas</string>
+    <string name="onboarding_mode_expert_feature_advanced">Para usuarios avanzados</string>
+    <string name="onboarding_mode_hint_title">Consejo</string>
+    <string name="onboarding_mode_hint_body">Puedes cambiar el modo en cualquier momento en los Ajustes de la aplicación.</string>
 
     <!-- Engine chip / misc -->
     <string name="engine_chip_auto">Auto</string>
