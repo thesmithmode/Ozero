@@ -432,7 +432,7 @@ private fun SingboxTopBarActions(
     }
     if (state.isPinging.isNotEmpty()) {
         IconButton(
-            onClick = viewModel::onCancelPing,
+            onClick = { viewModel.onCancel(ping = true) },
             modifier = Modifier.testTag("singbox_cancel_ping_button"),
         ) {
             Icon(Icons.Default.Close, contentDescription = null)
@@ -451,7 +451,7 @@ private fun SingboxTopBarActions(
     }
     if (state.isRefreshing.isNotEmpty()) {
         IconButton(
-            onClick = viewModel::onCancelRefresh,
+            onClick = { viewModel.onCancel(refresh = true) },
             modifier = Modifier.testTag("singbox_cancel_refresh_button"),
         ) {
             Icon(Icons.Default.Close, contentDescription = null)

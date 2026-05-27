@@ -159,10 +159,9 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
     }
 
-    fun onCancelRefresh() {
-        refreshJob?.cancel()
-        refreshJob = null
-        _uiState.update { it.copy(isRefreshing = emptySet()) }
+    fun onCancel(ping: Boolean = false, refresh: Boolean = false) {
+        if (ping) { pingJob?.cancel(); pingJob = null; _uiState.update { it.copy(isPinging = emptySet()) } }
+        if (refresh) { refreshJob?.cancel(); refreshJob = null; _uiState.update { it.copy(isRefreshing = emptySet()) } }
     }
 
     fun onPing(groupId: Long? = null) {
@@ -192,11 +191,6 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
     }
 
-    fun onCancelPing() {
-        pingJob?.cancel()
-        pingJob = null
-        _uiState.update { it.copy(isPinging = emptySet()) }
-    }
 
     fun onAutoSelectBest() {
         viewModelScope.launch {
