@@ -255,6 +255,8 @@ jobs:
           OZERO_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           OZERO_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
           UPDATE_PUBLIC_KEY_HEX: ${{ secrets.UPDATE_PUBLIC_KEY_HEX }}
+          UPDATE_GITHUB_OWNER: ${{ github.repository_owner }}
+          UPDATE_GITHUB_REPO: ${{ github.event.repository.name }}
           OZERO_VERSION_NAME: ${{ needs.resolve-version.outputs.tag }}
         run: ./gradlew :app:assembleRelease --stacktrace
 

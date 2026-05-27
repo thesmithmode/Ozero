@@ -143,7 +143,7 @@ WORKDIR /workspace
 # ---------------------------------------------------------------------------
 LABEL org.opencontainers.image.title="ozero-xray-builder" \
       org.opencontainers.image.description="Reproducible build env: Xray-core -> Android AAR via gomobile" \
-      org.opencontainers.image.source="https://github.com/thesmithmode/Ozero" \
+      org.opencontainers.image.source="https://github.com/ozero-app/Ozero" \
       org.opencontainers.image.base.name="golang:1.25-bookworm" \
       com.ozero.ndk.version="r27c" \
       com.ozero.go.version="1.25"

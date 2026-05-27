@@ -198,7 +198,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--engine", required=True, choices=sorted(ENGINE_CONFIGS.keys()))
     ap.add_argument("--tag", required=True, help="Release tag, e.g. xray-deadbeef")
-    ap.add_argument("--repo", required=True, help="GitHub owner/repo, e.g. thesmithmode/Ozero")
+    ap.add_argument("--repo", required=True, help="GitHub owner/repo, e.g. owner/Ozero")
     ap.add_argument("--manifest", required=True, help="Path to manifest.txt produced by build_<engine>.sh")
     ap.add_argument("--out", required=True, help="Path to binaries.lock.yaml (will be updated in-place)")
     args = ap.parse_args()

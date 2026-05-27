@@ -80,7 +80,7 @@ class BuildArtifactEntriesTest(unittest.TestCase):
                             "bbbb000000000000000000000000000000000000000000000000000000000000  libbyedpi-x86_64.so\n")
         meta, arts = rl.parse_manifest(str(manifest))
         entries = rl.build_artifact_entries(
-            engine="byedpi", tag="byedpi-deadbeef", repo="thesmithmode/Ozero",
+            engine="byedpi", tag="byedpi-deadbeef", repo="owner/Ozero",
             manifest_path=str(manifest), meta=meta, artifacts=arts,
         )
         self.assertEqual(len(entries), 2)
@@ -91,7 +91,7 @@ class BuildArtifactEntriesTest(unittest.TestCase):
         self.assertEqual(e["sha256"], "aaaa" + "0" * 60)
         self.assertEqual(e["size_bytes"], 1024)
         self.assertEqual(e["source_commit"], "c")
-        self.assertIn("thesmithmode/Ozero/releases/download/byedpi-deadbeef/libbyedpi-arm64-v8a.so",
+        self.assertIn("owner/Ozero/releases/download/byedpi-deadbeef/libbyedpi-arm64-v8a.so",
                       e["download_url"])
 
     def test_xray_aar_entry_has_no_abi_and_libs_destination(self):
@@ -101,7 +101,7 @@ class BuildArtifactEntriesTest(unittest.TestCase):
                             "eeee000000000000000000000000000000000000000000000000000000000000  libxray.aar\n")
         meta, arts = rl.parse_manifest(str(manifest))
         entries = rl.build_artifact_entries(
-            engine="xray", tag="xray-cafebabe", repo="thesmithmode/Ozero",
+            engine="xray", tag="xray-cafebabe", repo="owner/Ozero",
             manifest_path=str(manifest), meta=meta, artifacts=arts,
         )
         self.assertEqual(len(entries), 1)
@@ -282,7 +282,7 @@ class MainCliTest(unittest.TestCase):
             "regen_lock.py",
             "--engine", "xray",
             "--tag", "xray-12345678",
-            "--repo", "thesmithmode/Ozero",
+            "--repo", "owner/Ozero",
             "--manifest", str(manifest),
             "--out", str(out),
         ]):
@@ -295,7 +295,7 @@ class MainCliTest(unittest.TestCase):
         self.assertEqual(a["destination"], "libs")
         self.assertNotIn("abi", a)
         self.assertEqual(a["download_url"],
-                         "https://github.com/thesmithmode/Ozero/releases/download/xray-12345678/libxray.aar")
+                         "https://github.com/owner/Ozero/releases/download/xray-12345678/libxray.aar")
 
     def test_main_xray_added_to_existing_byedpi(self):
         # Existing lock with byedpi
@@ -325,7 +325,7 @@ class MainCliTest(unittest.TestCase):
             "regen_lock.py",
             "--engine", "xray",
             "--tag", "xray-87654321",
-            "--repo", "thesmithmode/Ozero",
+            "--repo", "owner/Ozero",
             "--manifest", str(manifest),
             "--out", str(out),
         ]):

@@ -27,8 +27,8 @@ android {
         applicationId = "ru.ozero.app"
         versionCode = gitVersionCode
         versionName = gitVersionName
-        buildConfigField("String", "UPDATE_GITHUB_OWNER", "\"thesmithmode\"")
-        buildConfigField("String", "UPDATE_GITHUB_REPO", "\"Ozero\"")
+        buildConfigField("String", "UPDATE_GITHUB_OWNER", "\"\"")
+        buildConfigField("String", "UPDATE_GITHUB_REPO", "\"\"")
         buildConfigField(
             "String",
             "UPDATE_PUBLIC_KEY_HEX",
@@ -45,6 +45,16 @@ android {
                 ?.takeIf { it.isNotBlank() }
             if (updateKey != null) {
                 buildConfigField("String", "UPDATE_PUBLIC_KEY_HEX", "\"$updateKey\"")
+            }
+            val updateOwner = providers.environmentVariable("UPDATE_GITHUB_OWNER").orNull
+                ?.takeIf { it.isNotBlank() }
+            if (updateOwner != null) {
+                buildConfigField("String", "UPDATE_GITHUB_OWNER", "\"$updateOwner\"")
+            }
+            val updateRepo = providers.environmentVariable("UPDATE_GITHUB_REPO").orNull
+                ?.takeIf { it.isNotBlank() }
+            if (updateRepo != null) {
+                buildConfigField("String", "UPDATE_GITHUB_REPO", "\"$updateRepo\"")
             }
         }
     }
