@@ -5,16 +5,29 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
@@ -27,6 +40,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -35,6 +50,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import ru.ozero.app.R
+import ru.ozero.app.ui.backup.BackupScreen
 import ru.ozero.app.ui.settings.LocaleApplier
 import ru.ozero.enginescore.settings.AppMode
 
@@ -101,7 +117,7 @@ fun OnboardingContent(
                         onSelect = onLocaleSelect,
                     )
                     1 -> StaticPage(R.string.onboarding_title_1, R.string.onboarding_body_1)
-                    2 -> StaticPage(R.string.onboarding_title_2, R.string.onboarding_body_2)
+                    2 -> BackupImportStep()
                     3 -> StaticPage(R.string.onboarding_title_3, R.string.onboarding_body_3)
                     4 -> ModePickStep(
                         currentMode = currentAppMode,
@@ -139,6 +155,21 @@ fun OnboardingContent(
 }
 
 @Composable
+private fun BackupImportStep() {
+    Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.Start) {
+        Text(text = stringResource(R.string.onboarding_title_2), style = MaterialTheme.typography.headlineMedium)
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.onboarding_body_2),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        BackupScreen(onBack = {})
+    }
+}
+
+@Composable
 private fun ModePickStep(
     currentMode: AppMode,
     onSelect: (AppMode) -> Unit,
@@ -160,58 +191,160 @@ private fun ModePickStep(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.height(16.dp))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .selectable(
-                    selected = currentMode == AppMode.SIMPLE,
-                    onClick = { onSelect(AppMode.SIMPLE) },
-                    role = Role.RadioButton,
+        ModeCard(
+            selected = currentMode == AppMode.SIMPLE,
+            title = stringResource(R.string.settings_app_mode_simple),
+            hint = stringResource(R.string.settings_app_mode_simple_hint),
+            features = listOf(
+                stringResource(R.string.onboarding_mode_simple_feature_auto),
+                stringResource(R.string.onboarding_mode_simple_feature_default),
+            ),
+            icon = {
+                Icon(
+                    Icons.Outlined.AutoAwesome,
+                    contentDescription = null,
+                    modifier = Modifier.size(22.dp),
                 )
-                .padding(vertical = 8.dp)
-                .testTag("onboarding_mode_simple"),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            RadioButton(
-                selected = currentMode == AppMode.SIMPLE,
-                onClick = { onSelect(AppMode.SIMPLE) },
-            )
-            Column(modifier = Modifier.padding(start = 12.dp)) {
-                Text(
-                    text = stringResource(R.string.settings_app_mode_simple),
-                    style = MaterialTheme.typography.bodyLarge,
+            },
+            featureIcon = {
+                Icon(
+                    Icons.Outlined.Bolt,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = Color(0xFF63F5E4),
                 )
-                Text(
-                    text = stringResource(R.string.settings_app_mode_simple_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+            },
+            onClick = { onSelect(AppMode.SIMPLE) },
+            tag = "onboarding_mode_simple",
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        ModeCard(
+            selected = currentMode == AppMode.EXPERT,
+            title = stringResource(R.string.settings_app_mode_expert),
+            hint = stringResource(R.string.settings_app_mode_expert_hint),
+            features = listOf(
+                stringResource(R.string.onboarding_mode_expert_feature_manual),
+                stringResource(R.string.onboarding_mode_expert_feature_advanced),
+            ),
+            icon = {
+                Icon(
+                    Icons.Outlined.Tune,
+                    contentDescription = null,
+                    modifier = Modifier.size(22.dp),
                 )
+            },
+            featureIcon = {
+                Icon(
+                    Icons.Outlined.Settings,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.outline,
+                )
+            },
+            onClick = { onSelect(AppMode.EXPERT) },
+            tag = "onboarding_mode_expert",
+        )
+        Spacer(modifier = Modifier.height(14.dp))
+        InfoCard()
+    }
+}
+
+@Composable
+private fun ModeCard(
+    selected: Boolean,
+    title: String,
+    hint: String,
+    features: List<String>,
+    icon: @Composable () -> Unit,
+    featureIcon: @Composable () -> Unit,
+    onClick: () -> Unit,
+    tag: String,
+) {
+    val border = if (selected) {
+        Color(0xFF63F5E4)
+    } else {
+        MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)
+    }
+    val bg = Brush.verticalGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.surface.copy(alpha = if (selected) 0.9f else 0.7f),
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (selected) 0.5f else 0.35f),
+        ),
+    )
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .selectable(selected = selected, onClick = onClick, role = Role.RadioButton)
+            .testTag(tag),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.Transparent,
+        ),
+        border = androidx.compose.foundation.BorderStroke(1.dp, border),
+    ) {
+        Column(modifier = Modifier.background(bg).padding(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                RadioButton(selected = selected, onClick = onClick)
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = title, style = MaterialTheme.typography.headlineSmall)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = hint,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                icon()
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = border.copy(alpha = 0.35f))
+            Spacer(modifier = Modifier.height(12.dp))
+            features.forEach { feature ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(vertical = 4.dp),
+                ) {
+                    featureIcon()
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = feature,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .selectable(
-                    selected = currentMode == AppMode.EXPERT,
-                    onClick = { onSelect(AppMode.EXPERT) },
-                    role = Role.RadioButton,
-                )
-                .padding(vertical = 8.dp)
-                .testTag("onboarding_mode_expert"),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            RadioButton(
-                selected = currentMode == AppMode.EXPERT,
-                onClick = { onSelect(AppMode.EXPERT) },
+    }
+}
+
+@Composable
+private fun InfoCard() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        ),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+        ),
+    ) {
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
+            Icon(
+                Icons.Outlined.Info,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
             )
-            Column(modifier = Modifier.padding(start = 12.dp)) {
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
                 Text(
-                    text = stringResource(R.string.settings_app_mode_expert),
-                    style = MaterialTheme.typography.bodyLarge,
+                    text = stringResource(R.string.onboarding_mode_hint_title),
+                    style = MaterialTheme.typography.titleMedium,
                 )
+                Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = stringResource(R.string.settings_app_mode_expert_hint),
-                    style = MaterialTheme.typography.bodySmall,
+                    text = stringResource(R.string.onboarding_mode_hint_body),
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -275,7 +408,7 @@ private fun LanguageStep(
                     selected = currentTag == tag,
                     onClick = { onSelect(tag) },
                 )
-                Spacer(modifier = Modifier.height(0.dp))
+                Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = stringResource(labelRes),
                     style = MaterialTheme.typography.bodyLarge,
