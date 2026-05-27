@@ -364,7 +364,7 @@
 - Articles created: [[concepts/vpnservice-double-shutdown-guard]], [[concepts/warp-allowedips-tun-routing]], [[concepts/engine-chip-switching-desync]], [[concepts/qs-tile-vpn-integration]]
 - Articles updated: [[concepts/engine-chip-race-observer]], [[concepts/urnetwork-relay-always]], [[concepts/byedpi-hev-pipeline-upstream-parity]], [[concepts/warp-config-generator-api]], [[concepts/amnezia-wg-warp-migration]], [[concepts/sentinel-protecting-bug-trap]], [[concepts/vpn-slot-conflict-detection]], [[concepts/urnetwork-location-hierarchy-migration]]
 - Index updated: 4 new rows + 8 updated rows
-- Sessions covered: 11:59 (chip switching desync fix), 13:00 (YouTube/QUIC revert), 13:40+ (double-shutdown root cause, log analysis), 16:02+ (URnetwork relay coordinator hardcode bug + UI fixes), 17:51 (WARP AWG defaults/migration/AllowedIPs routing), 19:25 (QS tile), 19:32 (Ruslan ownerUid false positive), 19:47 (selectLocation offline fix)
+- Sessions covered: 11:59 (chip switching desync fix), 13:00 (YouTube/QUIC revert), 13:40+ (double-shutdown root cause, log analysis), 16:02+ (URnetwork relay coordinator hardcode bug + UI fixes), 17:51 (WARP AWG defaults/migration/AllowedIPs routing), 19:25 (QS tile), 19:32 (user ownerUid false positive), 19:47 (selectLocation offline fix)
 - Verification: all passes confirmed against daily log — no gaps found
 
 ## [2026-05-22T23:59:00+03:00] compile | Daily Log 2026-05-22 (pass 6 — selectLocation offline fix, session 19:47)
@@ -381,7 +381,7 @@
 - Articles updated:
   - [[concepts/vpn-slot-conflict-detection]] — isExternalVpnActive() missing ownerUid filter: own dying VPN detected as external → 750ms delay + protect() conflict → cycling loop; fix c1123b04 (API 29+ ownerUid guard, v0.1.12); log pattern + diagnostic shortcut documented
 - Index updated: 1 row (vpn-slot-conflict-detection summary + date + source)
-- Sessions covered: 19:32 (Ruslan v0.1.11 user report — cycling VPN; isExternalVpnActive false positive root cause; v0.1.12 fix confirmed)
+- Sessions covered: 19:32 (v0.1.11 user report — cycling VPN; isExternalVpnActive false positive root cause; v0.1.12 fix confirmed)
 - Note: Passes 1-4 covered all other sessions; this pass closes the remaining gap
 
 ## [2026-05-22T22:00:00+03:00] compile | Daily Log 2026-05-22 (pass 4 — QS tile)
