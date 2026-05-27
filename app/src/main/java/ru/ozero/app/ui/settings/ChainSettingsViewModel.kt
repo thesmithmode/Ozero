@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ru.ozero.enginescore.EngineCapabilities
@@ -49,9 +50,7 @@ class ChainSettingsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            settingsRepository.settings.collect { model ->
-                stepsFlow.value = model.proxyChain
-            }
+            stepsFlow.value = settingsRepository.settings.first().proxyChain
         }
     }
 
