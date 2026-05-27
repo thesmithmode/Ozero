@@ -330,7 +330,7 @@ private fun InfoCard() {
     ) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
             Icon(
-                Icons.Outlined.Info,
+                Icons.Filled.Info,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
             )
