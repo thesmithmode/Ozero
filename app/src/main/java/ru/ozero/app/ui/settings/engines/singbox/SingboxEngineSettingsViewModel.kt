@@ -230,8 +230,8 @@ class SingboxEngineSettingsViewModel @Inject constructor(
             if (result.isSuccess && profiles.isNotEmpty()) {
                 probeService.probeAndAutoSelect(profiles, viewModelScope)
             }
-        } catch (_: CancellationException) {
-            throw
+        } catch (ce: CancellationException) {
+            throw ce
         } catch (t: Throwable) {
             errorMsg = t.message ?: "refresh failed"
         } finally {
