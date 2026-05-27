@@ -23,6 +23,7 @@ internal object BackupSettingsSerializer {
         s.bydpiUiSettingsJson?.let { obj.put("bydpiUiSettingsJson", it) }
         s.bydpiDefaultAccepted?.let { obj.put("bydpiDefaultAccepted", it) }
         s.urnetworkCountryCode?.let { obj.put("urnetworkCountryCode", it) }
+        s.fptnToken?.let { obj.put("fptnToken", it) }
         return obj
     }
 
@@ -45,5 +46,6 @@ internal object BackupSettingsSerializer {
             bydpiUiSettingsJson = s.optString("bydpiUiSettingsJson").takeIf { it.isNotEmpty() },
             bydpiDefaultAccepted = s.booleanOrNull("bydpiDefaultAccepted"),
             urnetworkCountryCode = s.optString("urnetworkCountryCode").takeIf { it.isNotEmpty() },
+            fptnToken = s.optString("fptnToken").takeIf { it.isNotEmpty() },
         )
 }

@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -221,22 +222,30 @@ class SingboxEngineSettingsViewModel @Inject constructor(
                 groupRefreshErrors = it.groupRefreshErrors - groupId,
             )
         }
-        val result = rawUpdater.refresh(group)
-        val profiles = profileDao.getByGroupId(groupId)
-        if (result.isSuccess && profiles.isNotEmpty()) {
-            probeService.probeAndAutoSelect(profiles, viewModelScope)
-        }
-        _uiState.update {
-            val errorMsg = result.exceptionOrNull()?.message
-            it.copy(
-                isRefreshing = it.isRefreshing - groupId,
-                groupProfiles = it.groupProfiles + (groupId to profileDao.getByGroupId(groupId)),
-                groupRefreshErrors = if (errorMsg != null) {
-                    it.groupRefreshErrors + (groupId to errorMsg)
-                } else {
-                    it.groupRefreshErrors - groupId
-                },
-            )
+        var errorMsg: String? = null
+        try {
+            val result = rawUpdater.refresh(group)
+            errorMsg = result.exceptionOrNull()?.message
+            val profiles = profileDao.getByGroupId(groupId)
+            if (result.isSuccess && profiles.isNotEmpty()) {
+                probeService.probeAndAutoSelect(profiles, viewModelScope)
+            }
+        } catch (_: CancellationException) {
+            throw
+        } catch (t: Throwable) {
+            errorMsg = t.message ?: "refresh failed"
+        } finally {
+            _uiState.update {
+                it.copy(
+                    isRefreshing = it.isRefreshing - groupId,
+                    groupProfiles = it.groupProfiles + (groupId to profileDao.getByGroupId(groupId)),
+                    groupRefreshErrors = if (errorMsg != null) {
+                        it.groupRefreshErrors + (groupId to errorMsg)
+                    } else {
+                        it.groupRefreshErrors - groupId
+                    },
+                )
+            }
         }
     }
 

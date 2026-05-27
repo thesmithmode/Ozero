@@ -40,6 +40,10 @@ class TunnelController(
     fun onConnecting(engineId: EngineId) = transition(TunnelState.Connecting(engineId))
 
     fun onEngineStarted(engineId: EngineId, socksPort: Int) {
+        if (isStaleEngineSignal(engineId)) {
+            PersistentLoggers.warn(TAG, "ignore stale engine started: engine=$engineId port=$socksPort")
+            return
+        }
         sessionStartMs = System.currentTimeMillis()
         prevTxBytes = 0L
         prevRxBytes = 0L
@@ -51,8 +55,13 @@ class TunnelController(
         transition(TunnelState.Connected(engineId, socksPort))
     }
 
-    fun onEngineDied(engineId: EngineId, reason: String) =
+    fun onEngineDied(engineId: EngineId, reason: String) {
+        if (isStaleEngineSignal(engineId)) {
+            PersistentLoggers.warn(TAG, "ignore stale engine failure: engine=$engineId reason=$reason")
+            return
+        }
         transition(TunnelState.Failed(engineId, reason), markError = true)
+    }
 
     fun onKillswitchEngaged(engineId: EngineId, reason: String) {
         transition(TunnelState.Failed(engineId, reason), markError = true)
@@ -171,6 +180,15 @@ class TunnelController(
                     PersistentLoggers.info(TAG, "switching cleared on transition → ${name(target)}")
                 }
             }
+        }
+    }
+
+    private fun isStaleEngineSignal(engineId: EngineId): Boolean {
+        val current = _state.value
+        return when (current) {
+            is TunnelState.Connecting -> current.engineId != engineId
+            is TunnelState.Connected -> current.engineId != engineId
+            else -> false
         }
     }
 

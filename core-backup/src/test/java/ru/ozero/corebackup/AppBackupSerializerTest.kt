@@ -27,9 +27,13 @@ class AppBackupSerializerTest {
             bydpiUiSettingsJson = """{"k":"v"}""",
             bydpiDefaultAccepted = false,
             urnetworkCountryCode = "DE",
+            fptnToken = "fptn:test-token",
         ),
         urnetwork = BackupUrnetwork(
             byJwt = "jwt-x",
+            byClientJwt = "client-jwt-x",
+            devicePubkey = "pub-x",
+            deviceNetworkName = "device-x",
             windowType = "speed",
             fixedIpSize = true,
             allowDirect = false,
@@ -81,9 +85,13 @@ class AppBackupSerializerTest {
         assertEquals("""{"k":"v"}""", s.bydpiUiSettingsJson)
         assertEquals(false, s.bydpiDefaultAccepted)
         assertEquals("DE", s.urnetworkCountryCode)
+        assertEquals("fptn:test-token", s.fptnToken)
 
         val u = restored.urnetwork
         assertEquals("jwt-x", u.byJwt)
+        assertEquals("client-jwt-x", u.byClientJwt)
+        assertEquals("pub-x", u.devicePubkey)
+        assertEquals("device-x", u.deviceNetworkName)
         assertEquals("speed", u.windowType)
         assertEquals(true, u.fixedIpSize)
         assertEquals(false, u.allowDirect)

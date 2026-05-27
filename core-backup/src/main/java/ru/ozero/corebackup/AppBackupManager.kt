@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.first
 import ru.ozero.corestorage.dao.AppSplitRuleDao
 import ru.ozero.corestorage.entity.AppSplitRule
 import ru.ozero.enginescore.settings.SettingsKeys
+import ru.ozero.enginefptn.FptnConfigStore
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkLocationSelection
 import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
@@ -26,6 +27,7 @@ class AppBackupManager(
     private val warpSlotStore: WarpConfigSlotStore,
     private val urnetworkStore: UrnetworkConfigStore,
     private val splitRuleDao: AppSplitRuleDao,
+    private val fptnStore: FptnConfigStore? = null,
     private val strategyProvider: StrategyBackupProvider? = null,
 ) {
 
@@ -69,6 +71,7 @@ class AppBackupManager(
             bydpiUiSettingsJson = if (inByedpi) prefs[SettingsKeys.BYDPI_UI_SETTINGS_JSON] else null,
             bydpiDefaultAccepted = if (inByedpi) prefs[SettingsKeys.BYDPI_DEFAULT_ACCEPTED] else null,
             urnetworkCountryCode = if (inUrn) prefs[SettingsKeys.URNETWORK_COUNTRY_CODE] else null,
+            fptnToken = if (inGeneral) fptnStore?.currentConfig()?.token?.takeIf { it.isNotBlank() } else null,
         )
     }
 
@@ -76,6 +79,9 @@ class AppBackupManager(
         val cfg = urnetworkStore.config().first()
         return BackupUrnetwork(
             byJwt = cfg.byJwt?.takeIf { it.isNotBlank() },
+            byClientJwt = cfg.byClientJwt?.takeIf { it.isNotBlank() },
+            devicePubkey = cfg.devicePubkey?.takeIf { it.isNotBlank() },
+            deviceNetworkName = cfg.deviceNetworkName?.takeIf { it.isNotBlank() },
             windowType = cfg.windowType.rawValue,
             fixedIpSize = cfg.fixedIpSize,
             allowDirect = cfg.allowDirect,
@@ -94,13 +100,14 @@ class AppBackupManager(
         }
 
     suspend fun import(data: AppBackupData, categories: Set<BackupCategory> = BackupCategory.ALL) {
+        val importedSettings = data.settings
         ozeroSettings.edit { prefs ->
-            val s = data.settings
-            if (BackupCategory.GENERAL_SETTINGS in categories) importGeneral(prefs, s)
-            if (BackupCategory.BYEDPI in categories) importByedpi(prefs, s)
-            if (BackupCategory.URNETWORK in categories) importUrnPrefs(prefs, s)
-            if (BackupCategory.DNS_HOSTS in categories) importDns(prefs, s)
+            if (BackupCategory.GENERAL_SETTINGS in categories) importGeneral(prefs, importedSettings)
+            if (BackupCategory.BYEDPI in categories) importByedpi(prefs, importedSettings)
+            if (BackupCategory.URNETWORK in categories) importUrnPrefs(prefs, importedSettings)
+            if (BackupCategory.DNS_HOSTS in categories) importDns(prefs, importedSettings)
         }
+        if (BackupCategory.GENERAL_SETTINGS in categories) importFptnToken(importedSettings)
         if (BackupCategory.URNETWORK in categories) importUrnConfig(data.urnetwork)
         if (BackupCategory.WARP in categories && data.warpSlots.isNotEmpty()) {
             warpSlotStore.replaceAll(data.warpSlots.map { it.toSlot() })
@@ -117,6 +124,11 @@ class AppBackupManager(
         s.uiLocaleTag?.let { prefs[SettingsKeys.UI_LOCALE_TAG] = it }
         s.appMode?.let { prefs[SettingsKeys.APP_MODE] = it }
         s.engineAutoPriority?.let { prefs[SettingsKeys.ENGINE_AUTO_PRIORITY] = it }
+    }
+
+    private suspend fun importFptnToken(s: BackupSettings) {
+        val token = s.fptnToken?.takeIf { it.isNotBlank() } ?: return
+        fptnStore?.update { it.copy(token = token) }
     }
 
     private fun importByedpi(prefs: MutablePreferences, s: BackupSettings) {
@@ -142,6 +154,9 @@ class AppBackupManager(
         urnetworkStore.update { current ->
             current.copy(
                 byJwt = u.byJwt ?: current.byJwt,
+                byClientJwt = u.byClientJwt ?: current.byClientJwt,
+                devicePubkey = u.devicePubkey ?: current.devicePubkey,
+                deviceNetworkName = u.deviceNetworkName ?: current.deviceNetworkName,
                 windowType = u.windowType?.let { UrnetworkWindowType.fromRaw(it) } ?: current.windowType,
                 fixedIpSize = u.fixedIpSize ?: current.fixedIpSize,
                 allowDirect = u.allowDirect ?: current.allowDirect,

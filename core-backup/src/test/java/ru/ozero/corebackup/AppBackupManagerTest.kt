@@ -13,6 +13,8 @@ import org.junit.jupiter.api.Test
 import ru.ozero.corestorage.dao.AppSplitRuleDao
 import ru.ozero.corestorage.entity.AppSplitRule
 import ru.ozero.enginescore.settings.SettingsKeys
+import ru.ozero.enginefptn.FptnConfig
+import ru.ozero.enginefptn.FptnConfigStore
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkLocationSelection
 import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
@@ -32,9 +34,10 @@ class AppBackupManagerTest {
     private val ozeroDs = FakePreferencesDataStore()
     private val warpStore = FakeWarpSlotStore()
     private val urnStore = FakeUrnetworkStore()
+    private val fptnStore = FakeFptnStore()
     private val splitDao = FakeSplitRuleDao()
 
-    private val manager = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao)
+    private val manager = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao, fptnStore)
 
     private val sampleWarpSlot = WarpConfigSlot(
         id = "warp-id-1",
@@ -87,6 +90,19 @@ class AppBackupManagerTest {
         assertEquals(true, data.settings.bydpiUseUiMode)
         assertEquals("""{"a":1}""", data.settings.bydpiUiSettingsJson)
         assertEquals("DE", data.settings.urnetworkCountryCode)
+        assertNull(data.settings.fptnToken)
+    }
+
+    @Test
+    fun `export and import — FPTN token сохраняется в backup`() = runTest {
+        fptnStore.inject { it.copy(token = "fptn:secret-token") }
+        val exported = manager.export()
+        assertEquals("fptn:secret-token", exported.settings.fptnToken)
+
+        val importedStore = FakeFptnStore()
+        val importedManager = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao, importedStore)
+        importedManager.import(exported)
+        assertEquals("fptn:secret-token", importedStore.currentConfig().token)
     }
 
     @Test
@@ -103,6 +119,9 @@ class AppBackupManagerTest {
         urnStore.inject {
             it.copy(
                 byJwt = "jwt-token",
+                byClientJwt = "client-jwt",
+                devicePubkey = "pub-key-1",
+                deviceNetworkName = "device-name-1",
                 windowType = UrnetworkWindowType.QUALITY,
                 fixedIpSize = true,
                 allowDirect = false,
@@ -114,6 +133,9 @@ class AppBackupManagerTest {
         }
         val data = manager.export()
         assertEquals("jwt-token", data.urnetwork.byJwt)
+        assertEquals("client-jwt", data.urnetwork.byClientJwt)
+        assertEquals("pub-key-1", data.urnetwork.devicePubkey)
+        assertEquals("device-name-1", data.urnetwork.deviceNetworkName)
         assertEquals("quality", data.urnetwork.windowType)
         assertEquals(true, data.urnetwork.fixedIpSize)
         assertEquals(false, data.urnetwork.allowDirect)
@@ -190,6 +212,9 @@ class AppBackupManagerTest {
         val data = makeMinimalBackup().copy(
             urnetwork = BackupUrnetwork(
                 byJwt = "imported-jwt",
+                byClientJwt = "imported-client-jwt",
+                devicePubkey = "imported-pub",
+                deviceNetworkName = "imported-device",
                 windowType = "speed",
                 fixedIpSize = true,
                 allowDirect = false,
@@ -203,6 +228,9 @@ class AppBackupManagerTest {
 
         val cfg = urnStore.config().first()
         assertEquals("imported-jwt", cfg.byJwt)
+        assertEquals("imported-client-jwt", cfg.byClientJwt)
+        assertEquals("imported-pub", cfg.devicePubkey)
+        assertEquals("imported-device", cfg.deviceNetworkName)
         assertEquals(UrnetworkWindowType.SPEED, cfg.windowType)
         assertEquals(true, cfg.fixedIpSize)
         assertEquals(false, cfg.allowDirect)
@@ -264,7 +292,8 @@ class AppBackupManagerTest {
         val freshWarp = FakeWarpSlotStore()
         val freshUrn = FakeUrnetworkStore()
         val freshDao = FakeSplitRuleDao()
-        val freshManager = AppBackupManager(freshDs, freshWarp, freshUrn, freshDao)
+        val freshFptn = FakeFptnStore()
+        val freshManager = AppBackupManager(freshDs, freshWarp, freshUrn, freshDao, freshFptn)
 
         freshManager.import(AppBackupSerializer.deserialize(jsonString))
 
@@ -283,7 +312,7 @@ class AppBackupManagerTest {
         provider.exported = BackupStrategy(
             settings = BackupStrategySettings(requestsPerDomain = 3, evolutionTargetFitness = 0.95f),
         )
-        val mgr = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao, provider)
+        val mgr = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao, fptnStore = fptnStore, strategyProvider = provider)
         val data = mgr.export()
         assertEquals(provider.exported, data.strategy)
     }
@@ -291,7 +320,7 @@ class AppBackupManagerTest {
     @Test
     fun `import strategy — provider получает данные`() = runTest {
         val provider = FakeStrategyBackupProvider()
-        val mgr = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao, provider)
+        val mgr = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao, fptnStore = fptnStore, strategyProvider = provider)
         val strategy = BackupStrategy(settings = BackupStrategySettings(evolutionTargetFitness = 0.88f))
         mgr.import(makeMinimalBackup().copy(strategy = strategy))
         assertEquals(strategy, provider.imported)
@@ -300,7 +329,7 @@ class AppBackupManagerTest {
     @Test
     fun `import strategy null — provider не вызывается`() = runTest {
         val provider = FakeStrategyBackupProvider()
-        val mgr = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao, provider)
+        val mgr = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao, fptnStore = fptnStore, strategyProvider = provider)
         mgr.import(makeMinimalBackup())
         assertNull(provider.imported)
     }
@@ -362,6 +391,7 @@ class AppBackupManagerTest {
             manualEngine = null, bydpiWinningArgs = null, urnetworkEnabled = null,
             urnetworkJwt = null, customDnsServers = null, hostsMode = null,
             hostsList = null, uiLocaleTag = null, appMode = null,
+            fptnToken = null,
         ),
         urnetwork = BackupUrnetwork(),
         warpSlots = emptyList(),
@@ -430,6 +460,14 @@ class AppBackupManagerTest {
         override suspend fun delete(packageName: String) {
             rules.value = rules.value.filter { it.packageName != packageName }
         }
+    }
+
+    private class FakeFptnStore : FptnConfigStore {
+        private val delegate = ru.ozero.enginefptn.InMemoryFptnConfigStore()
+        fun inject(transform: (FptnConfig) -> FptnConfig) = delegate.inject(transform)
+        override fun config() = delegate.config()
+        override fun currentConfig(): FptnConfig = delegate.currentConfig()
+        override suspend fun update(transform: (FptnConfig) -> FptnConfig) = delegate.update(transform)
     }
 
     private class FakeStrategyBackupProvider : StrategyBackupProvider {
