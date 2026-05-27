@@ -48,7 +48,7 @@ class SingboxEngineService : Service() {
             singboxJsonConfig: String,
             protector: ISingboxProtector,
         ) {
-            kotlinx.coroutines.runBlocking(Dispatchers.Main.immediate) {
+            kotlinx.coroutines.runBlocking {
                 SingboxRuntime.start(NO_TUN_FD, singboxJsonConfig, SingboxProtectorBridge(protector))
             }
         }

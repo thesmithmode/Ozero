@@ -187,6 +187,7 @@ class StartSequenceCoordinator(
             }
         }
         if (chainResult !is ChainResult.Success) {
+            runCatching { deps.chainOrchestrator.stop() }
             deps.engineWatchdog.handleEngineFailure(tailEngineId, chainResult?.toString() ?: "chain timeout")
             return
         }

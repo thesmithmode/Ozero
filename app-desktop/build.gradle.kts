@@ -48,9 +48,10 @@ compose.desktop {
         }
 
         nativeDistributions {
+            val version = desktopVersion
             targetFormats(TargetFormat.Exe, TargetFormat.Deb, TargetFormat.Dmg)
             packageName = "Ozero"
-            packageVersion = desktopVersion
+            packageVersion = version
             description = "Ozero VPN"
             vendor = "Ozero"
 
@@ -72,7 +73,7 @@ compose.desktop {
 
             macOS {
                 bundleID = "ru.ozero.desktop"
-                val parts = desktopVersion.split(".")
+                val parts = version.split(".")
                 if (parts.isNotEmpty() && (parts[0].toIntOrNull() ?: 0) < 1) {
                     val macVer = (listOf("1") + parts.drop(1)).joinToString(".")
                     packageVersion = macVer

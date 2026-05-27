@@ -199,12 +199,6 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
     }
 
-    fun onCancelPing() {
-        pingJob?.cancel()
-        pingJob = null
-        _uiState.update { it.copy(isPinging = emptySet()) }
-    }
-
     fun onAutoSelectBest() {
         viewModelScope.launch {
             _uiState.update { it.copy(isAutoSelecting = true) }
@@ -370,34 +364,6 @@ class SingboxEngineSettingsViewModel @Inject constructor(
                 )
             }
             profileDao.insertAll(profiles)
-        }
-    }
-
-    fun onSortOrderChanged(order: SortOrder) {
-        viewModelScope.launch {
-            dataStore.edit { prefs -> prefs[SORT_ORDER_KEY] = order.ordinal }
-        }
-    }
-
-    fun onRestoreDefaults() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isRestoringDefaults = true, restoreError = null) }
-            val error = runCatching {
-                val json = appContext.assets.open("singbox/preset_groups.json").bufferedReader().readText()
-                val obj = org.json.JSONObject(json)
-                val arr = obj.getJSONArray("groups")
-                val presets = (0 until arr.length()).map { i ->
-                    val g = arr.getJSONObject(i)
-                    GroupSeeder.PresetGroup(name = g.getString("name"), url = g.getString("url"))
-                }
-                groupSeeder.seedPresets(presets)
-            }.exceptionOrNull()
-            _uiState.update {
-                it.copy(
-                    isRestoringDefaults = false,
-                    restoreError = error?.let { e -> e.message ?: e.javaClass.simpleName },
-                )
-            }
         }
     }
 

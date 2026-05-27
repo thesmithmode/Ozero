@@ -142,14 +142,24 @@ class SingboxEngine @Inject constructor(
             val beans = config.autoSelectBeanBlobs
                 .take(MAX_AUTO_SELECT_OUTBOUNDS)
                 .mapNotNull {
-                    runCatching { KryoSerializer.deserialize<AbstractBean>(it) }.getOrNull()
+                    runCatching { KryoSerializer.deserialize<AbstractBean>(it) }
+                        .onFailure { e -> PersistentLoggers.warn(TAG, "bean deserialize: ${e.message}") }
+                        .getOrNull()
                 }
-            if (beans.isEmpty()) return null
-            return runCatching { ConfigBuilder.buildSingboxAutoConfig(beans) }.getOrNull()
+            if (beans.isEmpty()) {
+                PersistentLoggers.warn(TAG, "auto-select: all ${config.autoSelectBeanBlobs.size} beans failed")
+                return null
+            }
+            return runCatching { ConfigBuilder.buildSingboxAutoConfig(beans) }
+                .onFailure { PersistentLoggers.warn(TAG, "buildSingboxAutoConfig: ${it.message}") }
+                .getOrNull()
         }
         val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(config.beanBlob) }
+            .onFailure { PersistentLoggers.warn(TAG, "beanBlob deserialize: ${it.message}") }
             .getOrNull() ?: return null
-        return runCatching { ConfigBuilder.buildSingboxConfig(bean) }.getOrNull()
+        return runCatching { ConfigBuilder.buildSingboxConfig(bean) }
+            .onFailure { PersistentLoggers.warn(TAG, "buildSingboxConfig: ${it.message}") }
+            .getOrNull()
     }
 
     private suspend fun startChainMode(config: EngineConfig.Singbox, upstream: Upstream.Socks5): StartResult {
