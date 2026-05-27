@@ -1,8 +1,12 @@
 ﻿package ru.ozero.commonvpn
 
+import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.os.PowerManager
 import android.os.Process
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -177,8 +181,34 @@ class OzeroVpnService : android.net.VpnService() {
         }
         socketProtector = ru.ozero.enginescore.VpnSocketProtector { fd -> protect(fd) }
         ru.ozero.enginescore.VpnSocketProtectorHolder.bind(socketProtector!!)
+        acquireLocks()
         observeKillswitchSetting()
         PersistentLoggers.info(TAG, "onCreate after super (Hilt inject done)")
+    }
+
+    @SuppressLint("WakelockTimeout")
+    private fun acquireLocks() {
+        val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
+        wakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ozero::vpn-service")
+            ?.apply { acquire() }
+        val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+        val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            WifiManager.WIFI_MODE_FULL_LOW_LATENCY
+        } else {
+            @Suppress("DEPRECATION")
+            WifiManager.WIFI_MODE_FULL_HIGH_PERF
+        }
+        wifiLock = wm?.createWifiLock(mode, "ozero::vpn-service")
+            ?.apply { acquire() }
+        PersistentLoggers.debug(TAG, "locks acquired wake=${wakeLock != null} wifi=${wifiLock != null}")
+    }
+
+    private fun releaseLocks() {
+        wakeLock?.let { if (it.isHeld) it.release() }
+        wakeLock = null
+        wifiLock?.let { if (it.isHeld) it.release() }
+        wifiLock = null
+        PersistentLoggers.debug(TAG, "locks released")
     }
 
     private fun observeKillswitchSetting() {
@@ -193,6 +223,8 @@ class OzeroVpnService : android.net.VpnService() {
     }
 
     private var socketProtector: ru.ozero.enginescore.VpnSocketProtector? = null
+    private var wakeLock: PowerManager.WakeLock? = null
+    private var wifiLock: WifiManager.WifiLock? = null
 
     private val tunFdRef = AtomicReference<ParcelFileDescriptor?>(null)
     private val tunIfaceNameRef = AtomicReference<String?>(null)
@@ -358,6 +390,7 @@ class OzeroVpnService : android.net.VpnService() {
         }
         socketProtector?.let { ru.ozero.enginescore.VpnSocketProtectorHolder.unbind(it) }
         runCatching { healthMonitor.stop() }
+        releaseLocks()
         serviceScope.cancel()
         runCatching { tunFdRef.getAndSet(null)?.close() }
         super.onDestroy()

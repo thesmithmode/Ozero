@@ -601,4 +601,45 @@ class OzeroVpnServiceLifecycleTest {
                 "(см. EngineWarp.ipProbeRoute override).",
         )
     }
+
+    @Test
+    fun `onCreate acquireLocks — WakeLock и WifiLock держат CPU и WiFi при screen off`() {
+        val body = source
+            .substringAfter("override fun onCreate()")
+            .substringBefore("private fun observeKillswitchSetting()")
+        assertTrue(
+            body.contains("acquireLocks()"),
+            "onCreate обязан звать acquireLocks() — без PARTIAL_WAKE_LOCK CPU засыпает при screen off, " +
+                "native proxy (byedpi/hev) перестаёт обрабатывать пакеты → throughput падает. " +
+                "Без WifiLock WiFi переходит в power-save → higher latency, packet drops.",
+        )
+        val superIdx = body.indexOf("super.onCreate()")
+        val locksIdx = body.indexOf("acquireLocks()")
+        assertTrue(
+            superIdx in 0 until locksIdx,
+            "acquireLocks() обязан быть ПОСЛЕ super.onCreate() — getSystemService недоступен до super",
+        )
+    }
+
+    @Test
+    fun `onDestroy releaseLocks — пара к acquireLocks`() {
+        val body = source.substringAfter("override fun onDestroy()").substringBefore("\n}\n")
+        assertTrue(
+            body.contains("releaseLocks()"),
+            "onDestroy обязан звать releaseLocks() — каждому acquire парный release при teardown. " +
+                "Без release WakeLock leak → battery drain complaint от системы.",
+        )
+    }
+
+    @Test
+    fun `acquireLocks создаёт PARTIAL_WAKE_LOCK и WifiLock`() {
+        assertTrue(
+            source.contains("PowerManager.PARTIAL_WAKE_LOCK"),
+            "acquireLocks обязан брать PARTIAL_WAKE_LOCK — CPU не засыпает при screen off",
+        )
+        assertTrue(
+            source.contains("WIFI_MODE_FULL_LOW_LATENCY") || source.contains("WIFI_MODE_FULL_HIGH_PERF"),
+            "acquireLocks обязан брать WifiLock — WiFi не переходит в power-save",
+        )
+    }
 }
