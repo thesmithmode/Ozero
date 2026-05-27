@@ -1,5 +1,22 @@
 # Build Log
 
+## [2026-05-27T19:20:00+03:00] compile | daily/2026-05-15 (1).md
+- Source: daily/2026-05-15 (1).md
+- Articles created: [[concepts/auto-mode-traffic-fail-blindspot]], [[concepts/code-review-before-ci-monitor]], [[concepts/cyclomatic-complexity-extract-helper]]
+- Articles updated: (none — extractNativeLibs, tun-self-exclusion, sentinel-protecting-bug, byedpi-jni-guard-hardening, android-i18n-vm-compose-extraction already compiled from daily/2026-05-15.md which covers the same session content)
+
+## [2026-05-27T19:30:00+03:00] compile | daily/2026-05-14 (1).md
+- Source: daily/2026-05-14 (1).md
+- Articles created: [[concepts/github-draft-release-invisible]], [[concepts/shell-printf-dollar-zero-trap]], [[concepts/new-engine-module-ci-checklist]], [[concepts/ga-targetfitness-probe-test-early-exit]]
+- Articles updated: (none — runtest-uncompleted-coroutines-trap and robolectric-hilt-eager-init-trap and byedpi-mock-server-ci-fragility already compiled from this source)
+
+## [2026-05-27T18:58:39+03:00] compile | 2026-05-11.md (pass 3 — index correction)
+- Source: daily/2026-05-11.md
+- Articles created: (none — all compiled in passes 1-2 on 2026-05-11)
+- Articles updated: (none — content complete)
+- Index fixed: 6 entries had stale source `daily/2026-04-30.md | 2026-04-30` → corrected to `daily/2026-05-11.md | 2026-05-11`: debounce-split-heterogeneous-flow, engine-ownership-boundary, go-runtime-process-isolation, persistent-logger-accumulation-trap, sentinel-fqn-desync, split-tunnel-internet-permission-filter
+- Index added: [[concepts/visual-connected-switching-state]] was missing from index despite file existing (excluded in pass 2 notes, but file was created); added with accurate 1-line summary
+
 ## [2026-05-26T23:59:00+03:00] compile | daily/2026-05-26.md (pass 8 — verification)
 - Source: daily/2026-05-26.md
 - Articles created: (none)

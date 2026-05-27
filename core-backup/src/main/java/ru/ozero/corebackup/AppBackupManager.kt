@@ -48,32 +48,65 @@ class AppBackupManager(
         )
     }
 
-    private fun exportSettings(prefs: Preferences, categories: Set<BackupCategory>): BackupSettings {
-        val inGeneral = BackupCategory.GENERAL_SETTINGS in categories
-        val inByedpi = BackupCategory.BYEDPI in categories
-        val inUrn = BackupCategory.URNETWORK in categories
-        val inDns = BackupCategory.DNS_HOSTS in categories
-        return BackupSettings(
-            splitMode = if (inGeneral) prefs[SettingsKeys.SPLIT_MODE] else null,
-            ipv6Enabled = if (inGeneral) prefs[SettingsKeys.IPV6_ENABLED] else null,
-            autoStart = if (inGeneral) prefs[SettingsKeys.AUTO_START] else null,
-            manualEngine = if (inGeneral) prefs[SettingsKeys.MANUAL_ENGINE] else null,
-            bydpiWinningArgs = if (inByedpi) prefs[SettingsKeys.BYDPI_WINNING_ARGS] else null,
-            urnetworkEnabled = if (inUrn) prefs[SettingsKeys.URNETWORK_ENABLED] else null,
-            urnetworkJwt = if (inUrn) prefs[SettingsKeys.URNETWORK_JWT] else null,
-            customDnsServers = if (inDns) prefs[SettingsKeys.CUSTOM_DNS_SERVERS] else null,
-            hostsMode = if (inDns) prefs[SettingsKeys.HOSTS_MODE] else null,
-            hostsList = if (inDns) prefs[SettingsKeys.HOSTS_LIST] else null,
-            uiLocaleTag = if (inGeneral) prefs[SettingsKeys.UI_LOCALE_TAG] else null,
-            appMode = if (inGeneral) prefs[SettingsKeys.APP_MODE] else null,
-            engineAutoPriority = if (inGeneral) prefs[SettingsKeys.ENGINE_AUTO_PRIORITY] else null,
-            bydpiUseUiMode = if (inByedpi) prefs[SettingsKeys.BYDPI_USE_UI_MODE] else null,
-            bydpiUiSettingsJson = if (inByedpi) prefs[SettingsKeys.BYDPI_UI_SETTINGS_JSON] else null,
-            bydpiDefaultAccepted = if (inByedpi) prefs[SettingsKeys.BYDPI_DEFAULT_ACCEPTED] else null,
-            urnetworkCountryCode = if (inUrn) prefs[SettingsKeys.URNETWORK_COUNTRY_CODE] else null,
-            fptnToken = if (inGeneral) fptnStore?.currentConfig()?.token?.takeIf { it.isNotBlank() } else null,
+    private fun exportSettings(prefs: Preferences, categories: Set<BackupCategory>): BackupSettings =
+        BackupSettings(
+            splitMode = fromCategory(
+                BackupCategory.GENERAL_SETTINGS in categories,
+            ) { prefs[SettingsKeys.SPLIT_MODE] },
+            ipv6Enabled = fromCategory(
+                BackupCategory.GENERAL_SETTINGS in categories,
+            ) { prefs[SettingsKeys.IPV6_ENABLED] },
+            autoStart = fromCategory(
+                BackupCategory.GENERAL_SETTINGS in categories,
+            ) { prefs[SettingsKeys.AUTO_START] },
+            manualEngine = fromCategory(
+                BackupCategory.GENERAL_SETTINGS in categories,
+            ) { prefs[SettingsKeys.MANUAL_ENGINE] },
+            bydpiWinningArgs = fromCategory(
+                BackupCategory.BYEDPI in categories,
+            ) { prefs[SettingsKeys.BYDPI_WINNING_ARGS] },
+            urnetworkEnabled = fromCategory(
+                BackupCategory.URNETWORK in categories,
+            ) { prefs[SettingsKeys.URNETWORK_ENABLED] },
+            urnetworkJwt = fromCategory(
+                BackupCategory.URNETWORK in categories,
+            ) { prefs[SettingsKeys.URNETWORK_JWT] },
+            customDnsServers = fromCategory(
+                BackupCategory.DNS_HOSTS in categories,
+            ) { prefs[SettingsKeys.CUSTOM_DNS_SERVERS] },
+            hostsMode = fromCategory(
+                BackupCategory.DNS_HOSTS in categories,
+            ) { prefs[SettingsKeys.HOSTS_MODE] },
+            hostsList = fromCategory(
+                BackupCategory.DNS_HOSTS in categories,
+            ) { prefs[SettingsKeys.HOSTS_LIST] },
+            uiLocaleTag = fromCategory(
+                BackupCategory.GENERAL_SETTINGS in categories,
+            ) { prefs[SettingsKeys.UI_LOCALE_TAG] },
+            appMode = fromCategory(
+                BackupCategory.GENERAL_SETTINGS in categories,
+            ) { prefs[SettingsKeys.APP_MODE] },
+            engineAutoPriority = fromCategory(
+                BackupCategory.GENERAL_SETTINGS in categories,
+            ) { prefs[SettingsKeys.ENGINE_AUTO_PRIORITY] },
+            bydpiUseUiMode = fromCategory(
+                BackupCategory.BYEDPI in categories,
+            ) { prefs[SettingsKeys.BYDPI_USE_UI_MODE] },
+            bydpiUiSettingsJson = fromCategory(
+                BackupCategory.BYEDPI in categories,
+            ) { prefs[SettingsKeys.BYDPI_UI_SETTINGS_JSON] },
+            bydpiDefaultAccepted = fromCategory(
+                BackupCategory.BYEDPI in categories,
+            ) { prefs[SettingsKeys.BYDPI_DEFAULT_ACCEPTED] },
+            urnetworkCountryCode = fromCategory(
+                BackupCategory.URNETWORK in categories,
+            ) { prefs[SettingsKeys.URNETWORK_COUNTRY_CODE] },
+            fptnToken = fromCategory(
+                BackupCategory.GENERAL_SETTINGS in categories,
+            ) { fptnStore?.currentConfig()?.token?.takeIf { it.isNotBlank() } },
         )
-    }
+
+    private fun <T> fromCategory(enabled: Boolean, value: () -> T?): T? = if (enabled) value() else null
 
     private suspend fun exportUrnetwork(): BackupUrnetwork {
         val cfg = urnetworkStore.config().first()

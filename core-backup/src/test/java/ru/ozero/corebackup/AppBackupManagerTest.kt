@@ -312,7 +312,14 @@ class AppBackupManagerTest {
         provider.exported = BackupStrategy(
             settings = BackupStrategySettings(requestsPerDomain = 3, evolutionTargetFitness = 0.95f),
         )
-        val mgr = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao, fptnStore = fptnStore, strategyProvider = provider)
+        val mgr = AppBackupManager(
+            ozeroDs,
+            warpStore,
+            urnStore,
+            splitDao,
+            fptnStore = fptnStore,
+            strategyProvider = provider,
+        )
         val data = mgr.export()
         assertEquals(provider.exported, data.strategy)
     }
@@ -320,7 +327,14 @@ class AppBackupManagerTest {
     @Test
     fun `import strategy — provider получает данные`() = runTest {
         val provider = FakeStrategyBackupProvider()
-        val mgr = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao, fptnStore = fptnStore, strategyProvider = provider)
+        val mgr = AppBackupManager(
+            ozeroDs,
+            warpStore,
+            urnStore,
+            splitDao,
+            fptnStore = fptnStore,
+            strategyProvider = provider,
+        )
         val strategy = BackupStrategy(settings = BackupStrategySettings(evolutionTargetFitness = 0.88f))
         mgr.import(makeMinimalBackup().copy(strategy = strategy))
         assertEquals(strategy, provider.imported)
@@ -329,7 +343,14 @@ class AppBackupManagerTest {
     @Test
     fun `import strategy null — provider не вызывается`() = runTest {
         val provider = FakeStrategyBackupProvider()
-        val mgr = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao, fptnStore = fptnStore, strategyProvider = provider)
+        val mgr = AppBackupManager(
+            ozeroDs,
+            warpStore,
+            urnStore,
+            splitDao,
+            fptnStore = fptnStore,
+            strategyProvider = provider,
+        )
         mgr.import(makeMinimalBackup())
         assertNull(provider.imported)
     }
