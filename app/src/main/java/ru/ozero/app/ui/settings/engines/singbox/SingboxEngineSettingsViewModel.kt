@@ -148,15 +148,14 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
     }
 
-    fun onRefreshGroup(groupId: Long) {
-        viewModelScope.launch { refreshGroupInternal(groupId) }
-    }
-
-    fun onRefreshAll() {
+    fun onRefresh(groupId: Long? = null) {
         refreshJob?.cancel()
         refreshJob = viewModelScope.launch {
-            val groups = groupDao.getAll()
-            groups.map { group -> async { refreshGroupInternal(group.id) } }.awaitAll()
+            if (groupId != null) {
+                refreshGroupInternal(groupId)
+            } else {
+                groupDao.getAll().map { group -> async { refreshGroupInternal(group.id) } }.awaitAll()
+            }
         }
     }
 
@@ -166,22 +165,26 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         _uiState.update { it.copy(isRefreshing = emptySet()) }
     }
 
-    fun onPingAll() {
+    fun onPing(groupId: Long? = null) {
         pingJob?.cancel()
         _uiState.update { it.copy(isPinging = emptySet()) }
         pingJob = viewModelScope.launch {
-            val groups = groupDao.getAll()
-            groups.map { group ->
+            val groups = if (groupId != null) {
+                listOf(groupId)
+            } else {
+                groupDao.getAll().map { it.id }
+            }
+            groups.map { gid ->
                 async {
-                    val profiles = profileDao.getByGroupId(group.id)
+                    val profiles = profileDao.getByGroupId(gid)
                     if (profiles.isEmpty()) return@async
-                    _uiState.update { it.copy(isPinging = it.isPinging + group.id) }
+                    _uiState.update { it.copy(isPinging = it.isPinging + gid) }
                     probeService.probeAndAutoSelect(profiles, viewModelScope)
-                    val updated = profileDao.getByGroupId(group.id)
+                    val updated = profileDao.getByGroupId(gid)
                     _uiState.update {
                         it.copy(
-                            isPinging = it.isPinging - group.id,
-                            groupProfiles = it.groupProfiles + (group.id to updated),
+                            isPinging = it.isPinging - gid,
+                            groupProfiles = it.groupProfiles + (gid to updated),
                         )
                     }
                 }
@@ -206,24 +209,6 @@ class SingboxEngineSettingsViewModel @Inject constructor(
                 _uiState.update { it.copy(groupProfiles = it.groupProfiles + refreshed) }
             }
             _uiState.update { it.copy(isAutoSelecting = false) }
-        }
-    }
-
-    fun onPingGroup(groupId: Long) {
-        pingJob?.cancel()
-        _uiState.update { it.copy(isPinging = emptySet()) }
-        pingJob = viewModelScope.launch {
-            val profiles = profileDao.getByGroupId(groupId)
-            if (profiles.isEmpty()) return@launch
-            _uiState.update { it.copy(isPinging = it.isPinging + groupId) }
-            probeService.probeAndAutoSelect(profiles, viewModelScope)
-            val updated = profileDao.getByGroupId(groupId)
-            _uiState.update {
-                it.copy(
-                    isPinging = it.isPinging - groupId,
-                    groupProfiles = it.groupProfiles + (groupId to updated),
-                )
-            }
         }
     }
 
@@ -295,16 +280,21 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         if (show) {
             it.copy(showAddManualLinksDialog = true, showAddMenu = false)
         } else {
-            it.copy(showAddManualLinksDialog = false, manualLinksInput = "", manualLinksGroupName = "", manualLinksError = null)
+            it.copy(
+                showAddManualLinksDialog = false,
+                manualLinksInput = "",
+                manualLinksGroupName = "",
+                manualLinksError = null,
+            )
         }
     }
 
-    fun onManualLinksInputChanged(text: String) = _uiState.update {
-        it.copy(manualLinksInput = text, manualLinksError = null)
-    }
-
-    fun onManualLinksGroupNameChanged(name: String) = _uiState.update {
-        it.copy(manualLinksGroupName = name)
+    fun onManualLinksFieldChanged(input: String? = null, groupName: String? = null) = _uiState.update {
+        it.copy(
+            manualLinksInput = input ?: it.manualLinksInput,
+            manualLinksGroupName = groupName ?: it.manualLinksGroupName,
+            manualLinksError = if (input != null) null else it.manualLinksError,
+        )
     }
 
     fun onConfirmManualLinks() {
@@ -376,14 +366,6 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
     }
 
-    private fun protocolTypeOf(bean: AbstractBean): Int = when (bean) {
-        is VLESSBean -> 0
-        is VMessBean -> 1
-        is TrojanBean -> 2
-        is ShadowsocksBean -> 3
-        else -> 0
-    }
-
     fun onSortOrderChanged(order: SortOrder) {
         viewModelScope.launch {
             dataStore.edit { prefs -> prefs[SORT_ORDER_KEY] = order.ordinal }
@@ -415,4 +397,12 @@ class SingboxEngineSettingsViewModel @Inject constructor(
     companion object {
         private val SORT_ORDER_KEY = intPreferencesKey("singbox_sort_order")
     }
+}
+
+private fun protocolTypeOf(bean: AbstractBean): Int = when (bean) {
+    is VLESSBean -> 0
+    is VMessBean -> 1
+    is TrojanBean -> 2
+    is ShadowsocksBean -> 3
+    else -> 0
 }

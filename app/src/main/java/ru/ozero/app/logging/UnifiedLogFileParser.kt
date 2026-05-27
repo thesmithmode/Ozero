@@ -35,7 +35,8 @@ internal object UnifiedLogFileParser {
     fun parseAll(text: String): List<LogEntry> =
         text.lineSequence().mapNotNull { parseLine(it) }.toList()
 
-    private val LEVEL_TOKEN = Regex("""\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} (VERBOSE|TRACE|DEBUG|INFO|WARN|ERROR) """)
+    private val LEVEL_TOKEN =
+        Regex("""\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} (VERBOSE|TRACE|DEBUG|INFO|WARN|ERROR) """)
 
     fun filterByLevel(text: String, minLevel: LogLevel): String {
         val minSeverity = minLevel.severity

@@ -46,5 +46,4 @@ object PlatformDetector {
         log.warning("admin check failed: ${it.message}")
         false
     }
-
 }

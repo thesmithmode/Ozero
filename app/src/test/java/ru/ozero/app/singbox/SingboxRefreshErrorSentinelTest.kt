@@ -41,35 +41,35 @@ class SingboxRefreshErrorSentinelTest {
     }
 
     @Test
-    fun `onRefreshAll использует async и awaitAll для параллельного обновления`() {
+    fun `onRefresh использует async и awaitAll для параллельного обновления`() {
         val src = locateFile(vmPath)
         val text = src.readText()
-        val block = text.substringAfter("fun onRefreshAll(").substringBefore("\n    fun ")
+        val block = text.substringAfter("fun onRefresh(").substringBefore("\n    fun ")
         assertTrue(
             block.contains("async") && block.contains("awaitAll"),
-            "onRefreshAll обязан использовать async+awaitAll — " +
+            "onRefresh обязан использовать async+awaitAll — " +
                 "последовательный forEach блокирует обновление групп: группы обновляются по очереди, " +
                 "при 5 группах по 5с = 25с вместо 5с. Регрессия 2026-05-25.",
         )
         assertFalse(
             Regex("""forEach\s*\{[^}]*refreshGroupInternal""").containsMatchIn(block),
-            "onRefreshAll НЕ должен использовать forEach для вызова refreshGroupInternal — только async+awaitAll",
+            "onRefresh НЕ должен использовать forEach для вызова refreshGroupInternal — только async+awaitAll",
         )
     }
 
     @Test
-    fun `onPingAll существует и использует async и awaitAll`() {
+    fun `onPing существует и использует async и awaitAll`() {
         val src = locateFile(vmPath)
         val text = src.readText()
         assertTrue(
-            text.contains("fun onPingAll()"),
-            "ViewModel обязан содержать метод onPingAll() — " +
+            text.contains("fun onPing("),
+            "ViewModel обязан содержать метод onPing() — " +
                 "пользователь запросил кнопку ручного пинга всех групп в TopAppBar",
         )
-        val block = text.substringAfter("fun onPingAll(").substringBefore("\n    fun ")
+        val block = text.substringAfter("fun onPing(").substringBefore("\n    fun ")
         assertTrue(
             block.contains("async") && block.contains("awaitAll"),
-            "onPingAll обязан использовать async+awaitAll — параллельный пинг всех групп",
+            "onPing обязан использовать async+awaitAll — параллельный пинг всех групп",
         )
     }
 

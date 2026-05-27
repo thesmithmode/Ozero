@@ -132,31 +132,7 @@ fun WarpDesktopSettingsScreen(onBack: () -> Unit) {
             )
 
             if (configText.isNotBlank()) {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = OzeroPalette.GlassFill),
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        val lines = configText.lines()
-                        val endpoint = lines.find { it.trimStart().startsWith("Endpoint", ignoreCase = true) }
-                        val address = lines.find { it.trimStart().startsWith("Address", ignoreCase = true) }
-                        if (endpoint != null) {
-                            Text(
-                                text = endpoint.trim(),
-                                style = MaterialTheme.typography.bodySmall,
-                                fontFamily = FontFamily.Monospace,
-                                color = OzeroPalette.Aqua,
-                            )
-                        }
-                        if (address != null) {
-                            Text(
-                                text = address.trim(),
-                                style = MaterialTheme.typography.bodySmall,
-                                fontFamily = FontFamily.Monospace,
-                                color = OzeroPalette.Text2,
-                            )
-                        }
-                    }
-                }
+                WarpConfigPreview(configText)
             }
 
             Button(
@@ -179,6 +155,35 @@ fun WarpDesktopSettingsScreen(onBack: () -> Unit) {
             }
 
             Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun WarpConfigPreview(configText: String) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = OzeroPalette.GlassFill),
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            val lines = configText.lines()
+            val endpoint = lines.find { it.trimStart().startsWith("Endpoint", ignoreCase = true) }
+            val address = lines.find { it.trimStart().startsWith("Address", ignoreCase = true) }
+            if (endpoint != null) {
+                Text(
+                    text = endpoint.trim(),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = OzeroPalette.Aqua,
+                )
+            }
+            if (address != null) {
+                Text(
+                    text = address.trim(),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = OzeroPalette.Text2,
+                )
+            }
         }
     }
 }

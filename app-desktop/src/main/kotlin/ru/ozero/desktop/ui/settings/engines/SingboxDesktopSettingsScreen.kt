@@ -127,47 +127,10 @@ fun SingboxDesktopSettingsScreen(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
-            Text(
-                text = "Файл конфигурации",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
+            SingboxConfigFileSection(
+                configFilePath = configFilePath,
+                onFileImported = { configFilePath = it },
             )
-
-            Text(
-                text = "Импорт JSON конфигурации sing-box",
-                style = MaterialTheme.typography.bodySmall,
-                color = OzeroPalette.Text3,
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                OutlinedButton(onClick = {
-                    val dialog = FileDialog(null as Frame?, "Импорт sing-box конфигурации", FileDialog.LOAD)
-                    dialog.file = "*.json"
-                    dialog.isVisible = true
-                    val dir = dialog.directory
-                    val file = dialog.file
-                    if (dir != null && file != null) {
-                        val src = File(dir, file)
-                        SINGBOX_CONFIG_DIR.mkdirs()
-                        val dst = File(SINGBOX_CONFIG_DIR, "singbox-custom.json")
-                        src.copyTo(dst, overwrite = true)
-                        configFilePath = dst.absolutePath
-                    }
-                }) {
-                    Text("Импорт из файла")
-                }
-            }
-
-            if (configFilePath.isNotBlank()) {
-                Text(
-                    text = "Импортировано: $configFilePath",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = OzeroPalette.StateConnected,
-                )
-            }
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
@@ -187,5 +150,53 @@ fun SingboxDesktopSettingsScreen(
 
             Spacer(Modifier.height(16.dp))
         }
+    }
+}
+
+@Composable
+private fun SingboxConfigFileSection(
+    configFilePath: String,
+    onFileImported: (String) -> Unit,
+) {
+    Text(
+        text = "Файл конфигурации",
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.primary,
+    )
+
+    Text(
+        text = "Импорт JSON конфигурации sing-box",
+        style = MaterialTheme.typography.bodySmall,
+        color = OzeroPalette.Text3,
+    )
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        OutlinedButton(onClick = {
+            val dialog = FileDialog(null as Frame?, "Импорт sing-box конфигурации", FileDialog.LOAD)
+            dialog.file = "*.json"
+            dialog.isVisible = true
+            val dir = dialog.directory
+            val file = dialog.file
+            if (dir != null && file != null) {
+                val src = File(dir, file)
+                SINGBOX_CONFIG_DIR.mkdirs()
+                val dst = File(SINGBOX_CONFIG_DIR, "singbox-custom.json")
+                src.copyTo(dst, overwrite = true)
+                onFileImported(dst.absolutePath)
+            }
+        }) {
+            Text("Импорт из файла")
+        }
+    }
+
+    if (configFilePath.isNotBlank()) {
+        Text(
+            text = "Импортировано: $configFilePath",
+            style = MaterialTheme.typography.bodySmall,
+            color = OzeroPalette.StateConnected,
+        )
     }
 }

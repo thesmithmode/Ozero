@@ -98,41 +98,10 @@ fun SplitTunnelScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            Text(
-                text = "Режим",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            SplitTunnelModeSelector(
+                current = settings.splitTunnelMode,
+                onSelect = { settingsStore.update { copy(splitTunnelMode = it) } },
             )
-
-            SplitTunnelMode.entries.forEach { mode ->
-                val label = when (mode) {
-                    SplitTunnelMode.DISABLED -> "Выключено"
-                    SplitTunnelMode.INCLUDE -> "Только выбранные через VPN"
-                    SplitTunnelMode.EXCLUDE -> "Всё через VPN, кроме выбранных"
-                }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .selectable(
-                            selected = settings.splitTunnelMode == mode,
-                            onClick = { settingsStore.update { copy(splitTunnelMode = mode) } },
-                            role = Role.RadioButton,
-                        )
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RadioButton(
-                        selected = settings.splitTunnelMode == mode,
-                        onClick = null,
-                    )
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.padding(start = 12.dp),
-                    )
-                }
-            }
 
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
 
@@ -176,6 +145,47 @@ fun SplitTunnelScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SplitTunnelModeSelector(
+    current: SplitTunnelMode,
+    onSelect: (SplitTunnelMode) -> Unit,
+) {
+    Text(
+        text = "Режим",
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+    )
+    SplitTunnelMode.entries.forEach { mode ->
+        val label = when (mode) {
+            SplitTunnelMode.DISABLED -> "Выключено"
+            SplitTunnelMode.INCLUDE -> "Только выбранные через VPN"
+            SplitTunnelMode.EXCLUDE -> "Всё через VPN, кроме выбранных"
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .selectable(
+                    selected = current == mode,
+                    onClick = { onSelect(mode) },
+                    role = Role.RadioButton,
+                )
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RadioButton(
+                selected = current == mode,
+                onClick = null,
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(start = 12.dp),
+            )
         }
     }
 }

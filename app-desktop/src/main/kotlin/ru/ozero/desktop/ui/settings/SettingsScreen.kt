@@ -110,18 +110,36 @@ private fun AppModeSection(currentMode: AppMode, onSelect: (AppMode) -> Unit) {
 
 @Composable
 private fun EnginesSection(onOpenEngineSettings: (EngineId) -> Unit) {
-    NavRow(Strings.SETTINGS_BYEDPI_TITLE, Strings.SETTINGS_BYEDPI_SUMMARY,
-        onClick = { onOpenEngineSettings(EngineId.BYEDPI) })
-    NavRow(Strings.SETTINGS_URNETWORK_TITLE, Strings.SETTINGS_URNETWORK_SUMMARY,
-        onClick = { onOpenEngineSettings(EngineId.URNETWORK) })
-    NavRow(Strings.SETTINGS_WARP_TITLE, Strings.SETTINGS_WARP_SUMMARY,
-        onClick = { onOpenEngineSettings(EngineId.WARP) })
-    NavRow(Strings.SETTINGS_MASTERDNS_TITLE, Strings.SETTINGS_MASTERDNS_SUMMARY,
-        onClick = { onOpenEngineSettings(EngineId.MASTERDNS) })
-    NavRow(Strings.SETTINGS_FPTN_TITLE, Strings.SETTINGS_FPTN_SUMMARY,
-        onClick = { onOpenEngineSettings(EngineId.FPTN) })
-    NavRow(Strings.SETTINGS_SINGBOX_TITLE, Strings.SETTINGS_SINGBOX_SUMMARY,
-        onClick = { onOpenEngineSettings(EngineId.SINGBOX) })
+    NavRow(
+        Strings.SETTINGS_BYEDPI_TITLE,
+        Strings.SETTINGS_BYEDPI_SUMMARY,
+        onClick = { onOpenEngineSettings(EngineId.BYEDPI) },
+    )
+    NavRow(
+        Strings.SETTINGS_URNETWORK_TITLE,
+        Strings.SETTINGS_URNETWORK_SUMMARY,
+        onClick = { onOpenEngineSettings(EngineId.URNETWORK) },
+    )
+    NavRow(
+        Strings.SETTINGS_WARP_TITLE,
+        Strings.SETTINGS_WARP_SUMMARY,
+        onClick = { onOpenEngineSettings(EngineId.WARP) },
+    )
+    NavRow(
+        Strings.SETTINGS_MASTERDNS_TITLE,
+        Strings.SETTINGS_MASTERDNS_SUMMARY,
+        onClick = { onOpenEngineSettings(EngineId.MASTERDNS) },
+    )
+    NavRow(
+        Strings.SETTINGS_FPTN_TITLE,
+        Strings.SETTINGS_FPTN_SUMMARY,
+        onClick = { onOpenEngineSettings(EngineId.FPTN) },
+    )
+    NavRow(
+        Strings.SETTINGS_SINGBOX_TITLE,
+        Strings.SETTINGS_SINGBOX_SUMMARY,
+        onClick = { onOpenEngineSettings(EngineId.SINGBOX) },
+    )
 }
 
 @Composable

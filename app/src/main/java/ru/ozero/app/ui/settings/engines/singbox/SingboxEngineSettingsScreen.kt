@@ -1,6 +1,7 @@
 package ru.ozero.app.ui.settings.engines.singbox
 
 import android.net.Uri
+import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -92,8 +93,8 @@ fun SingboxEngineSettingsScreen(
             input = state.manualLinksInput,
             groupName = state.manualLinksGroupName,
             error = state.manualLinksError,
-            onInputChanged = viewModel::onManualLinksInputChanged,
-            onGroupNameChanged = viewModel::onManualLinksGroupNameChanged,
+            onInputChanged = { viewModel.onManualLinksFieldChanged(input = it) },
+            onGroupNameChanged = { viewModel.onManualLinksFieldChanged(groupName = it) },
             onConfirm = viewModel::onConfirmManualLinks,
             onDismiss = { viewModel.onShowAddManualLinksDialog(false) },
         )
@@ -109,81 +110,12 @@ fun SingboxEngineSettingsScreen(
                     }
                 },
                 actions = {
-                    Box {
-                        IconButton(
-                            onClick = { viewModel.onShowAddMenu(true) },
-                            modifier = Modifier.testTag("singbox_add_button"),
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = null)
-                        }
-                        DropdownMenu(
-                            expanded = state.showAddMenu,
-                            onDismissRequest = { viewModel.onShowAddMenu(false) },
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.singbox_add_menu_subscription)) },
-                                onClick = {
-                                    viewModel.onShowAddMenu(false)
-                                    viewModel.onAddGroupDialog(true)
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.singbox_add_menu_manual)) },
-                                onClick = { viewModel.onShowAddManualLinksDialog(true) },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.singbox_add_menu_file)) },
-                                onClick = {
-                                    viewModel.onShowAddMenu(false)
-                                    filePickerLauncher.launch(arrayOf("text/*", "application/octet-stream"))
-                                },
-                            )
-                        }
-                    }
-                    if (state.isPinging.isNotEmpty()) {
-                        IconButton(
-                            onClick = viewModel::onCancelPing,
-                            modifier = Modifier.testTag("singbox_cancel_ping_button"),
-                        ) {
-                            Icon(Icons.Default.Close, contentDescription = null)
-                        }
-                    } else {
-                        TextButton(
-                            onClick = viewModel::onPingAll,
-                            enabled = state.groups.isNotEmpty(),
-                            modifier = Modifier.testTag("singbox_ping_all_button"),
-                        ) {
-                            Text(
-                                text = stringResource(R.string.singbox_ping_all_button),
-                                style = MaterialTheme.typography.labelMedium,
-                            )
-                        }
-                    }
-                    if (state.isRefreshing.isNotEmpty()) {
-                        IconButton(
-                            onClick = viewModel::onCancelRefresh,
-                            modifier = Modifier.testTag("singbox_cancel_refresh_button"),
-                        ) {
-                            Icon(Icons.Default.Close, contentDescription = null)
-                        }
-                    } else {
-                        IconButton(
-                            onClick = viewModel::onRefreshAll,
-                            enabled = state.groups.isNotEmpty(),
-                            modifier = Modifier.testTag("singbox_refresh_all_button"),
-                        ) {
-                            Icon(
-                                Icons.Default.Refresh,
-                                contentDescription = stringResource(R.string.singbox_refresh_all_button),
-                            )
-                        }
-                    }
-                    IconButton(
-                        onClick = onOpenAdvanced,
-                        modifier = Modifier.testTag("singbox_advanced_settings_button"),
-                    ) {
-                        Icon(Icons.Filled.Settings, contentDescription = null)
-                    }
+                    SingboxTopBarActions(
+                        state = state,
+                        viewModel = viewModel,
+                        filePickerLauncher = filePickerLauncher,
+                        onOpenAdvanced = onOpenAdvanced,
+                    )
                 },
             )
         },
@@ -225,8 +157,8 @@ private fun SingboxSettingsContent(
                 isPinging = group.id in state.isPinging,
                 refreshError = state.groupRefreshErrors[group.id],
                 onToggle = { viewModel.onGroupExpand(group.id) },
-                onRefresh = { viewModel.onRefreshGroup(group.id) },
-                onPing = { viewModel.onPingGroup(group.id) },
+                onRefresh = { viewModel.onRefresh(group.id) },
+                onPing = { viewModel.onPing(group.id) },
                 onDelete = { viewModel.onDeleteGroup(group) },
                 onProfileSelect = { viewModel.onProfileSelect(it) },
             )
@@ -458,6 +390,90 @@ private fun AddGroupDialog(
             }
         },
     )
+}
+
+@Composable
+private fun SingboxTopBarActions(
+    state: SingboxSettingsUiState,
+    viewModel: SingboxEngineSettingsViewModel,
+    filePickerLauncher: ManagedActivityResultLauncher<Array<String>, Uri?>,
+    onOpenAdvanced: () -> Unit,
+) {
+    Box {
+        IconButton(
+            onClick = { viewModel.onShowAddMenu(true) },
+            modifier = Modifier.testTag("singbox_add_button"),
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null)
+        }
+        DropdownMenu(
+            expanded = state.showAddMenu,
+            onDismissRequest = { viewModel.onShowAddMenu(false) },
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.singbox_add_menu_subscription)) },
+                onClick = {
+                    viewModel.onShowAddMenu(false)
+                    viewModel.onAddGroupDialog(true)
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.singbox_add_menu_manual)) },
+                onClick = { viewModel.onShowAddManualLinksDialog(true) },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.singbox_add_menu_file)) },
+                onClick = {
+                    viewModel.onShowAddMenu(false)
+                    filePickerLauncher.launch(arrayOf("text/*", "application/octet-stream"))
+                },
+            )
+        }
+    }
+    if (state.isPinging.isNotEmpty()) {
+        IconButton(
+            onClick = viewModel::onCancelPing,
+            modifier = Modifier.testTag("singbox_cancel_ping_button"),
+        ) {
+            Icon(Icons.Default.Close, contentDescription = null)
+        }
+    } else {
+        TextButton(
+            onClick = { viewModel.onPing() },
+            enabled = state.groups.isNotEmpty(),
+            modifier = Modifier.testTag("singbox_ping_all_button"),
+        ) {
+            Text(
+                text = stringResource(R.string.singbox_ping_all_button),
+                style = MaterialTheme.typography.labelMedium,
+            )
+        }
+    }
+    if (state.isRefreshing.isNotEmpty()) {
+        IconButton(
+            onClick = viewModel::onCancelRefresh,
+            modifier = Modifier.testTag("singbox_cancel_refresh_button"),
+        ) {
+            Icon(Icons.Default.Close, contentDescription = null)
+        }
+    } else {
+        IconButton(
+            onClick = { viewModel.onRefresh() },
+            enabled = state.groups.isNotEmpty(),
+            modifier = Modifier.testTag("singbox_refresh_all_button"),
+        ) {
+            Icon(
+                Icons.Default.Refresh,
+                contentDescription = stringResource(R.string.singbox_refresh_all_button),
+            )
+        }
+    }
+    IconButton(
+        onClick = onOpenAdvanced,
+        modifier = Modifier.testTag("singbox_advanced_settings_button"),
+    ) {
+        Icon(Icons.Filled.Settings, contentDescription = null)
+    }
 }
 
 @Composable

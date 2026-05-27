@@ -45,7 +45,9 @@ class MainActivity : AppCompatActivity() {
 
     @Inject lateinit var warpConfigSlotStore: WarpConfigSlotStore
 
-    @Inject @SingboxPrefs lateinit var singboxDataStore: DataStore<Preferences>
+    @Inject
+    @SingboxPrefs
+    lateinit var singboxDataStore: DataStore<Preferences>
 
     @Inject lateinit var logcatReader: LogcatReader
 

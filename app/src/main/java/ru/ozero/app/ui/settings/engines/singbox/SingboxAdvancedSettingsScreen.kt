@@ -129,7 +129,7 @@ fun SingboxAdvancedSettingsScreen(
             Spacer(Modifier.height(8.dp))
 
             Button(
-                onClick = viewModel::onPingAll,
+                onClick = { viewModel.onPing() },
                 enabled = state.groups.isNotEmpty() && state.isPinging.isEmpty(),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -139,7 +139,7 @@ fun SingboxAdvancedSettingsScreen(
             }
             Spacer(Modifier.height(8.dp))
             Button(
-                onClick = viewModel::onRefreshAll,
+                onClick = { viewModel.onRefresh() },
                 enabled = state.groups.isNotEmpty() && state.isRefreshing.isEmpty(),
                 modifier = Modifier
                     .fillMaxWidth()
