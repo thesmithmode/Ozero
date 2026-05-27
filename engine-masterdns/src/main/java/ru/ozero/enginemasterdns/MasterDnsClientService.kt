@@ -67,7 +67,12 @@ class MasterDnsClientService(
             ensureWorkDir()
             val files = writer.write(runtime)
             val wrapper = wrapperFactory()
-            val process = wrapper.startClient(files.configPath, files.resolversPath, logPath = null, upstreamSocksUrl = runtime.upstreamSocksUrl)
+            val process = wrapper.startClient(
+                files.configPath,
+                files.resolversPath,
+                logPath = null,
+                upstreamSocksUrl = runtime.upstreamSocksUrl,
+            )
             processRef.getAndSet(process)?.let { stale ->
                 runCatching { stale.destroyForcibly() }
             }

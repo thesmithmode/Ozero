@@ -66,8 +66,16 @@ class ChainOrchestratorProxyChainTest {
     @Test
     fun `three step chain - each step gets correct upstream`() = runTest {
         val a = FakePlugin(EngineId.BYEDPI, listOf(StartResult.Success(socksPort = 100)))
-        val b = FakePlugin(EngineId.MASTERDNS, listOf(StartResult.Success(socksPort = 200)), supportsUpstreamSocks = true)
-        val c = FakePlugin(EngineId.SINGBOX, listOf(StartResult.Success(socksPort = 300)), supportsUpstreamSocks = true)
+        val b = FakePlugin(
+            EngineId.MASTERDNS,
+            listOf(StartResult.Success(socksPort = 200)),
+            supportsUpstreamSocks = true,
+        )
+        val c = FakePlugin(
+            EngineId.SINGBOX,
+            listOf(StartResult.Success(socksPort = 300)),
+            supportsUpstreamSocks = true,
+        )
         val orch = ChainOrchestrator(setOf(a, b, c))
         val r = orch.start(
             listOf(
@@ -118,14 +126,17 @@ class ChainOrchestratorProxyChainTest {
         override val capabilities =
             EngineCapabilities(true, false, false, false, false, supportsUpstreamSocks)
         val startCalls = mutableListOf<Pair<EngineConfig, Upstream>>()
-        var stopCalls = 0; private set
+        var stopCalls = 0
+            private set
 
         override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
             startCalls.add(config to upstream)
             return startResults[startCalls.size - 1]
         }
 
-        override suspend fun stop() { stopCalls++ }
+        override suspend fun stop() {
+            stopCalls++
+        }
         override suspend fun probe(): ProbeResult = ProbeResult.Failure("unused")
         override fun stats(): Flow<EngineStats> = flowOf(EngineStats())
     }

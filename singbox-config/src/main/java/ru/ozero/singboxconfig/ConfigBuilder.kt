@@ -122,7 +122,8 @@ object ConfigBuilder {
         sb.append(""",{"type":"block","tag":"block"}""")
         sb.append(""",{"type":"dns","tag":"dns-out"}""")
         sb.append("""],""")
-        sb.append(""""dns":{"servers":[{"tag":"dns-remote","address":"https://1.1.1.1/dns-query","detour":"proxy"}]},""")
+        sb.append(""""dns":{"servers":[{"tag":"dns-remote",""")
+        sb.append(""""address":"https://1.1.1.1/dns-query","detour":"proxy"}]},""")
         sb.append(""""route":{""")
         sb.append(""""final":"proxy",""")
         sb.append(""""auto_detect_interface":true,""")
@@ -169,192 +170,193 @@ object ConfigBuilder {
             append('}')
         }
 
-    private fun vlessOutbound(bean: VLESSBean, tag: String, detour: String? = null): String {
-        val sb = StringBuilder()
-        sb.append("""{"type":"vless","tag":${jsonString(tag)},""")
-        sb.append(""""server":${jsonString(bean.serverAddress)},""")
-        sb.append(""""server_port":${bean.serverPort},""")
-        sb.append(""""uuid":${jsonString(bean.uuid)},""")
-        if (bean.flow.isNotEmpty()) {
-            sb.append(""""flow":${jsonString(bean.flow)},""")
-        }
+}
 
-        val transport = buildTransport(bean)
-        if (transport != null) {
-            sb.append(""""transport":$transport,""")
-        }
-
-        val tls = buildTls(bean)
-        if (tls != null) {
-            sb.append(""""tls":$tls,""")
-        }
-
-        if (detour != null) sb.append(""""detour":${jsonString(detour)},""")
-        sb.append(""""packet_encoding":"xudp"}""")
-        return sb.toString()
+private fun vlessOutbound(bean: VLESSBean, tag: String, detour: String? = null): String {
+    val sb = StringBuilder()
+    sb.append("""{"type":"vless","tag":${jsonString(tag)},""")
+    sb.append(""""server":${jsonString(bean.serverAddress)},""")
+    sb.append(""""server_port":${bean.serverPort},""")
+    sb.append(""""uuid":${jsonString(bean.uuid)},""")
+    if (bean.flow.isNotEmpty()) {
+        sb.append(""""flow":${jsonString(bean.flow)},""")
     }
 
-    private fun vmessOutbound(bean: VMessBean, tag: String, detour: String? = null): String {
-        val sb = StringBuilder()
-        sb.append("""{"type":"vmess","tag":${jsonString(tag)},""")
-        sb.append(""""server":${jsonString(bean.serverAddress)},""")
-        sb.append(""""server_port":${bean.serverPort},""")
-        sb.append(""""uuid":${jsonString(bean.uuid)},""")
-        sb.append(""""alter_id":${bean.alterId},""")
-        sb.append(""""security":${jsonString(bean.encryption.ifEmpty { "auto" })},""")
-
-        val transport = buildTransport(bean)
-        if (transport != null) sb.append(""""transport":$transport,""")
-
-        val tls = buildTls(bean)
-        if (tls != null) sb.append(""""tls":$tls,""")
-
-        if (detour != null) sb.append(""""detour":${jsonString(detour)},""")
-        sb.append(""""packet_encoding":"xudp"}""")
-        return sb.toString()
+    val transport = buildTransport(bean)
+    if (transport != null) {
+        sb.append(""""transport":$transport,""")
     }
 
-    private fun trojanOutbound(bean: TrojanBean, tag: String, detour: String? = null): String {
-        val sb = StringBuilder()
-        sb.append("""{"type":"trojan","tag":${jsonString(tag)},""")
-        sb.append(""""server":${jsonString(bean.serverAddress)},""")
-        sb.append(""""server_port":${bean.serverPort},""")
-        sb.append(""""password":${jsonString(bean.password)},""")
-
-        val transport = buildTransport(bean)
-        if (transport != null) sb.append(""""transport":$transport,""")
-
-        val tls = buildTls(bean)
-        if (tls != null) sb.append(""""tls":$tls,""")
-
-        if (detour != null) sb.append(""""detour":${jsonString(detour)},""")
-        if (sb.isNotEmpty() && sb[sb.length - 1] == ',') sb.deleteCharAt(sb.length - 1)
-        sb.append('}')
-        return sb.toString()
+    val tls = buildTls(bean)
+    if (tls != null) {
+        sb.append(""""tls":$tls,""")
     }
 
-    private fun shadowsocksOutbound(bean: ShadowsocksBean, tag: String, detour: String? = null): String {
-        val sb = StringBuilder()
-        sb.append("""{"type":"shadowsocks","tag":${jsonString(tag)},""")
-        sb.append(""""server":${jsonString(bean.serverAddress)},""")
-        sb.append(""""server_port":${bean.serverPort},""")
-        sb.append(""""method":${jsonString(bean.method)},""")
-        sb.append(""""password":${jsonString(bean.password)}""")
-        if (bean.plugin.isNotEmpty()) {
-            sb.append(""","plugin":${jsonString(bean.plugin)}""")
-            if (bean.pluginOpts.isNotEmpty()) {
-                sb.append(""","plugin_opts":${jsonString(bean.pluginOpts)}""")
+    if (detour != null) sb.append(""""detour":${jsonString(detour)},""")
+    sb.append(""""packet_encoding":"xudp"}""")
+    return sb.toString()
+}
+
+private fun vmessOutbound(bean: VMessBean, tag: String, detour: String? = null): String {
+    val sb = StringBuilder()
+    sb.append("""{"type":"vmess","tag":${jsonString(tag)},""")
+    sb.append(""""server":${jsonString(bean.serverAddress)},""")
+    sb.append(""""server_port":${bean.serverPort},""")
+    sb.append(""""uuid":${jsonString(bean.uuid)},""")
+    sb.append(""""alter_id":${bean.alterId},""")
+    sb.append(""""security":${jsonString(bean.encryption.ifEmpty { "auto" })},""")
+
+    val transport = buildTransport(bean)
+    if (transport != null) sb.append(""""transport":$transport,""")
+
+    val tls = buildTls(bean)
+    if (tls != null) sb.append(""""tls":$tls,""")
+
+    if (detour != null) sb.append(""""detour":${jsonString(detour)},""")
+    sb.append(""""packet_encoding":"xudp"}""")
+    return sb.toString()
+}
+
+private fun trojanOutbound(bean: TrojanBean, tag: String, detour: String? = null): String {
+    val sb = StringBuilder()
+    sb.append("""{"type":"trojan","tag":${jsonString(tag)},""")
+    sb.append(""""server":${jsonString(bean.serverAddress)},""")
+    sb.append(""""server_port":${bean.serverPort},""")
+    sb.append(""""password":${jsonString(bean.password)},""")
+
+    val transport = buildTransport(bean)
+    if (transport != null) sb.append(""""transport":$transport,""")
+
+    val tls = buildTls(bean)
+    if (tls != null) sb.append(""""tls":$tls,""")
+
+    if (detour != null) sb.append(""""detour":${jsonString(detour)},""")
+    if (sb.isNotEmpty() && sb[sb.length - 1] == ',') sb.deleteCharAt(sb.length - 1)
+    sb.append('}')
+    return sb.toString()
+}
+
+private fun shadowsocksOutbound(bean: ShadowsocksBean, tag: String, detour: String? = null): String {
+    val sb = StringBuilder()
+    sb.append("""{"type":"shadowsocks","tag":${jsonString(tag)},""")
+    sb.append(""""server":${jsonString(bean.serverAddress)},""")
+    sb.append(""""server_port":${bean.serverPort},""")
+    sb.append(""""method":${jsonString(bean.method)},""")
+    sb.append(""""password":${jsonString(bean.password)}""")
+    if (bean.plugin.isNotEmpty()) {
+        sb.append(""","plugin":${jsonString(bean.plugin)}""")
+        if (bean.pluginOpts.isNotEmpty()) {
+            sb.append(""","plugin_opts":${jsonString(bean.pluginOpts)}""")
+        }
+    }
+    if (detour != null) sb.append(""","detour":${jsonString(detour)}""")
+    sb.append('}')
+    return sb.toString()
+}
+
+private fun buildTransport(bean: StandardV2RayBean): String? = when (bean.type) {
+    "ws" -> buildMap(
+        "type" to "ws",
+        "path" to (bean.path.ifEmpty { "/" }),
+        "headers" to if (bean.host.isNotEmpty()) """{"Host":${jsonString(bean.host)}}""" else "{}",
+        "max_early_data" to bean.maxEarlyData.toString(),
+        "early_data_header_name" to bean.earlyDataHeaderName,
+    )
+    "grpc" -> buildMap(
+        "type" to "grpc",
+        "service_name" to bean.grpcServiceName,
+    )
+    "http", "h2" -> buildMap(
+        "type" to "http",
+        "path" to (bean.path.ifEmpty { "/" }),
+        "host" to if (bean.host.isNotEmpty()) """[${jsonString(bean.host)}]""" else "[]",
+    )
+    "httpupgrade" -> buildMap(
+        "type" to "httpupgrade",
+        "path" to (bean.path.ifEmpty { "/" }),
+        "host" to bean.host,
+    )
+    "splithttp" -> buildMap(
+        "type" to "splithttp",
+        "path" to (bean.path.ifEmpty { "/" }),
+        "host" to bean.host,
+    )
+    "tcp" -> null
+    else -> null
+}
+
+private fun buildTls(bean: StandardV2RayBean): String? {
+    val security = bean.security
+    if (security == "none" || security.isEmpty()) return null
+
+    val sb = StringBuilder()
+    sb.append("""{"enabled":true,""")
+    sb.append(""""server_name":${jsonString(bean.sni.ifEmpty { bean.serverAddress })},""")
+
+    if (bean.alpn.isNotEmpty()) {
+        val alpns = bean.alpn.split(",").joinToString(",") { jsonString(it.trim()) }
+        sb.append(""""alpn":[$alpns],""")
+    }
+
+    if (security == "reality") {
+        sb.append(""""reality":{"enabled":true,""")
+        sb.append(""""public_key":${jsonString(bean.realityPublicKey)},""")
+        sb.append(""""short_id":${jsonString(bean.realityShortId)}},""")
+        val fp = bean.realityFingerprint.ifEmpty { "chrome" }
+        sb.append(""""utls":{"enabled":true,"fingerprint":${jsonString(fp)}},""")
+    } else if (security == "tls") {
+        if (bean.utlsFingerprint.isNotEmpty()) {
+            sb.append(""""utls":{"enabled":true,"fingerprint":${jsonString(bean.utlsFingerprint)}},""")
+        }
+        if (bean.allowInsecure) {
+            sb.append(""""insecure":true,""")
+        }
+        if (bean.certificates.isNotEmpty()) {
+            sb.append(""""certificate":${jsonString(bean.certificates)},""")
+        }
+    }
+
+    sb.append(""""disable_sni":false}""")
+    return sb.toString()
+}
+
+private fun buildMap(vararg pairs: Pair<String, String>): String {
+    val fields = pairs.filter { (_, v) -> v.isNotEmpty() && v != "0" && v != "[]" && v != "{}" }
+        .joinToString(",") { (k, v) ->
+            val isLiteral = v.startsWith("{") ||
+                v.startsWith("[") ||
+                v == "true" ||
+                v == "false" ||
+                v.all { c -> c.isDigit() }
+            val value = if (isLiteral) {
+                v
+            } else {
+                jsonString(v)
+            }
+            "${jsonString(k)}:$value"
+        }
+    return "{$fields}"
+}
+
+private fun jsonString(s: String): String {
+    val sb = StringBuilder(s.length + 2)
+    sb.append('"')
+    for (c in s) {
+        when (c) {
+            '\\' -> sb.append("\\\\")
+            '"' -> sb.append("\\\"")
+            '\n' -> sb.append("\\n")
+            '\r' -> sb.append("\\r")
+            '\t' -> sb.append("\\t")
+            '\b' -> sb.append("\\b")
+            '' -> sb.append("\\f")
+            else -> if (c.code < 0x20) {
+                sb.append("\\u%04x".format(c.code))
+            } else {
+                sb.append(c)
             }
         }
-        if (detour != null) sb.append(""","detour":${jsonString(detour)}""")
-        sb.append('}')
-        return sb.toString()
     }
-
-    private fun buildTransport(bean: StandardV2RayBean): String? = when (bean.type) {
-        "ws" -> buildMap(
-            "type" to "ws",
-            "path" to (bean.path.ifEmpty { "/" }),
-            "headers" to if (bean.host.isNotEmpty()) """{"Host":${jsonString(bean.host)}}""" else "{}",
-            "max_early_data" to bean.maxEarlyData.toString(),
-            "early_data_header_name" to bean.earlyDataHeaderName,
-        )
-        "grpc" -> buildMap(
-            "type" to "grpc",
-            "service_name" to bean.grpcServiceName,
-        )
-        "http", "h2" -> buildMap(
-            "type" to "http",
-            "path" to (bean.path.ifEmpty { "/" }),
-            "host" to if (bean.host.isNotEmpty()) """[${jsonString(bean.host)}]""" else "[]",
-        )
-        "httpupgrade" -> buildMap(
-            "type" to "httpupgrade",
-            "path" to (bean.path.ifEmpty { "/" }),
-            "host" to bean.host,
-        )
-        "splithttp" -> buildMap(
-            "type" to "splithttp",
-            "path" to (bean.path.ifEmpty { "/" }),
-            "host" to bean.host,
-        )
-        "tcp" -> null
-        else -> null
-    }
-
-    private fun buildTls(bean: StandardV2RayBean): String? {
-        val security = bean.security
-        if (security == "none" || security.isEmpty()) return null
-
-        val sb = StringBuilder()
-        sb.append("""{"enabled":true,""")
-        sb.append(""""server_name":${jsonString(bean.sni.ifEmpty { bean.serverAddress })},""")
-
-        if (bean.alpn.isNotEmpty()) {
-            val alpns = bean.alpn.split(",").joinToString(",") { jsonString(it.trim()) }
-            sb.append(""""alpn":[$alpns],""")
-        }
-
-        if (security == "reality") {
-            sb.append(""""reality":{"enabled":true,""")
-            sb.append(""""public_key":${jsonString(bean.realityPublicKey)},""")
-            sb.append(""""short_id":${jsonString(bean.realityShortId)}},""")
-            val fp = bean.realityFingerprint.ifEmpty { "chrome" }
-            sb.append(""""utls":{"enabled":true,"fingerprint":${jsonString(fp)}},""")
-        } else if (security == "tls") {
-            if (bean.utlsFingerprint.isNotEmpty()) {
-                sb.append(""""utls":{"enabled":true,"fingerprint":${jsonString(bean.utlsFingerprint)}},""")
-            }
-            if (bean.allowInsecure) {
-                sb.append(""""insecure":true,""")
-            }
-            if (bean.certificates.isNotEmpty()) {
-                sb.append(""""certificate":${jsonString(bean.certificates)},""")
-            }
-        }
-
-        sb.append(""""disable_sni":false}""")
-        return sb.toString()
-    }
-
-    private fun buildMap(vararg pairs: Pair<String, String>): String {
-        val fields = pairs.filter { (_, v) -> v.isNotEmpty() && v != "0" && v != "[]" && v != "{}" }
-            .joinToString(",") { (k, v) ->
-                val isLiteral = v.startsWith("{") ||
-                    v.startsWith("[") ||
-                    v == "true" ||
-                    v == "false" ||
-                    v.all { c -> c.isDigit() }
-                val value = if (isLiteral) {
-                    v
-                } else {
-                    jsonString(v)
-                }
-                "${jsonString(k)}:$value"
-            }
-        return "{$fields}"
-    }
-
-    private fun jsonString(s: String): String {
-        val sb = StringBuilder(s.length + 2)
-        sb.append('"')
-        for (c in s) {
-            when (c) {
-                '\\' -> sb.append("\\\\")
-                '"' -> sb.append("\\\"")
-                '\n' -> sb.append("\\n")
-                '\r' -> sb.append("\\r")
-                '\t' -> sb.append("\\t")
-                '\b' -> sb.append("\\b")
-                '' -> sb.append("\\f")
-                else -> if (c.code < 0x20) {
-                    sb.append("\\u%04x".format(c.code))
-                } else {
-                    sb.append(c)
-                }
-            }
-        }
-        sb.append('"')
-        return sb.toString()
-    }
+    sb.append('"')
+    return sb.toString()
 }

@@ -120,39 +120,34 @@ class SingboxEngine @Inject constructor(
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
         require(config is EngineConfig.Singbox) { "SingboxEngine requires EngineConfig.Singbox" }
 
-        val isChain = upstream !is Upstream.None
-        chainMode = isChain
-
-        if (isChain) {
-            val socks = upstream as? Upstream.Socks5
-                ?: return StartResult.Failure("SingboxEngine chain mode requires Socks5 upstream, got $upstream")
-            return startChainMode(config, socks)
+        chainMode = upstream !is Upstream.None
+        if (chainMode) return when (upstream) {
+            is Upstream.Socks5 -> startChainMode(config, upstream)
+            else -> StartResult.Failure("SingboxEngine chain requires Socks5, got $upstream")
         }
 
+        val json = buildPendingConfig(config)
+            ?: return StartResult.Failure("failed to build sing-box config")
+
+        bindOrFail()?.let { return it }
+
+        pendingConfig = json
+        return StartResult.Success(socksPort = 0)
+    }
+
+    private fun buildPendingConfig(config: EngineConfig.Singbox): String? {
         if (config.autoSelectBeanBlobs.isNotEmpty()) {
             val beans = config.autoSelectBeanBlobs
                 .take(MAX_AUTO_SELECT_OUTBOUNDS)
                 .mapNotNull {
                     runCatching { KryoSerializer.deserialize<AbstractBean>(it) }.getOrNull()
                 }
-            if (beans.isEmpty()) return StartResult.Failure("auto-select: no valid beans")
-            val json = runCatching { ConfigBuilder.buildSingboxAutoConfig(beans) }
-                .getOrElse { return StartResult.Failure("Failed to build auto-select config: ${it.message}") }
-            bindOrFail()?.let { return it }
-            pendingConfig = json
-            return StartResult.Success(socksPort = 0)
+            if (beans.isEmpty()) return null
+            return runCatching { ConfigBuilder.buildSingboxAutoConfig(beans) }.getOrNull()
         }
-
         val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(config.beanBlob) }
-            .getOrElse { return StartResult.Failure("Failed to deserialize config: ${it.message}") }
-
-        val json = runCatching { ConfigBuilder.buildSingboxConfig(bean) }
-            .getOrElse { return StartResult.Failure("Failed to build sing-box config: ${it.message}") }
-
-        bindOrFail()?.let { return it }
-
-        pendingConfig = json
-        return StartResult.Success(socksPort = 0)
+            .getOrNull() ?: return null
+        return runCatching { ConfigBuilder.buildSingboxConfig(bean) }.getOrNull()
     }
 
     private suspend fun startChainMode(config: EngineConfig.Singbox, upstream: Upstream.Socks5): StartResult {
