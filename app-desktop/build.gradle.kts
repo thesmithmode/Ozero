@@ -22,12 +22,13 @@ val desktopVersion: String = project.findProperty("desktopVersion")?.toString()
     ?.removePrefix("v") ?: "1.0.0"
 
 tasks.register("generateVersionProperties") {
+    val versionValue = desktopVersion
     val outDir = layout.buildDirectory.dir("generated/version")
     outputs.dir(outDir)
     doLast {
         val dir = outDir.get().asFile
         dir.mkdirs()
-        dir.resolve("version.properties").writeText("version=$desktopVersion\n")
+        dir.resolve("version.properties").writeText("version=$versionValue\n")
     }
 }
 
