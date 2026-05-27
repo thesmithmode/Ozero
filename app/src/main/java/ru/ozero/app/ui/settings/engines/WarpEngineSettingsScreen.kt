@@ -71,9 +71,11 @@ import ru.ozero.app.ui.theme.OzeroPalette
 import androidx.compose.ui.text.font.FontFamily
 import ru.ozero.enginewarp.AwgPreset
 import ru.ozero.enginewarp.AwgPresets
+import ru.ozero.enginewarp.WarpEditDraft
 import ru.ozero.enginewarp.DnsPresets
 import ru.ozero.enginewarp.EndpointPresets
 import ru.ozero.enginewarp.WarpConfigSlot
+import ru.ozero.enginewarp.WarpSettingsUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

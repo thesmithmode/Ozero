@@ -2,7 +2,7 @@ package ru.ozero.enginewarp
 
 import java.io.IOException
 
-internal object WarpConfParser {
+object WarpConfParser {
 
     fun parse(conf: String): Result<WarpConfig> = try {
         val iface = mutableMapOf<String, String>()
@@ -18,14 +18,14 @@ internal object WarpConfParser {
             }
         }
         val priv = iface["privatekey"]
-            ?: throw IOException("WireGuard conf: PrivateKey отсутствует")
+            ?: throw IOException("WireGuard conf: PrivateKey is missing")
         val addresses = iface["address"]
-            ?: throw IOException("WireGuard conf: Address отсутствует")
+            ?: throw IOException("WireGuard conf: Address is missing")
         val (v4, v6) = splitAddresses(addresses)
         val peerPub = peer["publickey"]
-            ?: throw IOException("WireGuard conf: PublicKey peer отсутствует")
+            ?: throw IOException("WireGuard conf: peer PublicKey is missing")
         val endpoint = peer["endpoint"]
-            ?: throw IOException("WireGuard conf: Endpoint peer отсутствует")
+            ?: throw IOException("WireGuard conf: peer Endpoint is missing")
         val mtu = iface["mtu"]?.toIntOrNull() ?: WarpConfig.DEFAULT_MTU
         val dnsServers = parseDnsServers(iface["dns"])
         val keepalive = peer["persistentkeepalive"]?.toIntOrNull() ?: WarpConfig.DEFAULT_KEEPALIVE

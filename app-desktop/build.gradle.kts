@@ -7,6 +7,7 @@ plugins {
 }
 
 dependencies {
+    implementation(project(":shared-warp-settings"))
     implementation(compose.desktop.currentOs)
     implementation(compose.material3)
     implementation(compose.materialIconsExtended)

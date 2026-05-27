@@ -17,6 +17,7 @@ android {
 }
 
 dependencies {
+    api(project(":shared-warp-settings"))
     implementation(project(":engines-core"))
     implementation(project(":common-vpn"))
     implementation(libs.bundles.coroutines)

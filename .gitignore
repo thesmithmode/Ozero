@@ -12,12 +12,12 @@ opencode
 .kilofiles/
 *.kilo.db
 .kilocode/
-AGENTS.md
 QWEN.md
 .serena/
 .mcp.json
 Index.md
 docs/superpowers/
+.codex/Контекст/
 
 # IntelliJ IDEA / Android Studio
 .idea/

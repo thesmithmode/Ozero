@@ -1,7 +1,7 @@
 package ru.ozero.enginewarp
 
 enum class DoHProvider(val displayName: String, val url: String) {
-    SYSTEM("System (системный DNS)", ""),
+    SYSTEM("System", ""),
     CLOUDFLARE_1111("Cloudflare (1.1.1.1)", "https://1.1.1.1/dns-query"),
     CLOUDFLARE_1001("Cloudflare (1.0.0.1)", "https://1.0.0.1/dns-query"),
     GOOGLE_8888("Google (8.8.8.8)", "https://8.8.8.8/dns-query"),

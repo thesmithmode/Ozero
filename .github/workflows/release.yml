@@ -494,6 +494,12 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
 
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: stable
+          cache: false
+
       - name: Install NSIS
         run: choco install nsis -y
 
@@ -517,6 +523,18 @@ jobs:
           cp /tmp/byedpi/byedpi.exe "$BINDIR/" 2>/dev/null \
             || cp /tmp/byedpi/ciadpi.exe "$BINDIR/byedpi.exe" 2>/dev/null \
             || find /tmp/byedpi -name '*.exe' -exec cp {} "$BINDIR/byedpi.exe" \;
+
+          echo "=== amneziawg ==="
+          rm -rf /tmp/amneziawg-go
+          git clone --depth 1 https://github.com/amnezia-vpn/amneziawg-go.git /tmp/amneziawg-go
+          (
+            cd /tmp/amneziawg-go
+            go build -trimpath -ldflags "-s -w" -o "$GITHUB_WORKSPACE/$BINDIR/amneziawg.exe" .
+          )
+          if [ ! -f "$BINDIR/amneziawg.exe" ]; then
+            echo "::error::amneziawg.exe not built"
+            exit 1
+          fi
 
           echo "=== wintun ==="
           curl -fsSL "https://www.wintun.net/builds/wintun-0.14.1.zip" -o /tmp/wintun.zip

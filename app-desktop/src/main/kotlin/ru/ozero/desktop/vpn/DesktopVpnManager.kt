@@ -29,6 +29,7 @@ class DesktopVpnManager(
     private val scope: CoroutineScope,
     private val systemProxy: SystemProxy = WindowsSystemProxy.create(),
     private val platformDetector: PlatformDetectorPort = DefaultPlatformDetectorPort,
+    private val warpConfigPort: WarpConfigPort = DefaultWarpConfigPort(),
 ) {
     private val log = Logger.getLogger("DesktopVpnManager")
 
@@ -102,7 +103,14 @@ class DesktopVpnManager(
     }
 
     private suspend fun connectWarpTun(id: EngineId, engine: DesktopEngine) {
-        val config = EngineConfig()
+        val warpConfigText = warpConfigPort.loadWarpConfigText()?.trim()
+        if (warpConfigText.isNullOrBlank()) {
+            log.warning("start failed: WARP config is empty")
+            _state.value = TunnelState.Failed(id, "WARP config is empty")
+            _powerDiscState.value = PowerDiscState.Off
+            return
+        }
+        val config = EngineConfig(warpConfig = warpConfigText)
         val result = engine.start(config)
         handleStartResult(id, engine, result)
     }

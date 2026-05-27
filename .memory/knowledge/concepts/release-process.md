@@ -7,13 +7,14 @@ sources:
   - "daily/2026-05-04.md"
   - "daily/2026-05-20.md"
   - "daily/2026-05-23.md"
+  - "daily/2026-05-27.md"
 created: 2026-04-29
-updated: 2026-05-23
+updated: 2026-05-27
 ---
 
 # Release Process
 
-Ozero releases are triggered by pushing a version tag (`v*.*.*`) to the `dev` branch. The `release.yml` GitHub Actions workflow detects the tag, builds a universal APK (`assembleRelease`), and publishes the release artifact. The process is intentionally simple: green CI on `dev` is the only prerequisite for tagging.
+Ozero releases are triggered by pushing a version tag (`v*.*.*`) to the `dev` branch. The `release.yml` GitHub Actions workflow detects the tag, builds artifacts for four platforms (Android APK, Linux `.deb`, Windows `.exe`, macOS `.dmg`), and publishes all artifacts to a GitHub Release. Green CI on `dev` is the only prerequisite for tagging.
 
 ## Key Points
 
@@ -61,11 +62,47 @@ A sentinel assert `versionCode > 1` was added to the pipeline to catch regressio
 
 The rule: **any CI job that uses `git rev-list --count` for version numbering must use `fetch-depth: 0`**. Debug CI typically does not compute versionCode, so this trap only manifests in `release.yml`.
 
+### GitHub Force-Push on Existing Tag → HTTP 500
+
+Force-pushing to an existing git tag on GitHub can return HTTP 500 (Internal Server Error). The safe procedure for re-releasing with a corrected tag:
+
+1. Delete tag locally: `git tag -d v0.2.1`
+2. Delete tag via GitHub API: `gh api -X DELETE repos/{owner}/{repo}/git/refs/tags/v0.2.1`
+3. Create new tag pointing to the corrected commit: `git tag v0.2.1 <sha>`
+4. Push new tag: `git push origin v0.2.1`
+
+Never use `git push --force origin v0.2.1` — the GitHub API may respond with 500 and leave the tag in an indeterminate state. Came up during v0.2.3 re-release when versionCode was corrected.
+
+### Multi-Platform Release Architecture (v0.2.12+)
+
+`release.yml` builds four artifacts in parallel jobs:
+
+| Job | Artifact | Notes |
+|-----|----------|-------|
+| `build-android-apk` | `Ozero-vX.Y.Z.apk` | arm64-v8a only; R8 minify enabled |
+| `build-linux` | `ozero_X.Y.Z_amd64.deb` | Downloads upstream byedpi binary; packages with dpkg-deb |
+| `build-windows` | `Ozero-X.Y.Z-setup.exe` | Gradle on Windows runner; requires `shell: bash` for `./gradlew` |
+| `build-macos` | `Ozero-X.Y.Z.dmg` | Gradle on macOS runner |
+
+Desktop jobs (Linux, Windows, macOS) require `GRADLE_OPTS="-Xmx4g --no-daemon"` — the default 2GB heap is insufficient for R8 dex compilation on GitHub-hosted runners.
+
+The `publish` job runs after all four build jobs, creates a git tag, and uploads all four artifacts to a GitHub Release. The workflow `conclusion` field is unreliable — a release with all four artifacts present is a successful release regardless of what `gh run list` reports. Verify via `gh release view <tag>`.
+
+### Upstream Binary Asset Names
+
+Pipeline steps that download binaries from upstream GitHub releases must use verified exact asset filenames — do not guess from version numbers. Check via `gh release view <tag> --repo <owner>/<repo>` before writing the download step. Example mismatch: assumed `byedpi-17.3-x86_64.tar.gz` vs actual `byedpi-Linux.tar.gz`.
+
 ## Related Concepts
 
 - [[concepts/ci-workflow-discipline]] - CI must be green before a release tag is created
 - [[concepts/vpn-engine-pipeline]] - The pipeline features shipped in v1.0.5
 - [[concepts/release-stub-gate]] - `release.yml` has independent validation gates (stub check) beyond CI
+- [[concepts/versioncode-git-history-rewrite-regression]] - versionCode defense that led to re-release procedure
+- [[concepts/ci-heredoc-single-quote-variable-trap]] - `<< 'HEREDOC'` blocks `$VERSION` expansion in deb packaging
+- [[concepts/github-release-asset-name-verification]] - verifying upstream binary asset filenames
+- [[concepts/github-workflow-failure-all-jobs-success]] - workflow conclusion vs actual artifact health
+- [[concepts/gradle-r8-oom-github-runners]] - R8 OOM fix for desktop build jobs
+- [[concepts/windows-runner-gradlew-shell]] - Windows runner requires `shell: bash` for `./gradlew`
 
 ## Sources
 
@@ -73,3 +110,5 @@ The rule: **any CI job that uses `git rev-list --count` for version numbering mu
 - [[daily/2026-05-04.md]] - Session 12:05: prerelease = contains(tag, '-') logic confirmed; v0.0.2 full release (no hyphen); tag recreated twice (OkHttp fix + stub removal)
 - [[daily/2026-05-20.md]] - KB audit (18:43): arm64-v8a only constraint confirmed; "universal APK" in old summary was misleading — universal means single APK for all users, not multi-ABI; other ABIs excluded because libhev/libam-go/libbyedpi/libmtg are arm64-v8a only
 - [[daily/2026-05-23.md]] - Session 20:44: v0.2.0 regression — `actions/checkout` without `fetch-depth: 0` → shallow clone → `git rev-list --count HEAD = 1` → `versionCode=1` → Android `INSTALL_FAILED_VERSION_DOWNGRADE`; fix: `fetch-depth: 0` + sentinel assert `versionCode > 1` in pipeline (commit `75e72b48`)
+- [[daily/2026-05-25.md]] - GitHub force-push on existing tag → HTTP 500; safe path: delete via API + POST new tag; used during v0.2.3 re-release (singbox go.Seq fix)
+- [[daily/2026-05-27.md]] - 8 failed release runs debugging: byedpi asset name mismatch, deb heredoc variable trap, Windows gradlew shell, R8 OOM on macOS/Windows runners; v0.2.12 successfully released with all 4 artifacts

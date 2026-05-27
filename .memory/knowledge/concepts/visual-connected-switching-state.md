@@ -4,8 +4,9 @@ aliases: [visualConnected, switching-ui-state, speed-history-null-transition]
 tags: [ui, compose, architecture, vpn, pattern]
 sources:
   - "daily/2026-05-11.md"
+  - "daily/2026-05-22.md"
 created: 2026-05-11
-updated: 2026-05-11
+updated: 2026-05-22
 ---
 
 # Visual Connected State During Engine Switching
@@ -97,6 +98,27 @@ Discovered during v0.0.12 debugging as "Bug 3" (chart jumping, late yellow). Roo
 - [[concepts/engine-ownership-boundary]] - VpnService owns the actual restart; VM owns the visual state model
 - [[concepts/chart-nice-max-dynamic-scaling]] - SpeedHistory and chart rendering that this fix preserves during transitions
 
+### Engine-Specific Clearing (2026-05-22)
+
+A regression was found where `Connected(X)` unconditionally cleared `_switching` even if the connected engine was different from `switching.to`. This caused the chip to show one engine while the tunnel was connected to another.
+
+Fix: `Connected(X)` clears `_switching` only if `sw.to == null || sw.to == X`:
+
+```kotlin
+is TunnelState.Connected -> {
+    val sw = _switching.value
+    if (sw == null || sw.to == state.engineId) {
+        _switching.value = null
+        switchingWatchdog?.cancel()
+    }
+}
+```
+
+The old test `switchingDoesNotClearOnConnectedOfDifferentEngine` had asserted `assertNull(_switching.value)` after `Connected(URNETWORK)` with `switching.to = WARP` — it was asserting the bug, not correct behavior. Rule: before fixing production code, verify that the existing test actually asserts the correct behavior, not the inverse.
+
+Also `restartVpnIfConnected` was changed from `to = null` to `to = tunnelController.switching.value?.to` — preserves the pending user-selected target engine through VPN restart cycles.
+
 ## Sources
 
 - [[daily/2026-05-11.md]] - Session 20:41: `visualConnected = isConnected || switching != null`; SpeedHistory not cleared on stats=null during transition; 12s watchdog timeout on `_switching` via coroutine Job.cancel(); chart-jump and late-yellow root causes traced to missing explicit switching state
+- [[daily/2026-05-22.md]] - Session 11:59: `Connected(X)` generic fix — clear switching only if `sw.to == null || sw.to == X`; old test asserting the bug (assertNull after wrong-engine Connected); `restartVpnIfConnected` preserves `switching.to` through restart

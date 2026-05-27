@@ -43,9 +43,9 @@ class WarpDesktopEngineTest {
     inner class BuildCommand {
 
         @Test
-        fun `should return help when no warp config`() {
+        fun `should return empty command when no warp config`() {
             val cmd = engine.buildCommand(EngineConfig(), "amneziawg")
-            assertEquals(listOf("amneziawg", "--help"), cmd)
+            assertTrue(cmd.isEmpty())
         }
 
         @Test

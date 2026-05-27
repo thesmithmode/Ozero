@@ -44,6 +44,10 @@ abstract class SubprocessEngine : DesktopEngine {
 
         val port = extractPort(config)
         val command = buildCommand(config, binaryPath)
+        if (command.isEmpty()) {
+            log.warning("engine '$binaryName' has empty start command")
+            return@withContext EngineStartResult.Failed("no start args for $binaryName")
+        }
 
         log.info("starting: ${command.joinToString(" ")}")
 

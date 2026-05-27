@@ -1,5 +1,29 @@
 # Build Log
 
+## [2026-05-27T19:25:00+03:00] compile | daily/2026-05-27.md
+- Source: daily/2026-05-27.md
+- Articles created: [[concepts/ci-heredoc-single-quote-variable-trap]], [[concepts/github-release-asset-name-verification]], [[concepts/github-workflow-failure-all-jobs-success]], [[concepts/windows-runner-gradlew-shell]], [[concepts/gradle-r8-oom-github-runners]]
+- Articles updated: [[concepts/release-process]] (multi-platform build architecture, upstream asset name verification, workflow conclusion unreliability)
+
+## [2026-05-27T23:00:00+03:00] compile | daily/2026-05-26.md (pass 9 — index sync)
+- Source: daily/2026-05-26.md
+- Articles created: (none)
+- Articles updated: (none — all confirmed compiled in passes 1-8)
+- Index updated: [[concepts/urnetwork-provide-tun-investigation]] summary refreshed to reflect 2026-05-27 IoLoop root cause + pipe-based dummy fix (file updated 2026-05-27, index was stale)
+
+## [2026-05-27T22:30:00+03:00] compile | daily/2026-05-25.md
+- Source: daily/2026-05-25.md
+- Articles created: [[concepts/ktlint-multiline-paren-gradle-dsl]], [[concepts/feature-deletion-orphaned-consumers]]
+- Articles updated: [[concepts/release-process]] (GitHub force-push tag → HTTP 500; safe path: delete API + POST new tag)
+- Notes: Core articles (versioncode-git-history-rewrite-regression, channel-conflate-deprecated, compileonly-nontransitive-android-library, gomobile-go-seq-multi-sdk-conflict, singbox-aidl-async-error-swallow, gomobile-build-go-get-require, agp-local-aar-library-restriction) were already compiled in-session on 2026-05-25 — present in index but no log entry existed. Two gaps filled: ktlint multi-line paren Gradle DSL trap and feature-deletion orphaned consumer pattern.
+
+## [2026-05-27T22:10:00+03:00] compile | daily/2026-05-22.md
+- Source: daily/2026-05-22.md
+- Articles created: [[concepts/fptn-engine-design]], [[concepts/byedpi-udp-quic-routing]], [[concepts/vpn-slot-self-detection-false-positive]]
+- Articles updated: [[concepts/visual-connected-switching-state]] (Connected(X) engine-specific clearing, restartVpnIfConnected preserves switching.to), [[concepts/subagent-code-review-false-positives]] (domain memory injection insight, walletOverride/warpSlots FP incident)
+- Index updated: vpnservice-double-shutdown-guard source corrected to daily/2026-05-22.md; warp-allowedips-tun-routing source corrected to daily/2026-05-22.md; visual-connected-switching-state and subagent-code-review-false-positives entries updated
+- Notes: vpnservice-double-shutdown-guard and warp-allowedips-tun-routing files were already compiled (correct content) but had stale sources in index — corrected. relay-coordinator-ownership-transfer and urnetwork-locvm-bootstrap-race already compiled from daily/2026-05-22 (1).md (duplicate file).
+
 ## [2026-05-27T19:20:00+03:00] compile | daily/2026-05-15 (1).md
 - Source: daily/2026-05-15 (1).md
 - Articles created: [[concepts/auto-mode-traffic-fail-blindspot]], [[concepts/code-review-before-ci-monitor]], [[concepts/cyclomatic-complexity-extract-helper]]

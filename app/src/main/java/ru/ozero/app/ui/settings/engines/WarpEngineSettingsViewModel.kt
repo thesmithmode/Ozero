@@ -1,6 +1,5 @@
 package ru.ozero.app.ui.settings.engines
 
-import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,53 +21,18 @@ import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginewarp.AwgParams
 import ru.ozero.enginewarp.DoHProvider
 import ru.ozero.enginewarp.WarpAutoConfig
-import ru.ozero.enginewarp.WarpConfig
 import ru.ozero.enginewarp.WarpConfigDuplicateException
-import ru.ozero.enginewarp.WarpConfigSlot
 import ru.ozero.enginewarp.WarpConfigSlotStore
+import ru.ozero.enginewarp.WarpEditDraft
 import ru.ozero.enginewarp.WarpFileImporter
+import ru.ozero.enginewarp.WarpSettingsUiState
+import ru.ozero.enginewarp.buildNextWarpSlotName
+import ru.ozero.enginewarp.draftFromSlot
+import ru.ozero.enginewarp.hasRequiredFields
+import ru.ozero.enginewarp.toWarpConfig
 import java.io.InputStream
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
-
-data class WarpEditDraft(
-    val slotId: String,
-    val name: String,
-    val endpoint: String,
-    val privateKey: String,
-    val publicKey: String,
-    val peerPublicKey: String,
-    val addressV4: String,
-    val addressV6: String,
-    val dns: String,
-    val mtu: String,
-    val keepalive: String,
-    val jc: String,
-    val jmin: String,
-    val jmax: String,
-    val s1: String,
-    val s2: String,
-    val h1: String,
-    val h2: String,
-    val h3: String,
-    val h4: String,
-    val doHProvider: DoHProvider = DoHProvider.SYSTEM,
-)
-
-data class WarpSettingsUiState(
-    val slots: List<WarpConfigSlot> = emptyList(),
-    val activeSlotId: String? = null,
-    val isRegistering: Boolean = false,
-    val errorMessage: String? = null,
-    @StringRes val errorMessageRes: Int? = null,
-    val progressMirror: String? = null,
-    val progressCurrent: Int = 0,
-    val progressTotal: Int = 0,
-    val importSuccessCount: Int = 0,
-    val editDraft: WarpEditDraft? = null,
-    val isProvingEndpoints: Boolean = false,
-    val provingProgress: String = "",
-)
 
 @HiltViewModel
 class WarpEngineSettingsViewModel @Inject constructor(
@@ -152,7 +116,7 @@ class WarpEngineSettingsViewModel @Inject constructor(
                 })
                 result.fold(
                     onSuccess = { registered ->
-                        val generatedName = buildOzeroName(store.slots().first())
+                        val generatedName = buildNextWarpSlotName(store.slots().first())
                         runCatching { store.addSlot(generatedName, registered.config, registered.rawIni) }
                             .onFailure { PersistentLoggers.warn(TAG, "generated addSlot failed: ${it.message}") }
                         _uiState.value = _uiState.value.copy(
@@ -192,7 +156,7 @@ class WarpEngineSettingsViewModel @Inject constructor(
             val result = fileImporter.import(stream)
             result.fold(
                 onSuccess = { imported ->
-                    val name = buildOzeroName(store.slots().first())
+                    val name = buildNextWarpSlotName(store.slots().first())
                     runCatching { store.addSlot(name, imported.config, imported.rawIni) }
                         .onSuccess { id ->
                             store.setActive(id)
@@ -244,32 +208,8 @@ class WarpEngineSettingsViewModel @Inject constructor(
 
     fun onStartEdit(id: String) {
         val slot = _uiState.value.slots.firstOrNull { it.id == id } ?: return
-        val cfg = slot.config
-        val awg = cfg.awgParams
         _uiState.value = _uiState.value.copy(
-            editDraft = WarpEditDraft(
-                slotId = id,
-                name = slot.name,
-                endpoint = cfg.peerEndpoint,
-                privateKey = cfg.privateKey,
-                publicKey = cfg.publicKey,
-                peerPublicKey = cfg.peerPublicKey,
-                addressV4 = cfg.interfaceAddressV4,
-                addressV6 = cfg.interfaceAddressV6,
-                dns = cfg.dnsServers.joinToString(", "),
-                mtu = cfg.mtu.toString(),
-                keepalive = cfg.keepaliveSeconds.toString(),
-                jc = awg.junkPacketCount.toString(),
-                jmin = awg.junkPacketMinSize.toString(),
-                jmax = awg.junkPacketMaxSize.toString(),
-                s1 = awg.initPacketJunkSize.toString(),
-                s2 = awg.responsePacketJunkSize.toString(),
-                h1 = awg.initPacketMagicHeader.toString(),
-                h2 = awg.responsePacketMagicHeader.toString(),
-                h3 = awg.cookieReplyMagicHeader.toString(),
-                h4 = awg.transportMagicHeader.toString(),
-                doHProvider = cfg.doHProvider,
-            ),
+            editDraft = draftFromSlot(slot),
         )
     }
 
@@ -279,52 +219,16 @@ class WarpEngineSettingsViewModel @Inject constructor(
 
     fun onSaveEdit() {
         val draft = _uiState.value.editDraft ?: return
-        val requiredFields = listOf(draft.privateKey, draft.peerPublicKey, draft.endpoint, draft.addressV4)
-        if (requiredFields.any { it.isBlank() }) {
+        if (!hasRequiredFields(draft)) {
             _uiState.value = _uiState.value.copy(
                 errorMessage = null,
                 errorMessageRes = R.string.warp_validation_required_fields,
             )
             return
         }
-        val mtu = draft.mtu.toIntOrNull() ?: WarpConfig.DEFAULT_MTU
-        val keepalive = draft.keepalive.toIntOrNull() ?: WarpConfig.DEFAULT_KEEPALIVE
-        val dns = draft.dns.split(",").map { it.trim() }.filter { it.isNotBlank() }
-            .ifEmpty { WarpConfig.DEFAULT_DNS }
-        val jc = draft.jc.toIntOrNull() ?: AwgParams.DEFAULT_JC
-        val jmin = draft.jmin.toIntOrNull() ?: AwgParams.DEFAULT_JMIN
-        val jmax = draft.jmax.toIntOrNull() ?: AwgParams.DEFAULT_JMAX
-        val s1 = draft.s1.toIntOrNull() ?: AwgParams.DEFAULT_S1
-        val s2 = draft.s2.toIntOrNull() ?: AwgParams.DEFAULT_S2
-        val h1 = draft.h1.toLongOrNull() ?: AwgParams.DEFAULT_H1
-        val h2 = draft.h2.toLongOrNull() ?: AwgParams.DEFAULT_H2
-        val h3 = draft.h3.toLongOrNull() ?: AwgParams.DEFAULT_H3
-        val h4 = draft.h4.toLongOrNull() ?: AwgParams.DEFAULT_H4
         val existingSlot = _uiState.value.slots.firstOrNull { it.id == draft.slotId }
         val basAwg = existingSlot?.config?.awgParams ?: AwgParams()
-        val config = WarpConfig(
-            privateKey = draft.privateKey.trim(),
-            publicKey = draft.publicKey.trim(),
-            peerPublicKey = draft.peerPublicKey.trim(),
-            peerEndpoint = draft.endpoint.trim(),
-            interfaceAddressV4 = draft.addressV4.trim(),
-            interfaceAddressV6 = draft.addressV6.trim(),
-            mtu = mtu,
-            dnsServers = dns,
-            keepaliveSeconds = keepalive,
-            awgParams = basAwg.copy(
-                junkPacketCount = jc,
-                junkPacketMinSize = minOf(jmin, jmax),
-                junkPacketMaxSize = maxOf(jmin, jmax),
-                initPacketJunkSize = s1,
-                responsePacketJunkSize = s2,
-                initPacketMagicHeader = h1,
-                responsePacketMagicHeader = h2,
-                cookieReplyMagicHeader = h3,
-                transportMagicHeader = h4,
-            ),
-            doHProvider = draft.doHProvider,
-        )
+        val config = draft.toWarpConfig(basAwg)
         val slotId = draft.slotId
         val name = draft.name.trim().ifBlank { "WARP" }
         viewModelScope.launch {
@@ -352,12 +256,5 @@ class WarpEngineSettingsViewModel @Inject constructor(
     private companion object {
         const val COOLDOWN_POLL_INTERVAL_MS = 1_000L
         const val TAG = "WarpSettingsVM"
-
-        fun buildOzeroName(existing: List<WarpConfigSlot>): String {
-            val used = existing.mapNotNull { it.name.removePrefix("Ozero-").toIntOrNull() }.toSet()
-            var n = 1
-            while (n in used) n++
-            return "Ozero-$n"
-        }
     }
 }

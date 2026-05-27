@@ -15,8 +15,7 @@ class WarpDesktopEngine : SubprocessEngine() {
         if (config.socksPort > 0) config.socksPort else DEFAULT_SOCKS_PORT
 
     override fun buildCommand(config: EngineConfig, binaryPath: String): List<String> {
-        val wgConfig = config.warpConfig
-            ?: return listOf(binaryPath, "--help")
+        val wgConfig = config.warpConfig ?: return emptyList()
 
         val tempFile = File.createTempFile("warp-", ".conf")
         tempFile.writeText(wgConfig)

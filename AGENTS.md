@@ -1,10 +1,10 @@
-# CLAUDE.md — Ozero
+# AGENTS.md — Ozero
 
 Само-обучение: новое правило → сюда. Без дублей, ≤100 строк.
 
 ## Продукт и архитектурный контракт
 
-Видение → `README.md`. Архитектура → `.claude/Контекст/Architect.md`.
+Видение → `README.md`. Архитектура → `.codex/Контекст/Architect.md`.
 
 **Нерушимые инварианты:**
 - Каждый движок = отдельный gradle-модуль `engine-*`. Падение одного не валит соседей.
@@ -88,10 +88,10 @@
 
 ПЕРЕД субагентом/advisor/гипотезой:
 1. `wiki-find <тема>` — `.memory/knowledge/` уже компилированы из daily логов.
-2. `ls .claude/Контекст/` + читать `*_ANALYSIS.md` соответствующего движка.
+2. `ls .codex/Контекст/` + читать `*_ANALYSIS.md` соответствующего движка.
 3. Только если 1-2 не дали ответ — субагент/новые гипотезы.
 
-## Reference impls движков (`.claude/Контекст/`)
+## Reference impls движков (`.codex/Контекст/`)
 
 - `android/` → **URnetwork** (`URNETWORK_INIT_ANALYSIS.md`)
 - `PORTAL_WG_v1.4.3/` + `CYBERPORTAL_X-v1.0.2/` → **WARP** (`PORTAL_WG_ANALYSIS.md`)
@@ -102,11 +102,11 @@
 <!-- === rules:start === -->
 ## Внешние правила
 
-- [`context7.md`](.claude/rules/context7.md) — **Закон.** Context7 MCP для всех библиотек/SDK.
-- [`tests.md`](.claude/rules/tests.md) — **Закон.** AAA, coverage ≥95%, exhaustive edge-cases.
-- [`folders.md`](.claude/rules/folders.md) — **Дух.** Новый движок = `engine-*` модуль, не файлы в `app/`.
-- [`git.md`](.claude/rules/git.md) — **Reference.** У Ozero: `dev` default, squash-merge без PR, main только по команде.
-- [`translate.md`](.claude/rules/translate.md) — **Baseline.** Локали ru/en/es/pt → `values-{en,es,pt}/strings.xml`.
+- [`context7.md`](.codex/rules/context7.md) — **Закон.** Context7 MCP для всех библиотек/SDK.
+- [`tests.md`](.codex/rules/tests.md) — **Закон.** AAA, coverage ≥95%, exhaustive edge-cases.
+- [`folders.md`](.codex/rules/folders.md) — **Дух.** Новый движок = `engine-*` модуль, не файлы в `app/`.
+- [`git.md`](.codex/rules/git.md) — **Reference.** У Ozero: `dev` default, squash-merge без PR, main только по команде.
+- [`translate.md`](.codex/rules/translate.md) — **Baseline.** Локали ru/en/es/pt → `values-{en,es,pt}/strings.xml`.
 
 <!-- === rules:end === -->
 
@@ -114,3 +114,4 @@
 
 - `graphify-out/GRAPH_REPORT.md` — god nodes, communities. `graphify query/path/explain`. После правок кода — `graphify update .`.
 - `.memory/knowledge/index.md` — project knowledge (почему так сделано, прошлые баги, неочевидные решения).
+

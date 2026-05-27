@@ -27,6 +27,10 @@ class DesktopVpnManagerTest {
     private val testScope = TestScope(testDispatcher)
     private val mockProxy = mockk<SystemProxy>(relaxed = true)
     private val mockPlatformDetector = mockk<PlatformDetectorPort>()
+    private val emptyWarpConfigPort = object : WarpConfigPort {
+        override fun loadWarpConfigText(): String? = null
+        override fun saveWarpConfigText(text: String) {}
+    }
 
     private lateinit var manager: DesktopVpnManager
 
@@ -40,6 +44,7 @@ class DesktopVpnManagerTest {
             scope = testScope,
             systemProxy = mockProxy,
             platformDetector = mockPlatformDetector,
+            warpConfigPort = emptyWarpConfigPort,
         )
     }
 
@@ -144,6 +149,23 @@ class DesktopVpnManagerTest {
 
             assertEquals(VpnMode.TUN, manager.effectiveVpnMode.value)
         }
+
+        @Test
+        fun `should fail fast when WARP config missing`() = testScope.runTest {
+            val localManager = DesktopVpnManager(
+                scope = testScope,
+                systemProxy = mockProxy,
+                platformDetector = mockPlatformDetector,
+                warpConfigPort = emptyWarpConfigPort,
+            )
+
+            localManager.connect(EngineId.WARP, VpnMode.TUN)
+            advanceUntilIdle()
+
+            val state = localManager.state.value
+            assertEquals(TunnelState.Failed::class, state::class)
+            assertEquals("WARP config is empty", (state as TunnelState.Failed).reason)
+        }
     }
 
     @Nested
@@ -191,7 +213,7 @@ class DesktopVpnManagerTest {
             advanceUntilIdle()
 
             val state = manager.state.value
-            assertTrue(state !is TunnelState.Idle || state is TunnelState.Failed)
+            assertTrue(state !is TunnelState.Idle)
         }
 
         @Test

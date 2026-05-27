@@ -3,8 +3,9 @@ title: "Subagent Code Review False Positives"
 aliases: [subagent-review-verification, code-review-false-positive, agent-review-trust]
 tags: [workflow, code-review, subagents, android, kotlin]
 sources:
+  - "daily/2026-05-22.md"
   - "daily/2026-05-26.md"
-created: 2026-05-26
+created: 2026-05-22
 updated: 2026-05-26
 ---
 
@@ -56,6 +57,16 @@ Code review subagents use heuristic pattern matching — they flag patterns that
 
 The false positive rate is high enough (2/3 in this session) that blind acceptance would cause harm. The value of subagent reviews is in finding issues that are easy to miss (real null pointer paths, actual concurrency violations) — not in rubber-stamping all findings.
 
+### Domain Context Correlation (2026-05-22)
+
+A second session confirmed the pattern: P1 findings from a KB compilation review session were false positives on 2026-05-20 code — `walletOverride` BC was dead code in production; `warpSlots` silent skip was intentional design. Both findings looked like bugs without access to:
+- Project memory articles describing deliberate design choices
+- Deployment status (whether code was actually active in prod)
+
+**High false-positive rate correlates with intentional design choices that look like bugs without business context.** Fresh code sessions (2026-05-15/18) had mostly correct P1s because the code was genuinely new without accumulated deliberate workarounds.
+
+**Mitigation**: inject relevant `project_*.md` memory articles into reviewer system prompt when spawning a code review subagent for domain-specific code (e.g., engine lifecycle, relay coordinator, URnetwork wallet). This gives the reviewer the business context needed to distinguish intentional design from bugs.
+
 ## Related Concepts
 
 - [[concepts/pingJob-viewmodel-cancellation]] - The specific patterns flagged: isPinging.clear() and LaunchedEffect(key) — both verified as correct
@@ -64,4 +75,5 @@ The false positive rate is high enough (2/3 in this session) that blind acceptan
 
 ## Sources
 
+- [[daily/2026-05-22.md]] - Session 13:30: P1 findings from reviewer on 2026-05-20 code were false positives (walletOverride dead code, warpSlots intentional design); reviewers lack project memory access → high FP on deliberate workarounds; mitigation: inject domain project_*.md into reviewer system prompt
 - [[daily/2026-05-26.md]] - Session 16:22: subagent returned 3 code review findings for SingboxServerListViewModel; personally verified 2 as false positives (isPinging.clear race, LaunchedEffect race); 1 accepted (Exception.message null fallback); established rule: verify all subagent findings against actual code before accepting
