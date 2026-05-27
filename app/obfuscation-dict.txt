@@ -81,13 +81,10 @@ IIlI
 lIII
 IlII
 lIll
-IlIl
 llll
 IIII
 IIIl
 lllI
-IlIl
-lIlI
 O0OO
 OO0O
 O00O
@@ -106,8 +103,6 @@ lIlIl
 IlIII
 IIlIl
 lIIlI
-IlIlI
-lIlIl
 IIlll
 lllII
 IlIll
