@@ -28,7 +28,7 @@ class LockFileParserTest {
                 engine: byedpi
                 abi: arm64-v8a
                 destination: jniLibs
-                download_url: https://github.com/thesmithmode/Ozero/releases/download/binaries-abc12345/libbyedpi-arm64-v8a.so
+                download_url: https://github.com/example-owner/example-repo/releases/download/binaries-abc12345/libbyedpi-arm64-v8a.so
                 sha256: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
                 size_bytes: 285184
                 source_repo: https://github.com/hufrea/byedpi

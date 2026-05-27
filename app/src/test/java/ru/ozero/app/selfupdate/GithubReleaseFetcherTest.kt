@@ -1,6 +1,7 @@
 package ru.ozero.app.selfupdate
 
 import org.junit.jupiter.api.Test
+import ru.ozero.app.BuildConfig
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -8,7 +9,10 @@ import kotlin.test.assertTrue
 
 class GithubReleaseFetcherTest {
 
-    private val fetcher = GithubReleaseFetcher(owner = "thesmithmode", repo = "Ozero")
+    private val fetcher = GithubReleaseFetcher(
+        owner = BuildConfig.UPDATE_GITHUB_OWNER,
+        repo = BuildConfig.UPDATE_GITHUB_REPO,
+    )
 
     @Test
     fun parsesValidReleaseJson() {

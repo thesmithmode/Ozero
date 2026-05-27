@@ -123,7 +123,7 @@ override fun onRevoke() {
 
 ### isExternalVpnActive() ownerUid False Positive (v0.1.11 Regression)
 
-A related bug found via user log analysis (Ruslan, v0.1.11, 2026-05-21): `isExternalVpnActive()` was checking for any VPN-capable network without filtering by `ownerUid`. When Ozero's own VPN was in a dying/restarting state, the system still reported it as an active VPN network. `isExternalVpnActive()` would detect it as "another VPN is active", triggering:
+A related bug found via user log analysis (v0.1.11, 2026-05-21): `isExternalVpnActive()` was checking for any VPN-capable network without filtering by `ownerUid`. When Ozero's own VPN was in a dying/restarting state, the system still reported it as an active VPN network. `isExternalVpnActive()` would detect it as "another VPN is active", triggering:
 
 1. A 750ms delay at engine start
 2. A `protect()` call conflict (can't protect sockets through a VPN you own but are tearing down)
@@ -162,4 +162,4 @@ private fun isExternalVpnActive(): Boolean {
 - [[daily/2026-05-19.md]] — Session 16:23: root cause in ozero.log L34381-34540 (external VPN captured slot → establish() null → silent Idle); fix: `onEngineDied("VPN slot занят")` before `stopVpnRequest`; `logActiveExternalVpn()` diagnostic; detekt ReturnCount CI fail resolved by merging null branches
 - [[daily/2026-05-20.md]] — Session (VPN slot onRevoke): `onRevoke()` → `postDelayed(Process.killProcess, 2500ms)` releases libgojni + VPN slot cleanly for next app; `stopVpn/onDestroy` do NOT kill — only revoke means "user chose another VPN"
 - [[daily/2026-05-21.md]] — Task37: `REVOKE_KILL_DELAY_MS` 2500→1000ms; new `EXTERNAL_VPN_RELEASE_DELAY_MS = 750ms` for external VPN race at startVpn; commit `3965b00a`
-- [[daily/2026-05-22.md]] — Session 19:32: user Ruslan v0.1.11 log — `isExternalVpnActive()` missing `ownerUid` filter detected own dying VPN as external VPN → false positive → cycling loop; fix `c1123b04` (API 29+ ownerUid guard) shipped in v0.1.12
+- [[daily/2026-05-22.md]] — Session 19:32: user v0.1.11 log — `isExternalVpnActive()` missing `ownerUid` filter detected own dying VPN as external VPN → false positive → cycling loop; fix `c1123b04` (API 29+ ownerUid guard) shipped in v0.1.12
