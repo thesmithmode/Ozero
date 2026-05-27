@@ -68,10 +68,14 @@ data class BackupSettings(
     val bydpiUiSettingsJson: String? = null,
     val bydpiDefaultAccepted: Boolean? = null,
     val urnetworkCountryCode: String? = null,
+    val fptnToken: String? = null,
 )
 
 data class BackupUrnetwork(
     val byJwt: String? = null,
+    val byClientJwt: String? = null,
+    val devicePubkey: String? = null,
+    val deviceNetworkName: String? = null,
     val windowType: String? = null,
     val fixedIpSize: Boolean? = null,
     val allowDirect: Boolean? = null,

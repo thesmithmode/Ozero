@@ -209,6 +209,11 @@ class SingboxEngine @Inject constructor(
             } finally {
                 runCatching { pfd.close() }
             }
+            delay(150)
+            val postStartStats = runCatching { p.stats }.getOrNull()
+            if (postStartStats?.activeConnections == 0) {
+                return TunAttachResult.Failure("sing-box runtime failed to start (activeConnections=0)")
+            }
             PersistentLoggers.debug(TAG, "startWithConfig sent over AIDL")
             TunAttachResult.Success
         }.getOrElse {
