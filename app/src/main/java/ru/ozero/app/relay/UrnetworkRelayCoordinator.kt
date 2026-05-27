@@ -141,8 +141,17 @@ class UrnetworkRelayCoordinator(
             val readEnd = pipe[0]
             val writeEnd = pipe[1]
             pipeWriteEndRef.set(writeEnd)
-            val fd = readEnd.detachFd()
-            val attachResult = bridge.attachTun(fd)
+            runCatching {
+                val jfd = readEnd.fileDescriptor
+                val flags = android.system.Os.fcntlInt(jfd, android.system.OsConstants.F_GETFL, 0)
+                android.system.Os.fcntlInt(
+                    jfd,
+                    android.system.OsConstants.F_SETFL,
+                    flags or android.system.OsConstants.O_NONBLOCK,
+                )
+            }.onFailure { PersistentLoggers.warn(TAG, "pipe non-blocking threw: ${it.message}") }
+            val rawFd = readEnd.detachFd()
+            val attachResult = bridge.attachTun(rawFd)
             if (attachResult is UrnetworkSdkBridge.AttachResult.Success) {
                 PersistentLoggers.info(TAG, "mesh session: dummy IoLoop attached (upstream offline-mode pattern)")
             } else {
