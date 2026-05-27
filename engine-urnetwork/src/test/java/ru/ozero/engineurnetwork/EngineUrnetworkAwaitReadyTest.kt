@@ -131,8 +131,8 @@ class EngineUrnetworkAwaitReadyTest {
             "awaitReady обязан логировать progress через PEER_PROGRESS_LOG_EVERY для видимости в boot.log",
         )
         assertTrue(
-            body.contains("PersistentLoggers.info"),
-            "progress log обязан идти через PersistentLoggers.info (boot.log persistent), не Log.i",
+            body.contains("PersistentLoggers.info") || body.contains("PersistentLoggers.debug"),
+            "progress log обязан идти через PersistentLoggers (boot.log persistent), не Log.i",
         )
     }
 

@@ -165,7 +165,8 @@ class SingboxEngine @Inject constructor(
             runCatching { ConfigBuilder.buildAutoChainConfig(beans, port, configUpstream) }
                 .getOrElse { return StartResult.Failure("chain auto config: ${it.message}") }
         } else if (config.wireGuardConfig != null) {
-            runCatching { ConfigBuilder.buildWireGuardChainConfig(config.wireGuardConfig, port, configUpstream) }
+            val wgConfig = config.wireGuardConfig
+            runCatching { ConfigBuilder.buildWireGuardChainConfig(wgConfig, port, configUpstream) }
                 .getOrElse { return StartResult.Failure("chain WG config: ${it.message}") }
         } else {
             val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(config.beanBlob) }

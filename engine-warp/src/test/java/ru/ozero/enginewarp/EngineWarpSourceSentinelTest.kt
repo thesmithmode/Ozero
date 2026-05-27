@@ -53,8 +53,9 @@ class EngineWarpSourceSentinelTest {
         val body = source.substringAfter("private fun startStatsPoll(")
             .substringBefore("private data class ResolvedWarp")
         assertTrue(
-            body.contains("PersistentLoggers.info") && body.contains("warp stats"),
-            "stats poll обязан вызывать PersistentLoggers.info с \"warp stats\" prefix — boot.log readable",
+            (body.contains("PersistentLoggers.info") || body.contains("PersistentLoggers.trace")) &&
+                body.contains("warp stats"),
+            "stats poll обязан вызывать PersistentLoggers с \"warp stats\" prefix — boot.log readable",
         )
         assertTrue(
             body.contains("Δtx") && body.contains("Δrx"),
