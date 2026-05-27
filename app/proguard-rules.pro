@@ -70,6 +70,17 @@
 -dontwarn libcore.**
 -dontwarn libsingboxgojni.**
 
+# ── OkHttp / Okio (engine-warp HttpClient, subscription fetch) ───────────────
+-keep class okhttp3.internal.platform.** { *; }
+-keep class okhttp3.** { *; }
+-keep class okio.** { *; }
+-dontwarn okhttp3.**
+-dontwarn okio.**
+
+# ── AmneziaWG (engine-warp native bridge) ───────────────────────────────────
+-keep class org.amnezia.awg.** { *; }
+-dontwarn org.amnezia.awg.**
+
 # ── Third-party libs without own consumer-rules ──────────────────────────────
 -keep class android.util.Log { *; }
 

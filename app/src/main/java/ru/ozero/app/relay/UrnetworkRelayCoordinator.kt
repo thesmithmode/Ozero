@@ -1,6 +1,5 @@
 package ru.ozero.app.relay
 
-import android.os.ParcelFileDescriptor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -38,6 +37,7 @@ class UrnetworkRelayCoordinator(
     private val jwtBootstrapper: UrnetworkJwtBootstrapper,
     private val networkMonitor: RelayNetworkMonitor? = null,
     private val relayLockManager: RelayLockManager? = null,
+    private val pipeFactory: DummyPipeFactory = AndroidDummyPipeFactory,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) {
 
@@ -45,7 +45,7 @@ class UrnetworkRelayCoordinator(
     private val watchdogRef = AtomicReference<Job?>(null)
     private val relayOwned = AtomicBoolean(false)
     private val bootstrapAttemptedThisSession = AtomicBoolean(false)
-    private val pipeWriteEndRef = AtomicReference<ParcelFileDescriptor?>(null)
+    private val pipeWriteEndRef = AtomicReference<AutoCloseable?>(null)
 
     fun start() {
         val newJob = combine(
@@ -137,21 +137,9 @@ class UrnetworkRelayCoordinator(
 
     private suspend fun attachDummyIoLoop() {
         try {
-            val pipe = ParcelFileDescriptor.createPipe()
-            val readEnd = pipe[0]
-            val writeEnd = pipe[1]
-            pipeWriteEndRef.set(writeEnd)
-            runCatching {
-                val jfd = readEnd.fileDescriptor
-                val flags = android.system.Os.fcntlInt(jfd, android.system.OsConstants.F_GETFL, 0)
-                android.system.Os.fcntlInt(
-                    jfd,
-                    android.system.OsConstants.F_SETFL,
-                    flags or android.system.OsConstants.O_NONBLOCK,
-                )
-            }.onFailure { PersistentLoggers.warn(TAG, "pipe non-blocking threw: ${it.message}") }
-            val rawFd = readEnd.detachFd()
-            val attachResult = bridge.attachTun(rawFd)
+            val pipe = pipeFactory.create()
+            pipeWriteEndRef.set(pipe.writeEnd)
+            val attachResult = bridge.attachTun(pipe.readFd)
             if (attachResult is UrnetworkSdkBridge.AttachResult.Success) {
                 PersistentLoggers.info(TAG, "mesh session: dummy IoLoop attached (upstream offline-mode pattern)")
             } else {

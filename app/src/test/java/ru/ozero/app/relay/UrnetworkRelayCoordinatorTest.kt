@@ -53,6 +53,7 @@ class UrnetworkRelayCoordinatorTest {
             configStore = configStore,
             tunnelController = tunnelController,
             jwtBootstrapper = bootstrapper,
+            pipeFactory = FakePipeFactory(),
             scope = coordinatorScope,
         )
         coordinator.start()
@@ -300,6 +301,10 @@ class UrnetworkRelayCoordinatorTest {
             return onCallAction?.invoke()
                 ?: UrnetworkJwtBootstrapper.Result.Failed("FakeJwtBootstrapper default failure")
         }
+    }
+
+    private class FakePipeFactory : DummyPipeFactory {
+        override fun create() = DummyPipeFactory.PipeHandle(42, AutoCloseable {})
     }
 
     private class FakeBridge : UrnetworkSdkBridge {

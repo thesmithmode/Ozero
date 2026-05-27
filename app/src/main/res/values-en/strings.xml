@@ -452,6 +452,7 @@
     <string name="logs_copy_empty_toast">Empty — nothing to copy</string>
     <string name="logs_copy_done_toast_fmt">Copied (%1$d chars)</string>
     <string name="logs_export">Export .log</string>
+    <string name="logs_export_level_title">Minimum level</string>
     <string name="logs_footer_fmt">%1$d / %2$d entries</string>
     <string name="warp_tweaks_endpoint_section">Endpoint</string>
     <string name="warp_tweaks_awg_section">AmneziaWG Settings</string>
