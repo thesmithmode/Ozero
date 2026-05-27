@@ -18,6 +18,27 @@ dependencies {
     testImplementation(libs.bundles.testing.unit)
 }
 
+val desktopVersion: String = project.findProperty("desktopVersion")?.toString()
+    ?.removePrefix("v") ?: "1.0.0"
+
+tasks.register("generateVersionProperties") {
+    val outDir = layout.buildDirectory.dir("generated/version")
+    outputs.dir(outDir)
+    doLast {
+        val dir = outDir.get().asFile
+        dir.mkdirs()
+        dir.resolve("version.properties").writeText("version=$desktopVersion\n")
+    }
+}
+
+sourceSets.main {
+    resources.srcDir(layout.buildDirectory.dir("generated/version"))
+}
+
+tasks.named("processResources") {
+    dependsOn("generateVersionProperties")
+}
+
 compose.desktop {
     application {
         mainClass = "ru.ozero.desktop.MainKt"
@@ -29,9 +50,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Exe, TargetFormat.Deb, TargetFormat.Dmg)
             packageName = "Ozero"
-            val ver = project.findProperty("desktopVersion")?.toString()
-                ?.removePrefix("v") ?: "1.0.0"
-            packageVersion = ver
+            packageVersion = desktopVersion
             description = "Ozero VPN"
             vendor = "Ozero"
 
@@ -41,18 +60,19 @@ compose.desktop {
                 dirChooser = true
                 upgradeUuid = "d3b07384-d113-4ec6-a5ea-024c9c7b1f2a"
                 perUserInstall = true
+                iconFile.set(project.file("src/main/resources/icon.ico"))
             }
 
             linux {
                 shortcut = true
                 menuGroup = "Ozero"
                 debMaintainer = "ozero@ozero.ru"
+                iconFile.set(project.file("src/main/resources/icon.png"))
             }
 
             macOS {
                 bundleID = "ru.ozero.desktop"
-                // macOS DMG требует MAJOR > 0; при 0.x.y подменяем на 1.x.y
-                val parts = ver.split(".")
+                val parts = desktopVersion.split(".")
                 if (parts.isNotEmpty() && (parts[0].toIntOrNull() ?: 0) < 1) {
                     val macVer = (listOf("1") + parts.drop(1)).joinToString(".")
                     packageVersion = macVer

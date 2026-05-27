@@ -10,7 +10,12 @@ import ru.ozero.desktop.model.EngineId
 import ru.ozero.desktop.ui.about.AboutScreen
 import ru.ozero.desktop.ui.logs.LogsScreen
 import ru.ozero.desktop.ui.settings.SettingsScreen
+import ru.ozero.desktop.ui.settings.engines.ByeDpiDesktopSettingsScreen
+import ru.ozero.desktop.ui.settings.engines.SingboxDesktopSettingsScreen
+import ru.ozero.desktop.ui.settings.engines.UnavailableEngineScreen
+import ru.ozero.desktop.ui.settings.engines.WarpDesktopSettingsScreen
 import ru.ozero.desktop.ui.splittunnel.SplitTunnelScreen
+import ru.ozero.desktop.vpn.DesktopSettingsStore
 
 private fun engineParamsTarget(engineId: EngineId?): TopScreen = when (engineId) {
     EngineId.WARP -> TopScreen.WarpEngineSettings
@@ -23,7 +28,7 @@ private fun engineParamsTarget(engineId: EngineId?): TopScreen = when (engineId)
 }
 
 @Composable
-fun RootNavigation(viewModel: MainViewModel) {
+fun RootNavigation(viewModel: MainViewModel, settingsStore: DesktopSettingsStore) {
     var screen by remember { mutableStateOf(TopScreen.Main) }
     val backStack = remember { mutableListOf<TopScreen>() }
     fun navigate(target: TopScreen) {
@@ -44,18 +49,37 @@ fun RootNavigation(viewModel: MainViewModel) {
                 onOpenAbout = { navigate(TopScreen.About) },
                 onOpenLogs = { navigate(TopScreen.Logs) },
                 onAppModeSelect = viewModel::onAppModeSelect,
+                onOpenEngineSettings = { engineId -> navigate(engineParamsTarget(engineId)) },
             )
         }
         TopScreen.About -> AboutScreen(onBack = { back() })
         TopScreen.Logs -> LogsScreen(onBack = { back() })
-        TopScreen.SplitTunnel -> SplitTunnelScreen(onBack = { back() })
-        TopScreen.ByeDpiEngineSettings,
-        TopScreen.UrnetworkEngineSettings,
-        TopScreen.WarpEngineSettings,
-        TopScreen.MasterDnsSettings,
-        TopScreen.FptnSettings,
-        TopScreen.SingboxSettings -> PlaceholderScreen(
-            title = screen.name,
+        TopScreen.SplitTunnel -> SplitTunnelScreen(
+            settingsStore = settingsStore,
+            onBack = { back() },
+        )
+        TopScreen.ByeDpiEngineSettings -> ByeDpiDesktopSettingsScreen(
+            settingsStore = settingsStore,
+            onBack = { back() },
+        )
+        TopScreen.WarpEngineSettings -> WarpDesktopSettingsScreen(onBack = { back() })
+        TopScreen.SingboxSettings -> SingboxDesktopSettingsScreen(
+            settingsStore = settingsStore,
+            onBack = { back() },
+        )
+        TopScreen.UrnetworkEngineSettings -> UnavailableEngineScreen(
+            engineName = "URnetwork",
+            reason = "URnetwork SDK требует нативную Go-привязку, доступную только на Android",
+            onBack = { back() },
+        )
+        TopScreen.MasterDnsSettings -> UnavailableEngineScreen(
+            engineName = "MasterDNS",
+            reason = "MasterDNS — серверный движок (Linux VPS)",
+            onBack = { back() },
+        )
+        TopScreen.FptnSettings -> UnavailableEngineScreen(
+            engineName = "FPTN",
+            reason = "Десктопная сборка FPTN пока не доступна",
             onBack = { back() },
         )
         TopScreen.Main -> MainScreen(

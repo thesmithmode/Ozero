@@ -99,12 +99,12 @@ class TunFrontend {
     }
 
     private fun findBinary(name: String): String? {
-        val candidates = listOf(
-            File(SubprocessEngine.appBinariesDir(), name),
-            File(System.getProperty("user.dir"), name),
-            File(System.getProperty("user.dir"), "binaries/$name"),
-        )
-        return candidates.firstOrNull { it.exists() && it.canExecute() }?.absolutePath
+        val candidates = SubprocessEngine.binaryCandidates(name)
+        val found = candidates.firstOrNull { it.exists() && it.canExecute() }
+        if (found == null) {
+            log.warning("binary '$name' not found. Checked: ${candidates.map { it.absolutePath }}")
+        }
+        return found?.absolutePath
     }
 
     companion object {
