@@ -31,7 +31,7 @@ import ru.ozero.app.vpn.EngineSettingsRestartObserver
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginesingbox.SingboxPrefs
-import ru.ozero.enginesingbox.SingboxProbeService
+import ru.ozero.app.ui.settings.engines.singbox.SingboxProbeService
 import ru.ozero.enginewarp.WarpConfigSlotStore
 import javax.inject.Inject
 
