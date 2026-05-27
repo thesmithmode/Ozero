@@ -679,10 +679,11 @@ private fun SlotListContent(
         ),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (state.errorMessage != null) {
+        val errorMessage = state.errorMessage
+        if (errorMessage != null) {
             item {
                 Text(
-                    text = state.errorMessage,
+                    text = errorMessage,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(horizontal = 4.dp),
