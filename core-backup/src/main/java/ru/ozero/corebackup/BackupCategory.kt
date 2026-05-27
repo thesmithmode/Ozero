@@ -29,7 +29,7 @@ enum class BackupCategory {
 }
 
 private fun BackupSettings.hasGeneral(): Boolean = listOfNotNull(
-    splitMode, ipv6Enabled, autoStart, manualEngine, engineAutoPriority, uiLocaleTag, appMode,
+    splitMode, ipv6Enabled, autoStart, manualEngine, engineAutoPriority, uiLocaleTag, appMode, fptnToken,
 ).isNotEmpty()
 
 private fun BackupSettings.hasDns(): Boolean =
@@ -43,6 +43,6 @@ private fun BackupSettings.hasUrnPrefs(): Boolean =
     listOfNotNull(urnetworkEnabled, urnetworkJwt, urnetworkCountryCode).isNotEmpty()
 
 private fun BackupUrnetwork.hasAny(): Boolean = listOfNotNull(
-    byJwt, windowType, fixedIpSize, allowDirect, provideEnabled,
+    byJwt, byClientJwt, devicePubkey, deviceNetworkName, windowType, fixedIpSize, allowDirect, provideEnabled,
     provideControlMode, provideNetworkMode, selectedLocation,
 ).isNotEmpty()

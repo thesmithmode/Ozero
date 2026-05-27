@@ -626,4 +626,28 @@ class TunnelControllerTest {
         controller.reset()
         assertNull(controller.stats.value, "reset() обязан очистить stats — иначе stale значения мелькают на reconnect")
     }
+
+    @Test
+    fun staleEngineFailureDuringSwitchIsIgnored() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.URNETWORK)
+        controller.onEngineDied(EngineId.BYEDPI, "old engine died")
+        assertEquals(
+            TunnelState.Connecting(EngineId.URNETWORK),
+            controller.state.value,
+            "ошибка старого движка не должна сбрасывать новый connect state",
+        )
+    }
+
+    @Test
+    fun staleEngineStartedDuringSwitchIsIgnored() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.FPTN)
+        controller.onEngineStarted(EngineId.URNETWORK, 1080)
+        assertEquals(
+            TunnelState.Connecting(EngineId.FPTN),
+            controller.state.value,
+            "успешный старт старого движка не должен подменять UI state текущего движка",
+        )
+    }
 }
