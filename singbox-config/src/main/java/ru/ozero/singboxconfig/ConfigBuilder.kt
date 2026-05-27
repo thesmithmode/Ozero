@@ -169,7 +169,6 @@ object ConfigBuilder {
             if (detour != null) append(""","detour":${jsonString(detour)}""")
             append('}')
         }
-
 }
 
 private fun vlessOutbound(bean: VLESSBean, tag: String, detour: String? = null): String {

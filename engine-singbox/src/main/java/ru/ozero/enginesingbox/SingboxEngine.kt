@@ -121,9 +121,11 @@ class SingboxEngine @Inject constructor(
         require(config is EngineConfig.Singbox) { "SingboxEngine requires EngineConfig.Singbox" }
 
         chainMode = upstream !is Upstream.None
-        if (chainMode) return when (upstream) {
-            is Upstream.Socks5 -> startChainMode(config, upstream)
-            else -> StartResult.Failure("SingboxEngine chain requires Socks5, got $upstream")
+        if (chainMode) {
+            return when (upstream) {
+                is Upstream.Socks5 -> startChainMode(config, upstream)
+                else -> StartResult.Failure("SingboxEngine chain requires Socks5, got $upstream")
+            }
         }
 
         val json = buildPendingConfig(config)
