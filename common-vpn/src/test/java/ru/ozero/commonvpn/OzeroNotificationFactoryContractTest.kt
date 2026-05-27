@@ -97,8 +97,8 @@ class OzeroNotificationFactoryContractTest {
             "notify может throw — обязан runCatching, иначе валит stats logger",
         )
         assertTrue(
-            body.contains("PersistentLoggers.warn") || body.contains("PersistentLoggers.debug"),
-            "notify failure → PersistentLoggers.warn/debug для boot.log диагностики",
+            body.contains("PersistentLoggers.debug"),
+            "notify failure → PersistentLoggers.debug для boot.log диагностики (не warn — success path)",
         )
     }
 
