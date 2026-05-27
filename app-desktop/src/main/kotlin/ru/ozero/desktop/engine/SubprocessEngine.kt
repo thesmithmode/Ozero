@@ -11,6 +11,7 @@ import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import java.util.logging.Logger
+import kotlin.concurrent.thread
 
 abstract class SubprocessEngine : DesktopEngine {
 
@@ -80,6 +81,7 @@ abstract class SubprocessEngine : DesktopEngine {
 
         portRef.set(port)
         log.info("started on port $port (pid=${process.pid()})")
+        drainStdout(process)
         EngineStartResult.Success(port)
     }
 
@@ -115,6 +117,22 @@ abstract class SubprocessEngine : DesktopEngine {
         if (exited == null && process.isAlive) {
             log.warning("force killing (pid=${process.pid()})")
             process.destroyForcibly()
+        }
+    }
+
+    private fun drainStdout(process: Process) {
+        val tag = javaClass.simpleName
+        thread(isDaemon = true, name = "$tag-stdout") {
+            runCatching {
+                process.inputStream.bufferedReader().forEachLine { line ->
+                    val level = when {
+                        line.contains("error", ignoreCase = true) -> DesktopLogLevel.ERROR
+                        line.contains("warn", ignoreCase = true) -> DesktopLogLevel.WARN
+                        else -> DesktopLogLevel.DEBUG
+                    }
+                    DesktopLogStore.append(level, tag, line)
+                }
+            }
         }
     }
 

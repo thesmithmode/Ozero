@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import ru.ozero.desktop.model.AppMode
+import ru.ozero.desktop.model.EngineId
 import ru.ozero.desktop.strings.Strings
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -39,7 +40,7 @@ fun SettingsScreen(
     onOpenAbout: () -> Unit = {},
     onOpenLogs: () -> Unit = {},
     onAppModeSelect: (AppMode) -> Unit = {},
-    onOpenEngineSettings: (ru.ozero.desktop.model.EngineId) -> Unit = {},
+    onOpenEngineSettings: (EngineId) -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -108,19 +109,19 @@ private fun AppModeSection(currentMode: AppMode, onSelect: (AppMode) -> Unit) {
 }
 
 @Composable
-private fun EnginesSection(onOpenEngineSettings: (ru.ozero.desktop.model.EngineId) -> Unit) {
+private fun EnginesSection(onOpenEngineSettings: (EngineId) -> Unit) {
     NavRow(Strings.SETTINGS_BYEDPI_TITLE, Strings.SETTINGS_BYEDPI_SUMMARY,
-        onClick = { onOpenEngineSettings(ru.ozero.desktop.model.EngineId.BYEDPI) })
+        onClick = { onOpenEngineSettings(EngineId.BYEDPI) })
     NavRow(Strings.SETTINGS_URNETWORK_TITLE, Strings.SETTINGS_URNETWORK_SUMMARY,
-        onClick = { onOpenEngineSettings(ru.ozero.desktop.model.EngineId.URNETWORK) })
+        onClick = { onOpenEngineSettings(EngineId.URNETWORK) })
     NavRow(Strings.SETTINGS_WARP_TITLE, Strings.SETTINGS_WARP_SUMMARY,
-        onClick = { onOpenEngineSettings(ru.ozero.desktop.model.EngineId.WARP) })
+        onClick = { onOpenEngineSettings(EngineId.WARP) })
     NavRow(Strings.SETTINGS_MASTERDNS_TITLE, Strings.SETTINGS_MASTERDNS_SUMMARY,
-        onClick = { onOpenEngineSettings(ru.ozero.desktop.model.EngineId.MASTERDNS) })
+        onClick = { onOpenEngineSettings(EngineId.MASTERDNS) })
     NavRow(Strings.SETTINGS_FPTN_TITLE, Strings.SETTINGS_FPTN_SUMMARY,
-        onClick = { onOpenEngineSettings(ru.ozero.desktop.model.EngineId.FPTN) })
+        onClick = { onOpenEngineSettings(EngineId.FPTN) })
     NavRow(Strings.SETTINGS_SINGBOX_TITLE, Strings.SETTINGS_SINGBOX_SUMMARY,
-        onClick = { onOpenEngineSettings(ru.ozero.desktop.model.EngineId.SINGBOX) })
+        onClick = { onOpenEngineSettings(EngineId.SINGBOX) })
 }
 
 @Composable
