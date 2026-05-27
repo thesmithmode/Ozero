@@ -11,9 +11,8 @@ DNAME="CN=Ozero, OU=Release, O=Ozero, L=Internet, ST=Internet, C=RU"
 VALIDITY=10000
 KEYSIZE=4096
 
-# Generate random 24-char base64 password
-# PKCS12 uses a single password for both store and key
-KS_PASS="$(openssl rand -base64 18 | tr -d '\n')"
+# Generate random 32-char alphanumeric password (ASCII-safe for keytool PKCS12)
+KS_PASS="$(openssl rand -hex 16)"
 KEY_PASS="$KS_PASS"
 
 KEYSTORE="$OUT/release.keystore"
