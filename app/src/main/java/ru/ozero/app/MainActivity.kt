@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import ru.ozero.app.logging.AppLogger
 import ru.ozero.app.logging.LogcatReader
 import ru.ozero.app.settings.UserFlagsRepository
@@ -28,6 +30,8 @@ import ru.ozero.app.ui.theme.OzeroTheme
 import ru.ozero.app.vpn.EngineSettingsRestartObserver
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
+import ru.ozero.enginesingbox.SingboxPrefs
+import ru.ozero.app.ui.settings.engines.singbox.SingboxProbeService
 import ru.ozero.enginewarp.WarpConfigSlotStore
 import javax.inject.Inject
 
@@ -40,6 +44,10 @@ class MainActivity : AppCompatActivity() {
     @Inject lateinit var settingsRepository: ru.ozero.enginescore.settings.SettingsRepository
 
     @Inject lateinit var warpConfigSlotStore: WarpConfigSlotStore
+
+    @Inject
+    @SingboxPrefs
+    lateinit var singboxDataStore: DataStore<Preferences>
 
     @Inject lateinit var logcatReader: LogcatReader
 
@@ -79,6 +87,7 @@ class MainActivity : AppCompatActivity() {
 
         observeLiveEngineSettingsChanges()
         observeWarpActiveSlotChanges()
+        observeSingboxProfileChanges()
         setContent {
             OzeroTheme {
                 OnboardingGate(userFlags = userFlags) {
@@ -135,6 +144,22 @@ class MainActivity : AppCompatActivity() {
                 .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
                 .collect {
                     restartVpnIfConnected("WARP active slot changed while connected → restart")
+                }
+        }
+    }
+
+    private fun observeSingboxProfileChanges() {
+        lifecycleScope.launch(safeUiCoroutineHandler) {
+            singboxDataStore.data
+                .map { prefs ->
+                    prefs[SingboxProbeService.SELECTED_PROFILE_KEY] to
+                        (prefs[SingboxProbeService.BEAN_KEY]?.contentHashCode() ?: 0)
+                }
+                .distinctUntilChanged()
+                .drop(1)
+                .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
+                .collect {
+                    restartVpnIfConnected("singbox profile changed while connected → restart")
                 }
         }
     }

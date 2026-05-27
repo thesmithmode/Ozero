@@ -37,6 +37,7 @@ class UrnetworkRelayCoordinator(
     private val jwtBootstrapper: UrnetworkJwtBootstrapper,
     private val networkMonitor: RelayNetworkMonitor? = null,
     private val relayLockManager: RelayLockManager? = null,
+    private val pipeFactory: DummyPipeFactory = AndroidDummyPipeFactory,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) {
 
@@ -44,6 +45,7 @@ class UrnetworkRelayCoordinator(
     private val watchdogRef = AtomicReference<Job?>(null)
     private val relayOwned = AtomicBoolean(false)
     private val bootstrapAttemptedThisSession = AtomicBoolean(false)
+    private val pipeWriteEndRef = AtomicReference<AutoCloseable?>(null)
 
     fun start() {
         val newJob = combine(
@@ -69,8 +71,9 @@ class UrnetworkRelayCoordinator(
         if (tunnelState !is TunnelState.Connected) {
             bootstrapAttemptedThisSession.set(false)
             if (relayOwned.compareAndSet(true, false)) {
-                PersistentLoggers.info(TAG, "mesh session: tunnel offline — releasing worker")
+                PersistentLoggers.debug(TAG, "mesh session: tunnel offline — releasing worker")
                 stopWatchdog()
+                closeDummyPipe()
                 runCatching { networkMonitor?.stop() }
                 runCatching { relayLockManager?.release() }
                 runCatching { bridge.stop() }
@@ -83,7 +86,7 @@ class UrnetworkRelayCoordinator(
         }
         if (byClientJwt == null) {
             if (bootstrapAttemptedThisSession.compareAndSet(false, true)) {
-                PersistentLoggers.info(
+                PersistentLoggers.debug(
                     TAG,
                     "mesh session: credential missing while ${tunnelState.engineId} active — acquiring",
                 )
@@ -91,7 +94,7 @@ class UrnetworkRelayCoordinator(
                 if (r is UrnetworkJwtBootstrapper.Result.Failed) {
                     PersistentLoggers.warn(TAG, "mesh session: credential acquisition failed: ${r.reason}")
                 } else {
-                    PersistentLoggers.info(TAG, "mesh session: credential acquired (${r.javaClass.simpleName})")
+                    PersistentLoggers.debug(TAG, "mesh session: credential acquired (${r.javaClass.simpleName})")
                 }
             }
             return
@@ -99,6 +102,7 @@ class UrnetworkRelayCoordinator(
         val result = startBridgeWithRetry(walletAddress, byClientJwt)
         if (result is UrnetworkSdkBridge.StartResult.Success) {
             relayOwned.set(true)
+            attachDummyIoLoop()
             val provideEnabled = runCatching { configStore.provideEnabled().first() }.getOrDefault(true)
             runCatching { bridge.setProvidePaused(!provideEnabled) }
                 .onFailure { PersistentLoggers.warn(TAG, "mesh session: worker pause toggle threw: ${it.message}") }
@@ -119,7 +123,7 @@ class UrnetworkRelayCoordinator(
                     .onFailure { PersistentLoggers.warn(TAG, "mesh session: lockManager threw: ${it.message}") }
             }
             val diag = runCatching { bridge.relayDiagnostics() }.getOrDefault("unavailable")
-            PersistentLoggers.info(
+            PersistentLoggers.debug(
                 TAG,
                 "mesh session: worker started alongside ${tunnelState.engineId} " +
                     "(provideEnabled=$provideEnabled controlMode=${controlMode.rawValue} " +
@@ -128,6 +132,30 @@ class UrnetworkRelayCoordinator(
             startWatchdog()
         } else {
             PersistentLoggers.warn(TAG, "mesh session: worker start failed: $result")
+        }
+    }
+
+    private suspend fun attachDummyIoLoop() {
+        try {
+            val pipe = pipeFactory.create()
+            pipeWriteEndRef.set(pipe.writeEnd)
+            val attachResult = bridge.attachTun(pipe.readFd)
+            if (attachResult is UrnetworkSdkBridge.AttachResult.Success) {
+                PersistentLoggers.info(TAG, "mesh session: dummy IoLoop attached (upstream offline-mode pattern)")
+            } else {
+                PersistentLoggers.warn(TAG, "mesh session: dummy IoLoop attach failed: $attachResult")
+                closeDummyPipe()
+            }
+        } catch (t: Throwable) {
+            PersistentLoggers.warn(TAG, "mesh session: dummy IoLoop threw: ${t.message}")
+            closeDummyPipe()
+        }
+    }
+
+    private fun closeDummyPipe() {
+        pipeWriteEndRef.getAndSet(null)?.let { writeEnd ->
+            runCatching { writeEnd.close() }
+                .onFailure { PersistentLoggers.warn(TAG, "pipe write-end close threw: ${it.message}") }
         }
     }
 
@@ -140,6 +168,7 @@ class UrnetworkRelayCoordinator(
                 val diag = runCatching { bridge.relayDiagnostics() }.getOrNull()
                 if (diag == null || diag == "device=null") {
                     PersistentLoggers.warn(TAG, "watchdog: bridge unhealthy ($diag) — resetting")
+                    closeDummyPipe()
                     runCatching { networkMonitor?.stop() }
                     runCatching { relayLockManager?.release() }
                     runCatching { bridge.stop() }
@@ -186,6 +215,7 @@ class UrnetworkRelayCoordinator(
     fun stop() {
         jobRef.getAndSet(null)?.cancel()
         stopWatchdog()
+        closeDummyPipe()
         runCatching { networkMonitor?.stop() }
         runCatching { relayLockManager?.release() }
     }

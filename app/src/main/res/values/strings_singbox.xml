@@ -2,12 +2,16 @@
 <resources>
     <string name="settings_singbox_title">Sing-box</string>
     <string name="settings_singbox_summary">VLESS/VMess/Trojan — полный sing-box клиент</string>
-    <string name="singbox_link_label">Share-link (vless://…)</string>
     <string name="singbox_save_button">Сохранить</string>
-    <string name="singbox_saved_hint">Сохранено. Нажмите Подключить на главном экране.</string>
     <string name="singbox_current_server">Сервер: %1$s</string>
     <string name="singbox_add_group_button">Добавить подписку</string>
-    <string name="singbox_custom_link_section">Вручную (VLESS-ссылка)</string>
+    <string name="singbox_add_menu_subscription">Добавить подписку</string>
+    <string name="singbox_add_menu_manual">Добавить ссылки вручную</string>
+    <string name="singbox_add_menu_file">Загрузить из файла</string>
+    <string name="singbox_group_name_auto_hint">Ozero-N (авто)</string>
+    <string name="singbox_manual_links_name_hint">Имя группы (необязательно)</string>
+    <string name="singbox_manual_links_error_empty">Вставьте хотя бы одну ссылку</string>
+    <string name="singbox_manual_links_error_parse">Не найдено валидных ссылок</string>
     <string name="singbox_group_refresh">Обновить</string>
     <string name="singbox_group_delete">Удалить</string>
     <string name="singbox_no_profiles_hint">Нет серверов — обновите подписку</string>
@@ -16,16 +20,11 @@
     <string name="singbox_group_url_hint">URL подписки</string>
     <string name="singbox_cancel">Отмена</string>
     <string name="singbox_refreshing">Обновление…</string>
-    <string name="singbox_add_error_empty_fields">Укажите название и URL</string>
-    <string name="singbox_link_error_empty">Вставьте VLESS share-link</string>
-    <string name="singbox_link_error_parse">Ошибка парсинга: %1$s</string>
-    <string name="singbox_link_error_save">Ошибка сохранения: %1$s</string>
+    <string name="singbox_add_error_empty_fields">Укажите URL подписки</string>
     <string name="singbox_refresh_error">Ошибка обновления: %1$s</string>
     <string name="singbox_refresh_all_button">Обновить все</string>
     <string name="singbox_ping_all_button">Тест</string>
     <string name="singbox_group_ping">Тест</string>
-    <string name="singbox_auto_select_button">Лучший сервер</string>
-    <string name="singbox_auto_select_hint">Проверяет задержку всех серверов и выбирает самый быстрый</string>
     <string name="singbox_auto_mode_title">Авто-выбор</string>
     <string name="singbox_auto_mode_desc">Подключается к серверу с наименьшим пингом, автоматически переключается при деградации</string>
     <string name="singbox_advanced_title">Параметры Sing-box</string>

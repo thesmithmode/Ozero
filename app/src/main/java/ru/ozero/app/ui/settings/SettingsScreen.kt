@@ -58,7 +58,6 @@ fun SettingsScreen(
     onOpenByeDpiEngineSettings: () -> Unit = {},
     onOpenUrnetworkSettings: () -> Unit = {},
     onOpenWarpSettings: () -> Unit = {},
-    onOpenManualServer: () -> Unit = {},
     onOpenStatsHistory: () -> Unit = {},
     onOpenDiagnostics: () -> Unit = {},
     onOpenBackup: () -> Unit = {},
@@ -67,6 +66,7 @@ fun SettingsScreen(
     onOpenMasterDnsSettings: () -> Unit = {},
     onOpenFptnSettings: () -> Unit = {},
     onOpenSingboxSettings: () -> Unit = {},
+    onOpenChainSettings: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -82,7 +82,6 @@ fun SettingsScreen(
             onOpenByeDpiEngineSettings = onOpenByeDpiEngineSettings,
             onOpenUrnetworkSettings = onOpenUrnetworkSettings,
             onOpenWarpSettings = onOpenWarpSettings,
-            onOpenManualServer = onOpenManualServer,
             onOpenStatsHistory = onOpenStatsHistory,
             onOpenDiagnostics = onOpenDiagnostics,
             onOpenBackup = onOpenBackup,
@@ -91,6 +90,7 @@ fun SettingsScreen(
             onOpenMasterDnsSettings = onOpenMasterDnsSettings,
             onOpenFptnSettings = onOpenFptnSettings,
             onOpenSingboxSettings = onOpenSingboxSettings,
+            onOpenChainSettings = onOpenChainSettings,
         ),
         onIpv6Toggle = viewModel::onIpv6Toggle,
         onAutoStartToggle = viewModel::onAutoStartToggle,
@@ -206,11 +206,14 @@ private fun ContentBody(
                 onOpenByeDpi = nav.onOpenByeDpiEngineSettings,
                 onOpenUrnetwork = nav.onOpenUrnetworkSettings,
                 onOpenWarp = nav.onOpenWarpSettings,
-                onOpenManualServer = nav.onOpenManualServer,
                 onOpenMasterDns = nav.onOpenMasterDnsSettings,
                 onOpenFptn = nav.onOpenFptnSettings,
                 onOpenSingbox = nav.onOpenSingboxSettings,
             )
+        }
+        if (model.appMode == AppMode.EXPERT) {
+            item { SectionDivider() }
+            item { ProxyChainRow(onOpen = nav.onOpenChainSettings) }
         }
         item { SectionDivider() }
         item {
@@ -407,7 +410,6 @@ private fun EnginesSection(
     onOpenByeDpi: () -> Unit,
     onOpenUrnetwork: () -> Unit,
     onOpenWarp: () -> Unit,
-    onOpenManualServer: () -> Unit,
     onOpenMasterDns: () -> Unit,
     onOpenFptn: () -> Unit,
     onOpenSingbox: () -> Unit,
@@ -437,13 +439,6 @@ private fun EnginesSection(
         summary = stringResource(R.string.settings_warp_summary),
         tag = "settings_warp_row",
         onClick = onOpenWarp,
-        enabled = true,
-    )
-    NavRow(
-        title = stringResource(R.string.settings_manual_server_title),
-        summary = stringResource(R.string.settings_manual_server_summary),
-        tag = "settings_manual_server_row",
-        onClick = onOpenManualServer,
         enabled = true,
     )
     NavRow(
@@ -735,6 +730,17 @@ private fun NavRow(
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha * 0.6f),
         )
     }
+}
+
+@Composable
+private fun ProxyChainRow(onOpen: () -> Unit) {
+    NavRow(
+        title = stringResource(R.string.chain_settings_title),
+        summary = stringResource(R.string.chain_settings_summary),
+        tag = "settings_proxy_chain_row",
+        onClick = onOpen,
+        enabled = true,
+    )
 }
 
 @Composable

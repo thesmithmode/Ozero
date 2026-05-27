@@ -8,6 +8,7 @@ android {
 
 dependencies {
     implementation(project(":singbox-fmt"))
+    implementation(project(":engines-core"))
     implementation(libs.bundles.coroutines)
 
     testImplementation(libs.bundles.junit5)

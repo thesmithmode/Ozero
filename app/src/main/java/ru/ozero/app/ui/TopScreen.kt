@@ -12,7 +12,6 @@ enum class TopScreen {
     UrnetworkEngineSettings,
     WarpEngineSettings,
     StrategyTest,
-    ManualServer,
     StatsHistory,
     Backup,
     AutoModeSettings,
@@ -22,4 +21,5 @@ enum class TopScreen {
     FptnSettings,
     SingboxSettings,
     SingboxAdvancedSettings,
+    ChainSettings,
 }

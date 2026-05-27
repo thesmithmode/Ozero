@@ -18,6 +18,7 @@ import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.SocketProtector
 import ru.ozero.enginescore.TunAttachResult
 import ru.ozero.enginescore.TunFdAcceptor
+import ru.ozero.enginescore.settings.ChainStepConfig
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginescore.settings.SplitTunnelMode
@@ -83,6 +84,12 @@ class StartSequenceCoordinator(
                 .onFailure { PersistentLoggers.error(TAG, "lockdown startup TUN failed: ${it.message}") }
         }
 
+        val chain = settings?.proxyChain.orEmpty()
+        if (chain.size >= 2) {
+            runProxyChain(chain, settings, splitConfig)
+            return
+        }
+
         val manualEngine = settings?.manualEngine
         val pick = if (manualEngine != null) {
             val cfg = buildEngineConfig(manualEngine, settings)
@@ -146,6 +153,74 @@ class StartSequenceCoordinator(
         if (!usesCustomTun) deps.engineWatchdog.startHealthKillswitchWatcher(activeEngineId)
         if (usesCustomTun) deps.engineWatchdog.startPeerWatchdog(activeEngineId)
         deps.engineWatchdog.startStagnationWatchdog(activeEngineId)
+        deps.statsLogger.start()
+    }
+
+    private suspend fun runProxyChain(
+        chain: List<ChainStepConfig>,
+        settings: SettingsModel?,
+        splitConfig: SplitTunnelConfig,
+    ) {
+        val tailEngineId = chain.last().engineId
+        deps.tunnelController.onProbing(tailEngineId)
+        if (state.stopping.get()) return
+
+        val steps = chain.map { step ->
+            val cfg = buildEngineConfig(step.engineId, settings)
+            if (cfg == null) {
+                PersistentLoggers.error(TAG, "chain: no config for engine ${step.engineId}")
+                deps.tunnelController.onEngineDied(tailEngineId, "no config for ${step.engineId}")
+                stopVpnRequest()
+                return
+            }
+            ChainStep(step.engineId, cfg)
+        }
+
+        val chainResult = withTimeoutOrNull(CHAIN_START_TIMEOUT_MS) {
+            try {
+                deps.chainOrchestrator.start(steps)
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (t: Throwable) {
+                PersistentLoggers.error(TAG, "chain.start threw: ${t.message}")
+                null
+            }
+        }
+        if (chainResult !is ChainResult.Success) {
+            deps.engineWatchdog.handleEngineFailure(tailEngineId, chainResult?.toString() ?: "chain timeout")
+            return
+        }
+        deps.tunnelController.onConnecting(tailEngineId)
+
+        val ipv6Enabled = settings?.ipv6Enabled ?: false
+        val customDns = settings?.customDnsServers.orEmpty()
+        val fd = establishTun(splitConfig, ipv6 = ipv6Enabled, customDns = customDns) ?: run {
+            runCatching { deps.chainOrchestrator.stop() }
+            deps.engineWatchdog.handleEngineFailure(tailEngineId, "chain TUN establish failed")
+            return
+        }
+        state.lockdownStartupFdRef.getAndSet(null)?.runCatching { close() }
+        if (state.stopping.get()) {
+            runCatching { fd.close() }
+            state.tunFdRef.compareAndSet(fd, null)
+            runCatching { deps.chainOrchestrator.stop() }
+            return
+        }
+        if (!startNativeTunnel(tailEngineId, fd, chainResult.finalSocksPort)) return
+
+        deps.tunnelController.onEngineStarted(tailEngineId, chainResult.finalSocksPort)
+        val nowMs = System.currentTimeMillis()
+        state.sessionStartMsRef.set(nowMs)
+        val label = chain.joinToString("→") { it.engineId.name }
+        state.sessionIdRef.set(
+            runCatching { deps.sessionStatsRecorder.startSession(label, nowMs) }.getOrDefault(-1L),
+        )
+        runCatching { deps.healthMonitor.start(chainResult.finalSocksPort) }
+            .onFailure { t ->
+                if (t is CancellationException) throw t
+                PersistentLoggers.warn(TAG, "chain healthMonitor.start threw: ${t.message}")
+            }
+        deps.engineWatchdog.startHealthKillswitchWatcher(tailEngineId)
         deps.statsLogger.start()
     }
 
@@ -288,7 +363,7 @@ class StartSequenceCoordinator(
         val spec = plugin.tunSpec() ?: return null
         val builder = deps.tunBuilderHelper.applyEngineTunSpec(spec, ipv6Enabled)
         TunBuilderConfigurator(packageName).apply(builder, splitConfig, excludeSelf = true)
-        PersistentLoggers.info(
+        PersistentLoggers.debug(
             TAG,
             "engineTUN params: engine=$engineId mode=${splitConfig.mode} " +
                 "blocklist=${splitConfig.blocklist.size}[${splitConfig.blocklist.joinToString(",")}] " +

@@ -409,15 +409,6 @@
     <string name="usage_history_empty">Ainda não aplicadas</string>
     <string name="strategy_scan_notification_title">Seleção de estratégias ByeDPI…</string>
     <string name="strategy_scan_channel_name">Seleção de estratégias</string>
-    <string name="manual_server_title">Adicionar servidor</string>
-    <string name="manual_server_hint">Cole um URI VLESS / Trojan / Hysteria2 / Shadowsocks. O servidor será salvo no banco de dados e utilizado pelos motores na próxima conexão.</string>
-    <string name="manual_server_uri_label">URI do servidor</string>
-    <string name="manual_server_add">Adicionar</string>
-    <string name="manual_server_clear">Limpar</string>
-    <string name="manual_server_error_prefix">Erro: %1$s</string>
-    <string name="manual_server_success_prefix">OK: servidor adicionado %1$s</string>
-    <string name="manual_server_error_empty_uri">URI vazio</string>
-    <string name="manual_server_error_import_unavailable">Importação não disponível nesta versão</string>
     <string name="logs_title">Registros</string>
     <string name="logs_title_fmt">Registros (%1$dKB)</string>
     <string name="logs_back_cd">Voltar</string>
@@ -429,6 +420,7 @@
     <string name="logs_copy_empty_toast">Vazio — nada para copiar</string>
     <string name="logs_copy_done_toast_fmt">Copiado (%1$d caracteres)</string>
     <string name="logs_export">Exportar .log</string>
+    <string name="logs_export_level_title">Nível mínimo</string>
     <string name="logs_footer_fmt">%1$d / %2$d linhas</string>
     <string name="warp_tweaks_endpoint_section">Ponto final</string>
     <string name="warp_tweaks_awg_section">Parâmetros AmneziaWG</string>
@@ -444,8 +436,6 @@
     <string name="byedpi_dns_field_label">Endereços DNS (separados por vírgula)</string>
     <string name="settings_byedpi_title">Args do ByeDPI</string>
     <string name="settings_byedpi_summary">Configurações de bypass DPI</string>
-    <string name="settings_manual_server_title">Adicionar servidor manualmente</string>
-    <string name="settings_manual_server_summary">URI VLESS / Trojan / Hysteria2 / Shadowsocks</string>
     <string name="settings_logs">Registros</string>
     <string name="warp_progress_mirror_fmt">Espelho %1$s</string>
     <string name="warp_validation_required_fields">PrivateKey, Endpoint, PublicKey (Par), Endereço são obrigatórios</string>
@@ -564,4 +554,14 @@
     <string name="warp_info_intro">Se a geração automática falhar, tente obter uma configuração em um destes sites e importe o arquivo .conf.</string>
     <string name="warp_info_close">Fechar</string>
     <string name="warp_register_error_hint">Não foi possível obter uma configuração automaticamente — todas as fontes estão indisponíveis. Toque em ⓘ acima, abra um dos sites geradores, baixe um .conf e importe-o.</string>
+
+    <string name="chain_settings_title">Cadeia de proxies</string>
+    <string name="chain_settings_summary">Conectar através de vários motores em sequência</string>
+    <string name="chain_screen_title">Cadeia de proxies</string>
+    <string name="chain_add_step">Adicionar motor</string>
+    <string name="chain_remove_step">Remover</string>
+    <string name="chain_empty_hint">Adicione motores para construir uma cadeia</string>
+    <string name="chain_enabled">Cadeia ativada</string>
+    <string name="chain_head_only">Apenas no início da cadeia</string>
+    <string name="chain_not_chainable">Não suporta encadeamento</string>
 </resources>

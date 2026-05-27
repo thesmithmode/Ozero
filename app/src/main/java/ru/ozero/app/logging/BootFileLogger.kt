@@ -10,7 +10,8 @@ object BootFileLogger : PersistentLogger {
 
     fun file(): File? = UnifiedLogger.file()
 
-    fun debug(tag: String, msg: String) = UnifiedLogger.debug(tag, msg)
+    override fun trace(tag: String, msg: String) = UnifiedLogger.trace(tag, msg)
+    override fun debug(tag: String, msg: String) = UnifiedLogger.debug(tag, msg)
     override fun info(tag: String, msg: String) = UnifiedLogger.info(tag, msg)
     override fun warn(tag: String, msg: String, t: Throwable?) = UnifiedLogger.warn(tag, msg, t)
     override fun error(tag: String, msg: String, t: Throwable?) = UnifiedLogger.error(tag, msg, t)

@@ -9,7 +9,7 @@ object AppLogger {
     }
 
     fun v(tag: String, msg: String) {
-        UnifiedLogger.log("VERBOSE", tag, msg)
+        UnifiedLogger.log("TRACE", tag, msg)
         emit(LogLevel.TRACE, tag, msg)
     }
 

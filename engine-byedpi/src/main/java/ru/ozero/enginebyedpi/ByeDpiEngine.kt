@@ -108,21 +108,27 @@ class ByeDpiEngine(
                 withTimeoutOrNull(STOP_GRACE_MS) { oldJob.join() }
                 if (oldJob.isActive) oldJob.cancel()
             }
-            PersistentLoggers.info(TAG, "start: barrier pre-drain oldJob.isActive=${oldJob.isActive}")
-            // limitedParallelism(1) — пустой withContext ждёт пока предыдущий JNI main() освободит поток
+            PersistentLoggers.debug(TAG, "start: barrier pre-drain oldJob.isActive=${oldJob.isActive}")
+        }
+
+        // limitedParallelism(1): безусловный drain гарантирует что слот свободен даже после dirty stop
+        val drained = withTimeoutOrNull(STOP_GRACE_MS) {
             withContext(proxyDispatcher) {}
-            PersistentLoggers.info(TAG, "start: barrier passed — dispatcher drained")
+            true
+        }
+        if (drained == null) {
+            PersistentLoggers.warn(TAG, "start: dispatcher drain timeout — native thread may still be active")
         }
 
         val args = buildArgs(resolvedConfig)
-        PersistentLoggers.info(
+        PersistentLoggers.debug(
             TAG,
             "jniStartProxy argv=[${args.joinToString(" ")}] (native префиксует argv[0]=\"byedpi\")",
         )
         val proxyJob = proxyScope.launch {
-            PersistentLoggers.info(TAG, "launch entered port=$resolvedPort")
+            PersistentLoggers.debug(TAG, "launch entered port=$resolvedPort")
             val code = startProxyWithRecovery(args)
-            PersistentLoggers.info(TAG, "startProxy returned code=$code port=$resolvedPort")
+            PersistentLoggers.debug(TAG, "startProxy returned code=$code port=$resolvedPort")
             when {
                 code == 0 -> { /* success — main() returned 0 */ }
                 code == JNI_GUARD_BUSY -> PersistentLoggers.warn(

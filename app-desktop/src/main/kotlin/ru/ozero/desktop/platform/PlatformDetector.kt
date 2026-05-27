@@ -23,12 +23,8 @@ object PlatformDetector {
 
     fun hasWintun(): Boolean {
         if (!isWindows()) return false
-        val candidates = listOf(
-            File(appBinariesDir(), "wintun.dll"),
-            File(System.getProperty("user.dir"), "wintun.dll"),
-            File(System.getProperty("user.dir"), "binaries/wintun.dll"),
-            File(System.getenv("SYSTEMROOT") ?: "C:\\Windows", "System32/wintun.dll"),
-        )
+        val candidates = ru.ozero.desktop.engine.SubprocessEngine.binaryCandidates("wintun.dll") +
+            File(System.getenv("SYSTEMROOT") ?: "C:\\Windows", "System32/wintun.dll")
         return candidates.any { it.exists() }
     }
 
@@ -49,12 +45,5 @@ object PlatformDetector {
     }.getOrElse {
         log.warning("admin check failed: ${it.message}")
         false
-    }
-
-    private fun appBinariesDir(): File {
-        val appDir = System.getProperty("app.dir")
-            ?: System.getProperty("compose.application.resources.dir")
-            ?: "."
-        return File(appDir, "binaries")
     }
 }

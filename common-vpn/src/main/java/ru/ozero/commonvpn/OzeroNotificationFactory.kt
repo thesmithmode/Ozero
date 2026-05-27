@@ -74,7 +74,7 @@ class OzeroNotificationFactory(
         runCatching {
             val nm = context.getSystemService(NotificationManager::class.java) ?: return
             nm.notify(NOTIFICATION_ID, build(statsText))
-        }.onFailure { PersistentLoggers.warn(TAG, "notifyStats: ${it.message}") }
+        }.onFailure { PersistentLoggers.debug(TAG, "notifyStats: ${it.message}") }
     }
 
     fun enterForeground(service: Service): Boolean {

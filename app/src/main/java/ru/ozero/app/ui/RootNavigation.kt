@@ -13,7 +13,6 @@ import ru.ozero.app.ui.about.AboutScreen
 import ru.ozero.app.ui.backup.BackupScreen
 import ru.ozero.app.ui.diag.DiagnosticsScreen
 import ru.ozero.app.ui.logs.LogsScreen
-import ru.ozero.app.ui.servers.ManualServerScreen
 import ru.ozero.app.ui.servers.ServersScreen
 import ru.ozero.app.ui.settings.AutoModeSettingsScreen
 import ru.ozero.app.ui.settings.LanguageScreen
@@ -24,6 +23,7 @@ import ru.ozero.app.ui.settings.engines.MasterDnsSettingsScreen
 import ru.ozero.app.ui.settings.engines.UrnetworkEngineSettingsScreen
 import ru.ozero.app.ui.settings.engines.UrnetworkSharedTrafficScreen
 import ru.ozero.app.ui.settings.engines.WarpEngineSettingsScreen
+import ru.ozero.app.ui.settings.ChainSettingsScreen
 import ru.ozero.app.ui.settings.engines.singbox.SingboxAdvancedSettingsScreen
 import ru.ozero.app.ui.settings.engines.singbox.SingboxEngineSettingsScreen
 import ru.ozero.app.ui.splittunnel.SplitTunnelScreen
@@ -72,7 +72,7 @@ fun RootNavigation(
                     onOpenMasterDnsSettings = { navigate(TopScreen.MasterDnsSettings) },
                     onOpenFptnSettings = { navigate(TopScreen.FptnSettings) },
                     onOpenSingboxSettings = { navigate(TopScreen.SingboxSettings) },
-                    onOpenManualServer = { navigate(TopScreen.ManualServer) },
+                    onOpenChainSettings = { navigate(TopScreen.ChainSettings) },
                     onOpenStatsHistory = { navigate(TopScreen.StatsHistory) },
                     onOpenDiagnostics = { navigate(TopScreen.Diagnostics) },
                     onOpenBackup = { navigate(TopScreen.Backup) },
@@ -105,8 +105,8 @@ fun RootNavigation(
                 onOpenAdvanced = { navigate(TopScreen.SingboxAdvancedSettings) },
             )
             TopScreen.SingboxAdvancedSettings -> SingboxAdvancedSettingsScreen(onBack = { back() })
+            TopScreen.ChainSettings -> ChainSettingsScreen(onBack = { back() })
             TopScreen.StrategyTest -> StrategyTestScreen(onBack = { back() })
-            TopScreen.ManualServer -> ManualServerScreen(onBack = { back() })
             TopScreen.StatsHistory -> TrafficStatsScreen(onBack = { back() })
             TopScreen.Main ->
                 MainScreen(

@@ -446,17 +446,6 @@
     <string name="chart_tf_30min">30м</string>
     <string name="chart_tf_1h">1ч</string>
 
-    <!-- Manual server -->
-    <string name="manual_server_title">Добавить сервер</string>
-    <string name="manual_server_hint">Вставьте VLESS / Trojan / Hysteria2 / Shadowsocks URI. Сервер будет добавлен в БД и подхвачен engine кандидатами при следующем подключении.</string>
-    <string name="manual_server_uri_label">Server URI</string>
-    <string name="manual_server_add">Добавить</string>
-    <string name="manual_server_clear">Очистить</string>
-    <string name="manual_server_error_prefix">Ошибка: %1$s</string>
-    <string name="manual_server_success_prefix">OK: добавлен сервер %1$s</string>
-    <string name="manual_server_error_empty_uri">Пустой URI</string>
-    <string name="manual_server_error_import_unavailable">Импорт недоступен в этой версии</string>
-
     <!-- Logs screen -->
     <string name="logs_title">Логи</string>
     <string name="logs_title_fmt">Логи (%1$dKB)</string>
@@ -472,6 +461,7 @@
     <string name="warp_tweaks_awg_section">Параметры AmneziaWG</string>
     <string name="logs_copy_empty_toast">Пусто — нечего копировать</string>
     <string name="logs_copy_done_toast_fmt">Скопировано (%1$d симв.)</string>
+    <string name="logs_export_level_title">Минимальный уровень</string>
 
     <!-- ByeDPI engine settings -->
     <string name="byedpi_args_description">Аргументы запуска libbyedpi. Используются для обхода ТСПУ DPI. Подробности: github.com/hufrea/byedpi</string>
@@ -488,8 +478,6 @@
     <!-- Settings additional rows -->
     <string name="settings_byedpi_title">ByeDPI args</string>
     <string name="settings_byedpi_summary">Настройки обхода ТСПУ</string>
-    <string name="settings_manual_server_title">Добавить сервер вручную</string>
-    <string name="settings_manual_server_summary">VLESS / Trojan / Hysteria2 / Shadowsocks URI</string>
     <string name="settings_logs">Логи</string>
 
     <!-- WARP engine settings -->
@@ -579,4 +567,14 @@
     <string name="urnetwork_shared_traffic_chart_title">График за 30 дней</string>
     <string name="urnetwork_shared_traffic_chart_empty">Пока нет данных — поработайте провайдером, и здесь появится статистика.</string>
     <string name="urnetwork_shared_traffic_chart_peak">Пиковый день: %1$s</string>
+
+    <string name="chain_settings_title">Цепочка прокси</string>
+    <string name="chain_settings_summary">Последовательное подключение через несколько движков</string>
+    <string name="chain_screen_title">Цепочка прокси</string>
+    <string name="chain_add_step">Добавить движок</string>
+    <string name="chain_remove_step">Удалить</string>
+    <string name="chain_empty_hint">Добавьте движки для построения цепочки</string>
+    <string name="chain_enabled">Цепочка включена</string>
+    <string name="chain_head_only">Только в начале цепочки</string>
+    <string name="chain_not_chainable">Не поддерживает цепочки</string>
 </resources>

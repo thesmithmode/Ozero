@@ -44,6 +44,15 @@ class SingboxEngineService : Service() {
             }
         }
 
+        override fun startProxyMode(
+            singboxJsonConfig: String,
+            protector: ISingboxProtector,
+        ) {
+            kotlinx.coroutines.runBlocking(Dispatchers.Main.immediate) {
+                SingboxRuntime.start(NO_TUN_FD, singboxJsonConfig, SingboxProtectorBridge(protector))
+            }
+        }
+
         override fun stop() {
             serviceScope.launch {
                 runCatching { SingboxRuntime.stop() }
@@ -84,7 +93,7 @@ class SingboxEngineService : Service() {
         java.io.File(dataDir).mkdirs()
         java.io.File("$dataDir/tmp").mkdirs()
         SingboxRuntime.setup(dataDir)
-        PersistentLoggers.info(
+        PersistentLoggers.debug(
             TAG,
             "SingboxEngineService created pid=${android.os.Process.myPid()} " +
                 "libraryLoaded=${Libsingboxgojni.libraryLoaded} loadError=${Libsingboxgojni.loadError}",
@@ -107,5 +116,6 @@ class SingboxEngineService : Service() {
     companion object {
         private const val TAG = "SingboxEngineService"
         private const val DESTROY_STOP_TIMEOUT_S = 3L
+        private const val NO_TUN_FD = -1
     }
 }

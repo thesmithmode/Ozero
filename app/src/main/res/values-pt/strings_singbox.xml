@@ -2,12 +2,9 @@
 <resources>
     <string name="settings_singbox_title">Sing-box</string>
     <string name="settings_singbox_summary">VLESS/VMess/Trojan — cliente sing-box completo</string>
-    <string name="singbox_link_label">Share-link (vless://…)</string>
     <string name="singbox_save_button">Salvar</string>
-    <string name="singbox_saved_hint">Salvo. Toque em Conectar na tela principal.</string>
     <string name="singbox_current_server">Servidor: %1$s</string>
     <string name="singbox_add_group_button">Adicionar assinatura</string>
-    <string name="singbox_custom_link_section">Manual (link VLESS)</string>
     <string name="singbox_group_refresh">Atualizar</string>
     <string name="singbox_group_delete">Excluir</string>
     <string name="singbox_no_profiles_hint">Sem servidores — atualize a assinatura</string>
@@ -16,16 +13,11 @@
     <string name="singbox_group_url_hint">URL da assinatura</string>
     <string name="singbox_cancel">Cancelar</string>
     <string name="singbox_refreshing">Atualizando…</string>
-    <string name="singbox_add_error_empty_fields">Informe nome e URL</string>
-    <string name="singbox_link_error_empty">Cole um VLESS share-link</string>
-    <string name="singbox_link_error_parse">Erro de análise: %1$s</string>
-    <string name="singbox_link_error_save">Erro ao salvar: %1$s</string>
+    <string name="singbox_add_error_empty_fields">Informe a URL da assinatura</string>
     <string name="singbox_refresh_error">Erro ao atualizar: %1$s</string>
     <string name="singbox_refresh_all_button">Atualizar tudo</string>
     <string name="singbox_ping_all_button">Teste</string>
     <string name="singbox_group_ping">Teste</string>
-    <string name="singbox_auto_select_button">Melhor servidor</string>
-    <string name="singbox_auto_select_hint">Verifica a latência de todos os servidores e escolhe o mais rápido</string>
     <string name="singbox_auto_mode_title">Seleção automática</string>
     <string name="singbox_auto_mode_desc">Conecta ao servidor com menor ping e troca automaticamente quando a latência piora</string>
     <string name="singbox_advanced_title">Configurações Sing-box</string>
@@ -38,4 +30,11 @@
     <string name="singbox_restore_defaults_title">Restaurar assinaturas</string>
     <string name="singbox_restore_defaults_confirm">As assinaturas padrão excluídas serão restauradas. Suas assinaturas personalizadas não serão afetadas.</string>
     <string name="singbox_restore_defaults_hint">Restaura assinaturas padrão excluídas sem afetar as personalizadas</string>
+    <string name="singbox_add_menu_subscription">Adicionar assinatura</string>
+    <string name="singbox_add_menu_manual">Adicionar links manualmente</string>
+    <string name="singbox_add_menu_file">Importar de arquivo</string>
+    <string name="singbox_group_name_auto_hint">Ozero-N (auto)</string>
+    <string name="singbox_manual_links_name_hint">Nome do grupo (opcional)</string>
+    <string name="singbox_manual_links_error_empty">Cole pelo menos um link</string>
+    <string name="singbox_manual_links_error_parse">Nenhum link válido encontrado</string>
 </resources>

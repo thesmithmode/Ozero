@@ -1,9 +1,10 @@
 package ru.ozero.desktop.ui.components
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
@@ -22,24 +23,24 @@ fun EngineChipsRow(
     onSelect: (EngineId?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    LazyRow(
-        modifier = modifier.testTag("engine_chips_row"),
+    Row(
+        modifier = modifier
+            .testTag("engine_chips_row")
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(horizontal = 16.dp),
     ) {
-        item {
-            FilterChip(
-                selected = selectedEngine == null,
-                onClick = { onSelect(null) },
-                label = { Text(Strings.ENGINE_CHIP_AUTO) },
-                modifier = Modifier.testTag("engine_chip_AUTO"),
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.primary,
-                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-            )
-        }
-        items(engineOrder, key = { it.name }) { engine ->
+        FilterChip(
+            selected = selectedEngine == null,
+            onClick = { onSelect(null) },
+            label = { Text(Strings.ENGINE_CHIP_AUTO) },
+            modifier = Modifier.testTag("engine_chip_AUTO"),
+            colors = FilterChipDefaults.filterChipColors(
+                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+            ),
+        )
+        engineOrder.forEach { engine ->
             FilterChip(
                 selected = selectedEngine == engine,
                 onClick = { onSelect(engine) },

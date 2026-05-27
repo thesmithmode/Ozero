@@ -53,6 +53,7 @@ class UrnetworkRelayCoordinatorTest {
             configStore = configStore,
             tunnelController = tunnelController,
             jwtBootstrapper = bootstrapper,
+            pipeFactory = FakePipeFactory(),
             scope = coordinatorScope,
         )
         coordinator.start()
@@ -264,6 +265,26 @@ class UrnetworkRelayCoordinatorTest {
         assertEquals(2, bridge.connectBestAvailableCalls)
     }
 
+    @Test
+    fun `relay attach dummy IoLoop после успешного start`() = relayTest {
+        setByClientJwt("test-jwt")
+        tunnelStateFlow.value = TunnelState.Connected(EngineId.WARP, socksPort = 0)
+
+        assertEquals(1, bridge.startCalls)
+        assertEquals(1, bridge.attachTunCalls, "dummy IoLoop должен быть создан после start")
+    }
+
+    @Test
+    fun `relay не attach dummy IoLoop при failed start`() = relayTest {
+        bridge.startResult = UrnetworkSdkBridge.StartResult.Failed("test")
+        setByClientJwt("test-jwt")
+        tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
+
+        advanceUntilIdle()
+
+        assertEquals(0, bridge.attachTunCalls)
+    }
+
     private class FakeJwtBootstrapper : UrnetworkJwtBootstrapper {
         var calls: Int = 0
         private var onCallAction: (suspend () -> UrnetworkJwtBootstrapper.Result)? = null
@@ -282,6 +303,10 @@ class UrnetworkRelayCoordinatorTest {
         }
     }
 
+    private class FakePipeFactory : DummyPipeFactory {
+        override fun create() = DummyPipeFactory.PipeHandle(42, AutoCloseable {})
+    }
+
     private class FakeBridge : UrnetworkSdkBridge {
         var startCalls = 0
         var stopCalls = 0
@@ -290,6 +315,7 @@ class UrnetworkRelayCoordinatorTest {
         var lastProvidePaused: Boolean? = null
         var running = false
         var startResult: UrnetworkSdkBridge.StartResult = UrnetworkSdkBridge.StartResult.Success
+        var attachTunCalls = 0
         var diagnosticsResult: String = "running=true"
 
         override suspend fun start(
@@ -306,7 +332,10 @@ class UrnetworkRelayCoordinatorTest {
             stopCalls++
         }
         override fun isRunning() = running
-        override suspend fun attachTun(tunFd: Int) = UrnetworkSdkBridge.AttachResult.Success
+        override suspend fun attachTun(tunFd: Int): UrnetworkSdkBridge.AttachResult {
+            attachTunCalls++
+            return UrnetworkSdkBridge.AttachResult.Success
+        }
         override fun connectTo(location: UrnetworkSdkBridge.LocationToken) = Unit
         override fun connectBestAvailable() {
             connectBestAvailableCalls++

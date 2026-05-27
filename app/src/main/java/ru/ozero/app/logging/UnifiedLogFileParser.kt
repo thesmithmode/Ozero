@@ -34,4 +34,29 @@ internal object UnifiedLogFileParser {
 
     fun parseAll(text: String): List<LogEntry> =
         text.lineSequence().mapNotNull { parseLine(it) }.toList()
+
+    private val LEVEL_TOKEN =
+        Regex("""\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} (VERBOSE|TRACE|DEBUG|INFO|WARN|ERROR) """)
+
+    fun filterByLevel(text: String, minLevel: LogLevel): String {
+        val minSeverity = minLevel.severity
+        val sb = StringBuilder()
+        var include = false
+        for (line in text.lineSequence()) {
+            if (line.startsWith("LOGCAT ")) continue
+            val m = LEVEL_TOKEN.find(line)
+            if (m != null) {
+                val lvl = when (m.groupValues[1]) {
+                    "VERBOSE", "TRACE" -> LogLevel.TRACE
+                    "DEBUG" -> LogLevel.DEBUG
+                    "WARN" -> LogLevel.WARN
+                    "ERROR" -> LogLevel.ERROR
+                    else -> LogLevel.INFO
+                }
+                include = lvl.severity >= minSeverity
+            }
+            if (include) sb.appendLine(line)
+        }
+        return sb.toString()
+    }
 }

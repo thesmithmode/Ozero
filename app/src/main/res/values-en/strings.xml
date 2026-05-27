@@ -440,17 +440,6 @@
     <string name="chart_tf_30min">30m</string>
     <string name="chart_tf_1h">1h</string>
 
-    <!-- Manual server -->
-    <string name="manual_server_title">Add server</string>
-    <string name="manual_server_hint">Paste a VLESS / Trojan / Hysteria2 / Shadowsocks URI. The server will be saved to the database and picked up by engine candidates on the next connection.</string>
-    <string name="manual_server_uri_label">Server URI</string>
-    <string name="manual_server_add">Add</string>
-    <string name="manual_server_clear">Clear</string>
-    <string name="manual_server_error_prefix">Error: %1$s</string>
-    <string name="manual_server_success_prefix">OK: added server %1$s</string>
-    <string name="manual_server_error_empty_uri">Empty URI</string>
-    <string name="manual_server_error_import_unavailable">Import is not available in this build</string>
-
     <!-- Logs screen -->
     <string name="logs_title">Logs</string>
     <string name="logs_title_fmt">Logs (%1$dKB)</string>
@@ -463,6 +452,7 @@
     <string name="logs_copy_empty_toast">Empty — nothing to copy</string>
     <string name="logs_copy_done_toast_fmt">Copied (%1$d chars)</string>
     <string name="logs_export">Export .log</string>
+    <string name="logs_export_level_title">Minimum level</string>
     <string name="logs_footer_fmt">%1$d / %2$d entries</string>
     <string name="warp_tweaks_endpoint_section">Endpoint</string>
     <string name="warp_tweaks_awg_section">AmneziaWG Settings</string>
@@ -482,8 +472,6 @@
     <!-- Settings additional rows -->
     <string name="settings_byedpi_title">ByeDPI args</string>
     <string name="settings_byedpi_summary">DPI bypass settings</string>
-    <string name="settings_manual_server_title">Add server manually</string>
-    <string name="settings_manual_server_summary">VLESS / Trojan / Hysteria2 / Shadowsocks URI</string>
     <string name="settings_logs">Logs</string>
 
     <!-- WARP engine settings -->
@@ -576,4 +564,13 @@
     <string name="urnetwork_shared_traffic_chart_empty">No data yet — provide some traffic and stats will show up here.</string>
     <string name="urnetwork_shared_traffic_chart_peak">Peak day: %1$s</string>
 
+    <string name="chain_settings_title">Proxy Chain</string>
+    <string name="chain_settings_summary">Route traffic through multiple engines sequentially</string>
+    <string name="chain_screen_title">Proxy Chain</string>
+    <string name="chain_add_step">Add engine</string>
+    <string name="chain_remove_step">Remove</string>
+    <string name="chain_empty_hint">Add engines to build a proxy chain</string>
+    <string name="chain_enabled">Chain enabled</string>
+    <string name="chain_head_only">Head position only</string>
+    <string name="chain_not_chainable">Does not support chaining</string>
 </resources>

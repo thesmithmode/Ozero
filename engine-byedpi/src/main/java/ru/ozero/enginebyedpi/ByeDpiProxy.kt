@@ -54,7 +54,7 @@ class ByeDpiProxy : ByeDpiProxyContract {
                 try {
                     System.loadLibrary("byedpi")
                     libraryLoaded = true
-                    PersistentLoggers.info(TAG, "libbyedpi loaded")
+                    PersistentLoggers.debug(TAG, "libbyedpi loaded")
                 } catch (e: UnsatisfiedLinkError) {
                     loadError = e.message ?: e.javaClass.simpleName
                     libraryLoaded = false

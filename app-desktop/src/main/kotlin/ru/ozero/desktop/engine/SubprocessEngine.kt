@@ -4,11 +4,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import ru.ozero.desktop.logging.DesktopLogLevel
+import ru.ozero.desktop.logging.DesktopLogStore
 import java.io.BufferedReader
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import java.util.logging.Logger
+import kotlin.concurrent.thread
 
 abstract class SubprocessEngine : DesktopEngine {
 
@@ -78,14 +81,22 @@ abstract class SubprocessEngine : DesktopEngine {
 
         portRef.set(port)
         log.info("started on port $port (pid=${process.pid()})")
+        drainStdout(process)
         EngineStartResult.Success(port)
     }
 
     private suspend fun waitForReady(reader: BufferedReader, process: Process): Any? {
+        val tag = javaClass.simpleName
         while (process.isAlive) {
             if (reader.ready()) {
                 val line = reader.readLine() ?: break
                 log.fine(line)
+                val level = when {
+                    line.contains("error", ignoreCase = true) -> DesktopLogLevel.ERROR
+                    line.contains("warn", ignoreCase = true) -> DesktopLogLevel.WARN
+                    else -> DesktopLogLevel.INFO
+                }
+                DesktopLogStore.append(level, tag, line)
                 if (detectReady(line)) return null
             } else {
                 delay(100)
@@ -109,13 +120,31 @@ abstract class SubprocessEngine : DesktopEngine {
         }
     }
 
+    private fun drainStdout(process: Process) {
+        val tag = javaClass.simpleName
+        thread(isDaemon = true, name = "$tag-stdout") {
+            runCatching {
+                process.inputStream.bufferedReader().forEachLine { line ->
+                    val level = when {
+                        line.contains("error", ignoreCase = true) -> DesktopLogLevel.ERROR
+                        line.contains("warn", ignoreCase = true) -> DesktopLogLevel.WARN
+                        else -> DesktopLogLevel.DEBUG
+                    }
+                    DesktopLogStore.append(level, tag, line)
+                }
+            }
+        }
+    }
+
     private fun findBinary(): String? {
-        val candidates = listOf(
-            File(appBinariesDir(), binaryName),
-            File(System.getProperty("user.dir"), binaryName),
-            File(System.getProperty("user.dir"), "binaries/$binaryName"),
-        )
-        return candidates.firstOrNull { it.exists() && it.canExecute() }?.absolutePath
+        val candidates = binaryCandidates(binaryName)
+        val found = candidates.firstOrNull { it.exists() && it.canExecute() }
+        if (found == null) {
+            log.warning("binary '$binaryName' not found. Checked: ${candidates.map { it.absolutePath }}")
+        } else {
+            log.info("resolved '$binaryName' → ${found.absolutePath}")
+        }
+        return found?.absolutePath
     }
 
     companion object {
@@ -125,5 +154,18 @@ abstract class SubprocessEngine : DesktopEngine {
                 ?: "."
             return File(appDir, "binaries")
         }
+
+        private fun appResourcesDir(): String =
+            System.getProperty("compose.application.resources.dir")
+                ?: System.getProperty("app.dir")
+                ?: "."
+
+        fun binaryCandidates(name: String): List<File> = listOf(
+            File(appBinariesDir(), name),
+            File(appResourcesDir(), name),
+            File(File(appResourcesDir()).parentFile ?: File("."), name),
+            File(System.getProperty("user.dir"), name),
+            File(System.getProperty("user.dir"), "binaries/$name"),
+        )
     }
 }

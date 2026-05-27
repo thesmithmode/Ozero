@@ -49,7 +49,7 @@ class RealUrnetworkJwtBootstrapper(
         when (val r = authService.acquireClientJwt(byJwt)) {
             is ClientJwtResult.Success -> {
                 configStore.setByClientJwt(r.byClientJwt)
-                PersistentLoggers.info(TAG, "client jwt acquired and persisted")
+                PersistentLoggers.debug(TAG, "client jwt acquired and persisted")
                 UrnetworkJwtBootstrapper.Result.Acquired
             }
             is ClientJwtResult.Error -> {
@@ -68,14 +68,14 @@ class RealUrnetworkJwtBootstrapper(
         val deviceJwt = tryAcquireDeviceJwt(legacyMigration = existing != null)
         if (deviceJwt != null) return deviceJwt
         if (existing != null) {
-            PersistentLoggers.info(TAG, "device walletAuth unavailable — keeping legacy guest byJwt")
+            PersistentLoggers.debug(TAG, "device walletAuth unavailable — keeping legacy guest byJwt")
             return existing
         }
-        PersistentLoggers.info(TAG, "device walletAuth unavailable — fallback to guest network")
+        PersistentLoggers.debug(TAG, "device walletAuth unavailable — fallback to guest network")
         return when (val r = authService.acquireGuestJwt()) {
             is GuestJwtResult.Success -> {
                 configStore.setByJwt(r.byJwt)
-                PersistentLoggers.info(TAG, "guest jwt acquired and persisted")
+                PersistentLoggers.debug(TAG, "guest jwt acquired and persisted")
                 r.byJwt
             }
             is GuestJwtResult.Error -> {
@@ -89,7 +89,7 @@ class RealUrnetworkJwtBootstrapper(
         val identity = deviceIdentity ?: return null
         val storedName = configStore.deviceNetworkName().first()
         val networkName = storedName?.takeIf { it.isNotBlank() } ?: networkNameGenerator()
-        PersistentLoggers.info(
+        PersistentLoggers.debug(
             TAG,
             if (legacyMigration) {
                 "device walletAuth — migrating legacy guest byJwt to per-device keypair"
@@ -108,7 +108,7 @@ class RealUrnetworkJwtBootstrapper(
                         deviceNetworkName = networkName,
                     )
                 }
-                PersistentLoggers.info(
+                PersistentLoggers.debug(
                     TAG,
                     "device walletAuth jwt acquired isNew=${r.isNewNetwork} " +
                         "migration=$legacyMigration " +

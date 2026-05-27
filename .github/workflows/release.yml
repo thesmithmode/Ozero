@@ -537,6 +537,20 @@ jobs:
           VERSION: ${{ needs.resolve-version.outputs.version }}
         run: ./gradlew :app-desktop:packageExe -PdesktopVersion=$VERSION --no-daemon --stacktrace
 
+      - name: Sign Windows installer
+        if: env.WINDOWS_CERT_PFX != ''
+        shell: pwsh
+        env:
+          WINDOWS_CERT_PFX: ${{ secrets.WINDOWS_CODESIGN_PFX_B64 }}
+          WINDOWS_CERT_PASS: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
+        run: |
+          $pfxBytes = [Convert]::FromBase64String($env:WINDOWS_CERT_PFX)
+          $pfxPath = "$env:RUNNER_TEMP\codesign.pfx"
+          [IO.File]::WriteAllBytes($pfxPath, $pfxBytes)
+          $exe = Get-ChildItem -Path "app-desktop\build\compose\binaries\main\exe" -Filter "*.exe" | Select-Object -First 1
+          & signtool sign /f $pfxPath /p $env:WINDOWS_CERT_PASS /tr http://timestamp.digicert.com /td sha256 /fd sha256 $exe.FullName
+          Remove-Item $pfxPath
+
       - name: Collect Windows artifact
         shell: bash
         env:

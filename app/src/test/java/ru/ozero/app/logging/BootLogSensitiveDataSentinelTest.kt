@@ -101,19 +101,19 @@ class BootLogSensitiveDataSentinelTest {
     }
 
     @Test
-    fun `FptnEngine логирует диагностику через PersistentLoggers info на start и authenticate`() {
+    fun `FptnEngine логирует диагностику через PersistentLoggers debug на start и authenticate`() {
         val src = readSource("engine-fptn/src/main/java/ru/ozero/enginefptn/FptnEngine.kt")
         assertTrue(
-            src.contains("PersistentLoggers.info(") &&
+            src.contains("PersistentLoggers.debug(") &&
                 src.contains("\"start: server=") &&
                 src.contains("sniDomain="),
-            "FptnEngine.start обязан логировать server+port+bypass+sniDomain в PersistentLoggers.info — " +
+            "FptnEngine.start обязан логировать server+port+bypass+sniDomain в PersistentLoggers.debug — " +
                 "иначе HTTP 608 timeout диагностика невозможна по файл-логу (только logcat)",
         )
         assertTrue(
             src.contains("authenticate: POST /api/v1/login server=") &&
                 src.contains("sni=\$sniDomain bypass=\$bypassMethod"),
-            "FptnEngine.authenticate обязан логировать connection target в PersistentLoggers.info " +
+            "FptnEngine.authenticate обязан логировать connection target в PersistentLoggers.debug " +
                 "до POST — иначе таймаут невозможно отличить от network unreachable по файл-логу",
         )
     }

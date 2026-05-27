@@ -42,6 +42,7 @@
 ## Workflow
 
 - main не трогать без явной команды.
+- Merge dev→main: БЕЗ сквоша (`git merge --ff` или `--no-ff`), история 1:1 с dev.
 - Релизы: тег `v*.*.*` на dev → release.yml соберёт APK.
 
 ## Билд

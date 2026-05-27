@@ -8,13 +8,16 @@ object RawShareLinksParser {
         text.lines()
             .map { it.trim() }
             .filter { it.isNotEmpty() && !it.startsWith("#") }
-            .mapNotNull { line ->
+            .flatMap { it.split(" ") }
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .mapNotNull { token ->
                 runCatching {
                     when {
-                        line.startsWith("vless://") -> V2RayFmt.parseVLESS(line)
-                        line.startsWith("vmess://") -> V2RayFmt.parseVMess(line)
-                        line.startsWith("trojan://") -> V2RayFmt.parseTrojan(line)
-                        line.startsWith("ss://") -> V2RayFmt.parseShadowsocks(line)
+                        token.startsWith("vless://") -> V2RayFmt.parseVLESS(token)
+                        token.startsWith("vmess://") -> V2RayFmt.parseVMess(token)
+                        token.startsWith("trojan://") -> V2RayFmt.parseTrojan(token)
+                        token.startsWith("ss://") -> V2RayFmt.parseShadowsocks(token)
                         else -> null
                     }
                 }.getOrNull()

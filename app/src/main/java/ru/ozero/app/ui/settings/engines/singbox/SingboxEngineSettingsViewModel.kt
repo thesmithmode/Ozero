@@ -20,7 +20,12 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import ru.ozero.enginesingbox.SingboxPrefs
+import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
+import ru.ozero.singboxfmt.ShadowsocksBean
+import ru.ozero.singboxfmt.TrojanBean
+import ru.ozero.singboxfmt.VLESSBean
+import ru.ozero.singboxfmt.VMessBean
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.dao.SubscriptionGroupDao
 import ru.ozero.singboxroom.entity.ProxyProfile
@@ -40,20 +45,11 @@ enum class SortOrder {
     }
 }
 
-sealed class CustomLinkError {
-    data object Empty : CustomLinkError()
-    data class ParseFailed(val cause: String) : CustomLinkError()
-    data class SaveFailed(val cause: String) : CustomLinkError()
-}
-
 data class SingboxSettingsUiState(
     val groups: List<SubscriptionGroup> = emptyList(),
     val expandedGroupId: Long? = null,
     val groupProfiles: Map<Long, List<ProxyProfile>> = emptyMap(),
     val selectedProfileId: Long? = null,
-    val customLinkInput: String = "",
-    val customLinkSaved: Boolean = false,
-    val customLinkError: CustomLinkError? = null,
     val isRefreshing: Set<Long> = emptySet(),
     val isPinging: Set<Long> = emptySet(),
     val isAutoSelecting: Boolean = false,
@@ -66,6 +62,11 @@ data class SingboxSettingsUiState(
     val addGroupName: String = "",
     val addGroupUrl: String = "",
     val addGroupError: String? = null,
+    val showAddMenu: Boolean = false,
+    val showAddManualLinksDialog: Boolean = false,
+    val manualLinksInput: String = "",
+    val manualLinksGroupName: String = "",
+    val manualLinksError: String? = null,
 )
 
 @HiltViewModel
@@ -131,7 +132,6 @@ class SingboxEngineSettingsViewModel @Inject constructor(
                 prefs[SingboxProbeService.SELECTED_PROFILE_KEY] = profile.id
                 prefs[SingboxProbeService.BEAN_KEY] = profile.beanBlob
             }
-            _uiState.update { it.copy(customLinkSaved = false) }
         }
     }
 
@@ -148,40 +148,50 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
     }
 
-    fun onRefreshGroup(groupId: Long) {
-        viewModelScope.launch { refreshGroupInternal(groupId) }
-    }
-
-    fun onRefreshAll() {
+    fun onRefresh(groupId: Long? = null) {
         refreshJob?.cancel()
         refreshJob = viewModelScope.launch {
-            val groups = groupDao.getAll()
-            groups.map { group -> async { refreshGroupInternal(group.id) } }.awaitAll()
+            if (groupId != null) {
+                refreshGroupInternal(groupId)
+            } else {
+                groupDao.getAll().map { group -> async { refreshGroupInternal(group.id) } }.awaitAll()
+            }
         }
     }
 
-    fun onCancelRefresh() {
-        refreshJob?.cancel()
-        refreshJob = null
-        _uiState.update { it.copy(isRefreshing = emptySet()) }
+    fun onCancel(ping: Boolean = false, refresh: Boolean = false) {
+        if (ping) {
+            pingJob?.cancel()
+            pingJob = null
+            _uiState.update { it.copy(isPinging = emptySet()) }
+        }
+        if (refresh) {
+            refreshJob?.cancel()
+            refreshJob = null
+            _uiState.update { it.copy(isRefreshing = emptySet()) }
+        }
     }
 
-    fun onPingAll() {
+    fun onPing(groupId: Long? = null) {
         pingJob?.cancel()
         _uiState.update { it.copy(isPinging = emptySet()) }
         pingJob = viewModelScope.launch {
-            val groups = groupDao.getAll()
-            groups.map { group ->
+            val groups = if (groupId != null) {
+                listOf(groupId)
+            } else {
+                groupDao.getAll().map { it.id }
+            }
+            groups.map { gid ->
                 async {
-                    val profiles = profileDao.getByGroupId(group.id)
+                    val profiles = profileDao.getByGroupId(gid)
                     if (profiles.isEmpty()) return@async
-                    _uiState.update { it.copy(isPinging = it.isPinging + group.id) }
+                    _uiState.update { it.copy(isPinging = it.isPinging + gid) }
                     probeService.probeAndAutoSelect(profiles, viewModelScope)
-                    val updated = profileDao.getByGroupId(group.id)
+                    val updated = profileDao.getByGroupId(gid)
                     _uiState.update {
                         it.copy(
-                            isPinging = it.isPinging - group.id,
-                            groupProfiles = it.groupProfiles + (group.id to updated),
+                            isPinging = it.isPinging - gid,
+                            groupProfiles = it.groupProfiles + (gid to updated),
                         )
                     }
                 }
@@ -206,24 +216,6 @@ class SingboxEngineSettingsViewModel @Inject constructor(
                 _uiState.update { it.copy(groupProfiles = it.groupProfiles + refreshed) }
             }
             _uiState.update { it.copy(isAutoSelecting = false) }
-        }
-    }
-
-    fun onPingGroup(groupId: Long) {
-        pingJob?.cancel()
-        _uiState.update { it.copy(isPinging = emptySet()) }
-        pingJob = viewModelScope.launch {
-            val profiles = profileDao.getByGroupId(groupId)
-            if (profiles.isEmpty()) return@launch
-            _uiState.update { it.copy(isPinging = it.isPinging + groupId) }
-            probeService.probeAndAutoSelect(profiles, viewModelScope)
-            val updated = profileDao.getByGroupId(groupId)
-            _uiState.update {
-                it.copy(
-                    isPinging = it.isPinging - groupId,
-                    groupProfiles = it.groupProfiles + (groupId to updated),
-                )
-            }
         }
     }
 
@@ -270,12 +262,13 @@ class SingboxEngineSettingsViewModel @Inject constructor(
     }
 
     fun onAddGroupConfirm() {
-        val name = _uiState.value.addGroupName.trim()
         val url = _uiState.value.addGroupUrl.trim()
-        if (name.isEmpty() || url.isEmpty()) {
+        if (url.isEmpty()) {
             _uiState.update { it.copy(addGroupError = "empty") }
             return
         }
+        val rawName = _uiState.value.addGroupName.trim()
+        val name = rawName.ifEmpty { "Ozero-${state.value.groups.size + 1}" }
         viewModelScope.launch {
             groupDao.insert(SubscriptionGroup(name = name, subscriptionUrl = url, userOrder = state.value.groups.size))
             _uiState.update {
@@ -288,35 +281,123 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         viewModelScope.launch { groupDao.delete(group) }
     }
 
-    fun onCustomLinkChanged(text: String) {
-        _uiState.update { it.copy(customLinkInput = text, customLinkError = null, customLinkSaved = false) }
+    fun onShowAddMenu(show: Boolean) = _uiState.update { it.copy(showAddMenu = show) }
+
+    fun onShowAddManualLinksDialog(show: Boolean) = _uiState.update {
+        if (show) {
+            it.copy(showAddManualLinksDialog = true, showAddMenu = false)
+        } else {
+            it.copy(
+                showAddManualLinksDialog = false,
+                manualLinksInput = "",
+                manualLinksGroupName = "",
+                manualLinksError = null,
+            )
+        }
     }
 
-    fun onSaveCustomLink() {
-        val raw = _uiState.value.customLinkInput.trim()
+    fun onManualLinksFieldChanged(input: String? = null, groupName: String? = null) = _uiState.update {
+        it.copy(
+            manualLinksInput = input ?: it.manualLinksInput,
+            manualLinksGroupName = groupName ?: it.manualLinksGroupName,
+            manualLinksError = if (input != null) null else it.manualLinksError,
+        )
+    }
+
+    fun onConfirmManualLinks() {
+        val raw = _uiState.value.manualLinksInput.trim()
         if (raw.isEmpty()) {
-            _uiState.update { it.copy(customLinkError = CustomLinkError.Empty) }
+            _uiState.update { it.copy(manualLinksError = "empty") }
             return
         }
         val parsed = RawShareLinksParser.parse(raw)
         if (parsed.isEmpty()) {
+            _uiState.update { it.copy(manualLinksError = "parse") }
+            return
+        }
+        val rawName = _uiState.value.manualLinksGroupName.trim()
+        val name = rawName.ifEmpty { "Ozero-${state.value.groups.size + 1}" }
+        viewModelScope.launch {
+            val groupId = groupDao.insert(
+                SubscriptionGroup(name = name, subscriptionUrl = "", userOrder = state.value.groups.size),
+            )
+            val profiles = parsed.mapIndexed { idx, bean ->
+                ProxyProfile(
+                    groupId = groupId,
+                    name = bean.name.ifBlank { "Server ${idx + 1}" },
+                    beanBlob = KryoSerializer.serialize(bean),
+                    protocolType = protocolTypeOf(bean),
+                    userOrder = idx,
+                )
+            }
+            profileDao.insertAll(profiles)
             _uiState.update {
-                it.copy(customLinkError = CustomLinkError.ParseFailed("vless://, vmess://, trojan://, ss://"))
+                it.copy(
+                    showAddManualLinksDialog = false,
+                    manualLinksInput = "",
+                    manualLinksGroupName = "",
+                    manualLinksError = null,
+                )
+            }
+        }
+    }
+
+    fun onImportFromFile(text: String, fileName: String?) {
+        val parsed = RawShareLinksParser.parse(text)
+        if (parsed.isEmpty()) {
+            _uiState.update {
+                it.copy(
+                    showAddManualLinksDialog = true,
+                    manualLinksInput = text.take(2000),
+                    manualLinksGroupName = fileName?.substringBeforeLast(".") ?: "",
+                    manualLinksError = "parse",
+                )
             }
             return
         }
-        val bean = parsed.first()
-        val blob = runCatching { KryoSerializer.serialize(bean) }
-            .getOrElse { e ->
-                _uiState.update { it.copy(customLinkError = CustomLinkError.SaveFailed(e.message ?: "")) }
-                return
-            }
+        val name = fileName?.substringBeforeLast(".") ?: "Ozero-${state.value.groups.size + 1}"
         viewModelScope.launch {
-            dataStore.edit { prefs ->
-                prefs[SingboxProbeService.BEAN_KEY] = blob
-                prefs.remove(SingboxProbeService.SELECTED_PROFILE_KEY)
+            val groupId = groupDao.insert(
+                SubscriptionGroup(name = name, subscriptionUrl = "", userOrder = state.value.groups.size),
+            )
+            val profiles = parsed.mapIndexed { idx, bean ->
+                ProxyProfile(
+                    groupId = groupId,
+                    name = bean.name.ifBlank { "Server ${idx + 1}" },
+                    beanBlob = KryoSerializer.serialize(bean),
+                    protocolType = protocolTypeOf(bean),
+                    userOrder = idx,
+                )
             }
-            _uiState.update { it.copy(customLinkSaved = true, customLinkError = null) }
+            profileDao.insertAll(profiles)
+        }
+    }
+
+    fun onSortOrderChanged(order: SortOrder) {
+        viewModelScope.launch {
+            dataStore.edit { prefs -> prefs[SORT_ORDER_KEY] = order.ordinal }
+        }
+    }
+
+    fun onRestoreDefaults() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRestoringDefaults = true, restoreError = null) }
+            val error = runCatching {
+                val json = appContext.assets.open("singbox/preset_groups.json").bufferedReader().readText()
+                val obj = org.json.JSONObject(json)
+                val arr = obj.getJSONArray("groups")
+                val presets = (0 until arr.length()).map { i ->
+                    val g = arr.getJSONObject(i)
+                    GroupSeeder.PresetGroup(name = g.getString("name"), url = g.getString("url"))
+                }
+                groupSeeder.seedPresets(presets)
+            }.exceptionOrNull()
+            _uiState.update {
+                it.copy(
+                    isRestoringDefaults = false,
+                    restoreError = error?.let { e -> e.message ?: e.javaClass.simpleName },
+                )
+            }
         }
     }
 
@@ -351,4 +432,12 @@ class SingboxEngineSettingsViewModel @Inject constructor(
     companion object {
         private val SORT_ORDER_KEY = intPreferencesKey("singbox_sort_order")
     }
+}
+
+private fun protocolTypeOf(bean: AbstractBean): Int = when (bean) {
+    is VLESSBean -> 0
+    is VMessBean -> 1
+    is TrojanBean -> 2
+    is ShadowsocksBean -> 3
+    else -> 0
 }
