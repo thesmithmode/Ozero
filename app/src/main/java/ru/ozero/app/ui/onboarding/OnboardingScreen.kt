@@ -18,11 +18,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Bolt
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -201,14 +200,14 @@ private fun ModePickStep(
             ),
             icon = {
                 Icon(
-                    Icons.Outlined.AutoAwesome,
+                    Icons.Filled.Star,
                     contentDescription = null,
                     modifier = Modifier.size(22.dp),
                 )
             },
             featureIcon = {
                 Icon(
-                    Icons.Outlined.Bolt,
+                    Icons.Filled.CheckCircle,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
                     tint = Color(0xFF63F5E4),
@@ -228,14 +227,14 @@ private fun ModePickStep(
             ),
             icon = {
                 Icon(
-                    Icons.Outlined.Tune,
+                    Icons.Filled.Settings,
                     contentDescription = null,
                     modifier = Modifier.size(22.dp),
                 )
             },
             featureIcon = {
                 Icon(
-                    Icons.Outlined.Settings,
+                    Icons.Filled.Settings,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.outline,
