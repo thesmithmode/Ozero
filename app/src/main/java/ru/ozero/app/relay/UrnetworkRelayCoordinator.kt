@@ -1,5 +1,6 @@
 package ru.ozero.app.relay
 
+import android.os.ParcelFileDescriptor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -44,6 +45,7 @@ class UrnetworkRelayCoordinator(
     private val watchdogRef = AtomicReference<Job?>(null)
     private val relayOwned = AtomicBoolean(false)
     private val bootstrapAttemptedThisSession = AtomicBoolean(false)
+    private val pipeWriteEndRef = AtomicReference<ParcelFileDescriptor?>(null)
 
     fun start() {
         val newJob = combine(
@@ -71,6 +73,7 @@ class UrnetworkRelayCoordinator(
             if (relayOwned.compareAndSet(true, false)) {
                 PersistentLoggers.debug(TAG, "mesh session: tunnel offline — releasing worker")
                 stopWatchdog()
+                closeDummyPipe()
                 runCatching { networkMonitor?.stop() }
                 runCatching { relayLockManager?.release() }
                 runCatching { bridge.stop() }
@@ -99,6 +102,7 @@ class UrnetworkRelayCoordinator(
         val result = startBridgeWithRetry(walletAddress, byClientJwt)
         if (result is UrnetworkSdkBridge.StartResult.Success) {
             relayOwned.set(true)
+            attachDummyIoLoop()
             val provideEnabled = runCatching { configStore.provideEnabled().first() }.getOrDefault(true)
             runCatching { bridge.setProvidePaused(!provideEnabled) }
                 .onFailure { PersistentLoggers.warn(TAG, "mesh session: worker pause toggle threw: ${it.message}") }
@@ -131,6 +135,33 @@ class UrnetworkRelayCoordinator(
         }
     }
 
+    private suspend fun attachDummyIoLoop() {
+        try {
+            val pipe = ParcelFileDescriptor.createPipe()
+            val readEnd = pipe[0]
+            val writeEnd = pipe[1]
+            pipeWriteEndRef.set(writeEnd)
+            val fd = readEnd.detachFd()
+            val attachResult = bridge.attachTun(fd)
+            if (attachResult is UrnetworkSdkBridge.AttachResult.Success) {
+                PersistentLoggers.info(TAG, "mesh session: dummy IoLoop attached (upstream offline-mode pattern)")
+            } else {
+                PersistentLoggers.warn(TAG, "mesh session: dummy IoLoop attach failed: $attachResult")
+                closeDummyPipe()
+            }
+        } catch (t: Throwable) {
+            PersistentLoggers.warn(TAG, "mesh session: dummy IoLoop threw: ${t.message}")
+            closeDummyPipe()
+        }
+    }
+
+    private fun closeDummyPipe() {
+        pipeWriteEndRef.getAndSet(null)?.let { writeEnd ->
+            runCatching { writeEnd.close() }
+                .onFailure { PersistentLoggers.warn(TAG, "pipe write-end close threw: ${it.message}") }
+        }
+    }
+
     private fun startWatchdog() {
         stopWatchdog()
         val job = scope.launch {
@@ -140,6 +171,7 @@ class UrnetworkRelayCoordinator(
                 val diag = runCatching { bridge.relayDiagnostics() }.getOrNull()
                 if (diag == null || diag == "device=null") {
                     PersistentLoggers.warn(TAG, "watchdog: bridge unhealthy ($diag) — resetting")
+                    closeDummyPipe()
                     runCatching { networkMonitor?.stop() }
                     runCatching { relayLockManager?.release() }
                     runCatching { bridge.stop() }
@@ -186,6 +218,7 @@ class UrnetworkRelayCoordinator(
     fun stop() {
         jobRef.getAndSet(null)?.cancel()
         stopWatchdog()
+        closeDummyPipe()
         runCatching { networkMonitor?.stop() }
         runCatching { relayLockManager?.release() }
     }
