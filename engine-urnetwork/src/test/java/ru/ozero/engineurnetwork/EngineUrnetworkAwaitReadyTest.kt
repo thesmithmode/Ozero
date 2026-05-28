@@ -126,6 +126,34 @@ class EngineUrnetworkAwaitReadyTest {
     }
 
     @Test
+    fun `awaitReady returns Ready for lowercase connected status`() = runTest {
+        val bridge = CountableBridge(fixedPeers = 0).also {
+            it.connectionStatusProvider = { "connected" }
+        }
+        val eng = engine(bridge, backgroundScope, peerReadyTimeoutMs = 300L, peerReadyPollMs = 50L)
+        eng.start(baseConfig, Upstream.None)
+
+        val result = eng.awaitReady()
+
+        assertEquals(EnginePlugin.ReadyResult.Ready, result, "status=connected (lowercase) must still become Ready")
+        assertTrue(bridge.connectionStatusCalls.get() >= 1, "connectionStatus should be queried")
+    }
+
+    @Test
+    fun `awaitReady returns Ready when peers positive even if connectionStatus throws`() = runTest {
+        val bridge = CountableBridge(fixedPeers = 2).also {
+            it.connectionStatusProvider = { throw IllegalStateException("status channel unavailable") }
+        }
+        val eng = engine(bridge, backgroundScope, peerReadyTimeoutMs = 300L, peerReadyPollMs = 50L)
+        eng.start(baseConfig, Upstream.None)
+
+        val result = eng.awaitReady()
+
+        assertEquals(EnginePlugin.ReadyResult.Ready, result, "peers>0 must drive Ready even with status read failure")
+        assertTrue(bridge.peerCountCalls.get() >= 1, "peerCount should be queried")
+    }
+
+    @Test
     fun `sentinel PEER_READY_TIMEOUT_MS не ниже 30s — initial P2P discovery медленно на плохих сетях`() {
         val source = File("src/main/java/ru/ozero/engineurnetwork/EngineUrnetwork.kt").readText()
         val match = Regex("PEER_READY_TIMEOUT_MS\\s*=\\s*(\\d+)_?(\\d*)L")

@@ -89,6 +89,19 @@ class ConfigBuilderChainTest {
     }
 
     @Test
+    fun `auto chain config fails fast when all transports unsupported`() {
+        val unsupportedOnly = listOf(
+            makeBean(uuid = "aaaa-2", host = "s2.com").apply { type = "splithttp" },
+            makeBean(uuid = "aaaa-3", host = "s3.com").apply { type = "splithttp" },
+        )
+
+        val result = runCatching { ConfigBuilder.buildAutoChainConfig(unsupportedOnly, socksPort = 49410) }
+
+        assertTrue(result.isFailure, "all unsupported transports must fail instead of building broken chain config")
+        assertContains(result.exceptionOrNull()?.message.orEmpty(), "supported transport")
+    }
+
+    @Test
     fun `auto chain config with upstream adds detour to all proxy outbounds`() {
         val beans = listOf(makeBean(uuid = "a1"), makeBean(uuid = "a2"))
         val upstream = ConfigBuilder.Upstream("127.0.0.1", 49200)
