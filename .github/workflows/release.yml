@@ -467,7 +467,7 @@ jobs:
           done
 
       - name: Upload APK artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: apk-artifacts
           path: release-out/*
@@ -581,7 +581,7 @@ jobs:
           sha256sum "Ozero-${TAG}.exe" > "Ozero-${TAG}.exe.sha256"
 
       - name: Upload Windows artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-artifacts
           path: |
@@ -658,7 +658,7 @@ jobs:
           sha256sum "Ozero-${TAG}.deb" > "Ozero-${TAG}.deb.sha256"
 
       - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linux-artifacts
           path: |
@@ -724,7 +724,7 @@ jobs:
           shasum -a 256 "Ozero-${TAG}.dmg" > "Ozero-${TAG}.dmg.sha256"
 
       - name: Upload macOS artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: macos-artifacts
           path: |
@@ -742,7 +742,7 @@ jobs:
 
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: release-all
           merge-multiple: true

@@ -1012,3 +1012,7 @@
 - Source: daily/2026-05-28.md
 - Articles created: [[concepts/shared-warp-settings-branch-coverage]], [[concepts/masterdns-fake-ssh-specificity]], [[concepts/fake-dao-preseed-autoincrement]], [[concepts/app-desktop-coverage-gate-scope]], [[connections/extra-module-ci-exposes-stale-fakes]]
 - Articles updated: none
+## [2026-05-28T20:03:01+03:00] compile | 2026-05-28.md
+- Source: daily/2026-05-28.md
+- Articles created: [[concepts/memory-only-commit-ci-risk]], [[concepts/release-regression-self-review-gate]], [[concepts/github-actions-run-level-polling]], [[concepts/release-audit-tag-sha-grounding]], [[concepts/test-retention-evidence-standard]]
+- Articles updated: none
