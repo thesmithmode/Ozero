@@ -83,26 +83,15 @@ fun BackupScreen(
         if (uri != null) viewModel.beginImport(context, uri)
     }
 
-    LaunchedEffect(state) {
-        when (state) {
-            is BackupUiState.ExportSuccess -> {
-                snackbar.showSnackbar(exportSuccessMsg)
-                viewModel.dismissResult()
-            }
-            is BackupUiState.ImportSuccess -> {
-                snackbar.showSnackbar(importSuccessMsg)
-                viewModel.dismissResult()
-            }
-            is BackupUiState.Error -> {
-                snackbar.showSnackbar("$errorPrefix${(state as BackupUiState.Error).message}")
-                viewModel.dismissResult()
-            }
-            is BackupUiState.PendingImport -> if (confirmImportImmediately) {
-                viewModel.confirmImport((state as BackupUiState.PendingImport).availableCategories)
-            }
-            else -> Unit
-        }
-    }
+    BackupResultEffects(
+        state = state,
+        snackbar = snackbar,
+        exportSuccessMsg = exportSuccessMsg,
+        importSuccessMsg = importSuccessMsg,
+        errorPrefix = errorPrefix,
+        confirmImportImmediately = confirmImportImmediately,
+        viewModel = viewModel,
+    )
 
     Scaffold(
         topBar = {
@@ -188,6 +177,38 @@ fun BackupScreen(
                 onConfirm = { selected -> viewModel.confirmImport(selected) },
                 onDismiss = { viewModel.cancelImport() },
             )
+        }
+    }
+}
+
+@Composable
+private fun BackupResultEffects(
+    state: BackupUiState,
+    snackbar: SnackbarHostState,
+    exportSuccessMsg: String,
+    importSuccessMsg: String,
+    errorPrefix: String,
+    confirmImportImmediately: Boolean,
+    viewModel: BackupViewModel,
+) {
+    LaunchedEffect(state) {
+        when (state) {
+            is BackupUiState.ExportSuccess -> {
+                snackbar.showSnackbar(exportSuccessMsg)
+                viewModel.dismissResult()
+            }
+            is BackupUiState.ImportSuccess -> {
+                snackbar.showSnackbar(importSuccessMsg)
+                viewModel.dismissResult()
+            }
+            is BackupUiState.Error -> {
+                snackbar.showSnackbar("$errorPrefix${state.message}")
+                viewModel.dismissResult()
+            }
+            is BackupUiState.PendingImport -> if (confirmImportImmediately) {
+                viewModel.confirmImport(state.availableCategories)
+            }
+            else -> Unit
         }
     }
 }
