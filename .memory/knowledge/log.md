@@ -1008,3 +1008,7 @@
 - Source: daily/2026-05-28.md
 - Articles created: [[concepts/byedpi-stop-timeout-contract]], [[concepts/warp-uapi-cleanup-all-sockets]], [[concepts/singbox-chain-dns-hijack-parity]], [[concepts/github-actions-run-id-monitoring]], [[concepts/ci-extra-modules-test-gate]], [[connections/release-engine-fix-contract-vs-timeout]]
 - Articles updated: none
+## [2026-05-28T19:39:36+03:00] compile | 2026-05-28.md
+- Source: daily/2026-05-28.md
+- Articles created: [[concepts/shared-warp-settings-branch-coverage]], [[concepts/masterdns-fake-ssh-specificity]], [[concepts/fake-dao-preseed-autoincrement]], [[concepts/app-desktop-coverage-gate-scope]], [[connections/extra-module-ci-exposes-stale-fakes]]
+- Articles updated: none
