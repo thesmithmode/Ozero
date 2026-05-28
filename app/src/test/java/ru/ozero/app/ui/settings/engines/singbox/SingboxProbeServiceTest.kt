@@ -29,7 +29,7 @@ class SingboxProbeServiceTest {
 
     @Test
     fun `probeAndAutoSelect preserves auto-select mode while updating latency`() = runTest {
-        val prefsFlow = MutableStateFlow(
+        val prefsFlow = MutableStateFlow<Preferences>(
             mutablePreferencesOf(selectedProfileKey to SingboxEngine.SELECTED_AUTO),
         )
         val dataStore = flowDataStore(prefsFlow)
