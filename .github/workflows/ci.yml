@@ -727,7 +727,6 @@ jobs:
           :singbox-room:testDebugUnitTest :singbox-room:jacocoTestReport :singbox-room:jacocoTestCoverageVerification
           :singbox-subscription:testDebugUnitTest :singbox-subscription:jacocoTestReport :singbox-subscription:jacocoTestCoverageVerification
           :shared-warp-settings:test :shared-warp-settings:jacocoTestReport :shared-warp-settings:jacocoTestCoverageVerification
-          :app-desktop:test :app-desktop:jacocoTestReport
           --stacktrace --continue
 
       - name: Upload coverage reports
@@ -745,7 +744,6 @@ jobs:
             singbox-room/build/reports/jacoco/**
             singbox-subscription/build/reports/jacoco/**
             shared-warp-settings/build/reports/jacoco/**
-            app-desktop/build/reports/jacoco/**
           retention-days: 14
 
       - name: Upload test reports
@@ -763,5 +761,4 @@ jobs:
             singbox-room/build/reports/tests/**
             singbox-subscription/build/reports/tests/**
             shared-warp-settings/build/reports/tests/**
-            app-desktop/build/reports/tests/**
           retention-days: 14

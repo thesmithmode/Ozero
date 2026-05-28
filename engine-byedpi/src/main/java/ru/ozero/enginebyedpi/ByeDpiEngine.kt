@@ -33,6 +33,8 @@ import java.net.InetAddress
 import java.net.ServerSocket
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 
 class ByeDpiEngine(
     private val proxy: ByeDpiProxyContract = ByeDpiProxy(),
@@ -121,13 +123,26 @@ class ByeDpiEngine(
         if (drained == null) {
             PersistentLoggers.warn(TAG, "start: dispatcher drain timeout — native thread may still be active")
         }
+        val startContext: CoroutineContext = if (drained == null) {
+            val priorGuardState =
+                safeJniCall(fallback = 0, tag = "emergencyReset after dispatcher drain timeout threw") {
+                    proxy.emergencyReset()
+                }
+            PersistentLoggers.error(
+                TAG,
+                "byedpi dispatcher stuck — emergencyReset выполнен (prior guard=$priorGuardState); start via IO",
+            )
+            Dispatchers.IO
+        } else {
+            EmptyCoroutineContext
+        }
 
         val args = buildArgs(resolvedConfig)
         PersistentLoggers.debug(
             TAG,
             "jniStartProxy argv=[${args.joinToString(" ")}] (native префиксует argv[0]=\"byedpi\")",
         )
-        val proxyJob = proxyScope.launch {
+        val proxyJob = proxyScope.launch(startContext) {
             PersistentLoggers.debug(TAG, "launch entered port=$resolvedPort")
             val code = startProxyWithRecovery(args)
             PersistentLoggers.debug(TAG, "startProxy returned code=$code port=$resolvedPort")

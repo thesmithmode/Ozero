@@ -105,4 +105,50 @@ class RawShareLinksParserTest {
         val bean = result.first() as VLESSBean
         assertEquals("proxy.example.com", bean.serverAddress)
     }
+
+    @Test
+    fun `should parse vless reality outbound from sing-box json`() {
+        val json = """
+            {
+              "outbounds": [
+                {
+                  "type": "vless",
+                  "tag": "Sample Reality",
+                  "server": "proxy.example.com",
+                  "server_port": 443,
+                  "uuid": "12345678-1234-1234-1234-123456789abc",
+                  "flow": "xtls-rprx-vision",
+                  "packet_encoding": "xudp",
+                  "tls": {
+                    "enabled": true,
+                    "server_name": "front.example.com",
+                    "utls": {
+                      "enabled": true,
+                      "fingerprint": "chrome"
+                    },
+                    "reality": {
+                      "enabled": true,
+                      "public_key": "sample-public-key",
+                      "short_id": "abcd"
+                    }
+                  }
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val result = RawShareLinksParser.parse(json)
+
+        assertEquals(1, result.size)
+        val bean = result.first() as VLESSBean
+        assertEquals("Sample Reality", bean.name)
+        assertEquals("proxy.example.com", bean.serverAddress)
+        assertEquals(443, bean.serverPort)
+        assertEquals("xtls-rprx-vision", bean.flow)
+        assertEquals("xudp", bean.packetEncoding)
+        assertEquals("reality", bean.security)
+        assertEquals("front.example.com", bean.sni)
+        assertEquals("sample-public-key", bean.realityPublicKey)
+        assertEquals("abcd", bean.realityShortId)
+    }
 }

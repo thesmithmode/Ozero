@@ -124,6 +124,38 @@ class FptnEngineTest {
     }
 
     @Test
+    fun `autoSelect uses every token server as start candidates`() {
+        val tokenData = tokenData(
+            server("S1"),
+            server("S2"),
+            server("S3"),
+        )
+
+        val result = engine.selectServerCandidates(
+            EngineConfig.Fptn(autoSelect = true, selectedServerName = "S2"),
+            tokenData,
+        )
+
+        assertEquals(listOf("S1", "S2", "S3"), result.map { it.name })
+    }
+
+    @Test
+    fun `manual selected server is tried before remaining fallback candidates`() {
+        val tokenData = tokenData(
+            server("S1"),
+            server("S2"),
+            server("S3"),
+        )
+
+        val result = engine.selectServerCandidates(
+            EngineConfig.Fptn(autoSelect = false, selectedServerName = "S2"),
+            tokenData,
+        )
+
+        assertEquals(listOf("S2", "S1", "S3"), result.map { it.name })
+    }
+
+    @Test
     fun `buildManualConfig returns null when token blank`() {
         assertNull(engine.buildManualConfig(null))
     }
@@ -243,4 +275,21 @@ class FptnEngineTest {
             "servers":[{"name":"S1","host":"1.2.3.4","port":443}]}"""
         return java.util.Base64.getEncoder().encodeToString(json.toByteArray())
     }
+
+    private fun tokenData(vararg servers: FptnServer): FptnTokenData =
+        FptnTokenData(
+            version = 1,
+            username = "u",
+            password = "p",
+            servers = servers.toList(),
+        )
+
+    private fun server(name: String): FptnServer =
+        FptnServer(
+            name = name,
+            host = "$name.example.com",
+            port = 443,
+            md5Fingerprint = "",
+            countryCode = "",
+        )
 }

@@ -62,6 +62,52 @@ class SingboxProbeServiceTest {
         assertTrue((dao.latencies[7L] ?: -1) >= 0)
     }
 
+    @Test
+    fun `probeAndAutoSelect skips unsupported transport before selecting fastest profile`() = runTest {
+        val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
+        val dataStore = flowDataStore(prefsFlow)
+        val dao = FakeProxyProfileDao()
+
+        ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { server ->
+            val accept = async(Dispatchers.IO) {
+                server.accept().use { }
+            }
+            val unsupported = ProxyProfile(
+                id = 8L,
+                groupId = 1L,
+                name = "unsupported",
+                beanBlob = KryoSerializer.serialize(
+                    VLESSBean().apply {
+                        serverAddress = "127.0.0.1"
+                        serverPort = server.localPort
+                        type = "splithttp"
+                    },
+                ),
+                protocolType = SingboxEngine.PROTOCOL_VLESS,
+            )
+            val supported = ProxyProfile(
+                id = 7L,
+                groupId = 1L,
+                name = "supported",
+                beanBlob = KryoSerializer.serialize(
+                    VLESSBean().apply {
+                        serverAddress = "127.0.0.1"
+                        serverPort = server.localPort
+                        type = "tcp"
+                    },
+                ),
+                protocolType = SingboxEngine.PROTOCOL_VLESS,
+            )
+
+            SingboxProbeService(dao, dataStore).probeAndAutoSelect(listOf(unsupported, supported), this)
+
+            accept.await()
+        }
+
+        assertEquals(SingboxProbeService.LATENCY_FAILED, dao.latencies[8L])
+        assertEquals(7L, prefsFlow.value[selectedProfileKey])
+    }
+
     private fun flowDataStore(prefsFlow: MutableStateFlow<Preferences>): DataStore<Preferences> =
         object : DataStore<Preferences> {
             override val data: Flow<Preferences> = prefsFlow

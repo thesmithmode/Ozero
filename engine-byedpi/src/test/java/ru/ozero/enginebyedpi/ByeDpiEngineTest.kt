@@ -529,6 +529,40 @@ class ByeDpiEngineTest {
     }
 
     @Test
+    fun `start uses fallback dispatcher when previous native job keeps proxy dispatcher occupied`() = runTest {
+        val firstNativeEntered = CountDownLatch(1)
+        val firstNativeExit = CountDownLatch(1)
+        var calls = 0
+        val blockingProxy: ByeDpiProxy = mockk(relaxed = true)
+        mockkObject(ByeDpiProxy.Companion)
+        every { ByeDpiProxy.loadOnce() } just runs
+        every { ByeDpiProxy.libraryLoaded } returns true
+        every { blockingProxy.startProxy(any()) } answers {
+            if (calls++ == 0) {
+                firstNativeEntered.countDown()
+                firstNativeExit.await()
+                0
+            } else {
+                0
+            }
+        }
+        every { blockingProxy.stopProxy() } returns 0
+        every { blockingProxy.forceClose() } returns 0
+        every { blockingProxy.emergencyReset() } returns 1
+        val eng = ByeDpiEngine(blockingProxy, socksProbe = { _, _, _ -> 1L })
+        try {
+            assertIs<StartResult.Success>(eng.start(EngineConfig.ByeDpi(socksPort = 1080)))
+            firstNativeEntered.await()
+            assertIs<StartResult.Success>(eng.start(EngineConfig.ByeDpi(socksPort = 1081)))
+        } finally {
+            firstNativeExit.countDown()
+            unmockkObject(ByeDpiProxy.Companion)
+        }
+        verify(atLeast = 1) { blockingProxy.emergencyReset() }
+        verify(exactly = 2) { blockingProxy.startProxy(any()) }
+    }
+
+    @Test
     fun `autoRotatePort skips ports occupied by another app — sentinel for port-conflict regression`() = runTest {
         // Simulates another app holding 49152 and 49153 on loopback.
         // ByeDPI must skip those and bind on the first free candidate (49154).
