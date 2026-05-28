@@ -99,7 +99,7 @@ class TrafficStatsViewModel @Inject constructor(
 
     val chartData: StateFlow<TrafficChartData> =
         combine(filteredSessions, timeframeRef) { sessions, tf ->
-            buildChartData(sessions, tf.bucketMs)
+            buildChartData(sessions, tf, System.currentTimeMillis())
         }.distinctUntilChanged()
             .stateIn(
                 scope = viewModelScope,
@@ -144,17 +144,24 @@ class TrafficStatsViewModel @Inject constructor(
 
         fun buildChartData(
             sessions: List<SessionStatsEntity>,
-            bucketMs: Long,
+            timeframe: TrafficTimeframe,
+            nowMs: Long,
         ): TrafficChartData {
             if (sessions.isEmpty()) return TrafficChartData.Empty
 
+            val bucketMs = timeframe.bucketMs
             val minTs = sessions.minOf { it.startedAt }
             val maxTs = sessions.maxOf { it.startedAt }
-            val firstBucket = (minTs / bucketMs) * bucketMs
-            val lastBucket = (maxTs / bucketMs) * bucketMs
-            val buckets = generateSequence(firstBucket) { it + bucketMs }
+            val firstBucket = timeframe.periodMs
+                ?.let { ((nowMs - it) / bucketMs) * bucketMs }
+                ?: ((minTs / bucketMs) * bucketMs)
+            val lastBucket = timeframe.periodMs
+                ?.let { (nowMs / bucketMs) * bucketMs }
+                ?: ((maxTs / bucketMs) * bucketMs)
+            val rawBuckets = generateSequence(firstBucket) { it + bucketMs }
                 .takeWhile { it <= lastBucket }
                 .toList()
+            val buckets = if (rawBuckets.size >= 2) rawBuckets else rawBuckets + (firstBucket + bucketMs)
 
             if (buckets.isEmpty()) return TrafficChartData.Empty
 

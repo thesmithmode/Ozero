@@ -67,13 +67,15 @@ class RouteTrafficForEngineContractTest {
         )
         assertTrue(
             acceptorBranch.contains("handleEngineFailure(") ||
-                acceptorBranch.contains("stopVpn()"),
+                acceptorBranch.contains("stopVpn()") ||
+                acceptorBranch.contains("reportEngineFailure("),
             "Failure path обязан вызвать handleEngineFailure() или stopVpn() — иначе утечка " +
                 "ресурсов и зомби-tunnel notification.",
         )
         assertTrue(
             acceptorBranch.contains("tunnelController.onEngineDied") ||
-                acceptorBranch.contains("handleEngineFailure("),
+                acceptorBranch.contains("handleEngineFailure(") ||
+                acceptorBranch.contains("reportEngineFailure("),
             "Failure path обязан уведомить о сбое через tunnelController.onEngineDied или handleEngineFailure.",
         )
     }
@@ -110,7 +112,8 @@ class RouteTrafficForEngineContractTest {
         )
         val catchBlock = acceptorBranch.substringAfter("} catch (t: Throwable) {").substringBefore("return when")
         assertTrue(
-            catchBlock.contains("handleEngineFailure(engineId"),
+            catchBlock.contains("handleEngineFailure(engineId") ||
+                catchBlock.contains("reportEngineFailure(engineId"),
             "Throw-catch обязан звать handleEngineFailure(engineId, reason) — иначе " +
                 "WarpSdkBridge.attachTun crash (DeadObjectException, IllegalStateException, " +
                 "RuntimeException из AIDL) → VPN остаётся в Connected state и killswitch не engaged. " +

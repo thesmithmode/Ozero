@@ -237,8 +237,6 @@ private fun ContentBody(
         item { SectionDivider() }
         item { StatsHistorySection(onOpenStats = nav.onOpenStatsHistory) }
         item { SectionDivider() }
-        item { DiagnosticsSection(onOpenDiagnostics = nav.onOpenDiagnostics) }
-        item { SectionDivider() }
         item { BackupSection(onOpenBackup = nav.onOpenBackup) }
         item { SectionDivider() }
         item {

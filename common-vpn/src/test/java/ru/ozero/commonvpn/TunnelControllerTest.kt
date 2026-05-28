@@ -640,6 +640,21 @@ class TunnelControllerTest {
     }
 
     @Test
+    fun staleEngineFailureDuringDisconnectingIsIgnoredAndKeepsSwitching() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        controller.onSwitchingStarted(EngineId.BYEDPI, EngineId.WARP)
+        controller.onDisconnecting()
+        controller.onEngineDied(EngineId.URNETWORK, "relay io-loop ended")
+        assertIs<TunnelState.Disconnecting>(controller.state.value)
+        assertNotNull(
+            controller.switching.value,
+            "СЃРјРµСЂС‚СЊ relay-URNETWORK РІРѕ РІСЂРµРјСЏ disconnect РЅРµ РґРѕР»Р¶РЅР° РїСЂРµРІСЂР°С‰Р°С‚СЊ UI РІ Failed(URNETWORK)",
+        )
+    }
+
+    @Test
     fun staleEngineStartedDuringSwitchIsIgnored() {
         controller.onProbing()
         controller.onConnecting(EngineId.FPTN)

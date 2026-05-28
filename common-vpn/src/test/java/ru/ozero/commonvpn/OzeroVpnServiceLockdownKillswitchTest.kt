@@ -235,9 +235,9 @@ class OzeroVpnServiceLockdownKillswitchTest {
     @Test
     fun `lockdownStartupTun устанавливается до выбора движка в StartSequenceCoordinator run`() {
         val lockdownIdx = runBody.indexOf("lockdownStartupFdRef.set")
-        val pickIdx = runBody.indexOf("pickAutoCandidateWithPreflight")
+        val pickIdx = runBody.indexOf("autoCandidatesWithPreflight")
         assertTrue(lockdownIdx >= 0, "lockdownStartupFdRef.set не найден в run. Body:\n$runBody")
-        assertTrue(pickIdx >= 0, "pickAutoCandidateWithPreflight не найден в run. Body:\n$runBody")
+        assertTrue(pickIdx >= 0, "autoCandidatesWithPreflight не найден в run. Body:\n$runBody")
         assertTrue(
             lockdownIdx < pickIdx,
             "lockdownStartupFdRef.set обязан быть РАНЬШЕ pickAutoCandidateWithPreflight — " +
@@ -314,7 +314,7 @@ class OzeroVpnServiceLockdownKillswitchTest {
     @Test
     fun `killswitch=on lockdownStartupTun establish выполняется ДО pickAutoCandidate (P35)`() {
         val lockdownEstablishIdx = runBody.indexOf("lockdownStartupFdRef.set")
-        val pickIdx = runBody.indexOf("pickAutoCandidateWithPreflight")
+        val pickIdx = runBody.indexOf("autoCandidatesWithPreflight")
         val manualIdx = runBody.indexOf("settings?.manualEngine")
         val anyPickIdx = listOf(pickIdx, manualIdx).filter { it >= 0 }.minOrNull() ?: -1
         assertTrue(

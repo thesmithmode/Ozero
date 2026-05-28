@@ -326,6 +326,35 @@ class TrafficStatsViewModelTest {
         }
 
         @Test
+        fun `DAY chart spans full timeframe buckets for sparse sessions`() = runTest {
+            val vm = vm()
+            advanceUntilIdle()
+            vm.setTimeframe(TrafficTimeframe.DAY)
+            dao.flow.value = listOf(sample(1L, rxBytes = 500L, startedAt = System.currentTimeMillis() - 1_000L))
+            advanceUntilIdle()
+            assertTrue(vm.chartData.value.buckets.size >= 24)
+        }
+
+        @Test
+        fun `WEEK chart spans full timeframe buckets for sparse sessions`() = runTest {
+            val vm = vm()
+            advanceUntilIdle()
+            dao.flow.value = listOf(sample(1L, rxBytes = 500L, startedAt = System.currentTimeMillis() - 1_000L))
+            advanceUntilIdle()
+            assertTrue(vm.chartData.value.buckets.size >= 7)
+        }
+
+        @Test
+        fun `ALL chart has at least two buckets for single sparse session`() = runTest {
+            val vm = vm()
+            advanceUntilIdle()
+            vm.setTimeframe(TrafficTimeframe.ALL)
+            dao.flow.value = listOf(sample(1L, rxBytes = 500L, startedAt = System.currentTimeMillis() - 1_000L))
+            advanceUntilIdle()
+            assertTrue(vm.chartData.value.buckets.size >= 2)
+        }
+
+        @Test
         fun `chart respects engine filter`() = runTest {
             val vm = vm()
             advanceUntilIdle()

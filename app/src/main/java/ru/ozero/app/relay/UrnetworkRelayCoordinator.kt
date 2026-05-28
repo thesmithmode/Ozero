@@ -73,10 +73,10 @@ class UrnetworkRelayCoordinator(
             if (relayOwned.compareAndSet(true, false)) {
                 PersistentLoggers.debug(TAG, "mesh session: tunnel offline — releasing worker")
                 stopWatchdog()
-                closeDummyPipe()
                 runCatching { networkMonitor?.stop() }
                 runCatching { relayLockManager?.release() }
                 runCatching { bridge.stop() }
+                closeDummyPipe()
             }
             return
         }
@@ -168,10 +168,10 @@ class UrnetworkRelayCoordinator(
                 val diag = runCatching { bridge.relayDiagnostics() }.getOrNull()
                 if (diag == null || diag == "device=null") {
                     PersistentLoggers.warn(TAG, "watchdog: bridge unhealthy ($diag) — resetting")
-                    closeDummyPipe()
                     runCatching { networkMonitor?.stop() }
                     runCatching { relayLockManager?.release() }
                     runCatching { bridge.stop() }
+                    closeDummyPipe()
                     relayOwned.set(false)
                     break
                 }

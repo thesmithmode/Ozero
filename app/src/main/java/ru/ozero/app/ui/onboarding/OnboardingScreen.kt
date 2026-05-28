@@ -164,7 +164,7 @@ private fun BackupImportStep() {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.height(16.dp))
-        BackupScreen(onBack = {})
+        BackupScreen(onBack = {}, importOnly = true, showTopBar = false)
     }
 }
 

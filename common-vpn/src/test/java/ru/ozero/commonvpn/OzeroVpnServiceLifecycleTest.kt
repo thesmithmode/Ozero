@@ -357,7 +357,7 @@ class OzeroVpnServiceLifecycleTest {
         val body = startSequenceSource.substringAfter("suspend fun run()")
             .substringBefore("suspend fun engineNeedsCustomTun")
         assertTrue(
-            body.contains("pickAutoCandidateWithPreflight("),
+            body.contains("autoCandidatesWithPreflight("),
             "run обязан звать pickAutoCandidateWithPreflight в auto-mode — " +
                 "fallback по priority + TCP-probe",
         )
@@ -377,7 +377,7 @@ class OzeroVpnServiceLifecycleTest {
             startSequenceSource.contains("plugin?.preflight()"),
             "pickAutoCandidateWithPreflight обязан брать EnginePreflight через plugin.preflight()",
         )
-        val preflightFn = startSequenceSource.substringAfter("private suspend fun pickAutoCandidateWithPreflight")
+        val preflightFn = startSequenceSource.substringAfter("private suspend fun autoCandidatesWithPreflight")
             .substringBefore("private suspend fun establishTunForEngine")
         assertTrue(
             preflightFn.contains("SocketProtector { _ -> true }"),
@@ -435,7 +435,7 @@ class OzeroVpnServiceLifecycleTest {
             "manual-mode идёт прямым путём через buildEngineConfig — без preflight",
         )
         assertTrue(
-            body.contains("pickAutoCandidateWithPreflight(settings)"),
+            body.contains("autoCandidatesWithPreflight(settings)"),
             "auto-mode (manualEngine == null) идёт через pickAutoCandidateWithPreflight",
         )
     }
@@ -499,6 +499,7 @@ class OzeroVpnServiceLifecycleTest {
             "suspend fun engineNeedsCustomTun",
             "private suspend fun awaitEngineReady(",
             "private suspend fun pickAutoCandidateWithPreflight",
+            "private suspend fun autoCandidatesWithPreflight",
             "private fun autoCandidates",
             "private fun resolveTargetForUi(",
             "private fun establishTun(",

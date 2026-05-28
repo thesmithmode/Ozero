@@ -77,6 +77,7 @@ class StartSequenceCoordinatorContractTest {
         listOf(
             "private suspend fun runStartSequence",
             "private suspend fun pickAutoCandidateWithPreflight",
+            "private suspend fun autoCandidatesWithPreflight",
             "private suspend fun establishTunForEngine",
             "private fun establishTun(",
             "private fun pickActiveEngine",
@@ -105,7 +106,7 @@ class StartSequenceCoordinatorContractTest {
     fun `run ветка killswitch строит instant lockdown TUN ДО pickAuto`() {
         val body = source.substringAfter("suspend fun run(").substringBefore("suspend fun engineNeedsCustomTun(")
         val killswitchIdx = body.indexOf("if (killswitch) {")
-        val pickIdx = body.indexOf("pickAutoCandidateWithPreflight(")
+        val pickIdx = body.indexOf("autoCandidatesWithPreflight(")
         assertTrue(killswitchIdx in 0 until pickIdx, "Killswitch lockdown TUN строится ДО pickAuto.")
         assertTrue(
             body.contains("state.lockdownStartupFdRef.set(fd)"),
@@ -138,7 +139,7 @@ class StartSequenceCoordinatorContractTest {
 
     @Test
     fun `pickAutoCandidateWithPreflight использует no-op SocketProtector`() {
-        val body = source.substringAfter("private suspend fun pickAutoCandidateWithPreflight(")
+        val body = source.substringAfter("private suspend fun autoCandidatesWithPreflight(")
             .substringBefore("private suspend fun establishTunForEngine(")
         assertTrue(
             body.contains("SocketProtector { _ -> true }"),
@@ -168,7 +169,7 @@ class StartSequenceCoordinatorContractTest {
     @Test
     fun `run — onProbing вызывается ДО onEngineDied при no engine reachable — UI не застревает в Idle`() {
         val body = source.substringAfter("suspend fun run(").substringBefore("suspend fun engineNeedsCustomTun(")
-        val failBlock = body.substringAfter("if (pick == null) {").substringBefore("stopVpnRequest()")
+        val failBlock = body.substringAfter("if (picks.isEmpty()) {").substringBefore("stopVpnRequest()")
         val probingIdx = failBlock.indexOf("tunnelController.onProbing(")
         val diedIdx = failBlock.indexOf("tunnelController.onEngineDied(")
         assertTrue(
@@ -180,6 +181,23 @@ class StartSequenceCoordinatorContractTest {
         assertTrue(
             probingIdx < diedIdx,
             "onProbing обязан быть ДО onEngineDied. probingIdx=$probingIdx diedIdx=$diedIdx",
+        )
+    }
+
+    @Test
+    fun `auto-mode cascades to next candidate before terminal failure`() {
+        val body = source.substringAfter("suspend fun run(").substringBefore("private suspend fun runProxyChain(")
+        assertTrue(
+            body.contains("picks.forEachIndexed"),
+            "auto-mode обязан перебирать все preflight-valid candidates, а не падать на первом runtime fail.",
+        )
+        assertTrue(
+            body.contains("notifyFailure = manualEngine != null || isLast"),
+            "непоследний auto candidate не должен вызывать terminal handleEngineFailure/stopVpnRequest.",
+        )
+        assertTrue(
+            body.contains("resetAfterAutoCandidateFailure"),
+            "после runtime fail auto-mode обязан сбросить transient state перед следующим candidate.",
         )
     }
 

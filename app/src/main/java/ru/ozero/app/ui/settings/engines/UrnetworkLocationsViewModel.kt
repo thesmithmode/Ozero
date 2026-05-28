@@ -33,6 +33,7 @@ import ru.ozero.engineurnetwork.UrnetworkLocationSelection
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.byClientJwt
 import ru.ozero.engineurnetwork.setProvideEnabled
+import ru.ozero.engineurnetwork.setSelectedLocation
 import ru.ozero.engineurnetwork.walletAddress
 import java.util.Locale
 import javax.inject.Inject
@@ -132,11 +133,17 @@ class UrnetworkLocationsViewModel @Inject constructor(
                         }
                     } else {
                         teardownLocationsVc()
-                        allCountries = emptyList()
-                        allRegions = emptyList()
-                        allCities = emptyList()
-                        allBestMatches = emptyList()
-                        _uiState.value = UrnetworkSettingsUiState.NotConnected
+                        if (hasCachedLocations()) {
+                            _uiState.update { current ->
+                                if (current is UrnetworkSettingsUiState.Ready) {
+                                    current.copy(providePaused = true)
+                                } else {
+                                    buildCachedReady()
+                                }
+                            }
+                        } else {
+                            _uiState.value = UrnetworkSettingsUiState.NotConnected
+                        }
                     }
                 }
             }
@@ -200,6 +207,15 @@ class UrnetworkLocationsViewModel @Inject constructor(
         }
         viewModelScope.launch {
             runCatching { settingsRepository.setUrnetworkCountryCode(targetCountry) }
+            runCatching {
+                configStore.setSelectedLocation(
+                    UrnetworkLocationSelection(
+                        countryCode = targetCountry,
+                        region = location?.region,
+                        city = location?.city,
+                    ),
+                )
+            }
         }
         runCatching {
             bridge.setPreferredLocation(
@@ -338,6 +354,9 @@ class UrnetworkLocationsViewModel @Inject constructor(
         return s is UrnetworkSettingsUiState.Ready && s.countries.isNotEmpty()
     }
 
+    private fun hasCachedLocations(): Boolean =
+        allCountries.isNotEmpty() || allRegions.isNotEmpty() || allCities.isNotEmpty() || allBestMatches.isNotEmpty()
+
     private fun isDeviceUnavailable(): Boolean = !bridge.isDeviceAvailable() && !bridge.isRunning()
 
     private fun handleNullVcFallback() {
@@ -358,6 +377,16 @@ class UrnetworkLocationsViewModel @Inject constructor(
             bestMatches = emptyList(),
             selectedLocation = bridge.selectedLocation(),
             providePaused = if (isUrnetworkActive.value) bridge.isProvidePaused() else false,
+        )
+
+    private fun buildCachedReady(): UrnetworkSettingsUiState.Ready =
+        UrnetworkSettingsUiState.Ready(
+            countries = allCountries,
+            regions = allRegions,
+            cities = allCities,
+            bestMatches = if (searchQuery.value.isBlank()) emptyList() else allBestMatches,
+            selectedLocation = bridge.selectedLocation(),
+            providePaused = true,
         )
 
     private fun teardownLocationsVc() {

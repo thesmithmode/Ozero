@@ -188,6 +188,7 @@ class TunnelController(
         return when (current) {
             is TunnelState.Connecting -> current.engineId != engineId
             is TunnelState.Connected -> current.engineId != engineId
+            is TunnelState.Disconnecting -> true
             else -> false
         }
     }

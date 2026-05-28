@@ -2,6 +2,7 @@ package ru.ozero.app.ui.settings.engines
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -13,6 +14,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import ru.ozero.engineurnetwork.selectedLocation
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
@@ -431,5 +433,16 @@ class UrnetworkLocationsViewModelTest {
             notConnectedBranch.contains("UrnetworkBalanceCard"),
             "NotConnected branch обязан содержать UrnetworkBalanceCard — баланс виден всегда",
         )
+    }
+
+    @Test
+    fun `selectLocation persists countryCode in engine configStore for backup and next start`() = runTest {
+        val store = fakeUrnetworkConfigStoreWithJwt()
+        val bridge = FakeUrnetworkBridge(deviceAvailable = true)
+        val v = UrnetworkLocationsViewModel(bridge, FakeSettingsRepo(), store, idleTunnel())
+        advanceUntilIdle()
+        v.selectLocation(FakeLocationToken("DE"))
+        advanceUntilIdle()
+        assertEquals("DE", store.selectedLocation().first().countryCode)
     }
 }

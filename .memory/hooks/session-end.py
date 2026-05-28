@@ -41,6 +41,39 @@ MAX_CONTEXT_CHARS = 15_000
 MIN_TURNS_TO_FLUSH = 1
 
 
+def extract_text(content: object) -> str:
+    if isinstance(content, str):
+        return content
+
+    if not isinstance(content, list):
+        return ""
+
+    text_parts = []
+    for block in content:
+        if isinstance(block, dict):
+            block_type = block.get("type")
+            if block_type in ("text", "input_text", "output_text"):
+                text_parts.append(block.get("text", ""))
+            elif block_type == "function_call_output":
+                text_parts.append(block.get("output", ""))
+        elif isinstance(block, str):
+            text_parts.append(block)
+
+    return "\n".join(part for part in text_parts if part)
+
+
+def extract_message(entry: dict) -> tuple[str, str]:
+    msg = entry.get("message", {})
+    if isinstance(msg, dict):
+        return msg.get("role", ""), extract_text(msg.get("content", ""))
+
+    payload = entry.get("payload", {})
+    if isinstance(payload, dict) and payload.get("type") == "message":
+        return payload.get("role", ""), extract_text(payload.get("content", ""))
+
+    return entry.get("role", ""), extract_text(entry.get("content", ""))
+
+
 def extract_conversation_context(transcript_path: Path) -> tuple[str, int]:
     """Read JSONL transcript and extract last ~N conversation turns as markdown."""
     turns: list[str] = []
@@ -55,25 +88,10 @@ def extract_conversation_context(transcript_path: Path) -> tuple[str, int]:
             except json.JSONDecodeError:
                 continue
 
-            msg = entry.get("message", {})
-            if isinstance(msg, dict):
-                role = msg.get("role", "")
-                content = msg.get("content", "")
-            else:
-                role = entry.get("role", "")
-                content = entry.get("content", "")
+            role, content = extract_message(entry)
 
             if role not in ("user", "assistant"):
                 continue
-
-            if isinstance(content, list):
-                text_parts = []
-                for block in content:
-                    if isinstance(block, dict) and block.get("type") == "text":
-                        text_parts.append(block.get("text", ""))
-                    elif isinstance(block, str):
-                        text_parts.append(block)
-                content = "\n".join(text_parts)
 
             if isinstance(content, str) and content.strip():
                 label = "User" if role == "user" else "Assistant"

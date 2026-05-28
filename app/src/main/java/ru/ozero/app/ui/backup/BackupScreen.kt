@@ -52,6 +52,8 @@ import ru.ozero.corebackup.BackupCategory
 fun BackupScreen(
     onBack: () -> Unit,
     viewModel: BackupViewModel = hiltViewModel(),
+    importOnly: Boolean = false,
+    showTopBar: Boolean = true,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -99,17 +101,19 @@ fun BackupScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.backup_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.settings_back),
-                        )
-                    }
-                },
-            )
+            if (showTopBar) {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.backup_title)) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.settings_back),
+                            )
+                        }
+                    },
+                )
+            }
         },
         snackbarHost = { SnackbarHost(snackbar, modifier = Modifier.padding(bottom = 80.dp)) },
     ) { padding ->
@@ -131,12 +135,14 @@ fun BackupScreen(
             if (state == BackupUiState.InProgress) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
             } else {
-                Button(
-                    onClick = { showExportDialog = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = state == BackupUiState.Idle,
-                ) {
-                    Text(stringResource(R.string.backup_export_button))
+                if (!importOnly) {
+                    Button(
+                        onClick = { showExportDialog = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = state == BackupUiState.Idle,
+                    ) {
+                        Text(stringResource(R.string.backup_export_button))
+                    }
                 }
 
                 OutlinedButton(
