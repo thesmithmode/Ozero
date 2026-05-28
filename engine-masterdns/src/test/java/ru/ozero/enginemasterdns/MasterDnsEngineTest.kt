@@ -34,7 +34,7 @@ class MasterDnsEngineTest {
         assertFalse(c.supportsDoH)
         assertFalse(c.localOnly)
         assertTrue(c.requiresServer)
-        assertFalse(c.supportsUpstreamSocks)
+        assertTrue(c.supportsUpstreamSocks)
     }
 
     @Test
@@ -142,7 +142,7 @@ class MasterDnsEngineTest {
         assertNotNull(cfg)
         assertTrue(cfg is EngineConfig.MasterDns)
         val md = cfg as EngineConfig.MasterDns
-        assertEquals("DOMAINS = [\"v.x\"]\n", md.configToml)
+        assertEquals("DOMAINS = [\"v.x\"]", md.configToml)
         assertEquals(listOf("1.1.1.1", "8.8.8.8"), md.resolvers)
     }
 

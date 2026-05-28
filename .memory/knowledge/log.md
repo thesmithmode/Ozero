@@ -1004,3 +1004,7 @@
 - Source: daily/2026-05-28.md
 - Articles created: [[concepts/codex-wiki-hook-smoke]], [[concepts/release-regression-evidence-checklist]], [[concepts/urnetwork-readiness-connectionstatus]], [[concepts/singbox-autochain-validator-parity]], [[concepts/ci-module-test-coverage-gap]], [[connections/release-regression-ci-vs-runtime-proof]]
 - Articles updated: none
+## [2026-05-28T19:02:53+03:00] compile | 2026-05-28.md
+- Source: daily/2026-05-28.md
+- Articles created: [[concepts/byedpi-stop-timeout-contract]], [[concepts/warp-uapi-cleanup-all-sockets]], [[concepts/singbox-chain-dns-hijack-parity]], [[concepts/github-actions-run-id-monitoring]], [[concepts/ci-extra-modules-test-gate]], [[connections/release-engine-fix-contract-vs-timeout]]
+- Articles updated: none

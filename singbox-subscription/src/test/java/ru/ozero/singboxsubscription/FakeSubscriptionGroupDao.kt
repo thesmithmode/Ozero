@@ -10,7 +10,12 @@ class FakeSubscriptionGroupDao : SubscriptionGroupDao {
     private var nextId = 1L
 
     override suspend fun insert(group: SubscriptionGroup): Long {
-        val id = if (group.id == 0L) nextId++ else group.id
+        val id = if (group.id == 0L) {
+            val maxExistingId = groups.maxOfOrNull { it.id } ?: 0L
+            maxOf(nextId, maxExistingId + 1).also { nextId = it + 1 }
+        } else {
+            group.id.also { nextId = maxOf(nextId, it + 1) }
+        }
         groups.removeAll { it.id == id }
         groups.add(group.copy(id = id))
         return id
