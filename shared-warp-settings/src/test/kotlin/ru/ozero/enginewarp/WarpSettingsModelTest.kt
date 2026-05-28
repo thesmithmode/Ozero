@@ -3,6 +3,7 @@ package ru.ozero.enginewarp
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 
 class WarpSettingsModelTest {
@@ -16,6 +17,13 @@ class WarpSettingsModelTest {
         )
 
         assertEquals("Ozero-2", buildNextWarpSlotName(slots))
+    }
+
+    @Test
+    fun `buildNextWarpSlotName starts from one when no numeric ozero names exist`() {
+        val slots = listOf(slot(name = "Manual"), slot(name = "Ozero-alpha"))
+
+        assertEquals("Ozero-1", buildNextWarpSlotName(slots))
     }
 
     @Test
@@ -73,6 +81,68 @@ class WarpSettingsModelTest {
     }
 
     @Test
+    fun `emptyWarpDraft has no required fields`() {
+        val draft = emptyWarpDraft()
+
+        assertFalse(hasRequiredFields(draft))
+        assertEquals("WARP", draft.name)
+    }
+
+    @Test
+    fun `ui state and doh providers expose defaults and values`() {
+        val draft = emptyWarpDraft()
+        val state = WarpSettingsUiState(
+            slots = listOf(slot()),
+            activeSlotId = "active",
+            isRegistering = true,
+            errorMessage = "error",
+            errorMessageRes = 7,
+            progressMirror = "mirror",
+            progressCurrent = 1,
+            progressTotal = 2,
+            importSuccessCount = 3,
+            editDraft = draft,
+            isProvingEndpoints = true,
+            provingProgress = "1/2",
+        )
+
+        assertEquals("active", state.activeSlotId)
+        assertTrue(state.isRegistering)
+        assertEquals("error", state.errorMessage)
+        assertEquals(7, state.errorMessageRes)
+        assertEquals("mirror", state.progressMirror)
+        assertEquals(1, state.progressCurrent)
+        assertEquals(2, state.progressTotal)
+        assertEquals(3, state.importSuccessCount)
+        assertEquals(draft, state.editDraft)
+        assertTrue(state.isProvingEndpoints)
+        assertEquals("1/2", state.provingProgress)
+        assertEquals(emptyList<WarpConfigSlot>(), WarpSettingsUiState().slots)
+        assertTrue(DoHProvider.SYSTEM.isSystem)
+        assertFalse(DoHProvider.CLOUDFLARE_1111.isSystem)
+        assertEquals("Cloudflare (1.1.1.1)", DoHProvider.CLOUDFLARE_1111.displayName)
+        assertEquals("https://1.1.1.1/dns-query", DoHProvider.CLOUDFLARE_1111.url)
+        assertTrue(DoHProvider.entries.contains(DoHProvider.GOOGLE_8888))
+    }
+
+    @Test
+    fun `slot and config expose optional metadata`() {
+        val config = sampleConfig().copy(accountLicense = "license")
+        val slot = WarpConfigSlot(
+            name = "Meta",
+            config = config,
+            isActive = true,
+            rawIniOverride = "ini",
+            endpointList = listOf("endpoint:2408"),
+        )
+
+        assertEquals("license", slot.config.accountLicense)
+        assertTrue(slot.isActive)
+        assertEquals("ini", slot.rawIniOverride)
+        assertEquals(listOf("endpoint:2408"), slot.endpointList)
+    }
+
+    @Test
     fun `hasRequiredFields validates minimum start fields`() {
         val valid = draftFromSlot(slot(config = sampleConfig()))
 
@@ -93,6 +163,343 @@ class WarpSettingsModelTest {
         assertEquals("engage.cloudflareclient.com:2408", parsed.peerEndpoint)
         assertEquals("10.0.0.2/32", parsed.interfaceAddressV4)
         assertEquals("2606:4700::2/128", parsed.interfaceAddressV6)
+    }
+
+    @Test
+    fun `parser applies cidr suffixes and ignores comments`() {
+        val parsed = WarpConfParser.parse(
+            """
+            # ignored
+            [Interface]
+            PrivateKey = private-key # hidden
+            Address = 10.0.0.2, 2606:4700::2
+            DNS = , 9.9.9.9 ,
+            MTU = bad
+            Jc = bad
+            I1 = <b 0x0A0b>
+            I2 = 0x0102
+            I3 = <b 0x010203>
+            I4 = bad
+            I5 = 7
+
+            [Peer]
+            PublicKey = peer-key
+            Endpoint = endpoint:2408
+            PersistentKeepalive = bad
+            """.trimIndent(),
+        ).getOrThrow()
+
+        assertEquals("10.0.0.2/32", parsed.interfaceAddressV4)
+        assertEquals("2606:4700::2/128", parsed.interfaceAddressV6)
+        assertEquals(listOf("9.9.9.9"), parsed.dnsServers)
+        assertEquals(WarpConfig.DEFAULT_MTU, parsed.mtu)
+        assertEquals(WarpConfig.DEFAULT_KEEPALIVE, parsed.keepaliveSeconds)
+        assertEquals("0a0b", parsed.awgParams.payloadHexI1)
+        assertEquals("0102", parsed.awgParams.payloadHexI2)
+        assertEquals("010203", parsed.awgParams.payloadHexI3)
+        assertEquals(AwgParams.DEFAULT_I4, parsed.awgParams.specialJunk4)
+        assertEquals(7, parsed.awgParams.payloadPacketSizeCount3)
+    }
+
+    @Test
+    fun `parser reports missing required fields`() {
+        val result = WarpConfParser.parse("[Interface]\nAddress = 10.0.0.2/32")
+
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()!!.message!!.contains("PrivateKey"))
+    }
+
+    @Test
+    fun `parser reports each missing required field`() {
+        val noAddress = WarpConfParser.parse(
+            """
+            [Interface]
+            PrivateKey = private-key
+            [Peer]
+            PublicKey = peer-key
+            Endpoint = endpoint:2408
+            """.trimIndent(),
+        )
+        val noPeerKey = WarpConfParser.parse(
+            """
+            [Interface]
+            PrivateKey = private-key
+            Address = 10.0.0.2/32
+            [Peer]
+            Endpoint = endpoint:2408
+            """.trimIndent(),
+        )
+        val noEndpoint = WarpConfParser.parse(
+            """
+            [Interface]
+            PrivateKey = private-key
+            Address = 10.0.0.2/32
+            [Peer]
+            PublicKey = peer-key
+            """.trimIndent(),
+        )
+
+        assertTrue(noAddress.exceptionOrNull()!!.message!!.contains("Address"))
+        assertTrue(noPeerKey.exceptionOrNull()!!.message!!.contains("PublicKey"))
+        assertTrue(noEndpoint.exceptionOrNull()!!.message!!.contains("Endpoint"))
+    }
+
+    @Test
+    fun `parser handles empty cidr inputs and default dns`() {
+        val parsed = WarpConfParser.parse(
+            """
+            ignored = value
+            [Interface]
+            PrivateKey = private-key
+            Address = ,
+            DNS = ,
+            broken-line
+            [Peer]
+            PublicKey = peer-key
+            Endpoint = endpoint:2408
+            """.trimIndent(),
+        ).getOrThrow()
+
+        assertEquals("", parsed.interfaceAddressV4)
+        assertEquals("", parsed.interfaceAddressV6)
+        assertEquals(WarpConfig.DEFAULT_DNS, parsed.dnsServers)
+    }
+
+    @Test
+    fun `parser preserves cidr addresses and integer awg payloads`() {
+        val parsed = WarpConfParser.parse(
+            """
+            [Interface]
+            PrivateKey = private-key
+            Address = 10.0.0.2/32, 2606:4700::2/128
+            I1 = 11
+            I2 = 12
+            I3 = 13
+            I4 = 14
+            I5 = 15
+            S3 = 16
+            S4 = 17
+            [Peer]
+            PublicKey = peer-key
+            Endpoint = endpoint:2408
+            """.trimIndent(),
+        ).getOrThrow()
+
+        assertEquals("10.0.0.2/32", parsed.interfaceAddressV4)
+        assertEquals("2606:4700::2/128", parsed.interfaceAddressV6)
+        assertEquals(11, parsed.awgParams.payloadPacketSizeCount1)
+        assertEquals(12, parsed.awgParams.payloadPacketSizeCount2)
+        assertEquals(13, parsed.awgParams.specialJunk3)
+        assertEquals(14, parsed.awgParams.specialJunk4)
+        assertEquals(15, parsed.awgParams.payloadPacketSizeCount3)
+        assertEquals(16, parsed.awgParams.underloadPacketJunkSize)
+        assertEquals(17, parsed.awgParams.payloadPacketJunkSize)
+    }
+
+    @Test
+    fun `parser ignores malformed hex payloads`() {
+        val parsed = WarpConfParser.parse(
+            """
+            [Interface]
+            PrivateKey = private-key
+            Address = 10.0.0.2/32
+            I1 = 0x1
+            I2 = <b 0x123>
+            I3 = <b 0xzz>
+            I4 = <x 0x0102>
+            I5 = <b 0102>
+            [Peer]
+            PublicKey = peer-key
+            Endpoint = endpoint:2408
+            """.trimIndent(),
+        ).getOrThrow()
+
+        assertEquals(AwgParams.DEFAULT_I1, parsed.awgParams.payloadPacketSizeCount1)
+        assertEquals(AwgParams.DEFAULT_I2, parsed.awgParams.payloadPacketSizeCount2)
+        assertEquals(AwgParams.DEFAULT_I3, parsed.awgParams.specialJunk3)
+        assertEquals(AwgParams.DEFAULT_I4, parsed.awgParams.specialJunk4)
+        assertEquals(AwgParams.DEFAULT_I5, parsed.awgParams.payloadPacketSizeCount3)
+        assertEquals("0102", parsed.awgParams.payloadHexI5)
+    }
+
+    @Test
+    fun `parser falls back for invalid numeric awg fields`() {
+        val parsed = WarpConfParser.parse(
+            """
+            [Interface]
+            PrivateKey = private-key
+            Address = 10.0.0.2
+            Jc = bad
+            Jmin = bad
+            Jmax = bad
+            S1 = bad
+            S2 = bad
+            S3 = bad
+            S4 = bad
+            H1 = bad
+            H2 = bad
+            H3 = bad
+            H4 = bad
+            I1 = <b 0X0A0B>
+            I2 = 0X0102
+            I3 = <b 0x010203
+            [Peer]
+            PublicKey = peer-key
+            Endpoint = endpoint:2408
+            """.trimIndent(),
+        ).getOrThrow()
+
+        assertEquals("10.0.0.2/32", parsed.interfaceAddressV4)
+        assertEquals("", parsed.interfaceAddressV6)
+        assertEquals(AwgParams.DEFAULT_JC, parsed.awgParams.junkPacketCount)
+        assertEquals(AwgParams.DEFAULT_JMIN, parsed.awgParams.junkPacketMinSize)
+        assertEquals(AwgParams.DEFAULT_JMAX, parsed.awgParams.junkPacketMaxSize)
+        assertEquals(AwgParams.DEFAULT_S1, parsed.awgParams.initPacketJunkSize)
+        assertEquals(AwgParams.DEFAULT_S2, parsed.awgParams.responsePacketJunkSize)
+        assertEquals(AwgParams.DEFAULT_S3, parsed.awgParams.underloadPacketJunkSize)
+        assertEquals(AwgParams.DEFAULT_S4, parsed.awgParams.payloadPacketJunkSize)
+        assertEquals(AwgParams.DEFAULT_H1, parsed.awgParams.initPacketMagicHeader)
+        assertEquals(AwgParams.DEFAULT_H2, parsed.awgParams.responsePacketMagicHeader)
+        assertEquals(AwgParams.DEFAULT_H3, parsed.awgParams.cookieReplyMagicHeader)
+        assertEquals(AwgParams.DEFAULT_H4, parsed.awgParams.transportMagicHeader)
+        assertEquals("0a0b", parsed.awgParams.payloadHexI1)
+        assertEquals("0102", parsed.awgParams.payloadHexI2)
+        assertEquals(AwgParams.DEFAULT_I3, parsed.awgParams.specialJunk3)
+    }
+
+    @Test
+    fun `builder omits awg section for vanilla params and blank ipv6`() {
+        val built = WarpIniBuilder.build(
+            sampleConfig().copy(
+                interfaceAddressV6 = "",
+                awgParams = AwgParams.VANILLA,
+            ),
+        )
+
+        assertTrue(built.contains("Address = 10.0.0.2/32"))
+        assertFalse(built.contains("Jc ="))
+    }
+
+    @Test
+    fun `builder formats numeric and hex payload params`() {
+        val awg = AwgParams(
+            underloadPacketJunkSize = 3,
+            payloadPacketJunkSize = 4,
+            payloadPacketSizeCount1 = 5,
+            payloadPacketSizeCount2 = 6,
+            payloadPacketSizeCount3 = 7,
+            specialJunk3 = 8,
+            specialJunk4 = 9,
+            payloadHexI1 = "0a0b",
+            payloadHexI2 = "0102",
+            payloadHexI3 = "010203",
+            payloadHexI4 = "040506",
+            payloadHexI5 = "0708",
+        )
+
+        val built = WarpIniBuilder.build(sampleConfig().copy(awgParams = awg))
+
+        assertTrue(built.contains("S3 = 3"))
+        assertTrue(built.contains("S4 = 4"))
+        assertTrue(built.contains("I1 = <b 0x0a0b>"))
+        assertTrue(built.contains("I2 = <b 0x0102>"))
+        assertTrue(built.contains("I3 = <b 0x010203>"))
+        assertTrue(built.contains("I4 = <b 0x040506>"))
+        assertTrue(built.contains("I5 = <b 0x0708>"))
+    }
+
+    @Test
+    fun `builder formats integer payload params`() {
+        val awg = AwgParams(
+            payloadPacketSizeCount1 = 1,
+            payloadPacketSizeCount2 = 2,
+            specialJunk3 = 3,
+            specialJunk4 = 4,
+            payloadPacketSizeCount3 = 5,
+        )
+
+        val built = WarpIniBuilder.build(sampleConfig().copy(interfaceAddressV4 = "", awgParams = awg))
+
+        assertTrue(built.contains("Address = 2606:4700::2/128"))
+        assertTrue(built.contains("I1 = 1"))
+        assertTrue(built.contains("I2 = 2"))
+        assertTrue(built.contains("I3 = 3"))
+        assertTrue(built.contains("I4 = 4"))
+        assertTrue(built.contains("I5 = 5"))
+    }
+
+    @Test
+    fun `toWarpConfig falls back for invalid optional awg fields`() {
+        val fallback = AwgParams(underloadPacketJunkSize = 9, payloadHexI1 = "0a0b")
+        val config = draftFromSlot(slot(config = sampleConfig())).copy(
+            jmin = "bad",
+            jmax = "bad",
+            s1 = "bad",
+            s2 = "bad",
+            h1 = "bad",
+            h2 = "bad",
+            h3 = "bad",
+            h4 = "bad",
+        ).toWarpConfig(fallback)
+
+        assertEquals(AwgParams.DEFAULT_JMIN, config.awgParams.junkPacketMinSize)
+        assertEquals(AwgParams.DEFAULT_JMAX, config.awgParams.junkPacketMaxSize)
+        assertEquals(AwgParams.DEFAULT_S1, config.awgParams.initPacketJunkSize)
+        assertEquals(AwgParams.DEFAULT_S2, config.awgParams.responsePacketJunkSize)
+        assertEquals(AwgParams.DEFAULT_H1, config.awgParams.initPacketMagicHeader)
+        assertEquals(AwgParams.DEFAULT_H2, config.awgParams.responsePacketMagicHeader)
+        assertEquals(AwgParams.DEFAULT_H3, config.awgParams.cookieReplyMagicHeader)
+        assertEquals(AwgParams.DEFAULT_H4, config.awgParams.transportMagicHeader)
+        assertEquals(9, config.awgParams.underloadPacketJunkSize)
+        assertEquals("0a0b", config.awgParams.payloadHexI1)
+    }
+
+    @Test
+    fun `AwgParams rejects invalid values`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            AwgParams(junkPacketMinSize = 200, junkPacketMaxSize = 100)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            AwgParams(junkPacketCount = -1)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            AwgParams(junkPacketCount = 129)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            AwgParams(initPacketJunkSize = 2000)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            AwgParams(junkPacketMinSize = -1)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            AwgParams(junkPacketMaxSize = 2000)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            AwgParams(responsePacketJunkSize = 2000)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            AwgParams(initPacketMagicHeader = 0)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            AwgParams(initPacketMagicHeader = 0x1_0000_0000L)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            AwgParams(initPacketMagicHeader = 1, responsePacketMagicHeader = 1)
+        }
+        assertTrue(AwgParams.JC_RANGE.contains(AwgParams.DEFAULT_JC))
+        assertTrue(AwgParams.SIZE_RANGE.contains(AwgParams.DEFAULT_JMIN))
+        assertTrue(AwgParams.HEADER_RANGE.contains(AwgParams.DEFAULT_H1))
+    }
+
+    @Test
+    fun `WarpConfig toString redacts short and long secrets`() {
+        val longPeer = sampleConfig().toString()
+        val shortPeer = sampleConfig().copy(peerPublicKey = "short").toString()
+
+        assertTrue(longPeer.contains("peerPublicKey=***peer-key"))
+        assertTrue(shortPeer.contains("peerPublicKey=***"))
+        assertFalse(longPeer.contains("private-key"))
+        assertFalse(longPeer.contains("2606:4700::2"))
     }
 
     private fun slot(

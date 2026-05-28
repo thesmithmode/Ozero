@@ -486,7 +486,27 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
-    fun `cleanupOnFailure закрывает device без throw`() {
+    fun `connectionStatus listener attached in start and detached in stop`() {
+        val startBlock = source.substringAfter("private suspend fun runStartOnMain")
+            .substringBefore("override suspend fun stop")
+        assertTrue(
+            source.contains("private val connectionStatusRef = AtomicReference<String?>"),
+            "Bridge must keep ConnectViewController.connectionStatus separately from grid.windowCurrentSize.",
+        )
+        assertTrue(
+            startBlock.contains("attachConnectionStatusListener(cv)"),
+            "runStartOnMain must subscribe to addConnectionStatusListener after openConnectViewController.",
+        )
+        val stopBlock = source.substringAfter("private suspend fun stopUnderLock")
+            .substringBefore("private fun cleanupOnFailure")
+        assertTrue(
+            stopBlock.contains("detachConnectionStatusListener()"),
+            "stopUnderLock must close connectionStatus Sub to prevent callbacks after teardown.",
+        )
+    }
+
+    @Test
+    fun `cleanupOnFailure closes device without throw sentinel`() {
         val cleanupBlock = source.substringAfter("private fun cleanupOnFailure")
             .substringBefore("private companion object")
         assertTrue(cleanupBlock.contains("deviceRef.getAndSet(null)"))

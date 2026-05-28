@@ -992,3 +992,23 @@
 - Connections created: [[connections/false-positive-engine-status]]
 - Articles updated: (none — 3 main concepts already existed from prior 2026-05-08 compile: [[concepts/warp-awg-obfuscation-russian-isps]], [[concepts/android-vpn-traffic-stats]], [[concepts/dual-go-runtime-eager-loading]])
 - Excluded as already covered: AwgParams() vs VANILLA confusion (in warp-awg-obfuscation article), CI not triggered on intermediate commits (in same article), git stash unreliability (process trivia), auto-mode failover design mention (insufficient detail), 5 memory flush failures ("Nothing worth saving" or error)
+## [2026-05-28T18:24:16+03:00] compile | 2026-05-21.md
+- Source: daily/2026-05-21.md
+- Articles created: [[concepts/byedpi-killswitch-applyunderlying-split]], [[concepts/masterdns-startup-hardening]], [[concepts/urnetwork-provide-mode-picker-parity]], [[concepts/byedpi-cmd-verbatim-pipeline]], [[concepts/startsequence-branch-specific-sentinels]], [[concepts/warp-config-import-naming-dedup]]
+- Articles updated: none
+## [2026-05-28T18:27:11+03:00] compile | 2026-05-27.md
+- Source: daily/2026-05-27.md
+- Articles created: [[concepts/navigation-cherrypick-preserve-routes]], [[concepts/detekt-returncount-extract-paths]], [[concepts/detekt-object-function-extraction]], [[concepts/repo-debranding-ci-owner-injection]], [[concepts/binaries-lock-real-url-exception]], [[connections/release-status-vs-asset-verification]]
+- Articles updated: none
+## [2026-05-28T18:29:40+03:00] compile | 2026-05-28.md
+- Source: daily/2026-05-28.md
+- Articles created: [[concepts/codex-wiki-hook-smoke]], [[concepts/release-regression-evidence-checklist]], [[concepts/urnetwork-readiness-connectionstatus]], [[concepts/singbox-autochain-validator-parity]], [[concepts/ci-module-test-coverage-gap]], [[connections/release-regression-ci-vs-runtime-proof]]
+- Articles updated: none
+## [2026-05-28T19:02:53+03:00] compile | 2026-05-28.md
+- Source: daily/2026-05-28.md
+- Articles created: [[concepts/byedpi-stop-timeout-contract]], [[concepts/warp-uapi-cleanup-all-sockets]], [[concepts/singbox-chain-dns-hijack-parity]], [[concepts/github-actions-run-id-monitoring]], [[concepts/ci-extra-modules-test-gate]], [[connections/release-engine-fix-contract-vs-timeout]]
+- Articles updated: none
+## [2026-05-28T19:39:36+03:00] compile | 2026-05-28.md
+- Source: daily/2026-05-28.md
+- Articles created: [[concepts/shared-warp-settings-branch-coverage]], [[concepts/masterdns-fake-ssh-specificity]], [[concepts/fake-dao-preseed-autoincrement]], [[concepts/app-desktop-coverage-gate-scope]], [[connections/extra-module-ci-exposes-stale-fakes]]
+- Articles updated: none

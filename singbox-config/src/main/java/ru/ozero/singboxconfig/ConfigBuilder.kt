@@ -47,8 +47,10 @@ object ConfigBuilder {
 
     fun buildAutoChainConfig(beans: List<AbstractBean>, socksPort: Int, upstream: Upstream? = null): String {
         require(beans.isNotEmpty()) { "beans must not be empty for auto-select chain config" }
+        val supported = beans.filter { isSupportedBean(it) }
+        require(supported.isNotEmpty()) { "no beans with supported transport types" }
         val detourTag = upstream?.let { "upstream" }
-        val proxyOutbounds = beans.mapIndexed { index, bean ->
+        val proxyOutbounds = supported.mapIndexed { index, bean ->
             beanOutbound(bean, "proxy-$index", detour = detourTag)
         }
         val tagList = proxyOutbounds.indices.joinToString(",") { jsonString("proxy-$it") }
@@ -155,14 +157,13 @@ object ConfigBuilder {
         }
         sb.append(""",{"type":"direct","tag":"direct"}""")
         sb.append(""",{"type":"block","tag":"block"}""")
-        sb.append(""",{"type":"dns","tag":"dns-out"}""")
         sb.append("""],""")
         sb.append(""""dns":{"servers":[{"tag":"dns-remote",""")
         sb.append(""""address":"https://1.1.1.1/dns-query","detour":"proxy"}]},""")
         sb.append(""""route":{""")
         sb.append(""""final":"proxy",""")
         sb.append(""""auto_detect_interface":true,""")
-        sb.append(""""rules":[{"protocol":"dns","outbound":"dns-out"}]""")
+        sb.append(""""rules":[{"action":"sniff"},{"protocol":"dns","action":"hijack-dns"}]""")
         sb.append('}')
         sb.append('}')
         return sb.toString()

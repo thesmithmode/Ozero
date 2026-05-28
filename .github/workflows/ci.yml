@@ -652,3 +652,116 @@ jobs:
             common-crypto/build/reports/tests/**
             common-net/build/reports/tests/**
           retention-days: 14
+
+  test-singbox-and-extra-modules:
+    name: Tests — singbox + extra modules
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: kotlin-style
+    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/') }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Setup Gradle with caching
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
+
+      - name: Cache Singbox libs
+        uses: actions/cache@v5
+        id: singbox-aar-cache
+        with:
+          path: |
+            singbox-core/libs
+            singbox-core/libs-stubs
+            singbox-core/src/main/jniLibs
+          key: singbox-libbox-1.13.12-exploded-v6
+
+      - name: Download and explode Singbox AAR
+        if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TMPAAR=/tmp/libbox.aar
+          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
+          mkdir -p singbox-core/libs
+          unzip -o "$TMPAAR" classes.jar -d /tmp
+          cp /tmp/classes.jar singbox-core/libs/libbox.jar
+          mkdir -p singbox-core/libs-stubs /tmp/go-stubs
+          unzip -o /tmp/classes.jar 'go/*.class' -d /tmp/go-stubs 2>/dev/null || true
+          jar cf singbox-core/libs-stubs/go-stubs.jar -C /tmp/go-stubs . 2>/dev/null || true
+          python3 scripts/patch-go-seq.py singbox-core/libs-stubs/go-stubs.jar
+          zip -d singbox-core/libs/libbox.jar 'go/*.class' || true
+          mkdir -p singbox-core/src/main/jniLibs
+          unzip -o "$TMPAAR" 'jni/*' -d /tmp/aar-exploded || true
+          if [ -d /tmp/aar-exploded/jni ]; then
+            cp -r /tmp/aar-exploded/jni/* singbox-core/src/main/jniLibs/
+          fi
+          ls -la singbox-core/libs/
+          find singbox-core/src/main/jniLibs -type f 2>/dev/null || echo "no jniLibs"
+
+      - name: test + coverage
+        run: >
+          ./gradlew
+          :engine-masterdns:testDebugUnitTest :engine-masterdns:jacocoTestReport :engine-masterdns:jacocoTestCoverageVerification
+          :engine-singbox:testDebugUnitTest :engine-singbox:jacocoTestReport :engine-singbox:jacocoTestCoverageVerification
+          :singbox-process:testDebugUnitTest :singbox-process:jacocoTestReport :singbox-process:jacocoTestCoverageVerification
+          :singbox-core:testDebugUnitTest :singbox-core:jacocoTestReport :singbox-core:jacocoTestCoverageVerification
+          :singbox-fmt:testDebugUnitTest :singbox-fmt:jacocoTestReport :singbox-fmt:jacocoTestCoverageVerification
+          :singbox-config:testDebugUnitTest :singbox-config:jacocoTestReport :singbox-config:jacocoTestCoverageVerification
+          :singbox-room:testDebugUnitTest :singbox-room:jacocoTestReport :singbox-room:jacocoTestCoverageVerification
+          :singbox-subscription:testDebugUnitTest :singbox-subscription:jacocoTestReport :singbox-subscription:jacocoTestCoverageVerification
+          :shared-warp-settings:test :shared-warp-settings:jacocoTestReport :shared-warp-settings:jacocoTestCoverageVerification
+          :app-desktop:test :app-desktop:jacocoTestReport
+          --stacktrace --continue
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-singbox-extra-modules
+          path: |
+            engine-masterdns/build/reports/jacoco/**
+            engine-singbox/build/reports/jacoco/**
+            singbox-process/build/reports/jacoco/**
+            singbox-core/build/reports/jacoco/**
+            singbox-fmt/build/reports/jacoco/**
+            singbox-config/build/reports/jacoco/**
+            singbox-room/build/reports/jacoco/**
+            singbox-subscription/build/reports/jacoco/**
+            shared-warp-settings/build/reports/jacoco/**
+            app-desktop/build/reports/jacoco/**
+          retention-days: 14
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports-singbox-extra-modules
+          path: |
+            engine-masterdns/build/reports/tests/**
+            engine-singbox/build/reports/tests/**
+            singbox-process/build/reports/tests/**
+            singbox-core/build/reports/tests/**
+            singbox-fmt/build/reports/tests/**
+            singbox-config/build/reports/tests/**
+            singbox-room/build/reports/tests/**
+            singbox-subscription/build/reports/tests/**
+            shared-warp-settings/build/reports/tests/**
+            app-desktop/build/reports/tests/**
+          retention-days: 14

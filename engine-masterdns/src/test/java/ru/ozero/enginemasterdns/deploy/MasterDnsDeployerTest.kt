@@ -26,7 +26,7 @@ class MasterDnsDeployerTest {
         transport.setResponse("free -m", "512 1024")
         transport.setResponse("apt-get", MasterDnsDockerScripts.MARKER_DOCKER_OK)
         transport.setResponse("Dockerfile", MasterDnsDockerScripts.MARKER_BUILD_OK)
-        transport.setResponse("docker rm -f", MasterDnsDockerScripts.MARKER_RUN_OK)
+        transport.setResponse("docker run -d", MasterDnsDockerScripts.MARKER_RUN_OK)
         transport.setResponse("encrypt_key", "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899")
     }
 
@@ -176,7 +176,7 @@ class MasterDnsDeployerTest {
 
     @Test
     fun `should return Error when container run fails`() = runTest {
-        transport.setResponse("docker rm -f", MasterDnsDockerScripts.MARKER_ERR_RUN)
+        transport.setResponse("docker run -d", MasterDnsDockerScripts.MARKER_ERR_RUN)
 
         val states = deployer.deploy(credentials()).toList()
 
@@ -307,7 +307,7 @@ class MasterDnsDeployerTest {
         transport.connectShouldFail = true
         val creds = credentials("super_secret_p@ssw0rd")
         deployer.deploy(creds).toList()
-        assertTrue(creds.password.all { it == ' ' }, "password must be wiped after connect failure")
+        assertTrue(creds.password.all { it == '\u0000' }, "password must be wiped after connect failure")
     }
 
     @Test
@@ -315,6 +315,6 @@ class MasterDnsDeployerTest {
         transport.connectShouldFail = true
         val creds = credentials("super_secret_p@ssw0rd")
         deployer.undeploy(creds).toList()
-        assertTrue(creds.password.all { it == ' ' }, "password must be wiped after connect failure")
+        assertTrue(creds.password.all { it == '\u0000' }, "password must be wiped after connect failure")
     }
 }

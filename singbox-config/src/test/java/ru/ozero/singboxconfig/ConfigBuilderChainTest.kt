@@ -56,6 +56,8 @@ class ConfigBuilderChainTest {
 
         assertContains(json, "\"address\":\"https://1.1.1.1/dns-query\"")
         assertContains(json, "\"detour\":\"proxy\"")
+        assertContains(json, "\"action\":\"hijack-dns\"")
+        assertFalse(json.contains("\"type\":\"dns\""), "chain config must not rely on legacy dns outbound")
     }
 
     @Test
@@ -70,6 +72,33 @@ class ConfigBuilderChainTest {
         assertContains(json, "\"tag\":\"proxy\"")
         assertContains(json, "\"type\":\"socks\"")
         assertContains(json, "\"listen_port\":49410")
+    }
+
+    @Test
+    fun `auto chain config filters unsupported transport beans`() {
+        val supported = makeBean(uuid = "aaaa-1", host = "s1.com")
+        val unsupported = makeBean(uuid = "aaaa-2", host = "s2.com").apply {
+            type = "splithttp"
+        }
+
+        val json = ConfigBuilder.buildAutoChainConfig(listOf(supported, unsupported), socksPort = 49410)
+
+        assertContains(json, "\"tag\":\"proxy-0\"")
+        assertFalse(json.contains("splithttp"), "auto chain must not pass unsupported transports to libbox")
+        assertFalse(json.contains("\"tag\":\"proxy-1\""), "unsupported beans must not leave gaps in urltest tags")
+    }
+
+    @Test
+    fun `auto chain config fails fast when all transports unsupported`() {
+        val unsupportedOnly = listOf(
+            makeBean(uuid = "aaaa-2", host = "s2.com").apply { type = "splithttp" },
+            makeBean(uuid = "aaaa-3", host = "s3.com").apply { type = "splithttp" },
+        )
+
+        val result = runCatching { ConfigBuilder.buildAutoChainConfig(unsupportedOnly, socksPort = 49410) }
+
+        assertTrue(result.isFailure, "all unsupported transports must fail instead of building broken chain config")
+        assertContains(result.exceptionOrNull()?.message.orEmpty(), "supported transport")
     }
 
     @Test
