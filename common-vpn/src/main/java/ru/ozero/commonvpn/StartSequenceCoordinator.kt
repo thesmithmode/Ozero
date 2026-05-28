@@ -18,10 +18,10 @@ import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.SocketProtector
 import ru.ozero.enginescore.TunAttachResult
 import ru.ozero.enginescore.TunFdAcceptor
-import ru.ozero.enginescore.settings.ChainStepConfig
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginescore.settings.SplitTunnelMode
+import ru.ozero.enginescore.settings.TrafficMode
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
@@ -62,9 +62,10 @@ class StartSequenceCoordinator(
             runCatching { deps.settingsRepository.settings.first() }.getOrNull()
         }
         val splitConfig = readSplitConfig(settings?.splitMode ?: SplitTunnelMode.ALL)
+        val trafficMode = settings?.trafficMode ?: TrafficMode.TUN
         val killswitch = settings?.killswitchEnabled ?: false
-        killswitchSetter(killswitch)
-        if (killswitch) {
+        killswitchSetter(trafficMode == TrafficMode.TUN && killswitch)
+        if (trafficMode == TrafficMode.TUN && killswitch) {
             val startupIpv6 = settings?.ipv6Enabled ?: false
             val startupDns = settings?.customDnsServers.orEmpty()
             runCatching {
@@ -84,18 +85,12 @@ class StartSequenceCoordinator(
                 .onFailure { PersistentLoggers.error(TAG, "lockdown startup TUN failed: ${it.message}") }
         }
 
-        val chain = settings?.proxyChain.orEmpty()
-        if (chain.size >= 2) {
-            runProxyChain(chain, settings, splitConfig)
-            return
-        }
-
         val manualEngine = settings?.manualEngine
         val pick = if (manualEngine != null) {
-            val cfg = buildEngineConfig(manualEngine, settings)
-            if (cfg == null) null else manualEngine to cfg
+            val cfg = buildEngineConfig(manualEngine, settings, trafficMode)
+            if (cfg == null || !engineAllowedForTrafficMode(manualEngine, trafficMode)) null else manualEngine to cfg
         } else {
-            pickAutoCandidateWithPreflight(settings)
+            pickAutoCandidateWithPreflight(settings, trafficMode)
         }
         if (pick == null) {
             val mode = if (manualEngine == null) "auto" else "manual"
@@ -114,6 +109,10 @@ class StartSequenceCoordinator(
         val activeConfig = pick.second
         deps.tunnelController.onProbing(activeEngineId)
         if (state.stopping.get()) return
+        if (trafficMode == TrafficMode.PROXY) {
+            runSingleProxy(activeEngineId, activeConfig)
+            return
+        }
         val usesCustomTun = engineNeedsCustomTun(activeEngineId)
         val ipv6Enabled = settings?.ipv6Enabled ?: false
         val established = establishTunAndChain(
@@ -156,73 +155,36 @@ class StartSequenceCoordinator(
         deps.statsLogger.start()
     }
 
-    private suspend fun runProxyChain(
-        chain: List<ChainStepConfig>,
-        settings: SettingsModel?,
-        splitConfig: SplitTunnelConfig,
-    ) {
-        val tailEngineId = chain.last().engineId
-        deps.tunnelController.onProbing(tailEngineId)
-        if (state.stopping.get()) return
+    private suspend fun runSingleProxy(engineId: EngineId, config: EngineConfig) {
+        val chainResult = startChain(engineId, config) ?: return
+        if (!finishProxyOnly(engineId, chainResult.finalSocksPort)) return
+    }
 
-        val steps = chain.map { step ->
-            val cfg = buildEngineConfig(step.engineId, settings)
-            if (cfg == null) {
-                PersistentLoggers.error(TAG, "chain: no config for engine ${step.engineId}")
-                deps.tunnelController.onEngineDied(tailEngineId, "no config for ${step.engineId}")
-                stopVpnRequest()
-                return
-            }
-            ChainStep(step.engineId, cfg)
-        }
-
-        val chainResult = withTimeoutOrNull(CHAIN_START_TIMEOUT_MS) {
-            try {
-                deps.chainOrchestrator.start(steps)
-            } catch (ce: CancellationException) {
-                throw ce
-            } catch (t: Throwable) {
-                PersistentLoggers.error(TAG, "chain.start threw: ${t.message}")
-                null
-            }
-        }
-        if (chainResult !is ChainResult.Success) {
+    private suspend fun finishProxyOnly(engineId: EngineId, socksPort: Int): Boolean {
+        if (socksPort <= 0) {
             runCatching { deps.chainOrchestrator.stop() }
-            deps.engineWatchdog.handleEngineFailure(tailEngineId, chainResult?.toString() ?: "chain timeout")
-            return
+            deps.engineWatchdog.handleEngineFailure(engineId, "engine does not expose local proxy endpoint")
+            return false
         }
-        deps.tunnelController.onConnecting(tailEngineId)
-
-        val ipv6Enabled = settings?.ipv6Enabled ?: false
-        val customDns = settings?.customDnsServers.orEmpty()
-        val fd = establishTun(splitConfig, ipv6 = ipv6Enabled, customDns = customDns) ?: run {
+        if (!awaitEngineReady(engineId)) {
             runCatching { deps.chainOrchestrator.stop() }
-            deps.engineWatchdog.handleEngineFailure(tailEngineId, "chain TUN establish failed")
-            return
+            deps.engineWatchdog.handleEngineFailure(engineId, "proxy awaitReady fail")
+            return false
         }
-        state.lockdownStartupFdRef.getAndSet(null)?.runCatching { close() }
-        if (state.stopping.get()) {
-            runCatching { fd.close() }
-            state.tunFdRef.compareAndSet(fd, null)
-            runCatching { deps.chainOrchestrator.stop() }
-            return
-        }
-        if (!startNativeTunnel(tailEngineId, fd, chainResult.finalSocksPort)) return
-
-        deps.tunnelController.onEngineStarted(tailEngineId, chainResult.finalSocksPort)
+        deps.tunnelController.onEngineStarted(engineId, socksPort)
         val nowMs = System.currentTimeMillis()
         state.sessionStartMsRef.set(nowMs)
-        val label = chain.joinToString("→") { it.engineId.name }
         state.sessionIdRef.set(
-            runCatching { deps.sessionStatsRecorder.startSession(label, nowMs) }.getOrDefault(-1L),
+            runCatching { deps.sessionStatsRecorder.startSession("${engineId.name}:PROXY", nowMs) }.getOrDefault(-1L),
         )
-        runCatching { deps.healthMonitor.start(chainResult.finalSocksPort) }
+        runCatching { deps.healthMonitor.start(socksPort) }
             .onFailure { t ->
                 if (t is CancellationException) throw t
-                PersistentLoggers.warn(TAG, "chain healthMonitor.start threw: ${t.message}")
+                PersistentLoggers.warn(TAG, "proxy healthMonitor.start threw: ${t.message}")
             }
-        deps.engineWatchdog.startHealthKillswitchWatcher(tailEngineId)
+        deps.engineWatchdog.startHealthKillswitchWatcher(engineId)
         deps.statsLogger.start()
+        return true
     }
 
     suspend fun engineNeedsCustomTun(engineId: EngineId): Boolean {
@@ -304,25 +266,44 @@ class StartSequenceCoordinator(
         }
     }
 
-    private fun buildEngineConfig(engineId: EngineId, settings: SettingsModel?): EngineConfig? =
-        deps.enginePlugins.firstOrNull { it.id == engineId }?.buildManualConfig(settings)
+    private fun buildEngineConfig(
+        engineId: EngineId,
+        settings: SettingsModel?,
+        trafficMode: TrafficMode = TrafficMode.TUN,
+    ): EngineConfig? {
+        val plugin = deps.enginePlugins.firstOrNull { it.id == engineId } ?: return null
+        return if (trafficMode == TrafficMode.PROXY) {
+            plugin.buildProxyConfig(settings)
+        } else {
+            plugin.buildManualConfig(settings)
+        }
+    }
 
     private fun resolveTargetForUi(manualEngine: EngineId?, settings: SettingsModel?): EngineId? = manualEngine
         ?: settings?.engineAutoPriority?.firstOrNull()
         ?: deps.enginePlugins.firstOrNull()?.id
 
-    private fun autoCandidates(settings: SettingsModel?): List<Pair<EngineId, EngineConfig>> {
+    private fun autoCandidates(settings: SettingsModel?, trafficMode: TrafficMode): List<Pair<EngineId, EngineConfig>> {
         val priority = settings?.engineAutoPriority ?: SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY
         return priority.mapNotNull { id ->
-            val cfg = buildEngineConfig(id, settings) ?: return@mapNotNull null
+            if (!engineAllowedForTrafficMode(id, trafficMode)) return@mapNotNull null
+            val cfg = buildEngineConfig(id, settings, trafficMode) ?: return@mapNotNull null
             id to cfg
         }
     }
 
+    private fun engineAllowedForTrafficMode(engineId: EngineId, trafficMode: TrafficMode): Boolean {
+        if (trafficMode == TrafficMode.TUN) return true
+        return deps.enginePlugins.firstOrNull { it.id == engineId }
+            ?.capabilities
+            ?.providesLocalSocksWithoutUpstream == true
+    }
+
     private suspend fun pickAutoCandidateWithPreflight(
         settings: SettingsModel?,
+        trafficMode: TrafficMode,
     ): Pair<EngineId, EngineConfig>? {
-        val candidates = autoCandidates(settings)
+        val candidates = autoCandidates(settings, trafficMode)
         if (candidates.isEmpty()) {
             PersistentLoggers.warn(TAG, "auto-mode: нет валидных кандидатов")
             return null

@@ -6,9 +6,9 @@ data class SettingsModel(
     val splitMode: SplitTunnelMode = DEFAULT_SPLIT_MODE,
     val ipv6Enabled: Boolean = DEFAULT_IPV6_ENABLED,
     val autoStart: Boolean = DEFAULT_AUTO_START,
+    val trafficMode: TrafficMode = DEFAULT_TRAFFIC_MODE,
     val manualEngine: EngineId? = DEFAULT_MANUAL_ENGINE,
     val engineAutoPriority: List<EngineId> = DEFAULT_ENGINE_AUTO_PRIORITY,
-    val proxyChain: List<ChainStepConfig> = DEFAULT_PROXY_CHAIN,
     val urnetworkEnabled: Boolean = DEFAULT_URNETWORK_ENABLED,
     val urnetworkJwt: String? = DEFAULT_URNETWORK_JWT,
     val urnetworkCountryCode: String? = DEFAULT_URNETWORK_COUNTRY_CODE,
@@ -28,8 +28,8 @@ data class SettingsModel(
         val DEFAULT_SPLIT_MODE: SplitTunnelMode = SplitTunnelMode.ALL
         const val DEFAULT_IPV6_ENABLED: Boolean = false
         const val DEFAULT_AUTO_START: Boolean = false
+        val DEFAULT_TRAFFIC_MODE: TrafficMode = TrafficMode.TUN
         val DEFAULT_MANUAL_ENGINE: EngineId? = null
-        val DEFAULT_PROXY_CHAIN: List<ChainStepConfig> = emptyList()
         val DEFAULT_ENGINE_AUTO_PRIORITY: List<EngineId> = listOf(
             EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI, EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN,
         )

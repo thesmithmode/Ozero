@@ -6,6 +6,8 @@ import android.os.IBinder
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import org.amnezia.awg.GoBackend
+import org.amnezia.awg.ProxyGoBackend
+import org.amnezia.awg.backend.SocketProtector
 import ru.ozero.enginewarp.IWarpEngineProcess
 import ru.ozero.enginewarp.WarpTurnOnResult
 
@@ -74,6 +76,29 @@ class WarpEngineService : Service() {
                 if (v6Fd > 0) ParcelFileDescriptor.fromFd(v6Fd) else null
             }.getOrNull()
             return WarpTurnOnResult(handle, v4Pfd, v6Pfd)
+        }
+
+        override fun startProxy(
+            name: String,
+            iniConfig: String,
+            uapiPath: String,
+            port: Int,
+        ): Int {
+            ensureLibraryLoaded()
+            Log.i(TAG, "awgStartProxy name=$name port=$port iniLen=${iniConfig.length}")
+            ProxyGoBackend.awgSetSocketProtector(SocketProtector { _ -> 1 })
+            return ProxyGoBackend.awgStartProxy(name, iniConfig, uapiPath, port)
+        }
+
+        override fun stopProxy() {
+            ensureLibraryLoaded()
+            Log.i(TAG, "awgStopProxy")
+            ProxyGoBackend.awgStopProxy()
+        }
+
+        override fun resetProxyGlobals() {
+            ensureLibraryLoaded()
+            ProxyGoBackend.awgResetJNIGlobals()
         }
     }
 

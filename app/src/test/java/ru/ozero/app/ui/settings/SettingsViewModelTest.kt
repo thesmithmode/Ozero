@@ -20,6 +20,7 @@ import ru.ozero.enginescore.settings.ByeDpiUiSettings
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginescore.settings.SplitTunnelMode
+import ru.ozero.enginescore.settings.TrafficMode
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
@@ -104,6 +105,14 @@ class SettingsViewModelTest {
         advanceUntilIdle()
 
         assertEquals(listOf(true), repository.autoStartUpdates)
+    }
+
+    @Test
+    fun `onTrafficModeSelect forwards to repository`() = runTest(dispatcher) {
+        viewModel.onTrafficModeSelect(TrafficMode.PROXY)
+        advanceUntilIdle()
+
+        assertEquals(listOf(TrafficMode.PROXY), repository.trafficModeUpdates)
     }
 
     @Test
@@ -192,6 +201,7 @@ class SettingsViewModelTest {
         val splitModeUpdates = mutableListOf<SplitTunnelMode>()
         val ipv6Updates = mutableListOf<Boolean>()
         val autoStartUpdates = mutableListOf<Boolean>()
+        val trafficModeUpdates = mutableListOf<TrafficMode>()
         val manualEngineUpdates = mutableListOf<EngineId?>()
         val appModeUpdates = mutableListOf<AppMode>()
         val killswitchUpdates = mutableListOf<Boolean>()
@@ -216,6 +226,10 @@ class SettingsViewModelTest {
 
         override suspend fun setAutoStart(enabled: Boolean) {
             autoStartUpdates += enabled
+        }
+
+        override suspend fun setTrafficMode(mode: TrafficMode) {
+            trafficModeUpdates += mode
         }
 
         override suspend fun setManualEngine(engine: EngineId?) {

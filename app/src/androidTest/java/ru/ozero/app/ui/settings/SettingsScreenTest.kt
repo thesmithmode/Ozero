@@ -11,6 +11,7 @@ import org.junit.runner.RunWith
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.SettingsModel
+import ru.ozero.enginescore.settings.TrafficMode
 import ru.ozero.app.ui.theme.OzeroTheme
 
 @RunWith(AndroidJUnit4::class)
@@ -143,6 +144,29 @@ class SettingsScreenTest {
 
         assert(captured == listOf(AppMode.EXPERT)) {
             "expected EXPERT callback, got $captured"
+        }
+    }
+
+    @Test
+    fun trafficModeProxyClickInvokesCallback() {
+        val captured = mutableListOf<TrafficMode>()
+        composeRule.setContent {
+            OzeroTheme {
+                SettingsScreenContent(
+                    state = SettingsUiState.Content(SettingsModel.DEFAULT),
+                    onBack = {},
+                    onIpv6Toggle = {},
+                    onAutoStartToggle = {},
+                    onManualEngineSelect = {},
+                    onTrafficModeSelect = { captured += it },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(SettingsTestTags.TRAFFIC_MODE_PROXY).performClick()
+
+        assert(captured == listOf(TrafficMode.PROXY)) {
+            "expected PROXY callback, got $captured"
         }
     }
 

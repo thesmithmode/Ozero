@@ -77,6 +77,7 @@
 
 ## Per-engine UI
 
+- Локальные тесты не запускать. Исключение — быстрый linter/static checks; тесты только в CI.
 - Каждый engine обязан иметь settings screen в `ui/settings/engines/`. Текущие: byedpi, fptn, urnetwork, warp, masterdns.
 
 ## Subprocess-proxy
@@ -114,4 +115,3 @@
 
 - `graphify-out/GRAPH_REPORT.md` — god nodes, communities. `graphify query/path/explain`. После правок кода — `graphify update .`.
 - `.memory/knowledge/index.md` — project knowledge (почему так сделано, прошлые баги, неочевидные решения).
-

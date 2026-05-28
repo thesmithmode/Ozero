@@ -76,6 +76,7 @@ class AppBackupManagerTest {
             prefs[SettingsKeys.MANUAL_ENGINE] = "byedpi"
             prefs[SettingsKeys.UI_LOCALE_TAG] = "ru"
             prefs[SettingsKeys.ENGINE_AUTO_PRIORITY] = "warp,byedpi,urnetwork"
+            prefs[SettingsKeys.TRAFFIC_MODE] = "PROXY"
             prefs[SettingsKeys.BYDPI_USE_UI_MODE] = true
             prefs[SettingsKeys.BYDPI_UI_SETTINGS_JSON] = """{"a":1}"""
             prefs[SettingsKeys.URNETWORK_COUNTRY_CODE] = "DE"
@@ -87,6 +88,7 @@ class AppBackupManagerTest {
         assertEquals("byedpi", data.settings.manualEngine)
         assertEquals("ru", data.settings.uiLocaleTag)
         assertEquals("warp,byedpi,urnetwork", data.settings.engineAutoPriority)
+        assertEquals("PROXY", data.settings.trafficMode)
         assertEquals(true, data.settings.bydpiUseUiMode)
         assertEquals("""{"a":1}""", data.settings.bydpiUiSettingsJson)
         assertEquals("DE", data.settings.urnetworkCountryCode)
@@ -181,6 +183,7 @@ class AppBackupManagerTest {
                 customDnsServers = null, hostsMode = null, hostsList = null,
                 uiLocaleTag = "en", appMode = null,
                 engineAutoPriority = "urnetwork,warp,byedpi",
+                trafficMode = "PROXY",
                 bydpiUseUiMode = true, bydpiUiSettingsJson = """{"k":"v"}""",
                 bydpiDefaultAccepted = true, urnetworkCountryCode = "FR",
             ),
@@ -194,6 +197,7 @@ class AppBackupManagerTest {
         assertEquals("warp", prefs[SettingsKeys.MANUAL_ENGINE])
         assertEquals("en", prefs[SettingsKeys.UI_LOCALE_TAG])
         assertEquals("urnetwork,warp,byedpi", prefs[SettingsKeys.ENGINE_AUTO_PRIORITY])
+        assertEquals("PROXY", prefs[SettingsKeys.TRAFFIC_MODE])
         assertEquals(true, prefs[SettingsKeys.BYDPI_USE_UI_MODE])
         assertEquals("""{"k":"v"}""", prefs[SettingsKeys.BYDPI_UI_SETTINGS_JSON])
         assertEquals(true, prefs[SettingsKeys.BYDPI_DEFAULT_ACCEPTED])
@@ -280,6 +284,7 @@ class AppBackupManagerTest {
             prefs[SettingsKeys.SPLIT_MODE] = "per_app"
             prefs[SettingsKeys.IPV6_ENABLED] = true
             prefs[SettingsKeys.ENGINE_AUTO_PRIORITY] = "warp"
+            prefs[SettingsKeys.TRAFFIC_MODE] = "PROXY"
         }
         warpStore.slots.value = listOf(sampleWarpSlot)
         urnStore.inject { it.copy(byJwt = "jwt", selectedLocation = UrnetworkLocationSelection("RU", null, null)) }
@@ -300,6 +305,7 @@ class AppBackupManagerTest {
         assertEquals("per_app", freshDs.data.first()[SettingsKeys.SPLIT_MODE])
         assertEquals(true, freshDs.data.first()[SettingsKeys.IPV6_ENABLED])
         assertEquals("warp", freshDs.data.first()[SettingsKeys.ENGINE_AUTO_PRIORITY])
+        assertEquals("PROXY", freshDs.data.first()[SettingsKeys.TRAFFIC_MODE])
         assertEquals(1, freshWarp.slots.value.size)
         assertEquals("jwt", freshUrn.config().first().byJwt)
         assertEquals("RU", freshUrn.config().first().selectedLocation.countryCode)

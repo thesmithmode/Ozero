@@ -13,6 +13,8 @@ object SettingsTestTags {
     const val SPLIT_MODE_PREFIX = "split_mode_"
     const val MANUAL_ENGINE_PREFIX = "manual_engine_"
     const val MANUAL_ENGINE_AUTO = "manual_engine_AUTO"
+    const val TRAFFIC_MODE_TUN = "traffic_mode_TUN"
+    const val TRAFFIC_MODE_PROXY = "traffic_mode_PROXY"
 
     const val IPV6_SWITCH = "ipv6_switch"
     const val AUTO_START_SWITCH = "auto_start_switch"

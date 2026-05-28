@@ -42,7 +42,9 @@ import ru.ozero.singboxfmt.ShadowsocksBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
+import ru.ozero.singboxroom.dao.ProxyChainDao
 import ru.ozero.singboxroom.dao.ProxyProfileDao
+import ru.ozero.singboxroom.entity.ProxyProfile
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -51,6 +53,7 @@ class SingboxEngine @Inject constructor(
     @ApplicationContext private val context: Context,
     @SingboxPrefs private val dataStore: DataStore<Preferences>,
     private val profileDao: ProxyProfileDao,
+    private val proxyChainDao: ProxyChainDao,
     private val onProcessDied: () -> Unit = {},
 ) : EnginePlugin, TunFdAcceptor {
 
@@ -65,6 +68,12 @@ class SingboxEngine @Inject constructor(
     @Volatile
     private var cachedAutoBlobs: List<ByteArray> = emptyList()
 
+    @Volatile
+    private var cachedProfilesById: Map<Long, ProxyProfile> = emptyMap()
+
+    @Volatile
+    private var cachedChainProfileIds: List<Long> = emptyList()
+
     init {
         engineScope.launch {
             dataStore.data.collect { prefs ->
@@ -74,7 +83,13 @@ class SingboxEngine @Inject constructor(
         }
         engineScope.launch {
             profileDao.getAllFlow().collect { profiles ->
+                cachedProfilesById = profiles.associateBy { it.id }
                 cachedAutoBlobs = profiles.map { it.beanBlob }
+            }
+        }
+        engineScope.launch {
+            proxyChainDao.getAllFlow().collect { steps ->
+                cachedChainProfileIds = steps.map { it.profileId }
             }
         }
     }
@@ -88,6 +103,8 @@ class SingboxEngine @Inject constructor(
         localOnly = false,
         requiresServer = true,
         supportsUpstreamSocks = true,
+        providesLocalSocks = true,
+        providesLocalSocksWithoutUpstream = true,
     )
 
     @Volatile
@@ -120,7 +137,10 @@ class SingboxEngine @Inject constructor(
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
         require(config is EngineConfig.Singbox) { "SingboxEngine requires EngineConfig.Singbox" }
 
-        chainMode = upstream !is Upstream.None
+        chainMode = upstream !is Upstream.None || config.proxyMode
+        if (config.proxyMode && upstream is Upstream.None) {
+            return startProxyMode(config, upstream = null)
+        }
         if (chainMode) {
             return when (upstream) {
                 is Upstream.Socks5 -> startChainMode(config, upstream)
@@ -157,31 +177,52 @@ class SingboxEngine @Inject constructor(
         val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(config.beanBlob) }
             .onFailure { PersistentLoggers.warn(TAG, "beanBlob deserialize: ${it.message}") }
             .getOrNull() ?: return null
+        val wrappers = chainWrapperBeans(config)
         return runCatching { ConfigBuilder.buildSingboxConfig(bean) }
+            .mapCatching {
+                if (wrappers.isNotEmpty()) {
+                    ConfigBuilder.buildProfileChainConfig(bean, wrappers)
+                } else {
+                    it
+                }
+            }
             .onFailure { PersistentLoggers.warn(TAG, "buildSingboxConfig: ${it.message}") }
             .getOrNull()
     }
 
     private suspend fun startChainMode(config: EngineConfig.Singbox, upstream: Upstream.Socks5): StartResult {
+        val configUpstream = ConfigBuilder.Upstream(upstream.host, upstream.port)
+        return startProxyMode(config, configUpstream)
+    }
+
+    private suspend fun startProxyMode(
+        config: EngineConfig.Singbox,
+        upstream: ConfigBuilder.Upstream?,
+    ): StartResult {
         val port = allocateChainPort()
         activeSocksPort = port
-        val configUpstream = ConfigBuilder.Upstream(upstream.host, upstream.port)
-
         val json = if (config.autoSelectBeanBlobs.isNotEmpty()) {
             val beans = config.autoSelectBeanBlobs
                 .take(MAX_AUTO_SELECT_OUTBOUNDS)
                 .mapNotNull { runCatching { KryoSerializer.deserialize<AbstractBean>(it) }.getOrNull() }
             if (beans.isEmpty()) return StartResult.Failure("chain auto-select: no valid beans")
-            runCatching { ConfigBuilder.buildAutoChainConfig(beans, port, configUpstream) }
+            runCatching { ConfigBuilder.buildAutoChainConfig(beans, port, upstream) }
                 .getOrElse { return StartResult.Failure("chain auto config: ${it.message}") }
         } else if (config.wireGuardConfig != null) {
             val wgConfig = requireNotNull(config.wireGuardConfig)
-            runCatching { ConfigBuilder.buildWireGuardChainConfig(wgConfig, port, configUpstream) }
+            runCatching { ConfigBuilder.buildWireGuardChainConfig(wgConfig, port, upstream) }
                 .getOrElse { return StartResult.Failure("chain WG config: ${it.message}") }
         } else {
             val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(config.beanBlob) }
                 .getOrElse { return StartResult.Failure("chain deserialize: ${it.message}") }
-            runCatching { ConfigBuilder.buildChainConfig(bean, port, configUpstream) }
+            val wrappers = if (upstream == null) chainWrapperBeans(config) else emptyList()
+            runCatching {
+                if (wrappers.isNotEmpty()) {
+                    ConfigBuilder.buildProfileChainProxyConfig(bean, wrappers, port)
+                } else {
+                    ConfigBuilder.buildChainConfig(bean, port, upstream)
+                }
+            }
                 .getOrElse { return StartResult.Failure("chain config: ${it.message}") }
         }
 
@@ -272,7 +313,6 @@ class SingboxEngine @Inject constructor(
     override fun buildManualConfig(settings: SettingsModel?): EngineConfig? {
         if (cachedSelectedProfileId == SELECTED_AUTO) {
             val blobs = cachedAutoBlobs.ifEmpty {
-                // cold-start race: cache not yet populated; do synchronous fallback read
                 runBlocking(Dispatchers.IO) {
                     profileDao.getAllFlow().first()
                 }.map { it.beanBlob }
@@ -288,8 +328,30 @@ class SingboxEngine @Inject constructor(
         val type = runCatching {
             protocolTypeOf(KryoSerializer.deserialize<AbstractBean>(blob))
         }.getOrDefault(PROTOCOL_VLESS)
-        return EngineConfig.Singbox(beanBlob = blob, protocolType = type)
+        return EngineConfig.Singbox(
+            beanBlob = blob,
+            protocolType = type,
+            chainBeanBlobs = chainWrapperBlobs(cachedSelectedProfileId),
+        )
     }
+
+    override fun buildProxyConfig(settings: SettingsModel?): EngineConfig? =
+        buildManualConfig(settings)?.let { it as? EngineConfig.Singbox }?.copy(proxyMode = true)
+
+    private fun chainWrapperBlobs(selectedProfileId: Long?): List<ByteArray> {
+        val selected = selectedProfileId ?: return emptyList()
+        if (selected == SELECTED_AUTO) return emptyList()
+        return cachedChainProfileIds
+            .filter { it != selected }
+            .mapNotNull { cachedProfilesById[it]?.beanBlob }
+    }
+
+    private fun chainWrapperBeans(config: EngineConfig.Singbox): List<AbstractBean> =
+        config.chainBeanBlobs.mapNotNull { blob ->
+            runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
+                .onFailure { PersistentLoggers.warn(TAG, "chain bean deserialize: ${it.message}") }
+                .getOrNull()
+        }
 
     private fun protocolTypeOf(bean: AbstractBean): Int = when (bean) {
         is VLESSBean -> PROTOCOL_VLESS

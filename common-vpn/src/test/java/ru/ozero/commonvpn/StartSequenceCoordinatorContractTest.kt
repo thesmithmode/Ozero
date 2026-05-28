@@ -104,12 +104,27 @@ class StartSequenceCoordinatorContractTest {
     @Test
     fun `run ветка killswitch строит instant lockdown TUN ДО pickAuto`() {
         val body = source.substringAfter("suspend fun run(").substringBefore("suspend fun engineNeedsCustomTun(")
-        val killswitchIdx = body.indexOf("if (killswitch) {")
+        val killswitchIdx = body.indexOf("if (trafficMode == TrafficMode.TUN && killswitch) {")
         val pickIdx = body.indexOf("pickAutoCandidateWithPreflight(")
         assertTrue(killswitchIdx in 0 until pickIdx, "Killswitch lockdown TUN строится ДО pickAuto.")
         assertTrue(
             body.contains("state.lockdownStartupFdRef.set(fd)"),
             "Killswitch ветка обязана сохранять lockdownStartupFdRef.",
+        )
+    }
+
+    @Test
+    fun `proxy mode игнорирует Android killswitch и не строит lockdown TUN`() {
+        val body = source.substringAfter("suspend fun run(").substringBefore("suspend fun engineNeedsCustomTun(")
+        val tunKillswitchIdx = body.indexOf("if (trafficMode == TrafficMode.TUN && killswitch)")
+        val setterIdx = body.indexOf("killswitchSetter(trafficMode == TrafficMode.TUN && killswitch)")
+        assertTrue(
+            setterIdx in 0 until tunKillswitchIdx,
+            "Service-level killswitch должен получать effective значение до TUN lockdown.",
+        )
+        assertTrue(
+            !body.contains("killswitchSetter(false)"),
+            "Proxy mode не должен сбрасывать настройку killswitch; он только игнорирует её как effective flag.",
         )
     }
 
@@ -144,6 +159,24 @@ class StartSequenceCoordinatorContractTest {
             body.contains("SocketProtector { _ -> true }"),
             "preflight обязан использовать no-op protector — TUN ещё не создан на момент preflight.",
         )
+    }
+
+    @Test
+    fun `proxy mode фильтрует auto и manual кандидатов по standalone proxy capability`() {
+        assertTrue(
+            source.contains("engineAllowedForTrafficMode(manualEngine, trafficMode)"),
+            "manual engine в PROXY mode должен проходить capability gate до start().",
+        )
+        val autoBody = source.substringAfter("private fun autoCandidates(")
+            .substringBefore("private fun engineAllowedForTrafficMode(")
+        assertTrue(
+            autoBody.contains("engineAllowedForTrafficMode(id, trafficMode)"),
+            "auto mode в PROXY mode обязан пропускать только движки с local proxy endpoint.",
+        )
+        val gateBody = source.substringAfter("private fun engineAllowedForTrafficMode(")
+            .substringBefore("private suspend fun pickAutoCandidateWithPreflight(")
+        assertTrue(gateBody.contains("trafficMode == TrafficMode.TUN"))
+        assertTrue(gateBody.contains("providesLocalSocksWithoutUpstream == true"))
     }
 
     @Test
@@ -184,11 +217,11 @@ class StartSequenceCoordinatorContractTest {
     }
 
     @Test
-    fun `killswitchSetter получает значение из settings — без побочных эффектов`() {
+    fun `killswitchSetter получает effective значение из settings и trafficMode`() {
         val body = source.substringAfter("suspend fun run(").substringBefore("suspend fun engineNeedsCustomTun(")
         assertTrue(
-            body.contains("killswitchSetter(killswitch)"),
-            "run обязан проталкивать killswitch значение в сервис через killswitchSetter callback.",
+            body.contains("killswitchSetter(trafficMode == TrafficMode.TUN && killswitch)"),
+            "run обязан проталкивать service-level effective killswitch, сохраняя пользовательский toggle для возврата в TUN.",
         )
     }
 }

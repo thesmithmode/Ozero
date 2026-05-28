@@ -169,6 +169,64 @@ class ChainOrchestratorTest {
     }
 
     @Test
+    fun start_multiStepRejectsEngineWithoutLocalSocksPort() = runTest {
+        val warp = FakePlugin(
+            EngineId.WARP,
+            listOf(StartResult.Success(socksPort = 0)),
+            supportsUpstreamSocks = false,
+        )
+        val xray = FakePlugin(
+            EngineId.XRAY,
+            listOf(StartResult.Success(socksPort = 10808)),
+            supportsUpstreamSocks = true,
+        )
+        val orch = ChainOrchestrator(setOf(warp, xray))
+
+        val r = orch.start(
+            listOf(
+                ChainStep(EngineId.WARP, EngineConfig.Warp),
+                ChainStep(EngineId.XRAY, EngineConfig.Xray("{}", 10808)),
+            ),
+        )
+
+        assertIs<ChainResult.Failure>(r)
+        assertEquals(0, r.failedAtIndex)
+        assertTrue(r.reason.contains("no local SOCKS port"))
+        assertEquals(1, warp.stopCalls)
+        assertEquals(0, xray.startCalls.size)
+    }
+
+    @Test
+    fun start_multiStepRejectsHeadWithoutStandaloneLocalSocksCapability() = runTest {
+        val warp = FakePlugin(
+            EngineId.WARP,
+            listOf(StartResult.Success(socksPort = 0)),
+            supportsUpstreamSocks = false,
+            providesLocalSocks = false,
+        )
+        val xray = FakePlugin(
+            EngineId.XRAY,
+            listOf(StartResult.Success(socksPort = 10808)),
+            supportsUpstreamSocks = true,
+        )
+        val orch = ChainOrchestrator(setOf(warp, xray))
+
+        val r = orch.start(
+            listOf(
+                ChainStep(EngineId.WARP, EngineConfig.Warp),
+                ChainStep(EngineId.XRAY, EngineConfig.Xray("{}", 10808)),
+            ),
+        )
+
+        assertIs<ChainResult.Failure>(r)
+        assertEquals(0, r.failedAtIndex)
+        assertTrue(r.reason.contains("chain head"))
+        assertEquals(0, warp.startCalls.size)
+        assertEquals(0, warp.stopCalls)
+        assertEquals(0, xray.startCalls.size)
+    }
+
+    @Test
     fun stop_canBeCalledTwice_withoutDoubleStop() = runTest {
         val byedpi = FakePlugin(EngineId.BYEDPI, listOf(StartResult.Success(socksPort = 1080)))
         val orch = ChainOrchestrator(setOf(byedpi))
@@ -183,9 +241,20 @@ class ChainOrchestratorTest {
         private val startResults: List<StartResult>,
         private val onStop: () -> Unit = {},
         supportsUpstreamSocks: Boolean = true,
+        providesLocalSocks: Boolean = true,
+        providesLocalSocksWithoutUpstream: Boolean = providesLocalSocks,
     ) : EnginePlugin {
         override val capabilities =
-            EngineCapabilities(true, false, false, false, false, supportsUpstreamSocks)
+            EngineCapabilities(
+                true,
+                false,
+                false,
+                false,
+                false,
+                supportsUpstreamSocks,
+                providesLocalSocks,
+                providesLocalSocksWithoutUpstream,
+            )
         val startCalls = mutableListOf<Pair<EngineConfig, Upstream>>()
         var stopCalls = 0
             private set

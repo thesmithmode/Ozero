@@ -11,6 +11,7 @@ import ru.ozero.app.logging.BootFileLogger
 import ru.ozero.app.ui.MainViewModel
 import ru.ozero.commonvpn.OzeroVpnService
 import ru.ozero.commonvpn.TunnelState
+import ru.ozero.enginescore.settings.TrafficMode
 
 class VpnIntentLauncher(
     private val activity: ComponentActivity,
@@ -85,6 +86,12 @@ class VpnIntentLauncher(
 
     private fun proceedToVpnRequest() {
         viewModel.onConnectClick()
+        if (viewModel.trafficMode.value == TrafficMode.PROXY) {
+            runCatching { BootFileLogger.info(TAG, "trafficMode=PROXY → start without VpnService.prepare") }
+            viewModel.onVpnPermissionGranted()
+            start()
+            return
+        }
         val vpnIntent = VpnService.prepare(activity)
         if (vpnIntent != null) {
             runCatching { BootFileLogger.info(TAG, "VpnService.prepare → permission dialog") }

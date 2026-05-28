@@ -26,6 +26,7 @@ import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_STOP
 import ru.ozero.enginescore.ChainOrchestrator
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.EnginePlugin
+import ru.ozero.enginescore.settings.TrafficMode
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
@@ -213,11 +214,11 @@ class OzeroVpnService : android.net.VpnService() {
 
     private fun observeKillswitchSetting() {
         settingsRepository.settings
-            .map { it.killswitchEnabled }
+            .map { it.trafficMode == TrafficMode.TUN && it.killswitchEnabled }
             .distinctUntilChanged()
             .onEach { enabled ->
                 killswitchCached = enabled
-                PersistentLoggers.debug(TAG, "killswitch live update: $enabled")
+                PersistentLoggers.debug(TAG, "effective killswitch live update: $enabled")
             }
             .launchIn(serviceScope)
     }

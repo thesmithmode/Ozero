@@ -42,6 +42,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -146,6 +149,20 @@ private fun SingboxSettingsContent(
             Spacer(Modifier.height(8.dp))
         }
 
+        if (state.allProfiles.isNotEmpty()) {
+            SingboxChainSection(
+                allProfiles = state.allProfiles,
+                chainProfileIds = state.chainProfileIds,
+                selectedProfileId = state.selectedProfileId,
+                onAdd = viewModel::onChainProfileAdd,
+                onRemove = viewModel::onChainProfileRemove,
+                onMove = viewModel::onChainProfileMove,
+            )
+            Spacer(Modifier.height(8.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(8.dp))
+        }
+
         state.groups.forEach { group ->
             SubscriptionGroupItem(
                 group = group,
@@ -165,6 +182,124 @@ private fun SingboxSettingsContent(
         }
 
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun SingboxChainSection(
+    allProfiles: List<ProxyProfile>,
+    chainProfileIds: List<Long>,
+    selectedProfileId: Long?,
+    onAdd: (ProxyProfile) -> Unit,
+    onRemove: (Long) -> Unit,
+    onMove: (Long, Int) -> Unit,
+) {
+    var addMenuExpanded by remember { mutableStateOf(false) }
+    val profilesById = allProfiles.associateBy { it.id }
+    val chain = chainProfileIds
+        .mapNotNull { profilesById[it] }
+        .filterNot { it.id == selectedProfileId }
+    val addable = allProfiles.filter { profile ->
+        profile.id != selectedProfileId && profile.id !in chainProfileIds
+    }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = stringResource(R.string.singbox_chain_title),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(vertical = 4.dp),
+        )
+        Text(
+            text = stringResource(R.string.singbox_chain_summary),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 8.dp),
+        )
+        if (chain.isEmpty()) {
+            Text(
+                text = stringResource(R.string.singbox_chain_empty),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+        } else {
+            chain.forEachIndexed { index, profile ->
+                SingboxChainStepRow(
+                    profile = profile,
+                    index = index,
+                    isFirst = index == 0,
+                    isLast = index == chain.lastIndex,
+                    onRemove = { onRemove(profile.id) },
+                    onMoveUp = { onMove(profile.id, -1) },
+                    onMoveDown = { onMove(profile.id, 1) },
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+        Box {
+            TextButton(
+                onClick = { addMenuExpanded = true },
+                enabled = addable.isNotEmpty(),
+                modifier = Modifier.testTag("singbox_chain_add"),
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(stringResource(R.string.singbox_chain_add))
+            }
+            DropdownMenu(
+                expanded = addMenuExpanded,
+                onDismissRequest = { addMenuExpanded = false },
+            ) {
+                addable.forEach { profile ->
+                    DropdownMenuItem(
+                        text = { Text(profile.name) },
+                        onClick = {
+                            addMenuExpanded = false
+                            onAdd(profile)
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SingboxChainStepRow(
+    profile: ProxyProfile,
+    index: Int,
+    isFirst: Boolean,
+    isLast: Boolean,
+    onRemove: () -> Unit,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = profile.name,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                text = stringResource(R.string.singbox_chain_step, index + 1),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        IconButton(onClick = onMoveUp, enabled = !isFirst, modifier = Modifier.size(36.dp)) {
+            Icon(Icons.Default.KeyboardArrowUp, contentDescription = null)
+        }
+        IconButton(onClick = onMoveDown, enabled = !isLast, modifier = Modifier.size(36.dp)) {
+            Icon(Icons.Default.KeyboardArrowDown, contentDescription = null)
+        }
+        IconButton(onClick = onRemove, modifier = Modifier.size(36.dp)) {
+            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.singbox_chain_remove))
+        }
     }
 }
 

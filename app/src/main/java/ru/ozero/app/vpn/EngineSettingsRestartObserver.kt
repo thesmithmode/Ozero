@@ -6,9 +6,10 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
-import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.settings.SettingsModel
+import ru.ozero.enginescore.settings.TrafficMode
 
 class EngineSettingsRestartObserver(
     settingsFlow: Flow<SettingsModel>,
@@ -19,6 +20,7 @@ class EngineSettingsRestartObserver(
         val manualEngine: EngineId?,
         val byedpiWinningArgs: String?,
         val ipv6Enabled: Boolean,
+        val trafficMode: TrafficMode,
         val customDnsServers: List<String>,
         val engineAutoPriority: List<EngineId>?,
     )
@@ -30,6 +32,7 @@ class EngineSettingsRestartObserver(
                 manualEngine = it.manualEngine,
                 byedpiWinningArgs = it.byedpiWinningArgs?.trim(),
                 ipv6Enabled = it.ipv6Enabled,
+                trafficMode = it.trafficMode,
                 customDnsServers = it.customDnsServers,
                 engineAutoPriority = if (it.manualEngine == null) it.engineAutoPriority else null,
             )

@@ -22,6 +22,7 @@ import ru.ozero.enginesingbox.SingboxPrefs
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.singboxroom.SingboxDatabase
+import ru.ozero.singboxroom.dao.ProxyChainDao
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.dao.SubscriptionGroupDao
 import ru.ozero.singboxsubscription.GroupSeeder
@@ -65,6 +66,11 @@ object SingboxModule {
 
     @Provides
     @Singleton
+    fun provideProxyChainDao(db: SingboxDatabase): ProxyChainDao =
+        db.proxyChainDao()
+
+    @Provides
+    @Singleton
     fun provideGroupSeeder(groupDao: SubscriptionGroupDao): GroupSeeder =
         GroupSeeder(groupDao)
 
@@ -91,11 +97,13 @@ object SingboxModule {
         @ApplicationContext context: Context,
         @SingboxPrefs dataStore: DataStore<Preferences>,
         profileDao: ProxyProfileDao,
+        proxyChainDao: ProxyChainDao,
         tunnelController: TunnelController,
     ): EnginePlugin = SingboxEngine(
         context = context,
         dataStore = dataStore,
         profileDao = profileDao,
+        proxyChainDao = proxyChainDao,
         onProcessDied = { tunnelController.onEngineDied(EngineId.SINGBOX, "binder-died") },
     )
 }
