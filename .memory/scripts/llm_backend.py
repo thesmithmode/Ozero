@@ -69,6 +69,7 @@ def _run_codex(prompt: str, cwd: Path, sandbox: str) -> str:
             _codex_command(cwd, sandbox, output_path),
             input=prompt,
             text=True,
+            encoding="utf-8",
             capture_output=True,
             cwd=str(cwd),
             env=env,
