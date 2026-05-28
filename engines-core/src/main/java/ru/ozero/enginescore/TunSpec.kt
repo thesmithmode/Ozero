@@ -14,4 +14,6 @@ data class TunSpec(
     val excludeRfc1918: Boolean = false,
     val routeAllV4: Boolean = true,
     val routeAllV6: Boolean = false,
+    val routeCidrsV4: List<String> = emptyList(),
+    val routeCidrsV6: List<String> = emptyList(),
 )

@@ -174,6 +174,12 @@ class DataStoreWarpConfigSlotStore(
         } else {
             WarpConfig.DEFAULT_DNS
         }
+        val allowedArr = configObj.optJSONArray("allowedIps")
+        val allowedIps = if (allowedArr != null) {
+            (0 until allowedArr.length()).map { allowedArr.getString(it) }
+        } else {
+            WarpConfig.DEFAULT_ALLOWED_IPS
+        }
         val awg = AwgParams(
             junkPacketCount = awgObj.optInt("jc", AwgParams.DEFAULT_JC),
             junkPacketMinSize = awgObj.optInt("jmin", AwgParams.DEFAULT_JMIN),
@@ -208,6 +214,7 @@ class DataStoreWarpConfigSlotStore(
             mtu = configObj.optInt("mtu", WarpConfig.DEFAULT_MTU),
             dnsServers = dns,
             keepaliveSeconds = configObj.optInt("keepalive", WarpConfig.DEFAULT_KEEPALIVE),
+            allowedIps = allowedIps,
             awgParams = awg,
             doHProvider = configObj.optString("doHProvider", "").let { name ->
                 DoHProvider.entries.firstOrNull { it.name == name } ?: DoHProvider.SYSTEM
@@ -272,6 +279,9 @@ class DataStoreWarpConfigSlotStore(
             val dnsArr = JSONArray()
             cfg.dnsServers.forEach { dnsArr.put(it) }
             configObj.put("dnsServers", dnsArr)
+            val allowedArr = JSONArray()
+            cfg.allowedIps.forEach { allowedArr.put(it) }
+            configObj.put("allowedIps", allowedArr)
             configObj.put("keepalive", cfg.keepaliveSeconds)
             val awg = cfg.awgParams
             val awgObj = JSONObject()

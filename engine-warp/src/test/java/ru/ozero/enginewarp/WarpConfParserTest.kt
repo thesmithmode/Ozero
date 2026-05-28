@@ -41,6 +41,14 @@ class WarpConfParserTest {
         assertEquals("2606:4700:110:8439:7020:74f6:eca1:6dab/128", cfg.interfaceAddressV6)
         assertEquals(1280, cfg.mtu)
         assertEquals(25, cfg.keepaliveSeconds)
+        assertEquals(listOf("0.0.0.0/0", "::/0"), cfg.allowedIps)
+    }
+
+    @Test
+    fun `parse сохраняет selective AllowedIPs для TUN route parity`() {
+        val conf = validConf.replace("0.0.0.0/0, ::/0", "1.1.1.0/24, 8.8.8.8/32")
+        val result = WarpConfParser.parse(conf)
+        assertEquals(listOf("1.1.1.0/24", "8.8.8.8/32"), result.getOrThrow().allowedIps)
     }
 
     @Test

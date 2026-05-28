@@ -460,7 +460,8 @@ class DataStoreWarpConfigSlotStoreTest {
         val cfg = """{"priv":"${c.privateKey}","pub":"${c.publicKey}","peerPub":"${c.peerPublicKey}",""" +
             """"peerEndpoint":"${c.peerEndpoint}","ifaceV4":"${c.interfaceAddressV4}",""" +
             """"ifaceV6":"${c.interfaceAddressV6}","license":"${c.accountLicense}","mtu":${c.mtu},""" +
-            """"dnsServers":["1.1.1.1"],"keepalive":${c.keepaliveSeconds},""" +
+            """"dnsServers":["1.1.1.1"],"allowedIps":["0.0.0.0/0","::/0"],""" +
+            """"keepalive":${c.keepaliveSeconds},""" +
             """"awgParams":{"jc":0,"jmin":0,"jmax":0,"s1":0,"s2":0,"h1":1,"h2":2,"h3":3,"h4":4}}"""
         return """{"id":"$id","name":"$name","isActive":false,"config":$cfg}"""
     }

@@ -342,7 +342,7 @@ class ByeDpiEngineTest {
     }
 
     @Test
-    fun `stop always forceClose after join — server_fd reset guarantees clean next start`() = runTest {
+    fun `stop forceClose before waiting native job — server_fd reset guarantees clean next start`() = runTest {
         every { proxy.startProxy(any()) } returns 0
         engine.start(EngineConfig.ByeDpi(socksPort = 1080))
         engine.stop()
@@ -577,9 +577,52 @@ class ByeDpiEngineTest {
         }
 
     @Test
+    fun `start after wedged stop uses fallback dispatcher even when job ref was cleared`() =
+        assertTimeoutPreemptively(Duration.ofSeconds(15)) {
+            val firstNativeEntered = CountDownLatch(1)
+            val firstNativeExit = CountDownLatch(1)
+            var calls = 0
+            val blockingProxy: ByeDpiProxy = mockk(relaxed = true)
+            mockkObject(ByeDpiProxy.Companion)
+            every { ByeDpiProxy.loadOnce() } just runs
+            every { ByeDpiProxy.libraryLoaded } returns true
+            every { blockingProxy.startProxy(any()) } answers {
+                if (calls++ == 0) {
+                    firstNativeEntered.countDown()
+                    firstNativeExit.await(10, TimeUnit.SECONDS)
+                    0
+                } else {
+                    0
+                }
+            }
+            every { blockingProxy.stopProxy() } returns 0
+            every { blockingProxy.forceClose() } returns 0
+            every { blockingProxy.emergencyReset() } returns 1
+            val eng = ByeDpiEngine(
+                blockingProxy,
+                socksProbe = { _, port, _ ->
+                    if (port == 1080) {
+                        assertTrue(firstNativeEntered.await(5, TimeUnit.SECONDS))
+                    }
+                    1L
+                },
+            )
+            runBlocking {
+                try {
+                    assertIs<StartResult.Success>(eng.start(EngineConfig.ByeDpi(socksPort = 1080)))
+                    eng.stop()
+                    assertIs<StartResult.Success>(eng.start(EngineConfig.ByeDpi(socksPort = 1081)))
+                } finally {
+                    firstNativeExit.countDown()
+                    unmockkObject(ByeDpiProxy.Companion)
+                }
+            }
+            verify(atLeast = 2) { blockingProxy.emergencyReset() }
+            verify(exactly = 2) { blockingProxy.startProxy(any()) }
+        }
+
+    @Test
     fun `autoRotatePort skips ports occupied by another app — sentinel for port-conflict regression`() = runTest {
-        // Simulates another app holding 49152 and 49153 on loopback.
-        // ByeDPI must skip those and bind on the first free candidate (49154).
         val busyPorts = setOf(ByeDpiEngine.PORT_ROTATION_BASE, ByeDpiEngine.PORT_ROTATION_BASE + 1)
         val conflictEngine = ByeDpiEngine(
             proxy,

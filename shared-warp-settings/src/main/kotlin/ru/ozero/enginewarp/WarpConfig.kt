@@ -11,7 +11,7 @@ data class WarpConfig(
     val mtu: Int = DEFAULT_MTU,
     val dnsServers: List<String> = DEFAULT_DNS,
     val keepaliveSeconds: Int = DEFAULT_KEEPALIVE,
-    val allowedIps: List<String> = listOf("0.0.0.0/0", "::/0"),
+    val allowedIps: List<String> = DEFAULT_ALLOWED_IPS,
     val awgParams: AwgParams = AwgParams(),
     val doHProvider: DoHProvider = DoHProvider.SYSTEM,
 ) {
@@ -31,5 +31,6 @@ data class WarpConfig(
         const val DEFAULT_MTU = 1280
         const val DEFAULT_KEEPALIVE = 25
         val DEFAULT_DNS = listOf("1.1.1.1", "2606:4700:4700::1111")
+        val DEFAULT_ALLOWED_IPS = listOf("0.0.0.0/0", "::/0")
     }
 }
