@@ -692,7 +692,7 @@ jobs:
           :singbox-config:testDebugUnitTest :singbox-config:jacocoTestReport :singbox-config:jacocoTestCoverageVerification
           :singbox-room:testDebugUnitTest :singbox-room:jacocoTestReport :singbox-room:jacocoTestCoverageVerification
           :singbox-subscription:testDebugUnitTest :singbox-subscription:jacocoTestReport :singbox-subscription:jacocoTestCoverageVerification
-          :shared-warp-settings:testDebugUnitTest :shared-warp-settings:jacocoTestReport :shared-warp-settings:jacocoTestCoverageVerification
+          :shared-warp-settings:test :shared-warp-settings:jacocoTestReport :shared-warp-settings:jacocoTestCoverageVerification
           :app-desktop:test :app-desktop:jacocoTestReport :app-desktop:jacocoTestCoverageVerification
           --stacktrace --continue
 

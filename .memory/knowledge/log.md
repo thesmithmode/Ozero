@@ -992,3 +992,7 @@
 - Connections created: [[connections/false-positive-engine-status]]
 - Articles updated: (none — 3 main concepts already existed from prior 2026-05-08 compile: [[concepts/warp-awg-obfuscation-russian-isps]], [[concepts/android-vpn-traffic-stats]], [[concepts/dual-go-runtime-eager-loading]])
 - Excluded as already covered: AwgParams() vs VANILLA confusion (in warp-awg-obfuscation article), CI not triggered on intermediate commits (in same article), git stash unreliability (process trivia), auto-mode failover design mention (insufficient detail), 5 memory flush failures ("Nothing worth saving" or error)
+## [2026-05-28T18:24:16+03:00] compile | 2026-05-21.md
+- Source: daily/2026-05-21.md
+- Articles created: [[concepts/byedpi-killswitch-applyunderlying-split]], [[concepts/masterdns-startup-hardening]], [[concepts/urnetwork-provide-mode-picker-parity]], [[concepts/byedpi-cmd-verbatim-pipeline]], [[concepts/startsequence-branch-specific-sentinels]], [[concepts/warp-config-import-naming-dedup]]
+- Articles updated: none
