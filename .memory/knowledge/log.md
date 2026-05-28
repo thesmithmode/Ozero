@@ -996,3 +996,11 @@
 - Source: daily/2026-05-21.md
 - Articles created: [[concepts/byedpi-killswitch-applyunderlying-split]], [[concepts/masterdns-startup-hardening]], [[concepts/urnetwork-provide-mode-picker-parity]], [[concepts/byedpi-cmd-verbatim-pipeline]], [[concepts/startsequence-branch-specific-sentinels]], [[concepts/warp-config-import-naming-dedup]]
 - Articles updated: none
+## [2026-05-28T18:27:11+03:00] compile | 2026-05-27.md
+- Source: daily/2026-05-27.md
+- Articles created: [[concepts/navigation-cherrypick-preserve-routes]], [[concepts/detekt-returncount-extract-paths]], [[concepts/detekt-object-function-extraction]], [[concepts/repo-debranding-ci-owner-injection]], [[concepts/binaries-lock-real-url-exception]], [[connections/release-status-vs-asset-verification]]
+- Articles updated: none
+## [2026-05-28T18:29:40+03:00] compile | 2026-05-28.md
+- Source: daily/2026-05-28.md
+- Articles created: [[concepts/codex-wiki-hook-smoke]], [[concepts/release-regression-evidence-checklist]], [[concepts/urnetwork-readiness-connectionstatus]], [[concepts/singbox-autochain-validator-parity]], [[concepts/ci-module-test-coverage-gap]], [[connections/release-regression-ci-vs-runtime-proof]]
+- Articles updated: none

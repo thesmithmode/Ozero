@@ -59,7 +59,12 @@ class MasterDnsClientServiceTest {
         val wrapperFactory: () -> MasterDnsClientWrapperContract = {
             object : MasterDnsClientWrapperContract {
                 override val binary: File = File("/tmp/libmdnsvpn.so")
-                override fun startClient(configPath: String, resolversPath: String, logPath: String?): Process =
+                override fun startClient(
+                    configPath: String,
+                    resolversPath: String,
+                    logPath: String?,
+                    upstreamSocksUrl: String?,
+                ): Process =
                     throw java.io.IOException("binary missing")
             }
         }
@@ -89,7 +94,12 @@ class MasterDnsClientServiceTest {
             wrapperFactory = {
                 object : MasterDnsClientWrapperContract {
                     override val binary: File = File("/tmp/libmdnsvpn.so")
-                    override fun startClient(configPath: String, resolversPath: String, logPath: String?): Process =
+                    override fun startClient(
+                        configPath: String,
+                        resolversPath: String,
+                        logPath: String?,
+                        upstreamSocksUrl: String?,
+                    ): Process =
                         processes.removeAt(0)
                 }
             },
@@ -130,6 +140,7 @@ class MasterDnsClientServiceTest {
                         configPath: String,
                         resolversPath: String,
                         logPath: String?,
+                        upstreamSocksUrl: String?,
                     ): Process = process
                 }
             },
