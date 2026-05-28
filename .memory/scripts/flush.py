@@ -14,6 +14,7 @@ from __future__ import annotations
 # Recursion prevention: set this BEFORE any imports that might trigger Claude
 import os
 os.environ["CLAUDE_INVOKED_BY"] = "memory_flush"
+os.environ["CODEX_INVOKED_BY"] = "memory_flush"
 
 import asyncio
 import json
@@ -22,6 +23,8 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+
+from llm_backend import run_text_prompt, selected_backend
 
 ROOT = Path(__file__).resolve().parent.parent
 DAILY_DIR = ROOT / "daily"
@@ -73,15 +76,7 @@ def append_to_daily_log(content: str, section: str = "Session") -> None:
 
 
 async def run_flush(context: str) -> str:
-    """Use Claude Agent SDK to extract important knowledge from conversation context."""
-    from claude_agent_sdk import (
-        AssistantMessage,
-        ClaudeAgentOptions,
-        ResultMessage,
-        TextBlock,
-        query,
-    )
-
+    """Extract important knowledge from conversation context."""
     prompt = f"""Review the conversation context below and respond with a concise summary
 of important items that should be preserved in the daily log.
 Do NOT use any tools — just return plain text.
@@ -114,29 +109,12 @@ respond with exactly: FLUSH_OK
 
 {context}"""
 
-    response = ""
-
     try:
-        async for message in query(
-            prompt=prompt,
-            options=ClaudeAgentOptions(
-                cwd=str(ROOT),
-                allowed_tools=[],
-                max_turns=2,
-            ),
-        ):
-            if isinstance(message, AssistantMessage):
-                for block in message.content:
-                    if isinstance(block, TextBlock):
-                        response += block.text
-            elif isinstance(message, ResultMessage):
-                pass
+        return await run_text_prompt(prompt, ROOT)
     except Exception as e:
         import traceback
-        logging.error("Agent SDK error: %s\n%s", e, traceback.format_exc())
-        response = f"FLUSH_ERROR: {type(e).__name__}: {e}"
-
-    return response
+        logging.error("LLM backend error: %s\n%s", e, traceback.format_exc())
+        return f"FLUSH_ERROR: {type(e).__name__}: {e}"
 
 
 COMPILE_AFTER_HOUR = 18  # 6 PM local time
@@ -220,7 +198,7 @@ def main():
         context_file.unlink(missing_ok=True)
         return
 
-    logging.info("Flushing session %s: %d chars", session_id, len(context))
+    logging.info("Flushing session %s: %d chars via backend=%s", session_id, len(context), selected_backend())
 
     # Run the LLM extraction
     response = asyncio.run(run_flush(context))

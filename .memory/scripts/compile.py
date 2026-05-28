@@ -19,6 +19,7 @@ import sys
 from pathlib import Path
 
 from config import AGENTS_FILE, CONCEPTS_DIR, CONNECTIONS_DIR, DAILY_DIR, KNOWLEDGE_DIR, now_iso
+from llm_backend import run_edit_prompt, selected_backend
 from utils import (
     file_hash,
     list_raw_files,
@@ -37,14 +38,6 @@ async def compile_daily_log(log_path: Path, state: dict) -> float:
 
     Returns the API cost of the compilation.
     """
-    from claude_agent_sdk import (
-        AssistantMessage,
-        ClaudeAgentOptions,
-        ResultMessage,
-        TextBlock,
-        query,
-    )
-
     log_content = log_path.read_text(encoding="utf-8")
     schema = AGENTS_FILE.read_text(encoding="utf-8")
     wiki_index = read_wiki_index()
@@ -123,30 +116,16 @@ Read the daily log above and compile it into wiki articles following the schema 
 - Details section should have 2+ paragraphs
 - Related Concepts section should have 2+ entries
 - Sources section should cite the daily log with specific claims extracted
+
+Make the file changes directly. Keep output concise.
 """
 
     cost = 0.0
 
     try:
-        async for message in query(
-            prompt=prompt,
-            options=ClaudeAgentOptions(
-                cwd=str(ROOT_DIR),
-                system_prompt={"type": "preset", "preset": "claude_code"},
-                allowed_tools=["Read", "Write", "Edit", "Glob", "Grep"],
-                permission_mode="acceptEdits",
-                max_turns=30,
-                setting_sources=[],
-                plugins=[],
-            ),
-        ):
-            if isinstance(message, AssistantMessage):
-                for block in message.content:
-                    if isinstance(block, TextBlock):
-                        pass  # compilation output - LLM writes files directly
-            elif isinstance(message, ResultMessage):
-                cost = message.total_cost_usd or 0.0
-                print(f"  Cost: ${cost:.4f}")
+        print(f"  Backend: {selected_backend()}")
+        cost = await run_edit_prompt(prompt, ROOT_DIR)
+        print(f"  Cost: ${cost:.4f}")
     except Exception as e:
         print(f"  Error: {e}")
         return 0.0
