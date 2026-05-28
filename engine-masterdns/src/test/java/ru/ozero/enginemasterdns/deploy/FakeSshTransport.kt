@@ -20,10 +20,12 @@ class FakeSshTransport : SshTransport {
 
     override fun exec(command: String, timeoutMs: Long): String {
         executedCommands.add(command)
-        for ((key, value) in commandResponses) {
-            if (command.contains(key)) return value
-        }
-        return ""
+        return commandResponses
+            .entries
+            .filter { command.contains(it.key) }
+            .maxByOrNull { it.key.length }
+            ?.value
+            ?: ""
     }
 
     var closeCalled = false

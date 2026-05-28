@@ -323,6 +323,51 @@ class WarpSettingsModelTest {
     }
 
     @Test
+    fun `parser falls back for invalid numeric awg fields`() {
+        val parsed = WarpConfParser.parse(
+            """
+            [Interface]
+            PrivateKey = private-key
+            Address = 10.0.0.2
+            Jc = bad
+            Jmin = bad
+            Jmax = bad
+            S1 = bad
+            S2 = bad
+            S3 = bad
+            S4 = bad
+            H1 = bad
+            H2 = bad
+            H3 = bad
+            H4 = bad
+            I1 = <b 0X0A0B>
+            I2 = 0X0102
+            I3 = <b 0x010203
+            [Peer]
+            PublicKey = peer-key
+            Endpoint = endpoint:2408
+            """.trimIndent(),
+        ).getOrThrow()
+
+        assertEquals("10.0.0.2/32", parsed.interfaceAddressV4)
+        assertEquals("", parsed.interfaceAddressV6)
+        assertEquals(AwgParams.DEFAULT_JC, parsed.awgParams.junkPacketCount)
+        assertEquals(AwgParams.DEFAULT_JMIN, parsed.awgParams.junkPacketMinSize)
+        assertEquals(AwgParams.DEFAULT_JMAX, parsed.awgParams.junkPacketMaxSize)
+        assertEquals(AwgParams.DEFAULT_S1, parsed.awgParams.initPacketJunkSize)
+        assertEquals(AwgParams.DEFAULT_S2, parsed.awgParams.responsePacketJunkSize)
+        assertEquals(AwgParams.DEFAULT_S3, parsed.awgParams.underloadPacketJunkSize)
+        assertEquals(AwgParams.DEFAULT_S4, parsed.awgParams.payloadPacketJunkSize)
+        assertEquals(AwgParams.DEFAULT_H1, parsed.awgParams.initPacketMagicHeader)
+        assertEquals(AwgParams.DEFAULT_H2, parsed.awgParams.responsePacketMagicHeader)
+        assertEquals(AwgParams.DEFAULT_H3, parsed.awgParams.cookieReplyMagicHeader)
+        assertEquals(AwgParams.DEFAULT_H4, parsed.awgParams.transportMagicHeader)
+        assertEquals("0a0b", parsed.awgParams.payloadHexI1)
+        assertEquals("0102", parsed.awgParams.payloadHexI2)
+        assertEquals(AwgParams.DEFAULT_I3, parsed.awgParams.specialJunk3)
+    }
+
+    @Test
     fun `builder omits awg section for vanilla params and blank ipv6`() {
         val built = WarpIniBuilder.build(
             sampleConfig().copy(
@@ -418,6 +463,9 @@ class WarpSettingsModelTest {
             AwgParams(junkPacketCount = -1)
         }
         assertThrows(IllegalArgumentException::class.java) {
+            AwgParams(junkPacketCount = 129)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
             AwgParams(initPacketJunkSize = 2000)
         }
         assertThrows(IllegalArgumentException::class.java) {
@@ -431,6 +479,9 @@ class WarpSettingsModelTest {
         }
         assertThrows(IllegalArgumentException::class.java) {
             AwgParams(initPacketMagicHeader = 0)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            AwgParams(initPacketMagicHeader = 0x1_0000_0000L)
         }
         assertThrows(IllegalArgumentException::class.java) {
             AwgParams(initPacketMagicHeader = 1, responsePacketMagicHeader = 1)
