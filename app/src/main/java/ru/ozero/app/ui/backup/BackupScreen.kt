@@ -54,6 +54,8 @@ fun BackupScreen(
     viewModel: BackupViewModel = hiltViewModel(),
     importOnly: Boolean = false,
     showTopBar: Boolean = true,
+    showWarning: Boolean = true,
+    confirmImportImmediately: Boolean = false,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -95,6 +97,9 @@ fun BackupScreen(
                 snackbar.showSnackbar("$errorPrefix${(state as BackupUiState.Error).message}")
                 viewModel.dismissResult()
             }
+            is BackupUiState.PendingImport -> if (confirmImportImmediately) {
+                viewModel.confirmImport((state as BackupUiState.PendingImport).availableCategories)
+            }
             else -> Unit
         }
     }
@@ -124,13 +129,15 @@ fun BackupScreen(
                 .padding(horizontal = 24.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(
-                text = stringResource(R.string.backup_warning),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (showWarning) {
+                Text(
+                    text = stringResource(R.string.backup_warning),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
 
-            Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(8.dp))
+            }
 
             if (state == BackupUiState.InProgress) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
@@ -172,14 +179,16 @@ fun BackupScreen(
         )
     }
 
-    (state as? BackupUiState.PendingImport)?.let { pending ->
-        CategoryPickerDialog(
-            title = stringResource(R.string.backup_select_import_title),
-            available = pending.availableCategories,
-            initiallySelected = pending.availableCategories,
-            onConfirm = { selected -> viewModel.confirmImport(selected) },
-            onDismiss = { viewModel.cancelImport() },
-        )
+    if (!confirmImportImmediately) {
+        (state as? BackupUiState.PendingImport)?.let { pending ->
+            CategoryPickerDialog(
+                title = stringResource(R.string.backup_select_import_title),
+                available = pending.availableCategories,
+                initiallySelected = pending.availableCategories,
+                onConfirm = { selected -> viewModel.confirmImport(selected) },
+                onDismiss = { viewModel.cancelImport() },
+            )
+        }
     }
 }
 

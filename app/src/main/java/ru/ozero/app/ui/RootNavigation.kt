@@ -11,7 +11,6 @@ import androidx.compose.runtime.setValue
 import ru.ozero.enginescore.EngineId
 import ru.ozero.app.ui.about.AboutScreen
 import ru.ozero.app.ui.backup.BackupScreen
-import ru.ozero.app.ui.diag.DiagnosticsScreen
 import ru.ozero.app.ui.logs.LogsScreen
 import ru.ozero.app.ui.servers.ServersScreen
 import ru.ozero.app.ui.settings.AutoModeSettingsScreen
@@ -74,7 +73,6 @@ fun RootNavigation(
                     onOpenSingboxSettings = { navigate(TopScreen.SingboxSettings) },
                     onOpenChainSettings = { navigate(TopScreen.ChainSettings) },
                     onOpenStatsHistory = { navigate(TopScreen.StatsHistory) },
-                    onOpenDiagnostics = { navigate(TopScreen.Diagnostics) },
                     onOpenBackup = { navigate(TopScreen.Backup) },
                     onOpenAutoModeSettings = { navigate(TopScreen.AutoModeSettings) },
                     onOpenLanguage = { navigate(TopScreen.Language) },
@@ -83,7 +81,6 @@ fun RootNavigation(
             TopScreen.Language -> LanguageScreen(onBack = { back() })
             TopScreen.Backup -> BackupScreen(onBack = { back() })
             TopScreen.Logs -> LogsScreen(onBack = { back() })
-            TopScreen.Diagnostics -> DiagnosticsScreen(onBack = { back() })
             TopScreen.SplitTunnel -> SplitTunnelScreen(onBack = { back() })
             TopScreen.Servers -> ServersScreen(onBack = { back() })
             TopScreen.About -> AboutScreen(onBack = { back() })

@@ -33,6 +33,7 @@ class AppBackupSerializerTest {
             byJwt = "jwt-x",
             byClientJwt = "client-jwt-x",
             devicePubkey = "pub-x",
+            deviceSeed = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
             deviceNetworkName = "device-x",
             windowType = "speed",
             fixedIpSize = true,
@@ -91,6 +92,7 @@ class AppBackupSerializerTest {
         assertEquals("jwt-x", u.byJwt)
         assertEquals("client-jwt-x", u.byClientJwt)
         assertEquals("pub-x", u.devicePubkey)
+        assertEquals("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", u.deviceSeed)
         assertEquals("device-x", u.deviceNetworkName)
         assertEquals("speed", u.windowType)
         assertEquals(true, u.fixedIpSize)

@@ -79,4 +79,14 @@ class InMemoryDeviceIdentityTest {
                 "и identity ломается. seed.copyOf() в init().",
         )
     }
+
+    @Test
+    fun `export and import seed restores same pubkey`() = runTest {
+        val source = InMemoryUrnetworkDeviceIdentity(ByteArray(32) { (it + 11).toByte() })
+        val target = InMemoryUrnetworkDeviceIdentity(ByteArray(32) { (it + 22).toByte() })
+        val seed = source.exportSeedForBackup()
+
+        assertTrue(target.importSeedFromBackup(seed))
+        assertEquals(source.pubkeyBase58(), target.pubkeyBase58())
+    }
 }

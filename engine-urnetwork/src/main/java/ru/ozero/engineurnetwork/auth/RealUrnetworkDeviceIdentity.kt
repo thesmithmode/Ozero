@@ -40,6 +40,20 @@ class RealUrnetworkDeviceIdentity(
         signer.generateSignature()
     }
 
+    override suspend fun exportSeedForBackup(): ByteArray? = withContext(Dispatchers.IO) {
+        ensureLoaded().encoded.copyOf()
+    }
+
+    override suspend fun importSeedFromBackup(seed: ByteArray): Boolean = withContext(Dispatchers.IO) {
+        if (seed.size != ED25519_SEED_LEN) return@withContext false
+        mutex.withLock {
+            val copy = seed.copyOf()
+            writeEncrypted(File(File(app.filesDir, KEYPAIR_DIR).apply { if (!exists()) mkdirs() }, KEYPAIR_FILE), copy)
+            loaded = Ed25519PrivateKeyParameters(copy, 0)
+            true
+        }
+    }
+
     private suspend fun ensureLoaded(): Ed25519PrivateKeyParameters {
         loaded?.let { return it }
         return mutex.withLock {

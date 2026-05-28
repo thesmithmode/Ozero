@@ -216,6 +216,10 @@ class EngineUrnetwork(
                             "deadline=${peerReadyTimeoutMs}ms",
                     )
                 }
+                if (polls % PEER_RECONNECT_EVERY == 0) {
+                    runCatching { sdkBridge.retryPreferredConnection() }
+                        .onFailure { PersistentLoggers.warn(TAG, "retryPreferredConnection threw: ${it.message}") }
+                }
                 delay(peerReadyPollMs)
             }
         }
@@ -246,5 +250,6 @@ class EngineUrnetwork(
         const val PEER_READY_TIMEOUT_MS = 45_000L
         const val PEER_READY_POLL_MS = 200L
         const val PEER_PROGRESS_LOG_EVERY = 15
+        const val PEER_RECONNECT_EVERY = 25
     }
 }

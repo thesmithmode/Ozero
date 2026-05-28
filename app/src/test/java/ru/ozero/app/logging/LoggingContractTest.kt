@@ -17,8 +17,6 @@ class LoggingContractTest {
         "app/src/main/java/ru/ozero/app/selfupdate/UpdateCoordinator.kt",
         "app/src/main/java/ru/ozero/app/selfupdate/UpdateInstallEventBus.kt",
         "app/src/main/java/ru/ozero/app/selfupdate/UpdateInstallResultReceiver.kt",
-        "app/src/main/java/ru/ozero/app/ui/diag/DiagnosticsTester.kt",
-        "app/src/main/java/ru/ozero/app/ui/diag/DiagnosticsViewModel.kt",
         "app/src/main/java/ru/ozero/app/BootReceiver.kt",
         "app/src/main/java/ru/ozero/app/warp/WarpEngineService.kt",
         "engines-core/src/main/java/ru/ozero/enginescore/PersistentLogger.kt",

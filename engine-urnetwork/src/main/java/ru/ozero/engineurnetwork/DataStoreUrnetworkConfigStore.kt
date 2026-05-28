@@ -8,6 +8,8 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import org.json.JSONArray
+import org.json.JSONObject
 
 class DataStoreUrnetworkConfigStore(
     private val dataStore: DataStore<Preferences>,
@@ -40,6 +42,10 @@ class DataStoreUrnetworkConfigStore(
             region = prefs[KEY_SELECTED_REGION]?.takeIf { it.isNotBlank() },
             city = prefs[KEY_SELECTED_CITY]?.takeIf { it.isNotBlank() },
         ),
+        cachedCountries = readLocationCache(prefs[KEY_CACHED_COUNTRIES]),
+        cachedRegions = readLocationCache(prefs[KEY_CACHED_REGIONS]),
+        cachedCities = readLocationCache(prefs[KEY_CACHED_CITIES]),
+        cachedBestMatches = readLocationCache(prefs[KEY_CACHED_BEST_MATCHES]),
     )
 
     private fun writeConfig(prefs: MutablePreferences, cfg: UrnetworkConfig) {
@@ -57,6 +63,53 @@ class DataStoreUrnetworkConfigStore(
         prefs.writeOrRemove(KEY_SELECTED_COUNTRY_CODE, cfg.selectedLocation.countryCode)
         prefs.writeOrRemove(KEY_SELECTED_REGION, cfg.selectedLocation.region)
         prefs.writeOrRemove(KEY_SELECTED_CITY, cfg.selectedLocation.city)
+        prefs.writeOrRemove(KEY_CACHED_COUNTRIES, writeLocationCache(cfg.cachedCountries))
+        prefs.writeOrRemove(KEY_CACHED_REGIONS, writeLocationCache(cfg.cachedRegions))
+        prefs.writeOrRemove(KEY_CACHED_CITIES, writeLocationCache(cfg.cachedCities))
+        prefs.writeOrRemove(KEY_CACHED_BEST_MATCHES, writeLocationCache(cfg.cachedBestMatches))
+    }
+
+    private fun readLocationCache(raw: String?): List<UrnetworkCachedLocation> {
+        if (raw.isNullOrBlank()) return emptyList()
+        return runCatching {
+            val arr = JSONArray(raw)
+            buildList {
+                for (i in 0 until arr.length()) {
+                    val obj = arr.optJSONObject(i) ?: continue
+                    val name = obj.optString("name").takeIf { it.isNotBlank() } ?: continue
+                    val code = obj.optString("code").takeIf { it.length == 2 } ?: continue
+                    add(
+                        UrnetworkCachedLocation(
+                            name = name,
+                            countryCode = code.uppercase(),
+                            region = obj.optString("region").takeIf { it.isNotBlank() },
+                            city = obj.optString("city").takeIf { it.isNotBlank() },
+                            providerCount = obj.optInt("providers", 0),
+                            isStable = obj.optBoolean("stable", true),
+                            isStrongPrivacy = obj.optBoolean("privacy", false),
+                        ),
+                    )
+                }
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    private fun writeLocationCache(items: List<UrnetworkCachedLocation>): String? {
+        if (items.isEmpty()) return null
+        val arr = JSONArray()
+        items.take(MAX_CACHED_LOCATIONS).forEach { loc ->
+            arr.put(
+                JSONObject()
+                    .put("name", loc.name)
+                    .put("code", loc.countryCode)
+                    .put("region", loc.region)
+                    .put("city", loc.city)
+                    .put("providers", loc.providerCount)
+                    .put("stable", loc.isStable)
+                    .put("privacy", loc.isStrongPrivacy),
+            )
+        }
+        return arr.toString()
     }
 
     private companion object {
@@ -74,6 +127,11 @@ class DataStoreUrnetworkConfigStore(
         val KEY_SELECTED_COUNTRY_CODE = stringPreferencesKey("urnetwork_selected_country_code")
         val KEY_SELECTED_REGION = stringPreferencesKey("urnetwork_selected_region")
         val KEY_SELECTED_CITY = stringPreferencesKey("urnetwork_selected_city")
+        val KEY_CACHED_COUNTRIES = stringPreferencesKey("urnetwork_cached_countries")
+        val KEY_CACHED_REGIONS = stringPreferencesKey("urnetwork_cached_regions")
+        val KEY_CACHED_CITIES = stringPreferencesKey("urnetwork_cached_cities")
+        val KEY_CACHED_BEST_MATCHES = stringPreferencesKey("urnetwork_cached_best_matches")
+        const val MAX_CACHED_LOCATIONS = 500
     }
 }
 

@@ -14,6 +14,7 @@ import ru.ozero.corebackup.StrategyBackupProvider
 import ru.ozero.corestorage.dao.AppSplitRuleDao
 import ru.ozero.enginefptn.FptnConfigStore
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
+import ru.ozero.engineurnetwork.auth.UrnetworkDeviceIdentity
 import ru.ozero.enginewarp.WarpConfigSlotStore
 import javax.inject.Singleton
 
@@ -40,6 +41,7 @@ object BackupModule {
         splitRuleDao: AppSplitRuleDao,
         fptnStore: FptnConfigStore,
         strategyProvider: StrategyBackupProvider,
+        urnetworkDeviceIdentity: UrnetworkDeviceIdentity,
     ): AppBackupManager = AppBackupManager(
         ozeroSettings = ozeroSettings,
         warpSlotStore = warpSlotStore,
@@ -47,5 +49,6 @@ object BackupModule {
         splitRuleDao = splitRuleDao,
         fptnStore = fptnStore,
         strategyProvider = strategyProvider,
+        urnetworkDeviceIdentity = urnetworkDeviceIdentity,
     )
 }

@@ -19,6 +19,7 @@ object AppBackupSerializer {
         data.urnetwork.byJwt?.let { urn.put("byJwt", it) }
         data.urnetwork.byClientJwt?.let { urn.put("byClientJwt", it) }
         data.urnetwork.devicePubkey?.let { urn.put("devicePubkey", it) }
+        data.urnetwork.deviceSeed?.let { urn.put("deviceSeed", it) }
         data.urnetwork.deviceNetworkName?.let { urn.put("deviceNetworkName", it) }
         data.urnetwork.windowType?.let { urn.put("windowType", it) }
         data.urnetwork.fixedIpSize?.let { urn.put("fixedIpSize", it) }
@@ -86,6 +87,7 @@ object AppBackupSerializer {
             byJwt = u.optString("byJwt").takeIf { it.isNotEmpty() },
             byClientJwt = u.optString("byClientJwt").takeIf { it.isNotEmpty() },
             devicePubkey = u.optString("devicePubkey").takeIf { it.isNotEmpty() },
+            deviceSeed = u.optString("deviceSeed").takeIf { it.isNotEmpty() },
             deviceNetworkName = u.optString("deviceNetworkName").takeIf { it.isNotEmpty() },
             windowType = u.optString("windowType").takeIf { it.isNotEmpty() },
             fixedIpSize = u.booleanOrNull("fixedIpSize"),

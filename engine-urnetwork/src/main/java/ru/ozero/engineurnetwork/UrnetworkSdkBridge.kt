@@ -30,6 +30,7 @@ interface UrnetworkSdkBridge {
     fun isDeviceAvailable(): Boolean = false
 
     fun setPreferredLocation(selection: UrnetworkLocationSelection?) {}
+    fun retryPreferredConnection() {}
 
     fun setProvidePaused(paused: Boolean)
     fun isProvidePaused(): Boolean

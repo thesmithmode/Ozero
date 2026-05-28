@@ -10,7 +10,7 @@ data class AppBackupData(
     val strategy: BackupStrategy? = null,
 ) {
     companion object {
-        const val CURRENT_VERSION = 3
+        const val CURRENT_VERSION = 4
     }
 }
 
@@ -75,6 +75,7 @@ data class BackupUrnetwork(
     val byJwt: String? = null,
     val byClientJwt: String? = null,
     val devicePubkey: String? = null,
+    val deviceSeed: String? = null,
     val deviceNetworkName: String? = null,
     val windowType: String? = null,
     val fixedIpSize: Boolean? = null,

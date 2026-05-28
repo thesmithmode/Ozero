@@ -372,6 +372,19 @@ class RealUrnetworkSdkBridge(
         Log.i(TAG, "preferredLocation set to ${cleaned?.summary() ?: "<auto>"}")
     }
 
+    override fun retryPreferredConnection() {
+        if (!running.get()) return
+        val cv = connectVcRef.get() ?: return
+        val device = deviceRef.get()
+        val preferred = preferredLocationRef.get()
+        if (preferred != null && device != null) {
+            preferredLocationConnector.connect(preferred, device, cv)
+        } else {
+            runCatching { cv.connectBestAvailable() }
+                .onFailure { PersistentLoggers.warn(TAG, "retry connectBestAvailable threw: ${it.message}") }
+        }
+    }
+
     override fun contractStatus(): StateFlow<UrnetworkSdkBridge.ContractStatusSnapshot> =
         contractStatusListener.status
 

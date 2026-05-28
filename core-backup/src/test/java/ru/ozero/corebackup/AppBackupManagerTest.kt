@@ -20,6 +20,7 @@ import ru.ozero.engineurnetwork.UrnetworkLocationSelection
 import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
 import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
 import ru.ozero.engineurnetwork.UrnetworkWindowType
+import ru.ozero.engineurnetwork.auth.InMemoryUrnetworkDeviceIdentity
 import ru.ozero.enginewarp.AwgParams
 import ru.ozero.enginewarp.WarpConfig
 import ru.ozero.enginewarp.WarpConfigSlot
@@ -36,8 +37,16 @@ class AppBackupManagerTest {
     private val urnStore = FakeUrnetworkStore()
     private val fptnStore = FakeFptnStore()
     private val splitDao = FakeSplitRuleDao()
+    private val urnIdentity = InMemoryUrnetworkDeviceIdentity(ByteArray(32) { (it + 1).toByte() })
 
-    private val manager = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao, fptnStore)
+    private val manager = AppBackupManager(
+        ozeroDs,
+        warpStore,
+        urnStore,
+        splitDao,
+        fptnStore,
+        urnetworkDeviceIdentity = urnIdentity,
+    )
 
     private val sampleWarpSlot = WarpConfigSlot(
         id = "warp-id-1",
@@ -135,6 +144,7 @@ class AppBackupManagerTest {
         assertEquals("jwt-token", data.urnetwork.byJwt)
         assertEquals("client-jwt", data.urnetwork.byClientJwt)
         assertEquals("pub-key-1", data.urnetwork.devicePubkey)
+        assertEquals(44, data.urnetwork.deviceSeed?.length)
         assertEquals("device-name-1", data.urnetwork.deviceNetworkName)
         assertEquals("quality", data.urnetwork.windowType)
         assertEquals(true, data.urnetwork.fixedIpSize)
@@ -209,11 +219,21 @@ class AppBackupManagerTest {
 
     @Test
     fun `import — Urnetwork prefs восстанавливаются`() = runTest {
+        val importedIdentity = InMemoryUrnetworkDeviceIdentity(ByteArray(32) { 9 })
+        val importingManager = AppBackupManager(
+            ozeroDs,
+            warpStore,
+            urnStore,
+            splitDao,
+            fptnStore,
+            urnetworkDeviceIdentity = importedIdentity,
+        )
         val data = makeMinimalBackup().copy(
             urnetwork = BackupUrnetwork(
                 byJwt = "imported-jwt",
                 byClientJwt = "imported-client-jwt",
                 devicePubkey = "imported-pub",
+                deviceSeed = manager.export().urnetwork.deviceSeed,
                 deviceNetworkName = "imported-device",
                 windowType = "speed",
                 fixedIpSize = true,
@@ -224,7 +244,7 @@ class AppBackupManagerTest {
                 selectedLocation = BackupUrnetworkLocation("ES", "Madrid", "Madrid"),
             ),
         )
-        manager.import(data)
+        importingManager.import(data)
 
         val cfg = urnStore.config().first()
         assertEquals("imported-jwt", cfg.byJwt)
@@ -239,6 +259,7 @@ class AppBackupManagerTest {
         assertEquals(UrnetworkProvideNetworkMode.ALL, cfg.provideNetworkMode)
         assertEquals("ES", cfg.selectedLocation.countryCode)
         assertEquals("Madrid", cfg.selectedLocation.city)
+        assertEquals(urnIdentity.pubkeyBase58(), importedIdentity.pubkeyBase58())
     }
 
     @Test

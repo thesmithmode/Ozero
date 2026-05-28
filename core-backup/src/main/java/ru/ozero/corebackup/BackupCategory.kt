@@ -43,6 +43,7 @@ private fun BackupSettings.hasUrnPrefs(): Boolean =
     listOfNotNull(urnetworkEnabled, urnetworkJwt, urnetworkCountryCode).isNotEmpty()
 
 private fun BackupUrnetwork.hasAny(): Boolean = listOfNotNull(
-    byJwt, byClientJwt, devicePubkey, deviceNetworkName, windowType, fixedIpSize, allowDirect, provideEnabled,
-    provideControlMode, provideNetworkMode, selectedLocation,
+    byJwt, byClientJwt, devicePubkey, deviceSeed, deviceNetworkName, windowType,
+    fixedIpSize, allowDirect, provideEnabled, provideControlMode, provideNetworkMode,
+    selectedLocation,
 ).isNotEmpty()

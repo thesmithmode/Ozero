@@ -14,6 +14,7 @@ import ru.ozero.engineurnetwork.UrnetworkLocationSelection
 import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
 import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
 import ru.ozero.engineurnetwork.UrnetworkWindowType
+import ru.ozero.engineurnetwork.auth.UrnetworkDeviceIdentity
 import ru.ozero.enginewarp.AwgParams
 import ru.ozero.enginewarp.WarpConfig
 import ru.ozero.enginewarp.WarpConfigSlot
@@ -29,6 +30,7 @@ class AppBackupManager(
     private val splitRuleDao: AppSplitRuleDao,
     private val fptnStore: FptnConfigStore? = null,
     private val strategyProvider: StrategyBackupProvider? = null,
+    private val urnetworkDeviceIdentity: UrnetworkDeviceIdentity? = null,
 ) {
 
     suspend fun export(categories: Set<BackupCategory> = BackupCategory.ALL): AppBackupData {
@@ -114,6 +116,8 @@ class AppBackupManager(
             byJwt = cfg.byJwt?.takeIf { it.isNotBlank() },
             byClientJwt = cfg.byClientJwt?.takeIf { it.isNotBlank() },
             devicePubkey = cfg.devicePubkey?.takeIf { it.isNotBlank() },
+            deviceSeed = urnetworkDeviceIdentity?.exportSeedForBackup()
+                ?.let { Base64Text.encode(it) },
             deviceNetworkName = cfg.deviceNetworkName?.takeIf { it.isNotBlank() },
             windowType = cfg.windowType.rawValue,
             fixedIpSize = cfg.fixedIpSize,
@@ -184,6 +188,11 @@ class AppBackupManager(
     }
 
     private suspend fun importUrnConfig(u: BackupUrnetwork) {
+        u.deviceSeed?.let { encoded ->
+            runCatching { Base64Text.decode(encoded) }
+                .getOrNull()
+                ?.let { urnetworkDeviceIdentity?.importSeedFromBackup(it) }
+        }
         urnetworkStore.update { current ->
             current.copy(
                 byJwt = u.byJwt ?: current.byJwt,

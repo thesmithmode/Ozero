@@ -22,10 +22,24 @@ data class UrnetworkConfig(
     val provideControlMode: UrnetworkProvideControlMode = UrnetworkProvideControlMode.ALWAYS,
     val provideNetworkMode: UrnetworkProvideNetworkMode = UrnetworkProvideNetworkMode.WIFI,
     val selectedLocation: UrnetworkLocationSelection = UrnetworkLocationSelection.EMPTY,
+    val cachedCountries: List<UrnetworkCachedLocation> = emptyList(),
+    val cachedRegions: List<UrnetworkCachedLocation> = emptyList(),
+    val cachedCities: List<UrnetworkCachedLocation> = emptyList(),
+    val cachedBestMatches: List<UrnetworkCachedLocation> = emptyList(),
 ) {
     val walletAddress: String
         get() = walletOverride?.takeIf { it.isNotBlank() } ?: UrnetworkDefaults.PRESET_WALLET
 }
+
+data class UrnetworkCachedLocation(
+    val name: String,
+    override val countryCode: String?,
+    override val region: String? = null,
+    override val city: String? = null,
+    val providerCount: Int = 0,
+    val isStable: Boolean = true,
+    val isStrongPrivacy: Boolean = false,
+) : UrnetworkSdkBridge.LocationToken
 
 data class UrnetworkLocationSelection(
     val countryCode: String?,
@@ -137,6 +151,22 @@ suspend fun UrnetworkConfigStore.setSelectedLocation(value: UrnetworkLocationSel
                 region = value.region?.trim()?.takeIf { it.isNotEmpty() },
                 city = value.city?.trim()?.takeIf { it.isNotEmpty() },
             ),
+        )
+    }
+}
+
+suspend fun UrnetworkConfigStore.setCachedLocations(
+    countries: List<UrnetworkCachedLocation>,
+    regions: List<UrnetworkCachedLocation>,
+    cities: List<UrnetworkCachedLocation>,
+    bestMatches: List<UrnetworkCachedLocation>,
+) {
+    update {
+        it.copy(
+            cachedCountries = countries,
+            cachedRegions = regions,
+            cachedCities = cities,
+            cachedBestMatches = bestMatches,
         )
     }
 }

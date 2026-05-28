@@ -15,16 +15,19 @@ import java.util.concurrent.atomic.AtomicBoolean
 internal class UrnetworkPreferredLocationConnector(
     private val bridgeScope: CoroutineScope,
 ) {
+    private val resolving = AtomicBoolean(false)
 
     fun connect(
         selection: UrnetworkLocationSelection,
         device: DeviceLocal,
         cv: ConnectViewController,
     ) {
+        if (!resolving.compareAndSet(false, true)) return
         val locVc = runCatching { device.openLocationsViewController() }.getOrNull()
         if (locVc == null) {
             PersistentLoggers.warn(TAG, "openLocationsViewController null — fallback connectBestAvailable")
             runCatching { cv.connectBestAvailable() }
+            resolving.set(false)
             return
         }
         val attached = AtomicBoolean(false)
@@ -34,6 +37,7 @@ internal class UrnetworkPreferredLocationConnector(
                 runCatching { cv.connectBestAvailable() }
                 runCatching { locVc.stop() }
                 runCatching { locVc.close() }
+                resolving.set(false)
                 PersistentLoggers.warn(
                     TAG,
                     "preferred ${selection.summary()} timeout (${PREFERRED_COUNTRY_TIMEOUT_MS}ms) → fallback connectBestAvailable",
@@ -51,6 +55,7 @@ internal class UrnetworkPreferredLocationConnector(
                     Log.i(TAG, "preferred ${selection.summary()} matched → connected")
                     runCatching { locVc.stop() }
                     runCatching { locVc.close() }
+                    resolving.set(false)
                 }
             }
             locVc.start()
@@ -62,6 +67,7 @@ internal class UrnetworkPreferredLocationConnector(
                 runCatching { cv.connectBestAvailable() }
                 runCatching { locVc.stop() }
                 runCatching { locVc.close() }
+                resolving.set(false)
             }
         }
     }

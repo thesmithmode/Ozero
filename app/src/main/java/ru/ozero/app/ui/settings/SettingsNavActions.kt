@@ -9,7 +9,6 @@ data class SettingsNavActions(
     val onOpenUrnetworkSettings: () -> Unit = {},
     val onOpenWarpSettings: () -> Unit = {},
     val onOpenStatsHistory: () -> Unit = {},
-    val onOpenDiagnostics: () -> Unit = {},
     val onOpenBackup: () -> Unit = {},
     val onOpenAutoModeSettings: () -> Unit = {},
     val onOpenLanguage: () -> Unit = {},
