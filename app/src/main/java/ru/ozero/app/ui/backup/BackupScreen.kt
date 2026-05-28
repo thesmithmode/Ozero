@@ -55,7 +55,6 @@ fun BackupScreen(
     importOnly: Boolean = false,
     showTopBar: Boolean = true,
     showWarning: Boolean = true,
-    confirmImportImmediately: Boolean = false,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -89,7 +88,6 @@ fun BackupScreen(
         exportSuccessMsg = exportSuccessMsg,
         importSuccessMsg = importSuccessMsg,
         errorPrefix = errorPrefix,
-        confirmImportImmediately = confirmImportImmediately,
         viewModel = viewModel,
     )
 
@@ -168,16 +166,14 @@ fun BackupScreen(
         )
     }
 
-    if (!confirmImportImmediately) {
-        (state as? BackupUiState.PendingImport)?.let { pending ->
-            CategoryPickerDialog(
-                title = stringResource(R.string.backup_select_import_title),
-                available = pending.availableCategories,
-                initiallySelected = pending.availableCategories,
-                onConfirm = { selected -> viewModel.confirmImport(selected) },
-                onDismiss = { viewModel.cancelImport() },
-            )
-        }
+    (state as? BackupUiState.PendingImport)?.let { pending ->
+        CategoryPickerDialog(
+            title = stringResource(R.string.backup_select_import_title),
+            available = pending.availableCategories,
+            initiallySelected = pending.availableCategories,
+            onConfirm = { selected -> viewModel.confirmImport(selected) },
+            onDismiss = { viewModel.cancelImport() },
+        )
     }
 }
 
@@ -188,7 +184,6 @@ private fun BackupResultEffects(
     exportSuccessMsg: String,
     importSuccessMsg: String,
     errorPrefix: String,
-    confirmImportImmediately: Boolean,
     viewModel: BackupViewModel,
 ) {
     LaunchedEffect(state) {
@@ -204,9 +199,6 @@ private fun BackupResultEffects(
             is BackupUiState.Error -> {
                 snackbar.showSnackbar("$errorPrefix${state.message}")
                 viewModel.dismissResult()
-            }
-            is BackupUiState.PendingImport -> if (confirmImportImmediately) {
-                viewModel.confirmImport(state.availableCategories)
             }
             else -> Unit
         }

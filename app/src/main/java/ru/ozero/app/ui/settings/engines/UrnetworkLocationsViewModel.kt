@@ -224,7 +224,7 @@ class UrnetworkLocationsViewModel @Inject constructor(
                 is SdkLocationToken -> bridge.connectTo(location)
                 else -> {
                     bridge.setPreferredLocation(targetSelection.normalized())
-                    bridge.retryPreferredConnection()
+                    bridge.connectPreferredLocation()
                 }
             }
             if (previousCountry != targetCountry) startSwitchingIndicator()

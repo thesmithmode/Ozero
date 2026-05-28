@@ -169,7 +169,6 @@ private fun BackupImportStep() {
             importOnly = true,
             showTopBar = false,
             showWarning = false,
-            confirmImportImmediately = true,
         )
     }
 }
