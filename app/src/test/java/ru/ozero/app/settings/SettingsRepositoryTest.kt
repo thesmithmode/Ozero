@@ -21,6 +21,7 @@ import ru.ozero.enginescore.settings.SettingsKeys
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginescore.settings.SplitTunnelMode
+import ru.ozero.enginescore.settings.TrafficMode
 import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -61,6 +62,7 @@ class SettingsRepositoryTest {
         assertEquals(SplitTunnelMode.ALL, current.splitMode)
         assertFalse(current.ipv6Enabled)
         assertFalse(current.autoStart)
+        assertEquals(TrafficMode.TUN, current.trafficMode)
         assertNull(current.manualEngine)
     }
 
@@ -100,6 +102,24 @@ class SettingsRepositoryTest {
         repository.setAutoStart(false)
         assertFalse(repository.settings.first().autoStart)
         assertEquals(listOf(true, false), autoStartGateway.invocations)
+    }
+
+    @Test
+    fun `setTrafficMode persists PROXY and round-trips back to TUN`() = runTest {
+        repository.setTrafficMode(TrafficMode.PROXY)
+        assertEquals(TrafficMode.PROXY, repository.settings.first().trafficMode)
+
+        repository.setTrafficMode(TrafficMode.TUN)
+        assertEquals(TrafficMode.TUN, repository.settings.first().trafficMode)
+    }
+
+    @Test
+    fun `unknown traffic mode in DataStore falls back to TUN`() = runTest {
+        dataStore.edit { prefs ->
+            prefs[SettingsKeys.TRAFFIC_MODE] = "WIRELESS"
+        }
+
+        assertEquals(TrafficMode.TUN, repository.settings.first().trafficMode)
     }
 
     @Test

@@ -19,6 +19,7 @@ internal object BackupSettingsSerializer {
         s.uiLocaleTag?.let { obj.put("uiLocaleTag", it) }
         s.appMode?.let { obj.put("appMode", it) }
         s.engineAutoPriority?.let { obj.put("engineAutoPriority", it) }
+        s.trafficMode?.let { obj.put("trafficMode", it) }
         s.bydpiUseUiMode?.let { obj.put("bydpiUseUiMode", it) }
         s.bydpiUiSettingsJson?.let { obj.put("bydpiUiSettingsJson", it) }
         s.bydpiDefaultAccepted?.let { obj.put("bydpiDefaultAccepted", it) }
@@ -42,6 +43,7 @@ internal object BackupSettingsSerializer {
             uiLocaleTag = s.optString("uiLocaleTag").takeIf { it.isNotEmpty() },
             appMode = s.optString("appMode").takeIf { it.isNotEmpty() },
             engineAutoPriority = s.optString("engineAutoPriority").takeIf { it.isNotEmpty() },
+            trafficMode = s.optString("trafficMode").takeIf { it.isNotEmpty() },
             bydpiUseUiMode = s.booleanOrNull("bydpiUseUiMode"),
             bydpiUiSettingsJson = s.optString("bydpiUiSettingsJson").takeIf { it.isNotEmpty() },
             bydpiDefaultAccepted = s.booleanOrNull("bydpiDefaultAccepted"),

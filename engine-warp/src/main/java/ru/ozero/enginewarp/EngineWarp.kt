@@ -33,8 +33,10 @@ import ru.ozero.enginescore.TunSpec
 import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.VpnSocketProtector
 import ru.ozero.enginescore.VpnSocketProtectorHolder
+import ru.ozero.enginescore.probe.Socks5HandshakeProbe
 import ru.ozero.enginescore.settings.SettingsModel
 
+@Suppress("TooManyFunctions")
 class EngineWarp(
     private val autoConfig: WarpAutoConfig,
     private val configStore: WarpConfigSlotStore,
@@ -73,6 +75,8 @@ class EngineWarp(
         localOnly = false,
         requiresServer = false,
         supportsUpstreamSocks = false,
+        providesLocalSocks = true,
+        providesLocalSocksWithoutUpstream = true,
     )
 
     private val _stats = MutableStateFlow(EngineStats())
@@ -83,15 +87,21 @@ class EngineWarp(
     @Volatile
     private var resolvedIni: String? = null
 
+    @Volatile
+    private var activeSocksPort: Int = WARP_NO_SOCKS_PORT
+
     override fun buildManualConfig(settings: SettingsModel?): EngineConfig = EngineConfig.Warp
 
+    override fun buildProxyConfig(settings: SettingsModel?): EngineConfig = EngineConfig.WarpProxy()
+
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
+        if (config is EngineConfig.WarpProxy) return startProxy(config, upstream)
         require(config is EngineConfig.Warp) { "EngineWarp требует EngineConfig.Warp" }
         require(upstream is Upstream.None) {
             "EngineWarp не принимает upstream — supportsUpstreamSocks=false"
         }
         val cached = resolvedConfig
-        val cachedIni = resolvedIni
+        val cachedIni = if (activeSocksPort > 0) null else resolvedIni
         val resolved = if (cached != null && cachedIni != null) {
             ResolvedWarp(cached, cachedIni, "cached")
         } else {
@@ -102,7 +112,42 @@ class EngineWarp(
         resolvedConfig = resolved.config
         resolvedIni = resolved.ini
         Log.i(TAG, "resolved config: ${resolved.config} (iniSource=${resolved.iniSource})")
+        activeSocksPort = WARP_NO_SOCKS_PORT
         return StartResult.Success(socksPort = WARP_NO_SOCKS_PORT)
+    }
+
+    private suspend fun startProxy(config: EngineConfig.WarpProxy, upstream: Upstream): StartResult {
+        require(upstream is Upstream.None) {
+            "EngineWarp proxy does not accept upstream because supportsUpstreamSocks=false"
+        }
+        val cached = resolvedConfig
+        val cachedIni = if (activeSocksPort > 0) null else resolvedIni
+        val resolved = if (cached != null && cachedIni != null) {
+            ResolvedWarp(cached, cachedIni, "cached")
+        } else {
+            resolveActive() ?: return StartResult.Failure(
+                reason = "WARP config resolve failed (auto-register unavailable)",
+            )
+        }
+        val proxyIni = appendSocks5Inbound(resolved.ini, config.socksPort)
+        return when (
+            val r = sdkBridge.startProxy(
+                TUNNEL_NAME,
+                proxyIni,
+                uapiPathProvider(),
+                config.socksPort,
+                socketProtector,
+            )
+        ) {
+            WarpSdkBridge.ProxyResult.Success -> {
+                resolvedConfig = resolved.config
+                resolvedIni = proxyIni
+                activeSocksPort = config.socksPort
+                Log.i(TAG, "resolved proxy config: ${resolved.config} (iniSource=${resolved.iniSource})")
+                StartResult.Success(socksPort = config.socksPort)
+            }
+            is WarpSdkBridge.ProxyResult.Failed -> StartResult.Failure(reason = r.reason)
+        }
     }
 
     override suspend fun stop() {
@@ -111,6 +156,7 @@ class EngineWarp(
         connectedSinceRef.set(0L)
         _stats.value = EngineStats()
         savedTunFd = -1
+        activeSocksPort = WARP_NO_SOCKS_PORT
         consecutiveRecoverFails = 0
         networkCallback?.let { cb ->
             networkCallback = null
@@ -119,6 +165,7 @@ class EngineWarp(
                     ?.unregisterNetworkCallback(cb)
             }.onFailure { PersistentLoggers.warn(TAG, "unregisterNetworkCallback failed: ${it.message}") }
         }
+        sdkBridge.stopProxy()
         sdkBridge.detachTun()
         resolvedConfig = null
         resolvedIni = null
@@ -189,6 +236,29 @@ class EngineWarp(
     }
 
     override suspend fun awaitReady(): EnginePlugin.ReadyResult {
+        val socksPort = activeSocksPort
+        if (socksPort > 0) {
+            val reached = withTimeoutOrNull(warpReadyTimeoutMs) {
+                while (true) {
+                    val ready = runCatching {
+                        Socks5HandshakeProbe.probe("127.0.0.1", socksPort, SOCKS_PROBE_TIMEOUT_MS)
+                    }.isSuccess
+                    if (ready) return@withTimeoutOrNull Unit
+                    delay(warpReadyPollMs)
+                }
+            }
+            return if (reached != null) {
+                _stats.value = _stats.value.copy(
+                    connectedSince = System.currentTimeMillis(),
+                    activeConnections = 1,
+                )
+                EnginePlugin.ReadyResult.Ready
+            } else {
+                val reason = "WARP proxy SOCKS timeout ${warpReadyTimeoutMs}ms (127.0.0.1:$socksPort)"
+                PersistentLoggers.warn(TAG, "awaitReady timeout — $reason")
+                EnginePlugin.ReadyResult.Timeout(reason)
+            }
+        }
         val uapiPath = uapiPathProvider()
         val reached = withTimeoutOrNull(warpReadyTimeoutMs) {
             while (true) {
@@ -218,10 +288,13 @@ class EngineWarp(
         }
     }
 
-    override suspend fun probe(): ProbeResult =
-        ProbeResult.Failure(reason = "WARP не предоставляет SOCKS-интерфейс")
+    override suspend fun probe(): ProbeResult {
+        if (activeSocksPort > 0) return proxyProbe()
+        return ProbeResult.Failure(reason = "WARP не предоставляет SOCKS-интерфейс")
+    }
 
     override suspend fun ipProbeRoute(socksPort: Int): IpProbeRoute {
+        if (activeSocksPort > 0) return IpProbeRoute.Socks("127.0.0.1", activeSocksPort)
         val connected = resolvedConfig?.peerEndpoint?.isNotBlank() == true
         return if (connected) {
             IpProbeRoute.StaticLocation(country = "Cloudflare WARP", countryCode = null)
@@ -507,6 +580,19 @@ class EngineWarp(
             }
         }
 
+    private suspend fun proxyProbe(): ProbeResult =
+        runCatching {
+            Socks5HandshakeProbe.probe("127.0.0.1", activeSocksPort, SOCKS_PROBE_TIMEOUT_MS)
+        }.fold(
+            onSuccess = { ProbeResult.Success(it) },
+            onFailure = { ProbeResult.Failure("WARP proxy probe failed: ${it.message}", it) },
+        )
+
+    private fun appendSocks5Inbound(ini: String, socksPort: Int): String {
+        val trimmed = ini.trimEnd()
+        return "$trimmed\n\n[Socks5]\nBindAddress = 127.0.0.1:$socksPort\n"
+    }
+
     internal companion object {
         fun isLikelyIpAddress(host: String): Boolean {
             if (host.isEmpty()) return false
@@ -521,6 +607,7 @@ class EngineWarp(
         const val DOH_READ_TIMEOUT_MS = 3_000
         const val WARP_READY_TIMEOUT_MS = 10_000L
         const val WARP_READY_POLL_MS = 100L
+        const val SOCKS_PROBE_TIMEOUT_MS = 300
         const val STATS_POLL_INTERVAL_MS = 5_000L
         const val HANDSHAKE_STALE_THRESHOLD_SEC = 180L
         const val STATS_LOG_EVERY = 5

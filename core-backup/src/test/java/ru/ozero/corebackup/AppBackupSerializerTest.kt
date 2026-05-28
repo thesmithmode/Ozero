@@ -23,6 +23,7 @@ class AppBackupSerializerTest {
             uiLocaleTag = "ru",
             appMode = "manual",
             engineAutoPriority = "warp,byedpi",
+            trafficMode = "PROXY",
             bydpiUseUiMode = true,
             bydpiUiSettingsJson = """{"k":"v"}""",
             bydpiDefaultAccepted = false,
@@ -82,6 +83,7 @@ class AppBackupSerializerTest {
         assertEquals("byedpi", s.manualEngine)
         assertEquals("--args", s.bydpiWinningArgs)
         assertEquals("warp,byedpi", s.engineAutoPriority)
+        assertEquals("PROXY", s.trafficMode)
         assertEquals(true, s.bydpiUseUiMode)
         assertEquals("""{"k":"v"}""", s.bydpiUiSettingsJson)
         assertEquals(false, s.bydpiDefaultAccepted)
@@ -214,6 +216,7 @@ class AppBackupSerializerTest {
         assertEquals(1, restored.version)
         assertNull(restored.strategy)
         assertNull(restored.settings.engineAutoPriority)
+        assertNull(restored.settings.trafficMode)
         assertNull(restored.urnetwork.selectedLocation)
     }
 

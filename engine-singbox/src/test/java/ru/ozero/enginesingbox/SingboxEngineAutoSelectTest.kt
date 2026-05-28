@@ -12,7 +12,9 @@ import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.VLESSBean
+import ru.ozero.singboxroom.dao.ProxyChainDao
 import ru.ozero.singboxroom.dao.ProxyProfileDao
+import ru.ozero.singboxroom.entity.ProxyChainStep
 import ru.ozero.singboxroom.entity.ProxyProfile
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -75,13 +77,38 @@ class SingboxEngineAutoSelectTest {
             override suspend fun delete(profile: ProxyProfile) {}
         }
 
+    private fun fakeProxyChainDao(profileIds: List<Long> = emptyList()): ProxyChainDao =
+        object : ProxyChainDao {
+            private val flow = MutableStateFlow(
+                profileIds.mapIndexed { index, id -> ProxyChainStep(profileId = id, userOrder = index) },
+            )
+
+            override fun getAllFlow(): Flow<List<ProxyChainStep>> = flow
+            override suspend fun getAll(): List<ProxyChainStep> = flow.value
+            override suspend fun clear() {
+                flow.value = emptyList()
+            }
+
+            override suspend fun insertAll(steps: List<ProxyChainStep>) {
+                flow.value = steps
+            }
+
+            override suspend fun replace(profileIds: List<Long>) {
+                flow.value = profileIds.mapIndexed { index, id ->
+                    ProxyChainStep(profileId = id, userOrder = index)
+                }
+            }
+        }
+
     private fun buildEngine(
         prefs: Preferences = mutablePreferencesOf(),
         profilesByGroup: Map<Long, List<ProxyProfile>> = emptyMap(),
+        chainProfileIds: List<Long> = emptyList(),
     ): SingboxEngine = SingboxEngine(
         context = mockk(relaxed = true),
         dataStore = fakeDataStore(prefs),
         profileDao = fakeProfileDao(profilesByGroup),
+        proxyChainDao = fakeProxyChainDao(chainProfileIds),
     )
 
     private fun awaitInit() = Thread.sleep(300)
@@ -131,6 +158,25 @@ class SingboxEngineAutoSelectTest {
         assertNotNull(result)
         assertTrue(result is EngineConfig.Singbox)
         assertTrue(result.autoSelectBeanBlobs.isEmpty())
+    }
+
+    @Test
+    fun `manual profile config includes chain wrapper blobs`() {
+        val selected = makeProfile(42L, 1L, "eu.example.com", 443)
+        val wrapper = makeProfile(7L, 1L, "ru.example.com", 443)
+        val prefs = mutablePreferencesOf(beanKey to selected.beanBlob, selectedProfileKey to selected.id)
+        val engine = buildEngine(
+            prefs = prefs,
+            profilesByGroup = mapOf(1L to listOf(wrapper, selected)),
+            chainProfileIds = listOf(wrapper.id, selected.id),
+        )
+        awaitInit()
+
+        val result = engine.buildManualConfig(null)
+
+        assertNotNull(result)
+        assertTrue(result is EngineConfig.Singbox)
+        assertEquals(1, result.chainBeanBlobs.size)
     }
 
     @Test

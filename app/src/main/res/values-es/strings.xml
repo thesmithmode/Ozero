@@ -54,6 +54,10 @@
     <string name="settings_section_updates">Actualizaciones</string>
     <string name="settings_section_about">Acerca de</string>
     <string name="settings_split_mode_label">Modo de túnel dividido</string>
+    <string name="settings_traffic_mode_title">Modo de tráfico</string>
+    <string name="settings_traffic_mode_summary">TUN captura el tráfico Android. Proxy inicia solo un puerto SOCKS local para apps configuradas manualmente.</string>
+    <string name="settings_traffic_mode_tun">TUN / VPN</string>
+    <string name="settings_traffic_mode_proxy">Proxy / SOCKS</string>
     <string name="settings_manual_engine_title">Selección de motor</string>
     <string name="settings_manual_engine_summary">Auto — Ozero elige el mejor</string>
     <string name="settings_manual_engine_auto">Auto</string>
@@ -273,7 +277,7 @@
 
     <!-- Kill switch -->
     <string name="settings_killswitch_title">Kill switch</string>
-    <string name="settings_killswitch_summary">Bloquea todo el tráfico cuando cae el túnel, hasta reconectar</string>
+    <string name="settings_killswitch_summary">Solo TUN: bloquea todo el tráfico cuando cae el túnel, hasta reconectar</string>
     <string name="killswitch_active_badge">Kill switch activo — tráfico bloqueado</string>
 
     <!-- Always-on banner -->
@@ -562,13 +566,10 @@
     <string name="warp_info_close">Cerrar</string>
     <string name="warp_register_error_hint">No se pudo obtener una configuración automáticamente — todas las fuentes no están disponibles. Toca ⓘ arriba, abre uno de los sitios generadores, descarga un .conf e impórtalo.</string>
 
-    <string name="chain_settings_title">Cadena de proxies</string>
-    <string name="chain_settings_summary">Conectar a través de varios motores en secuencia</string>
-    <string name="chain_screen_title">Cadena de proxies</string>
-    <string name="chain_add_step">Añadir motor</string>
-    <string name="chain_remove_step">Eliminar</string>
-    <string name="chain_empty_hint">Añade motores para construir una cadena</string>
-    <string name="chain_enabled">Cadena activada</string>
-    <string name="chain_head_only">Solo al inicio de la cadena</string>
-    <string name="chain_not_chainable">No soporta encadenamiento</string>
+    <string name="singbox_chain_title">Cadena sing-box</string>
+    <string name="singbox_chain_summary">El primer perfil de la lista está más cerca de internet. El servidor sing-box seleccionado se conecta a través de esta cadena.</string>
+    <string name="singbox_chain_step">Paso %1$d</string>
+    <string name="singbox_chain_add">Añadir paso</string>
+    <string name="singbox_chain_remove">Eliminar</string>
+    <string name="singbox_chain_empty">No hay cadena configurada</string>
 </resources>

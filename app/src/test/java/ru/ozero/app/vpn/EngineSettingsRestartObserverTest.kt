@@ -14,10 +14,11 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import ru.ozero.commonvpn.TunnelState
+import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SplitTunnelMode
-import ru.ozero.enginescore.EngineId
-import ru.ozero.commonvpn.TunnelState
+import ru.ozero.enginescore.settings.TrafficMode
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -76,6 +77,25 @@ class EngineSettingsRestartObserverTest {
         assertEquals(EngineId.BYEDPI, snap.manualEngine)
         assertEquals("--foo", snap.byedpiWinningArgs)
         assertEquals(true, snap.ipv6Enabled)
+        assertEquals(TrafficMode.TUN, snap.trafficMode)
+        job.cancel()
+    }
+
+    @Test
+    fun `trafficMode change triggers restart`() = runTest(dispatcher) {
+        val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
+        val observer = newObserver(flow, alwaysConnected())
+
+        val collected = mutableListOf<EngineSettingsRestartObserver.Snapshot>()
+        val job = launch { observer.triggers.toList(collected) }
+        advanceUntilIdle()
+
+        flow.emit(SettingsModel.DEFAULT)
+        flow.emit(SettingsModel.DEFAULT.copy(trafficMode = TrafficMode.PROXY))
+        advanceUntilIdle()
+
+        assertEquals(1, collected.size)
+        assertEquals(TrafficMode.PROXY, collected.single().trafficMode)
         job.cancel()
     }
 
@@ -163,6 +183,7 @@ class EngineSettingsRestartObserverTest {
             manualEngine = EngineId.WARP,
             byedpiWinningArgs = null,
             ipv6Enabled = false,
+            trafficMode = TrafficMode.TUN,
             customDnsServers = emptyList(),
             engineAutoPriority = null,
         )
@@ -212,6 +233,7 @@ class EngineSettingsRestartObserverTest {
             manualEngine = EngineId.WARP,
             byedpiWinningArgs = null,
             ipv6Enabled = false,
+            trafficMode = TrafficMode.TUN,
             customDnsServers = emptyList(),
             engineAutoPriority = null,
         )

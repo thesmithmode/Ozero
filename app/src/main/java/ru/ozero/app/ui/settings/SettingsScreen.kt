@@ -46,6 +46,7 @@ import ru.ozero.app.R
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.SettingsModel
+import ru.ozero.enginescore.settings.TrafficMode
 
 @Suppress("LongParameterList")
 @Composable
@@ -65,7 +66,6 @@ fun SettingsScreen(
     onOpenMasterDnsSettings: () -> Unit = {},
     onOpenFptnSettings: () -> Unit = {},
     onOpenSingboxSettings: () -> Unit = {},
-    onOpenChainSettings: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -88,13 +88,13 @@ fun SettingsScreen(
             onOpenMasterDnsSettings = onOpenMasterDnsSettings,
             onOpenFptnSettings = onOpenFptnSettings,
             onOpenSingboxSettings = onOpenSingboxSettings,
-            onOpenChainSettings = onOpenChainSettings,
         ),
         onIpv6Toggle = viewModel::onIpv6Toggle,
         onAutoStartToggle = viewModel::onAutoStartToggle,
         onKillswitchToggle = viewModel::onKillswitchToggle,
         onAlwaysOnBannerDismissed = viewModel::onAlwaysOnBannerDismissed,
         onManualEngineSelect = viewModel::onManualEngineSelect,
+        onTrafficModeSelect = viewModel::onTrafficModeSelect,
         onAppModeSelect = viewModel::onAppModeSelect,
     )
 }
@@ -111,6 +111,7 @@ fun SettingsScreenContent(
     onKillswitchToggle: (Boolean) -> Unit = {},
     onAlwaysOnBannerDismissed: () -> Unit = {},
     onManualEngineSelect: (EngineId?) -> Unit,
+    onTrafficModeSelect: (TrafficMode) -> Unit = {},
     onAppModeSelect: (AppMode) -> Unit = {},
 ) {
     Scaffold(
@@ -144,6 +145,7 @@ fun SettingsScreenContent(
                     onKillswitchToggle = onKillswitchToggle,
                     onAlwaysOnBannerDismissed = onAlwaysOnBannerDismissed,
                     onManualEngineSelect = onManualEngineSelect,
+                    onTrafficModeSelect = onTrafficModeSelect,
                     onAppModeSelect = onAppModeSelect,
                 )
         }
@@ -173,6 +175,7 @@ private fun ContentBody(
     onKillswitchToggle: (Boolean) -> Unit = {},
     onAlwaysOnBannerDismissed: () -> Unit = {},
     onManualEngineSelect: (EngineId?) -> Unit,
+    onTrafficModeSelect: (TrafficMode) -> Unit = {},
     onAppModeSelect: (AppMode) -> Unit = {},
 ) {
     LazyColumn(
@@ -189,7 +192,9 @@ private fun ContentBody(
         item {
             ConnectionSection(
                 manualEngine = model.manualEngine,
+                trafficMode = model.trafficMode,
                 onManualEngineSelect = onManualEngineSelect,
+                onTrafficModeSelect = onTrafficModeSelect,
                 onOpenServers = nav.onOpenServers,
             )
         }
@@ -208,10 +213,6 @@ private fun ContentBody(
                 onOpenFptn = nav.onOpenFptnSettings,
                 onOpenSingbox = nav.onOpenSingboxSettings,
             )
-        }
-        if (model.appMode == AppMode.EXPERT) {
-            item { SectionDivider() }
-            item { ProxyChainRow(onOpen = nav.onOpenChainSettings) }
         }
         item { SectionDivider() }
         item {
@@ -462,10 +463,30 @@ private fun LogsSection(onOpenLogs: () -> Unit) {
 @Composable
 private fun ConnectionSection(
     manualEngine: EngineId?,
+    trafficMode: TrafficMode,
     onManualEngineSelect: (EngineId?) -> Unit,
+    onTrafficModeSelect: (TrafficMode) -> Unit,
     onOpenServers: () -> Unit,
 ) {
     SectionHeader(R.string.settings_section_connection, SettingsTestTags.SECTION_CONNECTION)
+    SubsectionLabel(stringResource(R.string.settings_traffic_mode_title))
+    Text(
+        text = stringResource(R.string.settings_traffic_mode_summary),
+        style = MaterialTheme.typography.bodySmall,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+    )
+    RadioRow(
+        selected = trafficMode == TrafficMode.TUN,
+        label = stringResource(R.string.settings_traffic_mode_tun),
+        tag = SettingsTestTags.TRAFFIC_MODE_TUN,
+        onClick = { onTrafficModeSelect(TrafficMode.TUN) },
+    )
+    RadioRow(
+        selected = trafficMode == TrafficMode.PROXY,
+        label = stringResource(R.string.settings_traffic_mode_proxy),
+        tag = SettingsTestTags.TRAFFIC_MODE_PROXY,
+        onClick = { onTrafficModeSelect(TrafficMode.PROXY) },
+    )
     SubsectionLabel(stringResource(R.string.settings_manual_engine_title))
     Text(
         text = stringResource(R.string.settings_manual_engine_summary),
@@ -715,17 +736,6 @@ private fun NavRow(
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha * 0.6f),
         )
     }
-}
-
-@Composable
-private fun ProxyChainRow(onOpen: () -> Unit) {
-    NavRow(
-        title = stringResource(R.string.chain_settings_title),
-        summary = stringResource(R.string.chain_settings_summary),
-        tag = "settings_proxy_chain_row",
-        onClick = onOpen,
-        enabled = true,
-    )
 }
 
 @Composable

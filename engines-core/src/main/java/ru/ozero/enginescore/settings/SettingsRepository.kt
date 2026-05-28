@@ -13,6 +13,8 @@ interface SettingsRepository {
 
     suspend fun setAutoStart(enabled: Boolean)
 
+    suspend fun setTrafficMode(mode: TrafficMode) = Unit
+
     suspend fun setManualEngine(engine: EngineId?)
 
     suspend fun setEngineAutoPriority(priority: List<EngineId>) = Unit
@@ -44,6 +46,4 @@ interface SettingsRepository {
     suspend fun setKillswitchEnabled(enabled: Boolean)
 
     suspend fun setAlwaysOnBannerDismissed(dismissed: Boolean)
-
-    suspend fun setProxyChain(chain: List<ChainStepConfig>) = Unit
 }

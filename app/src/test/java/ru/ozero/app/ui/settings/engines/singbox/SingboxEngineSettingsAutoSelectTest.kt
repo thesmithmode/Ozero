@@ -18,8 +18,10 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import ru.ozero.singboxroom.dao.ProxyChainDao
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.dao.SubscriptionGroupDao
+import ru.ozero.singboxroom.entity.ProxyChainStep
 import ru.ozero.singboxroom.entity.ProxyProfile
 import ru.ozero.singboxroom.entity.SubscriptionGroup
 import kotlin.test.assertFalse
@@ -82,11 +84,24 @@ class SingboxEngineSettingsAutoSelectTest {
             override suspend fun update(profile: ProxyProfile) {}
             override suspend fun delete(profile: ProxyProfile) {}
         }
+        val proxyChainDao = object : ProxyChainDao {
+            private val chainStepsFlow = MutableStateFlow(emptyList<ProxyChainStep>())
+
+            override fun getAllFlow(): Flow<List<ProxyChainStep>> = chainStepsFlow
+            override suspend fun getAll(): List<ProxyChainStep> = chainStepsFlow.value
+            override suspend fun clear() {
+                chainStepsFlow.value = emptyList()
+            }
+            override suspend fun insertAll(steps: List<ProxyChainStep>) {
+                chainStepsFlow.value = steps
+            }
+        }
         return SingboxEngineSettingsViewModel(
             appContext = mockk(relaxed = true),
             dataStore = dataStore,
             groupDao = groupDao,
             profileDao = profileDao,
+            proxyChainDao = proxyChainDao,
             rawUpdater = mockk(relaxed = true),
             groupSeeder = mockk(relaxed = true),
             probeService = mockk(relaxed = true),

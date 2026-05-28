@@ -77,6 +77,10 @@
     <string name="settings_section_updates">Обновления</string>
     <string name="settings_section_about">О приложении</string>
     <string name="settings_split_mode_label">Режим Split-tunnel</string>
+    <string name="settings_traffic_mode_title">Режим трафика</string>
+    <string name="settings_traffic_mode_summary">TUN перехватывает трафик Android. Proxy запускает только локальный SOCKS-порт для приложений с ручной настройкой.</string>
+    <string name="settings_traffic_mode_tun">TUN / VPN</string>
+    <string name="settings_traffic_mode_proxy">Proxy / SOCKS</string>
     <string name="settings_manual_engine_title">Выбор движка</string>
     <string name="settings_manual_engine_summary">Авто — Ozero сам выберет лучший</string>
     <string name="settings_manual_engine_auto">Авто</string>
@@ -442,7 +446,7 @@
     <string name="entry_node_your_device">Ваше устройство</string>
     <!-- Killswitch -->
     <string name="settings_killswitch_title">Killswitch</string>
-    <string name="settings_killswitch_summary">Блокировать весь трафик при падении тоннеля до восстановления</string>
+    <string name="settings_killswitch_summary">Только в TUN: блокировать весь трафик при падении тоннеля до восстановления</string>
     <string name="killswitch_active_badge">Killswitch активен — трафик заблокирован</string>
     <string name="settings_always_on_banner_title">Усильте защиту</string>
     <string name="settings_always_on_banner_body">Включите «Всегда включён» в настройках VPN Android для защиты от утечек при перезагрузке</string>
@@ -575,13 +579,10 @@
     <string name="urnetwork_shared_traffic_chart_empty">Пока нет данных — поработайте провайдером, и здесь появится статистика.</string>
     <string name="urnetwork_shared_traffic_chart_peak">Пиковый день: %1$s</string>
 
-    <string name="chain_settings_title">Цепочка прокси</string>
-    <string name="chain_settings_summary">Последовательное подключение через несколько движков</string>
-    <string name="chain_screen_title">Цепочка прокси</string>
-    <string name="chain_add_step">Добавить движок</string>
-    <string name="chain_remove_step">Удалить</string>
-    <string name="chain_empty_hint">Добавьте движки для построения цепочки</string>
-    <string name="chain_enabled">Цепочка включена</string>
-    <string name="chain_head_only">Только в начале цепочки</string>
-    <string name="chain_not_chainable">Не поддерживает цепочки</string>
+    <string name="singbox_chain_title">Цепочка sing-box</string>
+    <string name="singbox_chain_summary">Первый профиль в списке ближе к интернету. Выбранный сервер sing-box подключается через эту цепочку.</string>
+    <string name="singbox_chain_step">Звено %1$d</string>
+    <string name="singbox_chain_add">Добавить звено</string>
+    <string name="singbox_chain_remove">Удалить</string>
+    <string name="singbox_chain_empty">Цепочка не настроена</string>
 </resources>

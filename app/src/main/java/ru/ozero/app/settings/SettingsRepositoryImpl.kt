@@ -9,12 +9,12 @@ import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.AutoStartGateway
 import ru.ozero.enginescore.settings.ByeDpiUiSettings
-import ru.ozero.enginescore.settings.ChainStepConfig
 import ru.ozero.enginescore.settings.HostsMode
 import ru.ozero.enginescore.settings.SettingsKeys
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginescore.settings.SplitTunnelMode
+import ru.ozero.enginescore.settings.TrafficMode
 import javax.inject.Inject
 
 @Suppress("TooManyFunctions")
@@ -37,6 +37,10 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setAutoStart(enabled: Boolean) {
         dataStore.edit { it[SettingsKeys.AUTO_START] = enabled }
         autoStartGateway.setAutoStart(enabled)
+    }
+
+    override suspend fun setTrafficMode(mode: TrafficMode) {
+        dataStore.edit { it[SettingsKeys.TRAFFIC_MODE] = mode.name }
     }
 
     override suspend fun setManualEngine(engine: EngineId?) {
@@ -159,23 +163,13 @@ class SettingsRepositoryImpl @Inject constructor(
         dataStore.edit { it[SettingsKeys.ALWAYS_ON_BANNER_DISMISSED] = dismissed }
     }
 
-    override suspend fun setProxyChain(chain: List<ChainStepConfig>) {
-        dataStore.edit { prefs ->
-            if (chain.isEmpty()) {
-                prefs.remove(SettingsKeys.PROXY_CHAIN)
-            } else {
-                prefs[SettingsKeys.PROXY_CHAIN] = chain.joinToString(",") { it.engineId.name }
-            }
-        }
-    }
-
     private fun Preferences.toSettingsModel(): SettingsModel = SettingsModel(
         splitMode = readSplitMode(),
         ipv6Enabled = this[SettingsKeys.IPV6_ENABLED] ?: SettingsModel.DEFAULT_IPV6_ENABLED,
         autoStart = this[SettingsKeys.AUTO_START] ?: SettingsModel.DEFAULT_AUTO_START,
+        trafficMode = readTrafficMode(),
         manualEngine = readManualEngine(),
         engineAutoPriority = readEngineAutoPriority(),
-        proxyChain = readProxyChain(),
         urnetworkEnabled = this[SettingsKeys.URNETWORK_ENABLED] ?: SettingsModel.DEFAULT_URNETWORK_ENABLED,
         urnetworkJwt = this[SettingsKeys.URNETWORK_JWT],
         urnetworkCountryCode = this[SettingsKeys.URNETWORK_COUNTRY_CODE]
@@ -218,6 +212,12 @@ class SettingsRepositoryImpl @Inject constructor(
             .getOrDefault(SettingsModel.DEFAULT_SPLIT_MODE)
     }
 
+    private fun Preferences.readTrafficMode(): TrafficMode {
+        val raw = this[SettingsKeys.TRAFFIC_MODE] ?: return SettingsModel.DEFAULT_TRAFFIC_MODE
+        return runCatching { TrafficMode.valueOf(raw) }
+            .getOrDefault(SettingsModel.DEFAULT_TRAFFIC_MODE)
+    }
+
     private fun Preferences.readManualEngine(): EngineId? {
         val raw = this[SettingsKeys.MANUAL_ENGINE] ?: return null
         return runCatching { EngineId.valueOf(raw) }.getOrNull()
@@ -233,15 +233,6 @@ class SettingsRepositoryImpl @Inject constructor(
         if (parsed.isEmpty()) return SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY
         val missing = EngineId.entries.filter { !it.isStub && it !in parsed }
         return parsed + missing
-    }
-
-    private fun Preferences.readProxyChain(): List<ChainStepConfig> {
-        val raw = this[SettingsKeys.PROXY_CHAIN] ?: return SettingsModel.DEFAULT_PROXY_CHAIN
-        return raw.split(",")
-            .mapNotNull { name ->
-                val id = runCatching { EngineId.valueOf(name.trim()) }.getOrNull()
-                id?.let { ChainStepConfig(it) }
-            }
     }
 
     private fun Preferences.readAppMode(): AppMode {

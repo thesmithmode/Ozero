@@ -9,4 +9,7 @@ interface IWarpEngineProcess {
     ParcelFileDescriptor socketV6Fd(int handle);
     String version();
     WarpTurnOnResult turnOnAndGetSockets(in ParcelFileDescriptor tunFd, String name, String iniConfig, String uapiPath);
+    int startProxy(String name, String iniConfig, String uapiPath, int port);
+    void stopProxy();
+    void resetProxyGlobals();
 }

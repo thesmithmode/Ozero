@@ -35,6 +35,7 @@ import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
+import ru.ozero.enginescore.settings.TrafficMode
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import javax.inject.Inject
 
@@ -134,6 +135,15 @@ class MainViewModel @Inject constructor(
                 scope = viewModelScope,
                 started = SharingStarted.Eagerly,
                 initialValue = null,
+            )
+
+    val trafficMode: StateFlow<TrafficMode> =
+        settingsRepository.settings
+            .map { it.trafficMode }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.Eagerly,
+                initialValue = TrafficMode.TUN,
             )
 
     val engineAutoPriority: StateFlow<List<EngineId>> =

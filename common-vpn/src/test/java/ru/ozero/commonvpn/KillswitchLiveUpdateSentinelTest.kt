@@ -26,7 +26,10 @@ class KillswitchLiveUpdateSentinelTest {
         val body = serviceSource.substringAfter("private fun observeKillswitchSetting()")
             .substringBefore("companion object")
         assertTrue(body.contains("settingsRepository.settings"), "источник — settingsRepository.settings flow")
-        assertTrue(body.contains("it.killswitchEnabled"), "извлекает killswitchEnabled")
+        assertTrue(
+            body.contains("it.trafficMode == TrafficMode.TUN && it.killswitchEnabled"),
+            "извлекает effective killswitch",
+        )
         assertTrue(body.contains("distinctUntilChanged()"), "distinctUntilChanged — без шумных перезаписей")
         assertTrue(body.contains("killswitchCached = enabled"), "запись в @Volatile cache")
         assertTrue(body.contains("launchIn(serviceScope)"), "subscription живёт в serviceScope")
