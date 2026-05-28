@@ -143,10 +143,11 @@ class RealWarpSdkBridge(
         }
         val socketsDir = File(uapiPath, "sockets")
         if (!socketsDir.isDirectory) return
-        val stale = socketsDir.listFiles { f -> f.name == ownSocketName }.orEmpty()
+        // awg can leave tunN.sock; handshake fallback must not attach to a stale UAPI socket.
+        val stale = socketsDir.listFiles { f -> f.extension == "sock" }.orEmpty()
         if (stale.isEmpty()) return
         val staleDeleted = stale.count { it.delete() }
-        Log.i(TAG, "stale sockets/ cleanup: name=$ownSocketName deleted=$staleDeleted/${stale.size}")
+        Log.i(TAG, "stale sockets/ cleanup: name=$ownSocketName allSock=true deleted=$staleDeleted/${stale.size}")
     }
 
     private fun invokeAwgTurnOnAndProtect(

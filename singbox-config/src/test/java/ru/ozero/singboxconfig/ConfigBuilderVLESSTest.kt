@@ -62,6 +62,24 @@ class ConfigBuilderVLESSTest {
     }
 
     @Test
+    fun `should normalize vision flow suffix rejected by sing-box`() {
+        val json = ConfigBuilder.buildSingboxConfig(makeBean(flow = "xtls-rprx-vision-udp443"))
+
+        assertContains(json, "\"flow\":\"xtls-rprx-vision\"")
+        assertFalse(
+            json.contains("xtls-rprx-vision-udp443"),
+            "sing-box rejects xtls-rprx-vision-* suffixes as unsupported flow",
+        )
+    }
+
+    @Test
+    fun `should omit unknown VLESS flow instead of generating invalid config`() {
+        val json = ConfigBuilder.buildSingboxConfig(makeBean(flow = "unsupported-flow"))
+
+        assertFalse(json.contains("\"flow\""), "unsupported flow must not brick the whole sing-box config")
+    }
+
+    @Test
     fun `should omit flow field when empty`() {
         val json = ConfigBuilder.buildSingboxConfig(makeBean(flow = ""))
 

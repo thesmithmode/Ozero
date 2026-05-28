@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
+import ru.ozero.enginesingbox.SingboxEngine
 import ru.ozero.enginesingbox.SingboxPrefs
 import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
@@ -39,6 +40,7 @@ class SingboxProbeService @Inject constructor(
         }.awaitAll()
         val best = results.filter { it.second >= 0 }.minByOrNull { it.second }?.first ?: return
         dataStore.edit { prefs ->
+            if (prefs[SELECTED_PROFILE_KEY] == SingboxEngine.SELECTED_AUTO) return@edit
             prefs[SELECTED_PROFILE_KEY] = best.id
             prefs[BEAN_KEY] = best.beanBlob
         }

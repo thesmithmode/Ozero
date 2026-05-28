@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.IpProbeRoute
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
@@ -65,6 +66,18 @@ class ByeDpiEngineTest {
         assertFalse(caps.requiresServer)
         assertTrue(caps.supportsTcp)
         assertFalse(caps.supportsUdp)
+    }
+
+    @Test
+    fun `stopTimeout covers two native drain windows`() {
+        assertTrue(
+            engine.stopTimeoutMs() > EnginePlugin.DEFAULT_STOP_TIMEOUT_MS,
+            "ChainOrchestrator must not cancel ByeDPI stop while forceClose/emergencyReset drain is still running",
+        )
+        assertTrue(
+            engine.stopTimeoutMs() >= ByeDpiEngine.STOP_GRACE_MS * 2,
+            "ByeDPI stop has first join and retry join; timeout must cover both before next start enters native guard",
+        )
     }
 
     @Test

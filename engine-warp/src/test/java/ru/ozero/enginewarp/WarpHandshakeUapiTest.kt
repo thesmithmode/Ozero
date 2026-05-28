@@ -68,9 +68,9 @@ class WarpHandshakeUapiTest {
         val src = locateSource("engine-warp/src/main/java/ru/ozero/enginewarp/RealWarpSdkBridge.kt")
         val text = src.readText(Charsets.UTF_8)
         kotlin.test.assertTrue(
-            text.contains("socketsDir") && text.contains("stale sockets/ cleanup"),
-            "RealWarpSdkBridge должен чистить uapiPath/sockets/*.sock перед awgTurnOn " +
-                "(stale leftover ломает findUapiSocket fallback)",
+            text.contains("socketsDir") && text.contains("extension == \"sock\"") && text.contains("allSock=true"),
+            "RealWarpSdkBridge должен чистить все uapiPath/sockets/*.sock перед awgTurnOn " +
+                "(stale tunN.sock ломает findUapiSocket fallback)",
         )
     }
 

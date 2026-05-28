@@ -244,8 +244,8 @@ class EngineUrnetwork(
         const val STATS_POLL_INTERVAL_MS = 2_000L
 
         const val URN_STOP_TIMEOUT_MS = 8_000L
-        const val PEER_READY_TIMEOUT_MS = 45_000L
+        const val PEER_READY_TIMEOUT_MS = 300_000L
         const val PEER_READY_POLL_MS = 200L
-        const val PEER_PROGRESS_LOG_EVERY = 15
+        const val PEER_PROGRESS_LOG_EVERY = 75
     }
 }

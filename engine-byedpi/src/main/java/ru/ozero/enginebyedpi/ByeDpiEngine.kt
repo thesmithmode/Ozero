@@ -55,6 +55,8 @@ class ByeDpiEngine(
         supportsUpstreamSocks = false,
     )
 
+    override fun stopTimeoutMs(): Long = BYEDPI_STOP_TIMEOUT_MS
+
     @Volatile private var activeSocksPort: Int = 0
     private val portCounter = AtomicInteger(0)
     private val _stats = MutableStateFlow(EngineStats())
@@ -314,6 +316,9 @@ class ByeDpiEngine(
         const val READY_PROBE_TIMEOUT_MS = 500
         const val READY_RETRY_MS = 100L
         const val STOP_GRACE_MS = 1_500L
+
+        // Must cover both STOP_GRACE_MS joins in stop(), otherwise restart can hit native guard busy.
+        const val BYEDPI_STOP_TIMEOUT_MS = 5_000L
         const val AUTO_ROTATE_PORT = 0
         const val PORT_ROTATION_BASE = 49_152
         const val PORT_ROTATION_RANGE = 256

@@ -11,9 +11,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -194,7 +197,7 @@ private fun SingboxChainSection(
     onRemove: (Long) -> Unit,
     onMove: (Long, Int) -> Unit,
 ) {
-    var addMenuExpanded by remember { mutableStateOf(false) }
+    var showChainAddDialog by remember { mutableStateOf(false) }
     val profilesById = allProfiles.associateBy { it.id }
     val chain = chainProfileIds
         .mapNotNull { profilesById[it] }
@@ -236,30 +239,44 @@ private fun SingboxChainSection(
             }
             Spacer(Modifier.height(8.dp))
         }
-        Box {
-            TextButton(
-                onClick = { addMenuExpanded = true },
-                enabled = addable.isNotEmpty(),
-                modifier = Modifier.testTag("singbox_chain_add"),
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(4.dp))
-                Text(stringResource(R.string.singbox_chain_add))
-            }
-            DropdownMenu(
-                expanded = addMenuExpanded,
-                onDismissRequest = { addMenuExpanded = false },
-            ) {
-                addable.forEach { profile ->
-                    DropdownMenuItem(
-                        text = { Text(profile.name) },
-                        onClick = {
-                            addMenuExpanded = false
-                            onAdd(profile)
-                        },
-                    )
-                }
-            }
+        TextButton(
+            onClick = { showChainAddDialog = true },
+            enabled = addable.isNotEmpty(),
+            modifier = Modifier.testTag("singbox_chain_add"),
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(4.dp))
+            Text(stringResource(R.string.singbox_chain_add))
+        }
+        if (showChainAddDialog) {
+            AlertDialog(
+                onDismissRequest = { showChainAddDialog = false },
+                title = { Text(stringResource(R.string.singbox_chain_add)) },
+                text = {
+                    LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
+                        items(addable, key = { it.id }) { profile ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        showChainAddDialog = false
+                                        onAdd(profile)
+                                    }
+                                    .padding(vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(profile.name, style = MaterialTheme.typography.bodyMedium)
+                            }
+                        }
+                    }
+                },
+                confirmButton = {},
+                dismissButton = {
+                    TextButton(onClick = { showChainAddDialog = false }) {
+                        Text(stringResource(R.string.singbox_cancel))
+                    }
+                },
+            )
         }
     }
 }

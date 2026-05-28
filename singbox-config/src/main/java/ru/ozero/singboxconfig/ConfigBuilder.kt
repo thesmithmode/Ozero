@@ -8,6 +8,8 @@ import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
 
+private const val VLESS_FLOW_XTLS_VISION = "xtls-rprx-vision"
+
 @Suppress("TooManyFunctions")
 object ConfigBuilder {
 
@@ -210,8 +212,9 @@ private fun vlessOutbound(bean: VLESSBean, tag: String, detour: String? = null):
     sb.append(""""server":${jsonString(bean.serverAddress)},""")
     sb.append(""""server_port":${bean.serverPort},""")
     sb.append(""""uuid":${jsonString(bean.uuid)},""")
-    if (bean.flow.isNotEmpty()) {
-        sb.append(""""flow":${jsonString(bean.flow)},""")
+    val flow = normalizeVlessFlow(bean.flow)
+    if (flow.isNotEmpty()) {
+        sb.append(""""flow":${jsonString(flow)},""")
     }
 
     val transport = buildTransport(bean)
@@ -227,6 +230,13 @@ private fun vlessOutbound(bean: VLESSBean, tag: String, detour: String? = null):
     if (detour != null) sb.append(""""detour":${jsonString(detour)},""")
     sb.append(""""packet_encoding":"xudp"}""")
     return sb.toString()
+}
+
+private fun normalizeVlessFlow(flow: String): String = when {
+    flow.isBlank() -> ""
+    flow == VLESS_FLOW_XTLS_VISION -> flow
+    flow.startsWith("$VLESS_FLOW_XTLS_VISION-") -> VLESS_FLOW_XTLS_VISION
+    else -> ""
 }
 
 private fun vmessOutbound(bean: VMessBean, tag: String, detour: String? = null): String {
