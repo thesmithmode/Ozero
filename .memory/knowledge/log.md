@@ -1032,3 +1032,7 @@
 - Source: daily/2026-05-28.md
 - Articles created: [[concepts/engine-switch-failure-containment]], [[concepts/private-subscription-sanitized-debugging]], [[concepts/ci-artifact-driven-extra-module-debugging]], [[concepts/release-postpublish-architecture-review]]
 - Articles updated: none
+## [2026-05-28T20:59:24+03:00] compile | 2026-05-28.md
+- Source: daily/2026-05-28.md
+- Articles created: [[concepts/android-apk-only-release-scope]], [[concepts/engine-poisoned-state-recovery-proof]], [[concepts/release-runtime-regression-sentinels]], [[concepts/ci-extra-module-artifact-feedback-loop]], [[connections/android-apk-scope-vs-runtime-proof]]
+- Articles updated: none
