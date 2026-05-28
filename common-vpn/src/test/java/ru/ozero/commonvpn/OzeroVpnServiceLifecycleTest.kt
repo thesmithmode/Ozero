@@ -435,7 +435,7 @@ class OzeroVpnServiceLifecycleTest {
             "manual-mode идёт прямым путём через buildEngineConfig — без preflight",
         )
         assertTrue(
-            body.contains("autoCandidatesWithPreflight(settings)"),
+            body.contains("autoCandidatesWithPreflight(settings, trafficMode)"),
             "auto-mode (manualEngine == null) идёт через autoCandidatesWithPreflight",
         )
     }
