@@ -10,6 +10,7 @@ object SettingsKeys {
     val SPLIT_MODE = stringPreferencesKey("split_mode")
     val IPV6_ENABLED = booleanPreferencesKey("ipv6_enabled")
     val AUTO_START = booleanPreferencesKey("auto_start")
+    val TRAFFIC_MODE = stringPreferencesKey("traffic_mode")
     val MANUAL_ENGINE = stringPreferencesKey("manual_engine")
     val ENGINE_AUTO_PRIORITY = stringPreferencesKey("engine_auto_priority")
 
@@ -38,6 +39,4 @@ object SettingsKeys {
 
     val KILLSWITCH_ENABLED = booleanPreferencesKey("killswitch_enabled")
     val ALWAYS_ON_BANNER_DISMISSED = booleanPreferencesKey("always_on_banner_dismissed")
-
-    val PROXY_CHAIN = stringPreferencesKey("proxy_chain")
 }

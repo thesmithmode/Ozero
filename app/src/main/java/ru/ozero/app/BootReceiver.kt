@@ -7,19 +7,31 @@ import android.content.SharedPreferences
 import android.net.VpnService
 import android.util.Log
 import androidx.core.content.ContextCompat
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import ru.ozero.commonvpn.OzeroVpnService
+import ru.ozero.enginescore.settings.SettingsKeys
+import ru.ozero.enginescore.settings.SettingsModel
+import ru.ozero.enginescore.settings.TrafficMode
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class BootReceiver : BroadcastReceiver() {
+    @Inject
+    lateinit var settingsDataStore: DataStore<Preferences>
+
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 if (!isAutoStartEnabled(context)) return@launch
-                if (VpnService.prepare(context) != null) {
+                if (currentTrafficMode() == TrafficMode.TUN && VpnService.prepare(context) != null) {
                     Log.w(TAG, "auto-start пропущен: VpnService.prepare не выдан (нужен повторный grant в UI)")
                     return@launch
                 }
@@ -36,6 +48,13 @@ class BootReceiver : BroadcastReceiver() {
     }
 
     private fun isAutoStartEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_AUTO_START, false)
+
+    private suspend fun currentTrafficMode(): TrafficMode {
+        val raw = settingsDataStore.data.first()[SettingsKeys.TRAFFIC_MODE]
+        return raw
+            ?.let { runCatching { TrafficMode.valueOf(it) }.getOrNull() }
+            ?: SettingsModel.DEFAULT_TRAFFIC_MODE
+    }
 
     companion object {
         private const val TAG = "BootReceiver"

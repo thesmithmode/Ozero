@@ -74,6 +74,10 @@
     <string name="settings_section_updates">Updates</string>
     <string name="settings_section_about">About</string>
     <string name="settings_split_mode_label">Split-tunnel mode</string>
+    <string name="settings_traffic_mode_title">Traffic mode</string>
+    <string name="settings_traffic_mode_summary">TUN captures Android traffic. Proxy starts only a local SOCKS port for apps configured manually.</string>
+    <string name="settings_traffic_mode_tun">TUN / VPN</string>
+    <string name="settings_traffic_mode_proxy">Proxy / SOCKS</string>
     <string name="settings_manual_engine_title">Engine selection</string>
     <string name="settings_manual_engine_summary">Auto — Ozero picks the best</string>
     <string name="settings_manual_engine_auto">Auto</string>
@@ -436,7 +440,7 @@
     <string name="entry_node_direct">Direct connection</string>
     <string name="entry_node_your_device">Your device</string>
     <string name="settings_killswitch_title">Kill switch</string>
-    <string name="settings_killswitch_summary">Block all traffic when tunnel drops, until reconnect</string>
+    <string name="settings_killswitch_summary">TUN only: block all traffic when tunnel drops, until reconnect</string>
     <string name="killswitch_active_badge">Kill switch active — traffic blocked</string>
     <string name="settings_always_on_banner_title">Strengthen protection</string>
     <string name="settings_always_on_banner_body">Enable Always-on VPN in Android settings to prevent leaks on reboot</string>
@@ -571,13 +575,10 @@
     <string name="urnetwork_shared_traffic_chart_empty">No data yet — provide some traffic and stats will show up here.</string>
     <string name="urnetwork_shared_traffic_chart_peak">Peak day: %1$s</string>
 
-    <string name="chain_settings_title">Proxy Chain</string>
-    <string name="chain_settings_summary">Route traffic through multiple engines sequentially</string>
-    <string name="chain_screen_title">Proxy Chain</string>
-    <string name="chain_add_step">Add engine</string>
-    <string name="chain_remove_step">Remove</string>
-    <string name="chain_empty_hint">Add engines to build a proxy chain</string>
-    <string name="chain_enabled">Chain enabled</string>
-    <string name="chain_head_only">Head position only</string>
-    <string name="chain_not_chainable">Does not support chaining</string>
+    <string name="singbox_chain_title">sing-box chain</string>
+    <string name="singbox_chain_summary">The first profile is closest to the internet. The selected sing-box server connects through this chain.</string>
+    <string name="singbox_chain_step">Step %1$d</string>
+    <string name="singbox_chain_add">Add step</string>
+    <string name="singbox_chain_remove">Remove</string>
+    <string name="singbox_chain_empty">No chain configured</string>
 </resources>

@@ -22,6 +22,7 @@ import ru.ozero.enginesingbox.SingboxPrefs
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.singboxroom.SingboxDatabase
+import ru.ozero.singboxroom.dao.ProxyChainDao
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.dao.SubscriptionGroupDao
 import ru.ozero.singboxsubscription.GroupSeeder
@@ -50,6 +51,7 @@ object SingboxModule {
         @ApplicationContext context: Context,
     ): SingboxDatabase =
         Room.databaseBuilder(context, SingboxDatabase::class.java, "singbox.db")
+            .addMigrations(SingboxDatabase.MIGRATION_1_2)
             .fallbackToDestructiveMigration()
             .build()
 
@@ -62,6 +64,11 @@ object SingboxModule {
     @Singleton
     fun provideProxyProfileDao(db: SingboxDatabase): ProxyProfileDao =
         db.proxyProfileDao()
+
+    @Provides
+    @Singleton
+    fun provideProxyChainDao(db: SingboxDatabase): ProxyChainDao =
+        db.proxyChainDao()
 
     @Provides
     @Singleton
@@ -91,11 +98,13 @@ object SingboxModule {
         @ApplicationContext context: Context,
         @SingboxPrefs dataStore: DataStore<Preferences>,
         profileDao: ProxyProfileDao,
+        proxyChainDao: ProxyChainDao,
         tunnelController: TunnelController,
     ): EnginePlugin = SingboxEngine(
         context = context,
         dataStore = dataStore,
         profileDao = profileDao,
+        proxyChainDao = proxyChainDao,
         onProcessDied = { tunnelController.onEngineDied(EngineId.SINGBOX, "binder-died") },
     )
 }

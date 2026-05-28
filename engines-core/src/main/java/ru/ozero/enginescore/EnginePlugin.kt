@@ -26,6 +26,8 @@ interface EnginePlugin {
 
     fun buildManualConfig(settings: SettingsModel?): EngineConfig? = null
 
+    fun buildProxyConfig(settings: SettingsModel?): EngineConfig? = buildManualConfig(settings)
+
     fun statsLabel(stats: EngineStats): String? {
         val peers = stats.activeConnections
         return if (peers > 0) "$peers conns" else null

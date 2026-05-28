@@ -8,6 +8,7 @@ import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
 
+@Suppress("TooManyFunctions")
 object ConfigBuilder {
 
     private val SUPPORTED_TRANSPORTS = setOf("tcp", "ws", "grpc", "http", "h2", "httpupgrade", "")
@@ -63,7 +64,39 @@ object ConfigBuilder {
         return buildChainFullConfig(socksPort, listOf(outbound), upstream)
     }
 
+    fun buildProfileChainConfig(
+        selected: AbstractBean,
+        wrappers: List<AbstractBean>,
+    ): String {
+        val outbounds = profileChainOutbounds(selected, wrappers)
+        return buildFullConfig(outbounds)
+    }
+
+    fun buildProfileChainProxyConfig(
+        selected: AbstractBean,
+        wrappers: List<AbstractBean>,
+        socksPort: Int,
+    ): String {
+        val outbounds = profileChainOutbounds(selected, wrappers)
+        return buildChainFullConfig(socksPort, outbounds, upstream = null)
+    }
+
     data class Upstream(val host: String, val port: Int)
+
+    private fun profileChainOutbounds(
+        selected: AbstractBean,
+        wrappers: List<AbstractBean>,
+    ): List<String> {
+        require(isSupportedBean(selected)) { "Unsupported selected transport" }
+        val supportedWrappers = wrappers.filter { isSupportedBean(it) }
+        val wrapperOutbounds = supportedWrappers.mapIndexed { index, bean ->
+            val detour = if (index == 0) null else "chain-${index - 1}"
+            beanOutbound(bean, "chain-$index", detour)
+        }
+        val selectedDetour = supportedWrappers.lastIndex.takeIf { it >= 0 }?.let { "chain-$it" }
+        val selectedOutbound = beanOutbound(selected, "proxy", selectedDetour)
+        return wrapperOutbounds + selectedOutbound
+    }
 
     private fun beanOutbound(bean: AbstractBean, tag: String, detour: String? = null): String = when (bean) {
         is VLESSBean -> vlessOutbound(bean, tag, detour)

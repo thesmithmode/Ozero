@@ -91,6 +91,9 @@ class AppBackupManager(
             engineAutoPriority = fromCategory(
                 BackupCategory.GENERAL_SETTINGS in categories,
             ) { prefs[SettingsKeys.ENGINE_AUTO_PRIORITY] },
+            trafficMode = fromCategory(
+                BackupCategory.GENERAL_SETTINGS in categories,
+            ) { prefs[SettingsKeys.TRAFFIC_MODE] },
             bydpiUseUiMode = fromCategory(
                 BackupCategory.BYEDPI in categories,
             ) { prefs[SettingsKeys.BYDPI_USE_UI_MODE] },
@@ -161,6 +164,7 @@ class AppBackupManager(
         s.uiLocaleTag?.let { prefs[SettingsKeys.UI_LOCALE_TAG] = it }
         s.appMode?.let { prefs[SettingsKeys.APP_MODE] = it }
         s.engineAutoPriority?.let { prefs[SettingsKeys.ENGINE_AUTO_PRIORITY] = it }
+        s.trafficMode?.let { prefs[SettingsKeys.TRAFFIC_MODE] = it }
     }
 
     private suspend fun importFptnToken(s: BackupSettings) {

@@ -12,6 +12,7 @@ import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginescore.settings.SplitTunnelMode
+import ru.ozero.enginescore.settings.TrafficMode
 import javax.inject.Inject
 
 @HiltViewModel
@@ -38,6 +39,10 @@ class SettingsViewModel @Inject constructor(
 
     fun onAutoStartToggle(enabled: Boolean) {
         viewModelScope.launch { repository.setAutoStart(enabled) }
+    }
+
+    fun onTrafficModeSelect(mode: TrafficMode) {
+        viewModelScope.launch { repository.setTrafficMode(mode) }
     }
 
     fun onKillswitchToggle(enabled: Boolean) {

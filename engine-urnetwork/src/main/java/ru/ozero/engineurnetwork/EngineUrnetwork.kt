@@ -49,6 +49,7 @@ class EngineUrnetwork(
         localOnly = false,
         requiresServer = true,
         supportsUpstreamSocks = false,
+        providesLocalSocks = false,
     )
 
     private val _stats = MutableStateFlow(EngineStats())

@@ -8,6 +8,7 @@ import android.os.IBinder
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import ru.ozero.enginescore.PersistentLoggers
+import ru.ozero.enginescore.VpnSocketProtector
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -164,6 +165,25 @@ class RemoteAwgRuntime(
         val v4 = combined.socketV4?.detachFd() ?: -1
         val v6 = combined.socketV6?.detachFd() ?: -1
         return AwgTurnOnResult(combined.handle, v4, v6)
+    }
+
+    override fun startProxy(
+        name: String,
+        ini: String,
+        uapiPath: String,
+        port: Int,
+        protector: VpnSocketProtector,
+    ): Int {
+        val e = ensureConnected()
+        return e.startProxy(name, ini, uapiPath, port)
+    }
+
+    override fun stopProxy() {
+        engine?.let { runCatching { it.stopProxy() } }
+    }
+
+    override fun resetProxyGlobals() {
+        engine?.let { runCatching { it.resetProxyGlobals() } }
     }
 
     override fun version(): String =

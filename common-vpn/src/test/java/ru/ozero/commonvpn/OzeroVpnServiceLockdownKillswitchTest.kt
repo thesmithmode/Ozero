@@ -208,7 +208,9 @@ class OzeroVpnServiceLockdownKillswitchTest {
 
     @Test
     fun `killswitch startup TUN использует buildTunBuilder с applyUnderlying=false — QUIC parity`() {
-        val block = runBody.substringAfter("if (killswitch)").substringBefore("val manualEngine")
+        val block = runBody
+            .substringAfter("if (trafficMode == TrafficMode.TUN && killswitch)")
+            .substringBefore("val chain")
         assertTrue(
             block.contains("buildTunBuilder"),
             "killswitch startup path обязан вызывать buildTunBuilder. Block:\n$block",

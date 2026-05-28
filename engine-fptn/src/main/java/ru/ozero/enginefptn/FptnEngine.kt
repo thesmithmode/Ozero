@@ -58,6 +58,7 @@ class FptnEngine(
         localOnly = false,
         requiresServer = true,
         supportsUpstreamSocks = false,
+        providesLocalSocks = false,
     )
 
     override fun stats(): Flow<EngineStats> = _stats.asStateFlow()

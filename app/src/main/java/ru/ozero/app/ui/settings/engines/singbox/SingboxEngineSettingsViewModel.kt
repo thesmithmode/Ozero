@@ -27,6 +27,7 @@ import ru.ozero.singboxfmt.ShadowsocksBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
+import ru.ozero.singboxroom.dao.ProxyChainDao
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.dao.SubscriptionGroupDao
 import ru.ozero.singboxroom.entity.ProxyProfile
@@ -48,9 +49,11 @@ enum class SortOrder {
 
 data class SingboxSettingsUiState(
     val groups: List<SubscriptionGroup> = emptyList(),
+    val allProfiles: List<ProxyProfile> = emptyList(),
     val expandedGroupId: Long? = null,
     val groupProfiles: Map<Long, List<ProxyProfile>> = emptyMap(),
     val selectedProfileId: Long? = null,
+    val chainProfileIds: List<Long> = emptyList(),
     val isRefreshing: Set<Long> = emptySet(),
     val isPinging: Set<Long> = emptySet(),
     val isAutoSelecting: Boolean = false,
@@ -70,12 +73,14 @@ data class SingboxSettingsUiState(
     val manualLinksError: String? = null,
 )
 
+@Suppress("TooManyFunctions")
 @HiltViewModel
 class SingboxEngineSettingsViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
     @SingboxPrefs private val dataStore: DataStore<Preferences>,
     private val groupDao: SubscriptionGroupDao,
     private val profileDao: ProxyProfileDao,
+    private val proxyChainDao: ProxyChainDao,
     private val rawUpdater: RawUpdater,
     private val groupSeeder: GroupSeeder,
     private val probeService: SingboxProbeService,
@@ -87,10 +92,13 @@ class SingboxEngineSettingsViewModel @Inject constructor(
 
     val state: StateFlow<SingboxSettingsUiState> = combine(
         groupDao.getAllFlow(),
+        profileDao.getAllFlow(),
+        proxyChainDao.getAllFlow(),
         dataStore.data,
         _uiState,
-    ) { groups, prefs, ui ->
+    ) { groups, profiles, chainSteps, prefs, ui ->
         val sort = SortOrder.fromOrdinal(prefs[SORT_ORDER_KEY] ?: 0)
+        val profileIds = profiles.map { it.id }.toSet()
         val sortedProfiles = ui.groupProfiles.mapValues { (_, profiles) ->
             when (sort) {
                 SortOrder.BY_LATENCY -> profiles.sortedWith(
@@ -101,8 +109,10 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
         ui.copy(
             groups = groups.sortedBy { it.userOrder },
+            allProfiles = profiles.sortedWith(compareBy<ProxyProfile> { it.groupId }.thenBy { it.userOrder }),
             selectedProfileId = prefs[SingboxProbeService.SELECTED_PROFILE_KEY],
             isAutoSelectMode = prefs[SingboxProbeService.SELECTED_PROFILE_KEY] == -1L,
+            chainProfileIds = chainSteps.map { it.profileId }.filter { it in profileIds },
             groupProfiles = sortedProfiles,
             sortOrder = sort,
         )
@@ -132,6 +142,35 @@ class SingboxEngineSettingsViewModel @Inject constructor(
             dataStore.edit { prefs ->
                 prefs[SingboxProbeService.SELECTED_PROFILE_KEY] = profile.id
                 prefs[SingboxProbeService.BEAN_KEY] = profile.beanBlob
+            }
+        }
+    }
+
+    fun onChainProfileAdd(profile: ProxyProfile) {
+        viewModelScope.launch {
+            val current = proxyChainDao.getAll().map { it.profileId }
+            if (profile.id !in current) {
+                proxyChainDao.replace(current + profile.id)
+            }
+        }
+    }
+
+    fun onChainProfileRemove(profileId: Long) {
+        viewModelScope.launch {
+            proxyChainDao.replace(proxyChainDao.getAll().map { it.profileId }.filterNot { it == profileId })
+        }
+    }
+
+    fun onChainProfileMove(profileId: Long, delta: Int) {
+        viewModelScope.launch {
+            val current = proxyChainDao.getAll().map { it.profileId }.toMutableList()
+            val from = current.indexOf(profileId)
+            if (from < 0) return@launch
+            val to = (from + delta).coerceIn(0, current.lastIndex)
+            if (from != to) {
+                current.removeAt(from)
+                current.add(to, profileId)
+                proxyChainDao.replace(current)
             }
         }
     }

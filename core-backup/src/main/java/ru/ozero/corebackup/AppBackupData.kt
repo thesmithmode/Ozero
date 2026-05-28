@@ -64,6 +64,7 @@ data class BackupSettings(
     val uiLocaleTag: String?,
     val appMode: String?,
     val engineAutoPriority: String? = null,
+    val trafficMode: String? = null,
     val bydpiUseUiMode: Boolean? = null,
     val bydpiUiSettingsJson: String? = null,
     val bydpiDefaultAccepted: Boolean? = null,

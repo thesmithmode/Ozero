@@ -20,5 +20,4 @@ enum class TopScreen {
     FptnSettings,
     SingboxSettings,
     SingboxAdvancedSettings,
-    ChainSettings,
 }

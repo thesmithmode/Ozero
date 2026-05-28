@@ -58,6 +58,12 @@ sealed class EngineConfig {
         override val engineId = EngineId.WARP
     }
 
+    data class WarpProxy(
+        val socksPort: Int = 10811,
+    ) : EngineConfig() {
+        override val engineId = EngineId.WARP
+    }
+
     data class MasterDns(
         val configToml: String,
         val resolvers: List<String>,
@@ -72,12 +78,15 @@ sealed class EngineConfig {
         val beanBlob: ByteArray,
         val protocolType: Int,
         val autoSelectBeanBlobs: List<ByteArray> = emptyList(),
+        val chainBeanBlobs: List<ByteArray> = emptyList(),
         val wireGuardConfig: WireGuardOutboundConfig? = null,
+        val proxyMode: Boolean = false,
     ) : EngineConfig() {
         override val engineId = EngineId.SINGBOX
         override fun toString(): String =
             "Singbox(protocol=$protocolType, blobSize=${beanBlob.size}, auto=${autoSelectBeanBlobs.size}" +
-                "${if (wireGuardConfig != null) ", wg=$wireGuardConfig" else ""})"
+                ", chain=${chainBeanBlobs.size}" +
+                "${if (wireGuardConfig != null) ", wg=$wireGuardConfig" else ""}, proxyMode=$proxyMode)"
 
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -86,13 +95,18 @@ sealed class EngineConfig {
                 beanBlob.contentEquals(other.beanBlob) &&
                 autoSelectBeanBlobs.size == other.autoSelectBeanBlobs.size &&
                 autoSelectBeanBlobs.zip(other.autoSelectBeanBlobs).all { (a, b) -> a.contentEquals(b) } &&
-                wireGuardConfig == other.wireGuardConfig
+                chainBeanBlobs.size == other.chainBeanBlobs.size &&
+                chainBeanBlobs.zip(other.chainBeanBlobs).all { (a, b) -> a.contentEquals(b) } &&
+                wireGuardConfig == other.wireGuardConfig &&
+                proxyMode == other.proxyMode
         }
 
         override fun hashCode(): Int {
             var result = 31 * protocolType + beanBlob.contentHashCode()
             for (blob in autoSelectBeanBlobs) result = 31 * result + blob.contentHashCode()
+            for (blob in chainBeanBlobs) result = 31 * result + blob.contentHashCode()
             result = 31 * result + (wireGuardConfig?.hashCode() ?: 0)
+            result = 31 * result + proxyMode.hashCode()
             return result
         }
     }
