@@ -53,7 +53,7 @@ With `problems=warn`, non-serializable types log a warning instead of failing th
 
 - [[concepts/ci-workflow-discipline]] — CI reliability; transient checkout failures vs configuration cache failures look similar in CI output
 - [[concepts/gradle-force-vs-catalog]] — AGP version management in version catalog; bumping AGP to 9.x would fix this
-- [[concepts/release-checks-beyond-ci]] — Green CI ≠ release success; configuration cache failures can appear only in CI but not local builds depending on cache state
+- [[connections/release-checks-beyond-ci]] — Green CI ≠ release success; configuration cache failures can appear only in CI but not local builds depending on cache state
 
 ## Sources
 

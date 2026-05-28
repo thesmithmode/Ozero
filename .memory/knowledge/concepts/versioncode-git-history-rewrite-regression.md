@@ -60,7 +60,7 @@ After any git history rewrite operation, verify that versionCode remains monoton
 
 - [[concepts/release-process]] - Release workflow and other versionCode traps (shallow clone)
 - [[concepts/git-contributor-rewrite]] - The git history rewrite that caused this regression
-- [[concepts/release-ci-invariants]] - CI assertions that guard release quality
+- [[connections/release-checks-beyond-ci]] - CI and release assertions that guard release quality
 
 ## Sources
 

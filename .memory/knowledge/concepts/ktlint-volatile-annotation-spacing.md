@@ -51,7 +51,7 @@ Applies to all annotation-prefixed declarations: fields, functions, classes. The
 ## Related Concepts
 
 - [[concepts/ci-gradle-log-reading]] - How to read ktlint errors from CI
-- [[concepts/ktlint-traps-ozero]] - Other ktlint traps in the Ozero project
+- [[concepts/ktlint-multiline-paren-gradle-dsl]] - Another non-obvious ktlint trap in the Ozero project
 
 ## Sources
 

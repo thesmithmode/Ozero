@@ -18,7 +18,7 @@ detekt's `TooManyFunctions` rule uses `>=` (greater-than-or-equal) semantics for
 - The fix for a file at exactly N functions is to reduce to N-1, not N
 - Merge pattern: combine `onFooOpen` + `onFooDismiss` → `onFoo(show: Boolean)` toggle reduces count by 1
 - Ozero global thresholds: `TooManyFunctions=30/20` (files/classes) — set globally in `detekt.yml`, not per-file suppress
-- See [[concepts/feedback_detekt_thresholds.md]] for the configured values
+- See [[concepts/hilt-viewmodel-split-too-many-functions]] for the same threshold-as-architecture-signal pattern
 
 ## Details
 

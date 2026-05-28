@@ -74,7 +74,7 @@ The race is timing-dependent and rarely manifests in unit tests using `StandardT
 
 - [[concepts/viewmodel-stateflow-test-race]] - StateFlow emission ordering in tests; complementary: tests may miss races that `.update{}` prevents
 - [[concepts/collect-vs-collectlatest-restart-semantics]] - Another concurrency idiom for flow processing where the wrong choice causes parallel accumulation
-- [[concepts/standard-test-dispatcher-lies]] - Test dispatcher masking real-device concurrency issues
+- [[concepts/viewmodel-polling-runtest-trap]] - Test dispatcher masking real-device timing issues
 
 ## Sources
 

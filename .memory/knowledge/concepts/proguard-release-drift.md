@@ -66,7 +66,7 @@ Alternatively: add a release CI check step that runs `./gradlew assembleRelease`
 - [[concepts/masterdns-deploy-hardening]] — sshj R8 crash was the first instance caught; Phase C of hardening
 - [[concepts/release-stub-gate]] — `release.yml` has independent validation gates beyond CI; same motivation
 - [[concepts/release-process]] — Release APK uses R8; debug CI does not; gap between CI green and release success
-- [[concepts/fptn-build-pitfalls]] — FPTN `c++_static` is the linker analog of R8 drift (dependency linked wrong → crash on device but not on host)
+- [[concepts/android-ndk-cxx-static-linking]] — FPTN `c++_static` is the linker analog of R8 drift (dependency linked wrong → crash on device but not on host)
 
 ## Sources
 
