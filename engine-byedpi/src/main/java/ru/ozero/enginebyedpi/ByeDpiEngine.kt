@@ -33,6 +33,8 @@ import java.net.InetAddress
 import java.net.ServerSocket
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 
 class ByeDpiEngine(
     private val proxy: ByeDpiProxyContract = ByeDpiProxy(),
@@ -97,6 +99,7 @@ class ByeDpiEngine(
         val resolvedConfig = if (config.socksPort > 0) config else config.copy(socksPort = resolvedPort)
         Log.i(TAG, "start socksPort=$resolvedPort args=${resolvedConfig.args}")
         val oldJob = proxyJobRef.getAndSet(null)
+        var startContext: CoroutineContext = EmptyCoroutineContext
         if (oldJob != null) {
             if (oldJob.isActive) {
                 PersistentLoggers.warn(TAG, "start: предыдущий прокси ещё активен — останавливаю")
@@ -111,15 +114,23 @@ class ByeDpiEngine(
                 if (oldJob.isActive) oldJob.cancel()
             }
             PersistentLoggers.debug(TAG, "start: barrier pre-drain oldJob.isActive=${oldJob.isActive}")
-        }
 
-        // limitedParallelism(1): безусловный drain гарантирует что слот свободен даже после dirty stop
-        val drained = withTimeoutOrNull(STOP_GRACE_MS) {
-            withContext(proxyDispatcher) {}
-            true
-        }
-        if (drained == null) {
-            PersistentLoggers.warn(TAG, "start: dispatcher drain timeout — native thread may still be active")
+            val drained = withTimeoutOrNull(STOP_GRACE_MS) {
+                withContext(proxyDispatcher) {}
+                true
+            }
+            if (drained == null) {
+                PersistentLoggers.warn(TAG, "start: dispatcher drain timeout — native thread may still be active")
+                val priorGuardState =
+                    safeJniCall(fallback = 0, tag = "emergencyReset after dispatcher drain timeout threw") {
+                        proxy.emergencyReset()
+                    }
+                PersistentLoggers.error(
+                    TAG,
+                    "byedpi dispatcher stuck — emergencyReset выполнен (prior guard=$priorGuardState); start via IO",
+                )
+                startContext = Dispatchers.IO
+            }
         }
 
         val args = buildArgs(resolvedConfig)
@@ -127,7 +138,7 @@ class ByeDpiEngine(
             TAG,
             "jniStartProxy argv=[${args.joinToString(" ")}] (native префиксует argv[0]=\"byedpi\")",
         )
-        val proxyJob = proxyScope.launch {
+        val proxyJob = proxyScope.launch(startContext) {
             PersistentLoggers.debug(TAG, "launch entered port=$resolvedPort")
             val code = startProxyWithRecovery(args)
             PersistentLoggers.debug(TAG, "startProxy returned code=$code port=$resolvedPort")

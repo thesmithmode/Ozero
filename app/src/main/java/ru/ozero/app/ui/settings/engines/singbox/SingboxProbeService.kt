@@ -12,6 +12,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
 import ru.ozero.enginesingbox.SingboxEngine
 import ru.ozero.enginesingbox.SingboxPrefs
+import ru.ozero.singboxconfig.ConfigBuilder
 import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxroom.dao.ProxyProfileDao
@@ -31,11 +32,17 @@ class SingboxProbeService @Inject constructor(
         profiles: List<ProxyProfile>,
         scope: CoroutineScope,
     ) {
-        val results = profiles.map { profile ->
-            scope.async(Dispatchers.IO) {
-                val latency = probeLatencyMs(profile)
-                profileDao.updateLatency(profile.id, latency)
-                profile to latency
+        val results = profiles.mapNotNull { profile ->
+            val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(profile.beanBlob) }.getOrNull()
+            if (bean == null || !ConfigBuilder.isSupportedBean(bean)) {
+                profileDao.updateLatency(profile.id, LATENCY_FAILED)
+                null
+            } else {
+                scope.async(Dispatchers.IO) {
+                    val latency = probeLatencyMs(bean)
+                    profileDao.updateLatency(profile.id, latency)
+                    profile to latency
+                }
             }
         }.awaitAll()
         val best = results.filter { it.second >= 0 }.minByOrNull { it.second }?.first ?: return
@@ -46,9 +53,7 @@ class SingboxProbeService @Inject constructor(
         }
     }
 
-    private suspend fun probeLatencyMs(profile: ProxyProfile): Int = withContext(Dispatchers.IO) {
-        val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(profile.beanBlob) }
-            .getOrNull() ?: return@withContext LATENCY_UNTESTED
+    private suspend fun probeLatencyMs(bean: AbstractBean): Int = withContext(Dispatchers.IO) {
         val t0 = System.currentTimeMillis()
         val ok = runCatching {
             Socket().use { s ->

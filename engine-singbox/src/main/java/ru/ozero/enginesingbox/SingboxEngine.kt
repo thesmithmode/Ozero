@@ -49,6 +49,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
+@Suppress("TooManyFunctions")
 class SingboxEngine @Inject constructor(
     @ApplicationContext private val context: Context,
     @SingboxPrefs private val dataStore: DataStore<Preferences>,
@@ -159,13 +160,7 @@ class SingboxEngine @Inject constructor(
 
     private fun buildPendingConfig(config: EngineConfig.Singbox): String? {
         if (config.autoSelectBeanBlobs.isNotEmpty()) {
-            val beans = config.autoSelectBeanBlobs
-                .take(MAX_AUTO_SELECT_OUTBOUNDS)
-                .mapNotNull {
-                    runCatching { KryoSerializer.deserialize<AbstractBean>(it) }
-                        .onFailure { e -> PersistentLoggers.warn(TAG, "bean deserialize: ${e.message}") }
-                        .getOrNull()
-                }
+            val beans = supportedBeans(config.autoSelectBeanBlobs.take(MAX_AUTO_SELECT_OUTBOUNDS))
             if (beans.isEmpty()) {
                 PersistentLoggers.warn(TAG, "auto-select: all ${config.autoSelectBeanBlobs.size} beans failed")
                 return null
@@ -178,6 +173,16 @@ class SingboxEngine @Inject constructor(
             .onFailure { PersistentLoggers.warn(TAG, "beanBlob deserialize: ${it.message}") }
             .getOrNull() ?: return null
         val wrappers = chainWrapperBeans(config)
+        if (!ConfigBuilder.isSupportedBean(bean)) {
+            val fallbackBeans = supportedBeans(cachedAutoBlobs).take(MAX_AUTO_SELECT_OUTBOUNDS)
+            if (fallbackBeans.isEmpty()) {
+                PersistentLoggers.warn(TAG, "selected bean unsupported and no supported fallback profiles")
+                return null
+            }
+            return runCatching { ConfigBuilder.buildSingboxAutoConfig(fallbackBeans) }
+                .onFailure { PersistentLoggers.warn(TAG, "build fallback auto config: ${it.message}") }
+                .getOrNull()
+        }
         return runCatching { ConfigBuilder.buildSingboxConfig(bean) }
             .mapCatching {
                 if (wrappers.isNotEmpty()) {
@@ -195,6 +200,7 @@ class SingboxEngine @Inject constructor(
         return startProxyMode(config, configUpstream)
     }
 
+    @Suppress("ReturnCount")
     private suspend fun startProxyMode(
         config: EngineConfig.Singbox,
         upstream: ConfigBuilder.Upstream?,
@@ -202,9 +208,7 @@ class SingboxEngine @Inject constructor(
         val port = allocateChainPort()
         activeSocksPort = port
         val json = if (config.autoSelectBeanBlobs.isNotEmpty()) {
-            val beans = config.autoSelectBeanBlobs
-                .take(MAX_AUTO_SELECT_OUTBOUNDS)
-                .mapNotNull { runCatching { KryoSerializer.deserialize<AbstractBean>(it) }.getOrNull() }
+            val beans = supportedBeans(config.autoSelectBeanBlobs.take(MAX_AUTO_SELECT_OUTBOUNDS))
             if (beans.isEmpty()) return StartResult.Failure("chain auto-select: no valid beans")
             runCatching { ConfigBuilder.buildAutoChainConfig(beans, port, upstream) }
                 .getOrElse { return StartResult.Failure("chain auto config: ${it.message}") }
@@ -215,15 +219,22 @@ class SingboxEngine @Inject constructor(
         } else {
             val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(config.beanBlob) }
                 .getOrElse { return StartResult.Failure("chain deserialize: ${it.message}") }
-            val wrappers = if (upstream == null) chainWrapperBeans(config) else emptyList()
-            runCatching {
-                if (wrappers.isNotEmpty()) {
-                    ConfigBuilder.buildProfileChainProxyConfig(bean, wrappers, port)
-                } else {
-                    ConfigBuilder.buildChainConfig(bean, port, upstream)
+            if (!ConfigBuilder.isSupportedBean(bean)) {
+                val fallbackBeans = supportedBeans(cachedAutoBlobs).take(MAX_AUTO_SELECT_OUTBOUNDS)
+                if (fallbackBeans.isEmpty()) return StartResult.Failure("chain selected transport unsupported")
+                runCatching { ConfigBuilder.buildAutoChainConfig(fallbackBeans, port, upstream) }
+                    .getOrElse { return StartResult.Failure("chain fallback auto config: ${it.message}") }
+            } else {
+                val wrappers = if (upstream == null) chainWrapperBeans(config) else emptyList()
+                runCatching {
+                    if (wrappers.isNotEmpty()) {
+                        ConfigBuilder.buildProfileChainProxyConfig(bean, wrappers, port)
+                    } else {
+                        ConfigBuilder.buildChainConfig(bean, port, upstream)
+                    }
                 }
+                    .getOrElse { return StartResult.Failure("chain config: ${it.message}") }
             }
-                .getOrElse { return StartResult.Failure("chain config: ${it.message}") }
         }
 
         bindOrFail()?.let { return it }
@@ -351,6 +362,15 @@ class SingboxEngine @Inject constructor(
             runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
                 .onFailure { PersistentLoggers.warn(TAG, "chain bean deserialize: ${it.message}") }
                 .getOrNull()
+                ?.takeIf { ConfigBuilder.isSupportedBean(it) }
+        }
+
+    private fun supportedBeans(blobs: List<ByteArray>): List<AbstractBean> =
+        blobs.mapNotNull { blob ->
+            runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
+                .onFailure { e -> PersistentLoggers.warn(TAG, "bean deserialize: ${e.message}") }
+                .getOrNull()
+                ?.takeIf { ConfigBuilder.isSupportedBean(it) }
         }
 
     private fun protocolTypeOf(bean: AbstractBean): Int = when (bean) {

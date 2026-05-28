@@ -62,8 +62,12 @@ class EngineUrnetwork(
     )
 
     override fun statsLabel(stats: EngineStats): String? {
-        val peers = stats.activeConnections
-        return if (peers > 0) "$peers peers" else null
+        val peers = runCatching { sdkBridge.peerCount() }.getOrDefault(stats.activeConnections)
+        return when {
+            peers > 0 -> "$peers peers"
+            isConnectedStatus(runCatching { sdkBridge.connectionStatus() }.getOrNull()) -> "connected"
+            else -> null
+        }
     }
 
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
@@ -161,8 +165,9 @@ class EngineUrnetwork(
         val job = pluginScope.launch {
             while (true) {
                 val peers = runCatching { sdkBridge.peerCount() }.getOrDefault(0)
+                val status = runCatching { sdkBridge.connectionStatus() }.getOrNull()
                 _stats.value = EngineStats(
-                    activeConnections = peers,
+                    activeConnections = if (peers > 0 || !isConnectedStatus(status)) peers else 1,
                     connectedSince = sessionStart,
                 )
                 delay(statsPollIntervalMs)

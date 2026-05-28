@@ -120,6 +120,29 @@ class EngineUrnetworkStatsPollingTest {
     }
 
     @Test
+    fun `connected status keeps stats active while peer count is still zero`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(SupervisorJob() + dispatcher)
+        val bridge = FakeBridge(initialPeerCount = 0, connectionStatusValue = "CONNECTED")
+        val engine = EngineUrnetwork(
+            configStore = fakeStore(byJwt = "j", byClientJwt = "cj"),
+            sdkBridge = bridge,
+            jwtBootstrapper = RealUrnetworkJwtBootstrapper(
+                fakeStore(byJwt = "j", byClientJwt = "cj"),
+                FakeAuth(),
+                null,
+            ),
+            pluginScope = scope,
+            statsPollIntervalMs = pollIntervalMs,
+        )
+        engine.start(baseConfig, Upstream.None)
+        runCurrent()
+        assertEquals(1, engine.stats().first().activeConnections)
+        assertEquals("connected", engine.statsLabel(engine.stats().first()))
+        scope.cancel()
+    }
+
+    @Test
     fun `bridge_peerCount throw — polling продолжается с peers=0`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val scope = CoroutineScope(SupervisorJob() + dispatcher)
@@ -148,6 +171,7 @@ class EngineUrnetworkStatsPollingTest {
 
     private class FakeBridge(
         initialPeerCount: Int = 0,
+        var connectionStatusValue: String? = null,
         var throwOnPeerCount: Boolean = false,
     ) : UrnetworkSdkBridge {
         var peerCountValue: Int = initialPeerCount
@@ -174,6 +198,7 @@ class EngineUrnetworkStatsPollingTest {
         }
 
         override fun isRunning(): Boolean = running
+        override fun connectionStatus(): String? = connectionStatusValue
         override suspend fun attachTun(tunFd: Int) = UrnetworkSdkBridge.AttachResult.Success
         override fun connectTo(location: UrnetworkSdkBridge.LocationToken) = Unit
         override fun connectBestAvailable() = Unit

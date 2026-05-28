@@ -1012,3 +1012,27 @@
 - Source: daily/2026-05-28.md
 - Articles created: [[concepts/shared-warp-settings-branch-coverage]], [[concepts/masterdns-fake-ssh-specificity]], [[concepts/fake-dao-preseed-autoincrement]], [[concepts/app-desktop-coverage-gate-scope]], [[connections/extra-module-ci-exposes-stale-fakes]]
 - Articles updated: none
+## [2026-05-28T20:03:01+03:00] compile | 2026-05-28.md
+- Source: daily/2026-05-28.md
+- Articles created: [[concepts/memory-only-commit-ci-risk]], [[concepts/release-regression-self-review-gate]], [[concepts/github-actions-run-level-polling]], [[concepts/release-audit-tag-sha-grounding]], [[concepts/test-retention-evidence-standard]]
+- Articles updated: none
+## [2026-05-28T20:10:28+03:00] compile | 2026-05-28.md
+- Source: daily/2026-05-28.md
+- Articles created: [[concepts/github-actions-artifact-node-major-upgrade]], [[concepts/release-runtime-scenario-checklist]], [[connections/ci-extra-gate-latent-failures]]
+- Articles updated: none
+## [2026-05-28T20:31:25+03:00] compile | 2026-05-28.md
+- Source: daily/2026-05-28.md
+- Articles created: [[concepts/engine-failure-recovery-isolation]], [[concepts/release-last-good-baseline-audit]], [[concepts/singbox-private-subscription-chain-validation]]
+- Articles updated: none
+## [2026-05-28T20:37:32+03:00] compile | 2026-05-28.md
+- Source: daily/2026-05-28.md
+- Articles created: [[concepts/release-post-stop-dev-review-discipline]], [[concepts/code-quality-review-proof-standard]], [[concepts/ci-artifact-report-driven-debugging]], [[concepts/fptn-http-608-regression-baseline]], [[connections/engine-switch-regressions-baseline-runtime-proof]]
+- Articles updated: none
+## [2026-05-28T20:39:14+03:00] compile | 2026-05-28.md
+- Source: daily/2026-05-28.md
+- Articles created: [[concepts/engine-switch-failure-containment]], [[concepts/private-subscription-sanitized-debugging]], [[concepts/ci-artifact-driven-extra-module-debugging]], [[concepts/release-postpublish-architecture-review]]
+- Articles updated: none
+## [2026-05-28T20:59:24+03:00] compile | 2026-05-28.md
+- Source: daily/2026-05-28.md
+- Articles created: [[concepts/android-apk-only-release-scope]], [[concepts/engine-poisoned-state-recovery-proof]], [[concepts/release-runtime-regression-sentinels]], [[concepts/ci-extra-module-artifact-feedback-loop]], [[connections/android-apk-scope-vs-runtime-proof]]
+- Articles updated: none
