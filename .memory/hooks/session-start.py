@@ -1,9 +1,9 @@
 """
-SessionStart hook - injects knowledge base context into every Codex conversation.
+SessionStart hook - injects knowledge base context into every session.
 
-This is the "context injection" layer. When Codex starts a session,
+This is the "context injection" layer. When a session starts,
 this hook reads the knowledge base index and recent daily log, then injects
-them as additional context so Codex always sees the local project memory.
+them as additional context so the model always sees the local project memory.
 
 Configured in project `.codex/hooks.json`.
 """

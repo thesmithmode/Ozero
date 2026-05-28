@@ -1,7 +1,7 @@
 """
-SessionEnd hook - captures Codex conversation transcript for memory extraction.
+SessionEnd hook - captures conversation transcript for memory extraction.
 
-When a Codex session ends, this hook reads the transcript path from
+When a session ends, this hook reads the transcript path from
 stdin, extracts conversation context, and spawns flush.py as a background
 process to extract knowledge into the daily log.
 
@@ -68,7 +68,7 @@ def main() -> None:
         if not transcript_path:
             logging.info("SKIP: no transcript path")
             return
-        logging.info("Resolved Codex transcript: %s", transcript_path)
+        logging.info("Resolved transcript: %s", transcript_path)
     else:
         transcript_path = Path(transcript_path_str)
 
@@ -78,7 +78,7 @@ def main() -> None:
             logging.info("SKIP: transcript missing: %s", transcript_path_str)
             return
         transcript_path = discovered
-        logging.info("Resolved Codex transcript after missing path: %s", transcript_path)
+        logging.info("Resolved transcript after missing path: %s", transcript_path)
 
     try:
         context, turn_count = extract_conversation_context(

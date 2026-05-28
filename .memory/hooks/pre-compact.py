@@ -1,7 +1,7 @@
 """
-PreCompact hook - captures Codex conversation transcript before auto-compaction.
+PreCompact hook - captures conversation transcript before auto-compaction.
 
-When Codex context fills up, it may compact or summarize and discard detail.
+When context fills up, it may compact or summarize and discard detail.
 This hook fires BEFORE that happens, extracting conversation
 context and spawning flush.py to extract knowledge that would otherwise
 be lost to summarization.
@@ -66,7 +66,7 @@ def main() -> None:
         if not transcript_path:
             logging.info("SKIP: no transcript path")
             return
-        logging.info("Resolved Codex transcript: %s", transcript_path)
+        logging.info("Resolved transcript: %s", transcript_path)
     else:
         transcript_path = Path(transcript_path_str)
 
@@ -76,7 +76,7 @@ def main() -> None:
             logging.info("SKIP: transcript missing: %s", transcript_path_str)
             return
         transcript_path = discovered
-        logging.info("Resolved Codex transcript after missing path: %s", transcript_path)
+        logging.info("Resolved transcript after missing path: %s", transcript_path)
 
     try:
         context, turn_count = extract_conversation_context(
