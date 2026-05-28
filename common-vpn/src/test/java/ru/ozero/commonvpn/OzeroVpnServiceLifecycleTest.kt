@@ -353,12 +353,12 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `StartSequenceCoordinator run в auto-mode идёт через pickAutoCandidateWithPreflight`() {
+    fun `StartSequenceCoordinator run в auto-mode идёт через autoCandidatesWithPreflight`() {
         val body = startSequenceSource.substringAfter("suspend fun run()")
             .substringBefore("suspend fun engineNeedsCustomTun")
         assertTrue(
             body.contains("autoCandidatesWithPreflight("),
-            "run обязан звать pickAutoCandidateWithPreflight в auto-mode — " +
+            "run обязан звать autoCandidatesWithPreflight в auto-mode — " +
                 "fallback по priority + TCP-probe",
         )
         val hasShortFallback = body.contains("?: EngineId.BYEDPI")
@@ -372,10 +372,10 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `pickAutoCandidateWithPreflight вызывает plugin preflight с no-op protector`() {
+    fun `autoCandidatesWithPreflight вызывает plugin preflight с no-op protector`() {
         assertTrue(
             startSequenceSource.contains("plugin?.preflight()"),
-            "pickAutoCandidateWithPreflight обязан брать EnginePreflight через plugin.preflight()",
+            "autoCandidatesWithPreflight обязан брать EnginePreflight через plugin.preflight()",
         )
         val preflightFn = startSequenceSource.substringAfter("private suspend fun autoCandidatesWithPreflight")
             .substringBefore("private suspend fun establishTunForEngine")
@@ -427,7 +427,7 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `manual-mode не зовёт pickAutoCandidateWithPreflight`() {
+    fun `manual-mode не зовёт autoCandidatesWithPreflight`() {
         val body = startSequenceSource.substringAfter("suspend fun run()")
             .substringBefore("suspend fun engineNeedsCustomTun")
         assertTrue(
@@ -436,14 +436,14 @@ class OzeroVpnServiceLifecycleTest {
         )
         assertTrue(
             body.contains("autoCandidatesWithPreflight(settings)"),
-            "auto-mode (manualEngine == null) идёт через pickAutoCandidateWithPreflight",
+            "auto-mode (manualEngine == null) идёт через autoCandidatesWithPreflight",
         )
     }
 
     @Test
     fun `autoCandidates итерирует engineAutoPriority при manualEngine null`() {
         val body = startSequenceSource.substringAfter("private fun autoCandidates(")
-            .substringBefore("private suspend fun pickAutoCandidateWithPreflight")
+            .substringBefore("private suspend fun autoCandidatesWithPreflight")
         assertTrue(
             body.contains("engineAutoPriority"),
             "autoCandidates обязан читать settings.engineAutoPriority для авто-режима",
@@ -498,7 +498,6 @@ class OzeroVpnServiceLifecycleTest {
             "suspend fun run()",
             "suspend fun engineNeedsCustomTun",
             "private suspend fun awaitEngineReady(",
-            "private suspend fun pickAutoCandidateWithPreflight",
             "private suspend fun autoCandidatesWithPreflight",
             "private fun autoCandidates",
             "private fun resolveTargetForUi(",

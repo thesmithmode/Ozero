@@ -76,7 +76,6 @@ class StartSequenceCoordinatorContractTest {
     fun `OzeroVpnService больше не имеет inline runStartSequence и related extracted методов`() {
         listOf(
             "private suspend fun runStartSequence",
-            "private suspend fun pickAutoCandidateWithPreflight",
             "private suspend fun autoCandidatesWithPreflight",
             "private suspend fun establishTunForEngine",
             "private fun establishTun(",
@@ -138,7 +137,7 @@ class StartSequenceCoordinatorContractTest {
     }
 
     @Test
-    fun `pickAutoCandidateWithPreflight использует no-op SocketProtector`() {
+    fun `autoCandidatesWithPreflight использует no-op SocketProtector`() {
         val body = source.substringAfter("private suspend fun autoCandidatesWithPreflight(")
             .substringBefore("private suspend fun establishTunForEngine(")
         assertTrue(

@@ -393,17 +393,6 @@ private fun BackupSection(onOpenBackup: () -> Unit) {
 }
 
 @Composable
-private fun DiagnosticsSection(onOpenDiagnostics: () -> Unit) {
-    NavRow(
-        title = stringResource(R.string.diag_title),
-        summary = stringResource(R.string.diag_idle_hint),
-        tag = "settings_diagnostics_row",
-        onClick = onOpenDiagnostics,
-        enabled = true,
-    )
-}
-
-@Composable
 private fun EnginesSection(
     onOpenByeDpi: () -> Unit,
     onOpenUrnetwork: () -> Unit,

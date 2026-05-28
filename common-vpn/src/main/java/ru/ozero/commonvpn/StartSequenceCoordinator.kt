@@ -344,10 +344,6 @@ class StartSequenceCoordinator(
         }
     }
 
-    private suspend fun pickAutoCandidateWithPreflight(
-        settings: SettingsModel?,
-    ): Pair<EngineId, EngineConfig>? = autoCandidatesWithPreflight(settings).firstOrNull()
-
     private suspend fun autoCandidatesWithPreflight(
         settings: SettingsModel?,
         skipIds: Set<EngineId> = emptySet(),

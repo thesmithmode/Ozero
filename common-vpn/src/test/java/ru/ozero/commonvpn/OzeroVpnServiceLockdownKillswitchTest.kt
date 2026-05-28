@@ -240,7 +240,7 @@ class OzeroVpnServiceLockdownKillswitchTest {
         assertTrue(pickIdx >= 0, "autoCandidatesWithPreflight не найден в run. Body:\n$runBody")
         assertTrue(
             lockdownIdx < pickIdx,
-            "lockdownStartupFdRef.set обязан быть РАНЬШЕ pickAutoCandidateWithPreflight — " +
+            "lockdownStartupFdRef.set обязан быть РАНЬШЕ autoCandidatesWithPreflight — " +
                 "иначе startup gap не закрыт. lockdownIdx=$lockdownIdx pickIdx=$pickIdx",
         )
     }
