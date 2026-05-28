@@ -56,6 +56,8 @@ class ConfigBuilderChainTest {
 
         assertContains(json, "\"address\":\"https://1.1.1.1/dns-query\"")
         assertContains(json, "\"detour\":\"proxy\"")
+        assertContains(json, "\"action\":\"hijack-dns\"")
+        assertFalse(json.contains("\"type\":\"dns\""), "chain config must not rely on legacy dns outbound")
     }
 
     @Test
