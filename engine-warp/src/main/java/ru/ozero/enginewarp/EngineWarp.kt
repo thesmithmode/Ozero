@@ -323,6 +323,10 @@ class EngineWarp(
         val v6Addr = cfg.interfaceAddressV6.substringBefore('/').takeIf { it.isNotBlank() && ipv6Allowed }
         val v6Prefix = cfg.interfaceAddressV6.substringAfter('/', missingDelimiterValue = "128")
             .toIntOrNull() ?: 128
+        val allowedV4 = cfg.allowedIps.filter { it.isIpv4Cidr() }
+        val allowedV6 = cfg.allowedIps.filter { it.isIpv6Cidr() && ipv6Allowed }
+        val routeAllV4 = allowedV4.any { it.isFullTunnelV4() }
+        val routeAllV6 = v6Addr != null && allowedV6.any { it.isFullTunnelV6() }
         return TunSpec(
             sessionName = "WARP",
             mtu = cfg.mtu,
@@ -335,8 +339,10 @@ class EngineWarp(
             ipv6Address = v6Addr,
             ipv6PrefixLength = v6Prefix,
             excludeRfc1918 = false,
-            routeAllV4 = true,
-            routeAllV6 = v6Addr != null,
+            routeAllV4 = routeAllV4,
+            routeAllV6 = routeAllV6,
+            routeCidrsV4 = if (routeAllV4) emptyList() else allowedV4,
+            routeCidrsV6 = if (routeAllV6) emptyList() else allowedV6,
         )
     }
 
@@ -491,12 +497,19 @@ class EngineWarp(
         } else {
             WarpIniBuilder.build(resolvedConfig)
         }
+        val iniConfig = if (!rawIni.isNullOrBlank()) {
+            WarpConfParser.parse(baseIni).getOrNull()?.let { parsed ->
+                resolvedConfig.copy(allowedIps = parsed.allowedIps)
+            } ?: resolvedConfig
+        } else {
+            resolvedConfig
+        }
         val ini = if (ipv6Allowed) baseIni else stripIpv6FromIni(baseIni)
         val iniSource = when {
             !rawIni.isNullOrBlank() -> "raw($source)"
             else -> "builder($source)"
         }
-        return ResolvedWarp(config = resolvedConfig, ini = ini, iniSource = iniSource)
+        return ResolvedWarp(config = iniConfig, ini = ini, iniSource = iniSource)
     }
 
     private fun stripIpv6FromIni(ini: String): String {
@@ -592,6 +605,14 @@ class EngineWarp(
         val trimmed = ini.trimEnd()
         return "$trimmed\n\n[Socks5]\nBindAddress = 127.0.0.1:$socksPort\n"
     }
+
+    private fun String.isIpv4Cidr(): Boolean = '/' in this && ':' !in this
+
+    private fun String.isIpv6Cidr(): Boolean = '/' in this && ':' in this
+
+    private fun String.isFullTunnelV4(): Boolean = trim() == "0.0.0.0/0"
+
+    private fun String.isFullTunnelV6(): Boolean = trim() == "::/0"
 
     internal companion object {
         fun isLikelyIpAddress(host: String): Boolean {

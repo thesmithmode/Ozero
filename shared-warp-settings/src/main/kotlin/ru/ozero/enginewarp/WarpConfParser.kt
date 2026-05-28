@@ -28,6 +28,7 @@ object WarpConfParser {
             ?: throw IOException("WireGuard conf: peer Endpoint is missing")
         val mtu = iface["mtu"]?.toIntOrNull() ?: WarpConfig.DEFAULT_MTU
         val dnsServers = parseDnsServers(iface["dns"])
+        val allowedIps = parseAllowedIps(peer["allowedips"])
         val keepalive = peer["persistentkeepalive"]?.toIntOrNull() ?: WarpConfig.DEFAULT_KEEPALIVE
         val awgParams = parseAwgParams(iface)
         Result.success(
@@ -42,6 +43,7 @@ object WarpConfParser {
                 mtu = mtu,
                 dnsServers = dnsServers,
                 keepaliveSeconds = keepalive,
+                allowedIps = allowedIps,
                 awgParams = awgParams,
             ),
         )
@@ -91,6 +93,12 @@ object WarpConfParser {
         if (raw.isNullOrBlank()) return WarpConfig.DEFAULT_DNS
         val servers = raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
         return servers.ifEmpty { WarpConfig.DEFAULT_DNS }
+    }
+
+    private fun parseAllowedIps(raw: String?): List<String> {
+        if (raw.isNullOrBlank()) return WarpConfig.DEFAULT_ALLOWED_IPS
+        val cidrs = raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        return cidrs.ifEmpty { WarpConfig.DEFAULT_ALLOWED_IPS }
     }
 
     private fun parseAwgParams(iface: Map<String, String>): AwgParams {
