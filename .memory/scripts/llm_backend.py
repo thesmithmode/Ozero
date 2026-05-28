@@ -11,7 +11,7 @@ DEFAULT_CODEX_TIMEOUT = 900
 
 
 def selected_backend() -> str:
-    return os.environ.get("WIKI_LLM_BACKEND", "codex").strip().lower()
+    return "codex"
 
 
 def _codex_command(cwd: Path, sandbox: str, output_file: Path) -> list[str]:
@@ -90,84 +90,14 @@ def _run_codex(prompt: str, cwd: Path, sandbox: str) -> str:
 
 
 async def run_text_prompt(prompt: str, cwd: Path) -> str:
-    if selected_backend() == "claude":
-        return await _run_claude_text_prompt(prompt, cwd)
     return await asyncio.to_thread(_run_codex, prompt, cwd, "read-only")
 
 
 async def run_edit_prompt(prompt: str, cwd: Path) -> float:
-    if selected_backend() == "claude":
-        return await _run_claude_edit_prompt(prompt, cwd)
     await asyncio.to_thread(_run_codex, prompt, cwd, "workspace-write")
     return 0.0
 
 
 async def run_workspace_text_prompt(prompt: str, cwd: Path) -> tuple[str, float]:
-    if selected_backend() == "claude":
-        return await _run_claude_workspace_text_prompt(prompt, cwd)
     response = await asyncio.to_thread(_run_codex, prompt, cwd, "workspace-write")
     return response, 0.0
-
-
-async def _run_claude_text_prompt(prompt: str, cwd: Path) -> str:
-    from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, TextBlock, query
-
-    response = ""
-    async for message in query(
-        prompt=prompt,
-        options=ClaudeAgentOptions(cwd=str(cwd), allowed_tools=[], max_turns=2),
-    ):
-        if isinstance(message, AssistantMessage):
-            for block in message.content:
-                if isinstance(block, TextBlock):
-                    response += block.text
-    return response
-
-
-async def _run_claude_edit_prompt(prompt: str, cwd: Path) -> float:
-    from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, ResultMessage, TextBlock, query
-
-    cost = 0.0
-    async for message in query(
-        prompt=prompt,
-        options=ClaudeAgentOptions(
-            cwd=str(cwd),
-            system_prompt={"type": "preset", "preset": "claude_code"},
-            allowed_tools=["Read", "Write", "Edit", "Glob", "Grep"],
-            permission_mode="acceptEdits",
-            max_turns=30,
-            setting_sources=[],
-            plugins=[],
-        ),
-    ):
-        if isinstance(message, AssistantMessage):
-            for block in message.content:
-                if isinstance(block, TextBlock):
-                    pass
-        elif isinstance(message, ResultMessage):
-            cost = message.total_cost_usd or 0.0
-    return cost
-
-
-async def _run_claude_workspace_text_prompt(prompt: str, cwd: Path) -> tuple[str, float]:
-    from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, ResultMessage, TextBlock, query
-
-    answer = ""
-    cost = 0.0
-    async for message in query(
-        prompt=prompt,
-        options=ClaudeAgentOptions(
-            cwd=str(cwd),
-            system_prompt={"type": "preset", "preset": "claude_code"},
-            allowed_tools=["Read", "Write", "Edit", "Glob", "Grep"],
-            permission_mode="acceptEdits",
-            max_turns=15,
-        ),
-    ):
-        if isinstance(message, AssistantMessage):
-            for block in message.content:
-                if isinstance(block, TextBlock):
-                    answer += block.text
-        elif isinstance(message, ResultMessage):
-            cost = message.total_cost_usd or 0.0
-    return answer, cost

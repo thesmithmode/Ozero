@@ -10,12 +10,10 @@ daily/ -> compile -> knowledge/ -> query -> SessionStart context
 
 ## Runtime Contract
 
-- Primary runtime is Codex CLI through `scripts/llm_backend.py`.
-- Legacy Claude fallback is allowed only with `WIKI_LLM_BACKEND=claude`.
+- Runtime is Codex CLI through `scripts/llm_backend.py`.
 - Project hooks live in `.codex/hooks.json`.
-- Hook scripts must accept Claude and Codex transcript JSONL.
+- Hook scripts accept Codex transcript JSONL.
 - Codex messages: `payload.type=message`, `payload.role`, `input_text/output_text`.
-- Claude messages: `message.role`, `message.content`.
 - If hook input has no `transcript_path`, discover the latest Codex transcript by `session_id` or `cwd`.
 
 ## Structure

@@ -1,8 +1,8 @@
 """
-PreCompact hook - captures conversation transcript before auto-compaction.
+PreCompact hook - captures Codex conversation transcript before auto-compaction.
 
-When Claude Code's context window fills up, it auto-compacts (summarizes and
-discards detail). This hook fires BEFORE that happens, extracting conversation
+When Codex context fills up, it may compact or summarize and discard detail.
+This hook fires BEFORE that happens, extracting conversation
 context and spawning flush.py to extract knowledge that would otherwise
 be lost to summarization.
 
@@ -27,7 +27,7 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 
 from transcript import discover_codex_transcript, extract_conversation_context
 
-if os.environ.get("CLAUDE_INVOKED_BY") or os.environ.get("CODEX_INVOKED_BY"):
+if os.environ.get("CODEX_INVOKED_BY"):
     sys.exit(0)
 
 logging.basicConfig(

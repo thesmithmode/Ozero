@@ -2,7 +2,7 @@
 Memory flush agent - extracts important knowledge from conversation context.
 
 Spawned by session-end.py or pre-compact.py as a background process. Reads
-pre-extracted conversation context from a .md file, uses the Claude Agent SDK
+pre-extracted conversation context from a .md file, uses Codex CLI
 to decide what's worth saving, and appends the result to today's daily log.
 
 Usage:
@@ -11,9 +11,8 @@ Usage:
 
 from __future__ import annotations
 
-# Recursion prevention: set this BEFORE any imports that might trigger Claude
+# Recursion prevention: set this BEFORE any imports that might invoke Codex.
 import os
-os.environ["CLAUDE_INVOKED_BY"] = "memory_flush"
 os.environ["CODEX_INVOKED_BY"] = "memory_flush"
 
 import asyncio

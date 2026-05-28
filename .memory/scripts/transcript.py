@@ -30,15 +30,11 @@ def extract_text(content: Any) -> str:
 
 
 def extract_message(entry: dict[str, Any]) -> tuple[str, str]:
-    msg = entry.get("message", {})
-    if isinstance(msg, dict) and ("role" in msg or "content" in msg):
-        return str(msg.get("role", "")), extract_text(msg.get("content", ""))
-
     payload = entry.get("payload", {})
     if isinstance(payload, dict) and payload.get("type") == "message":
         return str(payload.get("role", "")), extract_text(payload.get("content", ""))
 
-    return str(entry.get("role", "")), extract_text(entry.get("content", ""))
+    return "", ""
 
 
 def is_noise_turn(role: str, content: str, include_tool_output: bool) -> bool:

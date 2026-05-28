@@ -13,10 +13,8 @@ Codex session JSONL -> .codex hooks -> .memory/hooks/*
 
 ## Runtime
 
-- Primary backend: Codex CLI through `codex exec`.
-- Legacy backend: Claude Agent SDK only when `WIKI_LLM_BACKEND=claude`.
+- Backend: Codex CLI through `codex exec`.
 - Hooks are configured in project `.codex/hooks.json`.
-- Claude hooks in `.claude/settings.json` may remain for compatibility but are no longer the primary path.
 
 ## Key Commands
 
@@ -33,8 +31,7 @@ uv run python scripts/lint.py
 
 Codex stores sessions as JSONL under `$CODEX_HOME/sessions/`.
 
-Supported transcript formats:
-- Claude: `message.role` + `message.content`
+Supported transcript format:
 - Codex: `payload.type=message` + `payload.role` + `input_text/output_text`
 
 If hook input has no `transcript_path`, hooks discover the latest Codex transcript by `session_id` or `cwd`.

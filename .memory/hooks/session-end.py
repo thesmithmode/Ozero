@@ -1,7 +1,7 @@
 """
-SessionEnd hook - captures conversation transcript for memory extraction.
+SessionEnd hook - captures Codex conversation transcript for memory extraction.
 
-When a Claude Code session ends, this hook reads the transcript path from
+When a Codex session ends, this hook reads the transcript path from
 stdin, extracts conversation context, and spawns flush.py as a background
 process to extract knowledge into the daily log.
 
@@ -27,7 +27,7 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 
 from transcript import discover_codex_transcript, extract_conversation_context
 
-if os.environ.get("CLAUDE_INVOKED_BY") or os.environ.get("CODEX_INVOKED_BY"):
+if os.environ.get("CODEX_INVOKED_BY"):
     sys.exit(0)
 
 logging.basicConfig(
@@ -43,8 +43,8 @@ MIN_TURNS_TO_FLUSH = 1
 
 
 def main() -> None:
-    # Read hook input from stdin
-    # Claude Code on Windows may pass paths with unescaped backslashes
+    # Read hook input from stdin.
+    # Windows hook payloads may pass paths with unescaped backslashes.
     try:
         raw_input = sys.stdin.read()
         try:

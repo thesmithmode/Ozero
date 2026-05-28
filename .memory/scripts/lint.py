@@ -16,6 +16,7 @@ import asyncio
 from pathlib import Path
 
 from config import KNOWLEDGE_DIR, REPORTS_DIR, now_iso, today_iso
+from llm_backend import run_text_prompt
 from utils import (
     count_inbound_links,
     extract_wikilinks,
@@ -147,14 +148,6 @@ def check_sparse_articles() -> list[dict]:
 
 async def check_contradictions() -> list[dict]:
     """Use LLM to detect contradictions across articles."""
-    from claude_agent_sdk import (
-        AssistantMessage,
-        ClaudeAgentOptions,
-        ResultMessage,
-        TextBlock,
-        query,
-    )
-
     article_paths = sorted(
         str(p.relative_to(KNOWLEDGE_DIR)) for p in list_wiki_articles()
     )
@@ -163,12 +156,13 @@ async def check_contradictions() -> list[dict]:
     prompt = f"""Review this knowledge base for contradictions, inconsistencies, or
 conflicting claims across articles.
 
-## Knowledge Base (article paths — Read on demand with the Read tool)
+## Knowledge Base (article paths)
 
 {article_list}
 
 ## Instructions
 
+Read relevant files from the workspace before judging contradictions.
 Look for:
 - Direct contradictions (article A says X, article B says not-X)
 - Inconsistent recommendations (different articles recommend conflicting approaches)
@@ -182,23 +176,8 @@ If no issues found, output exactly: NO_ISSUES
 
 Do NOT output anything else - no preamble, no explanation, just the formatted lines."""
 
-    response = ""
     try:
-        async for message in query(
-            prompt=prompt,
-            options=ClaudeAgentOptions(
-                cwd=str(ROOT_DIR),
-                allowed_tools=["Read", "Glob", "Grep"],
-                permission_mode="acceptEdits",
-                max_turns=30,
-                setting_sources=[],
-                plugins=[],
-            ),
-        ):
-            if isinstance(message, AssistantMessage):
-                for block in message.content:
-                    if isinstance(block, TextBlock):
-                        response += block.text
+        response = await run_text_prompt(prompt, ROOT_DIR)
     except Exception as e:
         return [{"severity": "error", "check": "contradiction", "file": "(system)", "detail": f"LLM check failed: {e}"}]
 
