@@ -47,8 +47,10 @@ object ConfigBuilder {
 
     fun buildAutoChainConfig(beans: List<AbstractBean>, socksPort: Int, upstream: Upstream? = null): String {
         require(beans.isNotEmpty()) { "beans must not be empty for auto-select chain config" }
+        val supported = beans.filter { isSupportedBean(it) }
+        require(supported.isNotEmpty()) { "no beans with supported transport types" }
         val detourTag = upstream?.let { "upstream" }
-        val proxyOutbounds = beans.mapIndexed { index, bean ->
+        val proxyOutbounds = supported.mapIndexed { index, bean ->
             beanOutbound(bean, "proxy-$index", detour = detourTag)
         }
         val tagList = proxyOutbounds.indices.joinToString(",") { jsonString("proxy-$it") }

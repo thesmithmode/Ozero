@@ -50,6 +50,8 @@ class RealUrnetworkSdkBridge(
     private val deviceRef = AtomicReference<DeviceLocal?>(null)
     private val ioLoopRef = AtomicReference<IoLoop?>(null)
     private val connectVcRef = AtomicReference<ConnectViewController?>(null)
+    private val connectionStatusSubRef = AtomicReference<Sub?>(null)
+    private val connectionStatusRef = AtomicReference<String?>(null)
     private val walletVcRef = AtomicReference<WalletViewController?>(null)
     private val unpaidBytesRef = AtomicReference(0L)
     private val sharingTrafficLogged = AtomicBoolean(false)
@@ -194,6 +196,7 @@ class RealUrnetworkSdkBridge(
             return UrnetworkSdkBridge.StartResult.Failed("ConnectViewController unavailable")
         }
         connectVcRef.set(cv)
+        attachConnectionStatusListener(cv)
         PersistentLoggers.debug(TAG, "node start: routing controller opened — endpoints available")
 
         contractStatusListener.attach(device)
@@ -265,6 +268,7 @@ class RealUrnetworkSdkBridge(
     private suspend fun stopUnderLock() {
         runCatching { bridgeScope.coroutineContext.cancelChildren() }
         contractStatusListener.detach()
+        detachConnectionStatusListener()
         sharingTrafficLogged.set(false)
         val completed = withTimeoutOrNull(STOP_TIMEOUT_MS) {
             withContext(Dispatchers.Main.immediate) {
@@ -384,6 +388,11 @@ class RealUrnetworkSdkBridge(
 
     override fun contractStatus(): StateFlow<UrnetworkSdkBridge.ContractStatusSnapshot> =
         contractStatusListener.status
+
+    override fun connectionStatus(): String? {
+        if (!running.get()) return null
+        return connectionStatusRef.get()
+    }
 
     override fun openLocationsViewController(): LocationsViewController? {
         if (!running.get() && deviceRef.get() == null) return null
@@ -572,6 +581,34 @@ class RealUrnetworkSdkBridge(
     override fun peerCount(): Int {
         if (!running.get()) return 0
         return runCatching { connectVcRef.get()?.grid?.windowCurrentSize ?: 0 }.getOrDefault(0)
+    }
+
+    private fun attachConnectionStatusListener(cv: ConnectViewController) {
+        refreshConnectionStatus(cv)
+        runCatching {
+            val sub = cv.addConnectionStatusListener { refreshConnectionStatus(cv) }
+            connectionStatusSubRef.getAndSet(sub)?.also { stale ->
+                runCatching { stale.close() }
+                    .onFailure { PersistentLoggers.warn(TAG, "connectionStatus stale sub.close threw: ${it.message}") }
+            }
+            Log.i(TAG, "connectionStatus listener attached")
+        }.onFailure {
+            PersistentLoggers.warn(TAG, "addConnectionStatusListener threw: ${it.message}")
+        }
+    }
+
+    private fun detachConnectionStatusListener() {
+        connectionStatusSubRef.getAndSet(null)?.also { sub ->
+            runCatching { sub.close() }
+                .onFailure { PersistentLoggers.warn(TAG, "connectionStatus sub.close threw: ${it.message}") }
+        }
+        connectionStatusRef.set(null)
+    }
+
+    private fun refreshConnectionStatus(cv: ConnectViewController) {
+        val status = runCatching { cv.connectionStatus }.getOrNull()?.takeIf { it.isNotBlank() }
+        connectionStatusRef.set(status)
+        Log.i(TAG, "connectionStatus=${status ?: "<null>"}")
     }
 
     override fun unpaidByteCount(): Long = unpaidBytesRef.get()

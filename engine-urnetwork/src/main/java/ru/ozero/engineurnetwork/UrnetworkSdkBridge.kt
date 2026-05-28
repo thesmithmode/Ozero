@@ -46,6 +46,8 @@ interface UrnetworkSdkBridge {
 
     fun relayDiagnostics(): String = "unavailable"
 
+    fun connectionStatus(): String? = null
+
     fun peerCount(): Int
 
     fun unpaidByteCount(): Long

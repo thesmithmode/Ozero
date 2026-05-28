@@ -204,7 +204,16 @@ class EngineUrnetwork(
         var polls = 0
         val reached = withTimeoutOrNull(peerReadyTimeoutMs) {
             while (true) {
+                val status = runCatching { sdkBridge.connectionStatus() }.getOrNull()
                 val peers = runCatching { sdkBridge.peerCount() }.getOrDefault(0)
+                if (isConnectedStatus(status)) {
+                    Log.i(
+                        TAG,
+                        "awaitReady: status=$status peers=$peers — engine ready " +
+                            "(after ${polls * peerReadyPollMs}ms)",
+                    )
+                    return@withTimeoutOrNull Unit
+                }
                 if (peers > 0) {
                     Log.i(TAG, "awaitReady: peers=$peers — engine ready (after ${polls * peerReadyPollMs}ms)")
                     return@withTimeoutOrNull Unit
@@ -213,7 +222,8 @@ class EngineUrnetwork(
                 if (polls % PEER_PROGRESS_LOG_EVERY == 0) {
                     PersistentLoggers.debug(
                         TAG,
-                        "awaitReady progress: peers=0 elapsed≈${polls * peerReadyPollMs}ms " +
+                        "awaitReady progress: status=${status ?: "<null>"} peers=0 " +
+                            "elapsed≈${polls * peerReadyPollMs}ms " +
                             "deadline=${peerReadyTimeoutMs}ms",
                     )
                 }
@@ -223,11 +233,14 @@ class EngineUrnetwork(
         return if (reached != null) {
             EnginePlugin.ReadyResult.Ready
         } else {
-            val reason = "URnetwork: нет пиров за ${peerReadyTimeoutMs}ms"
+            val reason = "URnetwork: SDK не перешёл в CONNECTED и нет пиров за ${peerReadyTimeoutMs}ms"
             PersistentLoggers.warn(TAG, "awaitReady timeout — $reason — peer watchdog возьмёт")
             EnginePlugin.ReadyResult.Timeout(reason)
         }
     }
+
+    private fun isConnectedStatus(status: String?): Boolean =
+        status?.equals(CONNECTION_STATUS_CONNECTED, ignoreCase = true) == true
 
     override suspend fun attachTun(tunFd: Int): TunAttachResult {
         PersistentLoggers.debug(TAG, "attachTun fd=$tunFd")
@@ -247,5 +260,6 @@ class EngineUrnetwork(
         const val PEER_READY_TIMEOUT_MS = 300_000L
         const val PEER_READY_POLL_MS = 200L
         const val PEER_PROGRESS_LOG_EVERY = 75
+        const val CONNECTION_STATUS_CONNECTED = "CONNECTED"
     }
 }

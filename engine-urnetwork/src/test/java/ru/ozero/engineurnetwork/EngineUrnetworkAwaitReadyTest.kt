@@ -48,6 +48,24 @@ class EngineUrnetworkAwaitReadyTest {
     }
 
     @Test
+    fun `awaitReady возвращает Ready когда SDK уже CONNECTED даже без grid peers`() = runTest {
+        val bridge = CountableBridge(fixedPeers = 0).also {
+            it.connectionStatusProvider = { "CONNECTED" }
+        }
+        val eng = engine(bridge, backgroundScope)
+        eng.start(baseConfig, Upstream.None)
+
+        val result = eng.awaitReady()
+
+        assertEquals(
+            EnginePlugin.ReadyResult.Ready,
+            result,
+            "SDK CONNECTED → Ready даже если grid.windowCurrentSize ещё 0",
+        )
+        assertTrue(bridge.connectionStatusCalls.get() >= 1, "connectionStatus должен быть опрошен")
+    }
+
+    @Test
     fun `awaitReady возвращает Ready после ожидания пока peerCount не станет положительным`() = runTest {
         val bridge = CountableBridge(fixedPeers = 0)
         bridge.peerCountProvider = { if (bridge.peerCountCalls.get() >= 3) 1 else 0 }
@@ -149,7 +167,14 @@ class EngineUrnetworkAwaitReadyTest {
         private val fixedPeers: Int = 0,
     ) : UrnetworkSdkBridge {
         var peerCountProvider: (() -> Int)? = null
+        var connectionStatusProvider: (() -> String?)? = null
         val peerCountCalls = AtomicInteger(0)
+        val connectionStatusCalls = AtomicInteger(0)
+
+        override fun connectionStatus(): String? {
+            connectionStatusCalls.incrementAndGet()
+            return connectionStatusProvider?.invoke()
+        }
 
         override fun peerCount(): Int {
             peerCountCalls.incrementAndGet()

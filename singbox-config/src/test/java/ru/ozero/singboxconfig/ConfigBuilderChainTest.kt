@@ -73,6 +73,20 @@ class ConfigBuilderChainTest {
     }
 
     @Test
+    fun `auto chain config filters unsupported transport beans`() {
+        val supported = makeBean(uuid = "aaaa-1", host = "s1.com")
+        val unsupported = makeBean(uuid = "aaaa-2", host = "s2.com").apply {
+            type = "splithttp"
+        }
+
+        val json = ConfigBuilder.buildAutoChainConfig(listOf(supported, unsupported), socksPort = 49410)
+
+        assertContains(json, "\"tag\":\"proxy-0\"")
+        assertFalse(json.contains("splithttp"), "auto chain must not pass unsupported transports to libbox")
+        assertFalse(json.contains("\"tag\":\"proxy-1\""), "unsupported beans must not leave gaps in urltest tags")
+    }
+
+    @Test
     fun `auto chain config with upstream adds detour to all proxy outbounds`() {
         val beans = listOf(makeBean(uuid = "a1"), makeBean(uuid = "a2"))
         val upstream = ConfigBuilder.Upstream("127.0.0.1", 49200)
