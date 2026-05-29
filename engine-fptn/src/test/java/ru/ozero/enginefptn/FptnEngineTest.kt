@@ -191,7 +191,7 @@ class FptnEngineTest {
     }
 
     @Test
-    fun `start runtime path does not use multi server authenticate loop`() {
+    fun `start runtime path authenticates fallback candidates in priority order`() {
         val source = File(
             System.getProperty("user.dir") ?: ".",
             "src/main/java/ru/ozero/enginefptn/FptnEngine.kt",
@@ -199,18 +199,22 @@ class FptnEngineTest {
         val startBody = source.substringAfter("override suspend fun start(")
             .substringBefore("override suspend fun attachTun(")
 
-        assertFalse(
-            startBody.contains("authenticateFirstAvailable"),
-            "FPTN start must not run 15s-per-server auth loop in the critical path.",
-        )
-        assertFalse(
-            source.contains("fun authenticateFirstAvailable"),
-            "Fallback candidates must stay outside Engine.start until a bounded policy is introduced.",
+        assertTrue(
+            startBody.contains("selectServerCandidates(fptn, tokenData)"),
+            "FPTN start must preserve the candidate list for multi-server fallback.",
         )
         assertTrue(
-            startBody.contains("selectServer(fptn, tokenData)") &&
-                startBody.contains("authenticate(server, tokenData"),
-            "FPTN start must pick one runtime server and perform one auth attempt.",
+            startBody.contains("authenticateFirstAvailable(candidates"),
+            "FPTN start must try later token servers when earlier authentication fails.",
+        )
+        assertTrue(
+            source.contains("fun authenticateFirstAvailable") &&
+                source.contains("candidates.forEachIndexed"),
+            "FPTN authentication must iterate the ordered candidate list.",
+        )
+        assertFalse(
+            startBody.contains("authenticate(server, tokenData"),
+            "FPTN start must not bypass fallback candidates with a single selected-server auth attempt.",
         )
     }
 

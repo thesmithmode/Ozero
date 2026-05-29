@@ -109,8 +109,8 @@ class FptnEngine(
                 return StartResult.Failure("Invalid FPTN token")
             }
 
-        val server = selectServer(fptn, tokenData)
-        if (server == null) {
+        val candidates = selectServerCandidates(fptn, tokenData)
+        if (candidates.isEmpty()) {
             PersistentLoggers.error(
                 TAG,
                 "start: no server available — token contained ${tokenData.servers.size} server(s), " +
@@ -119,15 +119,17 @@ class FptnEngine(
             return StartResult.Failure("No FPTN server available")
         }
 
+        val firstServer = candidates.first()
         PersistentLoggers.debug(
             TAG,
-            "start: server=${server.name} port=${server.port} bypass=${fptn.bypassMethod} " +
+            "start: server=${firstServer.name} port=${firstServer.port} bypass=${fptn.bypassMethod} " +
                 "sniDomain=${fptn.sniDomain} tokenServers=${tokenData.servers.size} " +
-                "autoSelect=${fptn.autoSelect}",
+                "candidates=${candidates.size} autoSelect=${fptn.autoSelect}",
         )
         Log.d(
             TAG,
-            "start server=${server.name}:${server.port} bypass=${fptn.bypassMethod} n=${tokenData.servers.size}",
+            "start server=${firstServer.name}:${firstServer.port} bypass=${fptn.bypassMethod} " +
+                "n=${tokenData.servers.size} candidates=${candidates.size}",
         )
 
         FptnNativeWebSocket.loadOnce()
@@ -138,12 +140,12 @@ class FptnEngine(
             )
         }
 
-        val accessToken = withContext(Dispatchers.IO) {
-            authenticate(server, tokenData, fptn.bypassMethod, fptn.sniDomain)
+        val authenticated = withContext(Dispatchers.IO) {
+            authenticateFirstAvailable(candidates, tokenData, fptn.bypassMethod, fptn.sniDomain)
         } ?: return StartResult.Failure("FPTN authentication failed")
 
-        _currentServer = server
-        _accessToken = accessToken
+        _currentServer = authenticated.server
+        _accessToken = authenticated.accessToken
         _bypassMethod = fptn.bypassMethod
         _sniDomain = fptn.sniDomain
 
@@ -306,6 +308,23 @@ class FptnEngine(
         }
     }
 
+    private fun authenticateFirstAvailable(
+        candidates: List<FptnServer>,
+        data: FptnTokenData,
+        bypassMethod: String,
+        sniDomain: String,
+    ): AuthenticatedServer? {
+        candidates.forEachIndexed { index, server ->
+            val accessToken = authenticate(server, data, bypassMethod, sniDomain)
+            if (accessToken != null) return AuthenticatedServer(server, accessToken)
+            if (index < candidates.lastIndex) {
+                Log.d(TAG, "authenticate: fallback from ${server.name} to ${candidates[index + 1].name}")
+            }
+        }
+        PersistentLoggers.error(TAG, "authenticate: all ${candidates.size} server candidate(s) failed")
+        return null
+    }
+
     private fun authenticate(
         server: FptnServer,
         data: FptnTokenData,
@@ -357,6 +376,11 @@ class FptnEngine(
             httpsClient.nativeDestroy(handle)
         }
     }
+
+    private data class AuthenticatedServer(
+        val server: FptnServer,
+        val accessToken: String,
+    )
 
     companion object {
         private const val TAG = "FptnEngine"
