@@ -18,8 +18,25 @@ class EngineWatchdogCoordinatorContractTest {
     fun `companion exposes PEER_WATCHDOG_POLL_MS, TIMEOUT_MS, RECOVER_GRACE_MS`() {
         assertEquals(5_000L, EngineWatchdogCoordinator.PEER_WATCHDOG_POLL_MS)
         assertEquals(30_000L, EngineWatchdogCoordinator.PEER_WATCHDOG_TIMEOUT_MS)
-        assertEquals(300_000L, EngineWatchdogCoordinator.URNETWORK_PEER_WATCHDOG_TIMEOUT_MS)
         assertEquals(30_000L, EngineWatchdogCoordinator.PEER_WATCHDOG_RECOVER_GRACE_MS)
+    }
+
+    @Test
+    fun `peer watchdog uses engine policy instead of engine-specific constants`() {
+        val body = source.substringAfter("fun startPeerWatchdog(")
+            .substringBefore("fun startStagnationWatchdog")
+        assertTrue(
+            body.contains("val peerWatchdogPolicy = plugin.peerWatchdogPolicy()"),
+            "Peer watchdog must read policy from EnginePlugin, not from hardcoded EngineId branches.",
+        )
+        assertTrue(
+            body.contains("peerWatchdogPolicy.timeoutMs"),
+            "Peer watchdog timeout must come from engine policy.",
+        )
+        assertTrue(
+            body.contains("!peerWatchdogPolicy.recoverBeforeFirstPeer"),
+            "Initial zero-peer behavior must come from engine policy.",
+        )
     }
 
     @Test
