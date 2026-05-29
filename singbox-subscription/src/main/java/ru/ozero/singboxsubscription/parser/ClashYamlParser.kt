@@ -12,6 +12,7 @@ import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
 
 object ClashYamlParser {
+    private const val MAX_YAML_CODE_POINTS = 16 * 1024 * 1024
     private val proxiesKeyPattern = Regex("""(?m)^\s*proxies\s*:""")
 
     fun parse(text: String): List<AbstractBean> {
@@ -22,7 +23,10 @@ object ClashYamlParser {
     }
 
     private fun loadRoot(text: String): Map<String, Any?>? = try {
-        (Yaml(SafeConstructor(LoaderOptions())).load<Any?>(text) as? Map<*, *>)?.toStringKeyMap()
+        val loaderOptions = LoaderOptions().apply {
+            codePointLimit = MAX_YAML_CODE_POINTS
+        }
+        (Yaml(SafeConstructor(loaderOptions)).load<Any?>(text) as? Map<*, *>)?.toStringKeyMap()
     } catch (_: YAMLException) {
         null
     }
@@ -45,7 +49,7 @@ object ClashYamlParser {
         "trojan" -> TrojanBean().apply {
             applyCommon(fields)
             password = fields.string("password")
-            applyV2Ray(fields)
+            applyV2Ray(fields, defaultSecurity = "tls")
         }
         "ss", "shadowsocks" -> ShadowsocksBean().apply {
             applyCommon(fields)
@@ -63,19 +67,25 @@ object ClashYamlParser {
         serverPort = fields.int("port") ?: 0
     }
 
-    private fun StandardV2RayBean.applyV2Ray(fields: Map<String, Any?>) {
+    private fun StandardV2RayBean.applyV2Ray(fields: Map<String, Any?>, defaultSecurity: String = "none") {
         type = normalizeNetwork(fields.string("network", "net"))
+        val reality = fields.mapValue("reality-opts", "reality_opts")
+        val realityPublicKey = fields.string("pbk", "public-key").ifBlank { reality.string("public-key") }
+        val realityShortId = fields.string("sid", "short-id").ifBlank { reality.string("short-id") }
+        val explicitSecurity = fields.string("security")
         security = when {
-            fields.bool("reality") -> "reality"
+            fields.bool("reality") || realityPublicKey.isNotBlank() || realityShortId.isNotBlank() -> "reality"
             fields.bool("tls") -> "tls"
-            else -> fields.string("security").ifBlank { "none" }
+            explicitSecurity.isNotBlank() -> explicitSecurity
+            fields.containsKey("tls") -> "none"
+            else -> defaultSecurity
         }
         sni = fields.string("servername", "sni")
         alpn = fields.listString("alpn")
         allowInsecure = fields.bool("skip-cert-verify") || fields.bool("allowInsecure")
         utlsFingerprint = fields.string("client-fingerprint", "fingerprint", "fp")
         applyNestedTransport(fields)
-        applyReality(fields)
+        applyReality(fields, realityPublicKey, realityShortId)
         initializeDefaultValues()
     }
 
@@ -95,11 +105,14 @@ object ClashYamlParser {
         grpcServiceName = fields.string("serviceName", "service-name").ifBlank { grpc.string("grpc-service-name") }
     }
 
-    private fun StandardV2RayBean.applyReality(fields: Map<String, Any?>) {
-        val reality = fields.mapValue("reality-opts", "reality_opts")
-        realityPublicKey = fields.string("pbk", "public-key").ifBlank { reality.string("public-key") }
-        realityShortId = fields.string("sid", "short-id").ifBlank { reality.string("short-id") }
-        realityFingerprint = utlsFingerprint.ifBlank { realityFingerprint }
+    private fun StandardV2RayBean.applyReality(
+        fields: Map<String, Any?>,
+        publicKey: String,
+        shortId: String,
+    ) {
+        realityPublicKey = publicKey
+        realityShortId = shortId
+        realityFingerprint = fields.string("client-fingerprint", "fingerprint", "fp").ifBlank { realityFingerprint }
     }
 
     private fun normalizeNetwork(network: String): String = when (network.lowercase()) {
