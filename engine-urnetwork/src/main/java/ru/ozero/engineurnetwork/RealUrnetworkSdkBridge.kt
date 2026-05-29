@@ -52,6 +52,8 @@ class RealUrnetworkSdkBridge(
     private val connectVcRef = AtomicReference<ConnectViewController?>(null)
     private val connectionStatusSubRef = AtomicReference<Sub?>(null)
     private val connectionStatusRef = AtomicReference<String?>(null)
+    private val tunnelStartedRef = AtomicBoolean(false)
+    private val connectIssuedRef = AtomicBoolean(false)
     private val walletVcRef = AtomicReference<WalletViewController?>(null)
     private val unpaidBytesRef = AtomicReference(0L)
     private val sharingTrafficLogged = AtomicBoolean(false)
@@ -269,6 +271,8 @@ class RealUrnetworkSdkBridge(
         runCatching { bridgeScope.coroutineContext.cancelChildren() }
         contractStatusListener.detach()
         detachConnectionStatusListener()
+        tunnelStartedRef.set(false)
+        connectIssuedRef.set(false)
         sharingTrafficLogged.set(false)
         val completed = withTimeoutOrNull(STOP_TIMEOUT_MS) {
             withContext(Dispatchers.Main.immediate) {
@@ -328,6 +332,7 @@ class RealUrnetworkSdkBridge(
     private fun closeDevice(device: DeviceLocal) {
         runCatching { device.setTunnelStarted(false) }
             .onFailure { PersistentLoggers.warn(TAG, "setTunnelStarted(false) threw: ${it.message}") }
+        tunnelStartedRef.set(false)
         runCatching { device.close() }
             .onFailure { PersistentLoggers.warn(TAG, "device.close threw: ${it.message}") }
     }
@@ -341,6 +346,7 @@ class RealUrnetworkSdkBridge(
         }
         val sdkLoc = (location as? SdkLocationToken)?.sdk ?: return
         runCatching { connectVcRef.get()?.connect(sdkLoc) }
+            .onSuccess { connectIssuedRef.set(true) }
             .onFailure { PersistentLoggers.warn(TAG, "connect threw: ${it.message}") }
     }
 
@@ -350,6 +356,7 @@ class RealUrnetworkSdkBridge(
             return
         }
         runCatching { connectVcRef.get()?.connectBestAvailable() }
+            .onSuccess { connectIssuedRef.set(true) }
             .onFailure { PersistentLoggers.warn(TAG, "connectBestAvailable threw: ${it.message}") }
     }
 
@@ -383,6 +390,7 @@ class RealUrnetworkSdkBridge(
         val preferred = preferredLocationRef.get()
         if (preferred != null && device != null) {
             preferredLocationConnector.connect(preferred, device, cv)
+            connectIssuedRef.set(true)
         }
     }
 
@@ -391,7 +399,23 @@ class RealUrnetworkSdkBridge(
 
     override fun connectionStatus(): String? {
         if (!running.get()) return null
-        return connectionStatusRef.get()
+        return refreshConnectionStatus(connectVcRef.get()) ?: connectionStatusRef.get()
+    }
+
+    override fun runtimeSnapshot(): UrnetworkSdkBridge.RuntimeSnapshot {
+        if (!running.get()) return UrnetworkSdkBridge.RuntimeSnapshot()
+        val cv = connectVcRef.get()
+        val device = deviceRef.get()
+        return UrnetworkSdkBridge.RuntimeSnapshot(
+            connectionStatus = refreshConnectionStatus(cv) ?: connectionStatusRef.get(),
+            peers = runCatching { cv?.grid?.windowCurrentSize ?: 0 }.getOrDefault(0),
+            providerStateAdded = runCatching {
+                device?.windowStatus?.providerStateAdded?.toLong() ?: 0L
+            }.getOrDefault(0L),
+            tunnelStarted = runCatching { device?.tunnelStarted ?: tunnelStartedRef.get() }
+                .getOrDefault(tunnelStartedRef.get()),
+            connectIssued = connectIssuedRef.get(),
+        )
     }
 
     override fun openLocationsViewController(): LocationsViewController? {
@@ -605,10 +629,11 @@ class RealUrnetworkSdkBridge(
         connectionStatusRef.set(null)
     }
 
-    private fun refreshConnectionStatus(cv: ConnectViewController) {
-        val status = runCatching { cv.connectionStatus }.getOrNull()?.takeIf { it.isNotBlank() }
+    private fun refreshConnectionStatus(cv: ConnectViewController?): String? {
+        val status = runCatching { cv?.connectionStatus }.getOrNull()?.takeIf { it.isNotBlank() }
         connectionStatusRef.set(status)
         Log.i(TAG, "connectionStatus=${status ?: "<null>"}")
+        return status
     }
 
     override fun unpaidByteCount(): Long = unpaidBytesRef.get()
@@ -722,12 +747,16 @@ class RealUrnetworkSdkBridge(
         if (ioLoopRef.get() != null) {
             return UrnetworkSdkBridge.AttachResult.Failed("IoLoop already attached")
         }
+        val cv = connectVcRef.get()
+            ?: return UrnetworkSdkBridge.AttachResult.Failed("ConnectViewController not initialised — call start() first")
         return withContext(Dispatchers.Main.immediate) {
             try {
                 val capturedDevice = device
                 val callback = IoLoopDoneCallback {
                     PersistentLoggers.info(TAG, "IoLoop done — tunnel ended")
                     val wasRunning = running.compareAndSet(true, false)
+                    tunnelStartedRef.set(false)
+                    connectIssuedRef.set(false)
                     closeDevice(capturedDevice)
                     if (wasRunning) {
                         PersistentLoggers.error(
@@ -740,22 +769,20 @@ class RealUrnetworkSdkBridge(
                 val loop = Sdk.newIoLoop(capturedDevice, tunFd, callback)
                 ioLoopRef.set(loop)
                 runCatching { device.setTunnelStarted(true) }
+                    .onSuccess { tunnelStartedRef.set(true) }
                     .onFailure { PersistentLoggers.warn(TAG, "setTunnelStarted(true) threw: ${it.message}") }
                 val providePausedNow = runCatching { device.providePaused }.getOrNull()
                 Log.i(TAG, "tunnelStarted fd=$tunFd providePaused=$providePausedNow")
-                val cv = connectVcRef.get()
-                if (cv != null) {
-                    val preferred = preferredLocationRef.get()
-                    if (preferred != null) {
-                        Log.i(TAG, "IoLoop fd=$tunFd tunnelStarted preferredLocation=${preferred.summary()}")
-                        preferredLocationConnector.connect(preferred, capturedDevice, cv)
-                    } else {
-                        runCatching { cv.connectBestAvailable() }
-                            .onFailure { PersistentLoggers.warn(TAG, "connectBestAvailable threw: ${it.message}") }
-                        Log.i(TAG, "IoLoop fd=$tunFd tunnelStarted connectBestAvailable called")
-                    }
+                val preferred = preferredLocationRef.get()
+                if (preferred != null) {
+                    Log.i(TAG, "IoLoop fd=$tunFd tunnelStarted preferredLocation=${preferred.summary()}")
+                    preferredLocationConnector.connect(preferred, capturedDevice, cv)
+                    connectIssuedRef.set(true)
                 } else {
-                    PersistentLoggers.error(TAG, "No ConnectViewController — P2P connection will not be established")
+                    runCatching { cv.connectBestAvailable() }
+                        .onSuccess { connectIssuedRef.set(true) }
+                        .onFailure { PersistentLoggers.warn(TAG, "connectBestAvailable threw: ${it.message}") }
+                    Log.i(TAG, "IoLoop fd=$tunFd tunnelStarted connectBestAvailable called")
                 }
                 UrnetworkSdkBridge.AttachResult.Success
             } catch (t: Throwable) {
@@ -767,6 +794,8 @@ class RealUrnetworkSdkBridge(
 
     private fun cleanupOnFailure() {
         if (running.get()) return
+        tunnelStartedRef.set(false)
+        connectIssuedRef.set(false)
         deviceRef.getAndSet(null)?.also { runCatching { it.close() } }
     }
 

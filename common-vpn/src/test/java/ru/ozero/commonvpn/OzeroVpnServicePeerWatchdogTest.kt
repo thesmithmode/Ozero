@@ -153,6 +153,21 @@ class OzeroVpnServicePeerWatchdogTest {
     }
 
     @Test
+    fun `peerWatchdog gives URnetwork runtime peer grace from startup`() {
+        val body = watchdogSource
+            .substringAfter("fun startPeerWatchdog")
+            .substringBefore("fun startStagnationWatchdog")
+        assertTrue(
+            body.contains("EngineId.URNETWORK") && body.contains("URNETWORK_PEER_WATCHDOG_TIMEOUT_MS"),
+            "URnetwork must get the 5 minute zero-peer grace in runtime watchdog, not in awaitReady startup gate.",
+        )
+        assertTrue(
+            body.contains("!hadPeers && engineId != EngineId.URNETWORK"),
+            "Non-URnetwork engines keep hadPeers guard, but URnetwork may start with 0 peers and keep searching.",
+        )
+    }
+
+    @Test
     fun `PEER_WATCHDOG_TIMEOUT_MS и PEER_WATCHDOG_POLL_MS константы объявлены`() {
         assertTrue(
             watchdogSource.contains("PEER_WATCHDOG_TIMEOUT_MS"),
@@ -161,6 +176,10 @@ class OzeroVpnServicePeerWatchdogTest {
         assertTrue(
             watchdogSource.contains("PEER_WATCHDOG_POLL_MS"),
             "EngineWatchdogCoordinator обязан иметь PEER_WATCHDOG_POLL_MS константу.",
+        )
+        assertTrue(
+            watchdogSource.contains("URNETWORK_PEER_WATCHDOG_TIMEOUT_MS"),
+            "EngineWatchdogCoordinator обязан иметь отдельный runtime grace для URnetwork.",
         )
     }
 

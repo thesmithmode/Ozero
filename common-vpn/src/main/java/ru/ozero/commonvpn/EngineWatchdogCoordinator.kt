@@ -78,12 +78,13 @@ class EngineWatchdogCoordinator(
                         zeroPeersPolls = 0
                         continue
                     }
-                    if (!hadPeers) continue
+                    val timeoutMs = peerWatchdogTimeoutMs(engineId)
+                    if (!hadPeers && engineId != EngineId.URNETWORK) continue
                     zeroPeersPolls += 1
-                    if (zeroPeersPolls * PEER_WATCHDOG_POLL_MS < PEER_WATCHDOG_TIMEOUT_MS) continue
+                    if (zeroPeersPolls * PEER_WATCHDOG_POLL_MS < timeoutMs) continue
                     PersistentLoggers.warn(
                         TAG,
-                        "peer watchdog: 0 peers ${PEER_WATCHDOG_TIMEOUT_MS / 1000}s → recover",
+                        "peer watchdog: 0 peers ${timeoutMs / 1000}s → recover",
                     )
                     val result = runCatching { plugin.recover() }.getOrElse { t ->
                         EnginePlugin.RecoverResult.Failed("recover threw: ${t.message}")
@@ -115,6 +116,13 @@ class EngineWatchdogCoordinator(
         }
         peerWatchJobRef.set(job)
     }
+
+    private fun peerWatchdogTimeoutMs(engineId: EngineId): Long =
+        if (engineId == EngineId.URNETWORK) {
+            URNETWORK_PEER_WATCHDOG_TIMEOUT_MS
+        } else {
+            PEER_WATCHDOG_TIMEOUT_MS
+        }
 
     fun startStagnationWatchdog(engineId: EngineId) {
         stagnationWatchJobRef.getAndSet(null)?.cancel()
@@ -194,6 +202,7 @@ class EngineWatchdogCoordinator(
         private const val TAG = "EngineWatchdogCoordinator"
         const val PEER_WATCHDOG_POLL_MS = 5_000L
         const val PEER_WATCHDOG_TIMEOUT_MS = 30_000L
+        const val URNETWORK_PEER_WATCHDOG_TIMEOUT_MS = 300_000L
         const val PEER_WATCHDOG_RECOVER_GRACE_MS = 30_000L
         const val STAGNATION_POLL_MS = 10_000L
         const val STAGNATION_RECOVER_THRESHOLD_MS = 60_000L

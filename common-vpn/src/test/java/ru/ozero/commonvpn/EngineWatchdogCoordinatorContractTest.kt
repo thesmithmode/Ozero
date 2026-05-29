@@ -18,6 +18,7 @@ class EngineWatchdogCoordinatorContractTest {
     fun `companion exposes PEER_WATCHDOG_POLL_MS, TIMEOUT_MS, RECOVER_GRACE_MS`() {
         assertEquals(5_000L, EngineWatchdogCoordinator.PEER_WATCHDOG_POLL_MS)
         assertEquals(30_000L, EngineWatchdogCoordinator.PEER_WATCHDOG_TIMEOUT_MS)
+        assertEquals(300_000L, EngineWatchdogCoordinator.URNETWORK_PEER_WATCHDOG_TIMEOUT_MS)
         assertEquals(30_000L, EngineWatchdogCoordinator.PEER_WATCHDOG_RECOVER_GRACE_MS)
     }
 
