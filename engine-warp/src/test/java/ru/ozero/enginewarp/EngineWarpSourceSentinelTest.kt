@@ -105,6 +105,7 @@ class EngineWarpSourceSentinelTest {
         listOf(
             "private suspend fun resolveEndpointHost",
             "private fun bootstrapSafeDohUrl",
+            "private fun DoHProvider.supportsJsonQueryApi",
             "private fun isIpLiteralDohUrl",
             "private fun resolveViaDoH",
             "private suspend fun buildResolved(",
@@ -171,16 +172,26 @@ class EngineWarpSourceSentinelTest {
     }
 
     @Test
-    fun `bootstrapSafeDohUrl пропускает только IP literal DoH URL`() {
+    fun `bootstrapSafeDohUrl пропускает только IP literal JSON-compatible DoH URL`() {
         val body = source.substringAfter("private fun bootstrapSafeDohUrl")
             .substringBefore("private fun resolveViaDoH")
         assertTrue(
-            body.contains("isIpLiteralDohUrl"),
-            "bootstrapSafeDohUrl обязан проверять host DoH URL без DNS lookup.",
+            body.contains("supportsJsonQueryApi()") && body.contains("isIpLiteralDohUrl"),
+            "bootstrapSafeDohUrl обязан проверять host DoH URL без DNS lookup и JSON API совместимость.",
         )
         assertTrue(
             body.contains("BOOTSTRAP_DOH_URL"),
-            "Hostname-backed DoH providers должны уходить на pinned IP-literal bootstrap DoH, а не в system DNS.",
+            "Hostname-backed или RFC8484-only DoH providers должны уходить на pinned JSON bootstrap DoH.",
+        )
+    }
+
+    @Test
+    fun `Google IP DoH providers не используются напрямую для JSON query API`() {
+        val body = source.substringAfter("private fun DoHProvider.supportsJsonQueryApi")
+            .substringBefore("private fun isIpLiteralDohUrl")
+        assertTrue(
+            body.contains("DoHProvider.GOOGLE_8888") && body.contains("DoHProvider.GOOGLE_8844"),
+            "Google /dns-query endpoint RFC8484 wire-format, а resolveViaDoH читает JSON name/type API.",
         )
     }
 

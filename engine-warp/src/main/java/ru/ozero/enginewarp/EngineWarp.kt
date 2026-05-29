@@ -568,7 +568,12 @@ class EngineWarp(
     }
 
     private fun bootstrapSafeDohUrl(provider: DoHProvider): String =
-        provider.url.takeIf { isIpLiteralDohUrl(it) } ?: BOOTSTRAP_DOH_URL
+        provider.url.takeIf { provider.supportsJsonQueryApi() && isIpLiteralDohUrl(it) } ?: BOOTSTRAP_DOH_URL
+
+    private fun DoHProvider.supportsJsonQueryApi(): Boolean = this !in setOf(
+        DoHProvider.GOOGLE_8888,
+        DoHProvider.GOOGLE_8844,
+    )
 
     private fun isIpLiteralDohUrl(dohUrl: String): Boolean = runCatching {
         isLikelyIpAddress(java.net.URL(dohUrl).host)
