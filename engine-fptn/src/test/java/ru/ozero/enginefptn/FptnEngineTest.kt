@@ -196,7 +196,8 @@ class FptnEngineTest {
             System.getProperty("user.dir") ?: ".",
             "src/main/java/ru/ozero/enginefptn/FptnEngine.kt",
         ).readText()
-        val startBody = source.substringAfter("override suspend fun start(").substringBefore("override suspend fun attachTun(")
+        val startBody = source.substringAfter("override suspend fun start(")
+            .substringBefore("override suspend fun attachTun(")
 
         assertFalse(
             startBody.contains("authenticateFirstAvailable"),
