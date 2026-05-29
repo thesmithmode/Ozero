@@ -661,7 +661,7 @@ class TunnelControllerTest {
         assertIs<TunnelState.Disconnecting>(controller.state.value)
         assertNotNull(
             controller.switching.value,
-            "СЃРјРµСЂС‚СЊ relay-URNETWORK РІРѕ РІСЂРµРјСЏ disconnect РЅРµ РґРѕР»Р¶РЅР° РїСЂРµРІСЂР°С‰Р°С‚СЊ UI РІ Failed(URNETWORK)",
+            "relay-URNETWORK death during disconnect must not turn UI into Failed(URNETWORK)",
         )
     }
 

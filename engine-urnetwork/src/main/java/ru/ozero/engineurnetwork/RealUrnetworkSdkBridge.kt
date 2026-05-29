@@ -83,7 +83,7 @@ class RealUrnetworkSdkBridge(
             ?: return UrnetworkSdkBridge.StartResult.Failed("start called outside coroutine context")
         return lifecycleMutex.withLock {
             if (running.get()) {
-                Log.i(TAG, "start: already running вЂ” idempotent success")
+                Log.i(TAG, "start: already running - idempotent success")
                 return@withLock UrnetworkSdkBridge.StartResult.Success
             }
             startJobRef.set(myJob)
@@ -121,7 +121,7 @@ class RealUrnetworkSdkBridge(
             }
             val localState = space.asyncLocalState?.localState
             if (localState == null) {
-                PersistentLoggers.error(TAG, "asyncLocalState.localState is null вЂ” runtime not ready")
+                PersistentLoggers.error(TAG, "asyncLocalState.localState is null - runtime not ready")
                 cleanupOnFailure()
                 return UrnetworkSdkBridge.StartResult.Failed("URnetwork localState not ready")
             }
@@ -147,7 +147,7 @@ class RealUrnetworkSdkBridge(
                 val keys = localState.provideSecretKeys
                 if (keys != null) {
                     d.loadProvideSecretKeys(keys)
-                    PersistentLoggers.debug(TAG, "node start: session keys loaded вЂ” stable identity")
+                    PersistentLoggers.debug(TAG, "node start: session keys loaded - stable identity")
                 } else {
                     var sub: Sub? = null
                     sub = d.addProvideSecretKeysListener { generated ->
@@ -161,7 +161,7 @@ class RealUrnetworkSdkBridge(
                         runCatching { sub?.close() }
                     }
                     d.initProvideSecretKeys()
-                    PersistentLoggers.debug(TAG, "node start: session keys absent вЂ” generating new identity")
+                    PersistentLoggers.debug(TAG, "node start: session keys absent - generating new identity")
                 }
             }.onFailure {
                 PersistentLoggers.warn(TAG, "node start: session keys init threw: ${it.message}")
@@ -170,7 +170,7 @@ class RealUrnetworkSdkBridge(
                 d.addJwtRefreshListener { newJwt ->
                     runCatching { localState.byClientJwt = newJwt }
                         .onSuccess {
-                            PersistentLoggers.debug(TAG, "node start: credential refreshed вЂ” state updated")
+                            PersistentLoggers.debug(TAG, "node start: credential refreshed - state updated")
                         }
                         .onFailure {
                             PersistentLoggers.warn(
@@ -183,7 +183,7 @@ class RealUrnetworkSdkBridge(
                 PersistentLoggers.warn(TAG, "node start: credential refresh listener threw: ${it.message}")
             }
             applyDeviceFields(d, localState)
-            PersistentLoggers.debug(TAG, "node start: instance created вЂ” fields applied")
+            PersistentLoggers.debug(TAG, "node start: instance created - fields applied")
             deviceRef.set(d)
             d
         }
@@ -193,17 +193,17 @@ class RealUrnetworkSdkBridge(
             null
         }
         if (cv == null) {
-            PersistentLoggers.error(TAG, "node start: routing controller unavailable вЂ” start aborted")
+            PersistentLoggers.error(TAG, "node start: routing controller unavailable - start aborted")
             cleanupOnFailure()
             return UrnetworkSdkBridge.StartResult.Failed("ConnectViewController unavailable")
         }
         connectVcRef.set(cv)
         attachConnectionStatusListener(cv)
-        PersistentLoggers.debug(TAG, "node start: routing controller opened вЂ” endpoints available")
+        PersistentLoggers.debug(TAG, "node start: routing controller opened - endpoints available")
 
         contractStatusListener.attach(device)
         running.set(true)
-        PersistentLoggers.info(TAG, "node start: ready вЂ” awaiting attach(fd)")
+        PersistentLoggers.info(TAG, "node start: ready - awaiting attach(fd)")
         bridgeScope.launch {
             withContext(Dispatchers.Main.immediate) {
                 setupWalletControllerAndPipeline(device, walletAddress)
@@ -221,14 +221,14 @@ class RealUrnetworkSdkBridge(
                 if (ubc > 0L && sharingTrafficLogged.compareAndSet(false, true)) {
                     PersistentLoggers.debug(
                         TAG,
-                        "relay sharing: traffic forwarded вЂ” accumulated_bytes=$ubc " +
+                        "relay sharing: traffic forwarded - accumulated_bytes=$ubc " +
                             "(peer consumed bandwidth, accumulator active)",
                     )
                 }
             }
             walletVc?.start()
             walletVc?.fetchTransferStats()
-            PersistentLoggers.debug(TAG, "node start: account controller opened вЂ” metrics listener attached")
+            PersistentLoggers.debug(TAG, "node start: account controller opened - metrics listener attached")
             walletVc
         }.onFailure {
             PersistentLoggers.warn(TAG, "node start: account controller init threw: ${it.message}")
@@ -237,7 +237,7 @@ class RealUrnetworkSdkBridge(
         if (bound) {
             PersistentLoggers.debug(
                 TAG,
-                "relay sharing: endpoint bound вЂ” accumulator armed, traffic-forwarding ready",
+                "relay sharing: endpoint bound - accumulator armed, traffic-forwarding ready",
             )
         } else {
             PersistentLoggers.warn(
@@ -297,7 +297,7 @@ class RealUrnetworkSdkBridge(
             }
         }
         if (completed == null) {
-            PersistentLoggers.warn(TAG, "stop timed out after ${STOP_TIMEOUT_MS}ms вЂ” refs cleared")
+            PersistentLoggers.warn(TAG, "stop timed out after ${STOP_TIMEOUT_MS}ms - refs cleared")
         }
         val releaseOutcome = runCatching {
             withTimeoutOrNull(RUNTIME_RELEASE_TIMEOUT_MS) { UrnetworkRuntime.release() }
@@ -306,25 +306,25 @@ class RealUrnetworkSdkBridge(
             releaseOutcome.isFailure -> {
                 PersistentLoggers.warn(
                     TAG,
-                    "runtime release threw: ${releaseOutcome.exceptionOrNull()?.message} вЂ” " +
-                        "Go-runtime РјРѕР¶РµС‚ СѓРґРµСЂР¶РёРІР°С‚СЊ UDP/file handles, URnetwork-app РјРѕР¶РµС‚ РєСЂР°С€РёС‚СЊСЃСЏ",
+                    "runtime release threw: ${releaseOutcome.exceptionOrNull()?.message} - " +
+                        "Go runtime may hold UDP/file handles, URnetwork app may crash",
                 )
                 false
             }
             releaseOutcome.getOrNull() == null -> {
                 PersistentLoggers.warn(
                     TAG,
-                    "runtime release timed out after ${RUNTIME_RELEASE_TIMEOUT_MS}ms вЂ” " +
-                        "Sdk.freeMemory Р·Р°РІРёСЃ, СЂРµСЃСѓСЂСЃС‹ Go-runtime РјРѕРіСѓС‚ СѓС‚РµС‡СЊ",
+                    "runtime release timed out after ${RUNTIME_RELEASE_TIMEOUT_MS}ms - " +
+                        "Sdk.freeMemory hung, Go-runtime resources may leak",
                 )
                 false
             }
             else -> true
         }
         if (released) {
-            Log.i(TAG, "stop complete вЂ” runtime released")
+            Log.i(TAG, "stop complete - runtime released")
         } else {
-            PersistentLoggers.warn(TAG, "stop complete вЂ” runtime release РќР• РїРѕРґС‚РІРµСЂР¶РґС‘РЅ")
+            PersistentLoggers.warn(TAG, "stop complete - runtime release not confirmed")
         }
     }
 
@@ -340,7 +340,7 @@ class RealUrnetworkSdkBridge(
 
     override fun connectTo(location: UrnetworkSdkBridge.LocationToken) {
         if (!running.get()) {
-            PersistentLoggers.warn(TAG, "connectTo skipped вЂ” bridge not running")
+            PersistentLoggers.warn(TAG, "connectTo skipped - bridge not running")
             return
         }
         val sdkLoc = (location as? SdkLocationToken)?.sdk ?: return
@@ -351,7 +351,7 @@ class RealUrnetworkSdkBridge(
 
     override fun connectBestAvailable() {
         if (!running.get()) {
-            PersistentLoggers.warn(TAG, "connectBestAvailable skipped вЂ” bridge not running")
+            PersistentLoggers.warn(TAG, "connectBestAvailable skipped - bridge not running")
             return
         }
         runCatching { connectVcRef.get()?.connectBestAvailable() }
@@ -467,7 +467,7 @@ class RealUrnetworkSdkBridge(
             val keys = localState.provideSecretKeys
             if (keys != null) {
                 device.loadProvideSecretKeys(keys)
-                Log.i(TAG, "ensureDevice: provideSecretKeys loaded вЂ” stable provider identity")
+                Log.i(TAG, "ensureDevice: provideSecretKeys loaded - stable provider identity")
             } else {
                 var sub: Sub? = null
                 sub = device.addProvideSecretKeysListener { generated ->
@@ -477,19 +477,19 @@ class RealUrnetworkSdkBridge(
                     runCatching { sub?.close() }
                 }
                 device.initProvideSecretKeys()
-                Log.i(TAG, "ensureDevice: provideSecretKeys not found вЂ” generating new keys")
+                Log.i(TAG, "ensureDevice: provideSecretKeys not found - generating new keys")
             }
         }
         runCatching {
             device.addJwtRefreshListener { newJwt ->
                 runCatching { localState.byClientJwt = newJwt }
-                    .onSuccess { Log.i(TAG, "ensureDevice: SDK JWT refreshed вЂ” localState updated") }
+                    .onSuccess { Log.i(TAG, "ensureDevice: SDK JWT refreshed - localState updated") }
                     .onFailure { PersistentLoggers.warn(TAG, "ensureDevice: JWT refresh localState: ${it.message}") }
             }
         }.onFailure { PersistentLoggers.warn(TAG, "ensureDevice: addJwtRefreshListener threw: ${it.message}") }
         applyDeviceFields(device, localState)
         deviceRef.set(device)
-        Log.i(TAG, "initDeviceForLocations: device ready for location browse вЂ” applyDeviceFields done")
+        Log.i(TAG, "initDeviceForLocations: device ready for location browse - applyDeviceFields done")
         return true
     }
 
@@ -520,7 +520,7 @@ class RealUrnetworkSdkBridge(
 
     private inline fun guardedRun(label: String, block: () -> Unit) {
         if (!running.get()) {
-            PersistentLoggers.warn(TAG, "$label skipped вЂ” bridge not running")
+            PersistentLoggers.warn(TAG, "$label skipped - bridge not running")
             return
         }
         runCatching(block).onFailure { PersistentLoggers.warn(TAG, "$label threw: ${it.message}") }
@@ -570,11 +570,11 @@ class RealUrnetworkSdkBridge(
         allowDirect: Boolean,
     ) {
         if (!running.get()) {
-            PersistentLoggers.warn(TAG, "applyPerformanceProfile skipped вЂ” bridge not running")
+            PersistentLoggers.warn(TAG, "applyPerformanceProfile skipped - bridge not running")
             return
         }
         if (windowType == UrnetworkWindowType.AUTO && allowDirect) {
-            Log.i(TAG, "applyPerformanceProfile skip вЂ” AUTO+allowDirect uses SDK defaults")
+            Log.i(TAG, "applyPerformanceProfile skip - AUTO+allowDirect uses SDK defaults")
             return
         }
         val device = deviceRef.get() ?: return
@@ -648,7 +648,7 @@ class RealUrnetworkSdkBridge(
         if (!running.get()) return subscriptionBalanceRef.get()
         val device = deviceRef.get() ?: return null
         val api = runCatching { device.api }.getOrNull() ?: run {
-            PersistentLoggers.warn(TAG, "device.api is null вЂ” cannot fetch subscription balance")
+            PersistentLoggers.warn(TAG, "device.api is null - cannot fetch subscription balance")
             return null
         }
         val cached = subscriptionBalanceRef.get()
@@ -714,7 +714,7 @@ class RealUrnetworkSdkBridge(
                 snapshot
             }
             else -> {
-                PersistentLoggers.warn(TAG, "subscriptionBalance timeout/null вЂ” using cached=${cached != null}")
+                PersistentLoggers.warn(TAG, "subscriptionBalance timeout/null - using cached=${cached != null}")
                 cached
             }
         }
@@ -739,10 +739,10 @@ class RealUrnetworkSdkBridge(
 
     private suspend fun attachTunUnderLock(tunFd: Int): UrnetworkSdkBridge.AttachResult {
         if (!running.get()) {
-            return UrnetworkSdkBridge.AttachResult.Failed("bridge stopped вЂ” attachTun aborted")
+            return UrnetworkSdkBridge.AttachResult.Failed("bridge stopped - attachTun aborted")
         }
         val device = deviceRef.get()
-            ?: return UrnetworkSdkBridge.AttachResult.Failed("DeviceLocal not initialised вЂ” call start() first")
+            ?: return UrnetworkSdkBridge.AttachResult.Failed("DeviceLocal not initialised - call start() first")
         if (ioLoopRef.get() != null) {
             return UrnetworkSdkBridge.AttachResult.Failed("IoLoop already attached")
         }
@@ -754,7 +754,7 @@ class RealUrnetworkSdkBridge(
             try {
                 val capturedDevice = device
                 val callback = IoLoopDoneCallback {
-                    PersistentLoggers.info(TAG, "IoLoop done вЂ” tunnel ended")
+                    PersistentLoggers.info(TAG, "IoLoop done - tunnel ended")
                     val wasRunning = running.compareAndSet(true, false)
                     tunnelStartedRef.set(false)
                     connectIssuedRef.set(false)
@@ -762,7 +762,7 @@ class RealUrnetworkSdkBridge(
                     if (wasRunning) {
                         PersistentLoggers.error(
                             TAG,
-                            "IoLoop ended unexpectedly вЂ” Go runtime crash РІ URnetwork SDK",
+                            "IoLoop ended unexpectedly - Go runtime crash in URnetwork SDK",
                         )
                         runCatching { onIoLoopDied("io-loop-ended") }
                     }
