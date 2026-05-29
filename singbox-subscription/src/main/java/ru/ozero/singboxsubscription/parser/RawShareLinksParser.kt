@@ -12,7 +12,7 @@ import ru.ozero.singboxfmt.VMessBean
 object RawShareLinksParser {
     fun parse(text: String): List<AbstractBean> {
         val links = parseShareLinks(text)
-        return links.ifEmpty { parseSingboxJson(text) }
+        return links.ifEmpty { parseSingboxJson(text) }.ifEmpty { ClashYamlParser.parse(text) }
     }
 
     private fun parseShareLinks(text: String): List<AbstractBean> =
