@@ -116,7 +116,7 @@ class UrnetworkRelayCoordinator(
                 .onFailure { PersistentLoggers.warn(TAG, "mesh session: setProvideNetworkMode threw: ${it.message}") }
             runCatching { bridge.connectBestAvailable() }
                 .onFailure { PersistentLoggers.warn(TAG, "mesh session: connectBestAvailable threw: ${it.message}") }
-            runCatching { networkMonitor?.start(networkMode) }
+            runCatching { networkMonitor?.start(networkMode, provideEnabled) }
                 .onFailure { PersistentLoggers.warn(TAG, "mesh session: networkMonitor threw: ${it.message}") }
             if (provideEnabled) {
                 runCatching { relayLockManager?.acquire() }

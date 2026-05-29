@@ -21,6 +21,15 @@ class UrnetworkPayoutPipelineSentinelTest {
     }
 
     @Test
+    fun `external wallet registration uses upstream SOL chain token`() {
+        assertTrue(
+            setupSource.contains("WALLET_BLOCKCHAIN_SOLANA = \"SOL\""),
+            "addExternalWallet должен получать chain=\"SOL\" как upstream WalletViewModel; " +
+                "\"solana\" даёт registration ack без привязки registry id.",
+        )
+    }
+
+    @Test
     fun `WALLET_ADD_TIMEOUT_MS равен 30 секундам — backend race на регистрацию external wallet`() {
         val regex = Regex("WALLET_ADD_TIMEOUT_MS\\s*=\\s*(\\d[\\d_]*)L")
         val m = regex.find(setupSource) ?: error("WALLET_ADD_TIMEOUT_MS не найден")
