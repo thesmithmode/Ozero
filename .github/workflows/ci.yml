@@ -22,11 +22,7 @@ jobs:
     name: ktlint + detekt
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: ${{
-      (github.event_name == 'pull_request' && github.base_ref == 'main' &&
-      (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) ||
-      (github.event_name != 'pull_request' && github.ref != 'refs/heads/main')
-    }}
+    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && github.ref != 'refs/heads/main') }}
     permissions:
       contents: read
 
@@ -56,11 +52,7 @@ jobs:
     name: Python + shell + Dockerfile
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: ${{
-      (github.event_name == 'pull_request' && github.base_ref == 'main' &&
-      (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) ||
-      (github.event_name != 'pull_request' && github.ref != 'refs/heads/main')
-    }}
+    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && github.ref != 'refs/heads/main') }}
     permissions:
       contents: read
 
@@ -105,12 +97,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: kotlin-style
-    if: ${{
-      (github.event_name == 'pull_request' && github.base_ref == 'main' &&
-      (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) ||
-      (github.event_name != 'pull_request' &&
-      (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))
-    }}
+    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     permissions:
       contents: read
 
@@ -146,12 +133,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: kotlin-style
-    if: ${{
-      (github.event_name == 'pull_request' && github.base_ref == 'main' &&
-      (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) ||
-      (github.event_name != 'pull_request' &&
-      (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))
-    }}
+    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     permissions:
       contents: read
 
@@ -269,12 +251,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: kotlin-style
-    if: ${{
-      (github.event_name == 'pull_request' && github.base_ref == 'main' &&
-      (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) ||
-      (github.event_name != 'pull_request' &&
-      (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))
-    }}
+    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     permissions:
       contents: read
 
@@ -393,12 +370,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: kotlin-style
-    if: ${{
-      (github.event_name == 'pull_request' && github.base_ref == 'main' &&
-      (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) ||
-      (github.event_name != 'pull_request' &&
-      (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))
-    }}
+    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     permissions:
       contents: read
 
@@ -445,12 +417,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: kotlin-style
-    if: ${{
-      (github.event_name == 'pull_request' && github.base_ref == 'main' &&
-      (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) ||
-      (github.event_name != 'pull_request' &&
-      (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))
-    }}
+    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     permissions:
       contents: read
 
@@ -497,12 +464,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: kotlin-style
-    if: ${{
-      (github.event_name == 'pull_request' && github.base_ref == 'main' &&
-      (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) ||
-      (github.event_name != 'pull_request' &&
-      (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))
-    }}
+    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     permissions:
       contents: read
 
@@ -598,12 +560,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: kotlin-style
-    if: ${{
-      (github.event_name == 'pull_request' && github.base_ref == 'main' &&
-      (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) ||
-      (github.event_name != 'pull_request' &&
-      (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))
-    }}
+    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     permissions:
       contents: read
 
@@ -708,12 +665,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: kotlin-style
-    if: ${{
-      (github.event_name == 'pull_request' && github.base_ref == 'main' &&
-      (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) ||
-      (github.event_name != 'pull_request' &&
-      (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))
-    }}
+    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     permissions:
       contents: read
 
