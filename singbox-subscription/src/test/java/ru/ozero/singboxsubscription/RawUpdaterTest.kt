@@ -66,6 +66,43 @@ class RawUpdaterTest {
     }
 
     @Test
+    fun `should fetch clash yaml and insert profiles`() = runBlocking {
+        server.enqueue(
+            MockResponse().setBody(
+                """
+                proxies:
+                  - name: Clash VLESS
+                    type: vless
+                    server: vless.example.com
+                    port: 443
+                    uuid: cccccccc-3333-3333-3333-cccccccccccc
+                    network: ws
+                    tls: true
+                    servername: sni.example.com
+                    ws-opts:
+                      path: /ws
+                      headers:
+                        Host: host.example.com
+                  - name: Clash VMess
+                    type: vmess
+                    server: vmess.example.com
+                    port: 8443
+                    uuid: dddddddd-4444-4444-4444-dddddddddddd
+                    alterId: 0
+                    cipher: auto
+                """.trimIndent(),
+            ),
+        )
+        val g = group()
+
+        val result = rawUpdater.refresh(g)
+
+        assertTrue(result.isSuccess)
+        assertEquals(2, result.getOrNull())
+        assertEquals(listOf("Clash VLESS", "Clash VMess"), profileDao.profiles.map { it.name })
+    }
+
+    @Test
     fun `should fetch base64 bundle and insert profiles`() = runBlocking {
         val encoded = Base64.encodeToString("$vless1\n$vless2".toByteArray(), Base64.NO_WRAP)
         server.enqueue(MockResponse().setBody(encoded))

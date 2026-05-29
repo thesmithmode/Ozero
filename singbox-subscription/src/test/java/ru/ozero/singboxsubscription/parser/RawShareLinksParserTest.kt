@@ -6,6 +6,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
 
 @RunWith(RobolectricTestRunner::class)
@@ -107,6 +108,55 @@ class RawShareLinksParserTest {
     }
 
     @Test
+    fun `should infer reality security from clash reality opts`() {
+        val yaml = """
+            proxies:
+              - name: Clash Reality
+                type: vless
+                server: reality.example.com
+                port: 443
+                uuid: 12345678-1234-1234-1234-123456789abc
+                tls: true
+                servername: front.example.com
+                flow: xtls-rprx-vision
+                reality-opts:
+                  public-key: sample-public-key
+                  short-id: abcd
+                client-fingerprint: chrome
+        """.trimIndent()
+
+        val result = RawShareLinksParser.parse(yaml)
+
+        assertEquals(1, result.size)
+        val bean = result.first() as VLESSBean
+        assertEquals("reality", bean.security)
+        assertEquals("front.example.com", bean.sni)
+        assertEquals("sample-public-key", bean.realityPublicKey)
+        assertEquals("abcd", bean.realityShortId)
+        assertEquals("xtls-rprx-vision", bean.flow)
+    }
+
+    @Test
+    fun `should infer tls security for clash trojan without tls flag`() {
+        val yaml = """
+            proxies:
+              - name: Clash Trojan
+                type: trojan
+                server: trojan.example.com
+                port: 443
+                password: secret
+                sni: trojan-sni.example.com
+        """.trimIndent()
+
+        val result = RawShareLinksParser.parse(yaml)
+
+        assertEquals(1, result.size)
+        val bean = result.first() as TrojanBean
+        assertEquals("tls", bean.security)
+        assertEquals("trojan-sni.example.com", bean.sni)
+    }
+
+    @Test
     fun `should parse vless reality outbound from sing-box json`() {
         val json = """
             {
@@ -150,5 +200,52 @@ class RawShareLinksParserTest {
         assertEquals("front.example.com", bean.sni)
         assertEquals("sample-public-key", bean.realityPublicKey)
         assertEquals("abcd", bean.realityShortId)
+    }
+
+    @Test
+    fun `should infer reality from clash reality opts`() {
+        val yaml = """
+            proxies:
+              - name: Reality Clash
+                type: vless
+                server: proxy.example.com
+                port: 443
+                uuid: 12345678-1234-1234-1234-123456789abc
+                tls: true
+                servername: front.example.com
+                reality-opts:
+                  public-key: sample-public-key
+                  short-id: abcd
+        """.trimIndent()
+
+        val result = RawShareLinksParser.parse(yaml)
+
+        assertEquals(1, result.size)
+        val bean = result.first() as VLESSBean
+        assertEquals("reality", bean.security)
+        assertEquals("sample-public-key", bean.realityPublicKey)
+        assertEquals("abcd", bean.realityShortId)
+    }
+
+    @Test
+    fun `should default clash trojan to tls`() {
+        val yaml = """
+            proxies:
+              - name: Trojan Clash
+                type: trojan
+                server: trojan.example.com
+                port: 443
+                password: sample-password
+                sni: front.example.com
+                skip-cert-verify: true
+        """.trimIndent()
+
+        val result = RawShareLinksParser.parse(yaml)
+
+        assertEquals(1, result.size)
+        val bean = result.first() as TrojanBean
+        assertEquals("tls", bean.security)
+        assertEquals("front.example.com", bean.sni)
+        assertTrue(bean.allowInsecure)
     }
 }

@@ -11,6 +11,7 @@ dependencies {
     implementation(project(":singbox-room"))
     implementation(libs.bundles.coroutines)
     implementation(libs.bundles.okhttp)
+    implementation(libs.snakeyaml)
 
     testImplementation(libs.bundles.junit5)
     testRuntimeOnly(libs.junit.jupiter.engine)
