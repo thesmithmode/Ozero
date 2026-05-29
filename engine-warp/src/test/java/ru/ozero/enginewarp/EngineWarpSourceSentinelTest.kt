@@ -104,6 +104,8 @@ class EngineWarpSourceSentinelTest {
     fun `anchors — все функции-границы существуют в источнике`() {
         listOf(
             "private suspend fun resolveEndpointHost",
+            "private fun bootstrapSafeDohUrl",
+            "private fun isIpLiteralDohUrl",
             "private fun resolveViaDoH",
             "private suspend fun buildResolved(",
         ).forEach { anchor ->
@@ -150,6 +152,35 @@ class EngineWarpSourceSentinelTest {
             body.contains("resolvedConfig?.doHProvider"),
             "resolvedConfig содержит предыдущий slot или null на первом старте — " +
                 "его нельзя использовать для DNS policy.",
+        )
+    }
+
+    @Test
+    fun `resolveEndpointHost не резолвит hostname DoH provider через system DNS`() {
+        val body = source.substringAfter("private suspend fun resolveEndpointHost")
+            .substringBefore("private fun bootstrapSafeDohUrl")
+        assertTrue(
+            body.contains("resolveViaDoH(host, bootstrapSafeDohUrl(provider))"),
+            "Hostname-backed DoH providers нельзя передавать напрямую в URL.openConnection — " +
+                "это сначала резолвит DoH hostname через system DNS.",
+        )
+        assertFalse(
+            body.contains("resolveViaDoH(host, provider.url)"),
+            "provider.url может быть hostname-backed (MALW/GEOHIDE), что создаёт bootstrap DNS leak.",
+        )
+    }
+
+    @Test
+    fun `bootstrapSafeDohUrl пропускает только IP literal DoH URL`() {
+        val body = source.substringAfter("private fun bootstrapSafeDohUrl")
+            .substringBefore("private fun resolveViaDoH")
+        assertTrue(
+            body.contains("isIpLiteralDohUrl"),
+            "bootstrapSafeDohUrl обязан проверять host DoH URL без DNS lookup.",
+        )
+        assertTrue(
+            body.contains("BOOTSTRAP_DOH_URL"),
+            "Hostname-backed DoH providers должны уходить на pinned IP-literal bootstrap DoH, а не в system DNS.",
         )
     }
 
