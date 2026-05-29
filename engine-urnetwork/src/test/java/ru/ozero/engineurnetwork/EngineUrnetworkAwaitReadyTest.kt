@@ -1,4 +1,4 @@
-﻿package ru.ozero.engineurnetwork
+package ru.ozero.engineurnetwork
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.test.runTest
@@ -91,7 +91,7 @@ class EngineUrnetworkAwaitReadyTest {
     }
 
     @Test
-    fun `awaitReady РІРѕР·РІСЂР°С‰Р°РµС‚ Ready РїРѕСЃР»Рµ РѕР¶РёРґР°РЅРёСЏ РїРѕРєР° peerCount РЅРµ СЃС‚Р°РЅРµС‚ РїРѕР»РѕР¶РёС‚РµР»СЊРЅС‹Рј`() = runTest {
+    fun `awaitReady ready when peers appear later`() = runTest {
         val bridge = CountableBridge(fixedPeers = 0)
         bridge.peerCountProvider = { if (bridge.peerCountCalls.get() >= 3) 1 else 0 }
         val eng = engine(bridge, backgroundScope, startupReadyPollMs = 50L)
@@ -132,7 +132,7 @@ class EngineUrnetworkAwaitReadyTest {
     }
 
     @Test
-    fun `awaitReady РІРѕР·РІСЂР°С‰Р°РµС‚ Timeout РµСЃР»Рё peerCount РІСЃРµРіРґР° РєРёРґР°РµС‚ РёСЃРєР»СЋС‡РµРЅРёРµ`() = runTest {
+    fun `awaitReady timeout when peerCount always throws`() = runTest {
         val bridge = CountableBridge(fixedPeers = 0).also {
             it.peerCountProvider = { throw IllegalStateException("bridge unavailable") }
         }
@@ -262,4 +262,3 @@ class EngineUrnetworkAwaitReadyTest {
         override suspend fun fetchSubscriptionBalance(): UrnetworkSdkBridge.SubscriptionBalanceSnapshot? = null
     }
 }
-
