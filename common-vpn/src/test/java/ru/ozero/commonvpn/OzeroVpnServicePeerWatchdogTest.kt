@@ -139,9 +139,8 @@ class OzeroVpnServicePeerWatchdogTest {
             .substringAfter("fun startPeerWatchdog")
             .substringBefore("fun cancelWatchers")
         assertTrue(
-            body.contains("PEER_WATCHDOG_TIMEOUT_MS"),
-            "startPeerWatchdog обязан использовать PEER_WATCHDOG_TIMEOUT_MS константу — " +
-                "не хардкодить таймаут. Body:\n$body",
+            body.contains("peerWatchdogPolicy.timeoutMs"),
+            "startPeerWatchdog must read timeout from engine peerWatchdogPolicy, not hardcode engine branches.",
         )
         assertTrue(
             !body.contains("handleEngineFailure"),
@@ -149,6 +148,22 @@ class OzeroVpnServicePeerWatchdogTest {
                 "retry с жёлтой кнопкой. Регрессия 2026-05-20 (da4e2cda): handleEngineFailure → красная " +
                 "кнопка вместо жёлтой. handleEngineFailure живёт только в enterKillswitchMode/health-watcher. " +
                 "Body:\n$body",
+        )
+    }
+
+    @Test
+    fun `peerWatchdog delegates runtime peer grace to engine policy`() {
+        val body = watchdogSource
+            .substringAfter("fun startPeerWatchdog")
+            .substringBefore("fun startStagnationWatchdog")
+        assertTrue(
+            body.contains("plugin.peerWatchdogPolicy()") &&
+                body.contains("peerWatchdogPolicy.timeoutMs"),
+            "Runtime peer grace must come from EnginePlugin policy, not from common-vpn EngineId branches.",
+        )
+        assertTrue(
+            body.contains("!hadPeers && !peerWatchdogPolicy.recoverBeforeFirstPeer"),
+            "Initial zero-peer recovery behavior must be controlled by engine policy.",
         )
     }
 

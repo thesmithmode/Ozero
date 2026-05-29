@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
+import ru.ozero.enginescore.ExitNodeStrategy
 import ru.ozero.enginescore.IpProbeRoute
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
@@ -298,9 +299,17 @@ class ByeDpiEngineTest {
     }
 
     @Test
-    fun ipProbeRouteReturnsDefaultBeforeStartWhenPortZero() = runTest {
+    fun ipProbeRouteReturnsUnavailableBeforeStartWhenPortZero() = runTest {
         val route = engine.ipProbeRoute(socksPort = 0)
-        assertIs<IpProbeRoute.Default>(route)
+        assertIs<IpProbeRoute.Unavailable>(route)
+    }
+
+    @Test
+    fun exitNodeStrategyReturnsSocksWhenPortGivenExplicitly() = runTest {
+        val strategy = engine.exitNodeStrategy(socksPort = 1080)
+        assertIs<ExitNodeStrategy.ViaSocks>(strategy)
+        assertEquals("127.0.0.1", strategy.host)
+        assertEquals(1080, strategy.port)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)

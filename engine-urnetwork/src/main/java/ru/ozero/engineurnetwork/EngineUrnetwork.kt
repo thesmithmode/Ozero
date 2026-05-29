@@ -34,8 +34,8 @@ class EngineUrnetwork(
     private val jwtBootstrapper: UrnetworkJwtBootstrapper,
     private val pluginScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
     private val statsPollIntervalMs: Long = STATS_POLL_INTERVAL_MS,
-    private val peerReadyTimeoutMs: Long = PEER_READY_TIMEOUT_MS,
-    private val peerReadyPollMs: Long = PEER_READY_POLL_MS,
+    private val startupReadyTimeoutMs: Long = STARTUP_READY_TIMEOUT_MS,
+    private val startupReadyPollMs: Long = STARTUP_READY_POLL_MS,
 ) : EnginePlugin, TunFdAcceptor {
 
     private val statsJobRef = AtomicReference<Job?>(null)
@@ -56,24 +56,33 @@ class EngineUrnetwork(
 
     override fun stopTimeoutMs(): Long = URN_STOP_TIMEOUT_MS
 
+    override fun peerWatchdogPolicy(): EnginePlugin.PeerWatchdogPolicy =
+        EnginePlugin.PeerWatchdogPolicy(
+            timeoutMs = PEER_READY_TIMEOUT_MS,
+            recoverBeforeFirstPeer = true,
+        )
+
     override fun buildManualConfig(settings: SettingsModel?): EngineConfig = EngineConfig.Urnetwork(
         jwtToken = settings?.urnetworkJwt.orEmpty(),
         region = settings?.urnetworkCountryCode,
     )
 
     override fun statsLabel(stats: EngineStats): String? {
-        val peers = runCatching { sdkBridge.peerCount() }.getOrDefault(stats.activeConnections)
+        val snapshot = runtimeSnapshotSafe()
+        val peers = snapshot.peers.takeIf { it > 0 } ?: stats.activeConnections
+        val status = snapshot.connectionStatus ?: runCatching { sdkBridge.connectionStatus() }.getOrNull()
         return when {
             peers > 0 -> "$peers peers"
-            isConnectedStatus(runCatching { sdkBridge.connectionStatus() }.getOrNull()) -> "connected"
+            snapshot.providerStateAdded > 0L -> "connected"
+            isConnectedStatus(status) -> "connected"
             else -> null
         }
     }
 
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
-        require(config is EngineConfig.Urnetwork) { "EngineUrnetwork требует EngineConfig.Urnetwork" }
+        require(config is EngineConfig.Urnetwork) { "EngineUrnetwork requires EngineConfig.Urnetwork" }
         require(upstream is Upstream.None) {
-            "EngineUrnetwork не принимает upstream — supportsUpstreamSocks=false"
+            "EngineUrnetwork does not accept upstream - supportsUpstreamSocks=false"
         }
 
         when (val r = jwtBootstrapper.ensureClientJwt()) {
@@ -83,7 +92,7 @@ class EngineUrnetwork(
                 return StartResult.Failure(reason = r.reason)
         }
         val byClientJwt = configStore.byClientJwt().first() ?: return StartResult.Failure(
-            reason = "URnetwork client jwt missing after bootstrap — race condition",
+            reason = "URnetwork client jwt missing after bootstrap - race condition",
         )
 
         val wallet = configStore.walletAddress().first()
@@ -112,7 +121,7 @@ class EngineUrnetwork(
                     .onFailure { PersistentLoggers.warn(TAG, "applyPerformanceProfile threw: ${it.message}") }
                 val provideEnabled = configStore.provideEnabled().first()
                 runCatching { sdkBridge.setProvidePaused(!provideEnabled) }
-                    .onSuccess { Log.i(TAG, "setProvidePaused(${!provideEnabled}) — provideEnabled=$provideEnabled") }
+                    .onSuccess { Log.i(TAG, "setProvidePaused(${!provideEnabled}) - provideEnabled=$provideEnabled") }
                     .onFailure { PersistentLoggers.warn(TAG, "setProvidePaused threw: ${it.message}") }
                 val controlMode = configStore.provideControlMode().first()
                 runCatching { sdkBridge.setProvideControlMode(controlMode) }
@@ -164,10 +173,9 @@ class EngineUrnetwork(
         val sessionStart = System.currentTimeMillis()
         val job = pluginScope.launch {
             while (true) {
-                val peers = runCatching { sdkBridge.peerCount() }.getOrDefault(0)
-                val status = runCatching { sdkBridge.connectionStatus() }.getOrNull()
+                val snapshot = runtimeSnapshotSafe()
                 _stats.value = EngineStats(
-                    activeConnections = if (peers > 0 || !isConnectedStatus(status)) peers else 1,
+                    activeConnections = snapshot.peers,
                     connectedSince = sessionStart,
                 )
                 delay(statsPollIntervalMs)
@@ -177,18 +185,18 @@ class EngineUrnetwork(
     }
 
     override suspend fun probe(): ProbeResult =
-        ProbeResult.Failure(reason = "URnetwork не предоставляет SOCKS-интерфейс")
+        ProbeResult.Failure(reason = "URnetwork does not provide a SOCKS endpoint")
 
     override fun stats(): Flow<EngineStats> = _stats.asStateFlow()
 
     override fun preflight(): ru.ozero.enginescore.EnginePreflight = UrnetworkPreflight()
 
-    override suspend fun ipProbeRoute(socksPort: Int): ru.ozero.enginescore.IpProbeRoute {
-        if (sdkBridge.selectedLocation() == null) return ru.ozero.enginescore.IpProbeRoute.AutoSelected
+    override suspend fun exitNodeStrategy(socksPort: Int): ru.ozero.enginescore.ExitNodeStrategy {
+        if (sdkBridge.selectedLocation() == null) return ru.ozero.enginescore.ExitNodeStrategy.AutoSelected()
         val info = sdkBridge.selectedLocationInfo()
-            ?: return ru.ozero.enginescore.IpProbeRoute.Unavailable("URnetwork location pending")
+            ?: return ru.ozero.enginescore.ExitNodeStrategy.Unavailable("URnetwork location pending")
         val country = info.country ?: info.name
-        return ru.ozero.enginescore.IpProbeRoute.StaticLocation(country, info.countryCode)
+        return ru.ozero.enginescore.ExitNodeStrategy.LocationOnly(country, info.countryCode)
     }
 
     override suspend fun tunSpec(): TunSpec = TunSpec(
@@ -207,45 +215,63 @@ class EngineUrnetwork(
 
     override suspend fun awaitReady(): EnginePlugin.ReadyResult {
         var polls = 0
-        val reached = withTimeoutOrNull(peerReadyTimeoutMs) {
+        val reached = withTimeoutOrNull(startupReadyTimeoutMs) {
             while (true) {
-                val status = runCatching { sdkBridge.connectionStatus() }.getOrNull()
-                val peers = runCatching { sdkBridge.peerCount() }.getOrDefault(0)
-                if (isConnectedStatus(status)) {
+                val snapshot = runtimeSnapshotSafe()
+                if (isStartupReady(snapshot)) {
                     Log.i(
                         TAG,
-                        "awaitReady: status=$status peers=$peers — engine ready " +
-                            "(after ${polls * peerReadyPollMs}ms)",
+                        "awaitReady: tunnelStarted=${snapshot.tunnelStarted} " +
+                            "connectIssued=${snapshot.connectIssued} status=${snapshot.connectionStatus} " +
+                            "peers=${snapshot.peers} providerStateAdded=${snapshot.providerStateAdded} - " +
+                            "engine startup ready (after ${polls * startupReadyPollMs}ms)",
                     )
-                    return@withTimeoutOrNull Unit
-                }
-                if (peers > 0) {
-                    Log.i(TAG, "awaitReady: peers=$peers — engine ready (after ${polls * peerReadyPollMs}ms)")
                     return@withTimeoutOrNull Unit
                 }
                 polls += 1
-                if (polls % PEER_PROGRESS_LOG_EVERY == 0) {
+                if (polls % STARTUP_PROGRESS_LOG_EVERY == 0) {
                     PersistentLoggers.debug(
                         TAG,
-                        "awaitReady progress: status=${status ?: "<null>"} peers=0 " +
-                            "elapsed≈${polls * peerReadyPollMs}ms " +
-                            "deadline=${peerReadyTimeoutMs}ms",
+                        "awaitReady progress: tunnelStarted=${snapshot.tunnelStarted} " +
+                            "connectIssued=${snapshot.connectIssued} " +
+                            "status=${snapshot.connectionStatus ?: "<null>"} peers=${snapshot.peers} " +
+                            "providerStateAdded=${snapshot.providerStateAdded} " +
+                            "elapsed~${polls * startupReadyPollMs}ms " +
+                            "deadline=${startupReadyTimeoutMs}ms",
                     )
                 }
-                delay(peerReadyPollMs)
+                delay(startupReadyPollMs)
             }
         }
         return if (reached != null) {
             EnginePlugin.ReadyResult.Ready
         } else {
-            val reason = "URnetwork: SDK не перешёл в CONNECTED и нет пиров за ${peerReadyTimeoutMs}ms"
-            PersistentLoggers.warn(TAG, "awaitReady timeout — $reason — peer watchdog возьмёт")
+            val reason = "URnetwork: TUN attached, but SDK did not confirm tunnel/connect within " +
+                "${startupReadyTimeoutMs}ms"
+            PersistentLoggers.warn(TAG, "awaitReady timeout - $reason")
             EnginePlugin.ReadyResult.Timeout(reason)
         }
     }
 
+    private fun isStartupReady(snapshot: UrnetworkSdkBridge.RuntimeSnapshot): Boolean =
+        (snapshot.tunnelStarted && snapshot.connectIssued) ||
+            snapshot.providerStateAdded > 0L ||
+            snapshot.peers > 0 ||
+            isConnectedStatus(snapshot.connectionStatus)
+
     private fun isConnectedStatus(status: String?): Boolean =
         status?.equals(CONNECTION_STATUS_CONNECTED, ignoreCase = true) == true
+
+    private fun runtimeSnapshotSafe(): UrnetworkSdkBridge.RuntimeSnapshot {
+        val snapshot = runCatching { sdkBridge.runtimeSnapshot() }.getOrNull()
+        if (snapshot != null) return snapshot
+        val peers = runCatching { sdkBridge.peerCount() }.getOrDefault(0)
+        val status = runCatching { sdkBridge.connectionStatus() }.getOrNull()
+        return UrnetworkSdkBridge.RuntimeSnapshot(
+            connectionStatus = status,
+            peers = peers,
+        )
+    }
 
     override suspend fun attachTun(tunFd: Int): TunAttachResult {
         PersistentLoggers.debug(TAG, "attachTun fd=$tunFd")
@@ -262,9 +288,10 @@ class EngineUrnetwork(
         const val STATS_POLL_INTERVAL_MS = 2_000L
 
         const val URN_STOP_TIMEOUT_MS = 8_000L
+        const val STARTUP_READY_TIMEOUT_MS = 8_000L
         const val PEER_READY_TIMEOUT_MS = 300_000L
-        const val PEER_READY_POLL_MS = 200L
-        const val PEER_PROGRESS_LOG_EVERY = 75
+        const val STARTUP_READY_POLL_MS = 200L
+        const val STARTUP_PROGRESS_LOG_EVERY = 10
         const val CONNECTION_STATUS_CONNECTED = "CONNECTED"
     }
 }

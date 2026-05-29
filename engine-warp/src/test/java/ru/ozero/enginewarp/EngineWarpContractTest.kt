@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
+import ru.ozero.enginescore.ExitNodeStrategy
 import ru.ozero.enginescore.IpProbeRoute
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.TunAttachResult
@@ -185,6 +186,16 @@ class EngineWarpContractTest {
         val loc = assertIs<IpProbeRoute.StaticLocation>(route)
         assertEquals("Cloudflare WARP", loc.country)
         assertNull(loc.countryCode)
+    }
+
+    @Test
+    fun `exitNodeStrategy after start returns ProviderLabel and not DirectHttp`() = runTest {
+        val (e, _, _) = engine(activeConfig = sampleConfig)
+        e.start(EngineConfig.Warp, Upstream.None)
+        val strategy = e.exitNodeStrategy(socksPort = 0)
+        val label = assertIs<ExitNodeStrategy.ProviderLabel>(strategy)
+        assertEquals("Cloudflare WARP", label.label)
+        assertFalse(strategy is ExitNodeStrategy.DirectHttp)
     }
 
     @Test

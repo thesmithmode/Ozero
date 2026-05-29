@@ -89,7 +89,7 @@ class ByeDpiEngineConcurrencyContractTest {
             """withContext\(proxyDispatcher\)\s*\{\s*\}""",
         )
         assertTrue(
-            drainPattern.containsMatchIn(engineSource) && engineSource.contains("rotateProxyLane()"),
+            drainPattern.containsMatchIn(engineSource) && engineSource.contains("rotateProxyLane("),
             "start() обязан вызывать withContext(proxyDispatcher) {} после cleanup old job " +
                 "и ротировать lane при timeout. Cancelled JNI игнорирует Thread.interrupt() " +
                 "и может держать единственный слот dispatcher; без ротации новый proxy coroutine " +
@@ -103,7 +103,7 @@ class ByeDpiEngineConcurrencyContractTest {
             """oldJob\.cancel\(\)\s*rotateProxyLane\(\)""",
         )
         val deferredDrainPattern = Regex(
-            """if\s*\(oldJob\s*!=\s*null\s*\|\|\s*hadKnownWedge\)\s*\{\s*drainOrRotateProxyLane\(\)\s*\}""",
+            """else\s+if\s*\(oldJob\s*!=\s*null\)\s*\{\s*drainOrRotateProxyLane\(\)\s*\}""",
         )
         assertFalse(
             prematureRotatePattern.containsMatchIn(engineSource),
@@ -112,7 +112,10 @@ class ByeDpiEngineConcurrencyContractTest {
                 "может позже сбросить native guard под новым instance.",
         )
         assertTrue(
-            deferredDrainPattern.containsMatchIn(engineSource),
+            deferredDrainPattern.containsMatchIn(engineSource) &&
+                engineSource.contains("if (rotateBeforeLaunch)") &&
+                engineSource.contains("rotateProxyLane(\"start: previous proxy lane wedged\")") &&
+                engineSource.contains("rotateProxyLane(\"stop: proxyJob did not finish within \${STOP_GRACE_MS}ms\")"),
             "start() обязан сначала дренировать dispatcher, который владеет oldJob/hadKnownWedge, " +
                 "и только drainOrRotateProxyLane() может ротировать lane после timeout.",
         )

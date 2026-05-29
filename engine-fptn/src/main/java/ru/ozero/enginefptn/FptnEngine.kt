@@ -2,12 +2,15 @@ package ru.ozero.enginefptn
 
 import android.os.ParcelFileDescriptor
 import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,12 +18,14 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 import ru.ozero.enginescore.EngineCapabilities
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.EngineStats
+import ru.ozero.enginescore.ExitNodeStrategy
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
@@ -31,6 +36,8 @@ import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.settings.SettingsModel
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.net.Inet4Address
+import java.net.InetAddress
 
 class FptnEngine(
     private val configStore: FptnConfigStore,
@@ -44,6 +51,7 @@ class FptnEngine(
     private var tunScope: CoroutineScope? = null
     private var _nativeHandle: Long = 0L
     private var _currentServer: FptnServer? = null
+    private var _currentServerIp: String? = null
     private var _accessToken: String? = null
     private var _bypassMethod: String = FptnBypassMethod.DEFAULT.strategyName
     private var _sniDomain: String = FptnConfig.DEFAULT_SNI_DOMAIN
@@ -62,6 +70,11 @@ class FptnEngine(
     )
 
     override fun stats(): Flow<EngineStats> = _stats.asStateFlow()
+
+    override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy =
+        _currentServer?.name?.takeIf { it.isNotBlank() }
+            ?.let { ExitNodeStrategy.ProviderLabel(it) }
+            ?: ExitNodeStrategy.Unavailable("FPTN not connected")
 
     override fun buildManualConfig(settings: SettingsModel?): EngineConfig? {
         val cfg = configStore.currentConfig()
@@ -113,7 +126,7 @@ class FptnEngine(
         if (candidates.isEmpty()) {
             PersistentLoggers.error(
                 TAG,
-                "start: no server available — token contained ${tokenData.servers.size} server(s), " +
+                "start: no server available - token contained ${tokenData.servers.size} server(s), " +
                     "selected=${fptn.selectedServerName ?: "<auto>"}",
             )
             return StartResult.Failure("No FPTN server available")
@@ -141,10 +154,24 @@ class FptnEngine(
         }
 
         val authenticated = withContext(Dispatchers.IO) {
-            authenticateFirstAvailable(candidates, tokenData, fptn.bypassMethod, fptn.sniDomain)
+            withTimeoutOrNull(STARTUP_AUTH_BUDGET_MS) {
+                authenticateFirstAvailable(
+                    candidates = candidates,
+                    data = tokenData,
+                    bypassMethod = fptn.bypassMethod,
+                    sniDomain = fptn.sniDomain,
+                    deadlineMs = System.currentTimeMillis() + STARTUP_AUTH_BUDGET_MS,
+                    perCandidateMaxTimeoutS = if (candidates.size > 1) {
+                        AUTO_AUTH_CANDIDATE_TIMEOUT_S
+                    } else {
+                        AUTH_TIMEOUT_S
+                    },
+                )
+            }
         } ?: return StartResult.Failure("FPTN authentication failed")
 
         _currentServer = authenticated.server
+        _currentServerIp = authenticated.serverIp
         _accessToken = authenticated.accessToken
         _bypassMethod = fptn.bypassMethod
         _sniDomain = fptn.sniDomain
@@ -155,6 +182,7 @@ class FptnEngine(
 
     override suspend fun attachTun(tunFd: Int): TunAttachResult {
         val server = _currentServer ?: return TunAttachResult.Failure("Engine not started")
+        val serverIp = _currentServerIp ?: return TunAttachResult.Failure("No resolved server IP")
         val token = _accessToken ?: return TunAttachResult.Failure("No access token")
 
         Log.d(TAG, "attachTun: fd=$tunFd server=${server.name}")
@@ -183,7 +211,7 @@ class FptnEngine(
         Log.d(TAG, "attachTun: creating native handle method=$_bypassMethod")
         val handle = runCatching {
             wsClient.nativeCreate(
-                serverIp = server.host,
+                serverIp = serverIp,
                 serverPort = server.port,
                 tunIpv4 = "10.10.0.1",
                 tunIpv6 = "fd00::1",
@@ -248,7 +276,7 @@ class FptnEngine(
             }
             delay(READY_POLL_MS)
         }
-        PersistentLoggers.error(TAG, "awaitReady: timeout after ${READY_TIMEOUT_MS}ms — WS never started")
+        PersistentLoggers.error(TAG, "awaitReady: timeout after ${READY_TIMEOUT_MS}ms - WS never started")
         return EnginePlugin.ReadyResult.Timeout("FPTN WebSocket not started within ${READY_TIMEOUT_MS}ms")
     }
 
@@ -275,6 +303,7 @@ class FptnEngine(
             Log.d(TAG, "stop: nativeDestroy done")
         }
         _currentServer = null
+        _currentServerIp = null
         _accessToken = null
         Log.d(TAG, "stop: done")
     }
@@ -294,29 +323,44 @@ class FptnEngine(
         config: EngineConfig.Fptn,
         data: FptnTokenData,
     ): FptnServer? {
-        if (config.autoSelect || config.selectedServerName == null) return data.servers.firstOrNull()
-        return data.servers.firstOrNull { it.name == config.selectedServerName } ?: data.servers.firstOrNull()
+        if (config.autoSelect) return data.servers.firstOrNull()
+        val selectedName = config.selectedServerName ?: return null
+        return data.servers.firstOrNull { it.name == selectedName }
     }
 
     internal fun selectServerCandidates(config: EngineConfig.Fptn, data: FptnTokenData): List<FptnServer> {
-        if (config.autoSelect || config.selectedServerName == null) return data.servers
-        val selected = data.servers.firstOrNull { it.name == config.selectedServerName }
-        return if (selected == null) {
-            data.servers
-        } else {
-            listOf(selected) + data.servers.filterNot { it.name == selected.name }
-        }
+        if (config.autoSelect) return data.servers
+        val selectedName = config.selectedServerName ?: return emptyList()
+        val selected = data.servers.firstOrNull { it.name == selectedName } ?: return emptyList()
+        return listOf(selected)
     }
 
-    private fun authenticateFirstAvailable(
+    private suspend fun authenticateFirstAvailable(
         candidates: List<FptnServer>,
         data: FptnTokenData,
         bypassMethod: String,
         sniDomain: String,
+        deadlineMs: Long,
+        perCandidateMaxTimeoutS: Int,
     ): AuthenticatedServer? {
-        candidates.forEachIndexed { index, server ->
-            val accessToken = authenticate(server, data, bypassMethod, sniDomain)
-            if (accessToken != null) return AuthenticatedServer(server, accessToken)
+        for (index in candidates.indices) {
+            currentCoroutineContext().ensureActive()
+            val remainingMs = deadlineMs - System.currentTimeMillis()
+            if (remainingMs <= 0L) break
+            val server = candidates[index]
+            val timeoutS = authTimeoutSeconds(remainingMs, perCandidateMaxTimeoutS)
+            val accessToken = authenticate(server, data, bypassMethod, sniDomain, timeoutS)
+            currentCoroutineContext().ensureActive()
+            if (accessToken != null) {
+                val resolveRemainingMs = deadlineMs - System.currentTimeMillis()
+                if (resolveRemainingMs <= 0L) break
+                val serverIp = withTimeoutOrNull(resolveRemainingMs) { resolveServerIp(server) }
+                currentCoroutineContext().ensureActive()
+                if (serverIp != null) {
+                    return AuthenticatedServer(server, serverIp, accessToken)
+                }
+                PersistentLoggers.warn(TAG, "authenticate: resolved IP missing server=${server.name}")
+            }
             if (index < candidates.lastIndex) {
                 Log.d(TAG, "authenticate: fallback from ${server.name} to ${candidates[index + 1].name}")
             }
@@ -325,12 +369,20 @@ class FptnEngine(
         return null
     }
 
-    private fun authenticate(
+    private fun authTimeoutSeconds(remainingMs: Long, perCandidateMaxTimeoutS: Int): Int =
+        ((remainingMs + 999L) / 1_000L)
+            .coerceAtLeast(1L)
+            .coerceAtMost(perCandidateMaxTimeoutS.toLong())
+            .toInt()
+
+    private suspend fun authenticate(
         server: FptnServer,
         data: FptnTokenData,
         bypassMethod: String,
         sniDomain: String,
+        timeoutS: Int,
     ): String? {
+        currentCoroutineContext().ensureActive()
         val handle = httpsClient.nativeCreate(
             host = server.host,
             port = server.port,
@@ -339,16 +391,18 @@ class FptnEngine(
             censorshipStrategy = bypassMethod,
         )
         return try {
+            currentCoroutineContext().ensureActive()
             PersistentLoggers.debug(
                 TAG,
                 "authenticate: POST /api/v1/login server=${server.name}:${server.port} " +
-                    "sni=$sniDomain bypass=$bypassMethod timeout=${AUTH_TIMEOUT_S}s",
+                    "sni=$sniDomain bypass=$bypassMethod timeout=${timeoutS}s",
             )
             val body = JSONObject().apply {
                 put("username", data.username)
                 put("password", data.password)
             }.toString()
-            val resp = httpsClient.nativePost(handle, "/api/v1/login", body, AUTH_TIMEOUT_S)
+            val resp = httpsClient.nativePost(handle, "/api/v1/login", body, timeoutS)
+            currentCoroutineContext().ensureActive()
             if (resp.code == 200) {
                 val token = JSONObject(resp.body).optString("access_token").takeIf { it.isNotBlank() }
                 if (token != null) {
@@ -365,6 +419,8 @@ class FptnEngine(
                 )
                 null
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             PersistentLoggers.error(
                 TAG,
@@ -377,14 +433,31 @@ class FptnEngine(
         }
     }
 
+    private suspend fun resolveServerIp(server: FptnServer): String? {
+        currentCoroutineContext().ensureActive()
+        return try {
+            InetAddress.getAllByName(server.host)
+                .firstOrNull { it is Inet4Address }
+                ?.hostAddress
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            PersistentLoggers.warn(TAG, "resolve: failed server=${server.name} ${e.javaClass.simpleName}")
+            null
+        }
+    }
+
     private data class AuthenticatedServer(
         val server: FptnServer,
+        val serverIp: String,
         val accessToken: String,
     )
 
     companion object {
         private const val TAG = "FptnEngine"
         private const val AUTH_TIMEOUT_S = 15
+        private const val AUTO_AUTH_CANDIDATE_TIMEOUT_S = 5
+        private const val STARTUP_AUTH_BUDGET_MS = 15_000L
         private const val READY_TIMEOUT_MS = 30_000L
         private const val READY_POLL_MS = 300L
     }

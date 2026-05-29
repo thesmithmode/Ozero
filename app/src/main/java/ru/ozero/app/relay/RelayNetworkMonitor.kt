@@ -15,8 +15,12 @@ class RelayNetworkMonitor(
 
     private var callback: ConnectivityManager.NetworkCallback? = null
 
-    fun start(networkMode: UrnetworkProvideNetworkMode) {
+    fun start(networkMode: UrnetworkProvideNetworkMode, provideEnabled: Boolean) {
         stop()
+        if (!provideEnabled) {
+            bridge.setProvidePaused(true)
+            return
+        }
 
         val cb = object : ConnectivityManager.NetworkCallback() {
             private var connectedNetwork: Network? = null

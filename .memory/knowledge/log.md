@@ -1045,3 +1045,43 @@
 - Source: daily/2026-05-28.md
 - Articles created: [[concepts/fptn-dead-server-fallback]], [[concepts/singbox-karing-json-import-parity]], [[concepts/gradle-module-type-ci-task-selection]]
 - Articles updated: none
+## [2026-05-29T23:03:54+03:00] compile | 2026-05-29.md
+- Source: daily/2026-05-29.md
+- Articles created: [[concepts/fptn-upstream-dns-websocket-boundary]], [[concepts/byedpi-wedged-lane-restart-isolation]], [[concepts/urnetwork-startup-readiness-vs-runtime-peer-grace]], [[concepts/urnetwork-relay-provideenabled-boundary]], [[concepts/github-actions-multiline-if-parse-failure]], [[concepts/memory-commit-with-work-only]], [[connections/engine-lifecycle-stale-status-cascade]]
+- Articles updated: none
+## [2026-05-29T23:04:17+03:00] compile | 2026-05-29.md
+- Source: daily/2026-05-29.md
+- Articles created: [[concepts/fptn-upstream-websocket-dns-boundary]], [[concepts/fptn-cancellation-cooperative-auth-lifecycle]], [[concepts/byedpi-wedged-lane-generation-restart]], [[concepts/urnetwork-startup-readiness-runtime-peer-grace]], [[concepts/urnetwork-relay-provideenabled-sol-contract]], [[connections/stale-engine-signals-cross-engine-failures]]
+- Articles updated: none
+## [2026-05-29T23:09:33+03:00] compile | 2026-05-29.md
+- Source: daily/2026-05-29.md
+- Articles created: [[concepts/fptn-upstream-readiness-ip-callback-flow]], [[concepts/auto-candidate-terminal-status-invariant]], [[concepts/singbox-exit-ip-probe-chain-socks]], [[concepts/regression-diagnostics-real-path-grounding]], [[connections/cascade-lifecycle-regressions-cross-engine-proof]]
+- Articles updated: none
+## [2026-05-29T23:21:06+03:00] compile | 2026-05-29.md
+- Source: daily/2026-05-29.md
+- Articles created: none
+- Articles updated: [[concepts/fptn-cancellation-cooperative-auth-lifecycle]], [[concepts/auto-candidate-terminal-status-invariant]], [[concepts/byedpi-wedged-lane-generation-restart]], [[concepts/urnetwork-startup-readiness-runtime-peer-grace]], [[concepts/urnetwork-relay-provideenabled-sol-contract]], [[concepts/singbox-exit-ip-probe-chain-socks]], [[connections/stale-engine-signals-cross-engine-failures]]
+## [2026-05-29T23:26:16+03:00] compile | 2026-05-29.md
+- Source: daily/2026-05-29.md
+- Articles created: [[concepts/fptn-auth-ladder-orchestrator-block]], [[concepts/exit-node-strategy-resolver-contract]], [[concepts/ci-required-check-name-preservation]], [[connections/startup-readiness-runtime-recovery-boundary]]
+- Articles updated: none
+## [2026-05-29T23:29:37+03:00] compile | 2026-05-29.md
+- Source: daily/2026-05-29.md
+- Articles created: [[connections/shared-lifecycle-first-fix-order]]
+- Articles updated: [[concepts/fptn-upstream-websocket-dns-boundary]], [[concepts/byedpi-wedged-lane-generation-restart]], [[concepts/urnetwork-startup-readiness-runtime-peer-grace]], [[concepts/urnetwork-relay-provideenabled-sol-contract]], [[concepts/singbox-exit-ip-probe-chain-socks]], [[concepts/exit-node-strategy-resolver-contract]], [[concepts/memory-commit-with-work-only]]
+## [2026-05-29T23:38:11+03:00] compile | 2026-05-29.md
+- Source: daily/2026-05-29.md
+- Articles created: [[concepts/fptn-token-port-schema-upstream-contract]], [[concepts/fptn-single-auth-default-start-contract]], [[concepts/chain-start-timeout-stale-engine-failure-cascade]], [[concepts/urnetwork-providerstate-peer-grace-contract]], [[concepts/urnetwork-relay-user-flag-wallet-chain-contract]], [[concepts/exit-node-probe-no-direct-fallback]], [[connections/engine-startup-status-authority-boundary]]
+- Articles updated: none
+## [2026-05-29T23:44:08+03:00] compile | 2026-05-29.md
+- Source: daily/2026-05-29.md
+- Articles created: [[concepts/fptn-upstream-snapshot-grounding]], [[concepts/experimental-fix-branch-selective-port]], [[concepts/urnetwork-engine-relay-separation]], [[concepts/multiengine-regression-fix-staging]], [[connections/engine-exit-node-safe-routing-contract]]
+- Articles updated: none
+## [2026-05-29T23:47:37+03:00] compile | 2026-05-29.md
+- Source: daily/2026-05-29.md
+- Articles created: [[concepts/real-path-grounding-before-fix-plan]], [[concepts/memory-hook-postcommit-dirty-contract]], [[connections/candidate-attempt-lifecycle-status-isolation]], [[concepts/exit-node-strategy-no-direct-leak-sentinel]]
+- Articles updated: none
+## [2026-05-29T23:57:53+03:00] compile | 2026-05-29.md
+- Source: daily/2026-05-29.md
+- Articles created: [[concepts/singbox-active-socks-port-failure-reset]], [[concepts/ci-style-job-downstream-skip]], [[concepts/source-mojibake-diagnostics-risk]], [[concepts/strategy-extraction-import-retention]], [[connections/ci-style-gate-hides-compile-regression]], [[connections/exit-node-probe-resource-state-coupling]]
+- Articles updated: none

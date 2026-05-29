@@ -12,7 +12,8 @@ import ru.ozero.enginescore.PersistentLoggers
 internal class UrnetworkPayoutWalletSetup {
 
     suspend fun configure(walletVc: WalletViewController, walletAddress: String): Boolean {
-        if (walletAddress.isBlank()) {
+        val targetAddress = walletAddress.trim()
+        if (targetAddress.isBlank()) {
             Log.i(TAG, "endpoint sync skipped: target not configured")
             return false
         }
@@ -31,14 +32,14 @@ internal class UrnetworkPayoutWalletSetup {
                 "endpoint sync: fetch ${if (existing != null) "ok" else "timeout"} " +
                     "entries=$afterFetchCount",
             )
-            var walletId: Id? = findWalletIdByAddress(walletVc, walletAddress)
+            var walletId: Id? = findWalletIdByAddress(walletVc, targetAddress)
             if (walletId == null && existing != null) {
                 PersistentLoggers.debug(
                     TAG,
                     "endpoint sync: target not in registry — submitting external registration",
                 )
                 val added = awaitWalletsChanged(walletVc, WALLET_ADD_TIMEOUT_MS) {
-                    walletVc.addExternalWallet(walletAddress, WALLET_BLOCKCHAIN_SOLANA)
+                    walletVc.addExternalWallet(targetAddress, WALLET_BLOCKCHAIN_SOLANA)
                 }
                 val afterAddCount = currentWalletCount(walletVc)
                 PersistentLoggers.debug(
@@ -47,7 +48,7 @@ internal class UrnetworkPayoutWalletSetup {
                         "entries=$afterAddCount",
                 )
                 if (added != null) {
-                    walletId = findWalletIdByAddress(walletVc, walletAddress)
+                    walletId = findWalletIdByAddress(walletVc, targetAddress)
                 }
             }
             if (walletId != null) {
@@ -94,7 +95,7 @@ internal class UrnetworkPayoutWalletSetup {
         val count = runCatching { list.len() }.getOrDefault(0L)
         for (i in 0 until count) {
             val w = runCatching { list.get(i) }.getOrNull() ?: continue
-            val addr = runCatching { w.walletAddress }.getOrNull()
+            val addr = runCatching { w.walletAddress?.trim() }.getOrNull()
             if (addr == address) {
                 return runCatching { w.walletId }.getOrNull()
             }
@@ -111,6 +112,6 @@ internal class UrnetworkPayoutWalletSetup {
         const val TAG = "UrnAccountSync"
         const val WALLET_FETCH_TIMEOUT_MS = 5_000L
         const val WALLET_ADD_TIMEOUT_MS = 30_000L
-        const val WALLET_BLOCKCHAIN_SOLANA = "solana"
+        const val WALLET_BLOCKCHAIN_SOLANA = "SOL"
     }
 }

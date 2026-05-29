@@ -22,6 +22,24 @@ class EngineWatchdogCoordinatorContractTest {
     }
 
     @Test
+    fun `peer watchdog uses engine policy instead of engine-specific constants`() {
+        val body = source.substringAfter("fun startPeerWatchdog(")
+            .substringBefore("fun startStagnationWatchdog")
+        assertTrue(
+            body.contains("val peerWatchdogPolicy = plugin.peerWatchdogPolicy()"),
+            "Peer watchdog must read policy from EnginePlugin, not from hardcoded EngineId branches.",
+        )
+        assertTrue(
+            body.contains("peerWatchdogPolicy.timeoutMs"),
+            "Peer watchdog timeout must come from engine policy.",
+        )
+        assertTrue(
+            body.contains("!peerWatchdogPolicy.recoverBeforeFirstPeer"),
+            "Initial zero-peer behavior must come from engine policy.",
+        )
+    }
+
+    @Test
     fun `публичные методы существуют`() {
         listOf(
             "fun startHealthKillswitchWatcher(",

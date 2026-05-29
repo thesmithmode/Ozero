@@ -119,6 +119,17 @@ class ConfigBuilderAutoSelectTest {
     }
 
     @Test
+    fun `tun config can expose local socks inbound for exit ip probe`() {
+        val json = ConfigBuilder.buildSingboxConfig(makeVless(), probeSocksPort = 49421)
+
+        assertContains(json, "\"type\":\"tun\"")
+        assertContains(json, "\"type\":\"socks\"")
+        assertContains(json, "\"listen\":\"127.0.0.1\"")
+        assertContains(json, "\"listen_port\":49421")
+        assertContains(json, "\"final\":\"proxy\"")
+    }
+
+    @Test
     fun `auto config with ten beans stays under 50KB`() {
         val beans = (1..10).map { makeVless("server$it.example.com", 443 + it) }
         val json = ConfigBuilder.buildSingboxAutoConfig(beans)

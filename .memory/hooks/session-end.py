@@ -1,9 +1,10 @@
 """
-SessionEnd hook - captures conversation transcript for memory extraction.
+Stop hook - captures conversation transcript for memory extraction.
 
-When a session ends, this hook reads the transcript path from
-stdin, extracts conversation context, and spawns flush.py as a background
-process to extract knowledge into the daily log.
+Codex fires Stop when a turn finishes, not only when a session closes.
+This hook reads the transcript path from stdin, extracts conversation
+context, and spawns flush.py as a background process. flush.py throttles
+Stop-originated flushes so active sessions do not write memory on every turn.
 
 The hook itself does NO API calls - only local file I/O for speed (<10s).
 """
@@ -61,7 +62,7 @@ def main() -> None:
     transcript_path_str = hook_input.get("transcript_path", "")
     cwd = hook_input.get("cwd") or hook_input.get("workspace_root")
 
-    logging.info("SessionEnd fired: session=%s source=%s", session_id, source)
+    logging.info("Stop fired: session=%s source=%s", session_id, source)
 
     if not transcript_path_str or not isinstance(transcript_path_str, str):
         transcript_path = discover_codex_transcript(str(session_id), cwd if isinstance(cwd, str) else None)

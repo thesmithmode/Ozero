@@ -506,6 +506,24 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
+    fun `runtimeSnapshot exposes consumer readiness without relay state`() {
+        val body = source.substringAfter("override fun runtimeSnapshot()")
+            .substringBefore("override fun openLocationsViewController")
+        assertTrue(
+            body.contains("windowStatus") && body.contains("providerStateAdded"),
+            "runtimeSnapshot must expose SDK windowStatus.providerStateAdded as consumer readiness signal.",
+        )
+        assertTrue(
+            body.contains("tunnelStarted") && body.contains("connectIssued"),
+            "runtimeSnapshot must separate attach/connect readiness from peer count.",
+        )
+        assertTrue(
+            !body.contains("provideMode") && !body.contains("unpaidBytes"),
+            "runtimeSnapshot is for URnetwork consumer engine and must not couple to relay payout/provide state.",
+        )
+    }
+
+    @Test
     fun `cleanupOnFailure closes device without throw sentinel`() {
         val cleanupBlock = source.substringAfter("private fun cleanupOnFailure")
             .substringBefore("private companion object")

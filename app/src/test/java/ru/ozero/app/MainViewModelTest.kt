@@ -31,6 +31,7 @@ import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.EngineStats
+import ru.ozero.enginescore.ExitNodeStrategy
 import ru.ozero.enginescore.IpProbeRoute
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
@@ -117,6 +118,13 @@ class MainViewModelTest {
         override suspend fun probe(): ProbeResult = ProbeResult.Failure("test fake")
         override fun stats(): Flow<EngineStats> = emptyFlow()
         override suspend fun ipProbeRoute(socksPort: Int): IpProbeRoute = route(socksPort)
+        override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy = when (val r = route(socksPort)) {
+            IpProbeRoute.Default -> ExitNodeStrategy.DirectHttp
+            IpProbeRoute.AutoSelected -> ExitNodeStrategy.AutoSelected()
+            is IpProbeRoute.Socks -> ExitNodeStrategy.ViaSocks(r.host, r.port)
+            is IpProbeRoute.StaticLocation -> ExitNodeStrategy.LocationOnly(r.country, r.countryCode)
+            is IpProbeRoute.Unavailable -> ExitNodeStrategy.Unavailable(r.reason)
+        }
     }
 
     private class FakeIpInfoProvider(

@@ -57,8 +57,8 @@ class EngineWarpSourceSentinelTest {
             "stats poll обязан вызывать PersistentLoggers.trace с \"warp stats\" prefix — boot.log readable, не info/warn",
         )
         assertTrue(
-            body.contains("Δtx") && body.contains("Δrx"),
-            "stats log обязан содержать дельту (Δtx/Δrx) для outage diagnostics, не только absolute",
+            body.contains("deltaTx") && body.contains("deltaRx"),
+            "stats log must contain traffic deltas (deltaTx/deltaRx), not only absolute counters.",
         )
     }
 
