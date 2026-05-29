@@ -1036,3 +1036,12 @@
 - Source: daily/2026-05-28.md
 - Articles created: [[concepts/android-apk-only-release-scope]], [[concepts/engine-poisoned-state-recovery-proof]], [[concepts/release-runtime-regression-sentinels]], [[concepts/ci-extra-module-artifact-feedback-loop]], [[connections/android-apk-scope-vs-runtime-proof]]
 - Articles updated: none
+
+## [2026-05-28T22:00:09+03:00] compile | 2026-05-28.md
+- Source: daily/2026-05-28.md
+- Articles created: [[concepts/release-workflow-apk-only-artifact-pruning]], [[concepts/regression-test-bounded-waits]], [[concepts/ci-grouped-job-failure-attribution]], [[connections/apk-only-release-vs-extra-module-ci]]
+- Articles updated: none
+## [2026-05-28T22:30:54+03:00] compile | 2026-05-28.md
+- Source: daily/2026-05-28.md
+- Articles created: [[concepts/fptn-dead-server-fallback]], [[concepts/singbox-karing-json-import-parity]], [[concepts/gradle-module-type-ci-task-selection]]
+- Articles updated: none
