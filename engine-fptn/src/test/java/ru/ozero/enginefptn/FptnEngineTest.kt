@@ -13,10 +13,13 @@ import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
+import java.io.File
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class FptnEngineTest {
 
@@ -153,6 +156,66 @@ class FptnEngineTest {
         )
 
         assertEquals(listOf("S2", "S1", "S3"), result.map { it.name })
+    }
+
+    @Test
+    fun `autoSelect runtime server selection uses only first token server`() {
+        val tokenData = tokenData(
+            server("S1"),
+            server("S2"),
+            server("S3"),
+        )
+
+        val result = engine.selectServer(
+            EngineConfig.Fptn(autoSelect = true, selectedServerName = "S2"),
+            tokenData,
+        )
+
+        assertEquals("S1", result?.name)
+    }
+
+    @Test
+    fun `manual runtime server selection does not append fallback candidates`() {
+        val tokenData = tokenData(
+            server("S1"),
+            server("S2"),
+            server("S3"),
+        )
+
+        val result = engine.selectServer(
+            EngineConfig.Fptn(autoSelect = false, selectedServerName = "S2"),
+            tokenData,
+        )
+
+        assertEquals("S2", result?.name)
+    }
+
+    @Test
+    fun `start runtime path authenticates fallback candidates in priority order`() {
+        val source = File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/enginefptn/FptnEngine.kt",
+        ).readText()
+        val startBody = source.substringAfter("override suspend fun start(")
+            .substringBefore("override suspend fun attachTun(")
+
+        assertTrue(
+            startBody.contains("selectServerCandidates(fptn, tokenData)"),
+            "FPTN start must preserve the candidate list for multi-server fallback.",
+        )
+        assertTrue(
+            startBody.contains("authenticateFirstAvailable(candidates"),
+            "FPTN start must try later token servers when earlier authentication fails.",
+        )
+        assertTrue(
+            source.contains("fun authenticateFirstAvailable") &&
+                source.contains("candidates.forEachIndexed"),
+            "FPTN authentication must iterate the ordered candidate list.",
+        )
+        assertFalse(
+            startBody.contains("authenticate(server, tokenData"),
+            "FPTN start must not bypass fallback candidates with a single selected-server auth attempt.",
+        )
     }
 
     @Test

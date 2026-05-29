@@ -186,6 +186,7 @@ class TunnelController(
     private fun isStaleEngineSignal(engineId: EngineId): Boolean {
         val current = _state.value
         return when (current) {
+            is TunnelState.Probing -> current.engineId != null && current.engineId != engineId
             is TunnelState.Connecting -> current.engineId != engineId
             is TunnelState.Connected -> current.engineId != engineId
             is TunnelState.Disconnecting -> true
