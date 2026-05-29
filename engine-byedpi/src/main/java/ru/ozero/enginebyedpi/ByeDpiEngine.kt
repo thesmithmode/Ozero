@@ -106,7 +106,6 @@ class ByeDpiEngine(
                 PersistentLoggers.warn(TAG, "start: предыдущий прокси ещё активен — останавливаю")
                 runCatching { proxy.stopProxy() }
                     .onFailure { PersistentLoggers.warn(TAG, "oldProxy jniStopProxy: ${it.message}") }
-                withTimeoutOrNull(STOP_GRACE_MS) { oldJob.join() }
             }
             runCatching { proxy.forceClose() }
                 .onFailure { PersistentLoggers.warn(TAG, "oldProxy jniForceClose: ${it.message}") }
@@ -156,10 +155,12 @@ class ByeDpiEngine(
             if (proxyJob.isActive) {
                 runCatching { proxy.stopProxy() }
                     .onFailure { PersistentLoggers.warn(TAG, "jniStopProxy on failure: ${it.message}") }
-                withTimeoutOrNull(STOP_GRACE_MS) { proxyJob.join() }
             }
             runCatching { proxy.forceClose() }
                 .onFailure { PersistentLoggers.warn(TAG, "jniForceClose on failure: ${it.message}") }
+            if (proxyJob.isActive) {
+                withTimeoutOrNull(STOP_GRACE_MS) { proxyJob.join() }
+            }
             if (proxyJob.isActive) {
                 nativeMayBeWedged.set(true)
                 proxyJob.cancel()

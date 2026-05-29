@@ -136,6 +136,6 @@ class ShutdownCoordinator(
 
     companion object {
         private const val TAG = "ShutdownCoordinator"
-        const val PARALLEL_STOP_TIMEOUT_MS = 4_000L
+        const val PARALLEL_STOP_TIMEOUT_MS = 6_000L
     }
 }

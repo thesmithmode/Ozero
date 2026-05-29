@@ -7,7 +7,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -300,14 +302,17 @@ class FptnEngine(
         }
     }
 
-    private fun authenticateFirstAvailable(
+    private suspend fun authenticateFirstAvailable(
         servers: List<FptnServer>,
         data: FptnTokenData,
         bypassMethod: String,
         sniDomain: String,
     ): Pair<FptnServer, String>? {
+        val coroutineContext = currentCoroutineContext()
         servers.forEach { server ->
+            coroutineContext.ensureActive()
             val accessToken = authenticate(server, data, bypassMethod, sniDomain)
+            coroutineContext.ensureActive()
             if (accessToken != null) return server to accessToken
         }
         return null
@@ -353,6 +358,8 @@ class FptnEngine(
                 )
                 null
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             PersistentLoggers.error(
                 TAG,
@@ -367,7 +374,7 @@ class FptnEngine(
 
     companion object {
         private const val TAG = "FptnEngine"
-        private const val AUTH_TIMEOUT_S = 15
+        private const val AUTH_TIMEOUT_S = 4
         private const val READY_TIMEOUT_MS = 30_000L
         private const val READY_POLL_MS = 300L
     }

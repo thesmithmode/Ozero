@@ -23,7 +23,7 @@ class ShutdownCoordinatorContractTest {
 
     @Test
     fun `companion exposes PARALLEL_STOP_TIMEOUT_MS`() {
-        assertEquals(4_000L, ShutdownCoordinator.PARALLEL_STOP_TIMEOUT_MS)
+        assertEquals(6_000L, ShutdownCoordinator.PARALLEL_STOP_TIMEOUT_MS)
     }
 
     @Test
