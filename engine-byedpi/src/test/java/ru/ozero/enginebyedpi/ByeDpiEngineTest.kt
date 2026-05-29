@@ -30,6 +30,7 @@ import java.io.IOException
 import java.time.Duration
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
@@ -73,14 +74,14 @@ class ByeDpiEngineTest {
     }
 
     @Test
-    fun `stopTimeout covers two native drain windows`() {
+    fun `stopTimeout covers bounded native drain window`() {
         assertTrue(
             engine.stopTimeoutMs() > EnginePlugin.DEFAULT_STOP_TIMEOUT_MS,
-            "ChainOrchestrator must not cancel ByeDPI stop while forceClose/emergencyReset drain is still running",
+            "ChainOrchestrator must not cancel ByeDPI stop before the bounded forceClose drain finishes",
         )
         assertTrue(
-            engine.stopTimeoutMs() >= ByeDpiEngine.STOP_GRACE_MS * 2,
-            "ByeDPI stop has first join and retry join; timeout must cover both before next start enters native guard",
+            engine.stopTimeoutMs() < 4_000L,
+            "ByeDPI stop timeout must stay below ShutdownCoordinator parallel stop budget",
         )
     }
 
@@ -533,22 +534,24 @@ class ByeDpiEngineTest {
     }
 
     @Test
-    fun `start uses fallback dispatcher when previous native job keeps proxy dispatcher occupied`() =
+    fun `start rotates proxy lane when previous native job keeps proxy dispatcher occupied`() =
         assertTimeoutPreemptively(Duration.ofSeconds(15)) {
             val firstNativeEntered = CountDownLatch(1)
             val firstNativeExit = CountDownLatch(1)
-            var calls = 0
+            val calls = AtomicInteger(0)
             val blockingProxy: ByeDpiProxy = mockk(relaxed = true)
             mockkObject(ByeDpiProxy.Companion)
             every { ByeDpiProxy.loadOnce() } just runs
             every { ByeDpiProxy.libraryLoaded } returns true
             every { blockingProxy.startProxy(any()) } answers {
-                if (calls++ == 0) {
-                    firstNativeEntered.countDown()
-                    firstNativeExit.await(10, TimeUnit.SECONDS)
-                    0
-                } else {
-                    0
+                when (calls.getAndIncrement()) {
+                    0 -> {
+                        firstNativeEntered.countDown()
+                        firstNativeExit.await(10, TimeUnit.SECONDS)
+                        0
+                    }
+                    1 -> ByeDpiEngine.JNI_GUARD_BUSY
+                    else -> 0
                 }
             }
             every { blockingProxy.stopProxy() } returns 0
@@ -572,27 +575,29 @@ class ByeDpiEngineTest {
                     unmockkObject(ByeDpiProxy.Companion)
                 }
             }
-            verify(atLeast = 1) { blockingProxy.emergencyReset() }
-            verify(exactly = 2) { blockingProxy.startProxy(any()) }
+            verify(exactly = 1) { blockingProxy.emergencyReset() }
+            verify(exactly = 3) { blockingProxy.startProxy(any()) }
         }
 
     @Test
-    fun `start after wedged stop uses fallback dispatcher even when job ref was cleared`() =
+    fun `start after wedged stop rotates proxy lane even when job ref was cleared`() =
         assertTimeoutPreemptively(Duration.ofSeconds(15)) {
             val firstNativeEntered = CountDownLatch(1)
             val firstNativeExit = CountDownLatch(1)
-            var calls = 0
+            val calls = AtomicInteger(0)
             val blockingProxy: ByeDpiProxy = mockk(relaxed = true)
             mockkObject(ByeDpiProxy.Companion)
             every { ByeDpiProxy.loadOnce() } just runs
             every { ByeDpiProxy.libraryLoaded } returns true
             every { blockingProxy.startProxy(any()) } answers {
-                if (calls++ == 0) {
-                    firstNativeEntered.countDown()
-                    firstNativeExit.await(10, TimeUnit.SECONDS)
-                    0
-                } else {
-                    0
+                when (calls.getAndIncrement()) {
+                    0 -> {
+                        firstNativeEntered.countDown()
+                        firstNativeExit.await(10, TimeUnit.SECONDS)
+                        0
+                    }
+                    1 -> ByeDpiEngine.JNI_GUARD_BUSY
+                    else -> 0
                 }
             }
             every { blockingProxy.stopProxy() } returns 0
@@ -617,8 +622,8 @@ class ByeDpiEngineTest {
                     unmockkObject(ByeDpiProxy.Companion)
                 }
             }
-            verify(atLeast = 2) { blockingProxy.emergencyReset() }
-            verify(exactly = 2) { blockingProxy.startProxy(any()) }
+            verify(exactly = 1) { blockingProxy.emergencyReset() }
+            verify(exactly = 3) { blockingProxy.startProxy(any()) }
         }
 
     @Test

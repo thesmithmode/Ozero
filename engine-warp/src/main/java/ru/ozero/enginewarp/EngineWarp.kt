@@ -547,7 +547,7 @@ class EngineWarp(
         val host = ep.substring(0, sep)
         val port = ep.substring(sep + 1)
         if (host.isBlank() || isLikelyIpAddress(host)) return cfg
-        val provider = resolvedConfig?.doHProvider ?: DoHProvider.SYSTEM
+        val provider = cfg.doHProvider
         Log.i(TAG, "resolveEndpointHost host=$host provider=${provider.name}")
         for (attempt in 0..2) {
             val resolved = if (provider.isSystem) {
@@ -555,7 +555,7 @@ class EngineWarp(
                     runCatching { java.net.InetAddress.getByName(host).hostAddress }.getOrNull()
                 }
             } else {
-                withContext(Dispatchers.IO) { resolveViaDoH(host, provider.url) }
+                withContext(Dispatchers.IO) { resolveViaDoH(host, bootstrapSafeDohUrl(provider)) }
             }
             if (!resolved.isNullOrBlank()) {
                 Log.i(TAG, "endpoint resolved $host → $resolved via ${provider.name} (attempt ${attempt + 1})")
@@ -566,6 +566,18 @@ class EngineWarp(
         PersistentLoggers.warn(TAG, "endpoint resolve failed after 3 attempts for $host via ${provider.name}")
         return cfg
     }
+
+    private fun bootstrapSafeDohUrl(provider: DoHProvider): String =
+        provider.url.takeIf { provider.supportsJsonQueryApi() && isIpLiteralDohUrl(it) } ?: BOOTSTRAP_DOH_URL
+
+    private fun DoHProvider.supportsJsonQueryApi(): Boolean = this !in setOf(
+        DoHProvider.GOOGLE_8888,
+        DoHProvider.GOOGLE_8844,
+    )
+
+    private fun isIpLiteralDohUrl(dohUrl: String): Boolean = runCatching {
+        isLikelyIpAddress(java.net.URL(dohUrl).host)
+    }.getOrDefault(false)
 
     private fun resolveViaDoH(host: String, dohUrl: String): String? = runCatching {
         val url = java.net.URL("$dohUrl?name=$host&type=A")
@@ -626,6 +638,7 @@ class EngineWarp(
         const val TUNNEL_NAME = "ozero-warp"
         const val DOH_CONNECT_TIMEOUT_MS = 3_000
         const val DOH_READ_TIMEOUT_MS = 3_000
+        const val BOOTSTRAP_DOH_URL = "https://1.1.1.1/dns-query"
         const val WARP_READY_TIMEOUT_MS = 10_000L
         const val WARP_READY_POLL_MS = 100L
         const val SOCKS_PROBE_TIMEOUT_MS = 300

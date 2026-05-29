@@ -6,6 +6,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
 
 @RunWith(RobolectricTestRunner::class)
@@ -104,6 +105,55 @@ class RawShareLinksParserTest {
         val result = RawShareLinksParser.parse(sampleVless)
         val bean = result.first() as VLESSBean
         assertEquals("proxy.example.com", bean.serverAddress)
+    }
+
+    @Test
+    fun `should infer reality security from clash reality opts`() {
+        val yaml = """
+            proxies:
+              - name: Clash Reality
+                type: vless
+                server: reality.example.com
+                port: 443
+                uuid: 12345678-1234-1234-1234-123456789abc
+                tls: true
+                servername: front.example.com
+                flow: xtls-rprx-vision
+                reality-opts:
+                  public-key: sample-public-key
+                  short-id: abcd
+                client-fingerprint: chrome
+        """.trimIndent()
+
+        val result = RawShareLinksParser.parse(yaml)
+
+        assertEquals(1, result.size)
+        val bean = result.first() as VLESSBean
+        assertEquals("reality", bean.security)
+        assertEquals("front.example.com", bean.sni)
+        assertEquals("sample-public-key", bean.realityPublicKey)
+        assertEquals("abcd", bean.realityShortId)
+        assertEquals("xtls-rprx-vision", bean.flow)
+    }
+
+    @Test
+    fun `should infer tls security for clash trojan without tls flag`() {
+        val yaml = """
+            proxies:
+              - name: Clash Trojan
+                type: trojan
+                server: trojan.example.com
+                port: 443
+                password: secret
+                sni: trojan-sni.example.com
+        """.trimIndent()
+
+        val result = RawShareLinksParser.parse(yaml)
+
+        assertEquals(1, result.size)
+        val bean = result.first() as TrojanBean
+        assertEquals("tls", bean.security)
+        assertEquals("trojan-sni.example.com", bean.sni)
     }
 
     @Test
