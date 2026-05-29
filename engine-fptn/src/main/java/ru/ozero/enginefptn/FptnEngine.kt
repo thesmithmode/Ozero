@@ -2,12 +2,15 @@ package ru.ozero.enginefptn
 
 import android.os.ParcelFileDescriptor
 import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -308,14 +311,17 @@ class FptnEngine(
         }
     }
 
-    private fun authenticateFirstAvailable(
+    private suspend fun authenticateFirstAvailable(
         candidates: List<FptnServer>,
         data: FptnTokenData,
         bypassMethod: String,
         sniDomain: String,
     ): AuthenticatedServer? {
-        candidates.forEachIndexed { index, server ->
+        for (index in candidates.indices) {
+            currentCoroutineContext().ensureActive()
+            val server = candidates[index]
             val accessToken = authenticate(server, data, bypassMethod, sniDomain)
+            currentCoroutineContext().ensureActive()
             if (accessToken != null) return AuthenticatedServer(server, accessToken)
             if (index < candidates.lastIndex) {
                 Log.d(TAG, "authenticate: fallback from ${server.name} to ${candidates[index + 1].name}")
@@ -325,12 +331,13 @@ class FptnEngine(
         return null
     }
 
-    private fun authenticate(
+    private suspend fun authenticate(
         server: FptnServer,
         data: FptnTokenData,
         bypassMethod: String,
         sniDomain: String,
     ): String? {
+        currentCoroutineContext().ensureActive()
         val handle = httpsClient.nativeCreate(
             host = server.host,
             port = server.port,
@@ -339,6 +346,7 @@ class FptnEngine(
             censorshipStrategy = bypassMethod,
         )
         return try {
+            currentCoroutineContext().ensureActive()
             PersistentLoggers.debug(
                 TAG,
                 "authenticate: POST /api/v1/login server=${server.name}:${server.port} " +
@@ -349,6 +357,7 @@ class FptnEngine(
                 put("password", data.password)
             }.toString()
             val resp = httpsClient.nativePost(handle, "/api/v1/login", body, AUTH_TIMEOUT_S)
+            currentCoroutineContext().ensureActive()
             if (resp.code == 200) {
                 val token = JSONObject(resp.body).optString("access_token").takeIf { it.isNotBlank() }
                 if (token != null) {
@@ -365,6 +374,8 @@ class FptnEngine(
                 )
                 null
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             PersistentLoggers.error(
                 TAG,

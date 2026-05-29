@@ -208,13 +208,39 @@ class FptnEngineTest {
             "FPTN start must try later token servers when earlier authentication fails.",
         )
         assertTrue(
-            source.contains("fun authenticateFirstAvailable") &&
-                source.contains("candidates.forEachIndexed"),
+            source.contains("suspend fun authenticateFirstAvailable") &&
+                source.contains("for (index in candidates.indices)"),
             "FPTN authentication must iterate the ordered candidate list.",
         )
         assertFalse(
             startBody.contains("authenticate(server, tokenData"),
             "FPTN start must not bypass fallback candidates with a single selected-server auth attempt.",
+        )
+    }
+
+    @Test
+    fun `authentication fallback is cancellation cooperative`() {
+        val source = File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/enginefptn/FptnEngine.kt",
+        ).readText()
+        val fallbackBody = source.substringAfter("private suspend fun authenticateFirstAvailable(")
+            .substringBefore("private suspend fun authenticate(")
+        val authenticateBody = source.substringAfter("private suspend fun authenticate(")
+            .substringBefore("private data class AuthenticatedServer")
+
+        assertTrue(
+            fallbackBody.contains("currentCoroutineContext().ensureActive()"),
+            "FPTN fallback loop must stop before trying more servers after lifecycle cancellation.",
+        )
+        assertTrue(
+            authenticateBody.contains("currentCoroutineContext().ensureActive()"),
+            "FPTN single-server authentication must observe cancellation around native calls.",
+        )
+        assertTrue(
+            authenticateBody.contains("catch (e: CancellationException)") &&
+                authenticateBody.contains("throw e"),
+            "FPTN authentication must not swallow coroutine cancellation as a generic auth failure.",
         )
     }
 
