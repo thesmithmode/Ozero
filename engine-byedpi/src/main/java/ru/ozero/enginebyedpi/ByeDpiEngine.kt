@@ -25,7 +25,7 @@ import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
-import ru.ozero.enginescore.IpProbeRoute
+import ru.ozero.enginescore.ExitNodeStrategy
 import ru.ozero.enginescore.probe.Socks5HandshakeProbe
 import ru.ozero.enginescore.settings.HostsMode
 import ru.ozero.enginescore.settings.SettingsModel
@@ -302,9 +302,13 @@ class ByeDpiEngine(
 
     override fun preflight(): EnginePreflight = ByeDpiPreflight()
 
-    override suspend fun ipProbeRoute(socksPort: Int): IpProbeRoute {
+    override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy {
         val port = if (socksPort > 0) socksPort else activeSocksPort
-        return if (port > 0) IpProbeRoute.Socks("127.0.0.1", port) else IpProbeRoute.Default
+        return if (port > 0) {
+            ExitNodeStrategy.ViaSocks("127.0.0.1", port)
+        } else {
+            ExitNodeStrategy.Unavailable("ByeDPI SOCKS endpoint unavailable")
+        }
     }
 
     // Native inserts argv[0]="byedpi"; Kotlin prepending program-name makes getopt drop --ip.

@@ -188,6 +188,15 @@ class EngineWarpContractTest {
     }
 
     @Test
+    fun `exitNodeStrategy after start returns ProviderLabel and not DirectHttp`() = runTest {
+        val (e, _, _) = engine(activeConfig = sampleConfig)
+        e.start(EngineConfig.Warp, Upstream.None)
+        val strategy = e.exitNodeStrategy(socksPort = 0)
+        val label = assertIs<ExitNodeStrategy.ProviderLabel>(strategy)
+        assertEquals("Cloudflare WARP", label.label)
+        assertFalse(strategy is ExitNodeStrategy.DirectHttp)
+    }
+    @Test
     fun `ipProbeRoute не возвращает Default — иначе fetch покажет реальный IP вместо WARP`() = runTest {
         val (e, _, _) = engine(activeConfig = sampleConfig)
         e.start(EngineConfig.Warp, Upstream.None)

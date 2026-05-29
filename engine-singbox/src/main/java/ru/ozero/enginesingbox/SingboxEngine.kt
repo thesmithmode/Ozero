@@ -25,7 +25,7 @@ import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.EngineStats
-import ru.ozero.enginescore.IpProbeRoute
+import ru.ozero.enginescore.ExitNodeStrategy
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
@@ -323,9 +323,13 @@ class SingboxEngine @Inject constructor(
         routeAllV6 = true,
     )
 
-    override suspend fun ipProbeRoute(socksPort: Int): IpProbeRoute {
+    override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy {
         val port = activeSocksPort.takeIf { it > 0 } ?: socksPort.takeIf { it > 0 }
-        return if (port != null) IpProbeRoute.Socks("127.0.0.1", port) else IpProbeRoute.Default
+        return if (port != null) {
+            ExitNodeStrategy.ViaSocks("127.0.0.1", port)
+        } else {
+            ExitNodeStrategy.Unavailable("sing-box SOCKS probe unavailable")
+        }
     }
 
     override fun buildManualConfig(settings: SettingsModel?): EngineConfig? {

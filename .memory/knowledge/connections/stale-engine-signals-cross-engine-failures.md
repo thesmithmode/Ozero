@@ -5,31 +5,29 @@ sources:
 created: 2026-05-29
 updated: 2026-05-29
 ---
-
 # Stale engine signals and cross-engine failures
 
+## Summary
+Stale callbacks from one engine attempt can surface as a failure under another engine label when start/stop orchestration, candidate retries, and UI state transitions overlap.
+
 ## Key Points
-- A failure shown under one engine label can originate from an older lifecycle event from another engine.
-- `Failed(BYEDPI, timeout)` during FPTN activity was treated as a stale or cross-engine signal candidate.
-- Generation ids, candidate attempt ids, and stale-signal guards are needed to preserve status ownership.
-- Stop/start serialization can amplify stale signals into app-wide poisoned state.
-- This links [[concepts/byedpi-wedged-lane-generation-restart]], [[concepts/fptn-cancellation-cooperative-auth-lifecycle]], and [[concepts/engine-failure-recovery-isolation]].
+- `Failed(BYEDPI, timeout)` can be a symptom of an earlier FPTN or orchestration failure.
+- Candidate retries and reset paths must preserve attempt identity.
+- Stop timeout and stale job completion must not overwrite current active engine state.
+- Runtime diagnosis must correlate `startChain`, `onEngineDied`, `onEngineFailed`, and UI state by timestamp and engine attempt.
+- The pattern connects [[concepts/auto-candidate-terminal-status-invariant]] with [[concepts/byedpi-wedged-lane-generation-restart]].
 
 ## Details
+The daily log repeatedly showed apparent ByeDPI failures while FPTN authentication was still active, timing out, or being reset. The conclusion was that displayed engine status is not always the event origin. Cross-engine state can be overwritten when stale callbacks arrive after a new candidate or new engine has become active.
 
-The 2026-05-29 investigation repeatedly found that visible failures were not always owned by the label shown in UI. The most important example was `Failed(BYEDPI, timeout)` appearing after or during FPTN auth/start cycles, often without an explicit current ByeDPI start in the same interval. This led to the interpretation that stale callbacks or overlapping lifecycle transitions could repaint the current state with an old engine id.
-
-The same pattern appeared in several fixes. ByeDPI needed `proxyGeneration` so an old proxy/native job could not clear the state of a new lane. StartSequence needed non-terminal candidate handling so intermediate failures would not become UI terminal failures. FPTN needed cancellation-cooperative auth so stopped attempts would not continue to emit fallback errors after the user moved on.
-
-This connection explains why engine regressions must be diagnosed through timeline ownership, not only module logs. A single stale signal can poison ChainOrchestrator, trigger wrong stop/restart behavior, and make unrelated engines look broken. The durable invariant is that every failure must be correlated with the active sequence, candidate, and engine generation before becoming terminal state.
+This connection explains why fixes focused only on ByeDPI stop logic or only on FPTN token handling were insufficient. Correct recovery needs both sides: candidate failure isolation in `StartSequenceCoordinator`/`TunnelController`, and per-engine lifecycle isolation such as ByeDPI generation guards.
 
 ## Related Concepts
+- [[concepts/auto-candidate-terminal-status-invariant]]
 - [[concepts/byedpi-wedged-lane-generation-restart]]
 - [[concepts/fptn-cancellation-cooperative-auth-lifecycle]]
-- [[concepts/engine-failure-recovery-isolation]]
-- [[concepts/engine-switch-regressions-baseline-runtime-proof]]
+- [[concepts/engine-switch-failure-containment]]
 
 ## Sources
-- [[daily/2026-05-29]]: Logs showed `Failed(BYEDPI, timeout)` near FPTN cycles, leading to stale/cross-engine signal analysis.
-- [[daily/2026-05-29]]: `proxyGeneration` was introduced for ByeDPI to prevent old jobs from overwriting new runtime state.
-- [[daily/2026-05-29]]: StartSequence and FPTN fixes targeted non-terminal candidate failures and cancellation-cooperative auth.
+- [[daily/2026-05-29]]: log analysis tied false `Failed(BYEDPI, timeout)` to FPTN auth cycles and overlapping lifecycle events.
+- [[daily/2026-05-29]]: accepted fix plan required stale-signal guards, candidate attempt identity, and generation protection for wedged ByeDPI jobs.

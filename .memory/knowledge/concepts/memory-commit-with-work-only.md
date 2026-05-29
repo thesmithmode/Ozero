@@ -1,35 +1,28 @@
 ---
-title: Memory commits go with related work only
+title: "Memory changes bundled with working commits"
 sources:
-  - [[daily/2026-05-29]]
+  - "daily/2026-05-29.md"
 created: 2026-05-29
 updated: 2026-05-29
 ---
-# Memory commits go with related work only
-
+# Memory changes bundled with working commits
 ## Key Points
-- `.memory/` changes should not be pushed as a standalone routine step.
-- Dirty memory should be included in the nearest related working code commit.
-- A separate memory-only commit is acceptable only when explicitly requested or no working commit exists.
-- Memory workflow rules can conflict, so the project-specific AGENTS rule overrides generic memory advice for Ozero.
-- This rule reduces delay during active debugging sessions.
-
+- In Ozero, `.memory/` changes should not be pushed as routine standalone commits.
+- Memory updates should be included in the nearest related working code/rule commit.
+- The rule was clarified after memory-only commits slowed simple tasks and complicated push cadence.
+- A standalone memory commit remains exceptional and should require explicit user direction.
 ## Details
+The project has two competing pressures: `.memory/` should not be left dirty after meaningful work, but routine memory-only commits waste time and create noise. The 2026-05-29 sessions clarified the Ozero-specific rule: include memory changes with the nearest working commit and avoid a separate push just for `.memory/`.
 
-The 2026-05-29 session exposed a workflow conflict. The global memory rule said dirty `.memory/` should be committed immediately after each session, while the Ozero project rule says `.memory/` should not be committed or pushed as its own standalone step during normal work. The user explicitly objected to separate memory pushes because they slowed down urgent runtime debugging.
+This changes the operational default from "commit memory immediately as its own unit" to "carry memory into the next related work commit." The user explicitly corrected the workflow after a simple fetch/pull task spent extra time producing a separate memory commit.
 
-The updated Ozero rule is to include `.memory/` and AGENTS changes in the nearest working code commit. This keeps memory synchronized with the related fix while avoiding extra memory-only commits and pushes that interrupt the main task. Standalone memory commits remain exceptional, not the default.
-
-The rule matters operationally because multiple fixes on 2026-05-29 required fast sequencing across `dev`, CI, and runtime regressions. Memory changes were therefore bundled into working commits such as URnetwork fixes rather than pushed separately.
-
+This concept is about repository workflow, not memory schema. The schema and article quality rules remain governed by [[concepts/wiki-knowledge-base]], while commit/push discipline should stay compatible with [[concepts/ci-workflow-discipline]] and Ozero branch rules.
 ## Related Concepts
-- [[concepts/memory-only-commit-ci-risk]]
-- [[concepts/git-active-branch-discipline]]
-- [[concepts/ci-workflow-discipline]]
-- [[concepts/release-post-stop-dev-review-discipline]]
-
+- [[concepts/wiki-knowledge-base]] - Describes the `.memory/` knowledge system and compile/query workflow.
+- [[concepts/ci-workflow-discipline]] - Covers CI and branch discipline around changes.
+- [[concepts/memory-only-commit-ci-risk]] - Earlier note on memory-only commits and CI risk.
+- [[concepts/git-active-branch-discipline]] - Related repository hygiene rule.
 ## Sources
-- [[daily/2026-05-29]]: user rejected separate `.memory` push/commit steps during active debugging.
-- [[daily/2026-05-29]]: the project rule was changed to commit `.memory/` with the nearest working code commit.
-- [[daily/2026-05-29]]: URnetwork commits included `.memory`/AGENTS changes with the working code commit rather than as memory-only commits.
-- [[daily/2026-05-29]]: an earlier memory-only commit `3f9dc01b` was treated as a slowdown and later workflow rules were corrected.
+- [[daily/2026-05-29]]: records the user rejecting separate `.memory` push/commit cadence.
+- [[daily/2026-05-29]]: records the clarified rule to include `.memory` updates in the nearest working commit.
+- [[daily/2026-05-29]]: records the earlier memory-only commit `3f9dc01b` and why it was later treated as a workflow problem.

@@ -20,7 +20,17 @@ interface EnginePlugin {
         data class Timeout(val reason: String) : ReadyResult()
     }
 
-    suspend fun ipProbeRoute(socksPort: Int): IpProbeRoute = IpProbeRoute.Default
+    suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy =
+        ExitNodeStrategy.Unavailable("exit node strategy unavailable")
+
+    suspend fun ipProbeRoute(socksPort: Int): IpProbeRoute = when (val strategy = exitNodeStrategy(socksPort)) {
+        ExitNodeStrategy.DirectHttp -> IpProbeRoute.Default
+        is ExitNodeStrategy.ViaSocks -> IpProbeRoute.Socks(strategy.host, strategy.port)
+        is ExitNodeStrategy.LocationOnly -> IpProbeRoute.StaticLocation(strategy.country, strategy.countryCode)
+        is ExitNodeStrategy.ProviderLabel -> IpProbeRoute.StaticLocation(strategy.label, null)
+        is ExitNodeStrategy.AutoSelected -> IpProbeRoute.AutoSelected
+        is ExitNodeStrategy.Unavailable -> IpProbeRoute.Unavailable(strategy.reason)
+    }
 
     fun stopTimeoutMs(): Long = DEFAULT_STOP_TIMEOUT_MS
 

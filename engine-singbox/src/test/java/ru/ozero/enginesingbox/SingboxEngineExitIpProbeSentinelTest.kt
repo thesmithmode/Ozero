@@ -24,8 +24,8 @@ class SingboxEngineExitIpProbeSentinelTest {
             "Все TUN-конфиги sing-box должны получать probeSocksPort, иначе UI снова уйдёт в direct fetch.",
         )
         assertTrue(
-            source.contains("IpProbeRoute.Socks(\"127.0.0.1\", port)"),
-            "ipProbeRoute для sing-box должен вести HTTP проверку через локальный SOCKS sing-box, " +
+            source.contains("ExitNodeStrategy.ViaSocks(\"127.0.0.1\", port)"),
+            "exitNodeStrategy для sing-box должен вести HTTP проверку через локальный SOCKS sing-box, " +
                 "чтобы цепочка прокси показывала самый конечный публичный выход.",
         )
     }

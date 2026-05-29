@@ -74,9 +74,9 @@ class EngineUrnetwork(
     }
 
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
-        require(config is EngineConfig.Urnetwork) { "EngineUrnetwork требует EngineConfig.Urnetwork" }
+        require(config is EngineConfig.Urnetwork) { "EngineUrnetwork С‚СЂРµР±СѓРµС‚ EngineConfig.Urnetwork" }
         require(upstream is Upstream.None) {
-            "EngineUrnetwork не принимает upstream — supportsUpstreamSocks=false"
+            "EngineUrnetwork РЅРµ РїСЂРёРЅРёРјР°РµС‚ upstream вЂ” supportsUpstreamSocks=false"
         }
 
         when (val r = jwtBootstrapper.ensureClientJwt()) {
@@ -86,7 +86,7 @@ class EngineUrnetwork(
                 return StartResult.Failure(reason = r.reason)
         }
         val byClientJwt = configStore.byClientJwt().first() ?: return StartResult.Failure(
-            reason = "URnetwork client jwt missing after bootstrap — race condition",
+            reason = "URnetwork client jwt missing after bootstrap вЂ” race condition",
         )
 
         val wallet = configStore.walletAddress().first()
@@ -115,7 +115,7 @@ class EngineUrnetwork(
                     .onFailure { PersistentLoggers.warn(TAG, "applyPerformanceProfile threw: ${it.message}") }
                 val provideEnabled = configStore.provideEnabled().first()
                 runCatching { sdkBridge.setProvidePaused(!provideEnabled) }
-                    .onSuccess { Log.i(TAG, "setProvidePaused(${!provideEnabled}) — provideEnabled=$provideEnabled") }
+                    .onSuccess { Log.i(TAG, "setProvidePaused(${!provideEnabled}) вЂ” provideEnabled=$provideEnabled") }
                     .onFailure { PersistentLoggers.warn(TAG, "setProvidePaused threw: ${it.message}") }
                 val controlMode = configStore.provideControlMode().first()
                 runCatching { sdkBridge.setProvideControlMode(controlMode) }
@@ -180,20 +180,19 @@ class EngineUrnetwork(
     }
 
     override suspend fun probe(): ProbeResult =
-        ProbeResult.Failure(reason = "URnetwork не предоставляет SOCKS-интерфейс")
+        ProbeResult.Failure(reason = "URnetwork РЅРµ РїСЂРµРґРѕСЃС‚Р°РІР»СЏРµС‚ SOCKS-РёРЅС‚РµСЂС„РµР№СЃ")
 
     override fun stats(): Flow<EngineStats> = _stats.asStateFlow()
 
     override fun preflight(): ru.ozero.enginescore.EnginePreflight = UrnetworkPreflight()
 
-    override suspend fun ipProbeRoute(socksPort: Int): ru.ozero.enginescore.IpProbeRoute {
-        if (sdkBridge.selectedLocation() == null) return ru.ozero.enginescore.IpProbeRoute.AutoSelected
+    override suspend fun exitNodeStrategy(socksPort: Int): ru.ozero.enginescore.ExitNodeStrategy {
+        if (sdkBridge.selectedLocation() == null) return ru.ozero.enginescore.ExitNodeStrategy.AutoSelected()
         val info = sdkBridge.selectedLocationInfo()
-            ?: return ru.ozero.enginescore.IpProbeRoute.Unavailable("URnetwork location pending")
+            ?: return ru.ozero.enginescore.ExitNodeStrategy.Unavailable("URnetwork location pending")
         val country = info.country ?: info.name
-        return ru.ozero.enginescore.IpProbeRoute.StaticLocation(country, info.countryCode)
+        return ru.ozero.enginescore.ExitNodeStrategy.LocationOnly(country, info.countryCode)
     }
-
     override suspend fun tunSpec(): TunSpec = TunSpec(
         sessionName = "URnetwork",
         mtu = TUN_MTU,
@@ -219,7 +218,7 @@ class EngineUrnetwork(
                         TAG,
                         "awaitReady: tunnelStarted=${snapshot.tunnelStarted} " +
                             "connectIssued=${snapshot.connectIssued} status=${snapshot.connectionStatus} " +
-                            "peers=${snapshot.peers} providerStateAdded=${snapshot.providerStateAdded} — " +
+                            "peers=${snapshot.peers} providerStateAdded=${snapshot.providerStateAdded} вЂ” " +
                             "engine startup ready (after ${polls * startupReadyPollMs}ms)",
                     )
                     return@withTimeoutOrNull Unit
@@ -232,7 +231,7 @@ class EngineUrnetwork(
                             "connectIssued=${snapshot.connectIssued} " +
                             "status=${snapshot.connectionStatus ?: "<null>"} peers=${snapshot.peers} " +
                             "providerStateAdded=${snapshot.providerStateAdded} " +
-                            "elapsed≈${polls * startupReadyPollMs}ms " +
+                            "elapsedв‰€${polls * startupReadyPollMs}ms " +
                             "deadline=${startupReadyTimeoutMs}ms",
                     )
                 }
@@ -244,7 +243,7 @@ class EngineUrnetwork(
         } else {
             val reason = "URnetwork: TUN attached, but SDK did not confirm tunnel/connect within " +
                 "${startupReadyTimeoutMs}ms"
-            PersistentLoggers.warn(TAG, "awaitReady timeout — $reason")
+            PersistentLoggers.warn(TAG, "awaitReady timeout вЂ” $reason")
             EnginePlugin.ReadyResult.Timeout(reason)
         }
     }

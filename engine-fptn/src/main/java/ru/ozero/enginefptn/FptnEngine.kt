@@ -21,6 +21,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import ru.ozero.enginescore.EngineCapabilities
 import ru.ozero.enginescore.EngineConfig
+import ru.ozero.enginescore.ExitNodeStrategy
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.EngineStats
@@ -68,6 +69,11 @@ class FptnEngine(
     )
 
     override fun stats(): Flow<EngineStats> = _stats.asStateFlow()
+
+    override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy =
+        _currentServer?.name?.takeIf { it.isNotBlank() }
+            ?.let { ExitNodeStrategy.ProviderLabel(it) }
+            ?: ExitNodeStrategy.Unavailable("FPTN not connected")
 
     override fun buildManualConfig(settings: SettingsModel?): EngineConfig? {
         val cfg = configStore.currentConfig()

@@ -1,35 +1,28 @@
 ---
-title: URnetwork relay provideEnabled and SOL contract
+title: "URnetwork relay provideEnabled and SOL contract"
 sources:
-  - daily/2026-05-29.md
+  - "daily/2026-05-29.md"
 created: 2026-05-29
 updated: 2026-05-29
 ---
-
 # URnetwork relay provideEnabled and SOL contract
-
 ## Key Points
-- URnetwork relay is separate from the URnetwork engine and must not be diagnosed as the same path.
-- `provideEnabled=false` is the user's source of truth and network callbacks must not re-enable relay.
-- Upstream wallet registration uses chain token `SOL`, not `solana`.
-- Relay can use the dummy IoLoop/offline TUN pattern without owning the main engine bridge.
-- This connects [[concepts/urnetwork-provide-data-flow]] with [[concepts/relay-coordinator-ownership-transfer]].
-
+- URnetwork relay is separate from the URnetwork client engine and must not be diagnosed as the same module path.
+- `provideEnabled=false` is a user-owned off switch; `RelayNetworkMonitor` must not re-enable relay by clearing pause from a network callback.
+- `addExternalWallet` must use chain token `"SOL"`, matching upstream `WalletViewModel`, not `"solana"`.
+- The relay fix was committed as `54faf668 FIX: Исправление реле URnetwork`.
 ## Details
+The relay investigation found two independent contract breaks. First, network callbacks could reactivate provide mode even when the user had disabled relay. This violates feature ownership: a network monitor can manage temporary network pause, but it cannot override `provideEnabled=false`.
 
-After the URnetwork readiness fix, the daily log moved to relay analysis. The important boundary was architectural: URnetwork relay/provide is not the same as the URnetwork consumer engine. Relay starts when another non-URnetwork engine is active, uses its own provide flow, and must not be mixed into diagnosis of consumer `attachTun -> awaitReady`.
+Second, payout wallet registration used the wrong chain token. Upstream calls `addExternalWallet(..., "SOL")`; using `"solana"` can produce an acknowledgment-like path without resolving the registry id and binding the endpoint. The fix therefore uses the upstream token and preserves the relay architecture.
 
-Two concrete relay defects were recorded. First, the payout wallet path used `"solana"` where upstream uses `"SOL"` for `addExternalWallet`. The log notes this can produce a registration acknowledgement without resolving the expected registry id. Second, `RelayNetworkMonitor` could remove `providePaused` or re-enable behavior after network callbacks even when `provideEnabled=false`, violating the user's explicit relay setting.
-
-Commit `54faf668 FIX: Исправление реле URnetwork` corrected these boundaries: chain token `SOL`, network monitor respect for `provideEnabled`, and relay coordinator passing that flag into monitoring. This keeps network callbacks responsible for transient connectivity pauses only, not for overriding configuration.
-
+Relay remains architecturally distinct from the URnetwork client engine. It may start when another non-URnetwork engine is active, uses the dummy IoLoop/offline TUN pattern described in [[concepts/urnetwork-provide-tun-investigation]], and must not stop the shared bridge if the main engine owns it.
 ## Related Concepts
-- [[concepts/urnetwork-provide-data-flow]]
-- [[concepts/relay-coordinator-ownership-transfer]]
-- [[concepts/urnetwork-provide-tun-investigation]]
-- [[concepts/urnetwork-walletauth-per-device-registration]]
-
+- [[concepts/urnetwork-provide-tun-investigation]] - Details the dummy IoLoop/offline TUN pattern for provide mode.
+- [[concepts/urnetwork-provide-secret-keys-identity]] - Covers identity and listener ordering around provide keys.
+- [[concepts/urnetwork-startup-readiness-runtime-peer-grace]] - Separates client-engine readiness from relay behavior.
+- [[concepts/relay-coordinator-ownership-transfer]] - Prior relay ownership rule and provide pause gotcha.
 ## Sources
-- [[daily/2026-05-29]]: Relay design was confirmed as separate from URnetwork engine and based on dummy IoLoop/offline TUN pattern.
-- [[daily/2026-05-29]]: Upstream `WalletViewModel` uses `addExternalWallet(..., "SOL")`.
-- [[daily/2026-05-29]]: Commit `54faf668` fixed chain token and prevented network callback from overriding `provideEnabled=false`.
+- [[daily/2026-05-29]]: records that URnetwork engine and relay must not be mixed during diagnosis.
+- [[daily/2026-05-29]]: records the upstream `"SOL"` chain token comparison and the `"solana"` bug.
+- [[daily/2026-05-29]]: records the `provideEnabled=false` network callback bug and commit `54faf668`.

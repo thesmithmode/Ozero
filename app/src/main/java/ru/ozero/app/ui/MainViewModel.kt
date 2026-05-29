@@ -20,7 +20,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import ru.ozero.commonnet.IpInfo
 import ru.ozero.commonnet.IpInfoProvider
 import ru.ozero.commonvpn.HealthMonitor
 import ru.ozero.app.ui.components.PowerDiscState
@@ -30,7 +29,7 @@ import ru.ozero.commonvpn.TunnelState
 import ru.ozero.commonvpn.TunnelStats
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
-import ru.ozero.enginescore.IpProbeRoute
+import ru.ozero.enginescore.ExitNodeStrategy
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.SettingsModel
@@ -56,6 +55,8 @@ class MainViewModel @Inject constructor(
     private val ipInfoProvider: IpInfoProvider,
     private val enginePlugins: Set<@JvmSuppressWildcards EnginePlugin>,
 ) : ViewModel() {
+
+    private val exitNodeResolver = ExitNodeResolver(ipInfoProvider)
 
     val state: StateFlow<TunnelState> =
         tunnelController.state.stateIn(
@@ -310,7 +311,7 @@ class MainViewModel @Inject constructor(
                             "warmup begin engine=${s.engineId} port=${s.socksPort} delay=${IP_INFO_WARMUP_MS}ms",
                         )
                         delay(IP_INFO_WARMUP_MS)
-                        Log.i(IP_TAG, "warmup done — resolve IP")
+                        Log.i(IP_TAG, "warmup done вЂ” resolve IP")
                         val result = resolveIpInfoWithRetry(s.engineId, s.socksPort)
                         when (result) {
                             is IpInfoState.Loaded ->
@@ -359,45 +360,14 @@ class MainViewModel @Inject constructor(
 
     private suspend fun resolveOnce(engineId: EngineId?, socksPort: Int): IpInfoState {
         val plugin = engineId?.let { id -> enginePlugins.firstOrNull { it.id == id } }
-        val route = runCatching { plugin?.ipProbeRoute(socksPort) ?: IpProbeRoute.Default }
-            .getOrElse { return IpInfoState.Error(it.message ?: it.javaClass.simpleName) }
-        return when (route) {
-            IpProbeRoute.Default -> ipInfoProvider.fetch().toState()
-            IpProbeRoute.AutoSelected -> IpInfoState.AutoSelected
-            is IpProbeRoute.Socks -> {
-                val viaSocks = ipInfoProvider.fetchVia(route.host, route.port)
-                if (viaSocks.isSuccess) {
-                    viaSocks.toState()
-                } else {
-                    val reason = viaSocks.exceptionOrNull()?.message ?: "socks fetch failed"
-                    PersistentLoggers.warn(
-                        IP_TAG,
-                        "Socks probe ${route.host}:${route.port} failed ($reason) — fallback to direct fetch",
-                    )
-                    ipInfoProvider.fetch().toState()
-                }
-            }
-            is IpProbeRoute.StaticLocation -> IpInfoState.Loaded(
-                IpInfo(
-                    ip = "",
-                    country = route.country,
-                    countryCode = route.countryCode,
-                    city = null,
-                    fetchedAtMs = System.currentTimeMillis(),
-                ),
-            )
-            is IpProbeRoute.Unavailable -> IpInfoState.Error(route.reason)
+        val strategy = when {
+            engineId == null -> ExitNodeStrategy.DirectHttp
+            plugin == null -> ExitNodeStrategy.Unavailable("engine plugin unavailable")
+            else -> runCatching { plugin.exitNodeStrategy(socksPort) }
+                .getOrElse { ExitNodeStrategy.Unavailable(it.message ?: it.javaClass.simpleName) }
         }
+        return exitNodeResolver.resolve(strategy)
     }
-
-    private fun Result<IpInfo>.toState(): IpInfoState = fold(
-        onSuccess = { IpInfoState.Loaded(it) },
-        onFailure = {
-            if (it is kotlinx.coroutines.CancellationException) throw it
-            IpInfoState.Error(it.message ?: it.javaClass.simpleName)
-        },
-    )
-
     fun onConnectClick() = Unit
 
     fun onVpnPermissionGranted() = Unit

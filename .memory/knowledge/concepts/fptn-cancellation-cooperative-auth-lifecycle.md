@@ -5,31 +5,29 @@ sources:
 created: 2026-05-29
 updated: 2026-05-29
 ---
-
 # FPTN cancellation-cooperative auth lifecycle
 
+## Summary
+FPTN startup must treat cancellation as a lifecycle boundary, not as another authentication failure. Serial fallback over multiple servers can otherwise continue after stop/switch and poison the shared start/stop orchestration.
+
 ## Key Points
-- FPTN auth fallback must stop cooperatively when the engine is stopped or switched.
-- `CancellationException` must not be treated as an ordinary auth failure that continues fallback.
-- Mandatory serial auth over every candidate can create a `15s * N` startup ladder.
-- The runtime start path should avoid turning fallback into a long blocking orchestration task.
-- This refines [[concepts/fptn-dead-server-fallback]] and [[concepts/engine-switch-failure-containment]].
+- Default `FptnEngine.start()` must not run an unbounded `authenticateFirstAvailable()` ladder in the critical startup path.
+- `CancellationException` must stop candidate traversal and propagate lifecycle cancellation instead of being converted to ordinary auth failure.
+- Upstream FPTN readiness is a sequence: probe, login, DNS, WebSocket, and assigned IP callback, not just login success.
+- The current token schema uses `port`; the earlier `vpn_port` direction is stale and must not be implemented without new evidence.
+- This concept intersects with [[concepts/fptn-upstream-readiness-ip-callback-flow]] and [[concepts/auto-candidate-terminal-status-invariant]].
 
 ## Details
+The 2026-05-29 investigation compared current FPTN behavior against `v0.2.0`, local logs, and upstream `fptn-project/fptn`. It found that long serial auth fallback can continue after a stop or switch request. With `AUTH_TIMEOUT_S=15` per candidate, this creates a timeout ladder that blocks shared orchestration and makes later failures appear under neighboring engines.
 
-The 2026-05-29 log repeatedly traced FPTN failures against `v0.2.0` and later upstream evidence. The important finding was not that the token was dead. The user explicitly confirmed the token was valid, and upstream comparison rejected unrelated schema hypotheses. The actual lifecycle risk was serial auth fallback continuing after stop or engine switch.
-
-In Ozero, `selectServerCandidates()` plus `authenticateFirstAvailable()` can turn startup into several sequential network attempts. With `AUTH_TIMEOUT_S=15`, one failed runtime start can hold the engine lifecycle for a long time. Because the chain orchestrator serializes start and stop, this long-lived auth path can block shutdown, restart, and neighboring engine transitions.
-
-The fix direction recorded in the daily log is cancellation-cooperative auth: cancellation exits the attempt path instead of being converted into another fallback error, and the default runtime start avoids unnecessary full-candidate enumeration. Full fallback can remain as a controlled diagnostic or explicit fallback path, but not as an unbounded critical startup path.
+The same investigation corrected a false lead: upstream does not require a `vpn_port` token field for the current schema. The confirmed next layer is lifecycle/readiness alignment: startup should follow upstream order through test/probe, login, DNS, WebSocket readiness, and assigned IP callback. Cancellation is a separate safety boundary so a stopped startup cannot keep authenticating candidates in the background.
 
 ## Related Concepts
-- [[concepts/fptn-dead-server-fallback]]
+- [[concepts/fptn-upstream-readiness-ip-callback-flow]]
 - [[concepts/fptn-upstream-websocket-dns-boundary]]
-- [[concepts/engine-switch-failure-containment]]
-- [[concepts/regression-test-bounded-waits]]
+- [[concepts/auto-candidate-terminal-status-invariant]]
+- [[connections/stale-engine-signals-cross-engine-failures]]
 
 ## Sources
-- [[daily/2026-05-29]]: FPTN token was confirmed valid; the bug was in code/config lifecycle, not token validity.
-- [[daily/2026-05-29]]: Ozero log evidence showed serial auth fallback continuing after stop or switch.
-- [[daily/2026-05-29]]: Commit `e53229e9` was recorded as a minimal cancellation/fallback lifecycle fix.
+- [[daily/2026-05-29]]: upstream comparison showed `port` rather than `vpn_port`, and established the probe/login/DNS/WebSocket/IP callback order.
+- [[daily/2026-05-29]]: logs showed FPTN auth fallback continuing after stop/switch, making cancellation-cooperative auth a separate fix target.

@@ -243,6 +243,12 @@ class EngineUrnetworkContractTest {
     }
 
     @Test
+    fun `exitNodeStrategy returns AutoSelected when selectedLocation is null`() = runTest {
+        val (e, _, _) = engine()
+        val strategy = e.exitNodeStrategy(0)
+        assertIs<ExitNodeStrategy.AutoSelected>(strategy)
+    }
+    @Test
     fun `ipProbeRoute возвращает StaticLocation с кодом когда selectedLocation валидный`() = runTest {
         val bridge = FakeUrnetworkSdkBridge().also {
             it.selectedLocationResult = object : UrnetworkSdkBridge.LocationToken {
@@ -261,6 +267,24 @@ class EngineUrnetworkContractTest {
         assertEquals("India", route.country)
     }
 
+    @Test
+    fun `exitNodeStrategy returns LocationOnly when selectedLocation is valid`() = runTest {
+        val bridge = FakeUrnetworkSdkBridge().also {
+            it.selectedLocationResult = object : UrnetworkSdkBridge.LocationToken {
+                override val countryCode = "IN"
+            }
+            it.locationInfoResult = UrnetworkSdkBridge.LocationInfo(
+                country = "India",
+                countryCode = "IN",
+                name = "India",
+            )
+        }
+        val (e, _, _) = engine(bridge = bridge)
+        val strategy = e.exitNodeStrategy(0)
+        val location = assertIs<ExitNodeStrategy.LocationOnly>(strategy)
+        assertEquals("IN", location.countryCode)
+        assertEquals("India", location.country)
+    }
     @Test
     fun `ipProbeRoute возвращает StaticLocation с null country когда country и name оба null`() = runTest {
         val bridge = FakeUrnetworkSdkBridge().also {

@@ -1053,3 +1053,23 @@
 - Source: daily/2026-05-29.md
 - Articles created: [[concepts/fptn-upstream-websocket-dns-boundary]], [[concepts/fptn-cancellation-cooperative-auth-lifecycle]], [[concepts/byedpi-wedged-lane-generation-restart]], [[concepts/urnetwork-startup-readiness-runtime-peer-grace]], [[concepts/urnetwork-relay-provideenabled-sol-contract]], [[connections/stale-engine-signals-cross-engine-failures]]
 - Articles updated: none
+## [2026-05-29T23:09:33+03:00] compile | 2026-05-29.md
+- Source: daily/2026-05-29.md
+- Articles created: [[concepts/fptn-upstream-readiness-ip-callback-flow]], [[concepts/auto-candidate-terminal-status-invariant]], [[concepts/singbox-exit-ip-probe-chain-socks]], [[concepts/regression-diagnostics-real-path-grounding]], [[connections/cascade-lifecycle-regressions-cross-engine-proof]]
+- Articles updated: none
+## [2026-05-29T23:21:06+03:00] compile | 2026-05-29.md
+- Source: daily/2026-05-29.md
+- Articles created: none
+- Articles updated: [[concepts/fptn-cancellation-cooperative-auth-lifecycle]], [[concepts/auto-candidate-terminal-status-invariant]], [[concepts/byedpi-wedged-lane-generation-restart]], [[concepts/urnetwork-startup-readiness-runtime-peer-grace]], [[concepts/urnetwork-relay-provideenabled-sol-contract]], [[concepts/singbox-exit-ip-probe-chain-socks]], [[connections/stale-engine-signals-cross-engine-failures]]
+## [2026-05-29T23:26:16+03:00] compile | 2026-05-29.md
+- Source: daily/2026-05-29.md
+- Articles created: [[concepts/fptn-auth-ladder-orchestrator-block]], [[concepts/exit-node-strategy-resolver-contract]], [[concepts/ci-required-check-name-preservation]], [[connections/startup-readiness-runtime-recovery-boundary]]
+- Articles updated: none
+## [2026-05-29T23:29:37+03:00] compile | 2026-05-29.md
+- Source: daily/2026-05-29.md
+- Articles created: [[connections/shared-lifecycle-first-fix-order]]
+- Articles updated: [[concepts/fptn-upstream-websocket-dns-boundary]], [[concepts/byedpi-wedged-lane-generation-restart]], [[concepts/urnetwork-startup-readiness-runtime-peer-grace]], [[concepts/urnetwork-relay-provideenabled-sol-contract]], [[concepts/singbox-exit-ip-probe-chain-socks]], [[concepts/exit-node-strategy-resolver-contract]], [[concepts/memory-commit-with-work-only]]
+## [2026-05-29T23:38:11+03:00] compile | 2026-05-29.md
+- Source: daily/2026-05-29.md
+- Articles created: [[concepts/fptn-token-port-schema-upstream-contract]], [[concepts/fptn-single-auth-default-start-contract]], [[concepts/chain-start-timeout-stale-engine-failure-cascade]], [[concepts/urnetwork-providerstate-peer-grace-contract]], [[concepts/urnetwork-relay-user-flag-wallet-chain-contract]], [[concepts/exit-node-probe-no-direct-fallback]], [[connections/engine-startup-status-authority-boundary]]
+- Articles updated: none
