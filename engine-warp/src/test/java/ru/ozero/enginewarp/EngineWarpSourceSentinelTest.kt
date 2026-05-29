@@ -138,6 +138,22 @@ class EngineWarpSourceSentinelTest {
     }
 
     @Test
+    fun `resolveEndpointHost использует DoH provider текущего конфига`() {
+        val body = source.substringAfter("private suspend fun resolveEndpointHost")
+            .substringBefore("private fun resolveViaDoH")
+        assertTrue(
+            body.contains("val provider = cfg.doHProvider"),
+            "Endpoint hostname resolve обязан брать DoH provider из текущего WARP slot config. " +
+                "Иначе первый resolve уходит через system DNS и может раскрыть локального DNS провайдера.",
+        )
+        assertFalse(
+            body.contains("resolvedConfig?.doHProvider"),
+            "resolvedConfig содержит предыдущий slot или null на первом старте — " +
+                "его нельзя использовать для DNS policy.",
+        )
+    }
+
+    @Test
     fun `buildResolved является suspend fun`() {
         assertTrue(
             source.contains("private suspend fun buildResolved("),
