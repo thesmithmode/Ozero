@@ -1,6 +1,8 @@
 package ru.ozero.singboxsubscription.parser
 
+import org.yaml.snakeyaml.LoaderOptions
 import org.yaml.snakeyaml.Yaml
+import org.yaml.snakeyaml.constructor.SafeConstructor
 import org.yaml.snakeyaml.error.YAMLException
 import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.ShadowsocksBean
@@ -10,6 +12,8 @@ import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
 
 object ClashYamlParser {
+    private val yaml = Yaml(SafeConstructor(LoaderOptions()))
+
     fun parse(text: String): List<AbstractBean> {
         val root = loadRoot(text) ?: return emptyList()
         val proxies = root["proxies"].listValue()
@@ -17,7 +21,7 @@ object ClashYamlParser {
     }
 
     private fun loadRoot(text: String): Map<String, Any?>? = try {
-        (Yaml().load<Any?>(text) as? Map<*, *>)?.toStringKeyMap()
+        (yaml.load<Any?>(text) as? Map<*, *>)?.toStringKeyMap()
     } catch (_: YAMLException) {
         null
     }
