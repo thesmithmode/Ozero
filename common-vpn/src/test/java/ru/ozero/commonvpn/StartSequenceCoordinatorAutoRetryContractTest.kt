@@ -35,7 +35,9 @@ class StartSequenceCoordinatorAutoRetryContractTest {
 
     @Test
     fun `intermediate auto candidate failures stay non terminal`() {
-        val runBody = source.substringAfter("suspend fun run(").substringBefore("private suspend fun startSingleEngineCandidate(")
+        val runBody = source
+            .substringAfter("suspend fun run(")
+            .substringBefore("private suspend fun startSingleEngineCandidate(")
         assertTrue(
             runBody.contains("notifyFailure = manualEngine != null || isLast"),
             "Only manual mode or the last auto candidate may notify terminal engine failure.",
