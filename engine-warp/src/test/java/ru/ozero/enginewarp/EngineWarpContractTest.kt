@@ -225,6 +225,36 @@ class EngineWarpContractTest {
     }
 
     @Test
+    fun `tunSpec selective AllowedIPs добавляет только peer routes`() = runTest {
+        val selective = sampleConfig.copy(allowedIps = listOf("1.1.1.0/24", "8.8.8.8/32"))
+        val (e, _, _) = engine(activeConfig = selective)
+        val spec = e.tunSpec()!!
+        assertEquals(false, spec.routeAllV4)
+        assertEquals(listOf("1.1.1.0/24", "8.8.8.8/32"), spec.routeCidrsV4)
+    }
+
+    @Test
+    fun `tunSpec rawIni selective AllowedIPs переопределяет legacy config default`() = runTest {
+        val raw = """
+            [Interface]
+            PrivateKey = p
+            Address = 172.16.0.2/32, 2606:4700::1/128
+            DNS = 1.1.1.1
+            MTU = 1280
+
+            [Peer]
+            PublicKey = PP
+            AllowedIPs = 1.1.1.0/24, 8.8.8.8/32
+            Endpoint = 162.159.192.1:2408
+            PersistentKeepalive = 25
+        """.trimIndent()
+        val (e, _, _) = engine(activeConfig = sampleConfig, activeRawIni = raw)
+        val spec = e.tunSpec()!!
+        assertEquals(false, spec.routeAllV4)
+        assertEquals(listOf("1.1.1.0/24", "8.8.8.8/32"), spec.routeCidrsV4)
+    }
+
+    @Test
     fun `tunSpec без IPv6 → allowFamilyV6=false`() = runTest {
         val noV6 = sampleConfig.copy(interfaceAddressV6 = "")
         val (e, _, _) = engine(activeConfig = noV6)

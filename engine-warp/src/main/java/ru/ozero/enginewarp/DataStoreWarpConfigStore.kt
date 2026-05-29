@@ -29,6 +29,12 @@ class DataStoreWarpConfigStore(
             ?.takeIf { it.isNotEmpty() }
             ?: WarpConfig.DEFAULT_DNS
         val keepalive = prefs[KEY_KEEPALIVE] ?: WarpConfig.DEFAULT_KEEPALIVE
+        val allowedIps = prefs[KEY_ALLOWED_IPS]
+            ?.split(",")
+            ?.map { it.trim() }
+            ?.filter { it.isNotEmpty() }
+            ?.takeIf { it.isNotEmpty() }
+            ?: WarpConfig.DEFAULT_ALLOWED_IPS
         val awgParams = AwgParams(
             junkPacketCount = prefs[KEY_AWG_JC] ?: AwgParams.DEFAULT_JC,
             junkPacketMinSize = prefs[KEY_AWG_JMIN] ?: AwgParams.DEFAULT_JMIN,
@@ -51,6 +57,7 @@ class DataStoreWarpConfigStore(
             mtu = mtu,
             dnsServers = dnsServers,
             keepaliveSeconds = keepalive,
+            allowedIps = allowedIps,
             awgParams = awgParams,
         )
     }
@@ -67,6 +74,7 @@ class DataStoreWarpConfigStore(
             prefs[KEY_MTU] = config.mtu
             prefs[KEY_DNS] = config.dnsServers.joinToString(",")
             prefs[KEY_KEEPALIVE] = config.keepaliveSeconds
+            prefs[KEY_ALLOWED_IPS] = config.allowedIps.joinToString(",")
             prefs[KEY_AWG_JC] = config.awgParams.junkPacketCount
             prefs[KEY_AWG_JMIN] = config.awgParams.junkPacketMinSize
             prefs[KEY_AWG_JMAX] = config.awgParams.junkPacketMaxSize
@@ -91,6 +99,7 @@ class DataStoreWarpConfigStore(
             prefs.remove(KEY_MTU)
             prefs.remove(KEY_DNS)
             prefs.remove(KEY_KEEPALIVE)
+            prefs.remove(KEY_ALLOWED_IPS)
             prefs.remove(KEY_AWG_JC)
             prefs.remove(KEY_AWG_JMIN)
             prefs.remove(KEY_AWG_JMAX)
@@ -123,6 +132,7 @@ class DataStoreWarpConfigStore(
         val KEY_MTU = intPreferencesKey("warp_mtu")
         val KEY_DNS = stringPreferencesKey("warp_dns")
         val KEY_KEEPALIVE = intPreferencesKey("warp_keepalive")
+        val KEY_ALLOWED_IPS = stringPreferencesKey("warp_allowed_ips")
         val KEY_AWG_JC = intPreferencesKey("awg_jc")
         val KEY_AWG_JMIN = intPreferencesKey("awg_jmin")
         val KEY_AWG_JMAX = intPreferencesKey("awg_jmax")

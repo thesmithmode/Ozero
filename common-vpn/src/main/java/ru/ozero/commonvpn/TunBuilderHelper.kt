@@ -58,11 +58,17 @@ class TunBuilderHelper(private val service: VpnService) {
             } else {
                 builder.addRoute("0.0.0.0", 0)
             }
+        } else {
+            addCidrRoutes(builder, spec.routeCidrsV4, "v4")
         }
         val v6 = spec.ipv6Address
         if (spec.allowFamilyV6 && v6 != null) {
             builder.addAddress(v6, spec.ipv6PrefixLength)
-            if (spec.routeAllV6) builder.addRoute("::", 0)
+            if (spec.routeAllV6) {
+                builder.addRoute("::", 0)
+            } else {
+                addCidrRoutes(builder, spec.routeCidrsV6, "v6")
+            }
         }
         return builder
     }
@@ -117,6 +123,19 @@ class TunBuilderHelper(private val service: VpnService) {
                         "$callerTag: setUnderlyingNetworks(null) failed: ${t.message}",
                     )
                 }
+        }
+    }
+
+    private fun addCidrRoutes(builder: VpnService.Builder, cidrs: List<String>, familyTag: String) {
+        cidrs.forEach { cidr ->
+            val address = cidr.substringBefore('/').trim()
+            val prefix = cidr.substringAfter('/', missingDelimiterValue = "").trim().toIntOrNull()
+            if (address.isBlank() || prefix == null) {
+                PersistentLoggers.warn(TAG, "skip invalid $familyTag route")
+                return@forEach
+            }
+            runCatching { builder.addRoute(address, prefix) }
+                .onFailure { PersistentLoggers.warn(TAG, "addRoute $familyTag failed: ${it.message}") }
         }
     }
 
