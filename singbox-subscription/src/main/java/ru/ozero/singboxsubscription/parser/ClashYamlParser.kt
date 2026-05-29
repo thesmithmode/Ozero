@@ -12,16 +12,14 @@ import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
 
 object ClashYamlParser {
-    private val yaml = Yaml(SafeConstructor(LoaderOptions()))
-
     fun parse(text: String): List<AbstractBean> {
         val root = loadRoot(text) ?: return emptyList()
-        val proxies = root["proxies"].listValue()
+        val proxies = root["proxies"] as? List<*> ?: emptyList<Any?>()
         return proxies.mapNotNull { (it as? Map<*, *>)?.toStringKeyMap()?.let(::parseProxy) }
     }
 
     private fun loadRoot(text: String): Map<String, Any?>? = try {
-        (yaml.load<Any?>(text) as? Map<*, *>)?.toStringKeyMap()
+        (Yaml(SafeConstructor(LoaderOptions())).load<Any?>(text) as? Map<*, *>)?.toStringKeyMap()
     } catch (_: YAMLException) {
         null
     }
@@ -137,11 +135,6 @@ object ClashYamlParser {
     private fun Map<String, Any?>.mapValue(vararg keys: String): Map<String, Any?> = keys.firstNotNullOfOrNull { key ->
         (this[key] as? Map<*, *>)?.toStringKeyMap()
     }.orEmpty()
-
-    private fun Any?.listValue(): List<Any?> = when (this) {
-        is List<*> -> this
-        else -> emptyList()
-    }
 
     private fun Map<String, Any?>.listString(key: String): String = when (val value = this[key]) {
         is Iterable<*> -> value.joinToString(",") { it.toString() }
