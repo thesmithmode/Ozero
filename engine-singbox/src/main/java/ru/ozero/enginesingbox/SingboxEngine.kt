@@ -149,8 +149,12 @@ class SingboxEngine @Inject constructor(
             }
         }
 
-        val json = buildPendingConfig(config)
-            ?: return StartResult.Failure("failed to build sing-box config")
+        val probePort = allocateChainPort()
+        activeSocksPort = probePort
+        val json = buildPendingConfig(config, probePort) ?: run {
+            activeSocksPort = 0
+            return StartResult.Failure("failed to build sing-box config")
+        }
 
         bindOrFail()?.let { return it }
 
@@ -158,14 +162,14 @@ class SingboxEngine @Inject constructor(
         return StartResult.Success(socksPort = 0)
     }
 
-    private fun buildPendingConfig(config: EngineConfig.Singbox): String? {
+    private fun buildPendingConfig(config: EngineConfig.Singbox, probeSocksPort: Int): String? {
         if (config.autoSelectBeanBlobs.isNotEmpty()) {
             val beans = supportedBeans(config.autoSelectBeanBlobs.take(MAX_AUTO_SELECT_OUTBOUNDS))
             if (beans.isEmpty()) {
                 PersistentLoggers.warn(TAG, "auto-select: all ${config.autoSelectBeanBlobs.size} beans failed")
                 return null
             }
-            return runCatching { ConfigBuilder.buildSingboxAutoConfig(beans) }
+            return runCatching { ConfigBuilder.buildSingboxAutoConfig(beans, probeSocksPort) }
                 .onFailure { PersistentLoggers.warn(TAG, "buildSingboxAutoConfig: ${it.message}") }
                 .getOrNull()
         }
@@ -179,14 +183,14 @@ class SingboxEngine @Inject constructor(
                 PersistentLoggers.warn(TAG, "selected bean unsupported and no supported fallback profiles")
                 return null
             }
-            return runCatching { ConfigBuilder.buildSingboxAutoConfig(fallbackBeans) }
+            return runCatching { ConfigBuilder.buildSingboxAutoConfig(fallbackBeans, probeSocksPort) }
                 .onFailure { PersistentLoggers.warn(TAG, "build fallback auto config: ${it.message}") }
                 .getOrNull()
         }
-        return runCatching { ConfigBuilder.buildSingboxConfig(bean) }
+        return runCatching { ConfigBuilder.buildSingboxConfig(bean, probeSocksPort) }
             .mapCatching {
                 if (wrappers.isNotEmpty()) {
-                    ConfigBuilder.buildProfileChainConfig(bean, wrappers)
+                    ConfigBuilder.buildProfileChainConfig(bean, wrappers, probeSocksPort)
                 } else {
                     it
                 }
@@ -319,7 +323,10 @@ class SingboxEngine @Inject constructor(
         routeAllV6 = true,
     )
 
-    override suspend fun ipProbeRoute(socksPort: Int): IpProbeRoute = IpProbeRoute.Default
+    override suspend fun ipProbeRoute(socksPort: Int): IpProbeRoute {
+        val port = activeSocksPort.takeIf { it > 0 } ?: socksPort.takeIf { it > 0 }
+        return if (port != null) IpProbeRoute.Socks("127.0.0.1", port) else IpProbeRoute.Default
+    }
 
     override fun buildManualConfig(settings: SettingsModel?): EngineConfig? {
         if (cachedSelectedProfileId == SELECTED_AUTO) {

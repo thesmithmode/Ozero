@@ -1045,3 +1045,11 @@
 - Source: daily/2026-05-28.md
 - Articles created: [[concepts/fptn-dead-server-fallback]], [[concepts/singbox-karing-json-import-parity]], [[concepts/gradle-module-type-ci-task-selection]]
 - Articles updated: none
+## [2026-05-29T23:03:54+03:00] compile | 2026-05-29.md
+- Source: daily/2026-05-29.md
+- Articles created: [[concepts/fptn-upstream-dns-websocket-boundary]], [[concepts/byedpi-wedged-lane-restart-isolation]], [[concepts/urnetwork-startup-readiness-vs-runtime-peer-grace]], [[concepts/urnetwork-relay-provideenabled-boundary]], [[concepts/github-actions-multiline-if-parse-failure]], [[concepts/memory-commit-with-work-only]], [[connections/engine-lifecycle-stale-status-cascade]]
+- Articles updated: none
+## [2026-05-29T23:04:17+03:00] compile | 2026-05-29.md
+- Source: daily/2026-05-29.md
+- Articles created: [[concepts/fptn-upstream-websocket-dns-boundary]], [[concepts/fptn-cancellation-cooperative-auth-lifecycle]], [[concepts/byedpi-wedged-lane-generation-restart]], [[concepts/urnetwork-startup-readiness-runtime-peer-grace]], [[concepts/urnetwork-relay-provideenabled-sol-contract]], [[connections/stale-engine-signals-cross-engine-failures]]
+- Articles updated: none
