@@ -14,19 +14,19 @@ class SingboxEngineExitIpProbeSentinelTest {
         ).readText()
 
         assertTrue(
-            source.contains("activeSocksPort = probePort"),
-            "TUN mode должен выделять локальный SOCKS endpoint для exit-IP probe.",
+            source.contains("pendingSocksPort = probePort") &&
+                source.contains("activeSocksPort = pendingSocksPort"),
+            "TUN mode must keep the probe SOCKS port pending until sing-box runtime accepts startWithConfig.",
         )
         assertTrue(
             source.contains("ConfigBuilder.buildSingboxConfig(bean, probeSocksPort)") &&
                 source.contains("ConfigBuilder.buildSingboxAutoConfig(beans, probeSocksPort)") &&
                 source.contains("ConfigBuilder.buildProfileChainConfig(bean, wrappers, probeSocksPort)"),
-            "Все TUN-конфиги sing-box должны получать probeSocksPort, иначе UI снова уйдёт в direct fetch.",
+            "All sing-box TUN configs must receive probeSocksPort so exit-IP probe uses the real outbound graph.",
         )
         assertTrue(
             source.contains("ExitNodeStrategy.ViaSocks(\"127.0.0.1\", port)"),
-            "exitNodeStrategy для sing-box должен вести HTTP проверку через локальный SOCKS sing-box, " +
-                "чтобы цепочка прокси показывала самый конечный публичный выход.",
+            "exitNodeStrategy for sing-box must route HTTP probe through the active local SOCKS endpoint.",
         )
     }
 }

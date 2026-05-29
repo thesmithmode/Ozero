@@ -35,8 +35,11 @@ class MasterDnsEngine(
         supportsUpstreamSocks = true,
     )
 
-    @Volatile private var service: MasterDnsClientServiceContract? = null
-    @Volatile private var activeSocksPort: Int = 0
+    @Volatile
+    private var service: MasterDnsClientServiceContract? = null
+
+    @Volatile
+    private var activeSocksPort: Int = 0
 
     override fun buildManualConfig(settings: SettingsModel?): EngineConfig? {
         val toml = configTomlProvider().trim()
@@ -66,7 +69,7 @@ class MasterDnsEngine(
         } ?: run {
             activeService.stop()
             return StartResult.Failure(
-                "masterdns start timeout after ${startTimeoutMs}ms — subprocess stuck in Starting",
+                "masterdns start timeout after ${startTimeoutMs}ms - subprocess stuck in Starting",
             )
         }
         return when (terminal) {

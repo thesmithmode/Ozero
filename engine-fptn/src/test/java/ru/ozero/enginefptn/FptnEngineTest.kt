@@ -143,7 +143,7 @@ class FptnEngineTest {
     }
 
     @Test
-    fun `manual selected server is tried before remaining fallback candidates`() {
+    fun `manual selected server is the only candidate`() {
         val tokenData = tokenData(
             server("S1"),
             server("S2"),
@@ -155,7 +155,22 @@ class FptnEngineTest {
             tokenData,
         )
 
-        assertEquals(listOf("S2", "S1", "S3"), result.map { it.name })
+        assertEquals(listOf("S2"), result.map { it.name })
+    }
+
+    @Test
+    fun `manual missing selected server has no fallback candidates`() {
+        val tokenData = tokenData(
+            server("S1"),
+            server("S2"),
+        )
+
+        val result = engine.selectServerCandidates(
+            EngineConfig.Fptn(autoSelect = false, selectedServerName = "S9"),
+            tokenData,
+        )
+
+        assertEquals(emptyList(), result)
     }
 
     @Test
@@ -191,7 +206,7 @@ class FptnEngineTest {
     }
 
     @Test
-    fun `start runtime path authenticates fallback candidates in priority order`() {
+    fun `start runtime path keeps auto fallback inside bounded budget`() {
         val source = File(
             System.getProperty("user.dir") ?: ".",
             "src/main/java/ru/ozero/enginefptn/FptnEngine.kt",
@@ -201,20 +216,21 @@ class FptnEngineTest {
 
         assertTrue(
             startBody.contains("selectServerCandidates(fptn, tokenData)"),
-            "FPTN start must preserve the candidate list for multi-server fallback.",
+            "FPTN start must preserve the auto candidate list for multi-server fallback.",
         )
         assertTrue(
             startBody.contains("authenticateFirstAvailable(candidates"),
-            "FPTN start must try later token servers when earlier authentication fails.",
+            "FPTN auto start must try later token servers when earlier authentication fails.",
         )
         assertTrue(
-            source.contains("suspend fun authenticateFirstAvailable") &&
-                source.contains("for (index in candidates.indices)"),
-            "FPTN authentication must iterate the ordered candidate list.",
+            startBody.contains("STARTUP_AUTH_BUDGET_MS") &&
+                source.contains("AUTO_AUTH_CANDIDATE_TIMEOUT_S") &&
+                source.contains("authTimeoutSeconds(remainingMs, perCandidateMaxTimeoutS)"),
+            "FPTN fallback must use one bounded startup budget, not a full timeout per server.",
         )
         assertFalse(
-            startBody.contains("authenticate(server, tokenData"),
-            "FPTN start must not bypass fallback candidates with a single selected-server auth attempt.",
+            source.contains("listOf(selected) + data.servers.filterNot"),
+            "Manual FPTN selection must not silently append fallback candidates.",
         )
     }
 

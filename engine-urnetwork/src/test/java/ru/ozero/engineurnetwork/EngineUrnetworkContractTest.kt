@@ -8,6 +8,7 @@ import ru.ozero.engineurnetwork.auth.GuestJwtResult
 import ru.ozero.engineurnetwork.auth.UrnetworkAuthService
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.ExitNodeStrategy
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
 import kotlin.test.assertEquals
@@ -248,6 +249,7 @@ class EngineUrnetworkContractTest {
         val strategy = e.exitNodeStrategy(0)
         assertIs<ExitNodeStrategy.AutoSelected>(strategy)
     }
+
     @Test
     fun `ipProbeRoute возвращает StaticLocation с кодом когда selectedLocation валидный`() = runTest {
         val bridge = FakeUrnetworkSdkBridge().also {
@@ -285,6 +287,7 @@ class EngineUrnetworkContractTest {
         assertEquals("IN", location.countryCode)
         assertEquals("India", location.country)
     }
+
     @Test
     fun `ipProbeRoute возвращает StaticLocation с null country когда country и name оба null`() = runTest {
         val bridge = FakeUrnetworkSdkBridge().also {

@@ -242,8 +242,7 @@ class RealUrnetworkSdkBridge(
         } else {
             PersistentLoggers.warn(
                 TAG,
-                "relay sharing: endpoint deferred — accumulator pending registration, " +
-                    "retry on next start (relay продолжит работу, привязка повторится)",
+                "relay sharing: endpoint deferred - accumulator pending registration, retry on next start",
             )
         }
     }
@@ -748,7 +747,9 @@ class RealUrnetworkSdkBridge(
             return UrnetworkSdkBridge.AttachResult.Failed("IoLoop already attached")
         }
         val cv = connectVcRef.get()
-            ?: return UrnetworkSdkBridge.AttachResult.Failed("ConnectViewController not initialised — call start() first")
+            ?: return UrnetworkSdkBridge.AttachResult.Failed(
+            "ConnectViewController not initialised - call start() first",
+        )
         return withContext(Dispatchers.Main.immediate) {
             try {
                 val capturedDevice = device

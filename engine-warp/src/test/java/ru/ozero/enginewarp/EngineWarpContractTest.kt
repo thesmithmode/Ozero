@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
+import ru.ozero.enginescore.ExitNodeStrategy
 import ru.ozero.enginescore.IpProbeRoute
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.TunAttachResult
@@ -196,6 +197,7 @@ class EngineWarpContractTest {
         assertEquals("Cloudflare WARP", label.label)
         assertFalse(strategy is ExitNodeStrategy.DirectHttp)
     }
+
     @Test
     fun `ipProbeRoute не возвращает Default — иначе fetch покажет реальный IP вместо WARP`() = runTest {
         val (e, _, _) = engine(activeConfig = sampleConfig)

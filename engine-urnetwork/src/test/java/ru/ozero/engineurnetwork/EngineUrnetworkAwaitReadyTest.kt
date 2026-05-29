@@ -36,19 +36,19 @@ class EngineUrnetworkAwaitReadyTest {
     )
 
     @Test
-    fun `awaitReady РІРѕР·РІСЂР°С‰Р°РµС‚ Ready РЅРµРјРµРґР»РµРЅРЅРѕ РєРѕРіРґР° peerCount СѓР¶Рµ Р±РѕР»СЊС€Рµ РЅСѓР»СЏ`() = runTest {
+    fun `awaitReady ready when peers positive`() = runTest {
         val bridge = CountableBridge(fixedPeers = 3)
         val eng = engine(bridge, backgroundScope)
         eng.start(baseConfig, Upstream.None)
 
         val result = eng.awaitReady()
 
-        assertEquals(EnginePlugin.ReadyResult.Ready, result, "peers>0 в†’ Ready Р±РµР· timeout")
-        assertTrue(bridge.peerCountCalls.get() >= 1, "peerCount РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РѕРїСЂРѕС€РµРЅ С…РѕС‚СЏ Р±С‹ СЂР°Р·")
+        assertEquals(EnginePlugin.ReadyResult.Ready, result, "peers>0 -> Ready")
+        assertTrue(bridge.peerCountCalls.get() >= 1, "peerCount should be queried")
     }
 
     @Test
-    fun `awaitReady РІРѕР·РІСЂР°С‰Р°РµС‚ Ready РєРѕРіРґР° SDK СѓР¶Рµ CONNECTED РґР°Р¶Рµ Р±РµР· grid peers`() = runTest {
+    fun `awaitReady ready when SDK connected without peers`() = runTest {
         val bridge = CountableBridge(fixedPeers = 0).also {
             it.connectionStatusProvider = { "CONNECTED" }
         }
@@ -60,9 +60,9 @@ class EngineUrnetworkAwaitReadyTest {
         assertEquals(
             EnginePlugin.ReadyResult.Ready,
             result,
-            "SDK CONNECTED в†’ Ready РґР°Р¶Рµ РµСЃР»Рё grid.windowCurrentSize РµС‰С‘ 0",
+            "SDK CONNECTED -> Ready without peers",
         )
-        assertTrue(bridge.connectionStatusCalls.get() >= 1, "connectionStatus РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РѕРїСЂРѕС€РµРЅ")
+        assertTrue(bridge.connectionStatusCalls.get() >= 1, "connectionStatus should be queried")
     }
 
     @Test
@@ -99,15 +99,15 @@ class EngineUrnetworkAwaitReadyTest {
 
         val result = eng.awaitReady()
 
-        assertEquals(EnginePlugin.ReadyResult.Ready, result, "eventual peers>0 в†’ Ready")
+        assertEquals(EnginePlugin.ReadyResult.Ready, result, "eventual peers>0 -> Ready")
         assertTrue(
             bridge.peerCountCalls.get() >= 3,
-            "awaitReady РґРѕР»Р¶РµРЅ РѕРїСЂРѕСЃРёС‚СЊ РјРёРЅРёРјСѓРј 3 СЂР°Р·Р° РґРѕ СѓСЃРїРµС…Р°, calls=${bridge.peerCountCalls.get()}",
+            "expected >=3 peerCount calls, calls=${bridge.peerCountCalls.get()}",
         )
     }
 
     @Test
-    fun `awaitReady РІРѕР·РІСЂР°С‰Р°РµС‚ Timeout РєРѕРіРґР° peers РЅРёРєРѕРіРґР° РЅРµ РїРѕСЏРІР»СЏСЋС‚СЃСЏ вЂ” РЅРµ РјР°СЃРєРёСЂСѓРµС‚ РєР°Рє Ready`() = runTest {
+    fun `awaitReady timeout when peers never appear`() = runTest {
         val bridge = CountableBridge(fixedPeers = 0)
         val eng = engine(bridge, backgroundScope, startupReadyTimeoutMs = 300L, startupReadyPollMs = 50L)
         eng.start(baseConfig, Upstream.None)
@@ -115,15 +115,15 @@ class EngineUrnetworkAwaitReadyTest {
         val result = try {
             eng.awaitReady()
         } catch (_: Throwable) {
-            fail("awaitReady РЅРµ РґРѕР»Р¶РµРЅ Р±СЂРѕСЃР°С‚СЊ РёСЃРєР»СЋС‡РµРЅРёРµ РїСЂРё С‚Р°Р№РјР°СѓС‚Рµ")
+            fail("awaitReady must not throw on timeout")
         }
         val timeout = assertIs<EnginePlugin.ReadyResult.Timeout>(
             result,
-            "timeout РѕР±СЏР·Р°РЅ РІРµСЂРЅСѓС‚СЊ Timeout, РЅРµ Ready (root fix #59)",
+            "timeout must return Timeout",
         )
         assertTrue(
             timeout.reason.contains("URnetwork"),
-            "reason РґРѕР»Р¶РµРЅ СЃРѕРґРµСЂР¶Р°С‚СЊ РёРјСЏ РґРІРёР¶РєР° РґР»СЏ РґРёР°РіРЅРѕСЃС‚РёРєРё, Р±С‹Р»Рѕ: ${timeout.reason}",
+            "reason must include engine name, was: ${timeout.reason}",
         )
         assertTrue(
             timeout.reason.contains("300"),
@@ -142,11 +142,11 @@ class EngineUrnetworkAwaitReadyTest {
         val result = try {
             eng.awaitReady()
         } catch (_: Throwable) {
-            fail("awaitReady РЅРµ РґРѕР»Р¶РµРЅ РїСЂРѕР±СЂР°СЃС‹РІР°С‚СЊ РёСЃРєР»СЋС‡РµРЅРёСЏ РёР· peerCount")
+            fail("awaitReady must not rethrow peerCount errors")
         }
         assertIs<EnginePlugin.ReadyResult.Timeout>(
             result,
-            "bridge throw в†’ 0 peers в†’ Timeout (root fix #59)",
+            "bridge throw -> Timeout",
         )
     }
 
@@ -182,7 +182,7 @@ class EngineUrnetworkAwaitReadyTest {
     fun `sentinel STARTUP_READY_TIMEOUT_MS stays bounded and does not hold runtime peer grace`() {
         val source = File("src/main/java/ru/ozero/engineurnetwork/EngineUrnetwork.kt").readText()
         val match = Regex("STARTUP_READY_TIMEOUT_MS\\s*=\\s*(\\d+)_?(\\d*)L")
-            .find(source) ?: fail("STARTUP_READY_TIMEOUT_MS РЅРµ РЅР°Р№РґРµРЅ РІ EngineUrnetwork.kt")
+            .find(source) ?: fail("STARTUP_READY_TIMEOUT_MS not found in EngineUrnetwork.kt")
         val raw = (match.groupValues[1] + match.groupValues[2])
         val ms = raw.toLong()
         assertTrue(
@@ -193,17 +193,17 @@ class EngineUrnetworkAwaitReadyTest {
     }
 
     @Test
-    fun `sentinel awaitReady РїРёС€РµС‚ progress РІ boot log РїСЂРё РґРѕР»РіРѕРј peer discovery`() {
+    fun `sentinel awaitReady writes progress to boot log`() {
         val source = File("src/main/java/ru/ozero/engineurnetwork/EngineUrnetwork.kt").readText()
         val body = source.substringAfter("override suspend fun awaitReady(): EnginePlugin.ReadyResult")
             .substringBefore("override suspend fun attachTun")
         assertTrue(
             body.contains("STARTUP_PROGRESS_LOG_EVERY"),
-            "awaitReady РѕР±СЏР·Р°РЅ Р»РѕРіРёСЂРѕРІР°С‚СЊ progress С‡РµСЂРµР· STARTUP_PROGRESS_LOG_EVERY РґР»СЏ РІРёРґРёРјРѕСЃС‚Рё РІ boot.log",
+            "awaitReady must log progress through STARTUP_PROGRESS_LOG_EVERY for boot.log visibility",
         )
         assertTrue(
             body.contains("PersistentLoggers.debug"),
-            "progress log РѕР±СЏР·Р°РЅ РёРґС‚Рё С‡РµСЂРµР· PersistentLoggers.debug (boot.log persistent), РЅРµ info/warn",
+            "progress log must use PersistentLoggers.debug, not info or warn",
         )
     }
 

@@ -124,6 +124,9 @@ class SingboxEngine @Inject constructor(
     private var pendingConfig: String? = null
 
     @Volatile
+    private var pendingSocksPort: Int = 0
+
+    @Volatile
     private var chainMode: Boolean = false
 
     @Volatile
@@ -149,16 +152,21 @@ class SingboxEngine @Inject constructor(
             }
         }
 
+        activeSocksPort = 0
+        pendingSocksPort = 0
+        pendingConfig = null
         val probePort = allocateChainPort()
-        activeSocksPort = probePort
         val json = buildPendingConfig(config, probePort) ?: run {
-            activeSocksPort = 0
             return StartResult.Failure("failed to build sing-box config")
         }
 
-        bindOrFail()?.let { return it }
+        bindOrFail()?.let {
+            clearPendingStart()
+            return it
+        }
 
         pendingConfig = json
+        pendingSocksPort = probePort
         return StartResult.Success(socksPort = 0)
     }
 
@@ -209,8 +217,10 @@ class SingboxEngine @Inject constructor(
         config: EngineConfig.Singbox,
         upstream: ConfigBuilder.Upstream?,
     ): StartResult {
+        activeSocksPort = 0
+        pendingSocksPort = 0
+        pendingConfig = null
         val port = allocateChainPort()
-        activeSocksPort = port
         val json = if (config.autoSelectBeanBlobs.isNotEmpty()) {
             val beans = supportedBeans(config.autoSelectBeanBlobs.take(MAX_AUTO_SELECT_OUTBOUNDS))
             if (beans.isEmpty()) return StartResult.Failure("chain auto-select: no valid beans")
@@ -241,23 +251,31 @@ class SingboxEngine @Inject constructor(
             }
         }
 
-        bindOrFail()?.let { return it }
+        bindOrFail()?.let {
+            activeSocksPort = 0
+            return it
+        }
 
         val p = proxy ?: return StartResult.Failure("SingboxEngineService not connected for chain mode")
         return runCatching {
             p.startProxyMode(json, localProtector)
+            activeSocksPort = port
             PersistentLoggers.info(TAG, "startProxyMode sent over AIDL port=$port")
             StartResult.Success(socksPort = port)
         }.getOrElse {
+            activeSocksPort = 0
             PersistentLoggers.error(TAG, "startProxyMode AIDL call failed: ${it.message}", it)
             StartResult.Failure("startProxyMode failed: ${it.message}")
         }
     }
 
     override suspend fun attachTun(tunFd: Int): TunAttachResult {
-        if (chainMode) return TunAttachResult.Failure("chain mode — TUN not used")
+        if (chainMode) return TunAttachResult.Failure("chain mode - TUN not used")
         val json = pendingConfig ?: return TunAttachResult.Failure("attachTun called before start()")
-        val p = proxy ?: return TunAttachResult.Failure("SingboxEngineService not connected")
+        val p = proxy ?: run {
+            clearPendingStart()
+            return TunAttachResult.Failure("SingboxEngineService not connected")
+        }
         return runCatching {
             val pfd = ParcelFileDescriptor.fromFd(tunFd)
             try {
@@ -268,11 +286,16 @@ class SingboxEngine @Inject constructor(
             delay(150)
             val postStartStats = runCatching { p.stats }.getOrNull()
             if (postStartStats?.activeConnections == 0) {
+                clearPendingStart()
                 return TunAttachResult.Failure("sing-box runtime failed to start (activeConnections=0)")
             }
+            activeSocksPort = pendingSocksPort
+            pendingSocksPort = 0
+            pendingConfig = null
             PersistentLoggers.debug(TAG, "startWithConfig sent over AIDL")
             TunAttachResult.Success
         }.getOrElse {
+            clearPendingStart()
             PersistentLoggers.error(TAG, "startWithConfig AIDL call failed: ${it.message}", it)
             TunAttachResult.Failure("startWithConfig AIDL call failed: ${it.message}")
         }
@@ -280,6 +303,7 @@ class SingboxEngine @Inject constructor(
 
     override suspend fun stop() {
         pendingConfig = null
+        pendingSocksPort = 0
         chainMode = false
         activeSocksPort = 0
         runCatching { proxy?.stop() }
@@ -460,6 +484,12 @@ class SingboxEngine @Inject constructor(
                 null
             }
         }
+    }
+
+    private fun clearPendingStart() {
+        pendingConfig = null
+        pendingSocksPort = 0
+        activeSocksPort = 0
     }
 
     private fun close() {

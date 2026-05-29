@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import ru.ozero.commonnet.IpInfo
 import ru.ozero.commonnet.IpInfoProvider
 import ru.ozero.commonvpn.HealthMonitor
 import ru.ozero.app.ui.components.PowerDiscState
@@ -311,7 +312,7 @@ class MainViewModel @Inject constructor(
                             "warmup begin engine=${s.engineId} port=${s.socksPort} delay=${IP_INFO_WARMUP_MS}ms",
                         )
                         delay(IP_INFO_WARMUP_MS)
-                        Log.i(IP_TAG, "warmup done вЂ” resolve IP")
+                        Log.i(IP_TAG, "warmup done - resolve IP")
                         val result = resolveIpInfoWithRetry(s.engineId, s.socksPort)
                         when (result) {
                             is IpInfoState.Loaded ->
