@@ -34,6 +34,8 @@ import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.settings.SettingsModel
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.net.Inet4Address
+import java.net.InetAddress
 
 class FptnEngine(
     private val configStore: FptnConfigStore,
@@ -47,6 +49,7 @@ class FptnEngine(
     private var tunScope: CoroutineScope? = null
     private var _nativeHandle: Long = 0L
     private var _currentServer: FptnServer? = null
+    private var _currentServerIp: String? = null
     private var _accessToken: String? = null
     private var _bypassMethod: String = FptnBypassMethod.DEFAULT.strategyName
     private var _sniDomain: String = FptnConfig.DEFAULT_SNI_DOMAIN
@@ -148,6 +151,7 @@ class FptnEngine(
         } ?: return StartResult.Failure("FPTN authentication failed")
 
         _currentServer = authenticated.server
+        _currentServerIp = authenticated.serverIp
         _accessToken = authenticated.accessToken
         _bypassMethod = fptn.bypassMethod
         _sniDomain = fptn.sniDomain
@@ -158,6 +162,7 @@ class FptnEngine(
 
     override suspend fun attachTun(tunFd: Int): TunAttachResult {
         val server = _currentServer ?: return TunAttachResult.Failure("Engine not started")
+        val serverIp = _currentServerIp ?: return TunAttachResult.Failure("No resolved server IP")
         val token = _accessToken ?: return TunAttachResult.Failure("No access token")
 
         Log.d(TAG, "attachTun: fd=$tunFd server=${server.name}")
@@ -186,7 +191,7 @@ class FptnEngine(
         Log.d(TAG, "attachTun: creating native handle method=$_bypassMethod")
         val handle = runCatching {
             wsClient.nativeCreate(
-                serverIp = server.host,
+                serverIp = serverIp,
                 serverPort = server.port,
                 tunIpv4 = "10.10.0.1",
                 tunIpv6 = "fd00::1",
@@ -278,6 +283,7 @@ class FptnEngine(
             Log.d(TAG, "stop: nativeDestroy done")
         }
         _currentServer = null
+        _currentServerIp = null
         _accessToken = null
         Log.d(TAG, "stop: done")
     }
@@ -322,7 +328,14 @@ class FptnEngine(
             val server = candidates[index]
             val accessToken = authenticate(server, data, bypassMethod, sniDomain)
             currentCoroutineContext().ensureActive()
-            if (accessToken != null) return AuthenticatedServer(server, accessToken)
+            if (accessToken != null) {
+                val serverIp = resolveServerIp(server)
+                currentCoroutineContext().ensureActive()
+                if (serverIp != null) {
+                    return AuthenticatedServer(server, serverIp, accessToken)
+                }
+                PersistentLoggers.warn(TAG, "authenticate: resolved IP missing server=${server.name}")
+            }
             if (index < candidates.lastIndex) {
                 Log.d(TAG, "authenticate: fallback from ${server.name} to ${candidates[index + 1].name}")
             }
@@ -388,8 +401,23 @@ class FptnEngine(
         }
     }
 
+    private suspend fun resolveServerIp(server: FptnServer): String? {
+        currentCoroutineContext().ensureActive()
+        return try {
+            InetAddress.getAllByName(server.host)
+                .firstOrNull { it is Inet4Address }
+                ?.hostAddress
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            PersistentLoggers.warn(TAG, "resolve: failed server=${server.name} ${e.javaClass.simpleName}")
+            null
+        }
+    }
+
     private data class AuthenticatedServer(
         val server: FptnServer,
+        val serverIp: String,
         val accessToken: String,
     )
 

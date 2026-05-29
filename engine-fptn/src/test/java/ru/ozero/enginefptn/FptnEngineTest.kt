@@ -245,6 +245,39 @@ class FptnEngineTest {
     }
 
     @Test
+    fun `websocket receives resolved server ip instead of token host`() {
+        val source = File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/enginefptn/FptnEngine.kt",
+        ).readText()
+        val attachBody = source.substringAfter("override suspend fun attachTun(")
+            .substringBefore("override suspend fun awaitReady()")
+        val fallbackBody = source.substringAfter("private suspend fun authenticateFirstAvailable(")
+            .substringBefore("private suspend fun authenticate(")
+        val resolverBody = source.substringAfter("private suspend fun resolveServerIp(")
+            .substringBefore("private data class AuthenticatedServer")
+
+        assertTrue(
+            fallbackBody.contains("resolveServerIp(server)") &&
+                source.contains("val serverIp: String"),
+            "FPTN login success must carry a resolved IPv4 into the WebSocket layer.",
+        )
+        assertTrue(
+            resolverBody.contains("InetAddress.getAllByName(server.host)") &&
+                resolverBody.contains("Inet4Address"),
+            "FPTN must match upstream ResolveDomain before native WebSocket, which accepts IPv4.",
+        )
+        assertTrue(
+            attachBody.contains("serverIp = serverIp"),
+            "nativeCreate must receive resolved serverIp, not raw token host.",
+        )
+        assertFalse(
+            attachBody.contains("serverIp = server.host"),
+            "Raw token host can be a DNS name; C++ wrapper parses serverIp as IPv4Address.",
+        )
+    }
+
+    @Test
     fun `buildManualConfig returns null when token blank`() {
         assertNull(engine.buildManualConfig(null))
     }
