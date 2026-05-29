@@ -640,6 +640,17 @@ class TunnelControllerTest {
     }
 
     @Test
+    fun staleEngineFailureDuringTargetedProbingIsIgnored() {
+        controller.onProbing(EngineId.FPTN)
+        controller.onEngineDied(EngineId.BYEDPI, "timeout")
+        assertEquals(
+            TunnelState.Probing(EngineId.FPTN),
+            controller.state.value,
+            "stale BYEDPI timeout must not overwrite active FPTN probing state",
+        )
+    }
+
+    @Test
     fun staleEngineFailureDuringDisconnectingIsIgnoredAndKeepsSwitching() {
         controller.onProbing()
         controller.onConnecting(EngineId.BYEDPI)

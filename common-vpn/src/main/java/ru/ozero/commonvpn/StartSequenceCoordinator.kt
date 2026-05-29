@@ -561,7 +561,10 @@ class StartSequenceCoordinator(
         PersistentLoggers.warn(TAG, "auto-mode: retry next candidate after $engineId failure")
         runCatching { state.tunFdRef.getAndSet(null)?.close() }
         runCatching { deps.chainOrchestrator.stop() }
-        deps.tunnelController.onDisconnecting()
+        val state = deps.tunnelController.state.value
+        if (state is TunnelState.Connected || state is TunnelState.Connecting || state is TunnelState.Probing) {
+            deps.tunnelController.onDisconnecting()
+        }
         deps.tunnelController.reset()
     }
 

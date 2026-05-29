@@ -13,10 +13,13 @@ import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
+import java.io.File
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class FptnEngineTest {
 
@@ -153,6 +156,61 @@ class FptnEngineTest {
         )
 
         assertEquals(listOf("S2", "S1", "S3"), result.map { it.name })
+    }
+
+    @Test
+    fun `autoSelect runtime server selection uses only first token server`() {
+        val tokenData = tokenData(
+            server("S1"),
+            server("S2"),
+            server("S3"),
+        )
+
+        val result = engine.selectServer(
+            EngineConfig.Fptn(autoSelect = true, selectedServerName = "S2"),
+            tokenData,
+        )
+
+        assertEquals("S1", result?.name)
+    }
+
+    @Test
+    fun `manual runtime server selection does not append fallback candidates`() {
+        val tokenData = tokenData(
+            server("S1"),
+            server("S2"),
+            server("S3"),
+        )
+
+        val result = engine.selectServer(
+            EngineConfig.Fptn(autoSelect = false, selectedServerName = "S2"),
+            tokenData,
+        )
+
+        assertEquals("S2", result?.name)
+    }
+
+    @Test
+    fun `start runtime path does not use multi server authenticate loop`() {
+        val source = File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/enginefptn/FptnEngine.kt",
+        ).readText()
+        val startBody = source.substringAfter("override suspend fun start(").substringBefore("override suspend fun attachTun(")
+
+        assertFalse(
+            startBody.contains("authenticateFirstAvailable"),
+            "FPTN start must not run 15s-per-server auth loop in the critical path.",
+        )
+        assertFalse(
+            source.contains("fun authenticateFirstAvailable"),
+            "Fallback candidates must stay outside Engine.start until a bounded policy is introduced.",
+        )
+        assertTrue(
+            startBody.contains("selectServer(fptn, tokenData)") &&
+                startBody.contains("authenticate(server, tokenData"),
+            "FPTN start must pick one runtime server and perform one auth attempt.",
+        )
     }
 
     @Test
