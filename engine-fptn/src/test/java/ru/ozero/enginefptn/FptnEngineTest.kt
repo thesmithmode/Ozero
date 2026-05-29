@@ -219,13 +219,16 @@ class FptnEngineTest {
             "FPTN start must preserve the auto candidate list for multi-server fallback.",
         )
         assertTrue(
-            startBody.contains("authenticateFirstAvailable(candidates"),
+            startBody.contains("authenticateFirstAvailable(") &&
+                startBody.contains("candidates = candidates"),
             "FPTN auto start must try later token servers when earlier authentication fails.",
         )
         assertTrue(
             startBody.contains("STARTUP_AUTH_BUDGET_MS") &&
                 source.contains("AUTO_AUTH_CANDIDATE_TIMEOUT_S") &&
-                source.contains("authTimeoutSeconds(remainingMs, perCandidateMaxTimeoutS)"),
+                source.contains("authTimeoutSeconds(") &&
+                source.contains("perCandidateMaxTimeoutS") &&
+                source.contains("deadlineMs"),
             "FPTN fallback must use one bounded startup budget, not a full timeout per server.",
         )
         assertFalse(

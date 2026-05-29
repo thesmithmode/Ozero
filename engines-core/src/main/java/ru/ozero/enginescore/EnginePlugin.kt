@@ -15,6 +15,13 @@ interface EnginePlugin {
 
     suspend fun awaitReady(): ReadyResult = ReadyResult.Ready
 
+    fun peerWatchdogPolicy(): PeerWatchdogPolicy = PeerWatchdogPolicy()
+
+    data class PeerWatchdogPolicy(
+        val timeoutMs: Long = DEFAULT_PEER_WATCHDOG_TIMEOUT_MS,
+        val recoverBeforeFirstPeer: Boolean = false,
+    )
+
     sealed class ReadyResult {
         data object Ready : ReadyResult()
         data class Timeout(val reason: String) : ReadyResult()
@@ -53,5 +60,6 @@ interface EnginePlugin {
 
     companion object {
         const val DEFAULT_STOP_TIMEOUT_MS = 2_000L
+        const val DEFAULT_PEER_WATCHDOG_TIMEOUT_MS = 30_000L
     }
 }

@@ -56,18 +56,24 @@ class EngineUrnetwork(
 
     override fun stopTimeoutMs(): Long = URN_STOP_TIMEOUT_MS
 
+    override fun peerWatchdogPolicy(): EnginePlugin.PeerWatchdogPolicy =
+        EnginePlugin.PeerWatchdogPolicy(
+            timeoutMs = PEER_READY_TIMEOUT_MS,
+            recoverBeforeFirstPeer = true,
+        )
+
     override fun buildManualConfig(settings: SettingsModel?): EngineConfig = EngineConfig.Urnetwork(
         jwtToken = settings?.urnetworkJwt.orEmpty(),
         region = settings?.urnetworkCountryCode,
     )
 
     override fun statsLabel(stats: EngineStats): String? {
-        val snapshot = runCatching { sdkBridge.runtimeSnapshot() }.getOrNull()
-        val peers = snapshot?.peers ?: stats.activeConnections
-        val status = snapshot?.connectionStatus ?: runCatching { sdkBridge.connectionStatus() }.getOrNull()
+        val snapshot = runtimeSnapshotSafe()
+        val peers = snapshot.peers.takeIf { it > 0 } ?: stats.activeConnections
+        val status = snapshot.connectionStatus ?: runCatching { sdkBridge.connectionStatus() }.getOrNull()
         return when {
             peers > 0 -> "$peers peers"
-            snapshot?.providerStateAdded?.let { it > 0L } == true -> "connected"
+            snapshot.providerStateAdded > 0L -> "connected"
             isConnectedStatus(status) -> "connected"
             else -> null
         }
@@ -167,8 +173,7 @@ class EngineUrnetwork(
         val sessionStart = System.currentTimeMillis()
         val job = pluginScope.launch {
             while (true) {
-                val snapshot = runCatching { sdkBridge.runtimeSnapshot() }
-                    .getOrDefault(UrnetworkSdkBridge.RuntimeSnapshot())
+                val snapshot = runtimeSnapshotSafe()
                 _stats.value = EngineStats(
                     activeConnections = snapshot.peers,
                     connectedSince = sessionStart,
@@ -212,8 +217,7 @@ class EngineUrnetwork(
         var polls = 0
         val reached = withTimeoutOrNull(startupReadyTimeoutMs) {
             while (true) {
-                val snapshot = runCatching { sdkBridge.runtimeSnapshot() }
-                    .getOrDefault(UrnetworkSdkBridge.RuntimeSnapshot())
+                val snapshot = runtimeSnapshotSafe()
                 if (isStartupReady(snapshot)) {
                     Log.i(
                         TAG,
@@ -258,6 +262,17 @@ class EngineUrnetwork(
     private fun isConnectedStatus(status: String?): Boolean =
         status?.equals(CONNECTION_STATUS_CONNECTED, ignoreCase = true) == true
 
+    private fun runtimeSnapshotSafe(): UrnetworkSdkBridge.RuntimeSnapshot {
+        val snapshot = runCatching { sdkBridge.runtimeSnapshot() }.getOrNull()
+        if (snapshot != null) return snapshot
+        val peers = runCatching { sdkBridge.peerCount() }.getOrDefault(0)
+        val status = runCatching { sdkBridge.connectionStatus() }.getOrNull()
+        return UrnetworkSdkBridge.RuntimeSnapshot(
+            connectionStatus = status,
+            peers = peers,
+        )
+    }
+
     override suspend fun attachTun(tunFd: Int): TunAttachResult {
         PersistentLoggers.debug(TAG, "attachTun fd=$tunFd")
         return when (val r = sdkBridge.attachTun(tunFd)) {
@@ -274,6 +289,7 @@ class EngineUrnetwork(
 
         const val URN_STOP_TIMEOUT_MS = 8_000L
         const val STARTUP_READY_TIMEOUT_MS = 8_000L
+        const val PEER_READY_TIMEOUT_MS = 300_000L
         const val STARTUP_READY_POLL_MS = 200L
         const val STARTUP_PROGRESS_LOG_EVERY = 10
         const val CONNECTION_STATUS_CONNECTED = "CONNECTED"
