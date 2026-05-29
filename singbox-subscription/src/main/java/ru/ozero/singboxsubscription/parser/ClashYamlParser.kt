@@ -12,7 +12,10 @@ import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
 
 object ClashYamlParser {
+    private val proxiesKeyPattern = Regex("""(?m)^\s*proxies\s*:""")
+
     fun parse(text: String): List<AbstractBean> {
+        if (!proxiesKeyPattern.containsMatchIn(text)) return emptyList()
         val root = loadRoot(text) ?: return emptyList()
         val proxies = root["proxies"] as? List<*> ?: emptyList<Any?>()
         return proxies.mapNotNull { (it as? Map<*, *>)?.toStringKeyMap()?.let(::parseProxy) }
@@ -62,7 +65,11 @@ object ClashYamlParser {
 
     private fun StandardV2RayBean.applyV2Ray(fields: Map<String, Any?>) {
         type = normalizeNetwork(fields.string("network", "net"))
-        security = inferSecurity(fields)
+        security = when {
+            fields.bool("reality") -> "reality"
+            fields.bool("tls") -> "tls"
+            else -> fields.string("security").ifBlank { "none" }
+        }
         sni = fields.string("servername", "sni")
         alpn = fields.listString("alpn")
         allowInsecure = fields.bool("skip-cert-verify") || fields.bool("allowInsecure")
@@ -70,23 +77,6 @@ object ClashYamlParser {
         applyNestedTransport(fields)
         applyReality(fields)
         initializeDefaultValues()
-    }
-
-    private fun inferSecurity(fields: Map<String, Any?>): String {
-        val protocol = fields.string("type").lowercase()
-        val explicitSecurity = fields.string("security").lowercase()
-        val transportProtocol = fields.string("protocol").lowercase()
-        return when {
-            fields.bool("reality") -> "reality"
-            fields.hasRealityOptions() -> "reality"
-            transportProtocol == "reality" -> "reality"
-            explicitSecurity == "reality" -> "reality"
-            fields.bool("tls") -> "tls"
-            explicitSecurity == "tls" -> "tls"
-            protocol == "trojan" -> "tls"
-            explicitSecurity.isNotBlank() -> explicitSecurity
-            else -> "none"
-        }
     }
 
     private fun StandardV2RayBean.applyNestedTransport(fields: Map<String, Any?>) {
@@ -144,10 +134,6 @@ object ClashYamlParser {
         is String -> value.lowercase() in setOf("true", "1", "yes")
         else -> false
     }
-
-    private fun Map<String, Any?>.hasRealityOptions(): Boolean =
-        mapValue("reality-opts", "reality_opts").isNotEmpty() ||
-            string("pbk", "public-key", "short-id", "sid").isNotBlank()
 
     private fun Map<String, Any?>.mapValue(vararg keys: String): Map<String, Any?> = keys.firstNotNullOfOrNull { key ->
         (this[key] as? Map<*, *>)?.toStringKeyMap()
