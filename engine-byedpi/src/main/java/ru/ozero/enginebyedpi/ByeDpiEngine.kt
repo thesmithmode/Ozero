@@ -113,7 +113,6 @@ class ByeDpiEngine(
                 if (oldJob.isActive) {
                     nativeMayBeWedged.set(true)
                     oldJob.cancel()
-                    rotateProxyLane()
                 }
             }
             PersistentLoggers.debug(TAG, "start: barrier pre-drain oldJob.isActive=${oldJob.isActive}")
@@ -160,7 +159,6 @@ class ByeDpiEngine(
             if (proxyJob.isActive) {
                 nativeMayBeWedged.set(true)
                 proxyJob.cancel()
-                rotateProxyLane()
             }
             proxyJobRef.compareAndSet(proxyJob, null)
             StartResult.Failure(reason = "byedpi не открыл socks порт $resolvedPort")
@@ -259,10 +257,12 @@ class ByeDpiEngine(
                     true
                 }
                 if (completed == null) {
-                    PersistentLoggers.warn(TAG, "proxyJob не завершился за ${STOP_GRACE_MS}ms — cancel and rotate lane")
+                    PersistentLoggers.warn(
+                        TAG,
+                        "proxyJob не завершился за ${STOP_GRACE_MS}ms — cancel and defer lane drain",
+                    )
                     nativeMayBeWedged.set(true)
                     job.cancel()
-                    rotateProxyLane()
                 } else {
                     nativeMayBeWedged.set(false)
                 }

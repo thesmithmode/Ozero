@@ -2,6 +2,7 @@ package ru.ozero.enginebyedpi
 
 import org.junit.jupiter.api.Test
 import java.io.File
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -93,6 +94,27 @@ class ByeDpiEngineConcurrencyContractTest {
                 "и ротировать lane при timeout. Cancelled JNI игнорирует Thread.interrupt() " +
                 "и может держать единственный слот dispatcher; без ротации новый proxy coroutine " +
                 "встаёт в очередь за ним → waitSocksReady() timeout.",
+        )
+    }
+
+    @Test
+    fun `start не ротирует proxy lane до drain старого dispatcher`() {
+        val prematureRotatePattern = Regex(
+            """oldJob\.cancel\(\)\s*rotateProxyLane\(\)""",
+        )
+        val deferredDrainPattern = Regex(
+            """if\s*\(oldJob\s*!=\s*null\s*\|\|\s*hadKnownWedge\)\s*\{\s*drainOrRotateProxyLane\(\)\s*\}""",
+        )
+        assertFalse(
+            prematureRotatePattern.containsMatchIn(engineSource),
+            "start() не должен ротировать proxyDispatcher сразу после cancel старого oldJob. " +
+                "Иначе drainOrRotateProxyLane() дренирует свежую пустую lane, а старый JNI main() " +
+                "может позже сбросить native guard под новым instance.",
+        )
+        assertTrue(
+            deferredDrainPattern.containsMatchIn(engineSource),
+            "start() обязан сначала дренировать dispatcher, который владеет oldJob/hadKnownWedge, " +
+                "и только drainOrRotateProxyLane() может ротировать lane после timeout.",
         )
     }
 
