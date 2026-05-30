@@ -46,6 +46,38 @@ internal class MasterDnsDeployerImpl(
         }
     }
 
+    override fun removeAmneziaDnsAndContinue(
+        credentials: MasterDnsDeployCredentials,
+    ): Flow<MasterDnsDeployState> = flow {
+        PersistentLoggers.debug(TAG, "removeAmneziaDnsAndContinue: start host=${credentials.host}:${credentials.port}")
+        if (!connectAndAuth(credentials, "removeAmneziaDnsAndContinue")) return@flow
+        try {
+            emit(MasterDnsDeployState.Removing)
+            val removeResult = transport.exec(MasterDnsDockerScripts.removeAmneziaDnsOnly)
+            PersistentLoggers.debug(TAG, "removeAmneziaDnsAndContinue: remove result=${removeResult.takeShort()}")
+            if (!removeResult.contains(MasterDnsDockerScripts.MARKER_AMNEZIA_DNS_REMOVED) &&
+                !removeResult.contains(MasterDnsDockerScripts.MARKER_AMNEZIA_DNS_NOT_FOUND)
+            ) {
+                emit(MasterDnsDeployState.Error("amnezia_dns_remove_failed"))
+                return@flow
+            }
+            if (!preflightChecks()) return@flow
+            if (!installDocker()) return@flow
+            if (!buildAndRun()) return@flow
+            val key = extractKey() ?: return@flow
+            PersistentLoggers.debug(
+                TAG,
+                "removeAmneziaDnsAndContinue: done host=${credentials.host} key_len=${key.length}",
+            )
+            emit(MasterDnsDeployState.Done(buildClientToml(credentials.host, key)))
+        } catch (e: Exception) {
+            PersistentLoggers.warn(TAG, "removeAmneziaDnsAndContinue: unexpected error", e)
+            emit(MasterDnsDeployState.Error("unexpected_error"))
+        } finally {
+            transport.close()
+        }
+    }
+
     private suspend fun FlowCollector<MasterDnsDeployState>.connectAndAuth(
         credentials: MasterDnsDeployCredentials,
         tag: String,
@@ -88,6 +120,13 @@ internal class MasterDnsDeployerImpl(
             return false
         }
         emit(MasterDnsDeployState.CheckingPreflight)
+        PersistentLoggers.debug(TAG, "deploy: amnezia-dns port 53 check")
+        val amneziaResult = transport.exec(MasterDnsDockerScripts.checkAmneziaDns53)
+        PersistentLoggers.debug(TAG, "deploy: amnezia-dns result=${amneziaResult.takeShort()}")
+        parseAmneziaDnsConflict(amneziaResult)?.let { conflict ->
+            emit(conflict)
+            return false
+        }
         PersistentLoggers.debug(TAG, "deploy: port 53 check")
         val portResult = transport.exec(MasterDnsDockerScripts.checkPort53)
         PersistentLoggers.debug(TAG, "deploy: port result=${portResult.takeShort()}")
@@ -174,6 +213,21 @@ internal class MasterDnsDeployerImpl(
         }
         return key
     }
+
+    private fun parseAmneziaDnsConflict(result: String): MasterDnsDeployState.AmneziaDnsConflict? {
+        if (!result.contains(MasterDnsDockerScripts.MARKER_AMNEZIA_DNS_CONFLICT)) return null
+        return MasterDnsDeployState.AmneziaDnsConflict(
+            protocol = markerValue(result, "proto").ifBlank { "unknown" },
+            address = markerValue(result, "addr").ifBlank { "0.0.0.0" },
+        )
+    }
+
+    private fun markerValue(result: String, key: String): String =
+        result.split('|')
+            .firstOrNull { it.startsWith("$key=") }
+            ?.substringAfter('=')
+            .orEmpty()
+            .trim()
 
     private fun mapSudoResult(result: String): String? = when {
         result.contains(MasterDnsDockerScripts.MARKER_ERR_SUDO_NOT_INSTALLED) -> "sudo_not_installed"

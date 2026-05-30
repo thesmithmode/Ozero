@@ -42,6 +42,40 @@ class MasterDnsDockerScriptsContractTest {
     }
 
     @Test
+    fun `removeAmneziaDnsOnly does not prune or remove volumes networks images`() {
+        val cmd = MasterDnsDockerScripts.removeAmneziaDnsOnly
+        assertTrue(cmd.contains("sudo docker inspect amnezia-dns"))
+        assertTrue(cmd.contains("/amnezia-dns"))
+        assertTrue(cmd.contains("sudo docker stop amnezia-dns"))
+        assertTrue(cmd.contains("sudo docker rm amnezia-dns"))
+        assertFalse(cmd.contains("docker system prune"))
+        assertFalse(cmd.contains("docker volume rm"))
+        assertFalse(cmd.contains("docker network rm"))
+        assertFalse(cmd.contains("docker rmi"))
+        assertFalse(cmd.contains("amnezia-awg"))
+        assertFalse(cmd.contains("amnezia-awg2"))
+        assertFalse(cmd.contains("adguardhome"))
+    }
+
+    @Test
+    fun `checkAmneziaDns53 inspects exact amnezia-dns name and emits conflict marker`() {
+        val cmd = MasterDnsDockerScripts.checkAmneziaDns53
+        assertTrue(cmd.contains("sudo docker inspect amnezia-dns"))
+        assertTrue(cmd.contains("/amnezia-dns"))
+        assertTrue(cmd.contains("53/udp"))
+        assertTrue(cmd.contains("53/tcp"))
+        assertTrue(cmd.contains("AMNEZIA_DNS_CONFLICT|proto="))
+    }
+
+    @Test
+    fun `checkPort53 inspects UDP local address column`() {
+        val cmd = MasterDnsDockerScripts.checkPort53
+        assertTrue(cmd.contains("ss -H -ulpn"))
+        assertTrue(cmd.contains("awk '$4 ~ /(^|:)53$/ {print $4"))
+        assertFalse(cmd.contains("awk '$5 ~ /(^|:)53$/ {print $5"))
+    }
+
+    @Test
     fun `removeAll does NOT delete named volume - key persist for redeploy`() {
         assertFalse(
             MasterDnsDockerScripts.removeAll.contains("docker volume rm"),
