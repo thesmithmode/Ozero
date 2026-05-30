@@ -56,7 +56,7 @@ internal object MasterDnsDockerScripts {
             if printf '%s' "${'$'}block" | grep -q '"HostPort": *"53"'; then
                 addr=${'$'}(printf '%s' "${'$'}block" | awk -F'\"' '/HostIp/ {print ${'$'}4; exit}')
                 [ -n "${'$'}addr" ] || addr=0.0.0.0
-                echo AMNEZIA_DNS_CONFLICT'|proto='${'$'}proto'|addr='${'$'}addr
+                echo "AMNEZIA_DNS_CONFLICT|proto=${'$'}proto|addr=${'$'}addr"
                 exit 0
             fi
         done
