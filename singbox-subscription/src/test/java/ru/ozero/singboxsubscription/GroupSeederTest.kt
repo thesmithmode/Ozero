@@ -128,6 +128,19 @@ class GroupSeederTest {
     }
 
     @Test
+    fun `should preserve original preset position for userOrder after duplicate skip`() = runBlocking {
+        val presets = listOf(
+            GroupSeeder.PresetGroup("First", "https://same.example.com"),
+            GroupSeeder.PresetGroup("Duplicate", "https://same.example.com"),
+            GroupSeeder.PresetGroup("Third", "https://third.example.com"),
+        )
+
+        seeder.seedPresets(presets)
+
+        assertEquals(2, fakeDao.groups.first { it.subscriptionUrl == "https://third.example.com" }.userOrder)
+    }
+
+    @Test
     fun `should handle empty preset list without errors`() = runBlocking {
         seeder.seedPresets(emptyList())
 

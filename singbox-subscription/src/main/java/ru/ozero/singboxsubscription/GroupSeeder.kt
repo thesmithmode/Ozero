@@ -9,7 +9,7 @@ class GroupSeeder(private val dao: SubscriptionGroupDao) {
 
     suspend fun seedPresets(presets: List<PresetGroup>) {
         val seenUrls = mutableSetOf<String>()
-        presets.forEach { preset ->
+        presets.forEachIndexed { index, preset ->
             if (!seenUrls.add(preset.url)) {
                 return@forEach
             }
