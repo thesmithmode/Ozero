@@ -4,10 +4,13 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -38,6 +41,7 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.net.Inet4Address
 import java.net.InetAddress
+import kotlin.system.measureTimeMillis
 
 class FptnEngine(
     private val configStore: FptnConfigStore,
@@ -161,11 +165,7 @@ class FptnEngine(
                     bypassMethod = fptn.bypassMethod,
                     sniDomain = fptn.sniDomain,
                     deadlineMs = System.currentTimeMillis() + STARTUP_AUTH_BUDGET_MS,
-                    perCandidateMaxTimeoutS = if (candidates.size > 1) {
-                        AUTO_AUTH_CANDIDATE_TIMEOUT_S
-                    } else {
-                        AUTH_TIMEOUT_S
-                    },
+                    autoSelect = fptn.autoSelect,
                 )
             }
         } ?: return StartResult.Failure("FPTN authentication failed")
@@ -341,6 +341,118 @@ class FptnEngine(
         bypassMethod: String,
         sniDomain: String,
         deadlineMs: Long,
+        autoSelect: Boolean,
+    ): AuthenticatedServer? {
+        val orderedCandidates = if (autoSelect && candidates.size > 1) {
+            val healthResults = findReachableCandidates(candidates, bypassMethod, sniDomain, deadlineMs)
+            prioritizeAuthenticationCandidates(candidates, healthResults)
+        } else {
+            candidates
+        }
+        val authenticated = authenticateCandidates(
+            candidates = orderedCandidates,
+            data = data,
+            bypassMethod = bypassMethod,
+            sniDomain = sniDomain,
+            deadlineMs = deadlineMs,
+            perCandidateMaxTimeoutS = if (autoSelect && orderedCandidates.size > 1) {
+                AUTO_AUTH_FALLBACK_TIMEOUT_S
+            } else {
+                AUTH_TIMEOUT_S
+            },
+        )
+        if (authenticated == null) {
+            PersistentLoggers.error(TAG, "authenticate: all ${candidates.size} server candidate(s) failed")
+        }
+        return authenticated
+    }
+
+    private suspend fun findReachableCandidates(
+        candidates: List<FptnServer>,
+        bypassMethod: String,
+        sniDomain: String,
+        deadlineMs: Long,
+    ): List<FptnHealthCheck> = coroutineScope {
+        val results = mutableListOf<FptnHealthCheck>()
+        val healthDeadlineMs = minOf(deadlineMs, System.currentTimeMillis() + AUTO_HEALTH_BUDGET_MS)
+        for (batch in candidates.chunked(AUTO_HEALTH_CONCURRENCY)) {
+            currentCoroutineContext().ensureActive()
+            if (System.currentTimeMillis() >= healthDeadlineMs) break
+            val checks = batch.map { server ->
+                async {
+                    val remainingMs = healthDeadlineMs - System.currentTimeMillis()
+                    if (remainingMs <= 0L) {
+                        FptnHealthCheck(server, null)
+                    } else {
+                        healthCheck(
+                            server = server,
+                            bypassMethod = bypassMethod,
+                            sniDomain = sniDomain,
+                            timeoutS = authTimeoutSeconds(remainingMs, AUTO_HEALTH_TIMEOUT_S),
+                        )
+                    }
+                }
+            }.awaitAll()
+            results += checks
+            if (results.size >= AUTO_HEALTH_MIN_CHECKS && results.any { it.latencyMs != null }) break
+        }
+        results
+    }
+
+    private suspend fun healthCheck(
+        server: FptnServer,
+        bypassMethod: String,
+        sniDomain: String,
+        timeoutS: Int,
+    ): FptnHealthCheck {
+        currentCoroutineContext().ensureActive()
+        val handle = httpsClient.nativeCreate(
+            host = server.host,
+            port = server.port,
+            sni = sniDomain,
+            md5Fingerprint = server.md5Fingerprint,
+            censorshipStrategy = bypassMethod,
+        )
+        return try {
+            var ok = false
+            val latencyMs = measureTimeMillis {
+                val resp = httpsClient.nativeGet(handle, "/api/v1/test/file.bin", timeoutS)
+                ok = resp.code in 200..399
+            }
+            FptnHealthCheck(server, latencyMs.takeIf { ok })
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.d(TAG, "health: failed server=${server.name} ${e.javaClass.simpleName}")
+            FptnHealthCheck(server, null)
+        } finally {
+            httpsClient.nativeDestroy(handle)
+        }
+    }
+
+    internal fun prioritizeAuthenticationCandidates(
+        candidates: List<FptnServer>,
+        healthResults: List<FptnHealthCheck>,
+    ): List<FptnServer> {
+        val checked = healthResults.map { it.server }.toSet()
+        val reachable = healthResults
+            .filter { it.latencyMs != null }
+            .sortedWith(
+                compareBy<FptnHealthCheck> { it.latencyMs ?: Long.MAX_VALUE }
+                    .thenBy { candidates.indexOf(it.server) },
+            )
+            .map { it.server }
+        if (reachable.isEmpty()) return candidates
+        val unchecked = candidates.filterNot { checked.contains(it) }
+        return reachable + unchecked
+    }
+
+    private suspend fun authenticateCandidates(
+        candidates: List<FptnServer>,
+        data: FptnTokenData,
+        bypassMethod: String,
+        sniDomain: String,
+        deadlineMs: Long,
         perCandidateMaxTimeoutS: Int,
     ): AuthenticatedServer? {
         for (index in candidates.indices) {
@@ -365,7 +477,6 @@ class FptnEngine(
                 Log.d(TAG, "authenticate: fallback from ${server.name} to ${candidates[index + 1].name}")
             }
         }
-        PersistentLoggers.error(TAG, "authenticate: all ${candidates.size} server candidate(s) failed")
         return null
     }
 
@@ -447,6 +558,11 @@ class FptnEngine(
         }
     }
 
+    internal data class FptnHealthCheck(
+        val server: FptnServer,
+        val latencyMs: Long?,
+    )
+
     private data class AuthenticatedServer(
         val server: FptnServer,
         val serverIp: String,
@@ -456,8 +572,12 @@ class FptnEngine(
     companion object {
         private const val TAG = "FptnEngine"
         private const val AUTH_TIMEOUT_S = 15
-        private const val AUTO_AUTH_CANDIDATE_TIMEOUT_S = 5
-        private const val STARTUP_AUTH_BUDGET_MS = 15_000L
+        private const val AUTO_HEALTH_TIMEOUT_S = 1
+        private const val AUTO_HEALTH_CONCURRENCY = 4
+        private const val AUTO_HEALTH_MIN_CHECKS = 12
+        private const val AUTO_HEALTH_BUDGET_MS = 8_000L
+        private const val AUTO_AUTH_FALLBACK_TIMEOUT_S = 5
+        private const val STARTUP_AUTH_BUDGET_MS = 20_000L
         private const val READY_TIMEOUT_MS = 30_000L
         private const val READY_POLL_MS = 300L
     }

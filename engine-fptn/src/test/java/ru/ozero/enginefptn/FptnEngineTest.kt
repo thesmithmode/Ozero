@@ -225,15 +225,46 @@ class FptnEngineTest {
         )
         assertTrue(
             startBody.contains("STARTUP_AUTH_BUDGET_MS") &&
-                source.contains("AUTO_AUTH_CANDIDATE_TIMEOUT_S") &&
+                source.contains("AUTO_HEALTH_TIMEOUT_S") &&
+                source.contains("AUTO_HEALTH_CONCURRENCY") &&
+                source.contains("AUTO_HEALTH_MIN_CHECKS") &&
+                source.contains("AUTO_AUTH_FALLBACK_TIMEOUT_S") &&
                 source.contains("authTimeoutSeconds(") &&
-                source.contains("perCandidateMaxTimeoutS") &&
                 source.contains("deadlineMs"),
-            "FPTN fallback must use one bounded startup budget, not a full timeout per server.",
+            "FPTN fallback must use a quick health pass plus one bounded startup budget.",
         )
         assertFalse(
             source.contains("listOf(selected) + data.servers.filterNot"),
             "Manual FPTN selection must not silently append fallback candidates.",
+        )
+    }
+
+    @Test
+    fun `auto health timeouts among first three candidates do not stop later candidates`() {
+        val candidates = (1..28).map { server("S$it") }
+        val healthResults = candidates.take(12).mapIndexed { index, candidate ->
+            FptnEngine.FptnHealthCheck(
+                server = candidate,
+                latencyMs = when (index) {
+                    0, 1, 2 -> null
+                    3 -> 80L
+                    4 -> 20L
+                    else -> null
+                },
+            )
+        }
+
+        val ordered = engine.prioritizeAuthenticationCandidates(candidates, healthResults)
+
+        assertEquals("S5", ordered.first().name)
+        assertEquals("S4", ordered[1].name)
+        assertFalse(
+            ordered.take(2).map { it.name }.any { it in listOf("S1", "S2", "S3") },
+            "First three health timeouts must not consume the whole auto-select startup path.",
+        )
+        assertTrue(
+            ordered.drop(2).map { it.name }.containsAll(listOf("S13", "S28")),
+            "Unchecked later servers must remain eligible for auth fallback.",
         )
     }
 
