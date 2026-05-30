@@ -45,6 +45,7 @@ internal object MasterDnsDockerScripts {
 
     val checkAmneziaDns53: String =
         """
+        if ! sudo docker ps --format '{{.Names}}' 2>/dev/null | grep -qx 'amnezia-dns'; then echo AMNEZIA_DNS_NOT_FOUND; exit 0; fi
         inspect=${'$'}(sudo docker inspect amnezia-dns 2>/dev/null); rc=${'$'}?
         if [ ${'$'}rc -ne 0 ]; then echo AMNEZIA_DNS_NOT_FOUND; exit 0; fi
         name=${'$'}(printf '%s' "${'$'}inspect" | awk -F'\"' '/\"Name\"/ {print ${'$'}4; exit}')

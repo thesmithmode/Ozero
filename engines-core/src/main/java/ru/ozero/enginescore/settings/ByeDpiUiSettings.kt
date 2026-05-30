@@ -62,7 +62,7 @@ data class ByeDpiUiSettings(
         const val DEFAULT_NO_DOMAIN: Boolean = false
         const val DEFAULT_DESYNC_HTTP: Boolean = true
         const val DEFAULT_DESYNC_HTTPS: Boolean = true
-        const val DEFAULT_DESYNC_UDP: Boolean = true
+        const val DEFAULT_DESYNC_UDP: Boolean = false
         val DEFAULT_DESYNC_METHOD: DesyncMethod = DesyncMethod.OOB
         const val DEFAULT_SPLIT_POSITION: Int = 1
         const val DEFAULT_SPLIT_AT_HOST: Boolean = false
@@ -110,7 +110,7 @@ data class ByeDpiUiSettings(
         fun fromJson(raw: String?): ByeDpiUiSettings {
             if (raw.isNullOrBlank()) return DEFAULT
             val obj = runCatching { JSONObject(raw) }.getOrNull() ?: return DEFAULT
-            return ByeDpiUiSettings(
+            val parsed = ByeDpiUiSettings(
                 maxConnections = obj.optInt(KEY_MAX_CONNECTIONS, DEFAULT_MAX_CONNECTIONS),
                 bufferSize = obj.optInt(KEY_BUFFER_SIZE, DEFAULT_BUFFER_SIZE),
                 defaultTtl = obj.optInt(KEY_DEFAULT_TTL, DEFAULT_DEFAULT_TTL),
@@ -141,6 +141,9 @@ data class ByeDpiUiSettings(
                 udpFakeCount = obj.optInt(KEY_UDP_FAKE_COUNT, DEFAULT_UDP_FAKE_COUNT),
                 dropSack = obj.optBoolean(KEY_DROP_SACK, DEFAULT_DROP_SACK),
             )
+            return if (parsed == LEGACY_DEFAULT_WITH_UDP) DEFAULT else parsed
         }
+
+        private val LEGACY_DEFAULT_WITH_UDP: ByeDpiUiSettings = DEFAULT.copy(desyncUdp = true)
     }
 }
