@@ -228,15 +228,16 @@ class FptnEngineTest {
         )
         assertTrue(
             startBody.contains("STARTUP_AUTH_BUDGET_MS") &&
-                source.contains("AUTO_HEALTH_TIMEOUT_S") &&
-                source.contains("AUTO_HEALTH_CONCURRENCY") &&
-                source.contains("AUTO_HEALTH_MAX_CANDIDATES") &&
-                source.contains("AUTO_AUTH_MAX_CANDIDATES") &&
                 source.contains("AUTO_AUTH_CANDIDATE_TIMEOUT_S") &&
                 source.contains("authTimeoutSeconds(") &&
                 source.contains("perCandidateMaxTimeoutS") &&
                 source.contains("deadlineMs"),
-            "FPTN fallback must use a quick health pass plus one bounded startup budget.",
+            "FPTN fallback must preserve one bounded startup budget without a health preselect gate.",
+        )
+        assertFalse(
+            source.contains("AUTO_AUTH_MAX_CANDIDATES") ||
+                source.contains(".take(AUTO_AUTH_MAX_CANDIDATES)"),
+            "FPTN startup auth must not cap auto candidates to a health-preselected top list.",
         )
         assertFalse(
             source.contains("listOf(selected) + data.servers.filterNot"),
@@ -245,47 +246,57 @@ class FptnEngineTest {
     }
 
     @Test
-    fun `auto health prioritization skips timed out checked servers`() {
-        val candidates = (1..28).map { server("S$it") }
-        val healthResults = candidates.take(12).mapIndexed { index, candidate ->
-            FptnEngine.FptnHealthCheck(
-                server = candidate,
-                latencyMs = when (index) {
-                    0, 1, 2 -> null
-                    3 -> 80L
-                    4 -> 20L
-                    else -> null
-                },
-            )
-        }
-
-        val ordered = prioritizeFptnAuthenticationCandidates(candidates, healthResults)
-
-        assertEquals("S5", ordered.first().name)
-        assertEquals("S4", ordered[1].name)
-        assertFalse(
-            ordered.take(2).map { it.name }.any { it in listOf("S1", "S2", "S3") },
-            "First checked timeouts must not consume the first auth attempts.",
+    fun `startup auth preserves selected token order before any health order`() {
+        val candidates = listOf(
+            server("France-1"),
+            server("France-2"),
+            server("France-3"),
+            server("France-4"),
+            server("France-5"),
+            server("Estonia-1"),
         )
-        assertTrue(
-            ordered.drop(2).map { it.name }.containsAll(listOf("S13", "S28")),
-            "Unchecked later servers must remain eligible before the caller applies the startup limit.",
+
+        val ordered = fptnStartupAuthCandidates(candidates)
+
+        assertEquals(
+            listOf("France-1", "France-2", "France-3", "France-4", "France-5", "Estonia-1"),
+            ordered.map { it.name },
         )
     }
 
     @Test
-    fun `auto health prioritization keeps unchecked servers first when checked servers all fail`() {
-        val candidates = (1..12).map { server("S$it") }
-        val healthResults = candidates.take(8).map { candidate ->
-            FptnEngine.FptnHealthCheck(server = candidate, latencyMs = null)
-        }
+    fun `startup auth does not cap auto candidates to health top three`() {
+        val candidates = (1..28).map { server("S$it") }
 
-        val ordered = prioritizeFptnAuthenticationCandidates(candidates, healthResults)
+        val ordered = fptnStartupAuthCandidates(candidates)
 
-        assertEquals(listOf("S9", "S10", "S11"), ordered.take(3).map { it.name })
-        assertTrue(
-            ordered.drop(3).map { it.name }.containsAll(listOf("S1", "S8")),
-            "Checked failures can remain as last-resort candidates, but must not consume the bounded startup auth cap.",
+        assertEquals(28, ordered.size)
+        assertEquals(listOf("S1", "S2", "S3", "S4", "S5"), ordered.take(5).map { it.name })
+        assertEquals("S28", ordered.last().name)
+    }
+
+    @Test
+    fun `auto auth candidate timeout stays at baseline five seconds`() {
+        assertEquals(5, fptnStartupAuthPerCandidateTimeoutS(candidateCount = 28))
+        assertEquals(15, fptnStartupAuthPerCandidateTimeoutS(candidateCount = 1))
+        assertFalse(fptnStartupAuthPerCandidateTimeoutS(candidateCount = 28) == 3)
+    }
+
+    @Test
+    fun `startup auth failure reason remains structured for candidate failures`() {
+        val reason = startupFptnFailureReason(
+            failures = listOf(
+                FptnEngine.FPTN_AUTH_TIMEOUT,
+                FptnEngine.FPTN_AUTH_TIMEOUT,
+                FptnEngine.FPTN_AUTH_TIMEOUT,
+            ),
+            candidateCount = 28,
+        )
+
+        assertEquals("${FptnEngine.FPTN_ALL_CANDIDATES_FAILED}: ${FptnEngine.FPTN_AUTH_TIMEOUT}", reason)
+        assertEquals(
+            FptnEngine.FPTN_TOKEN_REJECTED,
+            startupFptnFailureReason(listOf(FptnEngine.FPTN_TOKEN_REJECTED), candidateCount = 28),
         )
     }
 

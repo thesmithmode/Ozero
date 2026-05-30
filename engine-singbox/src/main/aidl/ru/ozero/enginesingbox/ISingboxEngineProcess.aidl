@@ -9,6 +9,8 @@ interface ISingboxEngineProcess {
     void startWithConfigFile(in ParcelFileDescriptor tunFd, String configFilePath, ISingboxProtector protector);
     void startProxyMode(String singboxJsonConfig, ISingboxProtector protector);
     void stop();
+    boolean stopAndWait(long timeoutMs);
+    boolean runtimeRunning();
     SingboxStats getStats();
     void registerStatusCallback(ISingboxStatusCallback cb);
     long urlTest(long profileId);

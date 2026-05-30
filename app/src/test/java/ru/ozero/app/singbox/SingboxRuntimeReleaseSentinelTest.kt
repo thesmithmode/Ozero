@@ -106,6 +106,33 @@ class SingboxRuntimeReleaseSentinelTest {
         )
     }
 
+    @Test
+    fun `should SingboxEngineService stop synchronously and not fake active connections`() {
+        val root = locateRepoRoot()
+        val content = File(
+            root,
+            "singbox-process/src/main/java/ru/ozero/singboxprocess/SingboxEngineService.kt",
+        ).readText()
+
+        val stopBlock = content.substringAfter("override fun stop()")
+            .substringBefore("override fun getStats()")
+        assertTrue(
+            stopBlock.contains("stopAndWait(DEFAULT_STOP_TIMEOUT_MS)") &&
+                stopBlock.contains("withTimeoutOrNull") &&
+                stopBlock.contains("SingboxRuntime.stop()"),
+            "SingboxEngineService.stop must synchronously wait for SingboxRuntime.stop before the engine unbinds",
+        )
+
+        val statsBlock = content.substringAfter("override fun getStats()")
+            .substringBefore("override fun registerStatusCallback")
+        assertTrue(
+            statsBlock.contains("SingboxStats()") &&
+                !statsBlock.contains("SingboxRuntime.isRunning()) 1") &&
+                !statsBlock.contains("activeConnections = if"),
+            "stats must not report activeConnections=1 from runtimeRunning alone; startup health has a separate AIDL method",
+        )
+    }
+
     private fun locateRepoRoot(): File {
         var dir = File(System.getProperty("user.dir") ?: ".").absoluteFile
         repeat(5) {
