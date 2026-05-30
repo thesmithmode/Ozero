@@ -22,7 +22,7 @@ class MasterDnsDeployerTest {
     }
 
     private fun setupHappyPath() {
-        transport.setResponse("ss -uln", MasterDnsDockerScripts.MARKER_PORT_FREE)
+        transport.setResponse("bind_probe", MasterDnsDockerScripts.MARKER_PORT_FREE)
         transport.setResponse("free -m", "512 1024")
         transport.setResponse("apt-get", MasterDnsDockerScripts.MARKER_DOCKER_OK)
         transport.setResponse("Dockerfile", MasterDnsDockerScripts.MARKER_BUILD_OK)
@@ -60,13 +60,23 @@ class MasterDnsDeployerTest {
 
     @Test
     fun `should return Error when port 53 is busy`() = runTest {
-        transport.setResponse("ss -uln", MasterDnsDockerScripts.MARKER_PORT_BUSY)
+        transport.setResponse("bind_probe", MasterDnsDockerScripts.MARKER_PORT_BUSY)
 
         val states = deployer.deploy(credentials()).toList()
 
         assertInstanceOf(MasterDnsDeployState.Error::class.java, states.last())
         val error = states.last() as MasterDnsDeployState.Error
         assertTrue(error.message == "port_53_busy")
+    }
+
+    @Test
+    fun `should include port conflict details in Error for UI`() = runTest {
+        transport.setResponse("bind_probe", "PORT_BUSY|proto=udp|addr=0.0.0.0|name=docker-proxy")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("port_53_busy|proto=udp|addr=0.0.0.0|name=docker-proxy", error.message)
     }
 
     @Test
