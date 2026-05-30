@@ -169,8 +169,8 @@ internal object MasterDnsDockerScripts {
     const val removeAmneziaDnsOnly =
         "inspect=\$(sudo docker inspect amnezia-dns 2>/dev/null); rc=\$?;" +
             " if [ \$rc -ne 0 ]; then echo AMNEZIA_DNS_NOT_FOUND; exit 0; fi;" +
-            " name=\$(printf '%s' \"$inspect\" | awk -F'\\\"' '/\\\"Name\\\"/ {print $4; exit}');" +
-            " if [ \"$name\" != \"/amnezia-dns\" ]; then echo AMNEZIA_DNS_NOT_FOUND; exit 0; fi;" +
+            " name=\$(printf '%s' \"\$inspect\" | awk -F'\\\"' '/\\\"Name\\\"/ {print \$4; exit}');" +
+            " if [ \"\$name\" != \"/amnezia-dns\" ]; then echo AMNEZIA_DNS_NOT_FOUND; exit 0; fi;" +
             " sudo docker stop amnezia-dns 2>/dev/null || true;" +
             " sudo docker rm amnezia-dns 2>/dev/null || true;" +
             " echo AMNEZIA_DNS_REMOVED"
