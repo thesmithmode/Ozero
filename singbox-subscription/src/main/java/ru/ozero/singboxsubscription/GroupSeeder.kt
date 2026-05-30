@@ -11,7 +11,7 @@ class GroupSeeder(private val dao: SubscriptionGroupDao) {
         val seenUrls = mutableSetOf<String>()
         presets.forEachIndexed { index, preset ->
             if (!seenUrls.add(preset.url)) {
-                return@forEach
+                return@forEachIndexed
             }
             if (dao.getByUrl(preset.url) == null) {
                 dao.insert(
