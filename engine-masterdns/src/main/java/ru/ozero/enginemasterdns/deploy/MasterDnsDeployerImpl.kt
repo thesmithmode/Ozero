@@ -201,7 +201,7 @@ internal class MasterDnsDeployerImpl(
         val buildResult = transport.exec(MasterDnsDockerScripts.deployMasterDns, timeoutMs = 300_000L)
         PersistentLoggers.debug(TAG, "deploy: build result=${buildResult.takeShort()}")
         if (!buildResult.contains(MasterDnsDockerScripts.MARKER_BUILD_OK)) {
-            emit(MasterDnsDeployState.Error("build_failed"))
+            emit(MasterDnsDeployState.Error(mapBuildError(buildResult)))
             return false
         }
         emit(MasterDnsDeployState.StartingContainer)
@@ -209,7 +209,7 @@ internal class MasterDnsDeployerImpl(
         val runResult = transport.exec(MasterDnsDockerScripts.runContainer)
         PersistentLoggers.debug(TAG, "deploy: run result=${runResult.takeShort()}")
         if (!runResult.contains(MasterDnsDockerScripts.MARKER_RUN_OK)) {
-            emit(MasterDnsDeployState.Error("run_failed"))
+            emit(MasterDnsDeployState.Error(mapRunError(runResult)))
             return false
         }
         delay(CONTAINER_STARTUP_DELAY_MS)
@@ -264,6 +264,21 @@ internal class MasterDnsDeployerImpl(
         result.contains(MasterDnsDockerScripts.MARKER_ERR_SUDO_NO_HOME) -> "sudo_no_home"
         result.contains(MasterDnsDockerScripts.MARKER_ERR_SUDO_NOT_IN_GROUP) -> "sudo_not_in_group"
         else -> null
+    }
+
+    private fun mapBuildError(result: String): String = when {
+        result.contains(MasterDnsDockerScripts.MARKER_ERR_BUILD_BIN_MISSING) ||
+            result.contains("reason=bin_missing") -> "build_failed/bin_missing"
+        else -> "build_failed"
+    }
+
+    private fun mapRunError(result: String): String {
+        val markerLine = result.lineSequence()
+            .map { it.trim() }
+            .firstOrNull { it.startsWith(MasterDnsDockerScripts.MARKER_ERR_RUN) }
+            ?: return "run_failed"
+        val details = markerLine.substringAfter('|', missingDelimiterValue = "")
+        return if (details.isBlank()) "run_failed" else "run_failed|$details"
     }
 
     private fun mapPortResult(result: String): String? {

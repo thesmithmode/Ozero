@@ -284,10 +284,10 @@ class SingboxEngine @Inject constructor(
                 runCatching { pfd.close() }
             }
             delay(150)
-            val postStartStats = runCatching { p.stats }.getOrNull()
-            if (postStartStats?.activeConnections == 0) {
+            val runtimeRunning = runCatching { p.runtimeRunning() }.getOrDefault(false)
+            if (!runtimeRunning) {
                 clearPendingStart()
-                return TunAttachResult.Failure("sing-box runtime failed to start (activeConnections=0)")
+                return TunAttachResult.Failure("sing-box runtime failed to start")
             }
             activeSocksPort = pendingSocksPort
             pendingSocksPort = 0
@@ -306,10 +306,17 @@ class SingboxEngine @Inject constructor(
         pendingSocksPort = 0
         chainMode = false
         activeSocksPort = 0
-        runCatching { proxy?.stop() }
-            .onFailure { PersistentLoggers.warn(TAG, "proxy.stop() failed: ${it.message}") }
+        val p = proxy
+        if (p != null) {
+            runCatching {
+                val stopped = p.stopAndWait(REMOTE_STOP_TIMEOUT_MS)
+                if (!stopped) PersistentLoggers.warn(TAG, "proxy.stopAndWait() timed out")
+            }.onFailure { PersistentLoggers.warn(TAG, "proxy.stopAndWait() failed: ${it.message}") }
+        }
         close()
     }
+
+    override fun stopTimeoutMs(): Long = ENGINE_STOP_TIMEOUT_MS
 
     override suspend fun probe(): ProbeResult = ProbeResult.Success(latencyMs = 0L)
 
@@ -518,6 +525,8 @@ class SingboxEngine @Inject constructor(
         private const val TAG = "SingboxEngine"
         private const val CONNECT_TIMEOUT_S = 5L
         private const val STATS_POLL_MS = 1_000L
+        private const val REMOTE_STOP_TIMEOUT_MS = 3_000L
+        private const val ENGINE_STOP_TIMEOUT_MS = 4_000L
         private const val MAX_AUTO_SELECT_OUTBOUNDS = 50
         private const val CHAIN_PORT_BASE = 49408
         private const val CHAIN_PORT_RANGE = 256

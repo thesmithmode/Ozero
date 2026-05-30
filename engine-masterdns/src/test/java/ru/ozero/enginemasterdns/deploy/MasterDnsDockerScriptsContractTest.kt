@@ -28,6 +28,44 @@ class MasterDnsDockerScriptsContractTest {
     }
 
     @Test
+    fun `deployMasterDns fails build with bin missing marker when upstream installer produces no server binary`() {
+        val cmd = MasterDnsDockerScripts.deployMasterDns
+        assertFalse(cmd.contains("| bash 2>&1 || true"))
+        assertTrue(cmd.contains("ERR_BUILD_BIN_MISSING"))
+        assertTrue(cmd.contains("ERR_BUILD|reason=bin_missing"))
+        assertTrue(cmd.contains("grep -q ERR_BUILD_BIN_MISSING"))
+    }
+
+    @Test
+    fun `deployMasterDns installs discovered server binary into expected executable path`() {
+        val cmd = MasterDnsDockerScripts.deployMasterDns
+        assertTrue(cmd.contains("find / -maxdepth 8 -name 'masterdnsvpn-server'"))
+        assertTrue(cmd.contains("install -m755"))
+        assertTrue(cmd.contains("/usr/local/bin/masterdnsvpn-server"))
+        assertTrue(cmd.contains("test -x /usr/local/bin/masterdnsvpn-server"))
+        assertTrue(cmd.contains("CMD [\"/usr/local/bin/masterdnsvpn-server\"]"))
+    }
+
+    @Test
+    fun `runContainer removes stale masterdns container before run without touching key volume`() {
+        val cmd = MasterDnsDockerScripts.runContainer
+        assertTrue(cmd.contains("docker inspect -f '{{.State.Status}}' masterdns-ozero"))
+        assertTrue(cmd.contains("created|exited|dead"))
+        assertTrue(cmd.contains("sudo docker rm -f masterdns-ozero"))
+        assertFalse(cmd.contains("docker volume rm"))
+    }
+
+    @Test
+    fun `runContainer returns structured run diagnostics with inspect state error and log tail`() {
+        val cmd = MasterDnsDockerScripts.runContainer
+        assertTrue(cmd.contains("ERR_RUN|phase=%s|exit=%s|%s|error=%s|logs=%s"))
+        assertTrue(cmd.contains("state={{.State.Status}}|exit={{.State.ExitCode}}|error={{.State.Error}}"))
+        assertTrue(cmd.contains("docker logs --tail 20 masterdns-ozero"))
+        assertTrue(cmd.contains("run_out=\$"))
+        assertFalse(cmd.contains("{ echo ERR_RUN; exit 0; }"))
+    }
+
+    @Test
     fun `runContainer generates encrypt key only if missing - idempotent redeploy preserves key`() {
         val cmd = MasterDnsDockerScripts.runContainer
         assertTrue(

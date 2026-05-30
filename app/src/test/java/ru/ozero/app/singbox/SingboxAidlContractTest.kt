@@ -33,6 +33,19 @@ class SingboxAidlContractTest {
     }
 
     @Test
+    fun `should ISingboxEngineProcess define acknowledged stop and runtime health`() {
+        val content = aidlFile("ISingboxEngineProcess.aidl")
+        assertTrue(
+            content.contains("boolean stopAndWait(long timeoutMs)"),
+            "ISingboxEngineProcess must expose stopAndWait(timeoutMs) so caller waits before unbind or restart",
+        )
+        assertTrue(
+            content.contains("boolean runtimeRunning()"),
+            "ISingboxEngineProcess must expose runtimeRunning() for startup health without faking stats",
+        )
+    }
+
+    @Test
     fun `should ISingboxEngineProcess define getStats returning SingboxStats`() {
         val content = aidlFile("ISingboxEngineProcess.aidl")
         assertTrue(

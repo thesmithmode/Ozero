@@ -31,10 +31,23 @@ class DomainListManager(
         return result
     }
 
-    fun getActiveDomains(lists: List<DomainList>): List<String> =
-        lists.filter { it.isActive }
+    fun getActiveDomains(lists: List<DomainList>): List<String> {
+        val domains = lists.filter { it.isActive }
             .flatMap { it.domains }
             .distinct()
+        return withRequiredMediaDomains(domains).distinct()
+    }
+
+    private fun withRequiredMediaDomains(domains: List<String>): List<String> {
+        val normalized = domains.map { it.lowercase() }
+        val hasYoutubeFrontdoor = normalized.any { it in YOUTUBE_FRONTDOOR_DOMAINS }
+        val hasYoutubeMedia = normalized.any { it == "googlevideo.com" || it.endsWith(".googlevideo.com") }
+        return if (hasYoutubeFrontdoor && !hasYoutubeMedia) {
+            domains + REQUIRED_YOUTUBE_MEDIA_DOMAINS
+        } else {
+            domains
+        }
+    }
 
     fun toggle(lists: List<DomainList>, id: String): List<DomainList> =
         lists.map { if (it.id == id) it.copy(isActive = !it.isActive) else it }
@@ -56,12 +69,14 @@ class DomainListManager(
             Triple("youtube_lite", "YouTube (основные)", true),
             Triple("telegram_lite", "Telegram (основные)", true),
             Triple("instagram_lite", "Instagram (основные)", true),
-            Triple("googlevideo", "Google Video", false),
+            Triple("googlevideo", "Google Video", true),
             Triple("youtube", "YouTube (все домены)", false),
             Triple("cloudflare", "Cloudflare", false),
             Triple("discord", "Discord", false),
             Triple("social", "Social Media", false),
             Triple("telegram", "Telegram (все домены)", false),
         )
+        private val YOUTUBE_FRONTDOOR_DOMAINS = setOf("youtube.com", "www.youtube.com", "youtu.be")
+        private val REQUIRED_YOUTUBE_MEDIA_DOMAINS = listOf("manifest.googlevideo.com")
     }
 }

@@ -106,40 +106,117 @@ internal object MasterDnsDockerScripts {
             " sudo tail -30 /tmp/docker-install.log 2>/dev/null || true;" +
             " echo ERR_DOCKER; fi"
 
-    const val deployMasterDns: String =
-        "mkdir -p /tmp/mdns_build && cat > /tmp/mdns_build/Dockerfile << 'EODF'\n" +
-            "FROM ubuntu:22.04\n" +
-            "ARG DEBIAN_FRONTEND=noninteractive\n" +
-            "RUN apt-get update -yq && apt-get install -yq curl openssl ca-certificates\n" +
-            "RUN curl -fsSL https://raw.githubusercontent.com/masterking32/MasterDnsVPN" +
-            "/main/server_linux_install.sh | bash 2>&1 || true\n" +
-            "RUN [ -f /usr/local/bin/masterdnsvpn-server ] || " +
-            "(find / -maxdepth 6 -name 'masterdnsvpn-server' -type f 2>/dev/null" +
-            " | head -1 | xargs -I{} install -m755 {} /usr/local/bin/ 2>/dev/null)\n" +
-            "RUN mkdir -p /etc/masterdnsvpn\n" +
-            "EXPOSE 53/udp\n" +
-            "CMD [\"/usr/local/bin/masterdnsvpn-server\"]\n" +
-            "EODF\n" +
-            "sudo docker build --no-cache -t masterdns-ozero /tmp/mdns_build 2>&1" +
-            " | tail -3; build_rc=\${PIPESTATUS[0]}; [ \$build_rc -eq 0 ] && echo BUILD_OK || echo ERR_BUILD"
+    val deployMasterDns: String =
+        """
+        mkdir -p /tmp/mdns_build && cat > /tmp/mdns_build/Dockerfile << 'EODF'
+        FROM ubuntu:22.04
+        ARG DEBIAN_FRONTEND=noninteractive
+        RUN apt-get update -yq && apt-get install -yq curl openssl ca-certificates findutils
+        RUN set -eu; \
+            curl -fsSL https://raw.githubusercontent.com/masterking32/MasterDnsVPN/main/server_linux_install.sh \
+                -o /tmp/masterdns-install.sh; \
+            install_rc=0; \
+            bash /tmp/masterdns-install.sh 2>&1 || install_rc=${'$'}?; \
+            candidate=""; \
+            for path in \
+                /usr/local/bin/masterdnsvpn-server \
+                /usr/bin/masterdnsvpn-server \
+                /opt/masterdnsvpn/masterdnsvpn-server; \
+            do \
+                if [ -f "${'$'}path" ]; then candidate="${'$'}path"; break; fi; \
+            done; \
+            if [ -z "${'$'}candidate" ]; then \
+                candidate=${'$'}(find / -maxdepth 8 -name 'masterdnsvpn-server' -type f -perm /111 \
+                    2>/dev/null | head -1 || true); \
+            fi; \
+            if [ -z "${'$'}candidate" ]; then \
+                candidate=${'$'}(find / -maxdepth 8 -name 'masterdnsvpn-server' -type f \
+                    2>/dev/null | head -1 || true); \
+            fi; \
+            if [ -z "${'$'}candidate" ]; then echo ERR_BUILD_BIN_MISSING; exit 42; fi; \
+            if [ "${'$'}candidate" != "/usr/local/bin/masterdnsvpn-server" ]; then \
+                install -m755 "${'$'}candidate" /usr/local/bin/masterdnsvpn-server; \
+            else \
+                chmod 755 /usr/local/bin/masterdnsvpn-server; \
+            fi; \
+            test -x /usr/local/bin/masterdnsvpn-server; \
+            if [ "${'$'}install_rc" -ne 0 ]; then \
+                echo "INSTALL_NONZERO_BUT_BINARY_FOUND|exit=${'$'}install_rc"; \
+            fi
+        RUN mkdir -p /etc/masterdnsvpn
+        EXPOSE 53/udp
+        CMD ["/usr/local/bin/masterdnsvpn-server"]
+        EODF
+        build_log=/tmp/mdns_build/docker-build.log
+        sudo docker build --no-cache -t masterdns-ozero /tmp/mdns_build > "${'$'}build_log" 2>&1
+        build_rc=${'$'}?
+        tail -30 "${'$'}build_log" 2>/dev/null || true
+        if [ ${'$'}build_rc -eq 0 ]; then
+            echo BUILD_OK
+        elif grep -q ERR_BUILD_BIN_MISSING "${'$'}build_log" 2>/dev/null; then
+            echo "ERR_BUILD|reason=bin_missing"
+        else
+            echo ERR_BUILD
+        fi
+        """.trimIndent()
 
-    const val runContainer =
-        "sudo docker rm -f masterdns-ozero 2>/dev/null; " +
-            "sudo docker volume inspect masterdns-key >/dev/null 2>&1 || " +
-            "sudo docker volume create masterdns-key >/dev/null; " +
-            "sudo docker run -d --name masterdns-ozero --restart always" +
-            " -v masterdns-key:/etc/masterdnsvpn" +
-            " -p 53:53/udp masterdns-ozero || { echo ERR_RUN; exit 0; }; " +
-            "for i in \$(seq 1 15);" +
-            " do sudo docker exec masterdns-ozero true >/dev/null 2>&1 && break;" +
-            " sleep 1; done; " +
-            "sudo docker exec masterdns-ozero sh -c " +
-            "'test -f /etc/masterdnsvpn/encrypt_key.txt || " +
-            "(openssl rand -hex 32 > /etc/masterdnsvpn/encrypt_key.txt && " +
-            "chmod 600 /etc/masterdnsvpn/encrypt_key.txt && exit 42)'; " +
-            "rc=\$?; " +
-            "if [ \$rc -eq 42 ]; then sudo docker restart masterdns-ozero >/dev/null 2>&1; fi; " +
-            "echo RUN_OK"
+    val runContainer: String =
+        """
+        run_diag() {
+            phase="${'$'}1"
+            rc="${'$'}2"
+            err="${'$'}3"
+            state="${'$'}(
+                sudo docker inspect -f 'state={{.State.Status}}|exit={{.State.ExitCode}}|error={{.State.Error}}' \
+                    masterdns-ozero 2>/dev/null || true
+            )"
+            logs="${'$'}(
+                sudo docker logs --tail 20 masterdns-ozero 2>&1 |
+                    tr '\n\r' '  ' |
+                    cut -c1-1000 || true
+            )"
+            err_line="${'$'}(printf '%s' "${'$'}err" | tr '\n\r' '  ' | cut -c1-1000)"
+            printf 'ERR_RUN|phase=%s|exit=%s|%s|error=%s|logs=%s\n' \
+                "${'$'}phase" "${'$'}rc" "${'$'}state" "${'$'}err_line" "${'$'}logs"
+        }
+        state=${'$'}(sudo docker inspect -f '{{.State.Status}}' masterdns-ozero 2>/dev/null || true)
+        case "${'$'}state" in
+            created|exited|dead|running|restarting|paused)
+                sudo docker rm -f masterdns-ozero 2>/dev/null || true
+                ;;
+        esac
+        sudo docker volume inspect masterdns-key >/dev/null 2>&1 ||
+            sudo docker volume create masterdns-key >/dev/null
+        run_out=${'$'}(
+            sudo docker run -d --name masterdns-ozero --restart always \
+                -v masterdns-key:/etc/masterdnsvpn \
+                -p 53:53/udp masterdns-ozero 2>&1
+        )
+        run_rc=${'$'}?
+        if [ ${'$'}run_rc -ne 0 ]; then run_diag docker_run ${'$'}run_rc "${'$'}run_out"; exit 0; fi
+        ready=0
+        for i in ${'$'}(seq 1 15); do
+            sudo docker exec masterdns-ozero true >/dev/null 2>&1 && { ready=1; break; }
+            sleep 1
+        done
+        if [ ${'$'}ready -ne 1 ]; then run_diag readiness 1 "container did not become ready"; exit 0; fi
+        key_out=${'$'}(
+            sudo docker exec masterdns-ozero sh -c \
+                'test -f /etc/masterdnsvpn/encrypt_key.txt || \
+                (openssl rand -hex 32 > /etc/masterdnsvpn/encrypt_key.txt && \
+                chmod 600 /etc/masterdnsvpn/encrypt_key.txt && exit 42)' 2>&1
+        )
+        rc=${'$'}?
+        if [ ${'$'}rc -ne 0 ] && [ ${'$'}rc -ne 42 ]; then run_diag key_init ${'$'}rc "${'$'}key_out"; exit 0; fi
+        if [ ${'$'}rc -eq 42 ]; then
+            sudo docker restart masterdns-ozero >/dev/null 2>&1 || {
+                restart_rc=${'$'}?
+                run_diag restart ${'$'}restart_rc "docker restart failed"
+                exit 0
+            }
+        fi
+        echo RUN_OK
+        """.trimIndent()
 
     const val openFirewallPort53 =
         "sudo mkdir -p /var/lib/masterdns-ozero 2>/dev/null;" +
@@ -204,6 +281,7 @@ internal object MasterDnsDockerScripts {
     const val MARKER_ERR_NO_PM = "ERR_NO_PM"
     const val MARKER_ERR_DOCKER = "ERR_DOCKER"
     const val MARKER_ERR_BUILD = "ERR_BUILD"
+    const val MARKER_ERR_BUILD_BIN_MISSING = "ERR_BUILD_BIN_MISSING"
     const val MARKER_ERR_RUN = "ERR_RUN"
     const val MARKER_ERR_DPKG_LOCKED = "ERR_DPKG_LOCKED"
     const val MARKER_SUDO_OK = "SUDO_OK"

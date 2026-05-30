@@ -1089,3 +1089,7 @@
 - Source: daily/2026-05-30.md
 - Articles created: [[concepts/masterdns-amnezia-dns-running-udp-contract]], [[concepts/overlapping-pr-merge-preserve-dev-contracts]], [[concepts/exit-node-display-viasocks-known-ip-contract]], [[concepts/vpn-switch-confirm-stop-before-start]], [[concepts/groupseeder-url-dedupe-userorder-contract]], [[concepts/pr-ci-push-vs-pull-request-drift]], [[concepts/fptn-healthcheck-auth-diagnostics-contract]], [[connections/layered-pr-merge-ci-feedback-loop]]
 - Articles updated: none
+## [2026-05-30T22:02:26+03:00] compile | 2026-05-30.md
+- Source: daily/2026-05-30.md
+- Articles created: [[concepts/fptn-health-preselect-auth-timeout-regression]], [[concepts/warp-vpn-mode-exit-ip-proof-boundary]], [[concepts/byedpi-proxy-lane-test-race-synchronization]], [[concepts/byedpi-settings-schema-marker-migration]], [[concepts/masterdns-amnezia-dns-removal-success-contract]], [[connections/pr-ci-merge-ref-flaky-test-feedback-loop]]
+- Articles updated: none

@@ -30,6 +30,7 @@ import ru.ozero.app.ui.theme.OzeroTheme
 import ru.ozero.app.vpn.EngineSettingsRestartObserver
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
+import ru.ozero.enginescore.EngineId
 import ru.ozero.enginesingbox.SingboxPrefs
 import ru.ozero.app.ui.settings.engines.singbox.SingboxProbeService
 import ru.ozero.enginewarp.WarpConfigSlotStore
@@ -165,8 +166,15 @@ class MainActivity : AppCompatActivity() {
                 .drop(1)
                 .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
                 .collect {
-                    restartVpnIfConnected("singbox profile changed while connected → restart")
+                    restartSingboxIfStableConnected("singbox profile changed while connected → restart")
                 }
+        }
+    }
+
+    private suspend fun restartSingboxIfStableConnected(reason: String) {
+        val current = viewModel.state.value
+        if (current is TunnelState.Connected && current.engineId == EngineId.SINGBOX) {
+            restartVpnIfConnected(reason)
         }
     }
 

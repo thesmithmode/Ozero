@@ -262,6 +262,16 @@ class MasterDnsDeployerTest {
     }
 
     @Test
+    fun `should return bin missing build error when docker build reports missing server binary`() = runTest {
+        transport.setResponse("Dockerfile", "ERR_BUILD|reason=bin_missing")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("build_failed/bin_missing", error.message)
+    }
+
+    @Test
     fun `should return Error when container run fails`() = runTest {
         transport.setResponse("docker run -d", MasterDnsDockerScripts.MARKER_ERR_RUN)
 
@@ -269,6 +279,22 @@ class MasterDnsDeployerTest {
 
         val error = states.last() as MasterDnsDeployState.Error
         assertEquals("run_failed", error.message)
+    }
+
+    @Test
+    fun `should keep real run failure diagnostics in error message`() = runTest {
+        transport.setResponse(
+            "docker run -d",
+            "ERR_RUN|phase=docker_run|exit=127|state=created|exit=127|" +
+                "error=exec \"/usr/local/bin/masterdnsvpn-server\": stat no such file or directory|logs=",
+        )
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertTrue(error.message.startsWith("run_failed|phase=docker_run|exit=127|state=created"))
+        assertTrue(error.message.contains("masterdnsvpn-server"))
+        assertTrue(error.message.contains("no such file or directory"))
     }
 
     @Test
@@ -351,13 +377,14 @@ class MasterDnsDeployerTest {
     }
 
     @Test
-    fun `deployMasterDns script captures docker build exit code not bare pipe`() {
+    fun `deployMasterDns script captures docker build exit code without bare pipe`() {
         assertFalse(
             MasterDnsDockerScripts.deployMasterDns.contains("| tail") &&
                 !MasterDnsDockerScripts.deployMasterDns.contains("PIPESTATUS"),
             "deployMasterDns must use PIPESTATUS to capture docker build exit code — bare pipe loses it",
         )
-        assertTrue(MasterDnsDockerScripts.deployMasterDns.contains("PIPESTATUS"))
+        assertTrue(MasterDnsDockerScripts.deployMasterDns.contains("build_rc=\$"))
+        assertTrue(MasterDnsDockerScripts.deployMasterDns.contains("tail -30"))
     }
 
     @Test

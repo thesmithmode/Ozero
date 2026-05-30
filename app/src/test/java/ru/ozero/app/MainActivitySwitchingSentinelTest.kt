@@ -61,4 +61,25 @@ class MainActivitySwitchingSentinelTest {
             "restart must not send ACTION_START until stop published Idle/Failed. Block:\n$block",
         )
     }
+
+    @Test
+    fun `singbox profile changes restart only stable connected singbox`() {
+        val observerBlock = source.substringAfter("private fun observeSingboxProfileChanges")
+            .substringBefore("private suspend fun restartSingboxIfStableConnected")
+        assertTrue(
+            observerBlock.contains("restartSingboxIfStableConnected") &&
+                !observerBlock.contains("restartVpnIfConnected("),
+            "singbox profile observer must not call generic restart directly because Connecting/Probing profile writes can self-restart",
+        )
+
+        val helperBlock = source.substringAfter("private suspend fun restartSingboxIfStableConnected")
+            .substringBefore("private companion object")
+        assertTrue(
+            helperBlock.contains("TunnelState.Connected") &&
+                helperBlock.contains("EngineId.SINGBOX") &&
+                !helperBlock.contains("TunnelState.Connecting") &&
+                !helperBlock.contains("TunnelState.Probing"),
+            "singbox profile restart must be allowed only after stable Connected(SINGBOX), not during Connecting/Probing",
+        )
+    }
 }
