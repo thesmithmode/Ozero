@@ -110,9 +110,15 @@ class MainActivity : AppCompatActivity() {
         tunnelController.onSwitchingStarted(from = fromEngine, to = pendingTarget)
         try {
             vpnIntentLauncher.stop()
-            withTimeoutOrNull(5_000L) {
+            val stopped = withTimeoutOrNull(RESTART_STOP_TIMEOUT_MS) {
                 viewModel.state.first { it is TunnelState.Idle || it is TunnelState.Failed }
             }
+            if (stopped == null) {
+                AppLogger.w(TAG, "engine settings restart skipped: stop timeout")
+                tunnelController.onSwitchingFinished("restart stop timeout")
+                return
+            }
+            tunnelController.onSwitchingStarted(from = fromEngine, to = pendingTarget)
             vpnIntentLauncher.start()
         } catch (t: Throwable) {
             tunnelController.onSwitchingFinished("restart failed: ${t.message}")
@@ -166,5 +172,6 @@ class MainActivity : AppCompatActivity() {
 
     private companion object {
         const val TAG = "MainActivity"
+        const val RESTART_STOP_TIMEOUT_MS = 11_000L
     }
 }
