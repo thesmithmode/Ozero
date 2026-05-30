@@ -142,6 +142,28 @@ class MainScreenLabelsTest {
     }
 
     @Test
+    fun `failure reason for ui extracts readable chain failure reason`() {
+        val reason = failureReasonForUi(
+            TunnelState.Failed(
+                EngineId.FPTN,
+                "Failure(failedAtIndex=0, reason=Сервер FPTN не ответил, rolledBack=0)",
+            ),
+        )
+        assertEquals("Сервер FPTN не ответил", reason)
+    }
+
+    @Test
+    fun `failure reason for ui drops technical stack trace`() {
+        val reason = failureReasonForUi(
+            TunnelState.Failed(
+                EngineId.FPTN,
+                "attachTun threw: java.net.UnknownHostException: Unable to resolve host\n\tat ru.ozero.Bad.call(Bad.kt:1)",
+            ),
+        )
+        assertEquals("attachTun threw: Unable to resolve host", reason)
+    }
+
+    @Test
     fun `ui selected engine prefers real tunnel engine over manual selection`() {
         val selected = resolveUiSelectedEngine(
             tunnelState = TunnelState.Connected(EngineId.URNETWORK, socksPort = 0),

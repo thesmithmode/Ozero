@@ -297,6 +297,30 @@ class FptnEngineTest {
     }
 
     @Test
+    fun `auth failure classifier maps expected user reasons`() {
+        assertEquals(
+            FptnEngine.FPTN_TOKEN_REJECTED,
+            classifyFptnAuthFailure(FptnNativeResponse(401, "", "")),
+        )
+        assertEquals(
+            FptnEngine.FPTN_TOKEN_REJECTED,
+            classifyFptnAuthFailure(FptnNativeResponse(403, "", "")),
+        )
+        assertEquals(
+            FptnEngine.FPTN_SERVER_NO_RESPONSE,
+            classifyFptnAuthFailure(FptnNativeResponse(608, "", "Operation timeout")),
+        )
+        assertEquals(
+            FptnEngine.FPTN_MASK_DOMAIN_UNAVAILABLE,
+            classifyFptnAuthFailure(error = "SNI preflight handshake failed"),
+        )
+        assertEquals(
+            FptnEngine.FPTN_SERVER_IP_NOT_FOUND,
+            classifyFptnAuthFailure(error = "UnknownHostException resolve failed"),
+        )
+    }
+
+    @Test
     fun `buildManualConfig returns null when token blank`() {
         assertNull(engine.buildManualConfig(null))
     }

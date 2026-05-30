@@ -924,7 +924,28 @@ private fun StatusLabel(
                 color = OzeroPalette.Text3,
             )
         }
+        failureReasonForUi(state)?.let { reason ->
+            Text(
+                text = reason,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
     }
+}
+
+internal fun failureReasonForUi(state: TunnelState): String? = when (state) {
+    is TunnelState.Failed -> state.reason.toReadableFailureReason()
+    else -> null
+}
+
+private fun String.toReadableFailureReason(): String {
+    val extracted = Regex("reason=(.*), rolledBack=").find(this)?.groupValues?.getOrNull(1) ?: this
+    val firstLine = extracted.lineSequence().firstOrNull().orEmpty().trim()
+    val withoutTracePrefix = firstLine.substringBefore("\tat ").trim()
+    return withoutTracePrefix
+        .replace(Regex("\\b(java|kotlin|android)\\.[A-Za-z0-9_.]+: ?"), "")
+        .ifBlank { "Не удалось запустить туннель" }
 }
 
 private const val DOCK_TAB_HOME = "home"
