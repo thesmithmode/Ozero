@@ -8,4 +8,7 @@ class FakeSshMasterDnsDeployer(private val transport: FakeSshTransport) : Master
 
     override fun undeploy(credentials: MasterDnsDeployCredentials): Flow<MasterDnsDeployState> =
         MasterDnsDeployerImpl(transport).undeploy(credentials)
+
+    override fun removeAmneziaDnsAndContinue(credentials: MasterDnsDeployCredentials): Flow<MasterDnsDeployState> =
+        MasterDnsDeployerImpl(transport).removeAmneziaDnsAndContinue(credentials)
 }

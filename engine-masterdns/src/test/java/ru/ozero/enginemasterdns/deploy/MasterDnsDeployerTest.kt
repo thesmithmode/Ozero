@@ -22,7 +22,7 @@ class MasterDnsDeployerTest {
     }
 
     private fun setupHappyPath() {
-        transport.setResponse("ss -uln", MasterDnsDockerScripts.MARKER_PORT_FREE)
+        transport.setResponse("bind_probe", MasterDnsDockerScripts.MARKER_PORT_FREE)
         transport.setResponse("free -m", "512 1024")
         transport.setResponse("apt-get", MasterDnsDockerScripts.MARKER_DOCKER_OK)
         transport.setResponse("Dockerfile", MasterDnsDockerScripts.MARKER_BUILD_OK)
@@ -60,13 +60,73 @@ class MasterDnsDeployerTest {
 
     @Test
     fun `should return Error when port 53 is busy`() = runTest {
-        transport.setResponse("ss -uln", MasterDnsDockerScripts.MARKER_PORT_BUSY)
+        transport.setResponse("bind_probe", MasterDnsDockerScripts.MARKER_PORT_BUSY)
 
         val states = deployer.deploy(credentials()).toList()
 
         assertInstanceOf(MasterDnsDeployState.Error::class.java, states.last())
         val error = states.last() as MasterDnsDeployState.Error
-        assertTrue(error.message == "port_53_busy")
+        assertTrue(error.message.startsWith("port_53_busy"))
+    }
+
+    @Test
+    fun `should emit AmneziaDnsConflict when amnezia-dns publishes udp 53`() = runTest {
+        transport.setResponse(
+            "docker inspect amnezia-dns",
+            "AMNEZIA_DNS_CONFLICT|proto=udp|addr=0.0.0.0",
+        )
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val conflict = states.last() as MasterDnsDeployState.AmneziaDnsConflict
+        assertEquals("udp", conflict.protocol)
+        assertEquals("0.0.0.0", conflict.address)
+        assertFalse(transport.executedCommands.any { it.contains("docker stop amnezia-dns") })
+        assertFalse(transport.executedCommands.any { it.contains("docker rm amnezia-dns") })
+    }
+
+    @Test
+    fun `cancel path does not stop or remove amnezia-dns`() = runTest {
+        transport.setResponse(
+            "docker inspect amnezia-dns",
+            "AMNEZIA_DNS_CONFLICT|proto=udp|addr=0.0.0.0",
+        )
+
+        deployer.deploy(credentials()).toList()
+
+        assertFalse(transport.executedCommands.any { it.contains("docker stop amnezia-dns") })
+        assertFalse(transport.executedCommands.any { it.contains("docker rm amnezia-dns") })
+    }
+
+    @Test
+    fun `remove path calls only inspect stop rm for amnezia-dns before continuing`() = runTest {
+        transport.setResponse("docker inspect amnezia-dns", MasterDnsDockerScripts.MARKER_AMNEZIA_DNS_REMOVED)
+
+        val states = deployer.removeAmneziaDnsAndContinue(credentials()).toList()
+
+        assertInstanceOf(MasterDnsDeployState.Done::class.java, states.last())
+        val amneziaCommands = transport.executedCommands.filter { it.contains("amnezia-dns") }
+        assertTrue(
+            amneziaCommands.all {
+                it.contains("docker inspect amnezia-dns") ||
+                    it.contains("docker stop amnezia-dns") ||
+                    it.contains("docker rm amnezia-dns")
+            },
+        )
+        assertFalse(amneziaCommands.any { it.contains("system prune") })
+        assertFalse(
+            amneziaCommands.any { it.contains("volume rm") || it.contains("network rm") || it.contains("rmi") },
+        )
+    }
+
+    @Test
+    fun `should include port conflict details in Error for UI`() = runTest {
+        transport.setResponse("bind_probe", "PORT_BUSY|proto=udp|addr=0.0.0.0|name=docker-proxy")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("port_53_busy|proto=udp|addr=0.0.0.0|name=docker-proxy", error.message)
     }
 
     @Test
