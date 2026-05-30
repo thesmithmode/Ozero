@@ -28,7 +28,7 @@ class MasterDnsEngine(
 
     override val capabilities: EngineCapabilities = EngineCapabilities(
         supportsTcp = true,
-        supportsUdp = false,
+        supportsUdp = true,
         supportsDoH = false,
         localOnly = false,
         requiresServer = true,

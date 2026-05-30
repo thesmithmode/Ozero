@@ -1085,3 +1085,7 @@
 - Source: daily/2026-05-29.md
 - Articles created: [[concepts/singbox-active-socks-port-failure-reset]], [[concepts/ci-style-job-downstream-skip]], [[concepts/source-mojibake-diagnostics-risk]], [[concepts/strategy-extraction-import-retention]], [[connections/ci-style-gate-hides-compile-regression]], [[connections/exit-node-probe-resource-state-coupling]]
 - Articles updated: none
+## [2026-05-30T19:56:36+03:00] compile | 2026-05-30.md
+- Source: daily/2026-05-30.md
+- Articles created: [[concepts/masterdns-amnezia-dns-running-udp-contract]], [[concepts/overlapping-pr-merge-preserve-dev-contracts]], [[concepts/exit-node-display-viasocks-known-ip-contract]], [[concepts/vpn-switch-confirm-stop-before-start]], [[concepts/groupseeder-url-dedupe-userorder-contract]], [[concepts/pr-ci-push-vs-pull-request-drift]], [[concepts/fptn-healthcheck-auth-diagnostics-contract]], [[connections/layered-pr-merge-ci-feedback-loop]]
+- Articles updated: none

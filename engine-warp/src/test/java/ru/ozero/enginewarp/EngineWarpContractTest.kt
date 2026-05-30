@@ -199,6 +199,20 @@ class EngineWarpContractTest {
     }
 
     @Test
+    fun `exitNodeStrategy in proxy mode returns ViaSocks for real exit IP probe`() = runTest {
+        val bridge = FakeWarpSdkBridge(proxyResult = WarpSdkBridge.ProxyResult.Success)
+        val (e, _, _) = engine(activeConfig = sampleConfig, bridge = bridge)
+        val result = e.start(EngineConfig.WarpProxy(socksPort = 10991), Upstream.None)
+
+        assertIs<StartResult.Success>(result)
+        val strategy = e.exitNodeStrategy(socksPort = 0)
+        val socks = assertIs<ExitNodeStrategy.ViaSocks>(strategy)
+        assertEquals("127.0.0.1", socks.host)
+        assertEquals(10991, socks.port)
+        assertEquals(1, bridge.startProxyCalls)
+    }
+
+    @Test
     fun `ipProbeRoute не возвращает Default — иначе fetch покажет реальный IP вместо WARP`() = runTest {
         val (e, _, _) = engine(activeConfig = sampleConfig)
         e.start(EngineConfig.Warp, Upstream.None)
@@ -663,12 +677,15 @@ class EngineWarpContractTest {
 
     private class FakeWarpSdkBridge(
         private val attachResult: WarpSdkBridge.AttachResult = WarpSdkBridge.AttachResult.Success,
+        private val proxyResult: WarpSdkBridge.ProxyResult = WarpSdkBridge.ProxyResult.Failed("proxy disabled"),
     ) : WarpSdkBridge {
         var attachCalls: Int = 0
+        var startProxyCalls: Int = 0
         var detachCalls: Int = 0
         var lastFd: Int = -1
         var lastIni: String? = null
         var lastUapi: String? = null
+        var lastProxyPort: Int = -1
         private var running = false
 
         override suspend fun attachTun(
@@ -684,6 +701,19 @@ class EngineWarpContractTest {
             lastUapi = uapiPath
             if (attachResult is WarpSdkBridge.AttachResult.Success) running = true
             return attachResult
+        }
+
+        override suspend fun startProxy(
+            tunnelName: String,
+            iniConfig: String,
+            uapiPath: String,
+            socksPort: Int,
+            protector: ru.ozero.enginescore.VpnSocketProtector,
+        ): WarpSdkBridge.ProxyResult {
+            startProxyCalls++
+            lastProxyPort = socksPort
+            if (proxyResult is WarpSdkBridge.ProxyResult.Success) running = true
+            return proxyResult
         }
 
         override suspend fun detachTun() {

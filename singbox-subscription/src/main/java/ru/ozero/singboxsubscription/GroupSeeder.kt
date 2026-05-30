@@ -8,7 +8,11 @@ class GroupSeeder(private val dao: SubscriptionGroupDao) {
     data class PresetGroup(val name: String, val url: String)
 
     suspend fun seedPresets(presets: List<PresetGroup>) {
+        val seenUrls = mutableSetOf<String>()
         presets.forEachIndexed { index, preset ->
+            if (!seenUrls.add(preset.url)) {
+                return@forEachIndexed
+            }
             if (dao.getByUrl(preset.url) == null) {
                 dao.insert(
                     SubscriptionGroup(

@@ -42,6 +42,56 @@ class MasterDnsDockerScriptsContractTest {
     }
 
     @Test
+    fun `removeAmneziaDnsOnly does not prune or remove volumes networks images`() {
+        val cmd = MasterDnsDockerScripts.removeAmneziaDnsOnly
+        assertTrue(cmd.contains("sudo docker inspect amnezia-dns"))
+        assertTrue(cmd.contains("/amnezia-dns"))
+        assertTrue(cmd.contains("sudo docker stop amnezia-dns"))
+        assertTrue(cmd.contains("sudo docker rm amnezia-dns"))
+        assertFalse(cmd.contains("docker system prune"))
+        assertFalse(cmd.contains("docker volume rm"))
+        assertFalse(cmd.contains("docker network rm"))
+        assertFalse(cmd.contains("docker rmi"))
+        assertFalse(cmd.contains("amnezia-awg"))
+        assertFalse(cmd.contains("amnezia-awg2"))
+        assertFalse(cmd.contains("adguardhome"))
+    }
+
+    @Test
+    fun `removeAmneziaDnsOnly reports failed stop or rm instead of unconditional success`() {
+        val cmd = MasterDnsDockerScripts.removeAmneziaDnsOnly
+        assertTrue(cmd.contains(MasterDnsDockerScripts.MARKER_AMNEZIA_DNS_REMOVE_FAILED))
+        assertFalse(cmd.contains("docker stop amnezia-dns 2>/dev/null || true"))
+        assertFalse(cmd.contains("docker rm amnezia-dns 2>/dev/null || true"))
+    }
+
+    @Test
+    fun `checkAmneziaDns53 inspects exact amnezia-dns name and emits conflict marker`() {
+        val cmd = MasterDnsDockerScripts.checkAmneziaDns53
+        assertTrue(cmd.contains("sudo docker ps --format '{{.Names}}'"))
+        assertTrue(cmd.contains("grep -qx 'amnezia-dns'"))
+        assertTrue(cmd.contains("sudo docker inspect amnezia-dns"))
+        assertTrue(cmd.contains("/amnezia-dns"))
+        assertTrue(cmd.contains("53/udp"))
+        assertTrue(cmd.contains("AMNEZIA_DNS_CONFLICT|proto="))
+    }
+
+    @Test
+    fun `checkAmneziaDns53 checks only udp published on amnezia-dns`() {
+        val cmd = MasterDnsDockerScripts.checkAmneziaDns53
+        assertFalse(cmd.contains("53/tcp"))
+    }
+
+    @Test
+    fun `checkPort53 inspects UDP local address without peer-column false positive`() {
+        val cmd = MasterDnsDockerScripts.checkPort53
+        assertTrue(cmd.contains("ss_conflict udp -lunp"))
+        assertTrue(cmd.contains("for (i = 1; i <= NF; i++)"))
+        assertTrue(cmd.contains("local=\"\""))
+        assertFalse(cmd.contains("awk '$5 ~ /(^|:)53$/ {print $5"))
+    }
+
+    @Test
     fun `removeAll does NOT delete named volume - key persist for redeploy`() {
         assertFalse(
             MasterDnsDockerScripts.removeAll.contains("docker volume rm"),
@@ -119,6 +169,16 @@ class MasterDnsDockerScriptsContractTest {
     }
 
     @Test
+    fun `checkPort53 emits structured owner address protocol when busy`() {
+        val script = MasterDnsDockerScripts.checkPort53
+        assertTrue(script.contains("PORT_BUSY|proto="))
+        assertTrue(script.contains("|addr="))
+        assertTrue(script.contains("|owner="))
+        assertTrue(script.contains("ss_conflict udp -lunp"))
+        assertTrue(script.contains("docker_conflict"))
+    }
+
+    @Test
     fun `MARKER_ERR_DPKG_LOCKED constant exposed for deployer mapping`() {
         assertTrue(
             MasterDnsDockerScripts.MARKER_ERR_DPKG_LOCKED == "ERR_DPKG_LOCKED",
@@ -153,6 +213,70 @@ class MasterDnsDockerScriptsContractTest {
         assertTrue(script.contains("ERR_SUDO_NOT_ALLOWED"), "marker когда запрещён в sudoers")
         assertTrue(script.contains("ERR_SUDO_NO_HOME"), "marker когда home dir недоступен")
         assertTrue(script.contains("ERR_SUDO_NOT_IN_GROUP"), "marker когда не в sudo/wheel группе")
+    }
+
+    @Test
+    fun `checkPort53 loopback-only systemd-resolved does not produce busy contract`() {
+        val script = MasterDnsDockerScripts.checkPort53
+        assertTrue(script.contains("127.0.0.53"))
+        assertTrue(script.contains("127.0.0.54"))
+        assertTrue(script.contains("127.0.0.1"))
+        assertTrue(script.contains("::1"))
+        assertFalse(
+            script.contains("grep -q ':53 '") && script.contains("&& echo PORT_BUSY"),
+            "Raw ss :53 match treats loopback-only systemd-resolved as conflict.",
+        )
+    }
+
+    @Test
+    fun `checkPort53 test-binds UDP zero address used by runContainer`() {
+        val script = MasterDnsDockerScripts.checkPort53
+        assertTrue(script.contains("bind_probe udp"))
+        assertTrue(script.contains("socket.SOCK_DGRAM"))
+        assertTrue(script.contains("sock.bind((\"0.0.0.0\", 53))"))
+        assertTrue(MasterDnsDockerScripts.runContainer.contains("-p 53:53/udp"))
+    }
+
+    @Test
+    fun `checkPort53 reports zero IPv4 listener as busy with machine marker`() {
+        val script = MasterDnsDockerScripts.checkPort53
+        assertTrue(script.contains("PORT_BUSY|proto="))
+        assertTrue(script.contains("|addr="))
+        assertTrue(script.contains("|owner="))
+        assertTrue(script.contains("!ignored(addr)"))
+    }
+
+    @Test
+    fun `checkPort53 reports wildcard IPv6 listener as busy`() {
+        val script = MasterDnsDockerScripts.checkPort53
+        assertTrue(script.contains("gsub(/^\\[/"))
+        assertTrue(script.contains("gsub(/\\]$/"))
+        assertTrue(script.contains("addr == \"::1\""))
+        assertFalse(script.contains("addr == \"::\""), "[::]:53 must remain an external conflict, not ignored.")
+    }
+
+    @Test
+    fun `checkPort53 reports external server IPv4 listener as busy`() {
+        val script = MasterDnsDockerScripts.checkPort53
+        assertTrue(script.contains("ss_conflict udp -lunp"))
+        assertTrue(script.contains("sub(/%.*$/"))
+        assertTrue(script.contains("!ignored(addr)"))
+    }
+
+    @Test
+    fun `checkPort53 reports Docker UDP publish as busy`() {
+        val script = MasterDnsDockerScripts.checkPort53
+        assertTrue(script.contains("docker_conflict"))
+        assertTrue(script.contains("->53\\/udp"))
+        assertTrue(script.contains("proto="))
+    }
+
+    @Test
+    fun `checkPort53 ignores Docker TCP publish because runContainer binds only UDP`() {
+        val script = MasterDnsDockerScripts.checkPort53
+        assertFalse(script.contains("->53\\/(udp|tcp)"))
+        assertFalse(script.contains("->53\\/tcp"))
+        assertTrue(script.contains("sub(/^.*->53\\//"))
     }
 
     @Test

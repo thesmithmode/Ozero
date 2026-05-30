@@ -34,6 +34,8 @@
     <string name="masterdns_deploy_state_starting_container">Starting container…</string>
     <string name="masterdns_deploy_state_extracting_key">Extracting encryption key…</string>
     <string name="masterdns_deploy_state_done">Server deployed, configuration filled in</string>
+    <string name="masterdns_deploy_error_port_busy_structured">Port 53 is already in use: owner %1$s, address %2$s, protocol %3$s. Free the port and try again.</string>
+    <string name="masterdns_deploy_error_port_busy_details">Port 53 is already in use on the server: %1$s. Free the conflict and try again.</string>
     <string name="masterdns_deploy_error_port_busy">Port 53/UDP is already in use on the server. Free the port and try again.</string>
     <string name="masterdns_deploy_error_resources">Insufficient resources: need ≥512 MB RAM and ≥1 GB free disk.</string>
     <string name="masterdns_deploy_error_docker">Failed to install Docker. Check internet access on the server.</string>
@@ -55,4 +57,10 @@
     <string name="masterdns_deploy_state_removed">Server removed</string>
     <string name="masterdns_deploy_error_remove">Failed to remove the server.</string>
     <string name="masterdns_deploy_error_unexpected">Unexpected error. Please try again.</string>
+    <string name="masterdns_amnezia_dns_conflict_title">Port 53 is used by Amnezia DNS</string>
+    <string name="masterdns_amnezia_dns_conflict_text">The server has an &quot;amnezia-dns&quot; container using DNS port 53. MasterDNS cannot continue installation while this container is active. You can cancel deploy or safely remove only this container and continue installation.</string>
+    <string name="masterdns_amnezia_dns_conflict_cancel">Cancel deploy</string>
+    <string name="masterdns_amnezia_dns_conflict_remove_continue">Remove amnezia-dns and continue</string>
+    <string name="masterdns_deploy_error_amnezia_dns_cancelled">Deploy was cancelled because of the amnezia-dns container.</string>
+    <string name="masterdns_deploy_error_amnezia_dns_remove_failed">Failed to remove the amnezia-dns container.</string>
 </resources>

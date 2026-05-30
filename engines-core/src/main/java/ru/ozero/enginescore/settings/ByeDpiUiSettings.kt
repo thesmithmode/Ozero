@@ -30,6 +30,7 @@ data class ByeDpiUiSettings(
     enum class DesyncMethod { NONE, SPLIT, DISORDER, FAKE, OOB, DISOOB }
 
     fun toJson(): String = JSONObject().apply {
+        put(KEY_SCHEMA_VERSION, CURRENT_SCHEMA_VERSION)
         put(KEY_MAX_CONNECTIONS, maxConnections)
         put(KEY_BUFFER_SIZE, bufferSize)
         put(KEY_DEFAULT_TTL, defaultTtl)
@@ -62,7 +63,7 @@ data class ByeDpiUiSettings(
         const val DEFAULT_NO_DOMAIN: Boolean = false
         const val DEFAULT_DESYNC_HTTP: Boolean = true
         const val DEFAULT_DESYNC_HTTPS: Boolean = true
-        const val DEFAULT_DESYNC_UDP: Boolean = true
+        const val DEFAULT_DESYNC_UDP: Boolean = false
         val DEFAULT_DESYNC_METHOD: DesyncMethod = DesyncMethod.OOB
         const val DEFAULT_SPLIT_POSITION: Int = 1
         const val DEFAULT_SPLIT_AT_HOST: Boolean = false
@@ -82,6 +83,8 @@ data class ByeDpiUiSettings(
 
         val DEFAULT: ByeDpiUiSettings = ByeDpiUiSettings()
 
+        private const val KEY_SCHEMA_VERSION = "schemaVersion"
+        private const val CURRENT_SCHEMA_VERSION = 1
         private const val KEY_MAX_CONNECTIONS = "maxConnections"
         private const val KEY_BUFFER_SIZE = "bufferSize"
         private const val KEY_DEFAULT_TTL = "defaultTtl"
@@ -110,7 +113,8 @@ data class ByeDpiUiSettings(
         fun fromJson(raw: String?): ByeDpiUiSettings {
             if (raw.isNullOrBlank()) return DEFAULT
             val obj = runCatching { JSONObject(raw) }.getOrNull() ?: return DEFAULT
-            return ByeDpiUiSettings(
+            val hasSchemaVersion = obj.has(KEY_SCHEMA_VERSION)
+            val parsed = ByeDpiUiSettings(
                 maxConnections = obj.optInt(KEY_MAX_CONNECTIONS, DEFAULT_MAX_CONNECTIONS),
                 bufferSize = obj.optInt(KEY_BUFFER_SIZE, DEFAULT_BUFFER_SIZE),
                 defaultTtl = obj.optInt(KEY_DEFAULT_TTL, DEFAULT_DEFAULT_TTL),
@@ -141,6 +145,9 @@ data class ByeDpiUiSettings(
                 udpFakeCount = obj.optInt(KEY_UDP_FAKE_COUNT, DEFAULT_UDP_FAKE_COUNT),
                 dropSack = obj.optBoolean(KEY_DROP_SACK, DEFAULT_DROP_SACK),
             )
+            return if (!hasSchemaVersion && parsed == LEGACY_DEFAULT_WITH_UDP) DEFAULT else parsed
         }
+
+        private val LEGACY_DEFAULT_WITH_UDP: ByeDpiUiSettings = DEFAULT.copy(desyncUdp = true)
     }
 }

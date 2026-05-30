@@ -34,7 +34,7 @@ interface EnginePlugin {
         ExitNodeStrategy.DirectHttp -> IpProbeRoute.Default
         is ExitNodeStrategy.ViaSocks -> IpProbeRoute.Socks(strategy.host, strategy.port)
         is ExitNodeStrategy.LocationOnly -> IpProbeRoute.StaticLocation(strategy.country, strategy.countryCode)
-        is ExitNodeStrategy.ProviderLabel -> IpProbeRoute.StaticLocation(strategy.label, null)
+        is ExitNodeStrategy.ProviderLabel -> IpProbeRoute.StaticLocation(strategy.label, strategy.countryCode)
         is ExitNodeStrategy.AutoSelected -> IpProbeRoute.AutoSelected
         is ExitNodeStrategy.Unavailable -> IpProbeRoute.Unavailable(strategy.reason)
     }

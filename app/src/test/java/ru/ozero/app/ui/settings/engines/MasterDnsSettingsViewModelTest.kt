@@ -15,7 +15,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Assertions.assertTrue
-
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.enginemasterdns.MasterDnsConfigStore
@@ -152,6 +151,102 @@ class MasterDnsSettingsViewModelTest {
         assertTrue(combined.contains("Docker"), "лог должен описать шаг установки Docker: $combined")
         assertTrue(combined.contains("encrypt_key") || combined.contains("ключ"), combined)
         assertTrue(combined.contains("Резолверы") || combined.contains("✓"), combined)
+    }
+
+    @Test
+    fun `amnezia conflict cancel clears pending credentials and does not remove container`() = runTest {
+        val store = FakeStore(MasterDnsPersistedConfig())
+        var removeCalls = 0
+        val deployer = object : MasterDnsServerDeployer {
+            override fun deploy(credentials: MasterDnsDeployCredentials): Flow<MasterDnsDeployState> = flowOf(
+                MasterDnsDeployState.AmneziaDnsConflict("udp", "0.0.0.0"),
+            )
+
+            override fun undeploy(credentials: MasterDnsDeployCredentials): Flow<MasterDnsDeployState> =
+                flowOf(MasterDnsDeployState.Idle)
+
+            override fun removeAmneziaDnsAndContinue(
+                credentials: MasterDnsDeployCredentials,
+            ): Flow<MasterDnsDeployState> {
+                removeCalls++
+                return flowOf(MasterDnsDeployState.Done("toml"))
+            }
+        }
+        val vm = MasterDnsSettingsViewModel(store, deployer)
+
+        vm.onDeployClick("10.0.0.1", 22, "root", "secret".toCharArray())
+        vm.state.first { it.deployState is MasterDnsDeployState.AmneziaDnsConflict }
+        vm.onAmneziaDnsConflictCancel()
+        vm.onAmneziaDnsRemoveAndContinue()
+
+        val state = vm.state.first { it.deployState is MasterDnsDeployState.Error }
+        assertEquals("amnezia_dns_cancelled", (state.deployState as MasterDnsDeployState.Error).message)
+        assertEquals(0, removeCalls)
+        assertFalse(state.toString().contains("secret"))
+    }
+
+    @Test
+    fun `amnezia remove and continue calls targeted remove flow and persists deploy result`() = runTest {
+        val store = FakeStore(MasterDnsPersistedConfig())
+        var removeCalls = 0
+        val deployer = object : MasterDnsServerDeployer {
+            override fun deploy(credentials: MasterDnsDeployCredentials): Flow<MasterDnsDeployState> = flowOf(
+                MasterDnsDeployState.AmneziaDnsConflict("udp", "0.0.0.0"),
+            )
+
+            override fun undeploy(credentials: MasterDnsDeployCredentials): Flow<MasterDnsDeployState> =
+                flowOf(MasterDnsDeployState.Idle)
+
+            override fun removeAmneziaDnsAndContinue(
+                credentials: MasterDnsDeployCredentials,
+            ): Flow<MasterDnsDeployState> {
+                removeCalls++
+                assertEquals("10.0.0.1", credentials.host)
+                return flowOf(MasterDnsDeployState.CheckingPreflight, MasterDnsDeployState.Done("toml"))
+            }
+        }
+        val vm = MasterDnsSettingsViewModel(store, deployer)
+
+        vm.onDeployClick("10.0.0.1", 2222, "root", "secret".toCharArray())
+        vm.state.first { it.deployState is MasterDnsDeployState.AmneziaDnsConflict }
+        vm.onAmneziaDnsRemoveAndContinue()
+        val state = vm.state.first { it.deployState is MasterDnsDeployState.Done }
+
+        assertEquals(1, removeCalls)
+        assertEquals("toml", store.toml)
+        assertEquals("10.0.0.1", store.serverIp)
+        assertEquals(2222, store.serverPort)
+        assertFalse(state.toString().contains("secret"))
+    }
+
+    @Test
+    fun `port busy clears pending credentials and cannot continue amnezia cleanup`() = runTest {
+        val store = FakeStore(MasterDnsPersistedConfig())
+        var removeCalls = 0
+        val deployer = object : MasterDnsServerDeployer {
+            override fun deploy(credentials: MasterDnsDeployCredentials): Flow<MasterDnsDeployState> = flowOf(
+                MasterDnsDeployState.PortBusy("udp", "0.0.0.0:53", "docker:adguardhome"),
+            )
+
+            override fun undeploy(credentials: MasterDnsDeployCredentials): Flow<MasterDnsDeployState> =
+                flowOf(MasterDnsDeployState.Idle)
+
+            override fun removeAmneziaDnsAndContinue(
+                credentials: MasterDnsDeployCredentials,
+            ): Flow<MasterDnsDeployState> {
+                removeCalls++
+                return flowOf(MasterDnsDeployState.Done("toml"))
+            }
+        }
+        val vm = MasterDnsSettingsViewModel(store, deployer)
+
+        vm.onDeployClick("10.0.0.1", 22, "root", "secret".toCharArray())
+        val state = vm.state.first { it.deployState is MasterDnsDeployState.PortBusy }
+        vm.onAmneziaDnsRemoveAndContinue()
+
+        assertEquals(0, removeCalls)
+        assertFalse(state.toString().contains("secret"))
+        assertFalse(state.deployLog.joinToString("\n").contains("secret"))
     }
 
     @Test

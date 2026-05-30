@@ -65,7 +65,7 @@ class ByeDpiBuildManualConfigTest {
                 byedpiUiSettings = ByeDpiUiSettings.DEFAULT,
             ),
         ) as EngineConfig.ByeDpi
-        assertTrue("-Ku" in cfg.args, "UI mode defaults включают desyncUdp -Ku, got '${cfg.args}'")
+        assertTrue("-Ku" !in cfg.args, "UI mode defaults force TCP fallback for YouTube, got '${cfg.args}'")
         assertTrue("-Y -Ar -s5" !in cfg.args)
     }
 

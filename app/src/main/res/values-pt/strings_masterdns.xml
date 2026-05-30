@@ -34,6 +34,8 @@
     <string name="masterdns_deploy_state_starting_container">Iniciando contêiner…</string>
     <string name="masterdns_deploy_state_extracting_key">Extraindo chave de criptografia…</string>
     <string name="masterdns_deploy_state_done">Servidor implantado, configuração preenchida</string>
+    <string name="masterdns_deploy_error_port_busy_structured">A porta 53 já está em uso: proprietário %1$s, endereço %2$s, protocolo %3$s. Libere a porta e tente novamente.</string>
+    <string name="masterdns_deploy_error_port_busy_details">A porta 53 já está em uso no servidor: %1$s. Libere o conflito e tente novamente.</string>
     <string name="masterdns_deploy_error_port_busy">A porta 53/UDP já está em uso. Libere a porta e tente novamente.</string>
     <string name="masterdns_deploy_error_resources">Recursos insuficientes: necessário ≥512 MB RAM e ≥1 GB de disco livre.</string>
     <string name="masterdns_deploy_error_docker">Falha ao instalar o Docker. Verifique o acesso à internet do servidor.</string>
@@ -55,4 +57,10 @@
     <string name="masterdns_deploy_state_removed">Servidor removido</string>
     <string name="masterdns_deploy_error_remove">Falha ao remover o servidor.</string>
     <string name="masterdns_deploy_error_unexpected">Erro inesperado. Tente novamente.</string>
+    <string name="masterdns_amnezia_dns_conflict_title">A porta 53 é usada pelo Amnezia DNS</string>
+    <string name="masterdns_amnezia_dns_conflict_text">Foi encontrado no servidor o contêiner &quot;amnezia-dns&quot;, que usa a porta DNS 53. O MasterDNS não pode continuar a instalação enquanto esse contêiner estiver ativo. Você pode cancelar o deploy ou remover com segurança apenas esse contêiner e continuar a instalação.</string>
+    <string name="masterdns_amnezia_dns_conflict_cancel">Cancelar deploy</string>
+    <string name="masterdns_amnezia_dns_conflict_remove_continue">Remover amnezia-dns e continuar</string>
+    <string name="masterdns_deploy_error_amnezia_dns_cancelled">O deploy foi cancelado por causa do contêiner amnezia-dns.</string>
+    <string name="masterdns_deploy_error_amnezia_dns_remove_failed">Não foi possível remover o contêiner amnezia-dns.</string>
 </resources>

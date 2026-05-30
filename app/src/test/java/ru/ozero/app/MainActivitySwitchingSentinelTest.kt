@@ -48,4 +48,17 @@ class MainActivitySwitchingSentinelTest {
                 "Обязан читать tunnelController.switching.value?.to как pendingTarget. Block:\n$block",
         )
     }
+
+    @Test
+    fun `restartVpnIfConnected waits for stop before start`() {
+        val block = source.substringAfter("private suspend fun restartVpnIfConnected")
+            .substringBefore("private fun observeLiveEngineSettingsChanges")
+        val stoppedIdx = block.indexOf("val stopped = withTimeoutOrNull(RESTART_STOP_TIMEOUT_MS)")
+        val guardIdx = block.indexOf("if (stopped == null)")
+        val startIdx = block.indexOf("vpnIntentLauncher.start()")
+        assertTrue(
+            stoppedIdx >= 0 && guardIdx in stoppedIdx until startIdx,
+            "restart must not send ACTION_START until stop published Idle/Failed. Block:\n$block",
+        )
+    }
 }
