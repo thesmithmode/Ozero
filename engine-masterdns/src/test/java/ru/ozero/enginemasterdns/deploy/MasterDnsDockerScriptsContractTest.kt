@@ -119,6 +119,24 @@ class MasterDnsDockerScriptsContractTest {
     }
 
     @Test
+    fun `checkPort53 emits structured owner address protocol when busy`() {
+        val script = MasterDnsDockerScripts.checkPort53
+        assertTrue(script.contains("PORT_BUSY|proto="))
+        assertTrue(script.contains("|addr="))
+        assertTrue(script.contains("|owner="))
+        assertTrue(script.contains("ss -H -ltnup"))
+        assertTrue(script.contains("docker-proxy"))
+    }
+
+    @Test
+    fun `removeAmneziaDnsContainer targets only amnezia dns container`() {
+        assertEquals(
+            "sudo docker rm -f amnezia-dns 2>/dev/null || true",
+            MasterDnsDockerScripts.removeAmneziaDnsContainer,
+        )
+    }
+
+    @Test
     fun `MARKER_ERR_DPKG_LOCKED constant exposed for deployer mapping`() {
         assertTrue(
             MasterDnsDockerScripts.MARKER_ERR_DPKG_LOCKED == "ERR_DPKG_LOCKED",

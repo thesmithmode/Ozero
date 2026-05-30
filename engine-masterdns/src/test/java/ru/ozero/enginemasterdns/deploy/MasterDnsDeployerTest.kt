@@ -22,7 +22,7 @@ class MasterDnsDeployerTest {
     }
 
     private fun setupHappyPath() {
-        transport.setResponse("ss -uln", MasterDnsDockerScripts.MARKER_PORT_FREE)
+        transport.setResponse("ss -H", MasterDnsDockerScripts.MARKER_PORT_FREE)
         transport.setResponse("free -m", "512 1024")
         transport.setResponse("apt-get", MasterDnsDockerScripts.MARKER_DOCKER_OK)
         transport.setResponse("Dockerfile", MasterDnsDockerScripts.MARKER_BUILD_OK)
@@ -60,13 +60,45 @@ class MasterDnsDeployerTest {
 
     @Test
     fun `should return Error when port 53 is busy`() = runTest {
-        transport.setResponse("ss -uln", MasterDnsDockerScripts.MARKER_PORT_BUSY)
+        transport.setResponse("ss -H", MasterDnsDockerScripts.MARKER_PORT_BUSY)
 
         val states = deployer.deploy(credentials()).toList()
 
         assertInstanceOf(MasterDnsDeployState.Error::class.java, states.last())
         val error = states.last() as MasterDnsDeployState.Error
         assertTrue(error.message == "port_53_busy")
+    }
+
+    @Test
+    fun `should return PortBusy when port 53 check emits structured output`() = runTest {
+        transport.setResponse("ss -H", "PORT_BUSY|proto=udp|addr=0.0.0.0:53|owner=docker:adguardhome")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val portBusy = states.last() as MasterDnsDeployState.PortBusy
+        assertEquals("udp", portBusy.protocol)
+        assertEquals("0.0.0.0:53", portBusy.address)
+        assertEquals("docker:adguardhome", portBusy.owner)
+    }
+
+    @Test
+    fun `should stop with retry owner after removing amnezia dns container`() = runTest {
+        transport.setResponses(
+            "ss -H",
+            listOf(
+                "PORT_BUSY|proto=udp|addr=0.0.0.0:53|owner=docker:amnezia-dns",
+                "PORT_BUSY|proto=tcp|addr=[::]:53|owner=docker-proxy",
+            ),
+        )
+        transport.setResponse("amnezia-dns", "")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        assertTrue(transport.executedCommands.any { it.contains("amnezia-dns") })
+        val portBusy = states.last() as MasterDnsDeployState.PortBusy
+        assertEquals("tcp", portBusy.protocol)
+        assertEquals("[::]:53", portBusy.address)
+        assertEquals("docker-proxy", portBusy.owner)
     }
 
     @Test

@@ -266,7 +266,7 @@ private fun DeployActionPanel(
             enabled = actionsEnabled,
         )
         isRemoved -> DeployRemovedRow(onReset = onDeployReset)
-        deployState is MasterDnsDeployState.Error -> DeployErrorRow(
+        deployState is MasterDnsDeployState.Error || deployState is MasterDnsDeployState.PortBusy -> DeployErrorRow(
             error = deployState,
             onRetry = onDeployReset,
         )
@@ -406,7 +406,7 @@ private fun DeployRemovedRow(onReset: () -> Unit) {
 
 @Composable
 private fun DeployErrorRow(
-    error: MasterDnsDeployState.Error,
+    error: MasterDnsDeployState,
     onRetry: () -> Unit,
 ) {
     Card(
@@ -415,7 +415,7 @@ private fun DeployErrorRow(
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
             Text(
-                text = deployErrorMessage(error.message),
+                text = deployErrorMessage(error),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onErrorContainer,
             )
@@ -439,24 +439,44 @@ private fun deployStateLabel(state: MasterDnsDeployState): String = when (state)
 }
 
 @Composable
-private fun deployErrorMessage(code: String): String = when (code) {
-    "port_53_busy" -> stringResource(R.string.masterdns_deploy_error_port_busy)
-    "insufficient_resources" -> stringResource(R.string.masterdns_deploy_error_resources)
-    "docker_install_failed" -> stringResource(R.string.masterdns_deploy_error_docker)
-    "dpkg_locked" -> stringResource(R.string.masterdns_deploy_error_dpkg_locked)
-    "sudo_not_installed" -> stringResource(R.string.masterdns_deploy_error_sudo_not_installed)
-    "sudo_pwd_required" -> stringResource(R.string.masterdns_deploy_error_sudo_pwd_required)
-    "sudo_not_allowed" -> stringResource(R.string.masterdns_deploy_error_sudo_not_allowed)
-    "sudo_no_home" -> stringResource(R.string.masterdns_deploy_error_sudo_no_home)
-    "sudo_not_in_group" -> stringResource(R.string.masterdns_deploy_error_sudo_not_in_group)
-    "build_failed" -> stringResource(R.string.masterdns_deploy_error_build)
-    "run_failed" -> stringResource(R.string.masterdns_deploy_error_run)
-    "key_extraction_failed" -> stringResource(R.string.masterdns_deploy_error_key)
-    "auth_failed" -> stringResource(R.string.masterdns_deploy_error_auth)
-    "connection_failed" -> stringResource(R.string.masterdns_deploy_error_connection)
-    "remove_failed" -> stringResource(R.string.masterdns_deploy_error_remove)
-    "unexpected_error" -> stringResource(R.string.masterdns_deploy_error_unexpected)
-    else -> stringResource(R.string.masterdns_deploy_error_generic, code)
+private fun deployErrorMessage(error: MasterDnsDeployState): String {
+    val text = masterDnsDeployErrorText(error)
+    return if (text.args.isEmpty()) {
+        stringResource(text.resId)
+    } else {
+        stringResource(text.resId, *text.args.toTypedArray())
+    }
+}
+
+internal data class MasterDnsDeployErrorText(val resId: Int, val args: List<String> = emptyList())
+
+internal fun masterDnsDeployErrorText(error: MasterDnsDeployState): MasterDnsDeployErrorText = when (error) {
+    is MasterDnsDeployState.PortBusy -> MasterDnsDeployErrorText(
+        R.string.masterdns_deploy_error_port_busy_structured,
+        listOf(error.owner, error.address, error.protocol.uppercase()),
+    )
+    is MasterDnsDeployState.Error -> masterDnsDeployErrorText(error.message)
+    else -> MasterDnsDeployErrorText(R.string.masterdns_deploy_error_unexpected)
+}
+
+internal fun masterDnsDeployErrorText(code: String): MasterDnsDeployErrorText = when (code) {
+    "port_53_busy" -> MasterDnsDeployErrorText(R.string.masterdns_deploy_error_port_busy)
+    "insufficient_resources" -> MasterDnsDeployErrorText(R.string.masterdns_deploy_error_resources)
+    "docker_install_failed" -> MasterDnsDeployErrorText(R.string.masterdns_deploy_error_docker)
+    "dpkg_locked" -> MasterDnsDeployErrorText(R.string.masterdns_deploy_error_dpkg_locked)
+    "sudo_not_installed" -> MasterDnsDeployErrorText(R.string.masterdns_deploy_error_sudo_not_installed)
+    "sudo_pwd_required" -> MasterDnsDeployErrorText(R.string.masterdns_deploy_error_sudo_pwd_required)
+    "sudo_not_allowed" -> MasterDnsDeployErrorText(R.string.masterdns_deploy_error_sudo_not_allowed)
+    "sudo_no_home" -> MasterDnsDeployErrorText(R.string.masterdns_deploy_error_sudo_no_home)
+    "sudo_not_in_group" -> MasterDnsDeployErrorText(R.string.masterdns_deploy_error_sudo_not_in_group)
+    "build_failed" -> MasterDnsDeployErrorText(R.string.masterdns_deploy_error_build)
+    "run_failed" -> MasterDnsDeployErrorText(R.string.masterdns_deploy_error_run)
+    "key_extraction_failed" -> MasterDnsDeployErrorText(R.string.masterdns_deploy_error_key)
+    "auth_failed" -> MasterDnsDeployErrorText(R.string.masterdns_deploy_error_auth)
+    "connection_failed" -> MasterDnsDeployErrorText(R.string.masterdns_deploy_error_connection)
+    "remove_failed" -> MasterDnsDeployErrorText(R.string.masterdns_deploy_error_remove)
+    "unexpected_error" -> MasterDnsDeployErrorText(R.string.masterdns_deploy_error_unexpected)
+    else -> MasterDnsDeployErrorText(R.string.masterdns_deploy_error_generic, listOf(code))
 }
 
 @Composable

@@ -43,6 +43,10 @@ sealed class MasterDnsDeployState {
         override val progressPercent: Int = 100
     }
 
+    data class PortBusy(val protocol: String, val address: String, val owner: String) : MasterDnsDeployState() {
+        override val progressPercent: Int = 0
+    }
+
     data class Error(val message: String) : MasterDnsDeployState() {
         override val progressPercent: Int = 0
     }

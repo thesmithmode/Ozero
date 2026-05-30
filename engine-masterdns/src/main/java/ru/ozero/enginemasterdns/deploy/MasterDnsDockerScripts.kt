@@ -19,7 +19,20 @@ internal object MasterDnsDockerScripts {
     const val checkPort53 =
         "if sudo docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^masterdns-ozero$';" +
             " then echo PORT_FREE;" +
-            " else ss -uln 2>/dev/null | grep -q ':53 ' && echo PORT_BUSY || echo PORT_FREE; fi"
+            " else line=\$(sudo ss -H -ltnup 2>/dev/null | awk '\$5 ~ /(^|\\]|:)53$/ {print; exit}');" +
+            " if [ -n \"\$line\" ]; then" +
+            " proto=\$(printf '%s\\n' \"\$line\" | awk '{print tolower(\$1)}');" +
+            " addr=\$(printf '%s\\n' \"\$line\" | awk '{print \$5}');" +
+            " proc=\$(printf '%s\\n' \"\$line\" | sed -n 's/.*users:((\"\\([^\"]*\\)\".*/\\1/p');" +
+            " container=\$(sudo docker ps --format '{{.Names}} {{.Ports}}' 2>/dev/null" +
+            " | awk '\$0 ~ /:53->53\\/(udp|tcp)/ {print \$1; exit}');" +
+            " if [ \"\$proc\" = \"docker-proxy\" ] && [ -n \"\$container\" ];" +
+            " then owner=docker:\$container; else owner=\${proc:-unknown}; fi;" +
+            " echo PORT_BUSY|proto=\$proto|addr=\$addr|owner=\$owner;" +
+            " else echo PORT_FREE; fi; fi"
+
+    const val removeAmneziaDnsContainer =
+        "sudo docker rm -f amnezia-dns 2>/dev/null || true"
 
     const val checkResources =
         "echo \$(free -m 2>/dev/null | awk 'NR==2{print \$7}')" +

@@ -91,12 +91,53 @@ internal class MasterDnsDeployerImpl(
         PersistentLoggers.debug(TAG, "deploy: port 53 check")
         val portResult = transport.exec(MasterDnsDockerScripts.checkPort53)
         PersistentLoggers.debug(TAG, "deploy: port result=${portResult.takeShort()}")
-        if (portResult.contains(MasterDnsDockerScripts.MARKER_PORT_BUSY)) {
+        val portBusy = parsePortBusy(portResult)
+        if (portBusy != null) {
+            if (portBusy.owner == AMNEZIA_DNS_OWNER) {
+                transport.exec(MasterDnsDockerScripts.removeAmneziaDnsContainer)
+                val retryResult = transport.exec(MasterDnsDockerScripts.checkPort53)
+                PersistentLoggers.debug(TAG, "deploy: port retry result=${retryResult.takeShort()}")
+                val retryPortBusy = parsePortBusy(retryResult)
+                if (retryPortBusy != null) {
+                    emit(retryPortBusy)
+                    return false
+                }
+                if (retryResult.contains(MasterDnsDockerScripts.MARKER_PORT_BUSY)) {
+                    emit(MasterDnsDeployState.Error("port_53_busy"))
+                    return false
+                }
+            } else {
+                emit(portBusy)
+                return false
+            }
+        } else if (portResult.contains(MasterDnsDockerScripts.MARKER_PORT_BUSY)) {
             emit(MasterDnsDeployState.Error("port_53_busy"))
             return false
         }
         return checkResources()
     }
+
+    private fun parsePortBusy(result: String): MasterDnsDeployState.PortBusy? = result
+        .lineSequence()
+        .firstOrNull { it.startsWith("${MasterDnsDockerScripts.MARKER_PORT_BUSY}|") }
+        ?.let { line ->
+            val fields = line.substringAfter('|')
+                .split('|')
+                .mapNotNull { part ->
+                    val key = part.substringBefore('=', missingDelimiterValue = "")
+                    val value = part.substringAfter('=', missingDelimiterValue = "")
+                    if (key.isBlank() || value.isBlank()) null else key to value
+                }
+                .toMap()
+            val protocol = fields["proto"]?.trim()?.lowercase().orEmpty()
+            val address = fields["addr"]?.trim().orEmpty()
+            val owner = fields["owner"]?.trim().orEmpty()
+            if (protocol.isBlank() || address.isBlank() || owner.isBlank()) {
+                null
+            } else {
+                MasterDnsDeployState.PortBusy(protocol = protocol, address = address, owner = owner)
+            }
+        }
 
     private suspend fun FlowCollector<MasterDnsDeployState>.checkResources(): Boolean {
         val resources = transport.exec(MasterDnsDockerScripts.checkResources)
@@ -201,5 +242,6 @@ internal class MasterDnsDeployerImpl(
     private companion object {
         const val TAG = "MasterDnsDeployer"
         const val CONTAINER_STARTUP_DELAY_MS = 3_000L
+        const val AMNEZIA_DNS_OWNER = "docker:amnezia-dns"
     }
 }

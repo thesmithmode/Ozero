@@ -34,6 +34,7 @@
     <string name="masterdns_deploy_state_starting_container">Starting container…</string>
     <string name="masterdns_deploy_state_extracting_key">Extracting encryption key…</string>
     <string name="masterdns_deploy_state_done">Server deployed, configuration filled in</string>
+    <string name="masterdns_deploy_error_port_busy_structured">Port 53 is already in use: owner %1$s, address %2$s, protocol %3$s. Free it and try again.</string>
     <string name="masterdns_deploy_error_port_busy">Port 53/UDP is already in use on the server. Free the port and try again.</string>
     <string name="masterdns_deploy_error_resources">Insufficient resources: need ≥512 MB RAM and ≥1 GB free disk.</string>
     <string name="masterdns_deploy_error_docker">Failed to install Docker. Check internet access on the server.</string>
