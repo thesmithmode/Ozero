@@ -274,6 +274,22 @@ class FptnEngineTest {
     }
 
     @Test
+    fun `auto health prioritization keeps unchecked servers first when checked servers all fail`() {
+        val candidates = (1..12).map { server("S$it") }
+        val healthResults = candidates.take(8).map { candidate ->
+            FptnEngine.FptnHealthCheck(server = candidate, latencyMs = null)
+        }
+
+        val ordered = prioritizeFptnAuthenticationCandidates(candidates, healthResults)
+
+        assertEquals(listOf("S9", "S10", "S11"), ordered.take(3).map { it.name })
+        assertTrue(
+            ordered.drop(3).map { it.name }.containsAll(listOf("S1", "S8")),
+            "Checked failures can remain as last-resort candidates, but must not consume the bounded startup auth cap.",
+        )
+    }
+
+    @Test
     fun `exit node strategy exposes resolved server ip and flag source`() {
         val strategy = fptnExitNodeStrategy(
             server("Berlin").copy(countryCode = "de"),
