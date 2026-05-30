@@ -105,6 +105,29 @@ class GroupSeederTest {
     }
 
     @Test
+    fun `should skip only exact url duplicates in single call`() = runBlocking {
+        fakeDao.groups.add(
+            SubscriptionGroup(
+                id = 10L,
+                name = "Old",
+                subscriptionUrl = "https://a.example.com",
+                isBuiltin = true,
+            ),
+        )
+        val presets = listOf(
+            GroupSeeder.PresetGroup("Old 1", "https://a.example.com"),
+            GroupSeeder.PresetGroup("Old 2", "https://a.example.com"),
+            GroupSeeder.PresetGroup("New", "https://b.example.com"),
+        )
+
+        seeder.seedPresets(presets)
+
+        assertEquals(2, fakeDao.groups.size)
+        assertTrue(fakeDao.groups.any { it.subscriptionUrl == "https://b.example.com" })
+        assertEquals(1, fakeDao.groups.count { it.subscriptionUrl == "https://a.example.com" })
+    }
+
+    @Test
     fun `should handle empty preset list without errors`() = runBlocking {
         seeder.seedPresets(emptyList())
 

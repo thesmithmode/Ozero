@@ -50,16 +50,13 @@ internal object MasterDnsDockerScripts {
         if [ ${'$'}rc -ne 0 ]; then echo AMNEZIA_DNS_NOT_FOUND; exit 0; fi
         name=${'$'}(printf '%s' "${'$'}inspect" | awk -F'\"' '/\"Name\"/ {print ${'$'}4; exit}')
         if [ "${'$'}name" != "/amnezia-dns" ]; then echo AMNEZIA_DNS_NOT_FOUND; exit 0; fi
-        for port_proto in 53/udp 53/tcp; do
-            proto=${'$'}{port_proto#53/}
-            block=${'$'}(printf '%s' "${'$'}inspect" | awk -v proto='"'${'$'}port_proto'"' 'index(${'$'}0,proto){seen=1} seen{print} seen && index(${'$'}0,"]"){exit}')
-            if printf '%s' "${'$'}block" | grep -q '"HostPort": *"53"'; then
-                addr=${'$'}(printf '%s' "${'$'}block" | awk -F'\"' '/HostIp/ {print ${'$'}4; exit}')
-                [ -n "${'$'}addr" ] || addr=0.0.0.0
-                echo "AMNEZIA_DNS_CONFLICT|proto=${'$'}proto|addr=${'$'}addr"
-                exit 0
-            fi
-        done
+        block=${'$'}(printf '%s' "${'$'}inspect" | awk -v proto='"53/udp"' 'index(${'$'}0,proto){seen=1} seen{print} seen && index(${'$'}0,"]"){exit}')
+        if printf '%s' "${'$'}block" | grep -q '"HostPort": *"53"'; then
+            addr=${'$'}(printf '%s' "${'$'}block" | awk -F'\"' '/HostIp/ {print ${'$'}4; exit}')
+            [ -n "${'$'}addr" ] || addr=0.0.0.0
+            echo "AMNEZIA_DNS_CONFLICT|proto=udp|addr=${'$'}addr"
+            exit 0
+        fi
         echo AMNEZIA_DNS_NOT_FOUND
         """.trimIndent()
 

@@ -65,8 +65,13 @@ class MasterDnsDockerScriptsContractTest {
         assertTrue(cmd.contains("sudo docker inspect amnezia-dns"))
         assertTrue(cmd.contains("/amnezia-dns"))
         assertTrue(cmd.contains("53/udp"))
-        assertTrue(cmd.contains("53/tcp"))
         assertTrue(cmd.contains("AMNEZIA_DNS_CONFLICT|proto="))
+    }
+
+    @Test
+    fun `checkAmneziaDns53 checks only udp published on amnezia-dns`() {
+        val cmd = MasterDnsDockerScripts.checkAmneziaDns53
+        assertFalse(cmd.contains("53/tcp"))
     }
 
     @Test
