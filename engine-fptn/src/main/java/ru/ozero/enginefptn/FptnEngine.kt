@@ -669,9 +669,13 @@ internal fun prioritizeFptnAuthenticationCandidates(
     return reachable + unchecked
 }
 
-internal fun fptnExitNodeStrategy(server: FptnServer, serverIp: String?): ExitNodeStrategy {
+internal fun fptnExitNodeStrategy(
+    server: FptnServer,
+    serverIp: String?,
+    displayLocale: Locale = Locale.getDefault(),
+): ExitNodeStrategy {
     val countryCode = server.countryCode.normalizedCountryCode()
-    val label = countryCode?.displayCountryName() ?: server.name
+    val label = countryCode?.displayCountryName(displayLocale) ?: server.name
     return ExitNodeStrategy.ProviderLabel(
         label = label,
         ip = serverIp?.takeIf { it.isNotBlank() },
@@ -705,5 +709,5 @@ private fun String.normalizedCountryCode(): String? =
         code.length == 2 && code.all { it in 'A'..'Z' }
     }
 
-private fun String.displayCountryName(): String? =
-    Locale("", this).getDisplayCountry(Locale("ru")).takeIf { it.isNotBlank() && it != this }
+private fun String.displayCountryName(displayLocale: Locale): String? =
+    Locale("", this).getDisplayCountry(displayLocale).takeIf { it.isNotBlank() && it != this }

@@ -169,8 +169,8 @@ internal object MasterDnsDockerScripts {
             " if [ \$rc -ne 0 ]; then echo AMNEZIA_DNS_NOT_FOUND; exit 0; fi;" +
             " name=\$(printf '%s' \"\$inspect\" | awk -F'\\\"' '/\\\"Name\\\"/ {print \$4; exit}');" +
             " if [ \"\$name\" != \"/amnezia-dns\" ]; then echo AMNEZIA_DNS_NOT_FOUND; exit 0; fi;" +
-            " sudo docker stop amnezia-dns 2>/dev/null || true;" +
-            " sudo docker rm amnezia-dns 2>/dev/null || true;" +
+            " sudo docker stop amnezia-dns 2>/dev/null || { echo AMNEZIA_DNS_REMOVE_FAILED; exit 0; };" +
+            " sudo docker rm amnezia-dns 2>/dev/null || { echo AMNEZIA_DNS_REMOVE_FAILED; exit 0; };" +
             " echo AMNEZIA_DNS_REMOVED"
 
     const val removeAll =
@@ -195,6 +195,7 @@ internal object MasterDnsDockerScripts {
     const val MARKER_AMNEZIA_DNS_CONFLICT = "AMNEZIA_DNS_CONFLICT"
     const val MARKER_AMNEZIA_DNS_NOT_FOUND = "AMNEZIA_DNS_NOT_FOUND"
     const val MARKER_AMNEZIA_DNS_REMOVED = "AMNEZIA_DNS_REMOVED"
+    const val MARKER_AMNEZIA_DNS_REMOVE_FAILED = "AMNEZIA_DNS_REMOVE_FAILED"
     const val MARKER_PORT_BUSY = "PORT_BUSY"
     const val MARKER_PORT_FREE = "PORT_FREE"
     const val MARKER_DOCKER_OK = "DOCKER_OK"

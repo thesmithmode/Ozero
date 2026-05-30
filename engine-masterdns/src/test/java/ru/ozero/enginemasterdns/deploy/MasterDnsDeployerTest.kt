@@ -120,6 +120,19 @@ class MasterDnsDeployerTest {
     }
 
     @Test
+    fun `remove path stops when amnezia-dns removal script reports failure`() = runTest {
+        transport.setResponse("docker inspect amnezia-dns", MasterDnsDockerScripts.MARKER_AMNEZIA_DNS_REMOVE_FAILED)
+
+        val states = deployer.removeAmneziaDnsAndContinue(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("amnezia_dns_remove_failed", error.message)
+        assertFalse(transport.executedCommands.any { it.contains("bind_probe") })
+        assertFalse(transport.executedCommands.any { it.contains("apt-get") })
+        assertFalse(transport.executedCommands.any { it.contains("docker run -d") })
+    }
+
+    @Test
     fun `should emit PortBusy when port 53 check emits structured owner`() = runTest {
         transport.setResponse("bind_probe", "PORT_BUSY|proto=udp|addr=0.0.0.0:53|owner=docker:adguardhome")
 

@@ -58,6 +58,14 @@ class MasterDnsDockerScriptsContractTest {
     }
 
     @Test
+    fun `removeAmneziaDnsOnly reports failed stop or rm instead of unconditional success`() {
+        val cmd = MasterDnsDockerScripts.removeAmneziaDnsOnly
+        assertTrue(cmd.contains(MasterDnsDockerScripts.MARKER_AMNEZIA_DNS_REMOVE_FAILED))
+        assertFalse(cmd.contains("docker stop amnezia-dns 2>/dev/null || true"))
+        assertFalse(cmd.contains("docker rm amnezia-dns 2>/dev/null || true"))
+    }
+
+    @Test
     fun `checkAmneziaDns53 inspects exact amnezia-dns name and emits conflict marker`() {
         val cmd = MasterDnsDockerScripts.checkAmneziaDns53
         assertTrue(cmd.contains("sudo docker ps --format '{{.Names}}'"))
