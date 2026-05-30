@@ -22,7 +22,7 @@ class MasterDnsDeployerTest {
     }
 
     private fun setupHappyPath() {
-        transport.setResponse("ss -H", MasterDnsDockerScripts.MARKER_PORT_FREE)
+        transport.setResponse("bind_probe", MasterDnsDockerScripts.MARKER_PORT_FREE)
         transport.setResponse("free -m", "512 1024")
         transport.setResponse("apt-get", MasterDnsDockerScripts.MARKER_DOCKER_OK)
         transport.setResponse("Dockerfile", MasterDnsDockerScripts.MARKER_BUILD_OK)
@@ -60,18 +60,68 @@ class MasterDnsDeployerTest {
 
     @Test
     fun `should return Error when port 53 is busy`() = runTest {
-        transport.setResponse("ss -H", MasterDnsDockerScripts.MARKER_PORT_BUSY)
+        transport.setResponse("bind_probe", MasterDnsDockerScripts.MARKER_PORT_BUSY)
 
         val states = deployer.deploy(credentials()).toList()
 
         assertInstanceOf(MasterDnsDeployState.Error::class.java, states.last())
         val error = states.last() as MasterDnsDeployState.Error
-        assertTrue(error.message == "port_53_busy")
+        assertTrue(error.message.startsWith("port_53_busy"))
     }
 
     @Test
-    fun `should return PortBusy when port 53 check emits structured output`() = runTest {
-        transport.setResponse("ss -H", "PORT_BUSY|proto=udp|addr=0.0.0.0:53|owner=docker:adguardhome")
+    fun `should emit AmneziaDnsConflict when amnezia-dns publishes udp 53`() = runTest {
+        transport.setResponse(
+            "docker inspect amnezia-dns",
+            "AMNEZIA_DNS_CONFLICT|proto=udp|addr=0.0.0.0",
+        )
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val conflict = states.last() as MasterDnsDeployState.AmneziaDnsConflict
+        assertEquals("udp", conflict.protocol)
+        assertEquals("0.0.0.0", conflict.address)
+        assertFalse(transport.executedCommands.any { it.contains("docker stop amnezia-dns") })
+        assertFalse(transport.executedCommands.any { it.contains("docker rm amnezia-dns") })
+    }
+
+    @Test
+    fun `cancel path does not stop or remove amnezia-dns`() = runTest {
+        transport.setResponse(
+            "docker inspect amnezia-dns",
+            "AMNEZIA_DNS_CONFLICT|proto=udp|addr=0.0.0.0",
+        )
+
+        deployer.deploy(credentials()).toList()
+
+        assertFalse(transport.executedCommands.any { it.contains("docker stop amnezia-dns") })
+        assertFalse(transport.executedCommands.any { it.contains("docker rm amnezia-dns") })
+    }
+
+    @Test
+    fun `remove path calls only inspect stop rm for amnezia-dns before continuing`() = runTest {
+        transport.setResponse("docker inspect amnezia-dns", MasterDnsDockerScripts.MARKER_AMNEZIA_DNS_REMOVED)
+
+        val states = deployer.removeAmneziaDnsAndContinue(credentials()).toList()
+
+        assertInstanceOf(MasterDnsDeployState.Done::class.java, states.last())
+        val amneziaCommands = transport.executedCommands.filter { it.contains("amnezia-dns") }
+        assertTrue(
+            amneziaCommands.all {
+                it.contains("docker inspect amnezia-dns") ||
+                    it.contains("docker stop amnezia-dns") ||
+                    it.contains("docker rm amnezia-dns")
+            },
+        )
+        assertFalse(amneziaCommands.any { it.contains("system prune") })
+        assertFalse(
+            amneziaCommands.any { it.contains("volume rm") || it.contains("network rm") || it.contains("rmi") },
+        )
+    }
+
+    @Test
+    fun `should emit PortBusy when port 53 check emits structured owner`() = runTest {
+        transport.setResponse("bind_probe", "PORT_BUSY|proto=udp|addr=0.0.0.0:53|owner=docker:adguardhome")
 
         val states = deployer.deploy(credentials()).toList()
 
@@ -82,22 +132,14 @@ class MasterDnsDeployerTest {
     }
 
     @Test
-    fun `should stop with retry owner after removing amnezia dns container`() = runTest {
-        transport.setResponses(
-            "ss -H",
-            listOf(
-                "PORT_BUSY|proto=udp|addr=0.0.0.0:53|owner=docker:amnezia-dns",
-                "PORT_BUSY|proto=tcp|addr=[::]:53|owner=docker-proxy",
-            ),
-        )
-        transport.setResponse("amnezia-dns", "")
+    fun `should map legacy name field to PortBusy owner`() = runTest {
+        transport.setResponse("bind_probe", "PORT_BUSY|proto=udp|addr=0.0.0.0|name=docker-proxy")
 
         val states = deployer.deploy(credentials()).toList()
 
-        assertTrue(transport.executedCommands.any { it.contains("amnezia-dns") })
         val portBusy = states.last() as MasterDnsDeployState.PortBusy
-        assertEquals("tcp", portBusy.protocol)
-        assertEquals("[::]:53", portBusy.address)
+        assertEquals("udp", portBusy.protocol)
+        assertEquals("0.0.0.0", portBusy.address)
         assertEquals("docker-proxy", portBusy.owner)
     }
 

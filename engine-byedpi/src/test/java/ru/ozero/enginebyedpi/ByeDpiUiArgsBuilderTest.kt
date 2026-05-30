@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 class ByeDpiUiArgsBuilderTest {
 
     @Test
-    fun `defaults дают upstream OOB strategy с -e97 -An -Ku -a1 -An`() {
+    fun `defaults дают TCP OOB strategy без UDP секции`() {
         val args = ByeDpiUiArgsBuilder.build(ByeDpiUiSettings.DEFAULT, socksPort = 1080).toList()
 
         val expected = listOf(
@@ -19,7 +19,6 @@ class ByeDpiUiArgsBuilderTest {
             "-o1",
             "-e97",
             "-An",
-            "-Ku", "-a1", "-An",
         )
         assertEquals(expected, args)
     }
@@ -111,6 +110,20 @@ class ByeDpiUiArgsBuilderTest {
         val s = ByeDpiUiSettings.DEFAULT.copy(desyncUdp = false)
         val args = ByeDpiUiArgsBuilder.build(s, 1080).toList()
         assertTrue("-Ku" !in args)
+    }
+
+    @Test
+    fun `desyncUdp=true добавляет отдельную UDP секцию`() {
+        val s = ByeDpiUiSettings.DEFAULT.copy(desyncUdp = true)
+        val args = ByeDpiUiArgsBuilder.build(s, 1080).toList()
+        assertTrue(args.takeLast(3) == listOf("-Ku", "-a1", "-An"), "expected UDP section at tail, got $args")
+    }
+
+    @Test
+    fun `legacy default UI settings migrate to TCP fallback default`() {
+        val legacy = ByeDpiUiSettings.DEFAULT.copy(desyncUdp = true).toJson()
+        val migrated = ByeDpiUiSettings.fromJson(legacy)
+        assertTrue(!migrated.desyncUdp)
     }
 
     @Test

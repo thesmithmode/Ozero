@@ -15,6 +15,10 @@ sealed class MasterDnsDeployState {
         override val progressPercent: Int = 15
     }
 
+    data class AmneziaDnsConflict(val protocol: String, val address: String) : MasterDnsDeployState() {
+        override val progressPercent: Int = 15
+    }
+
     data object InstallingDocker : MasterDnsDeployState() {
         override val progressPercent: Int = 35
     }
