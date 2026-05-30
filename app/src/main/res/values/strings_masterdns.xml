@@ -34,6 +34,7 @@
     <string name="masterdns_deploy_state_starting_container">Запуск контейнера…</string>
     <string name="masterdns_deploy_state_extracting_key">Извлечение ключа шифрования…</string>
     <string name="masterdns_deploy_state_done">Сервер развёрнут, конфигурация заполнена</string>
+    <string name="masterdns_deploy_error_port_busy_details">Порт 53 уже занят на сервере: %1$s. Освободите конфликт и попробуйте снова.</string>
     <string name="masterdns_deploy_error_port_busy">Порт 53/UDP уже занят на сервере. Освободите порт и попробуйте снова.</string>
     <string name="masterdns_deploy_error_resources">Недостаточно ресурсов: нужно ≥512 МБ RAM и ≥1 ГБ дискового пространства.</string>
     <string name="masterdns_deploy_error_docker">Не удалось установить Docker. Проверьте доступ к интернету на сервере.</string>

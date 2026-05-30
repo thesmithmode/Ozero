@@ -156,6 +156,69 @@ class MasterDnsDockerScriptsContractTest {
     }
 
     @Test
+    fun `checkPort53 loopback-only systemd-resolved does not produce busy contract`() {
+        val script = MasterDnsDockerScripts.checkPort53
+        assertTrue(script.contains("127.0.0.53"))
+        assertTrue(script.contains("127.0.0.54"))
+        assertTrue(script.contains("127.0.0.1"))
+        assertTrue(script.contains("::1"))
+        assertFalse(
+            script.contains("grep -q ':53 '") && script.contains("&& echo PORT_BUSY"),
+            "Raw ss :53 match treats loopback-only systemd-resolved as conflict.",
+        )
+    }
+
+    @Test
+    fun `checkPort53 test-binds UDP zero address used by runContainer`() {
+        val script = MasterDnsDockerScripts.checkPort53
+        assertTrue(script.contains("bind_probe udp"))
+        assertTrue(script.contains("socket.SOCK_DGRAM"))
+        assertTrue(script.contains("sock.bind((\"0.0.0.0\", 53))"))
+        assertTrue(MasterDnsDockerScripts.runContainer.contains("-p 53:53/udp"))
+    }
+
+    @Test
+    fun `checkPort53 reports zero IPv4 listener as busy with machine marker`() {
+        val script = MasterDnsDockerScripts.checkPort53
+        assertTrue(script.contains("PORT_BUSY|proto="))
+        assertTrue(script.contains("|addr="))
+        assertTrue(script.contains("|name="))
+        assertTrue(script.contains("!ignored(addr)"))
+    }
+
+    @Test
+    fun `checkPort53 reports wildcard IPv6 listener as busy`() {
+        val script = MasterDnsDockerScripts.checkPort53
+        assertTrue(script.contains("gsub(/^\\[/"))
+        assertTrue(script.contains("gsub(/\\]$/"))
+        assertTrue(script.contains("addr == \"::1\""))
+        assertFalse(script.contains("addr == \"::\""), "[::]:53 must remain an external conflict, not ignored.")
+    }
+
+    @Test
+    fun `checkPort53 reports external server IPv4 listener as busy`() {
+        val script = MasterDnsDockerScripts.checkPort53
+        assertTrue(script.contains("ss_conflict udp -lunp"))
+        assertTrue(script.contains("sub(/%.*$/"))
+        assertTrue(script.contains("!ignored(addr)"))
+    }
+
+    @Test
+    fun `checkPort53 reports Docker UDP publish as busy`() {
+        val script = MasterDnsDockerScripts.checkPort53
+        assertTrue(script.contains("docker_conflict"))
+        assertTrue(script.contains("->53\\/(udp|tcp)"))
+        assertTrue(script.contains("proto="))
+    }
+
+    @Test
+    fun `checkPort53 reports Docker TCP publish for amnezia dns conflict`() {
+        val script = MasterDnsDockerScripts.checkPort53
+        assertTrue(script.contains("->53\\/(udp|tcp)"))
+        assertTrue(script.contains("sub(/^.*->53\\//"))
+    }
+
+    @Test
     fun `runContainer uses retry loop instead of fixed sleep for readiness probe`() {
         val cmd = MasterDnsDockerScripts.runContainer
         assertFalse(
