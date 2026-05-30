@@ -130,6 +130,11 @@ internal class MasterDnsDeployerImpl(
         PersistentLoggers.debug(TAG, "deploy: port 53 check")
         val portResult = transport.exec(MasterDnsDockerScripts.checkPort53)
         PersistentLoggers.debug(TAG, "deploy: port result=${portResult.takeShort()}")
+        val portBusy = parsePortBusy(portResult)
+        if (portBusy != null) {
+            emit(portBusy)
+            return false
+        }
         val portError = mapPortResult(portResult)
         if (portError != null) {
             emit(MasterDnsDeployState.Error(portError))
@@ -137,6 +142,29 @@ internal class MasterDnsDeployerImpl(
         }
         return checkResources()
     }
+
+    private fun parsePortBusy(result: String): MasterDnsDeployState.PortBusy? = result
+        .lineSequence()
+        .map { it.trim() }
+        .firstOrNull { it.startsWith(PORT_BUSY_PREFIX) }
+        ?.let { line ->
+            val fields = line.substringAfter('|', missingDelimiterValue = "")
+                .split('|')
+                .mapNotNull { part ->
+                    val key = part.substringBefore('=', missingDelimiterValue = "").trim()
+                    val value = part.substringAfter('=', missingDelimiterValue = "").trim()
+                    if (key.isBlank() || value.isBlank()) null else key to value
+                }
+                .toMap()
+            val protocol = fields["proto"]?.lowercase().orEmpty()
+            val address = fields["addr"].orEmpty()
+            val owner = fields["owner"] ?: fields["name"].orEmpty()
+            if (protocol.isBlank() || address.isBlank() || owner.isBlank()) {
+                null
+            } else {
+                MasterDnsDeployState.PortBusy(protocol = protocol, address = address, owner = owner)
+            }
+        }
 
     private suspend fun FlowCollector<MasterDnsDeployState>.checkResources(): Boolean {
         val resources = transport.exec(MasterDnsDockerScripts.checkResources)

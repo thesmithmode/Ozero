@@ -3,11 +3,15 @@ package ru.ozero.enginemasterdns.deploy
 class FakeSshTransport : SshTransport {
     var connectShouldFail = false
     var authShouldFail = false
-    private val commandResponses = mutableMapOf<String, String>()
+    private val commandResponses = mutableMapOf<String, ArrayDeque<String>>()
     val executedCommands = mutableListOf<String>()
 
     fun setResponse(commandSubstring: String, response: String) {
-        commandResponses[commandSubstring] = response
+        commandResponses[commandSubstring] = ArrayDeque(listOf(response))
+    }
+
+    fun setResponses(commandSubstring: String, responses: List<String>) {
+        commandResponses[commandSubstring] = ArrayDeque(responses)
     }
 
     override fun connect(host: String, port: Int) {
@@ -20,12 +24,13 @@ class FakeSshTransport : SshTransport {
 
     override fun exec(command: String, timeoutMs: Long): String {
         executedCommands.add(command)
-        return commandResponses
+        val responses = commandResponses
             .entries
             .filter { command.contains(it.key) }
             .maxByOrNull { it.key.length }
             ?.value
-            ?: ""
+            ?: return ""
+        return if (responses.size > 1) responses.removeFirst() else responses.first()
     }
 
     var closeCalled = false

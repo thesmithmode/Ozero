@@ -34,6 +34,7 @@
     <string name="masterdns_deploy_state_starting_container">Iniciando contêiner…</string>
     <string name="masterdns_deploy_state_extracting_key">Extraindo chave de criptografia…</string>
     <string name="masterdns_deploy_state_done">Servidor implantado, configuração preenchida</string>
+    <string name="masterdns_deploy_error_port_busy_structured">A porta 53 já está em uso: proprietário %1$s, endereço %2$s, protocolo %3$s. Libere a porta e tente novamente.</string>
     <string name="masterdns_deploy_error_port_busy_details">A porta 53 já está em uso no servidor: %1$s. Libere o conflito e tente novamente.</string>
     <string name="masterdns_deploy_error_port_busy">A porta 53/UDP já está em uso. Libere a porta e tente novamente.</string>
     <string name="masterdns_deploy_error_resources">Recursos insuficientes: necessário ≥512 MB RAM e ≥1 GB de disco livre.</string>

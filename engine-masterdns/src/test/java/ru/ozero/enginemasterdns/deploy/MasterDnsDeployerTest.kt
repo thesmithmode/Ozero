@@ -120,13 +120,27 @@ class MasterDnsDeployerTest {
     }
 
     @Test
-    fun `should include port conflict details in Error for UI`() = runTest {
+    fun `should emit PortBusy when port 53 check emits structured owner`() = runTest {
+        transport.setResponse("bind_probe", "PORT_BUSY|proto=udp|addr=0.0.0.0:53|owner=docker:adguardhome")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val portBusy = states.last() as MasterDnsDeployState.PortBusy
+        assertEquals("udp", portBusy.protocol)
+        assertEquals("0.0.0.0:53", portBusy.address)
+        assertEquals("docker:adguardhome", portBusy.owner)
+    }
+
+    @Test
+    fun `should map legacy name field to PortBusy owner`() = runTest {
         transport.setResponse("bind_probe", "PORT_BUSY|proto=udp|addr=0.0.0.0|name=docker-proxy")
 
         val states = deployer.deploy(credentials()).toList()
 
-        val error = states.last() as MasterDnsDeployState.Error
-        assertEquals("port_53_busy|proto=udp|addr=0.0.0.0|name=docker-proxy", error.message)
+        val portBusy = states.last() as MasterDnsDeployState.PortBusy
+        assertEquals("udp", portBusy.protocol)
+        assertEquals("0.0.0.0", portBusy.address)
+        assertEquals("docker-proxy", portBusy.owner)
     }
 
     @Test

@@ -20,6 +20,7 @@ class MasterDnsDeployStateTest {
             MasterDnsDeployState.Removing,
             MasterDnsDeployState.Removed,
             MasterDnsDeployState.Done("toml"),
+            MasterDnsDeployState.PortBusy("udp", "0.0.0.0:53", "named"),
             MasterDnsDeployState.Error("x"),
         )
         states.forEach { s ->
@@ -62,6 +63,7 @@ class MasterDnsDeployStateTest {
     @Test
     fun `Idle and Error progressPercent are 0 (no progress)`() {
         assertEquals(0, MasterDnsDeployState.Idle.progressPercent)
+        assertEquals(0, MasterDnsDeployState.PortBusy("udp", "0.0.0.0:53", "named").progressPercent)
         assertEquals(0, MasterDnsDeployState.Error("x").progressPercent)
     }
 }

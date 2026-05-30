@@ -70,6 +70,15 @@ class MasterDnsDockerScriptsContractTest {
     }
 
     @Test
+    fun `checkPort53 inspects UDP local address without peer-column false positive`() {
+        val cmd = MasterDnsDockerScripts.checkPort53
+        assertTrue(cmd.contains("ss_conflict udp -lunp"))
+        assertTrue(cmd.contains("for (i = 1; i <= NF; i++)"))
+        assertTrue(cmd.contains("local=\"\""))
+        assertFalse(cmd.contains("awk '$5 ~ /(^|:)53$/ {print $5"))
+    }
+
+    @Test
     fun `removeAll does NOT delete named volume - key persist for redeploy`() {
         assertFalse(
             MasterDnsDockerScripts.removeAll.contains("docker volume rm"),
@@ -147,6 +156,16 @@ class MasterDnsDockerScriptsContractTest {
     }
 
     @Test
+    fun `checkPort53 emits structured owner address protocol when busy`() {
+        val script = MasterDnsDockerScripts.checkPort53
+        assertTrue(script.contains("PORT_BUSY|proto="))
+        assertTrue(script.contains("|addr="))
+        assertTrue(script.contains("|owner="))
+        assertTrue(script.contains("ss_conflict udp -lunp"))
+        assertTrue(script.contains("docker_conflict"))
+    }
+
+    @Test
     fun `MARKER_ERR_DPKG_LOCKED constant exposed for deployer mapping`() {
         assertTrue(
             MasterDnsDockerScripts.MARKER_ERR_DPKG_LOCKED == "ERR_DPKG_LOCKED",
@@ -210,7 +229,7 @@ class MasterDnsDockerScriptsContractTest {
         val script = MasterDnsDockerScripts.checkPort53
         assertTrue(script.contains("PORT_BUSY|proto="))
         assertTrue(script.contains("|addr="))
-        assertTrue(script.contains("|name="))
+        assertTrue(script.contains("|owner="))
         assertTrue(script.contains("!ignored(addr)"))
     }
 
