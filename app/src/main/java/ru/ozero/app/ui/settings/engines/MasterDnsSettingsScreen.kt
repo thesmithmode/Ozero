@@ -476,7 +476,11 @@ private fun deployStateLabel(state: MasterDnsDeployState): String = when (state)
 
 @Composable
 private fun deployErrorMessage(code: String): String = when {
-    code.startsWith("port_53_busy") -> stringResource(R.string.masterdns_deploy_error_port_busy)
+    code == "port_53_busy" -> stringResource(R.string.masterdns_deploy_error_port_busy)
+    code.startsWith("port_53_busy|") -> stringResource(
+        R.string.masterdns_deploy_error_port_busy_details,
+        code.substringAfter('|'),
+    )
     code == "amnezia_dns_cancelled" -> stringResource(R.string.masterdns_deploy_error_amnezia_dns_cancelled)
     code == "amnezia_dns_remove_failed" -> stringResource(R.string.masterdns_deploy_error_amnezia_dns_remove_failed)
     code == "insufficient_resources" -> stringResource(R.string.masterdns_deploy_error_resources)

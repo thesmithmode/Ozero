@@ -16,30 +16,51 @@ internal object MasterDnsDockerScripts {
             " *) echo ERR_SUDO_NOT_ALLOWED;;" +
             " esac"
 
-    const val checkPort53 =
-        "if sudo docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^masterdns-ozero$';" +
-            " then echo PORT_FREE; exit 0; fi;" +
-            " udp=\$(sudo ss -H -ulpn 2>/dev/null | awk '$4 ~ /(^|:)53$/ {print $4 \"|\" $NF; exit}');" +
-            " if [ -n \"$udp\" ]; then addr=\${udp%%|*}; proc=\${udp#*|};" +
-            " echo PORT_BUSY'|protocol=udp|address='\$addr'|process='\$proc; exit 0; fi;" +
-            " tcp=\$(sudo ss -H -tlpn 2>/dev/null | awk '$4 ~ /(^|:)53$/ {print $4 \"|\" $NF; exit}');" +
-            " if [ -n \"$tcp\" ]; then addr=\${tcp%%|*}; proc=\${tcp#*|};" +
-            " echo PORT_BUSY'|protocol=tcp|address='\$addr'|process='\$proc;" +
-            " else echo PORT_FREE; fi"
+    val checkPort53: String =
+        """
+        if sudo docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^masterdns-ozero${'$'}'; then echo PORT_FREE; exit 0; fi
+        docker_conflict() { sudo docker ps --format '{{.Names}}|{{.Ports}}' 2>/dev/null | awk -F'|' '${'$'}1 != "masterdns-ozero" { split(${'$'}2, ports, ","); for (i in ports) { p=ports[i]; gsub(/^ +| +${'$'}/, "", p); if (p ~ /->53\/(udp|tcp)/) { proto=p; sub(/^.*->53\//, "", proto); sub(/ .*/, "", proto); host=p; sub(/->.*${'$'}/, "", host); addr=host; sub(/:53${'$'}/, "", addr); gsub(/^\[/, "", addr); gsub(/\]${'$'}/, "", addr); if (addr == "") addr="0.0.0.0"; print "PORT_BUSY|proto=" proto "|addr=" addr "|name=" ${'$'}1; exit } } } }'; }
+        ss_conflict() { proto="${'$'}1"; flags="${'$'}2"; sudo ss -H "${'$'}flags" 2>/dev/null | awk -v proto="${'$'}proto" 'function clean(addr) { gsub(/^\[/, "", addr); gsub(/\]${'$'}/, "", addr); sub(/%.*${'$'}/, "", addr); return addr } function ignored(addr) { return addr == "127.0.0.53" || addr == "127.0.0.54" || addr == "127.0.0.1" || addr == "::1" } { local=""; for (i = 1; i <= NF; i++) if (${'$'}i ~ /:53${'$'}/ || ${'$'}i ~ /\]:53${'$'}/) { local=${'$'}i; break } if (local == "") next; addr=local; sub(/:53${'$'}/, "", addr); addr=clean(addr); if (!ignored(addr)) { name="unknown"; if (match(${'$'}0, /"[^"]+"/)) name=substr(${'$'}0, RSTART + 1, RLENGTH - 2); print "PORT_BUSY|proto=" proto "|addr=" addr "|name=" name; exit } }'; }
+        bind_probe() { proto="${'$'}1"; py="${'$'}(command -v python3 2>/dev/null || command -v python 2>/dev/null)"; [ -n "${'$'}py" ] || return 0; sudo "${'$'}py" - "${'$'}proto" <<'PY'
+        import errno
+        import socket
+        import sys
+        proto = sys.argv[1]
+        sock_type = socket.SOCK_DGRAM if proto == "udp" else socket.SOCK_STREAM
+        sock = socket.socket(socket.AF_INET, sock_type)
+        try:
+            sock.bind(("0.0.0.0", 53))
+        except OSError as exc:
+            sys.exit(98 if exc.errno in (errno.EADDRINUSE, errno.EACCES) else 1)
+        finally:
+            sock.close()
+        PY
+        }
+        bind_probe udp; bind_rc=${'$'}?
+        if [ "${'$'}bind_rc" != "0" ]; then busy="${'$'}(docker_conflict)"; [ -n "${'$'}busy" ] && { echo "${'$'}busy"; exit 0; }; busy="${'$'}(ss_conflict udp -lunp)"; [ -n "${'$'}busy" ] && { echo "${'$'}busy"; exit 0; }; fi
+        busy="${'$'}(docker_conflict)"; [ -n "${'$'}busy" ] && { echo "${'$'}busy"; exit 0; }
+        busy="${'$'}(ss_conflict udp -lunp)"; [ -n "${'$'}busy" ] && { echo "${'$'}busy"; exit 0; }
+        echo PORT_FREE
+        """.trimIndent()
 
-    const val checkAmneziaDns53 =
-        "inspect=\$(sudo docker inspect amnezia-dns 2>/dev/null); rc=\$?;" +
-            " if [ \$rc -ne 0 ]; then echo AMNEZIA_DNS_NOT_FOUND; exit 0; fi;" +
-            " name=\$(printf '%s' \"$inspect\" | awk -F'\\\"' '/\\\"Name\\\"/ {print $4; exit}');" +
-            " if [ \"$name\" != \"/amnezia-dns\" ]; then echo AMNEZIA_DNS_NOT_FOUND; exit 0; fi;" +
-            " for proto in udp tcp; do" +
-            " block=\$(printf '%s' \"$inspect\" | awk -v proto='\"53/'\$proto'\"'" +
-            " 'index($0,proto){seen=1} seen{print} seen && index($0,\"]\"){exit}');" +
-            " if printf '%s' \"$block\" | grep -q '\"HostPort\": *\"53\"'; then" +
-            " addr=\$(printf '%s' \"$block\" | awk -F'\\\"' '/HostIp/ {print $4; exit}');" +
-            " [ -n \"$addr\" ] || addr=0.0.0.0;" +
-            " echo AMNEZIA_DNS_CONFLICT'|proto='\$proto'|addr='\$addr; exit 0; fi; done;" +
-            " echo AMNEZIA_DNS_NOT_FOUND"
+    val checkAmneziaDns53: String =
+        """
+        if ! sudo docker ps --format '{{.Names}}' 2>/dev/null | grep -qx 'amnezia-dns'; then echo AMNEZIA_DNS_NOT_FOUND; exit 0; fi
+        inspect=${'$'}(sudo docker inspect amnezia-dns 2>/dev/null); rc=${'$'}?
+        if [ ${'$'}rc -ne 0 ]; then echo AMNEZIA_DNS_NOT_FOUND; exit 0; fi
+        name=${'$'}(printf '%s' "${'$'}inspect" | awk -F'\"' '/\"Name\"/ {print ${'$'}4; exit}')
+        if [ "${'$'}name" != "/amnezia-dns" ]; then echo AMNEZIA_DNS_NOT_FOUND; exit 0; fi
+        for proto in udp tcp; do
+            block=${'$'}(printf '%s' "${'$'}inspect" | awk -v proto='"53/'${'$'}proto'"' 'index(${'$'}0,proto){seen=1} seen{print} seen && index(${'$'}0,"]"){exit}')
+            if printf '%s' "${'$'}block" | grep -q '"HostPort": *"53"'; then
+                addr=${'$'}(printf '%s' "${'$'}block" | awk -F'\"' '/HostIp/ {print ${'$'}4; exit}')
+                [ -n "${'$'}addr" ] || addr=0.0.0.0
+                echo AMNEZIA_DNS_CONFLICT'|proto='${'$'}proto'|addr='${'$'}addr
+                exit 0
+            fi
+        done
+        echo AMNEZIA_DNS_NOT_FOUND
+        """.trimIndent()
 
     const val checkResources =
         "echo \$(free -m 2>/dev/null | awk 'NR==2{print \$7}')" +

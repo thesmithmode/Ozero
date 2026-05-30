@@ -130,8 +130,9 @@ internal class MasterDnsDeployerImpl(
         PersistentLoggers.debug(TAG, "deploy: port 53 check")
         val portResult = transport.exec(MasterDnsDockerScripts.checkPort53)
         PersistentLoggers.debug(TAG, "deploy: port result=${portResult.takeShort()}")
-        if (portResult.contains(MasterDnsDockerScripts.MARKER_PORT_BUSY)) {
-            emit(MasterDnsDeployState.Error(portBusyError(portResult)))
+        val portError = mapPortResult(portResult)
+        if (portError != null) {
+            emit(MasterDnsDeployState.Error(portError))
             return false
         }
         return checkResources()
@@ -221,13 +222,6 @@ internal class MasterDnsDeployerImpl(
         )
     }
 
-    private fun portBusyError(result: String): String {
-        val protocol = markerValue(result, "protocol").ifBlank { "unknown" }
-        val address = markerValue(result, "address").ifBlank { "unknown" }
-        val process = markerValue(result, "process").ifBlank { "unknown" }
-        return "port_53_busy|process=$process|address=$address|protocol=$protocol"
-    }
-
     private fun markerValue(result: String, key: String): String =
         result.split('|')
             .firstOrNull { it.startsWith("$key=") }
@@ -242,6 +236,19 @@ internal class MasterDnsDeployerImpl(
         result.contains(MasterDnsDockerScripts.MARKER_ERR_SUDO_NO_HOME) -> "sudo_no_home"
         result.contains(MasterDnsDockerScripts.MARKER_ERR_SUDO_NOT_IN_GROUP) -> "sudo_not_in_group"
         else -> null
+    }
+
+    private fun mapPortResult(result: String): String? {
+        val busyLine = result.lineSequence()
+            .map { it.trim() }
+            .firstOrNull { it == MasterDnsDockerScripts.MARKER_PORT_BUSY || it.startsWith(PORT_BUSY_PREFIX) }
+            ?: return null
+        val details = busyLine.substringAfter('|', missingDelimiterValue = "")
+        return if (details.isBlank()) {
+            "port_53_busy"
+        } else {
+            "port_53_busy|$details"
+        }
     }
 
     private fun buildClientToml(serverIp: String, encryptionKey: String): String =
@@ -262,5 +269,6 @@ internal class MasterDnsDeployerImpl(
     private companion object {
         const val TAG = "MasterDnsDeployer"
         const val CONTAINER_STARTUP_DELAY_MS = 3_000L
+        const val PORT_BUSY_PREFIX = "PORT_BUSY|"
     }
 }
