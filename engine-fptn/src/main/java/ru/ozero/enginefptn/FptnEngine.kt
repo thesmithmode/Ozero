@@ -665,8 +665,9 @@ internal fun prioritizeFptnAuthenticationCandidates(
         )
         .map { it.server }
     val unchecked = candidates.filterNot { checked.contains(it) }
-    if (reachable.isEmpty()) return unchecked.ifEmpty { candidates }
-    return reachable + unchecked
+    val checkedFailures = candidates.filter { checked.contains(it) && !reachable.contains(it) }
+    if (reachable.isEmpty()) return unchecked + checkedFailures
+    return reachable + unchecked + checkedFailures
 }
 
 internal fun fptnExitNodeStrategy(
