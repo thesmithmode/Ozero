@@ -197,6 +197,7 @@ class MasterDnsSettingsViewModel @Inject constructor(
         is MasterDnsDeployState.Done -> "✓ Сервер развёрнут"
         is MasterDnsDeployState.Removing -> "→ Удаление контейнера и образа"
         is MasterDnsDeployState.Removed -> "✓ Сервер полностью удалён"
+        is MasterDnsDeployState.PortBusy -> "✗ Порт ${step.protocol}/${step.address} занят: ${step.owner}"
         is MasterDnsDeployState.Error -> "✗ Ошибка: ${step.message}"
         is MasterDnsDeployState.Idle -> null
     }
