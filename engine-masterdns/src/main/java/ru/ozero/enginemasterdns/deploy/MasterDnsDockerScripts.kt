@@ -19,7 +19,7 @@ internal object MasterDnsDockerScripts {
     const val checkPort53 =
         "if sudo docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^masterdns-ozero$';" +
             " then echo PORT_FREE; exit 0; fi;" +
-            " udp=\$(sudo ss -H -ulpn 2>/dev/null | awk '$5 ~ /(^|:)53$/ {print $5 \"|\" $NF; exit}');" +
+            " udp=\$(sudo ss -H -ulpn 2>/dev/null | awk '$4 ~ /(^|:)53$/ {print $4 \"|\" $NF; exit}');" +
             " if [ -n \"$udp\" ]; then addr=\${udp%%|*}; proc=\${udp#*|};" +
             " echo PORT_BUSY'|protocol=udp|address='\$addr'|process='\$proc; exit 0; fi;" +
             " tcp=\$(sudo ss -H -tlpn 2>/dev/null | awk '$4 ~ /(^|:)53$/ {print $4 \"|\" $NF; exit}');" +

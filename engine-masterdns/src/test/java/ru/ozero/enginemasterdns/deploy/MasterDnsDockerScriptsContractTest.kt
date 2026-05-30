@@ -68,6 +68,14 @@ class MasterDnsDockerScriptsContractTest {
     }
 
     @Test
+    fun `checkPort53 inspects UDP local address column`() {
+        val cmd = MasterDnsDockerScripts.checkPort53
+        assertTrue(cmd.contains("ss -H -ulpn"))
+        assertTrue(cmd.contains("awk '$4 ~ /(^|:)53$/ {print $4"))
+        assertFalse(cmd.contains("awk '$5 ~ /(^|:)53$/ {print $5"))
+    }
+
+    @Test
     fun `removeAll does NOT delete named volume - key persist for redeploy`() {
         assertFalse(
             MasterDnsDockerScripts.removeAll.contains("docker volume rm"),
