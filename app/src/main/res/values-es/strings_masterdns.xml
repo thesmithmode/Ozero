@@ -55,4 +55,10 @@
     <string name="masterdns_deploy_state_removed">Servidor eliminado</string>
     <string name="masterdns_deploy_error_remove">No se pudo eliminar el servidor.</string>
     <string name="masterdns_deploy_error_unexpected">Error inesperado. Inténtelo de nuevo.</string>
+    <string name="masterdns_amnezia_dns_conflict_title">El puerto 53 lo usa Amnezia DNS</string>
+    <string name="masterdns_amnezia_dns_conflict_text">En el servidor se encontró el contenedor &quot;amnezia-dns&quot;, que usa el puerto DNS 53. MasterDNS no puede continuar la instalación mientras este contenedor esté activo. Puedes cancelar el despliegue o eliminar de forma segura solo este contenedor y continuar la instalación.</string>
+    <string name="masterdns_amnezia_dns_conflict_cancel">Cancelar despliegue</string>
+    <string name="masterdns_amnezia_dns_conflict_remove_continue">Eliminar amnezia-dns y continuar</string>
+    <string name="masterdns_deploy_error_amnezia_dns_cancelled">El despliegue se canceló por el contenedor amnezia-dns.</string>
+    <string name="masterdns_deploy_error_amnezia_dns_remove_failed">No se pudo eliminar el contenedor amnezia-dns.</string>
 </resources>

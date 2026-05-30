@@ -12,6 +12,7 @@ class MasterDnsDeployStateTest {
             MasterDnsDeployState.Idle,
             MasterDnsDeployState.Connecting,
             MasterDnsDeployState.CheckingPreflight,
+            MasterDnsDeployState.AmneziaDnsConflict("udp", "0.0.0.0"),
             MasterDnsDeployState.InstallingDocker,
             MasterDnsDeployState.BuildingImage,
             MasterDnsDeployState.StartingContainer,

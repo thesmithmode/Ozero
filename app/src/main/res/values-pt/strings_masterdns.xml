@@ -55,4 +55,10 @@
     <string name="masterdns_deploy_state_removed">Servidor removido</string>
     <string name="masterdns_deploy_error_remove">Falha ao remover o servidor.</string>
     <string name="masterdns_deploy_error_unexpected">Erro inesperado. Tente novamente.</string>
+    <string name="masterdns_amnezia_dns_conflict_title">A porta 53 é usada pelo Amnezia DNS</string>
+    <string name="masterdns_amnezia_dns_conflict_text">Foi encontrado no servidor o contêiner &quot;amnezia-dns&quot;, que usa a porta DNS 53. O MasterDNS não pode continuar a instalação enquanto esse contêiner estiver ativo. Você pode cancelar o deploy ou remover com segurança apenas esse contêiner e continuar a instalação.</string>
+    <string name="masterdns_amnezia_dns_conflict_cancel">Cancelar deploy</string>
+    <string name="masterdns_amnezia_dns_conflict_remove_continue">Remover amnezia-dns e continuar</string>
+    <string name="masterdns_deploy_error_amnezia_dns_cancelled">O deploy foi cancelado por causa do contêiner amnezia-dns.</string>
+    <string name="masterdns_deploy_error_amnezia_dns_remove_failed">Não foi possível remover o contêiner amnezia-dns.</string>
 </resources>

@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -101,6 +102,8 @@ fun MasterDnsSettingsScreen(
                 onDeployClick = viewModel::onDeployClick,
                 onUndeployClick = viewModel::onUndeployClick,
                 onDeployReset = viewModel::onDeployReset,
+                onAmneziaDnsConflictCancel = viewModel::onAmneziaDnsConflictCancel,
+                onAmneziaDnsRemoveAndContinue = viewModel::onAmneziaDnsRemoveAndContinue,
             )
             ServerSetupCard(onCopy = onCopy)
             OutlinedTextField(
@@ -127,6 +130,8 @@ private fun DeployCard(
     onDeployClick: (host: String, port: Int, login: String, password: CharArray) -> Unit,
     onUndeployClick: (host: String, port: Int, login: String, password: CharArray) -> Unit,
     onDeployReset: () -> Unit,
+    onAmneziaDnsConflictCancel: () -> Unit,
+    onAmneziaDnsRemoveAndContinue: () -> Unit,
 ) {
     var host by rememberSaveable { mutableStateOf(state.serverIp) }
     var portText by rememberSaveable {
@@ -145,6 +150,13 @@ private fun DeployCard(
         deployState is MasterDnsDeployState.Removing
     val isDone = deployState is MasterDnsDeployState.Done
     val isRemoved = deployState is MasterDnsDeployState.Removed
+
+    if (deployState is MasterDnsDeployState.AmneziaDnsConflict) {
+        AmneziaDnsConflictDialog(
+            onCancel = onAmneziaDnsConflictCancel,
+            onRemoveAndContinue = onAmneziaDnsRemoveAndContinue,
+        )
+    }
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp)) {
@@ -266,6 +278,7 @@ private fun DeployActionPanel(
             enabled = actionsEnabled,
         )
         isRemoved -> DeployRemovedRow(onReset = onDeployReset)
+        deployState is MasterDnsDeployState.AmneziaDnsConflict -> DeployProgressRow(deployState)
         deployState is MasterDnsDeployState.Error -> DeployErrorRow(
             error = deployState,
             onRetry = onDeployReset,
@@ -330,6 +343,28 @@ private fun DeployLogPanel(lines: List<String>) {
 }
 
 private const val LOG_VISIBLE_LINES = 10
+
+@Composable
+private fun AmneziaDnsConflictDialog(
+    onCancel: () -> Unit,
+    onRemoveAndContinue: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = { Text(stringResource(R.string.masterdns_amnezia_dns_conflict_title)) },
+        text = { Text(stringResource(R.string.masterdns_amnezia_dns_conflict_text)) },
+        dismissButton = {
+            TextButton(onClick = onCancel) {
+                Text(stringResource(R.string.masterdns_amnezia_dns_conflict_cancel))
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onRemoveAndContinue) {
+                Text(stringResource(R.string.masterdns_amnezia_dns_conflict_remove_continue))
+            }
+        },
+    )
+}
 
 @Composable
 private fun DeployProgressRow(state: MasterDnsDeployState) {
@@ -435,27 +470,30 @@ private fun deployStateLabel(state: MasterDnsDeployState): String = when (state)
     is MasterDnsDeployState.StartingContainer -> stringResource(R.string.masterdns_deploy_state_starting_container)
     is MasterDnsDeployState.ExtractingKey -> stringResource(R.string.masterdns_deploy_state_extracting_key)
     is MasterDnsDeployState.Removing -> stringResource(R.string.masterdns_deploy_state_removing)
+    is MasterDnsDeployState.AmneziaDnsConflict -> stringResource(R.string.masterdns_amnezia_dns_conflict_title)
     else -> ""
 }
 
 @Composable
-private fun deployErrorMessage(code: String): String = when (code) {
-    "port_53_busy" -> stringResource(R.string.masterdns_deploy_error_port_busy)
-    "insufficient_resources" -> stringResource(R.string.masterdns_deploy_error_resources)
-    "docker_install_failed" -> stringResource(R.string.masterdns_deploy_error_docker)
-    "dpkg_locked" -> stringResource(R.string.masterdns_deploy_error_dpkg_locked)
-    "sudo_not_installed" -> stringResource(R.string.masterdns_deploy_error_sudo_not_installed)
-    "sudo_pwd_required" -> stringResource(R.string.masterdns_deploy_error_sudo_pwd_required)
-    "sudo_not_allowed" -> stringResource(R.string.masterdns_deploy_error_sudo_not_allowed)
-    "sudo_no_home" -> stringResource(R.string.masterdns_deploy_error_sudo_no_home)
-    "sudo_not_in_group" -> stringResource(R.string.masterdns_deploy_error_sudo_not_in_group)
-    "build_failed" -> stringResource(R.string.masterdns_deploy_error_build)
-    "run_failed" -> stringResource(R.string.masterdns_deploy_error_run)
-    "key_extraction_failed" -> stringResource(R.string.masterdns_deploy_error_key)
-    "auth_failed" -> stringResource(R.string.masterdns_deploy_error_auth)
-    "connection_failed" -> stringResource(R.string.masterdns_deploy_error_connection)
-    "remove_failed" -> stringResource(R.string.masterdns_deploy_error_remove)
-    "unexpected_error" -> stringResource(R.string.masterdns_deploy_error_unexpected)
+private fun deployErrorMessage(code: String): String = when {
+    code.startsWith("port_53_busy") -> stringResource(R.string.masterdns_deploy_error_port_busy)
+    code == "amnezia_dns_cancelled" -> stringResource(R.string.masterdns_deploy_error_amnezia_dns_cancelled)
+    code == "amnezia_dns_remove_failed" -> stringResource(R.string.masterdns_deploy_error_amnezia_dns_remove_failed)
+    code == "insufficient_resources" -> stringResource(R.string.masterdns_deploy_error_resources)
+    code == "docker_install_failed" -> stringResource(R.string.masterdns_deploy_error_docker)
+    code == "dpkg_locked" -> stringResource(R.string.masterdns_deploy_error_dpkg_locked)
+    code == "sudo_not_installed" -> stringResource(R.string.masterdns_deploy_error_sudo_not_installed)
+    code == "sudo_pwd_required" -> stringResource(R.string.masterdns_deploy_error_sudo_pwd_required)
+    code == "sudo_not_allowed" -> stringResource(R.string.masterdns_deploy_error_sudo_not_allowed)
+    code == "sudo_no_home" -> stringResource(R.string.masterdns_deploy_error_sudo_no_home)
+    code == "sudo_not_in_group" -> stringResource(R.string.masterdns_deploy_error_sudo_not_in_group)
+    code == "build_failed" -> stringResource(R.string.masterdns_deploy_error_build)
+    code == "run_failed" -> stringResource(R.string.masterdns_deploy_error_run)
+    code == "key_extraction_failed" -> stringResource(R.string.masterdns_deploy_error_key)
+    code == "auth_failed" -> stringResource(R.string.masterdns_deploy_error_auth)
+    code == "connection_failed" -> stringResource(R.string.masterdns_deploy_error_connection)
+    code == "remove_failed" -> stringResource(R.string.masterdns_deploy_error_remove)
+    code == "unexpected_error" -> stringResource(R.string.masterdns_deploy_error_unexpected)
     else -> stringResource(R.string.masterdns_deploy_error_generic, code)
 }
 

@@ -55,4 +55,10 @@
     <string name="masterdns_deploy_state_removed">Server removed</string>
     <string name="masterdns_deploy_error_remove">Failed to remove the server.</string>
     <string name="masterdns_deploy_error_unexpected">Unexpected error. Please try again.</string>
+    <string name="masterdns_amnezia_dns_conflict_title">Port 53 is used by Amnezia DNS</string>
+    <string name="masterdns_amnezia_dns_conflict_text">The server has an &quot;amnezia-dns&quot; container using DNS port 53. MasterDNS cannot continue installation while this container is active. You can cancel deploy or safely remove only this container and continue installation.</string>
+    <string name="masterdns_amnezia_dns_conflict_cancel">Cancel deploy</string>
+    <string name="masterdns_amnezia_dns_conflict_remove_continue">Remove amnezia-dns and continue</string>
+    <string name="masterdns_deploy_error_amnezia_dns_cancelled">Deploy was cancelled because of the amnezia-dns container.</string>
+    <string name="masterdns_deploy_error_amnezia_dns_remove_failed">Failed to remove the amnezia-dns container.</string>
 </resources>

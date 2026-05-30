@@ -11,4 +11,7 @@ class SshjMasterDnsDeployer : MasterDnsServerDeployer {
 
     override fun undeploy(credentials: MasterDnsDeployCredentials): Flow<MasterDnsDeployState> =
         MasterDnsDeployerImpl(SshjTransport()).undeploy(credentials).flowOn(Dispatchers.IO)
+
+    override fun removeAmneziaDnsAndContinue(credentials: MasterDnsDeployCredentials): Flow<MasterDnsDeployState> =
+        MasterDnsDeployerImpl(SshjTransport()).removeAmneziaDnsAndContinue(credentials).flowOn(Dispatchers.IO)
 }
