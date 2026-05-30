@@ -146,7 +146,11 @@ class MasterDnsSettingsViewModel @Inject constructor(
                     if (deployStep is MasterDnsDeployState.Done) {
                         persistDeployResult(host, pending.port, deployStep.configToml)
                     }
-                    if (deployStep is MasterDnsDeployState.Done || deployStep is MasterDnsDeployState.Error) {
+                    if (
+                        deployStep is MasterDnsDeployState.Done ||
+                        deployStep is MasterDnsDeployState.Error ||
+                        deployStep is MasterDnsDeployState.PortBusy
+                    ) {
                         clearPendingDeploy()
                     }
                 }

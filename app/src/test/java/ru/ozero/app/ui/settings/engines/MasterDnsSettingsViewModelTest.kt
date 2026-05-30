@@ -220,6 +220,36 @@ class MasterDnsSettingsViewModelTest {
     }
 
     @Test
+    fun `port busy clears pending credentials and cannot continue amnezia cleanup`() = runTest {
+        val store = FakeStore(MasterDnsPersistedConfig())
+        var removeCalls = 0
+        val deployer = object : MasterDnsServerDeployer {
+            override fun deploy(credentials: MasterDnsDeployCredentials): Flow<MasterDnsDeployState> = flowOf(
+                MasterDnsDeployState.PortBusy("udp", "0.0.0.0:53", "docker:adguardhome"),
+            )
+
+            override fun undeploy(credentials: MasterDnsDeployCredentials): Flow<MasterDnsDeployState> =
+                flowOf(MasterDnsDeployState.Idle)
+
+            override fun removeAmneziaDnsAndContinue(
+                credentials: MasterDnsDeployCredentials,
+            ): Flow<MasterDnsDeployState> {
+                removeCalls++
+                return flowOf(MasterDnsDeployState.Done("toml"))
+            }
+        }
+        val vm = MasterDnsSettingsViewModel(store, deployer)
+
+        vm.onDeployClick("10.0.0.1", 22, "root", "secret".toCharArray())
+        val state = vm.state.first { it.deployState is MasterDnsDeployState.PortBusy }
+        vm.onAmneziaDnsRemoveAndContinue()
+
+        assertEquals(0, removeCalls)
+        assertFalse(state.toString().contains("secret"))
+        assertFalse(state.deployLog.joinToString("\n").contains("secret"))
+    }
+
+    @Test
     fun `deploy log error step shown for user`() = runTest {
         val store = FakeStore(MasterDnsPersistedConfig())
         val vm = MasterDnsSettingsViewModel(

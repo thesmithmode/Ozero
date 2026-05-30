@@ -121,9 +121,40 @@ class ByeDpiUiArgsBuilderTest {
 
     @Test
     fun `legacy default UI settings migrate to TCP fallback default`() {
-        val legacy = ByeDpiUiSettings.DEFAULT.copy(desyncUdp = true).toJson()
+        val legacy = "{" +
+            "\"maxConnections\":512," +
+            "\"bufferSize\":16384," +
+            "\"defaultTtl\":0," +
+            "\"noDomain\":false," +
+            "\"desyncHttp\":true," +
+            "\"desyncHttps\":true," +
+            "\"desyncUdp\":true," +
+            "\"desyncMethod\":\"OOB\"," +
+            "\"splitPosition\":1," +
+            "\"splitAtHost\":false," +
+            "\"fakeTtl\":8," +
+            "\"fakeSni\":\"www.iana.org\"," +
+            "\"fakeOffset\":0," +
+            "\"oobChar\":\"a\"," +
+            "\"hostMixedCase\":false," +
+            "\"domainMixedCase\":false," +
+            "\"hostRemoveSpaces\":false," +
+            "\"tlsRecordSplit\":false," +
+            "\"tlsRecordSplitPosition\":0," +
+            "\"tlsRecordSplitAtSni\":false," +
+            "\"tcpFastOpen\":false," +
+            "\"udpFakeCount\":1," +
+            "\"dropSack\":false" +
+            "}"
         val migrated = ByeDpiUiSettings.fromJson(legacy)
         assertTrue(!migrated.desyncUdp)
+    }
+
+    @Test
+    fun `new explicit desyncUdp only setting round-trips with schema marker`() {
+        val saved = ByeDpiUiSettings.DEFAULT.copy(desyncUdp = true).toJson()
+        val restored = ByeDpiUiSettings.fromJson(saved)
+        assertTrue(restored.desyncUdp)
     }
 
     @Test

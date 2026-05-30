@@ -259,14 +259,15 @@ class MasterDnsDockerScriptsContractTest {
     fun `checkPort53 reports Docker UDP publish as busy`() {
         val script = MasterDnsDockerScripts.checkPort53
         assertTrue(script.contains("docker_conflict"))
-        assertTrue(script.contains("->53\\/(udp|tcp)"))
+        assertTrue(script.contains("->53\\/udp"))
         assertTrue(script.contains("proto="))
     }
 
     @Test
-    fun `checkPort53 reports Docker TCP publish for amnezia dns conflict`() {
+    fun `checkPort53 ignores Docker TCP publish because runContainer binds only UDP`() {
         val script = MasterDnsDockerScripts.checkPort53
-        assertTrue(script.contains("->53\\/(udp|tcp)"))
+        assertFalse(script.contains("->53\\/(udp|tcp)"))
+        assertFalse(script.contains("->53\\/tcp"))
         assertTrue(script.contains("sub(/^.*->53\\//"))
     }
 

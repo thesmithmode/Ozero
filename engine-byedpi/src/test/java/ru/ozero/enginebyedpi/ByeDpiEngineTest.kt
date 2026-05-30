@@ -547,6 +547,8 @@ class ByeDpiEngineTest {
         assertTimeoutPreemptively(Duration.ofSeconds(15)) {
             val firstNativeEntered = CountDownLatch(1)
             val firstNativeExit = CountDownLatch(1)
+            val recoveryStartEntered = CountDownLatch(1)
+            val retryStartEntered = CountDownLatch(1)
             val calls = AtomicInteger(0)
             val blockingProxy: ByeDpiProxy = mockk(relaxed = true)
             mockkObject(ByeDpiProxy.Companion)
@@ -559,8 +561,14 @@ class ByeDpiEngineTest {
                         firstNativeExit.await(10, TimeUnit.SECONDS)
                         0
                     }
-                    1 -> ByeDpiEngine.JNI_GUARD_BUSY
-                    else -> 0
+                    1 -> {
+                        recoveryStartEntered.countDown()
+                        ByeDpiEngine.JNI_GUARD_BUSY
+                    }
+                    else -> {
+                        retryStartEntered.countDown()
+                        0
+                    }
                 }
             }
             every { blockingProxy.stopProxy() } returns 0
@@ -571,6 +579,8 @@ class ByeDpiEngineTest {
                 socksProbe = { _, port, _ ->
                     if (port == 1080) {
                         assertTrue(firstNativeEntered.await(5, TimeUnit.SECONDS))
+                    } else if (port == 1081) {
+                        assertTrue(retryStartEntered.await(5, TimeUnit.SECONDS))
                     }
                     1L
                 },
@@ -584,6 +594,8 @@ class ByeDpiEngineTest {
                     unmockkObject(ByeDpiProxy.Companion)
                 }
             }
+            assertTrue(recoveryStartEntered.await(5, TimeUnit.SECONDS))
+            assertTrue(retryStartEntered.await(5, TimeUnit.SECONDS))
             verify(exactly = 1) { blockingProxy.emergencyReset() }
             verify(exactly = 3) { blockingProxy.startProxy(any()) }
         }
@@ -593,6 +605,8 @@ class ByeDpiEngineTest {
         assertTimeoutPreemptively(Duration.ofSeconds(15)) {
             val firstNativeEntered = CountDownLatch(1)
             val firstNativeExit = CountDownLatch(1)
+            val recoveryStartEntered = CountDownLatch(1)
+            val retryStartEntered = CountDownLatch(1)
             val calls = AtomicInteger(0)
             val blockingProxy: ByeDpiProxy = mockk(relaxed = true)
             mockkObject(ByeDpiProxy.Companion)
@@ -605,8 +619,14 @@ class ByeDpiEngineTest {
                         firstNativeExit.await(10, TimeUnit.SECONDS)
                         0
                     }
-                    1 -> ByeDpiEngine.JNI_GUARD_BUSY
-                    else -> 0
+                    1 -> {
+                        recoveryStartEntered.countDown()
+                        ByeDpiEngine.JNI_GUARD_BUSY
+                    }
+                    else -> {
+                        retryStartEntered.countDown()
+                        0
+                    }
                 }
             }
             every { blockingProxy.stopProxy() } returns 0
@@ -617,6 +637,8 @@ class ByeDpiEngineTest {
                 socksProbe = { _, port, _ ->
                     if (port == 1080) {
                         assertTrue(firstNativeEntered.await(5, TimeUnit.SECONDS))
+                    } else if (port == 1081) {
+                        assertTrue(retryStartEntered.await(5, TimeUnit.SECONDS))
                     }
                     1L
                 },
@@ -631,6 +653,8 @@ class ByeDpiEngineTest {
                     unmockkObject(ByeDpiProxy.Companion)
                 }
             }
+            assertTrue(recoveryStartEntered.await(5, TimeUnit.SECONDS))
+            assertTrue(retryStartEntered.await(5, TimeUnit.SECONDS))
             verify(exactly = 1) { blockingProxy.emergencyReset() }
             verify(exactly = 3) { blockingProxy.startProxy(any()) }
         }
