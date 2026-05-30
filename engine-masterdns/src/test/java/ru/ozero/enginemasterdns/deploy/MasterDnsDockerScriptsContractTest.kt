@@ -60,6 +60,8 @@ class MasterDnsDockerScriptsContractTest {
     @Test
     fun `checkAmneziaDns53 inspects exact amnezia-dns name and emits conflict marker`() {
         val cmd = MasterDnsDockerScripts.checkAmneziaDns53
+        assertTrue(cmd.contains("sudo docker ps --format '{{.Names}}'"))
+        assertTrue(cmd.contains("grep -qx 'amnezia-dns'"))
         assertTrue(cmd.contains("sudo docker inspect amnezia-dns"))
         assertTrue(cmd.contains("/amnezia-dns"))
         assertTrue(cmd.contains("53/udp"))
