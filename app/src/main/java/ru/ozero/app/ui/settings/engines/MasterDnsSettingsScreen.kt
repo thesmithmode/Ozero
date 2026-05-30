@@ -477,10 +477,12 @@ private fun deployStateLabel(state: MasterDnsDeployState): String = when (state)
 @Composable
 private fun deployErrorMessage(error: MasterDnsDeployState): String {
     val text = masterDnsDeployErrorText(error)
-    return if (text.args.isEmpty()) {
-        stringResource(text.resId)
-    } else {
-        stringResource(text.resId, *text.args.toTypedArray())
+    return when (text.args.size) {
+        0 -> stringResource(text.resId)
+        1 -> stringResource(text.resId, text.args[0])
+        2 -> stringResource(text.resId, text.args[0], text.args[1])
+        3 -> stringResource(text.resId, text.args[0], text.args[1], text.args[2])
+        else -> stringResource(text.resId)
     }
 }
 
