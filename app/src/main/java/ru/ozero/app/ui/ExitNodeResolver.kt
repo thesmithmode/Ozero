@@ -23,9 +23,9 @@ class ExitNodeResolver(
         )
         is ExitNodeStrategy.ProviderLabel -> IpInfoState.Loaded(
             IpInfo(
-                ip = "",
+                ip = strategy.ip.orEmpty(),
                 country = strategy.label,
-                countryCode = null,
+                countryCode = strategy.countryCode,
                 city = null,
                 fetchedAtMs = clock(),
             ),

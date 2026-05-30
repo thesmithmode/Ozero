@@ -68,6 +68,26 @@ class ExitNodeResolverTest {
     }
 
     @Test
+    fun `ProviderLabel can show known static IP without fetch`() = runTest {
+        val provider = FakeIpInfoProvider()
+        val resolver = ExitNodeResolver(provider, clock = { 42L })
+
+        val state = resolver.resolve(
+            ExitNodeStrategy.ProviderLabel(
+                label = "Germany",
+                ip = "198.51.100.44",
+                countryCode = "DE",
+            ),
+        )
+
+        val loaded = assertIs<IpInfoState.Loaded>(state)
+        assertEquals("198.51.100.44", loaded.info.ip)
+        assertEquals("Germany", loaded.info.country)
+        assertEquals("DE", loaded.info.countryCode)
+        assertEquals(0, provider.fetchCalls + provider.fetchViaCalls)
+    }
+
+    @Test
     fun `AutoSelected preserves URnetwork auto state`() = runTest {
         val provider = FakeIpInfoProvider()
         val resolver = ExitNodeResolver(provider)

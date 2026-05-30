@@ -294,7 +294,8 @@ class EngineWarp(
     }
 
     override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy {
-        if (activeSocksPort > 0) return ExitNodeStrategy.ViaSocks("127.0.0.1", activeSocksPort)
+        val port = activeSocksPort.takeIf { it > 0 } ?: socksPort.takeIf { it > 0 }
+        if (port != null) return ExitNodeStrategy.ViaSocks("127.0.0.1", port)
         val connected = resolvedConfig?.peerEndpoint?.isNotBlank() == true
         return if (connected) {
             ExitNodeStrategy.ProviderLabel("Cloudflare WARP")

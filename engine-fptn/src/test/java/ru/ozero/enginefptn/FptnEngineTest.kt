@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.ExitNodeStrategy
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
@@ -77,14 +78,16 @@ class FptnEngineTest {
     @Test
     fun `start with unknown token prefix returns failure`() = runTest {
         val result = engine.start(EngineConfig.Fptn(token = "notfptn:abc"), Upstream.None)
-        assertIs<StartResult.Failure>(result)
+        val failure = assertIs<StartResult.Failure>(result)
+        assertEquals(FptnEngine.FPTN_INVALID_TOKEN, failure.reason)
     }
 
     @Test
     fun `start with malformed base64 returns failure`() = runTest {
         every { Base64.decode(any<String>(), any<Int>()) } throws IllegalArgumentException("bad")
         val result = engine.start(EngineConfig.Fptn(token = "fptn:!!!"), Upstream.None)
-        assertIs<StartResult.Failure>(result)
+        val failure = assertIs<StartResult.Failure>(result)
+        assertEquals(FptnEngine.FPTN_INVALID_TOKEN, failure.reason)
     }
 
     @Test
@@ -225,16 +228,62 @@ class FptnEngineTest {
         )
         assertTrue(
             startBody.contains("STARTUP_AUTH_BUDGET_MS") &&
+                source.contains("AUTO_HEALTH_TIMEOUT_S") &&
+                source.contains("AUTO_HEALTH_CONCURRENCY") &&
+                source.contains("AUTO_HEALTH_MAX_CANDIDATES") &&
+                source.contains("AUTO_AUTH_MAX_CANDIDATES") &&
                 source.contains("AUTO_AUTH_CANDIDATE_TIMEOUT_S") &&
                 source.contains("authTimeoutSeconds(") &&
                 source.contains("perCandidateMaxTimeoutS") &&
                 source.contains("deadlineMs"),
-            "FPTN fallback must use one bounded startup budget, not a full timeout per server.",
+            "FPTN fallback must use a quick health pass plus one bounded startup budget.",
         )
         assertFalse(
             source.contains("listOf(selected) + data.servers.filterNot"),
             "Manual FPTN selection must not silently append fallback candidates.",
         )
+    }
+
+    @Test
+    fun `auto health prioritization skips timed out checked servers`() {
+        val candidates = (1..28).map { server("S$it") }
+        val healthResults = candidates.take(12).mapIndexed { index, candidate ->
+            FptnEngine.FptnHealthCheck(
+                server = candidate,
+                latencyMs = when (index) {
+                    0, 1, 2 -> null
+                    3 -> 80L
+                    4 -> 20L
+                    else -> null
+                },
+            )
+        }
+
+        val ordered = prioritizeFptnAuthenticationCandidates(candidates, healthResults)
+
+        assertEquals("S5", ordered.first().name)
+        assertEquals("S4", ordered[1].name)
+        assertFalse(
+            ordered.take(2).map { it.name }.any { it in listOf("S1", "S2", "S3") },
+            "First checked timeouts must not consume the first auth attempts.",
+        )
+        assertTrue(
+            ordered.drop(2).map { it.name }.containsAll(listOf("S13", "S28")),
+            "Unchecked later servers must remain eligible before the caller applies the startup limit.",
+        )
+    }
+
+    @Test
+    fun `exit node strategy exposes resolved server ip and flag source`() {
+        val strategy = fptnExitNodeStrategy(
+            server("Berlin").copy(countryCode = "de"),
+            serverIp = "198.51.100.70",
+        )
+
+        val label = assertIs<ExitNodeStrategy.ProviderLabel>(strategy)
+        assertEquals("198.51.100.70", label.ip)
+        assertEquals("DE", label.countryCode)
+        assertTrue(label.label.isNotBlank())
     }
 
     @Test
@@ -293,6 +342,30 @@ class FptnEngineTest {
         assertFalse(
             attachBody.contains("serverIp = server.host"),
             "Raw token host can be a DNS name; C++ wrapper parses serverIp as IPv4Address.",
+        )
+    }
+
+    @Test
+    fun `auth failure classifier maps startup failure reasons`() {
+        assertEquals(
+            FptnEngine.FPTN_TOKEN_REJECTED,
+            classifyFptnAuthFailure(FptnNativeResponse(401, "", "")),
+        )
+        assertEquals(
+            FptnEngine.FPTN_TOKEN_REJECTED,
+            classifyFptnAuthFailure(FptnNativeResponse(403, "", "")),
+        )
+        assertEquals(
+            FptnEngine.FPTN_AUTH_TIMEOUT,
+            classifyFptnAuthFailure(FptnNativeResponse(608, "", "Operation timeout")),
+        )
+        assertEquals(
+            FptnEngine.FPTN_DNS_FAILED,
+            classifyFptnAuthFailure(error = "UnknownHostException resolve failed"),
+        )
+        assertEquals(
+            FptnEngine.FPTN_API_ERROR,
+            classifyFptnAuthFailure(FptnNativeResponse(500, "", "internal server error")),
         )
     }
 

@@ -479,7 +479,11 @@ class StartSequenceCoordinator(
         }
         Log.i(TAG, "chain result=$chainResult engineId=$engineId")
         if (chainResult !is ChainResult.Success) {
-            reportEngineFailure(engineId, chainResult?.toString() ?: "timeout", notifyFailure)
+            val reason = when (chainResult) {
+                is ChainResult.Failure -> chainResult.reason
+                else -> "timeout"
+            }
+            reportEngineFailure(engineId, reason, notifyFailure)
             return null
         }
         deps.tunnelController.onConnecting(engineId)
