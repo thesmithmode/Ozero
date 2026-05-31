@@ -1,15 +1,8 @@
 package ru.ozero.enginebyedpi.strategy
 
 object ByeDpiArgvValidator {
-    private val longValueOptions = mapOf(
-        "--fake" to ::isSignedInt,
-        "--ttl" to ::isUnsignedInt,
-        "--split" to ::isModifierValue,
-        "--disorder" to ::isModifierValue,
-    )
-
     fun isValid(command: String): Boolean {
-        val tokens = command.trim().split(Regex("\\s+")).filter(String::isNotBlank)
+        val tokens = ByeDpiOptionBlocks.tokenize(command)
         if (tokens.isEmpty()) return false
         var expectedValueFor: String? = null
         for (token in tokens) {
@@ -23,8 +16,10 @@ object ByeDpiArgvValidator {
             when {
                 token == "-n" -> expectedValueFor = token
                 token.startsWith("--") -> {
-                    if (token !in longValueOptions) return false
-                    expectedValueFor = token
+                    if (!isLongOptionToken(token)) return false
+                    if (ByeDpiOptionBlocks.requiresDetachedValue(token)) {
+                        expectedValueFor = token
+                    }
                 }
                 token.startsWith("-") -> {
                     if (!isFlagToken(token)) return false
@@ -38,7 +33,10 @@ object ByeDpiArgvValidator {
     private fun isValueValid(option: String, token: String): Boolean =
         when (option) {
             "-n" -> isDomainValue(token)
-            else -> longValueOptions[option]?.invoke(token) == true
+            "--fake" -> isSignedInt(token)
+            "--ttl" -> isUnsignedInt(token)
+            "--split", "--disorder" -> isModifierValue(token)
+            else -> token.isNotBlank()
         }
 
     private fun isFlagToken(token: String): Boolean {
@@ -56,6 +54,13 @@ object ByeDpiArgvValidator {
                 token.length > 2 && token.drop(2).all(::isAttachedValueChar)
             else -> false
         }
+    }
+
+    private fun isLongOptionToken(token: String): Boolean {
+        val rawName = token.substringBefore('=')
+        if (rawName.length <= 2) return false
+        if (!rawName.drop(2).all { it.isLowerCase() || it.isDigit() || it == '-' }) return false
+        return token.indexOf('=') < 0 || token.substringAfter('=').isNotBlank()
     }
 
     private fun isAttachedValueChar(ch: Char): Boolean =

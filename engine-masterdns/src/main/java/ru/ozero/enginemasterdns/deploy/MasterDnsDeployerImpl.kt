@@ -268,7 +268,21 @@ internal class MasterDnsDeployerImpl(
 
     private fun mapBuildError(result: String): String = when {
         result.contains(MasterDnsDockerScripts.MARKER_ERR_BUILD_BIN_MISSING) ||
-            result.contains("reason=bin_missing") -> "build_failed/bin_missing"
+            result.contains("reason=bin_missing") -> {
+            val diagnostics = result.lineSequence()
+                .map { it.trim() }
+                .firstOrNull {
+                    it.startsWith("ERR_BUILD|reason=bin_missing") ||
+                        it.startsWith(MasterDnsDockerScripts.MARKER_ERR_BUILD_BIN_MISSING)
+                }
+                ?.sanitizeDeployDiagnostic()
+                .orEmpty()
+            if (diagnostics.isBlank()) {
+                "build_failed/bin_missing"
+            } else {
+                "build_failed/bin_missing|$diagnostics"
+            }
+        }
         else -> "build_failed"
     }
 
@@ -314,6 +328,13 @@ internal class MasterDnsDeployerImpl(
         val tailLen = (safeMaxLen - headLen - 5).coerceAtLeast(0)
         return normalized.take(headLen) + " ... " + normalized.takeLast(tailLen)
     }
+
+    private fun String.sanitizeDeployDiagnostic(maxLen: Int = 700): String =
+        replace('\n', ' ')
+            .replace('\r', ' ')
+            .replace(Regex("""password=[^| ]+"""), "password=<redacted>")
+            .replace(Regex("""token=[^| ]+"""), "token=<redacted>")
+            .take(maxLen)
 
     private companion object {
         const val TAG = "MasterDnsDeployer"

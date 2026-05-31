@@ -390,6 +390,7 @@ class StrategyTestViewModel @Inject constructor(
             isInitializing = true,
         )
         var lastBestFitness = 0.0
+        val evaluatedCommands = LinkedHashSet<String>()
         val best = evolutionEngine.evolve(
             seedStrategies = seedCommands,
             onGeneration = { result ->
@@ -432,10 +433,13 @@ class StrategyTestViewModel @Inject constructor(
                     )
                 }
             },
+            onCommandEvaluated = { command ->
+                evaluatedCommands += command
+            },
         )
         val finalCmd = best.toCommand()
         withContext(ioDispatcher) {
-            runCatching { savedStrategyStore.markVerified(seedCommands.toSet(), System.currentTimeMillis()) }
+            runCatching { savedStrategyStore.markVerified(evaluatedCommands, System.currentTimeMillis()) }
                 .onSuccess { _savedStrategies.value = it }
         }
         if (finalCmd.isNotBlank() && lastBestFitness > 0.0) {

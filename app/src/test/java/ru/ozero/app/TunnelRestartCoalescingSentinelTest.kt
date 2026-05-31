@@ -15,18 +15,21 @@ class TunnelRestartCoalescingSentinelTest {
         val switchingIdx = block.indexOf("onSwitchingStarted")
         assertTrue(
             source.contains("private val restartMutex = Mutex()") &&
+                source.contains("private var restartPending = false") &&
                 tryLockIdx >= 0 &&
                 tryLockIdx < switchingIdx &&
+                block.contains("restartPending = true") &&
+                block.contains("while (restartPending)") &&
                 block.contains("restartMutex.unlock()"),
-            "restartVpnIfConnected обязан брать restartMutex.tryLock() до onSwitchingStarted и unlock в finally. " +
-                "Иначе несколько observers одновременно запускают stop/start и спамят switching transitions. Block:\n$block",
+            "restartVpnIfConnected must take restartMutex.tryLock() before onSwitchingStarted, " +
+                "preserve a pending restart instead of dropping it, and unlock in finally. Block:\n$block",
         )
     }
 
     private fun mainActivitySource(): String {
         val moduleRoot = File(System.getProperty("user.dir") ?: ".")
         val file = File(moduleRoot, "src/main/java/ru/ozero/app/MainActivity.kt")
-        assertTrue(file.exists(), "MainActivity.kt не найден: $file")
+        assertTrue(file.exists(), "MainActivity.kt not found: $file")
         return file.readText()
     }
 }

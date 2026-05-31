@@ -272,7 +272,8 @@ class MasterDnsDeployerTest {
         val states = deployer.deploy(credentials()).toList()
 
         val error = states.last() as MasterDnsDeployState.Error
-        assertEquals("build_failed/bin_missing", error.message)
+        assertTrue(error.message.startsWith("build_failed/bin_missing|ERR_BUILD|reason=bin_missing"))
+        assertTrue(error.message.contains("candidates=none"))
     }
 
     @Test

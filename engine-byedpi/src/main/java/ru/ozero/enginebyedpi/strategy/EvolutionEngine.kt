@@ -95,6 +95,7 @@ class EvolutionEngine(
         seedStrategies: List<String>,
         onGeneration: (GenerationResult) -> Unit,
         onChromosomeEval: (index: Int, total: Int, command: String) -> Unit = { _, _, _ -> },
+        onCommandEvaluated: (command: String) -> Unit = {},
     ): Chromosome {
         var population = buildInitialPopulation(seedStrategies)
         var best: Chromosome = population.firstOrNull() ?: return emptyList()
@@ -110,7 +111,7 @@ class EvolutionEngine(
         for (generation in 1..settings.maxGenerations) {
             if (!currentCoroutineContext().isActive) break
 
-            val scored = evaluatePopulation(population, onChromosomeEval, evalCache)
+            val scored = evaluatePopulation(population, onChromosomeEval, onCommandEvaluated, evalCache)
             val fitnessPairs = scored.map { (ch, er) -> ch to er.fitness }
             val successRatePairs = scored.map { (ch, er) -> ch to er.successRate }
             val genBest = scored.maxByOrNull { it.second.fitness }
@@ -309,19 +310,21 @@ class EvolutionEngine(
     private suspend fun evaluatePopulation(
         population: List<Chromosome>,
         onChromosomeEval: (index: Int, total: Int, command: String) -> Unit = { _, _, _ -> },
+        onCommandEvaluated: (command: String) -> Unit = {},
         evalCache: MutableMap<Chromosome, EvalResult> = HashMap(),
     ): List<Pair<Chromosome, EvalResult>> {
         val results = population.mapIndexed { index, chromosome ->
             if (!currentCoroutineContext().isActive) return@mapIndexed chromosome to EvalResult(0.0, 0.0)
-            onChromosomeEval(index, population.size, chromosome.toCommand())
+            val command = chromosome.toCommand()
+            onChromosomeEval(index, population.size, command)
             val evalResult = evalCache.getOrPut(chromosome) {
-                val command = chromosome.toCommand()
                 val computed = evaluate(chromosome)
                 if (command.isNotBlank() && !computed.startFailed) {
                     fitnessCachePersistent?.put(command, computed.fitness)
                 }
                 computed
             }
+            if (command.isNotBlank() && !evalResult.startFailed) onCommandEvaluated(command)
             chromosome to evalResult
         }
         results.forEach { (chromosome, evalResult) ->

@@ -68,9 +68,11 @@ class MainViewModelTest {
         healthMonitor = HealthMonitor()
         settingsRepository = FakeSettingsRepository()
         ipInfoProvider = FakeIpInfoProvider()
-        byedpiPlugin = FakeEnginePlugin(EngineId.BYEDPI) { port ->
-            IpProbeRoute.Socks("127.0.0.1", if (port > 0) port else 1080)
-        }
+        byedpiPlugin = FakeEnginePlugin(
+            id = EngineId.BYEDPI,
+            route = { IpProbeRoute.StaticLocation(country = "ByeDPI", countryCode = null) },
+            strategy = { ExitNodeStrategy.ProviderLabel("ByeDPI") },
+        )
         warpPlugin = FakeEnginePlugin(EngineId.WARP) {
             IpProbeRoute.StaticLocation(country = "Cloudflare WARP", countryCode = null)
         }
@@ -103,6 +105,7 @@ class MainViewModelTest {
     private class FakeEnginePlugin(
         override val id: EngineId,
         private val route: (Int) -> IpProbeRoute,
+        private val strategy: ((Int) -> ExitNodeStrategy)? = null,
     ) : EnginePlugin {
         override val capabilities: EngineCapabilities = EngineCapabilities(
             supportsTcp = true,
@@ -118,13 +121,14 @@ class MainViewModelTest {
         override suspend fun probe(): ProbeResult = ProbeResult.Failure("test fake")
         override fun stats(): Flow<EngineStats> = emptyFlow()
         override suspend fun ipProbeRoute(socksPort: Int): IpProbeRoute = route(socksPort)
-        override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy = when (val r = route(socksPort)) {
-            IpProbeRoute.Default -> ExitNodeStrategy.DirectHttp
-            IpProbeRoute.AutoSelected -> ExitNodeStrategy.AutoSelected()
-            is IpProbeRoute.Socks -> ExitNodeStrategy.ViaSocks(r.host, r.port)
-            is IpProbeRoute.StaticLocation -> ExitNodeStrategy.LocationOnly(r.country, r.countryCode)
-            is IpProbeRoute.Unavailable -> ExitNodeStrategy.Unavailable(r.reason)
-        }
+        override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy =
+            strategy?.invoke(socksPort) ?: when (val r = route(socksPort)) {
+                IpProbeRoute.Default -> ExitNodeStrategy.DirectHttp
+                IpProbeRoute.AutoSelected -> ExitNodeStrategy.AutoSelected()
+                is IpProbeRoute.Socks -> ExitNodeStrategy.ViaSocks(r.host, r.port)
+                is IpProbeRoute.StaticLocation -> ExitNodeStrategy.LocationOnly(r.country, r.countryCode)
+                is IpProbeRoute.Unavailable -> ExitNodeStrategy.Unavailable(r.reason)
+            }
     }
 
     private class FakeIpInfoProvider(
@@ -474,7 +478,7 @@ class MainViewModelTest {
     }
 
     @Test
-    fun ipInfoFetchesViaSocksOnByedpiConnected() = runTest {
+    fun ipInfoUsesProviderLabelForByedpiConnected() = runTest {
         backgroundScope.launch { viewModel.ipInfo.collect {} }
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.BYEDPI)
@@ -484,11 +488,12 @@ class MainViewModelTest {
         advanceUntilIdle()
         val s = viewModel.ipInfo.value
         assertIs<IpInfoState.Loaded>(s)
-        assertEquals("203.0.113.1", s.info.ip)
-        assertEquals(1, ipInfoProvider.calls)
-        assertEquals(1, ipInfoProvider.fetchViaCalls)
-        assertEquals("127.0.0.1", ipInfoProvider.lastSocksHost)
-        assertEquals(1080, ipInfoProvider.lastSocksPort)
+        assertEquals("", s.info.ip)
+        assertEquals("ByeDPI", s.info.country)
+        assertEquals(0, ipInfoProvider.calls)
+        assertEquals(0, ipInfoProvider.fetchViaCalls)
+        assertNull(ipInfoProvider.lastSocksHost)
+        assertNull(ipInfoProvider.lastSocksPort)
     }
 
     @Test

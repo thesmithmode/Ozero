@@ -177,4 +177,17 @@ class GenePoolTest {
             assertTrue(found, "seed=$seed: $subsequence is not a contiguous subarray of $tokens")
         }
     }
+
+    @Test
+    fun `random chromosomes keep detached option values with their owner option`() {
+        val pool = GenePool(listOf("-n google.com --fake -1 --ttl 8 -Qr -a1"))
+        repeat(100) { seed ->
+            val tokens = pool.randomChromosome(5..12, Random(seed.toLong())).map { it.token }
+            tokens.forEachIndexed { index, token ->
+                if (token == "-n") assertEquals("google.com", tokens.getOrNull(index + 1))
+                if (token == "--fake") assertEquals("-1", tokens.getOrNull(index + 1))
+                if (token == "--ttl") assertEquals("8", tokens.getOrNull(index + 1))
+            }
+        }
+    }
 }

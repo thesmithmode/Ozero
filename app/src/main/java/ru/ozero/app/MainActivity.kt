@@ -58,6 +58,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var vpnIntentLauncher: VpnIntentLauncher
     private lateinit var batteryGuard: BatteryGuard
     private val restartMutex = Mutex()
+    private var restartPending = false
 
     private val safeUiCoroutineHandler = CoroutineExceptionHandler { _, throwable ->
         AppLogger.e(TAG, "uncaught coroutine in MainActivity", throwable)
@@ -102,38 +103,56 @@ class MainActivity : AppCompatActivity() {
 
     private suspend fun restartVpnIfConnected(reason: String) {
         if (!restartMutex.tryLock()) {
+            restartPending = true
             AppLogger.d(TAG, "restart request coalesced while another restart is running")
             return
         }
         try {
-            val current = viewModel.state.value
-            val fromEngine = when (current) {
-                is TunnelState.Connected -> current.engineId
-                is TunnelState.Connecting -> current.engineId
-                is TunnelState.Probing -> current.engineId
-                else -> return
-            }
-            AppLogger.i(TAG, reason)
-            val pendingTarget = tunnelController.switching.value?.to
-            tunnelController.onSwitchingStarted(from = fromEngine, to = pendingTarget)
-            try {
-                vpnIntentLauncher.stop()
-                val stopped = withTimeoutOrNull(RESTART_STOP_TIMEOUT_MS) {
-                    viewModel.state.first { it is TunnelState.Idle || it is TunnelState.Failed }
+            var nextReason = reason
+            do {
+                restartPending = false
+                if (!performRestartIfConnected(nextReason)) return
+                nextReason = "coalesced engine settings changed while restart was running -> restart"
+                if (restartPending) {
+                    withTimeoutOrNull(RESTART_SETTLE_TIMEOUT_MS) {
+                        viewModel.state.first {
+                            it is TunnelState.Connected || it is TunnelState.Idle || it is TunnelState.Failed
+                        }
+                    }
                 }
-                if (stopped == null) {
-                    AppLogger.w(TAG, "engine settings restart skipped: stop timeout")
-                    tunnelController.onSwitchingFinished("restart stop timeout")
-                    return
-                }
-                tunnelController.onSwitchingStarted(from = fromEngine, to = pendingTarget)
-                vpnIntentLauncher.start()
-            } catch (t: Throwable) {
-                tunnelController.onSwitchingFinished("restart failed: ${t.message}")
-                throw t
-            }
+            } while (restartPending)
         } finally {
             restartMutex.unlock()
+        }
+    }
+
+    private suspend fun performRestartIfConnected(reason: String): Boolean {
+        val current = viewModel.state.value
+        val fromEngine = when (current) {
+            is TunnelState.Connected -> current.engineId
+            is TunnelState.Connecting -> current.engineId
+            is TunnelState.Probing -> current.engineId
+            else -> return false
+        }
+        AppLogger.i(TAG, reason)
+        val pendingTarget = tunnelController.switching.value?.to
+        tunnelController.onSwitchingStarted(from = fromEngine, to = pendingTarget)
+        try {
+            vpnIntentLauncher.stop()
+            val stopped = withTimeoutOrNull(RESTART_STOP_TIMEOUT_MS) {
+                viewModel.state.first { it is TunnelState.Idle || it is TunnelState.Failed }
+            }
+            if (stopped == null) {
+                AppLogger.w(TAG, "engine settings restart skipped: stop timeout")
+                tunnelController.onSwitchingFinished("restart stop timeout")
+                return false
+            }
+            tunnelController.onSwitchingStarted(from = fromEngine, to = pendingTarget)
+            vpnIntentLauncher.start()
+            return true
+        } catch (t: Throwable) {
+            tunnelController.onSwitchingFinished("restart failed: ${t.message}")
+            throw t
         }
     }
 
@@ -191,5 +210,6 @@ class MainActivity : AppCompatActivity() {
     private companion object {
         const val TAG = "MainActivity"
         const val RESTART_STOP_TIMEOUT_MS = 11_000L
+        const val RESTART_SETTLE_TIMEOUT_MS = 15_000L
     }
 }
