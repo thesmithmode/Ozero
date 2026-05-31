@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Build
 import android.os.Process
 import android.util.Log
+import ru.ozero.enginescore.LogSanitizer
 import ru.ozero.enginescore.PersistentLogger
 import ru.ozero.enginescore.PersistentLoggers
 import java.io.File
@@ -69,14 +70,15 @@ object UnifiedLogger : PersistentLogger {
         val target = LogFileStore.current() ?: return
         runCatching {
             val sb = StringBuilder()
+            val safeMsg = LogSanitizer.sanitize(msg)
             sb.append(tsFmt.format(Date()))
                 .append(' ').append(level)
                 .append(" [").append(Thread.currentThread().name).append("] ")
-                .append(tag).append(": ").append(msg).append('\n')
+                .append(tag).append(": ").append(safeMsg).append('\n')
             if (t != null) {
                 val sw = StringWriter()
                 PrintWriter(sw).use { t.printStackTrace(it) }
-                sb.append(sw.toString())
+                sb.append(LogSanitizer.sanitize(sw.toString()))
             }
             RandomAccessFile(target, "rw").use { raf ->
                 raf.seek(raf.length())
@@ -91,10 +93,11 @@ object UnifiedLogger : PersistentLogger {
     fun writeRawSync(text: String) {
         val target = LogFileStore.current() ?: return
         runCatching {
+            val safeText = LogSanitizer.sanitize(text)
             RandomAccessFile(target, "rw").use { raf ->
                 raf.seek(raf.length())
-                raf.write(text.toByteArray(Charsets.UTF_8))
-                if (!text.endsWith("\n")) raf.write("\n".toByteArray(Charsets.UTF_8))
+                raf.write(safeText.toByteArray(Charsets.UTF_8))
+                if (!safeText.endsWith("\n")) raf.write("\n".toByteArray(Charsets.UTF_8))
                 raf.fd.sync()
             }
         }

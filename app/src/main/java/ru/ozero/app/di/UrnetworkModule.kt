@@ -2,6 +2,9 @@ package ru.ozero.app.di
 
 import android.app.Application
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.wifi.WifiManager
+import android.os.PowerManager
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
@@ -15,14 +18,12 @@ import dagger.multibindings.IntoSet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import android.net.ConnectivityManager
-import android.net.wifi.WifiManager
-import android.os.PowerManager
 import ru.ozero.app.relay.RelayLockManager
 import ru.ozero.app.relay.RelayNetworkMonitor
 import ru.ozero.app.relay.UrnetworkRelayCoordinator
 import ru.ozero.app.urnetwork.RealUrnetworkBalanceRepository
 import ru.ozero.app.urnetwork.UrnetworkBalanceRepository
+import ru.ozero.commonvpn.RuntimeFailureRouter
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.engineurnetwork.DataStoreUrnetworkConfigStore
 import ru.ozero.engineurnetwork.EngineUrnetwork
@@ -70,12 +71,12 @@ object UrnetworkModule {
     @Singleton
     fun provideUrnetworkSdkBridge(
         @ApplicationContext context: Context,
-        tunnelController: TunnelController,
+        runtimeFailureRouter: RuntimeFailureRouter,
     ): UrnetworkSdkBridge = RealUrnetworkSdkBridge(
         app = context.applicationContext as Application,
         appVersion = ru.ozero.app.BuildConfig.VERSION_NAME,
         onIoLoopDied = { reason ->
-            tunnelController.onEngineDied(EngineId.URNETWORK, reason)
+            runtimeFailureRouter.handleEngineFailure(EngineId.URNETWORK, reason)
         },
     )
 

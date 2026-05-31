@@ -24,8 +24,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_START
 import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_STOP
 import ru.ozero.enginescore.ChainOrchestrator
-import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.EnginePlugin
+import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.settings.TrafficMode
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -54,6 +54,8 @@ class OzeroVpnService : android.net.VpnService() {
     @Inject lateinit var healthMonitor: HealthMonitor
 
     @Inject lateinit var enginePlugins: Set<@JvmSuppressWildcards EnginePlugin>
+
+    @Inject lateinit var runtimeFailureRouter: RuntimeFailureRouter
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val sessionIdRef = AtomicReference<Long>(-1L)
@@ -113,6 +115,7 @@ class OzeroVpnService : android.net.VpnService() {
             chainOrchestrator = chainOrchestrator,
             notificationFactory = notificationFactory,
             tunFdRef = tunFdRef,
+            lockdownStartupFdRef = lockdownStartupFdRef,
             statsJobRef = statsJobRef,
             stopping = stopping,
             starting = starting,
@@ -182,6 +185,7 @@ class OzeroVpnService : android.net.VpnService() {
         }
         socketProtector = ru.ozero.enginescore.VpnSocketProtector { fd -> protect(fd) }
         ru.ozero.enginescore.VpnSocketProtectorHolder.bind(socketProtector!!)
+        runtimeFailureRouter.bind(runtimeFailureHandler)
         acquireLocks()
         observeKillswitchSetting()
         PersistentLoggers.info(TAG, "onCreate after super (Hilt inject done)")
@@ -240,6 +244,10 @@ class OzeroVpnService : android.net.VpnService() {
 
     @Volatile
     private var killswitchCached: Boolean = false
+
+    private val runtimeFailureHandler: (ru.ozero.enginescore.EngineId, String) -> Unit by lazy {
+        { engineId, reason -> engineWatchdog.handleEngineFailure(engineId, reason) }
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         PersistentLoggers.info(TAG, "onStartCommand action=${intent?.action} startId=$startId")
@@ -390,6 +398,7 @@ class OzeroVpnService : android.net.VpnService() {
             }
         }
         socketProtector?.let { ru.ozero.enginescore.VpnSocketProtectorHolder.unbind(it) }
+        runtimeFailureRouter.unbind(runtimeFailureHandler)
         runCatching { healthMonitor.stop() }
         releaseLocks()
         serviceScope.cancel()

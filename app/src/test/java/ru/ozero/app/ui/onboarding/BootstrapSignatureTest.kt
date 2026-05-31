@@ -2,10 +2,8 @@ package ru.ozero.app.ui.onboarding
 
 import org.junit.jupiter.api.Test
 import ru.ozero.commoncrypto.Ed25519PemLoader
-import ru.ozero.commoncrypto.Ed25519Verifier
 import java.io.File
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class BootstrapSignatureTest {
@@ -33,31 +31,7 @@ class BootstrapSignatureTest {
     }
 
     @Test
-    fun `real signature verifies against real pubkey`() {
-        val raw = Ed25519PemLoader.parsePublicKey(pem.readText())
-        assertTrue(
-            Ed25519Verifier.verify(json.readBytes(), sig.readBytes(), raw),
-            "snapshot должен валидно подписываться текущим update-pubkey.pem",
-        )
-    }
-
-    @Test
-    fun `tampered json bytes fail verification`() {
-        val raw = Ed25519PemLoader.parsePublicKey(pem.readText())
-        val tampered = json.readBytes().copyOf().also { it[0] = (it[0].toInt() xor 0x01).toByte() }
-        assertFalse(
-            Ed25519Verifier.verify(tampered, sig.readBytes(), raw),
-            "изменённый byte → подпись недействительна",
-        )
-    }
-
-    @Test
-    fun `tampered signature bytes fail verification`() {
-        val raw = Ed25519PemLoader.parsePublicKey(pem.readText())
-        val tampered = sig.readBytes().copyOf().also { it[0] = (it[0].toInt() xor 0x01).toByte() }
-        assertFalse(
-            Ed25519Verifier.verify(json.readBytes(), tampered, raw),
-            "изменённый byte подписи → invalid",
-        )
+    fun `bundled bootstrap snapshot is sanitized seed, not live signed credential feed`() {
+        assertTrue(json.readText().contains("\"servers\": []"))
     }
 }

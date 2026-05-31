@@ -24,6 +24,7 @@ class EngineWatchdogCoordinator(
     private val chainOrchestrator: ChainOrchestrator,
     private val notificationFactory: OzeroNotificationFactory,
     private val tunFdRef: AtomicReference<ParcelFileDescriptor?>,
+    private val lockdownStartupFdRef: AtomicReference<ParcelFileDescriptor?>,
     private val statsJobRef: AtomicReference<Job?>,
     private val stopping: AtomicBoolean,
     private val starting: AtomicBoolean,
@@ -42,7 +43,7 @@ class EngineWatchdogCoordinator(
                 healthMonitor.status
                     .filter { it == HealthMonitor.Status.DEGRADED }
                     .first()
-                if (killswitchProvider() && tunFdRef.get() != null && !stopping.get()) {
+                if (killswitchProvider() && hasBlockingTun() && !stopping.get()) {
                     PersistentLoggers.warn(
                         TAG,
                         "health degraded → killswitch fire engine=$engineId",
@@ -165,14 +166,16 @@ class EngineWatchdogCoordinator(
     }
 
     fun handleEngineFailure(engineId: EngineId, reason: String) {
-        val fdAlive = tunFdRef.get() != null
-        if (killswitchProvider() && fdAlive) {
+        if (killswitchProvider() && hasBlockingTun()) {
             enterKillswitchMode(engineId, reason)
         } else {
             tunnelController.onEngineDied(engineId, reason)
             stopVpnRequest()
         }
     }
+
+    private fun hasBlockingTun(): Boolean =
+        tunFdRef.get() != null || lockdownStartupFdRef.get() != null
 
     private fun enterKillswitchMode(engineId: EngineId, reason: String) {
         PersistentLoggers.warn(TAG, "killswitch engaging: engine=$engineId reason=$reason")

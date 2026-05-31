@@ -46,9 +46,12 @@ if (isAndroid) {
             ).asFileTree.matching { exclude(excludedClasses) }
         )
         executionData.setFrom(
-            layout.buildDirectory.file(
-                "outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec"
-            )
+            fileTree(layout.buildDirectory) {
+                include(
+                    "outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec",
+                    "jacoco/testDebugUnitTest.exec"
+                )
+            }
         )
 
         reports {
@@ -73,9 +76,12 @@ if (isAndroid) {
             ).asFileTree.matching { exclude(excludedClasses) }
         )
         executionData.setFrom(
-            layout.buildDirectory.file(
-                "outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec"
-            )
+            fileTree(layout.buildDirectory) {
+                include(
+                    "outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec",
+                    "jacoco/testDebugUnitTest.exec"
+                )
+            }
         )
 
         violationRules {
@@ -98,7 +104,7 @@ if (isAndroid) {
         }
     }
 } else {
-        tasks.named<JacocoReport>("jacocoTestReport") {
+    tasks.named<JacocoReport>("jacocoTestReport") {
         dependsOn("test")
 
         sourceDirectories.setFrom(
@@ -108,7 +114,11 @@ if (isAndroid) {
             files(layout.buildDirectory.dir("classes/kotlin/main"))
                 .asFileTree.matching { exclude(excludedClasses) }
         )
-        executionData.setFrom(layout.buildDirectory.file("jacoco/test.exec"))
+        executionData.setFrom(
+            fileTree(layout.buildDirectory) {
+                include("jacoco/test.exec")
+            }
+        )
 
         reports {
             html.required.set(true)
@@ -117,7 +127,7 @@ if (isAndroid) {
         }
     }
 
-        tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
+    tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
         dependsOn("jacocoTestReport")
 
         sourceDirectories.setFrom(
@@ -127,7 +137,11 @@ if (isAndroid) {
             files(layout.buildDirectory.dir("classes/kotlin/main"))
                 .asFileTree.matching { exclude(excludedClasses) }
         )
-        executionData.setFrom(layout.buildDirectory.file("jacoco/test.exec"))
+        executionData.setFrom(
+            fileTree(layout.buildDirectory) {
+                include("jacoco/test.exec")
+            }
+        )
 
         violationRules {
             rule {

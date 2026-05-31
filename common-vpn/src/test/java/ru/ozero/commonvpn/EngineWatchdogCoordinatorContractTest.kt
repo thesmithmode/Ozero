@@ -75,7 +75,7 @@ class EngineWatchdogCoordinatorContractTest {
     fun `handleEngineFailure ветвится по killswitchProvider + fdAlive`() {
         val body = source.substringAfter("fun handleEngineFailure(").substringBefore("private fun enterKillswitchMode")
         assertTrue(body.contains("killswitchProvider()"), "Обязан читать killswitchProvider().")
-        assertTrue(body.contains("tunFdRef.get() != null"), "Обязан проверять fdAlive.")
+        assertTrue(body.contains("hasBlockingTun()"), "Обязан проверять общий blocking TUN, включая startup lockdown fd.")
         assertTrue(body.contains("enterKillswitchMode("), "True-branch → killswitch.")
         assertTrue(body.contains("stopVpnRequest()"), "False-branch → stopVpnRequest callback.")
     }
@@ -172,9 +172,9 @@ class EngineWatchdogCoordinatorContractTest {
             .substringBefore("private fun enterKillswitchMode")
         assertTrue(
             body.contains("killswitchProvider() && fdAlive") ||
-                body.contains("killswitchProvider() && tunFdRef.get() != null") ||
+                body.contains("killswitchProvider() && hasBlockingTun()") ||
                 body.contains("fdAlive && killswitchProvider()") ||
-                body.contains("tunFdRef.get() != null && killswitchProvider()"),
+                body.contains("hasBlockingTun() && killswitchProvider()"),
             "True-branch обязан требовать ОБА: killswitch=on И fdAlive — иначе " +
                 "lockdown триггерится при уже мёртвом TUN (no-op + state inconsistency). Body:\n$body",
         )

@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.app.warp.WarpEngineService
-import ru.ozero.commonvpn.TunnelController
+import ru.ozero.commonvpn.RuntimeFailureRouter
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.settings.SettingsModel
@@ -35,10 +35,10 @@ import ru.ozero.enginewarp.ProxyWarpAutoConfig
 import ru.ozero.enginewarp.RemoteAwgRuntime
 import ru.ozero.enginewarp.RealWarpSdkBridge
 import ru.ozero.enginewarp.WarpAutoConfig
+import ru.ozero.enginewarp.WarpConfigSlotStore
 import ru.ozero.enginewarp.WarpConfFileImporter
 import ru.ozero.enginewarp.WarpEndpointProber
 import ru.ozero.enginewarp.WarpFileImporter
-import ru.ozero.enginewarp.WarpConfigSlotStore
 import ru.ozero.enginewarp.WarpSdkBridge
 import javax.inject.Qualifier
 import javax.inject.Singleton
@@ -105,13 +105,13 @@ object WarpModule {
     @Singleton
     fun provideWarpSdkBridge(
         @ApplicationContext context: Context,
-        tunnelController: TunnelController,
+        runtimeFailureRouter: RuntimeFailureRouter,
     ): WarpSdkBridge = RealWarpSdkBridge(
         RemoteAwgRuntime(
             context = context,
             serviceComponent = ComponentName(context, WarpEngineService::class.java),
             onProcessDied = {
-                tunnelController.onEngineDied(EngineId.WARP, "remote-binder-died")
+                runtimeFailureRouter.handleEngineFailure(EngineId.WARP, "remote-binder-died")
             },
         ),
     )

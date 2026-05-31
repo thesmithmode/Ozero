@@ -56,8 +56,7 @@ internal object LogFileStore {
     }
 
     private fun resolveDir(context: Context): File {
-        val external = runCatching { context.getExternalFilesDir(null) }.getOrNull()
-        return if (external != null) File(external, DIR) else File(context.filesDir, DIR)
+        return File(context.filesDir, DIR)
     }
 
     internal fun resetForTest() {

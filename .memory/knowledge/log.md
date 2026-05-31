@@ -1109,3 +1109,11 @@
 - Source: daily/2026-05-31.md
 - Articles created: [[concepts/byedpi-strategy-scan-isolated-structured-argv]], [[concepts/singbox-routed-probe-readiness-latency-contract]], [[concepts/split-tunnel-runtime-refresh-coalesced-restart]], [[concepts/masterdns-pinned-release-binary-name-drift]], [[concepts/dev-push-ci-visible-full-run-contract]], [[concepts/codex-pr-review-thread-fix-loop]]
 - Articles updated: none
+## [2026-05-31T20:48:24+03:00] compile | 2026-05-31.md
+- Source: daily/2026-05-31.md
+- Articles created: [[concepts/byedpi-argv-grammar-aware-validation]], [[concepts/singbox-vless-early-data-string-contract]], [[concepts/urnetwork-bestavailable-explicit-location]], [[concepts/warp-ipv6-fail-closed-routing]], [[concepts/engine-runtime-failclosed-watchdog-path]], [[concepts/android-jacoco-executiondata-false-green]], [[concepts/backup-one-click-restore-contract]], [[connections/runtime-security-ci-proof-loop]]
+- Articles updated: none
+## [2026-05-31T20:49:06+03:00] compile | 2026-05-31.md
+- Source: daily/2026-05-31.md
+- Articles created: [[concepts/singbox-vless-early-data-string-contract]], [[concepts/warp-ipv6-fail-closed-blackhole-route]], [[concepts/urnetwork-explicit-bestavailable-location]], [[concepts/masterdns-port53-bind-preflight-contract]], [[concepts/fail-closed-watchdog-startup-lockdown-contract]], [[concepts/ci-coverage-gate-artifact-trust-contract]], [[concepts/public-repo-secret-and-insecure-asset-boundary]], [[connections/fail-closed-security-ci-trust-boundary]]
+- Articles updated: none

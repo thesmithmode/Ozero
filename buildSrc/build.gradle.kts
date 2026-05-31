@@ -1,5 +1,6 @@
 plugins {
     `kotlin-dsl`
+    jacoco
 }
 
 repositories {
@@ -34,4 +35,53 @@ configurations.all {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+}
+
+jacoco {
+    toolVersion = "0.8.12"
+}
+
+tasks.named<JacocoReport>("jacocoTestReport") {
+    dependsOn(tasks.test)
+    sourceDirectories.setFrom(layout.projectDirectory.dir("src/main/kotlin"))
+    classDirectories.setFrom(layout.buildDirectory.dir("classes/kotlin/main"))
+    executionData.setFrom(
+        fileTree(layout.buildDirectory) {
+            include("jacoco/test.exec")
+        },
+    )
+    reports {
+        html.required.set(true)
+        xml.required.set(true)
+        csv.required.set(false)
+    }
+}
+
+tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
+    dependsOn("jacocoTestReport")
+    sourceDirectories.setFrom(layout.projectDirectory.dir("src/main/kotlin"))
+    classDirectories.setFrom(layout.buildDirectory.dir("classes/kotlin/main"))
+    executionData.setFrom(
+        fileTree(layout.buildDirectory) {
+            include("jacoco/test.exec")
+        },
+    )
+    violationRules {
+        rule {
+            element = "BUNDLE"
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = "0.95".toBigDecimal()
+            }
+        }
+        rule {
+            element = "BUNDLE"
+            limit {
+                counter = "BRANCH"
+                value = "COVEREDRATIO"
+                minimum = "0.95".toBigDecimal()
+            }
+        }
+    }
 }

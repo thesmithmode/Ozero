@@ -16,7 +16,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import okhttp3.OkHttpClient
-import ru.ozero.commonvpn.TunnelController
+import ru.ozero.commonvpn.RuntimeFailureRouter
 import ru.ozero.enginesingbox.SingboxEngine
 import ru.ozero.enginesingbox.SingboxPrefs
 import ru.ozero.enginescore.EngineId
@@ -99,12 +99,12 @@ object SingboxModule {
         @SingboxPrefs dataStore: DataStore<Preferences>,
         profileDao: ProxyProfileDao,
         proxyChainDao: ProxyChainDao,
-        tunnelController: TunnelController,
+        runtimeFailureRouter: RuntimeFailureRouter,
     ): EnginePlugin = SingboxEngine(
         context = context,
         dataStore = dataStore,
         profileDao = profileDao,
         proxyChainDao = proxyChainDao,
-        onProcessDied = { tunnelController.onEngineDied(EngineId.SINGBOX, "binder-died") },
+        onProcessDied = { runtimeFailureRouter.handleEngineFailure(EngineId.SINGBOX, "binder-died") },
     )
 }

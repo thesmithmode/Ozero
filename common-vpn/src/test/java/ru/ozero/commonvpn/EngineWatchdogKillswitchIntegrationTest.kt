@@ -26,6 +26,7 @@ class EngineWatchdogKillswitchIntegrationTest {
         scope: CoroutineScope,
         killswitch: Boolean,
         tunFd: ParcelFileDescriptor?,
+        lockdownStartupFd: ParcelFileDescriptor? = null,
         stopVpnInvocations: AtomicReference<Int>,
     ): EngineWatchdogCoordinator {
         val healthMonitor = HealthMonitor()
@@ -43,6 +44,7 @@ class EngineWatchdogKillswitchIntegrationTest {
             chainOrchestrator = chainOrchestrator,
             notificationFactory = notificationFactory,
             tunFdRef = tunFdRef,
+            lockdownStartupFdRef = AtomicReference(lockdownStartupFd),
             statsJobRef = statsJobRef,
             stopping = stopping,
             starting = starting,
@@ -52,6 +54,37 @@ class EngineWatchdogKillswitchIntegrationTest {
             },
         )
     }
+
+    @Test
+    fun `handleEngineFailure killswitch=true + startupLockdownFdAlive — observer видит killswitchActive без stopVpn`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val controller = TunnelController()
+            controller.onProbing(EngineId.WARP)
+            controller.onConnecting(EngineId.WARP)
+
+            val stopVpnCount = AtomicReference(0)
+            val lockdownFd = mockk<ParcelFileDescriptor>(relaxed = true)
+            val watchdog = buildWatchdog(
+                controller = controller,
+                scope = CoroutineScope(UnconfinedTestDispatcher() + SupervisorJob()),
+                killswitch = true,
+                tunFd = null,
+                lockdownStartupFd = lockdownFd,
+                stopVpnInvocations = stopVpnCount,
+            )
+
+            watchdog.handleEngineFailure(EngineId.WARP, "startup failed")
+
+            assertTrue(
+                controller.killswitchActive.value,
+                "startup lockdown fd должен считаться blocking TUN, иначе fail-closed теряется до основного tunFd.",
+            )
+            assertEquals(
+                0,
+                stopVpnCount.get(),
+                "При живом startup lockdown fd нельзя вызывать stopVpnRequest: это снимает блокировку трафика.",
+            )
+        }
 
     @Test
     fun `handleEngineFailure killswitch=true + fdAlive — observer видит killswitchActive=true и Failed state`() =

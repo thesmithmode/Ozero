@@ -85,6 +85,23 @@ class BootFileLoggerPersistenceTest {
     }
 
     @Test
+    fun `файл сохраняется в filesDir даже если external storage доступен`() {
+        val external = File(tmp, "external")
+        val ctx = mockk<Context>(relaxed = true)
+        every { ctx.filesDir } returns tmp
+        every { ctx.getExternalFilesDir(null) } returns external
+
+        BootFileLogger.init(ctx)
+        BootFileLogger.info("Path", "internal-only")
+
+        val target = assertNotNull(UnifiedLogger.file())
+        assertTrue(
+            target.parentFile == File(tmp, "logs"),
+            "persistent logs должны лежать во внутреннем filesDir, а не external app-specific storage",
+        )
+    }
+
+    @Test
     fun `clear очищает файл но re-init после clear не пересоздаёт его пустым повторно`() {
         BootFileLogger.init(mockContext(tmp))
         BootFileLogger.info("Tag", "before-clear-marker")

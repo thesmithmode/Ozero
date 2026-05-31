@@ -110,9 +110,9 @@ class StartSequenceCoordinator(
             } else {
                 PersistentLoggers.error(TAG, "no engine reachable ($mode mode) — отказ старта")
                 deps.tunnelController.onProbing(targetForUi)
-                deps.tunnelController.onEngineDied(targetForUi, "no engine reachable ($mode mode)")
+                deps.engineWatchdog.handleEngineFailure(targetForUi, "no engine reachable ($mode mode)")
             }
-            stopVpnRequest()
+            if (targetForUi == null) stopVpnRequest()
             return
         }
         picks.forEachIndexed { index, pick ->
@@ -402,8 +402,7 @@ class StartSequenceCoordinator(
             builder.establish()
         } catch (t: Throwable) {
             PersistentLoggers.error(TAG, "engine TUN establish threw: ${t.message}")
-            deps.tunnelController.onEngineDied(engineId, "VPN slot занят — выключите другой VPN")
-            stopVpnRequest()
+            deps.engineWatchdog.handleEngineFailure(engineId, "VPN slot занят — выключите другой VPN")
             return null
         }
         if (pfd == null) {
@@ -411,8 +410,7 @@ class StartSequenceCoordinator(
                 TAG,
                 "engine TUN establish returned null — VPN slot занят другим приложением",
             )
-            deps.tunnelController.onEngineDied(engineId, "VPN slot занят — выключите другой VPN")
-            stopVpnRequest()
+            deps.engineWatchdog.handleEngineFailure(engineId, "VPN slot занят — выключите другой VPN")
             return null
         }
         state.tunFdRef.set(pfd)

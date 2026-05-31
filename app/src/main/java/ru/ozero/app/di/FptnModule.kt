@@ -2,11 +2,11 @@ package ru.ozero.app.di
 
 import android.content.Context
 import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.preferencesDataStoreFile
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -16,7 +16,7 @@ import dagger.multibindings.IntoSet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import ru.ozero.commonvpn.TunnelController
+import ru.ozero.commonvpn.RuntimeFailureRouter
 import ru.ozero.enginefptn.DataStoreFptnConfigStore
 import ru.ozero.enginefptn.FptnConfigStore
 import ru.ozero.enginefptn.FptnEngine
@@ -56,9 +56,9 @@ object FptnModule {
     @IntoSet
     fun provideFptnEngine(
         store: FptnConfigStore,
-        tunnelController: TunnelController,
+        runtimeFailureRouter: RuntimeFailureRouter,
     ): EnginePlugin = FptnEngine(
         configStore = store,
-        onEngineFailed = { reason -> tunnelController.onEngineDied(EngineId.FPTN, reason) },
+        onEngineFailed = { reason -> runtimeFailureRouter.handleEngineFailure(EngineId.FPTN, reason) },
     )
 }

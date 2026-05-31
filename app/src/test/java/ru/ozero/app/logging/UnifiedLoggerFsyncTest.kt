@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -72,5 +73,21 @@ class UnifiedLoggerFsyncTest {
         BootFileLogger.info("Facade", "facade-payload")
         val target = assertNotNull(UnifiedLogger.file())
         assertTrue(target.readText().contains("facade-payload"))
+    }
+
+    @Test
+    fun `persistent log redacts proxy uris userinfo and long tokens`() {
+        UnifiedLogger.init(mockContext())
+        UnifiedLogger.error(
+            "Secret",
+            "trojan://user:pass@example.com:443/path token=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef123456",
+        )
+
+        val content = UnifiedLogger.read()
+
+        assertTrue(content.contains("<redacted-uri>") || content.contains("://<redacted>@"))
+        assertTrue(content.contains("<redacted-token>"))
+        assertFalse(content.contains("user:pass"))
+        assertFalse(content.contains("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef123456"))
     }
 }

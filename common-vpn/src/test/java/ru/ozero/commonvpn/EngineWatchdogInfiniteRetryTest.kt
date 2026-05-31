@@ -74,6 +74,7 @@ class EngineWatchdogInfiniteRetryTest {
             chainOrchestrator = mockk<ChainOrchestrator>(relaxed = true),
             notificationFactory = mockk<OzeroNotificationFactory>(relaxed = true),
             tunFdRef = AtomicReference<ParcelFileDescriptor?>(mockk<ParcelFileDescriptor>(relaxed = true)),
+            lockdownStartupFdRef = AtomicReference<ParcelFileDescriptor?>(null),
             statsJobRef = AtomicReference<Job?>(null),
             stopping = AtomicBoolean(false),
             starting = AtomicBoolean(false),

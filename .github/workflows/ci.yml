@@ -117,8 +117,8 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
-      - name: buildSrc unit tests
-        run: ./gradlew :buildSrc:test --stacktrace --continue
+      - name: buildSrc unit tests + coverage
+        run: ./gradlew :buildSrc:test :buildSrc:jacocoTestReport :buildSrc:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
         run: python3 scripts/verify-junit-nonzero.py buildSrc
@@ -129,6 +129,61 @@ jobs:
         with:
           name: test-reports-buildsrc
           path: buildSrc/build/reports/tests/**
+          retention-days: 14
+
+      - name: Upload buildSrc coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-buildsrc
+          path: buildSrc/build/reports/jacoco/**
+          retention-days: 14
+
+  test-app-desktop:
+    name: Tests — app-desktop
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: kotlin-style
+    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Gradle with caching
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
+
+      - name: test + coverage
+        run: ./gradlew :app-desktop:test :app-desktop:jacocoTestReport :app-desktop:jacocoTestCoverageVerification --stacktrace --continue
+
+      - name: Verify tests were discovered
+        run: python3 scripts/verify-junit-nonzero.py app-desktop
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-app-desktop
+          path: app-desktop/build/reports/jacoco/**
+          retention-days: 14
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports-app-desktop
+          path: app-desktop/build/reports/tests/**
           retention-days: 14
 
   assemble-debug:
