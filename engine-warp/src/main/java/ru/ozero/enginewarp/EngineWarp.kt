@@ -504,7 +504,11 @@ class EngineWarp(
         }
         val iniConfig = if (!rawIni.isNullOrBlank()) {
             WarpConfParser.parse(baseIni).getOrNull()?.let { parsed ->
-                resolvedConfig.copy(allowedIps = parsed.allowedIps)
+                parsed.copy(
+                    publicKey = resolvedConfig.publicKey,
+                    accountLicense = resolvedConfig.accountLicense,
+                    doHProvider = resolvedConfig.doHProvider,
+                )
             } ?: resolvedConfig
         } else {
             resolvedConfig

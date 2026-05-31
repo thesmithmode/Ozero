@@ -77,6 +77,43 @@ class EngineWarpContractTest {
     }
 
     @Test
+    fun `tunSpec rawIni keeps DNS Address MTU and AllowedIPs from one conf`() = runTest {
+        val raw = """
+            [Interface]
+            PrivateKey = raw-private
+            Address = 172.16.9.2/32, 2606:4700:110::9/128
+            DNS = 176.99.11.77, 80.78.247.254, 2a00:f940:2:4:2::5d1b
+            MTU = 1280
+
+            [Peer]
+            PublicKey = raw-peer
+            AllowedIPs = 203.0.113.0/24, 2001:db8:feed::/48
+            Endpoint = 162.159.192.1:4500
+            PersistentKeepalive = 25
+        """.trimIndent()
+        val staleSlotConfig = sampleConfig.copy(
+            interfaceAddressV4 = "10.10.10.10/32",
+            interfaceAddressV6 = "2001:db8::1/128",
+            dnsServers = listOf("1.1.1.1"),
+            allowedIps = listOf("0.0.0.0/0", "::/0"),
+        )
+        val (e, _, _) = engine(activeConfig = staleSlotConfig, activeRawIni = raw, ipv6Enabled = true)
+
+        val spec = e.tunSpec()!!
+
+        assertEquals("172.16.9.2", spec.ipv4Address)
+        assertEquals("2606:4700:110::9", spec.ipv6Address)
+        assertEquals(
+            listOf("176.99.11.77", "80.78.247.254", "2a00:f940:2:4:2::5d1b"),
+            spec.dnsServers,
+        )
+        assertEquals(false, spec.routeAllV4)
+        assertEquals(listOf("203.0.113.0/24"), spec.routeCidrsV4)
+        assertEquals(false, spec.routeAllV6)
+        assertEquals(listOf("2001:db8:feed::/48"), spec.routeCidrsV6)
+    }
+
+    @Test
     fun `start без active config регистрирует и кеширует ini`() = runTest {
         val (e, auto, store) = engine(activeConfig = null)
         val r = e.start(EngineConfig.Warp, Upstream.None)

@@ -26,6 +26,7 @@ import ru.ozero.enginewarp.WarpConfigDuplicateException
 import ru.ozero.enginewarp.WarpConfigSlotStore
 import ru.ozero.enginewarp.WarpEditDraft
 import ru.ozero.enginewarp.WarpFileImporter
+import ru.ozero.enginewarp.WarpIniBuilder
 import ru.ozero.enginewarp.WarpSettingsUiState
 import ru.ozero.enginewarp.buildNextWarpSlotName
 import ru.ozero.enginewarp.draftFromSlot
@@ -232,8 +233,9 @@ class WarpEngineSettingsViewModel @Inject constructor(
         val config = draft.toWarpConfig(basAwg)
         val slotId = draft.slotId
         val name = draft.name.trim().ifBlank { "WARP" }
+        val rawIni = existingSlot?.rawIniOverride?.let { WarpIniBuilder.build(config) }
         viewModelScope.launch {
-            runCatching { store.updateSlot(slotId, name, config, existingSlot?.rawIniOverride) }
+            runCatching { store.updateSlot(slotId, name, config, rawIni) }
                 .onSuccess {
                     _uiState.value = _uiState.value.copy(
                         editDraft = null,

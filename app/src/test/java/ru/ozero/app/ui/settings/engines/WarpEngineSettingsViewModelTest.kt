@@ -17,13 +17,13 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.app.R
+import ru.ozero.enginewarp.DoHProvider
 import ru.ozero.enginewarp.ImportedWarpConfig
 import ru.ozero.enginewarp.RegisteredWarpConfig
 import ru.ozero.enginewarp.WarpAutoConfig
 import ru.ozero.enginewarp.WarpConfig
 import ru.ozero.enginewarp.WarpConfigDuplicateException
 import ru.ozero.enginewarp.WarpConfigSlot
-import ru.ozero.enginewarp.DoHProvider
 import ru.ozero.enginewarp.WarpConfigSlotStore
 import ru.ozero.enginewarp.WarpFileImporter
 import java.io.ByteArrayInputStream
@@ -438,14 +438,23 @@ class WarpEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `onSaveEdit сохраняет rawIniOverride из слота — не обнуляет`() = runTest {
+    fun `onSaveEdit rebuilds rawIniOverride from updated config`() = runTest {
         val rawIni = "[Interface]\nPrivateKey = priv\n\n[Peer]\nPublicKey = peer\n"
         val id = store.addSlot("S", SAMPLE, rawIni)
         advanceUntilIdle()
         vm.onStartEdit(id)
+        vm.onEditDraftChange(
+            vm.uiState.value.editDraft!!.copy(
+                dns = "176.99.11.77, 80.78.247.254",
+                endpoint = "162.159.192.1:4500",
+            ),
+        )
         vm.onSaveEdit()
         advanceUntilIdle()
-        assertEquals(rawIni, store.lastUpdateRawIni, "rawIniOverride должен сохраняться при редактировании")
+        val updatedRaw = store.lastUpdateRawIni ?: error("rawIni missing")
+        assertTrue(updatedRaw.contains("DNS = 176.99.11.77, 80.78.247.254"))
+        assertTrue(updatedRaw.contains("Endpoint = 162.159.192.1:4500"))
+        assertTrue(updatedRaw.contains("PrivateKey = ${SAMPLE.privateKey}"))
     }
 
     @Test
