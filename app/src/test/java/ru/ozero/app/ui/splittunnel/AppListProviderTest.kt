@@ -117,6 +117,38 @@ class AppListProviderTest {
     }
 
     @Test
+    fun `AppListProvider exposes refreshApps and packageChanges`() {
+        val source = readProviderSource()
+        assertTrue(
+            source.contains("suspend fun refreshApps(): List<InstalledApp>") &&
+                source.contains("val packageChanges: Flow<Unit>"),
+            "AppListProvider обязан явно поддерживать runtime refresh: refreshApps() для onResume " +
+                "и packageChanges Flow<Unit> для package broadcasts.",
+        )
+    }
+
+    @Test
+    fun `package changes invalidate list cache and affected icon caches`() {
+        val source = readProviderSource()
+        assertTrue(
+            source.contains("Intent.ACTION_PACKAGE_ADDED") &&
+                source.contains("Intent.ACTION_PACKAGE_REMOVED") &&
+                source.contains("Intent.ACTION_PACKAGE_CHANGED") &&
+                source.contains("Intent.ACTION_PACKAGE_REPLACED") &&
+                source.contains("addDataScheme(\"package\")"),
+            "DefaultAppListProvider обязан слушать package broadcasts с dataScheme(\"package\") " +
+                "для install/remove/change/replace, иначе split-tunnel список стареет до рестарта приложения.",
+        )
+        assertTrue(
+            source.contains("schemeSpecificPart") &&
+                source.contains("listCache = null") &&
+                source.contains("iconCache.remove(packageName)") &&
+                source.contains("missingIcons.remove(packageName)"),
+            "package broadcast обязан сбрасывать listCache и affected icon/missing cache по packageName.",
+        )
+    }
+
+    @Test
     fun `loadIcon кэширует результат`() {
         val source = readProviderSource()
         assertTrue(

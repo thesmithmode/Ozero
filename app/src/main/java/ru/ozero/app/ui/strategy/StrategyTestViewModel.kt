@@ -4,11 +4,13 @@ import android.content.Context
 import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -17,6 +19,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -24,6 +27,8 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import ru.ozero.app.di.StrategyTestEngine
+import ru.ozero.commonnet.NetworkProfileDetector
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginebyedpi.ByeDpiEngine
@@ -32,7 +37,6 @@ import ru.ozero.enginebyedpi.strategy.EvolutionEngine
 import ru.ozero.enginebyedpi.strategy.EvolutionResourcesProvider
 import ru.ozero.enginebyedpi.strategy.GenePool
 import ru.ozero.enginebyedpi.strategy.ProbeResult
-import ru.ozero.commonnet.NetworkProfileDetector
 import ru.ozero.enginebyedpi.strategy.SocksProbeClient
 import ru.ozero.enginebyedpi.strategy.StrategyEvolver
 import ru.ozero.enginebyedpi.strategy.toCommand
@@ -49,7 +53,15 @@ sealed interface StrategyTestError {
     data object NoSites : StrategyTestError
 }
 
+enum class EvolutionUiPhase {
+    CandidateBuilding,
+    InitialPopulation,
+    Generation,
+    Finished,
+}
+
 data class EvolutionUiState(
+    val phase: EvolutionUiPhase = EvolutionUiPhase.CandidateBuilding,
     val generation: Int = 0,
     val maxGenerations: Int = 0,
     val bestFitness: Double = 0.0,
@@ -71,6 +83,7 @@ class StrategyTestViewModel @Inject constructor(
     private val settingsStore: StrategyTestSettingsStore,
     private val domainListManager: DomainListManager,
     private val savedStrategyStore: SavedStrategyStore,
+    @StrategyTestEngine
     private val byeDpiEngine: EnginePlugin,
     private val probeFactory: StrategyProbeClientFactory,
     private val tunnelController: TunnelController,
@@ -114,6 +127,11 @@ class StrategyTestViewModel @Inject constructor(
     private var testJob: Job? = null
 
     init {
+        viewModelScope.launch {
+            StrategyScanService.cancelRequests.collect {
+                onStop()
+            }
+        }
         viewModelScope.launch {
             val previous = withContext(ioDispatcher) {
                 runCatching { resultsStore.load() }.getOrDefault(emptyList())
@@ -197,11 +215,12 @@ class StrategyTestViewModel @Inject constructor(
         }.onFailure {
             PersistentLoggers.warn(TAG, "unable to start StrategyScanService: ${it.message}")
         }
-        testJob = viewModelScope.launch {
+        testJob = viewModelScope.launch(ioDispatcher) {
             val sites = domainListManager.getActiveDomains(_domainLists.value)
             if (sites.isEmpty()) {
                 _errorMessage.value = StrategyTestError.NoSites
                 _isRunning.value = false
+                context.stopService(Intent(context, StrategyScanService::class.java))
                 return@launch
             }
             val snap = _settings.value
@@ -227,26 +246,33 @@ class StrategyTestViewModel @Inject constructor(
             val useEvolution = _settings.value.evolutionMode
             var scanFailed = false
             try {
-                runCatching {
-                    if (useEvolution) {
-                        runEvolution(sites)
-                    } else {
-                        runLoop(sites)
-                    }
-                }.onFailure {
-                    scanFailed = true
-                    PersistentLoggers.warn(TAG, "Strategy scan failed: ${it.message}")
-                    _runSummary.value = "Scan failed: ${it.message ?: "unknown error"}"
+                if (useEvolution) {
+                    runEvolution(sites)
+                } else {
+                    runLoop(sites)
                 }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (t: Throwable) {
+                scanFailed = true
+                PersistentLoggers.warn(TAG, "Strategy scan failed: ${t.message}")
+                _runSummary.value = "Scan failed: ${t.message ?: "unknown error"}"
             } finally {
-                _evolutionState.update { it?.copy(evaluatingCommand = null, isInitializing = false) }
-                _strategies.value = _strategies.value.sortedForUi()
-                withContext(ioDispatcher) {
+                withContext(NonCancellable) {
+                    _evolutionState.update {
+                        it?.copy(
+                            phase = EvolutionUiPhase.Finished,
+                            evaluatingCommand = null,
+                            isInitializing = false,
+                        )
+                    }
+                    _strategies.value = _strategies.value.sortedForUi()
+                    runCatching { byeDpiEngine.stop() }
                     runCatching { resultsStore.save(_strategies.value) }
+                    if (!scanFailed) _runSummary.value = ""
+                    _isRunning.value = false
+                    context.stopService(Intent(context, StrategyScanService::class.java))
                 }
-                if (!scanFailed) _runSummary.value = ""
-                _isRunning.value = false
-                context.stopService(Intent(context, StrategyScanService::class.java))
             }
         }
     }
@@ -256,6 +282,11 @@ class StrategyTestViewModel @Inject constructor(
         testJob = null
         _isRunning.value = false
         context.stopService(Intent(context, StrategyScanService::class.java))
+        viewModelScope.launch(ioDispatcher) {
+            withContext(NonCancellable) {
+                runCatching { byeDpiEngine.stop() }
+            }
+        }
     }
 
     fun onToggleSave(command: String) {
@@ -319,12 +350,17 @@ class StrategyTestViewModel @Inject constructor(
 
     private suspend fun runEvolution(sites: List<String>) {
         val snap = _settings.value
+        val maxGen = snap.evolutionMaxGenerations
+        _evolutionState.value = EvolutionUiState(
+            phase = EvolutionUiPhase.CandidateBuilding,
+            maxGenerations = maxGen,
+            isInitializing = true,
+        )
         val pinnedCommands = _savedStrategies.value.filter { it.isPinned }.map { it.command }
         val userSeeds = _strategies.value.map { it.command }
         val seedCommands = (pinnedCommands + userSeeds + ByeDpiKnownSeeds.commands).distinct()
         val genePool = GenePool(seedCommands)
         val evolver = StrategyEvolver(genePool)
-        val maxGen = snap.evolutionMaxGenerations
         val timeoutMs = snap.timeoutSeconds * 1_000L
         val network = withContext(ioDispatcher) { networkProfileDetector.current() }
         _currentNetworkId.value = network.id
@@ -348,16 +384,19 @@ class StrategyTestViewModel @Inject constructor(
             fitnessCachePersistent = resources.fitnessCache,
         )
         _evolutionState.value = EvolutionUiState(
+            phase = EvolutionUiPhase.InitialPopulation,
             maxGenerations = maxGen,
             evaluatingTotal = snap.evolutionPopulationSize,
             isInitializing = true,
         )
         var lastBestFitness = 0.0
+        val evaluatedCommands = LinkedHashSet<String>()
         val best = evolutionEngine.evolve(
             seedStrategies = seedCommands,
             onGeneration = { result ->
                 _evolutionState.update { current ->
                     EvolutionUiState(
+                        phase = EvolutionUiPhase.Generation,
                         generation = result.generation,
                         maxGenerations = maxGen,
                         bestFitness = result.bestFitness,
@@ -382,16 +421,25 @@ class StrategyTestViewModel @Inject constructor(
             onChromosomeEval = { index, total, command ->
                 _evolutionState.update { current ->
                     current?.copy(
+                        phase = if ((current.generation) == 0) {
+                            EvolutionUiPhase.InitialPopulation
+                        } else {
+                            EvolutionUiPhase.Generation
+                        },
+                        isInitializing = false,
                         evaluatingIndex = index + 1,
                         evaluatingTotal = total,
                         evaluatingCommand = command,
                     )
                 }
             },
+            onCommandEvaluated = { command ->
+                evaluatedCommands += command
+            },
         )
         val finalCmd = best.toCommand()
         withContext(ioDispatcher) {
-            runCatching { savedStrategyStore.markVerified(seedCommands.toSet(), System.currentTimeMillis()) }
+            runCatching { savedStrategyStore.markVerified(evaluatedCommands, System.currentTimeMillis()) }
                 .onSuccess { _savedStrategies.value = it }
         }
         if (finalCmd.isNotBlank() && lastBestFitness > 0.0) {
@@ -400,7 +448,7 @@ class StrategyTestViewModel @Inject constructor(
                     .onSuccess { _savedStrategies.value = it }
             }
         }
-        _evolutionState.update { it?.copy(stagnationCount = 0) }
+        _evolutionState.update { it?.copy(phase = EvolutionUiPhase.Finished, stagnationCount = 0) }
     }
 
     private suspend fun runLoop(sites: List<String>) = coroutineScope {

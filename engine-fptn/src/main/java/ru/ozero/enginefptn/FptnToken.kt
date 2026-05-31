@@ -5,6 +5,7 @@ import org.brotli.dec.BrotliInputStream
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.InputStream
+import java.util.Locale
 
 object FptnToken {
 
@@ -53,7 +54,7 @@ object FptnToken {
                     host = s.getString("host"),
                     port = s.getInt("port"),
                     md5Fingerprint = s.optString("md5_fingerprint", ""),
-                    countryCode = s.optString("country_code", "??").uppercase(),
+                    countryCode = s.optCountryCode(),
                 )
             }
             if (servers.isEmpty()) return null
@@ -67,4 +68,15 @@ object FptnToken {
             null
         }
     }
+
+    private fun JSONObject.optNullableString(name: String): String? =
+        if (has(name) && !isNull(name)) optString(name).takeIf { it.isNotBlank() } else null
+
+    private fun JSONObject.optCountryCode(): String? =
+        (optNullableString("country_code") ?: optNullableString("countryCode")).normalizedCountryCode()
+
+    private fun String?.normalizedCountryCode(): String? =
+        this?.trim()?.uppercase(Locale.ROOT)?.takeIf { code ->
+            code.length == 2 && code.all { it in 'A'..'Z' }
+        }
 }

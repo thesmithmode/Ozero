@@ -171,6 +171,7 @@
     <string name="main_status_urnetwork_searching">Searching peers…</string>
     <string name="tab_servers">Params</string>
     <string name="tab_split_tunnel">Split Tunneling</string>
+    <string name="tab_tunneling">Tunneling</string>
     <string name="tab_stats">Stats</string>
     <string name="tab_subs">Subscription</string>
     <string name="tab_engine">Engine</string>

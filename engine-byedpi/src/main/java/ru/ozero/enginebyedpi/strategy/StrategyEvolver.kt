@@ -10,8 +10,10 @@ class StrategyEvolver(private val pool: GenePool) {
         random: Random = Random.Default,
     ): Chromosome {
         if (parent1.isEmpty() || parent2.isEmpty()) return parent1.ifEmpty { parent2 }
-        val splitPoint = random.nextInt(minOf(parent1.size, parent2.size).coerceAtLeast(1))
-        return parent1.subList(0, splitPoint) + parent2.subList(splitPoint, parent2.size)
+        val blocks1 = blocks(parent1)
+        val blocks2 = blocks(parent2)
+        val splitPoint = random.nextInt(minOf(blocks1.size, blocks2.size).coerceAtLeast(1))
+        return ByeDpiOptionBlocks.flatten(blocks1.subList(0, splitPoint) + blocks2.subList(splitPoint, blocks2.size))
     }
 
     fun crossoverTwoPoint(
@@ -20,15 +22,19 @@ class StrategyEvolver(private val pool: GenePool) {
         random: Random = Random.Default,
     ): Chromosome {
         if (parent1.isEmpty() || parent2.isEmpty()) return parent1.ifEmpty { parent2 }
-        val minLen = minOf(parent1.size, parent2.size)
+        val blocks1 = blocks(parent1)
+        val blocks2 = blocks(parent2)
+        val minLen = minOf(blocks1.size, blocks2.size)
         if (minLen < 2) return crossoverSinglePoint(parent1, parent2, random)
         val rawA = random.nextInt(minLen)
         val rawB = random.nextInt(minLen)
         val i = minOf(rawA, rawB)
         val j = (maxOf(rawA, rawB) + 1).coerceAtMost(minLen)
-        return parent1.subList(0, i) +
-            parent2.subList(i, j.coerceAtMost(parent2.size)) +
-            parent1.subList(j.coerceAtMost(parent1.size), parent1.size)
+        return ByeDpiOptionBlocks.flatten(
+            blocks1.subList(0, i) +
+                blocks2.subList(i, j.coerceAtMost(blocks2.size)) +
+                blocks1.subList(j.coerceAtMost(blocks1.size), blocks1.size),
+        )
     }
 
     fun crossoverUniform(
@@ -38,14 +44,18 @@ class StrategyEvolver(private val pool: GenePool) {
     ): Chromosome {
         if (parent1.isEmpty()) return parent2
         if (parent2.isEmpty()) return parent1
-        val maxLen = maxOf(parent1.size, parent2.size)
-        return (0 until maxLen).map { i ->
-            when {
-                i < parent1.size && i < parent2.size -> if (random.nextBoolean()) parent1[i] else parent2[i]
-                i < parent1.size -> parent1[i]
-                else -> parent2[i]
-            }
-        }
+        val blocks1 = blocks(parent1)
+        val blocks2 = blocks(parent2)
+        val maxLen = maxOf(blocks1.size, blocks2.size)
+        return ByeDpiOptionBlocks.flatten(
+            (0 until maxLen).map { i ->
+                when {
+                    i < blocks1.size && i < blocks2.size -> if (random.nextBoolean()) blocks1[i] else blocks2[i]
+                    i < blocks1.size -> blocks1[i]
+                    else -> blocks2[i]
+                }
+            },
+        )
     }
 
     fun crossover(
@@ -62,27 +72,34 @@ class StrategyEvolver(private val pool: GenePool) {
     }
 
     fun insert(chromosome: Chromosome, random: Random = Random.Default): Chromosome {
-        val gene = pool.randomGene(random)
-        if (chromosome.isEmpty()) return listOf(gene)
-        val pos = random.nextInt(chromosome.size + 1)
-        return chromosome.subList(0, pos) + listOf(gene) + chromosome.subList(pos, chromosome.size)
+        val blocks = blocks(chromosome).toMutableList()
+        val geneBlock = pool.randomBlock(random)
+        if (blocks.isEmpty()) return geneBlock
+        val pos = random.nextInt(blocks.size + 1)
+        blocks.add(pos, geneBlock)
+        return ByeDpiOptionBlocks.flatten(blocks)
     }
 
     fun delete(chromosome: Chromosome, random: Random = Random.Default): Chromosome {
-        if (chromosome.size <= 1) return chromosome
-        val pos = random.nextInt(chromosome.size)
-        return chromosome.filterIndexed { i, _ -> i != pos }
+        val blocks = blocks(chromosome).toMutableList()
+        if (blocks.size <= 1) return chromosome
+        val pos = random.nextInt(blocks.size)
+        blocks.removeAt(pos)
+        return ByeDpiOptionBlocks.flatten(blocks)
     }
 
     fun swap(chromosome: Chromosome, random: Random = Random.Default): Chromosome {
-        if (chromosome.size < 2) return chromosome
-        val i = random.nextInt(chromosome.size)
-        val j = (random.nextInt(chromosome.size - 1)).let { if (it >= i) it + 1 else it }
-        return chromosome.toMutableList().also { list ->
-            val tmp = list[i]
-            list[i] = list[j]
-            list[j] = tmp
-        }
+        val blocks = blocks(chromosome).toMutableList()
+        if (blocks.size < 2) return chromosome
+        val i = random.nextInt(blocks.size)
+        val j = (random.nextInt(blocks.size - 1)).let { if (it >= i) it + 1 else it }
+        return ByeDpiOptionBlocks.flatten(
+            blocks.also { list ->
+                val tmp = list[i]
+                list[i] = list[j]
+                list[j] = tmp
+            },
+        )
     }
 
     fun mutate(
@@ -92,17 +109,18 @@ class StrategyEvolver(private val pool: GenePool) {
         memory: GeneMemory? = null,
     ): Chromosome {
         if (chromosome.isEmpty()) return chromosome
-        var result: Chromosome = chromosome.map { gene ->
+        val resultBlocks: List<Chromosome> = blocks(chromosome).map { block ->
             if (random.nextFloat() < rate) {
                 if (memory != null && memory.hasData()) {
-                    pool.weightedRandomGene(memory, random)
+                    pool.weightedRandomBlock(memory, random)
                 } else {
-                    pool.randomGene(random)
+                    pool.randomBlock(random)
                 }
             } else {
-                gene
+                block
             }
         }
+        var result = ByeDpiOptionBlocks.flatten(resultBlocks)
         if (random.nextFloat() < rate / 2) result = insert(result, random)
         if (result.size > 3 && random.nextFloat() < rate / 2) result = delete(result, random)
         if (result.size >= 2 && random.nextFloat() < rate / 2) result = swap(result, random)
@@ -133,4 +151,7 @@ class StrategyEvolver(private val pool: GenePool) {
         }
         return result
     }
+
+    private fun blocks(chromosome: Chromosome): List<Chromosome> =
+        ByeDpiOptionBlocks.blocks(chromosome).ifEmpty { listOf(chromosome) }
 }

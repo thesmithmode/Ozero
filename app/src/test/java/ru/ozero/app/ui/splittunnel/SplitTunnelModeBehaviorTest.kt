@@ -41,4 +41,18 @@ class SplitTunnelModeBehaviorTest {
                 "противоречит UX (все идут через VPN, выбора нет).",
         )
     }
+
+    @Test
+    fun `SplitTunnelScreen refreshes apps on resume`() {
+        val source = File("src/main/java/ru/ozero/app/ui/splittunnel/SplitTunnelScreen.kt")
+            .takeIf { it.exists() }
+            ?.readText()
+            ?: error("SplitTunnelScreen.kt not found at expected path")
+        assertTrue(
+            source.contains("Lifecycle.Event.ON_RESUME") &&
+                source.contains("viewModel.onResume()"),
+            "SplitTunnelScreen обязан дергать VM refresh на ON_RESUME, иначе список приложений " +
+                "не обновится после установки или удаления пакетов вне экрана.",
+        )
+    }
 }

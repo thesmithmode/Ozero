@@ -17,15 +17,15 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.enginescore.EngineCapabilities
 import ru.ozero.enginescore.EngineConfig
-import ru.ozero.enginescore.EnginePreflight
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
+import ru.ozero.enginescore.EnginePreflight
 import ru.ozero.enginescore.EngineStats
+import ru.ozero.enginescore.ExitNodeStrategy
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
-import ru.ozero.enginescore.ExitNodeStrategy
 import ru.ozero.enginescore.probe.Socks5HandshakeProbe
 import ru.ozero.enginescore.settings.HostsMode
 import ru.ozero.enginescore.settings.SettingsModel
@@ -305,7 +305,7 @@ class ByeDpiEngine(
     override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy {
         val port = if (socksPort > 0) socksPort else activeSocksPort
         return if (port > 0) {
-            ExitNodeStrategy.ViaSocks("127.0.0.1", port)
+            ExitNodeStrategy.DirectHttp
         } else {
             ExitNodeStrategy.Unavailable("ByeDPI SOCKS endpoint unavailable")
         }

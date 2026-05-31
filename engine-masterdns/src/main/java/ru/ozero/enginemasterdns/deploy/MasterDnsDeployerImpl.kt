@@ -268,7 +268,21 @@ internal class MasterDnsDeployerImpl(
 
     private fun mapBuildError(result: String): String = when {
         result.contains(MasterDnsDockerScripts.MARKER_ERR_BUILD_BIN_MISSING) ||
-            result.contains("reason=bin_missing") -> "build_failed/bin_missing"
+            result.contains("reason=bin_missing") -> {
+            val diagnostics = result.lineSequence()
+                .map { it.trim() }
+                .firstOrNull {
+                    it.startsWith("ERR_BUILD|reason=bin_missing") ||
+                        it.startsWith(MasterDnsDockerScripts.MARKER_ERR_BUILD_BIN_MISSING)
+                }
+                ?.sanitizeDeployDiagnostic()
+                .orEmpty()
+            if (diagnostics.isBlank()) {
+                "build_failed/bin_missing"
+            } else {
+                "build_failed/bin_missing|$diagnostics"
+            }
+        }
         else -> "build_failed"
     }
 
@@ -306,8 +320,14 @@ internal class MasterDnsDeployerImpl(
         DOMAINS = []
         """.trimIndent()
 
-    private fun String.takeShort(maxLen: Int = 160): String =
-        replace('\n', ' ').replace('\r', ' ').trim().take(maxLen)
+    private fun String.takeShort(maxLen: Int = 1_200): String {
+        val normalized = replace('\n', ' ').replace('\r', ' ').trim()
+        if (normalized.length <= maxLen) return normalized
+        val safeMaxLen = maxLen.coerceAtLeast(80)
+        val headLen = 360.coerceAtMost(safeMaxLen / 2)
+        val tailLen = (safeMaxLen - headLen - 5).coerceAtLeast(0)
+        return normalized.take(headLen) + " ... " + normalized.takeLast(tailLen)
+    }
 
     private companion object {
         const val TAG = "MasterDnsDeployer"
@@ -315,3 +335,10 @@ internal class MasterDnsDeployerImpl(
         const val PORT_BUSY_PREFIX = "PORT_BUSY|"
     }
 }
+
+private fun String.sanitizeDeployDiagnostic(maxLen: Int = 700): String =
+    replace('\n', ' ')
+        .replace('\r', ' ')
+        .replace(Regex("""password=[^| ]+"""), "password=<redacted>")
+        .replace(Regex("""token=[^| ]+"""), "token=<redacted>")
+        .take(maxLen)

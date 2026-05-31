@@ -515,6 +515,8 @@ internal fun masterDnsDeployErrorText(code: String): MasterDnsDeployErrorText = 
     code == "sudo_not_allowed" -> MasterDnsDeployErrorText(R.string.masterdns_deploy_error_sudo_not_allowed)
     code == "sudo_no_home" -> MasterDnsDeployErrorText(R.string.masterdns_deploy_error_sudo_no_home)
     code == "sudo_not_in_group" -> MasterDnsDeployErrorText(R.string.masterdns_deploy_error_sudo_not_in_group)
+    code == "build_failed/bin_missing" || code.startsWith("build_failed/bin_missing|") ->
+        MasterDnsDeployErrorText(R.string.masterdns_deploy_error_build_bin_missing)
     code == "build_failed" -> MasterDnsDeployErrorText(R.string.masterdns_deploy_error_build)
     code == "run_failed" -> MasterDnsDeployErrorText(R.string.masterdns_deploy_error_run)
     code == "key_extraction_failed" -> MasterDnsDeployErrorText(R.string.masterdns_deploy_error_key)

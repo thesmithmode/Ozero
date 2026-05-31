@@ -46,6 +46,7 @@
     <string name="masterdns_deploy_error_sudo_no_home">Домашняя директория пользователя недоступна. Проверьте права доступа.</string>
     <string name="masterdns_deploy_error_sudo_not_in_group">Пользователь не в группе sudo/wheel. Добавьте: usermod -aG sudo пользователь.</string>
     <string name="masterdns_deploy_error_build">Ошибка сборки образа. Проверьте интернет-соединение сервера.</string>
+    <string name="masterdns_deploy_error_build_bin_missing">Не найден исполняемый файл MasterDNS в release-asset или выводе installer. Повторите позже; если ошибка повторяется, установите сервер вручную и пришлите лог деплоя.</string>
     <string name="masterdns_deploy_error_run">Не удалось запустить контейнер.</string>
     <string name="masterdns_deploy_error_key">Не удалось извлечь ключ шифрования из контейнера.</string>
     <string name="masterdns_deploy_error_auth">Ошибка аутентификации. Проверьте логин и пароль.</string>

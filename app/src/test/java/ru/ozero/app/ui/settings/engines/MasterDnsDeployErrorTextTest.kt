@@ -28,4 +28,22 @@ class MasterDnsDeployErrorTextTest {
         assertEquals(R.string.masterdns_deploy_error_port_busy, text.resId)
         assertEquals(emptyList(), text.args)
     }
+
+    @Test
+    fun `bin missing build failure maps to actionable localized message`() {
+        val text = masterDnsDeployErrorText(MasterDnsDeployState.Error("build_failed/bin_missing"))
+
+        assertEquals(R.string.masterdns_deploy_error_build_bin_missing, text.resId)
+        assertEquals(emptyList(), text.args)
+    }
+
+    @Test
+    fun `bin missing build failure with diagnostics keeps actionable localized message`() {
+        val text = masterDnsDeployErrorText(
+            MasterDnsDeployState.Error("build_failed/bin_missing|candidates=none"),
+        )
+
+        assertEquals(R.string.masterdns_deploy_error_build_bin_missing, text.resId)
+        assertEquals(emptyList(), text.args)
+    }
 }

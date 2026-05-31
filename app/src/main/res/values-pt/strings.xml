@@ -400,6 +400,7 @@
 
     <!-- ByeDPI strategy scanning + URnetwork peer search (W9.2 parity) -->
     <string name="tab_split_tunnel">Túnel dividido</string>
+    <string name="tab_tunneling">Túnel</string>
     <string name="main_status_urnetwork_searching">Buscando pares…</string>
     <string name="scan_mode_fast">Rápido</string>
     <string name="scan_mode_deep">Profundo</string>
@@ -409,6 +410,10 @@
     <string name="strategy_settings_field_empty">O campo não pode estar vazio</string>
     <string name="evolution_initializing">Preparando população…</string>
     <string name="evolution_stagnating">Estagnado — buscando outras opções…</string>
+    <string name="evolution_phase_candidate_building">Criando candidatos</string>
+    <string name="evolution_phase_initial_population">Avaliando população inicial</string>
+    <string name="evolution_phase_generation_fmt">Geração %1$d/%2$d</string>
+    <string name="evolution_phase_finished">Finalizado</string>
     <string name="saved_strategy_rename_title">Renomear</string>
     <string name="saved_strategy_edit_title">Editar estratégia</string>
     <string name="saved_strategy_add_title">Adicionar estratégia</string>

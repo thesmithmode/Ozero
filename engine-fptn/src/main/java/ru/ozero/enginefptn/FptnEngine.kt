@@ -586,8 +586,8 @@ private fun List<String>.preferredFptnFailureReason(): String = when {
 
 private fun String.hasAny(vararg needles: String): Boolean = needles.any(::contains)
 
-private fun String.normalizedCountryCode(): String? =
-    trim().uppercase(Locale.ROOT).takeIf { code ->
+private fun String?.normalizedCountryCode(): String? =
+    this?.trim()?.uppercase(Locale.ROOT)?.takeIf { code ->
         code.length == 2 && code.all { it in 'A'..'Z' }
     }
 

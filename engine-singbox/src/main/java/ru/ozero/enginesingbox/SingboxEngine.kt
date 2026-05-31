@@ -60,6 +60,8 @@ class SingboxEngine @Inject constructor(
 
     private val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    internal var routedProbe: SingboxRoutedProbe = SingboxHttp204RoutedProbe()
+
     @Volatile
     private var cachedBlob: ByteArray? = null
 
@@ -259,6 +261,11 @@ class SingboxEngine @Inject constructor(
         val p = proxy ?: return StartResult.Failure("SingboxEngineService not connected for chain mode")
         return runCatching {
             p.startProxyMode(json, localProtector)
+            val runtimeRunning = runCatching { p.runtimeRunning() }.getOrDefault(false)
+            if (!runtimeRunning) {
+                activeSocksPort = 0
+                return StartResult.Failure("sing-box proxy runtime failed to start")
+            }
             activeSocksPort = port
             PersistentLoggers.info(TAG, "startProxyMode sent over AIDL port=$port")
             StartResult.Success(socksPort = port)
@@ -318,7 +325,32 @@ class SingboxEngine @Inject constructor(
 
     override fun stopTimeoutMs(): Long = ENGINE_STOP_TIMEOUT_MS
 
-    override suspend fun probe(): ProbeResult = ProbeResult.Success(latencyMs = 0L)
+    override suspend fun probe(): ProbeResult {
+        val p = proxy ?: return ProbeResult.Failure("sing-box process is not connected")
+        val port = activeSocksPort.takeIf { it > 0 }
+            ?: return ProbeResult.Failure("sing-box SOCKS probe port is not active")
+        val runtimeRunning = runCatching { p.runtimeRunning() }.getOrElse {
+            clearRuntimeState()
+            return ProbeResult.Failure("sing-box runtime health check failed: ${it.message}", it)
+        }
+        if (!runtimeRunning) {
+            clearRuntimeState()
+            return ProbeResult.Failure("sing-box runtime is not running")
+        }
+        val latency = routedProbe.probeLatencyMs(port)
+        return if (latency >= 0) {
+            ProbeResult.Success(latencyMs = latency)
+        } else {
+            activeSocksPort = 0
+            ProbeResult.Failure("sing-box routed probe failed")
+        }
+    }
+
+    override suspend fun awaitReady(): EnginePlugin.ReadyResult =
+        when (val result = probe()) {
+            is ProbeResult.Success -> EnginePlugin.ReadyResult.Ready
+            is ProbeResult.Failure -> EnginePlugin.ReadyResult.Timeout(result.reason)
+        }
 
     override fun stats(): Flow<EngineStats> = flow {
         while (true) {
@@ -355,7 +387,7 @@ class SingboxEngine @Inject constructor(
     )
 
     override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy {
-        val port = activeSocksPort.takeIf { it > 0 } ?: socksPort.takeIf { it > 0 }
+        val port = activeSocksPort.takeIf { it > 0 }
         return if (port != null) {
             ExitNodeStrategy.ViaSocks("127.0.0.1", port)
         } else {
@@ -436,6 +468,7 @@ class SingboxEngine @Inject constructor(
                     val recipient = IBinder.DeathRecipient {
                         proxy = null
                         engineBinder = null
+                        clearRuntimeState()
                         val ref = serviceConn
                         serviceConn = null
                         if (ref != null) runCatching { context.unbindService(ref) }
@@ -451,6 +484,7 @@ class SingboxEngine @Inject constructor(
                 override fun onServiceDisconnected(name: ComponentName) {
                     proxy = null
                     engineBinder = null
+                    clearRuntimeState()
                     unlinkDeath()
                     val ref = serviceConn
                     serviceConn = null
@@ -462,6 +496,7 @@ class SingboxEngine @Inject constructor(
                 override fun onBindingDied(name: ComponentName?) {
                     proxy = null
                     engineBinder = null
+                    clearRuntimeState()
                     unlinkDeath()
                     val ref = serviceConn
                     serviceConn = null
@@ -494,6 +529,10 @@ class SingboxEngine @Inject constructor(
     }
 
     private fun clearPendingStart() {
+        clearRuntimeState()
+    }
+
+    private fun clearRuntimeState() {
         pendingConfig = null
         pendingSocksPort = 0
         activeSocksPort = 0

@@ -68,15 +68,17 @@ class MainViewModelTest {
         healthMonitor = HealthMonitor()
         settingsRepository = FakeSettingsRepository()
         ipInfoProvider = FakeIpInfoProvider()
-        byedpiPlugin = FakeEnginePlugin(EngineId.BYEDPI) { port ->
-            IpProbeRoute.Socks("127.0.0.1", if (port > 0) port else 1080)
-        }
-        warpPlugin = FakeEnginePlugin(EngineId.WARP) {
+        byedpiPlugin = FakeEnginePlugin(
+            id = EngineId.BYEDPI,
+            route = { IpProbeRoute.Default },
+            strategy = { ExitNodeStrategy.DirectHttp },
+        )
+        warpPlugin = FakeEnginePlugin(EngineId.WARP, route = {
             IpProbeRoute.StaticLocation(country = "Cloudflare WARP", countryCode = null)
-        }
-        urnetworkPlugin = FakeEnginePlugin(EngineId.URNETWORK) {
+        })
+        urnetworkPlugin = FakeEnginePlugin(EngineId.URNETWORK, route = {
             IpProbeRoute.Unavailable("URnetwork location pending")
-        }
+        })
         urnetworkBridge = FakeUrnetworkBridge()
         viewModel = MainViewModel(
             tunnelController,
@@ -103,6 +105,7 @@ class MainViewModelTest {
     private class FakeEnginePlugin(
         override val id: EngineId,
         private val route: (Int) -> IpProbeRoute,
+        private val strategy: ((Int) -> ExitNodeStrategy)? = null,
     ) : EnginePlugin {
         override val capabilities: EngineCapabilities = EngineCapabilities(
             supportsTcp = true,
@@ -118,13 +121,14 @@ class MainViewModelTest {
         override suspend fun probe(): ProbeResult = ProbeResult.Failure("test fake")
         override fun stats(): Flow<EngineStats> = emptyFlow()
         override suspend fun ipProbeRoute(socksPort: Int): IpProbeRoute = route(socksPort)
-        override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy = when (val r = route(socksPort)) {
-            IpProbeRoute.Default -> ExitNodeStrategy.DirectHttp
-            IpProbeRoute.AutoSelected -> ExitNodeStrategy.AutoSelected()
-            is IpProbeRoute.Socks -> ExitNodeStrategy.ViaSocks(r.host, r.port)
-            is IpProbeRoute.StaticLocation -> ExitNodeStrategy.LocationOnly(r.country, r.countryCode)
-            is IpProbeRoute.Unavailable -> ExitNodeStrategy.Unavailable(r.reason)
-        }
+        override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy =
+            strategy?.invoke(socksPort) ?: when (val r = route(socksPort)) {
+                IpProbeRoute.Default -> ExitNodeStrategy.DirectHttp
+                IpProbeRoute.AutoSelected -> ExitNodeStrategy.AutoSelected()
+                is IpProbeRoute.Socks -> ExitNodeStrategy.ViaSocks(r.host, r.port)
+                is IpProbeRoute.StaticLocation -> ExitNodeStrategy.LocationOnly(r.country, r.countryCode)
+                is IpProbeRoute.Unavailable -> ExitNodeStrategy.Unavailable(r.reason)
+            }
     }
 
     private class FakeIpInfoProvider(
@@ -474,7 +478,7 @@ class MainViewModelTest {
     }
 
     @Test
-    fun ipInfoFetchesViaSocksOnByedpiConnected() = runTest {
+    fun ipInfoFetchesRealIpForByedpiConnected() = runTest {
         backgroundScope.launch { viewModel.ipInfo.collect {} }
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.BYEDPI)
@@ -485,10 +489,12 @@ class MainViewModelTest {
         val s = viewModel.ipInfo.value
         assertIs<IpInfoState.Loaded>(s)
         assertEquals("203.0.113.1", s.info.ip)
+        assertEquals("Germany", s.info.country)
         assertEquals(1, ipInfoProvider.calls)
-        assertEquals(1, ipInfoProvider.fetchViaCalls)
-        assertEquals("127.0.0.1", ipInfoProvider.lastSocksHost)
-        assertEquals(1080, ipInfoProvider.lastSocksPort)
+        assertEquals(1, ipInfoProvider.fetchCalls)
+        assertEquals(0, ipInfoProvider.fetchViaCalls)
+        assertNull(ipInfoProvider.lastSocksHost)
+        assertNull(ipInfoProvider.lastSocksPort)
     }
 
     @Test
@@ -536,9 +542,9 @@ class MainViewModelTest {
 
     @Test
     fun ipInfoStaticLocationForUrnetworkWhenLocationKnown() = runTest {
-        val staticUrnetwork = FakeEnginePlugin(EngineId.URNETWORK) {
+        val staticUrnetwork = FakeEnginePlugin(EngineId.URNETWORK, route = {
             IpProbeRoute.StaticLocation(country = "Germany", countryCode = "DE")
-        }
+        })
         val vm = newViewModel(plugins = setOf(byedpiPlugin, warpPlugin, staticUrnetwork))
         backgroundScope.launch { vm.ipInfo.collect {} }
         tunnelController.onProbing()
@@ -558,9 +564,9 @@ class MainViewModelTest {
     @Test
     fun ipInfoUpdatesWhenUrnetworkLocationChangesDuringSession() = runTest {
         var countryCode = "US"
-        val dynamicUrnetwork = FakeEnginePlugin(EngineId.URNETWORK) {
+        val dynamicUrnetwork = FakeEnginePlugin(EngineId.URNETWORK, route = {
             IpProbeRoute.StaticLocation(country = "Country", countryCode = countryCode)
-        }
+        })
         val vm = newViewModel(plugins = setOf(byedpiPlugin, warpPlugin, dynamicUrnetwork))
         backgroundScope.launch { vm.ipInfo.collect {} }
         tunnelController.onProbing()
@@ -595,25 +601,29 @@ class MainViewModelTest {
 
     @Test
     fun ipInfoErrorOnProviderFailure() = runTest {
-        backgroundScope.launch { viewModel.ipInfo.collect {} }
+        val directWarp = FakeEnginePlugin(EngineId.WARP, route = { IpProbeRoute.Default })
+        val vm = newViewModel(plugins = setOf(byedpiPlugin, directWarp, urnetworkPlugin))
+        backgroundScope.launch { vm.ipInfo.collect {} }
         ipInfoProvider.result = Result.failure(java.io.IOException("network down"))
         tunnelController.onProbing()
-        tunnelController.onConnecting(EngineId.BYEDPI)
-        tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
+        tunnelController.onConnecting(EngineId.WARP)
+        tunnelController.onEngineStarted(EngineId.WARP, 0)
         advanceUntilIdle()
         kotlinx.coroutines.delay(6_000)
         advanceUntilIdle()
-        val s = viewModel.ipInfo.value
+        val s = vm.ipInfo.value
         assertIs<IpInfoState.Error>(s)
         assertEquals("network down", s.message)
     }
 
     @Test
     fun ipInfoNotRefetchedOnSameSession() = runTest {
-        backgroundScope.launch { viewModel.ipInfo.collect {} }
+        val directWarp = FakeEnginePlugin(EngineId.WARP, route = { IpProbeRoute.Default })
+        val vm = newViewModel(plugins = setOf(byedpiPlugin, directWarp, urnetworkPlugin))
+        backgroundScope.launch { vm.ipInfo.collect {} }
         tunnelController.onProbing()
-        tunnelController.onConnecting(EngineId.BYEDPI)
-        tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
+        tunnelController.onConnecting(EngineId.WARP)
+        tunnelController.onEngineStarted(EngineId.WARP, 0)
         advanceUntilIdle()
         kotlinx.coroutines.delay(2_500)
         advanceUntilIdle()

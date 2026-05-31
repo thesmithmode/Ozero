@@ -1,6 +1,7 @@
 package ru.ozero.app.ui.strategy
 
 import org.junit.jupiter.api.Test
+import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
@@ -33,4 +34,26 @@ class StrategyScanServiceContractTest {
     fun `CHANNEL_ID differs from VPN channel`() {
         assertNotEquals("ozero_vpn", StrategyScanService.CHANNEL_ID)
     }
+
+    @Test
+    fun `service is not sticky and does not self restart from task removal`() {
+        val source = serviceSource()
+        assertTrue(source.contains("return START_NOT_STICKY"))
+        assertTrue(!source.contains("return START_STICKY"), "user-started strategy scans must not auto-restart")
+        assertTrue(!source.contains("override fun onTaskRemoved"), "task removal must not self-restart scan service")
+    }
+
+    @Test
+    fun `notification exposes explicit stop action`() {
+        val source = serviceSource()
+        assertTrue(source.contains("PendingIntent.getService"))
+        assertTrue(source.contains("ACTION_STOP"))
+        assertTrue(source.contains(".addAction("))
+        assertTrue(source.contains("cancelRequests.tryEmit(Unit)"))
+    }
+
+    private fun serviceSource(): String =
+        File(System.getProperty("user.dir") ?: ".")
+            .resolve("src/main/java/ru/ozero/app/ui/strategy/StrategyScanService.kt")
+            .readText()
 }

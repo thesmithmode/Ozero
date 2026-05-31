@@ -63,6 +63,19 @@ class MainActivitySwitchingSentinelTest {
     }
 
     @Test
+    fun `coalesced restart settle wait ignores stale Idle after start`() {
+        val block = source.substringAfter("if (restartPending) {")
+            .substringBefore("} while (restartPending)")
+        assertTrue(
+            block.contains("TunnelState.Connected") &&
+                block.contains("TunnelState.Failed") &&
+                !block.contains("TunnelState.Idle"),
+            "coalesced restart must not treat stale Idle from the previous stop as post-start settlement. " +
+                "Block:\n$block",
+        )
+    }
+
+    @Test
     fun `singbox profile changes restart only stable connected singbox`() {
         val observerBlock = source.substringAfter("private fun observeSingboxProfileChanges")
             .substringBefore("private suspend fun restartSingboxIfStableConnected")

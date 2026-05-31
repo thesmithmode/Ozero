@@ -263,12 +263,17 @@ class MasterDnsDeployerTest {
 
     @Test
     fun `should return bin missing build error when docker build reports missing server binary`() = runTest {
-        transport.setResponse("Dockerfile", "ERR_BUILD|reason=bin_missing")
+        transport.setResponse(
+            "Dockerfile",
+            "ERR_BUILD|reason=bin_missing|ERR_BUILD_BIN_MISSING|candidates=none\n" +
+                "--- docker-build.log tail -80 ---\nno release asset produced a server binary",
+        )
 
         val states = deployer.deploy(credentials()).toList()
 
         val error = states.last() as MasterDnsDeployState.Error
-        assertEquals("build_failed/bin_missing", error.message)
+        assertTrue(error.message.startsWith("build_failed/bin_missing|ERR_BUILD|reason=bin_missing"))
+        assertTrue(error.message.contains("candidates=none"))
     }
 
     @Test
@@ -305,6 +310,18 @@ class MasterDnsDeployerTest {
 
         val error = states.last() as MasterDnsDeployState.Error
         assertEquals("key_extraction_failed", error.message)
+    }
+
+    @Test
+    fun `should execute retrying readEncryptKey script during key extraction`() = runTest {
+        deployer.deploy(credentials()).toList()
+
+        assertTrue(
+            transport.executedCommands.any {
+                it.contains("seq 1 10") &&
+                    it.contains("docker exec masterdns-ozero cat /etc/masterdnsvpn/encrypt_key.txt")
+            },
+        )
     }
 
     @Test
@@ -384,7 +401,8 @@ class MasterDnsDeployerTest {
             "deployMasterDns must use PIPESTATUS to capture docker build exit code — bare pipe loses it",
         )
         assertTrue(MasterDnsDockerScripts.deployMasterDns.contains("build_rc=\$"))
-        assertTrue(MasterDnsDockerScripts.deployMasterDns.contains("tail -30"))
+        assertTrue(MasterDnsDockerScripts.deployMasterDns.contains("head -40"))
+        assertTrue(MasterDnsDockerScripts.deployMasterDns.contains("tail -80"))
     }
 
     @Test

@@ -9,7 +9,12 @@ import kotlin.test.assertTrue
 
 class EvolutionEngineSentinelTest {
 
-    private val seeds = listOf("-winner -cmd", "-loser1", "-loser2", "-loser3")
+    private val seeds = listOf(
+        "-K -An -s2 -d1",
+        "-Ku -a1 -An",
+        "-K -r1+s -An",
+        "-K -s1 -q1",
+    )
 
     @Test
     fun `no mutation rate boost on stagnation — constant mutationRate`() {
@@ -64,6 +69,23 @@ class EvolutionEngineSentinelTest {
             source.contains("memory.isRich()") || source.contains("memoryRich"),
             "EvolutionEngine must switch ratios based on memory.isRich()",
         )
+    }
+
+    @Test
+    fun `evaluate is timeout bounded and cleanup is non cancellable`() {
+        val source = File(System.getProperty("user.dir") ?: ".")
+            .resolve("src/main/java/ru/ozero/enginebyedpi/strategy/EvolutionEngine.kt").readText()
+        assertTrue(source.contains("withTimeout(effectiveEvaluationTimeoutMs())"))
+        assertTrue(source.contains("NonCancellable"))
+        assertTrue(source.contains("withTimeoutOrNull(settings.stopTimeoutMs"))
+    }
+
+    @Test
+    fun `reduceChromosome runs only after best improves`() {
+        val source = File(System.getProperty("user.dir") ?: ".")
+            .resolve("src/main/java/ru/ozero/enginebyedpi/strategy/EvolutionEngine.kt").readText()
+        assertTrue(source.contains("if (bestImproved)"))
+        assertTrue(source.contains("maxReductionEvaluations"))
     }
 
     @Test

@@ -19,6 +19,7 @@ import ru.ozero.corestorage.dao.AppSplitRuleDao
 import ru.ozero.corestorage.entity.AppSplitRule
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginescore.settings.SplitTunnelMode
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 
 @HiltViewModel
@@ -34,9 +35,13 @@ class SplitTunnelViewModel @Inject constructor(
 
     private val query = MutableStateFlow("")
     private val apps = MutableStateFlow<List<InstalledApp>?>(null)
+    private val appLoadGeneration = AtomicInteger()
 
     init {
-        viewModelScope.launch { apps.value = appListProvider.loadApps() }
+        loadApps(refresh = false)
+        appListProvider.packageChanges
+            .onEach { refreshApps() }
+            .launchIn(viewModelScope)
         viewModelScope.launch {
             val current = settingsRepository.settings.map { it.splitMode }.first()
             if (current == SplitTunnelMode.BYPASS_LAN) {
@@ -98,6 +103,14 @@ class SplitTunnelViewModel @Inject constructor(
         query.value = value
     }
 
+    fun onResume() {
+        refreshApps()
+    }
+
+    fun refreshApps() {
+        loadApps(refresh = true)
+    }
+
     fun onClearAll() {
         viewModelScope.launch {
             val snapshot = runCatching { dao.observeAll().first() }.getOrNull() ?: return@launch
@@ -107,6 +120,20 @@ class SplitTunnelViewModel @Inject constructor(
 
     suspend fun loadIcon(packageName: String): androidx.compose.ui.graphics.ImageBitmap? =
         appListProvider.loadIcon(packageName)
+
+    private fun loadApps(refresh: Boolean) {
+        val generation = appLoadGeneration.incrementAndGet()
+        viewModelScope.launch {
+            val loaded = if (refresh) {
+                appListProvider.refreshApps()
+            } else {
+                appListProvider.loadApps()
+            }
+            if (generation == appLoadGeneration.get()) {
+                apps.value = loaded
+            }
+        }
+    }
 
     private fun InstalledApp.matches(q: String): Boolean {
         val needle = q.lowercase()
