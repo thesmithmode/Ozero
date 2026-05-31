@@ -9,7 +9,12 @@ import kotlin.test.assertTrue
 
 class EvolutionEngineSentinelTest {
 
-    private val seeds = listOf("-winner -cmd", "-loser1", "-loser2", "-loser3")
+    private val seeds = listOf(
+        "-K -An -s2 -d1",
+        "-Ku -a1 -An",
+        "-K -r1+s -An",
+        "-K -s1 -q1",
+    )
 
     @Test
     fun `no mutation rate boost on stagnation — constant mutationRate`() {

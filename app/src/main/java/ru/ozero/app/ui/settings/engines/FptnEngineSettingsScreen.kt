@@ -496,7 +496,7 @@ private fun FptnServersCard(
             servers.forEach { server ->
                 FptnServerRow(
                     label = server.name,
-                    flag = countryFlag(server.countryCode),
+                    flag = server.countryCode?.let(::countryFlag).orEmpty(),
                     selected = !autoSelect && selectedServerName == server.name,
                     onClick = {
                         onServerSelect(server.name)

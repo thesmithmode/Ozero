@@ -336,6 +336,9 @@ class EvolutionEngine(
         currentSuccessRate: Double,
         evalCache: MutableMap<Chromosome, EvalResult>,
     ): BestState {
+        if (!ByeDpiArgvValidator.isValid(current.toCommand())) {
+            return BestState(current, currentFitness, currentSuccessRate)
+        }
         val reduced = reduceChromosome(current, evalCache, settings.maxReductionEvaluations)
         if (reduced == current) return BestState(current, currentFitness, currentSuccessRate)
         val reducedResult = evalCache.getOrPut(reduced) { evaluate(reduced) }
