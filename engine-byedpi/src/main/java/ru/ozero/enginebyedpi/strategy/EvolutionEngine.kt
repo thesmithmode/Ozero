@@ -336,6 +336,9 @@ class EvolutionEngine(
         currentSuccessRate: Double,
         evalCache: MutableMap<Chromosome, EvalResult>,
     ): BestState {
+        if (currentFitness <= 0.0) {
+            return BestState(current, currentFitness, currentSuccessRate)
+        }
         if (!ByeDpiArgvValidator.isValid(current.toCommand())) {
             return BestState(current, currentFitness, currentSuccessRate)
         }
