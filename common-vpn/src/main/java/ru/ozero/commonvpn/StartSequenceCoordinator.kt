@@ -158,7 +158,7 @@ class StartSequenceCoordinator(
         val chainResult = established.second
         if (!routeTrafficForEngine(activeEngineId, fd, chainResult.finalSocksPort, notifyFailure)) return false
 
-        if (!awaitEngineReady(activeEngineId, allowStartupTimeout = usesCustomTun)) {
+        if (!awaitEngineReady(activeEngineId, allowStartupTimeout = allowsStartupTimeout(activeEngineId))) {
             runCatching { deps.chainOrchestrator.stop() }
             reportEngineFailure(
                 activeEngineId,
@@ -232,6 +232,11 @@ class StartSequenceCoordinator(
         val plugin = deps.enginePlugins.firstOrNull { it.id == engineId } ?: return false
         return plugin is TunFdAcceptor
     }
+
+    private fun allowsStartupTimeout(engineId: EngineId): Boolean =
+        deps.enginePlugins.firstOrNull { it.id == engineId }
+            ?.peerWatchdogPolicy()
+            ?.recoverBeforeFirstPeer == true
 
     private suspend fun establishTunAndChain(
         activeEngineId: EngineId,

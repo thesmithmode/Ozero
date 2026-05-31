@@ -16,12 +16,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.app.warp.WarpEngineService
 import ru.ozero.commonvpn.RuntimeFailureRouter
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
+import ru.ozero.enginescore.EngineRuntimeConfigProvider
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginewarp.DataStoreWarpConfigSlotStore
@@ -40,6 +42,7 @@ import ru.ozero.enginewarp.WarpConfFileImporter
 import ru.ozero.enginewarp.WarpEndpointProber
 import ru.ozero.enginewarp.WarpFileImporter
 import ru.ozero.enginewarp.WarpSdkBridge
+import ru.ozero.enginewarp.runtimeFingerprint
 import javax.inject.Qualifier
 import javax.inject.Singleton
 
@@ -142,6 +145,17 @@ object WarpModule {
         },
         endpointProber = endpointProber,
     )
+
+    @Provides
+    @Singleton
+    @IntoSet
+    fun provideWarpRuntimeConfigProvider(
+        store: WarpConfigSlotStore,
+    ): EngineRuntimeConfigProvider = object : EngineRuntimeConfigProvider {
+        override val engineId: EngineId = EngineId.WARP
+        override val changes = store.activeSlot().map { it?.runtimeFingerprint() }
+        override val restartReason: String = "WARP active slot changed while active -> restart"
+    }
 
     private const val SETTINGS_READ_TIMEOUT_MS = 1_500L
 }

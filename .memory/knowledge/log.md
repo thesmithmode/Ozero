@@ -1117,3 +1117,7 @@
 - Source: daily/2026-05-31.md
 - Articles created: [[concepts/singbox-vless-early-data-string-contract]], [[concepts/warp-ipv6-fail-closed-blackhole-route]], [[concepts/urnetwork-explicit-bestavailable-location]], [[concepts/masterdns-port53-bind-preflight-contract]], [[concepts/fail-closed-watchdog-startup-lockdown-contract]], [[concepts/ci-coverage-gate-artifact-trust-contract]], [[concepts/public-repo-secret-and-insecure-asset-boundary]], [[connections/fail-closed-security-ci-trust-boundary]]
 - Articles updated: none
+## [2026-05-31T23:08:11+03:00] compile | 2026-05-31.md
+- Source: daily/2026-05-31.md
+- Articles created: [[concepts/engine-runtime-config-provider-boundary]], [[concepts/settings-restart-baseline-debounce-state-machine]], [[concepts/fptn-runtime-fingerprint-replay-contract]], [[concepts/warp-readiness-delayed-handshake-contract]], [[concepts/intentional-tradeoff-sentinel-documentation]], [[connections/runtime-config-restart-boundary-loop]]
+- Articles updated: none

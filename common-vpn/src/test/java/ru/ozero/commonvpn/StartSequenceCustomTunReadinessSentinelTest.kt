@@ -18,9 +18,11 @@ class StartSequenceCustomTunReadinessSentinelTest {
         val body = source.substringAfter("private suspend fun startSingleEngineCandidate(")
             .substringBefore("private suspend fun runSingleProxy(")
         assertTrue(
-            body.contains("awaitEngineReady(activeEngineId, allowStartupTimeout = usesCustomTun)"),
-            "WARP/URnetwork attach TUN before first peer handshake. Startup timeout must not tear " +
-                "down custom-TUN engines; peer watchdog owns delayed handshake recovery.",
+            body.contains(
+                "awaitEngineReady(activeEngineId, allowStartupTimeout = allowsStartupTimeout(activeEngineId))",
+            ),
+            "Only engines whose peer-watchdog policy can recover before the first peer may continue after " +
+                "startup timeout. FPTN/sing-box custom TUN startup timeout must stay fast-fail.",
         )
 
         val awaitBody = source.substringAfter("private suspend fun awaitEngineReady(")
@@ -30,6 +32,14 @@ class StartSequenceCustomTunReadinessSentinelTest {
                 awaitBody.contains("peer watchdog owns recovery") &&
                 awaitBody.contains("return true"),
             "awaitReady Timeout for custom-TUN engines must continue with explicit diagnostic log.",
+        )
+
+        val policyBody = source.substringAfter("private fun allowsStartupTimeout(")
+            .substringBefore("private suspend fun establishTunAndChain(")
+        assertTrue(
+            policyBody.contains("peerWatchdogPolicy()") &&
+                policyBody.contains("recoverBeforeFirstPeer == true"),
+            "Startup timeout continuation must be policy-driven, not blanket TunFdAcceptor behavior.",
         )
     }
 }

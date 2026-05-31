@@ -15,12 +15,15 @@ import dagger.multibindings.IntoSet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.map
 import okhttp3.OkHttpClient
+import ru.ozero.app.ui.settings.engines.singbox.SingboxProbeService
 import ru.ozero.commonvpn.RuntimeFailureRouter
 import ru.ozero.enginesingbox.SingboxEngine
 import ru.ozero.enginesingbox.SingboxPrefs
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
+import ru.ozero.enginescore.EngineRuntimeConfigProvider
 import ru.ozero.singboxroom.SingboxDatabase
 import ru.ozero.singboxroom.dao.ProxyChainDao
 import ru.ozero.singboxroom.dao.ProxyProfileDao
@@ -107,4 +110,19 @@ object SingboxModule {
         proxyChainDao = proxyChainDao,
         onProcessDied = { runtimeFailureRouter.handleEngineFailure(EngineId.SINGBOX, "binder-died") },
     )
+
+    @Provides
+    @Singleton
+    @IntoSet
+    fun provideSingboxRuntimeConfigProvider(
+        @SingboxPrefs dataStore: DataStore<Preferences>,
+    ): EngineRuntimeConfigProvider = object : EngineRuntimeConfigProvider {
+        override val engineId: EngineId = EngineId.SINGBOX
+        override val changes = dataStore.data.map { prefs ->
+            prefs[SingboxProbeService.SELECTED_PROFILE_KEY] to
+                (prefs[SingboxProbeService.BEAN_KEY]?.contentHashCode() ?: 0)
+        }
+        override val includeStarting: Boolean = false
+        override val restartReason: String = "singbox profile changed while connected -> restart"
+    }
 }

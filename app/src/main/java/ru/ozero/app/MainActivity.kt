@@ -5,17 +5,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineExceptionHandler
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withTimeoutOrNull
@@ -27,14 +22,11 @@ import ru.ozero.app.ui.RootNavigation
 import ru.ozero.app.ui.launcher.BatteryGuard
 import ru.ozero.app.ui.launcher.OnboardingGate
 import ru.ozero.app.ui.launcher.VpnIntentLauncher
-import ru.ozero.app.ui.settings.engines.singbox.SingboxProbeService
 import ru.ozero.app.ui.theme.OzeroTheme
+import ru.ozero.app.vpn.EngineRuntimeConfigRestartObserver
 import ru.ozero.app.vpn.EngineSettingsRestartObserver
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
-import ru.ozero.enginescore.EngineId
-import ru.ozero.enginesingbox.SingboxPrefs
-import ru.ozero.enginewarp.WarpConfigSlotStore
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -45,11 +37,7 @@ class MainActivity : AppCompatActivity() {
 
     @Inject lateinit var settingsRepository: ru.ozero.enginescore.settings.SettingsRepository
 
-    @Inject lateinit var warpConfigSlotStore: WarpConfigSlotStore
-
-    @Inject
-    @SingboxPrefs
-    lateinit var singboxDataStore: DataStore<Preferences>
+    @Inject lateinit var runtimeConfigRestartObserver: EngineRuntimeConfigRestartObserver
 
     @Inject lateinit var logcatReader: LogcatReader
 
@@ -90,8 +78,7 @@ class MainActivity : AppCompatActivity() {
         )
 
         observeLiveEngineSettingsChanges()
-        observeWarpActiveSlotChanges()
-        observeSingboxProfileChanges()
+        observeRuntimeConfigChanges()
         setContent {
             OzeroTheme {
                 OnboardingGate(userFlags = userFlags) {
@@ -161,7 +148,7 @@ class MainActivity : AppCompatActivity() {
             settingsFlow = settingsRepository.settings,
             vpnStateProvider = { viewModel.state.value },
             onRestartConnected = { snapshot ->
-                restartVpnIfConnected("engine settings changed while connected → restart $snapshot")
+                restartVpnIfConnected("engine settings changed while connected -> restart $snapshot")
             },
         )
         lifecycleScope.launch(safeUiCoroutineHandler) {
@@ -171,40 +158,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun observeWarpActiveSlotChanges() {
-        lifecycleScope.launch(safeUiCoroutineHandler) {
-            warpConfigSlotStore.activeConfig()
-                .map { it?.peerEndpoint + it?.privateKey?.take(8) }
-                .distinctUntilChanged()
-                .drop(1)
-                .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
-                .collect {
-                    restartVpnIfConnected("WARP active slot changed while connected → restart")
-                }
-        }
-    }
-
-    private fun observeSingboxProfileChanges() {
-        lifecycleScope.launch(safeUiCoroutineHandler) {
-            singboxDataStore.data
-                .map { prefs ->
-                    prefs[SingboxProbeService.SELECTED_PROFILE_KEY] to
-                        (prefs[SingboxProbeService.BEAN_KEY]?.contentHashCode() ?: 0)
-                }
-                .distinctUntilChanged()
-                .drop(1)
-                .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
-                .collect {
-                    restartSingboxIfStableConnected("singbox profile changed while connected → restart")
-                }
-        }
-    }
-
-    private suspend fun restartSingboxIfStableConnected(reason: String) {
-        val current = viewModel.state.value
-        if (current is TunnelState.Connected && current.engineId == EngineId.SINGBOX) {
-            restartVpnIfConnected(reason)
-        }
+    private fun observeRuntimeConfigChanges() {
+        runtimeConfigRestartObserver.start(
+            scope = lifecycleScope,
+            lifecycle = lifecycle,
+            exceptionHandler = safeUiCoroutineHandler,
+            state = viewModel.state,
+            restart = ::restartVpnIfConnected,
+        )
     }
 
     private companion object {

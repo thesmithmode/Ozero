@@ -16,12 +16,16 @@ import dagger.multibindings.IntoSet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.map
 import ru.ozero.commonvpn.RuntimeFailureRouter
 import ru.ozero.enginefptn.DataStoreFptnConfigStore
+import ru.ozero.enginefptn.FptnConfig
 import ru.ozero.enginefptn.FptnConfigStore
 import ru.ozero.enginefptn.FptnEngine
+import ru.ozero.enginefptn.runtimeFingerprint
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
+import ru.ozero.enginescore.EngineRuntimeConfigProvider
 import javax.inject.Qualifier
 import javax.inject.Singleton
 
@@ -61,4 +65,18 @@ object FptnModule {
         configStore = store,
         onEngineFailed = { reason -> runtimeFailureRouter.handleEngineFailure(EngineId.FPTN, reason) },
     )
+
+    @Provides
+    @Singleton
+    @IntoSet
+    fun provideFptnRuntimeConfigProvider(
+        store: FptnConfigStore,
+    ): EngineRuntimeConfigProvider = object : EngineRuntimeConfigProvider {
+        override val engineId: EngineId = EngineId.FPTN
+        override val changes = store.config().map { it.runtimeFingerprint() }
+        override val includeStarting: Boolean = false
+        override val replayAfterStarting: Boolean = true
+        override val adoptedBaselineFrom = FptnConfig().runtimeFingerprint()
+        override val restartReason: String = "FPTN config changed while active -> restart"
+    }
 }
