@@ -56,6 +56,7 @@ data class SingboxSettingsUiState(
     val chainProfileIds: List<Long> = emptyList(),
     val isRefreshing: Set<Long> = emptySet(),
     val isPinging: Set<Long> = emptySet(),
+    val testingProfileIds: Set<Long> = emptySet(),
     val isAutoSelecting: Boolean = false,
     val isAutoSelectMode: Boolean = false,
     val groupRefreshErrors: Map<Long, String> = emptyMap(),
@@ -203,7 +204,7 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         if (ping) {
             pingJob?.cancel()
             pingJob = null
-            _uiState.update { it.copy(isPinging = emptySet()) }
+            _uiState.update { it.copy(isPinging = emptySet(), testingProfileIds = emptySet()) }
         }
         if (refresh) {
             refreshJob?.cancel()
@@ -226,11 +227,15 @@ class SingboxEngineSettingsViewModel @Inject constructor(
                     val profiles = profileDao.getByGroupId(gid)
                     if (profiles.isEmpty()) return@async
                     _uiState.update { it.copy(isPinging = it.isPinging + gid) }
-                    probeService.probeAndAutoSelect(profiles, viewModelScope)
+                    probeService.probeAndAutoSelect(
+                        profiles = profiles,
+                        onProfileTestingChanged = ::onProfileTestingChanged,
+                    )
                     val updated = profileDao.getByGroupId(gid)
                     _uiState.update {
                         it.copy(
                             isPinging = it.isPinging - gid,
+                            testingProfileIds = it.testingProfileIds - profiles.map { profile -> profile.id }.toSet(),
                             groupProfiles = it.groupProfiles + (gid to updated),
                         )
                     }
@@ -244,7 +249,10 @@ class SingboxEngineSettingsViewModel @Inject constructor(
             _uiState.update { it.copy(isAutoSelecting = true) }
             val allProfiles = groupDao.getAll().flatMap { profileDao.getByGroupId(it.id) }
             if (allProfiles.isNotEmpty()) {
-                probeService.probeAndAutoSelect(allProfiles, viewModelScope)
+                probeService.probeAndAutoSelect(
+                    profiles = allProfiles,
+                    onProfileTestingChanged = ::onProfileTestingChanged,
+                )
                 val groupIds = _uiState.value.groupProfiles.keys
                 val refreshed = groupIds.associateWith { gid -> profileDao.getByGroupId(gid) }
                 _uiState.update { it.copy(groupProfiles = it.groupProfiles + refreshed) }
@@ -267,7 +275,10 @@ class SingboxEngineSettingsViewModel @Inject constructor(
             errorMsg = result.exceptionOrNull()?.message
             val profiles = profileDao.getByGroupId(groupId)
             if (result.isSuccess && profiles.isNotEmpty()) {
-                probeService.probeAndAutoSelect(profiles, viewModelScope)
+                probeService.probeAndAutoSelect(
+                    profiles = profiles,
+                    onProfileTestingChanged = ::onProfileTestingChanged,
+                )
             }
         } catch (ce: CancellationException) {
             throw ce
@@ -445,6 +456,18 @@ class SingboxEngineSettingsViewModel @Inject constructor(
 
     companion object {
         private val SORT_ORDER_KEY = intPreferencesKey("singbox_sort_order")
+    }
+
+    private fun onProfileTestingChanged(profileId: Long, isTesting: Boolean) {
+        _uiState.update {
+            it.copy(
+                testingProfileIds = if (isTesting) {
+                    it.testingProfileIds + profileId
+                } else {
+                    it.testingProfileIds - profileId
+                },
+            )
+        }
     }
 }
 

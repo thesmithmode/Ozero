@@ -242,6 +242,25 @@ class MasterDnsDockerScriptsContractTest {
     }
 
     @Test
+    fun `checkPort53 inspects docker containers and removes stale own container before bind verdict`() {
+        val script = MasterDnsDockerScripts.checkPort53
+        assertTrue(script.contains("docker ps --format '{{.Names}}|{{.Ports}}'"))
+        assertTrue(script.contains("docker ps -a --filter status=created --format '{{.Names}}|{{.Ports}}'"))
+        assertTrue(script.contains("masterdns_state="))
+        assertTrue(script.contains("created|exited|dead|restarting|paused"))
+        assertTrue(script.contains("sudo docker rm -f masterdns-ozero"))
+        assertTrue(script.contains("running) echo PORT_FREE; exit 0"))
+    }
+
+    @Test
+    fun `checkPort53 never reports free after bind probe failure without owner details`() {
+        val script = MasterDnsDockerScripts.checkPort53
+        assertTrue(script.contains("bind_probe udp; bind_rc="))
+        assertTrue(script.contains("owner=bind_probe:exit_"))
+        assertTrue(script.contains("addr=0.0.0.0:53"))
+    }
+
+    @Test
     fun `MARKER_ERR_DPKG_LOCKED constant exposed for deployer mapping`() {
         assertTrue(
             MasterDnsDockerScripts.MARKER_ERR_DPKG_LOCKED == "ERR_DPKG_LOCKED",
@@ -332,6 +351,7 @@ class MasterDnsDockerScriptsContractTest {
         assertTrue(script.contains("docker_conflict"))
         assertTrue(script.contains("->53\\/udp"))
         assertTrue(script.contains("proto="))
+        assertTrue(script.contains("owner=docker:"))
     }
 
     @Test

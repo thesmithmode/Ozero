@@ -50,6 +50,7 @@ internal class UrnetworkPreferredLocationConnector(
                 val match = findBestMatch(filtered, selection) ?: return@addFilteredLocationsListener
                 if (attached.compareAndSet(false, true)) {
                     timeoutJob.cancel()
+                    persistLocation(device, match)
                     runCatching { cv.connect(match) }
                         .onFailure { PersistentLoggers.warn(TAG, "connect(match) threw: ${it.message}") }
                     Log.i(TAG, "preferred ${selection.summary()} matched → connected")
@@ -115,6 +116,14 @@ internal class UrnetworkPreferredLocationConnector(
             if (predicate(loc)) return loc
         }
         return null
+    }
+
+    private fun persistLocation(device: DeviceLocal, location: ConnectLocation) {
+        val localState = runCatching { device.networkSpace?.asyncLocalState?.localState }.getOrNull()
+        runCatching { localState?.connectLocation = location }
+        runCatching { localState?.defaultLocation = location }
+        runCatching { device.connectLocation = location }
+        runCatching { device.defaultLocation = location }
     }
 
     private companion object {

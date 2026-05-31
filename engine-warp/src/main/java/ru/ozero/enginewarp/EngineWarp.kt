@@ -321,13 +321,17 @@ class EngineWarp(
         val v4Prefix = cfg.interfaceAddressV4.substringAfter('/', missingDelimiterValue = "32")
             .toIntOrNull() ?: 32
         val ipv6Allowed = cfg.interfaceAddressV6.isNotBlank() && ipv6EnabledProvider()
-        val v6Addr = cfg.interfaceAddressV6.substringBefore('/').takeIf { it.isNotBlank() && ipv6Allowed }
+        val v6Addr = if (ipv6Allowed) {
+            cfg.interfaceAddressV6.substringBefore('/').takeIf { it.isNotBlank() }
+        } else {
+            WARP_IPV6_BLACKHOLE_ADDRESS
+        }
         val v6Prefix = cfg.interfaceAddressV6.substringAfter('/', missingDelimiterValue = "128")
             .toIntOrNull() ?: 128
         val allowedV4 = cfg.allowedIps.filter { it.isIpv4Cidr() }
         val allowedV6 = cfg.allowedIps.filter { it.isIpv6Cidr() && ipv6Allowed }
         val routeAllV4 = allowedV4.any { it.isFullTunnelV4() }
-        val routeAllV6 = v6Addr != null && allowedV6.any { it.isFullTunnelV6() }
+        val routeAllV6 = v6Addr != null && (!ipv6Allowed || allowedV6.any { it.isFullTunnelV6() })
         return TunSpec(
             sessionName = "WARP",
             mtu = cfg.mtu,
@@ -338,7 +342,7 @@ class EngineWarp(
             allowFamilyV4 = true,
             allowFamilyV6 = v6Addr != null,
             ipv6Address = v6Addr,
-            ipv6PrefixLength = v6Prefix,
+            ipv6PrefixLength = if (ipv6Allowed) v6Prefix else WARP_IPV6_BLACKHOLE_PREFIX,
             excludeRfc1918 = false,
             routeAllV4 = routeAllV4,
             routeAllV6 = routeAllV6,
@@ -640,6 +644,8 @@ class EngineWarp(
         const val DOH_CONNECT_TIMEOUT_MS = 3_000
         const val DOH_READ_TIMEOUT_MS = 3_000
         const val BOOTSTRAP_DOH_URL = "https://1.1.1.1/dns-query"
+        const val WARP_IPV6_BLACKHOLE_ADDRESS = "fd00::1"
+        const val WARP_IPV6_BLACKHOLE_PREFIX = 128
         const val WARP_READY_TIMEOUT_MS = 10_000L
         const val WARP_READY_POLL_MS = 100L
         const val SOCKS_PROBE_TIMEOUT_MS = 300

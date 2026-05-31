@@ -88,6 +88,8 @@ interface UrnetworkSdkBridge {
             get() = null
         val city: String?
             get() = null
+        val bestAvailable: Boolean
+            get() = false
     }
 
     data class LocationInfo(

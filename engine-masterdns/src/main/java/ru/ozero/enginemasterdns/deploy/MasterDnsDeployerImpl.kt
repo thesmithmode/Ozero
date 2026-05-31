@@ -16,6 +16,7 @@ internal class MasterDnsDeployerImpl(
         try {
             if (!preflightChecks()) return@flow
             if (!installDocker()) return@flow
+            if (!postDockerPortChecks()) return@flow
             if (!buildAndRun()) return@flow
             val key = extractKey() ?: return@flow
             PersistentLoggers.debug(TAG, "deploy: done host=${credentials.host} key_len=${key.length}")
@@ -63,6 +64,7 @@ internal class MasterDnsDeployerImpl(
             }
             if (!preflightChecks()) return@flow
             if (!installDocker()) return@flow
+            if (!postDockerPortChecks()) return@flow
             if (!buildAndRun()) return@flow
             val key = extractKey() ?: return@flow
             PersistentLoggers.debug(
@@ -120,14 +122,29 @@ internal class MasterDnsDeployerImpl(
             return false
         }
         emit(MasterDnsDeployState.CheckingPreflight)
-        PersistentLoggers.debug(TAG, "deploy: amnezia-dns port 53 check")
+        if (!checkAmneziaDns53Conflict("deploy: amnezia-dns port 53 check")) return false
+        if (!checkPort53Availability("deploy: port 53 check")) return false
+        return checkResources()
+    }
+
+    private suspend fun FlowCollector<MasterDnsDeployState>.postDockerPortChecks(): Boolean {
+        if (!checkAmneziaDns53Conflict("deploy: post-docker amnezia-dns port 53 check")) return false
+        return checkPort53Availability("deploy: post-docker port 53 check")
+    }
+
+    private suspend fun FlowCollector<MasterDnsDeployState>.checkAmneziaDns53Conflict(logLabel: String): Boolean {
+        PersistentLoggers.debug(TAG, logLabel)
         val amneziaResult = transport.exec(MasterDnsDockerScripts.checkAmneziaDns53)
         PersistentLoggers.debug(TAG, "deploy: amnezia-dns result=${amneziaResult.takeShort()}")
         parseAmneziaDnsConflict(amneziaResult)?.let { conflict ->
             emit(conflict)
             return false
         }
-        PersistentLoggers.debug(TAG, "deploy: port 53 check")
+        return true
+    }
+
+    private suspend fun FlowCollector<MasterDnsDeployState>.checkPort53Availability(logLabel: String): Boolean {
+        PersistentLoggers.debug(TAG, logLabel)
         val portResult = transport.exec(MasterDnsDockerScripts.checkPort53)
         PersistentLoggers.debug(TAG, "deploy: port result=${portResult.takeShort()}")
         val portBusy = parsePortBusy(portResult)
@@ -140,7 +157,7 @@ internal class MasterDnsDeployerImpl(
             emit(MasterDnsDeployState.Error(portError))
             return false
         }
-        return checkResources()
+        return true
     }
 
     private fun parsePortBusy(result: String): MasterDnsDeployState.PortBusy? = result

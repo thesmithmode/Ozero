@@ -14,6 +14,9 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import ru.ozero.engineurnetwork.UrnetworkCachedLocation
+import ru.ozero.engineurnetwork.UrnetworkConfig
+import ru.ozero.engineurnetwork.UrnetworkLocationSelection
 import ru.ozero.engineurnetwork.selectedLocation
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -444,5 +447,59 @@ class UrnetworkLocationsViewModelTest {
         v.selectLocation(FakeLocationToken("DE"))
         advanceUntilIdle()
         assertEquals("DE", store.selectedLocation().first().countryCode)
+    }
+
+    @Test
+    fun `settings screen shows stored country before SDK selectedLocation is available`() = runTest {
+        val store = ru.ozero.engineurnetwork.InMemoryUrnetworkConfigStore(
+            UrnetworkConfig(
+                byClientJwt = "test-jwt",
+                selectedLocation = UrnetworkLocationSelection(countryCode = "DE", region = null, city = null),
+                cachedCountries = listOf(UrnetworkCachedLocation(name = "Germany", countryCode = "DE")),
+            ),
+        )
+        val bridge = FakeUrnetworkBridge(deviceAvailable = true, initialLocation = null)
+        val v = UrnetworkLocationsViewModel(bridge, FakeSettingsRepo(), store, idleTunnel())
+        advanceUntilIdle()
+        val state = assertIs<UrnetworkSettingsUiState.Ready>(v.uiState.value)
+        assertEquals("DE", state.selectedLocation?.countryCode)
+    }
+
+    @Test
+    fun `settings screen falls back to stored country when SDK selectedLocation is best available token`() = runTest {
+        val store = ru.ozero.engineurnetwork.InMemoryUrnetworkConfigStore(
+            UrnetworkConfig(
+                byClientJwt = "test-jwt",
+                selectedLocation = UrnetworkLocationSelection(countryCode = "DE", region = null, city = null),
+                cachedCountries = listOf(UrnetworkCachedLocation(name = "Germany", countryCode = "DE")),
+            ),
+        )
+        val bridge = FakeUrnetworkBridge(
+            deviceAvailable = true,
+            initialLocation = FakeLocationToken(countryCode = null, bestAvailable = true),
+        )
+        val v = UrnetworkLocationsViewModel(bridge, FakeSettingsRepo(), store, idleTunnel())
+        advanceUntilIdle()
+        val state = assertIs<UrnetworkSettingsUiState.Ready>(v.uiState.value)
+        assertEquals("DE", state.selectedLocation?.countryCode)
+    }
+
+    @Test
+    fun `settings screen observes config store update after ViewModel creation`() = runTest {
+        val store = ru.ozero.engineurnetwork.InMemoryUrnetworkConfigStore(
+            UrnetworkConfig(byClientJwt = "test-jwt"),
+        )
+        val bridge = FakeUrnetworkBridge(deviceAvailable = true, initialLocation = null)
+        val v = UrnetworkLocationsViewModel(bridge, FakeSettingsRepo(), store, idleTunnel())
+        advanceUntilIdle()
+        store.update {
+            it.copy(
+                selectedLocation = UrnetworkLocationSelection(countryCode = "DE", region = null, city = null),
+                cachedCountries = listOf(UrnetworkCachedLocation(name = "Germany", countryCode = "DE")),
+            )
+        }
+        advanceUntilIdle()
+        val state = assertIs<UrnetworkSettingsUiState.Ready>(v.uiState.value)
+        assertEquals("DE", state.selectedLocation?.countryCode)
     }
 }
