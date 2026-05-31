@@ -49,7 +49,7 @@ class EvolutionEngine(
         val maxMutationRate: Float = 0.72f,
         val explorationRate: Double = 0.25,
         val survivorExplorationRate: Double = 0.2,
-        val evaluationTimeoutMs: Long = timeoutMs + 7_000L,
+        val evaluationTimeoutMs: Long = 0L,
         val stopTimeoutMs: Long = 2_000L,
         val maxReductionEvaluations: Int = 3,
     )
@@ -409,7 +409,7 @@ class EvolutionEngine(
         val port = nextRotatedSocksPort()
         var startAttempted = false
         return try {
-            withTimeout(settings.evaluationTimeoutMs) {
+            withTimeout(effectiveEvaluationTimeoutMs()) {
                 startAttempted = true
                 val started = byeDpiEngine.start(
                     config = EngineConfig.ByeDpi(args = command, socksPort = port),
@@ -456,9 +456,17 @@ class EvolutionEngine(
         }
     }
 
+    private fun effectiveEvaluationTimeoutMs(): Long {
+        if (settings.evaluationTimeoutMs > 0L) return settings.evaluationTimeoutMs
+        val concurrent = settings.concurrentProbes.coerceAtLeast(1)
+        val batches = ((sites.size + concurrent - 1) / concurrent).coerceAtLeast(1)
+        return EVALUATION_START_BUFFER_MS + settings.timeoutMs.coerceAtLeast(0L) * batches
+    }
+
     private companion object {
         const val SCORE_HTTP_PARTIAL = 0.6
         const val SCORE_HTTP_HEADERS = 0.3
+        const val EVALUATION_START_BUFFER_MS = 7_000L
         const val ADAPTIVE_SEED_RATIO = 0.2
         const val ADAPTIVE_MEMORY_RATIO = 0.5
         const val REDUCTION_TOLERANCE = 0.995

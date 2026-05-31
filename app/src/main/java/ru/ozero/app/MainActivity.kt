@@ -116,7 +116,7 @@ class MainActivity : AppCompatActivity() {
                 if (restartPending) {
                     withTimeoutOrNull(RESTART_SETTLE_TIMEOUT_MS) {
                         viewModel.state.first {
-                            it is TunnelState.Connected || it is TunnelState.Idle || it is TunnelState.Failed
+                            it is TunnelState.Connected || it is TunnelState.Failed
                         }
                     }
                 }

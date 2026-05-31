@@ -23,6 +23,9 @@ object ByeDpiArgvValidator {
                 }
                 token.startsWith("-") -> {
                     if (!isFlagToken(token)) return false
+                    if (ByeDpiOptionBlocks.requiresDetachedValue(token)) {
+                        expectedValueFor = token
+                    }
                 }
                 else -> return false
             }
@@ -36,6 +39,8 @@ object ByeDpiArgvValidator {
             "--fake" -> isSignedInt(token)
             "--ttl" -> isUnsignedInt(token)
             "--split", "--disorder" -> isModifierValue(token)
+            "-a", "-d", "-e", "-f", "-m", "-o", "-p", "-q", "-r", "-s", "-t", "-O", "-R" ->
+                isModifierValue(token) && !token.startsWith("-")
             else -> token.isNotBlank()
         }
 
@@ -51,7 +56,7 @@ object ByeDpiArgvValidator {
             'M' -> token.length > 2 && token.drop(2).all { it in "hdr," }
             'l' -> token.startsWith("-l:")
             'a', 'd', 'e', 'f', 'm', 'o', 'p', 'q', 'r', 's', 't', 'O', 'R' ->
-                token.length > 2 && token.drop(2).all(::isAttachedValueChar)
+                token.length == 2 || token.length > 2 && token.drop(2).all(::isAttachedValueChar)
             else -> false
         }
     }

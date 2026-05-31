@@ -68,11 +68,12 @@ class SingboxProbeService internal constructor(
             } else {
                 scope.async(Dispatchers.IO) {
                     val latency = probeLatencyMs(bean)
+                    if (latency == LATENCY_SKIPPED_ACTIVE_RUNTIME) return@async null
                     profileDao.updateLatency(profile.id, latency)
                     profile to latency
                 }
             }
-        }.awaitAll()
+        }.awaitAll().filterNotNull()
         val best = results.filter { it.second >= 0 }.minByOrNull { it.second }?.first ?: return
         dataStore.edit { prefs ->
             if (prefs[SELECTED_PROFILE_KEY] == SingboxEngine.SELECTED_AUTO) return@edit
@@ -95,6 +96,8 @@ internal fun interface SingboxProfileProbe {
     suspend fun probeLatencyMs(bean: AbstractBean): Int
 }
 
+internal const val LATENCY_SKIPPED_ACTIVE_RUNTIME = Int.MIN_VALUE
+
 private class SingboxServiceProfileProbe(
     private val context: Context,
     private val routedProbe: SingboxRoutedProbe = SingboxHttp204RoutedProbe(),
@@ -116,7 +119,7 @@ private class SingboxServiceProfileProbe(
             try {
                 val process = binding.process
                 val alreadyRunning = runCatching { process.runtimeRunning() }.getOrDefault(false)
-                if (alreadyRunning) return@withContext SingboxProbeService.LATENCY_FAILED
+                if (alreadyRunning) return@withContext LATENCY_SKIPPED_ACTIVE_RUNTIME
                 shouldStop = true
                 runCatching { process.startProxyMode(config, localProtector) }
                     .getOrElse { return@withContext SingboxProbeService.LATENCY_FAILED }

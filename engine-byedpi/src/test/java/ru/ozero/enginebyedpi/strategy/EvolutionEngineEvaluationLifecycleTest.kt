@@ -10,7 +10,7 @@ class EvolutionEngineEvaluationLifecycleTest {
     fun `onCommandEvaluated reports only commands that reached engine start`() = runTest {
         val engine = CountingEngine()
         val validSeeds = listOf("-K -An -s2 -d1 -a1")
-        val invalidSeeds = listOf("-s 25+s -t5 -a1")
+        val invalidSeeds = listOf("google.com -Qr -a1")
         val pool = GenePool(validSeeds + invalidSeeds)
         val evaluated = mutableListOf<String>()
         val evolutionEngine = EvolutionEngine(

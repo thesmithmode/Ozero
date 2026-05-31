@@ -76,6 +76,24 @@ class SingboxProbeServiceTest {
         assertNull(prefsFlow.value[selectedProfileKey])
     }
 
+    @Test
+    fun `probeAndAutoSelect does not overwrite latency when singbox runtime is busy`() = runTest {
+        val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
+        val dataStore = flowDataStore(prefsFlow)
+        val dao = FakeProxyProfileDao()
+        val profile = makeProfile(id = 7L, host = "busy.example", port = 443)
+
+        SingboxProbeService(
+            dao,
+            dataStore,
+            FakeProfileProbe(mapOf("busy.example:443" to LATENCY_SKIPPED_ACTIVE_RUNTIME)),
+        )
+            .probeAndAutoSelect(listOf(profile), this)
+
+        assertNull(dao.latencies[7L])
+        assertNull(prefsFlow.value[selectedProfileKey])
+    }
+
     private fun makeProfile(
         id: Long,
         host: String,

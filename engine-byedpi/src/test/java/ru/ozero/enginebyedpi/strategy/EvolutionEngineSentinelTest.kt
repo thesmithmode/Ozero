@@ -75,7 +75,7 @@ class EvolutionEngineSentinelTest {
     fun `evaluate is timeout bounded and cleanup is non cancellable`() {
         val source = File(System.getProperty("user.dir") ?: ".")
             .resolve("src/main/java/ru/ozero/enginebyedpi/strategy/EvolutionEngine.kt").readText()
-        assertTrue(source.contains("withTimeout(settings.evaluationTimeoutMs"))
+        assertTrue(source.contains("withTimeout(effectiveEvaluationTimeoutMs())"))
         assertTrue(source.contains("NonCancellable"))
         assertTrue(source.contains("withTimeoutOrNull(settings.stopTimeoutMs"))
     }

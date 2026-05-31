@@ -11,11 +11,12 @@ class ByeDpiArgvValidatorTest {
         assertTrue(ByeDpiArgvValidator.isValid("-K -An -s2 -d1 -a1"))
         assertTrue(ByeDpiArgvValidator.isValid("--fake -1 --ttl 8 --split 1+s --disorder 3+s -a1"))
         assertTrue(ByeDpiArgvValidator.isValid("-n google.com -Qr -f-204 -s1:5+sm -a1"))
+        assertTrue(ByeDpiArgvValidator.isValid("-d9+s -q20+s -s 25+s -t5 -At,r,s -r1+h -a1"))
     }
 
     @Test
-    fun `split option values are rejected unless option grammar allows a value token`() {
-        assertFalse(ByeDpiArgvValidator.isValid("-s 25+s -t5 -a1"))
+    fun `split option values reject missing detached value`() {
+        assertFalse(ByeDpiArgvValidator.isValid("-s -t5 -a1"))
         assertFalse(ByeDpiArgvValidator.isValid("google.com -Qr -a1"))
     }
 

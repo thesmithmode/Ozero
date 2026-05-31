@@ -13,6 +13,21 @@ fun parseChromosome(command: String): Chromosome =
 
 internal object ByeDpiOptionBlocks {
     private val detachedValueOptions = setOf("-n", "--fake", "--ttl", "--split", "--disorder")
+    private val shortDetachedValueOptions = setOf(
+        "-a",
+        "-d",
+        "-e",
+        "-f",
+        "-m",
+        "-o",
+        "-p",
+        "-q",
+        "-r",
+        "-s",
+        "-t",
+        "-O",
+        "-R",
+    )
 
     fun tokenize(command: String): List<String> =
         command.trim().split(Regex("\\s+")).filter(String::isNotBlank)
@@ -24,7 +39,7 @@ internal object ByeDpiOptionBlocks {
         while (index < chromosome.size) {
             val token = chromosome[index].token
             val next = chromosome.getOrNull(index + 1)
-            if (token in detachedValueOptions && next != null && acceptsDetachedValue(token, next.token)) {
+            if (requiresDetachedValue(token) && next != null && acceptsDetachedValue(token, next.token)) {
                 blocks += listOf(chromosome[index], next)
                 index += 2
             } else {
@@ -39,7 +54,8 @@ internal object ByeDpiOptionBlocks {
 
     fun flatten(blocks: List<Chromosome>): Chromosome = blocks.flatten()
 
-    fun requiresDetachedValue(token: String): Boolean = token in detachedValueOptions
+    fun requiresDetachedValue(token: String): Boolean =
+        token in detachedValueOptions || token in shortDetachedValueOptions
 
     fun acceptsDetachedValue(option: String, token: String): Boolean =
         when (option) {
@@ -47,6 +63,7 @@ internal object ByeDpiOptionBlocks {
             "--fake" -> token.toIntOrNull() != null
             "--ttl" -> token.toIntOrNull()?.let { it >= 0 } == true
             "--split", "--disorder" -> token.isNotBlank() && !token.startsWith("-")
+            in shortDetachedValueOptions -> token.isNotBlank() && !token.startsWith("-")
             else -> false
         }
 }

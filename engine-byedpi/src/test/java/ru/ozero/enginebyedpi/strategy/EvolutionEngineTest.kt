@@ -246,7 +246,7 @@ class EvolutionEngineTest {
     @Test
     fun `invalid chromosomes are skipped before native start`() = runTest {
         val engine = CountingEngine()
-        val invalidSeeds = listOf("-s 25+s -t5 -a1")
+        val invalidSeeds = listOf("google.com -Qr -a1")
         val pool = GenePool(invalidSeeds)
         val evolutionEngine = EvolutionEngine(
             byeDpiEngine = engine,
