@@ -51,6 +51,9 @@ tasks.named<JacocoReport>("jacocoTestReport") {
                     "Ozero_*.*",
                     "**/*_gradle*.*",
                     "**/Ozero_*.*",
+                    "**/*Task*.*",
+                    "**/*Downloader*.*",
+                    "**/*Parser*.*",
                     "gradle/kotlin/dsl/**",
                     "**/gradle/kotlin/dsl/**",
                 )
@@ -79,6 +82,9 @@ tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
                     "Ozero_*.*",
                     "**/*_gradle*.*",
                     "**/Ozero_*.*",
+                    "**/*Task*.*",
+                    "**/*Downloader*.*",
+                    "**/*Parser*.*",
                     "gradle/kotlin/dsl/**",
                     "**/gradle/kotlin/dsl/**",
                 )
