@@ -309,6 +309,12 @@ class EngineWarp(
     override fun preflight(): ru.ozero.enginescore.EnginePreflight =
         WarpPreflight(peerEndpointProvider = { resolvedConfig?.peerEndpoint })
 
+    override fun peerWatchdogPolicy(): EnginePlugin.PeerWatchdogPolicy =
+        EnginePlugin.PeerWatchdogPolicy(
+            timeoutMs = WARP_PEER_WATCHDOG_TIMEOUT_MS,
+            recoverBeforeFirstPeer = true,
+        )
+
     override suspend fun tunSpec(): TunSpec? {
         val cfg = resolvedConfig
             ?: resolveActive()?.also {
@@ -651,6 +657,7 @@ class EngineWarp(
         const val WARP_IPV6_BLACKHOLE_ADDRESS = "fd00::1"
         const val WARP_IPV6_BLACKHOLE_PREFIX = 128
         const val WARP_READY_TIMEOUT_MS = 30_000L
+        const val WARP_PEER_WATCHDOG_TIMEOUT_MS = 30_000L
         const val WARP_READY_POLL_MS = 100L
         const val SOCKS_PROBE_TIMEOUT_MS = 300
         const val STATS_POLL_INTERVAL_MS = 5_000L
