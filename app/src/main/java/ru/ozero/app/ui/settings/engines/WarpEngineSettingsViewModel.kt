@@ -21,6 +21,7 @@ import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginewarp.AwgParams
 import ru.ozero.enginewarp.DoHProvider
 import ru.ozero.enginewarp.WarpAutoConfig
+import ru.ozero.enginewarp.WarpConfig
 import ru.ozero.enginewarp.WarpConfigDuplicateException
 import ru.ozero.enginewarp.WarpConfigSlotStore
 import ru.ozero.enginewarp.WarpEditDraft
@@ -70,11 +71,11 @@ class WarpEngineSettingsViewModel @Inject constructor(
     }
 
     val selectedDoHProvider: StateFlow<DoHProvider> = uiState.map {
-        it.editDraft?.doHProvider ?: DoHProvider.SYSTEM
+        it.editDraft?.doHProvider ?: WarpConfig.DEFAULT_DOH_PROVIDER
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
-        initialValue = DoHProvider.SYSTEM,
+        initialValue = WarpConfig.DEFAULT_DOH_PROVIDER,
     )
 
     fun onSetDoHProvider(provider: DoHProvider) {

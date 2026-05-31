@@ -120,6 +120,8 @@ class WarpSettingsModelTest {
         assertEquals(emptyList<WarpConfigSlot>(), WarpSettingsUiState().slots)
         assertTrue(DoHProvider.SYSTEM.isSystem)
         assertFalse(DoHProvider.CLOUDFLARE_1111.isSystem)
+        assertEquals(DoHProvider.CLOUDFLARE_1111, WarpConfig.DEFAULT_DOH_PROVIDER)
+        assertEquals(WarpConfig.DEFAULT_DOH_PROVIDER, emptyWarpDraft().doHProvider)
         assertEquals("Cloudflare (1.1.1.1)", DoHProvider.CLOUDFLARE_1111.displayName)
         assertEquals("https://1.1.1.1/dns-query", DoHProvider.CLOUDFLARE_1111.url)
         assertTrue(DoHProvider.entries.contains(DoHProvider.GOOGLE_8888))

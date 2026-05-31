@@ -523,6 +523,13 @@ class WarpEngineSettingsViewModelTest {
         assertEquals(DoHProvider.GOOGLE_8844, vm.selectedDoHProvider.value)
     }
 
+    @Test
+    fun `selectedDoHProvider без draft использует Cloudflare DoH default как PORTAL WG`() = runTest {
+        advanceUntilIdle()
+
+        assertEquals(WarpConfig.DEFAULT_DOH_PROVIDER, vm.selectedDoHProvider.value)
+    }
+
     private open class FakeWarpStore : WarpConfigSlotStore {
         private val slotsFlow = MutableStateFlow<List<WarpConfigSlot>>(emptyList())
         val setActiveCalls = mutableListOf<String>()

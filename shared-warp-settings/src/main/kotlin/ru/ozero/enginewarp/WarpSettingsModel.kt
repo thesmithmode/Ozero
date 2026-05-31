@@ -21,7 +21,7 @@ data class WarpEditDraft(
     val h2: String,
     val h3: String,
     val h4: String,
-    val doHProvider: DoHProvider = DoHProvider.SYSTEM,
+    val doHProvider: DoHProvider = WarpConfig.DEFAULT_DOH_PROVIDER,
 )
 
 data class WarpSettingsUiState(

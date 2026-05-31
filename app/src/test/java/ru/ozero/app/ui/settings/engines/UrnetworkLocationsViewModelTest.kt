@@ -344,13 +344,12 @@ class UrnetworkLocationsViewModelTest {
         val store = fakeUrnetworkConfigStoreWithJwt()
         val v = vm(bridge = bridge, store = store)
         var sawNotConnected = false
-        val job = launch {
+        backgroundScope.launch {
             v.uiState.collect { state ->
                 if (state is UrnetworkSettingsUiState.NotConnected) sawNotConnected = true
             }
         }
         advanceUntilIdle()
-        job.cancel()
         kotlin.test.assertFalse(
             sawNotConnected,
             "uiState не должен переходить в NotConnected если JWT есть и initDeviceForLocations успешен",

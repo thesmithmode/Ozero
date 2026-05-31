@@ -217,7 +217,7 @@ class DataStoreWarpConfigSlotStore(
             allowedIps = allowedIps,
             awgParams = awg,
             doHProvider = configObj.optString("doHProvider", "").let { name ->
-                DoHProvider.entries.firstOrNull { it.name == name } ?: DoHProvider.SYSTEM
+                DoHProvider.entries.firstOrNull { it.name == name } ?: WarpConfig.DEFAULT_DOH_PROVIDER
             },
         )
         val rawIni = obj.optString("rawIni", "").takeIf { it.isNotEmpty() }

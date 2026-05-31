@@ -13,7 +13,7 @@ data class WarpConfig(
     val keepaliveSeconds: Int = DEFAULT_KEEPALIVE,
     val allowedIps: List<String> = DEFAULT_ALLOWED_IPS,
     val awgParams: AwgParams = AwgParams(),
-    val doHProvider: DoHProvider = DoHProvider.SYSTEM,
+    val doHProvider: DoHProvider = DEFAULT_DOH_PROVIDER,
 ) {
     override fun toString(): String {
         val peerFingerprint = if (peerPublicKey.length >= 8) {
@@ -32,5 +32,6 @@ data class WarpConfig(
         const val DEFAULT_KEEPALIVE = 25
         val DEFAULT_DNS = listOf("1.1.1.1", "2606:4700:4700::1111")
         val DEFAULT_ALLOWED_IPS = listOf("0.0.0.0/0", "::/0")
+        val DEFAULT_DOH_PROVIDER = DoHProvider.CLOUDFLARE_1111
     }
 }

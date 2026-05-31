@@ -8,6 +8,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
+import ru.ozero.singboxfmt.VMessBean
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
@@ -292,5 +293,110 @@ class RawShareLinksParserTest {
         assertEquals("tls", bean.security)
         assertEquals("front.example.com", bean.sni)
         assertTrue(bean.allowInsecure)
+    }
+
+    @Test
+    fun `should parse sing-box vmess websocket tls outbound`() {
+        val json = """
+            {
+              "outbounds": [
+                {
+                  "type": "vmess",
+                  "tag": "VMess WS",
+                  "server": "vmess.example.com",
+                  "server_port": 8443,
+                  "uuid": "12345678-1234-1234-1234-123456789abc",
+                  "alter_id": 4,
+                  "security": "auto",
+                  "packet_encoding": "packetaddr",
+                  "transport": {
+                    "type": "ws",
+                    "path": "/ws",
+                    "headers": {
+                      "Host": "front.example.com"
+                    }
+                  },
+                  "tls": {
+                    "enabled": true,
+                    "server_name": "tls.example.com",
+                    "alpn": ["h2", "http/1.1"],
+                    "insecure": true,
+                    "utls": {
+                      "fingerprint": "firefox"
+                    }
+                  }
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val result = RawShareLinksParser.parse(json)
+
+        assertEquals(1, result.size)
+        val bean = result.first() as VMessBean
+        assertEquals("VMess WS", bean.name)
+        assertEquals("vmess.example.com", bean.serverAddress)
+        assertEquals(8443, bean.serverPort)
+        assertEquals(4, bean.alterId)
+        assertEquals("auto", bean.encryption)
+        assertEquals("packetaddr", bean.packetEncoding)
+        assertEquals("ws", bean.type)
+        assertEquals("/ws", bean.path)
+        assertEquals("front.example.com", bean.host)
+        assertEquals("tls", bean.security)
+        assertEquals("tls.example.com", bean.sni)
+        assertEquals("h2,http/1.1", bean.alpn)
+        assertEquals("firefox", bean.utlsFingerprint)
+        assertTrue(bean.allowInsecure)
+    }
+
+    @Test
+    fun `should parse sing-box trojan grpc outbound`() {
+        val json = """
+            {
+              "outbounds": [
+                {
+                  "type": "trojan",
+                  "tag": "Trojan gRPC",
+                  "server": "trojan.example.com",
+                  "server_port": 443,
+                  "password": "secret",
+                  "transport": {
+                    "type": "grpc",
+                    "service_name": "ozero"
+                  }
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val result = RawShareLinksParser.parse(json)
+
+        assertEquals(1, result.size)
+        val bean = result.first() as TrojanBean
+        assertEquals("Trojan gRPC", bean.name)
+        assertEquals("trojan.example.com", bean.serverAddress)
+        assertEquals(443, bean.serverPort)
+        assertEquals("secret", bean.password)
+        assertEquals("grpc", bean.type)
+        assertEquals("ozero", bean.grpcServiceName)
+    }
+
+    @Test
+    fun `should skip invalid sing-box outbounds and unknown types`() {
+        val json = """
+            {
+              "outbounds": [
+                { "type": "direct", "tag": "direct" },
+                { "type": "vless", "tag": "missing-server", "server_port": 443 },
+                { "type": "shadowsocks", "server": "ss.example.com", "server_port": 8388, "method": "2022-blake3-aes-128-gcm", "password": "pw" }
+              ]
+            }
+        """.trimIndent()
+
+        val result = RawShareLinksParser.parse(json)
+
+        assertEquals(1, result.size)
+        assertEquals("ss.example.com", result.first().serverAddress)
     }
 }

@@ -433,6 +433,18 @@ class DataStoreWarpConfigSlotStoreTest {
     }
 
     @Test
+    fun `слот без doHProvider — fallback Cloudflare DoH как PORTAL WG`() = runTest {
+        val ds = FakePreferencesDataStore()
+        val goodSlot = buildValidSlotJson("id-no-doh", "NoDoH")
+        ds.edit { it[stringPreferencesKey("warp_slots_json")] = """[$goodSlot]""" }
+        val store = DataStoreWarpConfigSlotStore(ds, DataStoreWarpConfigStore(FakePreferencesDataStore()))
+
+        val slot = store.slots().first().single()
+
+        assertEquals(WarpConfig.DEFAULT_DOH_PROVIDER, slot.config.doHProvider)
+    }
+
+    @Test
     fun `updateSlot с endpointList — обновляет список`() = runTest {
         val store = newStore()
         val id = store.addSlot("S", sample)
