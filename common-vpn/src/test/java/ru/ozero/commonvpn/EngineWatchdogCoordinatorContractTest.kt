@@ -75,7 +75,10 @@ class EngineWatchdogCoordinatorContractTest {
     fun `handleEngineFailure ветвится по killswitchProvider + fdAlive`() {
         val body = source.substringAfter("fun handleEngineFailure(").substringBefore("private fun enterKillswitchMode")
         assertTrue(body.contains("killswitchProvider()"), "Обязан читать killswitchProvider().")
-        assertTrue(body.contains("hasBlockingTun()"), "Обязан проверять общий blocking TUN, включая startup lockdown fd.")
+        assertTrue(
+            body.contains("hasBlockingTun()"),
+            "Обязан проверять общий blocking TUN, включая startup lockdown fd.",
+        )
         assertTrue(body.contains("enterKillswitchMode("), "True-branch → killswitch.")
         assertTrue(body.contains("stopVpnRequest()"), "False-branch → stopVpnRequest callback.")
     }
