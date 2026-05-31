@@ -16,19 +16,25 @@ import ru.ozero.app.ui.strategy.FileStrategyResultsStore
 import ru.ozero.app.ui.strategy.FileUsageHistoryStore
 import ru.ozero.app.ui.strategy.SavedStrategyStore
 import ru.ozero.app.ui.strategy.SharedPrefsStrategyTestSettingsStore
-import ru.ozero.app.ui.strategy.UsageHistoryStore
 import ru.ozero.app.ui.strategy.StrategyAssetSource
 import ru.ozero.app.ui.strategy.StrategyProbeClientFactory
 import ru.ozero.app.ui.strategy.StrategyResultsStore
 import ru.ozero.app.ui.strategy.StrategyTestSettingsStore
-import ru.ozero.enginebyedpi.ByeDpiEngine
+import ru.ozero.app.ui.strategy.UsageHistoryStore
 import ru.ozero.commonnet.AndroidNetworkProfileDetector
 import ru.ozero.commonnet.NetworkProfileDetector
+import ru.ozero.enginebyedpi.ByeDpiEngine
+import ru.ozero.enginebyedpi.ByeDpiProxy
 import ru.ozero.enginebyedpi.strategy.DefaultEvolutionResourcesProvider
 import ru.ozero.enginebyedpi.strategy.EvolutionResourcesProvider
 import ru.ozero.enginebyedpi.strategy.HttpSocksProbeClient
 import ru.ozero.enginescore.EnginePlugin
+import javax.inject.Qualifier
 import javax.inject.Singleton
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class StrategyTestEngine
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -36,7 +42,8 @@ object StrategyTestModule {
 
     @Provides
     @Singleton
-    fun provideStrategyTestEnginePlugin(byeDpi: ByeDpiEngine): EnginePlugin = byeDpi
+    @StrategyTestEngine
+    fun provideStrategyTestEnginePlugin(): EnginePlugin = ByeDpiEngine(ByeDpiProxy())
 
     @Provides
     @Singleton

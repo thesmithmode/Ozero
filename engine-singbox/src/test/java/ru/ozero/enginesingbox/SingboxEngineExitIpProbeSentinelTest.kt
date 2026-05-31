@@ -53,6 +53,39 @@ class SingboxEngineExitIpProbeSentinelTest {
     }
 
     @Test
+    fun `singbox clears active socks port on process death and routed probe failure`() {
+        val source = File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/enginesingbox/SingboxEngine.kt",
+        ).readText()
+
+        assertTrue(
+            source.contains("private fun clearRuntimeState()"),
+            "SingboxEngine must have one runtime-state cleanup path for stale activeSocksPort",
+        )
+        assertTrue(
+            source.substringAfter("IBinder.DeathRecipient {").substringBefore("deathRecipient = recipient")
+                .contains("clearRuntimeState()"),
+            "DeathRecipient must clear activeSocksPort when :engine_singbox dies",
+        )
+        assertTrue(
+            source.substringAfter("onServiceDisconnected").substringBefore("onBindingDied")
+                .contains("clearRuntimeState()"),
+            "onServiceDisconnected must clear activeSocksPort after system disconnect",
+        )
+        assertTrue(
+            source.substringAfter("onBindingDied").substringBefore("private fun bindOrFail")
+                .contains("clearRuntimeState()"),
+            "onBindingDied must clear activeSocksPort after binding death",
+        )
+        assertTrue(
+            source.substringAfter("override suspend fun probe()").substringBefore("override fun stats()")
+                .contains("activeSocksPort = 0"),
+            "routed probe failure must clear activeSocksPort so exitNodeStrategy cannot reuse stale SOCKS",
+        )
+    }
+
+    @Test
     fun `singbox stop waits for remote stop before close`() {
         val source = File(
             System.getProperty("user.dir") ?: ".",

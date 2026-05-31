@@ -513,20 +513,28 @@ private fun EvolutionStateCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            if (state.isInitializing) {
-                Text(
-                    text = stringResource(R.string.evolution_initializing),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            } else {
-                if (state.stagnationCount >= 2) {
-                    Text(
-                        text = stringResource(R.string.evolution_stagnating),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
+            Text(
+                text = when (state.phase) {
+                    EvolutionUiPhase.CandidateBuilding -> stringResource(R.string.evolution_phase_candidate_building)
+                    EvolutionUiPhase.InitialPopulation -> stringResource(R.string.evolution_phase_initial_population)
+                    EvolutionUiPhase.Generation -> stringResource(
+                        R.string.evolution_phase_generation_fmt,
+                        state.generation.coerceAtLeast(1),
+                        state.maxGenerations,
                     )
-                }
+                    EvolutionUiPhase.Finished -> stringResource(R.string.evolution_phase_finished)
+                },
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (state.isInitializing && state.evaluatingCommand == null) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+            if (state.stagnationCount >= 2) {
+                Text(
+                    text = stringResource(R.string.evolution_stagnating),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
             if (state.evaluatingCommand != null) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {

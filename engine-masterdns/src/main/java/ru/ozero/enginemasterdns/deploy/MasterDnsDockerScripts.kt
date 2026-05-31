@@ -108,40 +108,78 @@ internal object MasterDnsDockerScripts {
 
     val deployMasterDns: String =
         """
+        sudo rm -rf /tmp/mdns_build 2>/dev/null || true
+        sudo docker rmi masterdns-ozero 2>/dev/null || true
         mkdir -p /tmp/mdns_build && cat > /tmp/mdns_build/Dockerfile << 'EODF'
         FROM ubuntu:22.04
+        ARG MASTERDNS_RELEASE_TAG=v2026.05.10.180256-27c7e11
         ARG DEBIAN_FRONTEND=noninteractive
-        RUN apt-get update -yq && apt-get install -yq curl openssl ca-certificates findutils
+        RUN apt-get update -yq && apt-get install -yq curl openssl ca-certificates findutils tar gzip unzip
         RUN set -eu; \
-            curl -fsSL https://raw.githubusercontent.com/masterking32/MasterDnsVPN/main/server_linux_install.sh \
-                -o /tmp/masterdns-install.sh; \
-            install_rc=0; \
-            bash /tmp/masterdns-install.sh 2>&1 || install_rc=${'$'}?; \
+            mkdir -p /tmp/masterdns-release-dir; \
+            arch=${'$'}(uname -m); \
+            asset_arch=""; \
+            case "${'$'}arch" in \
+                x86_64|amd64) asset_arch=AMD64;; \
+                aarch64|arm64) asset_arch=ARM64;; \
+                armv7l|armv7*) asset_arch=ARMv7;; \
+            esac; \
+            release_api="https://api.github.com/repos/masterking32/MasterDnsVPN/releases/tags/${'$'}{MASTERDNS_RELEASE_TAG}"; \
+            urls=${'$'}(curl -fsSL "${'$'}release_api" 2>/tmp/masterdns-release-api.err \
+                | tr ',' '\n' \
+                | sed -n 's/.*"browser_download_url": *"\([^"]*\)".*/\1/p' \
+                | grep -i 'MasterDnsVPN_Server_Linux' || true); \
+            url=""; \
+            if [ -n "${'$'}asset_arch" ]; then \
+                url=${'$'}(printf '%s\n' "${'$'}urls" | grep -Ei "MasterDnsVPN_Server_Linux.*${'$'}asset_arch" | head -1 || true); \
+            fi; \
+            if [ -z "${'$'}url" ]; then \
+                url=${'$'}(printf '%s\n' "${'$'}urls" | head -1 || true); \
+            fi; \
+            if [ -n "${'$'}url" ]; then \
+                asset_name=${'$'}(basename "${'$'}url" | sed 's/[?].*${'$'}//'); \
+                if curl -fL "${'$'}url" -o "/tmp/${'$'}asset_name"; then \
+                    case "${'$'}asset_name" in \
+                        *.tar.gz|*.tgz) tar -xzf "/tmp/${'$'}asset_name" -C /tmp/masterdns-release-dir || true;; \
+                        *.zip) unzip -q "/tmp/${'$'}asset_name" -d /tmp/masterdns-release-dir || true;; \
+                        *) cp "/tmp/${'$'}asset_name" "/tmp/masterdns-release-dir/${'$'}asset_name" || true;; \
+                    esac; \
+                fi; \
+            fi; \
             candidate=""; \
-            for path in \
-                /usr/local/bin/masterdnsvpn-server \
-                /usr/bin/masterdnsvpn-server \
-                /opt/masterdnsvpn/masterdnsvpn-server; \
-            do \
-                if [ -f "${'$'}path" ]; then candidate="${'$'}path"; break; fi; \
-            done; \
+            candidate=${'$'}(find /tmp/masterdns-release-dir -maxdepth 8 -type f \
+                \( -name 'MasterDnsVPN_Server_Linux*_v*' -o -name 'MasterDnsVPN_Server_Linux*' -o -name 'masterdnsvpn-server' \) \
+                2>/dev/null | head -1 || true); \
             if [ -z "${'$'}candidate" ]; then \
-                candidate=${'$'}(find / -maxdepth 8 -name 'masterdnsvpn-server' -type f -perm /111 \
+                if curl -fsSL https://raw.githubusercontent.com/masterking32/MasterDnsVPN/main/server_linux_install.sh \
+                    -o /tmp/masterdns-install.sh; \
+                then \
+                    install_rc=0; \
+                    bash /tmp/masterdns-install.sh 2>&1 || install_rc=${'$'}?; \
+                else \
+                    install_rc=127; \
+                fi; \
+                candidate=${'$'}(find / -maxdepth 8 -type f \
+                    \( -name 'MasterDnsVPN_Server_Linux*_v*' -o -name 'MasterDnsVPN_Server_Linux*' -o -name 'masterdnsvpn-server' \) \
                     2>/dev/null | head -1 || true); \
             fi; \
             if [ -z "${'$'}candidate" ]; then \
-                candidate=${'$'}(find / -maxdepth 8 -name 'masterdnsvpn-server' -type f \
-                    2>/dev/null | head -1 || true); \
+                api_error=${'$'}(cat /tmp/masterdns-release-api.err 2>/dev/null | tr '\n\r' '  ' | cut -c1-300 || true); \
+                missing_candidates=${'$'}(find /tmp/masterdns-release-dir /usr/local/bin /usr/bin /opt /tmp -maxdepth 8 -type f \
+                    \( -name 'MasterDnsVPN*' -o -name '*masterdns*' \) \
+                    2>/dev/null | head -20 | tr '\n' ',' | sed 's/,${'$'}//' || true); \
+                [ -n "${'$'}missing_candidates" ] || missing_candidates=none; \
+                echo "ERR_BUILD_BIN_MISSING|release_tag=${'$'}{MASTERDNS_RELEASE_TAG}|release_url=${'$'}{url:-none}|api_error=${'$'}api_error|candidates=${'$'}missing_candidates"; \
+                exit 42; \
             fi; \
-            if [ -z "${'$'}candidate" ]; then echo ERR_BUILD_BIN_MISSING; exit 42; fi; \
             if [ "${'$'}candidate" != "/usr/local/bin/masterdnsvpn-server" ]; then \
                 install -m755 "${'$'}candidate" /usr/local/bin/masterdnsvpn-server; \
             else \
                 chmod 755 /usr/local/bin/masterdnsvpn-server; \
             fi; \
             test -x /usr/local/bin/masterdnsvpn-server; \
-            if [ "${'$'}install_rc" -ne 0 ]; then \
-                echo "INSTALL_NONZERO_BUT_BINARY_FOUND|exit=${'$'}install_rc"; \
+            if [ "${'$'}{install_rc:-0}" -ne 0 ]; then \
+                echo "INSTALL_NONZERO_BUT_BINARY_FOUND|exit=${'$'}{install_rc:-0}"; \
             fi
         RUN mkdir -p /etc/masterdnsvpn
         EXPOSE 53/udp
@@ -150,11 +188,21 @@ internal object MasterDnsDockerScripts {
         build_log=/tmp/mdns_build/docker-build.log
         sudo docker build --no-cache -t masterdns-ozero /tmp/mdns_build > "${'$'}build_log" 2>&1
         build_rc=${'$'}?
-        tail -30 "${'$'}build_log" 2>/dev/null || true
+        echo "--- docker-build.log head -40 ---"
+        head -40 "${'$'}build_log" 2>/dev/null || true
+        echo "--- docker-build.log tail -80 ---"
+        tail -80 "${'$'}build_log" 2>/dev/null || true
         if [ ${'$'}build_rc -eq 0 ]; then
             echo BUILD_OK
         elif grep -q ERR_BUILD_BIN_MISSING "${'$'}build_log" 2>/dev/null; then
-            echo "ERR_BUILD|reason=bin_missing"
+            diag=${'$'}(
+                grep ERR_BUILD_BIN_MISSING "${'$'}build_log" 2>/dev/null |
+                    tail -1 |
+                    sed 's/^.*ERR_BUILD_BIN_MISSING/ERR_BUILD_BIN_MISSING/' |
+                    tr '\n\r' '  ' |
+                    cut -c1-1000
+            )
+            echo "ERR_BUILD|reason=bin_missing|${'$'}diag"
         else
             echo ERR_BUILD
         fi
@@ -239,7 +287,11 @@ internal object MasterDnsDockerScripts {
             " then echo \"\$fw_kind\" | sudo tee /var/lib/masterdns-ozero/fw_opened >/dev/null 2>&1; fi"
 
     const val readEncryptKey =
-        "sudo docker exec masterdns-ozero cat /etc/masterdnsvpn/encrypt_key.txt 2>/dev/null"
+        "for i in \$(seq 1 10); do" +
+            " key=\$(sudo docker exec masterdns-ozero cat /etc/masterdnsvpn/encrypt_key.txt 2>/dev/null || true);" +
+            " if [ -n \"\$key\" ]; then printf '%s\\n' \"\$key\"; exit 0; fi;" +
+            " sleep 1;" +
+            " done"
 
     const val removeAmneziaDnsOnly =
         "inspect=\$(sudo docker inspect amnezia-dns 2>/dev/null); rc=\$?;" +

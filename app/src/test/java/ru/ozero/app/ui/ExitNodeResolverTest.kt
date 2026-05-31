@@ -68,6 +68,34 @@ class ExitNodeResolverTest {
     }
 
     @Test
+    fun `ByeDPI label strategy does not call fetchVia`() = runTest {
+        val provider = FakeIpInfoProvider()
+        val resolver = ExitNodeResolver(provider, clock = { 42L })
+
+        val state = resolver.resolve(ExitNodeStrategy.ProviderLabel("ByeDPI"))
+
+        val loaded = assertIs<IpInfoState.Loaded>(state)
+        assertEquals("", loaded.info.ip)
+        assertEquals("ByeDPI", loaded.info.country)
+        assertEquals(0, provider.fetchCalls)
+        assertEquals(0, provider.fetchViaCalls)
+    }
+
+    @Test
+    fun `WARP VPN label strategy never calls direct fetch`() = runTest {
+        val provider = FakeIpInfoProvider()
+        val resolver = ExitNodeResolver(provider, clock = { 42L })
+
+        val state = resolver.resolve(ExitNodeStrategy.ProviderLabel("Cloudflare WARP"))
+
+        val loaded = assertIs<IpInfoState.Loaded>(state)
+        assertEquals("", loaded.info.ip)
+        assertEquals("Cloudflare WARP", loaded.info.country)
+        assertEquals(0, provider.fetchCalls)
+        assertEquals(0, provider.fetchViaCalls)
+    }
+
+    @Test
     fun `ProviderLabel can show known static IP without fetch`() = runTest {
         val provider = FakeIpInfoProvider()
         val resolver = ExitNodeResolver(provider, clock = { 42L })

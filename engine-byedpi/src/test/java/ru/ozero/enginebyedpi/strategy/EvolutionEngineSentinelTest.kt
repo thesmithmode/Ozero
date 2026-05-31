@@ -67,6 +67,23 @@ class EvolutionEngineSentinelTest {
     }
 
     @Test
+    fun `evaluate is timeout bounded and cleanup is non cancellable`() {
+        val source = File(System.getProperty("user.dir") ?: ".")
+            .resolve("src/main/java/ru/ozero/enginebyedpi/strategy/EvolutionEngine.kt").readText()
+        assertTrue(source.contains("withTimeout(settings.evaluationTimeoutMs"))
+        assertTrue(source.contains("NonCancellable"))
+        assertTrue(source.contains("withTimeoutOrNull(settings.stopTimeoutMs"))
+    }
+
+    @Test
+    fun `reduceChromosome runs only after best improves`() {
+        val source = File(System.getProperty("user.dir") ?: ".")
+            .resolve("src/main/java/ru/ozero/enginebyedpi/strategy/EvolutionEngine.kt").readText()
+        assertTrue(source.contains("if (bestImproved)"))
+        assertTrue(source.contains("maxReductionEvaluations"))
+    }
+
+    @Test
     fun `start failure result not cached in persistent fitness cache`() = runTest {
         val engine = AlwaysFailEngine()
         val pool = GenePool(seeds)

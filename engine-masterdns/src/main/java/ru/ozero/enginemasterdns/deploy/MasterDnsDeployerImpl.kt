@@ -306,8 +306,14 @@ internal class MasterDnsDeployerImpl(
         DOMAINS = []
         """.trimIndent()
 
-    private fun String.takeShort(maxLen: Int = 160): String =
-        replace('\n', ' ').replace('\r', ' ').trim().take(maxLen)
+    private fun String.takeShort(maxLen: Int = 1_200): String {
+        val normalized = replace('\n', ' ').replace('\r', ' ').trim()
+        if (normalized.length <= maxLen) return normalized
+        val safeMaxLen = maxLen.coerceAtLeast(80)
+        val headLen = 360.coerceAtMost(safeMaxLen / 2)
+        val tailLen = (safeMaxLen - headLen - 5).coerceAtLeast(0)
+        return normalized.take(headLen) + " ... " + normalized.takeLast(tailLen)
+    }
 
     private companion object {
         const val TAG = "MasterDnsDeployer"

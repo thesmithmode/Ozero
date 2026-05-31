@@ -34,16 +34,41 @@ class MasterDnsDockerScriptsContractTest {
         assertTrue(cmd.contains("ERR_BUILD_BIN_MISSING"))
         assertTrue(cmd.contains("ERR_BUILD|reason=bin_missing"))
         assertTrue(cmd.contains("grep -q ERR_BUILD_BIN_MISSING"))
+        assertTrue(cmd.contains("candidates="))
+        assertTrue(cmd.contains("tail -80"))
+        assertTrue(cmd.contains("head -40"))
+    }
+
+    @Test
+    fun `deployMasterDns uses pinned release assets before installer fallback`() {
+        val cmd = MasterDnsDockerScripts.deployMasterDns
+        assertTrue(cmd.contains("ARG MASTERDNS_RELEASE_TAG=v2026.05.10.180256-27c7e11"))
+        assertTrue(cmd.contains("api.github.com/repos/masterking32/MasterDnsVPN/releases/tags"))
+        assertTrue(cmd.contains("browser_download_url"))
+        assertTrue(cmd.contains("MasterDnsVPN_Server_Linux"))
+        assertTrue(cmd.contains("server_linux_install.sh"))
     }
 
     @Test
     fun `deployMasterDns installs discovered server binary into expected executable path`() {
         val cmd = MasterDnsDockerScripts.deployMasterDns
-        assertTrue(cmd.contains("find / -maxdepth 8 -name 'masterdnsvpn-server'"))
+        assertTrue(cmd.contains("MasterDnsVPN_Server_Linux*_v*"))
+        assertTrue(cmd.contains("MasterDnsVPN_Server_Linux*"))
+        assertTrue(cmd.contains("masterdnsvpn-server"))
         assertTrue(cmd.contains("install -m755"))
         assertTrue(cmd.contains("/usr/local/bin/masterdnsvpn-server"))
         assertTrue(cmd.contains("test -x /usr/local/bin/masterdnsvpn-server"))
         assertTrue(cmd.contains("CMD [\"/usr/local/bin/masterdnsvpn-server\"]"))
+    }
+
+    @Test
+    fun `deployMasterDns cleans only temp build dir and stale image metadata before build`() {
+        val cmd = MasterDnsDockerScripts.deployMasterDns
+        assertTrue(cmd.contains("sudo rm -rf /tmp/mdns_build"))
+        assertTrue(cmd.contains("sudo docker rmi masterdns-ozero"))
+        assertFalse(cmd.contains("masterdns-key"))
+        assertFalse(cmd.contains("docker volume rm"))
+        assertFalse(cmd.contains("docker system prune"))
     }
 
     @Test
@@ -333,6 +358,15 @@ class MasterDnsDockerScriptsContractTest {
             cmd.contains("seq 1 15"),
             "Retry loop ≥15 итераций (15s при sleep 1) — достаточно для запуска контейнера на slow VPS.",
         )
+    }
+
+    @Test
+    fun `readEncryptKey retries after container start before reporting empty key`() {
+        val cmd = MasterDnsDockerScripts.readEncryptKey
+        assertTrue(cmd.contains("seq 1 10"))
+        assertTrue(cmd.contains("docker exec masterdns-ozero cat /etc/masterdnsvpn/encrypt_key.txt"))
+        assertTrue(cmd.contains("sleep 1"))
+        assertTrue(cmd.contains("exit 0"))
     }
 
     @Test

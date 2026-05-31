@@ -1,0 +1,132 @@
+package ru.ozero.enginesingbox
+
+import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.Test
+import java.io.ByteArrayOutputStream
+import java.io.DataInputStream
+import java.net.InetAddress
+import java.net.ServerSocket
+import java.net.Socket
+import java.net.URL
+import java.nio.charset.StandardCharsets
+import kotlin.concurrent.thread
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+class SingboxHttp204RoutedProbeTest {
+
+    @Test
+    fun `routed probe succeeds after HTTP 204 through SOCKS`() = runTest {
+        Socks204Server().use { socks ->
+            val probe = SingboxHttp204RoutedProbe(
+                probeUrl = URL("http://127.0.0.1/generate_204"),
+                timeoutMs = 1_000,
+            )
+
+            val latency = probe.probeLatencyMs(socks.port)
+
+            assertTrue(latency >= 0)
+            assertTrue(socks.requestText.startsWith("GET /generate_204 "))
+        }
+    }
+
+    @Test
+    fun `routed probe rejects TCP listener without SOCKS HTTP 204`() = runTest {
+        ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { server ->
+            thread(start = true, isDaemon = true) {
+                runCatching { server.accept().use { } }
+            }
+            val probe = SingboxHttp204RoutedProbe(
+                probeUrl = URL("http://127.0.0.1/generate_204"),
+                timeoutMs = 300,
+            )
+
+            val latency = probe.probeLatencyMs(server.localPort)
+
+            assertEquals(SingboxHttp204RoutedProbe.LATENCY_FAILED, latency)
+        }
+    }
+
+    private class Socks204Server : AutoCloseable {
+        private val server = ServerSocket(0, 1, InetAddress.getLoopbackAddress())
+        private val worker = thread(start = true, isDaemon = true) {
+            runCatching {
+                server.accept().use { socket ->
+                    handle(socket)
+                }
+            }
+        }
+
+        @Volatile
+        var requestText: String = ""
+
+        val port: Int = server.localPort
+
+        private fun handle(socket: Socket) {
+            val input = DataInputStream(socket.getInputStream())
+            val output = socket.getOutputStream()
+            assertEquals(5, input.readUnsignedByte())
+            val methods = input.readUnsignedByte()
+            repeat(methods) { input.readUnsignedByte() }
+            output.write(byteArrayOf(5, 0))
+            output.flush()
+
+            assertEquals(5, input.readUnsignedByte())
+            assertEquals(1, input.readUnsignedByte())
+            input.readUnsignedByte()
+            when (input.readUnsignedByte()) {
+                1 -> input.skipNBytesCompat(4)
+                3 -> input.skipNBytesCompat(input.readUnsignedByte().toLong())
+                4 -> input.skipNBytesCompat(16)
+                else -> error("unsupported address type")
+            }
+            input.skipNBytesCompat(2)
+            output.write(byteArrayOf(5, 0, 0, 1, 127, 0, 0, 1, 0, 0))
+            output.flush()
+
+            requestText = input.readHttpHeaders()
+            output.write(
+                "HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    .toByteArray(StandardCharsets.US_ASCII),
+            )
+            output.flush()
+        }
+
+        override fun close() {
+            runCatching { server.close() }
+            runCatching { worker.join(1_000) }
+        }
+    }
+}
+
+private fun DataInputStream.skipNBytesCompat(count: Long) {
+    var remaining = count
+    while (remaining > 0) {
+        val skipped = skip(remaining)
+        if (skipped > 0) {
+            remaining -= skipped
+        } else {
+            readUnsignedByte()
+            remaining--
+        }
+    }
+}
+
+private fun DataInputStream.readHttpHeaders(): String {
+    val bytes = ByteArrayOutputStream()
+    var matched = 0
+    while (matched < 4) {
+        val next = read()
+        if (next < 0) break
+        bytes.write(next)
+        matched = when {
+            matched == 0 && next == '\r'.code -> 1
+            matched == 1 && next == '\n'.code -> 2
+            matched == 2 && next == '\r'.code -> 3
+            matched == 3 && next == '\n'.code -> 4
+            next == '\r'.code -> 1
+            else -> 0
+        }
+    }
+    return bytes.toString(StandardCharsets.US_ASCII.name())
+}

@@ -2,9 +2,11 @@ package ru.ozero.app
 
 import android.os.Bundle
 import androidx.activity.compose.setContent
-import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.appcompat.app.AppCompatActivity
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
@@ -15,9 +17,8 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withTimeoutOrNull
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
 import ru.ozero.app.logging.AppLogger
 import ru.ozero.app.logging.LogcatReader
 import ru.ozero.app.settings.UserFlagsRepository
@@ -26,13 +27,13 @@ import ru.ozero.app.ui.RootNavigation
 import ru.ozero.app.ui.launcher.BatteryGuard
 import ru.ozero.app.ui.launcher.OnboardingGate
 import ru.ozero.app.ui.launcher.VpnIntentLauncher
+import ru.ozero.app.ui.settings.engines.singbox.SingboxProbeService
 import ru.ozero.app.ui.theme.OzeroTheme
 import ru.ozero.app.vpn.EngineSettingsRestartObserver
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginesingbox.SingboxPrefs
-import ru.ozero.app.ui.settings.engines.singbox.SingboxProbeService
 import ru.ozero.enginewarp.WarpConfigSlotStore
 import javax.inject.Inject
 
@@ -56,6 +57,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var vpnIntentLauncher: VpnIntentLauncher
     private lateinit var batteryGuard: BatteryGuard
+    private val restartMutex = Mutex()
 
     private val safeUiCoroutineHandler = CoroutineExceptionHandler { _, throwable ->
         AppLogger.e(TAG, "uncaught coroutine in MainActivity", throwable)
@@ -99,31 +101,39 @@ class MainActivity : AppCompatActivity() {
     }
 
     private suspend fun restartVpnIfConnected(reason: String) {
-        val current = viewModel.state.value
-        val fromEngine = when (current) {
-            is TunnelState.Connected -> current.engineId
-            is TunnelState.Connecting -> current.engineId
-            is TunnelState.Probing -> current.engineId
-            else -> return
+        if (!restartMutex.tryLock()) {
+            AppLogger.d(TAG, "restart request coalesced while another restart is running")
+            return
         }
-        AppLogger.i(TAG, reason)
-        val pendingTarget = tunnelController.switching.value?.to
-        tunnelController.onSwitchingStarted(from = fromEngine, to = pendingTarget)
         try {
-            vpnIntentLauncher.stop()
-            val stopped = withTimeoutOrNull(RESTART_STOP_TIMEOUT_MS) {
-                viewModel.state.first { it is TunnelState.Idle || it is TunnelState.Failed }
+            val current = viewModel.state.value
+            val fromEngine = when (current) {
+                is TunnelState.Connected -> current.engineId
+                is TunnelState.Connecting -> current.engineId
+                is TunnelState.Probing -> current.engineId
+                else -> return
             }
-            if (stopped == null) {
-                AppLogger.w(TAG, "engine settings restart skipped: stop timeout")
-                tunnelController.onSwitchingFinished("restart stop timeout")
-                return
-            }
+            AppLogger.i(TAG, reason)
+            val pendingTarget = tunnelController.switching.value?.to
             tunnelController.onSwitchingStarted(from = fromEngine, to = pendingTarget)
-            vpnIntentLauncher.start()
-        } catch (t: Throwable) {
-            tunnelController.onSwitchingFinished("restart failed: ${t.message}")
-            throw t
+            try {
+                vpnIntentLauncher.stop()
+                val stopped = withTimeoutOrNull(RESTART_STOP_TIMEOUT_MS) {
+                    viewModel.state.first { it is TunnelState.Idle || it is TunnelState.Failed }
+                }
+                if (stopped == null) {
+                    AppLogger.w(TAG, "engine settings restart skipped: stop timeout")
+                    tunnelController.onSwitchingFinished("restart stop timeout")
+                    return
+                }
+                tunnelController.onSwitchingStarted(from = fromEngine, to = pendingTarget)
+                vpnIntentLauncher.start()
+            } catch (t: Throwable) {
+                tunnelController.onSwitchingFinished("restart failed: ${t.message}")
+                throw t
+            }
+        } finally {
+            restartMutex.unlock()
         }
     }
 

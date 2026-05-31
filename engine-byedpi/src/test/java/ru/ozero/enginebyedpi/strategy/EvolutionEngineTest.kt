@@ -239,6 +239,73 @@ class EvolutionEngineTest {
     }
 
     @Test
+    fun `invalid chromosomes are skipped before native start`() = runTest {
+        val engine = CountingEngine()
+        val invalidSeeds = listOf("-s 25+s -t5 -a1")
+        val pool = GenePool(invalidSeeds)
+        val evolutionEngine = EvolutionEngine(
+            byeDpiEngine = engine,
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(pool),
+            pool = pool,
+            sites = listOf("s1.com"),
+            settings = EvolutionEngine.EvolutionSettings(
+                populationSize = 1,
+                maxGenerations = 1,
+                targetFitness = 1.0,
+            ),
+        )
+        evolutionEngine.evolve(seedStrategies = invalidSeeds, onGeneration = {})
+        assertEquals(0, engine.startCount, "invalid argv must not reach native ByeDPI start")
+        assertEquals(0, engine.stopCount, "skip-before-start must not call stop when no start attempt happened")
+    }
+
+    @Test
+    fun `start timeout still stops engine after start attempt`() = runTest {
+        val engine = HangingStartEngine()
+        val validSeeds = listOf("-K -An -s2 -d1 -a1")
+        val pool = GenePool(validSeeds)
+        val evolutionEngine = EvolutionEngine(
+            byeDpiEngine = engine,
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(pool),
+            pool = pool,
+            sites = listOf("s1.com"),
+            settings = EvolutionEngine.EvolutionSettings(
+                populationSize = 1,
+                maxGenerations = 1,
+                evaluationTimeoutMs = 50L,
+                stopTimeoutMs = 50L,
+            ),
+        )
+        evolutionEngine.evolve(seedStrategies = validSeeds, onGeneration = {})
+        assertEquals(1, engine.startCount)
+        assertEquals(1, engine.stopCount, "stop must run in NonCancellable cleanup after a timed-out start")
+    }
+
+    @Test
+    fun `reduceChromosome respects evaluation budget`() = runTest {
+        val engine = CountingEngine()
+        val validSeeds = listOf("-K -An -s2 -d1 -a1")
+        val pool = GenePool(validSeeds)
+        val evolutionEngine = EvolutionEngine(
+            byeDpiEngine = engine,
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(pool),
+            pool = pool,
+            sites = listOf("s1.com"),
+            settings = EvolutionEngine.EvolutionSettings(
+                populationSize = 1,
+                maxGenerations = 1,
+                targetFitness = 1.01,
+                maxReductionEvaluations = 1,
+            ),
+        )
+        evolutionEngine.evolve(seedStrategies = validSeeds, onGeneration = {})
+        assertTrue(engine.startCount <= 2, "population eval plus one reduction eval expected, got ${engine.startCount}")
+    }
+
+    @Test
     fun `bestSuccessRate equals raw success ratio independent of latency`() = runTest {
         val slowProbe = object : SocksProbeClient {
             override suspend fun probe(site: String) = ProbeResult(site = site, success = true, durationMs = 8000L)

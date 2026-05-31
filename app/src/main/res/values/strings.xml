@@ -34,6 +34,7 @@
     <string name="tab_diagnostics">Диагностика</string>
     <string name="tab_servers">Параметры</string>
     <string name="tab_split_tunnel">Раздельное</string>
+    <string name="tab_tunneling">Туннелирование</string>
     <string name="tab_stats">Статистика</string>
     <string name="tab_subs">Подписка</string>
     <string name="tab_engine">Движок</string>
@@ -243,6 +244,10 @@
     <string name="evolution_population_label">Лучшие стратегии</string>
     <string name="evolution_initializing">Подготовка популяции…</string>
     <string name="evolution_stagnating">Топчусь на месте — ищу другие варианты…</string>
+    <string name="evolution_phase_candidate_building">Сбор кандидатов</string>
+    <string name="evolution_phase_initial_population">Первичная популяция</string>
+    <string name="evolution_phase_generation_fmt">Поколение %1$d/%2$d</string>
+    <string name="evolution_phase_finished">Завершено</string>
     <string name="saved_strategy_rename_title">Переименовать</string>
     <string name="saved_strategy_edit_title">Редактировать</string>
     <string name="saved_strategy_add_title">Добавить стратегию</string>

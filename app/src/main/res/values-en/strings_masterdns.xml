@@ -46,6 +46,7 @@
     <string name="masterdns_deploy_error_sudo_no_home">User home directory is inaccessible. Check directory permissions.</string>
     <string name="masterdns_deploy_error_sudo_not_in_group">User is not in the sudo/wheel group. Add them: usermod -aG sudo user.</string>
     <string name="masterdns_deploy_error_build">Image build failed. Check the server\'s internet connection.</string>
+    <string name="masterdns_deploy_error_build_bin_missing">MasterDNS server binary was not found in the release asset or installer output. Try again later; if it repeats, install the server manually and share the deploy log.</string>
     <string name="masterdns_deploy_error_run">Failed to start the container.</string>
     <string name="masterdns_deploy_error_key">Failed to extract encryption key from the container.</string>
     <string name="masterdns_deploy_error_auth">Authentication error. Check your login and password.</string>

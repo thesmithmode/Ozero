@@ -1,7 +1,10 @@
 package ru.ozero.app.ui.splittunnel
 
 import android.Manifest
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ApplicationInfo
 import android.content.pm.LauncherApps
 import android.graphics.Bitmap
@@ -10,17 +13,24 @@ import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
 
 interface AppListProvider {
+    val packageChanges: Flow<Unit>
     suspend fun loadApps(): List<InstalledApp>
+    suspend fun refreshApps(): List<InstalledApp>
     suspend fun loadIcon(packageName: String): ImageBitmap?
 }
 
@@ -30,16 +40,57 @@ class DefaultAppListProvider @Inject constructor(
 ) : AppListProvider {
 
     @Volatile private var listCache: List<InstalledApp>? = null
+    private val cacheGeneration = AtomicInteger()
     private val listMutex = Mutex()
     private val iconCache = ConcurrentHashMap<String, ImageBitmap>()
     private val missingIcons = ConcurrentHashMap.newKeySet<String>()
+
+    override val packageChanges: Flow<Unit> = callbackFlow {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                val packageName = intent?.data?.schemeSpecificPart
+                invalidatePackage(packageName)
+                trySend(Unit)
+            }
+        }
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addAction(Intent.ACTION_PACKAGE_CHANGED)
+            addAction(Intent.ACTION_PACKAGE_REPLACED)
+            addDataScheme("package")
+        }
+        val appContext = context.applicationContext
+        ContextCompat.registerReceiver(
+            appContext,
+            receiver,
+            filter,
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        awaitClose { runCatching { appContext.unregisterReceiver(receiver) } }
+    }
 
     override suspend fun loadApps(): List<InstalledApp> {
         listCache?.let { return it }
         return listMutex.withLock {
             listCache?.let { return@withLock it }
+            val generation = cacheGeneration.get()
             val loaded = withContext(Dispatchers.IO) { loadMetadata() }
-            listCache = loaded
+            if (generation == cacheGeneration.get()) {
+                listCache = loaded
+            }
+            loaded
+        }
+    }
+
+    override suspend fun refreshApps(): List<InstalledApp> {
+        return listMutex.withLock {
+            listCache = null
+            val generation = cacheGeneration.incrementAndGet()
+            val loaded = withContext(Dispatchers.IO) { loadMetadata() }
+            if (generation == cacheGeneration.get()) {
+                listCache = loaded
+            }
             loaded
         }
     }
@@ -101,6 +152,14 @@ class DefaultAppListProvider @Inject constructor(
             }
             .sortedWith(compareBy({ it.isSystem }, { it.label.lowercase() }))
             .toList()
+    }
+
+    private fun invalidatePackage(packageName: String?) {
+        listCache = null
+        cacheGeneration.incrementAndGet()
+        if (packageName.isNullOrBlank()) return
+        iconCache.remove(packageName)
+        missingIcons.remove(packageName)
     }
 }
 

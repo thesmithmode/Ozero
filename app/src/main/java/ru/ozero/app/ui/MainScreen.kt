@@ -534,7 +534,7 @@ private fun simpleDockTabs(): List<DockTab> {
 private fun expertDockTabs(): List<DockTab> {
     val labelHome = stringResource(R.string.tab_main)
     val labelServers = stringResource(R.string.tab_servers)
-    val labelSplit = stringResource(R.string.tab_split_tunnel)
+    val labelSplit = stringResource(R.string.tab_tunneling)
     val labelSettings = stringResource(R.string.tab_settings)
     return remember(labelHome, labelServers, labelSplit, labelSettings) {
         listOf(

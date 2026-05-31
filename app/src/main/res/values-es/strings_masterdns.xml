@@ -46,6 +46,7 @@
     <string name="masterdns_deploy_error_sudo_no_home">El directorio home del usuario no es accesible. Verifique los permisos.</string>
     <string name="masterdns_deploy_error_sudo_not_in_group">El usuario no está en el grupo sudo/wheel. Añádalo: usermod -aG sudo usuario.</string>
     <string name="masterdns_deploy_error_build">Error al construir la imagen. Compruebe la conexión a internet del servidor.</string>
+    <string name="masterdns_deploy_error_build_bin_missing">No se encontró el binario del servidor MasterDNS en el asset de release ni en la salida del instalador. Inténtelo más tarde; si se repite, instale el servidor manualmente y comparta el registro del despliegue.</string>
     <string name="masterdns_deploy_error_run">No se pudo iniciar el contenedor.</string>
     <string name="masterdns_deploy_error_key">No se pudo extraer la clave de cifrado del contenedor.</string>
     <string name="masterdns_deploy_error_auth">Error de autenticación. Verifique el usuario y la contraseña.</string>
