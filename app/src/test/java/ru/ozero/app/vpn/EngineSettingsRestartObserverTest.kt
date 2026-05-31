@@ -262,11 +262,63 @@ class EngineSettingsRestartObserverTest {
         state.value = TunnelState.Connected(EngineId.WARP, 1080)
         observer.handle(snapshot)
         assertEquals(
-            1,
+            0,
             restarts.size,
-            "Connected(WARP) + snapshot=WARP → restart фаерит (backwards-compat: ipv6/dns/byedpi-args " +
-                "ещё могут отличаться, движок прочитает их at-start).",
+            "Connected(WARP) + snapshot=WARP → restart skip. Late DataStore emissions after start " +
+                "must not tear down a healthy tunnel; settings apply on next connect unless engine target changes.",
         )
+    }
+
+    @Test
+    fun `handle skip — late settings snapshot не рестартит stable connected same engine`() = runTest(dispatcher) {
+        val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
+        val state = MutableStateFlow<TunnelState>(TunnelState.Connected(EngineId.FPTN, 0))
+        val restarts = mutableListOf<EngineSettingsRestartObserver.Snapshot>()
+        val observer = EngineSettingsRestartObserver(
+            settingsFlow = flow,
+            vpnStateProvider = { state.value },
+            onRestartConnected = { restarts += it },
+        )
+        val snapshot = EngineSettingsRestartObserver.Snapshot(
+            manualEngine = EngineId.FPTN,
+            byedpiWinningArgs = "--changed",
+            ipv6Enabled = false,
+            trafficMode = TrafficMode.TUN,
+            customDnsServers = listOf("45.90.28.168", "45.90.30.168"),
+            engineAutoPriority = null,
+        )
+
+        observer.handle(snapshot)
+
+        assertTrue(
+            restarts.isEmpty(),
+            "Regression v1.0.14: a delayed settings emission while FPTN was already Connected caused " +
+                "MainActivity to stop/start VPN and amplified native runtime instability.",
+        )
+    }
+
+    @Test
+    fun `handle restart — connected engine differs from new target`() = runTest(dispatcher) {
+        val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
+        val state = MutableStateFlow<TunnelState>(TunnelState.Connected(EngineId.FPTN, 0))
+        val restarts = mutableListOf<EngineSettingsRestartObserver.Snapshot>()
+        val observer = EngineSettingsRestartObserver(
+            settingsFlow = flow,
+            vpnStateProvider = { state.value },
+            onRestartConnected = { restarts += it },
+        )
+        val snapshot = EngineSettingsRestartObserver.Snapshot(
+            manualEngine = EngineId.WARP,
+            byedpiWinningArgs = null,
+            ipv6Enabled = false,
+            trafficMode = TrafficMode.TUN,
+            customDnsServers = emptyList(),
+            engineAutoPriority = null,
+        )
+
+        observer.handle(snapshot)
+
+        assertEquals(1, restarts.size, "Connected(FPTN) + target=WARP → user-visible engine switch restart")
     }
 
     @Test

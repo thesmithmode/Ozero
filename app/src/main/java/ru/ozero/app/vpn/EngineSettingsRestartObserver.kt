@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.TrafficMode
 
@@ -44,6 +45,13 @@ class EngineSettingsRestartObserver(
     suspend fun handle(snapshot: Snapshot) {
         val state = vpnStateProvider()
         if (state is TunnelState.Connected) {
+            if (connectedEngineMatchesSnapshot(state.engineId, snapshot)) {
+                PersistentLoggers.debug(
+                    TAG,
+                    "settings snapshot ignored while connected: engine unchanged (${state.engineId})",
+                )
+                return
+            }
             onRestartConnected(snapshot)
             return
         }
@@ -56,7 +64,13 @@ class EngineSettingsRestartObserver(
         onRestartConnected(snapshot)
     }
 
+    private fun connectedEngineMatchesSnapshot(currentEngine: EngineId, snapshot: Snapshot): Boolean {
+        val target = snapshot.manualEngine ?: snapshot.engineAutoPriority?.firstOrNull()
+        return target == null || target == currentEngine
+    }
+
     private companion object {
+        const val TAG = "EngineSettingsRestartObserver"
         const val RESTART_DEBOUNCE_MS = 4000L
     }
 }

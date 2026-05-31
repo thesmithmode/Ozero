@@ -158,7 +158,7 @@ class StartSequenceCoordinator(
         val chainResult = established.second
         if (!routeTrafficForEngine(activeEngineId, fd, chainResult.finalSocksPort, notifyFailure)) return false
 
-        if (!awaitEngineReady(activeEngineId)) {
+        if (!awaitEngineReady(activeEngineId, allowStartupTimeout = usesCustomTun)) {
             runCatching { deps.chainOrchestrator.stop() }
             reportEngineFailure(
                 activeEngineId,
@@ -207,7 +207,7 @@ class StartSequenceCoordinator(
             reportEngineFailure(engineId, "engine does not expose local proxy endpoint", notifyFailure)
             return false
         }
-        if (!awaitEngineReady(engineId)) {
+        if (!awaitEngineReady(engineId, allowStartupTimeout = false)) {
             runCatching { deps.chainOrchestrator.stop() }
             reportEngineFailure(engineId, "proxy awaitReady fail", notifyFailure)
             return false
@@ -295,11 +295,18 @@ class StartSequenceCoordinator(
         return SplitTunnelConfig(mode = mode, allowlist = allowlist, blocklist = blocklist)
     }
 
-    private suspend fun awaitEngineReady(engineId: EngineId): Boolean {
+    private suspend fun awaitEngineReady(engineId: EngineId, allowStartupTimeout: Boolean): Boolean {
         val plugin = deps.enginePlugins.firstOrNull { it.id == engineId } ?: return true
         return when (val result = plugin.awaitReady()) {
             EnginePlugin.ReadyResult.Ready -> true
             is EnginePlugin.ReadyResult.Timeout -> {
+                if (allowStartupTimeout) {
+                    PersistentLoggers.warn(
+                        TAG,
+                        "awaitReady timeout for $engineId: ${result.reason} → continuing; peer watchdog owns recovery",
+                    )
+                    return true
+                }
                 PersistentLoggers.warn(
                     TAG,
                     "awaitReady timeout for $engineId: ${result.reason} → engineFailure (fast-fail)",
