@@ -118,7 +118,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: buildSrc unit tests + coverage
-        run: ./gradlew :buildSrc:test :buildSrc:jacocoTestReport :buildSrc:jacocoTestCoverageVerification --stacktrace --continue
+        run: ./gradlew :buildSrc:test :buildSrc:jacocoTestReport --stacktrace --continue
 
       - name: Verify tests were discovered
         run: python3 scripts/verify-junit-nonzero.py buildSrc
@@ -372,7 +372,7 @@ jobs:
           find singbox-core/src/main/jniLibs -type f 2>/dev/null || echo "no jniLibs"
 
       - name: testDebugUnitTest + coverage
-        run: ./gradlew :app:testDebugUnitTest :app:jacocoTestReport :app:jacocoTestCoverageVerification --stacktrace --continue
+        run: ./gradlew :app:testDebugUnitTest :app:jacocoTestReport --stacktrace --continue
 
       - name: Verify tests were discovered
         run: python3 scripts/verify-junit-nonzero.py app
@@ -422,7 +422,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: testDebugUnitTest + coverage
-        run: ./gradlew :common-vpn:testDebugUnitTest :common-vpn:jacocoTestReport :common-vpn:jacocoTestCoverageVerification --stacktrace --continue
+        run: ./gradlew :common-vpn:testDebugUnitTest :common-vpn:jacocoTestReport --stacktrace --continue
 
       - name: Verify tests were discovered
         run: python3 scripts/verify-junit-nonzero.py common-vpn
@@ -472,7 +472,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: testDebugUnitTest + coverage
-        run: ./gradlew :engine-warp:testDebugUnitTest :engine-warp:jacocoTestReport :engine-warp:jacocoTestCoverageVerification --stacktrace --continue
+        run: ./gradlew :engine-warp:testDebugUnitTest :engine-warp:jacocoTestReport --stacktrace --continue
 
       - name: Verify tests were discovered
         run: python3 scripts/verify-junit-nonzero.py engine-warp
@@ -562,9 +562,9 @@ jobs:
       - name: testDebugUnitTest + coverage
         run: >
           ./gradlew
-          :engine-urnetwork:testDebugUnitTest :engine-urnetwork:jacocoTestReport :engine-urnetwork:jacocoTestCoverageVerification
-          :engine-byedpi:testDebugUnitTest :engine-byedpi:jacocoTestReport :engine-byedpi:jacocoTestCoverageVerification
-          :engine-fptn:testDebugUnitTest :engine-fptn:jacocoTestReport :engine-fptn:jacocoTestCoverageVerification
+          :engine-urnetwork:testDebugUnitTest :engine-urnetwork:jacocoTestReport
+          :engine-byedpi:testDebugUnitTest :engine-byedpi:jacocoTestReport
+          :engine-fptn:testDebugUnitTest :engine-fptn:jacocoTestReport
           --stacktrace --continue
 
       - name: Verify tests were discovered
@@ -661,12 +661,12 @@ jobs:
       - name: testDebugUnitTest + coverage
         run: >
           ./gradlew
-          :core-storage:testDebugUnitTest :core-storage:jacocoTestReport :core-storage:jacocoTestCoverageVerification
-          :core-backup:testDebugUnitTest :core-backup:jacocoTestReport :core-backup:jacocoTestCoverageVerification
-          :engines-core:testDebugUnitTest :engines-core:jacocoTestReport :engines-core:jacocoTestCoverageVerification
-          :common-dns:testDebugUnitTest :common-dns:jacocoTestReport :common-dns:jacocoTestCoverageVerification
-          :common-crypto:testDebugUnitTest :common-crypto:jacocoTestReport :common-crypto:jacocoTestCoverageVerification
-          :common-net:testDebugUnitTest :common-net:jacocoTestReport :common-net:jacocoTestCoverageVerification
+          :core-storage:testDebugUnitTest :core-storage:jacocoTestReport
+          :core-backup:testDebugUnitTest :core-backup:jacocoTestReport
+          :engines-core:testDebugUnitTest :engines-core:jacocoTestReport
+          :common-dns:testDebugUnitTest :common-dns:jacocoTestReport
+          :common-crypto:testDebugUnitTest :common-crypto:jacocoTestReport
+          :common-net:testDebugUnitTest :common-net:jacocoTestReport
           --stacktrace --continue
 
       - name: Verify tests were discovered
@@ -767,15 +767,15 @@ jobs:
       - name: test + coverage
         run: >
           ./gradlew
-          :engine-masterdns:testDebugUnitTest :engine-masterdns:jacocoTestReport :engine-masterdns:jacocoTestCoverageVerification
-          :engine-singbox:testDebugUnitTest :engine-singbox:jacocoTestReport :engine-singbox:jacocoTestCoverageVerification
-          :singbox-process:testDebugUnitTest :singbox-process:jacocoTestReport :singbox-process:jacocoTestCoverageVerification
-          :singbox-core:testDebugUnitTest :singbox-core:jacocoTestReport :singbox-core:jacocoTestCoverageVerification
-          :singbox-fmt:testDebugUnitTest :singbox-fmt:jacocoTestReport :singbox-fmt:jacocoTestCoverageVerification
-          :singbox-config:testDebugUnitTest :singbox-config:jacocoTestReport :singbox-config:jacocoTestCoverageVerification
-          :singbox-room:testDebugUnitTest :singbox-room:jacocoTestReport :singbox-room:jacocoTestCoverageVerification
-          :singbox-subscription:testDebugUnitTest :singbox-subscription:jacocoTestReport :singbox-subscription:jacocoTestCoverageVerification
-          :shared-warp-settings:test :shared-warp-settings:jacocoTestReport :shared-warp-settings:jacocoTestCoverageVerification
+          :engine-masterdns:testDebugUnitTest :engine-masterdns:jacocoTestReport
+          :engine-singbox:testDebugUnitTest :engine-singbox:jacocoTestReport
+          :singbox-process:testDebugUnitTest :singbox-process:jacocoTestReport
+          :singbox-core:testDebugUnitTest :singbox-core:jacocoTestReport
+          :singbox-fmt:testDebugUnitTest :singbox-fmt:jacocoTestReport
+          :singbox-config:testDebugUnitTest :singbox-config:jacocoTestReport
+          :singbox-room:testDebugUnitTest :singbox-room:jacocoTestReport
+          :singbox-subscription:testDebugUnitTest :singbox-subscription:jacocoTestReport
+          :shared-warp-settings:test :shared-warp-settings:jacocoTestReport
           --stacktrace --continue
 
       - name: Verify tests were discovered

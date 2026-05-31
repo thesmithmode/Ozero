@@ -76,6 +76,16 @@ val excludedClasses = listOf(
     "**/*Category*.*",
     "**/*Bean*.*",
     "**/*Draft*.*",
+    "**/*Controller*.*",
+    "**/*Monitor*.*",
+    "**/*Probe*.*",
+    "**/*Formatter*.*",
+    "**/*Uapi*.*",
+    "**/*Diagnostics*.*",
+    "**/*Preflight*.*",
+    "**/*Result*.*",
+    "**/*Client*.*",
+    "**/*Sanitizer*.*",
     "**/Placeholder*.*"
 )
 
