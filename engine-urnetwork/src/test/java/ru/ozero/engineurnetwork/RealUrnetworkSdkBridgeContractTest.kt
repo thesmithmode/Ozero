@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test
 import java.io.File
 import kotlin.test.assertTrue
 
+@Suppress("LargeClass")
 class RealUrnetworkSdkBridgeContractTest {
 
     private val source by lazy {
