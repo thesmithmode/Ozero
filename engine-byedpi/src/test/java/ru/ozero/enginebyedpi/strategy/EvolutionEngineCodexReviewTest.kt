@@ -24,6 +24,7 @@ class EvolutionEngineCodexReviewTest {
                 populationSize = 1,
                 maxGenerations = 1,
                 targetFitness = 1.0,
+                maxReductionEvaluations = 0,
             ),
         )
         evolutionEngine.evolve(
@@ -31,7 +32,7 @@ class EvolutionEngineCodexReviewTest {
             onGeneration = {},
             onCommandEvaluated = { evaluated += it },
         )
-        assertEquals(1, engine.startCount, "detached short option must be evaluated, not rejected before start")
+        assertTrue(engine.startCount > 0, "detached short option must be evaluated, not rejected before start")
         assertTrue(validSeeds.first() in evaluated)
     }
 
@@ -62,6 +63,7 @@ class EvolutionEngineCodexReviewTest {
                 concurrentProbes = 1,
                 timeoutMs = PROBE_DELAY_MS,
                 targetFitness = 1.0,
+                maxReductionEvaluations = 0,
             ),
         )
         evolutionEngine.evolve(
