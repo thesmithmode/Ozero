@@ -44,7 +44,7 @@ class EngineSettingsRestartObserverTest {
         val observer = newObserver(flow, alwaysConnected())
 
         val collected = mutableListOf<EngineSettingsRestartObserver.Trigger>()
-        val job = launch { observer.triggers.toList(collected) }
+        val job = backgroundScope.launch { observer.triggers.toList(collected) }
         advanceUntilIdle()
 
         flow.emit(SettingsModel.DEFAULT)
@@ -61,7 +61,7 @@ class EngineSettingsRestartObserverTest {
         val observer = newObserver(flow, alwaysConnected())
 
         val collected = mutableListOf<EngineSettingsRestartObserver.Trigger>()
-        val job = launch { observer.triggers.toList(collected) }
+        val job = backgroundScope.launch { observer.triggers.toList(collected) }
         advanceUntilIdle()
 
         flow.emit(SettingsModel.DEFAULT)
@@ -91,7 +91,7 @@ class EngineSettingsRestartObserverTest {
         val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
         val observer = newObserver(flow, alwaysConnected())
         val collected = mutableListOf<EngineSettingsRestartObserver.Trigger>()
-        val job = launch { observer.triggers.toList(collected) }
+        val job = backgroundScope.launch { observer.triggers.toList(collected) }
         advanceUntilIdle()
 
         flow.emit(SettingsModel.DEFAULT)
@@ -111,7 +111,7 @@ class EngineSettingsRestartObserverTest {
         val observer = newObserver(flow, alwaysConnected())
 
         val collected = mutableListOf<EngineSettingsRestartObserver.Trigger>()
-        val job = launch { observer.triggers.toList(collected) }
+        val job = backgroundScope.launch { observer.triggers.toList(collected) }
         advanceUntilIdle()
 
         flow.emit(SettingsModel.DEFAULT)
@@ -131,7 +131,7 @@ class EngineSettingsRestartObserverTest {
         val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
         val observer = newObserver(flow, alwaysConnected())
         val collected = mutableListOf<EngineSettingsRestartObserver.Trigger>()
-        val job = launch { observer.triggers.toList(collected) }
+        val job = backgroundScope.launch { observer.triggers.toList(collected) }
         advanceUntilIdle()
 
         flow.emit(SettingsModel.DEFAULT)
@@ -158,7 +158,7 @@ class EngineSettingsRestartObserverTest {
         val observer = newObserver(flow, alwaysConnected())
 
         val collected = mutableListOf<EngineSettingsRestartObserver.Trigger>()
-        val job = launch { observer.triggers.toList(collected) }
+        val job = backgroundScope.launch { observer.triggers.toList(collected) }
         advanceUntilIdle()
 
         flow.emit(SettingsModel.DEFAULT)
@@ -178,7 +178,7 @@ class EngineSettingsRestartObserverTest {
         val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 16)
         val observer = newObserver(flow, alwaysConnected())
         val collected = mutableListOf<EngineSettingsRestartObserver.Trigger>()
-        val job = launch { observer.triggers.toList(collected) }
+        val job = backgroundScope.launch { observer.triggers.toList(collected) }
         advanceUntilIdle()
 
         flow.emit(SettingsModel.DEFAULT)
@@ -502,7 +502,7 @@ class EngineSettingsRestartObserverTest {
         val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
         val observer = newObserver(flow, alwaysConnected())
         val collected = mutableListOf<EngineSettingsRestartObserver.Trigger>()
-        val job = launch { observer.triggers.toList(collected) }
+        val job = backgroundScope.launch { observer.triggers.toList(collected) }
         advanceUntilIdle()
 
         val baseline = SettingsModel.DEFAULT.copy(
@@ -529,7 +529,7 @@ class EngineSettingsRestartObserverTest {
         val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
         val observer = newObserver(flow, alwaysConnected())
         val collected = mutableListOf<EngineSettingsRestartObserver.Trigger>()
-        val job = launch { observer.triggers.toList(collected) }
+        val job = backgroundScope.launch { observer.triggers.toList(collected) }
         advanceUntilIdle()
 
         val baseline = SettingsModel.DEFAULT.copy(manualEngine = EngineId.BYEDPI)
@@ -577,7 +577,7 @@ class EngineSettingsRestartObserverTest {
         val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
         val observer = newObserver(flow, alwaysConnected())
         val collected = mutableListOf<EngineSettingsRestartObserver.Trigger>()
-        val job = launch { observer.triggers.toList(collected) }
+        val job = backgroundScope.launch { observer.triggers.toList(collected) }
         advanceUntilIdle()
 
         val autoMode = SettingsModel.DEFAULT.copy(manualEngine = null)
@@ -611,7 +611,7 @@ class EngineSettingsRestartObserverTest {
         val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
         val observer = newObserver(flow, alwaysConnected())
         val collected = mutableListOf<EngineSettingsRestartObserver.Trigger>()
-        val job = launch { observer.triggers.toList(collected) }
+        val job = backgroundScope.launch { observer.triggers.toList(collected) }
         advanceUntilIdle()
 
         val manualMode = SettingsModel.DEFAULT.copy(manualEngine = EngineId.BYEDPI)
