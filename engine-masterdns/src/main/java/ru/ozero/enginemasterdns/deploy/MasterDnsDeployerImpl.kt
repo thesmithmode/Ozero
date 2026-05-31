@@ -329,16 +329,16 @@ internal class MasterDnsDeployerImpl(
         return normalized.take(headLen) + " ... " + normalized.takeLast(tailLen)
     }
 
-    private fun String.sanitizeDeployDiagnostic(maxLen: Int = 700): String =
-        replace('\n', ' ')
-            .replace('\r', ' ')
-            .replace(Regex("""password=[^| ]+"""), "password=<redacted>")
-            .replace(Regex("""token=[^| ]+"""), "token=<redacted>")
-            .take(maxLen)
-
     private companion object {
         const val TAG = "MasterDnsDeployer"
         const val CONTAINER_STARTUP_DELAY_MS = 3_000L
         const val PORT_BUSY_PREFIX = "PORT_BUSY|"
     }
 }
+
+private fun String.sanitizeDeployDiagnostic(maxLen: Int = 700): String =
+    replace('\n', ' ')
+        .replace('\r', ' ')
+        .replace(Regex("""password=[^| ]+"""), "password=<redacted>")
+        .replace(Regex("""token=[^| ]+"""), "token=<redacted>")
+        .take(maxLen)

@@ -47,13 +47,15 @@ class StrategyEvolver(private val pool: GenePool) {
         val blocks1 = blocks(parent1)
         val blocks2 = blocks(parent2)
         val maxLen = maxOf(blocks1.size, blocks2.size)
-        return ByeDpiOptionBlocks.flatten((0 until maxLen).map { i ->
-            when {
-                i < blocks1.size && i < blocks2.size -> if (random.nextBoolean()) blocks1[i] else blocks2[i]
-                i < blocks1.size -> blocks1[i]
-                else -> blocks2[i]
-            }
-        })
+        return ByeDpiOptionBlocks.flatten(
+            (0 until maxLen).map { i ->
+                when {
+                    i < blocks1.size && i < blocks2.size -> if (random.nextBoolean()) blocks1[i] else blocks2[i]
+                    i < blocks1.size -> blocks1[i]
+                    else -> blocks2[i]
+                }
+            },
+        )
     }
 
     fun crossover(
@@ -91,11 +93,13 @@ class StrategyEvolver(private val pool: GenePool) {
         if (blocks.size < 2) return chromosome
         val i = random.nextInt(blocks.size)
         val j = (random.nextInt(blocks.size - 1)).let { if (it >= i) it + 1 else it }
-        return ByeDpiOptionBlocks.flatten(blocks.also { list ->
-            val tmp = list[i]
-            list[i] = list[j]
-            list[j] = tmp
-        })
+        return ByeDpiOptionBlocks.flatten(
+            blocks.also { list ->
+                val tmp = list[i]
+                list[i] = list[j]
+                list[j] = tmp
+            },
+        )
     }
 
     fun mutate(
