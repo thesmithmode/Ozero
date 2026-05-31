@@ -71,10 +71,12 @@ object ByeDpiArgvValidator {
     private fun isAttachedValueChar(ch: Char): Boolean =
         ch.isLetterOrDigit() || ch == '-' || ch == '+' || ch == ':' || ch == ',' || ch == '.'
 
-    private fun isDomainValue(token: String): Boolean =
-        token.isNotBlank() &&
-            !token.startsWith("-") &&
-            token.all { it.isLetterOrDigit() || it == '-' || it == '_' || it == '.' }
+    private fun isDomainValue(token: String): Boolean {
+        val value = token.removeSurrounding("\"")
+        return value.isNotBlank() &&
+            !value.startsWith("-") &&
+            value.all { it.isLetterOrDigit() || it == '-' || it == '_' || it == '.' }
+    }
 
     private fun isSignedInt(token: String): Boolean =
         token.toIntOrNull() != null

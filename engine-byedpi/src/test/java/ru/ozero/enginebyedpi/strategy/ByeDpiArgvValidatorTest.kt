@@ -11,6 +11,7 @@ class ByeDpiArgvValidatorTest {
         assertTrue(ByeDpiArgvValidator.isValid("-K -An -s2 -d1 -a1"))
         assertTrue(ByeDpiArgvValidator.isValid("--fake -1 --ttl 8 --split 1+s --disorder 3+s -a1"))
         assertTrue(ByeDpiArgvValidator.isValid("-n google.com -Qr -f-204 -s1:5+sm -a1"))
+        assertTrue(ByeDpiArgvValidator.isValid("-n \"google.com\" -Qr -f-204 -s1:5+sm -a1"))
         assertTrue(ByeDpiArgvValidator.isValid("-d9+s -q20+s -s 25+s -t5 -At,r,s -r1+h -a1"))
     }
 
@@ -23,6 +24,7 @@ class ByeDpiArgvValidatorTest {
     @Test
     fun `unresolved placeholders and dangling value options are rejected`() {
         assertFalse(ByeDpiArgvValidator.isValid("-n {sni} -Qr -a1"))
+        assertFalse(ByeDpiArgvValidator.isValid("-n \"-google.com\" -Qr -a1"))
         assertFalse(ByeDpiArgvValidator.isValid("-n"))
         assertFalse(ByeDpiArgvValidator.isValid("--ttl"))
     }

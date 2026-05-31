@@ -70,8 +70,8 @@ class MainViewModelTest {
         ipInfoProvider = FakeIpInfoProvider()
         byedpiPlugin = FakeEnginePlugin(
             id = EngineId.BYEDPI,
-            route = { IpProbeRoute.StaticLocation(country = "ByeDPI", countryCode = null) },
-            strategy = { ExitNodeStrategy.ProviderLabel("ByeDPI") },
+            route = { IpProbeRoute.Default },
+            strategy = { ExitNodeStrategy.DirectHttp },
         )
         warpPlugin = FakeEnginePlugin(EngineId.WARP, route = {
             IpProbeRoute.StaticLocation(country = "Cloudflare WARP", countryCode = null)
@@ -478,7 +478,7 @@ class MainViewModelTest {
     }
 
     @Test
-    fun ipInfoUsesProviderLabelForByedpiConnected() = runTest {
+    fun ipInfoFetchesRealIpForByedpiConnected() = runTest {
         backgroundScope.launch { viewModel.ipInfo.collect {} }
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.BYEDPI)
@@ -488,9 +488,10 @@ class MainViewModelTest {
         advanceUntilIdle()
         val s = viewModel.ipInfo.value
         assertIs<IpInfoState.Loaded>(s)
-        assertEquals("", s.info.ip)
-        assertEquals("ByeDPI", s.info.country)
-        assertEquals(0, ipInfoProvider.calls)
+        assertEquals("203.0.113.1", s.info.ip)
+        assertEquals("Germany", s.info.country)
+        assertEquals(1, ipInfoProvider.calls)
+        assertEquals(1, ipInfoProvider.fetchCalls)
         assertEquals(0, ipInfoProvider.fetchViaCalls)
         assertNull(ipInfoProvider.lastSocksHost)
         assertNull(ipInfoProvider.lastSocksPort)

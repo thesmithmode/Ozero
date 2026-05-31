@@ -346,6 +346,12 @@ class SingboxEngine @Inject constructor(
         }
     }
 
+    override suspend fun awaitReady(): EnginePlugin.ReadyResult =
+        when (val result = probe()) {
+            is ProbeResult.Success -> EnginePlugin.ReadyResult.Ready
+            is ProbeResult.Failure -> EnginePlugin.ReadyResult.Timeout(result.reason)
+        }
+
     override fun stats(): Flow<EngineStats> = flow {
         while (true) {
             val p = proxy

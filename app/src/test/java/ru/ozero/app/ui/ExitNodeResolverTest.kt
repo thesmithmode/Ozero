@@ -68,16 +68,16 @@ class ExitNodeResolverTest {
     }
 
     @Test
-    fun `ByeDPI label strategy does not call fetchVia`() = runTest {
+    fun `ByeDPI direct strategy fetches real IP without SOCKS`() = runTest {
         val provider = FakeIpInfoProvider()
         val resolver = ExitNodeResolver(provider, clock = { 42L })
 
-        val state = resolver.resolve(ExitNodeStrategy.ProviderLabel("ByeDPI"))
+        val state = resolver.resolve(ExitNodeStrategy.DirectHttp)
 
         val loaded = assertIs<IpInfoState.Loaded>(state)
-        assertEquals("", loaded.info.ip)
-        assertEquals("ByeDPI", loaded.info.country)
-        assertEquals(0, provider.fetchCalls)
+        assertEquals("198.51.100.20", loaded.info.ip)
+        assertEquals("Germany", loaded.info.country)
+        assertEquals(1, provider.fetchCalls)
         assertEquals(0, provider.fetchViaCalls)
     }
 

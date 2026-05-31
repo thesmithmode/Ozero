@@ -286,12 +286,9 @@ class ByeDpiEngineTest {
     }
 
     @Test
-    fun ipProbeRouteReturnsStaticLabelWhenPortGivenExplicitly() = runTest {
+    fun ipProbeRouteReturnsDefaultWhenPortGivenExplicitly() = runTest {
         val route = engine.ipProbeRoute(socksPort = 1080)
-        val label = assertIs<IpProbeRoute.StaticLocation>(route)
-        assertEquals("ByeDPI", label.country)
-        assertEquals(null, label.countryCode)
-        assertEquals(null, label.ip)
+        assertIs<IpProbeRoute.Default>(route)
     }
 
     @Test
@@ -301,12 +298,9 @@ class ByeDpiEngineTest {
     }
 
     @Test
-    fun exitNodeStrategyReturnsProviderLabelWhenPortGivenExplicitly() = runTest {
+    fun exitNodeStrategyReturnsDirectHttpWhenPortGivenExplicitly() = runTest {
         val strategy = engine.exitNodeStrategy(socksPort = 1080)
-        val label = assertIs<ExitNodeStrategy.ProviderLabel>(strategy)
-        assertEquals("ByeDPI", label.label)
-        assertEquals(null, label.ip)
-        assertEquals(null, label.countryCode)
+        assertIs<ExitNodeStrategy.DirectHttp>(strategy)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)

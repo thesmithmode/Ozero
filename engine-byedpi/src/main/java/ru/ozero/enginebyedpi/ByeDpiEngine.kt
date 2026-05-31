@@ -305,7 +305,7 @@ class ByeDpiEngine(
     override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy {
         val port = if (socksPort > 0) socksPort else activeSocksPort
         return if (port > 0) {
-            ExitNodeStrategy.ProviderLabel("ByeDPI")
+            ExitNodeStrategy.DirectHttp
         } else {
             ExitNodeStrategy.Unavailable("ByeDPI SOCKS endpoint unavailable")
         }

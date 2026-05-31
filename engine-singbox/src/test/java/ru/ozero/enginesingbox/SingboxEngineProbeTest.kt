@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
+import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.singboxroom.dao.ProxyChainDao
 import ru.ozero.singboxroom.dao.ProxyProfileDao
@@ -34,6 +35,23 @@ class SingboxEngineProbeTest {
 
         assertTrue(result is ProbeResult.Failure)
         assertTrue(result.reason.contains("routed probe"))
+        assertEquals(0, engine.privateIntField("activeSocksPort"))
+    }
+
+    @Test
+    fun `awaitReady fails when routed probe fails`() = runTest {
+        val engine = buildEngine()
+        engine.routedProbe = object : SingboxRoutedProbe {
+            override suspend fun probeLatencyMs(socksPort: Int): Long = SingboxHttp204RoutedProbe.LATENCY_FAILED
+        }
+        val process = mockk<ISingboxEngineProcess>()
+        every { process.runtimeRunning() } returns true
+        engine.setPrivateField("proxy", process)
+        engine.setPrivateField("activeSocksPort", 49408)
+
+        val result = engine.awaitReady()
+
+        assertTrue(result is EnginePlugin.ReadyResult.Timeout)
         assertEquals(0, engine.privateIntField("activeSocksPort"))
     }
 
