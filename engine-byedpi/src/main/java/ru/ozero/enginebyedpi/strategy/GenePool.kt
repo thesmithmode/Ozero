@@ -94,7 +94,10 @@ class GenePool(seedStrategies: List<String>) {
         val blocks = ByeDpiOptionBlocks.commandBlocks(source)
         if (blocks.isEmpty()) return randomChromosome(minLen..maxLen, random)
         if (blocks.sumOf { it.size } <= minLen) return ByeDpiOptionBlocks.flatten(blocks)
-        val start = random.nextInt(blocks.size)
+        val viableStarts = blocks.indices
+            .filter { start -> blocks.drop(start).sumOf { it.size } >= minLen }
+            .ifEmpty { listOf(0) }
+        val start = viableStarts[random.nextInt(viableStarts.size)]
         val selected = mutableListOf<Chromosome>()
         var tokenCount = 0
         for (block in blocks.drop(start)) {
