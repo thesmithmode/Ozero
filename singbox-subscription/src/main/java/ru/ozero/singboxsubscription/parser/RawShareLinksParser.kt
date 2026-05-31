@@ -99,6 +99,8 @@ object RawShareLinksParser {
             ?.takeIf { it.isNotBlank() }
             ?.let { bean.host = it }
         bean.grpcServiceName = transport.optString("service_name", bean.grpcServiceName)
+        bean.maxEarlyData = transport.optInt("max_early_data", bean.maxEarlyData)
+        bean.earlyDataHeaderName = transport.optString("early_data_header_name", bean.earlyDataHeaderName)
     }
 
     private fun applyTls(bean: StandardV2RayBean, outbound: JSONObject) {

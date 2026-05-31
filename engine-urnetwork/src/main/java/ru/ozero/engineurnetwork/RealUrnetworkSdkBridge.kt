@@ -3,6 +3,7 @@ package ru.ozero.engineurnetwork
 import android.app.Application
 import android.util.Log
 import com.bringyour.sdk.ConnectLocation
+import com.bringyour.sdk.ConnectLocationId
 import com.bringyour.sdk.ConnectViewController
 import com.bringyour.sdk.DeviceLocal
 import com.bringyour.sdk.IoLoop
@@ -38,6 +39,8 @@ class SdkLocationToken(val sdk: ConnectLocation) : UrnetworkSdkBridge.LocationTo
     override val countryCode: String? = runCatching { sdk.countryCode }.getOrNull()
     override val region: String? = runCatching { sdk.region.takeIf { it.isNotEmpty() } }.getOrNull()
     override val city: String? = runCatching { sdk.city.takeIf { it.isNotEmpty() } }.getOrNull()
+    override val bestAvailable: Boolean =
+        runCatching { sdk.connectLocationId?.bestAvailable == true }.getOrDefault(false)
 }
 
 @Suppress("TooManyFunctions", "LargeClass")
@@ -51,6 +54,7 @@ class RealUrnetworkSdkBridge(
     private val ioLoopRef = AtomicReference<IoLoop?>(null)
     private val connectVcRef = AtomicReference<ConnectViewController?>(null)
     private val connectionStatusSubRef = AtomicReference<Sub?>(null)
+    private val selectedLocationSubRef = AtomicReference<Sub?>(null)
     private val connectionStatusRef = AtomicReference<String?>(null)
     private val tunnelStartedRef = AtomicBoolean(false)
     private val connectIssuedRef = AtomicBoolean(false)
@@ -199,6 +203,7 @@ class RealUrnetworkSdkBridge(
         }
         connectVcRef.set(cv)
         attachConnectionStatusListener(cv)
+        attachSelectedLocationListener(cv)
         PersistentLoggers.debug(TAG, "node start: routing controller opened - endpoints available")
 
         contractStatusListener.attach(device)
@@ -270,6 +275,7 @@ class RealUrnetworkSdkBridge(
         runCatching { bridgeScope.coroutineContext.cancelChildren() }
         contractStatusListener.detach()
         detachConnectionStatusListener()
+        detachSelectedLocationListener()
         tunnelStartedRef.set(false)
         connectIssuedRef.set(false)
         sharingTrafficLogged.set(false)
@@ -344,6 +350,7 @@ class RealUrnetworkSdkBridge(
             return
         }
         val sdkLoc = (location as? SdkLocationToken)?.sdk ?: return
+        persistConnectLocation(sdkLoc)
         runCatching { connectVcRef.get()?.connect(sdkLoc) }
             .onSuccess { connectIssuedRef.set(true) }
             .onFailure { PersistentLoggers.warn(TAG, "connect threw: ${it.message}") }
@@ -354,6 +361,7 @@ class RealUrnetworkSdkBridge(
             PersistentLoggers.warn(TAG, "connectBestAvailable skipped - bridge not running")
             return
         }
+        persistConnectLocation(bestAvailableConnectLocation())
         runCatching { connectVcRef.get()?.connectBestAvailable() }
             .onSuccess { connectIssuedRef.set(true) }
             .onFailure { PersistentLoggers.warn(TAG, "connectBestAvailable threw: ${it.message}") }
@@ -502,12 +510,18 @@ class RealUrnetworkSdkBridge(
         } else {
             rawProvideMode
         }
+        val connectLocation = runCatching { localState.connectLocation }.getOrNull()
+            ?.takeIf { it.isMeaningfulConnectLocation() }
+            ?: bestAvailableConnectLocation()
+        val defaultLocation = runCatching { localState.defaultLocation }.getOrNull() ?: connectLocation
         runCatching { device.providePaused = true }
             .onFailure { PersistentLoggers.warn(TAG, "providePaused threw: ${it.message}") }
         runCatching { device.routeLocal = localState.routeLocal }
         runCatching { device.provideMode = effectiveProvideMode }
-        runCatching { device.connectLocation = localState.connectLocation }
-        runCatching { device.defaultLocation = localState.defaultLocation }
+        runCatching { localState.connectLocation = connectLocation }
+        runCatching { localState.defaultLocation = defaultLocation }
+        runCatching { device.connectLocation = connectLocation }
+        runCatching { device.defaultLocation = defaultLocation }
         runCatching { device.canShowRatingDialog = localState.canShowRatingDialog }
         runCatching { device.provideControlMode = normalizedControlMode }
         runCatching { device.vpnInterfaceWhileOffline = localState.vpnInterfaceWhileOffline }
@@ -517,6 +531,28 @@ class RealUrnetworkSdkBridge(
         runCatching { device.canPromptIntroFunnel = localState.canPromptIntroFunnel }
         runCatching { device.performanceProfile = localState.performanceProfile }
     }
+
+    private fun persistConnectLocation(location: ConnectLocation) {
+        val device = deviceRef.get()
+        val localState = runCatching { device?.networkSpace?.asyncLocalState?.localState }.getOrNull()
+        runCatching { localState?.connectLocation = location }
+            .onFailure { PersistentLoggers.warn(TAG, "persist connectLocation threw: ${it.message}") }
+        runCatching { localState?.defaultLocation = location }
+            .onFailure { PersistentLoggers.warn(TAG, "persist defaultLocation threw: ${it.message}") }
+        runCatching { device?.connectLocation = location }
+            .onFailure { PersistentLoggers.warn(TAG, "device connectLocation threw: ${it.message}") }
+        runCatching { device?.defaultLocation = location }
+            .onFailure { PersistentLoggers.warn(TAG, "device defaultLocation threw: ${it.message}") }
+    }
+
+    private fun ConnectLocation.isMeaningfulConnectLocation(): Boolean =
+        runCatching {
+            connectLocationId != null ||
+                countryCode?.isNotBlank() == true ||
+                region?.isNotBlank() == true ||
+                city?.isNotBlank() == true ||
+                name?.isNotBlank() == true
+        }.getOrDefault(false)
 
     private inline fun guardedRun(label: String, block: () -> Unit) {
         if (!running.get()) {
@@ -626,6 +662,34 @@ class RealUrnetworkSdkBridge(
                 .onFailure { PersistentLoggers.warn(TAG, "connectionStatus sub.close threw: ${it.message}") }
         }
         connectionStatusRef.set(null)
+    }
+
+    private fun attachSelectedLocationListener(cv: ConnectViewController) {
+        refreshSelectedLocation(cv)
+        runCatching {
+            val sub = cv.addSelectedLocationListener { refreshSelectedLocation(cv) }
+            selectedLocationSubRef.getAndSet(sub)?.also { stale ->
+                runCatching { stale.close() }
+                    .onFailure { PersistentLoggers.warn(TAG, "selectedLocation stale sub.close threw: ${it.message}") }
+            }
+            Log.i(TAG, "selectedLocation listener attached")
+        }.onFailure {
+            PersistentLoggers.warn(TAG, "addSelectedLocationListener threw: ${it.message}")
+        }
+    }
+
+    private fun detachSelectedLocationListener() {
+        selectedLocationSubRef.getAndSet(null)?.also { sub ->
+            runCatching { sub.close() }
+                .onFailure { PersistentLoggers.warn(TAG, "selectedLocation sub.close threw: ${it.message}") }
+        }
+    }
+
+    private fun refreshSelectedLocation(cv: ConnectViewController?) {
+        val location = runCatching { cv?.selectedLocation }.getOrNull() ?: return
+        if (location.isMeaningfulConnectLocation()) {
+            persistConnectLocation(location)
+        }
     }
 
     private fun refreshConnectionStatus(cv: ConnectViewController?): String? {
@@ -809,5 +873,14 @@ class RealUrnetworkSdkBridge(
         const val DEFAULT_APP_VERSION = "0.0.2"
         const val WINDOW_SIZE_MAX_EXPERIMENTAL = 6L
         const val DOUBLE_QUOTA_THRESHOLD_BYTES = 50_000_000_000L
+
+        fun bestAvailableConnectLocation(): ConnectLocation {
+            val id = ConnectLocationId()
+            id.bestAvailable = true
+            val location = ConnectLocation()
+            location.connectLocationId = id
+            location.name = "Best Available"
+            return location
+        }
     }
 }

@@ -280,12 +280,14 @@ class EngineWarpContractTest {
     }
 
     @Test
-    fun `tunSpec без IPv6 → allowFamilyV6=false`() = runTest {
+    fun `tunSpec без IPv6 → IPv6 blackhole route без AWG IPv6`() = runTest {
         val noV6 = sampleConfig.copy(interfaceAddressV6 = "")
         val (e, _, _) = engine(activeConfig = noV6)
         val spec = e.tunSpec()!!
-        assertEquals(false, spec.allowFamilyV6)
-        assertNull(spec.ipv6Address)
+        assertTrue(spec.allowFamilyV6)
+        assertEquals(EngineWarp.WARP_IPV6_BLACKHOLE_ADDRESS, spec.ipv6Address)
+        assertEquals(EngineWarp.WARP_IPV6_BLACKHOLE_PREFIX, spec.ipv6PrefixLength)
+        assertTrue(spec.routeAllV6)
     }
 
     @Test
@@ -342,22 +344,26 @@ class EngineWarpContractTest {
     }
 
     @Test
-    fun `tunSpec — конфиг без IPv6 → allowFamilyV6=false, ipv6Address=null`() = runTest {
+    fun `tunSpec — конфиг без IPv6 → IPv6 fail-closed blackhole`() = runTest {
         val noV6Config = sampleConfig.copy(interfaceAddressV6 = "")
         val (e, _, _) = engineIpv6(ipv6Enabled = false, activeConfig = noV6Config)
         e.start(EngineConfig.Warp, Upstream.None)
         val spec = e.tunSpec() ?: error("tunSpec null")
-        assertFalse(spec.allowFamilyV6, "allowFamilyV6 must be false — config has no IPv6")
-        assertNull(spec.ipv6Address, "ipv6Address must be null — config has no IPv6")
+        assertTrue(spec.allowFamilyV6, "allowFamilyV6 must stay enabled so Android routes IPv6 into WARP TUN")
+        assertEquals(EngineWarp.WARP_IPV6_BLACKHOLE_ADDRESS, spec.ipv6Address)
+        assertEquals(EngineWarp.WARP_IPV6_BLACKHOLE_PREFIX, spec.ipv6PrefixLength)
+        assertTrue(spec.routeAllV6, "IPv6 must fail closed instead of bypassing WARP on dual-stack networks")
     }
 
     @Test
-    fun `tunSpec — конфиг с IPv6 и ipv6Enabled=false → allowFamilyV6=false`() = runTest {
+    fun `tunSpec — конфиг с IPv6 и ipv6Enabled=false → IPv6 fail-closed blackhole`() = runTest {
         val (e, _, _) = engineIpv6(ipv6Enabled = false)
         e.start(EngineConfig.Warp, Upstream.None)
         val spec = e.tunSpec() ?: error("tunSpec null")
-        assertFalse(spec.allowFamilyV6, "allowFamilyV6 must be false — user disabled IPv6")
-        assertNull(spec.ipv6Address, "ipv6Address must be null — user disabled IPv6")
+        assertTrue(spec.allowFamilyV6, "allowFamilyV6 must stay enabled so Android cannot bypass WARP over IPv6")
+        assertEquals(EngineWarp.WARP_IPV6_BLACKHOLE_ADDRESS, spec.ipv6Address)
+        assertEquals(EngineWarp.WARP_IPV6_BLACKHOLE_PREFIX, spec.ipv6PrefixLength)
+        assertTrue(spec.routeAllV6, "Disabled WARP IPv6 must become a TUN blackhole, not direct network bypass")
     }
 
     @Test

@@ -251,6 +251,19 @@ class EngineUrnetworkContractTest {
     }
 
     @Test
+    fun `exitNodeStrategy returns AutoSelected when selectedLocation is SDK best available token`() = runTest {
+        val bridge = FakeUrnetworkSdkBridge().also {
+            it.selectedLocationResult = object : UrnetworkSdkBridge.LocationToken {
+                override val countryCode = null
+                override val bestAvailable = true
+            }
+        }
+        val (e, _, _) = engine(bridge = bridge)
+        val strategy = e.exitNodeStrategy(0)
+        assertIs<ExitNodeStrategy.AutoSelected>(strategy)
+    }
+
+    @Test
     fun `ipProbeRoute возвращает StaticLocation с кодом когда selectedLocation валидный`() = runTest {
         val bridge = FakeUrnetworkSdkBridge().also {
             it.selectedLocationResult = object : UrnetworkSdkBridge.LocationToken {

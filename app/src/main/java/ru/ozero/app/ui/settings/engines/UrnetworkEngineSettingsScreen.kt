@@ -207,7 +207,7 @@ private fun LocationListContent(
     onSelectProvideNetworkMode: (UrnetworkProvideNetworkMode) -> Unit,
     onOpenSharedTraffic: () -> Unit,
 ) {
-    val isBestAvailable = selectedLocation == null
+    val isBestAvailable = selectedLocation == null || selectedLocation.bestAvailable
     LazyColumn(
         modifier = modifier.fillMaxSize().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp),

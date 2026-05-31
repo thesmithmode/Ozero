@@ -303,13 +303,16 @@ private fun shadowsocksOutbound(bean: ShadowsocksBean, tag: String, detour: Stri
 }
 
 private fun buildTransport(bean: StandardV2RayBean): String? = when (bean.type) {
-    "ws" -> buildMap(
-        "type" to "ws",
-        "path" to (bean.path.ifEmpty { "/" }),
-        "headers" to if (bean.host.isNotEmpty()) """{"Host":${jsonString(bean.host)}}""" else "{}",
-        "max_early_data" to bean.maxEarlyData.toString(),
-        "early_data_header_name" to bean.earlyDataHeaderName,
-    )
+    "ws" -> {
+        val legacyEarlyData = bean.earlyDataHeaderName.toIntOrNull().takeIf { bean.maxEarlyData <= 0 }
+        buildMap(
+            "type" to "ws",
+            "path" to (bean.path.ifEmpty { "/" }),
+            "headers" to if (bean.host.isNotEmpty()) """{"Host":${jsonString(bean.host)}}""" else "{}",
+            "max_early_data" to (bean.maxEarlyData.takeIf { it > 0 } ?: legacyEarlyData ?: 0).toString(),
+            "early_data_header_name" to bean.earlyDataHeaderName.takeUnless { legacyEarlyData != null }.orEmpty(),
+        )
+    }
     "grpc" -> buildMap(
         "type" to "grpc",
         "service_name" to bean.grpcServiceName,
@@ -339,7 +342,7 @@ private fun buildTls(bean: StandardV2RayBean): String? {
 
     val sb = StringBuilder()
     sb.append("""{"enabled":true,""")
-    sb.append(""""server_name":${jsonString(bean.sni.ifEmpty { bean.serverAddress })},""")
+    sb.append(""""server_name":${jsonString(tlsServerName(bean))},""")
 
     if (bean.alpn.isNotEmpty()) {
         val alpns = bean.alpn.split(",").joinToString(",") { jsonString(it.trim()) }
@@ -368,14 +371,20 @@ private fun buildTls(bean: StandardV2RayBean): String? {
     return sb.toString()
 }
 
+private fun tlsServerName(bean: StandardV2RayBean): String {
+    if (bean.sni.isNotEmpty()) return bean.sni
+    val host = bean.host.trim()
+    return if (host.isNotEmpty() && "," !in host && ";" !in host) host else bean.serverAddress
+}
+
 private fun buildMap(vararg pairs: Pair<String, String>): String {
     val fields = pairs.filter { (_, v) -> v.isNotEmpty() && v != "0" && v != "[]" && v != "{}" }
         .joinToString(",") { (k, v) ->
-            val isLiteral = v.startsWith("{") ||
+            val isLiteral = k == "max_early_data" ||
+                v.startsWith("{") ||
                 v.startsWith("[") ||
                 v == "true" ||
-                v == "false" ||
-                v.all { c -> c.isDigit() }
+                v == "false"
             val value = if (isLiteral) {
                 v
             } else {

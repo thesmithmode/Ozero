@@ -1093,3 +1093,19 @@
 - Source: daily/2026-05-30.md
 - Articles created: [[concepts/fptn-health-preselect-auth-timeout-regression]], [[concepts/warp-vpn-mode-exit-ip-proof-boundary]], [[concepts/byedpi-proxy-lane-test-race-synchronization]], [[concepts/byedpi-settings-schema-marker-migration]], [[concepts/masterdns-amnezia-dns-removal-success-contract]], [[connections/pr-ci-merge-ref-flaky-test-feedback-loop]]
 - Articles updated: none
+## [2026-05-31T18:04:38+03:00] compile | 2026-05-28.md
+- Source: daily/2026-05-28.md
+- Articles created: [[concepts/release-regression-self-review-before-main]], [[concepts/ci-extra-modules-exposes-hidden-release-risk]], [[concepts/android-apk-only-release-artifact-scope]], [[concepts/private-subscription-profile-sanitized-evidence]], [[concepts/github-actions-artifact-node24-migration]], [[connections/release-ci-green-vs-runtime-engine-proof]]
+- Articles updated: none
+## [2026-05-31T18:08:30+03:00] compile | 2026-05-29.md
+- Source: daily/2026-05-29.md
+- Articles created: [[concepts/fptn-websocket-resolved-ip-readiness]], [[concepts/urnetwork-runtime-grace-startup-gate]], [[concepts/urnetwork-relay-user-config-authority]], [[concepts/exit-node-strategy-ui-unification]], [[concepts/singbox-probe-socks-port-lifecycle]], [[concepts/ci-style-failure-hides-compile-regression]], [[connections/fptn-bye-dpi-cascade-lifecycle-plan]]
+- Articles updated: none
+## [2026-05-31T18:12:23+03:00] compile | 2026-05-30.md
+- Source: daily/2026-05-30.md
+- Articles created: [[concepts/masterdns-docker-build-run-proof-contract]], [[concepts/singbox-process-stop-and-wait-sentinel]], [[concepts/exit-node-providerlabel-known-ip-contract]], [[concepts/fptn-v109-health-preselect-regression]], [[concepts/byedpi-youtube-quic-probe-domain-contract]], [[concepts/dev-ci-workflow-dispatch-nonzero-tests-contract]], [[connections/runtime-engine-fix-ci-proof-loop]]
+- Articles updated: none
+## [2026-05-31T18:16:50+03:00] compile | 2026-05-31.md
+- Source: daily/2026-05-31.md
+- Articles created: [[concepts/byedpi-strategy-scan-isolated-structured-argv]], [[concepts/singbox-routed-probe-readiness-latency-contract]], [[concepts/split-tunnel-runtime-refresh-coalesced-restart]], [[concepts/masterdns-pinned-release-binary-name-drift]], [[concepts/dev-push-ci-visible-full-run-contract]], [[concepts/codex-pr-review-thread-fix-loop]]
+- Articles updated: none

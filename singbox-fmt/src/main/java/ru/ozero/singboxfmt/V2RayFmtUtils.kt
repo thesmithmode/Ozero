@@ -18,6 +18,8 @@ internal object V2RayFmtUtils {
         bean.realityPublicKey = parsed.getQueryParameter("pbk") ?: ""
         bean.realityShortId = parsed.getQueryParameter("sid") ?: ""
         bean.realityFingerprint = parsed.getQueryParameter("fp") ?: "chrome"
+        bean.allowInsecure = listOf("allowInsecure", "allow_insecure", "insecure", "skip-cert-verify")
+            .any { parsed.getQueryParameter(it).isTruthy() }
     }
 
     fun parseTransportParams(bean: StandardV2RayBean, parsed: UriCompat) {
@@ -61,5 +63,10 @@ internal object V2RayFmtUtils {
     private fun padBase64(s: String): String {
         val rem = s.length % 4
         return if (rem == 0) s else s + "=".repeat(4 - rem)
+    }
+
+    private fun String?.isTruthy(): Boolean = when (this?.lowercase()) {
+        "1", "true", "yes" -> true
+        else -> false
     }
 }

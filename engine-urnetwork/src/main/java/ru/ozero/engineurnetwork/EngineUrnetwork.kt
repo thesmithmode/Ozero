@@ -192,7 +192,8 @@ class EngineUrnetwork(
     override fun preflight(): ru.ozero.enginescore.EnginePreflight = UrnetworkPreflight()
 
     override suspend fun exitNodeStrategy(socksPort: Int): ru.ozero.enginescore.ExitNodeStrategy {
-        if (sdkBridge.selectedLocation() == null) return ru.ozero.enginescore.ExitNodeStrategy.AutoSelected()
+        val selected = sdkBridge.selectedLocation()
+        if (selected == null || selected.bestAvailable) return ru.ozero.enginescore.ExitNodeStrategy.AutoSelected()
         val info = sdkBridge.selectedLocationInfo()
             ?: return ru.ozero.enginescore.ExitNodeStrategy.Unavailable("URnetwork location pending")
         val country = info.country ?: info.name

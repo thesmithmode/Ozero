@@ -157,6 +157,37 @@ class MasterDnsDeployerTest {
     }
 
     @Test
+    fun `should stop before docker run when bind probe reports port conflict without process owner`() = runTest {
+        transport.setResponse("bind_probe", "PORT_BUSY|proto=udp|addr=0.0.0.0:53|owner=bind_probe:exit_98")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val portBusy = states.last() as MasterDnsDeployState.PortBusy
+        assertEquals("udp", portBusy.protocol)
+        assertEquals("0.0.0.0:53", portBusy.address)
+        assertEquals("bind_probe:exit_98", portBusy.owner)
+        assertFalse(transport.executedCommands.any { it.contains("docker run -d") })
+    }
+
+    @Test
+    fun `should recheck port after docker install before docker build and run`() = runTest {
+        transport.setResponses(
+            "bind_probe",
+            listOf(
+                MasterDnsDockerScripts.MARKER_PORT_FREE,
+                "PORT_BUSY|proto=udp|addr=0.0.0.0:53|owner=docker:adguardhome",
+            ),
+        )
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val portBusy = states.last() as MasterDnsDeployState.PortBusy
+        assertEquals("docker:adguardhome", portBusy.owner)
+        assertFalse(transport.executedCommands.any { it.contains("Dockerfile") })
+        assertFalse(transport.executedCommands.any { it.contains("docker run -d") })
+    }
+
+    @Test
     fun `should return Error when free RAM is below threshold`() = runTest {
         transport.setResponse("free -m", "128 2048")
 

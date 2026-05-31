@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test
 import java.io.File
 import kotlin.test.assertTrue
 
+@Suppress("LargeClass")
 class RealUrnetworkSdkBridgeContractTest {
 
     private val source by lazy {
@@ -106,6 +107,21 @@ class RealUrnetworkSdkBridgeContractTest {
                     "страны без городов/регионов в LocationsViewController.",
             )
         }
+    }
+
+    @Test
+    fun `applyDeviceFields делает default best available явным connectLocation`() {
+        val block = source.substringAfter("private fun applyDeviceFields(")
+            .substringBefore("private inline fun guardedRun")
+        assertTrue(
+            block.contains("bestAvailableConnectLocation()"),
+            "applyDeviceFields не должен оставлять device.connectLocation null для default Best Available — " +
+                "иначе SDK стартует без выбранной connect location до ручного клика.",
+        )
+        assertTrue(
+            source.contains("ConnectLocationId") && source.contains("id.bestAvailable = true"),
+            "Best Available должен передаваться в SDK как ConnectLocationId.bestAvailable=true.",
+        )
     }
 
     @Test
@@ -502,6 +518,33 @@ class RealUrnetworkSdkBridgeContractTest {
         assertTrue(
             stopBlock.contains("detachConnectionStatusListener()"),
             "stopUnderLock must close connectionStatus Sub to prevent callbacks after teardown.",
+        )
+    }
+
+    @Test
+    fun `selectedLocation listener persists SDK chosen country after Best Available connect`() {
+        val startBlock = source.substringAfter("private suspend fun runStartOnMain")
+            .substringBefore("override suspend fun stop")
+        assertTrue(
+            source.contains("private val selectedLocationSubRef = AtomicReference<Sub?>(null)"),
+            "Bridge must keep SelectedLocation Sub so SDK-chosen Best Available country is persisted.",
+        )
+        assertTrue(
+            startBlock.contains("attachSelectedLocationListener(cv)"),
+            "runStartOnMain must subscribe to selectedLocation changes after openConnectViewController.",
+        )
+        val listenerBlock = source.substringAfter("private fun attachSelectedLocationListener")
+            .substringBefore("private fun refreshConnectionStatus")
+        assertTrue(
+            listenerBlock.contains("addSelectedLocationListener") &&
+                listenerBlock.contains("persistConnectLocation(location)"),
+            "selectedLocation listener must persist actual SDK location, otherwise settings UI only sees <best>.",
+        )
+        val stopBlock = source.substringAfter("private suspend fun stopUnderLock")
+            .substringBefore("private fun cleanupOnFailure")
+        assertTrue(
+            stopBlock.contains("detachSelectedLocationListener()"),
+            "stopUnderLock must close selectedLocation Sub to prevent callbacks after teardown.",
         )
     }
 

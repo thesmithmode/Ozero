@@ -203,6 +203,51 @@ class RawShareLinksParserTest {
     }
 
     @Test
+    fun `should parse sing-box websocket early data fields without numeric type leak`() {
+        val json = """
+            {
+              "outbounds": [
+                {
+                  "type": "vless",
+                  "tag": "WS Early",
+                  "server": "proxy.example.com",
+                  "server_port": 443,
+                  "uuid": "12345678-1234-1234-1234-123456789abc",
+                  "transport": {
+                    "type": "ws",
+                    "path": "/ws",
+                    "max_early_data": 2048,
+                    "early_data_header_name": 1
+                  }
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val result = RawShareLinksParser.parse(json)
+
+        assertEquals(1, result.size)
+        val bean = result.first() as VLESSBean
+        assertEquals(2048, bean.maxEarlyData)
+        assertEquals("1", bean.earlyDataHeaderName)
+    }
+
+    @Test
+    fun `should parse vless uri ed as max early data and eh as header name`() {
+        val uri = "vless://12345678-1234-1234-1234-123456789abc@proxy.example.com:443" +
+            "?type=ws&security=tls&host=front.example.com&ed=2048&eh=Sec-WebSocket-Protocol" +
+            "&allowInsecure=1#WS"
+
+        val result = RawShareLinksParser.parse(uri)
+
+        assertEquals(1, result.size)
+        val bean = result.first() as VLESSBean
+        assertEquals(2048, bean.maxEarlyData)
+        assertEquals("Sec-WebSocket-Protocol", bean.earlyDataHeaderName)
+        assertTrue(bean.allowInsecure)
+    }
+
+    @Test
     fun `should infer reality from clash reality opts`() {
         val yaml = """
             proxies:

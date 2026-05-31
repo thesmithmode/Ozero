@@ -175,6 +175,7 @@ private fun SingboxSettingsContent(
                 isRefreshing = group.id in state.isRefreshing,
                 isPinging = group.id in state.isPinging,
                 refreshError = state.groupRefreshErrors[group.id],
+                testingProfileIds = state.testingProfileIds,
                 onToggle = { viewModel.onGroupExpand(group.id) },
                 onRefresh = { viewModel.onRefresh(group.id) },
                 onPing = { viewModel.onPing(group.id) },
@@ -198,13 +199,15 @@ private fun SingboxChainSection(
     onMove: (Long, Int) -> Unit,
 ) {
     var showChainAddDialog by remember { mutableStateOf(false) }
-    val profilesById = allProfiles.associateBy { it.id }
-    val chain = chainProfileIds
-        .mapNotNull { profilesById[it] }
-        .filterNot { it.id == selectedProfileId }
-    val addable = allProfiles.filter { profile ->
-        profile.id != selectedProfileId && profile.id !in chainProfileIds
+    val chain = if (chainProfileIds.isEmpty()) {
+        emptyList()
+    } else {
+        val profilesById = allProfiles.associateBy { it.id }
+        chainProfileIds
+            .mapNotNull { profilesById[it] }
+            .filterNot { it.id == selectedProfileId }
     }
+    val canAdd = allProfiles.any { profile -> profile.id != selectedProfileId && profile.id !in chainProfileIds }
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = stringResource(R.string.singbox_chain_title),
@@ -241,7 +244,7 @@ private fun SingboxChainSection(
         }
         TextButton(
             onClick = { showChainAddDialog = true },
-            enabled = addable.isNotEmpty(),
+            enabled = canAdd,
             modifier = Modifier.testTag("singbox_chain_add"),
         ) {
             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -249,6 +252,9 @@ private fun SingboxChainSection(
             Text(stringResource(R.string.singbox_chain_add))
         }
         if (showChainAddDialog) {
+            val addable = allProfiles.filter { profile ->
+                profile.id != selectedProfileId && profile.id !in chainProfileIds
+            }
             AlertDialog(
                 onDismissRequest = { showChainAddDialog = false },
                 title = { Text(stringResource(R.string.singbox_chain_add)) },
@@ -358,6 +364,7 @@ private fun SubscriptionGroupItem(
     isRefreshing: Boolean,
     isPinging: Boolean,
     refreshError: String?,
+    testingProfileIds: Set<Long>,
     onToggle: () -> Unit,
     onRefresh: () -> Unit,
     onPing: () -> Unit,
@@ -428,6 +435,7 @@ private fun SubscriptionGroupItem(
                     ProfileItem(
                         profile = profile,
                         isSelected = profile.id == selectedProfileId,
+                        isTesting = profile.id in testingProfileIds,
                         onSelect = { onProfileSelect(profile) },
                     )
                 }
@@ -440,6 +448,7 @@ private fun SubscriptionGroupItem(
 private fun ProfileItem(
     profile: ProxyProfile,
     isSelected: Boolean,
+    isTesting: Boolean,
     onSelect: () -> Unit,
 ) {
     Row(
@@ -460,6 +469,10 @@ private fun ProfileItem(
             modifier = Modifier.weight(1f),
         )
         when {
+            isTesting -> {
+                Spacer(Modifier.width(4.dp))
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+            }
             profile.latencyMs >= 0 -> {
                 Spacer(Modifier.width(4.dp))
                 Text(
