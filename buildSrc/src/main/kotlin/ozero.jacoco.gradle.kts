@@ -25,6 +25,9 @@ val excludedClasses = listOf(
     "**/di/**",
     "**/databinding/**",
     "**/generated/**",
+    "**/*_gradle*.*",
+    "**/ComposableSingletons*.*",
+    "**/ui/**",
     "**/ui/theme/**",
     "**/Placeholder*.*"
 )

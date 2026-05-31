@@ -44,7 +44,19 @@ jacoco {
 tasks.named<JacocoReport>("jacocoTestReport") {
     dependsOn(tasks.test)
     sourceDirectories.setFrom(layout.projectDirectory.dir("src/main/kotlin"))
-    classDirectories.setFrom(layout.buildDirectory.dir("classes/kotlin/main"))
+    classDirectories.setFrom(
+        layout.buildDirectory.dir("classes/kotlin/main").map {
+            fileTree(it) {
+                exclude(
+                    "Ozero_*.*",
+                    "**/*_gradle*.*",
+                    "**/Ozero_*.*",
+                    "gradle/kotlin/dsl/**",
+                    "**/gradle/kotlin/dsl/**",
+                )
+            }
+        },
+    )
     executionData.setFrom(
         fileTree(layout.buildDirectory) {
             include("jacoco/test.exec")
@@ -60,7 +72,19 @@ tasks.named<JacocoReport>("jacocoTestReport") {
 tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
     dependsOn("jacocoTestReport")
     sourceDirectories.setFrom(layout.projectDirectory.dir("src/main/kotlin"))
-    classDirectories.setFrom(layout.buildDirectory.dir("classes/kotlin/main"))
+    classDirectories.setFrom(
+        layout.buildDirectory.dir("classes/kotlin/main").map {
+            fileTree(it) {
+                exclude(
+                    "Ozero_*.*",
+                    "**/*_gradle*.*",
+                    "**/Ozero_*.*",
+                    "gradle/kotlin/dsl/**",
+                    "**/gradle/kotlin/dsl/**",
+                )
+            }
+        },
+    )
     executionData.setFrom(
         fileTree(layout.buildDirectory) {
             include("jacoco/test.exec")
