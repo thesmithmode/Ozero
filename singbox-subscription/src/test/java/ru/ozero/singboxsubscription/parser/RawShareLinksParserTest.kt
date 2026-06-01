@@ -503,4 +503,138 @@ class RawShareLinksParserTest {
             ).isEmpty(),
         )
     }
+
+    @Test
+    fun `should parse clash transport aliases and boolean variants`() {
+        val yaml = """
+            proxies:
+              - name: WS Clash
+                type: vless
+                server: ws.example.com
+                port: "443"
+                uuid: 12345678-1234-1234-1234-123456789abc
+                network: ws
+                tls: 1
+                skip-cert-verify: yes
+                ws-opts:
+                  path: /socket
+                  headers:
+                    Host: front.example.com
+              - name: HTTP Upgrade
+                type: vmess
+                server: hu.example.com
+                port: 8443
+                uuid: 12345678-1234-1234-1234-123456789abc
+                alter-id: "2"
+                network: httpupgrade
+                httpupgrade-opts:
+                  path: /upgrade
+                  host: upgrade.example.com
+              - name: gRPC Clash
+                type: trojan
+                server: grpc.example.com
+                port: 443
+                password: secret
+                network: grpc
+                grpc-opts:
+                  grpc-service-name: svc
+                allowInsecure: true
+        """.trimIndent()
+
+        val result = RawShareLinksParser.parse(yaml)
+
+        assertEquals(3, result.size)
+        val ws = result[0] as VLESSBean
+        assertEquals("ws", ws.type)
+        assertEquals("/socket", ws.path)
+        assertEquals("front.example.com", ws.host)
+        assertEquals("tls", ws.security)
+        assertTrue(ws.allowInsecure)
+        val httpUpgrade = result[1] as VMessBean
+        assertEquals("httpupgrade", httpUpgrade.type)
+        assertEquals("/upgrade", httpUpgrade.path)
+        assertEquals("upgrade.example.com", httpUpgrade.host)
+        assertEquals(2, httpUpgrade.alterId)
+        val grpc = result[2] as TrojanBean
+        assertEquals("grpc", grpc.type)
+        assertEquals("svc", grpc.grpcServiceName)
+        assertTrue(grpc.allowInsecure)
+    }
+
+    @Test
+    fun `should parse clash inline reality keys and scalar alpn`() {
+        val yaml = """
+            proxies:
+              - name: Inline Reality
+                type: vless
+                server: reality-inline.example.com
+                port: 443
+                uuid: 12345678-1234-1234-1234-123456789abc
+                network: xhttp
+                reality: true
+                public-key: inline-public-key
+                short-id: ef01
+                alpn: h3
+                fp: safari
+        """.trimIndent()
+
+        val result = RawShareLinksParser.parse(yaml)
+
+        assertEquals(1, result.size)
+        val bean = result.first() as VLESSBean
+        assertEquals("splithttp", bean.type)
+        assertEquals("reality", bean.security)
+        assertEquals("inline-public-key", bean.realityPublicKey)
+        assertEquals("ef01", bean.realityShortId)
+        assertEquals("h3", bean.alpn)
+        assertEquals("safari", bean.realityFingerprint)
+    }
+
+    @Test
+    fun `should parse sing-box tls without reality and header fallbacks`() {
+        val json = """
+            {
+              "outbounds": [
+                {
+                  "type": "vless",
+                  "tag": "TLS WS",
+                  "server": "tls-ws.example.com",
+                  "server_port": 443,
+                  "uuid": "12345678-1234-1234-1234-123456789abc",
+                  "transport": {
+                    "type": "ws",
+                    "host": "transport.example.com",
+                    "headers": { "Host": "" },
+                    "max_early_data": "bad"
+                  },
+                  "tls": {
+                    "enabled": true,
+                    "server_name": "sni.example.com",
+                    "alpn": ["", "h2"],
+                    "insecure": false,
+                    "reality": { "enabled": false },
+                    "utls": { "fingerprint": "edge" }
+                  }
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val result = RawShareLinksParser.parse(json)
+
+        assertEquals(1, result.size)
+        val bean = result.first() as VLESSBean
+        assertEquals("tls", bean.security)
+        assertEquals("transport.example.com", bean.host)
+        assertEquals(0, bean.maxEarlyData)
+        assertEquals("sni.example.com", bean.sni)
+        assertEquals("h2", bean.alpn)
+        assertEquals("edge", bean.utlsFingerprint)
+    }
+
+    @Test
+    fun `should return empty for json without outbounds or malformed root`() {
+        assertTrue(RawShareLinksParser.parse("""{"route":{}}""").isEmpty())
+        assertTrue(RawShareLinksParser.parse("""["not", "object"]""").isEmpty())
+    }
 }

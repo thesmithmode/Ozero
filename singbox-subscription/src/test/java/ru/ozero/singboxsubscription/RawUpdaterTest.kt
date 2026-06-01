@@ -13,6 +13,7 @@ import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
 import ru.ozero.singboxroom.entity.SubscriptionGroup
 import java.util.Base64
+import javax.net.ssl.SSLHandshakeException
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -225,6 +226,26 @@ class RawUpdaterTest {
         val result = rawUpdater.refresh(g)
 
         assertTrue(result.isFailure)
+    }
+
+    @Test
+    fun `should normalize TLS chain validation failures`() = runBlocking {
+        rawUpdater = RawUpdater(
+            okHttpClient = OkHttpClient.Builder()
+                .addInterceptor { throw SSLHandshakeException("Chain validation failed: bad cert") }
+                .build(),
+            groupDao = groupDao,
+            profileDao = profileDao,
+        )
+        val g = group()
+
+        val result = rawUpdater.refresh(g)
+
+        assertTrue(result.isFailure)
+        assertEquals(
+            "Subscription TLS certificate chain validation failed",
+            result.exceptionOrNull()?.message,
+        )
     }
 
     @Test

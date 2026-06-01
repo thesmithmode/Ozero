@@ -79,4 +79,42 @@ class CoreModelCoverageTest {
         assertNotNull(IpProbeRoute.Unavailable("offline").reason)
         assertNotNull(ExitNodeStrategy.Unavailable("offline").reason)
     }
+
+    @Test
+    fun `engine config models expose ids and redact secrets`() {
+        val singbox = EngineConfig.Singbox(
+            beanBlob = byteArrayOf(1, 2),
+            protocolType = 3,
+            autoSelectBeanBlobs = listOf(byteArrayOf(4)),
+            chainBeanBlobs = listOf(byteArrayOf(5)),
+            wireGuardConfig = WireGuardOutboundConfig(
+                privateKey = "private",
+                peerPublicKey = "peer",
+                serverHost = "host",
+                serverPort = 443,
+                localAddresses = listOf("172.16.0.2/32"),
+            ),
+            proxyMode = true,
+        )
+        val sameSingbox = singbox.copy(
+            beanBlob = byteArrayOf(1, 2),
+            autoSelectBeanBlobs = listOf(byteArrayOf(4)),
+            chainBeanBlobs = listOf(byteArrayOf(5)),
+        )
+
+        assertEquals(EngineId.BYEDPI, EngineConfig.ByeDpi().engineId)
+        assertEquals(EngineId.TOR, EngineConfig.Tor().engineId)
+        assertEquals(EngineId.NAIVE, EngineConfig.Naive("https://proxy.example.com").engineId)
+        assertEquals(EngineId.WARP, EngineConfig.WarpProxy().engineId)
+        assertEquals(EngineId.FPTN, EngineConfig.Fptn(token = "secret").engineId)
+        assertEquals(EngineId.URNETWORK, EngineConfig.Urnetwork(jwtToken = "jwt").engineId)
+        assertEquals(EngineId.SINGBOX, singbox.engineId)
+        assertEquals(singbox, sameSingbox)
+        assertEquals(singbox.hashCode(), sameSingbox.hashCode())
+        assertContains(EngineConfig.Urnetwork(jwtToken = "jwt").toString(), "jwtToken=***")
+        assertContains(EngineConfig.MasterDns("secret", listOf("1.1.1.1")).toString(), "configToml=***")
+        assertContains(EngineConfig.Fptn(token = "secret").toString(), "token=***")
+        assertContains(singbox.toString(), "blobSize=2")
+        assertContains(singbox.toString(), "proxyMode=true")
+    }
 }
