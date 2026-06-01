@@ -2,12 +2,14 @@
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -46,7 +48,7 @@ class EngineSettingsRestartObserverTest {
         val observer = newObserver(flow, alwaysConnected())
 
         val collected = mutableListOf<EngineSettingsRestartObserver.Trigger>()
-        val job = backgroundScope.launch { observer.triggers.toList(collected) }
+        val job = collectTriggers(observer, collected)
         advanceUntilIdle()
 
         flow.emit(SettingsModel.DEFAULT)
@@ -63,7 +65,7 @@ class EngineSettingsRestartObserverTest {
         val observer = newObserver(flow, alwaysConnected())
 
         val collected = mutableListOf<EngineSettingsRestartObserver.Trigger>()
-        val job = backgroundScope.launch { observer.triggers.toList(collected) }
+        val job = collectTriggers(observer, collected)
         advanceUntilIdle()
 
         flow.emit(SettingsModel.DEFAULT)
@@ -93,7 +95,7 @@ class EngineSettingsRestartObserverTest {
         val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
         val observer = newObserver(flow, alwaysConnected())
         val collected = mutableListOf<EngineSettingsRestartObserver.Trigger>()
-        val job = backgroundScope.launch { observer.triggers.toList(collected) }
+        val job = collectTriggers(observer, collected)
         advanceUntilIdle()
 
         flow.emit(SettingsModel.DEFAULT)
@@ -113,7 +115,7 @@ class EngineSettingsRestartObserverTest {
         val observer = newObserver(flow, alwaysConnected())
 
         val collected = mutableListOf<EngineSettingsRestartObserver.Trigger>()
-        val job = backgroundScope.launch { observer.triggers.toList(collected) }
+        val job = collectTriggers(observer, collected)
         advanceUntilIdle()
 
         flow.emit(SettingsModel.DEFAULT)
@@ -133,7 +135,7 @@ class EngineSettingsRestartObserverTest {
         val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
         val observer = newObserver(flow, alwaysConnected())
         val collected = mutableListOf<EngineSettingsRestartObserver.Trigger>()
-        val job = backgroundScope.launch { observer.triggers.toList(collected) }
+        val job = collectTriggers(observer, collected)
         advanceUntilIdle()
 
         flow.emit(SettingsModel.DEFAULT)
@@ -160,7 +162,7 @@ class EngineSettingsRestartObserverTest {
         val observer = newObserver(flow, alwaysConnected())
 
         val collected = mutableListOf<EngineSettingsRestartObserver.Trigger>()
-        val job = backgroundScope.launch { observer.triggers.toList(collected) }
+        val job = collectTriggers(observer, collected)
         advanceUntilIdle()
 
         flow.emit(SettingsModel.DEFAULT)
@@ -180,7 +182,7 @@ class EngineSettingsRestartObserverTest {
         val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 16)
         val observer = newObserver(flow, alwaysConnected())
         val collected = mutableListOf<EngineSettingsRestartObserver.Trigger>()
-        val job = backgroundScope.launch { observer.triggers.toList(collected) }
+        val job = collectTriggers(observer, collected)
         advanceUntilIdle()
 
         flow.emit(SettingsModel.DEFAULT)
@@ -504,7 +506,7 @@ class EngineSettingsRestartObserverTest {
         val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
         val observer = newObserver(flow, alwaysConnected())
         val collected = mutableListOf<EngineSettingsRestartObserver.Trigger>()
-        val job = backgroundScope.launch { observer.triggers.toList(collected) }
+        val job = collectTriggers(observer, collected)
         advanceUntilIdle()
 
         val baseline = SettingsModel.DEFAULT.copy(
@@ -531,7 +533,7 @@ class EngineSettingsRestartObserverTest {
         val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
         val observer = newObserver(flow, alwaysConnected())
         val collected = mutableListOf<EngineSettingsRestartObserver.Trigger>()
-        val job = backgroundScope.launch { observer.triggers.toList(collected) }
+        val job = collectTriggers(observer, collected)
         advanceUntilIdle()
 
         val baseline = SettingsModel.DEFAULT.copy(manualEngine = EngineId.BYEDPI)
@@ -579,7 +581,7 @@ class EngineSettingsRestartObserverTest {
         val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
         val observer = newObserver(flow, alwaysConnected())
         val collected = mutableListOf<EngineSettingsRestartObserver.Trigger>()
-        val job = backgroundScope.launch { observer.triggers.toList(collected) }
+        val job = collectTriggers(observer, collected)
         advanceUntilIdle()
 
         val autoMode = SettingsModel.DEFAULT.copy(manualEngine = null)
@@ -613,7 +615,7 @@ class EngineSettingsRestartObserverTest {
         val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
         val observer = newObserver(flow, alwaysConnected())
         val collected = mutableListOf<EngineSettingsRestartObserver.Trigger>()
-        val job = backgroundScope.launch { observer.triggers.toList(collected) }
+        val job = collectTriggers(observer, collected)
         advanceUntilIdle()
 
         val manualMode = SettingsModel.DEFAULT.copy(manualEngine = EngineId.BYEDPI)
@@ -675,5 +677,12 @@ class EngineSettingsRestartObserverTest {
         runCurrent()
         advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
         runCurrent()
+    }
+
+    private fun TestScope.collectTriggers(
+        observer: EngineSettingsRestartObserver,
+        collected: MutableList<EngineSettingsRestartObserver.Trigger>,
+    ): Job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+        observer.triggers.toList(collected)
     }
 }
