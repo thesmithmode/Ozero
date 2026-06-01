@@ -3,7 +3,6 @@ package ru.ozero.enginewarp
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 
 class EngineWarpTimeoutSentinelTest {
 
@@ -18,7 +17,7 @@ class EngineWarpTimeoutSentinelTest {
     }
 
     @Test
-    fun `WARP startup timeout is recovered by peer watchdog instead of fast-fail`() {
+    fun `WARP startup timeout fast-fails before first peer`() {
         val policy = EngineWarp(
             autoConfig = EmptyAutoConfig,
             configStore = EmptySlotStore,
@@ -26,7 +25,7 @@ class EngineWarpTimeoutSentinelTest {
             uapiPathProvider = { "/tmp" },
         ).peerWatchdogPolicy()
 
-        assertTrue(policy.recoverBeforeFirstPeer)
+        assertFalse(policy.recoverBeforeFirstPeer)
         assertEquals(EngineWarp.WARP_PEER_WATCHDOG_TIMEOUT_MS, policy.timeoutMs)
     }
 

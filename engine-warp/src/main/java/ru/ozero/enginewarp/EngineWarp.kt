@@ -312,7 +312,7 @@ class EngineWarp(
     override fun peerWatchdogPolicy(): EnginePlugin.PeerWatchdogPolicy =
         EnginePlugin.PeerWatchdogPolicy(
             timeoutMs = WARP_PEER_WATCHDOG_TIMEOUT_MS,
-            recoverBeforeFirstPeer = true,
+            recoverBeforeFirstPeer = false,
         )
 
     override suspend fun tunSpec(): TunSpec? {

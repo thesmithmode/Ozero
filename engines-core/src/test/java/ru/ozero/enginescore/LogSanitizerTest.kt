@@ -9,7 +9,11 @@ class LogSanitizerTest {
 
     @Test
     fun `sanitize redacts userinfo proxy uri and long tokens`() {
-        val raw = "socks5://user:pass@proxy.example.com vless://secret@example.com/path token=abcdefghijklmnopqrstuvwxyzABCDEF"
+        val raw = listOf(
+            "socks5://user:pass@proxy.example.com",
+            "vless://secret@example.com/path",
+            "token=abcdefghijklmnopqrstuvwxyzABCDEF",
+        ).joinToString(" ")
 
         val sanitized = LogSanitizer.sanitize(raw)
 

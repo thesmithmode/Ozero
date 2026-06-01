@@ -14,32 +14,24 @@ class StartSequenceCustomTunReadinessSentinelTest {
     }
 
     @Test
-    fun `custom TUN startup timeout does not fast-fail before peer watchdog`() {
+    fun `custom TUN startup timeout fast-fails before Connected`() {
         val body = source.substringAfter("private suspend fun startSingleEngineCandidate(")
             .substringBefore("private suspend fun runSingleProxy(")
         assertTrue(
-            body.contains(
-                "awaitEngineReady(activeEngineId, allowStartupTimeout = allowsStartupTimeout(activeEngineId))",
-            ),
-            "Only engines whose peer-watchdog policy can recover before the first peer may continue after " +
-                "startup timeout. FPTN/sing-box custom TUN startup timeout must stay fast-fail.",
+            body.contains("if (!awaitEngineReady(activeEngineId))"),
+            "TUN startup must not publish Connected until awaitReady proves a real engine handshake.",
         )
 
         val awaitBody = source.substringAfter("private suspend fun awaitEngineReady(")
             .substringBefore("private fun buildEngineConfig(")
         assertTrue(
-            awaitBody.contains("if (allowStartupTimeout)") &&
-                awaitBody.contains("peer watchdog owns recovery") &&
-                awaitBody.contains("return true"),
-            "awaitReady Timeout for custom-TUN engines must continue with explicit diagnostic log.",
+            awaitBody.contains("ReadyResult.Timeout") &&
+                awaitBody.contains("engineFailure (fast-fail)") &&
+                awaitBody.contains("false"),
+            "awaitReady Timeout must remain a startup failure; peer watchdog starts only after Connected.",
         )
-
-        val policyBody = source.substringAfter("private fun allowsStartupTimeout(")
-            .substringBefore("private suspend fun establishTunAndChain(")
-        assertTrue(
-            policyBody.contains("peerWatchdogPolicy()") &&
-                policyBody.contains("recoverBeforeFirstPeer == true"),
-            "Startup timeout continuation must be policy-driven, not blanket TunFdAcceptor behavior.",
-        )
+        assertTrue(!source.contains("allowStartupTimeout"))
+        assertTrue(!source.contains("allowsStartupTimeout"))
+        assertTrue(!source.contains("peer watchdog owns recovery"))
     }
 }
