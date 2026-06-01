@@ -1,19 +1,14 @@
 package ru.ozero.singboxsubscription.parser
 
-import android.util.Base64
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
-import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
+import org.junit.jupiter.api.Test
+import java.util.Base64
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
-@RunWith(RobolectricTestRunner::class)
-@Config(sdk = [33])
 class Base64BundleParserTest {
 
     private fun encodeBase64(text: String): String =
-        Base64.encodeToString(text.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+        Base64.getEncoder().withoutPadding().encodeToString(text.toByteArray(Charsets.UTF_8))
 
     private val vless1 =
         "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@s1.example.com:443?type=tcp&security=none#S1"
@@ -64,7 +59,7 @@ class Base64BundleParserTest {
     @Test
     fun `should handle url-safe base64 variant`() {
         val textBytes = "$vless1\n$vless2".toByteArray(Charsets.UTF_8)
-        val encoded = Base64.encodeToString(textBytes, Base64.URL_SAFE or Base64.NO_WRAP)
+        val encoded = Base64.getUrlEncoder().withoutPadding().encodeToString(textBytes)
         val result = Base64BundleParser.parse(encoded)
         assertEquals(2, result.size)
     }

@@ -1,26 +1,21 @@
 package ru.ozero.singboxsubscription
 
-import android.util.Base64
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
-import org.junit.After
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
-import org.junit.Before
-import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 import ru.ozero.singboxfmt.ShadowsocksBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
 import ru.ozero.singboxroom.entity.SubscriptionGroup
+import java.util.Base64
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
-@RunWith(RobolectricTestRunner::class)
-@Config(sdk = [33])
 class RawUpdaterTest {
 
     private val server = MockWebServer()
@@ -33,7 +28,7 @@ class RawUpdaterTest {
     private val vless2 =
         "vless://bbbbbbbb-2222-2222-2222-bbbbbbbbbbbb@s2.example.com:443?type=tcp&security=none#S2"
 
-    @Before
+    @BeforeEach
     fun setUp() {
         server.start()
         groupDao = FakeSubscriptionGroupDao()
@@ -45,7 +40,7 @@ class RawUpdaterTest {
         )
     }
 
-    @After
+    @AfterEach
     fun tearDown() {
         server.shutdown()
     }
@@ -108,7 +103,9 @@ class RawUpdaterTest {
 
     @Test
     fun `should fetch base64 bundle and insert profiles`() = runBlocking {
-        val encoded = Base64.encodeToString("$vless1\n$vless2".toByteArray(), Base64.NO_WRAP)
+        val encoded = Base64.getEncoder()
+            .withoutPadding()
+            .encodeToString("$vless1\n$vless2".toByteArray())
         server.enqueue(MockResponse().setBody(encoded))
         val g = group()
 

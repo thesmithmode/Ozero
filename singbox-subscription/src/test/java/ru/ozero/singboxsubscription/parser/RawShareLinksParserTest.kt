@@ -1,17 +1,12 @@
 package ru.ozero.singboxsubscription.parser
 
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
-import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
+import org.junit.jupiter.api.Test
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
-@RunWith(RobolectricTestRunner::class)
-@Config(sdk = [33])
 class RawShareLinksParserTest {
 
     private val sampleVless =
@@ -389,7 +384,13 @@ class RawShareLinksParserTest {
               "outbounds": [
                 { "type": "direct", "tag": "direct" },
                 { "type": "vless", "tag": "missing-server", "server_port": 443 },
-                { "type": "shadowsocks", "server": "ss.example.com", "server_port": 8388, "method": "2022-blake3-aes-128-gcm", "password": "pw" }
+                {
+                  "type": "shadowsocks",
+                  "server": "ss.example.com",
+                  "server_port": 8388,
+                  "method": "2022-blake3-aes-128-gcm",
+                  "password": "pw"
+                }
               ]
             }
         """.trimIndent()
