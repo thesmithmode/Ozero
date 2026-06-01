@@ -1,6 +1,8 @@
 package ru.ozero.singboxsubscription.parser
 
 import org.junit.jupiter.api.Test
+import java.util.Base64
+import ru.ozero.singboxfmt.ShadowsocksBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
@@ -399,5 +401,106 @@ class RawShareLinksParserTest {
 
         assertEquals(1, result.size)
         assertEquals("ss.example.com", result.first().serverAddress)
+    }
+
+    @Test
+    fun `should parse vmess trojan and shadowsocks share links`() {
+        val vmessJson = """
+            {"ps":"VM","add":"vm.example.com","port":"443","id":"uuid","aid":"0","net":"tcp","tls":"tls"}
+        """.trimIndent()
+        val vmess = "vmess://" + Base64.getUrlEncoder().withoutPadding().encodeToString(vmessJson.toByteArray())
+        val trojan = "trojan://secret@trojan.example.com:443?type=ws&host=front.example.com&path=/ws#TR"
+        val ssUser = Base64.getUrlEncoder().withoutPadding().encodeToString("aes-128-gcm:pwd".toByteArray())
+        val ss = "ss://$ssUser@ss.example.com:8388?plugin=v2ray-plugin#SS"
+
+        val result = RawShareLinksParser.parse("$vmess $trojan\n$ss")
+
+        assertEquals(3, result.size)
+        assertEquals("vm.example.com", (result[0] as VMessBean).serverAddress)
+        assertEquals("trojan.example.com", (result[1] as TrojanBean).serverAddress)
+        assertEquals("ss.example.com", (result[2] as ShadowsocksBean).serverAddress)
+    }
+
+    @Test
+    fun `should ignore non object sing-box outbounds and disabled tls`() {
+        val json = """
+            {
+              "outbounds": [
+                "bad",
+                {
+                  "type": "vless",
+                  "tag": "No TLS",
+                  "server": "plain.example.com",
+                  "server_port": 80,
+                  "uuid": "12345678-1234-1234-1234-123456789abc",
+                  "transport": { "type": "xhttp", "host": "front.example.com", "path": "/x" },
+                  "tls": { "enabled": false, "server_name": "ignored.example.com" }
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val result = RawShareLinksParser.parse(json)
+
+        assertEquals(1, result.size)
+        val bean = result.first() as VLESSBean
+        assertEquals("No TLS", bean.name)
+        assertEquals("splithttp", bean.type)
+        assertEquals("none", bean.security)
+        assertEquals("", bean.sni)
+    }
+
+    @Test
+    fun `should parse clash ss and vmess nested transport variants`() {
+        val yaml = """
+            proxies:
+              - name: SS Clash
+                type: ss
+                server: ss.example.com
+                port: 8388
+                cipher: aes-128-gcm
+                password: pwd
+                plugin: v2ray-plugin
+                plugin-opts: mode=websocket
+              - name: VMess HTTP
+                type: vmess
+                server: vm.example.com
+                port: 443
+                uuid: 12345678-1234-1234-1234-123456789abc
+                security: zero
+                network: h2
+                h2-opts:
+                  path: /h2
+                  host: [a.example.com, b.example.com]
+        """.trimIndent()
+
+        val result = RawShareLinksParser.parse(yaml)
+
+        assertEquals(2, result.size)
+        val ss = result[0] as ShadowsocksBean
+        assertEquals("aes-128-gcm", ss.method)
+        assertEquals("v2ray-plugin", ss.plugin)
+        val vmess = result[1] as VMessBean
+        assertEquals("http", vmess.type)
+        assertEquals("/h2", vmess.path)
+        assertEquals("a.example.com,b.example.com", vmess.host)
+        assertEquals("zero", vmess.encryption)
+    }
+
+    @Test
+    fun `should skip malformed clash yaml and invalid proxy entries`() {
+        assertTrue(RawShareLinksParser.parse("proxies: [").isEmpty())
+        assertTrue(RawShareLinksParser.parse("proxies:\n  - direct").isEmpty())
+        assertTrue(
+            RawShareLinksParser.parse(
+                """
+                proxies:
+                  - name: Missing port
+                    type: vless
+                    server: no-port.example.com
+                    uuid: 12345678-1234-1234-1234-123456789abc
+                """.trimIndent(),
+            ).isEmpty(),
+        )
     }
 }
