@@ -1,6 +1,9 @@
 package ru.ozero.enginewarp
 
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
+import ru.ozero.enginescore.VpnSocketProtector
+import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
@@ -32,6 +35,56 @@ class WarpRuntimeFingerprintTest {
         assertNotEquals(slot.runtimeFingerprint(), rawChanged.runtimeFingerprint())
         assertTrue(slot.runtimeFingerprint().toString().contains("sample-warp-key-a").not())
         assertTrue(slot.runtimeFingerprint().toString().contains("digest=***"))
+    }
+
+    @Test
+    fun `fingerprint covers empty optional lists`() {
+        val base = WarpConfigSlot(
+            id = "slot-empty",
+            name = "WARP",
+            config = config(
+                privateKey = "sample-warp-key-a",
+                dnsServers = emptyList(),
+            ).copy(allowedIps = emptyList()),
+            rawIniOverride = null,
+            endpointList = emptyList(),
+        )
+        val changedDns = base.copy(config = base.config.copy(dnsServers = listOf("1.1.1.1")))
+        val changedAllowed = base.copy(config = base.config.copy(allowedIps = listOf("0.0.0.0/0")))
+        val changedEndpointList = base.copy(endpointList = listOf("162.159.193.10:2408"))
+
+        assertNotEquals(base.runtimeFingerprint(), changedDns.runtimeFingerprint())
+        assertNotEquals(base.runtimeFingerprint(), changedAllowed.runtimeFingerprint())
+        assertNotEquals(base.runtimeFingerprint(), changedEndpointList.runtimeFingerprint())
+    }
+
+    @Test
+    fun `WarpSdkBridge default proxy methods are explicit unsupported noops`() = runTest {
+        val bridge = object : WarpSdkBridge {
+            override suspend fun attachTun(
+                tunnelName: String,
+                tunFd: Int,
+                iniConfig: String,
+                uapiPath: String,
+                protector: VpnSocketProtector,
+            ): WarpSdkBridge.AttachResult = WarpSdkBridge.AttachResult.Success
+
+            override suspend fun detachTun() = Unit
+            override fun isRunning(): Boolean = false
+            override fun reprotectSockets() = Unit
+        }
+
+        val proxy = bridge.startProxy(
+            tunnelName = "warp",
+            iniConfig = "[Interface]",
+            uapiPath = "/tmp/uapi.sock",
+            socksPort = 1080,
+            protector = VpnSocketProtector { true },
+        )
+
+        assertIs<WarpSdkBridge.ProxyResult.Failed>(proxy)
+        assertTrue(proxy.reason.contains("not supported"))
+        bridge.stopProxy()
     }
 
     private fun config(

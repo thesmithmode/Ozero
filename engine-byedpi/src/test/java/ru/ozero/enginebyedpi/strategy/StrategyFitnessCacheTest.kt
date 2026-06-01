@@ -94,6 +94,15 @@ class StrategyFitnessCacheTest {
     }
 
     @Test
+    fun `clear without file still empties cache`() {
+        val cache = newCache()
+        cache.put("-x", 1.0)
+        cache.clear()
+        assertEquals(0, cache.size())
+        assertEquals(false, file.exists())
+    }
+
+    @Test
     fun `put overwrites previous value for same command`() {
         val cache = newCache()
         cache.put("-K", 0.1)

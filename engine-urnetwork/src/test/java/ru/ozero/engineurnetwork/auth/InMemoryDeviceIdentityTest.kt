@@ -89,4 +89,14 @@ class InMemoryDeviceIdentityTest {
         assertTrue(target.importSeedFromBackup(seed))
         assertEquals(source.pubkeyBase58(), target.pubkeyBase58())
     }
+
+    @Test
+    fun `import rejects invalid seed size and keeps current identity`() = runTest {
+        val identity = InMemoryUrnetworkDeviceIdentity(ByteArray(32) { (it + 9).toByte() })
+        val before = identity.pubkeyBase58()
+
+        assertEquals(false, identity.importSeedFromBackup(ByteArray(31)))
+
+        assertEquals(before, identity.pubkeyBase58())
+    }
 }

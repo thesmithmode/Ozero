@@ -2,6 +2,7 @@ package ru.ozero.enginebyedpi.strategy
 
 import io.mockk.coEvery
 import io.mockk.mockk
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineCapabilities
@@ -176,6 +177,24 @@ class AutoStrategyPickerTest {
         assertEquals(Triple(1, 3, "a"), captured[0])
         assertEquals(Triple(2, 3, "b"), captured[1])
         assertEquals(Triple(3, 3, "c"), captured[2])
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun `between strategy delay is applied when configured`() = runTest {
+        val probe = mockk<SocksProbeClient>()
+        coEvery { probe.probe(any()) } returns ProbeResult("x", success = true, durationMs = 10L)
+        val picker = AutoStrategyPicker(
+            byeDpiEngine = fakeEngine(),
+            probeClient = probe,
+            strategies = listOf(ByeDpiStrategy("a"), ByeDpiStrategy("b")),
+            sites = listOf("x"),
+            betweenDelayMs = 25L,
+        )
+
+        picker.pickBest()
+
+        assertEquals(50L, testScheduler.currentTime)
     }
 
     @Test

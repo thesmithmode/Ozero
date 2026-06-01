@@ -66,6 +66,17 @@ class UrnetworkAuthServiceTest {
         assertIs<ClientJwtResult.Error>(r)
     }
 
+    @Test
+    fun `default device wallet jwt returns explicit not implemented error`() = runTest {
+        val service = FakeUrnetworkAuthService()
+        val r = service.acquireDeviceWalletJwt(
+            identity = InMemoryUrnetworkDeviceIdentity(ByteArray(32) { it.toByte() }),
+            networkName = "net",
+        )
+        val err = assertIs<DeviceWalletJwtResult.Error>(r)
+        assertTrue(err.message.contains("not implemented"))
+    }
+
     private class FakeUrnetworkAuthService(
         private val jwt: String = "fake.jwt",
         private val clientJwt: String = "fake.cjwt",
