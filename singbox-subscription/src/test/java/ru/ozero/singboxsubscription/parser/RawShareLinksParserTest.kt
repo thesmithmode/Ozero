@@ -638,5 +638,4 @@ class RawShareLinksParserTest {
         assertTrue(RawShareLinksParser.parse("""{"route":{}}""").isEmpty())
         assertTrue(RawShareLinksParser.parse("""["not", "object"]""").isEmpty())
     }
-
 }
