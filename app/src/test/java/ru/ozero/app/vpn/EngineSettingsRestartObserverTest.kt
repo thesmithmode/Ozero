@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -48,7 +49,7 @@ class EngineSettingsRestartObserverTest {
         advanceUntilIdle()
 
         flow.emit(SettingsModel.DEFAULT)
-        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
+        advanceRestartDebounce()
         advanceUntilIdle()
 
         assertTrue(collected.isEmpty(), "drop(1) must skip the initial emission")
@@ -65,7 +66,7 @@ class EngineSettingsRestartObserverTest {
         advanceUntilIdle()
 
         flow.emit(SettingsModel.DEFAULT)
-        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
+        advanceRestartDebounce()
         advanceUntilIdle()
         flow.emit(
             SettingsModel.DEFAULT.copy(
@@ -74,7 +75,7 @@ class EngineSettingsRestartObserverTest {
                 byedpiWinningArgs = "  --foo  ",
             ),
         )
-        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
+        advanceRestartDebounce()
         advanceUntilIdle()
 
         assertEquals(1, collected.size)
@@ -96,7 +97,7 @@ class EngineSettingsRestartObserverTest {
 
         flow.emit(SettingsModel.DEFAULT)
         flow.emit(SettingsModel.DEFAULT.copy(customDnsServers = listOf("8.8.8.8")))
-        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
+        advanceRestartDebounce()
         advanceUntilIdle()
 
         assertEquals(1, collected.size)
@@ -115,10 +116,10 @@ class EngineSettingsRestartObserverTest {
         advanceUntilIdle()
 
         flow.emit(SettingsModel.DEFAULT)
-        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
+        advanceRestartDebounce()
         advanceUntilIdle()
         flow.emit(SettingsModel.DEFAULT.copy(trafficMode = TrafficMode.PROXY))
-        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
+        advanceRestartDebounce()
         advanceUntilIdle()
 
         assertEquals(1, collected.size)
@@ -135,12 +136,12 @@ class EngineSettingsRestartObserverTest {
         advanceUntilIdle()
 
         flow.emit(SettingsModel.DEFAULT)
-        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
+        advanceRestartDebounce()
         advanceUntilIdle()
         flow.emit(SettingsModel.DEFAULT.copy(splitMode = SplitTunnelMode.ALLOWLIST))
         flow.emit(SettingsModel.DEFAULT.copy(splitMode = SplitTunnelMode.BLOCKLIST))
         flow.emit(SettingsModel.DEFAULT.copy(splitMode = SplitTunnelMode.ALL))
-        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
+        advanceRestartDebounce()
         advanceUntilIdle()
 
         assertTrue(
@@ -162,11 +163,11 @@ class EngineSettingsRestartObserverTest {
         advanceUntilIdle()
 
         flow.emit(SettingsModel.DEFAULT)
-        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
+        advanceRestartDebounce()
         advanceUntilIdle()
         flow.emit(SettingsModel.DEFAULT.copy(autoStart = true))
         flow.emit(SettingsModel.DEFAULT.copy(autoStart = true, urnetworkEnabled = true))
-        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
+        advanceRestartDebounce()
         advanceUntilIdle()
 
         assertTrue(collected.isEmpty(), "autoStart/urnetwork are not in the watched set")
@@ -182,14 +183,14 @@ class EngineSettingsRestartObserverTest {
         advanceUntilIdle()
 
         flow.emit(SettingsModel.DEFAULT)
-        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
+        advanceRestartDebounce()
         advanceUntilIdle()
         flow.emit(SettingsModel.DEFAULT.copy(manualEngine = EngineId.BYEDPI))
         flow.emit(SettingsModel.DEFAULT.copy(manualEngine = EngineId.WARP))
         flow.emit(SettingsModel.DEFAULT.copy(manualEngine = EngineId.URNETWORK))
         flow.emit(SettingsModel.DEFAULT.copy(manualEngine = EngineId.BYEDPI))
         flow.emit(SettingsModel.DEFAULT.copy(manualEngine = EngineId.WARP))
-        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
+        advanceRestartDebounce()
         advanceUntilIdle()
 
         assertEquals(
@@ -511,11 +512,11 @@ class EngineSettingsRestartObserverTest {
         )
         val changed = baseline.copy(customDnsServers = listOf("8.8.8.8"))
         flow.emit(baseline)
-        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
+        advanceRestartDebounce()
         advanceUntilIdle()
         flow.emit(changed.copy(manualEngine = EngineId.WARP))
         flow.emit(changed.copy(manualEngine = EngineId.BYEDPI))
-        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
+        advanceRestartDebounce()
         advanceUntilIdle()
 
         assertEquals(1, collected.size)
@@ -534,11 +535,11 @@ class EngineSettingsRestartObserverTest {
 
         val baseline = SettingsModel.DEFAULT.copy(manualEngine = EngineId.BYEDPI)
         flow.emit(baseline)
-        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
+        advanceRestartDebounce()
         advanceUntilIdle()
         flow.emit(baseline.copy(manualEngine = EngineId.WARP))
         flow.emit(baseline.copy(manualEngine = EngineId.BYEDPI))
-        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
+        advanceRestartDebounce()
         advanceUntilIdle()
 
         assertTrue(
@@ -582,14 +583,14 @@ class EngineSettingsRestartObserverTest {
 
         val autoMode = SettingsModel.DEFAULT.copy(manualEngine = null)
         flow.emit(autoMode)
-        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
+        advanceRestartDebounce()
         advanceUntilIdle()
         flow.emit(
             autoMode.copy(
                 engineAutoPriority = listOf(EngineId.URNETWORK, EngineId.WARP, EngineId.BYEDPI),
             ),
         )
-        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
+        advanceRestartDebounce()
         advanceUntilIdle()
 
         assertEquals(
@@ -616,14 +617,14 @@ class EngineSettingsRestartObserverTest {
 
         val manualMode = SettingsModel.DEFAULT.copy(manualEngine = EngineId.BYEDPI)
         flow.emit(manualMode)
-        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
+        advanceRestartDebounce()
         advanceUntilIdle()
         flow.emit(
             manualMode.copy(
                 engineAutoPriority = listOf(EngineId.URNETWORK, EngineId.WARP, EngineId.BYEDPI),
             ),
         )
-        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
+        advanceRestartDebounce()
         advanceUntilIdle()
 
         assertTrue(
@@ -667,5 +668,9 @@ class EngineSettingsRestartObserverTest {
 
     private fun alwaysConnected(): () -> TunnelState = {
         TunnelState.Connected(engineId = EngineId.BYEDPI, socksPort = 1080)
+    }
+
+    private fun TestScope.advanceRestartDebounce() {
+        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS + 1)
     }
 }
