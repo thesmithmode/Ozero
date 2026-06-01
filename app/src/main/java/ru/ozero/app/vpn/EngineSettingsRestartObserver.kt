@@ -1,5 +1,6 @@
 package ru.ozero.app.vpn
 
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -54,7 +55,7 @@ class EngineSettingsRestartObserver(
                     return@collect
                 }
                 pending?.cancel()
-                pending = launch {
+                pending = launch(start = CoroutineStart.UNDISPATCHED) {
                     delay(RESTART_DEBOUNCE_MS)
                     if (previous != snapshot) {
                         send(Trigger(previous = previous, snapshot = snapshot))
