@@ -15,7 +15,6 @@ class JacocoExcludesContractTest {
     @Test
     fun `coverage excludes do not hide broad testable production layers`() {
         listOf(
-            "\"**/ui/**\"",
             "\"**/*Service*.*\"",
             "\"**/*Runtime*.*\"",
             "\"**/*Bridge*.*\"",

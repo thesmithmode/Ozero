@@ -20,7 +20,7 @@ class EngineRuntimeConfigRestartObserver @Inject constructor(
 ) {
     fun start(
         scope: CoroutineScope,
-        lifecycle: Lifecycle,
+        lifecycle: Lifecycle?,
         exceptionHandler: CoroutineExceptionHandler,
         state: StateFlow<TunnelState>,
         restart: suspend (String) -> Unit,
