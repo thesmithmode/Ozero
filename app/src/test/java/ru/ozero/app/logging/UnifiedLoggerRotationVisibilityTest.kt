@@ -29,7 +29,7 @@ class UnifiedLoggerRotationVisibilityTest {
     private fun forceRotation() {
         val target = UnifiedLogger.file() ?: error("logger must be initialized before rotation")
         val filler = "prefill "
-        target.writeText(filler.repeat((LogFileStore.MAX_BYTES / filler.length).toInt()) + "x")
+        target.appendText(filler.repeat((LogFileStore.MAX_BYTES / filler.length).toInt()) + "x")
         LogFileStore.rotateIfTooLarge(target)
     }
 
