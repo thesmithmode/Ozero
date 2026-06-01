@@ -159,6 +159,7 @@ val excludedClasses = listOf(
     "**/singboxfmt/V2RayFmtUtils*.*",
     "**/singboxfmt/VMessBean*.*",
     "**/singboxfmt/VMessFmt*.*",
+    "**/singboxsubscription/RawUpdater\$Companion*.*",
     "**/singboxsubscription/RawUpdater\$refresh\$*.*",
     "**/singboxsubscription/parser/Base64BundleParser*.*",
     "**/singboxsubscription/parser/ClashYamlParser*.*",
