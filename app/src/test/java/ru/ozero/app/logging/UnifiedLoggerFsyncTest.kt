@@ -49,11 +49,12 @@ class UnifiedLoggerFsyncTest {
     @Test
     fun `rotate работает при превышении MAX_BYTES`() {
         UnifiedLogger.init(mockContext())
-        val chunk = "x".repeat(50_000)
-        repeat(120) { UnifiedLogger.info("Bulk", chunk) }
+        val target = assertNotNull(UnifiedLogger.file())
+        val filler = "prefill "
+        target.writeText(filler.repeat((LogFileStore.MAX_BYTES / filler.length).toInt()))
+        UnifiedLogger.info("Bulk", "rotation marker ".repeat(64))
         val prev = File(File(tmp, "logs"), "ozero.log.prev")
         assertTrue(prev.exists(), "ожидали ротацию в ozero.log.prev")
-        val target = assertNotNull(UnifiedLogger.file())
         assertTrue(target.exists())
     }
 
