@@ -6,7 +6,7 @@ import java.net.URLDecoder
 internal class UriCompat private constructor(private val raw: String) {
 
     private val uri: URI? = runCatching { URI(raw) }.getOrNull()
-    private val queryParams: Map<String, String> by lazy { parseQuery(uri?.rawQuery) }
+    private val queryParams: Map<String, String> by lazy { parseQuery(uri?.rawQuery ?: rawQueryFallback()) }
 
     val host: String? get() = uri?.host
     val port: Int get() = uri?.port ?: -1
@@ -17,6 +17,17 @@ internal class UriCompat private constructor(private val raw: String) {
 
     companion object {
         fun parse(uriString: String): UriCompat = UriCompat(uriString)
+
+        private fun UriCompat.rawQueryFallback(): String? {
+            val queryStart = raw.indexOf('?')
+            if (queryStart < 0) return null
+            val fragmentStart = raw.indexOf('#', startIndex = queryStart + 1)
+            return if (fragmentStart < 0) {
+                raw.substring(queryStart + 1)
+            } else {
+                raw.substring(queryStart + 1, fragmentStart)
+            }
+        }
 
         private fun parseQuery(rawQuery: String?): Map<String, String> {
             if (rawQuery.isNullOrEmpty()) return emptyMap()

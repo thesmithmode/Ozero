@@ -158,7 +158,7 @@ class SocksProbeClientTest {
         every { conn.errorStream } returns ByteArrayInputStream(byteArrayOf(1, 2, 3, 4))
         every { conn.inputStream } throws AssertionError("input stream must not be used")
 
-        val result = client { _, _ -> conn }.probe("blocked.com")
+        val result = client(opener = { _, _ -> conn }).probe("blocked.com")
 
         assertTrue(result.success)
         assertEquals(403, result.responseCode)
@@ -172,7 +172,7 @@ class SocksProbeClientTest {
         every { conn.contentLengthLong } returns 10L
         every { conn.errorStream } returns null
 
-        val result = client { _, _ -> conn }.probe("blocked.com")
+        val result = client(opener = { _, _ -> conn }).probe("blocked.com")
 
         assertFalse(result.success)
         assertEquals(0L, result.actualLength)
@@ -210,7 +210,7 @@ class SocksProbeClientTest {
         every { conn.contentLengthLong } returns 4L
         every { conn.inputStream } returns stream
 
-        val result = client { _, _ -> conn }.probe("example.com")
+        val result = client(opener = { _, _ -> conn }).probe("example.com")
 
         assertFalse(result.success)
         assertEquals(2L, result.actualLength)
