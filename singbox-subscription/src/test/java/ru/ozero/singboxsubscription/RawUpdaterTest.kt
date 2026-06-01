@@ -13,6 +13,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import ru.ozero.singboxfmt.ShadowsocksBean
+import ru.ozero.singboxfmt.TrojanBean
+import ru.ozero.singboxfmt.VLESSBean
+import ru.ozero.singboxfmt.VMessBean
 import ru.ozero.singboxroom.entity.SubscriptionGroup
 
 @RunWith(RobolectricTestRunner::class)
@@ -145,6 +149,61 @@ class RawUpdaterTest {
         val updated = groupDao.groups.first { it.id == g.id }
         assertEquals(1800000000L, updated.expiryDate)
         assertEquals(700L, updated.bytesRemaining)
+    }
+
+    @Test
+    fun `should clamp negative remaining bytes from Subscription-Userinfo`() = runBlocking {
+        server.enqueue(
+            MockResponse()
+                .addHeader("Subscription-Userinfo", "upload=700; download=500; total=1000; expire=1800000000")
+                .setBody(vless1),
+        )
+        val g = group()
+
+        rawUpdater.refresh(g)
+
+        val updated = groupDao.groups.first { it.id == g.id }
+        assertEquals(1200L, updated.bytesUsed)
+        assertEquals(0L, updated.bytesRemaining)
+    }
+
+    @Test
+    fun `should preserve group traffic metadata when Subscription-Userinfo is absent`() = runBlocking {
+        server.enqueue(MockResponse().setBody(vless1))
+        val g = group().copy(bytesUsed = 11L, bytesRemaining = 22L, expiryDate = 33L)
+        groupDao.groups.clear()
+        groupDao.groups.add(g)
+
+        rawUpdater.refresh(g)
+
+        val updated = groupDao.groups.first { it.id == g.id }
+        assertEquals(11L, updated.bytesUsed)
+        assertEquals(22L, updated.bytesRemaining)
+        assertEquals(33L, updated.expiryDate)
+    }
+
+    @Test
+    fun `should use fallback server names when imported bean has blank name`() = runBlocking {
+        val unnamed =
+            "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@s1.example.com:443?type=tcp&security=none"
+        server.enqueue(MockResponse().setBody("$unnamed\n$unnamed"))
+        val g = group()
+
+        rawUpdater.refresh(g)
+
+        assertEquals(listOf("Server 1", "Server 2"), profileDao.profiles.map { it.name })
+    }
+
+    @Test
+    fun `protocolTypeOf maps all supported bean classes and defaults unknown to VLESS`() {
+        assertEquals(RawUpdater.PROTOCOL_VLESS, RawUpdater.protocolTypeOf(VLESSBean()))
+        assertEquals(RawUpdater.PROTOCOL_VMESS, RawUpdater.protocolTypeOf(VMessBean()))
+        assertEquals(RawUpdater.PROTOCOL_TROJAN, RawUpdater.protocolTypeOf(TrojanBean()))
+        assertEquals(RawUpdater.PROTOCOL_SHADOWSOCKS, RawUpdater.protocolTypeOf(ShadowsocksBean()))
+        assertEquals(
+            RawUpdater.PROTOCOL_VLESS,
+            RawUpdater.protocolTypeOf(object : ru.ozero.singboxfmt.AbstractBean() {}),
+        )
     }
 
     @Test
