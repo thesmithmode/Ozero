@@ -4,6 +4,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.flowWithLifecycle
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -54,7 +55,7 @@ class EngineRuntimeConfigRestartObserver @Inject constructor(
         state: Flow<TunnelState>,
         restart: suspend (String) -> Unit,
     ) {
-        scope.launch(exceptionHandler) {
+        scope.launch(exceptionHandler, start = CoroutineStart.UNDISPATCHED) {
             val lifecycleFlow = if (lifecycle != null) {
                 changes.flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
             } else {

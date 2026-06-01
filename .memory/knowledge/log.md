@@ -1121,3 +1121,11 @@
 - Source: daily/2026-05-31.md
 - Articles created: [[concepts/engine-runtime-config-provider-boundary]], [[concepts/settings-restart-baseline-debounce-state-machine]], [[concepts/fptn-runtime-fingerprint-replay-contract]], [[concepts/warp-readiness-delayed-handshake-contract]], [[concepts/intentional-tradeoff-sentinel-documentation]], [[connections/runtime-config-restart-boundary-loop]]
 - Articles updated: none
+## [2026-06-01T21:53:43+03:00] compile | 2026-05-31.md
+- Source: daily/2026-05-31.md
+- Articles created: [[concepts/local-gradle-validation-ban-ci-only]], [[concepts/runtime-restart-pending-fingerprint-baseline]], [[concepts/engine-runtime-provider-composition-root-boundary]], [[concepts/warp-proxy-config-wgquick-precedence]], [[concepts/ci-snapshot-artifact-failure-grounding]]
+- Articles updated: none
+## [2026-06-01T21:56:18+03:00] compile | 2026-06-01.md
+- Source: daily/2026-06-01.md
+- Articles created: [[concepts/warp-pretunnel-endpoint-doh-parity]], [[concepts/warp-awg-field-preservation-contract]], [[concepts/jacoco-honest-coverage-gate-boundary]], [[concepts/runTest-backgroundscope-hot-flow-collectors]], [[concepts/bootstrap-signature-real-trust-gate]], [[connections/post-release-ci-gate-test-harness-feedback-loop]]
+- Articles updated: none
