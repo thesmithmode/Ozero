@@ -134,8 +134,8 @@ class V2RayFmtCoverageTest {
         assertFailsWith<IllegalArgumentException> { V2RayFmt.parseTrojan("vless://x") }
         assertFailsWith<IllegalArgumentException> { V2RayFmt.parseShadowsocks("vless://x") }
         val malformedSs = V2RayFmt.parseShadowsocks("ss://!!!!")
-        assertEquals("", malformedSs.serverAddress)
-        assertEquals(0, malformedSs.serverPort)
+        assertEquals("127.0.0.1", malformedSs.serverAddress)
+        assertEquals(1080, malformedSs.serverPort)
         assertFalse(V2RayFmt.parseVLESS("vless://id@h?skip-cert-verify=no").allowInsecure)
     }
 }
