@@ -41,11 +41,13 @@ class ConfigBuilderBranchCoverageTest {
     @Test
     fun `httpupgrade transport omits empty fields and emits host when present`() {
         val empty = ConfigBuilder.buildSingboxConfig(vless().apply { type = "httpupgrade" })
-        val filled = ConfigBuilder.buildSingboxConfig(vless().apply {
-            type = "httpupgrade"
-            host = "front.example.com"
-            path = "/upgrade"
-        })
+        val filled = ConfigBuilder.buildSingboxConfig(
+            vless().apply {
+                type = "httpupgrade"
+                host = "front.example.com"
+                path = "/upgrade"
+            },
+        )
 
         assertContains(empty, "\"type\":\"httpupgrade\"")
         assertContains(empty, "\"path\":\"/\"")
