@@ -280,4 +280,26 @@ class SubscriptionParserBranchCoverageTest {
         assertEquals("tls", trojan.security)
         assertEquals("h2", trojan.alpn)
     }
+
+    @Test
+    fun `raw parser falls back to clash yaml when links and json are absent`() {
+        val yaml = """
+            proxies:
+              - name: Clash SS
+                type: ss
+                server: ss.example.com
+                port: 8388
+                method: chacha20-ietf-poly1305
+                password: secret
+        """.trimIndent()
+
+        val result = RawShareLinksParser.parse(yaml)
+
+        assertEquals(1, result.size)
+        val ss = result.single() as ShadowsocksBean
+        assertEquals("Clash SS", ss.name)
+        assertEquals("ss.example.com", ss.serverAddress)
+        assertEquals(8388, ss.serverPort)
+        assertEquals("chacha20-ietf-poly1305", ss.method)
+    }
 }

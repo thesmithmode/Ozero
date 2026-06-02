@@ -39,17 +39,19 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
         )
     }
 
-    private suspend fun restartVpnIfRunning(reason: String) {
+    private suspend fun restartVpnIfRunning(reason: String): Boolean {
         if (!restartMutex.tryLock()) {
             restartPending = true
             AppLogger.d(TAG, "runtime config restart request coalesced")
-            return
+            return false
         }
+        var completed = false
         try {
             var nextReason = reason
             do {
                 restartPending = false
-                if (!performRestartIfRunning(nextReason)) return
+                if (!performRestartIfRunning(nextReason)) return false
+                completed = true
                 nextReason = "coalesced runtime config changed while restart was running -> restart"
                 if (restartPending) {
                     withTimeoutOrNull(RESTART_SETTLE_TIMEOUT_MS) {
@@ -59,6 +61,7 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
                     }
                 }
             } while (restartPending)
+            return completed
         } finally {
             restartMutex.unlock()
         }

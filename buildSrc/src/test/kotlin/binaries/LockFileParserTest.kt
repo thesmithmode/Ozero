@@ -423,6 +423,25 @@ class LockFileParserTest {
         assertThatThrownBy { LockFileParser.parse(missingSize) }
             .isInstanceOf(LockFileException::class.java)
             .hasMessageContaining("size_bytes")
+
+        val missingSourceCommit = write(
+            """
+            tag: binaries-x
+            generated_at: 2026-04-25T10:00:00Z
+            artifacts:
+              - name: libx.so
+                engine: x
+                abi: arm64-v8a
+                destination: jniLibs
+                download_url: https://example.com/x.so
+                sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                size_bytes: 1
+                source_repo: https://example.com
+            """.trimIndent(),
+        )
+        assertThatThrownBy { LockFileParser.parse(missingSourceCommit) }
+            .isInstanceOf(LockFileException::class.java)
+            .hasMessageContaining("source_commit")
     }
 
     @Test

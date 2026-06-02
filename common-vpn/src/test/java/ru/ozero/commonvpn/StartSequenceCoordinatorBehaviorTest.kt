@@ -173,6 +173,41 @@ class StartSequenceCoordinatorBehaviorTest {
     }
 
     @Test
+    fun `auto preflight rejects all candidates and requests service stop`() = runTest {
+        val first = FakeEnginePlugin(
+            id = EngineId.WARP,
+            preflightResult = EnginePreflight.Result.Fail("offline"),
+            capabilities = standaloneProxyCapabilities(),
+        )
+        val second = FakeEnginePlugin(
+            id = EngineId.SINGBOX,
+            preflightResult = EnginePreflight.Result.Fail("blocked"),
+            capabilities = standaloneProxyCapabilities(),
+        )
+        val fixture = startFixture(
+            first,
+            second,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.PROXY,
+                manualEngine = null,
+                engineAutoPriority = listOf(EngineId.WARP, EngineId.SINGBOX),
+            ),
+        )
+
+        fixture.coordinator.run()
+
+        assertEquals(0, first.startedConfigs.size)
+        assertEquals(0, second.startedConfigs.size)
+        assertEquals(true, fixture.stopRequested.get())
+        verify(exactly = 1) {
+            fixture.engineWatchdog.handleEngineFailure(
+                EngineId.WARP,
+                match { it.contains("no engine reachable") },
+            )
+        }
+    }
+
+    @Test
     fun `stopping state exits before settings or engine side effects`() = runTest {
         val engine = FakeEnginePlugin(id = EngineId.SINGBOX, capabilities = standaloneProxyCapabilities())
         val fixture = startFixture(

@@ -343,10 +343,9 @@ class OzeroVpnService : android.net.VpnService() {
 
     private fun restartVpn() {
         val shutdownStarted = stopping.compareAndSet(false, true)
-        if (shutdownStarted) {
-            stopping.set(false)
-            shutdownCoord.stopVpn(callStopSelf = false)
-        }
+        if (!shutdownStarted) return
+        stopping.set(false)
+        shutdownCoord.stopVpn(callStopSelf = false)
         serviceScope.launch {
             shutdownJobRef.get()?.let { job ->
                 runCatching { withTimeoutOrNull(SHUTDOWN_JOIN_TIMEOUT_MS) { job.join() } }

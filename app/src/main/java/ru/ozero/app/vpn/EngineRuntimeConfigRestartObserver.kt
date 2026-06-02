@@ -20,7 +20,7 @@ class EngineRuntimeConfigRestartObserver @Inject constructor(
         scope: CoroutineScope,
         exceptionHandler: CoroutineExceptionHandler,
         state: StateFlow<TunnelState>,
-        restart: suspend (String) -> Unit,
+        restart: suspend (String) -> Boolean,
     ) {
         providers.forEach { provider ->
             observeFlow(
@@ -48,7 +48,7 @@ class EngineRuntimeConfigRestartObserver @Inject constructor(
         adoptedBaselineFrom: Any? = null,
         exceptionHandler: CoroutineExceptionHandler = CoroutineExceptionHandler { _, _ -> },
         state: Flow<TunnelState>,
-        restart: suspend (String) -> Unit,
+        restart: suspend (String) -> Boolean,
     ) {
         scope.launch(exceptionHandler, start = CoroutineStart.UNDISPATCHED) {
             var baseline: Any? = UNSET
@@ -61,9 +61,10 @@ class EngineRuntimeConfigRestartObserver @Inject constructor(
                         when {
                             current == pendingRestart.baseline -> pending = null
                             connectedEngine(tunnelState) == engineId && current == pendingRestart.fingerprint -> {
-                                pending = null
-                                baseline = current
-                                restart(pendingRestart.reason)
+                                if (restart(pendingRestart.reason)) {
+                                    pending = null
+                                    baseline = current
+                                }
                                 return@collect
                             }
                             startingEngine(tunnelState) == engineId -> {
@@ -83,8 +84,7 @@ class EngineRuntimeConfigRestartObserver @Inject constructor(
                         return@collect
                     }
                     if (activeEngine(tunnelState, includeStarting) == engineId) {
-                        baseline = current
-                        restart(reason)
+                        if (restart(reason)) baseline = current
                     } else if (replayAfterStarting && !includeStarting && startingEngine(tunnelState) == engineId) {
                         pending = PendingRestart(
                             reason = reason,

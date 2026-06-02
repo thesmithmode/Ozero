@@ -112,7 +112,7 @@ class StartSequenceCoordinator(
                 deps.tunnelController.onProbing(targetForUi)
                 deps.engineWatchdog.handleEngineFailure(targetForUi, "no engine reachable ($mode mode)")
             }
-            if (targetForUi == null) stopVpnRequest()
+            stopVpnRequest()
             return
         }
         picks.forEachIndexed { index, pick ->

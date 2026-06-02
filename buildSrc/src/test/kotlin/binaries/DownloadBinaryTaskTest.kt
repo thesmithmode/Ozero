@@ -210,6 +210,34 @@ class DownloadBinaryTaskTest {
     }
 
     @Test
+    fun `task downloads libs artifact using original name when target filename is absent`() {
+        val data = "fake-aar".toByteArray()
+        val sha = sha256(data)
+        server.enqueue(MockResponse().setResponseCode(200).setBody(Buffer().write(data)))
+        val lockPath = writeLock(
+            """
+            tag: binaries-test
+            generated_at: 2026-04-25T10:00:00Z
+            artifacts:
+              - name: original.aar
+                engine: xray
+                destination: libs
+                download_url: ${server.url("/x.aar")}
+                sha256: $sha
+                size_bytes: ${data.size}
+                source_repo: https://github.com/XTLS/Xray-core
+                source_commit: ${"a".repeat(40)}
+            """,
+        )
+        val testModuleDir = tmp.resolve("module-libs-original")
+        val task = newTask(lockPath = lockPath, testModuleDir = testModuleDir, requested = listOf("original.aar"))
+
+        task.run()
+
+        assertThat(Files.readAllBytes(testModuleDir.resolve("libs/original.aar"))).isEqualTo(data)
+    }
+
+    @Test
     fun `task wraps malformed lock file as gradle exception`() {
         val lockPath = writeLock("tag: [unclosed")
         val task = newTask(lockPath = lockPath, requested = listOf("libbyedpi-arm64-v8a.so"))
