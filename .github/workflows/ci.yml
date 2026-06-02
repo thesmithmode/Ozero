@@ -167,7 +167,7 @@ jobs:
           cache: gradle
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
+        uses: android-actions/setup-android@v3
 
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v6
@@ -292,7 +292,7 @@ jobs:
           cache: gradle
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
+        uses: android-actions/setup-android@v3
 
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v6
@@ -414,7 +414,7 @@ jobs:
           cache: gradle
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
+        uses: android-actions/setup-android@v3
 
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v6
@@ -464,7 +464,7 @@ jobs:
           cache: gradle
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
+        uses: android-actions/setup-android@v3
 
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v6
@@ -514,7 +514,7 @@ jobs:
           cache: gradle
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
+        uses: android-actions/setup-android@v3
 
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v6
@@ -613,7 +613,7 @@ jobs:
           cache: gradle
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
+        uses: android-actions/setup-android@v3
 
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v6
@@ -723,7 +723,7 @@ jobs:
           cache: gradle
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
+        uses: android-actions/setup-android@v3
 
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v6

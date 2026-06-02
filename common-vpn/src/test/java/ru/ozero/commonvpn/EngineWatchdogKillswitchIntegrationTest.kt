@@ -130,7 +130,7 @@ class EngineWatchdogKillswitchIntegrationTest {
         }
 
     @Test
-    fun `handleEngineFailure killswitch=true + fdAlive + stopping=true — graceful shutdown без lockdown`() =
+    fun `handleEngineFailure killswitch=true + fdAlive + stopping=true — не re-enter shutdown`() =
         runTest(UnconfinedTestDispatcher()) {
             val controller = TunnelController()
             controller.onProbing(EngineId.WARP)
@@ -160,9 +160,9 @@ class EngineWatchdogKillswitchIntegrationTest {
                 "Engine failure во время stopping не должен превращать Disconnecting в Failed.",
             )
             assertEquals(
-                1,
+                0,
                 stopVpnCount.get(),
-                "Во время stopping watchdog должен делегировать в graceful shutdown branch, а не включать lockdown.",
+                "Во время stopping watchdog не должен повторно входить в stopVpnRequest.",
             )
         }
 
