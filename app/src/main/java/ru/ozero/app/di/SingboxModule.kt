@@ -28,6 +28,8 @@ import ru.ozero.singboxroom.SingboxDatabase
 import ru.ozero.singboxroom.dao.ProxyChainDao
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.dao.SubscriptionGroupDao
+import ru.ozero.singboxroom.entity.ProxyChainStep
+import ru.ozero.singboxroom.entity.ProxyProfile
 import ru.ozero.singboxsubscription.GroupSeeder
 import ru.ozero.singboxsubscription.RawUpdater
 import java.util.concurrent.TimeUnit
@@ -125,15 +127,30 @@ object SingboxModule {
             profileDao.getAllFlow(),
             proxyChainDao.getAllFlow(),
         ) { prefs, profiles, chainSteps ->
-            val selectedProfileId = prefs[SingboxProbeService.SELECTED_PROFILE_KEY]
-            val selectedBlobHash = prefs[SingboxProbeService.BEAN_KEY]?.contentHashCode() ?: 0
-            val profileBlobHashes = profiles
-                .sortedBy { it.id }
-                .map { it.id to it.beanBlob.contentHashCode() }
-            val chainProfileIds = chainSteps.map { it.profileId }
-            listOf(selectedProfileId, selectedBlobHash, profileBlobHashes, chainProfileIds)
+            singboxRuntimeFingerprint(prefs, profiles, chainSteps)
         }
         override val includeStarting: Boolean = false
         override val restartReason: String = "singbox profile changed while connected -> restart"
+    }
+
+    private fun singboxRuntimeFingerprint(
+        prefs: Preferences,
+        profiles: List<ProxyProfile>,
+        chainSteps: List<ProxyChainStep>,
+    ): Any {
+        val selectedProfileId = prefs[SingboxProbeService.SELECTED_PROFILE_KEY]
+        if (selectedProfileId == SingboxEngine.SELECTED_AUTO) {
+            val profileBlobHashes = profiles
+                .sortedBy { it.id }
+                .map { it.id to it.beanBlob.contentHashCode() }
+            return listOf(selectedProfileId, profileBlobHashes)
+        }
+        val profilesById = profiles.associateBy { it.id }
+        val selectedBlobHash = prefs[SingboxProbeService.BEAN_KEY]?.contentHashCode() ?: 0
+        val activeProfileBlobHashes = chainSteps
+            .map { it.profileId }
+            .filter { it != selectedProfileId }
+            .mapNotNull { id -> profilesById[id]?.let { id to it.beanBlob.contentHashCode() } }
+        return listOf(selectedProfileId, selectedBlobHash, activeProfileBlobHashes)
     }
 }
