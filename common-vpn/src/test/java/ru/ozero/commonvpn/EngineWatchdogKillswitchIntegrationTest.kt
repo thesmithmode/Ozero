@@ -27,6 +27,7 @@ class EngineWatchdogKillswitchIntegrationTest {
         killswitch: Boolean,
         tunFd: ParcelFileDescriptor?,
         lockdownStartupFd: ParcelFileDescriptor? = null,
+        stopping: Boolean = false,
         stopVpnInvocations: AtomicReference<Int>,
     ): EngineWatchdogCoordinator {
         val healthMonitor = HealthMonitor()
@@ -34,7 +35,7 @@ class EngineWatchdogKillswitchIntegrationTest {
         val notificationFactory = mockk<OzeroNotificationFactory>(relaxed = true)
         val tunFdRef = AtomicReference<ParcelFileDescriptor?>(tunFd)
         val statsJobRef = AtomicReference<Job?>(null)
-        val stopping = AtomicBoolean(false)
+        val stopping = AtomicBoolean(stopping)
         val starting = AtomicBoolean(false)
         return EngineWatchdogCoordinator(
             scope = scope,
@@ -125,6 +126,43 @@ class EngineWatchdogKillswitchIntegrationTest {
                 stopVpnCount.get(),
                 "stopVpnRequest НЕ должен вызываться при killswitch=true — chain должен остаться " +
                     "остановленным но VPN service сохраняется для UI lockdown notification.",
+            )
+        }
+
+    @Test
+    fun `handleEngineFailure killswitch=true + fdAlive + stopping=true — graceful shutdown без lockdown`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val controller = TunnelController()
+            controller.onProbing(EngineId.WARP)
+            controller.onConnecting(EngineId.WARP)
+            controller.onEngineStarted(EngineId.WARP, socksPort = 0)
+            controller.onDisconnecting()
+
+            val stopVpnCount = AtomicReference(0)
+            val fakeFd = mockk<ParcelFileDescriptor>(relaxed = true)
+            val watchdog = buildWatchdog(
+                controller = controller,
+                scope = CoroutineScope(UnconfinedTestDispatcher() + SupervisorJob()),
+                killswitch = true,
+                tunFd = fakeFd,
+                stopping = true,
+                stopVpnInvocations = stopVpnCount,
+            )
+
+            watchdog.handleEngineFailure(EngineId.WARP, "remote-binder-died")
+
+            assertFalse(
+                controller.killswitchActive.value,
+                "killswitchActive обязан остаться false при штатной остановке, даже если fd ещё живой.",
+            )
+            assertIs<TunnelState.Disconnecting>(
+                controller.state.value,
+                "Engine failure во время stopping не должен превращать Disconnecting в Failed.",
+            )
+            assertEquals(
+                1,
+                stopVpnCount.get(),
+                "Во время stopping watchdog должен делегировать в graceful shutdown branch, а не включать lockdown.",
             )
         }
 
