@@ -277,7 +277,7 @@ class StartSequenceCoordinatorBehaviorTest {
     }
 
     @Test
-    fun `killswitch startup TUN is established before engine selection and closed after final TUN`() = runTest {
+    fun `killswitch startup TUN is established before engine selection and retained with final TUN`() = runTest {
         val engine = FakeEnginePlugin(id = EngineId.BYEDPI, socksPort = 2095, capabilities = tunnelCapabilities())
         val fixture = startFixture(
             engine,
@@ -304,7 +304,8 @@ class StartSequenceCoordinatorBehaviorTest {
         fixture.coordinator.run()
 
         assertEquals(listOf(true), fixture.killswitchValues)
-        verify(exactly = 1) { startupFd.close() }
+        verify(exactly = 0) { startupFd.close() }
+        assertEquals(startupFd, fixture.state.lockdownStartupFdRef.get())
         assertEquals(finalFd, fixture.state.tunFdRef.get())
         verify(exactly = 1) { fixture.tunnelGateway.start(match { it.tunPfd === finalFd && it.socksPort == 2095 }) }
     }

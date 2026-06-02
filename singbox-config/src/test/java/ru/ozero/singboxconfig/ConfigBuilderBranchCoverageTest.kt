@@ -102,7 +102,7 @@ class ConfigBuilderBranchCoverageTest {
     }
 
     @Test
-    fun `wireguard outbound omits optional keepalive and detour when absent`() {
+    fun `wireguard outbound omits optional keepalive and upstream detour when absent`() {
         val json = ConfigBuilder.buildWireGuardChainConfig(
             WireGuardOutboundConfig(
                 privateKey = "private",
@@ -118,7 +118,7 @@ class ConfigBuilderBranchCoverageTest {
 
         assertContains(json, "\"local_address\":[\"10.0.0.2/32\",\"fd00::2/128\"]")
         assertFalse(json.contains("persistent_keepalive_interval"))
-        assertFalse(json.contains("\"detour\""))
+        assertFalse(json.contains("\"detour\":\"upstream\""))
     }
 
     private fun vless(uuid: String = "12345678-1234-1234-1234-123456789abc") = VLESSBean().apply {

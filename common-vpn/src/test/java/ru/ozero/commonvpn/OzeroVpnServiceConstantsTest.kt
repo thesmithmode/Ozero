@@ -15,6 +15,11 @@ class OzeroVpnServiceConstantsTest {
     }
 
     @Test
+    fun actionRestartRuntimeConfigHasCorrectValue() {
+        assertEquals("ru.ozero.vpn.ACTION_RESTART_RUNTIME_CONFIG", OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG)
+    }
+
+    @Test
     fun tunAddressIsPrivateRange() {
         assertEquals("10.10.10.10", OzeroVpnService.TUN_ADDRESS)
     }

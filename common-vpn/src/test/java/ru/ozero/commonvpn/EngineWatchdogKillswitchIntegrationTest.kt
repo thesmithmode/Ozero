@@ -167,6 +167,33 @@ class EngineWatchdogKillswitchIntegrationTest {
         }
 
     @Test
+    fun `handleEngineFailure ignores inactive sidecar engine without killswitch or stop`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val controller = TunnelController()
+            controller.onProbing(EngineId.WARP)
+            controller.onConnecting(EngineId.WARP)
+            controller.onEngineStarted(EngineId.WARP, socksPort = 0)
+
+            val stopVpnCount = AtomicReference(0)
+            val fakeFd = mockk<ParcelFileDescriptor>(relaxed = true)
+            val watchdog = buildWatchdog(
+                controller = controller,
+                scope = CoroutineScope(UnconfinedTestDispatcher() + SupervisorJob()),
+                killswitch = true,
+                tunFd = fakeFd,
+                stopVpnInvocations = stopVpnCount,
+            )
+
+            watchdog.handleEngineFailure(EngineId.URNETWORK, "relay io-loop-ended")
+
+            assertFalse(controller.killswitchActive.value)
+            assertEquals(0, stopVpnCount.get())
+            val state = controller.state.value
+            assertIs<TunnelState.Connected>(state)
+            assertEquals(EngineId.WARP, state.engineId)
+        }
+
+    @Test
     fun `handleEngineFailure killswitch=false — observer видит Failed но НЕ killswitchActive`() =
         runTest(UnconfinedTestDispatcher()) {
             val controller = TunnelController()

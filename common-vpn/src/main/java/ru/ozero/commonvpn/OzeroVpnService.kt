@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_START
+import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_RESTART_RUNTIME_CONFIG
 import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_STOP
 import ru.ozero.enginescore.ChainOrchestrator
 import ru.ozero.enginescore.EnginePlugin
@@ -163,6 +164,7 @@ class OzeroVpnService : android.net.VpnService() {
     companion object {
         const val ACTION_START = "ru.ozero.vpn.ACTION_START"
         const val ACTION_STOP = "ru.ozero.vpn.ACTION_STOP"
+        const val ACTION_RESTART_RUNTIME_CONFIG = "ru.ozero.vpn.ACTION_RESTART_RUNTIME_CONFIG"
         const val TUN_ADDRESS = TunBuilderHelper.TUN_ADDRESS
         const val TUN_PREFIX_LENGTH = TunBuilderHelper.TUN_PREFIX_LENGTH
         const val TUN_ADDRESS_V6 = TunBuilderHelper.TUN_ADDRESS_V6
@@ -265,6 +267,7 @@ class OzeroVpnService : android.net.VpnService() {
             latestStartId.set(startId)
             when (intent?.action) {
                 ACTION_STOP -> stopVpn()
+                ACTION_RESTART_RUNTIME_CONFIG -> restartVpn()
                 ACTION_START, null -> {
                     stopping.set(false)
                     startVpn()
@@ -337,6 +340,20 @@ class OzeroVpnService : android.net.VpnService() {
     }
 
     private fun stopVpn() = shutdownCoord.stopVpn()
+
+    private fun restartVpn() {
+        val shutdownStarted = stopping.compareAndSet(false, true)
+        if (shutdownStarted) {
+            stopping.set(false)
+            shutdownCoord.stopVpn(callStopSelf = false)
+        }
+        serviceScope.launch {
+            shutdownJobRef.get()?.let { job ->
+                runCatching { withTimeoutOrNull(SHUTDOWN_JOIN_TIMEOUT_MS) { job.join() } }
+            }
+            if (!stopping.get() && notificationFactory.enterForeground(this@OzeroVpnService)) startVpn()
+        }
+    }
 
     private fun logActiveExternalVpn(): Boolean {
         return runCatching {

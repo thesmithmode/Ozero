@@ -100,4 +100,47 @@ class FmtBranchCoverageTest {
         assertEquals("hello", V2RayFmtUtils.tryBase64Decode(urlSafe))
         assertEquals("world", V2RayFmtUtils.tryBase64Decode(mime))
     }
+
+    @Test
+    fun `vless covers httpupgrade tcp http kcp and quic default branches`() {
+        val httpUpgrade = V2RayFmt.parseVLESS("vless://id@h?type=httpupgrade")
+        assertEquals("httpupgrade", httpUpgrade.type)
+        assertEquals("", httpUpgrade.host)
+        assertEquals("/", httpUpgrade.path)
+        assertEquals(0, httpUpgrade.maxEarlyData)
+
+        val tcpHttp = V2RayFmt.parseVLESS("vless://id@h?type=tcp&headerType=http")
+        assertEquals("http", tcpHttp.headerType)
+        assertEquals("", tcpHttp.host)
+        assertEquals("/", tcpHttp.path)
+
+        val kcp = V2RayFmt.parseVLESS("vless://id@h?type=mkcp")
+        assertEquals("kcp", kcp.type)
+        assertEquals("none", kcp.headerType)
+        assertEquals("", kcp.mKcpSeed)
+
+        val quic = V2RayFmt.parseVLESS("vless://id@h?type=quic")
+        assertEquals("none", quic.headerType)
+        assertEquals("none", quic.quicSecurity)
+        assertEquals("", quic.quicKey)
+    }
+
+    @Test
+    fun `standard v2ray parser covers transport and insecure aliases`() {
+        val vmessHttp = V2RayFmt.parseVMess("vmess://id@vm.example.com?type=h2&host=front&path=/h&insecure=yes")
+        assertEquals("http", vmessHttp.type)
+        assertEquals("front", vmessHttp.host)
+        assertEquals("/h", vmessHttp.path)
+        assertTrue(vmessHttp.allowInsecure)
+
+        val vmessGrpc = V2RayFmt.parseVMess("vmess://id@vm.example.com?type=grpc&serviceName=svc&allowInsecure=1")
+        assertEquals("grpc", vmessGrpc.type)
+        assertEquals("svc", vmessGrpc.grpcServiceName)
+        assertTrue(vmessGrpc.allowInsecure)
+
+        val trojanWs = V2RayFmt.parseTrojan("trojan://pwd@tr.example.com?type=httpupgrade&host=front&path=/u")
+        assertEquals("httpupgrade", trojanWs.type)
+        assertEquals("front", trojanWs.host)
+        assertEquals("/u", trojanWs.path)
+    }
 }

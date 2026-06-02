@@ -289,6 +289,17 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
+    fun `ACTION_RESTART_RUNTIME_CONFIG делает restart внутри живого service`() {
+        val commandBody = source.substringAfter("override fun onStartCommand").substringBefore("private fun startVpn()")
+        assertTrue(commandBody.contains("ACTION_RESTART_RUNTIME_CONFIG -> restartVpn()"))
+        val restartBody = source.substringAfter("private fun restartVpn()").substringBefore("private fun logActiveExternalVpn()")
+        assertTrue(restartBody.contains("shutdownCoord.stopVpn(callStopSelf = false)"))
+        assertTrue(restartBody.contains("shutdownJobRef.get()?.let"))
+        assertTrue(restartBody.contains("notificationFactory.enterForeground(this@OzeroVpnService)"))
+        assertTrue(restartBody.contains("startVpn()"))
+    }
+
+    @Test
     fun `startVpn не блокирует main thread runBlocking-ом`() {
         val body = source.substringAfter("private fun startVpn()").substringBefore("private fun engineExtras(")
         assertFalse(

@@ -385,6 +385,47 @@ class LockFileParserTest {
     }
 
     @Test
+    fun `reject artifact missing source metadata and size`() {
+        val missingSourceRepo = write(
+            """
+            tag: binaries-x
+            generated_at: 2026-04-25T10:00:00Z
+            artifacts:
+              - name: libx.so
+                engine: x
+                abi: arm64-v8a
+                destination: jniLibs
+                download_url: https://example.com/x.so
+                sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                size_bytes: 1
+                source_commit: 9999999999999999999999999999999999999999
+            """.trimIndent(),
+        )
+        assertThatThrownBy { LockFileParser.parse(missingSourceRepo) }
+            .isInstanceOf(LockFileException::class.java)
+            .hasMessageContaining("source_repo")
+
+        val missingSize = write(
+            """
+            tag: binaries-x
+            generated_at: 2026-04-25T10:00:00Z
+            artifacts:
+              - name: libx.so
+                engine: x
+                abi: arm64-v8a
+                destination: jniLibs
+                download_url: https://example.com/x.so
+                sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                source_repo: https://example.com
+                source_commit: 9999999999999999999999999999999999999999
+            """.trimIndent(),
+        )
+        assertThatThrownBy { LockFileParser.parse(missingSize) }
+            .isInstanceOf(LockFileException::class.java)
+            .hasMessageContaining("size_bytes")
+    }
+
+    @Test
     fun `reject malformed yaml`() {
         val f = write("tag: [unclosed")
         assertThatThrownBy { LockFileParser.parse(f) }

@@ -167,6 +167,10 @@ class EngineWatchdogCoordinator(
 
     fun handleEngineFailure(engineId: EngineId, reason: String) {
         if (stopping.get()) return
+        if (!isActiveEngine(engineId)) {
+            PersistentLoggers.warn(TAG, "ignore inactive engine failure: engine=$engineId reason=$reason")
+            return
+        }
         if (killswitchProvider() && hasBlockingTun()) {
             enterKillswitchMode(engineId, reason)
         } else {
@@ -177,6 +181,14 @@ class EngineWatchdogCoordinator(
 
     private fun hasBlockingTun(): Boolean =
         tunFdRef.get() != null || lockdownStartupFdRef.get() != null
+
+    private fun isActiveEngine(engineId: EngineId): Boolean = when (val state = tunnelController.state.value) {
+        is TunnelState.Probing -> state.engineId == null || state.engineId == engineId
+        is TunnelState.Connecting -> state.engineId == engineId
+        is TunnelState.Connected -> state.engineId == engineId
+        is TunnelState.Failed -> state.engineId == engineId
+        else -> false
+    }
 
     private fun enterKillswitchMode(engineId: EngineId, reason: String) {
         PersistentLoggers.warn(TAG, "killswitch engaging: engine=$engineId reason=$reason")

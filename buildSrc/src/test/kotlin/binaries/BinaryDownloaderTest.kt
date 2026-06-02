@@ -151,4 +151,20 @@ class BinaryDownloaderTest {
             .hasMessageContaining("after 3 attempts")
             .hasCauseInstanceOf(java.io.IOException::class.java)
     }
+
+    @Test
+    fun `empty retry schedule fails without issuing HTTP request`() {
+        val cache = tmp.resolve("cache")
+        val dst = tmp.resolve("out/libbyedpi.so")
+        val downloader = BinaryDownloader(cacheDir = cache, retryDelaysMs = emptyList())
+
+        assertThatThrownBy {
+            downloader.download(server.url("/x.so").toString(), "0".repeat(64), dst)
+        }
+            .isInstanceOf(BinaryDownloadException::class.java)
+            .hasMessageContaining("after 0 attempts")
+
+        assertThat(server.requestCount).isEqualTo(0)
+        assertThat(Files.exists(dst)).isFalse()
+    }
 }

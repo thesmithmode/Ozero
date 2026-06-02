@@ -2,7 +2,6 @@ package ru.ozero.app.vpn
 
 import android.content.Context
 import android.content.Intent
-import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -77,18 +76,31 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
         val pendingTarget = tunnelController.switching.value?.to
         tunnelController.onSwitchingStarted(from = fromEngine, to = pendingTarget)
         try {
-            sendVpnAction(OzeroVpnService.ACTION_STOP)
+            sendVpnAction(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG)
             val stopped = withTimeoutOrNull(RESTART_STOP_TIMEOUT_MS) {
-                tunnelController.state.first { it is TunnelState.Idle || it is TunnelState.Failed }
+                tunnelController.state.first {
+                    it is TunnelState.Disconnecting ||
+                        it is TunnelState.Idle ||
+                        it is TunnelState.Failed
+                }
             }
             if (stopped == null) {
                 AppLogger.w(TAG, "runtime config restart skipped: stop timeout")
                 tunnelController.onSwitchingFinished("runtime config restart stop timeout")
                 return false
             }
-            tunnelController.onSwitchingStarted(from = fromEngine, to = pendingTarget)
-            sendVpnAction(OzeroVpnService.ACTION_START)
-            return true
+            val restarted = withTimeoutOrNull(RESTART_START_TIMEOUT_MS) {
+                tunnelController.state.first {
+                    it is TunnelState.Probing ||
+                        it is TunnelState.Connecting ||
+                        it is TunnelState.Connected ||
+                        it is TunnelState.Failed
+                }
+            }
+            if (restarted != null) return true
+            AppLogger.w(TAG, "runtime config restart skipped: start timeout")
+            tunnelController.onSwitchingFinished("runtime config restart start timeout")
+            return false
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -98,8 +110,7 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
     }
 
     private fun sendVpnAction(action: String) {
-        ContextCompat.startForegroundService(
-            context,
+        context.startService(
             Intent(context, OzeroVpnService::class.java).apply {
                 this.action = action
             },
@@ -109,6 +120,7 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
     private companion object {
         const val TAG = "RuntimeConfigRestartCoordinator"
         const val RESTART_STOP_TIMEOUT_MS = 11_000L
+        const val RESTART_START_TIMEOUT_MS = 15_000L
         const val RESTART_SETTLE_TIMEOUT_MS = 15_000L
     }
 }

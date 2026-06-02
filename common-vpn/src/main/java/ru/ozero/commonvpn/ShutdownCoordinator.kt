@@ -43,7 +43,7 @@ class ShutdownCoordinator(
     private val stopSelfRequest: (Int) -> Unit,
 ) {
 
-    fun stopVpn() {
+    fun stopVpn(callStopSelf: Boolean = true) {
         if (!state.stopping.compareAndSet(false, true)) return
         state.stopSignal.set(true)
         PersistentLoggers.info(TAG, "stopVpn entry")
@@ -61,7 +61,7 @@ class ShutdownCoordinator(
             SessionStatsRecorder.Status.DISCONNECTED
         }
         recordSessionEnd(endStatus)
-        val job = scope.launch { performShutdown() }
+        val job = scope.launch { performShutdown(callStopSelf = callStopSelf) }
         state.shutdownJobRef.set(job)
     }
 

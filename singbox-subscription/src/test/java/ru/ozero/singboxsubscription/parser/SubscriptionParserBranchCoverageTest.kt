@@ -181,4 +181,103 @@ class SubscriptionParserBranchCoverageTest {
         assertEquals(1, Base64BundleParser.parse(encoded).size)
         assertTrue(Base64BundleParser.parse("####").isEmpty())
     }
+
+    @Test
+    fun `clash parser covers top level reality aliases and filters invalid proxies`() {
+        val yaml = """
+            proxies:
+              - name: Reality Alias
+                type: vless
+                server: vless.example.com
+                port: 443
+                uuid: id
+                network: xhttp
+                pbk: pk-top
+                sid: sid-top
+                fp: safari
+                allowInsecure: true
+                httpupgrade-opts:
+                  path: /upgrade
+                  host: upgrade.example.com
+              - name: Vmess Defaults
+                type: vmess
+                server: vmess.example.com
+                port: "443"
+                uuid: id
+                aid: bad
+                tls: false
+              - name: Missing server
+                type: trojan
+                port: 443
+                password: secret
+              - name: Missing port
+                type: ss
+                server: ss.example.com
+                cipher: aes-128-gcm
+                password: secret
+        """.trimIndent()
+
+        val result = ClashYamlParser.parse(yaml)
+
+        assertEquals(2, result.size)
+        val vless = result[0] as VLESSBean
+        assertEquals("splithttp", vless.type)
+        assertEquals("reality", vless.security)
+        assertEquals("pk-top", vless.realityPublicKey)
+        assertEquals("sid-top", vless.realityShortId)
+        assertEquals("safari", vless.realityFingerprint)
+        assertTrue(vless.allowInsecure)
+        val vmess = result[1] as VMessBean
+        assertEquals(0, vmess.alterId)
+        assertEquals("none", vmess.security)
+        assertEquals("auto", vmess.encryption)
+    }
+
+    @Test
+    fun `raw parser covers singbox tls disabled and transport host fallback`() {
+        val json = """
+            {
+              "outbounds": [
+                {
+                  "type": "vmess",
+                  "tag": "vmess",
+                  "server": "vmess.example.com",
+                  "server_port": 443,
+                  "uuid": "id",
+                  "security": "zero",
+                  "transport": {
+                    "type": "ws",
+                    "path": "/ws",
+                    "host": "direct-host.example.com"
+                  },
+                  "tls": { "enabled": false, "server_name": "ignored.example.com" }
+                },
+                {
+                  "type": "trojan",
+                  "tag": "trojan",
+                  "server": "trojan.example.com",
+                  "server_port": 443,
+                  "password": "secret",
+                  "transport": { "type": "grpc", "service_name": "svc" },
+                  "tls": { "enabled": true, "alpn": ["", "h2"] }
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val result = RawShareLinksParser.parse(json)
+
+        assertEquals(2, result.size)
+        val vmess = result[0] as VMessBean
+        assertEquals("ws", vmess.type)
+        assertEquals("/ws", vmess.path)
+        assertEquals("direct-host.example.com", vmess.host)
+        assertEquals("none", vmess.security)
+        assertEquals("zero", vmess.encryption)
+        val trojan = result[1] as TrojanBean
+        assertEquals("grpc", trojan.type)
+        assertEquals("svc", trojan.grpcServiceName)
+        assertEquals("tls", trojan.security)
+        assertEquals("h2", trojan.alpn)
+    }
 }
