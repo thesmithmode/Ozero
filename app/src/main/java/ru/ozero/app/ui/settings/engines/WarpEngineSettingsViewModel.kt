@@ -229,8 +229,12 @@ class WarpEngineSettingsViewModel @Inject constructor(
             return
         }
         val existingSlot = _uiState.value.slots.firstOrNull { it.id == draft.slotId }
-        val basAwg = existingSlot?.config?.awgParams ?: AwgParams()
-        val config = draft.toWarpConfig(basAwg)
+        val existingConfig = existingSlot?.config
+        val basAwg = existingConfig?.awgParams ?: AwgParams()
+        val config = draft.toWarpConfig(basAwg).copy(
+            accountLicense = existingConfig?.accountLicense ?: "",
+            allowedIps = existingConfig?.allowedIps ?: WarpConfig.DEFAULT_ALLOWED_IPS,
+        )
         val slotId = draft.slotId
         val name = draft.name.trim().ifBlank { "WARP" }
         val rawIni = existingSlot?.rawIniOverride?.let { WarpIniBuilder.build(config) }
