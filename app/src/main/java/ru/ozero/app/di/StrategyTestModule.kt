@@ -24,6 +24,7 @@ import ru.ozero.app.ui.strategy.UsageHistoryStore
 import ru.ozero.commonnet.AndroidNetworkProfileDetector
 import ru.ozero.commonnet.NetworkProfileDetector
 import ru.ozero.enginebyedpi.ByeDpiEngine
+import ru.ozero.enginebyedpi.ByeDpiProxy
 import ru.ozero.enginebyedpi.strategy.DefaultEvolutionResourcesProvider
 import ru.ozero.enginebyedpi.strategy.EvolutionResourcesProvider
 import ru.ozero.enginebyedpi.strategy.HttpSocksProbeClient
@@ -42,7 +43,7 @@ object StrategyTestModule {
     @Provides
     @Singleton
     @StrategyTestEngine
-    fun provideStrategyTestEnginePlugin(byeDpiEngine: ByeDpiEngine): EnginePlugin = byeDpiEngine
+    fun provideStrategyTestEnginePlugin(): EnginePlugin = ByeDpiEngine(proxy = ByeDpiProxy())
 
     @Provides
     @Singleton

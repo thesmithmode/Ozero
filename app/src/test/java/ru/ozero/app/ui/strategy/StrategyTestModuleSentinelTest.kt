@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 class StrategyTestModuleSentinelTest {
 
     @Test
-    fun `strategy scan engine binding is qualified and reuses production ByeDpiEngine singleton`() {
+    fun `strategy scan engine binding is qualified and uses isolated ByeDpiEngine`() {
         val source = File(System.getProperty("user.dir") ?: ".")
             .resolve("src/main/java/ru/ozero/app/di/StrategyTestModule.kt")
             .readText()
@@ -16,9 +16,10 @@ class StrategyTestModuleSentinelTest {
         assertTrue(source.contains("annotation class StrategyTestEngine"))
         assertTrue(source.contains("@StrategyTestEngine"))
         assertTrue(
-            source.contains("fun provideStrategyTestEnginePlugin(byeDpiEngine: ByeDpiEngine)"),
-            "strategy scan должен использовать существующий ByeDpiEngine из DI, а не создавать второй движок",
+            source.contains("fun provideStrategyTestEnginePlugin(): EnginePlugin"),
+            "strategy scan не должен получать production ByeDpiEngine из DI",
         )
-        assertFalse(source.contains("ByeDpiEngine(ByeDpiProxy())"))
+        assertTrue(source.contains("ByeDpiEngine(proxy = ByeDpiProxy())"))
+        assertFalse(source.contains("provideStrategyTestEnginePlugin(byeDpiEngine: ByeDpiEngine)"))
     }
 }
