@@ -616,6 +616,41 @@ class EngineRuntimeConfigRestartObserverTest {
     }
 
     @Test
+    fun `singbox runtime provider keeps auto select profile order in fingerprint`() = runTest(dispatcher) {
+        val prefs = MutableStateFlow<Preferences>(
+            mutablePreferencesOf(singboxSelectedProfileKey to SingboxEngine.SELECTED_AUTO),
+        )
+        val profiles = MutableStateFlow(
+            listOf(
+                proxyProfile(id = 1, blob = byteArrayOf(1)),
+                proxyProfile(id = 2, blob = byteArrayOf(2)),
+            ),
+        )
+        val chain = MutableStateFlow(emptyList<ProxyChainStep>())
+        val provider = SingboxModule.provideSingboxRuntimeConfigProvider(
+            dataStore = flowDataStore(prefs),
+            profileDao = fakeProfileDao(profiles),
+            proxyChainDao = fakeProxyChainDao(chain),
+        )
+
+        val baseline = provider.changes.first()
+        profiles.value = listOf(
+            proxyProfile(id = 2, blob = byteArrayOf(2)),
+            proxyProfile(id = 1, blob = byteArrayOf(1)),
+        )
+        val reordered = provider.changes.first()
+
+        assertNotEquals(baseline, reordered)
+    }
+
+    @Test
+    fun `warp runtime provider ignores active slot change while starting`() {
+        val warpModule = readSource("src/main/java/ru/ozero/app/di/WarpModule.kt")
+
+        assertTrue(warpModule.contains("override val includeStarting: Boolean = false"))
+    }
+
+    @Test
     fun `singbox runtime provider includes every profile only in auto select mode`() = runTest(dispatcher) {
         val prefs = MutableStateFlow<Preferences>(
             mutablePreferencesOf(singboxSelectedProfileKey to SingboxEngine.SELECTED_AUTO),

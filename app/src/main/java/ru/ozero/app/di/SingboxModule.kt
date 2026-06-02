@@ -141,7 +141,6 @@ object SingboxModule {
         val selectedProfileId = prefs[SingboxProbeService.SELECTED_PROFILE_KEY]
         if (selectedProfileId == SingboxEngine.SELECTED_AUTO) {
             val profileBlobHashes = profiles
-                .sortedBy { it.id }
                 .map { it.id to it.beanBlob.contentHashCode() }
             return listOf(selectedProfileId, profileBlobHashes)
         }

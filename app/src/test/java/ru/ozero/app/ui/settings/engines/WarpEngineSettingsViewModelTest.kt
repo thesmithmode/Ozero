@@ -458,6 +458,22 @@ class WarpEngineSettingsViewModelTest {
     }
 
     @Test
+    fun `onSaveEdit preserves imported allowedIps in config and rawIniOverride`() = runTest {
+        val restrictedAllowedIps = listOf("192.0.2.0/24", "2001:db8::/32")
+        val rawIni = "[Interface]\nPrivateKey = priv\n\n[Peer]\n" +
+            "PublicKey = peer\nAllowedIPs = 192.0.2.0/24, 2001:db8::/32\n"
+        val id = store.addSlot("S", SAMPLE.copy(allowedIps = restrictedAllowedIps), rawIni)
+        advanceUntilIdle()
+        vm.onStartEdit(id)
+        vm.onEditDraftChange(vm.uiState.value.editDraft!!.copy(name = "Renamed"))
+        vm.onSaveEdit()
+        advanceUntilIdle()
+
+        assertEquals(restrictedAllowedIps, store.lastUpdateCall?.third?.allowedIps)
+        assertTrue(store.lastUpdateRawIni?.contains("AllowedIPs = 192.0.2.0/24, 2001:db8::/32") == true)
+    }
+
+    @Test
     fun `onSaveEdit для слота без rawIniOverride передаёт null`() = runTest {
         val id = store.addSlot("S", SAMPLE, null)
         advanceUntilIdle()
