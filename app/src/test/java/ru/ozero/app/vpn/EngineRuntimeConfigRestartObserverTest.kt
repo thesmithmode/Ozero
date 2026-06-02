@@ -2,6 +2,8 @@ package ru.ozero.app.vpn
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.byteArrayPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -25,6 +27,7 @@ import ru.ozero.enginefptn.FptnConfig
 import ru.ozero.enginefptn.runtimeFingerprint
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EngineRuntimeConfigProvider
+import ru.ozero.enginesingbox.SingboxEngine
 import ru.ozero.singboxroom.dao.ProxyChainDao
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.entity.ProxyChainStep
@@ -37,6 +40,8 @@ import kotlin.test.assertTrue
 class EngineRuntimeConfigRestartObserverTest {
 
     private val dispatcher = StandardTestDispatcher()
+    private val singboxSelectedProfileKey = longPreferencesKey("singbox_selected_profile_id")
+    private val singboxBeanKey = byteArrayPreferencesKey("singbox_vless_bean")
 
     @BeforeEach
     fun setUp() {
@@ -517,25 +522,74 @@ class EngineRuntimeConfigRestartObserverTest {
         assertTrue(singboxModule.contains("proxyChainDao: ProxyChainDao"))
         assertTrue(singboxModule.contains("profileDao.getAllFlow()"))
         assertTrue(singboxModule.contains("proxyChainDao.getAllFlow()"))
+        assertTrue(singboxModule.contains("selectedProfileId == SingboxEngine.SELECTED_AUTO"))
         assertTrue(singboxModule.contains("profileBlobHashes"))
-        assertTrue(singboxModule.contains("chainProfileIds"))
-        assertTrue(singboxModule.contains("chainSteps.map { it.profileId }"))
+        assertTrue(singboxModule.contains("activeProfileBlobHashes"))
+        assertTrue(singboxModule.contains("chainSteps"))
     }
 
     @Test
-    fun `singbox runtime provider emits new fingerprint for chain order and profile blob changes`() = runTest(dispatcher) {
-        val prefs = MutableStateFlow<Preferences>(mutablePreferencesOf())
+    fun `singbox runtime provider emits new fingerprint for active chain order and profile blob changes`() =
+        runTest(dispatcher) {
+            val prefs = MutableStateFlow<Preferences>(
+                mutablePreferencesOf(
+                    singboxSelectedProfileKey to 1L,
+                    singboxBeanKey to byteArrayOf(1),
+                ),
+            )
+            val profiles = MutableStateFlow(
+                listOf(
+                    proxyProfile(id = 1, blob = byteArrayOf(1)),
+                    proxyProfile(id = 2, blob = byteArrayOf(2)),
+                    proxyProfile(id = 3, blob = byteArrayOf(3)),
+                ),
+            )
+            val chain = MutableStateFlow(
+                listOf(
+                    ProxyChainStep(id = 1, profileId = 2, userOrder = 0),
+                    ProxyChainStep(id = 2, profileId = 3, userOrder = 1),
+                ),
+            )
+            val provider = SingboxModule.provideSingboxRuntimeConfigProvider(
+                dataStore = flowDataStore(prefs),
+                profileDao = fakeProfileDao(profiles),
+                proxyChainDao = fakeProxyChainDao(chain),
+            )
+
+            val baseline = provider.changes.first()
+            chain.value = listOf(
+                ProxyChainStep(id = 2, profileId = 3, userOrder = 0),
+                ProxyChainStep(id = 1, profileId = 2, userOrder = 1),
+            )
+            val reordered = provider.changes.first()
+            profiles.value = listOf(
+                proxyProfile(id = 1, blob = byteArrayOf(1)),
+                proxyProfile(id = 2, blob = byteArrayOf(9)),
+                proxyProfile(id = 3, blob = byteArrayOf(3)),
+            )
+            val profileChanged = provider.changes.first()
+
+            assertNotEquals(baseline, reordered)
+            assertNotEquals(reordered, profileChanged)
+        }
+
+    @Test
+    fun `singbox runtime provider ignores unrelated profile changes in manual mode`() = runTest(dispatcher) {
+        val prefs = MutableStateFlow<Preferences>(
+            mutablePreferencesOf(
+                singboxSelectedProfileKey to 1L,
+                singboxBeanKey to byteArrayOf(1),
+            ),
+        )
         val profiles = MutableStateFlow(
             listOf(
                 proxyProfile(id = 1, blob = byteArrayOf(1)),
                 proxyProfile(id = 2, blob = byteArrayOf(2)),
+                proxyProfile(id = 9, blob = byteArrayOf(9)),
             ),
         )
         val chain = MutableStateFlow(
-            listOf(
-                ProxyChainStep(id = 1, profileId = 1, userOrder = 0),
-                ProxyChainStep(id = 2, profileId = 2, userOrder = 1),
-            ),
+            listOf(ProxyChainStep(id = 1, profileId = 2, userOrder = 0)),
         )
         val provider = SingboxModule.provideSingboxRuntimeConfigProvider(
             dataStore = flowDataStore(prefs),
@@ -544,19 +598,49 @@ class EngineRuntimeConfigRestartObserverTest {
         )
 
         val baseline = provider.changes.first()
-        chain.value = listOf(
-            ProxyChainStep(id = 2, profileId = 2, userOrder = 0),
-            ProxyChainStep(id = 1, profileId = 1, userOrder = 1),
-        )
-        val reordered = provider.changes.first()
         profiles.value = listOf(
-            proxyProfile(id = 1, blob = byteArrayOf(9)),
+            proxyProfile(id = 1, blob = byteArrayOf(1)),
             proxyProfile(id = 2, blob = byteArrayOf(2)),
+            proxyProfile(id = 9, blob = byteArrayOf(7)),
         )
-        val profileChanged = provider.changes.first()
+        val unrelatedChanged = provider.changes.first()
+        profiles.value = listOf(
+            proxyProfile(id = 1, blob = byteArrayOf(1)),
+            proxyProfile(id = 2, blob = byteArrayOf(8)),
+            proxyProfile(id = 9, blob = byteArrayOf(7)),
+        )
+        val activeChainChanged = provider.changes.first()
 
-        assertNotEquals(baseline, reordered)
-        assertNotEquals(reordered, profileChanged)
+        assertEquals(baseline, unrelatedChanged)
+        assertNotEquals(unrelatedChanged, activeChainChanged)
+    }
+
+    @Test
+    fun `singbox runtime provider includes every profile only in auto select mode`() = runTest(dispatcher) {
+        val prefs = MutableStateFlow<Preferences>(
+            mutablePreferencesOf(singboxSelectedProfileKey to SingboxEngine.SELECTED_AUTO),
+        )
+        val profiles = MutableStateFlow(
+            listOf(
+                proxyProfile(id = 1, blob = byteArrayOf(1)),
+                proxyProfile(id = 9, blob = byteArrayOf(9)),
+            ),
+        )
+        val chain = MutableStateFlow(emptyList<ProxyChainStep>())
+        val provider = SingboxModule.provideSingboxRuntimeConfigProvider(
+            dataStore = flowDataStore(prefs),
+            profileDao = fakeProfileDao(profiles),
+            proxyChainDao = fakeProxyChainDao(chain),
+        )
+
+        val baseline = provider.changes.first()
+        profiles.value = listOf(
+            proxyProfile(id = 1, blob = byteArrayOf(1)),
+            proxyProfile(id = 9, blob = byteArrayOf(7)),
+        )
+        val anyProfileChanged = provider.changes.first()
+
+        assertNotEquals(baseline, anyProfileChanged)
     }
 
     private fun readSource(path: String): String =

@@ -166,7 +166,8 @@ class EngineWatchdogCoordinator(
     }
 
     fun handleEngineFailure(engineId: EngineId, reason: String) {
-        if (killswitchProvider() && hasBlockingTun() && !stopping.get()) {
+        if (stopping.get()) return
+        if (killswitchProvider() && hasBlockingTun()) {
             enterKillswitchMode(engineId, reason)
         } else {
             tunnelController.onEngineDied(engineId, reason)
