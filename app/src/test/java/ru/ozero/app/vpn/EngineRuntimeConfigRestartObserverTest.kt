@@ -1,10 +1,14 @@
 package ru.ozero.app.vpn
 
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.mutablePreferencesOf
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -15,12 +19,18 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import ru.ozero.app.di.SingboxModule
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginefptn.FptnConfig
 import ru.ozero.enginefptn.runtimeFingerprint
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EngineRuntimeConfigProvider
+import ru.ozero.singboxroom.dao.ProxyChainDao
+import ru.ozero.singboxroom.dao.ProxyProfileDao
+import ru.ozero.singboxroom.entity.ProxyChainStep
+import ru.ozero.singboxroom.entity.ProxyProfile
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -499,11 +509,109 @@ class EngineRuntimeConfigRestartObserverTest {
         assertTrue(diSources.contains("EngineRuntimeConfigProvider"))
     }
 
+    @Test
+    fun `singbox runtime provider fingerprints chain and profile dao changes`() {
+        val singboxModule = readSource("src/main/java/ru/ozero/app/di/SingboxModule.kt")
+
+        assertTrue(singboxModule.contains("profileDao: ProxyProfileDao"))
+        assertTrue(singboxModule.contains("proxyChainDao: ProxyChainDao"))
+        assertTrue(singboxModule.contains("profileDao.getAllFlow()"))
+        assertTrue(singboxModule.contains("proxyChainDao.getAllFlow()"))
+        assertTrue(singboxModule.contains("profileBlobHashes"))
+        assertTrue(singboxModule.contains("chainProfileIds"))
+        assertTrue(singboxModule.contains("chainSteps.map { it.profileId }"))
+    }
+
+    @Test
+    fun `singbox runtime provider emits new fingerprint for chain order and profile blob changes`() = runTest(dispatcher) {
+        val prefs = MutableStateFlow<Preferences>(mutablePreferencesOf())
+        val profiles = MutableStateFlow(
+            listOf(
+                proxyProfile(id = 1, blob = byteArrayOf(1)),
+                proxyProfile(id = 2, blob = byteArrayOf(2)),
+            ),
+        )
+        val chain = MutableStateFlow(
+            listOf(
+                ProxyChainStep(id = 1, profileId = 1, userOrder = 0),
+                ProxyChainStep(id = 2, profileId = 2, userOrder = 1),
+            ),
+        )
+        val provider = SingboxModule.provideSingboxRuntimeConfigProvider(
+            dataStore = flowDataStore(prefs),
+            profileDao = fakeProfileDao(profiles),
+            proxyChainDao = fakeProxyChainDao(chain),
+        )
+
+        val baseline = provider.changes.first()
+        chain.value = listOf(
+            ProxyChainStep(id = 2, profileId = 2, userOrder = 0),
+            ProxyChainStep(id = 1, profileId = 1, userOrder = 1),
+        )
+        val reordered = provider.changes.first()
+        profiles.value = listOf(
+            proxyProfile(id = 1, blob = byteArrayOf(9)),
+            proxyProfile(id = 2, blob = byteArrayOf(2)),
+        )
+        val profileChanged = provider.changes.first()
+
+        assertNotEquals(baseline, reordered)
+        assertNotEquals(reordered, profileChanged)
+    }
+
     private fun readSource(path: String): String =
         java.io.File(
             System.getProperty("user.dir") ?: ".",
             path,
         ).readText()
+
+    private fun flowDataStore(flow: MutableStateFlow<Preferences>): DataStore<Preferences> =
+        object : DataStore<Preferences> {
+            override val data = flow
+
+            override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences {
+                val updated = transform(flow.value)
+                flow.value = updated
+                return updated
+            }
+        }
+
+    private fun fakeProfileDao(flow: MutableStateFlow<List<ProxyProfile>>): ProxyProfileDao =
+        object : ProxyProfileDao {
+            override suspend fun insert(profile: ProxyProfile): Long = profile.id
+            override suspend fun insertAll(profiles: List<ProxyProfile>) = Unit
+            override suspend fun getById(id: Long): ProxyProfile? = flow.value.firstOrNull { it.id == id }
+            override fun getAllFlow() = flow
+            override fun getByGroupIdFlow(groupId: Long) = flow
+            override suspend fun getByGroupId(groupId: Long): List<ProxyProfile> =
+                flow.value.filter { it.groupId == groupId }
+            override suspend fun deleteByGroupId(groupId: Long) = Unit
+            override suspend fun updateLatency(id: Long, latency: Int) = Unit
+            override suspend fun countByGroupId(groupId: Long): Int = flow.value.count { it.groupId == groupId }
+            override suspend fun update(profile: ProxyProfile) = Unit
+            override suspend fun delete(profile: ProxyProfile) = Unit
+        }
+
+    private fun fakeProxyChainDao(flow: MutableStateFlow<List<ProxyChainStep>>): ProxyChainDao =
+        object : ProxyChainDao {
+            override fun getAllFlow() = flow
+            override suspend fun getAll(): List<ProxyChainStep> = flow.value
+            override suspend fun clear() {
+                flow.value = emptyList()
+            }
+            override suspend fun insertAll(steps: List<ProxyChainStep>) {
+                flow.value = steps
+            }
+        }
+
+    private fun proxyProfile(id: Long, blob: ByteArray): ProxyProfile =
+        ProxyProfile(
+            id = id,
+            groupId = 1,
+            name = "profile-$id",
+            beanBlob = blob,
+            protocolType = 0,
+        )
 
     private fun newObserver() = EngineRuntimeConfigRestartObserver(
         providers = emptySet(),

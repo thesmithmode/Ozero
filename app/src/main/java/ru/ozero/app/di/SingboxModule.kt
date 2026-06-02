@@ -15,7 +15,7 @@ import dagger.multibindings.IntoSet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import okhttp3.OkHttpClient
 import ru.ozero.app.ui.settings.engines.singbox.SingboxProbeService
 import ru.ozero.commonvpn.RuntimeFailureRouter
@@ -116,11 +116,22 @@ object SingboxModule {
     @IntoSet
     fun provideSingboxRuntimeConfigProvider(
         @SingboxPrefs dataStore: DataStore<Preferences>,
+        profileDao: ProxyProfileDao,
+        proxyChainDao: ProxyChainDao,
     ): EngineRuntimeConfigProvider = object : EngineRuntimeConfigProvider {
         override val engineId: EngineId = EngineId.SINGBOX
-        override val changes = dataStore.data.map { prefs ->
-            prefs[SingboxProbeService.SELECTED_PROFILE_KEY] to
-                (prefs[SingboxProbeService.BEAN_KEY]?.contentHashCode() ?: 0)
+        override val changes = combine(
+            dataStore.data,
+            profileDao.getAllFlow(),
+            proxyChainDao.getAllFlow(),
+        ) { prefs, profiles, chainSteps ->
+            val selectedProfileId = prefs[SingboxProbeService.SELECTED_PROFILE_KEY]
+            val selectedBlobHash = prefs[SingboxProbeService.BEAN_KEY]?.contentHashCode() ?: 0
+            val profileBlobHashes = profiles
+                .sortedBy { it.id }
+                .map { it.id to it.beanBlob.contentHashCode() }
+            val chainProfileIds = chainSteps.map { it.profileId }
+            listOf(selectedProfileId, selectedBlobHash, profileBlobHashes, chainProfileIds)
         }
         override val includeStarting: Boolean = false
         override val restartReason: String = "singbox profile changed while connected -> restart"
