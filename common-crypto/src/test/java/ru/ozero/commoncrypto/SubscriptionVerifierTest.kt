@@ -1,10 +1,13 @@
 package ru.ozero.commoncrypto
 
 import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters
+import org.bouncycastle.crypto.DataLengthException
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
 import org.bouncycastle.crypto.signers.Ed25519Signer
 import org.junit.jupiter.api.Test
 import java.io.ByteArrayInputStream
+import java.io.IOException
+import java.io.InputStream
 import java.security.SecureRandom
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -137,6 +140,74 @@ class SubscriptionVerifierTest {
     }
 
     @Test
+    fun verifyUpdateStreamRejectsInvalidSignatureAndKeyLengthBeforeReading() {
+        val unreadable = object : InputStream() {
+            override fun read(): Int = error("stream should not be read")
+        }
+        assertFalse(SubscriptionVerifier.verifyUpdate(unreadable, ByteArray(63), ByteArray(32)))
+        assertFalse(SubscriptionVerifier.verifyUpdate(unreadable, ByteArray(64), ByteArray(31)))
+    }
+
+    @Test
+    fun verifyUpdateStreamReturnsFalseOnReadIoException() {
+        val (priv, pub) = keypair()
+        val payload = "payload".toByteArray()
+        val sig = sign(priv, "ozero.update.v1:".toByteArray() + payload)
+        val throwing = object : InputStream() {
+            override fun read(): Int = throw IOException("read failed")
+            override fun read(b: ByteArray, off: Int, len: Int): Int = throw IOException("read failed")
+        }
+
+        assertFalse(SubscriptionVerifier.verifyUpdate(throwing, sig, pub))
+    }
+
+    @Test
+    fun verifyUpdateStreamReturnsFalseWhenSignerFactoryThrowsKnownRuntimeFailures() {
+        val (_, pub) = keypair()
+        val signature = ByteArray(64)
+        val payload = ByteArrayInputStream("payload".toByteArray())
+
+        assertFalse(
+            SubscriptionVerifier.verifyUpdate(payload, signature, pub) {
+                throw IllegalArgumentException("bad key")
+            },
+        )
+        assertFalse(
+            SubscriptionVerifier.verifyUpdate(ByteArrayInputStream("payload".toByteArray()), signature, pub) {
+                throw DataLengthException("bad data")
+            },
+        )
+        assertFalse(
+            SubscriptionVerifier.verifyUpdate(ByteArrayInputStream("payload".toByteArray()), signature, pub) {
+                throw SignerProviderFailure()
+            },
+        )
+    }
+
+    @Test
+    fun verifyReturnsFalseWhenSignerFactoryThrowsKnownRuntimeFailures() {
+        val (_, pub) = keypair()
+        val signature = ByteArray(64)
+        val payload = "payload".toByteArray()
+
+        assertFalse(
+            SubscriptionVerifier.verify(payload, signature, pub) {
+                throw IllegalArgumentException("bad key")
+            },
+        )
+        assertFalse(
+            SubscriptionVerifier.verify(payload, signature, pub) {
+                throw DataLengthException("bad data")
+            },
+        )
+        assertFalse(
+            SubscriptionVerifier.verify(payload, signature, pub) {
+                throw SignerProviderFailure()
+            },
+        )
+    }
+
+    @Test
     fun bouncyCastleEd25519VerifiesRfc8032Vector2() {
         val pub = hexToByteArray("3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c")
         val sig = hexToByteArray(
@@ -188,4 +259,6 @@ class SubscriptionVerifierTest {
             cleanHex.substring(i * 2, i * 2 + 2).toInt(16).toByte()
         }
     }
+
+    private class SignerProviderFailure : RuntimeException()
 }

@@ -77,12 +77,18 @@ class MainActivitySwitchingSentinelTest {
 
     @Test
     fun `runtime config observer owns engine-specific restart rules`() {
-        val helperBlock = source.substringAfter("private fun observeRuntimeConfigChanges")
-            .substringBefore("private companion object")
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val app = File(moduleRoot, "src/main/java/ru/ozero/app/OzeroApp.kt").readText()
+        val coordinator = File(
+            moduleRoot,
+            "src/main/java/ru/ozero/app/vpn/RuntimeConfigRestartCoordinator.kt",
+        ).readText()
         assertTrue(
-            helperBlock.contains("runtimeConfigRestartObserver.start") &&
-                helperBlock.contains("restart = ::restartVpnIfConnected"),
-            "MainActivity must delegate engine-specific runtime config restarts to app/vpn observer.",
+            source.contains("EngineRuntimeConfigRestartObserver").not() &&
+                app.contains("runtimeConfigRestartCoordinator.start(appScope)") &&
+                coordinator.contains("observer.start") &&
+                coordinator.contains("tunnelController.state"),
+            "Runtime config restarts must be process-wide, not gated by MainActivity STARTED lifecycle.",
         )
     }
 }

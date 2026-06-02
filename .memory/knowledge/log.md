@@ -1129,3 +1129,11 @@
 - Source: daily/2026-06-01.md
 - Articles created: [[concepts/warp-pretunnel-endpoint-doh-parity]], [[concepts/warp-awg-field-preservation-contract]], [[concepts/jacoco-honest-coverage-gate-boundary]], [[concepts/runTest-backgroundscope-hot-flow-collectors]], [[concepts/bootstrap-signature-real-trust-gate]], [[connections/post-release-ci-gate-test-harness-feedback-loop]]
 - Articles updated: none
+## [2026-06-02T18:53:22+03:00] compile | 2026-06-01.md
+- Source: daily/2026-06-01.md
+- Articles created: [[concepts/post-release-app-test-harness-regression-map]], [[concepts/engine-runtime-config-restart-observer-stateflow-tests]], [[concepts/unified-logger-rotation-test-helper-append-contract]], [[concepts/jacoco-exclude-evidence-boundary]], [[concepts/ci-failure-batch-analysis-before-push]], [[connections/coverage-gate-vs-test-harness-validity-loop]]
+- Articles updated: none
+## [2026-06-02T18:57:23+03:00] compile | 2026-06-02.md
+- Source: daily/2026-06-02.md
+- Articles created: [[concepts/ci-push-not-hypothesis-proof]], [[concepts/jacoco-testable-logic-exclude-boundary]], [[concepts/app-ci-job-diagnostic-sharding-nonzero-gate]], [[concepts/bootstrap-empty-seed-product-contract]], [[connections/coverage-artifact-policy-feedback-loop]]
+- Articles updated: none

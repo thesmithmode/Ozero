@@ -23,7 +23,6 @@ import ru.ozero.app.ui.launcher.BatteryGuard
 import ru.ozero.app.ui.launcher.OnboardingGate
 import ru.ozero.app.ui.launcher.VpnIntentLauncher
 import ru.ozero.app.ui.theme.OzeroTheme
-import ru.ozero.app.vpn.EngineRuntimeConfigRestartObserver
 import ru.ozero.app.vpn.EngineSettingsRestartObserver
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
@@ -36,8 +35,6 @@ class MainActivity : AppCompatActivity() {
     @Inject lateinit var userFlags: UserFlagsRepository
 
     @Inject lateinit var settingsRepository: ru.ozero.enginescore.settings.SettingsRepository
-
-    @Inject lateinit var runtimeConfigRestartObserver: EngineRuntimeConfigRestartObserver
 
     @Inject lateinit var logcatReader: LogcatReader
 
@@ -78,7 +75,6 @@ class MainActivity : AppCompatActivity() {
         )
 
         observeLiveEngineSettingsChanges()
-        observeRuntimeConfigChanges()
         setContent {
             OzeroTheme {
                 OnboardingGate(userFlags = userFlags) {
@@ -156,16 +152,6 @@ class MainActivity : AppCompatActivity() {
                 .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
                 .collect { observer.handle(it) }
         }
-    }
-
-    private fun observeRuntimeConfigChanges() {
-        runtimeConfigRestartObserver.start(
-            scope = lifecycleScope,
-            lifecycle = lifecycle,
-            exceptionHandler = safeUiCoroutineHandler,
-            state = viewModel.state,
-            restart = ::restartVpnIfConnected,
-        )
     }
 
     private companion object {

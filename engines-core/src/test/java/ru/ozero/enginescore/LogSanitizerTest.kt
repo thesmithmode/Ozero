@@ -40,6 +40,24 @@ class LogSanitizerTest {
     @Test
     fun `redactUrl handles missing host missing scheme and malformed url`() {
         assertEquals("file://<redacted>", LogSanitizer.redactUrl("file:///tmp/secret"))
+        assertEquals("<redacted-uri>", LogSanitizer.redactUrl("example.com/path"))
         assertEquals("<redacted-uri>", LogSanitizer.redactUrl("://broken"))
+    }
+
+    @Test
+    fun `redactUrl redacts urls without host and preserves scheme only`() {
+        assertEquals("urn://<redacted>", LogSanitizer.redactUrl("urn:secret:value"))
+        assertEquals("https://example.com/<redacted>", LogSanitizer.redactUrl("https://example.com/path"))
+    }
+
+    @Test
+    fun `sanitize redacts keyed and bare long tokens with supported alphabet`() {
+        val raw = "jwt=abcdefghijklmnopqrstuvwxyzABCDEF0123456789 bare=abcdEFGHijklMNOPqrstUVWXyz012345"
+        val sanitized = LogSanitizer.sanitize(raw)
+
+        assertTrue(sanitized.contains("jwt=<redacted-token>"))
+        assertTrue(sanitized.contains("bare=<redacted-token>"))
+        assertFalse(sanitized.contains("abcdefghijklmnopqrstuvwxyzABCDEF0123456789"))
+        assertFalse(sanitized.contains("abcdEFGHijklMNOPqrstUVWXyz012345"))
     }
 }

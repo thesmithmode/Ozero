@@ -16,11 +16,20 @@ object SubscriptionVerifier {
     fun verifyUpdate(message: ByteArray, signature: ByteArray, publicKey: ByteArray): Boolean =
         verify(UPDATE_DOMAIN + message, signature, publicKey)
 
-    @Suppress("SwallowedException")
     fun verifyUpdate(messageStream: InputStream, signature: ByteArray, publicKey: ByteArray): Boolean {
+        return verifyUpdate(messageStream, signature, publicKey) { Ed25519Signer() }
+    }
+
+    @Suppress("SwallowedException")
+    internal fun verifyUpdate(
+        messageStream: InputStream,
+        signature: ByteArray,
+        publicKey: ByteArray,
+        signerFactory: () -> Ed25519Signer,
+    ): Boolean {
         if (signature.size != 64 || publicKey.size != 32) return false
         return try {
-            val signer = Ed25519Signer()
+            val signer = signerFactory()
             signer.init(false, Ed25519PublicKeyParameters(publicKey))
             signer.update(UPDATE_DOMAIN, 0, UPDATE_DOMAIN.size)
             val buf = ByteArray(STREAM_CHUNK_BYTES)
@@ -41,12 +50,21 @@ object SubscriptionVerifier {
         }
     }
 
-    @Suppress("SwallowedException")
     fun verify(message: ByteArray, signature: ByteArray, publicKey: ByteArray): Boolean {
+        return verify(message, signature, publicKey) { Ed25519Signer() }
+    }
+
+    @Suppress("SwallowedException")
+    internal fun verify(
+        message: ByteArray,
+        signature: ByteArray,
+        publicKey: ByteArray,
+        signerFactory: () -> Ed25519Signer,
+    ): Boolean {
         if (signature.size != 64 || publicKey.size != 32) return false
         return try {
             val params = Ed25519PublicKeyParameters(publicKey)
-            val signer = Ed25519Signer()
+            val signer = signerFactory()
             signer.init(false, params)
             signer.update(message, 0, message.size)
             signer.verifySignature(signature)

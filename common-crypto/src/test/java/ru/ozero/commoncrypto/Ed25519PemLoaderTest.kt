@@ -3,6 +3,7 @@ package ru.ozero.commoncrypto
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.io.File
+import java.util.Base64
 import kotlin.test.assertEquals
 
 class Ed25519PemLoaderTest {
@@ -38,6 +39,29 @@ class Ed25519PemLoaderTest {
         val bad = "-----BEGIN PUBLIC KEY-----\n!!!notbase64!!!\n-----END PUBLIC KEY-----"
         assertThrows<IllegalArgumentException> {
             Ed25519PemLoader.parsePublicKey(bad)
+        }
+    }
+
+    @Test
+    fun rejectsMissingPemMarkers() {
+        assertThrows<IllegalArgumentException> {
+            Ed25519PemLoader.parsePublicKey("MCowBQYDK2VwAyEAoaTc4Im/Ap0v8quyIoSZG1mhfTYa+PNOO4BNo0UMtQ0=")
+        }
+    }
+
+    @Test
+    fun rejectsDerWithExpectedLengthButWrongEd25519PrefixByte() {
+        val der = Base64.getDecoder()
+            .decode("MCowBQYDK2VwAyEAoaTc4Im/Ap0v8quyIoSZG1mhfTYa+PNOO4BNo0UMtQ0=")
+            .also { it[0] = 0x31 }
+        val pem = """
+            -----BEGIN PUBLIC KEY-----
+            ${Base64.getEncoder().encodeToString(der)}
+            -----END PUBLIC KEY-----
+        """.trimIndent()
+
+        assertThrows<IllegalArgumentException> {
+            Ed25519PemLoader.parsePublicKey(pem)
         }
     }
 

@@ -48,6 +48,8 @@ class JacocoExcludesContractTest {
             "SubscriptionVerifier",
             "LogSanitizer",
             "PersistentLoggers",
+            "BinaryDownloader",
+            "LockFileParser",
             "WarpConfParser",
             "WarpIniBuilder",
             "AwgParams",

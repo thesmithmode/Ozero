@@ -1,7 +1,5 @@
 package ru.ozero.app.vpn
 
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.flowWithLifecycle
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -20,7 +18,6 @@ class EngineRuntimeConfigRestartObserver @Inject constructor(
 ) {
     fun start(
         scope: CoroutineScope,
-        lifecycle: Lifecycle?,
         exceptionHandler: CoroutineExceptionHandler,
         state: StateFlow<TunnelState>,
         restart: suspend (String) -> Unit,
@@ -28,7 +25,6 @@ class EngineRuntimeConfigRestartObserver @Inject constructor(
         providers.forEach { provider ->
             observeFlow(
                 scope = scope,
-                lifecycle = lifecycle,
                 changes = provider.changes,
                 engineId = provider.engineId,
                 reason = provider.restartReason,
@@ -44,7 +40,6 @@ class EngineRuntimeConfigRestartObserver @Inject constructor(
 
     internal fun observeFlow(
         scope: CoroutineScope,
-        lifecycle: Lifecycle?,
         changes: Flow<Any?>,
         engineId: EngineId,
         reason: String,
@@ -56,14 +51,9 @@ class EngineRuntimeConfigRestartObserver @Inject constructor(
         restart: suspend (String) -> Unit,
     ) {
         scope.launch(exceptionHandler, start = CoroutineStart.UNDISPATCHED) {
-            val lifecycleFlow = if (lifecycle != null) {
-                changes.flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
-            } else {
-                changes
-            }
             var baseline: Any? = UNSET
             var pending: PendingRestart? = null
-            lifecycleFlow.distinctUntilChanged()
+            changes.distinctUntilChanged()
                 .combine(state.distinctUntilChanged()) { change, tunnelState -> change to tunnelState }
                 .collect { (current, tunnelState) ->
                     val pendingRestart = pending

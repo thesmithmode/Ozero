@@ -130,6 +130,7 @@ object SingboxModule {
             singboxRuntimeFingerprint(prefs, profiles, chainSteps)
         }
         override val includeStarting: Boolean = false
+        override val replayAfterStarting: Boolean = true
         override val restartReason: String = "singbox profile changed while connected -> restart"
     }
 

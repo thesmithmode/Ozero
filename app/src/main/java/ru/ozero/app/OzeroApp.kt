@@ -6,12 +6,12 @@ import android.os.Build
 import android.util.Log
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import androidx.work.WorkManager
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import androidx.work.WorkManager
 import ru.ozero.app.data.CrashLogStore
 import ru.ozero.app.logging.AppLogger
 import ru.ozero.app.logging.BootDiagnostics
@@ -20,6 +20,7 @@ import ru.ozero.app.logging.LogBuffer
 import ru.ozero.app.relay.UrnetworkRelayCoordinator
 import ru.ozero.app.ui.onboarding.FirstRunBootstrap
 import ru.ozero.app.ui.splittunnel.AppListProvider
+import ru.ozero.app.vpn.RuntimeConfigRestartCoordinator
 import ru.ozero.app.workers.SubscriptionUpdateWorker
 import ru.ozero.singboxsubscription.GroupSeeder
 import javax.inject.Inject
@@ -40,6 +41,8 @@ class OzeroApp : Application(), Configuration.Provider {
     @Inject lateinit var urnetworkContractStatusObserver: ru.ozero.engineurnetwork.UrnetworkContractStatusObserver
 
     @Inject lateinit var groupSeeder: GroupSeeder
+
+    @Inject lateinit var runtimeConfigRestartCoordinator: RuntimeConfigRestartCoordinator
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -98,6 +101,8 @@ class OzeroApp : Application(), Configuration.Provider {
             .onFailure { BootFileLogger.warn(TAG, "urnetworkContractStatusObserver.start failed", it) }
         runCatching { SubscriptionUpdateWorker.schedule(WorkManager.getInstance(this)) }
             .onFailure { BootFileLogger.warn(TAG, "SubscriptionUpdateWorker.schedule failed", it) }
+        runCatching { runtimeConfigRestartCoordinator.start(appScope) }
+            .onFailure { BootFileLogger.warn(TAG, "runtimeConfigRestartCoordinator.start failed", it) }
         appScope.launch {
             runCatching { groupSeeder.seedPresets(loadPresetGroups()) }
                 .onFailure { BootFileLogger.warn(TAG, "groupSeeder.seedPresets failed", it) }

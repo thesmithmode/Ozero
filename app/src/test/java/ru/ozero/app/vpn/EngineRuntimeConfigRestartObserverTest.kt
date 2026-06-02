@@ -37,6 +37,7 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
+@Suppress("LargeClass")
 class EngineRuntimeConfigRestartObserverTest {
 
     private val dispatcher = StandardTestDispatcher()
@@ -61,7 +62,6 @@ class EngineRuntimeConfigRestartObserverTest {
 
         newObserver().observeFlow(
             scope = observerScope(),
-            lifecycle = null,
             changes = changes,
             engineId = EngineId.WARP,
             reason = "warp changed",
@@ -87,7 +87,6 @@ class EngineRuntimeConfigRestartObserverTest {
 
         newObserver().observeFlow(
             scope = observerScope(),
-            lifecycle = null,
             changes = changes,
             engineId = EngineId.WARP,
             reason = "warp changed",
@@ -110,7 +109,6 @@ class EngineRuntimeConfigRestartObserverTest {
 
         newObserver().observeFlow(
             scope = observerScope(),
-            lifecycle = null,
             changes = changes,
             engineId = EngineId.WARP,
             reason = "warp changed",
@@ -133,7 +131,6 @@ class EngineRuntimeConfigRestartObserverTest {
 
         newObserver().observeFlow(
             scope = observerScope(),
-            lifecycle = null,
             changes = changes,
             engineId = EngineId.FPTN,
             reason = "fptn changed",
@@ -163,7 +160,6 @@ class EngineRuntimeConfigRestartObserverTest {
 
         newObserver().observeFlow(
             scope = observerScope(),
-            lifecycle = null,
             changes = changes,
             engineId = EngineId.FPTN,
             reason = "fptn changed",
@@ -192,7 +188,6 @@ class EngineRuntimeConfigRestartObserverTest {
 
         newObserver().observeFlow(
             scope = observerScope(),
-            lifecycle = null,
             changes = changes,
             engineId = EngineId.FPTN,
             reason = "fptn changed",
@@ -223,7 +218,6 @@ class EngineRuntimeConfigRestartObserverTest {
 
         newObserver().observeFlow(
             scope = observerScope(),
-            lifecycle = null,
             changes = changes,
             engineId = EngineId.FPTN,
             reason = "fptn changed",
@@ -252,7 +246,6 @@ class EngineRuntimeConfigRestartObserverTest {
 
         newObserver().observeFlow(
             scope = observerScope(),
-            lifecycle = null,
             changes = changes,
             engineId = EngineId.FPTN,
             reason = "fptn changed",
@@ -284,7 +277,6 @@ class EngineRuntimeConfigRestartObserverTest {
 
         newObserver().observeFlow(
             scope = observerScope(),
-            lifecycle = null,
             changes = changes,
             engineId = EngineId.FPTN,
             reason = "fptn changed",
@@ -311,7 +303,6 @@ class EngineRuntimeConfigRestartObserverTest {
 
         newObserver().observeFlow(
             scope = observerScope(),
-            lifecycle = null,
             changes = changes,
             engineId = EngineId.SINGBOX,
             reason = "singbox changed",
@@ -333,6 +324,58 @@ class EngineRuntimeConfigRestartObserverTest {
     }
 
     @Test
+    fun `observeFlow replays WARP slot edit made while startup is still connecting`() = runTest(dispatcher) {
+        val changes = MutableStateFlow<Any?>("slot-before-start")
+        val state = MutableStateFlow<TunnelState>(TunnelState.Connecting(EngineId.WARP))
+        val restarts = mutableListOf<String>()
+
+        newObserver().observeFlow(
+            scope = observerScope(),
+            changes = changes,
+            engineId = EngineId.WARP,
+            reason = "warp changed",
+            includeStarting = false,
+            replayAfterStarting = true,
+            state = state,
+            restart = { restarts += it },
+        )
+        runCurrent()
+
+        changes.value = "slot-edited-during-start"
+        runCurrent()
+        state.value = TunnelState.Connected(EngineId.WARP, 0)
+        runCurrent()
+
+        assertEquals(listOf("warp changed"), restarts)
+    }
+
+    @Test
+    fun `observeFlow replays Singbox profile edit made while startup is still probing`() = runTest(dispatcher) {
+        val changes = MutableStateFlow<Any?>("profile-before-start")
+        val state = MutableStateFlow<TunnelState>(TunnelState.Probing(EngineId.SINGBOX))
+        val restarts = mutableListOf<String>()
+
+        newObserver().observeFlow(
+            scope = observerScope(),
+            changes = changes,
+            engineId = EngineId.SINGBOX,
+            reason = "singbox changed",
+            includeStarting = false,
+            replayAfterStarting = true,
+            state = state,
+            restart = { restarts += it },
+        )
+        runCurrent()
+
+        changes.value = "profile-edited-during-start"
+        runCurrent()
+        state.value = TunnelState.Connected(EngineId.SINGBOX, 1080)
+        runCurrent()
+
+        assertEquals(listOf("singbox changed"), restarts)
+    }
+
+    @Test
     fun `start wires provider options into runtime observation`() = runTest(dispatcher) {
         val changes = MutableStateFlow<Any?>("default")
         val state = MutableStateFlow<TunnelState>(TunnelState.Probing(EngineId.FPTN))
@@ -348,7 +391,6 @@ class EngineRuntimeConfigRestartObserverTest {
 
         EngineRuntimeConfigRestartObserver(setOf(provider)).start(
             scope = observerScope(),
-            lifecycle = null,
             exceptionHandler = CoroutineExceptionHandler { _, _ -> },
             state = state,
             restart = { restarts += it },
@@ -381,7 +423,6 @@ class EngineRuntimeConfigRestartObserverTest {
 
         EngineRuntimeConfigRestartObserver(setOf(provider)).start(
             scope = observerScope(),
-            lifecycle = null,
             exceptionHandler = CoroutineExceptionHandler { _, _ -> },
             state = state,
             restart = { restarts += it },
@@ -419,7 +460,6 @@ class EngineRuntimeConfigRestartObserverTest {
 
         EngineRuntimeConfigRestartObserver(setOf(warpProvider, fptnProvider)).start(
             scope = observerScope(),
-            lifecycle = null,
             exceptionHandler = CoroutineExceptionHandler { _, _ -> },
             state = state,
             restart = { restarts += it },
@@ -445,7 +485,6 @@ class EngineRuntimeConfigRestartObserverTest {
 
         newObserver().observeFlow(
             scope = observerScope(),
-            lifecycle = null,
             changes = changes,
             engineId = EngineId.SINGBOX,
             reason = "singbox changed",
@@ -474,7 +513,6 @@ class EngineRuntimeConfigRestartObserverTest {
 
         newObserver().observeFlow(
             scope = observerScope(),
-            lifecycle = null,
             changes = changes,
             engineId = EngineId.WARP,
             reason = "warp changed",
@@ -499,9 +537,15 @@ class EngineRuntimeConfigRestartObserverTest {
     fun `runtime observer stays generic while composition root wires engine providers`() {
         val mainActivity = readSource("src/main/java/ru/ozero/app/MainActivity.kt")
         val observer = readSource("src/main/java/ru/ozero/app/vpn/EngineRuntimeConfigRestartObserver.kt")
+        val app = readSource("src/main/java/ru/ozero/app/OzeroApp.kt")
+        val coordinator = readSource("src/main/java/ru/ozero/app/vpn/RuntimeConfigRestartCoordinator.kt")
 
-        assertTrue(mainActivity.contains("EngineRuntimeConfigRestartObserver"))
+        assertTrue(mainActivity.contains("EngineRuntimeConfigRestartObserver").not())
+        assertTrue(app.contains("runtimeConfigRestartCoordinator.start(appScope)"))
+        assertTrue(coordinator.contains("EngineRuntimeConfigRestartObserver"))
+        assertTrue(coordinator.contains("tunnelController.state"))
         assertTrue(observer.contains("EngineRuntimeConfigProvider"))
+        assertTrue(observer.contains("flowWithLifecycle").not())
         assertTrue((mainActivity + observer).contains("WarpConfigSlotStore").not())
         assertTrue((mainActivity + observer).contains("FptnConfigStore").not())
         assertTrue((mainActivity + observer).contains("SingboxProbeService").not())
@@ -648,6 +692,15 @@ class EngineRuntimeConfigRestartObserverTest {
         val warpModule = readSource("src/main/java/ru/ozero/app/di/WarpModule.kt")
 
         assertTrue(warpModule.contains("override val includeStarting: Boolean = false"))
+        assertTrue(warpModule.contains("override val replayAfterStarting: Boolean = true"))
+    }
+
+    @Test
+    fun `singbox runtime provider replays startup edits after connected`() {
+        val singboxModule = readSource("src/main/java/ru/ozero/app/di/SingboxModule.kt")
+
+        assertTrue(singboxModule.contains("override val includeStarting: Boolean = false"))
+        assertTrue(singboxModule.contains("override val replayAfterStarting: Boolean = true"))
     }
 
     @Test

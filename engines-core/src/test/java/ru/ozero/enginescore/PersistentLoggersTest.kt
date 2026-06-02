@@ -35,6 +35,22 @@ class PersistentLoggersTest {
         )
     }
 
+    @Test
+    fun `fallback logger paths do not throw when persistent logger is absent`() {
+        PersistentLoggers.instance = null
+        val cause = IllegalStateException("boom")
+
+        PersistentLoggers.trace("T", "trace")
+        PersistentLoggers.debug("T", "debug")
+        PersistentLoggers.info("T", "info")
+        PersistentLoggers.warn("T", "warn")
+        PersistentLoggers.warn("T", "warn", cause)
+        PersistentLoggers.error("T", "error")
+        PersistentLoggers.error("T", "error", cause)
+
+        assertEquals(null, PersistentLoggers.instance)
+    }
+
     private class RecordingLogger : PersistentLogger {
         val events = mutableListOf<String>()
 

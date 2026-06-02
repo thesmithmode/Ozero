@@ -72,11 +72,95 @@ class LockFileParserTest {
     }
 
     @Test
+    fun `parse target filename and string size`() {
+        val f = write(
+            """
+            tag: binaries-deadbeef
+            generated_at: 2026-04-25T10:00:00Z
+            artifacts:
+              - name: original.aar
+                target_filename: renamed.aar
+                engine: xray
+                destination: libs
+                download_url: https://example.com/original.aar
+                sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                size_bytes: "15728640"
+                source_repo: https://github.com/XTLS/Xray-core
+                source_commit: 2222222222222222222222222222222222222222
+            """.trimIndent(),
+        )
+        val artifact = LockFileParser.parse(f).artifacts.single()
+        assertThat(artifact.targetFilename).isEqualTo("renamed.aar")
+        assertThat(artifact.sizeBytes).isEqualTo(15_728_640L)
+    }
+
+    @Test
+    fun `blank target filename falls back to artifact name`() {
+        val f = write(
+            """
+            tag: binaries-deadbeef
+            generated_at: 2026-04-25T10:00:00Z
+            artifacts:
+              - name: original.aar
+                target_filename: " "
+                engine: xray
+                destination: libs
+                download_url: https://example.com/original.aar
+                sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                size_bytes: 15728640
+                source_repo: https://github.com/XTLS/Xray-core
+                source_commit: 2222222222222222222222222222222222222222
+            """.trimIndent(),
+        )
+        assertThat(LockFileParser.parse(f).artifacts.single().targetFilename).isNull()
+    }
+
+    @Test
+    fun `parse lock with absent artifacts as empty list`() {
+        val f = write(
+            """
+            tag: binaries-empty
+            generated_at: 2026-04-25T10:00:00Z
+            """.trimIndent(),
+        )
+        assertThat(LockFileParser.parse(f).artifacts).isEmpty()
+    }
+
+    @Test
+    fun `parse lock with non list artifacts as empty list`() {
+        val f = write(
+            """
+            tag: binaries-empty
+            generated_at: 2026-04-25T10:00:00Z
+            artifacts:
+              byedpi: libbyedpi.so
+            """.trimIndent(),
+        )
+        assertThat(LockFileParser.parse(f).artifacts).isEmpty()
+    }
+
+    @Test
+    fun `reject scalar lock root`() {
+        val f = write("not-a-map")
+        assertThatThrownBy { LockFileParser.parse(f) }
+            .isInstanceOf(LockFileException::class.java)
+            .hasMessageContaining("root")
+    }
+
+    @Test
     fun `reject missing tag field`() {
         val f = write("generated_at: 2026-04-25T10:00:00Z\nartifacts: []\n")
         assertThatThrownBy { LockFileParser.parse(f) }
             .isInstanceOf(LockFileException::class.java)
             .hasMessageContaining("tag")
+    }
+
+    @Test
+    fun `reject missing generated at field`() {
+        val f = write("tag: binaries-x\nartifacts: []\n")
+        assertThatThrownBy { LockFileParser.parse(f) }
+            .isInstanceOf(LockFileException::class.java)
+            .hasMessageContaining("generated_at")
     }
 
     @Test
@@ -229,6 +313,52 @@ class LockFileParserTest {
         assertThatThrownBy { LockFileParser.parse(f) }
             .isInstanceOf(LockFileException::class.java)
             .hasMessageContaining("absolute")
+    }
+
+    @Test
+    fun `reject malformed download url`() {
+        val f = write(
+            """
+            tag: binaries-x
+            generated_at: 2026-04-25T10:00:00Z
+            artifacts:
+              - name: libx.so
+                engine: x
+                abi: arm64-v8a
+                destination: jniLibs
+                download_url: http://[
+                sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                size_bytes: 1
+                source_repo: https://example.com
+                source_commit: 9999999999999999999999999999999999999999
+            """.trimIndent(),
+        )
+        assertThatThrownBy { LockFileParser.parse(f) }
+            .isInstanceOf(LockFileException::class.java)
+            .hasMessageContaining("download_url")
+    }
+
+    @Test
+    fun `reject non integer string size bytes`() {
+        val f = write(
+            """
+            tag: binaries-x
+            generated_at: 2026-04-25T10:00:00Z
+            artifacts:
+              - name: libx.so
+                engine: x
+                abi: arm64-v8a
+                destination: jniLibs
+                download_url: https://example.com/x.so
+                sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                size_bytes: not-a-number
+                source_repo: https://example.com
+                source_commit: 9999999999999999999999999999999999999999
+            """.trimIndent(),
+        )
+        assertThatThrownBy { LockFileParser.parse(f) }
+            .isInstanceOf(LockFileException::class.java)
+            .hasMessageContaining("integer")
     }
 
     @Test
