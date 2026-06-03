@@ -170,36 +170,39 @@ private class RawWarpIniMerger(preserveRawIni: String) {
         return line.substring(0, eq).trim().lowercase() to line.substring(eq + 1).trim()
     }
 
-    private fun canonicalLabel(key: String): String = when (key.lowercase()) {
-        "address" -> "Address"
-        "persistentkeepalive" -> "PersistentKeepalive"
-        "allowedips" -> "AllowedIPs"
-        "privatekey" -> "PrivateKey"
-        "publickey" -> "PublicKey"
-        "endpoint" -> "Endpoint"
-        "dns" -> "DNS"
-        "mtu" -> "MTU"
-        "jc" -> "Jc"
-        "jmin" -> "Jmin"
-        "jmax" -> "Jmax"
-        "s1" -> "S1"
-        "s2" -> "S2"
-        "s3" -> "S3"
-        "s4" -> "S4"
-        "h1" -> "H1"
-        "h2" -> "H2"
-        "h3" -> "H3"
-        "h4" -> "H4"
-        "i1" -> "I1"
-        "i2" -> "I2"
-        "i3" -> "I3"
-        "i4" -> "I4"
-        "i5" -> "I5"
-        else -> key
-    }
+    private fun canonicalLabel(key: String): String = canonicalLabels[key.lowercase()] ?: key
 
     private data class Section(
         val header: String,
         val lines: MutableList<String>,
     )
+
+    private companion object {
+        val canonicalLabels = mapOf(
+            "address" to "Address",
+            "persistentkeepalive" to "PersistentKeepalive",
+            "allowedips" to "AllowedIPs",
+            "privatekey" to "PrivateKey",
+            "publickey" to "PublicKey",
+            "endpoint" to "Endpoint",
+            "dns" to "DNS",
+            "mtu" to "MTU",
+            "jc" to "Jc",
+            "jmin" to "Jmin",
+            "jmax" to "Jmax",
+            "s1" to "S1",
+            "s2" to "S2",
+            "s3" to "S3",
+            "s4" to "S4",
+            "h1" to "H1",
+            "h2" to "H2",
+            "h3" to "H3",
+            "h4" to "H4",
+            "i1" to "I1",
+            "i2" to "I2",
+            "i3" to "I3",
+            "i4" to "I4",
+            "i5" to "I5",
+        )
+    }
 }

@@ -99,12 +99,7 @@ class EngineSettingsRestartObserver(
             }
         }
         if (startupAcceptedSnapshot == snapshot) return
-        if (
-            currentEngine == snapshot.targetEngine() &&
-            trigger.previous.targetEngine() != currentEngine &&
-            snapshot.sameRuntimeFor(currentEngine, trigger.previous) &&
-            startupAcceptedSnapshot == null
-        ) {
+        if (canAcceptStartupSnapshot(currentEngine, trigger)) {
             startupAcceptedSnapshot = snapshot
             return
         }
@@ -113,6 +108,16 @@ class EngineSettingsRestartObserver(
     }
 
     private fun Snapshot.targetEngine(): EngineId? = manualEngine ?: engineAutoPriority?.firstOrNull()
+
+    private fun canAcceptStartupSnapshot(
+        currentEngine: EngineId,
+        trigger: Trigger,
+    ): Boolean {
+        return trigger.snapshot.targetEngine() == currentEngine &&
+            trigger.previous.targetEngine() != currentEngine &&
+            trigger.snapshot.sameRuntimeFor(currentEngine, trigger.previous) &&
+            startupAcceptedSnapshot == null
+    }
 
     private fun Snapshot.sameRuntimeFor(engineId: EngineId, other: Snapshot): Boolean {
         val commonRuntimeMatches = ipv6Enabled == other.ipv6Enabled &&
