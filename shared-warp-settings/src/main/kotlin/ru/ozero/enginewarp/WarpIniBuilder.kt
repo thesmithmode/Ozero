@@ -23,73 +23,8 @@ object WarpIniBuilder {
         }
     }
 
-    fun build(config: WarpConfig, preserveRawIni: String): String {
-        val preserved = parseSections(preserveRawIni)
-        if (preserved.isEmpty()) {
-            return build(config)
-        }
-        val baseIni = build(config)
-        val baseSections = parseSections(baseIni)
-        val rebuiltSections = linkedMapOf<String, Section>().apply {
-            putAll(preserved)
-            val mergedInterface = mergeSectionBody(
-                baseSections["interface"]?.lines.orEmpty(),
-                preserved["interface"]?.lines.orEmpty(),
-            )
-            val mergedPeer = mergeSectionBody(
-                baseSections["peer"]?.lines.orEmpty(),
-                preserved["peer"]?.lines.orEmpty(),
-            )
-            val interfaceHeader = preserved["interface"]?.header ?: "[Interface]"
-            val peerHeader = preserved["peer"]?.header ?: "[Peer]"
-            put(
-                "interface",
-                Section(
-                    header = interfaceHeader,
-                    lines = mergedInterface,
-                ),
-            )
-            put(
-                "peer",
-                Section(
-                    header = peerHeader,
-                    lines = mergedPeer,
-                ),
-            )
-        }
-
-        return renderSections(rebuiltSections, "interface", "peer")
-    }
-
-    private fun renderSections(
-        sections: Map<String, Section>,
-        preferredFirst: String,
-        preferredSecond: String,
-    ): String {
-        val output = StringBuilder()
-        val rendered = mutableSetOf<String>()
-        if (sections.containsKey(preferredFirst)) {
-            appendSection(output, sections[preferredFirst]!!)
-            rendered.add(preferredFirst)
-        }
-        if (sections.containsKey(preferredSecond) && rendered.add(preferredSecond)) {
-            if (output.isNotEmpty()) output.appendLine()
-            appendSection(output, sections[preferredSecond]!!)
-        }
-
-        val remaining = LinkedHashSet(sections.keys)
-        remaining.removeAll(rendered)
-        for (sectionName in remaining) {
-            if (output.isNotEmpty()) output.appendLine()
-            appendSection(output, sections[sectionName]!!)
-        }
-        return output.toString().trimEnd()
-    }
-
-    private fun appendSection(output: StringBuilder, section: Section) {
-        output.appendLine(section.header)
-        section.lines.forEach { output.appendLine(it) }
-    }
+    fun build(config: WarpConfig, preserveRawIni: String): String =
+        RawWarpIniMerger(preserveRawIni).mergeWith(build(config))
 
     private fun StringBuilder.appendAwgIfPresent(p: AwgParams) {
         if (p == AwgParams.VANILLA) return
@@ -104,30 +39,50 @@ object WarpIniBuilder {
         appendLine("H2 = ${p.responsePacketMagicHeader}")
         appendLine("H3 = ${p.cookieReplyMagicHeader}")
         appendLine("H4 = ${p.transportMagicHeader}")
-        when {
-            p.payloadHexI1 != null -> appendLine("I1 = ${formatI(p.payloadHexI1, p.payloadPacketSizeCount1)}")
-            p.payloadPacketSizeCount1 != 0 -> appendLine("I1 = ${p.payloadPacketSizeCount1}")
-        }
-        when {
-            p.payloadHexI2 != null -> appendLine("I2 = ${formatI(p.payloadHexI2, p.payloadPacketSizeCount2)}")
-            p.payloadPacketSizeCount2 != 0 -> appendLine("I2 = ${p.payloadPacketSizeCount2}")
-        }
-        when {
-            p.payloadHexI3 != null -> appendLine("I3 = <b 0x${p.payloadHexI3}>")
-            p.specialJunk3 != 0 -> appendLine("I3 = ${p.specialJunk3}")
-        }
-        when {
-            p.payloadHexI4 != null -> appendLine("I4 = <b 0x${p.payloadHexI4}>")
-            p.specialJunk4 != 0 -> appendLine("I4 = ${p.specialJunk4}")
-        }
-        when {
-            p.payloadHexI5 != null -> appendLine("I5 = ${formatI(p.payloadHexI5, p.payloadPacketSizeCount3)}")
-            p.payloadPacketSizeCount3 != 0 -> appendLine("I5 = ${p.payloadPacketSizeCount3}")
-        }
+        appendPayload("I1", p.payloadHexI1, p.payloadPacketSizeCount1)
+        appendPayload("I2", p.payloadHexI2, p.payloadPacketSizeCount2)
+        appendPayload("I3", p.payloadHexI3, p.specialJunk3)
+        appendPayload("I4", p.payloadHexI4, p.specialJunk4)
+        appendPayload("I5", p.payloadHexI5, p.payloadPacketSizeCount3)
     }
 
-    private fun formatI(hex: String?, intValue: Int): String =
-        if (hex != null) "<b 0x$hex>" else intValue.toString()
+    private fun StringBuilder.appendPayload(label: String, hex: String?, intValue: Int) {
+        when {
+            hex != null -> appendLine("$label = <b 0x$hex>")
+            intValue != 0 -> appendLine("$label = $intValue")
+        }
+    }
+}
+
+private class RawWarpIniMerger(preserveRawIni: String) {
+    private val preserved = parseSections(preserveRawIni)
+
+    fun mergeWith(generatedIni: String): String {
+        if (preserved.isEmpty()) return generatedIni
+        val generated = parseSections(generatedIni)
+        val rebuilt = linkedMapOf<String, Section>().apply {
+            putAll(preserved)
+            put("interface", mergeSection("interface", generated))
+            put("peer", mergeSection("peer", generated))
+        }
+        return renderSections(rebuilt, "interface", "peer")
+    }
+
+    private fun mergeSection(name: String, generated: Map<String, Section>): Section {
+        return Section(
+            header = preserved[name]?.header ?: defaultHeader(name),
+            lines = mergeSectionBody(
+                generated[name]?.lines.orEmpty(),
+                preserved[name]?.lines.orEmpty(),
+            ),
+        )
+    }
+
+    private fun defaultHeader(name: String): String = when (name) {
+        "interface" -> "[Interface]"
+        "peer" -> "[Peer]"
+        else -> "[$name]"
+    }
 
     private fun parseSections(rawIni: String): Map<String, Section> {
         val sections = LinkedHashMap<String, Section>()
@@ -140,10 +95,44 @@ object WarpIniBuilder {
                 sections.putIfAbsent(headerName, Section(line.trim(), mutableListOf()))
                 return@forEach
             }
-            if (current == null) return@forEach
-            sections[current]!!.lines.add(line)
+            val sectionName = current ?: return@forEach
+            sections.getValue(sectionName).lines.add(line)
         }
         return sections
+    }
+
+    private fun renderSections(
+        sections: Map<String, Section>,
+        preferredFirst: String,
+        preferredSecond: String,
+    ): String {
+        val output = StringBuilder()
+        val rendered = mutableSetOf<String>()
+        appendPreferredSection(output, sections, rendered, preferredFirst)
+        appendPreferredSection(output, sections, rendered, preferredSecond)
+
+        val remaining = LinkedHashSet(sections.keys)
+        remaining.removeAll(rendered)
+        for (sectionName in remaining) {
+            appendSection(output, sections.getValue(sectionName))
+        }
+        return output.toString().trimEnd()
+    }
+
+    private fun appendPreferredSection(
+        output: StringBuilder,
+        sections: Map<String, Section>,
+        rendered: MutableSet<String>,
+        name: String,
+    ) {
+        val section = sections[name] ?: return
+        if (rendered.add(name)) appendSection(output, section)
+    }
+
+    private fun appendSection(output: StringBuilder, section: Section) {
+        if (output.isNotEmpty()) output.appendLine()
+        output.appendLine(section.header)
+        section.lines.forEach { output.appendLine(it) }
     }
 
     private fun mergeSectionBody(
@@ -211,6 +200,6 @@ object WarpIniBuilder {
 
     private data class Section(
         val header: String,
-        val lines: List<String>,
+        val lines: MutableList<String>,
     )
 }

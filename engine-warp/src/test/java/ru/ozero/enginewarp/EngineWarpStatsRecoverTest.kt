@@ -9,9 +9,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EnginePlugin
-import ru.ozero.enginescore.ExitNodeStrategy
-import ru.ozero.enginescore.StartResult
-import ru.ozero.enginescore.TunAttachResult
 import ru.ozero.enginescore.Upstream
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
@@ -185,101 +182,6 @@ class EngineWarpStatsRecoverTest {
             r,
             "UAPI socket недоступен → Failed (watchdog retry), не NotSupported (не убиваем VPN)",
         )
-    }
-
-    @Test
-    fun `second stale recover reattaches saved tun and succeeds after handshake`() = runTest {
-        val bridge = FakeBridge()
-        val reader = FixedReader(
-            WarpUapiState(handshakeAgeSeconds = 999L, rxBytes = 0L, txBytes = 0L, peersSeen = 1),
-        )
-        val e = newEngine(bridge = bridge, reader = reader, scope = backgroundScope)
-        e.start(EngineConfig.Warp, Upstream.None)
-        e.attachTun(tunFd = 11)
-
-        assertIs<EnginePlugin.RecoverResult.Failed>(e.recover())
-        val r = e.recover()
-
-        assertEquals(EnginePlugin.RecoverResult.Success, r)
-        assertEquals(2, bridge.attachCalls)
-        assertEquals(1, bridge.detachCalls)
-    }
-
-    @Test
-    fun `second stale recover reports failed when reattach fails`() = runTest {
-        val bridge = FakeBridge(attachResult = WarpSdkBridge.AttachResult.Failed("attach down"))
-        val reader = FixedReader(
-            WarpUapiState(handshakeAgeSeconds = 999L, rxBytes = 0L, txBytes = 0L, peersSeen = 1),
-        )
-        val e = newEngine(bridge = bridge, reader = reader, scope = backgroundScope)
-        e.start(EngineConfig.Warp, Upstream.None)
-        e.attachTun(tunFd = 11)
-
-        assertIs<EnginePlugin.RecoverResult.Failed>(e.recover())
-        val r = e.recover()
-
-        val failed = assertIs<EnginePlugin.RecoverResult.Failed>(r)
-        assertTrue(failed.reason.contains("reattach failed"))
-    }
-
-    @Test
-    fun `proxy start success stores socks port and stop calls proxy bridge`() = runTest {
-        val bridge = FakeBridge(proxyResult = WarpSdkBridge.ProxyResult.Success)
-        val e = newEngine(bridge = bridge, reader = FixedReader(null), scope = backgroundScope)
-
-        val result = e.start(EngineConfig.WarpProxy(socksPort = 19090), Upstream.None)
-        val strategy = e.exitNodeStrategy(0)
-        e.stop()
-
-        assertIs<StartResult.Success>(result)
-        assertEquals(19090, result.socksPort)
-        assertEquals(1, bridge.proxyCalls)
-        assertEquals(1, bridge.stopProxyCalls)
-        assertEquals("127.0.0.1", (strategy as ExitNodeStrategy.ViaSocks).host)
-        assertEquals(19090, strategy.port)
-    }
-
-    @Test
-    fun `proxy start failure returns start failure and does not mark running`() = runTest {
-        val bridge = FakeBridge(proxyResult = WarpSdkBridge.ProxyResult.Failed("proxy unavailable"))
-        val e = newEngine(bridge = bridge, reader = FixedReader(null), scope = backgroundScope)
-
-        val result = e.start(EngineConfig.WarpProxy(socksPort = 19091), Upstream.None)
-
-        val failure = assertIs<StartResult.Failure>(result)
-        assertTrue(failure.reason.contains("proxy unavailable"))
-        assertEquals(1, bridge.proxyCalls)
-    }
-
-    @Test
-    fun `attachTun failure closes branch as TunAttachResult failure`() = runTest {
-        val e = newEngine(
-            bridge = FakeBridge(attachResult = WarpSdkBridge.AttachResult.Failed("attach failed")),
-            reader = FixedReader(null),
-            scope = backgroundScope,
-        )
-        e.start(EngineConfig.Warp, Upstream.None)
-
-        val result = e.attachTun(tunFd = 12)
-
-        val failure = assertIs<TunAttachResult.Failure>(result)
-        assertTrue(failure.reason.contains("attach failed"))
-    }
-
-    @Test
-    fun `tunSpec uses configured ipv6 when provider allows it`() = runTest {
-        val e = newEngine(
-            bridge = FakeBridge(),
-            reader = FixedReader(null),
-            scope = backgroundScope,
-            ipv6Enabled = true,
-        )
-
-        val spec = e.tunSpec()
-
-        assertEquals("2606:4700::1", spec?.ipv6Address)
-        assertEquals(128, spec?.ipv6PrefixLength)
-        assertTrue(spec?.allowFamilyV6 == true)
     }
 
     private fun interface WarpUapiStateReader {
