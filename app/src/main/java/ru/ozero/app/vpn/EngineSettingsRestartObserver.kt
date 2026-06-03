@@ -113,10 +113,10 @@ class EngineSettingsRestartObserver(
         currentEngine: EngineId,
         trigger: Trigger,
     ): Boolean {
-        return trigger.snapshot.targetEngine() == currentEngine &&
-            trigger.previous.targetEngine() != currentEngine &&
-            trigger.snapshot.sameRuntimeFor(currentEngine, trigger.previous) &&
-            startupAcceptedSnapshot == null
+        if (trigger.snapshot.targetEngine() != currentEngine) return false
+        if (trigger.previous.targetEngine() == currentEngine) return false
+        if (!trigger.snapshot.sameRuntimeFor(currentEngine, trigger.previous)) return false
+        return startupAcceptedSnapshot == null
     }
 
     private fun Snapshot.sameRuntimeFor(engineId: EngineId, other: Snapshot): Boolean {
