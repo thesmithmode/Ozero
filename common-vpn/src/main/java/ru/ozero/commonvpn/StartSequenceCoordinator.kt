@@ -111,6 +111,7 @@ class StartSequenceCoordinator(
                 PersistentLoggers.error(TAG, "no engine reachable ($mode mode) — отказ старта")
                 deps.tunnelController.onProbing(targetForUi)
                 deps.engineWatchdog.handleEngineFailure(targetForUi, "no engine reachable ($mode mode)")
+                if (deps.tunnelController.killswitchActive.value) return
             }
             stopVpnRequest()
             return
