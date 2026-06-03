@@ -1,16 +1,16 @@
 package ru.ozero.app.vpn
 
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SplitTunnelMode
 import ru.ozero.enginescore.settings.TrafficMode
-import org.junit.jupiter.api.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class EngineSettingsRestartObserverTriggersTest : EngineSettingsRestartObserverTestBase() {
@@ -104,7 +104,7 @@ class EngineSettingsRestartObserverTriggersTest : EngineSettingsRestartObserverT
     }
 
     @Test
-    fun `splitMode change НЕ триггерит restart — VPN живёт независимо от mode toggle`() = runTest(dispatcher) {
+    fun `splitMode change does not trigger restart on mode toggle`() = runTest(dispatcher) {
         val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
         val observer = newObserver(flow, alwaysConnected())
         val collected = mutableListOf<EngineSettingsRestartObserver.Trigger>()
@@ -122,9 +122,7 @@ class EngineSettingsRestartObserverTriggersTest : EngineSettingsRestartObserverT
 
         assertTrue(
             collected.isEmpty(),
-            "splitMode toggle не должен валить VPN restart — пользователь крутит вкладки " +
-                "Включено/Все/Исключено, каждый restart на Nubia ROM = SIGABRT в libam-go.so. " +
-                "splitMode применяется при следующем коннекте (engine читает значение из repo).",
+            "splitMode toggle should not trigger VPN restart; this toggle only changes UI behavior.",
         )
         job.cancel()
     }
@@ -151,7 +149,7 @@ class EngineSettingsRestartObserverTriggersTest : EngineSettingsRestartObserverT
     }
 
     @Test
-    fun `triggers debounce коалесцирует chain быстрых изменений`() = runTest(dispatcher) {
+    fun `triggers debounce coalesces fast sequence of engine changes`() = runTest(dispatcher) {
         val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 16)
         val observer = newObserver(flow, alwaysConnected())
         val collected = mutableListOf<EngineSettingsRestartObserver.Trigger>()
@@ -172,16 +170,14 @@ class EngineSettingsRestartObserverTriggersTest : EngineSettingsRestartObserverT
         assertEquals(
             1,
             collected.size,
-            "5 быстрых engine-toggle обязаны коалесцироваться в 1 emit после debounce — иначе " +
-                "MainActivity триггерит chain restart VPN, что роняет URnetwork (Go runtime " +
-                "conflict), сбивает IP fetch warmup и убивает стабильность.",
+            "5 engine toggles should coalesce into one debounced restart trigger.",
         )
         assertEquals(EngineId.WARP, collected.single().snapshot.manualEngine)
         job.cancel()
     }
 
     @Test
-    fun `engineAutoPriority изменился в auto-mode → restart триггерится`() = runTest(dispatcher) {
+    fun `engineAutoPriority change in auto mode triggers restart`() = runTest(dispatcher) {
         val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
         val observer = newObserver(flow, alwaysConnected())
         val collected = mutableListOf<EngineSettingsRestartObserver.Trigger>()
@@ -203,9 +199,7 @@ class EngineSettingsRestartObserverTriggersTest : EngineSettingsRestartObserverT
         assertEquals(
             1,
             collected.size,
-            "В auto-mode reorder engine priority должен дропнуть VPN и перевыбрать топ-приоритетный движок. " +
-                "Иначе пользователь меняет порядок а соединение продолжает использовать старый выбор — " +
-                "новая схема не применяется.",
+            "Changing engineAutoPriority in auto mode should trigger restart and keep fallback ordering.",
         )
         assertEquals(
             listOf(EngineId.URNETWORK, EngineId.WARP, EngineId.BYEDPI),
@@ -215,7 +209,7 @@ class EngineSettingsRestartObserverTriggersTest : EngineSettingsRestartObserverT
     }
 
     @Test
-    fun `engineAutoPriority изменился в manual-mode → restart НЕ триггерится`() = runTest(dispatcher) {
+    fun `engineAutoPriority change in manual mode does not trigger restart`() = runTest(dispatcher) {
         val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
         val observer = newObserver(flow, alwaysConnected())
         val collected = mutableListOf<EngineSettingsRestartObserver.Trigger>()
@@ -236,8 +230,7 @@ class EngineSettingsRestartObserverTriggersTest : EngineSettingsRestartObserverT
 
         assertTrue(
             collected.isEmpty(),
-            "В manual-mode auto-priority irrelevant — reorder в Auto-Mode секции настроек не должен " +
-                "дропать VPN если юзер вручную выбрал движок.",
+            "In manual-mode, engineAutoPriority reorder should not trigger VPN restart.",
         )
         job.cancel()
     }
