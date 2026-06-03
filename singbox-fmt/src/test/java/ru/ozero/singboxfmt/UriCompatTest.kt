@@ -44,4 +44,16 @@ class UriCompatTest {
         assertEquals("2", uri.getQueryParameter("a"))
         assertEquals("%GG", uri.getQueryParameter("bad"))
     }
+
+    @Test
+    fun `fallback parser keeps authority and fragment when URI parser fails`() {
+        val uri = UriCompat.parse("vless://uuid@example.com:443?type=xhttp&extra={a,b}#Name%20With%20Space")
+
+        assertEquals("uuid", uri.userInfo)
+        assertEquals("example.com", uri.host)
+        assertEquals(443, uri.port)
+        assertEquals("Name%20With%20Space", uri.fragment)
+        assertEquals("xhttp", uri.getQueryParameter("type"))
+        assertEquals("{a,b}", uri.getQueryParameter("extra"))
+    }
 }

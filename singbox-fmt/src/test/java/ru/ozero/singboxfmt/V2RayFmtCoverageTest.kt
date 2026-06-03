@@ -65,6 +65,21 @@ class V2RayFmtCoverageTest {
     }
 
     @Test
+    fun `parse vless fallback parser keeps malformed query params and authority`() {
+        val parsed = V2RayFmt.parseVLESS(
+            "vless://uuid@example.com:443?type=xhttp&extra={a,b}&host=front&path=%2Fx&bad=%E0%A4%A#Name%20With%20Space",
+        )
+
+        assertEquals("uuid", parsed.uuid)
+        assertEquals("example.com", parsed.serverAddress)
+        assertEquals(443, parsed.serverPort)
+        assertEquals("Name With Space", parsed.name)
+        assertEquals("splithttp", parsed.type)
+        assertEquals("front", parsed.host)
+        assertEquals("/x", parsed.path)
+    }
+
+    @Test
     fun `parse vmess json and standard uri`() {
         val json = """
             {"v":"2","ps":"vmess-json","add":"vm.example.com","port":"8443","id":"uuid",

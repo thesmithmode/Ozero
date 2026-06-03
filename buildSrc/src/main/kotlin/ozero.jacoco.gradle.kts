@@ -129,7 +129,6 @@ val excludedClasses = listOf(
     "**/ProxyWarpAutoConfig*.*",
     "**/PrefsMirrorRanker*.*",
     "**/WarpPreflight*.*",
-    "**/EngineWarp*.*",
     "**/EngineUrnetwork*.*",
     "**/UrnetworkPreferredLocationConnector*.*",
     "**/UrnetworkPayoutWalletSetup*.*",
