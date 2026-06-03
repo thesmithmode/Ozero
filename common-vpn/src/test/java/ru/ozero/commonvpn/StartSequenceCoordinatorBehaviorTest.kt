@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 @Suppress("LargeClass", "TooManyFunctions")
 class StartSequenceCoordinatorBehaviorTest {
@@ -205,6 +206,39 @@ class StartSequenceCoordinatorBehaviorTest {
                 match { it.contains("no engine reachable") },
             )
         }
+    }
+
+    @Test
+    fun `killswitch no reachable engine keeps startup lockdown active`() = runTest {
+        val engine = FakeEnginePlugin(
+            id = EngineId.BYEDPI,
+            preflightResult = EnginePreflight.Result.Fail("blocked"),
+            capabilities = tunnelCapabilities(),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = null,
+                engineAutoPriority = listOf(EngineId.BYEDPI),
+                killswitchEnabled = true,
+            ),
+        )
+        val startupFd = mockk<ParcelFileDescriptor>(relaxed = true)
+        val startupBuilder = mockk<VpnService.Builder> {
+            every { establish() } returns startupFd
+        }
+        every { fixture.tunBuilderHelper.buildTunBuilder(any(), any(), any(), any()) } returns startupBuilder
+        every { fixture.engineWatchdog.handleEngineFailure(any(), any()) } answers {
+            fixture.tunnelController.onKillswitchEngaged(firstArg(), secondArg())
+        }
+
+        fixture.coordinator.run()
+
+        assertTrue(fixture.tunnelController.killswitchActive.value)
+        assertFalse(fixture.stopRequested.get())
+        assertEquals(startupFd, fixture.state.lockdownStartupFdRef.get())
+        verify(exactly = 0) { startupFd.close() }
     }
 
     @Test
