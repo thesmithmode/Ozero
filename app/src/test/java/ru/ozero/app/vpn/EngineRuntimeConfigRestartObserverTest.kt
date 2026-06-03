@@ -66,7 +66,10 @@ class EngineRuntimeConfigRestartObserverTest {
             engineId = EngineId.WARP,
             reason = "warp changed",
             state = state,
-            restart = { restarts += it; true },
+            restart = {
+                restarts += it
+                true
+            },
         )
         runCurrent()
 
@@ -124,7 +127,10 @@ class EngineRuntimeConfigRestartObserverTest {
             engineId = EngineId.WARP,
             reason = "warp changed",
             state = state,
-            restart = { restarts += it; true },
+            restart = {
+                restarts += it
+                true
+            },
         )
         runCurrent()
 
@@ -146,7 +152,10 @@ class EngineRuntimeConfigRestartObserverTest {
             engineId = EngineId.WARP,
             reason = "warp changed",
             state = state,
-            restart = { restarts += it; true },
+            restart = {
+                restarts += it
+                true
+            },
         )
         runCurrent()
 
@@ -171,7 +180,10 @@ class EngineRuntimeConfigRestartObserverTest {
             replayAfterStarting = true,
             adoptedBaselineFrom = "synthetic-default",
             state = state,
-            restart = { restarts += it; true },
+            restart = {
+                restarts += it
+                true
+            },
         )
         runCurrent()
 
@@ -199,7 +211,10 @@ class EngineRuntimeConfigRestartObserverTest {
             includeStarting = false,
             replayAfterStarting = true,
             state = state,
-            restart = { restarts += it; true },
+            restart = {
+                restarts += it
+                true
+            },
         )
         runCurrent()
 
@@ -227,7 +242,10 @@ class EngineRuntimeConfigRestartObserverTest {
             includeStarting = false,
             replayAfterStarting = true,
             state = state,
-            restart = { restarts += it; true },
+            restart = {
+                restarts += it
+                true
+            },
         )
         runCurrent()
 
@@ -257,7 +275,10 @@ class EngineRuntimeConfigRestartObserverTest {
             includeStarting = false,
             replayAfterStarting = true,
             state = state,
-            restart = { restarts += it; true },
+            restart = {
+                restarts += it
+                true
+            },
         )
         runCurrent()
 
@@ -285,7 +306,10 @@ class EngineRuntimeConfigRestartObserverTest {
             includeStarting = false,
             replayAfterStarting = true,
             state = state,
-            restart = { restarts += it; true },
+            restart = {
+                restarts += it
+                true
+            },
         )
         runCurrent()
 
@@ -316,7 +340,10 @@ class EngineRuntimeConfigRestartObserverTest {
             includeStarting = false,
             adoptedBaselineFrom = default,
             state = state,
-            restart = { restarts += it; true },
+            restart = {
+                restarts += it
+                true
+            },
         )
         runCurrent()
 
@@ -342,7 +369,10 @@ class EngineRuntimeConfigRestartObserverTest {
             includeStarting = false,
             replayAfterStarting = false,
             state = state,
-            restart = { restarts += it; true },
+            restart = {
+                restarts += it
+                true
+            },
         )
         runCurrent()
 
@@ -370,7 +400,10 @@ class EngineRuntimeConfigRestartObserverTest {
             includeStarting = false,
             replayAfterStarting = true,
             state = state,
-            restart = { restarts += it; true },
+            restart = {
+                restarts += it
+                true
+            },
         )
         runCurrent()
 
@@ -396,7 +429,10 @@ class EngineRuntimeConfigRestartObserverTest {
             includeStarting = false,
             replayAfterStarting = true,
             state = state,
-            restart = { restarts += it; true },
+            restart = {
+                restarts += it
+                true
+            },
         )
         runCurrent()
 
@@ -426,7 +462,10 @@ class EngineRuntimeConfigRestartObserverTest {
             scope = observerScope(),
             exceptionHandler = CoroutineExceptionHandler { _, _ -> },
             state = state,
-            restart = { restarts += it; true },
+            restart = {
+                restarts += it
+                true
+            },
         )
         runCurrent()
 
@@ -458,7 +497,10 @@ class EngineRuntimeConfigRestartObserverTest {
             scope = observerScope(),
             exceptionHandler = CoroutineExceptionHandler { _, _ -> },
             state = state,
-            restart = { restarts += it; true },
+            restart = {
+                restarts += it
+                true
+            },
         )
         runCurrent()
 
@@ -495,7 +537,10 @@ class EngineRuntimeConfigRestartObserverTest {
             scope = observerScope(),
             exceptionHandler = CoroutineExceptionHandler { _, _ -> },
             state = state,
-            restart = { restarts += it; true },
+            restart = {
+                restarts += it
+                true
+            },
         )
         runCurrent()
 
@@ -524,7 +569,10 @@ class EngineRuntimeConfigRestartObserverTest {
             includeStarting = false,
             replayAfterStarting = false,
             state = state,
-            restart = { restarts += it; true },
+            restart = {
+                restarts += it
+                true
+            },
         )
         runCurrent()
 
@@ -552,7 +600,10 @@ class EngineRuntimeConfigRestartObserverTest {
             includeStarting = true,
             replayAfterStarting = false,
             state = state,
-            restart = { restarts += it; true },
+            restart = {
+                restarts += it
+                true
+            },
         )
         runCurrent()
 

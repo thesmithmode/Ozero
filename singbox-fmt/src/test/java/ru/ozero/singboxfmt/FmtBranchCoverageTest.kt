@@ -143,5 +143,4 @@ class FmtBranchCoverageTest {
         assertEquals("front", trojanWs.host)
         assertEquals("/u", trojanWs.path)
     }
-
 }

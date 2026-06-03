@@ -51,49 +51,29 @@ class EngineRuntimeConfigRestartObserver @Inject constructor(
         restart: suspend (String) -> Boolean,
     ) {
         scope.launch(exceptionHandler, start = CoroutineStart.UNDISPATCHED) {
-            var baseline: Any? = UNSET
-            var pending: PendingRestart? = null
+            val observerState = ObserveState()
             changes.distinctUntilChanged()
                 .combine(state.distinctUntilChanged()) { change, tunnelState -> change to tunnelState }
                 .collect { (current, tunnelState) ->
-                    val pendingRestart = pending
-                    if (pendingRestart != null) {
-                        when {
-                            current == pendingRestart.baseline -> pending = null
-                            connectedEngine(tunnelState) == engineId && current == pendingRestart.fingerprint -> {
-                                if (restart(pendingRestart.reason)) {
-                                    pending = null
-                                    baseline = current
-                                }
-                                return@collect
-                            }
-                            startingEngine(tunnelState) == engineId -> {
-                                pending = pendingRestart.copy(fingerprint = current)
-                            }
-                            else -> pending = null
-                        }
-                    }
-                    if (current == baseline) return@collect
-                    val previous = baseline
-                    if (previous === UNSET) {
-                        baseline = current
-                        return@collect
-                    }
-                    if (previous == adoptedBaselineFrom) {
-                        baseline = current
-                        return@collect
-                    }
-                    if (activeEngine(tunnelState, includeStarting) == engineId) {
-                        if (restart(reason)) baseline = current
-                    } else if (replayAfterStarting && !includeStarting && startingEngine(tunnelState) == engineId) {
-                        pending = PendingRestart(
-                            reason = reason,
-                            fingerprint = current,
-                            baseline = previous,
+                    if (observerState.handlePendingRestart(
+                            current = current,
+                            tunnelState = tunnelState,
+                            engineId = engineId,
+                            restart = restart,
                         )
-                    } else {
-                        baseline = current
+                    ) {
+                        return@collect
                     }
+                    observerState.handleCurrentChange(
+                        current = current,
+                        tunnelState = tunnelState,
+                        engineId = engineId,
+                        reason = reason,
+                        includeStarting = includeStarting,
+                        replayAfterStarting = replayAfterStarting,
+                        adoptedBaselineFrom = adoptedBaselineFrom,
+                        restart = restart,
+                    )
                 }
         }
     }
@@ -112,6 +92,82 @@ class EngineRuntimeConfigRestartObserver @Inject constructor(
     }
 
     private fun connectedEngine(state: TunnelState): EngineId? = (state as? TunnelState.Connected)?.engineId
+
+    private data class ObserveState(
+        var baseline: Any? = UNSET,
+        var pendingRestart: PendingRestart? = null,
+    ) {
+        suspend fun handlePendingRestart(
+            current: Any?,
+            tunnelState: TunnelState,
+            engineId: EngineId,
+            restart: suspend (String) -> Boolean,
+        ): Boolean {
+            val pending = pendingRestart ?: return false
+            return when {
+                current == pending.baseline -> {
+                    pendingRestart = null
+                    true
+                }
+                connectedEngine(tunnelState) == engineId && current == pending.fingerprint -> {
+                    pendingRestart = if (restart(pending.reason)) {
+                        baseline = current
+                        null
+                    } else {
+                        pending
+                    }
+                    true
+                }
+                startingEngine(tunnelState) == engineId -> {
+                    pendingRestart = pending.copy(fingerprint = current)
+                    true
+                }
+                else -> false.also { pendingRestart = null }
+            }
+        }
+
+        suspend fun handleCurrentChange(
+            current: Any?,
+            tunnelState: TunnelState,
+            engineId: EngineId,
+            reason: String,
+            includeStarting: Boolean,
+            replayAfterStarting: Boolean,
+            adoptedBaselineFrom: Any?,
+            restart: suspend (String) -> Boolean,
+        ) {
+            if (current == baseline) return
+            if (isFreshBaseline(previous = baseline, adoptedBaselineFrom = adoptedBaselineFrom)) {
+                baseline = current
+                return
+            }
+            if (activeEngine(tunnelState, includeStarting) == engineId) {
+                if (restart(reason)) baseline = current
+            } else if (shouldReplay(replayAfterStarting, includeStarting, tunnelState, engineId)) {
+                pendingRestart = PendingRestart(
+                    reason = reason,
+                    fingerprint = current,
+                    baseline = baseline,
+                )
+            } else {
+                baseline = current
+            }
+        }
+
+        private fun isFreshBaseline(previous: Any?, adoptedBaselineFrom: Any?): Boolean =
+            previous === UNSET || previous == adoptedBaselineFrom
+
+        private fun shouldReplay(
+            replayAfterStarting: Boolean,
+            includeStarting: Boolean,
+            tunnelState: TunnelState,
+            engineId: EngineId,
+        ): Boolean {
+            return replayAfterStarting &&
+                !includeStarting &&
+                startingEngine(tunnelState) == engineId
+        }
+    }
 
     private data class PendingRestart(
         val reason: String,
