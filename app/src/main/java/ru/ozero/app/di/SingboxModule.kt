@@ -146,7 +146,10 @@ object SingboxModule {
             return listOf(selectedProfileId, profileBlobHashes)
         }
         val profilesById = profiles.associateBy { it.id }
-        val selectedBlobHash = prefs[SingboxProbeService.BEAN_KEY]?.contentHashCode() ?: 0
+        val selectedBlobHash = selectedProfileId
+            ?.let { profilesById[it]?.beanBlob?.contentHashCode() }
+            ?: prefs[SingboxProbeService.BEAN_KEY]?.contentHashCode()
+            ?: 0
         val activeProfileBlobHashes = chainSteps
             .map { it.profileId }
             .filter { it != selectedProfileId }

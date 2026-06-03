@@ -474,6 +474,21 @@ class WarpEngineSettingsViewModelTest {
     }
 
     @Test
+    fun `onSaveEdit preserves unmodeled peer fields from rawIniOverride`() = runTest {
+        val rawIni = "[Interface]\nPrivateKey = priv\nAddress = 10.0.0.1/32\nDNS = 1.1.1.1\n" +
+            "[Peer]\nPublicKey = peer\nPresharedKey = very-secret\nEndpoint = engage.cloudflareclient.com:2408\n"
+        val id = store.addSlot("S", SAMPLE, rawIni)
+        advanceUntilIdle()
+        vm.onStartEdit(id)
+        vm.onSaveEdit()
+        advanceUntilIdle()
+
+        val updatedRaw = store.lastUpdateRawIni ?: error("rawIni missing")
+        assertTrue(updatedRaw.contains("PresharedKey = very-secret"), "unmodeled peer field must be preserved")
+        assertTrue(updatedRaw.contains("PrivateKey = ${SAMPLE.privateKey}"))
+    }
+
+    @Test
     fun `onSaveEdit для слота без rawIniOverride передаёт null`() = runTest {
         val id = store.addSlot("S", SAMPLE, null)
         advanceUntilIdle()

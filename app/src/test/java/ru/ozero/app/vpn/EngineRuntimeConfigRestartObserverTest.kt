@@ -707,6 +707,37 @@ class EngineRuntimeConfigRestartObserverTest {
         }
 
     @Test
+    fun `singbox runtime provider uses selected profile row blob over stale BEAN_KEY`() = runTest(dispatcher) {
+        val prefs = MutableStateFlow<Preferences>(
+            mutablePreferencesOf(
+                singboxSelectedProfileKey to 1L,
+                singboxBeanKey to byteArrayOf(1),
+            ),
+        )
+        val profiles = MutableStateFlow(
+            listOf(
+                proxyProfile(id = 1, blob = byteArrayOf(1)),
+                proxyProfile(id = 2, blob = byteArrayOf(2)),
+            ),
+        )
+        val chain = MutableStateFlow(emptyList<ProxyChainStep>())
+        val provider = SingboxModule.provideSingboxRuntimeConfigProvider(
+            dataStore = flowDataStore(prefs),
+            profileDao = fakeProfileDao(profiles),
+            proxyChainDao = fakeProxyChainDao(chain),
+        )
+
+        val baseline = provider.changes.first()
+        profiles.value = listOf(
+            proxyProfile(id = 1, blob = byteArrayOf(9)),
+            proxyProfile(id = 2, blob = byteArrayOf(2)),
+        )
+        val selectedProfileUpdated = provider.changes.first()
+
+        assertNotEquals(baseline, selectedProfileUpdated)
+    }
+
+    @Test
     fun `singbox runtime provider ignores unrelated profile changes in manual mode`() = runTest(dispatcher) {
         val prefs = MutableStateFlow<Preferences>(
             mutablePreferencesOf(

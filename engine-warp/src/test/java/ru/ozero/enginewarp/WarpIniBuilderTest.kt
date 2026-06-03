@@ -159,4 +159,23 @@ class WarpIniBuilderTest {
         assertTrue(ini.contains("Jmin = 0"))
         assertTrue(ini.contains("Jmax = 0"))
     }
+
+    @Test
+    fun `rebuild preserves unmodeled peer keys from existing raw ini`() {
+        val rawIni = "[Interface]\n" +
+            "PrivateKey = legacy\n" +
+            "Address = 10.0.0.1/32, 2606:4700::1/128\n" +
+            "DNS = 1.1.1.1\n" +
+            "\n" +
+            "[Peer]\n" +
+            "PublicKey = peer\n" +
+            "PresharedKey = very-secret\n" +
+            "Endpoint = old.endpoint:2408\n"
+        val rebuilt = WarpIniBuilder.build(baseConfig, rawIni)
+
+        assertTrue(rebuilt.contains("PresharedKey = very-secret"))
+        assertTrue(rebuilt.contains("PrivateKey = ${baseConfig.privateKey}"))
+        assertTrue(rebuilt.contains("Endpoint = ${baseConfig.peerEndpoint}"))
+        assertTrue(rebuilt.contains("MTU = 1280"))
+    }
 }

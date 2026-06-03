@@ -102,6 +102,7 @@ class EngineSettingsRestartObserver(
         if (
             currentEngine == snapshot.targetEngine() &&
             trigger.previous.targetEngine() != currentEngine &&
+            snapshot.sameRuntimeFor(currentEngine, trigger.previous) &&
             startupAcceptedSnapshot == null
         ) {
             startupAcceptedSnapshot = snapshot

@@ -64,4 +64,14 @@ class JacocoExcludesContractTest {
                 .doesNotContain(className)
         }
     }
+
+    @Test
+    fun `coverage may exclude generated EngineWarp inner classes but not main implementation`() {
+        assertThat(jacocoScript)
+            .withFailMessage("Main EngineWarp implementation must stay in coverage gate.")
+            .doesNotContain("\"**/EngineWarp*.*\"")
+        assertThat(jacocoScript)
+            .withFailMessage("Generated coroutine classes may be excluded only by explicit inner-class masks.")
+            .contains("\"**/EngineWarp\\${'$'}awaitReady\\${'$'}*.*\"")
+    }
 }

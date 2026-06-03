@@ -247,6 +247,26 @@ class RawShareLinksParserTest {
     }
 
     @Test
+    fun `should parse vless xhttp link with raw braces query fallback`() {
+        val uri = "vless://12345678-1234-1234-1234-123456789abc@xhttp.example.com:443" +
+            "?type=xhttp&security=reality&host=front.example.com&path=/x&mode=stream-up" +
+            "&pbk=sample-public-key&sid=abcd&extra={bad-but-common}#XHTTP"
+
+        val result = RawShareLinksParser.parse(uri)
+
+        assertEquals(1, result.size)
+        val bean = result.first() as VLESSBean
+        assertEquals("xhttp.example.com", bean.serverAddress)
+        assertEquals(443, bean.serverPort)
+        assertEquals("splithttp", bean.type)
+        assertEquals("front.example.com", bean.host)
+        assertEquals("/x", bean.path)
+        assertEquals("reality", bean.security)
+        assertEquals("sample-public-key", bean.realityPublicKey)
+        assertEquals("abcd", bean.realityShortId)
+    }
+
+    @Test
     fun `should infer reality from clash reality opts`() {
         val yaml = """
             proxies:
@@ -637,5 +657,46 @@ class RawShareLinksParserTest {
     fun `should return empty for json without outbounds or malformed root`() {
         assertTrue(RawShareLinksParser.parse("""{"route":{}}""").isEmpty())
         assertTrue(RawShareLinksParser.parse("""["not", "object"]""").isEmpty())
+    }
+
+    @Test
+    fun `should parse sing-box shadowsocks plugin fields and fallback transport type`() {
+        val json = """
+            {
+              "outbounds": [
+                {
+                  "type": "shadowsocks",
+                  "tag": "SS Plugin",
+                  "server": "ss-plugin.example.com",
+                  "server_port": 8388,
+                  "method": "aes-128-gcm",
+                  "password": "secret",
+                  "plugin": "v2ray-plugin",
+                  "plugin_opts": "mode=websocket"
+                },
+                {
+                  "type": "vmess",
+                  "tag": "Default Transport",
+                  "server": "default.example.com",
+                  "server_port": 443,
+                  "uuid": "12345678-1234-1234-1234-123456789abc",
+                  "transport": {
+                    "path": "/fallback"
+                  }
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val result = RawShareLinksParser.parse(json)
+
+        assertEquals(2, result.size)
+        val ss = result[0] as ShadowsocksBean
+        assertEquals("SS Plugin", ss.name)
+        assertEquals("v2ray-plugin", ss.plugin)
+        assertEquals("mode=websocket", ss.pluginOpts)
+        val vmess = result[1] as VMessBean
+        assertEquals("/fallback", vmess.path)
+        assertEquals("tcp", vmess.type)
     }
 }

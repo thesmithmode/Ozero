@@ -1137,3 +1137,7 @@
 - Source: daily/2026-06-02.md
 - Articles created: [[concepts/ci-push-not-hypothesis-proof]], [[concepts/jacoco-testable-logic-exclude-boundary]], [[concepts/app-ci-job-diagnostic-sharding-nonzero-gate]], [[concepts/bootstrap-empty-seed-product-contract]], [[connections/coverage-artifact-policy-feedback-loop]]
 - Articles updated: none
+## [2026-06-02T21:12:42+03:00] compile | 2026-06-02.md
+- Source: daily/2026-06-02.md
+- Articles created: [[concepts/ci-coverage-historical-debt-gate-boundary]], [[concepts/coverage-security-defensive-branches-test-contract]], [[concepts/runtime-restart-application-scope-observer]], [[concepts/runtime-restart-service-owned-action]], [[concepts/watchdog-active-engine-failure-filter]], [[concepts/auto-preflight-all-fail-stop-contract]], [[connections/runtime-restart-watchdog-preflight-state-ownership]]
+- Articles updated: none

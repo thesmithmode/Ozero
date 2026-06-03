@@ -373,8 +373,8 @@ class StartSequenceCoordinatorBehaviorTest {
         fixture.coordinator.run()
 
         assertEquals(listOf(true), fixture.killswitchValues)
-        verify(exactly = 0) { startupFd.close() }
-        assertEquals(startupFd, fixture.state.lockdownStartupFdRef.get())
+        verify(exactly = 1) { startupFd.close() }
+        assertEquals(null, fixture.state.lockdownStartupFdRef.get())
         assertEquals(finalFd, fixture.state.tunFdRef.get())
         verify(exactly = 1) { fixture.tunnelGateway.start(match { it.tunPfd === finalFd && it.socksPort == 2095 }) }
     }

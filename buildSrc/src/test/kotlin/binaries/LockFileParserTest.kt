@@ -50,6 +50,32 @@ class LockFileParserTest {
     }
 
     @Test
+    fun `parse preserves generated at source repo and lookup by name`() {
+        val f = write(
+            """
+            tag: binaries-meta
+            generated_at: 2026-04-25T10:00:00Z
+            artifacts:
+              - name: libone.so
+                engine: one
+                abi: arm64-v8a
+                destination: jniLibs
+                download_url: https://example.com/libone.so
+                sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                size_bytes: 1
+                source_repo: https://example.com/one
+                source_commit: 1111111111111111111111111111111111111111
+            """.trimIndent(),
+        )
+
+        val lock = LockFileParser.parse(f)
+
+        assertThat(lock.generatedAt).isEqualTo("2026-04-25T10:00:00Z")
+        assertThat(lock.findByName("libone.so")?.sourceRepo).isEqualTo("https://example.com/one")
+        assertThat(lock.findByName("missing.so")).isNull()
+    }
+
+    @Test
     fun `parse AAR with libs destination and no abi`() {
         val f = write(
             """

@@ -413,6 +413,42 @@ class EngineSettingsRestartObserverTest {
     }
 
     @Test
+    fun `handle restart — startup fallback target can change runtime`() = runTest(dispatcher) {
+        val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
+        val state = MutableStateFlow<TunnelState>(TunnelState.Probing(EngineId.FPTN))
+        val restarts = mutableListOf<EngineSettingsRestartObserver.Snapshot>()
+        val observer = EngineSettingsRestartObserver(
+            settingsFlow = flow,
+            vpnStateProvider = { state.value },
+            onRestartConnected = { restarts += it },
+        )
+        val previous = EngineSettingsRestartObserver.Snapshot(
+            manualEngine = EngineId.WARP,
+            byedpiWinningArgs = null,
+            ipv6Enabled = false,
+            trafficMode = TrafficMode.TUN,
+            customDnsServers = listOf("1.1.1.1"),
+            engineAutoPriority = null,
+        )
+        val snapshot = EngineSettingsRestartObserver.Snapshot(
+            manualEngine = null,
+            byedpiWinningArgs = null,
+            ipv6Enabled = true,
+            trafficMode = TrafficMode.PROXY,
+            customDnsServers = listOf("8.8.8.8"),
+            engineAutoPriority = listOf(EngineId.FPTN),
+        )
+
+        observer.handle(trigger(previous = previous, snapshot = snapshot))
+
+        assertEquals(
+            1,
+            restarts.size,
+            "runtime-changing startup snapshot that becomes the current target should not be silently accepted",
+        )
+    }
+
+    @Test
     fun `handle skip — connected engine toggle away and back without runtime change`() = runTest(dispatcher) {
         val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
         val state = MutableStateFlow<TunnelState>(TunnelState.Connected(EngineId.BYEDPI, 1080))

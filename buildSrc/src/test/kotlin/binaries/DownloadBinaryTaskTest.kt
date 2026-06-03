@@ -181,6 +181,51 @@ class DownloadBinaryTaskTest {
     }
 
     @Test
+    fun `task handles multiple requested artifacts and creates both destination kinds`() {
+        val soBytes = "fake-so".toByteArray()
+        val aarBytes = "fake-aar".toByteArray()
+        server.enqueue(MockResponse().setResponseCode(200).setBody(Buffer().write(soBytes)))
+        server.enqueue(MockResponse().setResponseCode(200).setBody(Buffer().write(aarBytes)))
+        val lockPath = writeLock(
+            """
+            tag: binaries-test
+            generated_at: 2026-04-25T10:00:00Z
+            artifacts:
+              - name: libengine-arm64-v8a.so
+                engine: engine
+                abi: arm64-v8a
+                destination: jniLibs
+                download_url: ${server.url("/engine.so")}
+                sha256: ${sha256(soBytes)}
+                size_bytes: ${soBytes.size}
+                source_repo: https://example.com/engine
+                source_commit: ${"a".repeat(40)}
+              - name: engine.aar
+                engine: engine
+                destination: libs
+                download_url: ${server.url("/engine.aar")}
+                sha256: ${sha256(aarBytes)}
+                size_bytes: ${aarBytes.size}
+                source_repo: https://example.com/engine
+                source_commit: ${"b".repeat(40)}
+            """,
+        )
+        val moduleDir = tmp.resolve("module-both")
+        val task = newTask(
+            lockPath = lockPath,
+            testModuleDir = moduleDir,
+            requested = listOf("libengine-arm64-v8a.so", "engine.aar"),
+        )
+
+        task.run()
+
+        assertThat(Files.readAllBytes(moduleDir.resolve("src/main/jniLibs/arm64-v8a/libengine-arm64-v8a.so")))
+            .isEqualTo(soBytes)
+        assertThat(Files.readAllBytes(moduleDir.resolve("libs/engine.aar"))).isEqualTo(aarBytes)
+        assertThat(server.requestCount).isEqualTo(2)
+    }
+
+    @Test
     fun `task downloads libs artifact using target filename`() {
         val data = "fake-aar".toByteArray()
         val sha = sha256(data)
