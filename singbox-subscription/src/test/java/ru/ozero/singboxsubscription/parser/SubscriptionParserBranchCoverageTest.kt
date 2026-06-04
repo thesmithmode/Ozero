@@ -367,6 +367,44 @@ class SubscriptionParserBranchCoverageTest {
     }
 
     @Test
+    fun `clash parser infers nested transport types when network is absent`() {
+        val yaml = """
+            proxies:
+              - name: WS Inferred
+                type: vless
+                server: ws.example.com
+                port: 443
+                uuid: 12345678-1234-1234-1234-123456789abc
+                ws-opts:
+                  path: /ws
+                  headers:
+                    Host: ws-host.example.com
+              - name: GRPC Inferred
+                type: trojan
+                server: grpc.example.com
+                port: 443
+                password: secret
+                grpc-opts:
+                  grpc-service-name: svc
+              - name: HttpUpgrade Inferred
+                type: vmess
+                server: upgrade.example.com
+                port: 443
+                uuid: 12345678-1234-1234-1234-123456789abc
+                httpupgrade-opts:
+                  path: /upgrade
+                  host: upgrade-host.example.com
+        """.trimIndent()
+
+        val result = ClashYamlParser.parse(yaml)
+
+        assertEquals(3, result.size)
+        assertEquals("ws", (result[0] as VLESSBean).type)
+        assertEquals("grpc", (result[1] as TrojanBean).type)
+        assertEquals("httpupgrade", (result[2] as VMessBean).type)
+    }
+
+    @Test
     fun `clash parser covers transport fallback and bool int edge variants`() {
         val yaml = """
             proxies:

@@ -100,6 +100,30 @@ class LockFileParserTest {
     }
 
     @Test
+    fun `parse preserves plain string generated at without coercion`() {
+        val f = write(
+            """
+            tag: binaries-meta
+            generated_at: custom-build-marker
+            artifacts:
+              - name: libone.so
+                engine: one
+                abi: arm64-v8a
+                destination: jniLibs
+                download_url: https://example.com/libone.so
+                sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                size_bytes: 1
+                source_repo: https://example.com/one
+                source_commit: 1111111111111111111111111111111111111111
+            """.trimIndent(),
+        )
+
+        val lock = LockFileParser.parse(f)
+
+        assertThat(lock.generatedAt).isEqualTo("custom-build-marker")
+    }
+
+    @Test
     fun `parse converts unquoted yaml timestamp generated at to instant string`() {
         val f = write(
             """

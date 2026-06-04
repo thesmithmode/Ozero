@@ -94,6 +94,15 @@ object ClashYamlParser {
         val grpc = fields.mapValue("grpc-opts", "grpc_opts")
         val http = fields.mapValue("h2-opts", "h2_opts", "http-opts", "http_opts")
         val httpUpgrade = fields.mapValue("httpupgrade-opts", "httpupgrade_opts")
+        type = fields.string("network", "net").ifBlank {
+            when {
+                ws.isNotEmpty() -> "ws"
+                grpc.isNotEmpty() -> "grpc"
+                http.isNotEmpty() -> "http"
+                httpUpgrade.isNotEmpty() -> "httpupgrade"
+                else -> type
+            }
+        }.let(::normalizeNetwork)
         path = fields.string("path").ifBlank {
             ws.string("path").ifBlank { http.string("path").ifBlank { httpUpgrade.string("path") } }
         }
