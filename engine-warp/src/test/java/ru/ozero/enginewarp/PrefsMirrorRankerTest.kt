@@ -10,7 +10,7 @@ class PrefsMirrorRankerTest {
     @Test
     fun `order groups mirrors by score and keeps neutral mirrors`() {
         val prefs = FakePrefs(
-            mapOf(
+            mutableMapOf(
                 "mirror_score:a" to 4,
                 "mirror_score:b" to 0,
                 "mirror_score:c" to -2,

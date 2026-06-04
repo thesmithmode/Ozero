@@ -149,7 +149,7 @@ object ClashYamlParser {
     private fun Map<String, Any?>.string(vararg keys: String): String = keys.firstNotNullOfOrNull { key ->
         when (val value = this[key]) {
             null -> null
-            is Map<*, *> -> value.entries.joinToString(";") { (k, v) -> "$k=$v" }
+            is Map<*, *> -> value.entries.joinToString(",") { (k, v) -> "$k=$v" }
             is Iterable<*> -> value.joinToString(",") { it.toString() }
             else -> value.toString()
         }?.takeIf { it.isNotBlank() }
