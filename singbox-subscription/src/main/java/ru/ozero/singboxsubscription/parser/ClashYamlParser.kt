@@ -18,15 +18,26 @@ object ClashYamlParser {
     fun parse(text: String): List<AbstractBean> {
         if (!proxiesKeyPattern.containsMatchIn(text)) return emptyList()
         val root = loadRoot(text) ?: return emptyList()
-        val proxies = root["proxies"] as? List<*> ?: emptyList<Any?>()
-        return proxies.mapNotNull { (it as? Map<*, *>)?.toStringKeyMap()?.let(::parseProxy) }
+        val proxies = when (val value = root["proxies"]) {
+            is List<*> -> value
+            else -> return emptyList()
+        }
+        return proxies.mapNotNull { item ->
+            when (item) {
+                is Map<*, *> -> parseProxy(item.toStringKeyMap())
+                else -> null
+            }
+        }
     }
 
     private fun loadRoot(text: String): Map<String, Any?>? = try {
         val loaderOptions = LoaderOptions().apply {
             codePointLimit = MAX_YAML_CODE_POINTS
         }
-        (Yaml(SafeConstructor(loaderOptions)).load<Any?>(text) as? Map<*, *>)?.toStringKeyMap()
+        when (val root = Yaml(SafeConstructor(loaderOptions)).load<Any?>(text)) {
+            is Map<*, *> -> root.toStringKeyMap()
+            else -> null
+        }
     } catch (_: YAMLException) {
         null
     }
@@ -158,7 +169,10 @@ object ClashYamlParser {
     }
 
     private fun Map<String, Any?>.mapValue(vararg keys: String): Map<String, Any?> = keys.firstNotNullOfOrNull { key ->
-        (this[key] as? Map<*, *>)?.toStringKeyMap()
+        when (val value = this[key]) {
+            is Map<*, *> -> value.toStringKeyMap()
+            else -> null
+        }
     }.orEmpty()
 
     private fun Map<String, Any?>.listString(key: String): String = when (val value = this[key]) {
