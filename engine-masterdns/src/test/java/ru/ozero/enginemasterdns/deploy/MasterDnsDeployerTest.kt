@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
 class MasterDnsDeployerTest {
+    private val readEncryptKeyCommand = "docker exec masterdns-ozero cat /etc/masterdnsvpn/encrypt_key.txt"
 
     private lateinit var transport: FakeSshTransport
     private lateinit var deployer: FakeSshMasterDnsDeployer
@@ -27,7 +28,10 @@ class MasterDnsDeployerTest {
         transport.setResponse("apt-get", MasterDnsDockerScripts.MARKER_DOCKER_OK)
         transport.setResponse("Dockerfile", MasterDnsDockerScripts.MARKER_BUILD_OK)
         transport.setResponse("docker run -d", MasterDnsDockerScripts.MARKER_RUN_OK)
-        transport.setResponse("encrypt_key", "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899")
+        transport.setResponse(
+            readEncryptKeyCommand,
+            "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899",
+        )
     }
 
     private fun credentials(password: String = "secret") = MasterDnsDeployCredentials(
@@ -335,7 +339,7 @@ class MasterDnsDeployerTest {
 
     @Test
     fun `should return Error when key extraction returns empty`() = runTest {
-        transport.setResponse("encrypt_key", "")
+        transport.setResponse(readEncryptKeyCommand, "")
 
         val states = deployer.deploy(credentials()).toList()
 
