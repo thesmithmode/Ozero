@@ -8,8 +8,11 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.ChainOrchestrator
@@ -258,6 +261,29 @@ class StartSequenceCoordinatorBehaviorTest {
     }
 
     @Test
+    fun `settings read timeout falls back to defaults and still starts the default candidate`() = runTest {
+        val defaultEngine = SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY.first()
+        val engine = FakeEnginePlugin(id = defaultEngine, socksPort = 2098, capabilities = tunnelCapabilities())
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(trafficMode = TrafficMode.TUN, manualEngine = defaultEngine),
+            settingsFlow = emptyFlow(),
+        )
+        fixture.establishedTunFd()
+        every { fixture.tunnelGateway.start(any()) } returns 0
+
+        val job = backgroundScope.launch { fixture.coordinator.run() }
+        advanceTimeBy(StartSequenceCoordinator.SETTINGS_READ_TIMEOUT_MS)
+        advanceUntilIdle()
+        job.join()
+
+        assertEquals(1, fixture.settingsRepository.reads)
+        assertEquals(1, engine.startedConfigs.size)
+        assertEquals(listOf(false), fixture.killswitchValues)
+        assertFalse(fixture.stopRequested.get())
+    }
+
+    @Test
     fun `manual TUN success starts native tunnel, watchdogs, stats logger and session`() = runTest {
         val engine = FakeEnginePlugin(id = EngineId.BYEDPI, socksPort = 2091, capabilities = tunnelCapabilities())
         val fixture = startFixture(
@@ -387,6 +413,7 @@ class StartSequenceCoordinatorBehaviorTest {
     private fun startFixture(
         vararg engines: FakeEnginePlugin,
         settings: SettingsModel,
+        settingsFlow: Flow<SettingsModel>? = null,
         stopping: Boolean = false,
     ): StartFixture {
         val tunnelController = TunnelController()
@@ -398,7 +425,7 @@ class StartSequenceCoordinatorBehaviorTest {
         val sessionRecorder = RecordingSessionStatsRecorder()
         val stopRequested = AtomicBoolean(false)
         val killswitchValues = mutableListOf<Boolean>()
-        val settingsRepository = StaticSettingsRepository(settings)
+        val settingsRepository = StaticSettingsRepository(settingsFlow ?: flowOf(settings))
         coEvery { healthMonitor.start(any()) } returns Unit
         every { statsLogger.start() } returns Unit
         every { engineWatchdog.startHealthKillswitchWatcher(any()) } returns Unit
@@ -555,9 +582,12 @@ class StartSequenceCoordinatorBehaviorTest {
         }
     }
 
-    private class StaticSettingsRepository(value: SettingsModel) : SettingsRepository {
+    private class StaticSettingsRepository(
+        flow: Flow<SettingsModel>,
+    ) : SettingsRepository {
+        private val backing = flow
         var reads = 0
-        private val backing = MutableStateFlow(value)
+
         override val settings: Flow<SettingsModel>
             get() {
                 reads++

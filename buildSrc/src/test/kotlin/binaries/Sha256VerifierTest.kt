@@ -26,6 +26,13 @@ class Sha256VerifierTest {
     }
 
     @Test
+    fun `streamingHash handles empty stream`() {
+        val data = ByteArray(0)
+        val computed = Sha256Verifier.streamingHash(data.inputStream())
+        assertThat(computed).isEqualTo(sha256(data))
+    }
+
+    @Test
     fun `verifyAndMove succeeds when SHA matches and moves file atomically`() {
         val src = tmp.resolve("src.bin")
         val dst = tmp.resolve("dst.bin")

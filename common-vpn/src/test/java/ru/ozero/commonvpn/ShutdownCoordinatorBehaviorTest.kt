@@ -82,6 +82,16 @@ class ShutdownCoordinatorBehaviorTest {
     }
 
     @Test
+    fun `stopVpn skips session recorder when no session is active`() = runTest {
+        val fixture = shutdownFixture(this)
+
+        fixture.coordinator.stopVpn()
+        advanceUntilIdle()
+
+        assertTrue(fixture.sessionRecorder.ended.isEmpty())
+    }
+
+    @Test
     fun `performShutdown resets state and can skip stopSelf for onDestroy path`() = runTest {
         val fixture = shutdownFixture(this)
         fixture.state.starting.set(true)

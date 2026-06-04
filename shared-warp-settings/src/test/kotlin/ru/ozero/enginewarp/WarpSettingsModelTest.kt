@@ -431,6 +431,34 @@ class WarpSettingsModelTest {
     }
 
     @Test
+    fun `builder preserves raw peer fields while rebuilding known sections`() {
+        val built = WarpIniBuilder.build(
+            sampleConfig().copy(
+                interfaceAddressV4 = "10.9.0.2/32",
+                peerEndpoint = "new.example.com:2408",
+            ),
+            """
+            [Interface]
+            PrivateKey = old-private
+            Address = 10.8.0.2/32
+            DNS = 9.9.9.9
+
+            [Peer]
+            PublicKey = old-peer
+            PresharedKey = shared-secret
+            Endpoint = old.example.com:1234
+            AllowedIPs = 0.0.0.0/0
+            """.trimIndent(),
+        )
+
+        assertTrue(built.contains("PrivateKey = private-key"))
+        assertTrue(built.contains("Address = 10.9.0.2/32, 2606:4700::2/128"))
+        assertTrue(built.contains("Endpoint = new.example.com:2408"))
+        assertTrue(built.contains("PresharedKey = shared-secret"))
+        assertTrue(built.contains("AllowedIPs = 0.0.0.0/0"))
+    }
+
+    @Test
     fun `toWarpConfig falls back for invalid optional awg fields`() {
         val fallback = AwgParams(underloadPacketJunkSize = 9, payloadHexI1 = "0a0b")
         val config = draftFromSlot(slot(config = sampleConfig())).copy(
