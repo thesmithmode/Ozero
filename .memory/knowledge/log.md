@@ -1141,3 +1141,13 @@
 - Source: daily/2026-06-02.md
 - Articles created: [[concepts/ci-coverage-historical-debt-gate-boundary]], [[concepts/coverage-security-defensive-branches-test-contract]], [[concepts/runtime-restart-application-scope-observer]], [[concepts/runtime-restart-service-owned-action]], [[concepts/watchdog-active-engine-failure-filter]], [[concepts/auto-preflight-all-fail-stop-contract]], [[connections/runtime-restart-watchdog-preflight-state-ownership]]
 - Articles updated: none
+## [2026-06-04T18:54:10+03:00] compile | 2026-06-02.md
+- Source: daily/2026-06-02.md
+- Articles created: none
+- Articles updated: [[concepts/runtime-restart-application-scope-observer]], [[concepts/runtime-restart-service-owned-action]], [[concepts/watchdog-active-engine-failure-filter]], [[concepts/auto-preflight-all-fail-stop-contract]], [[concepts/jacoco-testable-logic-exclude-boundary]], [[connections/runtime-restart-watchdog-preflight-state-ownership]]
+## [2026-06-04T18:59:45+03:00] compile | 2026-06-03.md
+- Source: daily/2026-06-03.md
+- Articles created: [[concepts/dev-ci-kotlin-style-cascade]], [[concepts/engine-settings-restart-startup-runtime-match]], [[concepts/warp-raw-ini-preserve-unmodeled-peer-fields]], [[concepts/singbox-selected-profile-row-fingerprint]], [[concepts/singbox-subscription-branch-coverage-edges]], [[connections/ci-style-coverage-triage-feedback-loop]]
+## [2026-06-04T19:03:11+03:00] compile | 2026-06-04.md
+- Source: daily/2026-06-04.md
+- Articles created: [[concepts/kotlin-style-blank-line-root-cause]], [[concepts/dev-ci-root-cause-sequencing-loop]], [[concepts/buildsrc-lockfileparser-date-branch-coverage]], [[concepts/common-vpn-split-start-and-shutdown-branch-coverage]], [[concepts/singbox-subscription-nested-transport-mapping]], [[connections/dev-ci-first-failure-sequencing-loop]]

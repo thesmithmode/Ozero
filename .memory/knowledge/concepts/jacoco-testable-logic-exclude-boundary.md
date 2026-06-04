@@ -1,39 +1,23 @@
 ---
-title: JaCoCo excludes must not remove testable production logic
+title: "JaCoCo excludes must keep testable production logic in the gate"
 sources:
   - daily/2026-06-02.md
-created: 2026-06-02
-updated: 2026-06-02
+created: 2026-06-04
+updated: 2026-06-04
 ---
-
-# JaCoCo excludes must not remove testable production logic
-
-## Summary
-
-Ozero's 95% coverage gate applies to production code that is realistically testable. Excludes are acceptable for Android shell, generated, DI, native, and external SDK wrapper boundaries, but not for deterministic Kotlin or Java logic.
-
+# JaCoCo excludes must keep testable production logic in the gate
 ## Key Points
-
-- Parser, config, fingerprint, restart, state-machine, and security helper classes belong in the coverage gate.
-- Generated, DI, Android framework glue, native bridges, and external SDK wrappers may be excluded when they have no deterministic unit-test surface.
-- Broad masks such as `**/ui/**` can lower the ratio by excluding covered classes while leaving miss-heavy code.
-- `JacocoExcludesContractTest` must catch both broad masks and targeted exclusions of meaningful testable classes.
-
+- Coverage excludes should remove Android shell, generated code, native glue, and thin SDK wrappers only when they are not meaningfully testable.
+- Deterministic production code such as parsers, state machines, fingerprint logic, and security helpers should stay in the gate.
+- Broad masks can lower the ratio by removing already-covered code while leaving miss-heavy code in place.
+- The contract test should defend both against broad patterns and against accidental narrow exclusions of real logic.
 ## Details
+The daily log sharpened the coverage boundary: the 95 percent gate is only fair when it applies to code that actually has testable production behavior. Excluding deterministic Kotlin or Java logic simply because it is inconvenient to test creates a false-green gate and makes CI less trustworthy.
 
-The 2026-06-02 audit concluded that the current `dev` coverage policy was too soft because it excluded business logic and stateful production behavior that should remain measurable. The user clarified the intended threshold: 95% is not for every generated or Android-bound line, but it is for code that has a meaningful deterministic test surface.
-
-This boundary changes the role of `JacocoExcludesContractTest`. It should not only reject obviously broad masks; it should also prevent specific class-level exclusions for production logic such as runtime restart orchestration, parsers, fingerprints, and security verification. When code is important and unit-testable, the preferred fix is focused coverage or a justified narrow boundary, not removal from the gate.
-
+The resulting boundary is narrow and evidence-based. Generated, DI, Android shell, and native bridge layers can be excluded, but parsers, restart state machines, fingerprint builders, and security-sensitive helpers should remain inside the measurement surface. This aligns with [[concepts/jacoco-exclude-evidence-boundary]] and [[concepts/coverage-security-defensive-branches-test-contract]].
 ## Related Concepts
-
 - [[concepts/jacoco-exclude-evidence-boundary]]
-- [[concepts/jacoco-honest-coverage-gate-boundary]]
-- [[concepts/bootstrap-signature-real-trust-gate]]
-- [[concepts/runtime-restart-pending-fingerprint-baseline]]
-
+- [[concepts/coverage-security-defensive-branches-test-contract]]
+- [[concepts/ci-coverage-historical-debt-gate-boundary]]
 ## Sources
-
-- [[daily/2026-06-02]]: user clarified that 95% coverage applies to code that realistically makes sense to test.
-- [[daily/2026-06-02]]: audit found exclusions for restart logic, state machines, parsers, fingerprints, and security helpers.
-- [[daily/2026-06-02]]: decision recorded that only generated, DI, Android shell, native, and external SDK wrapper code should remain excluded.
+- `daily/2026-06-02.md`: the log says the coverage gate should keep deterministic production logic in scope and only exclude Android/generated/native glue and similar non-deterministic boundaries.

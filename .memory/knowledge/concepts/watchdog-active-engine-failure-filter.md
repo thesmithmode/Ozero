@@ -1,37 +1,23 @@
 ---
-title: Watchdog active engine failure filter
+title: "Engine watchdog must ignore stale failures for inactive engines"
 sources:
   - daily/2026-06-02.md
-created: 2026-06-02
-updated: 2026-06-02
+created: 2026-06-04
+updated: 2026-06-04
 ---
-
-# Watchdog active engine failure filter
-
+# Engine watchdog must ignore stale failures for inactive engines
 ## Key Points
-- Watchdog recovery must ignore stale or sidecar engine failures when they do not match the active tunnel engine.
-- A stale failure can bypass `TunnelController.onEngineDied` if the watchdog acts before active-engine filtering.
-- Regression tests should prove stale sidecar failure does not enable killswitch or stop the VPN.
-- Active engine matching is part of fail-closed correctness, not only UI labeling.
-- This refines [[concepts/engine-runtime-failclosed-watchdog-path]] and [[connections/stale-engine-signals-cross-engine-failures]].
-
+- Watchdog recovery should only react to failures from the engine that is currently active in tunnel state.
+- Failures from stale, sidecar, or otherwise inactive attempts must be ignored.
+- A stale failure can otherwise trigger the wrong recovery path or overwrite the active engine's state.
+- This guard is part of the broader stale-signal isolation problem across engine lifecycle events.
 ## Details
+The daily log describes a bug class where a watchdog receives a failure event from an engine that is not the one currently running the tunnel. If that event is treated as authoritative, the system can stop the wrong session, enable a killswitch unnecessarily, or publish a terminal failure for a tunnel that is still healthy.
 
-On 2026-06-02, review confirmed a real bug in `EngineWatchdogCoordinator`: it could react to failure from an inactive engine. That path could trigger killswitch or `stopVpnRequest()` before the stale-signal guard in `TunnelController.onEngineDied` had a chance to filter the event.
-
-The corrected rule is that watchdog failure handling must compare the failed engine with the active `TunnelState` engine. If the failure belongs to a stale attempt or sidecar engine, it must not stop the active VPN and must not enable killswitch.
-
-This is especially important in a multi-engine VPN service where subprocess, sidecar, and previous attempt signals can outlive the active selection. Fail-closed behavior should protect real active traffic, not punish unrelated stale state.
-
+The fix is to compare the failing engine against the active tunnel state before performing recovery. This preserves state ownership boundaries and keeps watchdog handling aligned with [[connections/stale-engine-signals-cross-engine-failures]] and [[concepts/engine-lifecycle-stale-status-cascade]].
 ## Related Concepts
-
-- [[concepts/engine-runtime-failclosed-watchdog-path]]
-- [[concepts/auto-candidate-terminal-status-invariant]]
 - [[connections/stale-engine-signals-cross-engine-failures]]
-- [[connections/engine-startup-status-authority-boundary]]
-
+- [[concepts/engine-lifecycle-stale-status-cascade]]
+- [[connections/runtime-restart-watchdog-preflight-state-ownership]]
 ## Sources
-
-- [[daily/2026-06-02]]: Session 20:45 confirmed that watchdog reacted to inactive-engine failure.
-- [[daily/2026-06-02]]: Session 20:45 decided `EngineWatchdogCoordinator` must ignore failures when the failed engine does not match active `TunnelState`.
-- [[daily/2026-06-02]]: Session 20:45 added an action item for regression tests proving stale URnetwork sidecar failure during active WARP does not trigger killswitch or stop VPN.
+- `daily/2026-06-02.md`: the log states that watchdog recovery must ignore stale or sidecar failures whose engine does not match the active tunnel state.
