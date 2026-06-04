@@ -92,9 +92,9 @@ class StartSequenceCoordinatorExtraTest {
             sessionStatsRecorder = sessionRecorder,
         )
         val state = StartSequenceState(
-            tunFdRef = AtomicReference(null),
-            tunIfaceNameRef = AtomicReference(null),
-            lockdownStartupFdRef = AtomicReference(null),
+            tunFdRef = AtomicReference<android.os.ParcelFileDescriptor?>(null),
+            tunIfaceNameRef = AtomicReference<String?>(null),
+            lockdownStartupFdRef = AtomicReference<android.os.ParcelFileDescriptor?>(null),
             sessionStartMsRef = AtomicReference(0L),
             sessionIdRef = AtomicReference(-1L),
             stopping = AtomicBoolean(stopping),

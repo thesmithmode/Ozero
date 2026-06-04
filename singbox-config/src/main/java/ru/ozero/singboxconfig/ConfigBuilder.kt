@@ -327,11 +327,6 @@ private fun buildTransport(bean: StandardV2RayBean): String? = when (bean.type) 
         "path" to (bean.path.ifEmpty { "/" }),
         "host" to bean.host,
     )
-    "splithttp" -> buildMap(
-        "type" to "splithttp",
-        "path" to (bean.path.ifEmpty { "/" }),
-        "host" to bean.host,
-    )
     "tcp" -> null
     else -> null
 }

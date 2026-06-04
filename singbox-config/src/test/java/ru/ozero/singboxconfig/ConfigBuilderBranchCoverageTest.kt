@@ -1,8 +1,8 @@
 package ru.ozero.singboxconfig
 
 import org.junit.jupiter.api.Test
-import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.enginescore.WireGuardOutboundConfig
+import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.ShadowsocksBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
@@ -144,16 +144,10 @@ class ConfigBuilderBranchCoverageTest {
             type = "grpc"
             grpcServiceName = "svc"
         }
-        val splithttp = vless().apply {
-            type = "splithttp"
-            host = "split.example.com"
-            path = ""
-        }
 
         val realityJson = ConfigBuilder.buildSingboxConfig(reality)
         val wsJson = ConfigBuilder.buildSingboxConfig(ws, probeSocksPort = 0)
         val grpcJson = ConfigBuilder.buildSingboxConfig(grpc)
-        val splitJson = ConfigBuilder.buildSingboxConfig(splithttp)
 
         assertContains(realityJson, "\"server_name\":\"front.example.com\"")
         assertContains(realityJson, "\"public_key\":\"pub\"")
@@ -165,9 +159,6 @@ class ConfigBuilderBranchCoverageTest {
         assertFalse(wsJson.contains("early_data_header_name"))
         assertContains(grpcJson, "\"type\":\"grpc\"")
         assertContains(grpcJson, "\"service_name\":\"svc\"")
-        assertContains(splitJson, "\"type\":\"splithttp\"")
-        assertContains(splitJson, "\"path\":\"/\"")
-        assertContains(splitJson, "\"host\":\"split.example.com\"")
     }
 
     @Test

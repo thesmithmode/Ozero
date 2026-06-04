@@ -60,8 +60,8 @@ class ShutdownCoordinatorExtraTest {
         val sessionRecorder = RecordingSessionStatsRecorder()
         val state = ShutdownState(
             tunFdRef = AtomicReference<ParcelFileDescriptor?>(null),
-            tunIfaceNameRef = AtomicReference(null),
-            lockdownStartupFdRef = AtomicReference(null),
+            tunIfaceNameRef = AtomicReference<String?>(null),
+            lockdownStartupFdRef = AtomicReference<ParcelFileDescriptor?>(null),
             sessionStartMsRef = AtomicReference(sessionStartedAt),
             sessionIdRef = AtomicReference(sessionId),
             startJobRef = AtomicReference<Job?>(null),
