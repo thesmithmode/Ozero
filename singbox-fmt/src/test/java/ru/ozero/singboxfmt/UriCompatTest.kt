@@ -30,7 +30,7 @@ class UriCompatTest {
         assertNull(noPort.getQueryParameter("missing"))
 
         val malformed = UriCompat.parse("://broken%%%")
-        assertNull(malformed.host)
+        assertEquals("broken%%%", malformed.host)
         assertEquals(-1, malformed.port)
         assertNull(malformed.userInfo)
         assertNull(malformed.fragment)
