@@ -138,7 +138,7 @@ private class RawWarpIniMerger(preserveRawIni: String) {
     private fun mergeSectionBody(
         generated: List<String>,
         existing: List<String>,
-    ): List<String> {
+    ): MutableList<String> {
         val generatedByKey = generated
             .mapNotNull { parseKeyValue(it) }
             .associateBy({ it.first }, { it.second })
@@ -174,7 +174,7 @@ private class RawWarpIniMerger(preserveRawIni: String) {
 
     private data class Section(
         val header: String,
-        val lines: List<String>,
+        val lines: MutableList<String>,
     )
 
     private companion object {
