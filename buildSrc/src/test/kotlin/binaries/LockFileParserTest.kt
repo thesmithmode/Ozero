@@ -270,6 +270,19 @@ class LockFileParserTest {
     }
 
     @Test
+    fun `reject list lock root`() {
+        val f = write(
+            """
+            - tag: binaries-x
+            - generated_at: 2026-04-25T10:00:00Z
+            """.trimIndent(),
+        )
+        assertThatThrownBy { LockFileParser.parse(f) }
+            .isInstanceOf(LockFileException::class.java)
+            .hasMessageContaining("root")
+    }
+
+    @Test
     fun `reject missing tag field`() {
         val f = write("generated_at: 2026-04-25T10:00:00Z\nartifacts: []\n")
         assertThatThrownBy { LockFileParser.parse(f) }
