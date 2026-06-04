@@ -597,7 +597,9 @@ class WarpSettingsModelTest {
         val mergerClass = Class.forName("ru.ozero.enginewarp.RawWarpIniMerger")
         val ctor = mergerClass.getDeclaredConstructor(String::class.java).apply { isAccessible = true }
         val merger = ctor.newInstance("")
-        val canonicalLabel = mergerClass.getDeclaredMethod("canonicalLabel", String::class.java).apply { isAccessible = true }
+        val canonicalLabel = mergerClass
+            .getDeclaredMethod("canonicalLabel", String::class.java)
+            .apply { isAccessible = true }
         val appendPreferredSection = mergerClass.getDeclaredMethod(
             "appendPreferredSection",
             StringBuilder::class.java,
@@ -607,7 +609,13 @@ class WarpSettingsModelTest {
         ).apply { isAccessible = true }
 
         assertEquals("custom", canonicalLabel.invoke(merger, "custom"))
-        appendPreferredSection.invoke(merger, StringBuilder(), emptyMap<String, Any>(), mutableSetOf<String>(), "missing")
+        appendPreferredSection.invoke(
+            merger,
+            StringBuilder(),
+            emptyMap<String, Any>(),
+            mutableSetOf<String>(),
+            "missing",
+        )
     }
 
     @Test
