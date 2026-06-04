@@ -22,8 +22,6 @@ object LockFileParser {
                     ?: throw LockFileException("Lock file root must be a YAML map: $path")
             } catch (e: YAMLException) {
                 throw LockFileException("Malformed YAML in $path: ${e.message}", e)
-            } catch (e: ClassCastException) {
-                throw LockFileException("Lock file root must be a YAML map: $path", e)
             }
 
         val tag = raw["tag"]?.toString()
