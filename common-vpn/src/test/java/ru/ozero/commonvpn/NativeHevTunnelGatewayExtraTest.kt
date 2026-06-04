@@ -3,7 +3,7 @@ package ru.ozero.commonvpn
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
-import kotlin.test.assertTrue
+import kotlin.test.assertFalse
 
 class NativeHevTunnelGatewayExtraTest {
 
@@ -25,6 +25,6 @@ class NativeHevTunnelGatewayExtraTest {
 
         gateway.stop()
 
-        assertTrue(!stopCalled)
+        assertFalse(stopCalled)
     }
 }

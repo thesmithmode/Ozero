@@ -124,30 +124,6 @@ class StartSequenceCoordinatorExtraTest {
         )
     }
 
-    private fun standaloneProxyCapabilities(
-        providesLocalSocksWithoutUpstream: Boolean = true,
-    ): EngineCapabilities = EngineCapabilities(
-        supportsTcp = true,
-        supportsUdp = true,
-        supportsDoH = false,
-        localOnly = true,
-        requiresServer = false,
-        supportsUpstreamSocks = false,
-        providesLocalSocks = true,
-        providesLocalSocksWithoutUpstream = providesLocalSocksWithoutUpstream,
-    )
-
-    private fun tunnelCapabilities(): EngineCapabilities = EngineCapabilities(
-        supportsTcp = true,
-        supportsUdp = true,
-        supportsDoH = false,
-        localOnly = true,
-        requiresServer = false,
-        supportsUpstreamSocks = false,
-        providesLocalSocks = true,
-        providesLocalSocksWithoutUpstream = false,
-    )
-
     private data class StartFixture(
         val coordinator: StartSequenceCoordinator,
         val state: StartSequenceState,
