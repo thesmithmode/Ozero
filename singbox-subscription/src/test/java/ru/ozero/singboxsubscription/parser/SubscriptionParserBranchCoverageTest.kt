@@ -367,7 +367,7 @@ class SubscriptionParserBranchCoverageTest {
     }
 
     @Test
-    fun `clash parser covers transport fallback and bool/int edge variants`() {
+    fun `clash parser covers transport fallback and bool int edge variants`() {
         val yaml = """
             proxies:
               - name: WS fallback from ws opts
