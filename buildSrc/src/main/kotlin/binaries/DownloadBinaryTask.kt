@@ -37,7 +37,7 @@ abstract class DownloadBinaryTask : DefaultTask() {
             try {
                 LockFileParser.parse(lockPath)
             } catch (e: LockFileException) {
-                throw GradleException(e.message ?: "Lock file parse error", e)
+                throw GradleException("Lock file parse error", e)
             }
 
         val cache = cacheDir.get().asFile.toPath()
@@ -61,9 +61,9 @@ abstract class DownloadBinaryTask : DefaultTask() {
             try {
                 downloader.download(art.downloadUrl, art.sha256, dst)
             } catch (e: BinaryDownloadException) {
-                throw GradleException(e.message ?: "Download failed", e)
+                throw GradleException("Download failed", e)
             } catch (e: IntegrityException) {
-                throw GradleException(e.message ?: "Integrity check failed", e)
+                throw GradleException("Integrity check failed", e)
             }
         }
     }

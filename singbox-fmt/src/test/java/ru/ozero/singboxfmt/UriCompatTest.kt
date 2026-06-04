@@ -56,4 +56,31 @@ class UriCompatTest {
         assertEquals("xhttp", uri.getQueryParameter("type"))
         assertEquals("{a,b}", uri.getQueryParameter("extra"))
     }
+
+    @Test
+    fun `fallback parser handles ipv6 authority and query keys without values`() {
+        val uri = UriCompat.parse("vless://user@[2001:db8::1]:443?flag&bad={x}#Name")
+
+        assertEquals("user", uri.userInfo)
+        assertEquals("[2001:db8::1]", uri.host)
+        assertEquals(443, uri.port)
+        assertEquals("Name", uri.fragment)
+        assertEquals("", uri.getQueryParameter("flag"))
+        assertEquals("{x}", uri.getQueryParameter("bad"))
+    }
+
+    @Test
+    fun `fallback parser tolerates invalid ports and bare authorities`() {
+        val ipv6 = UriCompat.parse("vless://user@[2001:db8::1]:abc?flag#N")
+        val bare = UriCompat.parse("vless://example.com?x=1")
+
+        assertEquals("user", ipv6.userInfo)
+        assertEquals("[2001:db8::1]", ipv6.host)
+        assertEquals(-1, ipv6.port)
+        assertEquals("N", ipv6.fragment)
+        assertEquals("", ipv6.getQueryParameter("flag"))
+        assertEquals("example.com", bare.host)
+        assertEquals(-1, bare.port)
+        assertEquals("1", bare.getQueryParameter("x"))
+    }
 }

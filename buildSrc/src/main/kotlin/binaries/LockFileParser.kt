@@ -24,8 +24,8 @@ object LockFileParser {
                 throw LockFileException("Malformed YAML in $path: ${e.message}", e)
             }
 
-        val tag = raw["tag"]?.toString()
-            ?: throw LockFileException("Missing required field 'tag' in $path")
+        val tagValue = raw["tag"] ?: throw LockFileException("Missing required field 'tag' in $path")
+        val tag = tagValue.toString()
         val generatedAt = when (val value = raw["generated_at"]) {
             null -> throw LockFileException("Missing required field 'generated_at' in $path")
             is String -> value

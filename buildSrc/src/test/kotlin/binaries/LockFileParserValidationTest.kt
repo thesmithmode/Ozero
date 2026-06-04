@@ -130,6 +130,29 @@ class LockFileParserValidationTest {
     }
 
     @Test
+    fun `reject jniLibs artifact with blank abi`() {
+        val f = write(
+            """
+            tag: binaries-x
+            generated_at: 2026-04-25T10:00:00Z
+            artifacts:
+              - name: libbyedpi.so
+                engine: byedpi
+                abi: " "
+                destination: jniLibs
+                download_url: https://example.com/x.so
+                sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                size_bytes: 1
+                source_repo: https://example.com
+                source_commit: 7777777777777777777777777777777777777777
+            """.trimIndent(),
+        )
+        assertThatThrownBy { LockFileParser.parse(f) }
+            .isInstanceOf(LockFileException::class.java)
+            .hasMessageContaining("abi")
+    }
+
+    @Test
     fun `reject unknown destination value`() {
         val f = write(
             """

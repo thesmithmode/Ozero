@@ -279,7 +279,7 @@ private fun trojanOutbound(bean: TrojanBean, tag: String, detour: String? = null
     if (tls != null) sb.append(""""tls":$tls,""")
 
     if (detour != null) sb.append(""""detour":${jsonString(detour)},""")
-    if (sb.isNotEmpty() && sb[sb.length - 1] == ',') sb.deleteCharAt(sb.length - 1)
+    if (sb[sb.length - 1] == ',') sb.deleteCharAt(sb.length - 1)
     sb.append('}')
     return sb.toString()
 }

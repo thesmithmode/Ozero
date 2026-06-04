@@ -124,6 +124,21 @@ class LockFileParserTest {
     }
 
     @Test
+    fun `parse coerces numeric tag to string`() {
+        val f = write(
+            """
+            tag: 123
+            generated_at: 2026-04-25T10:00:00Z
+            artifacts: []
+            """.trimIndent(),
+        )
+
+        val lock = LockFileParser.parse(f)
+
+        assertThat(lock.tag).isEqualTo("123")
+    }
+
+    @Test
     fun `parse converts unquoted yaml timestamp generated at to instant string`() {
         val f = write(
             """

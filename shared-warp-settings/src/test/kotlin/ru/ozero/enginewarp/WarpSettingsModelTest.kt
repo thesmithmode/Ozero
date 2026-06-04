@@ -459,6 +459,75 @@ class WarpSettingsModelTest {
     }
 
     @Test
+    fun `builder merges preserved raw ini with unknown sections and blank preserve shortcut`() {
+        val generated = WarpIniBuilder.build(sampleConfig())
+        val preserved = """
+            [Custom]
+            Comment line without equals
+
+            [interface]
+            PrivateKey = old-private
+            Address = 10.8.0.2/32
+            DNS = 9.9.9.9
+            MTU = 1400
+
+            [peer]
+            PublicKey = old-peer
+            Endpoint = old.example.com:1234
+            AllowedIPs = 0.0.0.0/0
+        """.trimIndent()
+
+        val merged = WarpIniBuilder.build(sampleConfig(), preserved)
+        val passthrough = WarpIniBuilder.build(sampleConfig(), "")
+
+        assertEquals(generated, passthrough)
+        assertTrue(merged.contains("[Custom]"))
+        assertTrue(merged.contains("Comment line without equals"))
+        assertTrue(merged.contains("PrivateKey = private-key"))
+        assertTrue(merged.contains("Endpoint = engage.cloudflareclient.com:2408"))
+        assertTrue(merged.contains("AllowedIPs = 0.0.0.0/0"))
+    }
+
+    @Test
+    fun `builder uses default headers when preserved ini omits known sections`() {
+        val merged = WarpIniBuilder.build(
+            sampleConfig(),
+            """
+            [Custom]
+            Keep = value
+            """.trimIndent(),
+        )
+
+        assertTrue(merged.contains("[Interface]"))
+        assertTrue(merged.contains("[Peer]"))
+        assertTrue(merged.contains("[Custom]"))
+        assertTrue(merged.contains("Keep = value"))
+    }
+
+    @Test
+    fun `builder keeps malformed and duplicate preserved lines`() {
+        val merged = WarpIniBuilder.build(
+            sampleConfig(),
+            """
+            [Interface]
+            PrivateKey = old-private
+            PrivateKey = duplicate-private
+            Note without equals
+
+            [Peer]
+            Endpoint = old.example.com:1234
+            Endpoint = duplicate.example.com:1234
+            """.trimIndent(),
+        )
+
+        assertTrue(merged.contains("Note without equals"))
+        assertTrue(merged.contains("PrivateKey = private-key"))
+        assertTrue(merged.contains("Endpoint = engage.cloudflareclient.com:2408"))
+        assertFalse(merged.contains("duplicate-private"))
+        assertFalse(merged.contains("duplicate.example.com:1234"))
+    }
+
+    @Test
     fun `toWarpConfig falls back for invalid optional awg fields`() {
         val fallback = AwgParams(underloadPacketJunkSize = 9, payloadHexI1 = "0a0b")
         val config = draftFromSlot(slot(config = sampleConfig())).copy(
