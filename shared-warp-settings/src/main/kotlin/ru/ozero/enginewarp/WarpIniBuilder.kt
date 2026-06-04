@@ -174,7 +174,7 @@ private class RawWarpIniMerger(preserveRawIni: String) {
 
     private data class Section(
         val header: String,
-        val lines: MutableList<String>,
+        val lines: List<String>,
     )
 
     private companion object {
