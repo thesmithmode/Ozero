@@ -366,8 +366,13 @@ class StartSequenceCoordinatorBehaviorTest {
         val finalBuilder = mockk<VpnService.Builder> {
             every { establish() } returns finalFd
         }
-        every { fixture.tunBuilderHelper.buildTunBuilder(any(), any(), any(), any()) } returns startupBuilder
-        every { fixture.tunBuilderHelper.buildTunBuilder(any(), any(), any()) } returns finalBuilder
+        var buildCalls = 0
+        every { fixture.tunBuilderHelper.buildTunBuilder(any(), any(), any(), any()) } answers {
+            if (buildCalls++ == 0) startupBuilder else finalBuilder
+        }
+        every { fixture.tunBuilderHelper.buildTunBuilder(any(), any(), any()) } answers {
+            if (buildCalls++ == 0) startupBuilder else finalBuilder
+        }
         every { fixture.tunnelGateway.start(any()) } returns 0
 
         fixture.coordinator.run()

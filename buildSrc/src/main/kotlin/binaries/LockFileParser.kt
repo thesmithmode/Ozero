@@ -4,6 +4,8 @@ import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.error.YAMLException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.Instant
+import java.util.Date
 
 object LockFileParser {
     private val SHA256_REGEX = Regex("[0-9a-f]{64}")
@@ -26,8 +28,12 @@ object LockFileParser {
 
         val tag = raw["tag"]?.toString()
             ?: throw LockFileException("Missing required field 'tag' in $path")
-        val generatedAt = raw["generated_at"]?.toString()
-            ?: throw LockFileException("Missing required field 'generated_at' in $path")
+        val generatedAt = when (val value = raw["generated_at"]) {
+            null -> throw LockFileException("Missing required field 'generated_at' in $path")
+            is String -> value
+            is Date -> Instant.ofEpochMilli(value.time).toString()
+            else -> value.toString()
+        }
 
         @Suppress("UNCHECKED_CAST")
         val rawArtifacts = (raw["artifacts"] as? List<Map<String, Any?>>).orEmpty()

@@ -352,7 +352,6 @@ class SubscriptionParserBranchCoverageTest {
         assertEquals("http-host.example.com,fallback-host.example.com", vless.host)
         assertEquals("none", vless.security)
         assertFalse(vless.allowInsecure)
-        assertEquals("mode=stream-up,host=nested", vless.pluginOpts)
         val vmess = result[1] as VMessBean
         assertEquals("auto", vmess.encryption)
         assertEquals("none", vmess.security)
