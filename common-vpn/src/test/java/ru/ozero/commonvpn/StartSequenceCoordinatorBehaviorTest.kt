@@ -7,6 +7,7 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
@@ -284,6 +285,164 @@ class StartSequenceCoordinatorBehaviorTest {
     }
 
     @Test
+    fun `allowlist split mode reads allowlist packages and passes them to the TUN builder`() = runTest {
+        val engine = FakeEnginePlugin(id = EngineId.BYEDPI, socksPort = 2099, capabilities = tunnelCapabilities())
+        val splitRules = StaticSplitTunnelRulesProvider(
+            allowlist = setOf("com.example.browser", "com.example.app"),
+            blocklist = setOf("com.example.blocked"),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = EngineId.BYEDPI,
+                splitMode = SplitTunnelMode.ALLOWLIST,
+            ),
+            splitTunnelRulesProvider = splitRules,
+        )
+        val tunFd = fixture.establishedTunFd()
+        every { fixture.tunnelGateway.start(any()) } returns 0
+
+        fixture.coordinator.run()
+
+        assertEquals(1, splitRules.allowlistReads)
+        assertEquals(0, splitRules.blocklistReads)
+        assertEquals(1, fixture.settingsRepository.reads)
+        verify(exactly = 1) {
+            fixture.tunBuilderHelper.buildTunBuilder(
+                match {
+                    it.mode == SplitTunnelMode.ALLOWLIST &&
+                        it.allowlist == setOf("com.example.browser", "com.example.app") &&
+                        it.blocklist.isEmpty()
+                },
+                false,
+                emptyList(),
+            )
+        }
+        verify(exactly = 1) { fixture.tunnelGateway.start(match { it.tunPfd === tunFd && it.socksPort == 2099 }) }
+        assertEquals(1, engine.startedConfigs.size)
+    }
+
+    @Test
+    fun `allowlist split mode timeout falls back to empty allowlist`() = runTest {
+        val engine = FakeEnginePlugin(id = EngineId.BYEDPI, socksPort = 2100, capabilities = tunnelCapabilities())
+        val splitRules = DelayedSplitTunnelRulesProvider(
+            allowlist = setOf("com.example.browser"),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = EngineId.BYEDPI,
+                splitMode = SplitTunnelMode.ALLOWLIST,
+            ),
+            splitTunnelRulesProvider = splitRules,
+        )
+        val tunFd = fixture.establishedTunFd()
+        every { fixture.tunnelGateway.start(any()) } returns 0
+
+        val job = backgroundScope.launch { fixture.coordinator.run() }
+        advanceTimeBy(StartSequenceCoordinator.SETTINGS_READ_TIMEOUT_MS)
+        advanceUntilIdle()
+        job.join()
+
+        assertEquals(1, splitRules.allowlistReads)
+        assertEquals(0, splitRules.blocklistReads)
+        verify(exactly = 1) {
+            fixture.tunBuilderHelper.buildTunBuilder(
+                match {
+                    it.mode == SplitTunnelMode.ALLOWLIST &&
+                        it.allowlist.isEmpty() &&
+                        it.blocklist.isEmpty()
+                },
+                false,
+                emptyList(),
+            )
+        }
+        verify(exactly = 1) { fixture.tunnelGateway.start(match { it.tunPfd === tunFd && it.socksPort == 2100 }) }
+        assertEquals(1, engine.startedConfigs.size)
+    }
+
+    @Test
+    fun `blocklist split mode reads blocklist packages and passes them to the TUN builder`() = runTest {
+        val engine = FakeEnginePlugin(id = EngineId.BYEDPI, socksPort = 2101, capabilities = tunnelCapabilities())
+        val splitRules = StaticSplitTunnelRulesProvider(
+            allowlist = setOf("com.example.allowed"),
+            blocklist = setOf("com.example.blocked", "com.example.blocked2"),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = EngineId.BYEDPI,
+                splitMode = SplitTunnelMode.BLOCKLIST,
+            ),
+            splitTunnelRulesProvider = splitRules,
+        )
+        val tunFd = fixture.establishedTunFd()
+        every { fixture.tunnelGateway.start(any()) } returns 0
+
+        fixture.coordinator.run()
+
+        assertEquals(0, splitRules.allowlistReads)
+        assertEquals(1, splitRules.blocklistReads)
+        assertEquals(1, fixture.settingsRepository.reads)
+        verify(exactly = 1) {
+            fixture.tunBuilderHelper.buildTunBuilder(
+                match {
+                    it.mode == SplitTunnelMode.BLOCKLIST &&
+                        it.allowlist.isEmpty() &&
+                        it.blocklist == setOf("com.example.blocked", "com.example.blocked2")
+                },
+                false,
+                emptyList(),
+            )
+        }
+        verify(exactly = 1) { fixture.tunnelGateway.start(match { it.tunPfd === tunFd && it.socksPort == 2101 }) }
+        assertEquals(1, engine.startedConfigs.size)
+    }
+
+    @Test
+    fun `blocklist split mode timeout falls back to empty blocklist`() = runTest {
+        val engine = FakeEnginePlugin(id = EngineId.BYEDPI, socksPort = 2102, capabilities = tunnelCapabilities())
+        val splitRules = DelayedSplitTunnelRulesProvider(
+            blocklist = setOf("com.example.blocked"),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = EngineId.BYEDPI,
+                splitMode = SplitTunnelMode.BLOCKLIST,
+            ),
+            splitTunnelRulesProvider = splitRules,
+        )
+        val tunFd = fixture.establishedTunFd()
+        every { fixture.tunnelGateway.start(any()) } returns 0
+
+        val job = backgroundScope.launch { fixture.coordinator.run() }
+        advanceTimeBy(StartSequenceCoordinator.SETTINGS_READ_TIMEOUT_MS)
+        advanceUntilIdle()
+        job.join()
+
+        assertEquals(0, splitRules.allowlistReads)
+        assertEquals(1, splitRules.blocklistReads)
+        verify(exactly = 1) {
+            fixture.tunBuilderHelper.buildTunBuilder(
+                match {
+                    it.mode == SplitTunnelMode.BLOCKLIST &&
+                        it.allowlist.isEmpty() &&
+                        it.blocklist.isEmpty()
+                },
+                false,
+                emptyList(),
+            )
+        }
+        verify(exactly = 1) { fixture.tunnelGateway.start(match { it.tunPfd === tunFd && it.socksPort == 2102 }) }
+        assertEquals(1, engine.startedConfigs.size)
+    }
+
+    @Test
     fun `manual TUN success starts native tunnel, watchdogs, stats logger and session`() = runTest {
         val engine = FakeEnginePlugin(id = EngineId.BYEDPI, socksPort = 2091, capabilities = tunnelCapabilities())
         val fixture = startFixture(
@@ -415,6 +574,7 @@ class StartSequenceCoordinatorBehaviorTest {
         settings: SettingsModel,
         settingsFlow: Flow<SettingsModel>? = null,
         stopping: Boolean = false,
+        splitTunnelRulesProvider: SplitTunnelRulesProvider = SplitTunnelRulesProvider.NoOp,
     ): StartFixture {
         val tunnelController = TunnelController()
         val healthMonitor = mockk<HealthMonitor>(relaxed = true)
@@ -444,7 +604,7 @@ class StartSequenceCoordinatorBehaviorTest {
             tunBuilderHelper = tunBuilderHelper,
             engineWatchdog = engineWatchdog,
             statsLogger = statsLogger,
-            splitTunnelRulesProvider = SplitTunnelRulesProvider.NoOp,
+            splitTunnelRulesProvider = splitTunnelRulesProvider,
             settingsRepository = settingsRepository,
             sessionStatsRecorder = sessionRecorder,
         )
@@ -614,6 +774,48 @@ class StartSequenceCoordinatorBehaviorTest {
         override suspend fun setAppMode(mode: AppMode) = Unit
         override suspend fun setKillswitchEnabled(enabled: Boolean) = Unit
         override suspend fun setAlwaysOnBannerDismissed(dismissed: Boolean) = Unit
+    }
+
+    private class StaticSplitTunnelRulesProvider(
+        private val allowlist: Set<String>,
+        private val blocklist: Set<String>,
+    ) : SplitTunnelRulesProvider {
+        var allowlistReads = 0
+            private set
+        var blocklistReads = 0
+            private set
+
+        override suspend fun allowlistPackages(): Set<String> {
+            allowlistReads++
+            return allowlist
+        }
+
+        override suspend fun blocklistPackages(): Set<String> {
+            blocklistReads++
+            return blocklist
+        }
+    }
+
+    private class DelayedSplitTunnelRulesProvider(
+        private val allowlist: Set<String> = emptySet(),
+        private val blocklist: Set<String> = emptySet(),
+    ) : SplitTunnelRulesProvider {
+        var allowlistReads = 0
+            private set
+        var blocklistReads = 0
+            private set
+
+        override suspend fun allowlistPackages(): Set<String> {
+            allowlistReads++
+            delay(StartSequenceCoordinator.SETTINGS_READ_TIMEOUT_MS + 1)
+            return allowlist
+        }
+
+        override suspend fun blocklistPackages(): Set<String> {
+            blocklistReads++
+            delay(StartSequenceCoordinator.SETTINGS_READ_TIMEOUT_MS + 1)
+            return blocklist
+        }
     }
 
     private class RecordingSessionStatsRecorder : SessionStatsRecorder {
