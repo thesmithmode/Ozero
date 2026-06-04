@@ -5,6 +5,7 @@ import java.io.File
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+@Suppress("LargeClass")
 class OzeroVpnServiceLifecycleTest {
 
     private val source by lazy {

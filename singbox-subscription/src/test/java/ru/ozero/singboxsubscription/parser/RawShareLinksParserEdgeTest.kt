@@ -116,4 +116,110 @@ class RawShareLinksParserEdgeTest {
             ).isEmpty(),
         )
     }
+
+    @Test
+    fun `should skip malformed links and invalid sing-box json`() {
+        val text = """
+            # comments and malformed tokens should not crash parser
+            just-a-comment
+            vless://
+            vmess://not-a-valid-vmess
+        """.trimIndent()
+
+        assertTrue(RawShareLinksParser.parse(text).isEmpty())
+
+        val malformedJson = """
+            {"outbounds":
+            "not-array"
+        """.trimIndent()
+
+        assertTrue(RawShareLinksParser.parse(malformedJson).isEmpty())
+    }
+
+    @Test
+    fun `should ignore empty tokens from multiple spaces in share link lines`() {
+        val text = """
+            vless://12345678-1234-1234-1234-123456789abc@vless.example.com:443?type=tcp  trojan://secret@trojan.example.com:443
+            # comment to ignore
+        """.trimIndent()
+
+        val result = RawShareLinksParser.parse(text)
+
+        assertEquals(2, result.size)
+        assertEquals("vless.example.com", result[0].serverAddress)
+        assertEquals("trojan.example.com", result[1].serverAddress)
+    }
+
+    @Test
+    fun `should parse valid sing-box outbounds and skip unknown type`() {
+        val json = """
+            {
+              "outbounds": [
+                { "type": "direct", "tag": "skip", "server": "skip.example.com" },
+                {
+                  "type": "vless",
+                  "tag": "keep-vless",
+                  "server": "vless.example.com",
+                  "server_port": 443,
+                  "uuid": "12345678-1234-1234-1234-123456789abc"
+                },
+                {
+                  "type": "vmess",
+                  "tag": "keep-vmess",
+                  "server": "vmess.example.com",
+                  "server_port": 443,
+                  "uuid": "12345678-1234-1234-1234-123456789abc"
+                },
+                {
+                  "type": "vless",
+                  "tag": "reality-no-utls",
+                  "server": "fallback.example.com",
+                  "server_port": 443,
+                  "uuid": "12345678-1234-1234-1234-123456789abc",
+                  "tls": {
+                    "enabled": true,
+                    "reality": {
+                      "enabled": true,
+                      "public_key": "public-key",
+                      "short_id": "short"
+                    }
+                  }
+                },
+                {
+                  "type": "vless",
+                  "tag": "reality-disabled",
+                  "server": "disabled.example.com",
+                  "server_port": 443,
+                  "uuid": "12345678-1234-1234-1234-123456789abc",
+                  "tls": {
+                    "enabled": true,
+                    "reality": {
+                      "enabled": false,
+                      "public_key": "unused-key",
+                      "short_id": "unused"
+                    }
+                  }
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val result = RawShareLinksParser.parse(json)
+
+        assertEquals(4, result.size)
+        assertEquals("VLESSBean", result[0]::class.simpleName)
+        assertEquals("VMessBean", result[1]::class.simpleName)
+        assertEquals("VLESSBean", result[2]::class.simpleName)
+        assertEquals("VLESSBean", result[3]::class.simpleName)
+
+        val vlessNoUtls = result[2] as VLESSBean
+        assertEquals("reality", vlessNoUtls.security)
+        assertEquals("public-key", vlessNoUtls.realityPublicKey)
+        assertEquals("short", vlessNoUtls.realityShortId)
+        assertEquals("chrome", vlessNoUtls.realityFingerprint)
+
+        val vlessRealityDisabled = result[3] as VLESSBean
+        assertEquals("tls", vlessRealityDisabled.security)
+        assertEquals("chrome", vlessRealityDisabled.realityFingerprint)
+    }
 }

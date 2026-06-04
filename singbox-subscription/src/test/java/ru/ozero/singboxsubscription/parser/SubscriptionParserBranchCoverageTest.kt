@@ -7,6 +7,7 @@ import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
 import java.util.Base64
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @Suppress("LongMethod")
@@ -301,5 +302,112 @@ class SubscriptionParserBranchCoverageTest {
         assertEquals("ss.example.com", ss.serverAddress)
         assertEquals(8388, ss.serverPort)
         assertEquals("chacha20-ietf-poly1305", ss.method)
+    }
+
+    @Test
+    fun `clash parser covers nested helper fallbacks and unsupported type filtering`() {
+        val yaml = """
+            proxies:
+              - name: Unknown
+                type: direct
+                server: ignored.example.com
+                port: 443
+              - name: Uppercase Vless
+                type: VLESS
+                server: vless-default.example.com
+                port: 443
+                uuid: 12345678-1234-1234-1234-123456789abc
+                tls: false
+                skip-cert-verify: {}
+                allowInsecure: {}
+                http-opts:
+                  path: /http
+                  host:
+                    - http-host.example.com
+                    - fallback-host.example.com
+                plugin-opts:
+                  mode: stream-up
+                  host: nested
+              - name: VMess No Security
+                type: vmess
+                server: vmess-default.example.com
+                port: "443"
+                uuid: 12345678-1234-1234-1234-123456789abc
+              - name: SS Method Map
+                type: shadowsocks
+                server: ss-map.example.com
+                port: 8388
+                cipher:
+                  method: aes-128-gcm
+                  mode: cfb
+                password: secret
+        """.trimIndent()
+
+        val result = ClashYamlParser.parse(yaml)
+
+        assertEquals(3, result.size)
+        val vless = result[0] as VLESSBean
+        assertEquals("http", vless.type)
+        assertEquals("/http", vless.path)
+        assertEquals("http-host.example.com,fallback-host.example.com", vless.host)
+        assertEquals("none", vless.security)
+        assertFalse(vless.allowInsecure)
+        assertEquals("mode=stream-up,host=nested", vless.pluginOpts)
+        val vmess = result[1] as VMessBean
+        assertEquals("auto", vmess.encryption)
+        assertEquals("none", vmess.security)
+        val ss = result[2] as ShadowsocksBean
+        assertEquals("method=aes-128-gcm,mode=cfb", ss.method)
+    }
+
+    @Test
+    fun `clash parser handles malformed root structures`() {
+        assertTrue(ClashYamlParser.parse("proxies: [").isEmpty())
+        assertTrue(ClashYamlParser.parse("proxies: plain").isEmpty())
+        assertTrue(ClashYamlParser.parse("name: scalar").isEmpty())
+    }
+
+    @Test
+    fun `clash parser covers transport fallback and bool/int edge variants`() {
+        val yaml = """
+            proxies:
+              - name: WS fallback from ws opts
+                type: vless
+                server: ws-fallback.example.com
+                port: 443
+                uuid: 12345678-1234-1234-1234-123456789abc
+                tls: true
+                ws-opts:
+                  path: /ws
+                  headers:
+                    Host: ws-host.example.com
+              - name: VMess malformed alter-id and no utls
+                type: vmess
+                server: vmess-h2.example.com
+                port: 443
+                uuid: 12345678-1234-1234-1234-123456789abc
+                security: none
+                alter-id: bad
+                h2-opts:
+                  path: /h2
+                  host:
+                    - h2-a.example.com
+                    - h2-b.example.com
+                skip-cert-verify: no
+        """.trimIndent()
+
+        val result = ClashYamlParser.parse(yaml)
+
+        assertEquals(2, result.size)
+        val vless = result[0] as VLESSBean
+        assertEquals("/ws", vless.path)
+        assertEquals("ws-host.example.com", vless.host)
+        assertEquals("tls", vless.security)
+        assertFalse(vless.allowInsecure)
+        val vmess = result[1] as VMessBean
+        assertEquals(0, vmess.alterId)
+        assertEquals("/h2", vmess.path)
+        assertEquals("h2-a.example.com,h2-b.example.com", vmess.host)
+        assertEquals("none", vmess.security)
     }
 }
