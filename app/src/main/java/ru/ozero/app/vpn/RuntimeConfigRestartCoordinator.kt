@@ -100,10 +100,24 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
                         it is TunnelState.Failed
                 }
             }
-            if (restarted != null) return true
-            AppLogger.w(TAG, "runtime config restart skipped: start timeout")
-            tunnelController.onSwitchingFinished("runtime config restart start timeout")
-            return false
+            return when (restarted) {
+                is TunnelState.Probing,
+                is TunnelState.Connecting,
+                is TunnelState.Connected -> {
+                    tunnelController.onSwitchingFinished("runtime config restart started")
+                    true
+                }
+                is TunnelState.Failed -> {
+                    tunnelController.onSwitchingFinished("runtime config restart failed: ${restarted.reason}")
+                    false
+                }
+                null -> {
+                    AppLogger.w(TAG, "runtime config restart skipped: start timeout")
+                    tunnelController.onSwitchingFinished("runtime config restart start timeout")
+                    false
+                }
+                else -> false
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

@@ -104,8 +104,10 @@ class FmtBranchCoverageTest {
     @Test
     fun `v2ray utils cover truthy aliases transport mapping and tcp defaults`() {
         val bean = VLESSBean()
-        val parsed = UriCompat.parse("vless://id@host:443?security=tls&sni=sni&alpn=h2&fp=chrome&pbk=pk&sid=sid" +
-            "&allowInsecure=yes&type=ws&host=front&path=/x")
+        val parsed = UriCompat.parse(
+            "vless://id@host:443?security=tls&sni=sni&alpn=h2&fp=chrome&pbk=pk&sid=sid" +
+                "&allowInsecure=yes&type=ws&host=front&path=/x",
+        )
 
         V2RayFmtUtils.parseSecurityParams(bean, parsed)
         V2RayFmtUtils.parseTransportParams(bean, parsed)

@@ -154,6 +154,9 @@ class WarpSettingsModelTest {
         assertFalse(hasRequiredFields(valid.copy(endpoint = "")))
         assertFalse(hasRequiredFields(valid.copy(addressV4 = "")))
     }
+}
+
+class WarpConfParserTest {
 
     @Test
     fun `parser and builder round trip required fields`() {
@@ -417,6 +420,9 @@ class WarpSettingsModelTest {
         assertEquals("0102", parsed.awgParams.payloadHexI2)
         assertEquals(AwgParams.DEFAULT_I3, parsed.awgParams.specialJunk3)
     }
+}
+
+class WarpIniBuilderTest {
 
     @Test
     fun `builder omits awg section for vanilla params and blank ipv6`() {
@@ -642,6 +648,9 @@ class WarpSettingsModelTest {
         assertTrue(merged.contains("Endpoint = engage.cloudflareclient.com:2408"))
         assertTrue(merged.contains("Other = ignored"))
     }
+}
+
+class WarpConfigValidationTest {
 
     @Test
     fun `parser defaults allowed ips and dns for missing or blank peer values`() {
@@ -741,21 +750,21 @@ class WarpSettingsModelTest {
         assertFalse(longPeer.contains("private-key"))
         assertFalse(longPeer.contains("2606:4700::2"))
     }
-
-    private fun slot(
-        name: String = "Ozero-1",
-        config: WarpConfig = sampleConfig(),
-    ): WarpConfigSlot = WarpConfigSlot(name = name, config = config)
-
-    private fun sampleConfig(): WarpConfig =
-        WarpConfig(
-            privateKey = "private-key",
-            publicKey = "public-key",
-            peerPublicKey = "peer-key",
-            peerEndpoint = "engage.cloudflareclient.com:2408",
-            interfaceAddressV4 = "10.0.0.2/32",
-            interfaceAddressV6 = "2606:4700::2/128",
-            dnsServers = listOf("1.1.1.1", "8.8.8.8"),
-            awgParams = AwgParams(junkPacketCount = 7),
-        )
 }
+
+private fun slot(
+    name: String = "Ozero-1",
+    config: WarpConfig = sampleConfig(),
+): WarpConfigSlot = WarpConfigSlot(name = name, config = config)
+
+private fun sampleConfig(): WarpConfig =
+    WarpConfig(
+        privateKey = "private-key",
+        publicKey = "public-key",
+        peerPublicKey = "peer-key",
+        peerEndpoint = "engage.cloudflareclient.com:2408",
+        interfaceAddressV4 = "10.0.0.2/32",
+        interfaceAddressV6 = "2606:4700::2/128",
+        dnsServers = listOf("1.1.1.1", "8.8.8.8"),
+        awgParams = AwgParams(junkPacketCount = 7),
+    )

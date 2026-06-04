@@ -78,21 +78,6 @@ class EngineRuntimeConfigRestartObserver @Inject constructor(
         }
     }
 
-    private fun activeEngine(state: TunnelState, includeStarting: Boolean): EngineId? = when (state) {
-        is TunnelState.Connected -> state.engineId
-        is TunnelState.Connecting -> state.engineId.takeIf { includeStarting }
-        is TunnelState.Probing -> state.engineId.takeIf { includeStarting }
-        else -> null
-    }
-
-    private fun startingEngine(state: TunnelState): EngineId? = when (state) {
-        is TunnelState.Connecting -> state.engineId
-        is TunnelState.Probing -> state.engineId
-        else -> null
-    }
-
-    private fun connectedEngine(state: TunnelState): EngineId? = (state as? TunnelState.Connected)?.engineId
-
     private data class ObserveState(
         var baseline: Any? = UNSET,
         var pendingRestart: PendingRestart? = null,
@@ -179,3 +164,18 @@ class EngineRuntimeConfigRestartObserver @Inject constructor(
         private val UNSET = Any()
     }
 }
+
+private fun activeEngine(state: TunnelState, includeStarting: Boolean): EngineId? = when (state) {
+    is TunnelState.Connected -> state.engineId
+    is TunnelState.Connecting -> state.engineId.takeIf { includeStarting }
+    is TunnelState.Probing -> state.engineId.takeIf { includeStarting }
+    else -> null
+}
+
+private fun startingEngine(state: TunnelState): EngineId? = when (state) {
+    is TunnelState.Connecting -> state.engineId
+    is TunnelState.Probing -> state.engineId
+    else -> null
+}
+
+private fun connectedEngine(state: TunnelState): EngineId? = (state as? TunnelState.Connected)?.engineId
