@@ -268,6 +268,35 @@ class WarpSettingsModelTest {
     }
 
     @Test
+    fun `parser preserves only ipv4 or ipv6 address inputs`() {
+        val ipv4Only = WarpConfParser.parse(
+            """
+            [Interface]
+            PrivateKey = private-key
+            Address = 10.0.0.2
+            [Peer]
+            PublicKey = peer-key
+            Endpoint = endpoint:2408
+            """.trimIndent(),
+        ).getOrThrow()
+        val ipv6Only = WarpConfParser.parse(
+            """
+            [Interface]
+            PrivateKey = private-key
+            Address = 2606:4700::2
+            [Peer]
+            PublicKey = peer-key
+            Endpoint = endpoint:2408
+            """.trimIndent(),
+        ).getOrThrow()
+
+        assertEquals("10.0.0.2/32", ipv4Only.interfaceAddressV4)
+        assertEquals("", ipv4Only.interfaceAddressV6)
+        assertEquals("", ipv6Only.interfaceAddressV4)
+        assertEquals("2606:4700::2/128", ipv6Only.interfaceAddressV6)
+    }
+
+    @Test
     fun `parser preserves cidr addresses and integer awg payloads`() {
         val parsed = WarpConfParser.parse(
             """
@@ -322,6 +351,26 @@ class WarpSettingsModelTest {
         assertEquals(AwgParams.DEFAULT_I4, parsed.awgParams.specialJunk4)
         assertEquals(AwgParams.DEFAULT_I5, parsed.awgParams.payloadPacketSizeCount3)
         assertEquals("0102", parsed.awgParams.payloadHexI5)
+    }
+
+    @Test
+    fun `parser falls back when awg hex fields are absent entirely`() {
+        val parsed = WarpConfParser.parse(
+            """
+            [Interface]
+            PrivateKey = private-key
+            Address = 10.0.0.2
+            [Peer]
+            PublicKey = peer-key
+            Endpoint = endpoint:2408
+            """.trimIndent(),
+        ).getOrThrow()
+
+        assertEquals(null, parsed.awgParams.payloadHexI1)
+        assertEquals(null, parsed.awgParams.payloadHexI2)
+        assertEquals(null, parsed.awgParams.payloadHexI3)
+        assertEquals(null, parsed.awgParams.payloadHexI4)
+        assertEquals(null, parsed.awgParams.payloadHexI5)
     }
 
     @Test
@@ -505,6 +554,22 @@ class WarpSettingsModelTest {
     }
 
     @Test
+    fun `builder keeps default headers when only one known section is preserved`() {
+        val merged = WarpIniBuilder.build(
+            sampleConfig(),
+            """
+            [Peer]
+            Endpoint = old.example.com:1234
+            AllowedIPs = 0.0.0.0/0
+            """.trimIndent(),
+        )
+
+        assertTrue(merged.contains("[Interface]"))
+        assertTrue(merged.contains("[Peer]"))
+        assertTrue(merged.contains("Endpoint = engage.cloudflareclient.com:2408"))
+    }
+
+    @Test
     fun `builder keeps malformed and duplicate preserved lines`() {
         val merged = WarpIniBuilder.build(
             sampleConfig(),
@@ -525,6 +590,68 @@ class WarpSettingsModelTest {
         assertTrue(merged.contains("Endpoint = engage.cloudflareclient.com:2408"))
         assertFalse(merged.contains("duplicate-private"))
         assertFalse(merged.contains("duplicate.example.com:1234"))
+    }
+
+    @Test
+    fun `private warp ini helpers cover unknown labels and missing preferred sections`() {
+        val mergerClass = Class.forName("ru.ozero.enginewarp.RawWarpIniMerger")
+        val ctor = mergerClass.getDeclaredConstructor(String::class.java).apply { isAccessible = true }
+        val merger = ctor.newInstance("")
+        val canonicalLabel = mergerClass.getDeclaredMethod("canonicalLabel", String::class.java).apply { isAccessible = true }
+        val appendPreferredSection = mergerClass.getDeclaredMethod(
+            "appendPreferredSection",
+            StringBuilder::class.java,
+            Map::class.java,
+            MutableSet::class.java,
+            String::class.java,
+        ).apply { isAccessible = true }
+
+        assertEquals("custom", canonicalLabel.invoke(merger, "custom"))
+        appendPreferredSection.invoke(merger, StringBuilder(), emptyMap<String, Any>(), mutableSetOf<String>(), "missing")
+    }
+
+    @Test
+    fun `builder preserves unknown key labels and handles duplicate preferred sections`() {
+        val merged = WarpIniBuilder.build(
+            sampleConfig(),
+            """
+            [Interface]
+            CustomKey = old
+            PrivateKey = old-private
+
+            [Interface]
+            Other = ignored
+
+            [Peer]
+            Endpoint = old.example.com:1234
+            custompeer = keep
+            """.trimIndent(),
+        )
+
+        assertTrue(merged.contains("CustomKey = old"))
+        assertTrue(merged.contains("custompeer = keep"))
+        assertTrue(merged.contains("PrivateKey = private-key"))
+        assertTrue(merged.contains("Endpoint = engage.cloudflareclient.com:2408"))
+        assertTrue(merged.contains("Other = ignored"))
+    }
+
+    @Test
+    fun `parser defaults allowed ips and dns for missing or blank peer values`() {
+        val parsed = WarpConfParser.parse(
+            """
+            [Interface]
+            PrivateKey = private-key
+            Address = 10.0.0.2/32
+            DNS =
+            [Peer]
+            PublicKey = peer-key
+            Endpoint = endpoint:2408
+            AllowedIPs = ,
+            """.trimIndent(),
+        ).getOrThrow()
+
+        assertEquals(WarpConfig.DEFAULT_DNS, parsed.dnsServers)
+        assertEquals(WarpConfig.DEFAULT_ALLOWED_IPS, parsed.allowedIps)
     }
 
     @Test
@@ -584,6 +711,12 @@ class WarpSettingsModelTest {
         }
         assertThrows(IllegalArgumentException::class.java) {
             AwgParams(initPacketMagicHeader = 1, responsePacketMagicHeader = 1)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            AwgParams(transportMagicHeader = 0)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            AwgParams(cookieReplyMagicHeader = 1, transportMagicHeader = 1)
         }
         assertTrue(AwgParams.JC_RANGE.contains(AwgParams.DEFAULT_JC))
         assertTrue(AwgParams.SIZE_RANGE.contains(AwgParams.DEFAULT_JMIN))

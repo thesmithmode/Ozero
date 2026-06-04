@@ -298,6 +298,29 @@ class LockFileParserValidationTest {
     }
 
     @Test
+    fun `reject null size bytes`() {
+        val f = write(
+            """
+            tag: binaries-x
+            generated_at: 2026-04-25T10:00:00Z
+            artifacts:
+              - name: libx.so
+                engine: x
+                abi: arm64-v8a
+                destination: jniLibs
+                download_url: https://example.com/x.so
+                sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                size_bytes: null
+                source_repo: https://example.com
+                source_commit: 9999999999999999999999999999999999999999
+            """.trimIndent(),
+        )
+        assertThatThrownBy { LockFileParser.parse(f) }
+            .isInstanceOf(LockFileException::class.java)
+            .hasMessageContaining("size_bytes")
+    }
+
+    @Test
     fun `reject artifact missing source metadata and size`() {
         val missingSourceRepo = write(
             """
@@ -355,6 +378,29 @@ class LockFileParserValidationTest {
         assertThatThrownBy { LockFileParser.parse(missingSourceCommit) }
             .isInstanceOf(LockFileException::class.java)
             .hasMessageContaining("source_commit")
+    }
+
+    @Test
+    fun `reject null artifact field with canonical missing message`() {
+        val f = write(
+            """
+            tag: binaries-x
+            generated_at: 2026-04-25T10:00:00Z
+            artifacts:
+              - name: null
+                engine: x
+                abi: arm64-v8a
+                destination: jniLibs
+                download_url: https://example.com/x.so
+                sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                size_bytes: 1
+                source_repo: https://example.com
+                source_commit: 9999999999999999999999999999999999999999
+            """.trimIndent(),
+        )
+        assertThatThrownBy { LockFileParser.parse(f) }
+            .isInstanceOf(LockFileException::class.java)
+            .hasMessageContaining("name")
     }
 
     @Test

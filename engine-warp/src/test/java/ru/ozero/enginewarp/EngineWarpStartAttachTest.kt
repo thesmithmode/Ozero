@@ -122,6 +122,42 @@ class EngineWarpStartAttachTest {
         assertTrue(spec?.allowFamilyV6 == true)
     }
 
+    @Test
+    fun `tunSpec returns null when resolved config has no IPv4 address`() = runTest {
+        val noAddress = sampleConfig.copy(interfaceAddressV4 = "")
+        val engine = newEngine(
+            bridge = FakeBridge(),
+            reader = FixedReader(null),
+            scope = backgroundScope,
+            activeConfig = noAddress,
+        )
+
+        val spec = engine.tunSpec()
+
+        assertEquals(null, spec)
+    }
+
+    @Test
+    fun `system resolver rewrites hostname endpoints before attach`() = runTest {
+        val bridge = FakeBridge()
+        val hostConfig = sampleConfig.copy(
+            peerEndpoint = "localhost:2408",
+            doHProvider = DoHProvider.SYSTEM,
+        )
+        val engine = newEngine(
+            bridge = bridge,
+            reader = FixedReader(null),
+            scope = backgroundScope,
+            activeConfig = hostConfig,
+        )
+
+        engine.start(EngineConfig.Warp, Upstream.None)
+        engine.attachTun(tunFd = 12)
+
+        val ini = bridge.lastIni ?: error("ini missing")
+        assertTrue(ini.contains("Endpoint = 127.0.0.1:2408") || ini.contains("Endpoint = 0:0:0:0:0:0:0:1:2408"))
+    }
+
     private fun interface WarpUapiStateReader {
         operator fun invoke(uapiPath: String, tunnelName: String): WarpUapiState?
     }
@@ -135,9 +171,10 @@ class EngineWarpStartAttachTest {
         reader: WarpUapiStateReader,
         scope: CoroutineScope,
         ipv6Enabled: Boolean = false,
+        activeConfig: WarpConfig = sampleConfig,
     ): EngineWarp = EngineWarp(
         autoConfig = FakeAuto(),
-        configStore = FakeStore(sampleConfig),
+        configStore = FakeStore(activeConfig),
         sdkBridge = bridge,
         uapiPathProvider = { "/tmp/uapi" },
         socketProtector = ru.ozero.enginescore.VpnSocketProtector { true },
@@ -200,6 +237,7 @@ class EngineWarpStartAttachTest {
         var detachCalls = 0
         var proxyCalls = 0
         var stopProxyCalls = 0
+        var lastIni: String? = null
         private var running = false
 
         override suspend fun attachTun(
@@ -210,6 +248,7 @@ class EngineWarpStartAttachTest {
             protector: ru.ozero.enginescore.VpnSocketProtector,
         ): WarpSdkBridge.AttachResult {
             attachCalls++
+            lastIni = iniConfig
             running = attachResult is WarpSdkBridge.AttachResult.Success
             return attachResult
         }

@@ -46,7 +46,10 @@ class TcpProbeTest {
 
     @Test
     fun `probe возвращает Fail timeout когда host не отвечает`() = runTest {
-        val result = TcpProbe.probe("10.255.255.1", 65000, timeoutMs = 200, protector = protectorOk)
+        val closed = ServerSocket(0)
+        val port = closed.localPort
+        closed.close()
+        val result = TcpProbe.probe("127.0.0.1", port, timeoutMs = 200, protector = protectorOk)
         val fail = assertIs<EnginePreflight.Result.Fail>(result)
         assertTrue(fail.reason.contains("timeout") || fail.reason.contains("connect"))
     }

@@ -186,11 +186,12 @@ class ConfigBuilderBranchCoverageTest {
         assertContains(httpJson, "\"host\":[\"front.example.com\"]")
         assertContains(httpJson, "\"path\":\"/\"")
         assertContains(h2Json, "\"type\":\"http\"")
-        assertContains(h2Json, "\"host\":[]")
+        assertFalse(h2Json.contains("\"host\""))
         assertContains(h2Json, "\"path\":\"/h2\"")
         assertFalse(unknownJson.contains("\"transport\""))
         assertFalse(unknownJson.contains("\"tls\""))
-        assertFalse(unknownJson.contains("\"detour\""))
+        assertContains(unknownJson, "\"listen_port\":2085")
+        assertContains(unknownJson, "\"final\":\"proxy\"")
         assertFailsWith<IllegalStateException> {
             ConfigBuilder.buildChainConfig(unsupported, socksPort = 2086)
         }

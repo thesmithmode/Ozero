@@ -447,4 +447,145 @@ class SubscriptionParserBranchCoverageTest {
         assertEquals("h2-a.example.com,h2-b.example.com", vmess.host)
         assertEquals("none", vmess.security)
     }
+
+    @Test
+    fun `clash parser covers blank scalar fallbacks and helper edge values`() {
+        val yaml = """
+            proxies:
+              - name: Blank VLESS Encryption
+                type: vless
+                server: vless.blank.example.com
+                port: 443
+                uuid: 12345678-1234-1234-1234-123456789abc
+                encryption: "   "
+                tls: false
+              - name: Blank SS Method
+                type: ss
+                server: ss.blank.example.com
+                port: 8388
+                cipher: "   "
+                password: secret
+              - name: SS Method Map
+                type: shadowsocks
+                server: ss.map.example.com
+                port: 8388
+                cipher:
+                  method: aes-128-gcm
+                  mode: cfb
+                password: secret
+        """.trimIndent()
+
+        val result = ClashYamlParser.parse(yaml)
+
+        assertEquals(3, result.size)
+        val vless = result[0] as VLESSBean
+        assertEquals("none", vless.encryption)
+        assertEquals("none", vless.security)
+        val ssBlank = result[1] as ShadowsocksBean
+        assertEquals("", ssBlank.method)
+        val ssMap = result[2] as ShadowsocksBean
+        assertEquals("method=aes-128-gcm,mode=cfb", ssMap.method)
+    }
+
+    @Test
+    fun `raw parser covers malformed json fallback and singbox outbound validation edges`() {
+        assertTrue(RawShareLinksParser.parse("{").isEmpty())
+
+        val json = """
+            {
+              "outbounds": [
+                {
+                  "type": "vless",
+                  "tag": "missing port",
+                  "server": "vless.example.com",
+                  "uuid": "id"
+                },
+                {
+                  "type": "vmess",
+                  "tag": "empty server",
+                  "server": "",
+                  "server_port": 443,
+                  "uuid": "id"
+                },
+                {
+                  "type": "trojan",
+                  "tag": "no transport tls",
+                  "server": "trojan-valid.example.com",
+                  "server_port": 443,
+                  "password": "secret"
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val result = RawShareLinksParser.parse(json)
+
+        assertEquals(1, result.size)
+        val trojan = result.single() as TrojanBean
+        assertEquals("trojan-valid.example.com", trojan.serverAddress)
+        assertEquals("none", trojan.security)
+    }
+
+    @Test
+    fun `raw parser covers transport header fallback and tls reality branches`() {
+        val json = """
+            {
+              "outbounds": [
+                {
+                  "type": "vless",
+                  "tag": "blank-host",
+                  "server": "blank-host.example.com",
+                  "server_port": 443,
+                  "uuid": "id",
+                  "transport": {
+                    "type": "ws",
+                    "host": "transport-host.example.com",
+                    "headers": { "Host": "   " }
+                  },
+                  "tls": {
+                    "enabled": true,
+                    "reality": { "enabled": false },
+                    "utls": { "fingerprint": "safari" }
+                  }
+                },
+                {
+                  "type": "vmess",
+                  "tag": "reality-enabled",
+                  "server": "reality.example.com",
+                  "server_port": 443,
+                  "uuid": "id",
+                  "transport": {
+                    "type": "xhttp",
+                    "headers": { "Host": "edge.example.com" }
+                  },
+                  "tls": {
+                    "enabled": true,
+                    "reality": {
+                      "enabled": true,
+                      "public_key": "pk",
+                      "short_id": "sid"
+                    },
+                    "utls": { "fingerprint": "chrome" }
+                  }
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val result = RawShareLinksParser.parse(json)
+
+        assertEquals(2, result.size)
+        val blankHost = result[0] as VLESSBean
+        assertEquals("transport-host.example.com", blankHost.host)
+        assertEquals("tls", blankHost.security)
+        assertEquals("safari", blankHost.utlsFingerprint)
+        assertEquals("", blankHost.realityPublicKey)
+        assertEquals("", blankHost.realityShortId)
+        val realityEnabled = result[1] as VMessBean
+        assertEquals("splithttp", realityEnabled.type)
+        assertEquals("reality", realityEnabled.security)
+        assertEquals("pk", realityEnabled.realityPublicKey)
+        assertEquals("sid", realityEnabled.realityShortId)
+        assertEquals("chrome", realityEnabled.realityFingerprint)
+    }
 }

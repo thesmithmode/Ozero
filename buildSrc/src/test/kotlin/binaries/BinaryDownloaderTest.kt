@@ -122,6 +122,23 @@ class BinaryDownloaderTest {
     }
 
     @Test
+    fun `single retry slot still reports final failure without sleeping`() {
+        server.enqueue(MockResponse().setResponseCode(500))
+        val cache = tmp.resolve("cache")
+        val dst = tmp.resolve("out/libbyedpi.so")
+        val downloader = BinaryDownloader(cacheDir = cache, retryDelaysMs = listOf(0))
+
+        assertThatThrownBy {
+            downloader.download(server.url("/x.so").toString(), "0".repeat(64), dst)
+        }
+            .isInstanceOf(BinaryDownloadException::class.java)
+            .hasMessageContaining("after 1 attempts")
+            .hasMessageContaining("HTTP 500")
+
+        assertThat(server.requestCount).isEqualTo(1)
+    }
+
+    @Test
     fun `SHA mismatch fails without retry`() {
         val data = "byedpi-binary".toByteArray()
         server.enqueue(bodyResponse(data))
@@ -166,5 +183,21 @@ class BinaryDownloaderTest {
 
         assertThat(server.requestCount).isEqualTo(0)
         assertThat(Files.exists(dst)).isFalse()
+    }
+
+    @Test
+    fun `io failure on final attempt reports wrapped message without retry sleep`() {
+        val url = server.url("/x.so").toString()
+        server.shutdown()
+        val cache = tmp.resolve("cache")
+        val dst = tmp.resolve("out/libbyedpi.so")
+        val downloader = BinaryDownloader(cacheDir = cache, retryDelaysMs = listOf(0))
+
+        assertThatThrownBy {
+            downloader.download(url, "0".repeat(64), dst)
+        }
+            .isInstanceOf(BinaryDownloadException::class.java)
+            .hasMessageContaining("after 1 attempts")
+            .hasCauseInstanceOf(java.io.IOException::class.java)
     }
 }

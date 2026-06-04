@@ -126,7 +126,8 @@ private class RawWarpIniMerger(preserveRawIni: String) {
         name: String,
     ) {
         val section = sections[name] ?: return
-        if (rendered.add(name)) appendSection(output, section)
+        rendered.add(name)
+        appendSection(output, section)
     }
 
     private fun appendSection(output: StringBuilder, section: Section) {

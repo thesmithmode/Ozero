@@ -2,7 +2,6 @@ package ru.ozero.commonvpn
 
 import android.os.ParcelFileDescriptor
 import io.mockk.coEvery
-import io.mockk.any
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi

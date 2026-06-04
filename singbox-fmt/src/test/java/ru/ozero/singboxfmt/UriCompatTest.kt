@@ -83,4 +83,27 @@ class UriCompatTest {
         assertEquals(-1, bare.port)
         assertEquals("1", bare.getQueryParameter("x"))
     }
+
+    @Test
+    fun `fallback parser handles absent scheme blank authority and empty query`() {
+        val noScheme = UriCompat.parse("plain-host?x=1")
+        val blankAuthority = UriCompat.parse("vless://?x=1")
+        val emptyQuery = UriCompat.parse("vless://user@example.com?")
+        val noFragment = UriCompat.parse("vless://user@example.com:8443?host=front")
+        val badIpv6 = UriCompat.parse("vless://user@[2001:db8::1?x=1")
+        val invalidPort = UriCompat.parse("vless://user@example.com:abc?x=1")
+        val bareAuth = UriCompat.parse("vless://user@example.com#frag")
+
+        assertNull(noScheme.host)
+        assertEquals("1", noScheme.getQueryParameter("x"))
+        assertNull(blankAuthority.host)
+        assertEquals("1", blankAuthority.getQueryParameter("x"))
+        assertEquals("example.com", emptyQuery.host)
+        assertNull(emptyQuery.getQueryParameter("x"))
+        assertEquals("front", noFragment.getQueryParameter("host"))
+        assertNull(noFragment.fragment)
+        assertEquals("[2001:db8::1", badIpv6.host)
+        assertEquals(-1, invalidPort.port)
+        assertEquals("frag", bareAuth.fragment)
+    }
 }

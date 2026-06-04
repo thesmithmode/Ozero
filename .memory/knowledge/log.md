@@ -1151,3 +1151,11 @@
 ## [2026-06-04T19:03:11+03:00] compile | 2026-06-04.md
 - Source: daily/2026-06-04.md
 - Articles created: [[concepts/kotlin-style-blank-line-root-cause]], [[concepts/dev-ci-root-cause-sequencing-loop]], [[concepts/buildsrc-lockfileparser-date-branch-coverage]], [[concepts/common-vpn-split-start-and-shutdown-branch-coverage]], [[concepts/singbox-subscription-nested-transport-mapping]], [[connections/dev-ci-first-failure-sequencing-loop]]
+## [2026-06-04T21:17:58+03:00] compile | 2026-06-04.md
+- Source: daily/2026-06-04.md
+- Articles created: [[concepts/kotlin-atomicreference-null-generic-trap]], [[concepts/tcp-probe-test-local-closed-port-contract]], [[concepts/downloadbinarytask-wrapper-error-detail-contract]], [[concepts/singbox-splithttp-unsupported-test-contract]], [[concepts/ci-terminal-success-fresh-run-contract]], [[connections/ci-compile-coverage-style-blocker-sequencing]]
+- Articles updated: none
+## [2026-06-04T23:20:25+03:00] compile | 2026-06-04.md
+- Source: daily/2026-06-04.md
+- Articles created: [[concepts/ci-current-run-batch-failure-triage]], [[concepts/jacoco-historical-debt-per-module-baseline-boundary]], [[concepts/mockk-real-object-observable-state-contract]], [[concepts/singbox-config-chain-detour-test-contract]], [[concepts/warp-ini-builder-private-branch-coverage]], [[connections/current-ci-green-proof-vs-coverage-debt-loop]]
+- Articles updated: [[concepts/tcp-probe-test-local-closed-port-contract]]

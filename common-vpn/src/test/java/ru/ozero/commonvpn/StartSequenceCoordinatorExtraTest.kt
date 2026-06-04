@@ -1,7 +1,6 @@
 package ru.ozero.commonvpn
 
 import io.mockk.coEvery
-import io.mockk.any
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -29,6 +28,7 @@ import ru.ozero.enginescore.settings.TrafficMode
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 @Suppress("LargeClass")
@@ -49,7 +49,7 @@ class StartSequenceCoordinatorExtraTest {
         assertEquals(1, fixture.settingsRepository.reads)
         assertTrue(fixture.stopRequested.get())
         verify(exactly = 0) { fixture.engineWatchdog.handleEngineFailure(any(), any()) }
-        verify(exactly = 0) { fixture.tunnelController.onProbing(any()) }
+        assertIs<TunnelState.Idle>(fixture.tunnelController.state.value)
     }
 
     private fun startFixture(

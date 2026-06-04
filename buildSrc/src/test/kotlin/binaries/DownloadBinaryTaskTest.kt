@@ -307,6 +307,23 @@ class DownloadBinaryTaskTest {
     }
 
     @Test
+    fun `task retries transient server error and wraps final failure`() {
+        repeat(3) {
+            server.enqueue(MockResponse().setResponseCode(500))
+        }
+        val data = "fake-so".toByteArray()
+        val lockPath = writeLock(data, "/transient.so")
+        val task = newTask(lockPath = lockPath, requested = listOf("libbyedpi-arm64-v8a.so"))
+
+        assertThatThrownBy { task.run() }
+            .isInstanceOf(GradleException::class.java)
+            .hasMessageContaining("Failed to download")
+            .hasMessageContaining("HTTP 500")
+            .hasCauseInstanceOf(BinaryDownloadException::class.java)
+        assertThat(server.requestCount).isEqualTo(3)
+    }
+
+    @Test
     fun `task wraps integrity failure as gradle exception`() {
         server.enqueue(MockResponse().setResponseCode(200).setBody(Buffer().write("wrong".toByteArray())))
         val lockPath = writeLock("expected".toByteArray(), "/lib.so")

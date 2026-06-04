@@ -71,4 +71,30 @@ class FmtAdditionalBranchCoverageTest {
         assertEquals(8388, ss.serverPort)
         assertEquals("Full", ss.name)
     }
+
+    @Test
+    fun `format parsers cover default optional branches`() {
+        val vless = V2RayFmt.parseVLESS("vless://id@vl.example.com:443?type=grpc")
+        assertEquals("", vless.grpcServiceName)
+        assertEquals("", vless.name)
+
+        val h2 = V2RayFmt.parseVLESS("vless://id@vl.example.com:443?type=h2")
+        assertEquals("http", h2.type)
+        assertEquals("", h2.host)
+        assertEquals("/", h2.path)
+
+        val split = V2RayFmt.parseVLESS("vless://id@vl.example.com:443?type=xhttp")
+        assertEquals("splithttp", split.type)
+        assertEquals("", split.host)
+        assertEquals("/", split.path)
+        assertEquals("auto", split.splithttpMode)
+
+        val kcp = V2RayFmt.parseVLESS("vless://id@vl.example.com:443?type=mkcp")
+        assertEquals("kcp", kcp.type)
+        assertEquals("none", kcp.headerType)
+
+        val ss = V2RayFmt.parseShadowsocks("ss://method:pwd@ss.example.com:bad")
+        assertEquals(443, ss.serverPort)
+        assertEquals("", ss.plugin)
+    }
 }
