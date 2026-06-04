@@ -1,6 +1,5 @@
 package ru.ozero.commonvpn
 
-import android.net.VpnService
 import android.os.ParcelFileDescriptor
 import io.mockk.coEvery
 import io.mockk.any
@@ -110,32 +109,18 @@ class StartSequenceCoordinatorExtraTest {
         )
         return StartFixture(
             coordinator = coordinator,
-            state = state,
-            tunnelController = tunnelController,
-            tunnelGateway = tunnelGateway,
-            healthMonitor = healthMonitor,
-            tunBuilderHelper = tunBuilderHelper,
-            statsLogger = statsLogger,
-            engineWatchdog = engineWatchdog,
-            sessionRecorder = sessionRecorder,
             settingsRepository = settingsRepository,
-            killswitchValues = killswitchValues,
             stopRequested = stopRequested,
+            tunnelController = tunnelController,
+            engineWatchdog = engineWatchdog,
         )
     }
 
     private data class StartFixture(
         val coordinator: StartSequenceCoordinator,
-        val state: StartSequenceState,
         val tunnelController: TunnelController,
-        val tunnelGateway: HevTunnelGateway,
-        val healthMonitor: HealthMonitor,
-        val tunBuilderHelper: TunBuilderHelper,
-        val statsLogger: TunnelStatsLogger,
         val engineWatchdog: EngineWatchdogCoordinator,
-        val sessionRecorder: RecordingSessionStatsRecorder,
         val settingsRepository: StaticSettingsRepository,
-        val killswitchValues: List<Boolean>,
         val stopRequested: AtomicBoolean,
     )
 
