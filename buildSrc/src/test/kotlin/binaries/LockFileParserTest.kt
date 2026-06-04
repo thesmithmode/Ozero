@@ -124,6 +124,30 @@ class LockFileParserTest {
     }
 
     @Test
+    fun `parse converts yaml date generated at to instant string`() {
+        val f = write(
+            """
+            tag: binaries-meta
+            generated_at: 2026-04-25
+            artifacts:
+              - name: libone.so
+                engine: one
+                abi: arm64-v8a
+                destination: jniLibs
+                download_url: https://example.com/libone.so
+                sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                size_bytes: 1
+                source_repo: https://example.com/one
+                source_commit: 1111111111111111111111111111111111111111
+            """.trimIndent(),
+        )
+
+        val lock = LockFileParser.parse(f)
+
+        assertThat(lock.generatedAt).startsWith("2026-04-25T00:00:00")
+    }
+
+    @Test
     fun `parse AAR with libs destination and no abi`() {
         val f = write(
             """
