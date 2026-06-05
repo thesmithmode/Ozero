@@ -166,17 +166,19 @@ class EngineWatchdogCoordinator(
         stagnationWatchJobRef.getAndSet(null)?.cancel()
     }
 
-    fun handleEngineFailure(engineId: EngineId, reason: String) {
-        if (stopping.get()) return
+    fun handleEngineFailure(engineId: EngineId, reason: String): Boolean {
+        if (stopping.get()) return false
         if (!isActiveEngine(engineId)) {
             PersistentLoggers.warn(TAG, "ignore inactive engine failure: engine=$engineId reason=$reason")
-            return
+            return false
         }
         if (killswitchProvider() && hasBlockingTun()) {
             enterKillswitchMode(engineId, reason)
+            return true
         } else {
             tunnelController.onEngineDied(engineId, reason)
             stopVpnRequest()
+            return false
         }
     }
 

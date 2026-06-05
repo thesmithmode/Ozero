@@ -190,7 +190,7 @@ class StartSequenceCoordinatorContractTest {
     }
 
     @Test
-    fun `establishTunForEngine fail fast stops VPN on establish failure`() {
+    fun `establishTunForEngine routes failure через watchdog and only stops on non-killswitch path`() {
         val body = source.substringAfter("private suspend fun establishTunForEngine(")
             .substringBefore("private fun captureTunIfaceName(")
         assertTrue(
@@ -198,8 +198,8 @@ class StartSequenceCoordinatorContractTest {
             "establishTunForEngine must still report engine failure through watchdog.",
         )
         assertTrue(
-            body.contains("stopVpnRequest()"),
-            "establishTunForEngine must stop the VPN explicitly after establish failure.",
+            body.contains("if (!deps.engineWatchdog.handleEngineFailure"),
+            "establishTunForEngine must stop the VPN only when watchdog has not entered killswitch mode.",
         )
     }
 

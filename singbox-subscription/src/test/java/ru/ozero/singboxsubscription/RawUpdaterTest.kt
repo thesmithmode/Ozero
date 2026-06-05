@@ -28,6 +28,8 @@ class RawUpdaterTest {
         "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@s1.example.com:443?type=tcp&security=none#S1"
     private val vless2 =
         "vless://bbbbbbbb-2222-2222-2222-bbbbbbbbbbbb@s2.example.com:443?type=tcp&security=none#S2"
+    private val vless1RotatedRuntime =
+        "vless://cccccccc-3333-3333-3333-cccccccccccc@s1.example.com:443?type=grpc&security=none#S1"
 
     @BeforeEach
     fun setUp() {
@@ -309,5 +311,22 @@ class RawUpdaterTest {
         val secondIds = profileDao.profiles.sortedBy { it.name }.map { it.id }
 
         assertEquals(firstIds, secondIds)
+    }
+
+    @Test
+    fun `should preserve profile ids when runtime fields changed on refresh`() = runBlocking {
+        server.enqueue(MockResponse().setBody(vless1))
+        val g = group()
+
+        rawUpdater.refresh(g)
+        val firstProfile = profileDao.profiles.first()
+        val firstId = firstProfile.id
+
+        server.enqueue(MockResponse().setBody(vless1RotatedRuntime))
+        rawUpdater.refresh(g)
+        val secondId = profileDao.profiles.first().id
+
+        assertEquals(firstId, secondId)
+        assertTrue(!firstProfile.beanBlob.contentEquals(profileDao.profiles.first().beanBlob))
     }
 }

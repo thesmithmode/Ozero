@@ -6,6 +6,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import javax.net.ssl.SSLHandshakeException
+import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.ShadowsocksBean
 import ru.ozero.singboxfmt.TrojanBean
@@ -117,5 +118,8 @@ private fun ProxyProfile.stableIdentityKey(): String =
         groupId.toString(),
         protocolType.toString(),
         name.trim(),
-        beanBlob.contentHashCode().toString(),
+        runCatching { KryoSerializer.deserialize<AbstractBean>(beanBlob) }
+            .getOrNull()
+            ?.let { "${it.serverAddress}|${it.serverPort}" }
+            ?: beanBlob.contentHashCode().toString(),
     ).joinToString("|")

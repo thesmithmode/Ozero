@@ -23,9 +23,12 @@ import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.EnginePreflight
 import ru.ozero.enginescore.EngineStats
+import ru.ozero.enginescore.TunAttachResult
+import ru.ozero.enginescore.TunFdAcceptor
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
+import ru.ozero.enginescore.TunSpec
 import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.ByeDpiUiSettings
 import ru.ozero.enginescore.settings.HostsMode
@@ -235,6 +238,7 @@ class StartSequenceCoordinatorBehaviorTest {
         every { fixture.tunBuilderHelper.buildTunBuilder(any(), any(), any(), any()) } returns startupBuilder
         every { fixture.engineWatchdog.handleEngineFailure(any(), any()) } answers {
             fixture.tunnelController.onKillswitchEngaged(firstArg(), secondArg())
+            true
         }
 
         fixture.coordinator.run()
@@ -242,6 +246,65 @@ class StartSequenceCoordinatorBehaviorTest {
         assertTrue(fixture.tunnelController.killswitchActive.value)
         assertFalse(fixture.stopRequested.get())
         assertEquals(startupFd, fixture.state.lockdownStartupFdRef.get())
+        verify(exactly = 0) { startupFd.close() }
+    }
+
+    @Test
+    fun `custom tun establish throw keeps startup lockdown and avoids stopVpnRequest`() = runTest {
+        val engine = object : EnginePlugin, TunFdAcceptor {
+            override val id = EngineId.WARP
+            override val capabilities = tunnelCapabilities()
+            override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult =
+                StartResult.Success(10000)
+            override suspend fun stop() = Unit
+            override suspend fun probe(): ProbeResult = ProbeResult.Success(1L)
+            override fun stats(): Flow<EngineStats> = emptyFlow()
+            override suspend fun tunSpec(): TunSpec? = TunSpec(
+                sessionName = "test",
+                mtu = 1400,
+                blocking = true,
+                ipv4Address = "10.0.0.2",
+                ipv4PrefixLength = 32,
+                dnsServers = listOf("1.1.1.1"),
+            )
+            override fun buildManualConfig(settings: SettingsModel?): EngineConfig {
+                return EngineConfig.WarpProxy(socksPort = 10000)
+            }
+            override suspend fun attachTun(tunFd: Int): TunAttachResult = TunAttachResult.Success
+        }
+
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = EngineId.WARP,
+                killswitchEnabled = true,
+            ),
+        )
+        val startupFd = mockk<ParcelFileDescriptor>(relaxed = true)
+        val startupBuilder = mockk<VpnService.Builder> { every { establish() } returns startupFd }
+        val engineBuilder = mockk<VpnService.Builder> { every { establish() } throws IllegalStateException("slot busy") }
+
+        every { fixture.tunBuilderHelper.buildTunBuilder(any(), any(), any(), any()) } returns startupBuilder
+        every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), any()) } returns engineBuilder
+        every { fixture.engineWatchdog.handleEngineFailure(any(), any()) } answers {
+            fixture.tunnelController.onKillswitchEngaged(firstArg(), secondArg())
+            true
+        }
+
+        fixture.coordinator.run()
+
+        assertTrue(fixture.tunnelController.killswitchActive.value)
+        assertFalse(fixture.stopRequested.get())
+        assertEquals(startupFd, fixture.state.lockdownStartupFdRef.get())
+        assertEquals(0, fixture.stopRequested.get())
+        verify(exactly = 0) { fixture.tunnelGateway.start(any()) }
+        verify(exactly = 1) {
+            fixture.engineWatchdog.handleEngineFailure(
+                EngineId.WARP,
+                match { it.startsWith("VPN slot") },
+            )
+        }
         verify(exactly = 0) { startupFd.close() }
     }
 
@@ -594,6 +657,7 @@ class StartSequenceCoordinatorBehaviorTest {
         every { engineWatchdog.handleEngineFailure(any(), any()) } answers {
             tunnelController.onEngineDied(firstArg(), secondArg())
             stopRequested.set(true)
+            false
         }
         val collaborators = StartSequenceCollaborators(
             enginePlugins = engines.toSet(),

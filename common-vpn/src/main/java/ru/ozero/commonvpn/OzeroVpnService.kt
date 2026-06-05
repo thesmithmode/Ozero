@@ -251,7 +251,10 @@ class OzeroVpnService : android.net.VpnService() {
     private var killswitchCached: Boolean = false
 
     private val runtimeFailureHandler: (ru.ozero.enginescore.EngineId, String) -> Unit by lazy {
-        { engineId, reason -> engineWatchdog.handleEngineFailure(engineId, reason) }
+        { engineId, reason ->
+            engineWatchdog.handleEngineFailure(engineId, reason)
+            Unit
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

@@ -77,6 +77,7 @@ class StartSequenceCoordinatorExtraTest {
         every { engineWatchdog.handleEngineFailure(any(), any()) } answers {
             tunnelController.onEngineDied(firstArg(), secondArg())
             stopRequested.set(true)
+            false
         }
         val collaborators = StartSequenceCollaborators(
             enginePlugins = engines.toSet(),

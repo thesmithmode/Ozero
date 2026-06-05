@@ -403,8 +403,9 @@ class StartSequenceCoordinator(
             builder.establish()
         } catch (t: Throwable) {
             PersistentLoggers.error(TAG, "engine TUN establish threw: ${t.message}")
-            deps.engineWatchdog.handleEngineFailure(engineId, "VPN slot занят — выключите другой VPN")
-            stopVpnRequest()
+            if (!deps.engineWatchdog.handleEngineFailure(engineId, "VPN slot занят — выключите другой VPN")) {
+                stopVpnRequest()
+            }
             return null
         }
         if (pfd == null) {
@@ -412,8 +413,9 @@ class StartSequenceCoordinator(
                 TAG,
                 "engine TUN establish returned null — VPN slot занят другим приложением",
             )
-            deps.engineWatchdog.handleEngineFailure(engineId, "VPN slot занят — выключите другой VPN")
-            stopVpnRequest()
+            if (!deps.engineWatchdog.handleEngineFailure(engineId, "VPN slot занят — выключите другой VPN")) {
+                stopVpnRequest()
+            }
             return null
         }
         state.tunFdRef.set(pfd)
