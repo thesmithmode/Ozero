@@ -13,6 +13,7 @@ val isAndroid = plugins.hasPlugin("com.android.application") || plugins.hasPlugi
 data class CoverageThresholds(val line: BigDecimal, val branch: BigDecimal)
 
 fun coverageThresholdsFor(projectPath: String): CoverageThresholds = when (projectPath) {
+    ":app" -> CoverageThresholds(BigDecimal("0.74"), BigDecimal("0.59"))
     ":common-vpn" -> CoverageThresholds(BigDecimal("0.75"), BigDecimal("0.64"))
     ":engine-warp" -> CoverageThresholds(BigDecimal("0.89"), BigDecimal("0.68"))
     ":singbox-fmt" -> CoverageThresholds(BigDecimal("0.90"), BigDecimal("0.90"))
