@@ -503,9 +503,13 @@ class RealUrnetworkSdkBridge(
         runCatching {
             device.addJwtRefreshListener { newJwt ->
                 bridgeScope.launch(Dispatchers.Main.immediate) {
-                    runCatching { localState.byClientJwt = newJwt }
-                        .onSuccess { Log.i(TAG, "ensureDevice: SDK JWT refreshed - localState updated") }
-                        .onFailure { PersistentLoggers.warn(TAG, "ensureDevice: JWT refresh localState: ${it.message}") }
+                    runCatching {
+                        localState.byClientJwt = newJwt
+                    }.onSuccess {
+                        Log.i(TAG, "ensureDevice: SDK JWT refreshed - localState updated")
+                    }.onFailure {
+                        PersistentLoggers.warn(TAG, "ensureDevice: JWT refresh localState: ${it.message}")
+                    }
                 }
             }
         }.onFailure { PersistentLoggers.warn(TAG, "ensureDevice: addJwtRefreshListener threw: ${it.message}") }

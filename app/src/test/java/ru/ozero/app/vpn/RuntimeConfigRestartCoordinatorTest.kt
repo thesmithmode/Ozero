@@ -60,12 +60,16 @@ class RuntimeConfigRestartCoordinatorTest {
             )
             method.isAccessible = true
             try {
-                val returned = method.invoke(this, reason, object : Continuation<Boolean> {
-                    override val context = coroutineContext
-                    override fun resumeWith(result: Result<Boolean>) {
-                        cont.resumeWith(result)
-                    }
-                })
+                val returned = method.invoke(
+                    this,
+                    reason,
+                    object : Continuation<Boolean> {
+                        override val context = coroutineContext
+                        override fun resumeWith(result: Result<Boolean>) {
+                            cont.resumeWith(result)
+                        }
+                    },
+                )
                 if (returned !== COROUTINE_SUSPENDED) {
                     @Suppress("UNCHECKED_CAST")
                     cont.resumeWith(Result.success(returned as Boolean))

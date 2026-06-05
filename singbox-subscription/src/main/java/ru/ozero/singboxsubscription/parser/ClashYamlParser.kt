@@ -17,7 +17,17 @@ object ClashYamlParser {
 
     fun parse(text: String): List<AbstractBean> {
         if (!proxiesKeyPattern.containsMatchIn(text)) return emptyList()
-        val root = loadRoot(text) ?: return emptyList()
+        val root = try {
+            val loaderOptions = LoaderOptions().apply {
+                codePointLimit = MAX_YAML_CODE_POINTS
+            }
+            when (val loaded = Yaml(SafeConstructor(loaderOptions)).load<Any?>(text)) {
+                is Map<*, *> -> loaded.toStringKeyMap()
+                else -> null
+            }
+        } catch (_: YAMLException) {
+            null
+        } ?: return emptyList()
         val proxies = when (val value = root["proxies"]) {
             is List<*> -> value
             else -> return emptyList()
@@ -28,18 +38,6 @@ object ClashYamlParser {
                 else -> null
             }
         }
-    }
-
-    private fun loadRoot(text: String): Map<String, Any?>? = try {
-        val loaderOptions = LoaderOptions().apply {
-            codePointLimit = MAX_YAML_CODE_POINTS
-        }
-        when (val root = Yaml(SafeConstructor(loaderOptions)).load<Any?>(text)) {
-            is Map<*, *> -> root.toStringKeyMap()
-            else -> null
-        }
-    } catch (_: YAMLException) {
-        null
     }
 
     private fun parseProxy(fields: Map<String, Any?>): AbstractBean? = when (fields.string("type").lowercase()) {

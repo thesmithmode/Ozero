@@ -59,7 +59,7 @@ class EngineWatchdogKillswitchIntegrationTest {
     }
 
     @Test
-    fun `handleEngineFailure killswitch=true + startupLockdownFdAlive — observer видит killswitchActive без stopVpn`() =
+    fun `handleEngineFailure killswitch=true + startupLockdownFdAlive вЂ” observer РІРёРґРёС‚ killswitchActive Р±РµР· stopVpn`() =
         runTest(UnconfinedTestDispatcher()) {
             val controller = TunnelController()
             controller.onProbing(EngineId.WARP)
@@ -80,17 +80,17 @@ class EngineWatchdogKillswitchIntegrationTest {
 
             assertTrue(
                 controller.killswitchActive.value,
-                "startup lockdown fd должен считаться blocking TUN, иначе fail-closed теряется до основного tunFd.",
+                "startup lockdown fd РґРѕР»Р¶РµРЅ СЃС‡РёС‚Р°С‚СЊСЃСЏ blocking TUN, РёРЅР°С‡Рµ fail-closed С‚РµСЂСЏРµС‚СЃСЏ РґРѕ РѕСЃРЅРѕРІРЅРѕРіРѕ tunFd.",
             )
             assertEquals(
                 0,
                 stopVpnCount.get(),
-                "При живом startup lockdown fd нельзя вызывать stopVpnRequest: это снимает блокировку трафика.",
+                "РџСЂРё Р¶РёРІРѕРј startup lockdown fd РЅРµР»СЊР·СЏ РІС‹Р·С‹РІР°С‚СЊ stopVpnRequest: СЌС‚Рѕ СЃРЅРёРјР°РµС‚ Р±Р»РѕРєРёСЂРѕРІРєСѓ С‚СЂР°С„РёРєР°.",
             )
         }
 
     @Test
-    fun `handleEngineFailure killswitch=true + runtime restart pending — observer enters killswitch without blocking fd`() =
+    fun `runtime restart keeps killswitch without blocking fd`() =
         runTest(UnconfinedTestDispatcher()) {
             val controller = TunnelController()
             controller.onProbing(EngineId.WARP)
@@ -114,7 +114,7 @@ class EngineWatchdogKillswitchIntegrationTest {
         }
 
     @Test
-    fun `handleEngineFailure killswitch=true + fdAlive — observer видит killswitchActive=true и Failed state`() =
+    fun `handleEngineFailure killswitch=true + fdAlive вЂ” observer РІРёРґРёС‚ killswitchActive=true Рё Failed state`() =
         runTest(UnconfinedTestDispatcher()) {
             val controller = TunnelController()
             controller.onProbing(EngineId.WARP)
@@ -137,26 +137,26 @@ class EngineWatchdogKillswitchIntegrationTest {
 
             assertTrue(
                 controller.killswitchActive.value,
-                "killswitchActive обязан стать true после enterKillswitchMode — иначе UI не знает " +
-                    "что трафик заблокирован.",
+                "killswitchActive РѕР±СЏР·Р°РЅ СЃС‚Р°С‚СЊ true РїРѕСЃР»Рµ enterKillswitchMode вЂ” РёРЅР°С‡Рµ UI РЅРµ Р·РЅР°РµС‚ " +
+                    "С‡С‚Рѕ С‚СЂР°С„РёРє Р·Р°Р±Р»РѕРєРёСЂРѕРІР°РЅ.",
             )
             val state = controller.state.value
-            assertIs<TunnelState.Failed>(state, "Tunnel state обязан перейти в Failed.")
+            assertIs<TunnelState.Failed>(state, "Tunnel state РѕР±СЏР·Р°РЅ РїРµСЂРµР№С‚Рё РІ Failed.")
             assertEquals(EngineId.WARP, state.engineId)
             assertTrue(
                 state.reason.contains("remote-binder-died"),
-                "Failed.reason обязан содержать переданный reason. Got: ${state.reason}",
+                "Failed.reason РѕР±СЏР·Р°РЅ СЃРѕРґРµСЂР¶Р°С‚СЊ РїРµСЂРµРґР°РЅРЅС‹Р№ reason. Got: ${state.reason}",
             )
             assertEquals(
                 0,
                 stopVpnCount.get(),
-                "stopVpnRequest НЕ должен вызываться при killswitch=true — chain должен остаться " +
-                    "остановленным но VPN service сохраняется для UI lockdown notification.",
+                "stopVpnRequest РќР• РґРѕР»Р¶РµРЅ РІС‹Р·С‹РІР°С‚СЊСЃСЏ РїСЂРё killswitch=true вЂ” chain РґРѕР»Р¶РµРЅ РѕСЃС‚Р°С‚СЊСЃСЏ " +
+                    "РѕСЃС‚Р°РЅРѕРІР»РµРЅРЅС‹Рј РЅРѕ VPN service СЃРѕС…СЂР°РЅСЏРµС‚СЃСЏ РґР»СЏ UI lockdown notification.",
             )
         }
 
     @Test
-    fun `handleEngineFailure killswitch=true + fdAlive + stopping=true — не re-enter shutdown`() =
+    fun `handleEngineFailure killswitch=true + fdAlive + stopping=true вЂ” РЅРµ re-enter shutdown`() =
         runTest(UnconfinedTestDispatcher()) {
             val controller = TunnelController()
             controller.onProbing(EngineId.WARP)
@@ -179,16 +179,16 @@ class EngineWatchdogKillswitchIntegrationTest {
 
             assertFalse(
                 controller.killswitchActive.value,
-                "killswitchActive обязан остаться false при штатной остановке, даже если fd ещё живой.",
+                "killswitchActive РѕР±СЏР·Р°РЅ РѕСЃС‚Р°С‚СЊСЃСЏ false РїСЂРё С€С‚Р°С‚РЅРѕР№ РѕСЃС‚Р°РЅРѕРІРєРµ, РґР°Р¶Рµ РµСЃР»Рё fd РµС‰С‘ Р¶РёРІРѕР№.",
             )
             assertIs<TunnelState.Disconnecting>(
                 controller.state.value,
-                "Engine failure во время stopping не должен превращать Disconnecting в Failed.",
+                "Engine failure РІРѕ РІСЂРµРјСЏ stopping РЅРµ РґРѕР»Р¶РµРЅ РїСЂРµРІСЂР°С‰Р°С‚СЊ Disconnecting РІ Failed.",
             )
             assertEquals(
                 0,
                 stopVpnCount.get(),
-                "Во время stopping watchdog не должен повторно входить в stopVpnRequest.",
+                "Р’Рѕ РІСЂРµРјСЏ stopping watchdog РЅРµ РґРѕР»Р¶РµРЅ РїРѕРІС‚РѕСЂРЅРѕ РІС…РѕРґРёС‚СЊ РІ stopVpnRequest.",
             )
         }
 
@@ -220,7 +220,7 @@ class EngineWatchdogKillswitchIntegrationTest {
         }
 
     @Test
-    fun `handleEngineFailure killswitch=false — observer видит Failed но НЕ killswitchActive`() =
+    fun `handleEngineFailure killswitch=false вЂ” observer РІРёРґРёС‚ Failed РЅРѕ РќР• killswitchActive`() =
         runTest(UnconfinedTestDispatcher()) {
             val controller = TunnelController()
             controller.onProbing(EngineId.BYEDPI)
@@ -241,21 +241,21 @@ class EngineWatchdogKillswitchIntegrationTest {
 
             assertFalse(
                 controller.killswitchActive.value,
-                "killswitchActive обязан остаться false при killswitch=off — graceful shutdown branch.",
+                "killswitchActive РѕР±СЏР·Р°РЅ РѕСЃС‚Р°С‚СЊСЃСЏ false РїСЂРё killswitch=off вЂ” graceful shutdown branch.",
             )
             assertIs<TunnelState.Failed>(
                 controller.state.value,
-                "Failed state обязан выставиться через onEngineDied.",
+                "Failed state РѕР±СЏР·Р°РЅ РІС‹СЃС‚Р°РІРёС‚СЊСЃСЏ С‡РµСЂРµР· onEngineDied.",
             )
             assertEquals(
                 1,
                 stopVpnCount.get(),
-                "stopVpnRequest обязан вызваться ровно один раз — graceful VPN shutdown.",
+                "stopVpnRequest РѕР±СЏР·Р°РЅ РІС‹Р·РІР°С‚СЊСЃСЏ СЂРѕРІРЅРѕ РѕРґРёРЅ СЂР°Р· вЂ” graceful VPN shutdown.",
             )
         }
 
     @Test
-    fun `handleEngineFailure killswitch=true + fdAlive=null — fallback на stopVpnRequest, не lockdown`() =
+    fun `handleEngineFailure killswitch=true + fdAlive=null вЂ” fallback РЅР° stopVpnRequest, РЅРµ lockdown`() =
         runTest(UnconfinedTestDispatcher()) {
             val controller = TunnelController()
             controller.onProbing(EngineId.URNETWORK)
@@ -275,17 +275,17 @@ class EngineWatchdogKillswitchIntegrationTest {
 
             assertFalse(
                 controller.killswitchActive.value,
-                "killswitchActive обязан остаться false когда fdAlive=null — нет TUN для lockdown.",
+                "killswitchActive РѕР±СЏР·Р°РЅ РѕСЃС‚Р°С‚СЊСЃСЏ false РєРѕРіРґР° fdAlive=null вЂ” РЅРµС‚ TUN РґР»СЏ lockdown.",
             )
             assertEquals(
                 1,
                 stopVpnCount.get(),
-                "stopVpnRequest обязан вызваться когда нет fdAlive — VPN service нужно остановить.",
+                "stopVpnRequest РѕР±СЏР·Р°РЅ РІС‹Р·РІР°С‚СЊСЃСЏ РєРѕРіРґР° РЅРµС‚ fdAlive вЂ” VPN service РЅСѓР¶РЅРѕ РѕСЃС‚Р°РЅРѕРІРёС‚СЊ.",
             )
         }
 
     @Test
-    fun `onKillswitchReleased сбрасывает killswitchActive — UI может вернуться в Idle`() =
+    fun `onKillswitchReleased СЃР±СЂР°СЃС‹РІР°РµС‚ killswitchActive вЂ” UI РјРѕР¶РµС‚ РІРµСЂРЅСѓС‚СЊСЃСЏ РІ Idle`() =
         runTest(UnconfinedTestDispatcher()) {
             val controller = TunnelController()
             controller.onProbing(EngineId.WARP)
@@ -309,7 +309,7 @@ class EngineWatchdogKillswitchIntegrationTest {
 
             assertFalse(
                 controller.killswitchActive.value,
-                "onKillswitchReleased обязан сбросить killswitchActive — иначе UI блокируется навсегда.",
+                "onKillswitchReleased РѕР±СЏР·Р°РЅ СЃР±СЂРѕСЃРёС‚СЊ killswitchActive вЂ” РёРЅР°С‡Рµ UI Р±Р»РѕРєРёСЂСѓРµС‚СЃСЏ РЅР°РІСЃРµРіРґР°.",
             )
         }
 }

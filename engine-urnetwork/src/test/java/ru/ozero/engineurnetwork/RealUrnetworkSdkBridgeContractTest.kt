@@ -322,10 +322,9 @@ class RealUrnetworkSdkBridgeContractTest {
             bestBlock.contains(".onSuccess {"),
             "connectBestAvailable must persist only on successful connect.",
         )
-        assertTrue(
-            bestBlock.indexOf("cv.connectBestAvailable()") < bestBlock.indexOf("persistConnectLocation(bestAvailableConnectLocation())"),
-            "connectBestAvailable must persist after connect succeeds.",
-        )
+        val connectIndex = bestBlock.indexOf("cv.connectBestAvailable()")
+        val persistIndex = bestBlock.indexOf("persistConnectLocation(bestAvailableConnectLocation())")
+        assertTrue(connectIndex < persistIndex, "connectBestAvailable must persist after connect succeeds.")
     }
 
     @Test

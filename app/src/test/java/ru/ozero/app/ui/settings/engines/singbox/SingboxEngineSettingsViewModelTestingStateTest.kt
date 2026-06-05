@@ -22,7 +22,11 @@ class SingboxEngineSettingsViewModelTestingStateTest {
     @Test
     fun `overlapping testing callbacks keep spinner visible until all probes finish`() = runTest {
         val vm = buildViewModel()
-        val invokeTesting = vm.javaClass.getDeclaredMethod("onProfileTestingChanged", Long::class.javaPrimitiveType, Boolean::class.javaPrimitiveType)
+        val invokeTesting = vm.javaClass.getDeclaredMethod(
+            "onProfileTestingChanged",
+            Long::class.javaPrimitiveType,
+            Boolean::class.javaPrimitiveType,
+        )
             .apply { isAccessible = true }
         val uiStateField = vm.javaClass.getDeclaredField("_uiState")
             .apply { isAccessible = true }
