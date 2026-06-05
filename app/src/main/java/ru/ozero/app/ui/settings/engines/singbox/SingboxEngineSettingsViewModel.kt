@@ -467,16 +467,16 @@ class SingboxEngineSettingsViewModel @Inject constructor(
             val count = testingProfileCounts.compute(profileId) { _, current ->
                 (current ?: AtomicInteger(0)).apply { incrementAndGet() }
             }?.get() ?: 0
-        if (count <= 0) return
-        _uiState.update {
-            if (profileId in it.testingProfileIds) {
-                it
-            } else {
-                it.copy(testingProfileIds = it.testingProfileIds + profileId)
+            if (count <= 0) return
+            _uiState.update {
+                if (profileId in it.testingProfileIds) {
+                    it
+                } else {
+                    it.copy(testingProfileIds = it.testingProfileIds + profileId)
+                }
             }
+            return
         }
-        return
-    }
         val remaining = testingProfileCounts.computeIfPresent(profileId) { _, current ->
             if (current.decrementAndGet() <= 0) null else current
         }

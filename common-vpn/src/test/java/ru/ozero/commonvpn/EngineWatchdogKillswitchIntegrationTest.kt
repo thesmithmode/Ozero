@@ -59,7 +59,7 @@ class EngineWatchdogKillswitchIntegrationTest {
     }
 
     @Test
-    fun `handleEngineFailure killswitch=true + startupLockdownFdAlive вЂ” observer РІРёРґРёС‚ killswitchActive Р±РµР· stopVpn`() =
+    fun `startup lockdown keeps killswitch active without stopVpn`() =
         runTest(UnconfinedTestDispatcher()) {
             val controller = TunnelController()
             controller.onProbing(EngineId.WARP)
@@ -114,7 +114,7 @@ class EngineWatchdogKillswitchIntegrationTest {
         }
 
     @Test
-    fun `handleEngineFailure killswitch=true + fdAlive вЂ” observer РІРёРґРёС‚ killswitchActive=true Рё Failed state`() =
+    fun `fd alive keeps killswitch active and failed state`() =
         runTest(UnconfinedTestDispatcher()) {
             val controller = TunnelController()
             controller.onProbing(EngineId.WARP)
@@ -137,8 +137,7 @@ class EngineWatchdogKillswitchIntegrationTest {
 
             assertTrue(
                 controller.killswitchActive.value,
-                "killswitchActive РѕР±СЏР·Р°РЅ СЃС‚Р°С‚СЊ true РїРѕСЃР»Рµ enterKillswitchMode вЂ” РёРЅР°С‡Рµ UI РЅРµ Р·РЅР°РµС‚ " +
-                    "С‡С‚Рѕ С‚СЂР°С„РёРє Р·Р°Р±Р»РѕРєРёСЂРѕРІР°РЅ.",
+                "killswitchActive must stay true after enterKillswitchMode.",
             )
             val state = controller.state.value
             assertIs<TunnelState.Failed>(state, "Tunnel state РѕР±СЏР·Р°РЅ РїРµСЂРµР№С‚Рё РІ Failed.")
@@ -150,13 +149,12 @@ class EngineWatchdogKillswitchIntegrationTest {
             assertEquals(
                 0,
                 stopVpnCount.get(),
-                "stopVpnRequest РќР• РґРѕР»Р¶РµРЅ РІС‹Р·С‹РІР°С‚СЊСЃСЏ РїСЂРё killswitch=true вЂ” chain РґРѕР»Р¶РµРЅ РѕСЃС‚Р°С‚СЊСЃСЏ " +
-                    "РѕСЃС‚Р°РЅРѕРІР»РµРЅРЅС‹Рј РЅРѕ VPN service СЃРѕС…СЂР°РЅСЏРµС‚СЃСЏ РґР»СЏ UI lockdown notification.",
+                "stopVpnRequest must stay silent while killswitch=true.",
             )
         }
 
     @Test
-    fun `handleEngineFailure killswitch=true + fdAlive + stopping=true вЂ” РЅРµ re-enter shutdown`() =
+    fun `stopping state prevents re-entering shutdown`() =
         runTest(UnconfinedTestDispatcher()) {
             val controller = TunnelController()
             controller.onProbing(EngineId.WARP)
