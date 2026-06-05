@@ -17,10 +17,11 @@ internal fun singboxRuntimeFingerprint(
         return listOf(selectedProfileId, profileBlobHashes)
     }
     val profilesById = profiles.associateBy { it.id }
-    val selectedBlobHash = selectedProfileId
-        ?.let { profilesById[it]?.beanBlob?.contentHashCode() }
-        ?: prefs[SingboxProbeService.BEAN_KEY]?.contentHashCode()
-        ?: 0
+    val selectedBlobHash = when {
+        selectedProfileId == null -> prefs[SingboxProbeService.BEAN_KEY]?.contentHashCode() ?: 0
+        selectedProfileId in profilesById -> profilesById.getValue(selectedProfileId).beanBlob.contentHashCode()
+        else -> 0
+    }
     val activeProfileBlobHashes = chainSteps
         .map { it.profileId }
         .filter { it != selectedProfileId }

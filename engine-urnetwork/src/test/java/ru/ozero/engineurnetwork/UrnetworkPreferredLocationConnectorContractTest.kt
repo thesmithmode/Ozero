@@ -53,5 +53,9 @@ class UrnetworkPreferredLocationConnectorContractTest {
             !source.contains("timeoutJob.invokeOnCompletion { resolving.set(false) }"),
             "resolving must stay locked until the connect/cleanup path finishes, not until timeoutJob completion.",
         )
+        assertTrue(
+            source.contains("finish()"),
+            "successful match and fallback cleanup must release resolving after cleanup finishes.",
+        )
     }
 }

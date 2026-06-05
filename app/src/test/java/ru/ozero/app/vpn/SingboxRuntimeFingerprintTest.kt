@@ -58,7 +58,7 @@ class SingboxRuntimeFingerprintTest {
         val fingerprint = singboxRuntimeFingerprint(prefs, profiles, emptyList())
 
         assertEquals(
-            listOf(10L, byteArrayOf(5, 5).contentHashCode(), emptyList<Pair<Long, Int>>()),
+            listOf(10L, 0, emptyList<Pair<Long, Int>>()),
             fingerprint,
         )
     }

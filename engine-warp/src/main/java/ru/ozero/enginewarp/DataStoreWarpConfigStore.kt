@@ -59,7 +59,7 @@ class DataStoreWarpConfigStore(
             keepaliveSeconds = keepalive,
             allowedIps = allowedIps,
             awgParams = awgParams,
-            doHProvider = DoHProvider.SYSTEM,
+            doHProvider = WarpConfig.DEFAULT_DOH_PROVIDER,
         )
     }
 

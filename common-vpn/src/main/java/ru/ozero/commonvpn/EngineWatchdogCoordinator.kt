@@ -29,7 +29,7 @@ class EngineWatchdogCoordinator(
     private val stopping: AtomicBoolean,
     private val starting: AtomicBoolean,
     private val killswitchProvider: () -> Boolean,
-    private val restartInProgressProvider: () -> Boolean = { false },
+    private val restartInProgressProvider: () -> Boolean,
     private val stopVpnRequest: () -> Unit,
 ) {
 
@@ -172,7 +172,7 @@ class EngineWatchdogCoordinator(
             PersistentLoggers.warn(TAG, "ignore inactive engine failure: engine=$engineId reason=$reason")
             return
         }
-        if (killswitchProvider() && hasBlockingTunForKillswitch()) {
+        if (killswitchProvider() && hasBlockingTun()) {
             enterKillswitchMode(engineId, reason)
         } else {
             tunnelController.onEngineDied(engineId, reason)

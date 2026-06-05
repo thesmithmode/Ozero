@@ -50,10 +50,16 @@ class RawUpdater(
                     )
                 }
                 val existingProfiles = profileDao.getByGroupId(group.id)
+                val existingByStableIdentity = existingProfiles
+                    .groupBy { it.stableIdentityKey() }
                 val profilesWithStableIds = profiles.map { profile ->
-                    existingProfiles.firstOrNull { it.userOrder == profile.userOrder }?.id
-                        ?.let { profile.copy(id = it) }
-                        ?: profile
+                    val stableKey = profile.stableIdentityKey()
+                    val matched = existingByStableIdentity[stableKey].orEmpty().firstOrNull()
+                    if (matched != null) {
+                        profile.copy(id = matched.id)
+                    } else {
+                        profile
+                    }
                 }
 
                 profileDao.replaceForGroup(group.id, profilesWithStableIds)
@@ -105,3 +111,11 @@ class RawUpdater(
         }
     }
 }
+
+private fun ProxyProfile.stableIdentityKey(): String =
+    listOf(
+        groupId.toString(),
+        protocolType.toString(),
+        name.trim(),
+        beanBlob.contentHashCode().toString(),
+    ).joinToString("|")

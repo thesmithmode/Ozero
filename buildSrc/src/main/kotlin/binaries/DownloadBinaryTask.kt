@@ -78,4 +78,6 @@ abstract class DownloadBinaryTask : DefaultTask() {
 }
 
 internal fun Throwable.gradleMessage(): String =
-    message?.takeIf { it.isNotBlank() } ?: javaClass.simpleName
+    message?.takeIf { it.isNotBlank() } ?: javaClass.simpleName.ifBlank {
+        javaClass.superclass?.simpleName.orEmpty().ifBlank { "Throwable" }
+    }

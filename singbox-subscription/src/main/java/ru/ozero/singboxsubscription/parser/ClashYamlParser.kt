@@ -182,7 +182,7 @@ object ClashYamlParser {
         is String -> cipher
         is Number,
         is Boolean -> cipher.toString()
-        is Map<*, *> -> cipher.toStringKeyMap().string("method")
+        is Map<*, *> -> cipher.toStringKeyMap().entries.joinToString(",") { (key, value) -> "$key=$value" }
         else -> string("method")
     }.ifBlank { string("method") }
 }

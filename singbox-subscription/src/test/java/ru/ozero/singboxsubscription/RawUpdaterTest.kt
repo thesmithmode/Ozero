@@ -295,4 +295,19 @@ class RawUpdaterTest {
 
         assertEquals(firstIds, secondIds)
     }
+
+    @Test
+    fun `should preserve profile ids across refresh when server order changes`() = runBlocking {
+        server.enqueue(MockResponse().setBody("$vless1\n$vless2"))
+        val g = group()
+
+        rawUpdater.refresh(g)
+        val firstIds = profileDao.profiles.sortedBy { it.name }.map { it.id }
+
+        server.enqueue(MockResponse().setBody("$vless2\n$vless1"))
+        rawUpdater.refresh(g)
+        val secondIds = profileDao.profiles.sortedBy { it.name }.map { it.id }
+
+        assertEquals(firstIds, secondIds)
+    }
 }
