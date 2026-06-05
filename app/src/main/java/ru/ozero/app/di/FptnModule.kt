@@ -76,7 +76,7 @@ object FptnModule {
         override val changes = store.config().map { it.runtimeFingerprint() }
         override val includeStarting: Boolean = false
         override val replayAfterStarting: Boolean = true
-        override val adoptedBaselineFrom = FptnConfig().runtimeFingerprint()
+        override val adoptedBaselineFrom = null
         override val restartReason: String = "FPTN config changed while active -> restart"
     }
 }

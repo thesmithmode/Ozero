@@ -356,6 +356,34 @@ class EngineRuntimeConfigRestartObserverTest {
     }
 
     @Test
+    fun `observeFlow restarts on first FPTN edit when baseline starts at default`() = runTest(dispatcher) {
+        val default = FptnConfig().runtimeFingerprint()
+        val persisted = FptnConfig(token = "persisted-token").runtimeFingerprint()
+        val changes = MutableStateFlow<Any?>(default)
+        val state = MutableStateFlow<TunnelState>(TunnelState.Connected(EngineId.FPTN, 0))
+        val restarts = mutableListOf<String>()
+
+        newObserver().observeFlow(
+            scope = observerScope(),
+            changes = changes,
+            engineId = EngineId.FPTN,
+            reason = "fptn changed",
+            includeStarting = false,
+            state = state,
+            restart = {
+                restarts += it
+                true
+            },
+        )
+        runCurrent()
+
+        changes.value = persisted
+        runCurrent()
+
+        assertEquals(listOf("fptn changed"), restarts)
+    }
+
+    @Test
     fun `observeFlow excludes starting states for singbox profile writes`() = runTest(dispatcher) {
         val changes = MutableStateFlow<Any?>("initial")
         val state = MutableStateFlow<TunnelState>(TunnelState.Connecting(EngineId.SINGBOX))
@@ -653,6 +681,7 @@ class EngineRuntimeConfigRestartObserverTest {
             "src/main/java/ru/ozero/app/di/SingboxModule.kt",
         ).joinToString("\n") { readSource(it) }
         assertTrue(diSources.contains("EngineRuntimeConfigProvider"))
+        assertTrue(diSources.contains("override val adoptedBaselineFrom = null"))
     }
 
     @Test
