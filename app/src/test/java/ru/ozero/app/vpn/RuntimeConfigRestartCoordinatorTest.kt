@@ -1,9 +1,10 @@
 package ru.ozero.app.vpn
 
 import android.content.Context
-import io.mockk.any
+import android.content.Intent
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.isA
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
@@ -25,7 +26,7 @@ class RuntimeConfigRestartCoordinatorTest {
     fun `restart queue clears after exception and accepts the next restart`() = runTest {
         val context = mockk<Context>()
         var startServiceCalls = 0
-        every { context.startService(any()) } answers {
+        every { context.startService(isA<Intent>()) } answers {
             startServiceCalls += 1
             throw IllegalStateException("boom")
         }

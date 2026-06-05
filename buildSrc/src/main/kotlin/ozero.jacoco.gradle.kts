@@ -128,8 +128,10 @@ if (isAndroid) {
         executionData.setFrom(
             fileTree(layout.buildDirectory) {
                 include(
-                    "outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec",
-                    "jacoco/testDebugUnitTest.exec"
+                    "outputs/unit_test_code_coverage/**/testDebugUnitTest.exec",
+                    "outputs/unit_test_code_coverage/**/test/*.exec",
+                    "jacoco/testDebugUnitTest.exec",
+                    "**/jacoco/testDebugUnitTest.exec",
                 )
             }
         )
@@ -158,8 +160,10 @@ if (isAndroid) {
         executionData.setFrom(
             fileTree(layout.buildDirectory) {
                 include(
-                    "outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec",
-                    "jacoco/testDebugUnitTest.exec"
+                    "outputs/unit_test_code_coverage/**/testDebugUnitTest.exec",
+                    "outputs/unit_test_code_coverage/**/test/*.exec",
+                    "jacoco/testDebugUnitTest.exec",
+                    "**/jacoco/testDebugUnitTest.exec",
                 )
             }
         )
@@ -192,12 +196,15 @@ if (isAndroid) {
             layout.projectDirectory.files("src/main/java", "src/main/kotlin")
         )
         classDirectories.setFrom(
-            files(layout.buildDirectory.dir("classes/kotlin/main"))
+            files(
+                layout.buildDirectory.dir("classes/kotlin/main"),
+                layout.buildDirectory.dir("classes/java/main"),
+            )
                 .asFileTree.matching { exclude(excludedClasses) }
         )
         executionData.setFrom(
             fileTree(layout.buildDirectory) {
-                include("jacoco/test.exec")
+                include("jacoco/test.exec", "jacoco/test*.exec", "outputs/unit_test_code_coverage/**/*.exec")
             }
         )
 
@@ -215,12 +222,15 @@ if (isAndroid) {
             layout.projectDirectory.files("src/main/java", "src/main/kotlin")
         )
         classDirectories.setFrom(
-            files(layout.buildDirectory.dir("classes/kotlin/main"))
+            files(
+                layout.buildDirectory.dir("classes/kotlin/main"),
+                layout.buildDirectory.dir("classes/java/main"),
+            )
                 .asFileTree.matching { exclude(excludedClasses) }
         )
         executionData.setFrom(
             fileTree(layout.buildDirectory) {
-                include("jacoco/test.exec")
+                include("jacoco/test.exec", "jacoco/test*.exec", "outputs/unit_test_code_coverage/**/*.exec")
             }
         )
 

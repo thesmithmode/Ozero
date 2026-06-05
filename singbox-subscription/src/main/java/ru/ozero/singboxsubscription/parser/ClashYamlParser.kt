@@ -182,7 +182,11 @@ object ClashYamlParser {
         is String -> cipher
         is Number,
         is Boolean -> cipher.toString()
-        is Map<*, *> -> cipher.toStringKeyMap().entries.joinToString(",") { (key, value) -> "$key=$value" }
+        is Map<*, *> -> {
+            val parsed = cipher.toStringKeyMap()
+            val method = parsed["method"]?.toString()?.trim()
+            method?.takeIf { it.isNotBlank() } ?: parsed.entries.joinToString(",") { (key, value) -> "$key=$value" }
+        }
         else -> string("method")
     }.ifBlank { string("method") }
 }
