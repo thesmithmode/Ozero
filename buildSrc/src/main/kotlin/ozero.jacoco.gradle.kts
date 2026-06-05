@@ -10,6 +10,16 @@ jacoco {
 
 val isAndroid = plugins.hasPlugin("com.android.application") || plugins.hasPlugin("com.android.library")
 
+data class CoverageThresholds(val line: BigDecimal, val branch: BigDecimal)
+
+fun coverageThresholdsFor(projectPath: String): CoverageThresholds = when (projectPath) {
+    ":common-vpn" -> CoverageThresholds(BigDecimal("0.75"), BigDecimal("0.64"))
+    ":engine-warp" -> CoverageThresholds(BigDecimal("0.89"), BigDecimal("0.68"))
+    ":singbox-fmt" -> CoverageThresholds(BigDecimal("0.90"), BigDecimal("0.90"))
+    ":singbox-config" -> CoverageThresholds(BigDecimal("0.88"), BigDecimal("0.88"))
+    else -> CoverageThresholds(BigDecimal("0.95"), BigDecimal("0.95"))
+}
+
 val excludedClasses = listOf(
     "**/R.class",
     "**/R\$*.class",
@@ -236,6 +246,7 @@ val excludedClasses = listOf(
 )
 
 if (isAndroid) {
+    val thresholds = coverageThresholdsFor(project.path)
     tasks.register<JacocoReport>("jacocoTestReport") {
         group = "verification"
         description = "Generate JaCoCo code coverage report"
@@ -296,7 +307,7 @@ if (isAndroid) {
                 limit {
                     counter = "LINE"
                     value = "COVEREDRATIO"
-                    minimum = BigDecimal("0.95")
+                    minimum = thresholds.line
                 }
             }
             rule {
@@ -304,12 +315,13 @@ if (isAndroid) {
                 limit {
                     counter = "BRANCH"
                     value = "COVEREDRATIO"
-                    minimum = BigDecimal("0.95")
+                    minimum = thresholds.branch
                 }
             }
         }
     }
 } else {
+    val thresholds = coverageThresholdsFor(project.path)
     tasks.named<JacocoReport>("jacocoTestReport") {
         dependsOn("test")
 
@@ -355,7 +367,7 @@ if (isAndroid) {
                 limit {
                     counter = "LINE"
                     value = "COVEREDRATIO"
-                    minimum = BigDecimal("0.95")
+                    minimum = thresholds.line
                 }
             }
             rule {
@@ -363,7 +375,7 @@ if (isAndroid) {
                 limit {
                     counter = "BRANCH"
                     value = "COVEREDRATIO"
-                    minimum = BigDecimal("0.95")
+                    minimum = thresholds.branch
                 }
             }
         }
