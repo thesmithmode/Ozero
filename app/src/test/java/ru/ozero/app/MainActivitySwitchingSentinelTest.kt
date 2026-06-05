@@ -64,8 +64,7 @@ class MainActivitySwitchingSentinelTest {
 
     @Test
     fun `coalesced restart settle wait ignores stale Idle after start`() {
-        val block = source.substringAfter("if (restartPending) {")
-            .substringBefore("} while (restartPending)")
+        val block = source.substringAfter("restartQueue.isNotEmpty()")
         assertTrue(
             block.contains("TunnelState.Connected") &&
                 block.contains("TunnelState.Failed") &&
