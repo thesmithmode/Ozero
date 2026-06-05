@@ -19,7 +19,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.map
 import ru.ozero.commonvpn.RuntimeFailureRouter
 import ru.ozero.enginefptn.DataStoreFptnConfigStore
-import ru.ozero.enginefptn.FptnConfig
 import ru.ozero.enginefptn.FptnConfigStore
 import ru.ozero.enginefptn.FptnEngine
 import ru.ozero.enginefptn.runtimeFingerprint
