@@ -26,11 +26,17 @@ class SingboxEngineBuildManualConfigSentinelTest {
     }
 
     @Test
-    fun `should SingboxEngine use DataStore BEAN_KEY for blob`() {
+    fun `should SingboxEngine prefer selected row blob over stale BEAN_KEY`() {
         val content = engineFile().readText()
+        val block = content.substringAfter("override fun buildManualConfig(settings: SettingsModel?): EngineConfig?")
+        val rowBlobIdx = block.indexOf("cachedProfilesById[it]?.beanBlob")
+        val beanIdx = block.indexOf("cachedBlob")
         assertTrue(
-            content.contains("BEAN_KEY") || content.contains("byteArrayPreferencesKey"),
-            "SingboxEngine must read blob from DataStore with BEAN_KEY — same key as the settings ViewModel writes",
+            rowBlobIdx >= 0 &&
+                beanIdx >= 0 &&
+                rowBlobIdx < beanIdx &&
+                block.contains("chainWrapperBlobs(cachedSelectedProfileId)"),
+            "SingboxEngine must use the selected profile row blob first and fall back to the cached DataStore blob only when the row is missing. Block:\n$block",
         )
     }
 

@@ -60,7 +60,7 @@ internal class UriCompat private constructor(private val raw: String) {
             }
 
             return ParsedAuthority(
-                userInfo = userInfo?.takeIf { it.isNotBlank() },
+                userInfo = userInfo?.takeIf { it.isNotBlank() }?.let(::decodeUserInfo),
                 host = host.takeIf { it.isNotBlank() },
                 port = port,
             )
@@ -99,6 +99,9 @@ internal class UriCompat private constructor(private val raw: String) {
 
         private fun decode(s: String): String =
             runCatching { URLDecoder.decode(s, "UTF-8") }.getOrDefault(s)
+
+        private fun decodeUserInfo(s: String): String =
+            runCatching { URLDecoder.decode(s.replace("+", "%2B"), "UTF-8") }.getOrDefault(s)
     }
 
     private data class ParsedAuthority(

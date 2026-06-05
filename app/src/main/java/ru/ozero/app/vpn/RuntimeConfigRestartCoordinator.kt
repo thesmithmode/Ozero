@@ -64,7 +64,10 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
                         }
                     }
                 } ?: return completed
-                if (!performRestartIfRunning(nextReason)) return false
+                if (!performRestartIfRunning(nextReason)) {
+                    abortQueuedRestarts()
+                    return false
+                }
                 completed = true
                 if (restartMutex.withLock { restartQueue.isNotEmpty() }) {
                     withTimeoutOrNull(RESTART_SETTLE_TIMEOUT_MS) {
@@ -81,6 +84,13 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
                     restartInProgress = false
                 }
             }
+        }
+    }
+
+    private suspend fun abortQueuedRestarts() {
+        restartMutex.withLock {
+            restartQueue.clear()
+            restartInProgress = false
         }
     }
 

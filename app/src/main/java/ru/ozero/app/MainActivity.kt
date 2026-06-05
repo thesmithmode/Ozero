@@ -108,7 +108,10 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                 } ?: return
-                if (!performRestartIfConnected(nextReason)) return
+                if (!performRestartIfConnected(nextReason)) {
+                    abortQueuedRestarts()
+                    return
+                }
                 if (restartMutex.withLock { restartQueue.isNotEmpty() }) {
                     withTimeoutOrNull(RESTART_SETTLE_TIMEOUT_MS) {
                         viewModel.state.first {
@@ -123,6 +126,13 @@ class MainActivity : AppCompatActivity() {
                     restartInProgress = false
                 }
             }
+        }
+    }
+
+    private suspend fun abortQueuedRestarts() {
+        restartMutex.withLock {
+            restartQueue.clear()
+            restartInProgress = false
         }
     }
 

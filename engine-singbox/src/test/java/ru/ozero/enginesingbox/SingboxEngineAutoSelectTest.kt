@@ -180,6 +180,25 @@ class SingboxEngineAutoSelectTest {
     }
 
     @Test
+    fun `manual profile config prefers selected row blob over stale datastore blob`() {
+        val selected = makeProfile(42L, 1L, "eu.example.com", 443)
+        val stale = makeVlessBlob("stale.example.com", 8443)
+        val prefs = mutablePreferencesOf(beanKey to stale, selectedProfileKey to selected.id)
+        val engine = buildEngine(
+            prefs = prefs,
+            profilesByGroup = mapOf(1L to listOf(selected)),
+        )
+        awaitInit()
+
+        val result = engine.buildManualConfig(null)
+
+        assertNotNull(result)
+        assertTrue(result is EngineConfig.Singbox)
+        assertTrue(result.beanBlob.contentEquals(selected.beanBlob))
+        assertTrue(!result.beanBlob.contentEquals(stale))
+    }
+
+    @Test
     fun `should return null when no blob and no auto mode`() {
         val engine = buildEngine()
         awaitInit()

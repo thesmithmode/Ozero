@@ -106,4 +106,14 @@ class UriCompatTest {
         assertEquals(-1, invalidPort.port)
         assertEquals("frag", bareAuth.fragment)
     }
+
+    @Test
+    fun `fallback parser decodes percent encoded user info`() {
+        val uri = UriCompat.parse("trojan://pa%40ss@host:443?extra={a,b}")
+
+        assertEquals("pa@ss", uri.userInfo)
+        assertEquals("host", uri.host)
+        assertEquals(443, uri.port)
+        assertEquals("{a,b}", uri.getQueryParameter("extra"))
+    }
 }

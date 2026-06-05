@@ -409,7 +409,11 @@ class SingboxEngine @Inject constructor(
                 autoSelectBeanBlobs = blobs,
             )
         }
-        val blob = cachedBlob ?: return null
+        val blob = cachedSelectedProfileId
+            ?.takeIf { it != SELECTED_AUTO }
+            ?.let { cachedProfilesById[it]?.beanBlob }
+            ?: cachedBlob
+            ?: return null
         val type = runCatching {
             protocolTypeOf(KryoSerializer.deserialize<AbstractBean>(blob))
         }.getOrDefault(PROTOCOL_VLESS)

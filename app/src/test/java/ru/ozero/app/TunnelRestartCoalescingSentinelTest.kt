@@ -18,6 +18,8 @@ class TunnelRestartCoalescingSentinelTest {
                 block.contains("restartMutex.withLock") &&
                 block.contains("restartQueue.addLast(reason)") &&
                 block.contains("restartQueue.removeFirstOrNull()") &&
+                block.contains("abortQueuedRestarts()") &&
+                block.contains("restartQueue.clear()") &&
                 block.contains("restartInProgress = false") &&
                 block.contains("restartQueue.isNotEmpty()"),
             "restartVpnIfConnected must coalesce through a mutex-guarded queue so enqueue and exit checks stay consistent. Block:\n$block",
