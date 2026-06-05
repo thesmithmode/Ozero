@@ -47,7 +47,6 @@ internal class UrnetworkPreferredLocationConnector(
                 )
             }
         }
-        timeoutJob.invokeOnCompletion { resolving.set(false) }
         runCatching {
             locVc.addFilteredLocationsListener { filtered, _ ->
                 bridgeScope.launch(Dispatchers.Main.immediate) {

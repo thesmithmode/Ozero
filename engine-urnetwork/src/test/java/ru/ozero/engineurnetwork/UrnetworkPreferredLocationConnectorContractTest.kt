@@ -49,5 +49,9 @@ class UrnetworkPreferredLocationConnectorContractTest {
             source.contains("timeoutJob = bridgeScope.launch(Dispatchers.Main.immediate)"),
             "timeout fallback must also run on the main thread.",
         )
+        assertTrue(
+            !source.contains("timeoutJob.invokeOnCompletion { resolving.set(false) }"),
+            "resolving must stay locked until the connect/cleanup path finishes, not until timeoutJob completion.",
+        )
     }
 }
