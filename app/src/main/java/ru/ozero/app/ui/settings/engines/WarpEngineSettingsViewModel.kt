@@ -240,7 +240,11 @@ class WarpEngineSettingsViewModel @Inject constructor(
         val rawIni = existingSlot?.rawIniOverride?.let {
             runCatching { WarpIniBuilder.build(config, it) }.getOrElse { WarpIniBuilder.build(config) }
         }
-        val endpointList = existingSlot?.endpointList ?: emptyList()
+        val endpointList = if (existingConfig?.peerEndpoint?.trim() == config.peerEndpoint.trim()) {
+            existingSlot?.endpointList ?: emptyList()
+        } else {
+            listOf(config.peerEndpoint)
+        }
         viewModelScope.launch {
             runCatching { store.updateSlot(slotId, name, config, rawIni, endpointList) }
                 .onSuccess {

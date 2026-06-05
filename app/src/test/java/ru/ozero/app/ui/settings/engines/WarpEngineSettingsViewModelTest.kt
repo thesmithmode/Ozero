@@ -487,6 +487,19 @@ class WarpEngineSettingsViewModelTest {
     }
 
     @Test
+    fun `onSaveEdit replaces endpointList when endpoint changes`() = runTest {
+        val endpoints = listOf("162.159.193.10:2408", "162.159.195.10:2408")
+        val id = store.addSlot("S", SAMPLE, endpointList = endpoints)
+        advanceUntilIdle()
+        vm.onStartEdit(id)
+        vm.onEditDraftChange(vm.uiState.value.editDraft!!.copy(endpoint = "9.9.9.9:2408"))
+        vm.onSaveEdit()
+        advanceUntilIdle()
+
+        assertEquals(listOf("9.9.9.9:2408"), store.lastUpdateEndpointList)
+    }
+
+    @Test
     fun `onSaveEdit preserves unmodeled peer fields from rawIniOverride`() = runTest {
         val rawIni = "[Interface]\nPrivateKey = priv\nAddress = 10.0.0.1/32\nDNS = 1.1.1.1\n" +
             "[Peer]\nPublicKey = peer\nPresharedKey = very-secret\nEndpoint = engage.cloudflareclient.com:2408\n"
