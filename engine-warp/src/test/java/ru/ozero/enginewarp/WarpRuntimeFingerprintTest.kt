@@ -60,7 +60,7 @@ class WarpRuntimeFingerprintTest {
     }
 
     @Test
-    fun `fingerprint ignores raw ini formatting noise and endpoint order`() {
+    fun `fingerprint ignores raw ini formatting noise but tracks endpoint order`() {
         val base = WarpConfigSlot(
             id = "slot-normalized",
             name = "WARP",
@@ -96,7 +96,7 @@ class WarpRuntimeFingerprintTest {
             endpointList = listOf("162.159.193.11:2408", "162.159.193.10:2408"),
         )
 
-        assertEquals(base.runtimeFingerprint(), formatted.runtimeFingerprint())
+        assertNotEquals(base.runtimeFingerprint(), formatted.runtimeFingerprint())
     }
 
     @Test

@@ -49,8 +49,14 @@ class RawUpdater(
                         userOrder = idx,
                     )
                 }
+                val existingProfiles = profileDao.getByGroupId(group.id)
+                val profilesWithStableIds = profiles.map { profile ->
+                    existingProfiles.firstOrNull { it.userOrder == profile.userOrder }?.id
+                        ?.let { profile.copy(id = it) }
+                        ?: profile
+                }
 
-                profileDao.replaceForGroup(group.id, profiles)
+                profileDao.replaceForGroup(group.id, profilesWithStableIds)
 
                 val usedBytes = subInfo?.let { it.uploadBytes + it.downloadBytes } ?: group.bytesUsed
                 val remainingBytes = subInfo?.let {
@@ -65,8 +71,8 @@ class RawUpdater(
                     ),
                 )
 
-                Log.i(TAG, "refresh ok groupId=${group.id} servers=${profiles.size}")
-                profiles.size
+                Log.i(TAG, "refresh ok groupId=${group.id} servers=${profilesWithStableIds.size}")
+                profilesWithStableIds.size
             }
         }.recoverCatching { e ->
             throw normalizeError(e)

@@ -91,4 +91,14 @@ class UnifiedLoggerFsyncTest {
         assertFalse(content.contains("user:pass"))
         assertFalse(content.contains("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef123456"))
     }
+
+    @Test
+    fun `logger source uses sanitized logcat payload`() {
+        val src = File("app/src/main/java/ru/ozero/app/logging/UnifiedLogger.kt").readText()
+        assertTrue(src.contains("safeLogcatMsg"))
+        assertTrue(src.contains("Log.e(tag, safeLogcatMsg)"))
+        assertTrue(src.contains("Log.w(tag, safeLogcatMsg)"))
+        assertFalse(src.contains("Log.e(tag, msg, t)"))
+        assertFalse(src.contains("Log.w(tag, msg, t)"))
+    }
 }

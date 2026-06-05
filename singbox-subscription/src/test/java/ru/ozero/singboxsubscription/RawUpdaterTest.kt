@@ -280,4 +280,19 @@ class RawUpdaterTest {
         val orders = profileDao.profiles.sortedBy { it.userOrder }.map { it.userOrder }
         assertEquals(listOf(0, 1), orders)
     }
+
+    @Test
+    fun `should preserve profile ids across refresh by userOrder`() = runBlocking {
+        server.enqueue(MockResponse().setBody("$vless1\n$vless2"))
+        val g = group()
+
+        rawUpdater.refresh(g)
+        val firstIds = profileDao.profiles.sortedBy { it.userOrder }.map { it.id }
+
+        server.enqueue(MockResponse().setBody("$vless1\n$vless2"))
+        rawUpdater.refresh(g)
+        val secondIds = profileDao.profiles.sortedBy { it.userOrder }.map { it.id }
+
+        assertEquals(firstIds, secondIds)
+    }
 }

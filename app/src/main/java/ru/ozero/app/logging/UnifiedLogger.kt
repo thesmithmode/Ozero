@@ -60,25 +60,34 @@ object UnifiedLogger : PersistentLogger {
 
     @Synchronized
     fun log(level: String, tag: String, msg: String, t: Throwable? = null) {
+        val safeMsg = LogSanitizer.sanitize(msg)
+        val safeThrowableText = t?.let { throwable ->
+            val sw = StringWriter()
+            PrintWriter(sw).use { throwable.printStackTrace(it) }
+            LogSanitizer.sanitize(sw.toString())
+        }
+        val safeLogcatMsg = buildString {
+            append(safeMsg)
+            if (safeThrowableText != null) {
+                append('\n').append(safeThrowableText)
+            }
+        }
         when (level) {
-            "ERROR" -> Log.e(tag, msg, t)
-            "WARN" -> Log.w(tag, msg, t)
-            "DEBUG" -> Log.d(tag, msg)
-            "VERBOSE", "TRACE" -> Log.v(tag, msg)
-            else -> Log.i(tag, msg)
+            "ERROR" -> Log.e(tag, safeLogcatMsg)
+            "WARN" -> Log.w(tag, safeLogcatMsg)
+            "DEBUG" -> Log.d(tag, safeMsg)
+            "VERBOSE", "TRACE" -> Log.v(tag, safeMsg)
+            else -> Log.i(tag, safeMsg)
         }
         val target = LogFileStore.current() ?: return
         runCatching {
             val sb = StringBuilder()
-            val safeMsg = LogSanitizer.sanitize(msg)
             sb.append(tsFmt.format(Date()))
                 .append(' ').append(level)
                 .append(" [").append(Thread.currentThread().name).append("] ")
                 .append(tag).append(": ").append(safeMsg).append('\n')
-            if (t != null) {
-                val sw = StringWriter()
-                PrintWriter(sw).use { t.printStackTrace(it) }
-                sb.append(LogSanitizer.sanitize(sw.toString()))
+            if (safeThrowableText != null) {
+                sb.append(safeThrowableText)
             }
             RandomAccessFile(target, "rw").use { raf ->
                 raf.seek(raf.length())

@@ -51,7 +51,6 @@ private fun canonicalEndpoints(endpointList: List<String>): String =
     endpointList.map { it.trim() }
         .filter { it.isNotEmpty() }
         .distinct()
-        .sorted()
         .joinToString("\n")
 
 private fun extractRawExtras(raw: String): List<String> {

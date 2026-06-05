@@ -233,9 +233,10 @@ class DataStoreWarpConfigSlotStore(
     }
 
     private fun parseDoHProvider(configObj: JSONObject): DoHProvider {
-        if (!configObj.has("doHProvider")) return DoHProvider.SYSTEM
+        if (!configObj.has("doHProvider")) return WarpConfig.DEFAULT_DOH_PROVIDER
         val name = configObj.optString("doHProvider", "")
-        if (name.isBlank()) return DoHProvider.SYSTEM
+        if (name.isBlank()) return WarpConfig.DEFAULT_DOH_PROVIDER
+        if (name == DoHProvider.SYSTEM.name) return DoHProvider.SYSTEM
         return DoHProvider.entries.firstOrNull { it.name == name } ?: WarpConfig.DEFAULT_DOH_PROVIDER
     }
 
