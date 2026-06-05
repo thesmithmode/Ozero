@@ -216,9 +216,7 @@ class DataStoreWarpConfigSlotStore(
             keepaliveSeconds = configObj.optInt("keepalive", WarpConfig.DEFAULT_KEEPALIVE),
             allowedIps = allowedIps,
             awgParams = awg,
-            doHProvider = configObj.optString("doHProvider", "").let { name ->
-                DoHProvider.entries.firstOrNull { it.name == name } ?: WarpConfig.DEFAULT_DOH_PROVIDER
-            },
+            doHProvider = parseDoHProvider(configObj),
         )
         val rawIni = obj.optString("rawIni", "").takeIf { it.isNotEmpty() }
         val endpointList = obj.optJSONArray("endpointList")?.let { arr ->
@@ -232,6 +230,13 @@ class DataStoreWarpConfigSlotStore(
             rawIniOverride = rawIni,
             endpointList = endpointList,
         )
+    }
+
+    private fun parseDoHProvider(configObj: JSONObject): DoHProvider {
+        if (!configObj.has("doHProvider")) return DoHProvider.SYSTEM
+        val name = configObj.optString("doHProvider", "")
+        if (name.isBlank()) return DoHProvider.SYSTEM
+        return DoHProvider.entries.firstOrNull { it.name == name } ?: WarpConfig.DEFAULT_DOH_PROVIDER
     }
 
     private fun migrateAwgParams(awg: AwgParams): AwgParams {

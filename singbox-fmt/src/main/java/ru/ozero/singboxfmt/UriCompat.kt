@@ -42,7 +42,7 @@ internal class UriCompat private constructor(private val raw: String) {
             if (hostPort.startsWith("[")) {
                 val close = hostPort.indexOf(']')
                 if (close > 0) {
-                    host = hostPort.take(close + 1)
+                    host = hostPort.substring(1, close)
                     if (hostPort.length > close + 1 && hostPort[close + 1] == ':') {
                         val candidate = hostPort.substring(close + 2)
                         port = candidate.toIntOrNull() ?: -1

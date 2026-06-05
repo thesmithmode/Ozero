@@ -71,7 +71,7 @@ class SingboxProbeService internal constructor(
                 profile to bean
             }
         }
-        val results = ConcurrentLinkedQueue<Pair<ProxyProfile, Int>>()
+        val results = ConcurrentLinkedQueue<ProbeResult>()
         val nextIndex = AtomicInteger(0)
         val workerCount = minOf(MAX_CONCURRENT_PROFILE_PROBES, probeCandidates.size)
         coroutineScope {
@@ -86,7 +86,7 @@ class SingboxProbeService internal constructor(
                             val latency = probeLatencyMs(bean)
                             if (latency == LATENCY_SKIPPED_ACTIVE_RUNTIME) continue
                             profileDao.updateLatency(profile.id, latency)
-                            results.add(profile to latency)
+                            results.add(ProbeResult(index, profile, latency))
                         } finally {
                             onProfileTestingChanged(profile.id, false)
                         }
@@ -94,7 +94,14 @@ class SingboxProbeService internal constructor(
                 }
             }.awaitAll()
         }
-        val best = results.filter { it.second >= 0 }.minByOrNull { it.second }?.first ?: return
+        val best = results
+            .filter { it.latency >= 0 }
+            .minWithOrNull(
+                compareBy<ProbeResult> { it.latency }
+                    .thenBy { it.index },
+            )
+            ?.profile
+            ?: return
         dataStore.edit { prefs ->
             if (prefs[SELECTED_PROFILE_KEY] == SingboxEngine.SELECTED_AUTO) return@edit
             prefs[SELECTED_PROFILE_KEY] = best.id
@@ -103,6 +110,12 @@ class SingboxProbeService internal constructor(
     }
 
     private suspend fun probeLatencyMs(bean: AbstractBean): Int = profileProbe.probeLatencyMs(bean)
+
+    private data class ProbeResult(
+        val index: Int,
+        val profile: ProxyProfile,
+        val latency: Int,
+    )
 
     companion object {
         val BEAN_KEY = byteArrayPreferencesKey("singbox_vless_bean")

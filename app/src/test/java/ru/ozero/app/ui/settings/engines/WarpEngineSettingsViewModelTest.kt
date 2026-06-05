@@ -474,6 +474,19 @@ class WarpEngineSettingsViewModelTest {
     }
 
     @Test
+    fun `onSaveEdit preserves endpointList from existing slot`() = runTest {
+        val endpoints = listOf("162.159.193.10:2408", "162.159.195.10:2408")
+        val id = store.addSlot("S", SAMPLE, endpointList = endpoints)
+        advanceUntilIdle()
+        vm.onStartEdit(id)
+        vm.onEditDraftChange(vm.uiState.value.editDraft!!.copy(name = "Renamed"))
+        vm.onSaveEdit()
+        advanceUntilIdle()
+
+        assertEquals(endpoints, store.lastUpdateEndpointList)
+    }
+
+    @Test
     fun `onSaveEdit preserves unmodeled peer fields from rawIniOverride`() = runTest {
         val rawIni = "[Interface]\nPrivateKey = priv\nAddress = 10.0.0.1/32\nDNS = 1.1.1.1\n" +
             "[Peer]\nPublicKey = peer\nPresharedKey = very-secret\nEndpoint = engage.cloudflareclient.com:2408\n"
@@ -575,6 +588,7 @@ class WarpEngineSettingsViewModelTest {
         val setActiveCalls = mutableListOf<String>()
         var lastUpdateCall: Triple<String, String, WarpConfig>? = null
         var lastUpdateRawIni: String? = null
+        var lastUpdateEndpointList: List<String>? = null
         private var idCounter = 0
 
         fun slotCount() = slotsFlow.value.size
@@ -634,6 +648,7 @@ class WarpEngineSettingsViewModelTest {
         ) {
             lastUpdateCall = Triple(id, name, config)
             lastUpdateRawIni = rawIni
+            lastUpdateEndpointList = endpointList
             slotsFlow.value = slotsFlow.value.map {
                 if (it.id == id) {
                     it.copy(name = name, config = config, rawIniOverride = rawIni, endpointList = endpointList)

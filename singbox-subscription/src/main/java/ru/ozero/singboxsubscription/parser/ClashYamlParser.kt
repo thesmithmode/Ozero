@@ -64,7 +64,7 @@ object ClashYamlParser {
         }
         "ss", "shadowsocks" -> ShadowsocksBean().apply {
             applyCommon(fields)
-            method = fields.string("cipher", "method").ifBlank { method }
+            method = fields.shadowsocksMethod().ifBlank { method }
             password = fields.string("password")
             plugin = fields.string("plugin")
             pluginOpts = fields.string("plugin-opts", "plugin_opts")
@@ -179,4 +179,12 @@ object ClashYamlParser {
         is Iterable<*> -> value.joinToString(",") { it.toString() }
         else -> string(key)
     }
+
+    private fun Map<String, Any?>.shadowsocksMethod(): String = when (val cipher = this["cipher"]) {
+        is String -> cipher
+        is Number,
+        is Boolean -> cipher.toString()
+        is Map<*, *> -> cipher.toStringKeyMap().string("method")
+        else -> string("method")
+    }.ifBlank { string("method") }
 }

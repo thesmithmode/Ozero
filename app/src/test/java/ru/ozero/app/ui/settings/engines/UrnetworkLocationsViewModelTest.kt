@@ -501,4 +501,30 @@ class UrnetworkLocationsViewModelTest {
         val state = assertIs<UrnetworkSettingsUiState.Ready>(v.uiState.value)
         assertEquals("DE", state.selectedLocation?.countryCode)
     }
+
+    @Test
+    fun `settings screen resets to NotConnected when cached locations become empty`() = runTest {
+        val store = ru.ozero.engineurnetwork.InMemoryUrnetworkConfigStore(
+            UrnetworkConfig(
+                byClientJwt = "test-jwt",
+                cachedCountries = listOf(UrnetworkCachedLocation(name = "Germany", countryCode = "DE")),
+            ),
+        )
+        val bridge = FakeUrnetworkBridge(deviceAvailable = false, initialLocation = null)
+        val v = UrnetworkLocationsViewModel(bridge, FakeSettingsRepo(), store, idleTunnel())
+        advanceUntilIdle()
+        assertIs<UrnetworkSettingsUiState.Ready>(v.uiState.value)
+
+        store.update {
+            it.copy(
+                cachedCountries = emptyList(),
+                cachedRegions = emptyList(),
+                cachedCities = emptyList(),
+                cachedBestMatches = emptyList(),
+            )
+        }
+        advanceUntilIdle()
+
+        assertIs<UrnetworkSettingsUiState.NotConnected>(v.uiState.value)
+    }
 }

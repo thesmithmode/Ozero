@@ -334,4 +334,13 @@ class DownloadBinaryTaskTest {
             .hasMessageContaining("SHA256")
             .hasCauseInstanceOf(IntegrityException::class.java)
     }
+
+    @Test
+    fun `gradleMessage falls back to exception type when message is null`() {
+        val exception = object : RuntimeException() {
+            override val message: String? = null
+        }
+
+        assertThat(exception.gradleMessage()).isEqualTo("RuntimeException")
+    }
 }

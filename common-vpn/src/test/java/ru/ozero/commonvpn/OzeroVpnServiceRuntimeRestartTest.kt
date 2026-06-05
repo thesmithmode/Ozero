@@ -25,8 +25,10 @@ class OzeroVpnServiceRuntimeRestartTest {
             .substringBefore("private fun logActiveExternalVpn()")
         assertTrue(restartBody.contains("shutdownCoord.stopVpn(callStopSelf = false)"))
         assertTrue(restartBody.contains("if (!shutdownStarted) return"))
+        assertTrue(restartBody.contains("runtimeConfigRestartInProgress.set(true)"))
         assertTrue(restartBody.contains("shutdownJobRef.get()?.let"))
         assertTrue(restartBody.contains("notificationFactory.enterForeground(this@OzeroVpnService)"))
         assertTrue(restartBody.contains("startVpn()"))
+        assertTrue(restartBody.contains("runtimeConfigRestartInProgress.set(false)"))
     }
 }

@@ -240,8 +240,9 @@ class WarpEngineSettingsViewModel @Inject constructor(
         val rawIni = existingSlot?.rawIniOverride?.let {
             runCatching { WarpIniBuilder.build(config, it) }.getOrElse { WarpIniBuilder.build(config) }
         }
+        val endpointList = existingSlot?.endpointList ?: emptyList()
         viewModelScope.launch {
-            runCatching { store.updateSlot(slotId, name, config, rawIni) }
+            runCatching { store.updateSlot(slotId, name, config, rawIni, endpointList) }
                 .onSuccess {
                     _uiState.value = _uiState.value.copy(
                         editDraft = null,

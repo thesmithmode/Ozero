@@ -27,6 +27,7 @@ class EngineWatchdogKillswitchIntegrationTest {
         killswitch: Boolean,
         tunFd: ParcelFileDescriptor?,
         lockdownStartupFd: ParcelFileDescriptor? = null,
+        restartInProgress: Boolean = false,
         stopping: Boolean = false,
         stopVpnInvocations: AtomicReference<Int>,
     ): EngineWatchdogCoordinator {
@@ -50,6 +51,7 @@ class EngineWatchdogKillswitchIntegrationTest {
             stopping = stopping,
             starting = starting,
             killswitchProvider = { killswitch },
+            restartInProgressProvider = { restartInProgress },
             stopVpnRequest = {
                 stopVpnInvocations.updateAndGet { it + 1 }
             },
@@ -85,6 +87,30 @@ class EngineWatchdogKillswitchIntegrationTest {
                 stopVpnCount.get(),
                 "При живом startup lockdown fd нельзя вызывать stopVpnRequest: это снимает блокировку трафика.",
             )
+        }
+
+    @Test
+    fun `handleEngineFailure killswitch=true + runtime restart pending — observer enters killswitch without blocking fd`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val controller = TunnelController()
+            controller.onProbing(EngineId.WARP)
+            controller.onConnecting(EngineId.WARP)
+
+            val stopVpnCount = AtomicReference(0)
+            val watchdog = buildWatchdog(
+                controller = controller,
+                scope = CoroutineScope(UnconfinedTestDispatcher() + SupervisorJob()),
+                killswitch = true,
+                tunFd = null,
+                restartInProgress = true,
+                stopVpnInvocations = stopVpnCount,
+            )
+
+            watchdog.handleEngineFailure(EngineId.WARP, "runtime restart gap")
+
+            assertTrue(controller.killswitchActive.value)
+            assertEquals(0, stopVpnCount.get())
+            assertIs<TunnelState.Failed>(controller.state.value)
         }
 
     @Test

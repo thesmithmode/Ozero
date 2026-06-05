@@ -51,9 +51,7 @@ object VpnModule {
 
     @Provides
     @Singleton
-    fun provideRuntimeFailureRouter(
-        tunnelController: TunnelController,
-    ): RuntimeFailureRouter = RuntimeFailureRouter(tunnelController)
+    fun provideRuntimeFailureRouter(): RuntimeFailureRouter = RuntimeFailureRouter()
 }
 
 @Module

@@ -35,6 +35,8 @@ import ru.ozero.singboxroom.entity.SubscriptionGroup
 import ru.ozero.singboxsubscription.GroupSeeder
 import ru.ozero.singboxsubscription.RawUpdater
 import ru.ozero.singboxsubscription.parser.RawShareLinksParser
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 
 enum class SortOrder {
@@ -88,6 +90,7 @@ class SingboxEngineSettingsViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SingboxSettingsUiState())
+    private val testingProfileCounts = ConcurrentHashMap<Long, AtomicInteger>()
     private var pingJob: Job? = null
     private var refreshJob: Job? = null
 
@@ -204,6 +207,7 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         if (ping) {
             pingJob?.cancel()
             pingJob = null
+            testingProfileCounts.clear()
             _uiState.update { it.copy(isPinging = emptySet(), testingProfileIds = emptySet()) }
         }
         if (refresh) {
@@ -459,14 +463,22 @@ class SingboxEngineSettingsViewModel @Inject constructor(
     }
 
     private fun onProfileTestingChanged(profileId: Long, isTesting: Boolean) {
+        if (isTesting) {
+            val count = testingProfileCounts.compute(profileId) { _, current ->
+                (current ?: AtomicInteger(0)).apply { incrementAndGet() }
+            }?.get() ?: 0
+            if (count <= 0) return
+            _uiState.update {
+                if (profileId in it.testingProfileIds) it else it.copy(testingProfileIds = it.testingProfileIds + profileId)
+            }
+            return
+        }
+        val remaining = testingProfileCounts.computeIfPresent(profileId) { _, current ->
+            if (current.decrementAndGet() <= 0) null else current
+        }
+        if (remaining != null) return
         _uiState.update {
-            it.copy(
-                testingProfileIds = if (isTesting) {
-                    it.testingProfileIds + profileId
-                } else {
-                    it.testingProfileIds - profileId
-                },
-            )
+            it.copy(testingProfileIds = it.testingProfileIds - profileId)
         }
     }
 }

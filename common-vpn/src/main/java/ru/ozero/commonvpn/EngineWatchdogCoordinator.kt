@@ -29,6 +29,7 @@ class EngineWatchdogCoordinator(
     private val stopping: AtomicBoolean,
     private val starting: AtomicBoolean,
     private val killswitchProvider: () -> Boolean,
+    private val restartInProgressProvider: () -> Boolean = { false },
     private val stopVpnRequest: () -> Unit,
 ) {
 
@@ -43,7 +44,7 @@ class EngineWatchdogCoordinator(
                 healthMonitor.status
                     .filter { it == HealthMonitor.Status.DEGRADED }
                     .first()
-                if (killswitchProvider() && hasBlockingTun() && !stopping.get()) {
+                if (killswitchProvider() && hasBlockingTunForKillswitch() && !stopping.get()) {
                     PersistentLoggers.warn(
                         TAG,
                         "health degraded → killswitch fire engine=$engineId",
@@ -171,7 +172,7 @@ class EngineWatchdogCoordinator(
             PersistentLoggers.warn(TAG, "ignore inactive engine failure: engine=$engineId reason=$reason")
             return
         }
-        if (killswitchProvider() && hasBlockingTun()) {
+        if (killswitchProvider() && hasBlockingTunForKillswitch()) {
             enterKillswitchMode(engineId, reason)
         } else {
             tunnelController.onEngineDied(engineId, reason)
@@ -181,6 +182,9 @@ class EngineWatchdogCoordinator(
 
     private fun hasBlockingTun(): Boolean =
         tunFdRef.get() != null || lockdownStartupFdRef.get() != null
+
+    private fun hasBlockingTunForKillswitch(): Boolean =
+        hasBlockingTun() || restartInProgressProvider()
 
     private fun isActiveEngine(engineId: EngineId): Boolean = when (val state = tunnelController.state.value) {
         is TunnelState.Probing -> state.engineId == null || state.engineId == engineId

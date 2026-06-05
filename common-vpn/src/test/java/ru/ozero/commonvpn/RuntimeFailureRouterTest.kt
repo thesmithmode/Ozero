@@ -9,23 +9,20 @@ import kotlin.test.assertTrue
 class RuntimeFailureRouterTest {
 
     @Test
-    fun `without bound handler routes failure to TunnelController`() {
+    fun `without bound handler ignores failure instead of mutating controller`() {
         val controller = TunnelController()
-        val router = RuntimeFailureRouter(controller)
+        val router = RuntimeFailureRouter()
 
         controller.onProbing(EngineId.WARP)
         router.handleEngineFailure(EngineId.WARP, "binder died")
 
-        val state = controller.state.value
-        assertIs<TunnelState.Failed>(state)
-        assertEquals(EngineId.WARP, state.engineId)
-        assertEquals("binder died", state.reason)
+        assertIs<TunnelState.Probing>(controller.state.value)
     }
 
     @Test
     fun `bound handler receives failures instead of fallback controller path`() {
         val controller = TunnelController()
-        val router = RuntimeFailureRouter(controller)
+        val router = RuntimeFailureRouter()
         val calls = mutableListOf<Pair<EngineId, String>>()
 
         router.bind { engineId, reason -> calls += engineId to reason }
@@ -38,7 +35,7 @@ class RuntimeFailureRouterTest {
     @Test
     fun `unbind only clears the currently bound handler instance`() {
         val controller = TunnelController()
-        val router = RuntimeFailureRouter(controller)
+        val router = RuntimeFailureRouter()
         val staleCalls = mutableListOf<Pair<EngineId, String>>()
         val activeCalls = mutableListOf<Pair<EngineId, String>>()
         val staleHandler: (EngineId, String) -> Unit = { engineId, reason -> staleCalls += engineId to reason }
@@ -55,9 +52,9 @@ class RuntimeFailureRouterTest {
     }
 
     @Test
-    fun `unbind current handler restores fallback controller path`() {
+    fun `unbind current handler keeps fallback path disabled`() {
         val controller = TunnelController()
-        val router = RuntimeFailureRouter(controller)
+        val router = RuntimeFailureRouter()
         val handler: (EngineId, String) -> Unit = { _, _ -> error("handler should be unbound") }
 
         router.bind(handler)
@@ -65,9 +62,6 @@ class RuntimeFailureRouterTest {
         controller.onProbing(EngineId.SINGBOX)
         router.handleEngineFailure(EngineId.SINGBOX, "binder-died")
 
-        val state = controller.state.value
-        assertIs<TunnelState.Failed>(state)
-        assertEquals(EngineId.SINGBOX, state.engineId)
-        assertEquals("binder-died", state.reason)
+        assertIs<TunnelState.Probing>(controller.state.value)
     }
 }

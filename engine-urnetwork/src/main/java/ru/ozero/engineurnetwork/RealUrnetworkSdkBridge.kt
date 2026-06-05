@@ -155,14 +155,16 @@ class RealUrnetworkSdkBridge(
                 } else {
                     var sub: Sub? = null
                     sub = d.addProvideSecretKeysListener { generated ->
-                        runCatching { localState.provideSecretKeys = generated }
-                            .onSuccess {
-                                PersistentLoggers.debug(TAG, "node start: session keys generated and persisted")
-                            }
-                            .onFailure {
-                                PersistentLoggers.warn(TAG, "node start: session keys persist threw: ${it.message}")
-                            }
-                        runCatching { sub?.close() }
+                        bridgeScope.launch(Dispatchers.Main.immediate) {
+                            runCatching { localState.provideSecretKeys = generated }
+                                .onSuccess {
+                                    PersistentLoggers.debug(TAG, "node start: session keys generated and persisted")
+                                }
+                                .onFailure {
+                                    PersistentLoggers.warn(TAG, "node start: session keys persist threw: ${it.message}")
+                                }
+                            runCatching { sub?.close() }
+                        }
                     }
                     d.initProvideSecretKeys()
                     PersistentLoggers.debug(TAG, "node start: session keys absent - generating new identity")
@@ -172,16 +174,18 @@ class RealUrnetworkSdkBridge(
             }
             runCatching {
                 d.addJwtRefreshListener { newJwt ->
-                    runCatching { localState.byClientJwt = newJwt }
-                        .onSuccess {
-                            PersistentLoggers.debug(TAG, "node start: credential refreshed - state updated")
-                        }
-                        .onFailure {
-                            PersistentLoggers.warn(
-                                TAG,
-                                "node start: credential refresh persist threw: ${it.message}",
-                            )
-                        }
+                    bridgeScope.launch(Dispatchers.Main.immediate) {
+                        runCatching { localState.byClientJwt = newJwt }
+                            .onSuccess {
+                                PersistentLoggers.debug(TAG, "node start: credential refreshed - state updated")
+                            }
+                            .onFailure {
+                                PersistentLoggers.warn(
+                                    TAG,
+                                    "node start: credential refresh persist threw: ${it.message}",
+                                )
+                            }
+                    }
                 }
             }.onFailure {
                 PersistentLoggers.warn(TAG, "node start: credential refresh listener threw: ${it.message}")
@@ -350,9 +354,12 @@ class RealUrnetworkSdkBridge(
             return
         }
         val sdkLoc = (location as? SdkLocationToken)?.sdk ?: return
-        persistConnectLocation(sdkLoc)
-        runCatching { connectVcRef.get()?.connect(sdkLoc) }
-            .onSuccess { connectIssuedRef.set(true) }
+        val cv = connectVcRef.get() ?: return
+        runCatching { cv.connect(sdkLoc) }
+            .onSuccess {
+                persistConnectLocation(sdkLoc)
+                connectIssuedRef.set(true)
+            }
             .onFailure { PersistentLoggers.warn(TAG, "connect threw: ${it.message}") }
     }
 
@@ -361,9 +368,12 @@ class RealUrnetworkSdkBridge(
             PersistentLoggers.warn(TAG, "connectBestAvailable skipped - bridge not running")
             return
         }
-        persistConnectLocation(bestAvailableConnectLocation())
-        runCatching { connectVcRef.get()?.connectBestAvailable() }
-            .onSuccess { connectIssuedRef.set(true) }
+        val cv = connectVcRef.get() ?: return
+        runCatching { cv.connectBestAvailable() }
+            .onSuccess {
+                persistConnectLocation(bestAvailableConnectLocation())
+                connectIssuedRef.set(true)
+            }
             .onFailure { PersistentLoggers.warn(TAG, "connectBestAvailable threw: ${it.message}") }
     }
 
@@ -479,10 +489,12 @@ class RealUrnetworkSdkBridge(
             } else {
                 var sub: Sub? = null
                 sub = device.addProvideSecretKeysListener { generated ->
-                    runCatching { localState.provideSecretKeys = generated }
-                        .onSuccess { Log.i(TAG, "ensureDevice: provideSecretKeys generated and persisted") }
-                        .onFailure { PersistentLoggers.warn(TAG, "ensureDevice: persist keys: ${it.message}") }
-                    runCatching { sub?.close() }
+                    bridgeScope.launch(Dispatchers.Main.immediate) {
+                        runCatching { localState.provideSecretKeys = generated }
+                            .onSuccess { Log.i(TAG, "ensureDevice: provideSecretKeys generated and persisted") }
+                            .onFailure { PersistentLoggers.warn(TAG, "ensureDevice: persist keys: ${it.message}") }
+                        runCatching { sub?.close() }
+                    }
                 }
                 device.initProvideSecretKeys()
                 Log.i(TAG, "ensureDevice: provideSecretKeys not found - generating new keys")
@@ -490,9 +502,11 @@ class RealUrnetworkSdkBridge(
         }
         runCatching {
             device.addJwtRefreshListener { newJwt ->
-                runCatching { localState.byClientJwt = newJwt }
-                    .onSuccess { Log.i(TAG, "ensureDevice: SDK JWT refreshed - localState updated") }
-                    .onFailure { PersistentLoggers.warn(TAG, "ensureDevice: JWT refresh localState: ${it.message}") }
+                bridgeScope.launch(Dispatchers.Main.immediate) {
+                    runCatching { localState.byClientJwt = newJwt }
+                        .onSuccess { Log.i(TAG, "ensureDevice: SDK JWT refreshed - localState updated") }
+                        .onFailure { PersistentLoggers.warn(TAG, "ensureDevice: JWT refresh localState: ${it.message}") }
+                }
             }
         }.onFailure { PersistentLoggers.warn(TAG, "ensureDevice: addJwtRefreshListener threw: ${it.message}") }
         applyDeviceFields(device, localState)
@@ -645,7 +659,11 @@ class RealUrnetworkSdkBridge(
     private fun attachConnectionStatusListener(cv: ConnectViewController) {
         refreshConnectionStatus(cv)
         runCatching {
-            val sub = cv.addConnectionStatusListener { refreshConnectionStatus(cv) }
+            val sub = cv.addConnectionStatusListener {
+                bridgeScope.launch(Dispatchers.Main.immediate) {
+                    refreshConnectionStatus(cv)
+                }
+            }
             connectionStatusSubRef.getAndSet(sub)?.also { stale ->
                 runCatching { stale.close() }
                     .onFailure { PersistentLoggers.warn(TAG, "connectionStatus stale sub.close threw: ${it.message}") }
@@ -667,7 +685,11 @@ class RealUrnetworkSdkBridge(
     private fun attachSelectedLocationListener(cv: ConnectViewController) {
         refreshSelectedLocation(cv)
         runCatching {
-            val sub = cv.addSelectedLocationListener { refreshSelectedLocation(cv) }
+            val sub = cv.addSelectedLocationListener {
+                bridgeScope.launch(Dispatchers.Main.immediate) {
+                    refreshSelectedLocation(cv)
+                }
+            }
             selectedLocationSubRef.getAndSet(sub)?.also { stale ->
                 runCatching { stale.close() }
                     .onFailure { PersistentLoggers.warn(TAG, "selectedLocation stale sub.close threw: ${it.message}") }

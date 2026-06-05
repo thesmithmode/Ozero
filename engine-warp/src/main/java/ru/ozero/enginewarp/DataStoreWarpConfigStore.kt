@@ -59,6 +59,7 @@ class DataStoreWarpConfigStore(
             keepaliveSeconds = keepalive,
             allowedIps = allowedIps,
             awgParams = awgParams,
+            doHProvider = DoHProvider.SYSTEM,
         )
     }
 

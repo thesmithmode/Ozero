@@ -190,6 +190,20 @@ class StartSequenceCoordinatorContractTest {
     }
 
     @Test
+    fun `establishTunForEngine fail fast stops VPN on establish failure`() {
+        val body = source.substringAfter("private suspend fun establishTunForEngine(")
+            .substringBefore("private fun captureTunIfaceName(")
+        assertTrue(
+            body.contains("handleEngineFailure(engineId, \"VPN slot"),
+            "establishTunForEngine must still report engine failure through watchdog.",
+        )
+        assertTrue(
+            body.contains("stopVpnRequest()"),
+            "establishTunForEngine must stop the VPN explicitly after establish failure.",
+        )
+    }
+
+    @Test
     fun `routeTrafficForEngine — TunFdAcceptor ветка через attachTun, иначе native tunnel`() {
         val body = source.substringAfter("private suspend fun routeTrafficForEngine(")
             .substringBefore("private suspend fun startNativeTunnel(")

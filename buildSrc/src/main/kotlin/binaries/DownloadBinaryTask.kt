@@ -37,7 +37,7 @@ abstract class DownloadBinaryTask : DefaultTask() {
             try {
                 LockFileParser.parse(lockPath)
             } catch (e: LockFileException) {
-                throw GradleException(e.message!!, e)
+                throw GradleException(e.gradleMessage(), e)
             }
 
         val cache = cacheDir.get().asFile.toPath()
@@ -61,9 +61,9 @@ abstract class DownloadBinaryTask : DefaultTask() {
             try {
                 downloader.download(art.downloadUrl, art.sha256, dst)
             } catch (e: BinaryDownloadException) {
-                throw GradleException(e.message!!, e)
+                throw GradleException(e.gradleMessage(), e)
             } catch (e: IntegrityException) {
-                throw GradleException(e.message!!, e)
+                throw GradleException(e.gradleMessage(), e)
             }
         }
     }
@@ -76,3 +76,6 @@ abstract class DownloadBinaryTask : DefaultTask() {
         }
     }
 }
+
+internal fun Throwable.gradleMessage(): String =
+    message?.takeIf { it.isNotBlank() } ?: javaClass.simpleName

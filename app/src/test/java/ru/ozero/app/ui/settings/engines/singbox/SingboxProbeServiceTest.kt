@@ -126,6 +126,31 @@ class SingboxProbeServiceTest {
         )
     }
 
+    @Test
+    fun `probeAndAutoSelect breaks equal latency ties by input order not completion order`() = runTest {
+        val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
+        val dataStore = flowDataStore(prefsFlow)
+        val dao = FakeProxyProfileDao()
+        val first = makeProfile(id = 1L, host = "first.example", port = 443)
+        val second = makeProfile(id = 2L, host = "second.example", port = 443)
+
+        val probe = object : SingboxProfileProbe {
+            override suspend fun probeLatencyMs(bean: AbstractBean): Int {
+                when (bean.serverAddress) {
+                    "first.example" -> delay(50)
+                    "second.example" -> delay(0)
+                }
+                return 42
+            }
+        }
+
+        SingboxProbeService(dao, dataStore, probe).probeAndAutoSelect(listOf(first, second))
+
+        assertEquals(1L, prefsFlow.value[selectedProfileKey])
+        assertEquals(42, dao.latencies[1L])
+        assertEquals(42, dao.latencies[2L])
+    }
+
     private fun makeProfile(
         id: Long,
         host: String,

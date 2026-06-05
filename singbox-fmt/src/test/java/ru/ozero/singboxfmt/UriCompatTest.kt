@@ -62,7 +62,7 @@ class UriCompatTest {
         val uri = UriCompat.parse("vless://user@[2001:db8::1]:443?flag&bad={x}#Name")
 
         assertEquals("user", uri.userInfo)
-        assertEquals("[2001:db8::1]", uri.host)
+        assertEquals("2001:db8::1", uri.host)
         assertEquals(443, uri.port)
         assertEquals("Name", uri.fragment)
         assertEquals("", uri.getQueryParameter("flag"))
@@ -75,7 +75,7 @@ class UriCompatTest {
         val bare = UriCompat.parse("vless://example.com?x=1")
 
         assertEquals("user", ipv6.userInfo)
-        assertEquals("[2001:db8::1]", ipv6.host)
+        assertEquals("2001:db8::1", ipv6.host)
         assertEquals(-1, ipv6.port)
         assertEquals("N", ipv6.fragment)
         assertEquals("", ipv6.getQueryParameter("flag"))

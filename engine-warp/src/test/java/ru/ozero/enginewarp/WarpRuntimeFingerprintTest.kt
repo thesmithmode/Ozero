@@ -3,6 +3,7 @@ package ru.ozero.enginewarp
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.VpnSocketProtector
+import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
@@ -56,6 +57,95 @@ class WarpRuntimeFingerprintTest {
         assertNotEquals(base.runtimeFingerprint(), changedDns.runtimeFingerprint())
         assertNotEquals(base.runtimeFingerprint(), changedAllowed.runtimeFingerprint())
         assertNotEquals(base.runtimeFingerprint(), changedEndpointList.runtimeFingerprint())
+    }
+
+    @Test
+    fun `fingerprint ignores raw ini formatting noise and endpoint order`() {
+        val base = WarpConfigSlot(
+            id = "slot-normalized",
+            name = "WARP",
+            config = config(privateKey = "sample-warp-key-a", dnsServers = listOf("1.1.1.1")),
+            rawIniOverride = """
+                [Interface]
+                PrivateKey = sample-warp-key-a
+                Address = 10.0.0.2/32
+                DNS = 1.1.1.1
+
+                [Peer]
+                PublicKey = peer-public
+                AllowedIPs = 0.0.0.0/0, ::/0
+                Endpoint = engage.cloudflareclient.com:2408
+                PersistentKeepalive = 25
+            """.trimIndent(),
+            endpointList = listOf("162.159.193.10:2408", "162.159.193.11:2408"),
+        )
+        val formatted = base.copy(
+            rawIniOverride = """
+                [Interface]
+                # comment
+                PrivateKey = sample-warp-key-a
+                Address = 10.0.0.2/32
+                DNS = 1.1.1.1
+
+                [Peer]
+                PublicKey = peer-public
+                AllowedIPs = 0.0.0.0/0, ::/0
+                Endpoint = engage.cloudflareclient.com:2408
+                PersistentKeepalive = 25
+            """.trimIndent(),
+            endpointList = listOf("162.159.193.11:2408", "162.159.193.10:2408"),
+        )
+
+        assertEquals(base.runtimeFingerprint(), formatted.runtimeFingerprint())
+    }
+
+    @Test
+    fun `fingerprint changes when raw ini carries unmodeled peer fields`() {
+        val base = WarpConfigSlot(
+            id = "slot-extra",
+            name = "WARP",
+            config = config(privateKey = "sample-warp-key-a", dnsServers = listOf("1.1.1.1")),
+            rawIniOverride = """
+                [Interface]
+                PrivateKey = sample-warp-key-a
+                Address = 10.0.0.2/32
+
+                [Peer]
+                PublicKey = sample-peer-key
+                Endpoint = engage.cloudflareclient.com:2408
+                PresharedKey = secret-a
+            """.trimIndent(),
+            endpointList = listOf("162.159.193.10:2408"),
+        )
+        val changed = base.copy(
+            rawIniOverride = """
+                [Interface]
+                PrivateKey = sample-warp-key-a
+                Address = 10.0.0.2/32
+
+                [Peer]
+                PublicKey = sample-peer-key
+                Endpoint = engage.cloudflareclient.com:2408
+                PresharedKey = secret-b
+            """.trimIndent(),
+        )
+
+        assertNotEquals(base.runtimeFingerprint(), changed.runtimeFingerprint())
+    }
+
+    @Test
+    fun `fingerprint ignores slot identity when runtime config is unchanged`() {
+        val config = config(privateKey = "sample-warp-key-a", dnsServers = listOf("1.1.1.1"))
+        val first = WarpConfigSlot(
+            id = "slot-a",
+            name = "WARP",
+            config = config,
+            rawIniOverride = "ini",
+            endpointList = listOf("162.159.193.10:2408"),
+        )
+        val second = first.copy(id = "slot-b")
+
+        assertEquals(first.runtimeFingerprint(), second.runtimeFingerprint())
     }
 
     @Test

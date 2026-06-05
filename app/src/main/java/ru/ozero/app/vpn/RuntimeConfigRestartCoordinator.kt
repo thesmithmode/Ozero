@@ -146,8 +146,10 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
                 else -> false
             }
         } catch (e: CancellationException) {
+            abortQueuedRestarts()
             throw e
         } catch (e: Exception) {
+            abortQueuedRestarts()
             tunnelController.onSwitchingFinished("runtime config restart failed: ${e.message}")
             throw e
         }

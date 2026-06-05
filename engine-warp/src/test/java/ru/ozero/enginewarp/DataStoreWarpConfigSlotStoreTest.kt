@@ -433,7 +433,7 @@ class DataStoreWarpConfigSlotStoreTest {
     }
 
     @Test
-    fun `слот без doHProvider — fallback Cloudflare DoH как PORTAL WG`() = runTest {
+    fun `слот без doHProvider — fallback System resolver как старый WARP`() = runTest {
         val ds = FakePreferencesDataStore()
         val goodSlot = buildValidSlotJson("id-no-doh", "NoDoH")
         ds.edit { it[stringPreferencesKey("warp_slots_json")] = """[$goodSlot]""" }
@@ -441,7 +441,18 @@ class DataStoreWarpConfigSlotStoreTest {
 
         val slot = store.slots().first().single()
 
-        assertEquals(WarpConfig.DEFAULT_DOH_PROVIDER, slot.config.doHProvider)
+        assertEquals(DoHProvider.SYSTEM, slot.config.doHProvider)
+    }
+
+    @Test
+    fun `legacy current without doHProvider falls back to System resolver`() = runTest {
+        val legacy = FakePreferencesDataStore()
+        runBlocking { DataStoreWarpConfigStore(legacy).save(sample) }
+
+        val current = DataStoreWarpConfigStore(legacy).current().first()
+
+        assertNotNull(current)
+        assertEquals(DoHProvider.SYSTEM, current.doHProvider)
     }
 
     @Test

@@ -121,6 +121,7 @@ class OzeroVpnService : android.net.VpnService() {
             stopping = stopping,
             starting = starting,
             killswitchProvider = { killswitchCached },
+            restartInProgressProvider = { runtimeConfigRestartInProgress.get() },
             stopVpnRequest = { stopVpn() },
         )
     }
@@ -241,6 +242,7 @@ class OzeroVpnService : android.net.VpnService() {
     private val lockdownStartupFdRef = AtomicReference<ParcelFileDescriptor?>(null)
     private val starting = AtomicBoolean(false)
     private val stopping = AtomicBoolean(false)
+    private val runtimeConfigRestartInProgress = AtomicBoolean(false)
     private val stopSignal = AtomicBoolean(false)
     private val latestStartId = AtomicInteger(-1)
 
@@ -325,6 +327,7 @@ class OzeroVpnService : android.net.VpnService() {
                 startSequence.run()
             } finally {
                 starting.set(false)
+                runtimeConfigRestartInProgress.set(false)
             }
         }
         startJobRef.set(job)
@@ -344,13 +347,18 @@ class OzeroVpnService : android.net.VpnService() {
     private fun restartVpn() {
         val shutdownStarted = stopping.compareAndSet(false, true)
         if (!shutdownStarted) return
+        runtimeConfigRestartInProgress.set(true)
         stopping.set(false)
         shutdownCoord.stopVpn(callStopSelf = false)
         serviceScope.launch {
             shutdownJobRef.get()?.let { job ->
                 runCatching { withTimeoutOrNull(SHUTDOWN_JOIN_TIMEOUT_MS) { job.join() } }
             }
-            if (!stopping.get() && notificationFactory.enterForeground(this@OzeroVpnService)) startVpn()
+            if (!stopping.get() && notificationFactory.enterForeground(this@OzeroVpnService)) {
+                startVpn()
+            } else {
+                runtimeConfigRestartInProgress.set(false)
+            }
         }
     }
 

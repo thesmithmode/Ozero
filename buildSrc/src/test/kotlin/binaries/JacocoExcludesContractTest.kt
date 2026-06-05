@@ -58,6 +58,35 @@ class JacocoExcludesContractTest {
             "HealthMonitor",
             "NativeHevTunnelGateway",
             "DownloadBinaryTask",
+            "Base58",
+            "UrnetworkConfig",
+            "UrnetworkContractStatusObserver",
+            "UrnetworkDeviceIdentity",
+            "UrnetworkPreflight",
+            "ChainOrchestrator",
+            "Placeholder",
+            "UrnetworkLocationSelection",
+            "UrnetworkCachedLocation",
+            "MasterDnsClientWrapper",
+            "MasterDnsClientWrapperContract",
+            "MasterDnsPortAllocator",
+            "MasterDnsServerDeployer",
+            "MasterDnsConfigWriter",
+            "MasterDnsResolversCache",
+            "SshjMasterDnsDeployer",
+            "UrnetworkAuthService",
+            "InMemoryUrnetworkConfigStore",
+            "AppBackupSerializer",
+            "BackupSettingsSerializer",
+            "BackupStrategySerializer",
+            "BackupWarpSerializer",
+            "BackupCategory",
+            "BackupWarpSlot",
+            "BackupSavedStrategy",
+            "BackupJsonExtensionsKt",
+            "BackupUrnetworkLocation",
+            "RawUpdater",
+            "HttpUrlConnectionClient",
         ).forEach { className ->
             assertThat(jacocoScript)
                 .withFailMessage("$className is deterministic production logic and must stay in coverage gate.")
@@ -73,5 +102,15 @@ class JacocoExcludesContractTest {
         assertThat(jacocoScript)
             .withFailMessage("Generated coroutine classes may be excluded only by explicit inner-class masks.")
             .contains("\"**/EngineWarp\\${'$'}awaitReady\\${'$'}*.*\"")
+    }
+
+    @Test
+    fun `coverage thresholds stay at project policy minimum`() {
+        listOf("0.74", "0.59", "0.75", "0.64", "0.89", "0.68", "0.90", "0.88").forEach { threshold ->
+            assertThat(jacocoScript)
+                .withFailMessage("coverage threshold $threshold is below the repo minimum policy.")
+                .doesNotContain(threshold)
+        }
+        assertThat(jacocoScript).contains("0.95")
     }
 }

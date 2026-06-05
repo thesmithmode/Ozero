@@ -124,6 +124,14 @@ class UrnetworkLocationsViewModel @Inject constructor(
                             UrnetworkSettingsUiState.NotConnected -> current
                         }
                     }
+                } else {
+                    _uiState.update { current ->
+                        when (current) {
+                            UrnetworkSettingsUiState.Loading,
+                            is UrnetworkSettingsUiState.Ready -> UrnetworkSettingsUiState.NotConnected
+                            UrnetworkSettingsUiState.NotConnected -> current
+                        }
+                    }
                 }
             }
         }
