@@ -31,4 +31,20 @@ class OzeroVpnServiceRuntimeRestartTest {
         assertTrue(restartBody.contains("startVpn()"))
         assertTrue(restartBody.contains("runtimeConfigRestartInProgress.set(false)"))
     }
+
+    @Test
+    fun `runtime restart respects user stop before relaunch`() {
+        val startBody = source.substringAfter("private fun startVpn()").substringBefore("private fun engineExtras(")
+        assertTrue(startBody.contains("runtimeConfigRestartCancelled.set(false)"))
+
+        val stopBody = source.substringAfter("private fun stopVpn()").substringBefore("private fun restartVpn()")
+        assertTrue(stopBody.contains("runtimeConfigRestartInProgress.get()"))
+        assertTrue(stopBody.contains("runtimeConfigRestartCancelled.set(true)"))
+
+        val restartBody = source
+            .substringAfter("private fun restartVpn()")
+            .substringBefore("private fun logActiveExternalVpn()")
+        assertTrue(restartBody.contains("!runtimeConfigRestartCancelled.get()"))
+        assertTrue(restartBody.contains("runtimeConfigRestartCancelled.set(false)"))
+    }
 }

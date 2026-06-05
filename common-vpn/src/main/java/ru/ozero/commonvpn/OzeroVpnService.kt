@@ -243,6 +243,7 @@ class OzeroVpnService : android.net.VpnService() {
     private val starting = AtomicBoolean(false)
     private val stopping = AtomicBoolean(false)
     private val runtimeConfigRestartInProgress = AtomicBoolean(false)
+    private val runtimeConfigRestartCancelled = AtomicBoolean(false)
     private val stopSignal = AtomicBoolean(false)
     private val latestStartId = AtomicInteger(-1)
 
@@ -286,6 +287,7 @@ class OzeroVpnService : android.net.VpnService() {
     private fun startVpn() {
         if (!starting.compareAndSet(false, true)) return
         stopSignal.set(false)
+        runtimeConfigRestartCancelled.set(false)
         PersistentLoggers.info(TAG, "startVpn entry")
         val externalVpnActive = logActiveExternalVpn()
         runCatching { tunFdRef.getAndSet(null)?.close() }
@@ -342,11 +344,17 @@ class OzeroVpnService : android.net.VpnService() {
         }.getOrDefault("")
     }
 
-    private fun stopVpn() = shutdownCoord.stopVpn()
+    private fun stopVpn() {
+        if (runtimeConfigRestartInProgress.get() && stopping.get()) {
+            runtimeConfigRestartCancelled.set(true)
+        }
+        shutdownCoord.stopVpn()
+    }
 
     private fun restartVpn() {
         val shutdownStarted = stopping.compareAndSet(false, true)
         if (!shutdownStarted) return
+        runtimeConfigRestartCancelled.set(false)
         runtimeConfigRestartInProgress.set(true)
         stopping.set(false)
         shutdownCoord.stopVpn(callStopSelf = false)
@@ -354,10 +362,15 @@ class OzeroVpnService : android.net.VpnService() {
             shutdownJobRef.get()?.let { job ->
                 runCatching { withTimeoutOrNull(SHUTDOWN_JOIN_TIMEOUT_MS) { job.join() } }
             }
-            if (!stopping.get() && notificationFactory.enterForeground(this@OzeroVpnService)) {
+            if (
+                !runtimeConfigRestartCancelled.get() &&
+                !stopping.get() &&
+                notificationFactory.enterForeground(this@OzeroVpnService)
+            ) {
                 startVpn()
             } else {
                 runtimeConfigRestartInProgress.set(false)
+                runtimeConfigRestartCancelled.set(false)
             }
         }
     }
