@@ -123,6 +123,26 @@ class ConfigBuilderBranchCoverageTest {
     }
 
     @Test
+    fun `wireguard outbound emits keepalive and upstream detour when present`() {
+        val json = ConfigBuilder.buildWireGuardChainConfig(
+            WireGuardOutboundConfig(
+                privateKey = "private",
+                peerPublicKey = "peer",
+                serverHost = "203.0.113.1",
+                serverPort = 51820,
+                localAddresses = listOf("10.0.0.2/32"),
+                mtu = 1280,
+                keepaliveSeconds = 25,
+            ),
+            socksPort = 2084,
+            upstream = ConfigBuilder.Upstream("127.0.0.1", 1080),
+        )
+
+        assertContains(json, "\"persistent_keepalive_interval\":25")
+        assertContains(json, "\"detour\":\"upstream\"")
+    }
+
+    @Test
     fun `tls reality and transport variants keep branch coverage honest`() {
         val reality = vless().apply {
             security = "reality"

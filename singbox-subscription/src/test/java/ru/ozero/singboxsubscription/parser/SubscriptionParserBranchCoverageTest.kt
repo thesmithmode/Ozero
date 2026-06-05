@@ -482,7 +482,7 @@ class SubscriptionParserBranchCoverageTest {
         assertEquals("none", vless.encryption)
         assertEquals("none", vless.security)
         val ssBlank = result[1] as ShadowsocksBean
-        assertEquals("", ssBlank.method)
+        assertEquals("aes-128-gcm", ssBlank.method)
         val ssMap = result[2] as ShadowsocksBean
         assertEquals("method=aes-128-gcm,mode=cfb", ssMap.method)
     }

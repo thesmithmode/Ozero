@@ -73,6 +73,16 @@ class FmtAdditionalBranchCoverageTest {
     }
 
     @Test
+    fun `shadowsocks initialize defaults restores blank method`() {
+        val bean = ShadowsocksBean().apply {
+            method = ""
+            initializeDefaultValues()
+        }
+
+        assertEquals("aes-128-gcm", bean.method)
+    }
+
+    @Test
     fun `format parsers cover default optional branches`() {
         val vless = V2RayFmt.parseVLESS("vless://id@vl.example.com:443?type=grpc")
         assertEquals("", vless.grpcServiceName)
