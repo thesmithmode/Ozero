@@ -12,6 +12,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.app.logging.AppLogger
@@ -43,7 +44,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var vpnIntentLauncher: VpnIntentLauncher
     private lateinit var batteryGuard: BatteryGuard
     private val restartMutex = Mutex()
-    private var restartPending = false
+    private val restartQueue = ArrayDeque<String>()
+    private var restartInProgress = false
 
     private val safeUiCoroutineHandler = CoroutineExceptionHandler { _, throwable ->
         AppLogger.e(TAG, "uncaught coroutine in MainActivity", throwable)
@@ -85,27 +87,42 @@ class MainActivity : AppCompatActivity() {
     }
 
     private suspend fun restartVpnIfConnected(reason: String) {
-        if (!restartMutex.tryLock()) {
-            restartPending = true
+        var shouldProcess = false
+        restartMutex.withLock {
+            restartQueue.addLast(reason)
+            if (!restartInProgress) {
+                restartInProgress = true
+                shouldProcess = true
+            }
+        }
+        if (!shouldProcess) {
             AppLogger.d(TAG, "restart request coalesced while another restart is running")
             return
         }
         try {
-            var nextReason = reason
             do {
-                restartPending = false
+                val nextReason = restartMutex.withLock {
+                    restartQueue.removeFirstOrNull().also {
+                        if (it == null) {
+                            restartInProgress = false
+                        }
+                    }
+                } ?: return
                 if (!performRestartIfConnected(nextReason)) return
-                nextReason = "coalesced engine settings changed while restart was running -> restart"
-                if (restartPending) {
+                if (restartMutex.withLock { restartQueue.isNotEmpty() }) {
                     withTimeoutOrNull(RESTART_SETTLE_TIMEOUT_MS) {
                         viewModel.state.first {
                             it is TunnelState.Connected || it is TunnelState.Failed
                         }
                     }
                 }
-            } while (restartPending)
+            } while (restartMutex.withLock { restartQueue.isNotEmpty() })
         } finally {
-            restartMutex.unlock()
+            restartMutex.withLock {
+                if (restartQueue.isEmpty()) {
+                    restartInProgress = false
+                }
+            }
         }
     }
 

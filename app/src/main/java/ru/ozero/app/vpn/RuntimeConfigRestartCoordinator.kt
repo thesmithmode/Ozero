@@ -8,6 +8,7 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.app.logging.AppLogger
 import ru.ozero.commonvpn.OzeroVpnService
@@ -23,7 +24,8 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
     private val tunnelController: TunnelController,
 ) {
     private val restartMutex = Mutex()
-    private var restartPending = false
+    private val restartQueue = ArrayDeque<String>()
+    private var restartInProgress = false
     private var started = false
 
     fun start(scope: CoroutineScope) {
@@ -40,30 +42,45 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
     }
 
     private suspend fun restartVpnIfRunning(reason: String): Boolean {
-        if (!restartMutex.tryLock()) {
-            restartPending = true
+        var shouldProcess = false
+        restartMutex.withLock {
+            restartQueue.addLast(reason)
+            if (!restartInProgress) {
+                restartInProgress = true
+                shouldProcess = true
+            }
+        }
+        if (!shouldProcess) {
             AppLogger.d(TAG, "runtime config restart request coalesced")
             return false
         }
         var completed = false
         try {
-            var nextReason = reason
             do {
-                restartPending = false
+                val nextReason = restartMutex.withLock {
+                    restartQueue.removeFirstOrNull().also {
+                        if (it == null) {
+                            restartInProgress = false
+                        }
+                    }
+                } ?: return completed
                 if (!performRestartIfRunning(nextReason)) return false
                 completed = true
-                nextReason = "coalesced runtime config changed while restart was running -> restart"
-                if (restartPending) {
+                if (restartMutex.withLock { restartQueue.isNotEmpty() }) {
                     withTimeoutOrNull(RESTART_SETTLE_TIMEOUT_MS) {
                         tunnelController.state.first {
                             it is TunnelState.Connected || it is TunnelState.Failed
                         }
                     }
                 }
-            } while (restartPending)
+            } while (restartMutex.withLock { restartQueue.isNotEmpty() })
             return completed
         } finally {
-            restartMutex.unlock()
+            restartMutex.withLock {
+                if (restartQueue.isEmpty()) {
+                    restartInProgress = false
+                }
+            }
         }
     }
 
