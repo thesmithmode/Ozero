@@ -282,8 +282,12 @@ class StartSequenceCoordinatorBehaviorTest {
             ),
         )
         val startupFd = mockk<ParcelFileDescriptor>(relaxed = true)
-        val startupBuilder = mockk<VpnService.Builder> { every { establish() } returns startupFd }
-        val engineBuilder = mockk<VpnService.Builder> { every { establish() } throws IllegalStateException("slot busy") }
+        val startupBuilder = mockk<VpnService.Builder> {
+            every { establish() } returns startupFd
+        }
+        val engineBuilder = mockk<VpnService.Builder> {
+            every { establish() } throws IllegalStateException("slot busy")
+        }
 
         every { fixture.tunBuilderHelper.buildTunBuilder(any(), any(), any(), any()) } returns startupBuilder
         every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), any()) } returns engineBuilder
