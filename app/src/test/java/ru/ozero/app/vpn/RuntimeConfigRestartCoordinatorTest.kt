@@ -2,9 +2,9 @@ package ru.ozero.app.vpn
 
 import android.content.Context
 import android.content.Intent
+import io.mockk.any
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.isA
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
@@ -13,7 +13,6 @@ import ru.ozero.enginescore.EngineId
 import java.lang.reflect.InvocationTargetException
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.suspendCoroutine
-import kotlin.coroutines.coroutineContext
 import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -26,7 +25,7 @@ class RuntimeConfigRestartCoordinatorTest {
     fun `restart queue clears after exception and accepts the next restart`() = runTest {
         val context = mockk<Context>()
         var startServiceCalls = 0
-        every { context.startService(isA<Intent>()) } answers {
+        every { context.startService(any<Intent>()) } answers {
             startServiceCalls += 1
             throw IllegalStateException("boom")
         }
@@ -65,7 +64,7 @@ class RuntimeConfigRestartCoordinatorTest {
                     this,
                     reason,
                     object : Continuation<Boolean> {
-                        override val context = coroutineContext
+                        override val context = cont.context
                         override fun resumeWith(result: Result<Boolean>) {
                             cont.resumeWith(result)
                         }

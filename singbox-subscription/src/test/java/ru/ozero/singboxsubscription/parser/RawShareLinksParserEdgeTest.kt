@@ -95,7 +95,7 @@ class RawShareLinksParserEdgeTest {
         val disabled = result[1] as VMessBean
         assertEquals("none", disabled.security)
         val ss = result[2] as ShadowsocksBean
-        assertEquals("method=aes-128-gcm", ss.method)
+        assertEquals("aes-128-gcm", ss.method)
         val trojan = result[3] as TrojanBean
         assertEquals("tls", trojan.security)
         assertFalse(trojan.allowInsecure)

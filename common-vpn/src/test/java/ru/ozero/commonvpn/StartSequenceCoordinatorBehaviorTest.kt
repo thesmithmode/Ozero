@@ -301,7 +301,7 @@ class StartSequenceCoordinatorBehaviorTest {
         assertTrue(fixture.tunnelController.killswitchActive.value)
         assertFalse(fixture.stopRequested.get())
         assertEquals(startupFd, fixture.state.lockdownStartupFdRef.get())
-        assertEquals(0, fixture.stopRequested.get())
+        assertFalse(fixture.stopRequested.get())
         verify(exactly = 0) { fixture.tunnelGateway.start(any()) }
         verify(exactly = 1) {
             fixture.engineWatchdog.handleEngineFailure(
@@ -637,7 +637,7 @@ class StartSequenceCoordinatorBehaviorTest {
     }
 
     private fun startFixture(
-        vararg engines: FakeEnginePlugin,
+        vararg engines: EnginePlugin,
         settings: SettingsModel,
         settingsFlow: Flow<SettingsModel>? = null,
         stopping: Boolean = false,

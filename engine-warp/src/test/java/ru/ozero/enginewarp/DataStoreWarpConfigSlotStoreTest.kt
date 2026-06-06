@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import org.json.JSONArray
+import org.json.JSONObject
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import kotlin.test.assertEquals
@@ -496,18 +498,38 @@ class DataStoreWarpConfigSlotStoreTest {
         doHProvider: String? = null,
     ): String {
         val c = sample
-        val cfg = buildString {
-            append("""{"priv":"${c.privateKey}","pub":"${c.publicKey}","peerPub":"${c.peerPublicKey}",""")
-            append(""" "peerEndpoint":"${c.peerEndpoint}","ifaceV4":"${c.interfaceAddressV4}","""")
-            append(""" "ifaceV6":"${c.interfaceAddressV6}","license":"${c.accountLicense}","mtu":${c.mtu},"""")
-            append(""" "dnsServers":["1.1.1.1"],"allowedIps":["0.0.0.0/0","::/0"],""")
-            if (doHProvider != null) {
-                append(" \"doHProvider\":\"$doHProvider\",")
-            }
-            append(""" "keepalive":${c.keepaliveSeconds},""")
-            append(""" "awgParams":{"jc":0,"jmin":0,"jmax":0,"s1":0,"s2":0,"h1":1,"h2":2,"h3":3,"h4":4}}""")
-        }.replace("  ", "")
-        return """{"id":"$id","name":"$name","isActive":false,"config":$cfg}"""
+        val config = JSONObject()
+            .put("priv", c.privateKey)
+            .put("pub", c.publicKey)
+            .put("peerPub", c.peerPublicKey)
+            .put("peerEndpoint", c.peerEndpoint)
+            .put("ifaceV4", c.interfaceAddressV4)
+            .put("ifaceV6", c.interfaceAddressV6)
+            .put("license", c.accountLicense)
+            .put("mtu", c.mtu)
+            .put("dnsServers", JSONArray().put("1.1.1.1"))
+            .put("allowedIps", JSONArray().put("0.0.0.0/0").put("::/0"))
+            .put("keepalive", c.keepaliveSeconds)
+            .put(
+                "awgParams",
+                JSONObject()
+                    .put("jc", 0)
+                    .put("jmin", 0)
+                    .put("jmax", 0)
+                    .put("s1", 0)
+                    .put("s2", 0)
+                    .put("h1", 1)
+                    .put("h2", 2)
+                    .put("h3", 3)
+                    .put("h4", 4),
+            )
+        doHProvider?.let { config.put("doHProvider", it) }
+        return JSONObject()
+            .put("id", id)
+            .put("name", name)
+            .put("isActive", false)
+            .put("config", config)
+            .toString()
     }
 
     private class FakePreferencesDataStore : DataStore<Preferences> {
