@@ -17,7 +17,10 @@ object ByeDpiArgvValidator {
                 token == "-n" -> expectedValueFor = token
                 token.startsWith("--") -> {
                     if (!isLongOptionToken(token)) return false
-                    if (ByeDpiOptionBlocks.requiresDetachedValue(token)) {
+                    val rawName = token.substringBefore('=')
+                    if (token.contains("=")) {
+                        if (!isValueValid(rawName, token.substringAfter('='))) return false
+                    } else if (ByeDpiOptionBlocks.requiresDetachedValue(rawName)) {
                         expectedValueFor = token
                     }
                 }

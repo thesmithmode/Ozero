@@ -251,6 +251,33 @@ class ConfigBuilderBranchCoverageTest {
         assertFalse(json.contains("\"plugin_opts\""))
     }
 
+    @Test
+    fun `vless flow normalization keeps vision variants only`() {
+        val blank = ConfigBuilder.buildSingboxConfig(vless().apply { flow = " " })
+        val exact = ConfigBuilder.buildSingboxConfig(vless().apply { flow = "xtls-rprx-vision" })
+        val suffixed = ConfigBuilder.buildSingboxConfig(vless().apply { flow = "xtls-rprx-vision-udp443" })
+        val unsupported = ConfigBuilder.buildSingboxConfig(vless().apply { flow = "unknown-flow" })
+
+        assertFalse(blank.contains("\"flow\""))
+        assertContains(exact, "\"flow\":\"xtls-rprx-vision\"")
+        assertContains(suffixed, "\"flow\":\"xtls-rprx-vision\"")
+        assertFalse(unsupported.contains("\"flow\""))
+    }
+
+    @Test
+    fun `auto chain config emits upstream detour for every supported proxy`() {
+        val json = ConfigBuilder.buildAutoChainConfig(
+            beans = listOf(vless(), vmess(), vless(uuid = "unsupported").apply { type = "splithttp" }),
+            socksPort = 2090,
+            upstream = ConfigBuilder.Upstream("127.0.0.1", 1080),
+        )
+
+        assertContains(json, "\"tag\":\"upstream\"")
+        assertContains(json, "\"detour\":\"upstream\"")
+        assertContains(json, "\"listen_port\":2090")
+        assertFalse(json.contains("unsupported"))
+    }
+
     private fun vless(uuid: String = "12345678-1234-1234-1234-123456789abc") = VLESSBean().apply {
         this.uuid = uuid
         serverAddress = "server.example.com"

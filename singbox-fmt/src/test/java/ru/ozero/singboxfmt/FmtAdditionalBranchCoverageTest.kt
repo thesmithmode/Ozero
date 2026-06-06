@@ -107,4 +107,23 @@ class FmtAdditionalBranchCoverageTest {
         assertEquals(443, ss.serverPort)
         assertEquals("", ss.plugin)
     }
+
+    @Test
+    fun `vless parser covers quic and tcp http branches`() {
+        val quic = V2RayFmt.parseVLESS(
+            "vless://id@vl.example.com:443?type=quic&headerType=srtp&quicSecurity=aes-128-gcm&key=secret",
+        )
+        assertEquals("quic", quic.type)
+        assertEquals("srtp", quic.headerType)
+        assertEquals("aes-128-gcm", quic.quicSecurity)
+        assertEquals("secret", quic.quicKey)
+
+        val tcpHttp = V2RayFmt.parseVLESS(
+            "vless://id@vl.example.com:443?type=tcp&headerType=http&host=front.example.com&path=/tcp",
+        )
+        assertEquals("tcp", tcpHttp.type)
+        assertEquals("http", tcpHttp.headerType)
+        assertEquals("front.example.com", tcpHttp.host)
+        assertEquals("/tcp", tcpHttp.path)
+    }
 }

@@ -172,7 +172,7 @@ class EngineWatchdogCoordinator(
             PersistentLoggers.warn(TAG, "ignore inactive engine failure: engine=$engineId reason=$reason")
             return false
         }
-        if (killswitchProvider() && hasBlockingTun()) {
+        if (killswitchProvider() && hasBlockingTunForKillswitch()) {
             enterKillswitchMode(engineId, reason)
             return true
         } else {

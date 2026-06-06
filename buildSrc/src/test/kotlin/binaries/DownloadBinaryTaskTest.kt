@@ -343,4 +343,20 @@ class DownloadBinaryTaskTest {
 
         assertThat(exception.gradleMessage()).isEqualTo("RuntimeException")
     }
+
+    @Test
+    fun `gradleMessage falls back when message is blank`() {
+        val exception = object : RuntimeException("   ") {}
+
+        assertThat(exception.gradleMessage()).isEqualTo("RuntimeException")
+    }
+
+    @Test
+    fun `gradleMessage falls back to superclass name for anonymous throwable`() {
+        val exception = object : Throwable() {
+            override val message: String? = ""
+        }
+
+        assertThat(exception.gradleMessage()).isEqualTo("Throwable")
+    }
 }

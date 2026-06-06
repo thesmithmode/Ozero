@@ -10,6 +10,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class UrnetworkConfigStoreTest {
 
@@ -257,6 +258,122 @@ class UrnetworkConfigStoreTest {
         assertEquals("DE", snap.countryCode)
         assertNull(snap.region)
         assertEquals("Munich", snap.city)
+    }
+
+    @Test
+    fun `config persists enum and boolean branches`() = runTest {
+        val (store, _) = newStore()
+
+        store.update {
+            it.copy(
+                windowType = UrnetworkWindowType.SPEED,
+                fixedIpSize = true,
+                allowDirect = false,
+                provideEnabled = false,
+                provideControlMode = UrnetworkProvideControlMode.AUTO,
+                provideNetworkMode = UrnetworkProvideNetworkMode.ALL,
+            )
+        }
+
+        val snap = store.config().first()
+        assertEquals(UrnetworkWindowType.SPEED, snap.windowType)
+        assertEquals(true, snap.fixedIpSize)
+        assertEquals(false, snap.allowDirect)
+        assertEquals(false, snap.provideEnabled)
+        assertEquals(UrnetworkProvideControlMode.AUTO, snap.provideControlMode)
+        assertEquals(UrnetworkProvideNetworkMode.ALL, snap.provideNetworkMode)
+    }
+
+    @Test
+    fun `cached locations roundtrip all buckets and optional fields`() = runTest {
+        val (store, _) = newStore()
+        val country = UrnetworkCachedLocation(
+            name = "Germany",
+            countryCode = "de",
+            providerCount = 12,
+            isStable = false,
+            isStrongPrivacy = true,
+        )
+        val region = UrnetworkCachedLocation(
+            name = "Bavaria",
+            countryCode = "DE",
+            region = "Bavaria",
+            providerCount = 3,
+        )
+        val city = UrnetworkCachedLocation(
+            name = "Munich",
+            countryCode = "DE",
+            region = "Bavaria",
+            city = "Munich",
+            providerCount = 2,
+        )
+        val best = UrnetworkCachedLocation(
+            name = "Best",
+            countryCode = "US",
+            city = "New York",
+            isStrongPrivacy = true,
+        )
+
+        store.setCachedLocations(
+            countries = listOf(country),
+            regions = listOf(region),
+            cities = listOf(city),
+            bestMatches = listOf(best),
+        )
+
+        val snap = store.config().first()
+        assertEquals("DE", snap.cachedCountries.single().countryCode)
+        assertEquals(false, snap.cachedCountries.single().isStable)
+        assertEquals(true, snap.cachedCountries.single().isStrongPrivacy)
+        assertEquals("Bavaria", snap.cachedRegions.single().region)
+        assertEquals("Munich", snap.cachedCities.single().city)
+        assertEquals("New York", snap.cachedBestMatches.single().city)
+    }
+
+    @Test
+    fun `empty cached locations remove persisted json`() = runTest {
+        val (store, _) = newStore()
+        store.setCachedLocations(
+            countries = listOf(UrnetworkCachedLocation("Germany", "DE")),
+            regions = emptyList(),
+            cities = emptyList(),
+            bestMatches = emptyList(),
+        )
+
+        store.setCachedLocations(emptyList(), emptyList(), emptyList(), emptyList())
+
+        val snap = store.config().first()
+        assertTrue(snap.cachedCountries.isEmpty())
+        assertTrue(snap.cachedRegions.isEmpty())
+        assertTrue(snap.cachedCities.isEmpty())
+        assertTrue(snap.cachedBestMatches.isEmpty())
+    }
+
+    @Test
+    fun `cached locations are capped to max size`() = runTest {
+        val (store, _) = newStore()
+        val locations = (1..510).map { index ->
+            UrnetworkCachedLocation(name = "L$index", countryCode = "US")
+        }
+
+        store.setCachedLocations(locations, emptyList(), emptyList(), emptyList())
+
+        val cached = store.config().first().cachedCountries
+        assertEquals(500, cached.size)
+        assertEquals("L1", cached.first().name)
+        assertEquals("L500", cached.last().name)
+    }
+
+    @Test
+    fun `location selection normalization rejects invalid country only values`() {
+        assertNull(UrnetworkLocationSelection("U1", null, null).normalized())
+        assertNull(UrnetworkLocationSelection("USA", null, null).normalized())
+        assertEquals(
+            UrnetworkLocationSelection("DE", "Bavaria", "Munich"),
+            UrnetworkLocationSelection(" de ", " Bavaria ", " Munich ").normalized(),
+        )
+        assertEquals("DE/Bavaria/Munich", UrnetworkLocationSelection("DE", "Bavaria", "Munich").summary())
+        assertEquals("??", UrnetworkLocationSelection.EMPTY.summary())
     }
 
     private class FakePreferencesDataStore : DataStore<Preferences> {

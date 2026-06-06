@@ -59,6 +59,22 @@ class WarpToWireGuardAdapterTest {
     }
 
     @Test
+    fun `clamps low MTU and accepts empty interface addresses`() {
+        val result = WarpToWireGuardAdapter.convert(
+            privateKey = "k=",
+            peerPublicKey = "p=",
+            peerEndpoint = "h:1234",
+            interfaceAddressV4 = "",
+            interfaceAddressV6 = "",
+            mtu = 1000,
+            keepaliveSeconds = 0,
+        )
+
+        assertEquals(1280, result.mtu)
+        assertEquals(emptyList(), result.localAddresses)
+    }
+
+    @Test
     fun `parses IPv6 bracket endpoint`() {
         val (host, port) = WarpToWireGuardAdapter.splitEndpoint("[::1]:8080")
         assertEquals("::1", host)
@@ -76,6 +92,13 @@ class WarpToWireGuardAdapterTest {
     fun `throws on invalid endpoint`() {
         assertThrows<IllegalArgumentException> {
             WarpToWireGuardAdapter.splitEndpoint("noport")
+        }
+    }
+
+    @Test
+    fun `throws on invalid endpoint port`() {
+        assertThrows<NumberFormatException> {
+            WarpToWireGuardAdapter.splitEndpoint("[::1]:bad")
         }
     }
 }

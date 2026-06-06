@@ -53,6 +53,16 @@ class CountryFlagTest {
     }
 
     @Test
+    fun `non letter first char returns white flag`() {
+        assertEquals(whiteFlag, CountryFlag.emoji("1U"))
+    }
+
+    @Test
+    fun `punctuation second char returns white flag`() {
+        assertEquals(whiteFlag, CountryFlag.emoji("U-"))
+    }
+
+    @Test
     fun `whitespace stripped — gb-with-spaces resolves to GB`() {
         assertEquals("🇬🇧", CountryFlag.emoji("  gb  "))
     }

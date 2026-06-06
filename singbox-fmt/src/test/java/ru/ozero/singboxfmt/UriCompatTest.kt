@@ -116,4 +116,15 @@ class UriCompatTest {
         assertEquals(443, uri.port)
         assertEquals("{a,b}", uri.getQueryParameter("extra"))
     }
+
+    @Test
+    fun `fallback parser preserves plus in user info and handles empty query pair`() {
+        val uri = UriCompat.parse("trojan://pa+ss@[2001:db8::2]?=blank-key&&bad=%GG")
+
+        assertEquals("pa+ss", uri.userInfo)
+        assertEquals("2001:db8::2", uri.host)
+        assertEquals(-1, uri.port)
+        assertEquals("blank-key", uri.getQueryParameter(""))
+        assertEquals("%GG", uri.getQueryParameter("bad"))
+    }
 }

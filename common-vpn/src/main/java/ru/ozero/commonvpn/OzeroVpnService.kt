@@ -347,7 +347,12 @@ class OzeroVpnService : android.net.VpnService() {
         }.getOrDefault("")
     }
 
-    private fun stopVpn() = shutdownCoord.stopVpn()
+    private fun stopVpn() {
+        if (runtimeConfigRestartInProgress.get()) {
+            runtimeConfigRestartCancelled.set(true)
+        }
+        shutdownCoord.stopVpn()
+    }
 
     private fun restartVpn() {
         val shutdownStarted = stopping.compareAndSet(false, true)

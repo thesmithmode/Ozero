@@ -3,6 +3,7 @@ package ru.ozero.corebackup
 import org.json.JSONObject
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -235,5 +236,39 @@ class AppBackupSerializerTest {
         assertEquals(1.5f, json.floatOrNull("float"))
         assertEquals(true, json.booleanOrNull("bool"))
         assertEquals(null, json.intOrNull("missing"))
+    }
+
+    @Test
+    fun `deserialize rejects unsupported versions and malformed json`() {
+        val tooOld = assertFailsWith<AppBackupSerializer.BackupParseException> {
+            AppBackupSerializer.deserialize("""{"version":0}""")
+        }
+        val tooNew = assertFailsWith<AppBackupSerializer.BackupParseException> {
+            AppBackupSerializer.deserialize("""{"version":999}""")
+        }
+        val malformed = assertFailsWith<AppBackupSerializer.BackupParseException> {
+            AppBackupSerializer.deserialize("{")
+        }
+
+        assertTrue(tooOld.message.orEmpty().contains("Unsupported backup version"))
+        assertTrue(tooNew.message.orEmpty().contains("Unsupported backup version"))
+        assertTrue(malformed.message.orEmpty().contains("Malformed backup JSON"))
+    }
+
+    @Test
+    fun `deserializeAuto rejects oversized and unreadable payloads`() {
+        val oversized = ByteArray(10 * 1024 * 1024 + 1)
+        val encrypted = AppBackupSerializer.serializeEncrypted(minimalBackupData)
+        encrypted[encrypted.lastIndex] = encrypted.last().inc()
+
+        val tooLarge = assertFailsWith<AppBackupSerializer.BackupParseException> {
+            AppBackupSerializer.deserializeAuto(oversized)
+        }
+        val unreadable = assertFailsWith<AppBackupSerializer.BackupParseException> {
+            AppBackupSerializer.deserializeAuto(encrypted)
+        }
+
+        assertTrue(tooLarge.message.orEmpty().contains("Backup file too large"))
+        assertTrue(unreadable.message.orEmpty().contains("Failed to read backup payload"))
     }
 }

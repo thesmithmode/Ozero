@@ -2,7 +2,6 @@ package ru.ozero.app.vpn
 
 import android.content.Context
 import android.content.Intent
-import io.mockk.any
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi

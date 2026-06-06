@@ -98,4 +98,21 @@ class V2RayFmtUtilsTest {
             assertEquals("/tcp", bean.path)
         }
     }
+
+    @Test
+    fun `parseTransportParams covers default branches without optional values`() {
+        VLESSBean().also { bean ->
+            V2RayFmtUtils.parseTransportParams(bean, UriCompat.parse("vless://id@example.com:443?type=tcp"))
+            assertEquals("tcp", bean.type)
+            assertEquals("none", bean.headerType)
+            assertEquals("", bean.host)
+            assertEquals("", bean.path)
+        }
+        VLESSBean().also { bean ->
+            V2RayFmtUtils.parseTransportParams(bean, UriCompat.parse("vless://id@example.com:443?type=httpupgrade"))
+            assertEquals("httpupgrade", bean.type)
+            assertEquals("", bean.host)
+            assertEquals("/", bean.path)
+        }
+    }
 }

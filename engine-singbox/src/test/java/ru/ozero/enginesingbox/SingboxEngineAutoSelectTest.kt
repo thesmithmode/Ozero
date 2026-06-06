@@ -11,7 +11,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.singboxfmt.KryoSerializer
+import ru.ozero.singboxfmt.ShadowsocksBean
+import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
+import ru.ozero.singboxfmt.VMessBean
 import ru.ozero.singboxroom.dao.ProxyChainDao
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.entity.ProxyChainStep
@@ -36,6 +39,33 @@ class SingboxEngineAutoSelectTest {
         }
         return KryoSerializer.serialize(bean)
     }
+
+    private fun makeVmessBlob(): ByteArray = KryoSerializer.serialize(
+        VMessBean().apply {
+            uuid = "vmess-id"
+            serverAddress = "vmess.example.com"
+            serverPort = 443
+            type = "tcp"
+        },
+    )
+
+    private fun makeTrojanBlob(): ByteArray = KryoSerializer.serialize(
+        TrojanBean().apply {
+            password = "secret"
+            serverAddress = "trojan.example.com"
+            serverPort = 443
+            type = "tcp"
+        },
+    )
+
+    private fun makeShadowsocksBlob(): ByteArray = KryoSerializer.serialize(
+        ShadowsocksBean().apply {
+            method = "aes-128-gcm"
+            password = "secret"
+            serverAddress = "ss.example.com"
+            serverPort = 8388
+        },
+    )
 
     private fun makeProfile(id: Long, groupId: Long, host: String, port: Int): ProxyProfile =
         ProxyProfile(
@@ -227,5 +257,62 @@ class SingboxEngineAutoSelectTest {
         assertNotNull(result)
         assertTrue(result is EngineConfig.Singbox)
         assertEquals(3, result.autoSelectBeanBlobs.size)
+    }
+
+    @Test
+    fun `buildManualConfig maps protocol type from selected bean class`() {
+        val cases = listOf(
+            makeVlessBlob() to SingboxEngine.PROTOCOL_VLESS,
+            makeVmessBlob() to SingboxEngine.PROTOCOL_VMESS,
+            makeTrojanBlob() to SingboxEngine.PROTOCOL_TROJAN,
+            makeShadowsocksBlob() to SingboxEngine.PROTOCOL_SHADOWSOCKS,
+        )
+
+        cases.forEachIndexed { index, (blob, expectedType) ->
+            val prefs = mutablePreferencesOf(beanKey to blob, selectedProfileKey to (index + 10L))
+            val profile = ProxyProfile(
+                id = index + 10L,
+                groupId = 1L,
+                name = "case-$index",
+                beanBlob = blob,
+                protocolType = expectedType,
+            )
+            val engine = buildEngine(prefs = prefs, profilesByGroup = mapOf(1L to listOf(profile)))
+            awaitInit()
+
+            val result = engine.buildManualConfig(null)
+
+            assertNotNull(result)
+            assertTrue(result is EngineConfig.Singbox)
+            assertEquals(expectedType, result.protocolType)
+        }
+    }
+
+    @Test
+    fun `buildManualConfig falls back to VLESS protocol for invalid blob`() {
+        val invalid = byteArrayOf(1, 2, 3)
+        val prefs = mutablePreferencesOf(beanKey to invalid)
+        val engine = buildEngine(prefs = prefs)
+        awaitInit()
+
+        val result = engine.buildManualConfig(null)
+
+        assertNotNull(result)
+        assertTrue(result is EngineConfig.Singbox)
+        assertEquals(SingboxEngine.PROTOCOL_VLESS, result.protocolType)
+    }
+
+    @Test
+    fun `buildProxyConfig mirrors manual config with proxy mode enabled`() {
+        val blob = makeVlessBlob()
+        val prefs = mutablePreferencesOf(beanKey to blob)
+        val engine = buildEngine(prefs = prefs)
+        awaitInit()
+
+        val result = engine.buildProxyConfig(null)
+
+        assertNotNull(result)
+        assertTrue(result.proxyMode)
+        assertTrue(result.beanBlob.contentEquals(blob))
     }
 }

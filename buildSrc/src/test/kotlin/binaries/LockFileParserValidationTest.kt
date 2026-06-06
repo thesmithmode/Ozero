@@ -199,6 +199,52 @@ class LockFileParserValidationTest {
     }
 
     @Test
+    fun `reject uppercase sha256`() {
+        val f = write(
+            """
+            tag: binaries-x
+            generated_at: 2026-04-25T10:00:00Z
+            artifacts:
+              - name: libx.so
+                engine: x
+                abi: arm64-v8a
+                destination: jniLibs
+                download_url: https://example.com/x.so
+                sha256: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+                size_bytes: 1
+                source_repo: https://example.com
+                source_commit: 9999999999999999999999999999999999999999
+            """.trimIndent(),
+        )
+        assertThatThrownBy { LockFileParser.parse(f) }
+            .isInstanceOf(LockFileException::class.java)
+            .hasMessageContaining("lowercase")
+    }
+
+    @Test
+    fun `reject jniLibs artifact with numeric abi`() {
+        val f = write(
+            """
+            tag: binaries-x
+            generated_at: 2026-04-25T10:00:00Z
+            artifacts:
+              - name: libx.so
+                engine: x
+                abi: 64
+                destination: jniLibs
+                download_url: https://example.com/x.so
+                sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                size_bytes: 1
+                source_repo: https://example.com
+                source_commit: 9999999999999999999999999999999999999999
+            """.trimIndent(),
+        )
+        assertThatThrownBy { LockFileParser.parse(f) }
+            .isInstanceOf(LockFileException::class.java)
+            .hasMessageContaining("abi")
+    }
+
+    @Test
     fun `reject empty file`() {
         val f = write("")
         assertThatThrownBy { LockFileParser.parse(f) }

@@ -588,4 +588,52 @@ class SubscriptionParserBranchCoverageTest {
         assertEquals("sid", realityEnabled.realityShortId)
         assertEquals("chrome", realityEnabled.realityFingerprint)
     }
+
+    @Test
+    fun `clash parser covers scalar list and shadowsocks cipher edge branches`() {
+        val yaml = """
+            proxies:
+              - name: Scalar ALPN
+                type: vless
+                server: scalar.example.com
+                port: 443
+                uuid: 12345678-1234-1234-1234-123456789abc
+                security: tls
+                alpn: h3
+                public-key: top-pk
+                short-id: top-sid
+              - name: Numeric Cipher
+                type: ss
+                server: numeric.example.com
+                port: 8388
+                cipher: 2022
+                password: pwd
+              - name: Boolean Cipher
+                type: ss
+                server: boolean.example.com
+                port: 8388
+                cipher: true
+                password: pwd
+              - name: Map Cipher Without Method
+                type: ss
+                server: map.example.com
+                port: 8388
+                cipher:
+                  mode: cfb
+                  rounds: 2
+                password: pwd
+        """.trimIndent()
+
+        val result = ClashYamlParser.parse(yaml)
+
+        assertEquals(4, result.size)
+        val vless = result[0] as VLESSBean
+        assertEquals("h3", vless.alpn)
+        assertEquals("reality", vless.security)
+        assertEquals("top-pk", vless.realityPublicKey)
+        assertEquals("top-sid", vless.realityShortId)
+        assertEquals("2022", (result[1] as ShadowsocksBean).method)
+        assertEquals("true", (result[2] as ShadowsocksBean).method)
+        assertEquals("mode=cfb,rounds=2", (result[3] as ShadowsocksBean).method)
+    }
 }

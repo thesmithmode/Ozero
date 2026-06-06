@@ -51,6 +51,16 @@ class DnsMessageTest {
     }
 
     @Test
+    fun parseAAnswersReturnsEmptyWhenAnswerCountIsZero() {
+        val body = byteArrayOf(
+            0, 0, 0x81.toByte(), 0x80.toByte(), 0, 1, 0, 0, 0, 0, 0, 0,
+            1, 'a'.code.toByte(), 0,
+            0, 1, 0, 1,
+        )
+        assertTrue(DnsMessage.parseAAnswers(body).isEmpty())
+    }
+
+    @Test
     fun parseAAnswersIgnoresAAAARecords() {
         val body = byteArrayOf(
             0, 0, 0x81.toByte(), 0x80.toByte(), 0, 1, 0, 1, 0, 0, 0, 0,
@@ -58,6 +68,52 @@ class DnsMessageTest {
             0, 28, 0, 1,
             0xC0.toByte(), 0x0C, 0, 28, 0, 1, 0, 0, 0, 60, 0, 16,
             0x20, 0x01, 0x0d, 0xb8.toByte(), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+        )
+        assertTrue(DnsMessage.parseAAnswers(body).isEmpty())
+    }
+
+    @Test
+    fun parseAAnswersExtractsIpv4FromCompressedAnswerName() {
+        val body = byteArrayOf(
+            0, 0, 0x81.toByte(), 0x80.toByte(), 0, 1, 0, 1, 0, 0, 0, 0,
+            1, 'a'.code.toByte(), 0,
+            0, 1, 0, 1,
+            0xC0.toByte(), 0x0C, 0, 1, 0, 1, 0, 0, 0, 60, 0, 4,
+            1, 2, 3, 4,
+        )
+        assertEquals(listOf("1.2.3.4"), DnsMessage.parseAAnswers(body))
+    }
+
+    @Test
+    fun parseAAnswersStopsOnTruncatedCompressedAnswerName() {
+        val body = byteArrayOf(
+            0, 0, 0x81.toByte(), 0x80.toByte(), 0, 1, 0, 1, 0, 0, 0, 0,
+            1, 'a'.code.toByte(), 0,
+            0, 1, 0, 1,
+            0xC0.toByte(),
+        )
+        assertTrue(DnsMessage.parseAAnswers(body).isEmpty())
+    }
+
+    @Test
+    fun parseAAnswersStopsOnTruncatedResourceRecordHeader() {
+        val body = byteArrayOf(
+            0, 0, 0x81.toByte(), 0x80.toByte(), 0, 1, 0, 1, 0, 0, 0, 0,
+            1, 'a'.code.toByte(), 0,
+            0, 1, 0, 1,
+            0,
+        )
+        assertTrue(DnsMessage.parseAAnswers(body).isEmpty())
+    }
+
+    @Test
+    fun parseAAnswersStopsOnTruncatedRdata() {
+        val body = byteArrayOf(
+            0, 0, 0x81.toByte(), 0x80.toByte(), 0, 1, 0, 1, 0, 0, 0, 0,
+            1, 'a'.code.toByte(), 0,
+            0, 1, 0, 1,
+            0xC0.toByte(), 0x0C, 0, 1, 0, 1, 0, 0, 0, 60, 0, 4,
+            1, 2,
         )
         assertTrue(DnsMessage.parseAAnswers(body).isEmpty())
     }

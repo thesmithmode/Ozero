@@ -251,6 +251,23 @@ class RawUpdaterTest {
     }
 
     @Test
+    fun `should preserve non chain TLS failures`() = runBlocking {
+        rawUpdater = RawUpdater(
+            okHttpClient = OkHttpClient.Builder()
+                .addInterceptor { throw SSLHandshakeException("certificate expired") }
+                .build(),
+            groupDao = groupDao,
+            profileDao = profileDao,
+        )
+        val g = group()
+
+        val result = rawUpdater.refresh(g)
+
+        assertTrue(result.isFailure)
+        assertEquals("certificate expired", result.exceptionOrNull()?.message)
+    }
+
+    @Test
     fun `should return zero count for empty body`() = runBlocking {
         server.enqueue(MockResponse().setBody(""))
         val g = group()

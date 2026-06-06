@@ -19,6 +19,9 @@ class RomCompatTest {
     fun redmagic_model_returns_true() = assertTrue(check("nubia", "RedMagic 9 Pro"))
 
     @Test
+    fun redmagic_model_without_nubia_manufacturer_returns_true() = assertTrue(check("unknown", "RedMagic 9 Pro"))
+
+    @Test
     fun nx7_model_returns_true() = assertTrue(check("Nubia", "NX729J"))
 
     @Test
