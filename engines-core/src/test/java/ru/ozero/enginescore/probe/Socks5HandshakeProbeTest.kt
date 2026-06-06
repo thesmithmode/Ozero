@@ -66,6 +66,7 @@ class Socks5HandshakeProbeTest {
     private class OneShotSocksServer(private val response: ByteArray) {
         private val socket = ServerSocket(0)
         val port: Int = socket.localPort
+
         @Volatile
         var received: ByteArray = ByteArray(0)
 
