@@ -29,14 +29,23 @@ class EnginePluginDefaultsTest {
     @Test
     fun `default ipProbeRoute maps every exit node strategy`() = runTest {
         assertEquals(IpProbeRoute.Default, FakePlugin(ExitNodeStrategy.DirectHttp).ipProbeRoute(1080))
-        assertEquals(IpProbeRoute.Socks("127.0.0.1", 1080), FakePlugin(ExitNodeStrategy.ViaSocks("127.0.0.1", 1080)).ipProbeRoute(1080))
-        assertEquals(IpProbeRoute.StaticLocation("Germany", "DE"), FakePlugin(ExitNodeStrategy.LocationOnly("Germany", "DE")).ipProbeRoute(1080))
+        assertEquals(
+            IpProbeRoute.Socks("127.0.0.1", 1080),
+            FakePlugin(ExitNodeStrategy.ViaSocks("127.0.0.1", 1080)).ipProbeRoute(1080),
+        )
+        assertEquals(
+            IpProbeRoute.StaticLocation("Germany", "DE"),
+            FakePlugin(ExitNodeStrategy.LocationOnly("Germany", "DE")).ipProbeRoute(1080),
+        )
         assertEquals(
             IpProbeRoute.StaticLocation("Provider", "NL", "203.0.113.1"),
             FakePlugin(ExitNodeStrategy.ProviderLabel("Provider", "NL", "203.0.113.1")).ipProbeRoute(1080),
         )
         assertEquals(IpProbeRoute.AutoSelected, FakePlugin(ExitNodeStrategy.AutoSelected()).ipProbeRoute(1080))
-        assertEquals(IpProbeRoute.Unavailable("offline"), FakePlugin(ExitNodeStrategy.Unavailable("offline")).ipProbeRoute(1080))
+        assertEquals(
+            IpProbeRoute.Unavailable("offline"),
+            FakePlugin(ExitNodeStrategy.Unavailable("offline")).ipProbeRoute(1080),
+        )
         assertIs<ExitNodeStrategy.Unavailable>(FakePlugin().exitNodeStrategy(1080))
     }
 
@@ -53,7 +62,8 @@ class EnginePluginDefaultsTest {
             supportsUpstreamSocks = false,
         )
 
-        override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult = StartResult.Success(1080)
+        override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult =
+            StartResult.Success(1080)
 
         override suspend fun stop() = Unit
 

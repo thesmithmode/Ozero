@@ -16,11 +16,8 @@ object ByeDpiArgvValidator {
             when {
                 token == "-n" -> expectedValueFor = token
                 token.startsWith("--") -> {
-                    if (!isLongOptionToken(token)) return false
-                    val rawName = token.substringBefore('=')
-                    if (token.contains("=")) {
-                        if (!isValueValid(rawName, token.substringAfter('='))) return false
-                    } else if (ByeDpiOptionBlocks.requiresDetachedValue(rawName)) {
+                    if (!isLongOptionValid(token)) return false
+                    if (expectsDetachedLongValue(token)) {
                         expectedValueFor = token
                     }
                 }
@@ -46,6 +43,16 @@ object ByeDpiArgvValidator {
                 isModifierValue(token) && !token.startsWith("-")
             else -> token.isNotBlank()
         }
+
+    private fun isLongOptionValid(token: String): Boolean {
+        if (!isLongOptionToken(token)) return false
+        if (!token.contains("=")) return true
+        val rawName = token.substringBefore('=')
+        return isValueValid(rawName, token.substringAfter('='))
+    }
+
+    private fun expectsDetachedLongValue(token: String): Boolean =
+        !token.contains("=") && ByeDpiOptionBlocks.requiresDetachedValue(token.substringBefore('='))
 
     private fun isFlagToken(token: String): Boolean {
         if (token.length < 2) return false
