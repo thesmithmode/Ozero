@@ -29,7 +29,6 @@ class EngineWatchdogCoordinator(
     private val stopping: AtomicBoolean,
     private val starting: AtomicBoolean,
     private val killswitchProvider: () -> Boolean,
-    private val restartInProgressProvider: () -> Boolean,
     private val stopVpnRequest: () -> Unit,
 ) {
 
@@ -185,8 +184,7 @@ class EngineWatchdogCoordinator(
     private fun hasBlockingTun(): Boolean =
         tunFdRef.get() != null || lockdownStartupFdRef.get() != null
 
-    private fun hasBlockingTunForKillswitch(): Boolean =
-        hasBlockingTun() || restartInProgressProvider()
+    private fun hasBlockingTunForKillswitch(): Boolean = hasBlockingTun()
 
     private fun isActiveEngine(engineId: EngineId): Boolean = when (val state = tunnelController.state.value) {
         is TunnelState.Probing -> state.engineId == null || state.engineId == engineId

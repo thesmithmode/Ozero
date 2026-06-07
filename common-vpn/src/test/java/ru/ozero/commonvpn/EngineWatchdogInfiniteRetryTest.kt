@@ -79,7 +79,6 @@ class EngineWatchdogInfiniteRetryTest {
             stopping = AtomicBoolean(false),
             starting = AtomicBoolean(false),
             killswitchProvider = { false },
-            restartInProgressProvider = { false },
             stopVpnRequest = { stopVpnInvocations.updateAndGet { it + 1 } },
         )
         return watchdog to controller

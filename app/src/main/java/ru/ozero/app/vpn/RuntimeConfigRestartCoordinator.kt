@@ -55,42 +55,31 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
             return false
         }
         var completed = false
-        try {
-            do {
-                val nextReason = restartMutex.withLock {
-                    restartQueue.removeFirstOrNull().also {
-                        if (it == null) {
-                            restartInProgress = false
-                        }
-                    }
-                } ?: return completed
-                if (!performRestartIfRunning(nextReason)) {
-                    abortQueuedRestarts()
-                    return false
+        while (true) {
+            val nextReason = restartMutex.withLock {
+                restartQueue.removeFirstOrNull()?.also {
+                    restartInProgress = true
+                } ?: run {
+                    restartInProgress = false
+                    null
                 }
-                completed = true
-                if (restartMutex.withLock { restartQueue.isNotEmpty() }) {
-                    withTimeoutOrNull(RESTART_SETTLE_TIMEOUT_MS) {
-                        tunnelController.state.first {
-                            it is TunnelState.Connected || it is TunnelState.Failed
-                        }
+            } ?: return completed
+            if (!performRestartIfRunning(nextReason)) {
+                abortQueuedRestarts()
+                return false
+            }
+            completed = true
+            if (restartMutex.withLock { restartQueue.isNotEmpty() }) {
+                withTimeoutOrNull(RESTART_SETTLE_TIMEOUT_MS) {
+                    tunnelController.state.first {
+                        it is TunnelState.Connected || it is TunnelState.Failed
                     }
                 }
-            } while (restartMutex.withLock { restartQueue.isNotEmpty() })
-            return completed
-        } finally {
-            resetRestartState()
+            }
         }
     }
 
     private suspend fun abortQueuedRestarts() {
-        restartMutex.withLock {
-            restartQueue.clear()
-            restartInProgress = false
-        }
-    }
-
-    private suspend fun resetRestartState() {
         restartMutex.withLock {
             restartQueue.clear()
             restartInProgress = false

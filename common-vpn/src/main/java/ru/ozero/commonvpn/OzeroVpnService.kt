@@ -121,7 +121,6 @@ class OzeroVpnService : android.net.VpnService() {
             stopping = stopping,
             starting = starting,
             killswitchProvider = { killswitchCached },
-            restartInProgressProvider = { runtimeConfigRestartInProgress.get() },
             stopVpnRequest = { stopVpn() },
         )
     }

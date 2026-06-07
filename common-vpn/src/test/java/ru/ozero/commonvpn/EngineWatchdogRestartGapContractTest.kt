@@ -14,12 +14,12 @@ class EngineWatchdogRestartGapContractTest {
         ).readText()
 
         assertTrue(
-            source.contains("restartInProgressProvider"),
-            "EngineWatchdogCoordinator must accept runtime-restart state so restart gaps stay fail-closed.",
+            !source.contains("restartInProgressProvider"),
+            "EngineWatchdogCoordinator must not treat restart-in-progress as a blocking TUN.",
         )
         assertTrue(
             source.contains("hasBlockingTunForKillswitch()"),
-            "EngineWatchdogCoordinator must use the combined blocking check for killswitch decisions.",
+            "EngineWatchdogCoordinator must keep a dedicated blocking-TUN check for killswitch decisions.",
         )
     }
 }
