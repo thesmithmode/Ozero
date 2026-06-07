@@ -134,6 +134,35 @@ class DnsMessageTest {
     }
 
     @Test
+    fun parseAAAAAnswersStopsOnTruncatedAnswerHeader() {
+        val body = byteArrayOf(
+            0, 0, 0x81.toByte(), 0x80.toByte(), 0, 1, 0, 1, 0, 0, 0, 0,
+            1, 'a'.code.toByte(), 0,
+            0, 28, 0, 1,
+            0xC0.toByte(),
+        )
+        assertTrue(DnsMessage.parseAAAAAnswers(body).isEmpty())
+    }
+
+    @Test
+    fun parseAAAAAnswersStopsOnTruncatedRdata() {
+        val body = byteArrayOf(
+            0, 0, 0x81.toByte(), 0x80.toByte(), 0, 1, 0, 1, 0, 0, 0, 0,
+            1, 'a'.code.toByte(), 0,
+            0, 28, 0, 1,
+            0xC0.toByte(), 0x0C, 0, 28, 0, 1, 0, 0, 0, 60, 0, 16,
+            0x20, 0x01, 0x0d, 0xb8.toByte(),
+        )
+        assertTrue(DnsMessage.parseAAAAAnswers(body).isEmpty())
+    }
+
+    @Test
+    fun buildAQueryKeepsTwoLabelHostnameBoundary() {
+        val q = DnsMessage.buildAQuery("a.b")
+        assertEquals(21, q.size)
+    }
+
+    @Test
     fun `buildAQuery бросает IllegalArgumentException на label больше 63 байт`() {
         val tooLong = "a".repeat(64) + ".com"
         val e = kotlin.runCatching { DnsMessage.buildAQuery(tooLong) }.exceptionOrNull()

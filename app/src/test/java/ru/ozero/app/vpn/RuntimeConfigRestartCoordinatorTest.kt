@@ -39,7 +39,7 @@ class RuntimeConfigRestartCoordinatorTest {
         coordinator.restartQueue().addLast("queued-before")
 
         runCatching { coordinator.invokeRestart("current-request") }
-        assertEquals(listOf("ACTION_RESTART_RUNTIME_CONFIG"), startServiceActions)
+        assertEquals(listOf<String?>("ACTION_RESTART_RUNTIME_CONFIG"), startServiceActions)
         assertTrue(coordinator.restartQueue().isEmpty())
         assertFalse(coordinator.restartInProgress())
         assertTrue(tunnelController.switching.value == null)

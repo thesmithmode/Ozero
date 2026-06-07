@@ -100,4 +100,20 @@ class MasterDnsPreflightTest {
         assertEquals("2001:db8::1", host)
         assertEquals(53, port)
     }
+
+    @Test
+    fun `missing closing bracket falls back to whole value and 53`() {
+        val pf = MasterDnsPreflight(resolversProvider = { listOf("[2001:db8::1") })
+        val (host, port) = pf.resolveTarget()
+        assertEquals("[2001:db8::1", host)
+        assertEquals(53, port)
+    }
+
+    @Test
+    fun `invalid bracketed port falls back to 53`() {
+        val pf = MasterDnsPreflight(resolversProvider = { listOf("[2001:db8::1]:99999") })
+        val (host, port) = pf.resolveTarget()
+        assertEquals("2001:db8::1", host)
+        assertEquals(53, port)
+    }
 }

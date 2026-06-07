@@ -15,8 +15,8 @@ data class WarpTurnOnResult(
 
     override fun writeToParcel(parcel: Parcel, flags: Int) {
         parcel.writeInt(handle)
-        parcel.writeParcelable(socketV4, flags)
-        parcel.writeParcelable(socketV6, flags)
+        parcel.writeParcelFileDescriptor(socketV4)
+        parcel.writeParcelFileDescriptor(socketV6)
     }
 
     companion object {
@@ -24,8 +24,8 @@ data class WarpTurnOnResult(
         val CREATOR: Parcelable.Creator<WarpTurnOnResult> = object : Parcelable.Creator<WarpTurnOnResult> {
             override fun createFromParcel(parcel: Parcel): WarpTurnOnResult {
                 val handle = parcel.readInt()
-                val v4 = parcel.readParcelable<ParcelFileDescriptor>(ParcelFileDescriptor::class.java.classLoader)
-                val v6 = parcel.readParcelable<ParcelFileDescriptor>(ParcelFileDescriptor::class.java.classLoader)
+                val v4 = parcel.readParcelFileDescriptor()
+                val v6 = parcel.readParcelFileDescriptor()
                 return WarpTurnOnResult(handle, v4, v6)
             }
 
@@ -33,3 +33,11 @@ data class WarpTurnOnResult(
         }
     }
 }
+
+private fun Parcel.writeParcelFileDescriptor(value: ParcelFileDescriptor?) {
+    writeInt(if (value == null) 0 else 1)
+    if (value != null) writeFileDescriptor(value.fileDescriptor)
+}
+
+private fun Parcel.readParcelFileDescriptor(): ParcelFileDescriptor? =
+    if (readInt() == 0) null else ParcelFileDescriptor.dup(readFileDescriptor())

@@ -180,7 +180,8 @@ class EngineWatchdogCoordinatorContractTest {
         val body = source.substringAfter("fun handleEngineFailure(")
             .substringBefore("private fun enterKillswitchMode")
         assertTrue(
-            body.contains("killswitchProvider() && hasBlockingTun()"),
+            body.contains("killswitchProvider() && hasBlockingTunForKillswitch()") &&
+                !body.contains("restartInProgressProvider"),
             "True-branch обязана требовать killswitch=on + real blocking TUN. Body:\n$body",
         )
     }

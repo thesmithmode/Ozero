@@ -11,6 +11,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.test.TestScope
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -527,7 +528,7 @@ class UrnetworkLocationsViewModelTest {
 
         assertIs<UrnetworkSettingsUiState.NotConnected>(v.uiState.value)
     }
-    private suspend fun awaitReadyState(v: UrnetworkLocationsViewModel): UrnetworkSettingsUiState.Ready {
+    private suspend fun TestScope.awaitReadyState(v: UrnetworkLocationsViewModel): UrnetworkSettingsUiState.Ready {
         repeat(10) {
             val state = v.uiState.value
             if (state is UrnetworkSettingsUiState.Ready) return state

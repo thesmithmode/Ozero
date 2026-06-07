@@ -77,13 +77,13 @@ class DataStoreUrnetworkConfigStore(
                 for (i in 0 until arr.length()) {
                     val obj = arr.optJSONObject(i) ?: continue
                     val name = obj.optString("name").takeIf { it.isNotBlank() } ?: continue
-                    val code = obj.optString("code").takeIf { it.length == 2 } ?: continue
+                    val code = obj.nullableString("code")?.takeIf { it.length == 2 } ?: continue
                     add(
                         UrnetworkCachedLocation(
                             name = name,
                             countryCode = code.uppercase(),
-                            region = obj.optString("region").takeIf { it.isNotBlank() },
-                            city = obj.optString("city").takeIf { it.isNotBlank() },
+                            region = obj.nullableString("region"),
+                            city = obj.nullableString("city"),
                             providerCount = obj.optInt("providers", 0),
                             isStable = obj.optBoolean("stable", true),
                             isStrongPrivacy = obj.optBoolean("privacy", false),
@@ -99,14 +99,15 @@ class DataStoreUrnetworkConfigStore(
         val arr = JSONArray()
         items.take(MAX_CACHED_LOCATIONS).forEach { loc ->
             arr.put(
-                JSONObject()
-                    .put("name", loc.name)
-                    .put("code", loc.countryCode)
-                    .put("region", loc.region)
-                    .put("city", loc.city)
-                    .put("providers", loc.providerCount)
-                    .put("stable", loc.isStable)
-                    .put("privacy", loc.isStrongPrivacy),
+                JSONObject().apply {
+                    put("name", loc.name)
+                    put("code", loc.countryCode)
+                    loc.region?.takeIf { it.isNotBlank() }?.let { put("region", it) }
+                    loc.city?.takeIf { it.isNotBlank() }?.let { put("city", it) }
+                    put("providers", loc.providerCount)
+                    put("stable", loc.isStable)
+                    put("privacy", loc.isStrongPrivacy)
+                },
             )
         }
         return arr.toString()
@@ -138,3 +139,6 @@ class DataStoreUrnetworkConfigStore(
 private fun MutablePreferences.writeOrRemove(key: Preferences.Key<String>, value: String?) {
     value?.takeIf { it.isNotBlank() }?.let { this[key] = it } ?: remove(key)
 }
+
+private fun JSONObject.nullableString(key: String): String? =
+    if (isNull(key)) null else optString(key).takeIf { it.isNotBlank() }

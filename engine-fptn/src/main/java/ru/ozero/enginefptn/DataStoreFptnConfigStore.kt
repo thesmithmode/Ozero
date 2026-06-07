@@ -11,27 +11,27 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 
 class DataStoreFptnConfigStore(
     private val dataStore: DataStore<Preferences>,
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) : FptnConfigStore {
 
-    private val cache = dataStore.data
-        .map { readConfig(it) }
-        .stateIn(scope, SharingStarted.Eagerly, FptnConfig())
+    @Volatile
+    private var latest = FptnConfig()
 
-    override fun config(): Flow<FptnConfig> = cache
+    override fun config(): Flow<FptnConfig> = dataStore.data.map { prefs ->
+        readConfig(prefs).also { latest = it }
+    }
 
-    override fun currentConfig(): FptnConfig = cache.value
+    override fun currentConfig(): FptnConfig = latest
 
     override suspend fun update(transform: (FptnConfig) -> FptnConfig) {
         dataStore.edit { prefs ->
             val next = transform(readConfig(prefs))
             writeConfig(prefs, next)
+            latest = next
         }
     }
 
