@@ -79,15 +79,18 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
             } while (restartMutex.withLock { restartQueue.isNotEmpty() })
             return completed
         } finally {
-            restartMutex.withLock {
-                if (restartQueue.isEmpty()) {
-                    restartInProgress = false
-                }
-            }
+            resetRestartState()
         }
     }
 
     private suspend fun abortQueuedRestarts() {
+        restartMutex.withLock {
+            restartQueue.clear()
+            restartInProgress = false
+        }
+    }
+
+    private suspend fun resetRestartState() {
         restartMutex.withLock {
             restartQueue.clear()
             restartInProgress = false

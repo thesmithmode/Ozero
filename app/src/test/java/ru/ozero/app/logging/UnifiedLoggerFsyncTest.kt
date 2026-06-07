@@ -94,11 +94,34 @@ class UnifiedLoggerFsyncTest {
 
     @Test
     fun `logger source uses sanitized logcat payload`() {
-        val src = File("app/src/main/java/ru/ozero/app/logging/UnifiedLogger.kt").readText()
+        val src = readSourceFile("app/src/main/java/ru/ozero/app/logging/UnifiedLogger.kt")
         assertTrue(src.contains("safeLogcatMsg"))
         assertTrue(src.contains("Log.e(tag, safeLogcatMsg)"))
         assertTrue(src.contains("Log.w(tag, safeLogcatMsg)"))
         assertFalse(src.contains("Log.e(tag, msg, t)"))
         assertFalse(src.contains("Log.w(tag, msg, t)"))
+    }
+
+    private fun readSourceFile(relativePath: String): String {
+        val candidates = buildList {
+            val cwd = File(System.getProperty("user.dir") ?: ".")
+            var current = cwd
+            repeat(6) {
+                add(current.resolve(relativePath))
+                if (current.name.equals("app", ignoreCase = false)) {
+                    add(current.resolve("..").resolve(relativePath))
+                } else {
+                    add(current.resolve("app").resolve(relativePath.removePrefix("app/")))
+                }
+                current.parentFile ?: return@repeat
+                current = current.parentFile
+            }
+        }.distinct()
+        for (candidate in candidates) {
+            if (candidate.exists()) {
+                return candidate.readText()
+            }
+        }
+        return File(relativePath).readText()
     }
 }

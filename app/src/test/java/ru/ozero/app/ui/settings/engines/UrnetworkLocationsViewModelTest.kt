@@ -73,7 +73,7 @@ class UrnetworkLocationsViewModelTest {
             store = fakeUrnetworkConfigStoreWithJwt(),
         )
         advanceUntilIdle()
-        assertIs<UrnetworkSettingsUiState.Ready>(v.uiState.value)
+        assertIs<UrnetworkSettingsUiState.Ready>(awaitReadyState(v))
     }
 
     @Test
@@ -87,7 +87,7 @@ class UrnetworkLocationsViewModelTest {
         advanceUntilIdle()
         tc.onDisconnecting()
         advanceUntilIdle()
-        assertIs<UrnetworkSettingsUiState.Ready>(v.uiState.value)
+        assertIs<UrnetworkSettingsUiState.Ready>(awaitReadyState(v))
     }
 
     @Test
@@ -99,7 +99,7 @@ class UrnetworkLocationsViewModelTest {
         advanceUntilIdle()
         v.refresh()
         advanceUntilIdle()
-        assertIs<UrnetworkSettingsUiState.Ready>(v.uiState.value)
+        assertIs<UrnetworkSettingsUiState.Ready>(awaitReadyState(v))
     }
 
     @Test
@@ -276,7 +276,7 @@ class UrnetworkLocationsViewModelTest {
         if (before is UrnetworkSettingsUiState.Ready) {
             v.selectLocation(locB)
             runCurrent()
-            val after = v.uiState.value
+            val after = awaitReadyState(v)
             if (after is UrnetworkSettingsUiState.Ready) {
                 assertEquals(locB, after.selectedLocation)
             }
@@ -299,7 +299,7 @@ class UrnetworkLocationsViewModelTest {
 
         assertEquals(1, bridge.setProvidePausedCallCount.get())
         assertEquals(true, bridge.lastPausedValue)
-        val after = v.uiState.value
+        val after = awaitReadyState(v)
         assertIs<UrnetworkSettingsUiState.Ready>(after)
         assertEquals(true, after.providePaused)
     }
@@ -318,7 +318,7 @@ class UrnetworkLocationsViewModelTest {
 
         assertEquals(2, bridge.setProvidePausedCallCount.get())
         assertEquals(false, bridge.lastPausedValue)
-        val after = v.uiState.value
+        val after = awaitReadyState(v)
         assertIs<UrnetworkSettingsUiState.Ready>(after)
         assertEquals(false, after.providePaused)
     }
@@ -414,10 +414,10 @@ class UrnetworkLocationsViewModelTest {
         val bridge = FakeUrnetworkBridge(deviceAvailable = true)
         val v = UrnetworkLocationsViewModel(bridge, FakeSettingsRepo(), fakeUrnetworkConfigStoreWithJwt(), idleTunnel())
         advanceUntilIdle()
-        assertIs<UrnetworkSettingsUiState.Ready>(v.uiState.value)
+        assertIs<UrnetworkSettingsUiState.Ready>(awaitReadyState(v))
         v.selectLocation(locB)
         runCurrent()
-        val after = v.uiState.value
+        val after = awaitReadyState(v)
         assertIs<UrnetworkSettingsUiState.Ready>(after)
         assertEquals(locB, after.selectedLocation)
     }
@@ -460,7 +460,7 @@ class UrnetworkLocationsViewModelTest {
         val bridge = FakeUrnetworkBridge(deviceAvailable = true, initialLocation = null)
         val v = UrnetworkLocationsViewModel(bridge, FakeSettingsRepo(), store, idleTunnel())
         advanceUntilIdle()
-        val state = assertIs<UrnetworkSettingsUiState.Ready>(v.uiState.value)
+        val state = assertIs<UrnetworkSettingsUiState.Ready>(awaitReadyState(v))
         assertEquals("DE", state.selectedLocation?.countryCode)
     }
 
@@ -479,7 +479,7 @@ class UrnetworkLocationsViewModelTest {
         )
         val v = UrnetworkLocationsViewModel(bridge, FakeSettingsRepo(), store, idleTunnel())
         advanceUntilIdle()
-        val state = assertIs<UrnetworkSettingsUiState.Ready>(v.uiState.value)
+        val state = assertIs<UrnetworkSettingsUiState.Ready>(awaitReadyState(v))
         assertEquals("DE", state.selectedLocation?.countryCode)
     }
 
@@ -498,7 +498,7 @@ class UrnetworkLocationsViewModelTest {
             )
         }
         advanceUntilIdle()
-        val state = assertIs<UrnetworkSettingsUiState.Ready>(v.uiState.value)
+        val state = assertIs<UrnetworkSettingsUiState.Ready>(awaitReadyState(v))
         assertEquals("DE", state.selectedLocation?.countryCode)
     }
 
@@ -513,7 +513,7 @@ class UrnetworkLocationsViewModelTest {
         val bridge = FakeUrnetworkBridge(deviceAvailable = false, initialLocation = null)
         val v = UrnetworkLocationsViewModel(bridge, FakeSettingsRepo(), store, idleTunnel())
         advanceUntilIdle()
-        assertIs<UrnetworkSettingsUiState.Ready>(v.uiState.value)
+        assertIs<UrnetworkSettingsUiState.Ready>(awaitReadyState(v))
 
         store.update {
             it.copy(
@@ -526,5 +526,14 @@ class UrnetworkLocationsViewModelTest {
         advanceUntilIdle()
 
         assertIs<UrnetworkSettingsUiState.NotConnected>(v.uiState.value)
+    }
+    private suspend fun awaitReadyState(v: UrnetworkLocationsViewModel): UrnetworkSettingsUiState.Ready {
+        repeat(10) {
+            val state = v.uiState.value
+            if (state is UrnetworkSettingsUiState.Ready) return state
+            runCurrent()
+            advanceUntilIdle()
+        }
+        return assertIs<UrnetworkSettingsUiState.Ready>(v.uiState.value)
     }
 }

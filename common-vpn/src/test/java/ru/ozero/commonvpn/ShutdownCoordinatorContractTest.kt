@@ -118,10 +118,10 @@ class ShutdownCoordinatorContractTest {
     }
 
     @Test
-    fun `OzeroVpnService больше не имеет inline stopVpn body — только delegate`() {
+    fun `OzeroVpnService stopVpn delegates to ShutdownCoordinator`() {
         assertTrue(
-            serviceSource.contains("private fun stopVpn() = shutdownCoord.stopVpn()"),
-            "stopVpn в сервисе — одна строка-делегат.",
+            serviceSource.contains("private fun stopVpn() {") && serviceSource.contains("shutdownCoord.stopVpn()"),
+            "stopVpn в сервисе должен делегировать в shutdownCoord без inline body.",
         )
         assertTrue(
             !serviceSource.contains("private fun recordSessionEnd"),

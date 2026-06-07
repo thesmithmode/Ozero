@@ -685,17 +685,47 @@ class EngineRuntimeConfigRestartObserverTest {
     }
 
     @Test
-    fun `singbox runtime provider fingerprints chain and profile dao changes`() {
-        val singboxModule = readSource("src/main/java/ru/ozero/app/di/SingboxModule.kt")
+    fun `singbox runtime provider fingerprints chain and profile dao changes`() = runTest(dispatcher) {
+        val prefs = MutableStateFlow<Preferences>(
+            mutablePreferencesOf(
+                singboxSelectedProfileKey to 1L,
+                singboxBeanKey to byteArrayOf(1),
+            ),
+        )
+        val profiles = MutableStateFlow(
+            listOf(
+                proxyProfile(id = 1, blob = byteArrayOf(1)),
+                proxyProfile(id = 2, blob = byteArrayOf(2)),
+                proxyProfile(id = 3, blob = byteArrayOf(3)),
+            ),
+        )
+        val chain = MutableStateFlow(
+            listOf(
+                ProxyChainStep(id = 1, profileId = 2, userOrder = 0),
+                ProxyChainStep(id = 2, profileId = 3, userOrder = 1),
+            ),
+        )
+        val provider = SingboxModule.provideSingboxRuntimeConfigProvider(
+            dataStore = flowDataStore(prefs),
+            profileDao = fakeProfileDao(profiles),
+            proxyChainDao = fakeProxyChainDao(chain),
+        )
 
-        assertTrue(singboxModule.contains("profileDao: ProxyProfileDao"))
-        assertTrue(singboxModule.contains("proxyChainDao: ProxyChainDao"))
-        assertTrue(singboxModule.contains("profileDao.getAllFlow()"))
-        assertTrue(singboxModule.contains("proxyChainDao.getAllFlow()"))
-        assertTrue(singboxModule.contains("selectedProfileId == SingboxEngine.SELECTED_AUTO"))
-        assertTrue(singboxModule.contains("profileBlobHashes"))
-        assertTrue(singboxModule.contains("activeProfileBlobHashes"))
-        assertTrue(singboxModule.contains("chainSteps"))
+        val baseline = provider.changes.first()
+        chain.value = listOf(
+            ProxyChainStep(id = 2, profileId = 3, userOrder = 0),
+            ProxyChainStep(id = 1, profileId = 2, userOrder = 1),
+        )
+        val reordered = provider.changes.first()
+        profiles.value = listOf(
+            proxyProfile(id = 1, blob = byteArrayOf(1)),
+            proxyProfile(id = 2, blob = byteArrayOf(9)),
+            proxyProfile(id = 3, blob = byteArrayOf(3)),
+        )
+        val profileChanged = provider.changes.first()
+
+        assertNotEquals(baseline, reordered)
+        assertNotEquals(reordered, profileChanged)
     }
 
     @Test

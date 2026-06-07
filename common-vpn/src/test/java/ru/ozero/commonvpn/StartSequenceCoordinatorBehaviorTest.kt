@@ -285,7 +285,7 @@ class StartSequenceCoordinatorBehaviorTest {
         val startupBuilder = mockk<VpnService.Builder> {
             every { establish() } returns startupFd
         }
-        val engineBuilder = mockk<VpnService.Builder> {
+        val engineBuilder = mockk<VpnService.Builder>(relaxed = true) {
             every { establish() } throws IllegalStateException("slot busy")
         }
 

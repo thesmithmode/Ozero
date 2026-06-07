@@ -23,9 +23,9 @@ class RuntimeConfigRestartCoordinatorTest {
     @Test
     fun `restart queue clears after exception and accepts the next restart`() = runTest {
         val context = mockk<Context>()
-        var startServiceCalls = 0
+        val startServiceActions = mutableListOf<String?>()
         every { context.startService(any<Intent>()) } answers {
-            startServiceCalls += 1
+            startServiceActions += arg<Intent>(0).action
             throw IllegalStateException("boom")
         }
         val tunnelController = TunnelController()
@@ -39,13 +39,14 @@ class RuntimeConfigRestartCoordinatorTest {
         coordinator.restartQueue().addLast("queued-before")
 
         runCatching { coordinator.invokeRestart("current-request") }
-        assertEquals(1, startServiceCalls)
+        assertEquals(listOf("ACTION_RESTART_RUNTIME_CONFIG"), startServiceActions)
         assertTrue(coordinator.restartQueue().isEmpty())
         assertFalse(coordinator.restartInProgress())
         assertTrue(tunnelController.switching.value == null)
 
         runCatching { coordinator.invokeRestart("second-request") }
-        assertEquals(2, startServiceCalls)
+        assertEquals(2, startServiceActions.size)
+        assertEquals("ACTION_RESTART_RUNTIME_CONFIG", startServiceActions.last())
         assertTrue(coordinator.restartQueue().isEmpty())
         assertFalse(coordinator.restartInProgress())
     }

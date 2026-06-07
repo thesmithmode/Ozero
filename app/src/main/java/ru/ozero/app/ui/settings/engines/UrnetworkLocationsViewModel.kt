@@ -110,6 +110,7 @@ class UrnetworkLocationsViewModel @Inject constructor(
                 allRegions = cfg.cachedRegions.map { it.toLocationItem() }
                 allCities = cfg.cachedCities.map { it.toLocationItem() }
                 allBestMatches = cfg.cachedBestMatches.map { it.toLocationItem() }
+                val hasBootstrapJwt = cfg.byClientJwt?.isNotBlank() == true
                 if (hasCachedLocations()) {
                     _uiState.update { current ->
                         when (current) {
@@ -121,13 +122,13 @@ class UrnetworkLocationsViewModel @Inject constructor(
                                 bestMatches = if (searchQuery.value.isBlank()) emptyList() else allBestMatches,
                                 selectedLocation = selectedLocationForUi(),
                             )
-                            UrnetworkSettingsUiState.NotConnected -> current
+                            is UrnetworkSettingsUiState.NotConnected -> buildCachedReady()
                         }
                     }
                 } else {
                     _uiState.update { current ->
                         when (current) {
-                            UrnetworkSettingsUiState.Loading,
+                            UrnetworkSettingsUiState.Loading -> if (hasBootstrapJwt) current else UrnetworkSettingsUiState.NotConnected
                             is UrnetworkSettingsUiState.Ready -> UrnetworkSettingsUiState.NotConnected
                             UrnetworkSettingsUiState.NotConnected -> current
                         }
@@ -259,7 +260,17 @@ class UrnetworkLocationsViewModel @Inject constructor(
         }
         runCatching { bridge.setPreferredLocation(targetSelection.normalized()) }
         _uiState.update { current ->
-            if (current is UrnetworkSettingsUiState.Ready) current.copy(selectedLocation = location) else current
+            when (current) {
+                is UrnetworkSettingsUiState.Ready -> current.copy(selectedLocation = location)
+                is UrnetworkSettingsUiState.Loading,
+                is UrnetworkSettingsUiState.NotConnected -> readyState(
+                    countries = allCountries,
+                    regions = allRegions,
+                    cities = allCities,
+                    bestMatches = if (searchQuery.value.isBlank()) emptyList() else allBestMatches,
+                    selectedLocation = location,
+                )
+            }
         }
     }
 
@@ -297,7 +308,17 @@ class UrnetworkLocationsViewModel @Inject constructor(
         }
         viewModelScope.launch { configStore.setProvideEnabled(!paused) }
         _uiState.update { current ->
-            if (current is UrnetworkSettingsUiState.Ready) current.copy(providePaused = paused) else current
+            when (current) {
+                is UrnetworkSettingsUiState.Ready -> current.copy(providePaused = paused)
+                is UrnetworkSettingsUiState.Loading,
+                is UrnetworkSettingsUiState.NotConnected -> readyState(
+                    countries = allCountries,
+                    regions = allRegions,
+                    cities = allCities,
+                    bestMatches = if (searchQuery.value.isBlank()) emptyList() else allBestMatches,
+                    providePaused = paused,
+                )
+            }
         }
     }
 
@@ -387,24 +408,37 @@ class UrnetworkLocationsViewModel @Inject constructor(
     }
 
     private fun buildEmptyReady(): UrnetworkSettingsUiState.Ready =
-        UrnetworkSettingsUiState.Ready(
+        readyState(
             countries = emptyList(),
             regions = emptyList(),
             cities = emptyList(),
             bestMatches = emptyList(),
-            selectedLocation = selectedLocationForUi(),
-            providePaused = if (isUrnetworkActive.value) bridge.isProvidePaused() else false,
         )
 
     private fun buildCachedReady(): UrnetworkSettingsUiState.Ready =
-        UrnetworkSettingsUiState.Ready(
+        readyState(
             countries = allCountries,
             regions = allRegions,
             cities = allCities,
             bestMatches = if (searchQuery.value.isBlank()) emptyList() else allBestMatches,
-            selectedLocation = selectedLocationForUi(),
             providePaused = true,
         )
+
+    private fun readyState(
+        countries: List<UrnetworkLocationItem>,
+        regions: List<UrnetworkLocationItem>,
+        cities: List<UrnetworkLocationItem>,
+        bestMatches: List<UrnetworkLocationItem>,
+        selectedLocation: UrnetworkSdkBridge.LocationToken? = null,
+        providePaused: Boolean? = null,
+    ): UrnetworkSettingsUiState.Ready = UrnetworkSettingsUiState.Ready(
+        countries = countries,
+        regions = regions,
+        cities = cities,
+        bestMatches = bestMatches,
+        selectedLocation = selectedLocation ?: selectedLocationForUi(),
+        providePaused = providePaused ?: if (isUrnetworkActive.value) bridge.isProvidePaused() else false,
+    )
 
     private fun teardownLocationsVc() {
         locationsVc?.also {

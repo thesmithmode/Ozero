@@ -22,6 +22,19 @@ class EngineWatchdogCoordinatorContractTest {
     }
 
     @Test
+    fun `handleEngineFailure fdAlive=false ведёт к stopVpnRequest, не lockdown (P33)`() {
+        val body = source.substringAfter("fun handleEngineFailure(")
+        assertTrue(
+            body.contains("killswitchProvider() && hasBlockingTunForKillswitch()"),
+            "True-branch обязан требовать killswitch=on и общий blocking TUN check через hasBlockingTunForKillswitch(). Body:\n$body",
+        )
+        assertTrue(
+            body.contains("tunnelController.onEngineDied(engineId, reason)") && body.contains("stopVpnRequest()"),
+            "False-branch обязан оставить graceful stop через onEngineDied + stopVpnRequest. Body:\n$body",
+        )
+    }
+
+    @Test
     fun `peer watchdog uses engine policy instead of engine-specific constants`() {
         val body = source.substringAfter("fun startPeerWatchdog(")
             .substringBefore("fun startStagnationWatchdog")
