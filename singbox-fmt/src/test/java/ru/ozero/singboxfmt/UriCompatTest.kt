@@ -127,4 +127,13 @@ class UriCompatTest {
         assertEquals("blank-key", uri.getQueryParameter(""))
         assertEquals("%GG", uri.getQueryParameter("bad"))
     }
+
+    @Test
+    fun `fallback parser ignores empty query segments between ampersands`() {
+        val uri = UriCompat.parse("trojan://host?first=1&&second=2&")
+
+        assertEquals("1", uri.getQueryParameter("first"))
+        assertEquals("2", uri.getQueryParameter("second"))
+        assertNull(uri.getQueryParameter(""))
+    }
 }

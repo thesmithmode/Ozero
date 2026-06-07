@@ -7,21 +7,23 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONArray
 import org.json.JSONObject
 
 class DataStoreUrnetworkConfigStore(
     private val dataStore: DataStore<Preferences>,
 ) : UrnetworkConfigStore {
+    private val latest = MutableStateFlow(UrnetworkConfig())
 
-    override fun config(): Flow<UrnetworkConfig> = dataStore.data.map { prefs -> readConfig(prefs) }
+    override fun config(): Flow<UrnetworkConfig> = latest.asStateFlow()
 
     override suspend fun update(transform: (UrnetworkConfig) -> UrnetworkConfig) {
         dataStore.edit { prefs ->
-            val current = readConfig(prefs)
-            val next = transform(current)
+            val next = transform(readConfig(prefs))
             writeConfig(prefs, next)
+            latest.value = next.withNormalizedCachedLocations()
         }
     }
 
@@ -112,6 +114,14 @@ class DataStoreUrnetworkConfigStore(
         }
         return arr.toString()
     }
+
+    private fun UrnetworkConfig.withNormalizedCachedLocations(): UrnetworkConfig =
+        copy(
+            cachedCountries = cachedCountries.map { it.copy(countryCode = it.countryCode?.uppercase()) }.take(MAX_CACHED_LOCATIONS),
+            cachedRegions = cachedRegions.map { it.copy(countryCode = it.countryCode?.uppercase()) }.take(MAX_CACHED_LOCATIONS),
+            cachedCities = cachedCities.map { it.copy(countryCode = it.countryCode?.uppercase()) }.take(MAX_CACHED_LOCATIONS),
+            cachedBestMatches = cachedBestMatches.map { it.copy(countryCode = it.countryCode?.uppercase()) }.take(MAX_CACHED_LOCATIONS),
+        )
 
     private companion object {
         val KEY_WALLET_OVERRIDE = stringPreferencesKey("urnetwork_wallet_override")

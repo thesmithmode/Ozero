@@ -534,6 +534,7 @@ class UrnetworkLocationsViewModelTest {
             if (state is UrnetworkSettingsUiState.Ready) return state
             runCurrent()
             advanceUntilIdle()
+            dispatcher.scheduler.advanceUntilIdle()
         }
         return assertIs<UrnetworkSettingsUiState.Ready>(v.uiState.value)
     }

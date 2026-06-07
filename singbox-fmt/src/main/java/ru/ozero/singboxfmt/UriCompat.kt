@@ -87,6 +87,7 @@ internal class UriCompat private constructor(private val raw: String) {
             if (rawQuery.isNullOrEmpty()) return emptyMap()
             val result = LinkedHashMap<String, String>()
             for (pair in rawQuery.split('&')) {
+                if (pair.isEmpty()) continue
                 val eqIdx = pair.indexOf('=')
                 if (eqIdx < 0) {
                     result[decode(pair)] = ""

@@ -48,7 +48,7 @@ object LockFileParser {
                     path,
                 )
             }
-            else -> emptyList()
+            else -> throw LockFileException("Field 'artifacts' must be a YAML list in $path")
         }
 
         val dupName = artifacts.groupBy { it.name }.entries.firstOrNull { it.value.size > 1 }?.key
@@ -83,7 +83,7 @@ object LockFileParser {
                     "Artifact '$name' has unknown destination '$destinationStr' (expected libs|jniLibs) in $path",
                 )
             }
-        val abi = m.stringOrNull("abi")
+        val abi = m.strictStringOrNull("abi")
         if (destination == Destination.JNI_LIBS && abi.isNullOrBlank()) {
             throw LockFileException("Artifact '$name' has destination=jniLibs but no abi in $path")
         }
@@ -106,7 +106,7 @@ object LockFileParser {
         val sourceRepo = req("source_repo")
         val sourceCommit = req("source_commit")
 
-        val targetFilename = m.stringOrNull("target_filename")?.takeIf { it.isNotBlank() }
+        val targetFilename = m.strictStringOrNull("target_filename")?.takeIf { it.isNotBlank() }
 
         return Artifact(
             name = name,
@@ -122,8 +122,8 @@ object LockFileParser {
         )
     }
 
-    private fun Map<String, Any?>.stringOrNull(key: String): String? {
+    private fun Map<String, Any?>.strictStringOrNull(key: String): String? {
         val value = this[key] ?: return null
-        return value as? String ?: value.toString()
+        return value as? String
     }
 }

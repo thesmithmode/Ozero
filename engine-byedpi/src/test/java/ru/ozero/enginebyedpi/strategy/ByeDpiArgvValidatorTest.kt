@@ -46,6 +46,7 @@ class ByeDpiArgvValidatorTest {
         assertFalse(ByeDpiArgvValidator.isValid("--ttl -1 -K"))
         assertFalse(ByeDpiArgvValidator.isValid("--fake abc -K"))
         assertFalse(ByeDpiArgvValidator.isValid("--split -bad -K"))
+        assertFalse(ByeDpiArgvValidator.isValid("--split=-bad -K"))
         assertFalse(ByeDpiArgvValidator.isValid("--disorder bad/value -K"))
     }
 

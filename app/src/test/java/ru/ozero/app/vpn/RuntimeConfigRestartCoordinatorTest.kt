@@ -1,88 +1,61 @@
 package ru.ozero.app.vpn
 
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
-import io.mockk.every
-import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.Test
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.RobolectricTestRunner
+import ru.ozero.commonvpn.OzeroVpnService
 import ru.ozero.commonvpn.TunnelController
+import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginescore.EngineId
-import java.lang.reflect.InvocationTargetException
-import kotlin.coroutines.Continuation
-import kotlin.coroutines.suspendCoroutine
-import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class RuntimeConfigRestartCoordinatorTest {
 
     @Test
     fun `restart queue clears after exception and accepts the next restart`() = runTest {
-        val context = mockk<Context>()
         val startServiceActions = mutableListOf<String?>()
-        every { context.startService(any<Intent>()) } answers {
-            startServiceActions += arg<Intent>(0).action
-            throw IllegalStateException("boom")
+        val context = object : ContextWrapper(RuntimeEnvironment.getApplication()) {
+            override fun startService(intent: Intent): android.content.ComponentName? {
+                startServiceActions += intent.action
+                throw IllegalStateException("boom")
+            }
         }
         val tunnelController = TunnelController()
-        tunnelController.onConnecting(EngineId.WARP)
+        tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820))
+        assertIs<TunnelState.Connected>(tunnelController.state.value)
         val coordinator = RuntimeConfigRestartCoordinator(
             context = context,
             observer = EngineRuntimeConfigRestartObserver(emptySet()),
             tunnelController = tunnelController,
         )
 
-        coordinator.restartQueue().addLast("queued-before")
-
-        runCatching { coordinator.invokeRestart("current-request") }
-        assertEquals(listOf<String?>("ACTION_RESTART_RUNTIME_CONFIG"), startServiceActions)
+        val firstRestart = runCatching { coordinator.restartVpnIfRunning("current-request") }
+        assertTrue(firstRestart.isFailure, firstRestart.toString())
+        assertEquals("boom", firstRestart.exceptionOrNull()?.message)
+        assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), startServiceActions)
         assertTrue(coordinator.restartQueue().isEmpty())
         assertFalse(coordinator.restartInProgress())
         assertTrue(tunnelController.switching.value == null)
 
-        runCatching { coordinator.invokeRestart("second-request") }
+        runCatching { coordinator.restartVpnIfRunning("second-request") }
         assertEquals(2, startServiceActions.size)
-        assertEquals("ACTION_RESTART_RUNTIME_CONFIG", startServiceActions.last())
+        assertEquals(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG, startServiceActions.last())
         assertTrue(coordinator.restartQueue().isEmpty())
         assertFalse(coordinator.restartInProgress())
     }
-
-    private suspend fun RuntimeConfigRestartCoordinator.invokeRestart(reason: String): Boolean =
-        suspendCoroutine { cont ->
-            val method = javaClass.getDeclaredMethod(
-                "restartVpnIfRunning",
-                String::class.java,
-                Continuation::class.java,
-            )
-            method.isAccessible = true
-            try {
-                val returned = method.invoke(
-                    this,
-                    reason,
-                    object : Continuation<Boolean> {
-                        override val context = cont.context
-                        override fun resumeWith(result: Result<Boolean>) {
-                            cont.resumeWith(result)
-                        }
-                    },
-                )
-                if (returned !== COROUTINE_SUSPENDED) {
-                    if (returned is Boolean) {
-                        cont.resumeWith(Result.success(returned))
-                    } else {
-                        cont.resumeWith(Result.failure(IllegalStateException("Expected Boolean result")))
-                    }
-                }
-            } catch (e: InvocationTargetException) {
-                cont.resumeWith(Result.failure(e.cause ?: e))
-            } catch (t: Throwable) {
-                cont.resumeWith(Result.failure(t))
-            }
-        }
 
     @Suppress("UNCHECKED_CAST")
     private fun RuntimeConfigRestartCoordinator.restartQueue(): ArrayDeque<String> {
@@ -95,5 +68,13 @@ class RuntimeConfigRestartCoordinatorTest {
         val field = javaClass.getDeclaredField("restartInProgress")
         field.isAccessible = true
         return field.getBoolean(this)
+    }
+
+    private fun TunnelController.setState(state: TunnelState) {
+        val field = javaClass.getDeclaredField("_state")
+        field.isAccessible = true
+        @Suppress("UNCHECKED_CAST")
+        val flow = field.get(this) as kotlinx.coroutines.flow.MutableStateFlow<TunnelState>
+        flow.value = state
     }
 }

@@ -38,7 +38,7 @@ object ByeDpiArgvValidator {
             "-n" -> isDomainValue(token)
             "--fake" -> isSignedInt(token)
             "--ttl" -> isUnsignedInt(token)
-            "--split", "--disorder" -> isModifierValue(token)
+            "--split", "--disorder" -> isModifierValue(token) && !token.startsWith("-")
             "-a", "-d", "-e", "-f", "-m", "-o", "-p", "-q", "-r", "-s", "-t", "-O", "-R" ->
                 isModifierValue(token) && !token.startsWith("-")
             else -> token.isNotBlank()

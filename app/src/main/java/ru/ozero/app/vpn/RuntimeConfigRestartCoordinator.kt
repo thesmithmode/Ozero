@@ -41,7 +41,7 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
         )
     }
 
-    private suspend fun restartVpnIfRunning(reason: String): Boolean {
+    internal suspend fun restartVpnIfRunning(reason: String): Boolean {
         var shouldProcess = false
         restartMutex.withLock {
             restartQueue.addLast(reason)
@@ -149,9 +149,7 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
 
     private fun sendVpnAction(action: String) {
         context.startService(
-            Intent(context, OzeroVpnService::class.java).apply {
-                this.action = action
-            },
+            Intent(action).setClass(context, OzeroVpnService::class.java),
         )
     }
 

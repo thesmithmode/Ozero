@@ -2,6 +2,7 @@ package ru.ozero.app.selfupdate
 
 import android.content.Context
 import android.content.pm.PackageInstaller
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
@@ -27,23 +28,16 @@ class SilentPackageInstallerTest {
     @Test
     fun `install returns FileError when apk exists but is unreadable`() = runTest {
         val context = mockk<Context>(relaxed = true)
-        val packageInstaller = mockk<PackageInstaller>()
+        val packageInstaller = mockk<PackageInstaller>(relaxed = true)
         val installer = SilentPackageInstaller(context, packageInstaller)
-        val tmpApk = File.createTempFile("ozero-test-", ".apk").apply {
-            writeBytes(byteArrayOf(0x50, 0x4B))
-            setReadable(false, false)
-            deleteOnExit()
-        }
-        try {
-            val result = installer.install(tmpApk)
+        val unreadableApk = mockk<File>()
+        every { unreadableApk.exists() } returns true
+        every { unreadableApk.canRead() } returns false
+        every { unreadableApk.absolutePath } returns "/tmp/unreadable.apk"
 
-            if (!tmpApk.canRead()) {
-                assertIs<SilentPackageInstaller.Result.FileError>(result)
-                verify(exactly = 0) { packageInstaller.createSession(any()) }
-            }
-        } finally {
-            tmpApk.setReadable(true, false)
-            tmpApk.delete()
-        }
+        val result = installer.install(unreadableApk)
+
+        assertIs<SilentPackageInstaller.Result.FileError>(result)
+        verify(exactly = 0) { packageInstaller.createSession(any()) }
     }
 }

@@ -120,7 +120,7 @@ class UrnetworkLocationsViewModel @Inject constructor(
                                 regions = allRegions,
                                 cities = allCities,
                                 bestMatches = if (searchQuery.value.isBlank()) emptyList() else allBestMatches,
-                                selectedLocation = selectedLocationForUi(),
+                                selectedLocation = current.selectedLocation ?: selectedLocationForUi(),
                             )
                             is UrnetworkSettingsUiState.NotConnected -> buildCachedReady()
                         }
@@ -130,7 +130,12 @@ class UrnetworkLocationsViewModel @Inject constructor(
                         when (current) {
                             UrnetworkSettingsUiState.Loading ->
                                 if (hasBootstrapJwt) current else UrnetworkSettingsUiState.NotConnected
-                            is UrnetworkSettingsUiState.Ready -> UrnetworkSettingsUiState.NotConnected
+                            is UrnetworkSettingsUiState.Ready ->
+                                if (bridge.isDeviceAvailable() || bridge.isRunning()) {
+                                    current.copy(selectedLocation = current.selectedLocation ?: selectedLocationForUi())
+                                } else {
+                                    UrnetworkSettingsUiState.NotConnected
+                                }
                             UrnetworkSettingsUiState.NotConnected -> current
                         }
                     }
@@ -144,6 +149,9 @@ class UrnetworkLocationsViewModel @Inject constructor(
                 val ready = bridge.initDeviceForLocations(byClientJwt, wallet)
                 if (ready && _uiState.value !is UrnetworkSettingsUiState.Ready) {
                     refreshOnce()
+                    if (_uiState.value !is UrnetworkSettingsUiState.Ready) {
+                        _uiState.value = buildEmptyReady()
+                    }
                 }
             }
         }
@@ -165,7 +173,7 @@ class UrnetworkLocationsViewModel @Inject constructor(
                             if (current is UrnetworkSettingsUiState.Ready) {
                                 current.copy(providePaused = true)
                             } else {
-                                current
+                                buildEmptyReady().copy(providePaused = true)
                             }
                         }
                     } else {

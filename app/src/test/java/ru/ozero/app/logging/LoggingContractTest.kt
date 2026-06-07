@@ -27,7 +27,7 @@ class LoggingContractTest {
 
     private val rawLogPattern = Regex("""\bLog\.(e|w|wtf)\(""")
 
-    private val skipDirs = setOf("build", ".git", ".gradle", ".memory", "node_modules", ".claude")
+    private val skipDirs = setOf("build", ".git", ".gradle", ".memory", ".codex", "node_modules", ".claude")
 
     @Test
     fun `production code uses PersistentLoggers for warn-error, raw android-util-Log only on whitelist`() {
