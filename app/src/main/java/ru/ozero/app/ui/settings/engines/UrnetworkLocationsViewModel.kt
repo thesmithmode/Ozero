@@ -111,7 +111,7 @@ class UrnetworkLocationsViewModel @Inject constructor(
                 allCities = cfg.cachedCities.map { it.toLocationItem() }
                 allBestMatches = cfg.cachedBestMatches.map { it.toLocationItem() }
                 val hasBootstrapJwt = cfg.byClientJwt?.isNotBlank() == true
-                if (hasCachedLocations()) {
+                if (hasCachedLocations(allCountries, allRegions, allCities, allBestMatches)) {
                     _uiState.update { current ->
                         when (current) {
                             UrnetworkSettingsUiState.Loading -> buildCachedReady()
@@ -128,7 +128,8 @@ class UrnetworkLocationsViewModel @Inject constructor(
                 } else {
                     _uiState.update { current ->
                         when (current) {
-                            UrnetworkSettingsUiState.Loading -> if (hasBootstrapJwt) current else UrnetworkSettingsUiState.NotConnected
+                            UrnetworkSettingsUiState.Loading ->
+                                if (hasBootstrapJwt) current else UrnetworkSettingsUiState.NotConnected
                             is UrnetworkSettingsUiState.Ready -> UrnetworkSettingsUiState.NotConnected
                             UrnetworkSettingsUiState.NotConnected -> current
                         }
@@ -392,9 +393,6 @@ class UrnetworkLocationsViewModel @Inject constructor(
         return s is UrnetworkSettingsUiState.Ready && s.countries.isNotEmpty()
     }
 
-    private fun hasCachedLocations(): Boolean =
-        allCountries.isNotEmpty() || allRegions.isNotEmpty() || allCities.isNotEmpty() || allBestMatches.isNotEmpty()
-
     private fun isDeviceUnavailable(): Boolean = !bridge.isDeviceAvailable() && !bridge.isRunning()
 
     private fun handleNullVcFallback() {
@@ -489,6 +487,13 @@ class UrnetworkLocationsViewModel @Inject constructor(
         private const val SWITCHING_INDICATOR_SETTLE_MS = 1_500L
     }
 }
+
+private fun hasCachedLocations(
+    countries: List<UrnetworkLocationItem>,
+    regions: List<UrnetworkLocationItem>,
+    cities: List<UrnetworkLocationItem>,
+    bestMatches: List<UrnetworkLocationItem>,
+): Boolean = countries.isNotEmpty() || regions.isNotEmpty() || cities.isNotEmpty() || bestMatches.isNotEmpty()
 
 private fun com.bringyour.sdk.ConnectLocationList?.toLocationItems(): List<UrnetworkLocationItem> =
     buildList {
