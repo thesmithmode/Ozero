@@ -113,6 +113,6 @@ class DataStoreFptnConfigStoreTest {
             scope = scope.backgroundScope,
             produceFile = { File(tmp, "fptn.preferences_pb") },
         )
-        return DataStoreFptnConfigStore(dataStore, scope.backgroundScope)
+        return DataStoreFptnConfigStore(dataStore)
     }
 }

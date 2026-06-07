@@ -21,7 +21,7 @@ object LockFileParser {
                 val map = root as? Map<*, *>
                     ?: throw LockFileException("Lock file root must be a YAML map: $path")
                 map.entries.associate { (key, value) ->
-                    key?.toString() to value
+                    requireNotNull(key?.toString()) to value
                 }
             } catch (e: YAMLException) {
                 throw LockFileException("Malformed YAML in $path: ${e.message}", e)
@@ -43,7 +43,7 @@ object LockFileParser {
                 val map = item as? Map<*, *>
                     ?: throw LockFileException("Artifact #$i must be a YAML map in $path")
                 parseArtifact(
-                    map.entries.associate { (key, value) -> key?.toString() to value },
+                    map.entries.associate { (key, value) -> requireNotNull(key?.toString()) to value },
                     i,
                     path,
                 )
