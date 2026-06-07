@@ -71,8 +71,11 @@ class RuntimeConfigRestartCoordinatorTest {
                     },
                 )
                 if (returned !== COROUTINE_SUSPENDED) {
-                    @Suppress("UNCHECKED_CAST")
-                    cont.resumeWith(Result.success(returned as Boolean))
+                    if (returned is Boolean) {
+                        cont.resumeWith(Result.success(returned))
+                    } else {
+                        cont.resumeWith(Result.failure(IllegalStateException("Expected Boolean result")))
+                    }
                 }
             } catch (e: InvocationTargetException) {
                 cont.resumeWith(Result.failure(e.cause ?: e))
@@ -81,10 +84,10 @@ class RuntimeConfigRestartCoordinatorTest {
             }
         }
 
+    @Suppress("UNCHECKED_CAST")
     private fun RuntimeConfigRestartCoordinator.restartQueue(): ArrayDeque<String> {
         val field = javaClass.getDeclaredField("restartQueue")
         field.isAccessible = true
-        @Suppress("UNCHECKED_CAST")
         return field.get(this) as ArrayDeque<String>
     }
 

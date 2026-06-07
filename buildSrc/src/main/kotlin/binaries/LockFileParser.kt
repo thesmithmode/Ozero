@@ -17,9 +17,12 @@ object LockFileParser {
         }
         val raw: Map<String, Any?> =
             try {
-                @Suppress("UNCHECKED_CAST")
-                Yaml().load<Any?>(content) as? Map<String, Any?>
+                val root = Yaml().load<Any?>(content)
+                val map = root as? Map<*, *>
                     ?: throw LockFileException("Lock file root must be a YAML map: $path")
+                map.entries.associate { (key, value) ->
+                    key?.toString() to value
+                }
             } catch (e: YAMLException) {
                 throw LockFileException("Malformed YAML in $path: ${e.message}", e)
             }
@@ -37,9 +40,13 @@ object LockFileParser {
         val artifacts = when (rawArtifacts) {
             null -> emptyList()
             is List<*> -> rawArtifacts.mapIndexed { i, item ->
-                val map = item as? Map<String, Any?>
+                val map = item as? Map<*, *>
                     ?: throw LockFileException("Artifact #$i must be a YAML map in $path")
-                parseArtifact(map, i, path)
+                parseArtifact(
+                    map.entries.associate { (key, value) -> key?.toString() to value },
+                    i,
+                    path,
+                )
             }
             else -> emptyList()
         }
@@ -76,7 +83,7 @@ object LockFileParser {
                     "Artifact '$name' has unknown destination '$destinationStr' (expected libs|jniLibs) in $path",
                 )
             }
-        val abi = m["abi"] as? String
+        val abi = m.stringOrNull("abi")
         if (destination == Destination.JNI_LIBS && abi.isNullOrBlank()) {
             throw LockFileException("Artifact '$name' has destination=jniLibs but no abi in $path")
         }
@@ -99,7 +106,7 @@ object LockFileParser {
         val sourceRepo = req("source_repo")
         val sourceCommit = req("source_commit")
 
-        val targetFilename = (m["target_filename"] as? String)?.takeIf { it.isNotBlank() }
+        val targetFilename = m.stringOrNull("target_filename")?.takeIf { it.isNotBlank() }
 
         return Artifact(
             name = name,
@@ -113,5 +120,10 @@ object LockFileParser {
             sourceCommit = sourceCommit,
             targetFilename = targetFilename,
         )
+    }
+
+    private fun Map<String, Any?>.stringOrNull(key: String): String? {
+        val value = this[key] ?: return null
+        return value as? String ?: value.toString()
     }
 }
