@@ -5,16 +5,13 @@ import kotlinx.coroutines.test.runTest
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
-import okhttp3.Request
 import okhttp3.Response
 import okhttp3.ResponseBody
-import okio.BufferedSink
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
 import java.io.IOException
 import java.nio.file.Path
-import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -25,10 +22,12 @@ class ApkDownloaderTest {
 
     @Test
     fun `download success emits progress and success`() = runTest {
-        val downloader = ApkDownloader(client = clientOf(
-            "https://x/a.apk" to ResponseSpec(200, ByteArray(4) { it.toByte() }),
-            "https://x/a.sig" to ResponseSpec(200, ByteArray(3) { (it + 10).toByte() }),
-        ))
+        val downloader = ApkDownloader(
+            client = clientOf(
+                "https://x/a.apk" to ResponseSpec(200, ByteArray(4) { it.toByte() }),
+                "https://x/a.sig" to ResponseSpec(200, ByteArray(3) { (it + 10).toByte() }),
+            )
+        )
 
         val events = downloader.download("https://x/a.apk", "https://x/a.sig", tempDir.toFile()).toList()
 
@@ -41,9 +40,11 @@ class ApkDownloaderTest {
     @Test
     fun `download http error emits failed and cleans partial files`() = runTest {
         val dest = tempDir.toFile()
-        val downloader = ApkDownloader(client = clientOf(
-            "https://x/a.apk" to ResponseSpec(500, "boom".encodeToByteArray()),
-        ))
+        val downloader = ApkDownloader(
+            client = clientOf(
+                "https://x/a.apk" to ResponseSpec(500, "boom".encodeToByteArray()),
+            )
+        )
 
         val events = downloader.download("https://x/a.apk", "https://x/a.sig", dest).toList()
 

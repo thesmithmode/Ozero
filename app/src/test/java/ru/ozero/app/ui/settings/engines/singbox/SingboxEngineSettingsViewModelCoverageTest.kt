@@ -1,0 +1,737 @@
+package ru.ozero.app.ui.settings.engines.singbox
+
+import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.mutablePreferencesOf
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.every
+import io.mockk.mockk
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import ru.ozero.singboxroom.dao.ProxyChainDao
+import ru.ozero.singboxroom.dao.ProxyProfileDao
+import ru.ozero.singboxroom.dao.SubscriptionGroupDao
+import ru.ozero.singboxfmt.AbstractBean
+import ru.ozero.singboxfmt.KryoSerializer
+import ru.ozero.singboxfmt.VLESSBean
+import ru.ozero.singboxroom.entity.ProxyChainStep
+import ru.ozero.singboxroom.entity.ProxyProfile
+import ru.ozero.singboxroom.entity.SubscriptionGroup
+import ru.ozero.singboxsubscription.GroupSeeder
+import java.io.ByteArrayInputStream
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+class SingboxEngineSettingsViewModelCoverageTest {
+
+    private val sortOrderKey = intPreferencesKey("singbox_sort_order")
+    private val dispatcher = StandardTestDispatcher()
+
+    @BeforeEach
+    fun setUp() {
+        Dispatchers.setMain(dispatcher)
+    }
+
+    @AfterEach
+    fun tearDown() {
+        Dispatchers.resetMain()
+    }
+
+    @Test
+    fun `sort order defaults to BY_LATENCY when preference is absent`() = runTest {
+        val harness = Harness()
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        assertEquals(SortOrder.BY_LATENCY, harness.viewModel.state.value.sortOrder)
+    }
+
+    @Test
+    fun `invalid sort order preference falls back to BY_LATENCY and sorts by latency`() = runTest {
+        val harness = Harness(
+            initialPreferences = mutablePreferencesOf(sortOrderKey to 99),
+            initialGroups = listOf(group(id = 1L, userOrder = 0)),
+            initialProfiles = listOf(
+                profile(id = 11L, groupId = 1L, name = "Zulu", userOrder = 1, latencyMs = 80),
+                profile(id = 12L, groupId = 1L, name = "alpha", userOrder = 0, latencyMs = 10),
+            ),
+        )
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onGroupExpand(1L)
+        advanceUntilIdle()
+
+        assertEquals(SortOrder.BY_LATENCY, harness.viewModel.state.value.sortOrder)
+        assertEquals(listOf(12L, 11L), harness.viewModel.state.value.groupProfiles.getValue(1L).map { it.id })
+    }
+
+    @Test
+    fun `onSortOrderChanged persists BY_NAME and resorts expanded group`() = runTest {
+        val harness = Harness(
+            initialGroups = listOf(group(id = 1L, userOrder = 0)),
+            initialProfiles = listOf(
+                profile(id = 21L, groupId = 1L, name = "Zulu", userOrder = 1, latencyMs = 1),
+                profile(id = 22L, groupId = 1L, name = "alpha", userOrder = 0, latencyMs = 100),
+            ),
+        )
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onGroupExpand(1L)
+        advanceUntilIdle()
+
+        harness.viewModel.onSortOrderChanged(SortOrder.BY_NAME)
+        advanceUntilIdle()
+
+        assertEquals(SortOrder.BY_NAME, harness.viewModel.state.value.sortOrder)
+        assertEquals(SortOrder.BY_NAME.ordinal, harness.prefsFlow.value[sortOrderKey])
+        assertEquals(listOf(22L, 21L), harness.viewModel.state.value.groupProfiles.getValue(1L).map { it.id })
+    }
+
+    @Test
+    fun `add group dialog show and hide preserve then reset fields`() = runTest {
+        val harness = Harness()
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onAddGroupFieldChanged(name = "Custom", url = "https://example.com")
+        harness.viewModel.onAddGroupDialog(true)
+        advanceUntilIdle()
+
+        assertTrue(harness.viewModel.state.value.showAddGroupDialog)
+        assertEquals("Custom", harness.viewModel.state.value.addGroupName)
+        assertEquals("https://example.com", harness.viewModel.state.value.addGroupUrl)
+
+        harness.viewModel.onAddGroupDialog(false)
+        advanceUntilIdle()
+
+        assertFalse(harness.viewModel.state.value.showAddGroupDialog)
+        assertEquals("", harness.viewModel.state.value.addGroupName)
+        assertEquals("", harness.viewModel.state.value.addGroupUrl)
+        assertNull(harness.viewModel.state.value.addGroupError)
+    }
+
+    @Test
+    fun `empty add group url sets validation error and skips insert`() = runTest {
+        val harness = Harness()
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onAddGroupFieldChanged(name = "New group", url = "   ")
+        harness.viewModel.onAddGroupConfirm()
+        advanceUntilIdle()
+
+        assertEquals("empty", harness.viewModel.state.value.addGroupError)
+        assertTrue(harness.insertedGroups.isEmpty())
+    }
+
+    @Test
+    fun `blank add group name uses generated default name`() = runTest {
+        val harness = Harness()
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onAddGroupFieldChanged(name = "   ", url = " https://example.com/sub ")
+        harness.viewModel.onAddGroupConfirm()
+        advanceUntilIdle()
+
+        assertEquals(1, harness.insertedGroups.size)
+        assertEquals("Ozero-1", harness.insertedGroups.single().name)
+        assertEquals("https://example.com/sub", harness.insertedGroups.single().subscriptionUrl)
+        assertFalse(harness.viewModel.state.value.showAddGroupDialog)
+        assertEquals("", harness.viewModel.state.value.addGroupName)
+        assertEquals("", harness.viewModel.state.value.addGroupUrl)
+        assertNull(harness.viewModel.state.value.addGroupError)
+    }
+
+    @Test
+    fun `manual links dialog show and hide preserve then reset fields`() = runTest {
+        val harness = Harness()
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onShowAddMenu(true)
+        harness.viewModel.onManualLinksFieldChanged(input = "vless://id@host:443?type=tcp", groupName = "Manual")
+        harness.viewModel.onShowAddManualLinksDialog(true)
+        advanceUntilIdle()
+
+        assertTrue(harness.viewModel.state.value.showAddManualLinksDialog)
+        assertFalse(harness.viewModel.state.value.showAddMenu)
+        assertEquals("vless://id@host:443?type=tcp", harness.viewModel.state.value.manualLinksInput)
+        assertEquals("Manual", harness.viewModel.state.value.manualLinksGroupName)
+
+        harness.viewModel.onShowAddManualLinksDialog(false)
+        advanceUntilIdle()
+
+        assertFalse(harness.viewModel.state.value.showAddManualLinksDialog)
+        assertEquals("", harness.viewModel.state.value.manualLinksInput)
+        assertEquals("", harness.viewModel.state.value.manualLinksGroupName)
+        assertNull(harness.viewModel.state.value.manualLinksError)
+    }
+
+    @Test
+    fun `empty manual links input sets validation error and invalid input clears on edit`() = runTest {
+        val harness = Harness()
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onManualLinksFieldChanged(input = "   ")
+        harness.viewModel.onConfirmManualLinks()
+        advanceUntilIdle()
+
+        assertEquals("empty", harness.viewModel.state.value.manualLinksError)
+
+        harness.viewModel.onManualLinksFieldChanged(
+            input = "vless://12345678-1234-1234-1234-123456789abc@host.example.com:443?type=tcp",
+        )
+        advanceUntilIdle()
+
+        assertNull(harness.viewModel.state.value.manualLinksError)
+    }
+
+    @Test
+    fun `invalid manual links input sets parse error and skips insert`() = runTest {
+        val harness = Harness()
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onManualLinksFieldChanged(input = "not-a-link")
+        harness.viewModel.onConfirmManualLinks()
+        advanceUntilIdle()
+
+        assertEquals("parse", harness.viewModel.state.value.manualLinksError)
+        assertTrue(harness.insertedGroups.isEmpty())
+        assertTrue(harness.profileDao.insertedProfiles.isEmpty())
+    }
+
+    @Test
+    fun `blank manual links group name uses generated default name and server fallback`() = runTest {
+        val harness = Harness()
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onManualLinksFieldChanged(
+            input = "vless://12345678-1234-1234-1234-123456789abc@host.example.com:443?type=tcp",
+            groupName = "   ",
+        )
+        harness.viewModel.onConfirmManualLinks()
+        advanceUntilIdle()
+
+        assertEquals(1, harness.insertedGroups.size)
+        assertEquals("Ozero-1", harness.insertedGroups.single().name)
+        assertEquals(1, harness.profileDao.insertedProfiles.size)
+        assertEquals("Server 1", harness.profileDao.insertedProfiles.single().name)
+        assertFalse(harness.viewModel.state.value.showAddManualLinksDialog)
+        assertEquals("", harness.viewModel.state.value.manualLinksInput)
+        assertEquals("", harness.viewModel.state.value.manualLinksGroupName)
+        assertNull(harness.viewModel.state.value.manualLinksError)
+    }
+
+    @Test
+    fun `chain profile ids filter missing profiles from state`() = runTest {
+        val harness = Harness(
+            initialProfiles = listOf(
+                profile(id = 10L, groupId = 1L, name = "First", userOrder = 0),
+                profile(id = 20L, groupId = 1L, name = "Second", userOrder = 1),
+            ),
+            initialChain = listOf(
+                chainStep(profileId = 10L, userOrder = 0),
+                chainStep(profileId = 99L, userOrder = 1),
+                chainStep(profileId = 20L, userOrder = 2),
+            ),
+        )
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        assertEquals(listOf(10L, 20L), harness.viewModel.state.value.chainProfileIds)
+    }
+
+    @Test
+    fun `onChainProfileAdd appends unseen profile once`() = runTest {
+        val harness = Harness(
+            initialChain = listOf(
+                chainStep(profileId = 1L, userOrder = 0),
+                chainStep(profileId = 2L, userOrder = 1),
+            ),
+            initialProfiles = listOf(
+                profile(id = 1L, groupId = 1L, name = "One", userOrder = 0),
+                profile(id = 2L, groupId = 1L, name = "Two", userOrder = 1),
+                profile(id = 3L, groupId = 1L, name = "Three", userOrder = 2),
+            ),
+        )
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onChainProfileAdd(profile(id = 3L, groupId = 1L, name = "Three", userOrder = 2))
+        advanceUntilIdle()
+        harness.viewModel.onChainProfileAdd(profile(id = 3L, groupId = 1L, name = "Three", userOrder = 2))
+        advanceUntilIdle()
+
+        assertEquals(listOf(1L, 2L, 3L), harness.chainDao.lastReplace())
+        assertEquals(1, harness.chainDao.replaceCalls.size)
+        assertEquals(listOf(1L, 2L, 3L), harness.viewModel.state.value.chainProfileIds)
+    }
+
+    @Test
+    fun `onChainProfileRemove drops requested profile and ignores missing id`() = runTest {
+        val harness = Harness(
+            initialChain = listOf(
+                chainStep(profileId = 1L, userOrder = 0),
+                chainStep(profileId = 2L, userOrder = 1),
+                chainStep(profileId = 3L, userOrder = 2),
+            ),
+            initialProfiles = listOf(
+                profile(id = 1L, groupId = 1L, name = "One", userOrder = 0),
+                profile(id = 2L, groupId = 1L, name = "Two", userOrder = 1),
+                profile(id = 3L, groupId = 1L, name = "Three", userOrder = 2),
+            ),
+        )
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onChainProfileRemove(2L)
+        advanceUntilIdle()
+        harness.viewModel.onChainProfileRemove(99L)
+        advanceUntilIdle()
+
+        assertEquals(listOf(1L, 3L), harness.chainDao.lastReplace())
+        assertEquals(2, harness.chainDao.replaceCalls.size)
+        assertEquals(listOf(1L, 3L), harness.viewModel.state.value.chainProfileIds)
+    }
+
+    @Test
+    fun `onChainProfileMove clamps movement at bounds`() = runTest {
+        val harness = Harness(
+            initialChain = listOf(
+                chainStep(profileId = 1L, userOrder = 0),
+                chainStep(profileId = 2L, userOrder = 1),
+                chainStep(profileId = 3L, userOrder = 2),
+            ),
+            initialProfiles = listOf(
+                profile(id = 1L, groupId = 1L, name = "One", userOrder = 0),
+                profile(id = 2L, groupId = 1L, name = "Two", userOrder = 1),
+                profile(id = 3L, groupId = 1L, name = "Three", userOrder = 2),
+            ),
+        )
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onChainProfileMove(1L, -10)
+        advanceUntilIdle()
+        harness.viewModel.onChainProfileMove(3L, 10)
+        advanceUntilIdle()
+
+        assertTrue(harness.chainDao.replaceCalls.isEmpty())
+        assertEquals(listOf(1L, 2L, 3L), harness.viewModel.state.value.chainProfileIds)
+    }
+
+    @Test
+    fun `onChainProfileMove reorders profile within bounds`() = runTest {
+        val harness = Harness(
+            initialChain = listOf(
+                chainStep(profileId = 1L, userOrder = 0),
+                chainStep(profileId = 2L, userOrder = 1),
+                chainStep(profileId = 3L, userOrder = 2),
+            ),
+            initialProfiles = listOf(
+                profile(id = 1L, groupId = 1L, name = "One", userOrder = 0),
+                profile(id = 2L, groupId = 1L, name = "Two", userOrder = 1),
+                profile(id = 3L, groupId = 1L, name = "Three", userOrder = 2),
+            ),
+        )
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onChainProfileMove(2L, -1)
+        advanceUntilIdle()
+
+        assertEquals(listOf(2L, 1L, 3L), harness.chainDao.lastReplace())
+        assertEquals(1, harness.chainDao.replaceCalls.size)
+        assertEquals(listOf(2L, 1L, 3L), harness.viewModel.state.value.chainProfileIds)
+    }
+
+    @Test
+    fun `onProfileSelect persists selected profile id and bean blob`() = runTest {
+        val profile = profile(id = 41L, groupId = 1L, name = "Chosen", userOrder = 0)
+        val harness = Harness(initialProfiles = listOf(profile))
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onProfileSelect(profile)
+        advanceUntilIdle()
+
+        assertEquals(41L, harness.prefsFlow.value[SingboxProbeService.SELECTED_PROFILE_KEY])
+        assertTrue(
+            harness.prefsFlow.value[SingboxProbeService.BEAN_KEY]?.contentEquals(profile.beanBlob) == true,
+        )
+    }
+
+    @Test
+    fun `onSetAutoSelect toggles selected profile preference and clears bean`() = runTest {
+        val profile = profile(id = 51L, groupId = 1L, name = "Chosen", userOrder = 0)
+        val harness = Harness(initialProfiles = listOf(profile))
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onProfileSelect(profile)
+        advanceUntilIdle()
+        harness.viewModel.onSetAutoSelect(true)
+        advanceUntilIdle()
+
+        assertEquals(-1L, harness.prefsFlow.value[SingboxProbeService.SELECTED_PROFILE_KEY])
+        assertNull(harness.prefsFlow.value[SingboxProbeService.BEAN_KEY])
+
+        harness.viewModel.onSetAutoSelect(false)
+        advanceUntilIdle()
+
+        assertFalse(harness.prefsFlow.value.contains(SingboxProbeService.SELECTED_PROFILE_KEY))
+        assertNull(harness.prefsFlow.value[SingboxProbeService.BEAN_KEY])
+    }
+
+    @Test
+    fun `onCancel clears pinging and refreshing state`() = runTest {
+        val harness = Harness(
+            initialGroups = listOf(group(id = 1L, userOrder = 0)),
+            initialProfiles = listOf(profile(id = 61L, groupId = 1L, name = "Ping", userOrder = 0)),
+        )
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onPing(groupId = 1L)
+        advanceUntilIdle()
+        harness.viewModel.onRefresh(groupId = 1L)
+        advanceUntilIdle()
+        harness.viewModel.onCancel(ping = true, refresh = true)
+        advanceUntilIdle()
+
+        assertTrue(harness.viewModel.state.value.isPinging.isEmpty())
+        assertTrue(harness.viewModel.state.value.testingProfileIds.isEmpty())
+        assertTrue(harness.viewModel.state.value.isRefreshing.isEmpty())
+    }
+
+    @Test
+    fun `onDeleteGroup removes group from source and state`() = runTest {
+        val harness = Harness(initialGroups = listOf(group(id = 1L, userOrder = 0)))
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onDeleteGroup(group(id = 1L, userOrder = 0))
+        advanceUntilIdle()
+
+        assertTrue(harness.groupsFlow.value.isEmpty())
+        assertTrue(harness.viewModel.state.value.groups.isEmpty())
+    }
+
+    @Test
+    fun `restore defaults reads preset asset and clears restore error`() = runTest {
+        val harness = Harness()
+        every { harness.appContext.assets.open("singbox/preset_groups.json") } returns ByteArrayInputStream(
+            """{"groups":[{"name":"Preset A","url":"https://example.com/a"},{"name":"Preset B","url":"https://example.com/b"}]}"""
+                .toByteArray(),
+        )
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onRestoreDefaults()
+        advanceUntilIdle()
+
+        coVerify {
+            harness.groupSeeder.seedPresets(
+                listOf(
+                    GroupSeeder.PresetGroup("Preset A", "https://example.com/a"),
+                    GroupSeeder.PresetGroup("Preset B", "https://example.com/b"),
+                ),
+            )
+        }
+        assertFalse(harness.viewModel.state.value.isRestoringDefaults)
+        assertNull(harness.viewModel.state.value.restoreError)
+    }
+
+    @Test
+    fun `restore defaults stores error when preset asset is missing`() = runTest {
+        val harness = Harness()
+        every { harness.appContext.assets.open("singbox/preset_groups.json") } throws IllegalStateException("missing")
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onRestoreDefaults()
+        advanceUntilIdle()
+
+        assertFalse(harness.viewModel.state.value.isRestoringDefaults)
+        assertEquals("missing", harness.viewModel.state.value.restoreError)
+    }
+
+    @Test
+    fun `import from file with invalid text opens manual dialog with filename default`() = runTest {
+        val harness = Harness()
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onImportFromFile("not a proxy link", "Imported.txt")
+        advanceUntilIdle()
+
+        assertTrue(harness.viewModel.state.value.showAddManualLinksDialog)
+        assertEquals("not a proxy link", harness.viewModel.state.value.manualLinksInput)
+        assertEquals("Imported", harness.viewModel.state.value.manualLinksGroupName)
+        assertEquals("parse", harness.viewModel.state.value.manualLinksError)
+    }
+
+    @Test
+    fun `import from file creates group and profiles from valid links`() = runTest {
+        val harness = Harness()
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onImportFromFile(
+            "vless://12345678-1234-1234-1234-123456789abc@host.example.com:443?type=tcp#Imported",
+            null,
+        )
+        advanceUntilIdle()
+
+        assertEquals("Ozero-1", harness.insertedGroups.single().name)
+        assertEquals(1, harness.profileDao.insertedProfiles.size)
+        assertEquals("Imported", harness.profileDao.insertedProfiles.single().name)
+    }
+
+    @Test
+    fun `onPing ignores empty groups and clears previous pinging state`() = runTest {
+        val harness = Harness(initialGroups = listOf(group(id = 1L, userOrder = 0)))
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onPing(groupId = 1L)
+        advanceUntilIdle()
+
+        assertTrue(harness.probeCalls.isEmpty())
+        assertTrue(harness.viewModel.state.value.isPinging.isEmpty())
+    }
+
+    private fun group(id: Long, userOrder: Int): SubscriptionGroup =
+        SubscriptionGroup(
+            id = id,
+            name = "Group $id",
+            userOrder = userOrder,
+        )
+
+    private fun profile(
+        id: Long,
+        groupId: Long,
+        name: String,
+        userOrder: Int,
+        latencyMs: Int = -1,
+    ): ProxyProfile =
+        ProxyProfile(
+            id = id,
+            groupId = groupId,
+            name = name,
+            beanBlob = KryoSerializer.serialize(
+                VLESSBean().apply {
+                    serverAddress = "$name.example.com"
+                    serverPort = 443
+                    type = "tcp"
+                },
+            ),
+            protocolType = 0,
+            userOrder = userOrder,
+            latencyMs = latencyMs,
+        )
+
+    private fun chainStep(profileId: Long, userOrder: Int): ProxyChainStep =
+        ProxyChainStep(
+            profileId = profileId,
+            userOrder = userOrder,
+        )
+
+    private inner class Harness(
+        initialPreferences: Preferences = mutablePreferencesOf(),
+        initialGroups: List<SubscriptionGroup> = emptyList(),
+        initialProfiles: List<ProxyProfile> = emptyList(),
+        initialChain: List<ProxyChainStep> = emptyList(),
+    ) {
+        val prefsFlow = MutableStateFlow(initialPreferences)
+        val groupsFlow = MutableStateFlow(initialGroups)
+        val profilesFlow = MutableStateFlow(initialProfiles)
+        val chainFlow = MutableStateFlow(initialChain)
+        val insertedGroups = mutableListOf<SubscriptionGroup>()
+        val probeCalls = mutableListOf<String>()
+        val viewModel: SingboxEngineSettingsViewModel
+        val appContext: Context
+        val groupDao: SubscriptionGroupDao
+        val profileDao: RecordingProxyProfileDao
+        val chainDao: RecordingProxyChainDao
+        val groupSeeder: GroupSeeder
+
+        private var nextGroupId = 1L
+
+        init {
+            appContext = mockk(relaxed = true)
+            groupSeeder = mockk(relaxed = true)
+            coEvery { groupSeeder.seedPresets(any()) } returns Unit
+            groupDao = object : SubscriptionGroupDao {
+                override fun getAllFlow(): Flow<List<SubscriptionGroup>> = groupsFlow
+
+                override suspend fun getAll(): List<SubscriptionGroup> = groupsFlow.value
+
+                override suspend fun getById(id: Long): SubscriptionGroup? = groupsFlow.value.find { it.id == id }
+
+                override suspend fun getByUrl(url: String): SubscriptionGroup? = null
+
+                override suspend fun getBuiltins(): List<SubscriptionGroup> = emptyList()
+
+                override suspend fun count(): Int = groupsFlow.value.size
+
+                override suspend fun insert(group: SubscriptionGroup): Long {
+                    insertedGroups += group
+                    val id = if (group.id == 0L) nextGroupId++ else group.id
+                    groupsFlow.value = groupsFlow.value + group.copy(id = id)
+                    return id
+                }
+
+                override suspend fun update(group: SubscriptionGroup) = Unit
+
+                override suspend fun delete(group: SubscriptionGroup) {
+                    groupsFlow.value = groupsFlow.value.filterNot { it.id == group.id }
+                }
+            }
+            profileDao = RecordingProxyProfileDao(profilesFlow)
+            chainDao = RecordingProxyChainDao(chainFlow)
+            val probeService = SingboxProbeService(
+                profileDao = profileDao,
+                dataStore = dataStore(),
+                profileProbe = RecordingProfileProbe(probeCalls),
+            )
+            viewModel = SingboxEngineSettingsViewModel(
+                appContext = appContext,
+                dataStore = dataStore(),
+                groupDao = groupDao,
+                profileDao = profileDao,
+                proxyChainDao = chainDao,
+                rawUpdater = mockk(relaxed = true),
+                groupSeeder = groupSeeder,
+                probeService = probeService,
+            )
+        }
+
+        fun startStateCollection() {
+            CoroutineScope(Dispatchers.Main).launch {
+                viewModel.state.collect { }
+            }
+        }
+
+        private fun dataStore(): DataStore<Preferences> =
+            object : DataStore<Preferences> {
+                override val data: Flow<Preferences> = prefsFlow
+
+                override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences {
+                    val updated = transform(prefsFlow.value)
+                    prefsFlow.value = updated
+                    return updated
+                }
+            }
+    }
+
+    private inner class RecordingProxyProfileDao(
+        private val flow: MutableStateFlow<List<ProxyProfile>>,
+    ) : ProxyProfileDao {
+        val insertedProfiles = mutableListOf<ProxyProfile>()
+
+        override fun getAllFlow(): Flow<List<ProxyProfile>> = flow
+
+        override fun getByGroupIdFlow(groupId: Long): Flow<List<ProxyProfile>> =
+            MutableStateFlow(flow.value.filter { it.groupId == groupId })
+
+        override suspend fun getByGroupId(groupId: Long): List<ProxyProfile> =
+            flow.value.filter { it.groupId == groupId }
+
+        override suspend fun getById(id: Long): ProxyProfile? = flow.value.find { it.id == id }
+
+        override suspend fun insert(profile: ProxyProfile): Long {
+            insertedProfiles += profile
+            val id = if (profile.id == 0L) (flow.value.maxOfOrNull { it.id } ?: 0L) + 1 else profile.id
+            flow.value = flow.value + profile.copy(id = id)
+            return id
+        }
+
+        override suspend fun insertAll(profiles: List<ProxyProfile>) {
+            insertedProfiles += profiles
+            flow.value = flow.value + profiles.mapIndexed { index, profile ->
+                profile.copy(
+                    id = if (profile.id ==
+                        0L
+                    ) {
+                        (flow.value.maxOfOrNull { it.id } ?: 0L) + index + 1
+                    } else {
+                        profile.id
+                    }
+                )
+            }
+        }
+
+        override suspend fun deleteByGroupId(groupId: Long) {
+            flow.value = flow.value.filterNot { it.groupId == groupId }
+        }
+
+        override suspend fun updateLatency(id: Long, latency: Int) = Unit
+
+        override suspend fun countByGroupId(groupId: Long): Int = flow.value.count { it.groupId == groupId }
+
+        override suspend fun update(profile: ProxyProfile) = Unit
+
+        override suspend fun delete(profile: ProxyProfile) {
+            flow.value = flow.value.filterNot { it.id == profile.id }
+        }
+    }
+
+    private inner class RecordingProxyChainDao(
+        private val flow: MutableStateFlow<List<ProxyChainStep>>,
+    ) : ProxyChainDao {
+        val replaceCalls = mutableListOf<List<Long>>()
+
+        override fun getAllFlow(): Flow<List<ProxyChainStep>> = flow
+
+        override suspend fun getAll(): List<ProxyChainStep> = flow.value
+
+        override suspend fun clear() {
+            flow.value = emptyList()
+        }
+
+        override suspend fun insertAll(steps: List<ProxyChainStep>) {
+            flow.value = steps
+        }
+
+        suspend fun lastReplace(): List<Long> = replaceCalls.last()
+
+        override suspend fun replace(profileIds: List<Long>) {
+            replaceCalls += profileIds
+            flow.value = profileIds.mapIndexed { index, profileId ->
+                ProxyChainStep(profileId = profileId, userOrder = index)
+            }
+        }
+    }
+
+    private class RecordingProfileProbe(
+        private val calls: MutableList<String>,
+    ) : SingboxProfileProbe {
+        override suspend fun probeLatencyMs(bean: AbstractBean): Int {
+            calls += bean.serverAddress
+            return 1
+        }
+    }
+}

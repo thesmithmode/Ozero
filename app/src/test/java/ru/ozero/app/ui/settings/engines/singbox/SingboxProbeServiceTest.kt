@@ -151,6 +151,72 @@ class SingboxProbeServiceTest {
         assertEquals(42, dao.latencies[2L])
     }
 
+    @Test
+    fun `probeAndAutoSelect with empty profiles leaves prefs and latencies unchanged`() = runTest {
+        val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
+        val dataStore = flowDataStore(prefsFlow)
+        val dao = FakeProxyProfileDao()
+
+        SingboxProbeService(dao, dataStore, FakeProfileProbe(emptyMap())).probeAndAutoSelect(emptyList())
+
+        assertTrue(dao.latencies.isEmpty())
+        assertNull(prefsFlow.value[selectedProfileKey])
+        assertNull(prefsFlow.value[beanKey])
+    }
+
+    @Test
+    fun `probeAndAutoSelect leaves selection unset when all probes fail`() = runTest {
+        val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
+        val dataStore = flowDataStore(prefsFlow)
+        val dao = FakeProxyProfileDao()
+        val first = makeProfile(id = 1L, host = "first.example", port = 443)
+        val second = makeProfile(id = 2L, host = "second.example", port = 443)
+
+        SingboxProbeService(dao, dataStore, FakeProfileProbe(emptyMap())).probeAndAutoSelect(listOf(first, second))
+
+        assertEquals(SingboxProbeService.LATENCY_FAILED, dao.latencies[1L])
+        assertEquals(SingboxProbeService.LATENCY_FAILED, dao.latencies[2L])
+        assertNull(prefsFlow.value[selectedProfileKey])
+        assertNull(prefsFlow.value[beanKey])
+    }
+
+    @Test
+    fun `probeAndAutoSelect selects fastest successful profile and writes bean blob`() = runTest {
+        val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
+        val dataStore = flowDataStore(prefsFlow)
+        val dao = FakeProxyProfileDao()
+        val slower = makeProfile(id = 1L, host = "slow.example", port = 443)
+        val faster = makeProfile(id = 2L, host = "fast.example", port = 443)
+
+        SingboxProbeService(
+            dao,
+            dataStore,
+            FakeProfileProbe(mapOf("slow.example:443" to 100, "fast.example:443" to 10)),
+        ).probeAndAutoSelect(listOf(slower, faster))
+
+        assertEquals(2L, prefsFlow.value[selectedProfileKey])
+        assertTrue(faster.beanBlob.contentEquals(prefsFlow.value[beanKey]))
+        assertEquals(10, dao.latencies[2L])
+    }
+
+    @Test
+    fun `probeAndAutoSelect reports testing false when runtime skip short-circuits profile`() = runTest {
+        val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
+        val dataStore = flowDataStore(prefsFlow)
+        val dao = FakeProxyProfileDao()
+        val events = mutableListOf<Pair<Long, Boolean>>()
+        val profile = makeProfile(id = 5L, host = "busy.example", port = 443)
+
+        SingboxProbeService(
+            dao,
+            dataStore,
+            FakeProfileProbe(mapOf("busy.example:443" to LATENCY_SKIPPED_ACTIVE_RUNTIME)),
+        ).probeAndAutoSelect(listOf(profile)) { id, testing -> events += id to testing }
+
+        assertEquals(listOf(5L to true, 5L to false), events)
+        assertTrue(dao.latencies.isEmpty())
+    }
+
     private fun makeProfile(
         id: Long,
         host: String,

@@ -117,10 +117,18 @@ class DataStoreUrnetworkConfigStore(
 
     private fun UrnetworkConfig.withNormalizedCachedLocations(): UrnetworkConfig =
         copy(
-            cachedCountries = cachedCountries.map { it.copy(countryCode = it.countryCode?.uppercase()) }.take(MAX_CACHED_LOCATIONS),
-            cachedRegions = cachedRegions.map { it.copy(countryCode = it.countryCode?.uppercase()) }.take(MAX_CACHED_LOCATIONS),
-            cachedCities = cachedCities.map { it.copy(countryCode = it.countryCode?.uppercase()) }.take(MAX_CACHED_LOCATIONS),
-            cachedBestMatches = cachedBestMatches.map { it.copy(countryCode = it.countryCode?.uppercase()) }.take(MAX_CACHED_LOCATIONS),
+            cachedCountries = cachedCountries.map {
+                it.copy(countryCode = it.countryCode?.uppercase())
+            }.take(MAX_CACHED_LOCATIONS),
+            cachedRegions = cachedRegions.map {
+                it.copy(countryCode = it.countryCode?.uppercase())
+            }.take(MAX_CACHED_LOCATIONS),
+            cachedCities = cachedCities.map {
+                it.copy(countryCode = it.countryCode?.uppercase())
+            }.take(MAX_CACHED_LOCATIONS),
+            cachedBestMatches = cachedBestMatches.map {
+                it.copy(countryCode = it.countryCode?.uppercase())
+            }.take(MAX_CACHED_LOCATIONS),
         )
 
     private companion object {
