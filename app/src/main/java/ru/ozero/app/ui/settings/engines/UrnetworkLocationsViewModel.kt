@@ -170,7 +170,7 @@ class UrnetworkLocationsViewModel @Inject constructor(
                         }
                     } else {
                         teardownLocationsVc()
-                        if (hasCachedLocations()) {
+                        if (hasCachedLocations(allCountries, allRegions, allCities, allBestMatches)) {
                             _uiState.update { current ->
                                 if (current is UrnetworkSettingsUiState.Ready) {
                                     current.copy(providePaused = true)

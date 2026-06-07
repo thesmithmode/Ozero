@@ -11,6 +11,7 @@ import ru.ozero.singboxfmt.ShadowsocksBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
+import ru.ozero.singboxsubscription.parser.RawShareLinksParser
 import ru.ozero.singboxroom.entity.SubscriptionGroup
 import java.util.Base64
 import javax.net.ssl.SSLHandshakeException
@@ -345,5 +346,34 @@ class RawUpdaterTest {
 
         assertEquals(firstId, secondId)
         assertTrue(!firstProfile.beanBlob.contentEquals(profileDao.profiles.first().beanBlob))
+    }
+
+    @Test
+    fun `should not reuse the same existing id for duplicate stable matches`() = runBlocking {
+        val duplicate1 =
+            "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@dup.example.com:443?type=tcp&security=none#Dup"
+        val duplicate2 =
+            "vless://bbbbbbbb-2222-2222-2222-bbbbbbbbbbbb@dup.example.com:443?type=tcp&security=none#Dup"
+        server.enqueue(MockResponse().setBody("$duplicate1\n$duplicate2"))
+        val g = group()
+
+        profileDao.profiles.add(
+            ru.ozero.singboxroom.entity.ProxyProfile(
+                id = 77L,
+                groupId = g.id,
+                name = "Dup",
+                beanBlob = ru.ozero.singboxfmt.KryoSerializer.serialize(
+                    RawShareLinksParser.parse(duplicate1).single(),
+                ),
+                protocolType = RawUpdater.PROTOCOL_VLESS,
+            ),
+        )
+
+        rawUpdater.refresh(g)
+
+        val ids = profileDao.profiles.map { it.id }
+        assertEquals(2, profileDao.profiles.size)
+        assertEquals(2, ids.toSet().size)
+        assertTrue(profileDao.profiles.any { it.id == 77L })
     }
 }

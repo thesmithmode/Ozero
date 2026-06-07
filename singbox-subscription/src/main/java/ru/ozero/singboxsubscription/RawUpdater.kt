@@ -53,9 +53,10 @@ class RawUpdater(
                 val existingProfiles = profileDao.getByGroupId(group.id)
                 val existingByStableIdentity = existingProfiles
                     .groupBy { it.stableIdentityKey() }
+                    .mapValues { (_, matches) -> matches.toMutableList() }
                 val profilesWithStableIds = profiles.map { profile ->
                     val stableKey = profile.stableIdentityKey()
-                    val matched = existingByStableIdentity[stableKey].orEmpty().firstOrNull()
+                    val matched = existingByStableIdentity[stableKey]?.removeFirstOrNull()
                     if (matched != null) {
                         profile.copy(id = matched.id)
                     } else {

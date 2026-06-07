@@ -235,7 +235,10 @@ class AppBackupSerializerTest {
         assertEquals(7, json.intOrNull("int"))
         assertEquals(1.5f, json.floatOrNull("float"))
         assertEquals(true, json.booleanOrNull("bool"))
+        assertEquals(false, JSONObject().put("bool", false).booleanOrNull("bool"))
         assertEquals(null, json.intOrNull("missing"))
+        assertEquals(null, JSONObject().floatOrNull("missing"))
+        assertEquals(null, JSONObject().booleanOrNull("missing"))
     }
 
     @Test

@@ -39,7 +39,7 @@ class EnginePluginDefaultsTest {
         )
         assertEquals(
             IpProbeRoute.StaticLocation("Provider", "NL", "203.0.113.1"),
-            FakePlugin(ExitNodeStrategy.ProviderLabel("Provider", "NL", "203.0.113.1")).ipProbeRoute(1080),
+            FakePlugin(ExitNodeStrategy.ProviderLabel("Provider", ip = "203.0.113.1", countryCode = "NL")).ipProbeRoute(1080),
         )
         assertEquals(IpProbeRoute.AutoSelected, FakePlugin(ExitNodeStrategy.AutoSelected()).ipProbeRoute(1080))
         assertEquals(

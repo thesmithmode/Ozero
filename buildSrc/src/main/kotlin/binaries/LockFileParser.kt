@@ -33,10 +33,16 @@ object LockFileParser {
             else -> value.toString()
         }
 
-        @Suppress("UNCHECKED_CAST")
-        val rawArtifacts = (raw["artifacts"] as? List<Map<String, Any?>>).orEmpty()
-
-        val artifacts = rawArtifacts.mapIndexed { i, m -> parseArtifact(m, i, path) }
+        val rawArtifacts = raw["artifacts"]
+        val artifacts = when (rawArtifacts) {
+            null -> emptyList()
+            is List<*> -> rawArtifacts.mapIndexed { i, item ->
+                val map = item as? Map<String, Any?>
+                    ?: throw LockFileException("Artifact #$i must be a YAML map in $path")
+                parseArtifact(map, i, path)
+            }
+            else -> throw LockFileException("Lock file artifacts must be a YAML list in $path")
+        }
 
         val dupName = artifacts.groupBy { it.name }.entries.firstOrNull { it.value.size > 1 }?.key
         if (dupName != null) {

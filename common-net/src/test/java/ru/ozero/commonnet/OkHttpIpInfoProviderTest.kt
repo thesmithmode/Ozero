@@ -8,7 +8,9 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.io.IOException
+import java.util.concurrent.CancellationException
 import java.util.concurrent.TimeUnit
+import javax.net.SocketFactory
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
@@ -161,6 +163,45 @@ class OkHttpIpInfoProviderTest {
         server.enqueue(MockResponse().setResponseCode(200).setBody("""{"ip":"2.2.2.2"}"""))
         val info = provider.fetchVia(socksHost = "127.0.0.1", socksPort = 0).getOrThrow()
         assertEquals("2.2.2.2", info.ip)
+    }
+
+    @Test
+    fun fetchViaSocketFactoryNullUsesDefaultClient() = runTest {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"ip":"3.3.3.3"}"""))
+        val info = provider.fetchViaSocketFactory(null).getOrThrow()
+        assertEquals("3.3.3.3", info.ip)
+    }
+
+    @Test
+    fun fetchViaSocketFactoryNonNullUsesProvidedFactory() = runTest {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"ip":"4.4.4.4"}"""))
+        val factory = SocketFactory.getDefault()
+        val info = provider.fetchViaSocketFactory(factory).getOrThrow()
+        assertEquals("4.4.4.4", info.ip)
+    }
+
+    @Test
+    fun parseFallsBackToLegacyCountryFields() {
+        val info = parse(
+            """{"ip":"1.2.3.4","country":"Germany","country_iso":"DE"}""",
+            99L,
+        )
+        assertEquals("Germany", info.country)
+        assertEquals("DE", info.countryCode)
+    }
+
+    @Test
+    fun fetchPropagatesCancellationException() = runTest {
+        val throwingClient = OkHttpClient.Builder()
+            .addInterceptor { throw CancellationException("cancelled") }
+            .build()
+        val throwingProvider = OkHttpIpInfoProvider(
+            client = throwingClient,
+            endpoint = server.url("/json/").toString(),
+            clock = { 1L },
+        )
+
+        assertTrue(kotlin.runCatching { throwingProvider.fetch() }.exceptionOrNull() is CancellationException)
     }
 
     @Test

@@ -28,6 +28,7 @@ class WarpTurnOnResultTest {
             val restored = roundTrip(original)
 
             assertEquals(9, restored.handle)
+            assertEquals(1, restored.describeContents())
             assertEquals(3, WarpTurnOnResult.CREATOR.newArray(3).size)
             runCatching { restored.socketV4?.close() }
             runCatching { restored.socketV6?.close() }

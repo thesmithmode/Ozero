@@ -119,6 +119,21 @@ class DnsMessageTest {
     }
 
     @Test
+    fun parseAAnswersStopsOnPointerLoopGuard() {
+        val body = ByteArray(12 + 2 + 4) {
+            0
+        }.also {
+            it[2] = 0x81.toByte()
+            it[3] = 0x80.toByte()
+            it[5] = 1
+            it[7] = 1
+            it[12] = 0xC0.toByte()
+            it[13] = 12
+        }
+        assertTrue(DnsMessage.parseAAnswers(body).isEmpty())
+    }
+
+    @Test
     fun `buildAQuery бросает IllegalArgumentException на label больше 63 байт`() {
         val tooLong = "a".repeat(64) + ".com"
         val e = kotlin.runCatching { DnsMessage.buildAQuery(tooLong) }.exceptionOrNull()

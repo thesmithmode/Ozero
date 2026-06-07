@@ -455,4 +455,33 @@ class LockFileParserValidationTest {
         assertThatThrownBy { LockFileParser.parse(f) }
             .isInstanceOf(LockFileException::class.java)
     }
+
+    @Test
+    fun `reject non map artifact entries`() {
+        val f = write(
+            """
+            tag: binaries-x
+            generated_at: 2026-04-25T10:00:00Z
+            artifacts:
+              - not-a-map
+            """.trimIndent(),
+        )
+        assertThatThrownBy { LockFileParser.parse(f) }
+            .isInstanceOf(LockFileException::class.java)
+            .hasMessageContaining("Artifact #0")
+    }
+
+    @Test
+    fun `reject scalar artifacts field`() {
+        val f = write(
+            """
+            tag: binaries-x
+            generated_at: 2026-04-25T10:00:00Z
+            artifacts: not-a-list
+            """.trimIndent(),
+        )
+        assertThatThrownBy { LockFileParser.parse(f) }
+            .isInstanceOf(LockFileException::class.java)
+            .hasMessageContaining("artifacts")
+    }
 }

@@ -312,7 +312,8 @@ class SingboxEngineAutoSelectTest {
         val result = engine.buildProxyConfig(null)
 
         assertNotNull(result)
-        assertTrue(result.proxyMode)
-        assertTrue(result.beanBlob.contentEquals(blob))
+        val singbox = result as EngineConfig.Singbox
+        assertTrue(singbox.proxyMode)
+        assertTrue(singbox.beanBlob.contentEquals(blob))
     }
 }

@@ -22,7 +22,7 @@ class EngineWatchdogCoordinatorContractTest {
     }
 
     @Test
-    fun `handleEngineFailure fdAlive=false ведёт к stopVpnRequest, не lockdown (P33)`() {
+    fun `handleEngineFailure fdAlive=false ведёт к stopVpnRequest, не lockdown (P33) - default path`() {
         val body = source.substringAfter("fun handleEngineFailure(")
         assertTrue(
             body.contains("killswitchProvider() && hasBlockingTunForKillswitch()"),
@@ -183,7 +183,7 @@ class EngineWatchdogCoordinatorContractTest {
     }
 
     @Test
-    fun `handleEngineFailure fdAlive=false ведёт к stopVpnRequest, не lockdown (P33)`() {
+    fun `handleEngineFailure fdAlive=false ведёт к stopVpnRequest, не lockdown (P33) - blocking tun path`() {
         val body = source.substringAfter("fun handleEngineFailure(")
             .substringBefore("private fun enterKillswitchMode")
         assertTrue(
