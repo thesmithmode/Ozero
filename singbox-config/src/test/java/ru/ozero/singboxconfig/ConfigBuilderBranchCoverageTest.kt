@@ -254,20 +254,23 @@ class ConfigBuilderBranchCoverageTest {
 
     @Test
     fun `default outbound branches omit transport tls detour and probe socks`() {
-        val vmessJson = ConfigBuilder.buildSingboxConfig(vmess().apply {
+        val vmess = vmess().apply {
             type = "tcp"
             security = "none"
             encryption = ""
-        })
-        val trojanJson = ConfigBuilder.buildSingboxConfig(trojan().apply {
+        }
+        val trojan = trojan().apply {
             type = "tcp"
             security = "none"
-        })
+        }
+        val shadowsocks = shadowsocks().apply {
+            plugin = "v2ray-plugin"
+            pluginOpts = "mode=websocket"
+        }
+        val vmessJson = ConfigBuilder.buildSingboxConfig(vmess)
+        val trojanJson = ConfigBuilder.buildSingboxConfig(trojan)
         val shadowsocksJson = ConfigBuilder.buildChainConfig(
-            bean = shadowsocks().apply {
-                plugin = "v2ray-plugin"
-                pluginOpts = "mode=websocket"
-            },
+            bean = shadowsocks,
             socksPort = 2091,
             upstream = ConfigBuilder.Upstream("127.0.0.1", 1080),
         )
@@ -287,9 +290,10 @@ class ConfigBuilderBranchCoverageTest {
 
     @Test
     fun `json string escapes carriage return tab backspace and form feed`() {
-        val json = ConfigBuilder.buildSingboxConfig(vless().apply {
+        val bean = vless().apply {
             serverAddress = "srv\r\t\b${12.toChar()}.example.com"
-        })
+        }
+        val json = ConfigBuilder.buildSingboxConfig(bean)
 
         assertContains(json, """srv\r\t\b\f.example.com""")
     }
@@ -335,7 +339,7 @@ class ConfigBuilderBranchCoverageTest {
 
     @Test
     fun `vmess and trojan emit transport and tls optional branches`() {
-        val vmessJson = ConfigBuilder.buildSingboxConfig(vmess().apply {
+        val vmess = vmess().apply {
             type = "ws"
             path = ""
             host = ""
@@ -345,14 +349,16 @@ class ConfigBuilderBranchCoverageTest {
             sni = "vmess.example.com"
             allowInsecure = false
             utlsFingerprint = ""
-        })
-        val trojanJson = ConfigBuilder.buildSingboxConfig(trojan().apply {
+        }
+        val trojan = trojan().apply {
             type = "grpc"
             grpcServiceName = "trojan-service"
             security = "tls"
             host = "front.example.com;other.example.com"
             sni = ""
-        })
+        }
+        val vmessJson = ConfigBuilder.buildSingboxConfig(vmess)
+        val trojanJson = ConfigBuilder.buildSingboxConfig(trojan)
 
         assertContains(vmessJson, "\"type\":\"ws\"")
         assertContains(vmessJson, "\"path\":\"/\"")
@@ -369,14 +375,16 @@ class ConfigBuilderBranchCoverageTest {
 
     @Test
     fun `empty security and plugin option edges omit optional blocks`() {
-        val emptySecurityJson = ConfigBuilder.buildSingboxConfig(vless().apply {
+        val emptySecurity = vless().apply {
             security = ""
             host = ""
-        })
-        val pluginOptsWithoutPluginJson = ConfigBuilder.buildSingboxConfig(shadowsocks().apply {
+        }
+        val pluginOptsWithoutPlugin = shadowsocks().apply {
             plugin = ""
             pluginOpts = "mode=websocket"
-        })
+        }
+        val emptySecurityJson = ConfigBuilder.buildSingboxConfig(emptySecurity)
+        val pluginOptsWithoutPluginJson = ConfigBuilder.buildSingboxConfig(pluginOptsWithoutPlugin)
 
         assertFalse(emptySecurityJson.contains("\"tls\""))
         assertFalse(pluginOptsWithoutPluginJson.contains("\"plugin\""))

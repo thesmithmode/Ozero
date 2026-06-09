@@ -7,23 +7,20 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import org.json.JSONArray
 import org.json.JSONObject
 
 class DataStoreUrnetworkConfigStore(
     private val dataStore: DataStore<Preferences>,
 ) : UrnetworkConfigStore {
-    private val latest = MutableStateFlow(UrnetworkConfig())
-
-    override fun config(): Flow<UrnetworkConfig> = latest.asStateFlow()
+    override fun config(): Flow<UrnetworkConfig> =
+        dataStore.data.map { readConfig(it).withNormalizedCachedLocations() }
 
     override suspend fun update(transform: (UrnetworkConfig) -> UrnetworkConfig) {
         dataStore.edit { prefs ->
             val next = transform(readConfig(prefs))
             writeConfig(prefs, next)
-            latest.value = next.withNormalizedCachedLocations()
         }
     }
 

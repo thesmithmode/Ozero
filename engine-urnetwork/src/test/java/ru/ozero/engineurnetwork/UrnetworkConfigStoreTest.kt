@@ -423,6 +423,42 @@ class UrnetworkConfigStoreTest {
     }
 
     @Test
+    fun `config first after process recreation emits persisted values without update`() = runTest {
+        val (store, ds) = newStore()
+        store.update {
+            it.copy(
+                walletOverride = "wallet-override",
+                byJwt = "by.jwt",
+                byClientJwt = "client.jwt",
+                devicePubkey = "device-pubkey",
+                deviceNetworkName = "device-network",
+                windowType = UrnetworkWindowType.SPEED,
+                fixedIpSize = true,
+                allowDirect = false,
+                provideEnabled = false,
+                provideControlMode = UrnetworkProvideControlMode.AUTO,
+                provideNetworkMode = UrnetworkProvideNetworkMode.ALL,
+                selectedLocation = UrnetworkLocationSelection("DE", "Bavaria", "Munich"),
+            )
+        }
+
+        val snap = DataStoreUrnetworkConfigStore(ds).config().first()
+
+        assertEquals("wallet-override", snap.walletOverride)
+        assertEquals("by.jwt", snap.byJwt)
+        assertEquals("client.jwt", snap.byClientJwt)
+        assertEquals("device-pubkey", snap.devicePubkey)
+        assertEquals("device-network", snap.deviceNetworkName)
+        assertEquals(UrnetworkWindowType.SPEED, snap.windowType)
+        assertEquals(true, snap.fixedIpSize)
+        assertEquals(false, snap.allowDirect)
+        assertEquals(false, snap.provideEnabled)
+        assertEquals(UrnetworkProvideControlMode.AUTO, snap.provideControlMode)
+        assertEquals(UrnetworkProvideNetworkMode.ALL, snap.provideNetworkMode)
+        assertEquals(UrnetworkLocationSelection("DE", "Bavaria", "Munich"), snap.selectedLocation)
+    }
+
+    @Test
     fun `blank persisted optional values are treated as absent after reload`() = runTest {
         val (_, ds) = newStore()
         ds.editRaw(
