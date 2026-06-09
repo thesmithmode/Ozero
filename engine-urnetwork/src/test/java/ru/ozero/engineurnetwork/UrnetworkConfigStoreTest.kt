@@ -504,6 +504,88 @@ class UrnetworkConfigStoreTest {
         }
     }
 
+    @Test
+    fun `line cached locations preserve escaped tabs newlines and backslashes`() = runTest {
+        val (store, ds) = newStore()
+        val original = UrnetworkCachedLocation(
+            name = "Name\twith\nslashes\\",
+            countryCode = "de",
+            region = "Region\tA",
+            city = "City\nB",
+            providerCount = 7,
+            isStable = false,
+            isStrongPrivacy = true,
+        )
+
+        store.setCachedLocations(listOf(original), emptyList(), emptyList(), emptyList())
+        val reloaded = DataStoreUrnetworkConfigStore(ds).config().first().cachedCountries.single()
+
+        assertEquals("Name\twith\nslashes\\", reloaded.name)
+        assertEquals("DE", reloaded.countryCode)
+        assertEquals("Region\tA", reloaded.region)
+        assertEquals("City\nB", reloaded.city)
+        assertEquals(7, reloaded.providerCount)
+        assertEquals(false, reloaded.isStable)
+        assertEquals(true, reloaded.isStrongPrivacy)
+    }
+
+    @Test
+    fun `line cached locations skip invalid rows and keep valid rows`() = runTest {
+        val (_, ds) = newStore()
+        ds.editRaw(
+            "urnetwork_cached_countries" to listOf(
+                "",
+                "MissingCode",
+                "Short\tD",
+                "Good\tde\t\tBerlin\t9\tfalse\ttrue",
+                "BadProviders\tus\t\t\tNaN\tbad\tbad",
+            ).joinToString("\n"),
+        )
+
+        val cached = DataStoreUrnetworkConfigStore(ds).config().first().cachedCountries
+
+        assertEquals(2, cached.size)
+        assertEquals("Good", cached[0].name)
+        assertEquals("DE", cached[0].countryCode)
+        assertEquals(9, cached[0].providerCount)
+        assertEquals(false, cached[0].isStable)
+        assertEquals(true, cached[0].isStrongPrivacy)
+        assertEquals("BadProviders", cached[1].name)
+        assertEquals("US", cached[1].countryCode)
+        assertEquals(0, cached[1].providerCount)
+        assertEquals(true, cached[1].isStable)
+        assertEquals(false, cached[1].isStrongPrivacy)
+    }
+
+    @Test
+    fun `line cached locations are capped during raw reload`() = runTest {
+        val (_, ds) = newStore()
+        val raw = (1..510).joinToString("\n") { index -> "L$index\tus" }
+
+        ds.editRaw("urnetwork_cached_best_matches" to raw)
+
+        val cached = DataStoreUrnetworkConfigStore(ds).config().first().cachedBestMatches
+        assertEquals(500, cached.size)
+        assertEquals("L1", cached.first().name)
+        assertEquals("L500", cached.last().name)
+    }
+
+    @Test
+    fun `invalid persisted enum raw values fall back to defaults`() = runTest {
+        val (_, ds) = newStore()
+        ds.editRaw(
+            "urnetwork_window_type" to "bad-window",
+            "urnetwork_provide_control_mode" to "bad-control",
+            "urnetwork_provide_network_mode" to "bad-network",
+        )
+
+        val snap = DataStoreUrnetworkConfigStore(ds).config().first()
+
+        assertEquals(UrnetworkWindowType.AUTO, snap.windowType)
+        assertEquals(UrnetworkProvideControlMode.ALWAYS, snap.provideControlMode)
+        assertEquals(UrnetworkProvideNetworkMode.WIFI, snap.provideNetworkMode)
+    }
+
     private class FakePreferencesDataStore : DataStore<Preferences> {
         private val state = MutableStateFlow<Preferences>(emptyPreferences())
         override val data: Flow<Preferences> get() = state
