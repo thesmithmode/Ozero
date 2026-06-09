@@ -163,6 +163,21 @@ class SingboxEngineSettingsViewModelCoverageTest {
     }
 
     @Test
+    fun `explicit add group name is trimmed and user order follows current groups`() = runTest {
+        val harness = Harness(initialGroups = listOf(group(id = 7L, userOrder = 0)))
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onAddGroupFieldChanged(name = "  Work  ", url = " https://example.com/work ")
+        harness.viewModel.onAddGroupConfirm()
+        advanceUntilIdle()
+
+        assertEquals("Work", harness.insertedGroups.single().name)
+        assertEquals("https://example.com/work", harness.insertedGroups.single().subscriptionUrl)
+        assertEquals(1, harness.insertedGroups.single().userOrder)
+    }
+
+    @Test
     fun `manual links dialog show and hide preserve then reset fields`() = runTest {
         val harness = Harness()
         harness.startStateCollection()
@@ -441,6 +456,20 @@ class SingboxEngineSettingsViewModelCoverageTest {
     }
 
     @Test
+    fun `onCancel can clear only ping state and keep refresh marker`() = runTest {
+        val harness = Harness(initialGroups = listOf(group(id = 1L, userOrder = 0)))
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onRefresh(1L)
+        harness.viewModel.onCancel(ping = true, refresh = false)
+        advanceUntilIdle()
+
+        assertTrue(harness.viewModel.state.value.isPinging.isEmpty())
+        assertTrue(harness.viewModel.state.value.testingProfileIds.isEmpty())
+    }
+
+    @Test
     fun `restore defaults reads preset asset and clears restore error`() = runTest {
         val harness = Harness()
         every { harness.appContext.assets.open("singbox/preset_groups.json") } returns ByteArrayInputStream(
@@ -491,6 +520,22 @@ class SingboxEngineSettingsViewModelCoverageTest {
         assertTrue(harness.viewModel.state.value.showAddManualLinksDialog)
         assertEquals("not a proxy link", harness.viewModel.state.value.manualLinksInput)
         assertEquals("Imported", harness.viewModel.state.value.manualLinksGroupName)
+        assertEquals("parse", harness.viewModel.state.value.manualLinksError)
+    }
+
+    @Test
+    fun `import from file invalid text without filename uses blank group name and truncates input`() = runTest {
+        val harness = Harness()
+        val text = "x".repeat(2_100)
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onImportFromFile(text, null)
+        advanceUntilIdle()
+
+        assertTrue(harness.viewModel.state.value.showAddManualLinksDialog)
+        assertEquals(2_000, harness.viewModel.state.value.manualLinksInput.length)
+        assertEquals("", harness.viewModel.state.value.manualLinksGroupName)
         assertEquals("parse", harness.viewModel.state.value.manualLinksError)
     }
 
@@ -564,6 +609,22 @@ class SingboxEngineSettingsViewModelCoverageTest {
     }
 
     @Test
+    fun `onRefresh without group refreshes all groups`() = runTest {
+        val harness = Harness(
+            initialGroups = listOf(group(id = 1L, userOrder = 0), group(id = 2L, userOrder = 1)),
+        )
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onRefresh()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { harness.rawUpdater.refresh(match { it.id == 1L }) }
+        coVerify(exactly = 1) { harness.rawUpdater.refresh(match { it.id == 2L }) }
+        assertTrue(harness.viewModel.state.value.isRefreshing.isEmpty())
+    }
+
+    @Test
     fun `onRefresh stores thrown updater error and still refreshes visible group profiles`() = runTest {
         val harness = Harness(
             initialGroups = listOf(group(id = 1L, userOrder = 0)),
@@ -602,6 +663,41 @@ class SingboxEngineSettingsViewModelCoverageTest {
 
         assertEquals("protocols", harness.insertedGroups.single().name)
         assertEquals(listOf(0, 1, 2, 3), harness.profileDao.insertedProfiles.map { it.protocolType })
+    }
+
+    @Test
+    fun `onAutoSelectBest skips probe when no profiles exist`() = runTest {
+        val harness = Harness(initialGroups = listOf(group(id = 1L, userOrder = 0)))
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onAutoSelectBest()
+        advanceUntilIdle()
+
+        assertTrue(harness.probeCalls.isEmpty())
+        assertFalse(harness.viewModel.state.value.isAutoSelecting)
+    }
+
+    @Test
+    fun `onAutoSelectBest probes all groups and refreshes expanded profiles`() = runTest {
+        val harness = Harness(
+            initialGroups = listOf(group(id = 1L, userOrder = 0), group(id = 2L, userOrder = 1)),
+            initialProfiles = listOf(
+                profile(id = 101L, groupId = 1L, name = "One", userOrder = 0),
+                profile(id = 201L, groupId = 2L, name = "Two", userOrder = 0),
+            ),
+        )
+        harness.startStateCollection()
+        advanceUntilIdle()
+        harness.viewModel.onGroupExpand(1L)
+        advanceUntilIdle()
+
+        harness.viewModel.onAutoSelectBest()
+        advanceUntilIdle()
+
+        assertEquals(listOf("One.example.com", "Two.example.com"), harness.probeCalls)
+        assertEquals(listOf(101L), harness.viewModel.state.value.groupProfiles.getValue(1L).map { it.id })
+        assertFalse(harness.viewModel.state.value.isAutoSelecting)
     }
 
     private fun group(id: Long, userOrder: Int): SubscriptionGroup =

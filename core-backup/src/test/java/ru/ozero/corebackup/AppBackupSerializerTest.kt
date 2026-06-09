@@ -313,6 +313,41 @@ class AppBackupSerializerTest {
     }
 
     @Test
+    fun `deserialize uses defaults when optional sections are absent`() {
+        val data = AppBackupSerializer.deserialize("""{"version":${AppBackupData.CURRENT_VERSION}}""")
+
+        assertEquals(AppBackupData.CURRENT_VERSION, data.version)
+        assertEquals("", data.exportedAt)
+        assertEquals(BackupUrnetwork(), data.urnetwork)
+        assertEquals(emptyList(), data.warpSlots)
+        assertEquals(emptyList(), data.splitRules)
+        assertEquals(null, data.strategy)
+    }
+
+    @Test
+    fun `deserialize split rule defaults isExcluded to false`() {
+        val data = AppBackupSerializer.deserialize(
+            """
+            {
+              "version": ${AppBackupData.CURRENT_VERSION},
+              "splitRules": [
+                {"packageName": "com.example.default"},
+                {"packageName": "com.example.excluded", "isExcluded": true}
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(
+            listOf(
+                BackupSplitRule("com.example.default", isExcluded = false),
+                BackupSplitRule("com.example.excluded", isExcluded = true),
+            ),
+            data.splitRules,
+        )
+    }
+
+    @Test
     fun `deserialize rejects unsupported versions and malformed json`() {
         val tooOld = assertFailsWith<AppBackupSerializer.BackupParseException> {
             AppBackupSerializer.deserialize("""{"version":0}""")

@@ -19,6 +19,7 @@ class DataStoreFptnConfigStore(
 
     @Volatile
     private var latest = FptnConfig()
+
     @Volatile
     private var loaded = false
 

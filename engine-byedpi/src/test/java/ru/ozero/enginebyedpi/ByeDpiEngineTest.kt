@@ -209,6 +209,17 @@ class ByeDpiEngineTest {
     }
 
     @Test
+    fun buildHostsArgs_trimsHostsAndDropsBlankEntries() {
+        val args = engine.buildHostsArgs(
+            EngineConfig.ByeDpi(
+                hostsMode = HostsMode.WHITELIST,
+                hosts = listOf(" youtube.com ", "", "   ", "discord.com"),
+            ),
+        )
+        assertEquals(listOf("-H:youtube.com discord.com"), args)
+    }
+
+    @Test
     fun buildHostsArgs_blacklistMode_addsHflagAndAn() {
         val args = engine.buildHostsArgs(
             EngineConfig.ByeDpi(
@@ -229,6 +240,23 @@ class ByeDpiEngineTest {
             ),
         ).toList()
         assertTrue(args.contains("-H:youtube.com"))
+    }
+
+    @Test
+    fun buildArgs_splitsWhitespaceArgsAndKeepsHostArgsAfterExtraFlags() {
+        val args = engine.buildArgs(
+            EngineConfig.ByeDpi(
+                args = "  -Ku   -a1\t-An  ",
+                socksPort = 1080,
+                hostsMode = HostsMode.BLACKLIST,
+                hosts = listOf("ads.example.com"),
+            ),
+        ).toList()
+
+        assertEquals(
+            listOf("--ip", "127.0.0.1", "-p", "1080", "-Ku", "-a1", "-An", "-H:ads.example.com", "-An"),
+            args,
+        )
     }
 
     @Test
@@ -301,6 +329,24 @@ class ByeDpiEngineTest {
     fun exitNodeStrategyReturnsDirectHttpWhenPortGivenExplicitly() = runTest {
         val strategy = engine.exitNodeStrategy(socksPort = 1080)
         assertIs<ExitNodeStrategy.DirectHttp>(strategy)
+    }
+
+    @Test
+    fun exitNodeStrategyUnavailableBeforeStartWhenNoPortProvided() = runTest {
+        val strategy = engine.exitNodeStrategy(socksPort = 0)
+        val unavailable = assertIs<ExitNodeStrategy.Unavailable>(strategy)
+        assertTrue(unavailable.reason.contains("ByeDPI"))
+    }
+
+    @Test
+    fun startFailureWhenNativeLibraryIsMissing() = runTest {
+        every { ByeDpiProxy.libraryLoaded } returns false
+        every { ByeDpiProxy.loadError } returns "missing"
+
+        val result = engine.start(EngineConfig.ByeDpi(socksPort = 1080))
+
+        val failure = assertIs<StartResult.Failure>(result)
+        assertTrue(failure.reason.contains("missing"))
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)

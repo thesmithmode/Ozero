@@ -215,6 +215,56 @@ class EngineWatchdogKillswitchIntegrationTest {
         }
 
     @Test
+    fun `handleEngineFailure treats probing without engine id as active startup failure`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val controller = TunnelController()
+            controller.onProbing()
+
+            val stopVpnCount = AtomicReference(0)
+            val watchdog = buildWatchdog(
+                controller = controller,
+                scope = CoroutineScope(UnconfinedTestDispatcher() + SupervisorJob()),
+                killswitch = false,
+                tunFd = null,
+                stopVpnInvocations = stopVpnCount,
+            )
+
+            val handled = watchdog.handleEngineFailure(EngineId.WARP, "startup probe failed")
+
+            assertFalse(handled)
+            assertEquals(1, stopVpnCount.get())
+            val state = controller.state.value
+            assertIs<TunnelState.Failed>(state)
+            assertEquals(EngineId.WARP, state.engineId)
+        }
+
+    @Test
+    fun `handleEngineFailure ignores failure for different engine after failed state`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val controller = TunnelController()
+            controller.onProbing(EngineId.WARP)
+            controller.onConnecting(EngineId.WARP)
+            controller.onEngineDied(EngineId.WARP, "first failure")
+
+            val stopVpnCount = AtomicReference(0)
+            val watchdog = buildWatchdog(
+                controller = controller,
+                scope = CoroutineScope(UnconfinedTestDispatcher() + SupervisorJob()),
+                killswitch = false,
+                tunFd = null,
+                stopVpnInvocations = stopVpnCount,
+            )
+
+            val handled = watchdog.handleEngineFailure(EngineId.BYEDPI, "sidecar failure")
+
+            assertFalse(handled)
+            assertEquals(0, stopVpnCount.get())
+            val state = controller.state.value
+            assertIs<TunnelState.Failed>(state)
+            assertEquals(EngineId.WARP, state.engineId)
+        }
+
+    @Test
     fun `handleEngineFailure killswitch=false вЂ” observer РІРёРґРёС‚ Failed РЅРѕ РќР• killswitchActive`() =
         runTest(UnconfinedTestDispatcher()) {
             val controller = TunnelController()
