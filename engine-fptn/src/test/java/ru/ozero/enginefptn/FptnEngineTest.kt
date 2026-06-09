@@ -4,15 +4,19 @@ import android.util.Base64
 import io.mockk.every
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.ExitNodeStrategy
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
+import ru.ozero.enginescore.TunAttachResult
+import ru.ozero.enginescore.TunSpec
 import ru.ozero.enginescore.Upstream
 import java.io.File
 import kotlin.test.assertEquals
@@ -54,6 +58,52 @@ class FptnEngineTest {
         assertEquals(false, caps.supportsUpstreamSocks)
         assertEquals(true, caps.supportsTcp)
         assertEquals(true, caps.supportsUdp)
+    }
+
+    @Test
+    fun `stats starts with zero counters`() = runTest {
+        val stats = engine.stats().first()
+
+        assertEquals(0L, stats.bytesIn)
+        assertEquals(0L, stats.bytesOut)
+        assertEquals(0, stats.activeConnections)
+    }
+
+    @Test
+    fun `tunSpec exposes blocking full tunnel contract`() = runTest {
+        val spec = assertIs<TunSpec>(engine.tunSpec())
+
+        assertEquals("FPTN", spec.sessionName)
+        assertEquals(1500, spec.mtu)
+        assertEquals(true, spec.blocking)
+        assertEquals("10.10.0.1", spec.ipv4Address)
+        assertEquals("fd00::1", spec.ipv6Address)
+        assertEquals(true, spec.routeAllV4)
+        assertEquals(false, spec.routeAllV6)
+    }
+
+    @Test
+    fun `exitNodeStrategy is unavailable before authenticated start`() = runTest {
+        val strategy = engine.exitNodeStrategy(0)
+
+        val unavailable = assertIs<ExitNodeStrategy.Unavailable>(strategy)
+        assertTrue(unavailable.reason.contains("FPTN"))
+    }
+
+    @Test
+    fun `attachTun fails before start`() = runTest {
+        val result = engine.attachTun(42)
+
+        val failure = assertIs<TunAttachResult.Failure>(result)
+        assertTrue(failure.reason.contains("not started", ignoreCase = true))
+    }
+
+    @Test
+    fun `awaitReady times out before attachTun creates native handle`() = runTest {
+        val result = engine.awaitReady()
+
+        val timeout = assertIs<EnginePlugin.ReadyResult.Timeout>(result)
+        assertTrue(timeout.reason.contains("handle", ignoreCase = true))
     }
 
     @Test
@@ -174,6 +224,19 @@ class FptnEngineTest {
         )
 
         assertEquals(emptyList(), result)
+    }
+
+    @Test
+    fun `manual mode without selected server has no candidates`() {
+        val tokenData = tokenData(server("S1"))
+
+        val result = engine.selectServerCandidates(
+            EngineConfig.Fptn(autoSelect = false, selectedServerName = null),
+            tokenData,
+        )
+
+        assertEquals(emptyList(), result)
+        assertNull(engine.selectServer(EngineConfig.Fptn(autoSelect = false, selectedServerName = null), tokenData))
     }
 
     @Test

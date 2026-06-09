@@ -5,6 +5,7 @@ import android.content.ContextWrapper
 import android.content.Intent
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -18,6 +19,7 @@ import ru.ozero.commonvpn.OzeroVpnService
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.EngineRuntimeConfigProvider
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
@@ -27,6 +29,31 @@ import kotlin.test.assertTrue
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class RuntimeConfigRestartCoordinatorTest {
+
+    @Test
+    fun `start subscribes observer once and restarts connected engine on runtime change`() = runTest {
+        val startServiceActions = mutableListOf<String?>()
+        val changes = MutableStateFlow<Any?>("baseline")
+        val tunnelController = TunnelController()
+        tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820))
+        val coordinator = RuntimeConfigRestartCoordinator(
+            context = recordingContext(startServiceActions) {
+                tunnelController.setState(TunnelState.Disconnecting)
+                launch { tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820)) }
+            },
+            observer = EngineRuntimeConfigRestartObserver(setOf(runtimeProvider(EngineId.WARP, changes))),
+            tunnelController = tunnelController,
+        )
+
+        coordinator.start(backgroundScope)
+        coordinator.start(backgroundScope)
+        runCurrent()
+        changes.value = "changed"
+        runCurrent()
+
+        assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), startServiceActions)
+        assertFalse(coordinator.restartInProgress())
+    }
 
     @Test
     fun `restart returns false and does not start service when tunnel is idle`() = runTest {
@@ -322,5 +349,14 @@ class RuntimeConfigRestartCoordinatorTest {
         @Suppress("UNCHECKED_CAST")
         val flow = field.get(this) as kotlinx.coroutines.flow.MutableStateFlow<TunnelState>
         flow.value = state
+    }
+
+    private fun runtimeProvider(
+        engineId: EngineId,
+        changes: MutableStateFlow<Any?>,
+    ): EngineRuntimeConfigProvider = object : EngineRuntimeConfigProvider {
+        override val engineId: EngineId = engineId
+        override val changes = changes
+        override val restartReason: String = "runtime changed"
     }
 }

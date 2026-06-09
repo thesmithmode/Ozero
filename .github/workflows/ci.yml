@@ -151,7 +151,7 @@ jobs:
       - test-engines-urnetwork-byedpi
       - test-core-modules
       - test-singbox-and-extra-modules
-    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
+    if: ${{ always() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))) }}
     permissions:
       contents: read
 
