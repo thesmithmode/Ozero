@@ -48,7 +48,7 @@ object LockFileParser {
                     path,
                 )
             }
-            else -> throw LockFileException("Field 'artifacts' must be a YAML list in $path")
+            else -> emptyList()
         }
 
         val dupName = artifacts.groupBy { it.name }.entries.firstOrNull { it.value.size > 1 }?.key

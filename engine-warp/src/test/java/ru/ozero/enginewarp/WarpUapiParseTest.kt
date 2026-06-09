@@ -1,13 +1,20 @@
 package ru.ozero.enginewarp
 
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 import java.io.BufferedReader
+import java.io.File
 import java.io.StringReader
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class WarpUapiParseTest {
+
+    @Test
+    fun `readState returns null when uapi socket is absent`(@TempDir tmp: File) {
+        assertNull(WarpUapi.readState(tmp.absolutePath, "ozero-warp"))
+    }
 
     @Test
     fun `parseReply aggregates traffic and newest handshake age`() {

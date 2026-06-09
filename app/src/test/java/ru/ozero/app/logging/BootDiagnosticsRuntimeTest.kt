@@ -67,4 +67,51 @@ class BootDiagnosticsRuntimeTest {
         assertTrue(seen.any { it.startsWith("prev:boot:kaboom") })
         assertFalse(seen.isEmpty())
     }
+
+    @Test
+    fun `installUncaughtHandler is idempotent and keeps first crash sink`() {
+        val seen = AtomicInteger(0)
+        BootDiagnostics.installUncaughtHandler { _, _ -> seen.addAndGet(1) }
+        BootDiagnostics.installUncaughtHandler { _, _ -> seen.addAndGet(100) }
+
+        Thread.getDefaultUncaughtExceptionHandler()
+            .uncaughtException(Thread("boot"), IllegalStateException("boom"))
+
+        assertEquals(1, seen.get())
+    }
+
+    @Test
+    fun `extractAsciiStrings keeps printable runs at threshold`() {
+        val bytes = byteArrayOf(
+            0x01,
+            'a'.code.toByte(),
+            'b'.code.toByte(),
+            'c'.code.toByte(),
+            0x00,
+            '1'.code.toByte(),
+            '2'.code.toByte(),
+            '3'.code.toByte(),
+            '4'.code.toByte(),
+            0x7F,
+            'x'.code.toByte(),
+            'y'.code.toByte(),
+            'z'.code.toByte(),
+        )
+
+        val strings = BootDiagnostics.extractAsciiStrings(bytes, minLen = 3)
+
+        assertEquals("abc\n1234\nxyz", strings)
+    }
+
+    @Test
+    fun `extractAsciiStrings returns empty when runs shorter than minimum`() {
+        val strings = BootDiagnostics.extractAsciiStrings("ab\u0000cd".toByteArray(), minLen = 3)
+
+        assertEquals("", strings)
+    }
+
+    @Test
+    fun `signalToString falls back for unknown signal`() {
+        assertEquals("signal=99", BootDiagnostics.signalToString(99))
+    }
 }

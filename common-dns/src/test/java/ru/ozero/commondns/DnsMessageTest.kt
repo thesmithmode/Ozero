@@ -73,6 +73,18 @@ class DnsMessageTest {
     }
 
     @Test
+    fun parseAAnswersIgnoresARecordWithUnexpectedRdataLength() {
+        val body = byteArrayOf(
+            0, 0, 0x81.toByte(), 0x80.toByte(), 0, 1, 0, 1, 0, 0, 0, 0,
+            1, 'a'.code.toByte(), 0,
+            0, 1, 0, 1,
+            0xC0.toByte(), 0x0C, 0, 1, 0, 1, 0, 0, 0, 60, 0, 3,
+            1, 2, 3,
+        )
+        assertTrue(DnsMessage.parseAAnswers(body).isEmpty())
+    }
+
+    @Test
     fun parseAAnswersExtractsIpv4FromCompressedAnswerName() {
         val body = byteArrayOf(
             0, 0, 0x81.toByte(), 0x80.toByte(), 0, 1, 0, 1, 0, 0, 0, 0,
@@ -158,6 +170,25 @@ class DnsMessageTest {
             it[7] = 1
             it[12] = 0xC0.toByte()
             it[13] = 12
+        }
+        assertTrue(DnsMessage.parseAAnswers(body).isEmpty())
+    }
+
+    @Test
+    fun parseAAnswersStopsWhenQuestionNameExceedsLoopGuard() {
+        val body = ByteArray(12 + 129 * 2 + 4) {
+            0
+        }.also {
+            it[2] = 0x81.toByte()
+            it[3] = 0x80.toByte()
+            it[5] = 1
+            it[7] = 1
+            var offset = 12
+            repeat(129) {
+                it[offset] = 1
+                it[offset + 1] = 'a'.code.toByte()
+                offset += 2
+            }
         }
         assertTrue(DnsMessage.parseAAnswers(body).isEmpty())
     }

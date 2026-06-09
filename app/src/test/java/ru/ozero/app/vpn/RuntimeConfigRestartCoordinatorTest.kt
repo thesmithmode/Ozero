@@ -3,6 +3,7 @@ package ru.ozero.app.vpn
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
@@ -67,6 +68,51 @@ class RuntimeConfigRestartCoordinatorTest {
     }
 
     @Test
+    fun `restart works from connecting state and preserves pending switch target`() = runTest {
+        val startServiceActions = mutableListOf<String?>()
+        val tunnelController = TunnelController()
+        tunnelController.setState(TunnelState.Connecting(EngineId.BYEDPI))
+        tunnelController.onSwitchingStarted(from = EngineId.WARP, to = EngineId.BYEDPI)
+        val context = recordingContext(startServiceActions) {
+            tunnelController.setState(TunnelState.Disconnecting)
+            launch {
+                tunnelController.setState(TunnelState.Connected(EngineId.BYEDPI, 1080))
+            }
+        }
+        val coordinator = coordinator(context, tunnelController)
+
+        val restarted = coordinator.restartVpnIfRunning("profile changed")
+        runCurrent()
+
+        assertTrue(restarted)
+        assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), startServiceActions)
+        assertTrue(tunnelController.switching.value == null)
+        assertTrue(coordinator.restartQueue().isEmpty())
+        assertFalse(coordinator.restartInProgress())
+    }
+
+    @Test
+    fun `restart works from probing state when restart reaches connecting`() = runTest {
+        val startServiceActions = mutableListOf<String?>()
+        val tunnelController = TunnelController()
+        tunnelController.setState(TunnelState.Probing(EngineId.FPTN))
+        val context = recordingContext(startServiceActions) {
+            tunnelController.setState(TunnelState.Disconnecting)
+            launch {
+                tunnelController.setState(TunnelState.Connecting(EngineId.FPTN))
+            }
+        }
+        val coordinator = coordinator(context, tunnelController)
+
+        val restarted = coordinator.restartVpnIfRunning("token changed")
+        runCurrent()
+
+        assertTrue(restarted)
+        assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), startServiceActions)
+        assertTrue(tunnelController.switching.value == null)
+    }
+
+    @Test
     fun `restart returns false and clears switching when restarted tunnel fails`() = runTest {
         val startServiceActions = mutableListOf<String?>()
         val tunnelController = TunnelController()
@@ -83,6 +129,31 @@ class RuntimeConfigRestartCoordinatorTest {
         runCurrent()
 
         assertFalse(restarted)
+        assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), startServiceActions)
+        assertTrue(coordinator.restartQueue().isEmpty())
+        assertFalse(coordinator.restartInProgress())
+        assertTrue(tunnelController.switching.value == null)
+    }
+
+    @Test
+    fun `restart times out waiting for start after stop signal`() = runTest {
+        val startServiceActions = mutableListOf<String?>()
+        val tunnelController = TunnelController()
+        tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820))
+        val coordinator = coordinator(
+            context = recordingContext(startServiceActions) {
+                tunnelController.setState(TunnelState.Disconnecting)
+            },
+            tunnelController = tunnelController,
+        )
+
+        val restart = launch {
+            assertFalse(coordinator.restartVpnIfRunning("settings changed"))
+        }
+        runCurrent()
+        advanceTimeBy(15_001)
+        restart.join()
+
         assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), startServiceActions)
         assertTrue(coordinator.restartQueue().isEmpty())
         assertFalse(coordinator.restartInProgress())
@@ -137,6 +208,50 @@ class RuntimeConfigRestartCoordinatorTest {
         runCatching { coordinator.restartVpnIfRunning("second-request") }
         assertEquals(2, startServiceActions.size)
         assertEquals(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG, startServiceActions.last())
+        assertTrue(coordinator.restartQueue().isEmpty())
+        assertFalse(coordinator.restartInProgress())
+    }
+
+    @Test
+    fun `queued restart is processed after first restart settles`() = runTest {
+        val startServiceActions = mutableListOf<String?>()
+        val tunnelController = TunnelController()
+        tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820))
+        val allowRestartStart = CompletableDeferred<Unit>()
+        var calls = 0
+        val coordinator = coordinator(
+            context = recordingContext(startServiceActions) {
+                calls += 1
+                tunnelController.setState(TunnelState.Disconnecting)
+                launch {
+                    allowRestartStart.await()
+                    tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820))
+                }
+            },
+            tunnelController = tunnelController,
+        )
+
+        val firstRestart = launch {
+            assertTrue(coordinator.restartVpnIfRunning("first-request"))
+        }
+        runCurrent()
+        val secondRestart = launch {
+            assertFalse(coordinator.restartVpnIfRunning("second-request"))
+        }
+        runCurrent()
+        allowRestartStart.complete(Unit)
+        runCurrent()
+        firstRestart.join()
+        secondRestart.join()
+
+        assertEquals(2, calls)
+        assertEquals(
+            listOf(
+                OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG,
+                OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG,
+            ),
+            startServiceActions,
+        )
         assertTrue(coordinator.restartQueue().isEmpty())
         assertFalse(coordinator.restartInProgress())
     }

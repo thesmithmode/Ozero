@@ -7,13 +7,16 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.ExitNodeStrategy
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
+import ru.ozero.enginescore.TunAttachResult
 import ru.ozero.enginescore.TunSpec
 import ru.ozero.enginescore.Upstream
 import ru.ozero.singboxroom.dao.ProxyChainDao
@@ -124,6 +127,81 @@ class SingboxEngineProbeTest {
         assertEquals(null, engine.privateField("pendingConfig"))
         assertEquals(false, engine.privateField("chainMode"))
         assertEquals(null, engine.privateField("proxy"))
+    }
+
+    @Test
+    fun `stop clears runtime state when remote stop throws`() = runTest {
+        val engine = buildEngine()
+        val process = mockk<ISingboxEngineProcess>()
+        every { process.stopAndWait(3_000L) } throws IllegalStateException("binder died")
+        engine.setPrivateField("proxy", process)
+        engine.setPrivateField("pendingConfig", "{}")
+        engine.setPrivateField("pendingSocksPort", 49408)
+        engine.setPrivateField("activeSocksPort", 49409)
+        engine.setPrivateField("chainMode", true)
+
+        engine.stop()
+
+        assertEquals(0, engine.privateIntField("pendingSocksPort"))
+        assertEquals(0, engine.privateIntField("activeSocksPort"))
+        assertEquals(null, engine.privateField("pendingConfig"))
+        assertEquals(false, engine.privateField("chainMode"))
+        assertEquals(null, engine.privateField("proxy"))
+    }
+
+    @Test
+    fun `attachTun fails immediately in chain mode`() = runTest {
+        val engine = buildEngine()
+        engine.setPrivateField("chainMode", true)
+
+        val result = engine.attachTun(42)
+
+        val failure = assertIs<TunAttachResult.Failure>(result)
+        assertTrue(failure.reason.contains("chain mode"))
+    }
+
+    @Test
+    fun `attachTun fails before start when no pending config`() = runTest {
+        val engine = buildEngine()
+
+        val result = engine.attachTun(42)
+
+        val failure = assertIs<TunAttachResult.Failure>(result)
+        assertTrue(failure.reason.contains("before start"))
+    }
+
+    @Test
+    fun `attachTun without connected process clears pending runtime state`() = runTest {
+        val engine = buildEngine()
+        engine.setPrivateField("pendingConfig", "{}")
+        engine.setPrivateField("pendingSocksPort", 49408)
+        engine.setPrivateField("activeSocksPort", 49409)
+
+        val result = engine.attachTun(42)
+
+        val failure = assertIs<TunAttachResult.Failure>(result)
+        assertTrue(failure.reason.contains("not connected"))
+        assertEquals(null, engine.privateField("pendingConfig"))
+        assertEquals(0, engine.privateIntField("pendingSocksPort"))
+        assertEquals(0, engine.privateIntField("activeSocksPort"))
+    }
+
+    @Test
+    fun `stats maps process counters to EngineStats`() = runTest {
+        val engine = buildEngine()
+        val process = mockk<ISingboxEngineProcess>()
+        every { process.stats } returns SingboxStats(
+            txTotal = 123L,
+            rxTotal = 456L,
+            activeConnections = 7,
+        )
+        engine.setPrivateField("proxy", process)
+
+        val stats = withTimeout(1_000L) { engine.stats().first() }
+
+        assertEquals(456L, stats.bytesIn)
+        assertEquals(123L, stats.bytesOut)
+        assertEquals(7, stats.activeConnections)
     }
 
     @Test

@@ -582,6 +582,69 @@ class UrnetworkLocationsViewModelTest {
         assertEquals("Bavaria", ready.selectedLocation?.region)
         assertEquals("Munich", ready.selectedLocation?.city)
     }
+
+    @Test
+    fun `setSearchQuery filters cached regions and cities independently`() = runTest {
+        val store = ru.ozero.engineurnetwork.InMemoryUrnetworkConfigStore(
+            UrnetworkConfig(
+                cachedRegions = listOf(
+                    UrnetworkCachedLocation(name = "Bavaria", countryCode = "DE", region = "Bavaria"),
+                    UrnetworkCachedLocation(name = "Saxony", countryCode = "DE", region = "Saxony"),
+                ),
+                cachedCities = listOf(
+                    UrnetworkCachedLocation(name = "Munich", countryCode = "DE", region = "Bavaria", city = "Munich"),
+                    UrnetworkCachedLocation(name = "Warsaw", countryCode = "PL", city = "Warsaw"),
+                ),
+            ),
+        )
+        val v = UrnetworkLocationsViewModel(
+            FakeUrnetworkBridge(deviceAvailable = false),
+            FakeSettingsRepo(),
+            store,
+            idleTunnel(),
+        )
+        advanceUntilIdle()
+
+        v.setSearchQuery("mun")
+        advanceUntilIdle()
+
+        val state = assertIs<UrnetworkSettingsUiState.Ready>(v.uiState.value)
+        assertEquals(emptyList(), state.regions)
+        assertEquals("Munich", state.cities.single().name)
+    }
+
+    @Test
+    fun `selectLocation null chooses best available when engine is active`() = runTest {
+        val bridge = FakeUrnetworkBridge(connected = true, initialLocation = FakeLocationToken("DE"))
+        val store = fakeUrnetworkConfigStoreWithJwt()
+        val v = UrnetworkLocationsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel())
+        advanceUntilIdle()
+
+        v.selectLocation(null)
+        advanceUntilIdle()
+
+        assertEquals(1, bridge.connectBestAvailableCallCount.get())
+        assertEquals(null, store.selectedLocation().first().countryCode)
+    }
+
+    @Test
+    fun `selectLocation custom token uses preferred location reconnect path`() = runTest {
+        val custom = UrnetworkCachedLocation(name = "Munich", countryCode = "DE", region = "Bavaria", city = "Munich")
+        val bridge = FakeUrnetworkBridge(connected = true, initialLocation = FakeLocationToken("US"))
+        val store = fakeUrnetworkConfigStoreWithJwt()
+        val v = UrnetworkLocationsViewModel(bridge, FakeSettingsRepo(), store, activeTunnel())
+        advanceUntilIdle()
+
+        v.selectLocation(custom)
+        advanceUntilIdle()
+
+        assertEquals(0, bridge.connectToCallCount.get())
+        assertEquals(1, bridge.connectPreferredLocationCallCount.get())
+        assertEquals("DE", bridge.lastPreferredLocation?.countryCode)
+        assertEquals("Bavaria", bridge.lastPreferredLocation?.region)
+        assertEquals("Munich", bridge.lastPreferredLocation?.city)
+    }
+
     private suspend fun TestScope.awaitReadyState(v: UrnetworkLocationsViewModel): UrnetworkSettingsUiState.Ready {
         repeat(10) {
             val state = v.uiState.value

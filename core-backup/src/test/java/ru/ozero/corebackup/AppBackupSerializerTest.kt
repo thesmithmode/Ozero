@@ -226,6 +226,77 @@ class AppBackupSerializerTest {
     }
 
     @Test
+    fun `backup categories detect every single settings bucket`() {
+        assertEquals(
+            setOf(BackupCategory.GENERAL_SETTINGS),
+            BackupCategory.availableIn(minimalBackupData.copy(settings = emptySettings(autoStart = true))),
+        )
+        assertEquals(
+            setOf(BackupCategory.DNS_HOSTS),
+            BackupCategory.availableIn(minimalBackupData.copy(settings = emptySettings(hostsList = "127.0.0.1 x"))),
+        )
+        assertEquals(
+            setOf(BackupCategory.BYEDPI),
+            BackupCategory.availableIn(minimalBackupData.copy(settings = emptySettings(bydpiDefaultAccepted = true))),
+        )
+        assertEquals(
+            setOf(BackupCategory.URNETWORK),
+            BackupCategory.availableIn(minimalBackupData.copy(settings = emptySettings(urnetworkCountryCode = "DE"))),
+        )
+        assertEquals(
+            setOf(BackupCategory.STRATEGY),
+            BackupCategory.availableIn(minimalBackupData.copy(strategy = BackupStrategy())),
+        )
+        assertEquals(
+            emptySet(),
+            BackupCategory.availableIn(minimalBackupData),
+        )
+    }
+
+    @Test
+    fun `backup categories detect urnetwork nested fields independently`() {
+        assertEquals(
+            setOf(BackupCategory.URNETWORK),
+            BackupCategory.availableIn(minimalBackupData.copy(urnetwork = BackupUrnetwork(devicePubkey = "pub"))),
+        )
+        assertEquals(
+            setOf(BackupCategory.URNETWORK),
+            BackupCategory.availableIn(minimalBackupData.copy(urnetwork = BackupUrnetwork(fixedIpSize = false))),
+        )
+        assertEquals(
+            setOf(BackupCategory.URNETWORK),
+            BackupCategory.availableIn(
+                minimalBackupData.copy(
+                    urnetwork = BackupUrnetwork(selectedLocation = BackupUrnetworkLocation("DE", null, null)),
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun `warp serializer applies defaults for missing optional fields`() {
+        val json = JSONObject()
+            .put("id", "slot")
+            .put("name", "Slot")
+            .put("priv", "priv")
+            .put("peerPub", "peer")
+            .put("peerEndpoint", "1.2.3.4:2408")
+            .put("ifaceV4", "172.16.0.2/32")
+            .put("ifaceV6", "2606:4700:110::2/128")
+
+        val slot = BackupWarpSerializer.fromJson(json)
+
+        assertEquals(false, slot.isActive)
+        assertEquals("", slot.publicKey)
+        assertEquals("", slot.accountLicense)
+        assertEquals(1280, slot.mtu)
+        assertEquals(listOf("1.1.1.1", "1.0.0.1"), slot.dnsServers)
+        assertEquals(25, slot.keepaliveSeconds)
+        assertEquals(null, slot.awgS3)
+        assertEquals(null, slot.awgI1Hex)
+    }
+
+    @Test
     fun `json extension helpers keep optional primitives nullable`() {
         val json = JSONObject()
             .put("int", 7)
@@ -274,4 +345,26 @@ class AppBackupSerializerTest {
         assertTrue(tooLarge.message.orEmpty().contains("Backup file too large"))
         assertTrue(unreadable.message.orEmpty().contains("Failed to read backup payload"))
     }
+
+    private fun emptySettings(
+        autoStart: Boolean? = null,
+        hostsList: String? = null,
+        bydpiDefaultAccepted: Boolean? = null,
+        urnetworkCountryCode: String? = null,
+    ) = BackupSettings(
+        splitMode = null,
+        ipv6Enabled = null,
+        autoStart = autoStart,
+        manualEngine = null,
+        bydpiWinningArgs = null,
+        urnetworkEnabled = null,
+        urnetworkJwt = null,
+        customDnsServers = null,
+        hostsMode = null,
+        hostsList = hostsList,
+        uiLocaleTag = null,
+        appMode = null,
+        bydpiDefaultAccepted = bydpiDefaultAccepted,
+        urnetworkCountryCode = urnetworkCountryCode,
+    )
 }

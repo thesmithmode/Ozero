@@ -1,10 +1,12 @@
 package ru.ozero.enginebyedpi.strategy
 
+import java.io.File
+import org.json.JSONObject
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import java.io.File
 import kotlin.random.Random
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class GeneMemoryTest {
@@ -122,6 +124,54 @@ class GeneMemoryTest {
         val mem = GeneMemory(file)
         mem.save()
         assertFalse(file.exists() && file.readText().contains("\"wins\""))
+    }
+
+    @Test
+    fun `rawJson returns null for empty memory and JSON after record`() {
+        val mem = memory()
+        assertNull(mem.rawJson())
+
+        mem.record(listOf("-x"), fitness = 0.25)
+        val raw = mem.rawJson()
+
+        assertTrue(raw.orEmpty().contains("-x"), "rawJson must include persisted token: $raw")
+        assertTrue(raw.orEmpty().contains("\"trials\""), "rawJson must include trial count: $raw")
+    }
+
+    @Test
+    fun `importRawJson ignores empty JSON and keeps existing scores`() {
+        val mem = memory()
+        mem.record(listOf("-keep"), fitness = 1.0)
+        val before = meanSamples(mem, "-keep", SEED_DEFAULT)
+
+        mem.importRawJson("{}")
+        val after = meanSamples(mem, "-keep", SEED_DEFAULT)
+
+        assertTrue(before > 0.5)
+        assertTrue(after > 0.5, "empty import must not clear in-memory scores")
+    }
+
+    @Test
+    fun `load decays stale evidence but keeps token available`() {
+        val file = File(tempDir, "decay.json")
+        val oldMs = System.currentTimeMillis() - 2 * 86_400_000L
+        file.writeText(
+            JSONObject()
+                .put(
+                    "-old",
+                    JSONObject()
+                        .put("wins", 10.0)
+                        .put("trials", 10.0)
+                        .put("lastMs", oldMs),
+                )
+                .toString(),
+        )
+        val mem = GeneMemory(file)
+
+        mem.load()
+
+        assertTrue(mem.hasData())
+        assertTrue(meanSamples(mem, "-old", SEED_DEFAULT) > 0.5)
     }
 
     @Test

@@ -40,16 +40,50 @@ class ChainOrchestratorTimeoutAndCancellationTest {
         }
     }
 
+    @Test
+    fun `cancellation during start rolls back already started engines`() = runTest {
+        val started = SimplePlugin(EngineId.BYEDPI)
+        val cancelling = CancellingStartPlugin(EngineId.XRAY)
+        val orch = ChainOrchestrator(setOf(started, cancelling))
+
+        assertFailsWith<CancellationException> {
+            orch.start(
+                listOf(
+                    ChainStep(EngineId.BYEDPI, EngineConfig.ByeDpi(socksPort = 1080)),
+                    ChainStep(EngineId.XRAY, EngineConfig.Xray(configJson = "{}", socksPort = 10808)),
+                ),
+            )
+        }
+
+        assertEquals(1, started.stopCount)
+        assertEquals(emptyList(), orch.activeEngines())
+    }
+
+    @Test
+    fun `stop exception is swallowed and active list is cleared`() = runTest {
+        val throwing = ThrowingStopPlugin(EngineId.BYEDPI)
+        val orch = ChainOrchestrator(setOf(throwing))
+        orch.start(listOf(ChainStep(EngineId.BYEDPI, EngineConfig.ByeDpi(socksPort = 1080))))
+
+        orch.stop()
+
+        assertEquals(1, throwing.stopCount)
+        assertEquals(emptyList(), orch.activeEngines())
+    }
+
     private class SimplePlugin(
         override val id: EngineId,
     ) : EnginePlugin {
         override val capabilities = EngineCapabilities(true, false, false, false, false, true)
         var startCount = 0
+        var stopCount = 0
         override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
             startCount++
             return StartResult.Success(1080)
         }
-        override suspend fun stop() {}
+        override suspend fun stop() {
+            stopCount++
+        }
         override suspend fun probe(): ProbeResult = ProbeResult.Failure("n/a")
         override fun stats(): Flow<EngineStats> = flowOf(EngineStats())
     }
@@ -76,6 +110,32 @@ class ChainOrchestratorTimeoutAndCancellationTest {
         override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult = StartResult.Success(1080)
         override suspend fun stop() {
             throw CancellationException("cancelled")
+        }
+        override suspend fun probe(): ProbeResult = ProbeResult.Failure("n/a")
+        override fun stats(): Flow<EngineStats> = flowOf(EngineStats())
+    }
+
+    private class CancellingStartPlugin(
+        override val id: EngineId,
+    ) : EnginePlugin {
+        override val capabilities = EngineCapabilities(true, false, false, false, false, true)
+        override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
+            throw CancellationException("cancelled")
+        }
+        override suspend fun stop() = Unit
+        override suspend fun probe(): ProbeResult = ProbeResult.Failure("n/a")
+        override fun stats(): Flow<EngineStats> = flowOf(EngineStats())
+    }
+
+    private class ThrowingStopPlugin(
+        override val id: EngineId,
+    ) : EnginePlugin {
+        override val capabilities = EngineCapabilities(true, false, false, false, false, true)
+        var stopCount = 0
+        override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult = StartResult.Success(1080)
+        override suspend fun stop() {
+            stopCount++
+            error("stop failed")
         }
         override suspend fun probe(): ProbeResult = ProbeResult.Failure("n/a")
         override fun stats(): Flow<EngineStats> = flowOf(EngineStats())

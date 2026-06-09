@@ -70,6 +70,7 @@ class DataStoreUrnetworkConfigStore(
 
     private fun readLocationCache(raw: String?): List<UrnetworkCachedLocation> {
         if (raw.isNullOrBlank()) return emptyList()
+        readLocationCacheLines(raw)?.let { return it }
         return runCatching {
             val arr = JSONArray(raw)
             buildList {
@@ -95,21 +96,39 @@ class DataStoreUrnetworkConfigStore(
 
     private fun writeLocationCache(items: List<UrnetworkCachedLocation>): String? {
         if (items.isEmpty()) return null
-        val arr = JSONArray()
-        items.take(MAX_CACHED_LOCATIONS).forEach { loc ->
-            arr.put(
-                JSONObject().apply {
-                    put("name", loc.name)
-                    put("code", loc.countryCode)
-                    loc.region?.takeIf { it.isNotBlank() }?.let { put("region", it) }
-                    loc.city?.takeIf { it.isNotBlank() }?.let { put("city", it) }
-                    put("providers", loc.providerCount)
-                    put("stable", loc.isStable)
-                    put("privacy", loc.isStrongPrivacy)
-                },
-            )
+        return items.take(MAX_CACHED_LOCATIONS).joinToString("\n") { loc ->
+            listOf(
+                loc.name,
+                loc.countryCode.orEmpty(),
+                loc.region.orEmpty(),
+                loc.city.orEmpty(),
+                loc.providerCount.toString(),
+                loc.isStable.toString(),
+                loc.isStrongPrivacy.toString(),
+            ).joinToString("\t") { it.escapeCacheField() }
         }
-        return arr.toString()
+    }
+
+    private fun readLocationCacheLines(raw: String): List<UrnetworkCachedLocation>? {
+        if (raw.trimStart().startsWith("[")) return null
+        return raw.lineSequence()
+            .filter { it.isNotBlank() }
+            .mapNotNull { line ->
+                val fields = line.split('\t').map { it.unescapeCacheField() }
+                val name = fields.getOrNull(0)?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                val code = fields.getOrNull(1)?.takeIf { it.length == 2 } ?: return@mapNotNull null
+                UrnetworkCachedLocation(
+                    name = name,
+                    countryCode = code.uppercase(),
+                    region = fields.getOrNull(2)?.takeIf { it.isNotBlank() },
+                    city = fields.getOrNull(3)?.takeIf { it.isNotBlank() },
+                    providerCount = fields.getOrNull(4)?.toIntOrNull() ?: 0,
+                    isStable = fields.getOrNull(5)?.toBooleanStrictOrNull() ?: true,
+                    isStrongPrivacy = fields.getOrNull(6)?.toBooleanStrictOrNull() ?: false,
+                )
+            }
+            .take(MAX_CACHED_LOCATIONS)
+            .toList()
     }
 
     private fun UrnetworkConfig.withNormalizedCachedLocations(): UrnetworkConfig =
@@ -157,3 +176,29 @@ private fun MutablePreferences.writeOrRemove(key: Preferences.Key<String>, value
 
 private fun JSONObject.nullableString(key: String): String? =
     if (isNull(key)) null else optString(key).takeIf { it.isNotBlank() }
+
+private fun String.escapeCacheField(): String =
+    replace("\\", "\\\\").replace("\t", "\\t").replace("\n", "\\n")
+
+private fun String.unescapeCacheField(): String {
+    val out = StringBuilder(length)
+    var escaped = false
+    for (ch in this) {
+        if (escaped) {
+            out.append(
+                when (ch) {
+                    't' -> '\t'
+                    'n' -> '\n'
+                    else -> ch
+                },
+            )
+            escaped = false
+        } else if (ch == '\\') {
+            escaped = true
+        } else {
+            out.append(ch)
+        }
+    }
+    if (escaped) out.append('\\')
+    return out.toString()
+}

@@ -9,6 +9,11 @@ import kotlin.test.assertNull
 class WarpHandshakeUapiTest {
 
     @Test
+    fun `check returns false when uapi socket is absent`(@TempDir tmp: File) {
+        assertEquals(false, WarpHandshakeUapi.check(tmp.absolutePath, "ozero-warp"))
+    }
+
+    @Test
     fun `findUapiSocket предпочитает preferred имя если exists`(@TempDir tmp: File) {
         val sockets = File(tmp, "sockets").apply { mkdirs() }
         File(sockets, "ozero-warp.sock").createNewFile()
@@ -36,6 +41,40 @@ class WarpHandshakeUapiTest {
     fun `findUapiSocket null когда sockets пуст и legacy отсутствует`(@TempDir tmp: File) {
         File(tmp, "sockets").mkdirs()
         assertNull(WarpHandshakeUapi.findUapiSocket(tmp.absolutePath, "ozero-warp"))
+    }
+
+    @Test
+    fun `findUapiSocket ignores non sock files when choosing newest fallback`(@TempDir tmp: File) {
+        val sockets = File(tmp, "sockets").apply { mkdirs() }
+        File(sockets, "newest.txt").also {
+            it.createNewFile()
+            it.setLastModified(99_000L)
+        }
+        val socket = File(sockets, "tun1.sock").also {
+            it.createNewFile()
+            it.setLastModified(1_000L)
+        }
+
+        val found = WarpHandshakeUapi.findUapiSocket(tmp.absolutePath, "ozero-warp")
+
+        assertEquals(socket.absolutePath, found?.absolutePath)
+    }
+
+    @Test
+    fun `findUapiSocket prefers sockets directory over legacy even when legacy is newer`(@TempDir tmp: File) {
+        val sockets = File(tmp, "sockets").apply { mkdirs() }
+        val fallback = File(sockets, "tun1.sock").also {
+            it.createNewFile()
+            it.setLastModified(1_000L)
+        }
+        File(tmp, "ozero-warp.sock").also {
+            it.createNewFile()
+            it.setLastModified(99_000L)
+        }
+
+        val found = WarpHandshakeUapi.findUapiSocket(tmp.absolutePath, "ozero-warp")
+
+        assertEquals(fallback.absolutePath, found?.absolutePath)
     }
 
     @Test

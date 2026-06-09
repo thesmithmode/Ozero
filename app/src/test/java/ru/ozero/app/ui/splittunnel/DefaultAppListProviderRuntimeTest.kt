@@ -5,7 +5,11 @@ import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.ColorFilter
+import android.graphics.PixelFormat
 import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
 import android.os.Looper
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -38,8 +42,10 @@ class DefaultAppListProviderRuntimeTest {
         packageManager().removePackage("pkg.one")
         packageManager().removePackage("pkg.two")
         packageManager().removePackage("pkg.icon")
+        packageManager().removePackage("pkg.drawable")
         packageManager().removePackage("pkg.missing")
         packageManager().removePackage("pkg.added")
+        packageManager().removePackage("pkg.broadcast")
     }
 
     @Test
@@ -98,11 +104,45 @@ class DefaultAppListProviderRuntimeTest {
     }
 
     @Test
+    fun `loadIcon renders non bitmap drawable through canvas fallback`() = runTest {
+        val context = RuntimeEnvironment.getApplication()
+        val shadowPm = packageManager()
+        shadowPm.installPackage(packageInfo("pkg.drawable", "Drawable", system = false))
+        shadowPm.setApplicationIcon("pkg.drawable", SolidDrawable())
+        val provider = DefaultAppListProvider(context)
+
+        val icon = provider.loadIcon("pkg.drawable")
+
+        assertNotNull(icon)
+    }
+
+    @Test
     fun `loadIcon returns null and remembers missing package`() = runTest {
         val provider = DefaultAppListProvider(RuntimeEnvironment.getApplication())
 
         assertNull(provider.loadIcon("pkg.missing"))
         assertNull(provider.loadIcon("pkg.missing"))
+    }
+
+    @Test
+    fun `invalidate without package clears list cache but keeps icon cache`() = runTest {
+        val context = RuntimeEnvironment.getApplication()
+        val shadowPm = packageManager()
+        shadowPm.installPackage(packageInfo("pkg.icon", "Icon", system = false))
+        val bitmap = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+        shadowPm.setApplicationIcon("pkg.icon", BitmapDrawable(context.resources, bitmap))
+        val provider = DefaultAppListProvider(context)
+        val firstApps = provider.loadApps()
+        val firstIcon = provider.loadIcon("pkg.icon")
+
+        provider.invalidateForTest(null)
+        shadowPm.installPackage(packageInfo("pkg.added", "Added App", system = false))
+        val refreshed = provider.loadApps()
+        val cachedIcon = provider.loadIcon("pkg.icon")
+
+        assertEquals(listOf("pkg.icon"), firstApps.map { it.packageName })
+        assertTrue(refreshed.any { it.packageName == "pkg.added" })
+        assertTrue(firstIcon === cachedIcon)
     }
 
     @Test
@@ -147,6 +187,20 @@ class DefaultAppListProviderRuntimeTest {
         assertFalse(holdsInternetPermission(emptyArray()))
         assertFalse(holdsInternetPermission(arrayOf(Manifest.permission.ACCESS_NETWORK_STATE)))
         assertTrue(holdsInternetPermission(arrayOf(Manifest.permission.INTERNET)))
+    }
+
+    private fun DefaultAppListProvider.invalidateForTest(packageName: String?) {
+        val method = javaClass.getDeclaredMethod("invalidatePackage", String::class.java)
+        method.isAccessible = true
+        method.invoke(this, packageName)
+    }
+
+    private class SolidDrawable : Drawable() {
+        override fun draw(canvas: Canvas) = canvas.drawColor(android.graphics.Color.RED)
+        override fun setAlpha(alpha: Int) = Unit
+        override fun setColorFilter(colorFilter: ColorFilter?) = Unit
+        @Deprecated("Deprecated in Java")
+        override fun getOpacity(): Int = PixelFormat.OPAQUE
     }
 
     private fun packageInfo(

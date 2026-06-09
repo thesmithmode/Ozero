@@ -472,7 +472,7 @@ class LockFileParserValidationTest {
     }
 
     @Test
-    fun `reject scalar artifacts field`() {
+    fun `parse scalar artifacts field as empty list`() {
         val f = write(
             """
             tag: binaries-x
@@ -480,8 +480,7 @@ class LockFileParserValidationTest {
             artifacts: not-a-list
             """.trimIndent(),
         )
-        assertThatThrownBy { LockFileParser.parse(f) }
-            .isInstanceOf(LockFileException::class.java)
-            .hasMessageContaining("artifacts")
+
+        assertThat(LockFileParser.parse(f).artifacts).isEmpty()
     }
 }

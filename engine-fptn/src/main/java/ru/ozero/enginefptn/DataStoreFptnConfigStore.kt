@@ -7,8 +7,11 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
 
 class DataStoreFptnConfigStore(
     private val dataStore: DataStore<Preferences>,
@@ -16,18 +19,34 @@ class DataStoreFptnConfigStore(
 
     @Volatile
     private var latest = FptnConfig()
+    @Volatile
+    private var loaded = false
 
     override fun config(): Flow<FptnConfig> = dataStore.data.map { prefs ->
-        readConfig(prefs).also { latest = it }
+        readConfig(prefs).also {
+            latest = it
+            loaded = true
+        }
     }
 
-    override fun currentConfig(): FptnConfig = latest
+    override fun currentConfig(): FptnConfig {
+        if (!loaded) {
+            synchronized(this) {
+                if (!loaded) {
+                    latest = runBlocking(Dispatchers.IO) { dataStore.data.first().let(::readConfig) }
+                    loaded = true
+                }
+            }
+        }
+        return latest
+    }
 
     override suspend fun update(transform: (FptnConfig) -> FptnConfig) {
         dataStore.edit { prefs ->
             val next = transform(readConfig(prefs))
             writeConfig(prefs, next)
             latest = next
+            loaded = true
         }
     }
 

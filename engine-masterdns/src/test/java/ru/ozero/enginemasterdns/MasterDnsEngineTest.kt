@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePreflight
+import ru.ozero.enginescore.ExitNodeStrategy
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
@@ -58,6 +59,47 @@ class MasterDnsEngineTest {
     }
 
     @Test
+    fun `start passes socks upstream URL into runtime config`() = runTest {
+        val service = FakeService()
+        val engine = MasterDnsEngine(
+            serviceFactory = { service },
+            portAllocator = StubAllocator(18000),
+        )
+
+        engine.start(masterDnsConfig(), Upstream.Socks5("127.0.0.1", 1080))
+
+        assertEquals("socks5://127.0.0.1:1080", service.lastRuntime?.upstreamSocksUrl)
+    }
+
+    @Test
+    fun `start passes http upstream URL into runtime config`() = runTest {
+        val service = FakeService()
+        val engine = MasterDnsEngine(
+            serviceFactory = { service },
+            portAllocator = StubAllocator(18000),
+        )
+
+        engine.start(masterDnsConfig(), Upstream.Http("127.0.0.1", 8080))
+
+        assertEquals("http://127.0.0.1:8080", service.lastRuntime?.upstreamSocksUrl)
+    }
+
+    @Test
+    fun `start uses allocated port and resolvers in runtime config`() = runTest {
+        val service = FakeService(succeedWithPort = 19090)
+        val engine = MasterDnsEngine(
+            serviceFactory = { service },
+            portAllocator = StubAllocator(19090),
+        )
+
+        engine.start(masterDnsConfig(), Upstream.None)
+
+        assertEquals(19090, service.lastRuntime?.socksPort)
+        assertEquals(listOf("8.8.8.8"), service.lastRuntime?.resolvers)
+        assertEquals(null, service.lastRuntime?.upstreamSocksUrl)
+    }
+
+    @Test
     fun `start with failing service returns Failure`() = runTest {
         val service = FakeService(errorMessage = "boom")
         val engine = MasterDnsEngine(
@@ -70,12 +112,36 @@ class MasterDnsEngineTest {
     }
 
     @Test
+    fun `start failure does not activate exit node endpoint`() = runTest {
+        val service = FakeService(errorMessage = "boom")
+        val engine = MasterDnsEngine(
+            serviceFactory = { service },
+            portAllocator = StubAllocator(18000),
+        )
+
+        engine.start(masterDnsConfig(), Upstream.None)
+
+        assertTrue(engine.exitNodeStrategy(0) is ExitNodeStrategy.Unavailable)
+    }
+
+    @Test
     fun `stop delegates to service`() = runTest {
         val service = FakeService()
         val engine = makeEngine(service = service)
         engine.start(masterDnsConfig(), Upstream.None)
         engine.stop()
         assertTrue(service.stopped)
+    }
+
+    @Test
+    fun `stop resets active exit node port`() = runTest {
+        val service = FakeService(succeedWithPort = 18181)
+        val engine = makeEngine(service = service)
+        engine.start(masterDnsConfig(), Upstream.None)
+
+        engine.stop()
+
+        assertEquals(ExitNodeStrategy.ViaSocks("127.0.0.1", 19191), engine.exitNodeStrategy(19191))
     }
 
     @Test
@@ -112,6 +178,34 @@ class MasterDnsEngineTest {
         assertEquals(0L, stats.bytesIn)
         assertEquals(0L, stats.bytesOut)
         assertEquals(0, stats.activeConnections)
+    }
+
+    @Test
+    fun `exitNodeStrategy uses active port after successful start`() = runTest {
+        val engine = makeEngine(service = FakeService(succeedWithPort = 18181))
+        engine.start(masterDnsConfig(), Upstream.None)
+
+        val strategy = engine.exitNodeStrategy(0)
+
+        assertEquals(ExitNodeStrategy.ViaSocks("127.0.0.1", 18181), strategy)
+    }
+
+    @Test
+    fun `exitNodeStrategy falls back to supplied socks port before start`() = runTest {
+        val engine = makeEngine(service = FakeService())
+
+        val strategy = engine.exitNodeStrategy(19191)
+
+        assertEquals(ExitNodeStrategy.ViaSocks("127.0.0.1", 19191), strategy)
+    }
+
+    @Test
+    fun `exitNodeStrategy unavailable when no active or supplied port`() = runTest {
+        val engine = makeEngine(service = FakeService())
+
+        val strategy = engine.exitNodeStrategy(0)
+
+        assertTrue(strategy is ExitNodeStrategy.Unavailable)
     }
 
     @Test
@@ -169,6 +263,21 @@ class MasterDnsEngineTest {
     }
 
     @Test
+    fun `start asks allocator for requested socks port from config`() = runTest {
+        val allocator = RecordingAllocator(19090)
+        val service = FakeService(succeedWithPort = 19090)
+        val engine = MasterDnsEngine(
+            serviceFactory = { service },
+            portAllocator = allocator,
+        )
+
+        engine.start(masterDnsConfig(socksPort = 17777), Upstream.None)
+
+        assertEquals(17777, allocator.lastDesired)
+        assertEquals(19090, service.lastRuntime?.socksPort)
+    }
+
+    @Test
     fun `buildManualConfig default provider returns null — sentinel против silent breakage`() {
         val engine = MasterDnsEngine(
             serviceFactory = { FakeService() },
@@ -188,8 +297,22 @@ class MasterDnsEngineTest {
         socksPort = 18000,
     )
 
+    private fun masterDnsConfig(socksPort: Int) = EngineConfig.MasterDns(
+        configToml = "DOMAINS = [\"v.x\"]\n",
+        resolvers = listOf("8.8.8.8"),
+        socksPort = socksPort,
+    )
+
     private class StubAllocator(private val value: Int) : MasterDnsPortAllocator() {
         override fun allocate(desired: Int): Int = value
+    }
+
+    private class RecordingAllocator(private val value: Int) : MasterDnsPortAllocator() {
+        var lastDesired: Int? = null
+        override fun allocate(desired: Int): Int {
+            lastDesired = desired
+            return value
+        }
     }
 
     private class FakeService(
@@ -197,9 +320,11 @@ class MasterDnsEngineTest {
         private val errorMessage: String? = null,
     ) : MasterDnsClientServiceContract {
         var stopped: Boolean = false
+        var lastRuntime: MasterDnsRuntimeConfig? = null
         private val flow = MutableStateFlow<MasterDnsClientState>(MasterDnsClientState.Idle)
         override val state: StateFlow<MasterDnsClientState> = flow.asStateFlow()
         override fun start(runtime: MasterDnsRuntimeConfig) {
+            lastRuntime = runtime
             flow.value = MasterDnsClientState.Starting
             flow.value = if (errorMessage != null) {
                 MasterDnsClientState.Error(errorMessage)
