@@ -400,5 +400,4 @@ class RawUpdaterTest {
         assertEquals(2, ids.toSet().size)
         assertTrue(profileDao.profiles.any { it.id == 77L })
     }
-
 }
